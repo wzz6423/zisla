@@ -1,0 +1,13 @@
+# Shared workspace files
+.DS_Store
+
+# Web test artifacts
+/Web/.playwright/
+/Web/screenshots/
+
+# Future Windows build outputs
+/windows/[Bb]in/
+/windows/[Oo]bj/
+/windows/.vs/
+*.suo
+*.user

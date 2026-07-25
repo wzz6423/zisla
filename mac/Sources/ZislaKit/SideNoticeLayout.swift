@@ -1,0 +1,252 @@
+import CoreGraphics
+import ZislaCore
+
+public struct SideNoticePresentation: Equatable, Sendable {
+    public let activeAICount: Int
+    public let activeAINotice: IslandNotice?
+    public let activeMediaNotice: IslandNotice?
+    public let activeFocusCountdownNotice: IslandNotice?
+    public let activeToolboxNotice: IslandNotice?
+    public let ordinaryNotices: [IslandNotice]
+    public let panelSize: CGSize
+    public let compactWingsEnabled: Bool
+    public let compactWingHeight: CGFloat
+    public let compactPlaceholder: Bool
+
+    public init(
+        activeAICount: Int,
+        activeAINotice: IslandNotice? = nil,
+        activeMediaNotice: IslandNotice? = nil,
+        activeFocusCountdownNotice: IslandNotice? = nil,
+        activeToolboxNotice: IslandNotice? = nil,
+        ordinaryNotices: [IslandNotice],
+        panelSize: CGSize,
+        compactWingsEnabled: Bool = true,
+        compactWingHeight: CGFloat = 34,
+        compactPlaceholder: Bool = false
+    ) {
+        self.activeAICount = activeAICount
+        self.activeAINotice = activeAINotice
+        self.activeMediaNotice = activeMediaNotice
+        self.activeFocusCountdownNotice = activeFocusCountdownNotice
+        self.activeToolboxNotice = activeToolboxNotice
+        self.ordinaryNotices = ordinaryNotices
+        self.panelSize = panelSize
+        self.compactWingsEnabled = compactWingsEnabled
+        self.compactWingHeight = compactWingHeight
+        self.compactPlaceholder = compactPlaceholder
+    }
+
+    public var hasCompactContent: Bool {
+        activeAICount > 0 || activeMediaNotice != nil || activeFocusCountdownNotice != nil
+            || activeToolboxNotice != nil || compactPlaceholder
+    }
+
+    public var shouldExtendCompactBarForFocusCountdown: Bool {
+        activeMediaNotice == nil && activeFocusCountdownNotice != nil
+    }
+}
+
+public struct CompactBarContourMetrics: Equatable, Sendable {
+    public static let maximumTopInset: CGFloat = 14
+
+    public let topInset: CGFloat
+    public let bottomInset: CGFloat
+    public let bottomRadius: CGFloat
+    public let topWidth: CGFloat
+    public let bottomWidth: CGFloat
+
+    public init(size: CGSize) {
+        let width = max(0, size.width)
+        let height = max(0, size.height)
+        topInset = min(Self.maximumTopInset, width / 2)
+        bottomInset = 0
+        // Flat-top Dynamic-Island contour: a straight top edge that bleeds into
+        // the screen frame, and bottom corners flared with the same proportion
+        // (~40%) as the physical MacBook notch's bottom radius.
+        bottomRadius = min(12, height * 0.4)
+        topWidth = max(0, width - topInset * 2)
+        bottomWidth = width
+    }
+}
+
+public struct SideNoticeLayoutEngine: Equatable, Sendable {
+    private enum Layout {
+        static let compactWingWidth: CGFloat = 40
+        /// 倒计时长态对齐无刘海设备的 240pt 模拟岛宽，确保 `HH:MM:SS`
+        /// 不受刘海两侧圆角与遮罩挤压。
+        static let compactBarSideExtension: CGFloat = 40
+        static let defaultCompactWingHeight: CGFloat = 34
+        static let compactBarNavigationInset: CGFloat = 1
+        static let compactOverlap: CGFloat = 0
+        static let compactTopOverlap: CGFloat = 0
+        static let ordinaryWidth: CGFloat = 252
+        static let ordinaryRowHeight: CGFloat = 54
+        static let rowSpacing: CGFloat = 6
+        static let screenMargin: CGFloat = 8
+        static let ordinaryTopGap: CGFloat = 4
+    }
+
+    public init() {}
+
+    public func presentation(
+        for notices: [IslandNotice],
+        compactWingsEnabled: Bool = true,
+        compactWingHeight: CGFloat = 34,
+        reserveCompactWing: Bool = false
+    ) -> SideNoticePresentation {
+        let normalizedHeight = max(1, compactWingHeight)
+        let activeMediaNotice = compactWingsEnabled
+            ? notices.first(where: { $0.id.hasPrefix("media-active-") })
+            : nil
+        let activeFocusCountdownNotice = compactWingsEnabled
+            ? notices.first(where: { $0.id.hasPrefix("focus-countdown-") })
+            : nil
+        let activeAINotices = compactWingsEnabled
+            ? notices.filter { $0.id.hasPrefix("ai-active-") }
+            : []
+        let activeToolboxNotice = compactWingsEnabled
+            ? notices.first(where: { $0.id.hasPrefix("toolbox-reminder-") })
+            : nil
+        let activeAICount = activeAINotices.count
+        let ordinaryNotices = notices.filter {
+            !$0.id.hasPrefix("ai-active-")
+                && !$0.id.hasPrefix("media-active-")
+                && !$0.id.hasPrefix("focus-countdown-")
+                && !$0.id.hasPrefix("toolbox-reminder-")
+        }
+        let panelSize = panelSize(
+            activeAICount: activeAICount,
+            hasMedia: activeMediaNotice != nil,
+            hasFocusCountdown: activeFocusCountdownNotice != nil,
+            hasToolbox: activeToolboxNotice != nil,
+            ordinaryCount: ordinaryNotices.count,
+            compactWingHeight: normalizedHeight,
+            reserveCompactWing: compactWingsEnabled && reserveCompactWing
+        )
+        let compactPlaceholder = compactWingsEnabled
+            && reserveCompactWing
+            && activeAICount == 0
+            && activeMediaNotice == nil
+            && activeFocusCountdownNotice == nil
+            && activeToolboxNotice == nil
+        return SideNoticePresentation(
+            activeAICount: activeAICount,
+            activeAINotice: activeAINotices.first,
+            activeMediaNotice: activeMediaNotice,
+            activeFocusCountdownNotice: activeFocusCountdownNotice,
+            activeToolboxNotice: activeToolboxNotice,
+            ordinaryNotices: ordinaryNotices,
+            panelSize: panelSize,
+            compactWingsEnabled: compactWingsEnabled,
+            compactWingHeight: normalizedHeight,
+            compactPlaceholder: compactPlaceholder
+        )
+    }
+
+    public func supportsCompactWings(for screen: ScreenSnapshot) -> Bool {
+        ScreenLayoutEngine().layout(for: screen).topology.hasPhysicalNotch
+    }
+
+    public func compactWingHeight(for screen: ScreenSnapshot) -> CGFloat {
+        let layout = ScreenLayoutEngine().layout(for: screen)
+        guard layout.topology.hasPhysicalNotch else { return 0 }
+        return compactBarHeight(for: screen, anchor: layout.topology.anchorFrame)
+    }
+
+    public func compactBarFrame(
+        for screen: ScreenSnapshot,
+        extendsForFocusCountdown: Bool = false
+    ) -> CGRect {
+        let topology = ScreenLayoutEngine().layout(for: screen).topology
+        let anchor = topology.anchorFrame
+        let baseWidth: CGFloat
+        let height: CGFloat
+        if topology.hasPhysicalNotch {
+            let visibleWingWidth = Layout.compactWingWidth
+                + (extendsForFocusCountdown ? Layout.compactBarSideExtension : 0)
+                - Layout.compactOverlap
+            baseWidth = anchor.width + visibleWingWidth * 2
+            height = compactBarHeight(for: screen, anchor: anchor)
+        } else {
+            baseWidth = anchor.width
+            height = anchor.height
+        }
+        let width = min(screen.frame.width, baseWidth)
+        let idealX = anchor.midX - width / 2
+        let x = min(max(screen.frame.minX, idealX), screen.frame.maxX - width)
+        let topEdge = topology.hasPhysicalNotch ? screen.frame.maxY : anchor.maxY
+        return CGRect(
+            x: x,
+            y: topEdge - height,
+            width: width,
+            height: height
+        )
+    }
+
+    private func compactBarHeight(for screen: ScreenSnapshot, anchor: CGRect) -> CGFloat {
+        let navigationBarHeight = max(0, screen.topBarHeight)
+        let desiredHeight = max(
+            anchor.height,
+            navigationBarHeight - Layout.compactBarNavigationInset
+        )
+        return min(screen.frame.height, desiredHeight)
+    }
+
+    public func frame(
+        side: NoticeSide,
+        presentation: SideNoticePresentation,
+        screen: ScreenSnapshot
+    ) -> CGRect {
+        guard presentation.panelSize != .zero else { return .zero }
+        let layout = ScreenLayoutEngine().layout(for: screen)
+        let anchor = layout.topology.anchorFrame
+        if presentation.hasCompactContent,
+           !layout.topology.hasPhysicalNotch,
+           presentation.ordinaryNotices.isEmpty {
+            return .zero
+        }
+        let size = presentation.panelSize
+        let overlap = presentation.hasCompactContent && layout.topology.hasPhysicalNotch
+            ? Layout.compactOverlap
+            : 0
+        let idealX = side == .left
+            ? anchor.minX - size.width + overlap
+            : anchor.maxX - overlap
+        let minimumX = screen.frame.minX + Layout.screenMargin
+        let maximumX = max(minimumX, screen.frame.maxX - size.width - Layout.screenMargin)
+        let x = min(max(idealX, minimumX), maximumX)
+        let idealY = presentation.hasCompactContent
+            ? screen.frame.maxY - size.height + Layout.compactTopOverlap
+            : anchor.minY - Layout.ordinaryTopGap - size.height
+        let y = max(screen.frame.minY, idealY)
+
+        return CGRect(origin: CGPoint(x: x, y: y), size: size)
+    }
+
+    private func panelSize(
+        activeAICount: Int,
+        hasMedia: Bool,
+        hasFocusCountdown: Bool,
+        hasToolbox: Bool,
+        ordinaryCount: Int,
+        compactWingHeight: CGFloat,
+        reserveCompactWing: Bool
+    ) -> CGSize {
+        guard ordinaryCount > 0 else {
+            return activeAICount > 0 || hasMedia || hasFocusCountdown || hasToolbox || reserveCompactWing
+                ? CGSize(width: Layout.compactWingWidth, height: compactWingHeight)
+                : .zero
+        }
+
+        let ordinaryHeight = CGFloat(ordinaryCount) * Layout.ordinaryRowHeight
+        let ordinarySpacing = CGFloat(max(0, ordinaryCount - 1)) * Layout.rowSpacing
+        let compactHeight = activeAICount > 0 || hasMedia || hasFocusCountdown || hasToolbox || reserveCompactWing
+            ? compactWingHeight + Layout.rowSpacing
+            : 0
+        return CGSize(
+            width: Layout.ordinaryWidth,
+            height: compactHeight + ordinaryHeight + ordinarySpacing
+        )
+    }
+}

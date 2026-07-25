@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  Zisla — Developer ID notarization entitlements.
+
+  This file is intended for the Developer ID + notarization + Sparkle signed-update
+  path, NOT for Mac App Store submission. The app loads the private MediaRemote
+  framework for Now Playing metadata; private frameworks are incompatible with the
+  strict App Sandbox, so MAS submission is not supported. See README "系统限制".
+
+  Scripts/build-app.sh applies this file when CODE_SIGN_IDENTITY names a
+  Developer ID or Apple Development certificate.
+
+  Adhoc local builds (CODE_SIGN_IDENTITY="-") skip this file and are not
+  notarization-ready; they remain a developer convenience.
+-->
+<dict>
+  <!-- Hardened runtime requires library validation disabled because the app
+       dlopens MediaRemote.framework (private, not signed by Apple) and loads
+       Sparkle.framework. Without this, dyld rejects the private framework. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+
+  <!-- Apple Music 与 Spotify 的公开脚本字典控制。 -->
+  <key>com.apple.security.automation.apple-events</key>
+  <true/>
+
+  <!-- Outbound network: Open-Meteo weather, GitHub Releases API, Bilibili
+       fallback download, Sparkle appcast + update download. -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+
+  <!-- VoiceInputController 仅在用户主动点击语音输入后访问麦克风。 -->
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+
+  <!-- WeatherKit 返回所选地点的气象机构官方预警。 -->
+  <key>com.apple.developer.weatherkit</key>
+  <true/>
+
+  <!-- CalendarService.requestFullAccessToEvents() — full calendar access for
+       the agenda module. Mirrors NSCalendarsFullAccessUsageDescription. -->
+  <key>com.apple.security.personal-information.calendars</key>
+  <true/>
+
+  <!-- Scheduled reminders are merged into the same agenda as calendar events. -->
+  <key>com.apple.security.personal-information.reminders</key>
+  <true/>
+
+  <!-- WeatherLocationService.CoreLocationCurrentLocationProvider uses
+       requestWhenInUseAuthorization() for one-shot local weather.
+       Mirrors NSLocationWhenInUseUsageDescription. -->
+  <key>com.apple.security.personal-information.location</key>
+  <true/>
+
+  <!-- FileShelfStore security-scoped bookmarks for the transit station and
+       user-picked download directory. -->
+  <key>com.apple.security.files.user-selected.read-write</key>
+  <true/>
+
+  <!-- Default download destination is the user's Downloads folder. -->
+  <key>com.apple.security.files.downloads.read-write</key>
+  <true/>
+
+  <!-- Optional convenience: user may pick Movies or Pictures as a download
+       target for media. Disabled by default — enable only if you want the
+       app to write into these protected folders without an explicit pick. -->
+  <key>com.apple.security.files.movies.read-write</key>
+  <false/>
+  <key>com.apple.security.files.pictures.read-write</key>
+  <false/>
+</dict>
+</plist>

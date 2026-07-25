@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>zh_CN</string>
+    <key>CFBundleDisplayName</key>
+    <string>zisla</string>
+    <key>CFBundleExecutable</key>
+    <string>zisla</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIdentifier</key>
+    <string>dev.wzz.zisla</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>zisla</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>@VERSION@</string>
+    <key>CFBundleVersion</key>
+    <string>@BUILD_NUMBER@</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>zisla 需要读取近期日程并显示在顶部信息面板中。</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>zisla 需要读取当前播放音频的频段能量，以实时显示随音乐变化的音浪。</string>
+  <key>NSRemindersFullAccessUsageDescription</key>
+  <string>zisla 需要读取带日期的提醒事项并与日历事件一起展示。</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>zisla 需要使用当前位置显示本地天气和地区名称。</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>zisla 仅在你点击语音输入时使用麦克风，将语音转换为当前 AI 对话的文字。</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright 2026 zisla Contributors</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>zisla 需要将你主动录入的语音转换为 AI 对话文字。</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>zisla 需要通过 Mail.app 读取和管理你的邮件，包括收件箱列表、标记已读、删除和回复。</string>
+	<key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUAutomaticallyUpdate</key>
+    <true/>
+    <key>SUFeedURL</key>
+    <string>https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml</string>
+</dict>
+</plist>
