@@ -3,9 +3,9 @@ import ApplicationServices
 import CoreGraphics
 import Foundation
 
-/// 针对不完整支持 MediaRemote 的播放器应用的特化配置。
-/// 当 MediaRemote 未暴露收藏、播放模式等能力时，
-/// 通过应用公开脚本字典或 Accessibility API 补充控制手段。
+/// Specialized configuration for player apps with incomplete MediaRemote support.
+/// When MediaRemote does not expose capabilities such as favorites or playback modes,
+/// this provides supplemental controls via the app's public scripting dictionary or Accessibility API.
 struct MediaAppProfile: Sendable {
     let bundleIdentifier: String
     let supportsFavorite: Bool
@@ -13,14 +13,16 @@ struct MediaAppProfile: Sendable {
     let supportsPlaybackControls: Bool
     let supportsPlaybackModeSet: Bool
     let supportsPlaybackModeCycle: Bool
+    let prefersAccessibilityControls: Bool
     let defaultPlaybackMode: NowPlayingPlaybackMode
     let favoriteControl: NowPlayingFavoriteControl
 }
 
-/// 执行针对特定播放器应用的控制命令。
+/// Executes control commands targeting a specific player app.
 @MainActor
 final class MediaAppSpecialist {
     static let shared = MediaAppSpecialist()
+    private var hasRequestedQQMusicAccessibilityAccess = false
 
     private let profiles: [String: MediaAppProfile] = [
         "com.apple.Music": MediaAppProfile(
@@ -30,6 +32,7 @@ final class MediaAppSpecialist {
             supportsPlaybackControls: true,
             supportsPlaybackModeSet: true,
             supportsPlaybackModeCycle: false,
+            prefersAccessibilityControls: false,
             defaultPlaybackMode: .sequential,
             favoriteControl: .like
         ),
@@ -40,6 +43,7 @@ final class MediaAppSpecialist {
             supportsPlaybackControls: true,
             supportsPlaybackModeSet: false,
             supportsPlaybackModeCycle: false,
+            prefersAccessibilityControls: false,
             defaultPlaybackMode: .sequential,
             favoriteControl: .like
         ),
@@ -50,6 +54,7 @@ final class MediaAppSpecialist {
             supportsPlaybackControls: true,
             supportsPlaybackModeSet: false,
             supportsPlaybackModeCycle: true,
+            prefersAccessibilityControls: true,
             defaultPlaybackMode: .sequential,
             favoriteControl: .like
         ),
@@ -63,17 +68,24 @@ final class MediaAppSpecialist {
         return profiles.first { id.hasPrefix($0.key) }?.value
     }
 
-    /// Apple Music 使用公开脚本字典；QQ 音乐优先执行无障碍元素的 Press action。
+    /// Apple Music uses its public scripting dictionary; QQ Music prefers its pressable menu items.
     func toggleFavorite(pid: pid_t?, bundleIdentifier: String?) -> Bool {
         if bundleIdentifier == Self.appleMusicBundleIdentifier {
             return Self.runAppleScript(Self.appleMusicToggleFavoriteScript)
         }
         guard bundleIdentifier == Self.qqMusicBundleIdentifier,
               let pid,
-              Self.isAccessibilityTrusted(prompt: true)
+              hasQQMusicAccessibilityAccess()
         else { return false }
-        let app = AXUIElementCreateApplication(pid)
-        if let button = Self.findFavoriteButton(in: app, depth: 0),
+        if Self.performQQMusicMenuCommand(
+            pid: pid,
+            matching: Self.qqMusicFavoriteMenuLabels
+        ) {
+            return true
+        }
+        if let button = Self.qqMusicControlRoots(pid: pid).lazy.compactMap({
+            Self.findFavoriteButton(in: $0, depth: 0)
+        }).first,
            Self.performPress(on: button, pid: pid)
         {
             return true
@@ -87,19 +99,21 @@ final class MediaAppSpecialist {
         }
         guard bundleIdentifier == Self.qqMusicBundleIdentifier,
               let pid,
-              Self.isAccessibilityTrusted(prompt: false)
+              AXIsProcessTrusted()
         else { return nil }
-        return Self.favoriteState(
-            for: Self.accessibilityLabels(
-                of: Self.findFavoriteButton(
-                    in: AXUIElementCreateApplication(pid),
-                    depth: 0
-                )
+        if let item = Self.qqMusicMenuItem(pid: pid, matching: Self.qqMusicFavoriteMenuLabels),
+           let state = Self.favoriteState(for: Self.accessibilityLabels(of: item))
+        {
+            return state
+        }
+        return Self.qqMusicControlRoots(pid: pid).lazy.compactMap {
+            Self.favoriteState(
+                for: Self.accessibilityLabels(of: Self.findFavoriteButton(in: $0, depth: 0))
             )
-        )
+        }.first
     }
 
-    /// Apple Music 与 Spotify 使用公开脚本字典；QQ 音乐使用主播放栏无障碍操作。
+    /// Apple Music and Spotify use their public scripting dictionaries; QQ Music prioritises pressable menu items.
     func sendPlaybackCommand(
         _ command: NowPlayingService.Command,
         pid: pid_t?,
@@ -110,18 +124,19 @@ final class MediaAppSpecialist {
         }
         guard bundleIdentifier == Self.qqMusicBundleIdentifier,
               let pid,
-              Self.isAccessibilityTrusted(prompt: true),
-              let labels = Self.playbackLabels(for: command)
+              hasQQMusicAccessibilityAccess(),
+              let labels = Self.qqMusicMenuLabels(for: command)
         else { return nil }
-        guard let button = Self.findButton(
-            in: AXUIElementCreateApplication(pid),
-            depth: 0,
-            matching: labels
-        ) else { return nil }
+        if Self.performQQMusicMenuCommand(pid: pid, matching: labels) {
+            return true
+        }
+        guard let button = Self.qqMusicControlRoots(pid: pid).lazy.compactMap({
+            Self.findButton(in: $0, depth: 0, matching: labels)
+        }).first else { return nil }
         return Self.performPress(on: button, pid: pid) ? true : nil
     }
 
-    /// Apple Music 的模式属性在公开脚本字典中可写；其它播放器继续走各自的控制通道。
+    /// Apple Music's mode property is writable in its public scripting dictionary; other players continue through their own control channels.
     func setPlaybackMode(
         _ mode: NowPlayingPlaybackMode,
         pid _: pid_t?,
@@ -131,37 +146,61 @@ final class MediaAppSpecialist {
         return Self.runAppleScript(Self.appleMusicModeScript(for: mode)) ? true : nil
     }
 
-    /// QQ 音乐通过 Accessibility 标签循环切换。
+    /// QQ Music selects the next playback mode directly from its Accessibility menu.
     func cyclePlaybackMode(
         pid: pid_t?,
         bundleIdentifier: String?,
-        currentMode _: NowPlayingPlaybackMode
+        currentMode: NowPlayingPlaybackMode
     ) -> Bool {
         guard bundleIdentifier == Self.qqMusicBundleIdentifier,
               let pid,
-              Self.isAccessibilityTrusted(prompt: true)
+              hasQQMusicAccessibilityAccess()
         else { return false }
-        let app = AXUIElementCreateApplication(pid)
-        return Self.searchAndClickPlayMode(in: app, depth: 0, pid: pid)
+        if Self.performQQMusicMenuCommand(
+            pid: pid,
+            matching: Self.qqMusicPlaybackModeMenuLabels(after: currentMode)
+        ) {
+            return true
+        }
+        return Self.qqMusicControlRoots(pid: pid).contains {
+            Self.searchAndClickPlayMode(in: $0, depth: 0, pid: pid)
+        }
     }
 
     // MARK: - CGEvent
     private static let appleMusicBundleIdentifier = "com.apple.Music"
     private static let qqMusicBundleIdentifier = "com.tencent.QQMusicMac"
 
-    private static func isAccessibilityTrusted(prompt: Bool) -> Bool {
-        guard prompt else { return AXIsProcessTrusted() }
+    private func hasQQMusicAccessibilityAccess() -> Bool {
+        let trusted = AXIsProcessTrusted()
+        guard Self.shouldRequestAccessibilityPrompt(
+            isTrusted: trusted,
+            hasRequestedInCurrentLaunch: hasRequestedQQMusicAccessibilityAccess
+        ) else {
+            return trusted
+        }
+        hasRequestedQQMusicAccessibilityAccess = true
         let options = [
             "AXTrustedCheckOptionPrompt": true,
         ] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
     }
 
+    static func shouldRequestAccessibilityPrompt(
+        isTrusted: Bool,
+        hasRequestedInCurrentLaunch: Bool
+    ) -> Bool {
+        !isTrusted && !hasRequestedInCurrentLaunch
+    }
+
     private static let favoriteEnabledLabels = [
-        "从我喜欢删除", "取消喜欢", "取消收藏",
+        "从我喜欢删除", "取消喜欢", "取消收藏", "移除收藏",
     ]
     private static let favoriteDisabledLabels = [
-        "添加到我喜欢", "添加到喜欢", "添加收藏",
+        "添加到我喜欢", "添加到喜欢", "添加收藏", "收藏", "喜欢歌曲",
+    ]
+    static let qqMusicFavoriteMenuLabels = [
+        "喜欢歌曲", "取消喜欢", "添加到我喜欢", "从我喜欢删除", "喜欢",
     ]
 
     static func favoriteState(for labels: [String]) -> Bool? {
@@ -181,7 +220,7 @@ final class MediaAppSpecialist {
         return nil
     }
 
-    /// 纯坐标逻辑：有效 frame 时返回中心点，供单元测试与点击共用。
+    /// Pure coordinate logic: returns the center point of a valid frame; shared by unit tests and click handling.
     static func clickPoint(position: CGPoint, size: CGSize) -> CGPoint? {
         guard size.width > 0, size.height > 0,
               position.x.isFinite, position.y.isFinite,
@@ -194,7 +233,7 @@ final class MediaAppSpecialist {
         return point.x.isFinite && point.y.isFinite ? point : nil
     }
 
-    /// 纯标签匹配：判断无障碍文案是否指向播放模式控件。
+    /// Pure label matching: determines whether accessibility labels point to the playback mode control.
     static func matchesPlayModeLabels(_ labels: [String]) -> Bool {
         labels.contains { label in
             let text = label.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -205,7 +244,7 @@ final class MediaAppSpecialist {
         }
     }
 
-    /// 纯标签匹配：判断无障碍文案是否指向收藏控件。
+    /// Pure label matching: determines whether accessibility labels point to the favorite control.
     static func matchesFavoriteLabels(_ labels: [String]) -> Bool {
         favoriteState(for: labels) != nil
     }
@@ -312,7 +351,7 @@ final class MediaAppSpecialist {
         return result.stringValue
     }
 
-    private static func playbackLabels(for command: NowPlayingService.Command) -> [String]? {
+    static func qqMusicMenuLabels(for command: NowPlayingService.Command) -> [String]? {
         switch command {
         case .play:
             ["播放", "继续播放"]
@@ -321,11 +360,22 @@ final class MediaAppSpecialist {
         case .togglePlayPause:
             ["播放", "暂停", "继续播放"]
         case .previous:
-            ["上一首"]
+            ["上一首", "上一曲", "上一首歌", "上一个"]
         case .next:
-            ["下一首"]
+            ["下一首", "下一曲", "下一首歌", "下一个"]
         case .likeTrack, .addTrackToWishList, .removeTrackFromWishList:
             nil
+        }
+    }
+
+    static func qqMusicPlaybackModeMenuLabels(after mode: NowPlayingPlaybackMode) -> [String] {
+        switch mode {
+        case .sequential:
+            ["单曲循环"]
+        case .repeatOne:
+            ["随机播放"]
+        case .random:
+            ["顺序播放"]
         }
     }
 
@@ -355,13 +405,12 @@ final class MediaAppSpecialist {
     private static let playModeKeywords = [
         "循环", "随机", "顺序", "播放模式", "repeat", "shuffle",
     ]
+    private static let maximumAccessibilityDepth = 20
 
     private static func findFavoriteButton(in element: AXUIElement, depth: Int) -> AXUIElement? {
-        guard depth < 12 else { return nil }
-        if favoriteState(for: accessibilityLabels(of: element)) != nil,
-           let pressable = pressableAncestor(of: element)
-        {
-            return pressable
+        guard depth < maximumAccessibilityDepth else { return nil }
+        if favoriteState(for: accessibilityLabels(of: element)) != nil {
+            return pressableAncestor(of: element) ?? element
         }
 
         for child in children(of: element) {
@@ -377,11 +426,9 @@ final class MediaAppSpecialist {
         depth: Int,
         matching labels: [String]
     ) -> AXUIElement? {
-        guard depth < 12 else { return nil }
-        if accessibilityLabels(of: element).contains(where: { labels.contains($0) }),
-           let pressable = pressableAncestor(of: element)
-        {
-            return pressable
+        guard depth < maximumAccessibilityDepth else { return nil }
+        if matchesControlLabels(accessibilityLabels(of: element), expected: labels) {
+            return pressableAncestor(of: element) ?? element
         }
 
         for child in children(of: element) {
@@ -428,12 +475,58 @@ final class MediaAppSpecialist {
         return actions.contains(kAXPressAction as String)
     }
 
+    private static func findQQMusicMenuItem(
+        in element: AXUIElement,
+        depth: Int,
+        matching labels: [String]
+    ) -> AXUIElement? {
+        guard depth < maximumAccessibilityDepth else { return nil }
+        if role(of: element) == kAXMenuItemRole as String,
+           supportsPress(element),
+           matchesControlLabels(accessibilityLabels(of: element), expected: labels)
+        {
+            return element
+        }
+        for child in children(of: element) {
+            if let match = findQQMusicMenuItem(in: child, depth: depth + 1, matching: labels) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private static func performQQMusicMenuCommand(pid: pid_t, matching labels: [String]) -> Bool {
+        guard let item = qqMusicMenuItem(pid: pid, matching: labels) else { return false }
+        return performPress(on: item, pid: pid)
+    }
+
+    /// The menu bar is not among the application element's AX children; it is only reachable via kAXMenuBarAttribute.
+    private static func qqMusicMenuItem(pid: pid_t, matching labels: [String]) -> AXUIElement? {
+        guard let menuBar = elementAttribute(
+            kAXMenuBarAttribute,
+            of: AXUIElementCreateApplication(pid)
+        ) else { return nil }
+        return findQQMusicMenuItem(in: menuBar, depth: 0, matching: labels)
+    }
+
+    private static func role(of element: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXRoleAttribute as CFString,
+            &value
+        ) == .success else { return nil }
+        return value as? String
+    }
+
     private static func accessibilityLabels(of element: AXUIElement?) -> [String] {
         guard let element else { return [] }
         let attributes = [
             kAXTitleAttribute as CFString,
             kAXDescriptionAttribute as CFString,
             kAXHelpAttribute as CFString,
+            kAXValueAttribute as CFString,
+            kAXIdentifierAttribute as CFString,
         ]
         return attributes.compactMap { attribute in
             var value: CFTypeRef?
@@ -493,12 +586,10 @@ final class MediaAppSpecialist {
         depth: Int,
         pid: pid_t
     ) -> Bool {
-        guard depth < 12 else { return false }
+        guard depth < maximumAccessibilityDepth else { return false }
 
         if matchesPlayModeLabels(accessibilityLabels(of: element)),
-           let pressable = pressableAncestor(of: element),
-           performPress(on: pressable, pid: pid)
-        {
+           performPress(on: pressableAncestor(of: element) ?? element, pid: pid) {
             return true
         }
 
@@ -508,5 +599,74 @@ final class MediaAppSpecialist {
             }
         }
         return false
+    }
+
+    private static func matchesControlLabels(
+        _ labels: [String],
+        expected: [String]
+    ) -> Bool {
+        labels.contains { label in
+            expected.contains { target in
+                label.localizedCaseInsensitiveContains(target)
+            }
+        }
+    }
+
+    private static let qqMusicControlBarLabel = "播放控制栏"
+
+    /// The window content area exposes links sharing the player controls' copy ("收藏", "封面播放", …)
+    /// which depth-first search hits earlier; only the "播放控制栏" container is a safe search root.
+    private static func qqMusicControlRoots(pid: pid_t) -> [AXUIElement] {
+        let application = AXUIElementCreateApplication(pid)
+        var windows: [AXUIElement] = []
+        for attribute in [
+            kAXFocusedWindowAttribute,
+            kAXMainWindowAttribute,
+        ] {
+            if let window = elementAttribute(attribute, of: application) {
+                windows.append(window)
+            }
+        }
+        windows.append(contentsOf: self.windows(of: application))
+        return windows.compactMap { findControlBar(in: $0, depth: 0) }
+    }
+
+    private static func findControlBar(in element: AXUIElement, depth: Int) -> AXUIElement? {
+        guard depth < 6 else { return nil }
+        if accessibilityLabels(of: element).contains(where: {
+            $0.contains(qqMusicControlBarLabel)
+        }) {
+            return element
+        }
+        for child in children(of: element) {
+            if let bar = findControlBar(in: child, depth: depth + 1) {
+                return bar
+            }
+        }
+        return nil
+    }
+
+    private static func windows(of element: AXUIElement) -> [AXUIElement] {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXWindowsAttribute as CFString,
+            &value
+        ) == .success else { return [] }
+        return value as? [AXUIElement] ?? []
+    }
+
+    private static func elementAttribute(
+        _ attribute: String,
+        of element: AXUIElement
+    ) -> AXUIElement? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            attribute as CFString,
+            &value
+        ) == .success,
+        let value else { return nil }
+        return unsafeDowncast(value, to: AXUIElement.self)
     }
 }

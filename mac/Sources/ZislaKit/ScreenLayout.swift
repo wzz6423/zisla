@@ -177,16 +177,14 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         let anchor = topology.anchorFrame
         let triggerAnchor: CGRect
         if topology.hasPhysicalNotch {
-            // 刘海屏：触发区 = 刘海本身（左右各留一点 padding 方便命中窄刘海），
-            // 不向刘海下方延伸。
+            // On notched displays, the trigger covers only the notch with horizontal padding for narrow targets.
             let padding = max(0, configuration.notchTriggerHorizontalPadding)
             triggerAnchor = anchor.insetBy(dx: -padding, dy: 0)
                 .intersection(screen.frame)
         } else {
             triggerAnchor = anchor
         }
-        // 悬停触发区 = 岛身（刘海/模拟岛）本身：鼠标移到岛上才展开，
-        // 岛/刘海下方不触发。
+        // Hovering triggers expansion only over the island itself, whether it is a notch or a simulated island.
         let triggerFrame = triggerAnchor
 
         let margin = min(max(0, configuration.horizontalMargin), screen.frame.width / 2)

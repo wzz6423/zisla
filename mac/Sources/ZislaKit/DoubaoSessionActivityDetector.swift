@@ -1,11 +1,12 @@
+import AppKit
 import Foundation
 import ZislaCore
 
-/// 从豆包桌面端（PWA 壳）的本地数据目录推断活动状态。
+/// Infers activity state from the local data directory of the Doubao desktop app (PWA shell).
 ///
-/// 数据目录：`~/Library/Application Support/Doubao/`
-/// 豆包是 PWA 壳，无结构化 AI 任务日志；采用本地数据目录文件修改时间推断：
-/// 若数据目录中有文件在 TTL 窗口内被修改，判定为活动状态。
+/// Data directory: `~/Library/Application Support/Doubao/`
+/// Doubao is a PWA shell with no structured AI task log, so a running application and recent local-data
+/// activity are both required before reporting an active session.
 public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     private struct Candidate {
         var url: URL
@@ -17,6 +18,7 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     public let recencyThreshold: TimeInterval
 
     private let fileManager: FileManager
+    private let isDoubaoRunning: () -> Bool
     private var cachedTask: AIProgressTask?
     private var cachedSignature: String?
     private var lastScanAt: Date = .distantPast
@@ -27,7 +29,8 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
         maxFiles: Int = 32,
         recencyThreshold: TimeInterval = 10 * 60,
         scanInterval: TimeInterval = 5,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        isDoubaoRunning: (() -> Bool)? = nil
     ) {
         if let dataRoots {
             self.dataRoots = dataRoots
@@ -41,9 +44,16 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
         self.recencyThreshold = recencyThreshold
         self.scanInterval = max(0, scanInterval)
         self.fileManager = fileManager
+        self.isDoubaoRunning = isDoubaoRunning ?? Self.isDoubaoRunning
     }
 
     public func activeTasks() throws -> [AIProgressTask] {
+        guard isDoubaoRunning() else {
+            cachedTask = nil
+            cachedSignature = nil
+            return []
+        }
+
         let now = Date()
         if now.timeIntervalSince(lastScanAt) < scanInterval,
            let cached = cachedTask {
@@ -81,6 +91,26 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     }
 
     public static let taskID = "doubao-active"
+
+    private static func isDoubaoRunning() -> Bool {
+        NSWorkspace.shared.runningApplications.contains { application in
+            guard !application.isTerminated else { return false }
+
+            if let bundleIdentifier = application.bundleIdentifier?.lowercased(),
+               bundleIdentifier.hasSuffix(".doubao") || bundleIdentifier.contains(".doubao.") {
+                return true
+            }
+
+            return [
+                application.localizedName,
+                application.executableURL?.deletingPathExtension().lastPathComponent,
+            ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .contains { name in
+                name == "豆包" || name.caseInsensitiveCompare("doubao") == .orderedSame
+            }
+        }
+    }
 
     public static func defaultDataRoots(
         home: URL = FileManager.default.homeDirectoryForCurrentUser,

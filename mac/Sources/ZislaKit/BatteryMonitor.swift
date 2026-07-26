@@ -2,15 +2,15 @@ import Combine
 import Foundation
 import IOKit.ps
 
-/// 电池状态快照。桌面 Mac 无内置电池时 `BatteryMonitor.snapshot` 为 nil。
+/// Battery status snapshot. `BatteryMonitor.snapshot` is nil on desktop Macs with no built-in battery.
 public struct BatterySnapshot: Equatable, Sendable {
-    /// 剩余电量占比，0...1。
+    /// Remaining charge as a fraction, 0...1.
     public var level: Double
     public var isCharging: Bool
-    /// 是否接入外部电源（含充满后仍插电）。
+    /// Whether external power is connected (including when fully charged but still plugged in).
     public var isPluggedIn: Bool
     public var isCharged: Bool
-    /// 放电时为剩余分钟数、充电时为充满分钟数；系统仍在估算时为 nil。
+    /// Minutes remaining when discharging, or minutes to full when charging; nil while the system is still estimating.
     public var timeRemainingMinutes: Int?
 
     public init(
@@ -31,7 +31,7 @@ public struct BatterySnapshot: Equatable, Sendable {
         Int((level * 100).rounded())
     }
 
-    /// 锁屏风格电量符号：充电中用 bolt，其余按档位选取对应填充图标。
+    /// Lock-screen-style battery symbol: bolt when charging, otherwise a filled icon at the appropriate level.
     public var symbolName: String {
         if isCharging || (isPluggedIn && !isCharged) {
             return "battery.100percent.bolt"
@@ -46,7 +46,7 @@ public struct BatterySnapshot: Equatable, Sendable {
     }
 }
 
-/// 使用公开 IOKit Power Source API 读取电量，并通过运行循环通知刷新。
+/// Reads battery level using the public IOKit Power Source API and refreshes via run-loop notifications.
 @MainActor
 public final class BatteryMonitor: ObservableObject {
     @Published public private(set) var snapshot: BatterySnapshot?
@@ -93,7 +93,7 @@ public final class BatteryMonitor: ObservableObject {
         return nil
     }
 
-    /// 纯逻辑：把 Power Source 描述字典解析成快照，便于单测。
+    /// Pure logic: parses a Power Source description dictionary into a snapshot, for unit testing.
     nonisolated static func snapshot(from description: [String: Any]) -> BatterySnapshot? {
         if let type = description[kIOPSTypeKey as String] as? String,
            type != kIOPSInternalBatteryType as String {
@@ -114,7 +114,7 @@ public final class BatteryMonitor: ObservableObject {
         let rawTime = isCharging
             ? (description[kIOPSTimeToFullChargeKey as String] as? NSNumber)?.intValue
             : (description[kIOPSTimeToEmptyKey as String] as? NSNumber)?.intValue
-        // IOKit 用 -1 表示仍在估算。
+        // IOKit uses -1 to indicate the estimate is still being calculated.
         let timeRemaining = (rawTime ?? -1) > 0 ? rawTime : nil
 
         return BatterySnapshot(

@@ -151,7 +151,7 @@ public final class CalendarService: ObservableObject {
     private var scheduledRefresh: Task<Void, Never>?
     private var refreshGeneration: UInt64 = 0
     private var isRefreshing = false
-    /// 日历变化后的延迟刷新继续查询用户当前查看的这一周。
+    /// Delayed refresh triggered by calendar changes continues querying the week the user is currently viewing.
     private var queryAnchorDate = Date()
 
     public convenience init() {
@@ -616,7 +616,7 @@ public final class CalendarService: ObservableObject {
         return calendar
     }
 
-    /// 返回系统日历定义下左闭右开的完整周区间。
+    /// Returns the full week interval (half-open) as defined by the system calendar.
     public nonisolated static func weekDateInterval(
         containing date: Date,
         calendar: Calendar = .current
@@ -635,7 +635,7 @@ public final class CalendarService: ObservableObject {
         }
     }
 
-    /// 匹配某天覆盖到的定时、全天及跨日事项。
+    /// Matches timed, all-day, and multi-day items that overlap a given day.
     public nonisolated static func item(
         _ item: CalendarEventSnapshot,
         occursOn day: Date,
@@ -645,14 +645,14 @@ public final class CalendarService: ObservableObject {
         guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else {
             return false
         }
-        // 无持续时间的提醒仍应归属到期当天。
+        // Reminders with no duration should still be assigned to their due day.
         if item.endDate <= item.startDate {
             return item.startDate >= dayStart && item.startDate < dayEnd
         }
         return item.startDate < dayEnd && item.endDate > dayStart
     }
 
-    /// 只排序不截断，日期筛选由调用方负责。
+    /// Sorts only — does not truncate; date filtering is the caller's responsibility.
     public nonisolated static func preparedAgendaItems(
         _ items: [CalendarEventSnapshot]
     ) -> [CalendarEventSnapshot] {

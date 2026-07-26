@@ -80,7 +80,7 @@ public final class PointerEdgeMonitor {
 
     private nonisolated func emit(_ event: NSEvent) {
         let eventType = event.type
-        // AppKit 保证事件监视器的回调位于主线程，避免为每个鼠标事件创建 Task。
+        // AppKit guarantees event monitor callbacks run on the main thread, avoiding a Task per mouse event.
         MainActor.assumeIsolated {
             let interaction: Interaction
             switch PointerEdgeEventAction(eventType: eventType) {

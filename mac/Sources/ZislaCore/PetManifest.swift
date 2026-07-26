@@ -1,30 +1,31 @@
 import Foundation
 
-/// 一个桌面宠物的元数据：单张（或水平排列的）像素精灵图。
+/// Metadata for a desktop pet: a single (or horizontally-laid-out) pixel sprite sheet.
 ///
-/// 为了把二进制体积压到极低，本 App 的宠物采用 **CC0 像素动物**
-/// （Kenney Animal Pack Redux），每只一张小 PNG，编入 `Resources/Pets/<id>/`。
+/// To keep the binary size extremely small, the app uses **CC0 pixel animals**
+/// (Kenney Animal Pack Redux) — one small PNG per pet, embedded in `Resources/Pets/<id>/`.
 ///
-/// 动画不依赖逐帧图集，而是由 `PetSpriteView` 做程序化 idle
-/// （轻微上下浮动 + 呼吸感 + 点击小跳），体积极小（KB 级）。
+/// Animation does not rely on a frame atlas; instead `PetSpriteView` drives a
+/// procedural idle (gentle bob + breathing feel + click-jump), keeping each asset
+/// in the KB range.
 ///
-/// 包结构：
+/// Bundle layout:
 /// ```
 /// <pet>/
-/// ├── pet.json       // 本结构
-/// └── sprite.png     // 单帧 PNG（或水平帧带）
+/// ├── pet.json       // this struct
+/// └── sprite.png     // single-frame PNG (or horizontal strip)
 /// ```
 public struct PetManifest: Codable, Equatable, Sendable, Identifiable {
     public var id: String
     public var displayName: String
     public var description: String
-    /// 精灵图文件名（相对宠物目录），如 `sprite.png`。
+    /// Sprite filename relative to the pet directory, e.g. `sprite.png`.
     public var spritePath: String
-    /// 若为水平帧带（多帧），每帧宽度（px）；否则为单帧，留空。
+    /// Width of each frame (px) if this is a horizontal strip; omit for a single frame.
     public var frameWidth: Int?
-    /// 帧带总帧数（默认 1，即单帧静态图，靠程序化动画赋予生命）。
+    /// Total frame count (defaults to 1, i.e. a static single frame animated procedurally).
     public var frames: Int?
-    /// 帧率（fps），仅帧带模式使用。
+    /// Frame rate (fps); only used in strip mode.
     public var fps: Double?
 
     private enum CodingKeys: String, CodingKey {

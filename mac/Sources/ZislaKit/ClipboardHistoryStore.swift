@@ -37,15 +37,30 @@ public final class ClipboardHistoryStore: ObservableObject {
 
     @discardableResult
     public func record(_ content: ClipboardHistoryContent) -> Bool {
+        insert(content, pinned: false)
+    }
+
+    /// Adds an item and pins it: if it already exists, refreshes its content and timestamp while keeping it pinned.
+    /// Intended for direct use by UI/AppModel; correctly handles existence checks, deduplication, capacity, and async persistence semantics.
+    /// Manually added favorites are always pinned.
+    @discardableResult
+    public func recordPinned(_ content: ClipboardHistoryContent) -> Bool {
+        insert(content, pinned: true)
+    }
+
+    @discardableResult
+    private func insert(_ content: ClipboardHistoryContent, pinned: Bool) -> Bool {
         guard isStorable(content) else { return false }
 
         let now = persistenceCompatibleDate()
         if let index = items.firstIndex(where: { $0.content == content }) {
             var item = items.remove(at: index)
+            item.content = content
             item.lastCopiedAt = now
+            if pinned { item.isPinned = true }
             items.append(item)
         } else {
-            items.append(ClipboardHistoryItem(content: content, lastCopiedAt: now))
+            items.append(ClipboardHistoryItem(content: content, lastCopiedAt: now, isPinned: pinned))
         }
         normalizeOrder()
         trimHistoryToCapacity()
@@ -68,14 +83,14 @@ public final class ClipboardHistoryStore: ObservableObject {
         schedulePersistence()
     }
 
-    /// 仅清理历史记录，保留用户固定的常用信息。
+    /// Clears history only; retains items the user has pinned.
     public func removeAllHistory() {
         guard items.contains(where: { !$0.isPinned }) else { return }
         items.removeAll { !$0.isPinned }
         schedulePersistence()
     }
 
-    /// 应用退出前提交被合并的最后一批剪贴板变更。
+    /// Commits the last coalesced batch of clipboard changes before the app quits.
     public func flushPendingChanges() {
         persistenceTask?.cancel()
         persistenceTask = nil
@@ -91,7 +106,8 @@ public final class ClipboardHistoryStore: ObservableObject {
     private func load() {
         do {
             let decoded = try database.load()
-            items = decoded.filter { isStorable($0.content) }
+            let resolved = decoded.map(resolvingFileBookmark)
+            items = resolved.filter { isStorable($0.content) }
             normalizeOrder()
             trimHistoryToCapacity()
             errorDescription = nil
@@ -99,6 +115,31 @@ public final class ClipboardHistoryStore: ObservableObject {
         } catch {
             errorDescription = error.localizedDescription
         }
+    }
+
+    /// Restores the actual URL and security scope from a bookmark after relaunch;
+    /// falls back to the original path if the bookmark is stale but the file still exists, then refreshes the bookmark.
+    private func resolvingFileBookmark(_ item: ClipboardHistoryItem) -> ClipboardHistoryItem {
+        guard case .file(let reference) = item.content else { return item }
+        var stale = false
+        let resolved = try? URL(
+            resolvingBookmarkData: reference.bookmark,
+            options: [.withSecurityScope, .withoutUI],
+            relativeTo: nil,
+            bookmarkDataIsStale: &stale
+        )
+        let url = (resolved ?? reference.url).standardizedFileURL
+        guard FileManager.default.fileExists(atPath: url.path) else { return item }
+        let bookmark = (resolved == nil || stale)
+            ? ((try? ClipboardFileReference.makeBookmark(for: url)) ?? reference.bookmark)
+            : reference.bookmark
+        var updated = item
+        updated.content = .file(ClipboardFileReference(
+            url: url,
+            displayName: reference.displayName,
+            bookmark: bookmark
+        ))
+        return updated
     }
 
     private func normalizeOrder() {
@@ -117,10 +158,14 @@ public final class ClipboardHistoryStore: ObservableObject {
 
     private func isStorable(_ content: ClipboardHistoryContent) -> Bool {
         guard content.isStorable else { return false }
-        if case .image(let data) = content {
+        switch content {
+        case .image(let data):
             return data.count <= maxImageBytes
+        case .file(let reference):
+            return FileManager.default.fileExists(atPath: reference.url.standardizedFileURL.path)
+        case .text:
+            return true
         }
-        return true
     }
 
     private func persistenceCompatibleDate() -> Date {

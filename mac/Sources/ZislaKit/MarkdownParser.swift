@@ -1,10 +1,10 @@
 import Foundation
 
-/// Markdown 块级解析结果。仅覆盖随记场景常用的子集，刻意不引入第三方依赖。
+/// Parsed Markdown block-level result. Covers only the subset commonly used in note-taking scenarios; intentionally avoids third-party dependencies.
 ///
-/// 解析器以行为单位扫描，识别：标题、无序/有序列表、引用、围栏代码块、分隔线、
-/// 段落、**独立图片行**、**GFM 管道表格**。行内格式（粗体、斜体、行内代码、链接、
-/// 删除线、行内图片）交给 `MarkdownHTMLRenderer` / `MarkdownRenderer` 处理，块级解析不触碰。
+/// The parser scans line by line and recognises: headings, unordered/ordered lists, blockquotes, fenced code blocks, horizontal rules,
+/// paragraphs, **standalone image lines**, and **GFM pipe tables**. Inline formatting (bold, italic, inline code, links,
+/// strikethrough, inline images) is handled by `MarkdownHTMLRenderer` / `MarkdownRenderer`; the block parser does not touch them.
 public enum MarkdownBlock: Equatable {
     case heading(level: Int, text: String)
     case paragraph(text: String)
@@ -13,14 +13,14 @@ public enum MarkdownBlock: Equatable {
     case blockquote(text: String)
     case codeBlock(language: String?, content: String)
     case horizontalRule
-    /// 单独成行的图片：`![alt](url)`。
+    /// Single standalone image line: `![alt](url)`.
     case image(url: String, alt: String)
-    /// GFM 管道表格：首行为表头，随后分隔行，其余为数据行。
+    /// GFM pipe table: first row is the header, followed by the delimiter row, then data rows.
     case table(header: [String], rows: [[String]])
 }
 
 public enum MarkdownParser {
-    /// 将 Markdown 源文本解析为块序列。空输入返回空数组。
+    /// Parses Markdown source text into a sequence of blocks. Returns an empty array for empty input.
     public static func parse(_ source: String) -> [MarkdownBlock] {
         let lines = source.replacingOccurrences(of: "\r\n", with: "\n")
             .split(separator: "\n", omittingEmptySubsequences: false)
@@ -31,13 +31,13 @@ public enum MarkdownParser {
         while index < lines.count {
             let line = lines[index]
 
-            // 跳过空行（块边界）
+            // Skip blank lines (block boundaries).
             guard !line.trimmingCharacters(in: .whitespaces).isEmpty else {
                 index += 1
                 continue
             }
 
-            // 围栏代码块 ```lang
+            // Fenced code block: ```lang
             if let fence = fenceInfo(line) {
                 let (content, next) = collectCodeBlock(lines: lines, from: index + 1, fence: fence.marker)
                 blocks.append(.codeBlock(language: fence.language, content: content))
@@ -45,35 +45,35 @@ public enum MarkdownParser {
                 continue
             }
 
-            // 分隔线：--- / *** / ___（至少三个相同字符）
+            // Horizontal rule: --- / *** / ___ (at least three identical characters).
             if isHorizontalRule(line) {
                 blocks.append(.horizontalRule)
                 index += 1
                 continue
             }
 
-            // 标题 # .. ######
+            // Heading: # .. ######
             if let heading = headingInfo(line) {
                 blocks.append(.heading(level: heading.level, text: heading.text))
                 index += 1
                 continue
             }
 
-            // 独立图片行：![alt](url)
+            // Standalone image line: ![alt](url)
             if let image = imageInfo(line) {
                 blocks.append(.image(url: image.url, alt: image.alt))
                 index += 1
                 continue
             }
 
-            // GFM 管道表格：当前行为表头、下一行为分隔行
+            // GFM pipe table: current line is the header, next line is the delimiter row.
             if let table = collectTableIfPresent(lines: lines, from: index) {
                 blocks.append(.table(header: table.header, rows: table.rows))
                 index = table.next
                 continue
             }
 
-            // 引用 >
+            // Blockquote: >
             if line.hasPrefix(">") {
                 let (text, next) = collectBlockquote(lines: lines, from: index)
                 blocks.append(.blockquote(text: text))
@@ -81,7 +81,7 @@ public enum MarkdownParser {
                 continue
             }
 
-            // 无序列表 - / * / +
+            // Unordered list: - / * / +
             if isBulletItem(line) {
                 let (items, next) = collectList(
                     lines: lines,
@@ -93,7 +93,7 @@ public enum MarkdownParser {
                 continue
             }
 
-            // 有序列表 1. / 2)
+            // Ordered list: 1. / 2)
             if let _ = orderedItemPrefix(line) {
                 let (items, next) = collectList(
                     lines: lines,
@@ -105,7 +105,7 @@ public enum MarkdownParser {
                 continue
             }
 
-            // 段落：连续非空行直到块边界
+            // Paragraph: consecutive non-empty lines until a block boundary.
             let (text, next) = collectParagraph(lines: lines, from: index)
             blocks.append(.paragraph(text: text))
             index = next
@@ -114,7 +114,7 @@ public enum MarkdownParser {
         return blocks
     }
 
-    // MARK: - 块收集
+    // MARK: - Block collection
 
     private static func collectParagraph(lines: [String], from start: Int) -> (String, Int) {
         var collected: [String] = []
@@ -123,8 +123,14 @@ public enum MarkdownParser {
             let line = lines[index]
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty { break }
-            // 遇到下一个块的起始符则停止
+            // Stop when the start of the next block is encountered.
             if isBlockStart(line) { break }
+            // isBlockStart 只认得出分隔行；表头要结合下一行判断，否则紧跟段落（无空行）的表格
+            // 会被吞掉表头、表体退化成裸管道文本。首行交给主循环的表格分支处理。
+            if index > start, line.contains("|"),
+               index + 1 < lines.count, isTableDelimiter(lines[index + 1]) {
+                break
+            }
             collected.append(trimmed)
             index += 1
         }
@@ -183,13 +189,13 @@ public enum MarkdownParser {
             collected.append(line)
             index += 1
         }
-        // 未闭合的代码块：取到末尾
+        // Unclosed code block: consume to end of input.
         return (collected.joined(separator: "\n"), index)
     }
 
-    // MARK: - 行首判定
+    // MARK: - Line-start detection
 
-    /// 当前行是否是某个块级结构的起始（用于段落收集时判断边界）。
+    /// Returns true if the line is the start of a block-level structure (used to detect paragraph boundaries).
     private static func isBlockStart(_ line: String) -> Bool {
         fenceInfo(line) != nil
             || isHorizontalRule(line)
@@ -201,21 +207,22 @@ public enum MarkdownParser {
             || orderedItemPrefix(line) != nil
     }
 
-    // MARK: - 图片
+    // MARK: - Image
 
-    /// 解析独立图片行 `![alt](url "可选标题")`，非独立图片返回 `nil`。
+    /// Parses a standalone image line `![alt](url "optional title")`. Returns `nil` if the line is not a standalone image.
     private static func imageInfo(_ line: String) -> (url: String, alt: String)? {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard trimmed.hasPrefix("!"),
               let open = trimmed.firstIndex(of: "["),
               let close = trimmed.firstIndex(of: "]"),
-              open < close,
-              trimmed[trimmed.index(after: close)] == "("
+              open < close
         else { return nil }
-        // 整行必须只有这一个图片标记（前后可空白），避免误吞正文里的图片。
-        let alt = String(trimmed[trimmed.index(after: open)..<close])
+        // `]` 位于行尾时 index(after:) 即 endIndex，直接下标访问会越界崩溃（如 `![截图]`）。
         let afterClose = trimmed.index(after: close)
-        // inner 从 '(' 开始（包含 '('），这样后续的 startIndex/lastIndex 校验才有意义。
+        guard afterClose < trimmed.endIndex, trimmed[afterClose] == "(" else { return nil }
+        // The entire line must contain only this one image marker (whitespace allowed around it), to avoid swallowing inline images in body text.
+        let alt = String(trimmed[trimmed.index(after: open)..<close])
+        // `inner` starts at '(' (inclusive) so that subsequent startIndex/lastIndex checks are meaningful.
         let inner = trimmed[afterClose...]
         guard let endParen = inner.lastIndex(of: ")"),
               inner[inner.startIndex] == "(",
@@ -223,12 +230,12 @@ public enum MarkdownParser {
         else { return nil }
         var url = String(inner[inner.index(after: inner.startIndex)..<endParen])
             .trimmingCharacters(in: .whitespaces)
-        // 去掉末尾可选的 "标题"
+        // Strip optional trailing "title".
         if let quoteStart = url.firstIndex(of: "\""),
            let quoteEnd = url.lastIndex(of: "\""), quoteStart < quoteEnd {
             url = String(url[..<quoteStart]).trimmingCharacters(in: .whitespaces)
         }
-        // 整行若除图片标记外还有其它可见字符，则视为正文而非独立图片。
+        // If the line contains any visible characters beyond the image marker, treat it as body text rather than a standalone image.
         let remainder = trimmed
             .replacingOccurrences(of: "![" + alt + "]" + inner, with: "")
             .trimmingCharacters(in: .whitespaces)
@@ -236,9 +243,9 @@ public enum MarkdownParser {
         return (url, alt)
     }
 
-    // MARK: - GFM 表格
+    // MARK: - GFM table
 
-    /// 当前行是表格表头且下一行是分隔行时，收集整张表格。
+    /// Collects a full table when the current line is the header and the next line is the delimiter row.
     private static func collectTableIfPresent(
         lines: [String],
         from start: Int
@@ -254,7 +261,7 @@ public enum MarkdownParser {
         while index < lines.count {
             let line = lines[index]
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            // 空行或不再含 `|` 即表格结束
+            // Empty line or no `|` means end of table.
             if trimmed.isEmpty || !line.contains("|") { break }
             rows.append(splitTableRow(line))
             index += 1
@@ -262,7 +269,7 @@ public enum MarkdownParser {
         return (header: header, rows: rows, next: index)
     }
 
-    /// 分隔行：`| --- | :--: | ---: |` 等，每格仅由 `-`、`:`、空格组成。
+    /// Delimiter row: `| --- | :--: | ---: |` etc.; each cell contains only `-`, `:`, and spaces.
     private static func isTableDelimiter(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard trimmed.contains("|") else { return false }
@@ -275,7 +282,7 @@ public enum MarkdownParser {
         }
     }
 
-    /// 按 `|` 切分单元格，去掉首尾空列（如 `| a | b |` → ["a","b"]）。
+    /// Splits cells by `|`, dropping leading and trailing empty columns (e.g. `| a | b |` → ["a","b"]).
     private static func splitTableRow(_ line: String) -> [String] {
         var row = line.trimmingCharacters(in: .whitespaces)
         if row.hasPrefix("|") { row.removeFirst() }
@@ -347,7 +354,7 @@ public enum MarkdownParser {
         return (marker, String(rest.dropFirst()).trimmingCharacters(in: .whitespaces))
     }
 
-    /// 去掉任务列表标记 `[ ]` / `[x]`，保留纯文本。
+    /// Strips task-list markers `[ ]` / `[x]`, keeping plain text.
     private static func normalizeListItemText(_ text: String, marker: String) -> String {
         if text.hasPrefix("[ ] ") || text.hasPrefix("[ ]") {
             return "☐ " + text.replacingOccurrences(of: "^\\[ ?\\]\\s*", with: "", options: .regularExpression)

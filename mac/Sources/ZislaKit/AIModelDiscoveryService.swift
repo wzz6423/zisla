@@ -16,7 +16,7 @@ public enum AIModelDiscoveryError: LocalizedError, Sendable {
     }
 }
 
-/// 从运行中的本地服务或 OpenAI 兼容服务读取模型目录，不改变工作台的聊天或密钥路由状态。
+/// Reads the model catalog from a running local service or an OpenAI-compatible service without changing the workspace's chat or key-routing state.
 public struct AIModelDiscoveryService: Sendable {
     private let session: URLSession
 
@@ -99,9 +99,16 @@ public struct AIModelDiscoveryService: Sendable {
 
 public enum AIHardwareProfileDetector {
     public static func current() -> AIHardwareProfile {
-        AIHardwareProfile(
-            machineName: sysctlString(named: "machdep.cpu.brand_string") ?? "此 Mac",
-            memoryBytes: ProcessInfo.processInfo.physicalMemory
+        let hardware = SystemHardwareInfoReader.read()
+        return AIHardwareProfile(
+            machineName: Host.current().localizedName ?? "此 Mac",
+            memoryBytes: ProcessInfo.processInfo.physicalMemory,
+            cpuName: hardware.cpuName ?? sysctlString(named: "machdep.cpu.brand_string"),
+            cpuCoreCount: hardware.cpuCoreCount,
+            cpuPerformanceCoreCount: hardware.cpuPerformanceCoreCount,
+            cpuEfficiencyCoreCount: hardware.cpuEfficiencyCoreCount,
+            gpuName: hardware.gpuName,
+            gpuCoreCount: hardware.gpuCoreCount
         )
     }
 

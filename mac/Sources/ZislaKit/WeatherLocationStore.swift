@@ -84,7 +84,7 @@ public struct WeatherLocation: Identifiable, Codable, Equatable, Sendable {
 public final class WeatherLocationStore: ObservableObject {
     public static let maxSavedCount = 6
 
-    /// 约 100m 量级，用于同地去重。
+    /// ~100m tolerance, used to deduplicate the same location.
     public static let coordinateMatchTolerance = 0.001
 
     @Published public private(set) var locations: [WeatherLocation]

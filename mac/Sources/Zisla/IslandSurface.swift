@@ -1,4 +1,5 @@
 import AppKit
+import ZislaCore
 import ZislaKit
 import SwiftUI
 
@@ -13,32 +14,34 @@ struct IslandSurface<Content: View>: View {
     private let isCollapsed: Bool
     private let collapsedSize: CGSize
     private let expandedSize: CGSize
+    private let visualStyle: IslandVisualStyle
+    private let notchBackground: IslandNotchBackground
 
     init(
         isCollapsed: Bool = false,
         collapsedSize: CGSize = CGSize(width: 240, height: 34),
         expandedSize: CGSize = CGSize(width: 748, height: 324),
+        visualStyle: IslandVisualStyle = .frosted,
+        notchBackground: IslandNotchBackground = .black,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.isCollapsed = isCollapsed
         self.collapsedSize = collapsedSize
         self.expandedSize = expandedSize
+        self.visualStyle = visualStyle
+        self.notchBackground = notchBackground
         self.content = content
     }
 
     var body: some View {
         ZStack(alignment: .top) {
-            // 岛面：顶部实黑（贴合菜单栏/刘海），经烟灰过渡带淡入下方透明磨砂玻璃；
-            // 底部为烟灰色透射磨砂玻璃（折射桌面、不泛白），整体观感趋近 iOS 27 Siri 弹窗。
             unifiedSurface
                 .allowsHitTesting(false)
-
-            // IslandRootView keeps the content on the fixed dark appearance.
             content()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // 保持遮罩的布局尺寸不变，只在其画布内重绘轮廓。动画期间若改动遮罩 view
-        // 的 frame，SwiftUI/AppKit 的布局插值会让轮廓短暂从左侧偏移。
+        // Keeps the mask's layout size fixed, redrawing only the outline within its canvas — if the
+        // mask view's frame changes during animation, SwiftUI/AppKit layout interpolation briefly shifts the outline leftward.
         .mask {
             IslandRevealMask(
                 collapsedSize: collapsedSize,
@@ -48,39 +51,103 @@ struct IslandSurface<Content: View>: View {
             .animation(
                 reduceMotion
                     ? nil
-                    : .easeOut(duration: isCollapsed ? 0.18 : 0.22),
+                    // Collapse stays quick and crisp; expand gets a spring with a hint of
+                    // bounce, matching the iOS Dynamic Island reveal feel.
+                    : isCollapsed
+                        ? .smooth(duration: 0.18)
+                        : .snappy(duration: 0.28, extraBounce: 0.05),
                 value: isCollapsed
             )
         }
     }
 
-    // MARK: - 岛面表面
+    // MARK: - Island surface
 
     @ViewBuilder
     private var unifiedSurface: some View {
+        if isCollapsed {
+            collapsedSurface
+        } else {
+            switch visualStyle {
+            case .frosted:
+                frostedSurface
+            case .transparent:
+                transparentSurface
+            }
+        }
+    }
+
+    private var frostedSurface: some View {
         ZStack(alignment: .top) {
-            // 收起态底色始终铺底，展开时被 crown + glass 完全覆盖。
             Color.black
-            if !isCollapsed && !reduceTransparency {
-                // 底部透射磨砂玻璃（烟灰、折射桌面、不泛白）。
+            if !reduceTransparency {
+                // Bottom transmissive frosted glass (smoked, refracts the desktop, no white bloom).
                 glassBody
-                // 顶部实黑 crown + 烟灰过渡。
+                // Ambient light field sits between the glass and the crown so the solid
+                // crown keeps covering it where text legibility matters.
+                IslandLightField(visualStyle: .frosted)
+                // Solid-black crown on top + smoked transition.
                 crown
-            } else if !isCollapsed && reduceTransparency {
-                // 无障碍：不透明黑→烟灰渐变。
+                IslandSheenSweep(visualStyle: .frosted)
+                    .id(visualStyle)
+                IslandRimLight(visualStyle: .frosted)
+            } else {
+                // Accessibility: opaque black → smoked gradient.
                 surfaceGradient
             }
         }
     }
 
-    /// 顶部实黑 crown + 向下平滑过渡。
-    /// 实黑段覆盖 NowPlayingHeader + 工具栏（白字）；其下用缓动渐变把黑淡入
-    /// 烟灰磨砂玻璃。渐变 stops 均匀递减，避免中段出现密度跳变（"矮了一截"感）。
+    @ViewBuilder
+    private var transparentSurface: some View {
+        if reduceTransparency {
+            ZStack(alignment: .top) {
+                Color.black
+                surfaceGradient
+            }
+        } else {
+            ZStack(alignment: .top) {
+                transparentLiquidGlassShell
+                IslandLightField(visualStyle: .transparent)
+                transparentCrown
+                IslandSheenSweep(visualStyle: .transparent)
+                    .id(visualStyle)
+                IslandRimLight(visualStyle: .transparent)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var collapsedSurface: some View {
+        if reduceTransparency {
+            Color.black
+        } else {
+            Group {
+                switch notchBackground {
+                case .black:
+                    Color.black
+                case .frosted:
+                    VisualEffectBackground(alphaValue: 0.62)
+                }
+            }
+            .frame(width: collapsedSize.width, height: collapsedSize.height)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    /// Solid-black crown on top + smooth downward transition.
+    /// The solid-black section covers NowPlayingHeader + toolbar (white text); below it an eased gradient fades black into the smoked frosted glass.
+    /// Gradient stops decrease evenly to avoid a density jump ("sunken" feel) in the middle.
+    /// Crown adapts to the expanded surface height: full size above the floor, compressed below.
     private var crown: some View {
-        VStack(spacing: 0) {
+        let metrics = IslandCrownGeometry.crownMetrics(
+            forSurfaceHeight: expandedSize.height,
+            blendHeight: crownBlend
+        )
+        return VStack(spacing: 0) {
             Rectangle()
                 .fill(Color.black.opacity(crownOpacity))
-                .frame(height: crownHeight)
+                .frame(height: metrics.solidHeight)
             LinearGradient(
                 stops: [
                     .init(color: .black.opacity(crownOpacity), location: 0),
@@ -91,33 +158,91 @@ struct IslandSurface<Content: View>: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: crownBlend)
+            .frame(height: metrics.blendHeight)
             Spacer(minLength: 0)
         }
         .allowsHitTesting(false)
     }
 
-    /// crown 实黑高度：覆盖标题(NowPlayingHeader ~72pt + padding) + 工具栏(30pt)。
-    private let crownHeight: CGFloat = 132
-    /// 视觉保持黑色，同时让透明面板保留极轻的透光感。
+    /// Visually stays black while allowing the transparent panel to retain a very faint translucency.
     private let crownOpacity: CGFloat = 0.98
-    /// crown 向下淡入磨砂玻璃的过渡高度。加长至 60pt 让黑→烟灰融合更平滑。
+    /// Crown-to-frosted-glass blend height. Extended to 60pt for a smoother black → smoked merge.
     private let crownBlend: CGFloat = 60
 
-    /// 岛面底色：透射式烟灰磨砂玻璃。
+    /// Island surface base: transmissive smoked frosted glass.
     ///
-    /// 放弃 `.glassEffect(.regular)` 作大面积背景——它在深色 colorScheme 下会坍缩成
-    /// 实色黑（Liquid Glass 设计用途是悬浮控件，非整面背景）。改用 `NSVisualEffectView`
-    /// 的 `.hudWindow` + `.behindWindow` + 深色外观：真正透射窗口后方桌面，深色下呈
-    /// 烟灰半透磨砂、不泛白也不纯黑，行为稳定可控。顶部黑 crown 负责与黑顶衔接。
+    /// `.glassEffect(.regular)` is dropped for large-area backgrounds — it collapses to
+    /// solid black in dark colorScheme (Liquid Glass is designed for floating controls, not
+    /// full-surface backgrounds). Instead, `NSVisualEffectView` with `.hudWindow` +
+    /// `.behindWindow` + dark appearance is used: truly transmissive through the desktop
+    /// behind the window, rendering as smoked semi-transparent frosted glass in dark mode —
+    /// no white bloom, no pure black, stable and predictable. The solid-black crown handles
+    /// the transition at the top.
     private var glassBody: some View {
         VisualEffectBackground()
     }
 
-    // MARK: - 表面渐变（无障碍：不透明黑 → 烟灰）
+    // MARK: - Transparent glass (macOS 27 / Liquid Glass approximation)
 
-    /// 无障碍（Reduce Transparency）模式：不透明黑→烟灰竖向渐变，
-    /// 去掉磨砂与透明，配合浅色文字保证对比度。
+    /// The clear layer keeps the lower edge refractive; the regular layer above it restores
+    /// enough frosted contrast for module content to remain readable.
+    private var transparentLiquidGlassShell: some View {
+        ZStack {
+            NativeLiquidGlassShell(isCollapsed: isCollapsed, material: .clear)
+            NativeLiquidGlassShell(isCollapsed: isCollapsed, material: .regular)
+                .mask(alignment: .bottom) {
+                    // A single gradient avoids an AppKit compositor seam at the boundary
+                    // between separately laid-out opaque and fading mask views.
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black, location: 0.72),
+                            .init(color: .black.opacity(0.92), location: 0.78),
+                            .init(color: .black.opacity(0.70), location: 0.84),
+                            .init(color: .black.opacity(0.38), location: 0.90),
+                            .init(color: .black.opacity(0.12), location: 0.96),
+                            .init(color: .clear, location: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// The top remains completely opaque: Liquid Glass starts below the crown, where the module content lives.
+    private var transparentCrown: some View {
+        let metrics = IslandCrownGeometry.crownMetrics(
+            forSurfaceHeight: expandedSize.height,
+            blendHeight: transparentCrownBlend
+        )
+        return VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: metrics.solidHeight)
+            LinearGradient(
+                stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black.opacity(0.78), location: 0.35),
+                    .init(color: .black.opacity(0.34), location: 0.72),
+                    .init(color: .black.opacity(0.0), location: 1),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: metrics.blendHeight)
+            Spacer(minLength: 0)
+        }
+        .allowsHitTesting(false)
+    }
+
+    private let transparentCrownBlend = IslandCrownGeometry.crownBlendHeight
+
+    // MARK: - Surface gradient (accessibility: opaque black → smoked)
+
+    /// Accessibility (Reduce Transparency) mode: opaque black → smoked vertical gradient,
+    /// removes frosted glass and transparency while preserving contrast for light-colored text.
     private var surfaceGradient: some View {
         LinearGradient(
             stops: [
@@ -171,7 +296,7 @@ private struct IslandRevealMask: Shape {
     }
 }
 
-/// 灵动岛轮廓：展开态直接贴合屏幕顶部，底部使用连续大圆角收束。
+/// Island outline: expanded state sits flush with the top of the screen; bottom uses a continuous large corner radius.
 struct IslandSilhouette: InsettableShape {
     var topCornerRadius: CGFloat = 0
     var bottomCornerRadius: CGFloat = 34
@@ -209,16 +334,17 @@ struct IslandSilhouette: InsettableShape {
 }
 
 struct VisualEffectBackground: NSViewRepresentable {
-    /// 0…1，降低后整体材质更通透；nil 表示使用系统默认（1.0）。
+    /// 0…1; lower values make the material more transmissive; nil uses the system default (1.0).
     var alphaValue: CGFloat? = nil
+    var material: NSVisualEffectView.Material = .hudWindow
+    var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
 
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        view.material = .hudWindow
-        view.blendingMode = .behindWindow
+        view.material = material
+        view.blendingMode = blendingMode
         view.state = .active
-        // 深色外观：让 HUD 材质渲染为烟灰半透磨砂玻璃，与 macOS 26 的
-        // Liquid Glass 深色分支观感一致，底部不泛白。
+        // Resolve each semantic material against the app's fixed dark appearance.
         view.appearance = NSAppearance(named: .darkAqua)
         if let alphaValue {
             view.alphaValue = alphaValue
@@ -226,7 +352,144 @@ struct VisualEffectBackground: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = material
+        nsView.blendingMode = blendingMode
+        // Sync alpha on style switch so a reused NSView doesn't keep the old transmissivity.
+        nsView.alphaValue = alphaValue ?? 1
+    }
 }
 
-// `IconButton` 已迁移至 DesignSystem.swift（统一实现，含尺寸与激活态令牌）。
+/// Module-level liquid glass pane (composer input, cards): the same native renderer as the
+/// island's transparent shell, so panes refract the desktop instead of overlaying flat darkness.
+/// macOS 26+ only — `IslandGlassSurface` falls back to the frosted material on older systems.
+struct LiquidGlassPaneBackground: NSViewRepresentable {
+    var cornerRadius: CGFloat
+
+    func makeNSView(context: Context) -> NSView {
+        guard #available(macOS 26.0, *) else { return NSView() }
+        let view = NSGlassEffectView()
+        // Same trick as the island shell: a transparent content host guarantees the full
+        // compositing path so the pane doesn't render as just an edge.
+        let host = NSView(frame: view.bounds)
+        host.autoresizingMask = [.width, .height]
+        host.wantsLayer = true
+        host.layer?.backgroundColor = NSColor.clear.cgColor
+        view.contentView = host
+        configure(view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard #available(macOS 26.0, *), let view = nsView as? NSGlassEffectView else { return }
+        configure(view)
+    }
+
+    @available(macOS 26.0, *)
+    private func configure(_ view: NSGlassEffectView) {
+        // `.regular` plus a dark tint reads as frosted; the clear material keeps the input
+        // pane visibly distinct from the frosted-mode branch while retaining native refraction.
+        view.style = .clear
+        view.tintColor = nil
+        view.cornerRadius = cornerRadius
+    }
+}
+
+/// Uses the system Liquid Glass renderer only as an optical shell. Keeping content out of the
+/// native view avoids its large-surface white wash while retaining the real refraction effect.
+private enum NativeLiquidGlassMaterial {
+    case regular
+    case clear
+}
+
+private struct NativeLiquidGlassShell: NSViewRepresentable {
+    let isCollapsed: Bool
+    let material: NativeLiquidGlassMaterial
+
+    init(isCollapsed: Bool, material: NativeLiquidGlassMaterial = .regular) {
+        self.isCollapsed = isCollapsed
+        self.material = material
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        if #available(macOS 26.0, *) {
+            let view = LiquidGlassShellView()
+            configure(view)
+            view.setCollapsed(isCollapsed)
+            return view
+        }
+        return NSView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if #available(macOS 26.0, *), let glass = nsView as? LiquidGlassShellView {
+            configure(glass)
+            glass.setCollapsed(isCollapsed)
+        }
+    }
+
+    @available(macOS 26.0, *)
+    private func configure(_ view: LiquidGlassShellView) {
+        switch material {
+        case .regular:
+            view.style = .regular
+            view.tintColor = NSColor.black.withAlphaComponent(0.23)
+        case .clear:
+            view.style = .clear
+            view.tintColor = nil
+        }
+        view.alphaValue = 1
+        view.cornerRadius = IslandSurfaceGeometry.expandedBottomCornerRadius
+        view.installTransparentContentHostIfNeeded()
+    }
+}
+
+@available(macOS 26.0, *)
+private final class LiquidGlassShellView: NSGlassEffectView {
+    private var isCollapsed = true
+    private var refreshGeneration = 0
+
+    func setCollapsed(_ isCollapsed: Bool) {
+        let didExpand = self.isCollapsed && !isCollapsed
+        self.isCollapsed = isCollapsed
+        guard didExpand else { return }
+
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
+        refreshAfterReveal(generation: generation, delay: 0)
+        refreshAfterReveal(generation: generation, delay: 0.24)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, !isCollapsed else { return }
+        refreshGeneration &+= 1
+        refreshAfterReveal(generation: refreshGeneration, delay: 0)
+    }
+
+    /// NSGlassEffectView guarantees its full compositing path for `contentView`; an empty shell
+    /// may otherwise render only an edge until an interaction causes a later compositor pass.
+    func installTransparentContentHostIfNeeded() {
+        guard contentView == nil else { return }
+
+        let host = NSView(frame: bounds)
+        host.autoresizingMask = [.width, .height]
+        host.wantsLayer = true
+        host.layer?.backgroundColor = NSColor.clear.cgColor
+        contentView = host
+    }
+
+    private func refreshAfterReveal(generation: Int, delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, self.refreshGeneration == generation, !self.isCollapsed,
+                  self.window != nil
+            else { return }
+            self.needsLayout = true
+            self.layoutSubtreeIfNeeded()
+            self.needsDisplay = true
+            self.displayIfNeeded()
+        }
+    }
+}
+
+// `IconButton` has been moved to DesignSystem.swift (unified implementation with size and activation-state tokens).

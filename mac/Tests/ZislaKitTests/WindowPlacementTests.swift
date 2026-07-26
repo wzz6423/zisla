@@ -44,9 +44,77 @@ struct WindowPlacementTests {
         #expect(abs(window.frame.midY - screen.visibleFrame.midY) <= 1)
     }
 
-    /// 授权锚点宿主应落在指定屏幕可见区域中心、保持不可见的极小尺寸且可成为 key，
-    /// 这样系统权限面板才会跟随到该屏幕。测试仅验证定位逻辑，不触发激活/前置的系统副作用，
-    /// 也不 mock 系统弹窗本身。
+    @Test @MainActor
+    func preparesModalWindowAboveDynamicIsland() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let window = NSWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 180),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+
+        WindowPlacement.prepareModal(window, on: screen)
+
+        #expect(window.level == WindowPlacement.modalWindowLevel)
+        #expect(window.level.rawValue > IslandPanel.onTopLevel.rawValue)
+        #expect(abs(window.frame.midX - screen.visibleFrame.midX) <= 1)
+        #expect(abs(window.frame.midY - screen.visibleFrame.midY) <= 1)
+    }
+
+    @Test @MainActor
+    func promotesTransientWindowAboveDynamicIsland() {
+        let window = NSPanel(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 180),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+
+        WindowPlacement.promoteTransientWindowIfNeeded(window)
+
+        #expect(window.level == WindowPlacement.modalWindowLevel)
+    }
+
+    @Test @MainActor
+    func promotesWindowThatBecomesKeyAfterSwiftUIPresentation() {
+        let window = NSPanel(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 180),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        WindowPlacement.installTransientWindowPromotion()
+
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+
+        #expect(window.level == WindowPlacement.modalWindowLevel)
+    }
+
+    @Test @MainActor
+    func leavesIslandAndHigherPriorityWindowsUntouched() {
+        let island = IslandPanel(
+            contentView: NSView(),
+            frame: CGRect(x: 0, y: 0, width: 320, height: 180)
+        )
+        let screenSaverWindow = NSPanel(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 180),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        screenSaverWindow.level = .screenSaver
+
+        WindowPlacement.promoteTransientWindowIfNeeded(island)
+        WindowPlacement.promoteTransientWindowIfNeeded(screenSaverWindow)
+
+        #expect(island.level == IslandPanel.onTopLevel)
+        #expect(screenSaverWindow.level == .screenSaver)
+    }
+
+    /// The authorization anchor host should center on the requested screen's visible frame, stay tiny and invisible yet keyable,
+    /// so the system permission sheet follows that screen. Tests only verify placement logic—no activate/front system side effects,
+    /// and do not mock the system prompt itself.
     @Test @MainActor
     func authorizationPromptHostUsesRequestedScreen() throws {
         let screen = try #require(NSScreen.screens.first)

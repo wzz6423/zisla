@@ -1,7 +1,7 @@
 import Foundation
 import ZislaCore
 
-/// 从 Grok CLI `~/.grok/sessions/**/events.jsonl` 推断活动任务。
+/// Infers active tasks from Grok CLI `~/.grok/sessions/**/events.jsonl` files.
 public final class GrokSessionActivityDetector: AIActivityDetecting {
     private struct Candidate {
         var url: URL

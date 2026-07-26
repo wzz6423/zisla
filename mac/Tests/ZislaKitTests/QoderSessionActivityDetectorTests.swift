@@ -326,6 +326,7 @@ struct QoderSessionActivityDetectorTests {
         #expect(task.id == QoderSessionActivityDetector.taskID(forSessionID: "sess-desktop"))
         #expect(task.detail == "Desktop")
         #expect(task.status == .blocked)
+        #expect(task.sessionURL?.absoluteString == "qoder-work-cn://notification-click?chatId=sess-desktop")
 
         let cachedTasks = try detector.activeTasks()
         #expect(cachedTasks == tasks)

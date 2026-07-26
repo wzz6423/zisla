@@ -1,6 +1,6 @@
 import CoreGraphics
 
-/// 让展开面在缩放期间保持顶部中心不动，避免视觉上从左上角飞入。
+/// Keeps the top center of the expanded surface stationary during scaling, preventing it from flying in from the top-left corner.
 public struct IslandSurfaceTransform: Equatable, Sendable {
     public let scaleX: CGFloat
     public let scaleY: CGFloat
@@ -31,6 +31,14 @@ public struct IslandSurfaceTransform: Equatable, Sendable {
             y: 0,
             width: expandedSize.width * scaleX,
             height: expandedSize.height * scaleY
+        )
+    }
+
+    /// Keeps the expanded surface inside the panel frame without scaling its controls or typography.
+    public static func fittingSize(contentSize: CGSize, availableSize: CGSize) -> CGSize {
+        CGSize(
+            width: min(max(0, contentSize.width), max(0, availableSize.width)),
+            height: min(max(0, contentSize.height), max(0, availableSize.height))
         )
     }
 }

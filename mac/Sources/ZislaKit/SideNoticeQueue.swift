@@ -44,7 +44,7 @@ public final class SideNoticeQueue: ObservableObject {
         }
     }
 
-    /// 仅刷新已在队列中的通知内容；不新增、不取消或重启到期任务。
+    /// Updates the content of a notice already in the queue; does not add, cancel, or restart its expiry task.
     @discardableResult
     public func updateIfPresent(_ notice: IslandNotice) -> Bool {
         if let index = left.firstIndex(where: { $0.id == notice.id }) {
@@ -99,12 +99,17 @@ public final class SideNoticeQueue: ObservableObject {
         }
     }
 
-    /// 与 SideNoticeLayoutEngine 一致：折叠展示的活动项不占普通侧容量。
+    /// Consistent with SideNoticeLayoutEngine: collapsed active items do not consume ordinary side capacity.
     private static func isCompactCollapsedNotice(_ notice: IslandNotice) -> Bool {
         notice.id.hasPrefix("ai-active-")
             || notice.id.hasPrefix("media-active-")
             || notice.id.hasPrefix("focus-countdown-")
+            || notice.id.hasPrefix("focus-mode-")
+            || notice.id.hasPrefix("focus-transition")
             || notice.id.hasPrefix("toolbox-reminder-")
+            || notice.id.hasPrefix("browser-download-")
+            || notice.id.hasPrefix("video-download-")
+            || notice.style == .headphone
     }
 
     private func scheduleExpiry(for id: String, after seconds: Double) {

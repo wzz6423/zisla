@@ -7,19 +7,34 @@ import SwiftUI
 @MainActor
 final class SideNoticePresenter {
     private let queue: SideNoticeQueue
+    private let media: NowPlayingService
+    private let settingsStore: FeatureSettingsStore
     private let layoutEngine = SideNoticeLayoutEngine()
-    private let displayState = SideNoticeDisplayState()
     private var panelsByDisplayID: [CGDirectDisplayID: DisplayPanels] = [:]
     private var cancellables: Set<AnyCancellable> = []
     private var configuredDisplayIDs: Set<UInt32>
     private var isIslandExpanded = false
 
-    init(queue: SideNoticeQueue, displayIDs: Set<UInt32> = []) {
+    init(
+        queue: SideNoticeQueue,
+        media: NowPlayingService,
+        settingsStore: FeatureSettingsStore,
+        displayIDs: Set<UInt32> = []
+    ) {
         self.queue = queue
+        self.media = media
+        self.settingsStore = settingsStore
         configuredDisplayIDs = displayIDs
         queue.$left
             .combineLatest(queue.$right)
             .sink { [weak self] _, _ in
+                Task { @MainActor [weak self] in self?.updatePanels() }
+            }
+            .store(in: &cancellables)
+        // A settings change can switch the winning compact status and its required width.
+        settingsStore.$settings
+            .removeDuplicates()
+            .sink { [weak self] _ in
                 Task { @MainActor [weak self] in self?.updatePanels() }
             }
             .store(in: &cancellables)
@@ -78,6 +93,7 @@ final class SideNoticePresenter {
 
         for snapshot in snapshots where displayIDs.contains(UInt32(snapshot.displayID)) {
             let panels = panels(for: snapshot.displayID)
+            let displayState = panels.displayState
             let compactBarFrame = layoutEngine.compactBarFrame(for: snapshot)
             displayState.compactWingsEnabled = false
             displayState.compactWingHeight = compactBarFrame.height
@@ -99,22 +115,33 @@ final class SideNoticePresenter {
     }
 
     private func updateCompactBar(screen snapshot: ScreenSnapshot, panels: DisplayPanels) {
+        let displayState = panels.displayState
         let compactNotices = queue.left + queue.right
-        let compactPresentation = layoutEngine.presentation(for: compactNotices)
         guard !displayState.compactStatusHidden,
             compactNotices.contains(where: Self.isCompactNotice)
         else {
             panels.compactBar?.orderOut(nil)
             return
         }
+        let selectedPriority = selectedCompactStatusPriority(for: compactNotices)
+        let extendsForCompactStatus = selectedPriority == .transient
+            || selectedPriority == .focusCountdown
+        let usesDetailedMedia = selectedPriority == .media
+            && settingsStore.settings.mediaCompactStyle == .detailed
         let frame = layoutEngine.compactBarFrame(
             for: snapshot,
-            extendsForFocusCountdown: compactPresentation.shouldExtendCompactBarForFocusCountdown
+            extendsForFocusCountdown: extendsForCompactStatus,
+            expandsForDetailedMedia: usesDetailedMedia
         )
         guard frame != .zero else {
             panels.compactBar?.orderOut(nil)
             return
         }
+        let topology = ScreenLayoutEngine().layout(for: snapshot).topology
+        // Detailed mode left/right content must avoid the physical notch; simulated-island devices have no obstruction, so no center gap.
+        displayState.compactBarCenterInset = topology.hasPhysicalNotch
+            ? topology.anchorFrame.width
+            : 0
         let panel = ensureCompactBarPanel(in: panels)
         panel.setFrame(frame, display: true)
         panel.orderFrontRegardless()
@@ -126,6 +153,7 @@ final class SideNoticePresenter {
         screen snapshot: ScreenSnapshot,
         panels: DisplayPanels
     ) {
+        let displayState = panels.displayState
         guard !notices.isEmpty || displayState.reserveCompactWing else {
             panel(for: side, in: panels)?.orderOut(nil)
             return
@@ -150,7 +178,7 @@ final class SideNoticePresenter {
         if let panel = panel(for: side, in: panels) { return panel }
         let rootView = SideNoticeRootView(
             queue: queue,
-            displayState: displayState,
+            displayState: panels.displayState,
             side: side
         )
         let hostingView = NSHostingView(rootView: rootView)
@@ -167,7 +195,9 @@ final class SideNoticePresenter {
         if let compactBar = panels.compactBar { return compactBar }
         let rootView = CompactStatusBarView(
             queue: queue,
-            displayState: displayState,
+            displayState: panels.displayState,
+            media: media,
+            settingsStore: settingsStore,
             onStatusHidden: { [weak self] in self?.updatePanels() }
         )
         let hostingView = NSHostingView(rootView: rootView)
@@ -184,7 +214,38 @@ final class SideNoticePresenter {
         notice.id.hasPrefix("ai-active-")
             || notice.id.hasPrefix("media-active-")
             || notice.id.hasPrefix("focus-countdown-")
+            || notice.id.hasPrefix("focus-mode-")
+            || isTransientCompactNotice(notice)
             || notice.id.hasPrefix("toolbox-reminder-")
+            || notice.id.hasPrefix("browser-download-")
+            || notice.id.hasPrefix("video-download-")
+    }
+
+    private static func isTransientCompactNotice(_ notice: IslandNotice) -> Bool {
+        notice.id.hasPrefix("focus-transition") || notice.style == .headphone
+    }
+
+    private func selectedCompactStatusPriority(for notices: [IslandNotice]) -> CompactStatusPriority? {
+        settingsStore.settings.compactStatusPriority.first { priority in
+            switch priority {
+            case .transient:
+                notices.contains(where: Self.isTransientCompactNotice)
+            case .videoDownload:
+                notices.contains { $0.id.hasPrefix("video-download-") }
+            case .browserDownload:
+                notices.contains { $0.id.hasPrefix("browser-download-") }
+            case .focusCountdown:
+                notices.contains { $0.id.hasPrefix("focus-countdown-") }
+            case .toolboxReminder:
+                notices.contains { $0.id.hasPrefix("toolbox-reminder-") }
+            case .aiActivity:
+                notices.contains { $0.id.hasPrefix("ai-active-") }
+            case .media:
+                notices.contains { $0.id.hasPrefix("media-active-") }
+            case .focusMode:
+                notices.contains { $0.id.hasPrefix("focus-mode-") }
+            }
+        }
     }
 
     private func panel(for side: NoticeSide, in panels: DisplayPanels) -> IslandPanel? {
@@ -227,6 +288,7 @@ final class SideNoticePresenter {
 
 @MainActor
 private final class DisplayPanels {
+    let displayState = SideNoticeDisplayState()
     var left: IslandPanel?
     var right: IslandPanel?
     var compactBar: IslandPanel?

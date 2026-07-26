@@ -1,16 +1,17 @@
 import Foundation
 import SwiftUI
 
-/// 把 Markdown 源文本渲染为单个 `AttributedString`，供灵动岛预览区 `Text` 直接显示。
+/// Renders a Markdown source string into a single `AttributedString` for direct display
+/// in the island preview area's `Text` view.
 ///
-/// 块级结构由 `MarkdownParser` 提供；行内格式（粗体/斜体/行内代码/链接/删除线）
-/// 交给 Foundation 的 `AttributedString(markdown:)`，因此无需自己写正则替换，
-/// 也不会误伤代码块内容。
+/// Block structure is provided by `MarkdownParser`; inline formatting (bold/italic/inline
+/// code/links/strikethrough) is delegated to Foundation's `AttributedString(markdown:)`,
+/// so no custom regex substitution is needed and code block content is never mangled.
 ///
-/// 仅使用 SwiftUI 的 `Font`/`Color` 类型，不依赖 SwiftUI 属性包装宏，因此可在
-/// 仅安装 Command Line Tools 的环境下编译。
+/// Uses only SwiftUI's `Font`/`Color` types and no SwiftUI property-wrapper macros, so
+/// it compiles in environments with only Command Line Tools installed.
 public enum MarkdownRenderer {
-    /// 基础正文字号；灵动岛内紧凑布局的下限。
+    /// Base body font size; the lower bound for the island's compact layout.
     private static let baseSize: CGFloat = 12
 
     public static func attributedString(from source: String) -> AttributedString {
@@ -111,8 +112,8 @@ public enum MarkdownRenderer {
         return attr
     }
 
-    /// 行内格式：用 Foundation 解析粗体/斜体/行内代码/链接/删除线，
-    /// 解析失败时回退为纯文本。
+    /// Inline formatting: parse bold/italic/inline code/links/strikethrough via Foundation;
+    /// fall back to plain text on parse failure.
     private static func inline(_ text: String, font: Font) -> AttributedString {
         var attr: AttributedString
         if let parsed = try? AttributedString(markdown: text) {

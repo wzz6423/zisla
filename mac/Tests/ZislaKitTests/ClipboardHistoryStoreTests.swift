@@ -178,6 +178,136 @@ struct ClipboardHistoryStoreTests {
         #expect(restored.items.map(\.content) == store.items.map(\.content))
     }
 
+    @Test
+    func recordPinnedAddsEmojiTextAndKeepsItPinnedAcrossRestart() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL, capacity: 2)
+
+        let emoji = "常用信息 🎉👨‍👩‍👧‍👦🚀"
+        #expect(store.recordPinned(.text(emoji)))
+        // Append history past capacity; pinned items must not be evicted.
+        #expect(store.record(.text("历史一")))
+        #expect(store.record(.text("历史二")))
+        #expect(store.record(.text("历史三")))
+
+        #expect(store.pinnedItems.map(\.content) == [.text(emoji)])
+        #expect(store.pinnedItems.first?.isPinned == true)
+
+        store.flushPendingChanges()
+        let restored = ClipboardHistoryStore(storageURL: storageURL, capacity: 2)
+        #expect(restored.pinnedItems.map(\.content) == [.text(emoji)])
+        #expect(restored.pinnedItems.first?.isPinned == true)
+    }
+
+    @Test
+    func recordPinnedDeduplicatesRepeatedRecords() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ClipboardHistoryStore(
+            storageURL: directory.appendingPathComponent("clipboard-history.sqlite")
+        )
+
+        #expect(store.recordPinned(.text("重复")))
+        #expect(store.recordPinned(.text("重复")))
+
+        #expect(store.pinnedItems.map(\.content) == [.text("重复")])
+        #expect(store.items.count == 1)
+        store.flushPendingChanges()
+    }
+
+    @Test
+    func fileItemIsWrittenAndRestoredAfterRestart() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let fileURL = directory.appendingPathComponent("附件.txt")
+        try Data("hello".utf8).write(to: fileURL)
+
+        let store = ClipboardHistoryStore(storageURL: storageURL, capacity: 2)
+        let content = try ClipboardHistoryContent.file(at: fileURL)
+        #expect(store.recordPinned(content))
+
+        let pinned = try #require(store.pinnedItems.first)
+        #expect(pinned.isPinned)
+        guard case .file(let reference) = pinned.content else {
+            Issue.record("期望文件内容")
+            return
+        }
+        #expect(reference.displayName == "附件.txt")
+        #expect(reference.url.standardizedFileURL == fileURL.standardizedFileURL)
+
+        store.flushPendingChanges()
+        let restored = ClipboardHistoryStore(storageURL: storageURL, capacity: 2)
+        let restoredItem = try #require(restored.pinnedItems.first)
+        #expect(restoredItem.isPinned)
+        guard case .file(let restoredReference) = restoredItem.content else {
+            Issue.record("重启后期望文件内容")
+            return
+        }
+        #expect(restoredReference.displayName == "附件.txt")
+        #expect(restoredReference.url.standardizedFileURL == fileURL.standardizedFileURL)
+    }
+
+    @Test
+    func missingFileItemIsDroppedOnLoad() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let fileURL = directory.appendingPathComponent("临时.txt")
+        try Data("bye".utf8).write(to: fileURL)
+
+        let store = ClipboardHistoryStore(storageURL: storageURL)
+        #expect(store.recordPinned(try ClipboardHistoryContent.file(at: fileURL)))
+        #expect(store.record(.text("保留文字")))
+        store.flushPendingChanges()
+
+        try FileManager.default.removeItem(at: fileURL)
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        #expect(restored.items.map(\.content) == [.text("保留文字")])
+    }
+
+    @Test
+    func legacyTextAndImageRowsRemainReadableAfterMigration() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        // Build a history DB with only the old 6 columns to simulate pre-migration data.
+        try executeSQL(
+            """
+            CREATE TABLE clipboard_history (
+                id TEXT PRIMARY KEY NOT NULL,
+                content_type INTEGER NOT NULL,
+                text_value TEXT,
+                image_data BLOB,
+                last_copied_at REAL NOT NULL,
+                is_pinned INTEGER NOT NULL
+            );
+            INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned)
+            VALUES ('\(UUID().uuidString)', 0, '旧文字', NULL, 1000.0, 1);
+            INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned)
+            VALUES ('\(UUID().uuidString)', 1, NULL, x'00010203', 900.0, 0);
+            """,
+            at: storageURL
+        )
+
+        let store = ClipboardHistoryStore(storageURL: storageURL)
+        #expect(store.errorDescription == nil)
+        #expect(store.pinnedItems.map(\.content) == [.text("旧文字")])
+        #expect(store.historyItems.map(\.content) == [.image(Data([0, 1, 2, 3]))])
+
+        // After migration, file items can still be written and read back.
+        let fileURL = directory.appendingPathComponent("新文件.dat")
+        try Data([9]).write(to: fileURL)
+        #expect(store.recordPinned(try ClipboardHistoryContent.file(at: fileURL)))
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        #expect(restored.items.contains { $0.content == .text("旧文字") })
+        #expect(restored.items.contains { if case .file = $0.content { return true }; return false })
+    }
+
     private func makeDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

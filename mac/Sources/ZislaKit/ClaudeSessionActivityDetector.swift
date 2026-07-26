@@ -1,7 +1,7 @@
 import Foundation
 import ZislaCore
 
-/// 从 Claude Code / Claude VS Code 的 `~/.claude/projects/**/*.jsonl` 推断活动任务。
+/// Infers active tasks from `~/.claude/projects/**/*.jsonl` written by Claude Code / Claude VS Code.
 public final class ClaudeSessionActivityDetector: AIActivityDetecting {
     private struct Candidate {
         var url: URL
@@ -17,6 +17,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         var model: String?
         var pendingAskToolUseIDs: Set<String> = []
         var hasError = false
+        var isVSCode = false
     }
 
     private struct CachedTranscript {
@@ -166,6 +167,10 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
                 }
                 var state = next.stateBySession[sid] ?? SessionState()
 
+                if (root["entrypoint"] as? String)?.lowercased() == "claude-vscode" {
+                    state.isVSCode = true
+                }
+
                 let timestamp = Self.parseTimestamp(root["timestamp"])
                     ?? candidate.modificationDate
                 if let model = Self.extractModel(root) {
@@ -220,16 +225,25 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         next.task = AIProgressTask(
             id: Self.taskID(forSessionID: active.key),
             provider: .claude,
-            title: "Claude",
+            title: active.value.isVSCode ? "Claude Code (VS Code)" : "Claude",
             detail: active.value.model,
             progress: nil,
             status: status,
             updatedAt: updatedAt,
-            sessionURL: nil,
+            sessionURL: active.value.isVSCode ? Self.vsCodeSessionURL(for: active.key) : nil,
             effort: nil,
             startedAt: active.value.startedAt
         )
         return next
+    }
+
+    private static func vsCodeSessionURL(for sessionID: String) -> URL? {
+        var components = URLComponents()
+        components.scheme = "vscode"
+        components.host = "anthropic.claude-code"
+        components.path = "/open"
+        components.queryItems = [URLQueryItem(name: "session", value: sessionID)]
+        return components.url
     }
 
     private func applyUserRecord(

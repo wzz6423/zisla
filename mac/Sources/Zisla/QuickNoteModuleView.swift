@@ -1,19 +1,19 @@
 import ZislaKit
 import SwiftUI
 
-/// 「随记」模块：以系统「备忘录」为数据源。
+/// "Quick Notes" module: uses the system Notes app as its data source.
 ///
-/// 左侧列出备忘录中已有的笔记（可刷新/新建/删除），右侧编辑或预览：编辑态用
-/// `TextEditor` 读写选中笔记的 Markdown 原文，预览态用 `MarkdownRenderer` 渲染；
-/// 草稿停止输入 0.8 秒后自动写回备忘录。这样既能查看、编辑已有的备忘录笔记，
-/// 也能新建——而不仅限于新增。
+/// The left column lists existing notes from Notes (with refresh/create/delete actions); the right side
+/// edits the note body in a rich-text editor. Drafts are automatically written back to Notes 0.8 s after
+/// the user stops typing, enabling both viewing/editing existing notes and creating new ones — not just appending.
 struct QuickNoteModuleView: View {
     @ObservedObject var model: AppModel
 
-    @State private var draft: String = ""
-    @State private var lastLoadedDraft: String = ""
+    @State private var draftHTML: String = "<div><br></div>"
+    @State private var draftPlainText: String = ""
     @State private var noteContent: NotesAppBridge.NoteContent?
-    @State private var isPreview = false
+    @State private var editorCommand: RichNoteEditorCommand?
+    @State private var isTransferTarget = false
 
     private var service: QuickNotesService { model.quickNotes }
 
@@ -30,28 +30,20 @@ struct QuickNoteModuleView: View {
             cancelAndLoadDraft()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            // 从备忘录 App 等外部返回时同步列表（外部删除后清掉陈旧条目）
+            // Sync the list when returning from an external app such as Notes (removes stale entries after external deletions).
             Task { await service.refresh() }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            // 菜单栏 accessory 应用从备忘录等外部切回时，app 不一定重新 active，
-            // 但面板/窗口会成为 key window，此时补一次刷新确保列表同步。
+            // When a menu-bar accessory app returns from Notes or another external app the app may not become active again,
+            // but the panel/window becomes the key window — do an extra refresh here to keep the list in sync.
             Task { await service.refresh() }
         }
         .onChange(of: service.selectedID) { _, _ in
             cancelAndLoadDraft()
         }
-        .onChange(of: draft) { _, newValue in
-            // 载入产生的相同内容不触发写回；只有用户改动才保存
-            guard let id = service.selectedID,
-                  noteContent?.usesNativeHTML != true,
-                  newValue != lastLoadedDraft
-            else { return }
-            service.scheduleSave(id: id, markdown: newValue)
-        }
     }
 
-    // MARK: - 笔记列表
+    // MARK: - Note list
 
     private var noteListColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -73,13 +65,13 @@ struct QuickNoteModuleView: View {
             .padding(.horizontal, 4)
 
             Group {
-                if service.isLoadingList && service.notes.isEmpty {
+                if service.isLoadingList && service.notes.isEmpty && service.welcomeNote == nil {
                     ProgressView()
                         .controlSize(.small)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = service.errorMessage, service.notes.isEmpty {
+                } else if let error = service.errorMessage, service.notes.isEmpty, service.welcomeNote == nil {
                     listErrorView(error)
-                } else if service.notes.isEmpty {
+                } else if service.notes.isEmpty, service.welcomeNote == nil {
                     EmptyState(symbol: "note.text", title: "备忘录暂无笔记", detail: "点 + 新建一条")
                 } else {
                     ScrollView(.vertical) {
@@ -128,16 +120,20 @@ struct QuickNoteModuleView: View {
         let selected = note.id == service.selectedID
         return Button {
             service.select(id: note.id)
-            isPreview = false
         } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(note.title.isEmpty ? "无标题" : note.title)
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundStyle(selected ? Color.primary : Color.primary.opacity(0.86))
                     .lineLimit(2)
-                Text(note.modifiedAt.map { relativeTime($0) } ?? "—")
-                    .font(.islandMicro())
-                    .foregroundStyle(.tertiary)
+                HStack(spacing: 3) {
+                    if note.isPasswordProtected {
+                        Image(systemName: "lock.fill")
+                    }
+                    Text(service.isBuiltInWelcomeNote(id: note.id) ? "内置说明" : note.modifiedAt.map { relativeTime($0) } ?? "—")
+                }
+                .font(.islandMicro())
+                .foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)
@@ -156,32 +152,28 @@ struct QuickNoteModuleView: View {
         }
     }
 
-    // MARK: - 编辑 / 预览
+    // MARK: - Editing
 
     private var editorColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
             editorToolbar
-                .frame(height: 30)
+                .frame(height: 34)
                 .padding(.bottom, 6)
 
-            Group {
-                if isPreview {
-                    previewPane
-                } else {
-                    editorPane
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.fillCard)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.strokeCard, lineWidth: 1)
+            if let noteContent {
+                ReadOnlyNoteMetadata(
+                    content: noteContent,
+                    showNote: service.showSelectedNoteInNotes,
+                    showAttachment: { service.showAttachmentInNotes(id: $0.id) },
+                    wordCount: draftPlainText.count
+                )
+                .frame(height: 28)
+                .padding(.bottom, 5)
             }
 
-            editorFooter
-                .frame(height: 18)
-                .padding(.top, 5)
+            editorPane
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .islandGlassSurface(.input, cornerRadius: 8)
         }
         .padding(.leading, 10)
     }
@@ -201,91 +193,74 @@ struct QuickNoteModuleView: View {
                 ProgressView().controlSize(.mini)
             }
             Spacer(minLength: 6)
-            Picker("", selection: $isPreview) {
-                Image(systemName: "square.and.pencil").tag(false)
-                Image(systemName: "eye").tag(true)
+            RichNoteToolbar(command: $editorCommand)
+                .frame(maxWidth: .infinity)
+                .disabled(service.isBuiltInWelcomeNoteSelected)
+            IconButton(symbol: "text.viewfinder", help: "发送到提词器", size: .compact) {
+                model.sendQuickNoteToTeleprompter(draftPlainText)
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .controlSize(.mini)
-            .frame(width: 64)
-            .disabled(noteContent?.usesNativeHTML == true)
+            .disabled(draftPlainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            IconButton(symbol: "sparkles", help: "发送到 AI Agent", size: .compact) {
+                model.sendQuickNoteToAIAgent(draftPlainText)
+            }
+            .disabled(draftPlainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             IconButton(symbol: "arrow.up.left.and.arrow.down.right", help: "展开大窗口编辑", size: .compact) {
                 (NSApp.delegate as? AppDelegate)?.openQuickNotesEditor()
             }
             IconButton(symbol: "square.and.arrow.up", help: "系统共享", size: .compact) {
-                model.share([.text(draft)])
+                model.share([.text(draftPlainText)])
             }
-            .disabled(draft.isEmpty)
+            .disabled(draftPlainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
     }
 
     private var editorPane: some View {
-        ZStack(alignment: .topLeading) {
-            TextEditor(text: $draft)
-                .font(.system(size: 12))
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-            if draft.isEmpty {
-                Text("在此输入 Markdown…\n# 标题  ·  **粗体**  ·  *斜体*  ·  `代码`  ·  - 列表")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
+        Group {
+            if noteContent?.isPasswordProtected == true {
+                LockedNotePlaceholder(showNote: service.showSelectedNoteInNotes)
+            } else {
+                RichNoteEditor(
+                    html: draftHTML,
+                    command: service.isBuiltInWelcomeNoteSelected ? nil : editorCommand,
+                    isEditable: !service.isBuiltInWelcomeNoteSelected
+                ) { html, plainText in
+                    draftHTML = html
+                    draftPlainText = plainText
+                    if let id = service.selectedID, !service.isBuiltInWelcomeNote(id: id) {
+                        service.scheduleSave(id: id, html: html)
+                    }
+                }
+            }
+        }
+        .overlay {
+            if isTransferTarget {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
                     .allowsHitTesting(false)
             }
         }
-    }
-
-    private var previewPane: some View {
-        MarkdownWebView(
-            html: previewHTML,
-            baseURL: URL(fileURLWithPath: NSHomeDirectory())
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var editorFooter: some View {
-        HStack(spacing: 8) {
-            if let note = service.selectedNote, let modified = note.modifiedAt {
-                Text("更新于 \(relativeTime(modified))")
+        .onDrop(
+            of: TransferDropDelegate.supportedTypes,
+            delegate: TransferDropDelegate(isTargeted: $isTransferTarget) {
+                model.receiveQuickNoteTransferItems($0)
             }
-            Spacer(minLength: 4)
-            Text("\(draft.count) 字")
-        }
-        .font(.islandMicro())
-        .foregroundStyle(.tertiary)
+        )
     }
 
-    // MARK: - 动作
+    // MARK: - Actions
 
     private func cancelAndLoadDraft() {
         service.cancelPendingSave()
         Task {
             let content = await service.loadNote()
             noteContent = content
-            let text = content?.plainText ?? ""
-            lastLoadedDraft = text
-            draft = text
-            isPreview = content?.usesNativeHTML == true
+            draftHTML = RichNoteEditor.editableHTML(for: content)
+            draftPlainText = content?.plainText ?? ""
         }
-    }
-
-    private var previewHTML: String {
-        if let content = noteContent, content.usesNativeHTML {
-            return MarkdownHTMLRenderer.html(fromNotesHTML: content.bodyHTML)
-        }
-        return MarkdownHTMLRenderer.html(from: draft)
     }
 
     private func createNew() async {
-        let success = await service.create(markdown: "# 新随记\n")
-        if success {
-            isPreview = false
-            // 新建后 selectedID 变化会触发 cancelAndLoadDraft 载入草稿
-        }
+        _ = await service.create(html: RichNoteEditor.newNoteHTML)
     }
 
     private func relativeTime(_ date: Date) -> String {

@@ -90,7 +90,7 @@ struct WeatherLocationServiceTests {
 
         let result = try await service.currentLocation()
 
-        // 展示名来自反向解析，坐标来自定位。
+        // Display name comes from reverse geocoding; coordinates come from location.
         #expect(result.displayName == "北京市海淀区")
         #expect(result.latitude == 39.9)
         #expect(result.longitude == 116.3)

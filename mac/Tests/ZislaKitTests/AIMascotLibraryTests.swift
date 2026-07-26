@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 
+@testable import ZislaCore
 @testable import ZislaKit
 
 struct AIMascotLibraryTests {
@@ -103,11 +104,22 @@ struct AIMascotLibraryTests {
         #expect(AIMascotLibrary.providerAssetName(for: .claude) == "claude-color.svg")
         #expect(AIMascotLibrary.providerAssetName(for: .gemini) == "gemini-color.svg")
         #expect(AIMascotLibrary.providerAssetName(for: .grok) == "grok.svg")
+        #expect(AIMascotLibrary.providerAssetName(for: .copilot) == "copilot.svg")
+        #expect(AIMascotLibrary.providerAssetName(for: .kimi) == "kimi.png")
         #expect(AIMascotLibrary.providerAssetName(for: .qwen) == "qwen-color.svg")
-        #expect(AIMascotLibrary.providerAssetName(for: .coder) == nil)
-        #expect(AIMascotLibrary.providerAssetName(for: .trae) == nil)
+        #expect(AIMascotLibrary.providerAssetName(for: .coder) == "qoder.icns")
+        #expect(AIMascotLibrary.providerAssetName(for: .trae) == "trae.icns")
         #expect(AIMascotLibrary.providerAssetName(for: .opencode) == "opencode.svg")
-        #expect(AIMascotLibrary.providerAssetName(for: .doubao) == "doubao-color.svg")
+        #expect(AIMascotLibrary.providerAssetName(for: .harness) == "workbuddy.icns")
+        #expect(AIMascotLibrary.providerAssetName(for: .doubao) == "doubao.png")
+    }
+
+    @Test
+    func everyProviderHasAnOfflineBrandAsset() {
+        let missing = AIProvider.allCases.filter {
+            AIMascotLibrary.providerAssetName(for: $0) == nil
+        }
+        #expect(missing.isEmpty, "缺少离线品牌资源：\(missing.map(\.rawValue).joined(separator: ", "))")
     }
 
     @Test

@@ -1,80 +1,30 @@
 import Foundation
 
-public enum VoiceModelEndpointMode: String, Codable, CaseIterable, Sendable {
+public enum AIModelConfigurationSource: String, Codable, Hashable, Sendable {
     case local
-    case remote
-
-    public var displayName: String {
-        switch self {
-        case .local: "本地"
-        case .remote: "远端"
-        }
-    }
-
-    public var detail: String {
-        switch self {
-        case .local: "连接此 Mac 上运行的模型服务"
-        case .remote: "连接 OpenAI 兼容的远端模型服务"
-        }
-    }
+    case channel
 }
 
-public struct VoiceModelRemoteEndpoint: Identifiable, Codable, Equatable, Sendable {
+/// References one model configuration without duplicating its endpoint or credentials in feature settings.
+public struct AIModelConfigurationReference: Codable, Equatable, Hashable, Sendable {
+    public var source: AIModelConfigurationSource
     public var id: UUID
-    public var name: String
-    public var baseURL: String
-    public var modelName: String
-    /// `nil` 表示旧配置或无需认证的端点。
-    public var apiKey: String?
-    public var isEnabled: Bool
 
-    public init(
-        id: UUID = UUID(),
-        name: String,
-        baseURL: String = "",
-        modelName: String = "",
-        apiKey: String? = nil,
-        isEnabled: Bool = true
-    ) {
+    public init(source: AIModelConfigurationSource, id: UUID) {
+        self.source = source
         self.id = id
-        self.name = name
-        self.baseURL = baseURL
-        self.modelName = modelName
-        self.apiKey = apiKey
-        self.isEnabled = isEnabled
+    }
+
+    public static func local(_ id: UUID) -> Self {
+        Self(source: .local, id: id)
+    }
+
+    public static func channel(_ id: UUID) -> Self {
+        Self(source: .channel, id: id)
     }
 }
 
-public struct VoiceModelEndpointRouter: Sendable {
-    private var nextIndex = 0
-
-    public init() {}
-
-    public mutating func next(
-        from endpoints: [VoiceModelRemoteEndpoint],
-        selectedID: UUID?,
-        loadBalancingEnabled: Bool
-    ) -> VoiceModelRemoteEndpoint? {
-        let enabledEndpoints = endpoints.filter(\.isEnabled)
-        guard !enabledEndpoints.isEmpty else { return nil }
-        guard loadBalancingEnabled else {
-            if let selectedID {
-                return enabledEndpoints.first { $0.id == selectedID }
-            }
-            return enabledEndpoints.first
-        }
-
-        let index = nextIndex % enabledEndpoints.count
-        nextIndex = (index + 1) % enabledEndpoints.count
-        return enabledEndpoints[index]
-    }
-
-    public mutating func reset() {
-        nextIndex = 0
-    }
-}
-
-/// Zisla 模型端点协议。本地 OpenAI 兼容端点覆盖 LM Studio 等；Ollama 走原生端口。
+/// Zisla model endpoint protocol. Local OpenAI-compatible endpoints cover LM Studio and similar; Ollama uses its native port.
 public enum AIEndpointKind: String, Codable, CaseIterable, Sendable {
     case openAICompatible
     case ollama
@@ -115,16 +65,46 @@ public enum AIHardwareTier: String, Codable, CaseIterable, Sendable {
         case .highPerformance: "高配档"
         }
     }
+
+    fileprivate var capacityRank: Int {
+        switch self {
+        case .entry: 0
+        case .balanced: 1
+        case .performance: 2
+        case .highPerformance: 3
+        }
+    }
 }
 
-/// 用总内存作为跨 Mac 机型可稳定获取的本地推理容量信号；具体量化和上下文长度仍由运行时决定。
+/// Describes the hardware signals that determine local-model capacity and expected throughput.
 public struct AIHardwareProfile: Equatable, Sendable {
     public var machineName: String
     public var memoryBytes: UInt64
+    public var cpuName: String?
+    public var cpuCoreCount: Int?
+    public var cpuPerformanceCoreCount: Int?
+    public var cpuEfficiencyCoreCount: Int?
+    public var gpuName: String?
+    public var gpuCoreCount: Int?
 
-    public init(machineName: String, memoryBytes: UInt64) {
+    public init(
+        machineName: String,
+        memoryBytes: UInt64,
+        cpuName: String? = nil,
+        cpuCoreCount: Int? = nil,
+        cpuPerformanceCoreCount: Int? = nil,
+        cpuEfficiencyCoreCount: Int? = nil,
+        gpuName: String? = nil,
+        gpuCoreCount: Int? = nil
+    ) {
         self.machineName = machineName
         self.memoryBytes = memoryBytes
+        self.cpuName = cpuName
+        self.cpuCoreCount = cpuCoreCount
+        self.cpuPerformanceCoreCount = cpuPerformanceCoreCount
+        self.cpuEfficiencyCoreCount = cpuEfficiencyCoreCount
+        self.gpuName = gpuName
+        self.gpuCoreCount = gpuCoreCount
     }
 
     public var memoryGigabytes: Int {
@@ -133,6 +113,68 @@ public struct AIHardwareProfile: Equatable, Sendable {
     }
 
     public var tier: AIHardwareTier {
+        guard let computeTier else { return memoryTier }
+        return memoryTier.capacityRank <= computeTier.capacityRank ? memoryTier : computeTier
+    }
+
+    public var cpuDescription: String {
+        var parts = [cpuName ?? "未能读取型号"]
+        if let cpuCoreCount {
+            let topology = [
+                cpuPerformanceCoreCount.map { "\($0) 性能" },
+                cpuEfficiencyCoreCount.map { "\($0) 能效" },
+            ]
+            .compactMap { $0 }
+            .joined(separator: " + ")
+            parts.append(topology.isEmpty ? "\(cpuCoreCount) 核" : "\(cpuCoreCount) 核（\(topology)）")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    public var gpuDescription: String {
+        var parts = [gpuName ?? "未能读取型号"]
+        if let gpuCoreCount {
+            parts.append("\(gpuCoreCount) 核")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    public var memoryDescription: String {
+        "\(memoryGigabytes)GB 统一内存"
+    }
+
+    public var recommendationDescription: String {
+        let recommendations = AIModelRecommendations.recommended(for: self)
+        let preferredModel = recommendations.first?.name ?? "无推荐"
+        return "\(preferredModel) · \(tier.displayName) · 基于 CPU、GPU 与统一内存综合判定"
+    }
+
+    public var compactHardwareDescription: String {
+        var parts = [machineName]
+        if let cpuName, !cpuName.isEmpty {
+            parts.append(cpuName)
+        }
+        if let cpuCoreCount {
+            let topology = [
+                cpuPerformanceCoreCount.map { "\($0) 性能" },
+                cpuEfficiencyCoreCount.map { "\($0) 能效" },
+            ]
+            .compactMap { $0 }
+            .joined(separator: " + ")
+            let coreDescription = topology.isEmpty ? "\(cpuCoreCount) 核" : "\(cpuCoreCount) 核（\(topology)）"
+            parts.append("CPU \(coreDescription)")
+        }
+        if let gpuName, !gpuName.isEmpty, gpuName != cpuName {
+            parts.append(gpuName)
+        }
+        if let gpuCoreCount {
+            parts.append("GPU \(gpuCoreCount) 核")
+        }
+        parts.append(memoryDescription)
+        return parts.joined(separator: " · ")
+    }
+
+    private var memoryTier: AIHardwareTier {
         let gibibyte = UInt64(1 << 30)
         switch memoryBytes {
         case ...(UInt64(16) * gibibyte): return .entry
@@ -142,8 +184,40 @@ public struct AIHardwareProfile: Equatable, Sendable {
         }
     }
 
+    private var computeTier: AIHardwareTier? {
+        let cpuScore = Self.computeScore(forCPUCoreCount: cpuCoreCount)
+        let gpuScore = Self.computeScore(forGPUCoreCount: gpuCoreCount)
+        let score = cpuScore + gpuScore
+        guard score > 0 else { return nil }
+
+        switch score {
+        case 4...: return .highPerformance
+        case 3: return .performance
+        case 2: return .balanced
+        default: return .entry
+        }
+    }
+
+    private static func computeScore(forCPUCoreCount coreCount: Int?) -> Int {
+        guard let coreCount else { return 0 }
+        switch coreCount {
+        case 8...: return 2
+        case 4...: return 1
+        default: return 0
+        }
+    }
+
+    private static func computeScore(forGPUCoreCount coreCount: Int?) -> Int {
+        guard let coreCount else { return 0 }
+        switch coreCount {
+        case 16...: return 2
+        case 4...: return 1
+        default: return 0
+        }
+    }
+
     public var displayDescription: String {
-        "\(machineName) · \(memoryGigabytes)GB 内存 · \(tier.displayName)"
+        "\(memoryDescription) · \(tier.displayName)"
     }
 }
 
@@ -155,6 +229,8 @@ public struct AIModelRecommendation: Identifiable, Equatable, Sendable {
     public var reason: String
     public var ollamaModelName: String
     public var lmStudioSearchQuery: String
+    public var ollamaPullCommand: String
+    public var ollamaRunCommand: String
 
     public init(
         id: String,
@@ -172,6 +248,8 @@ public struct AIModelRecommendation: Identifiable, Equatable, Sendable {
         self.reason = reason
         self.ollamaModelName = ollamaModelName
         self.lmStudioSearchQuery = lmStudioSearchQuery
+        self.ollamaPullCommand = "ollama pull \(ollamaModelName)"
+        self.ollamaRunCommand = "ollama run \(ollamaModelName)"
     }
 }
 
@@ -191,68 +269,58 @@ public enum AIModelRecommendations {
 
     private static let entryModels = [
         AIModelRecommendation(
-            id: "qwen3-4b", name: "Qwen3 4B", parameterScale: "4B", recommendedQuantization: "Q4",
-            reason: "低内存下优先保证响应速度与稳定性。", ollamaModelName: "qwen3:4b",
-            lmStudioSearchQuery: "Qwen3-4B Q4_K_M GGUF"
+            id: "qwen3-4b", name: "Qwen 3", parameterScale: "4B", recommendedQuantization: "Q4_K_M",
+            reason: "轻量聊天模型，中文理解优秀，适合整理语音转写文本。", ollamaModelName: "qwen3:4b",
+            lmStudioSearchQuery: "Qwen3 4B Instruct GGUF"
         ),
         AIModelRecommendation(
-            id: "qwen2.5-coder-3b", name: "Qwen2.5-Coder 3B", parameterScale: "3B", recommendedQuantization: "Q4",
-            reason: "适合轻量代码补全与脚本任务。", ollamaModelName: "qwen2.5-coder:3b",
-            lmStudioSearchQuery: "Qwen2.5-Coder-3B Q4_K_M GGUF"
+            id: "gemma3-4b", name: "Gemma 3", parameterScale: "4B", recommendedQuantization: "Q4_K_M",
+            reason: "Google 轻量模型，适合快速文本整理与润色。", ollamaModelName: "gemma3:4b",
+            lmStudioSearchQuery: "Gemma 3 4B IT GGUF"
         ),
     ]
 
     private static let balancedModels = [
         AIModelRecommendation(
-            id: "qwen3-8b", name: "Qwen3 8B", parameterScale: "8B", recommendedQuantization: "Q4",
-            reason: "通用聊天、总结与轻量推理的平衡选择。", ollamaModelName: "qwen3:8b",
-            lmStudioSearchQuery: "Qwen3-8B Q4_K_M GGUF"
+            id: "qwen3-8b", name: "Qwen 3", parameterScale: "8B", recommendedQuantization: "Q4_K_M",
+            reason: "中等规模聊天模型，中文处理能力强，适合整理转写内容。", ollamaModelName: "qwen3:8b",
+            lmStudioSearchQuery: "Qwen3 8B Instruct GGUF"
         ),
         AIModelRecommendation(
-            id: "qwen2.5-coder-7b", name: "Qwen2.5-Coder 7B", parameterScale: "7B", recommendedQuantization: "Q4",
-            reason: "以较低资源成本处理日常编码任务。", ollamaModelName: "qwen2.5-coder:7b",
-            lmStudioSearchQuery: "Qwen2.5-Coder-7B Q4_K_M GGUF"
+            id: "gemma3-12b", name: "Gemma 3", parameterScale: "12B", recommendedQuantization: "Q4_K_M",
+            reason: "Google 中型模型，均衡的文本理解与生成能力。", ollamaModelName: "gemma3:12b",
+            lmStudioSearchQuery: "Gemma 3 12B IT GGUF"
         ),
     ]
 
     private static let performanceModels = [
         AIModelRecommendation(
-            id: "qwen3-14b", name: "Qwen3 14B", parameterScale: "14B", recommendedQuantization: "Q4",
-            reason: "兼顾复杂任务质量与交互延迟。", ollamaModelName: "qwen3:14b",
-            lmStudioSearchQuery: "Qwen3-14B Q4_K_M GGUF"
+            id: "qwen3-14b", name: "Qwen 3", parameterScale: "14B", recommendedQuantization: "Q4_K_M",
+            reason: "高性能中文聊天模型，适合复杂的转写文本整理任务。", ollamaModelName: "qwen3:14b",
+            lmStudioSearchQuery: "Qwen3 14B Instruct GGUF"
         ),
         AIModelRecommendation(
-            id: "qwen2.5-coder-14b", name: "Qwen2.5-Coder 14B", parameterScale: "14B", recommendedQuantization: "Q4",
-            reason: "面向代码生成、重构和调试的优先选择。", ollamaModelName: "qwen2.5-coder:14b",
-            lmStudioSearchQuery: "Qwen2.5-Coder-14B Q4_K_M GGUF"
-        ),
-        AIModelRecommendation(
-            id: "qwen3-8b-performance", name: "Qwen3 8B", parameterScale: "8B", recommendedQuantization: "Q4",
-            reason: "追求更短首字延迟时使用。", ollamaModelName: "qwen3:8b",
-            lmStudioSearchQuery: "Qwen3-8B Q4_K_M GGUF"
+            id: "gemma3-27b", name: "Gemma 3", parameterScale: "27B", recommendedQuantization: "Q4_K_M",
+            reason: "Google 大型模型，提供高质量的文本理解与生成。", ollamaModelName: "gemma3:27b",
+            lmStudioSearchQuery: "Gemma 3 27B IT GGUF"
         ),
     ]
 
     private static let highPerformanceModels = [
         AIModelRecommendation(
-            id: "qwen3-32b", name: "Qwen3 32B", parameterScale: "32B", recommendedQuantization: "Q4",
-            reason: "当前机型的通用主力，优先质量与复杂推理。", ollamaModelName: "qwen3:32b",
-            lmStudioSearchQuery: "Qwen3-32B Q4_K_M GGUF"
+            id: "qwen3-32b", name: "Qwen 3", parameterScale: "32B", recommendedQuantization: "Q4_K_M",
+            reason: "旗舰级中文聊天模型，顶级的转写文本整理与润色能力。", ollamaModelName: "qwen3:32b",
+            lmStudioSearchQuery: "Qwen3 32B Instruct GGUF"
         ),
         AIModelRecommendation(
-            id: "qwen2.5-coder-32b", name: "Qwen2.5-Coder 32B", parameterScale: "32B", recommendedQuantization: "Q4",
-            reason: "面向多文件编码、重构和较复杂调试。", ollamaModelName: "qwen2.5-coder:32b",
-            lmStudioSearchQuery: "Qwen2.5-Coder-32B Q4_K_M GGUF"
+            id: "mistral-small-24b", name: "Mistral Small", parameterScale: "24B", recommendedQuantization: "Q4_K_M",
+            reason: "Mistral 高性能模型，多语言文本处理能力出色。", ollamaModelName: "mistral-small3.1:24b",
+            lmStudioSearchQuery: "Mistral Small 3.1 24B Instruct GGUF"
         ),
         AIModelRecommendation(
-            id: "qwen3-14b-high", name: "Qwen3 14B", parameterScale: "14B", recommendedQuantization: "Q4",
-            reason: "需要更低延迟时的高质量备选。", ollamaModelName: "qwen3:14b",
-            lmStudioSearchQuery: "Qwen3-14B Q4_K_M GGUF"
-        ),
-        AIModelRecommendation(
-            id: "qwen3-8b-high", name: "Qwen3 8B", parameterScale: "8B", recommendedQuantization: "Q4",
-            reason: "短请求与高频交互的低延迟档。", ollamaModelName: "qwen3:8b",
-            lmStudioSearchQuery: "Qwen3-8B Q4_K_M GGUF"
+            id: "gemma3-27b-high", name: "Gemma 3", parameterScale: "27B", recommendedQuantization: "Q4_K_M",
+            reason: "高质量文本理解与生成的通用备选。", ollamaModelName: "gemma3:27b",
+            lmStudioSearchQuery: "Gemma 3 27B IT GGUF"
         ),
     ]
 }
@@ -286,7 +354,7 @@ public struct AIEndpoint: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-/// 端点运行时返回的模型目录。仅用于挑选本地小模型，不持久化。
+/// The model endpoint catalog returned by the endpoint at runtime. Used only for selecting small local models; not persisted.
 public struct AIDiscoveredModel: Identifiable, Equatable, Sendable {
     public var id: String { name }
     public var name: String

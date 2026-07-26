@@ -24,6 +24,7 @@ struct TraeSessionActivityDetectorTests {
         #expect(task.provider == .trae)
         #expect(task.title == "TRAE")
         #expect(task.status == .running)
+        #expect(task.sessionURL?.absoluteString == "solo-cn://solo-deeplink.ai/teleport_session?sid=6a61ffa1e2aa15b31f3a9b93")
     }
 
     @Test

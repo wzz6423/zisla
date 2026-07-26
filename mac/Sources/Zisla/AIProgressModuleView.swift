@@ -103,7 +103,7 @@ private struct UsageTrendChart: View {
 
     private var maximumTokens: Int {
         let raw = max(series.map(\.totalTokens).max() ?? 0, 1)
-        // 留出 15% 顶部余量，避免曲线贴着或超出坐标轴上沿
+        // Leave 15% headroom at the top so the curve does not touch or exceed the top axis edge
         return max(Int((Double(raw) * 1.15).rounded()), raw + 1)
     }
 
@@ -192,7 +192,7 @@ private struct TaskProgressRow: View {
             }
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .help("在 Codex 中打开会话")
+            .help("在 \(task.title) 中打开会话")
         } else {
             content
         }
@@ -317,8 +317,8 @@ private struct UsageHeatmap: View {
     private let gap: CGFloat = 1.5
     @State private var selectedDate: Date?
 
-    /// 当前窗口内的最大单日 token；强度按它做相对归一，
-    /// 避免绝对阈值（原 50M/100M/…）对多数用户恒为最浅档而失去信息量。
+    /// Maximum single-day token count within the current window; intensity is normalized relative to it
+    /// to avoid absolute thresholds (e.g., 50M/100M/…) always mapping most users to the lightest level.
     private var maxTokens: Int {
         weeks.flatMap { $0 }.compactMap { $0?.tokens }.max() ?? 0
     }

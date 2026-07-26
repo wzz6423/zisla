@@ -114,6 +114,9 @@ struct PomodoroEngineTests {
 
 @MainActor
 struct PowerAssertionControllerTests {
+    private static let displayType = kIOPMAssertPreventUserIdleDisplaySleep as String
+    private static let idleSystemType = kIOPMAssertPreventUserIdleSystemSleep as String
+
     @Test
     func lifecycleCreatesAndReleasesAssertions() {
         let manager = FakePowerAssertionManager()
@@ -128,6 +131,11 @@ struct PowerAssertionControllerTests {
         #expect(controller.preventIdleSystemSleep)
         #expect(manager.createCallCount == 2)
         #expect(manager.activeIDs.count == 2)
+        #expect(manager.createdTypes == [Self.displayType, Self.idleSystemType])
+        #expect(manager.createdLevels == [
+            IOPMAssertionLevel(kIOPMAssertionLevelOn),
+            IOPMAssertionLevel(kIOPMAssertionLevelOn),
+        ])
 
         controller.releaseAll()
         #expect(controller.keepDisplayAwake == false)
@@ -146,6 +154,21 @@ struct PowerAssertionControllerTests {
         #expect(controller.keepDisplayAwake == false)
         #expect(manager.activeIDs.isEmpty)
     }
+
+    @Test
+    func failedCreateDoesNotEnableToggleOrRetainAnAssertionID() {
+        let manager = FakePowerAssertionManager()
+        manager.failingTypes = [Self.displayType, Self.idleSystemType]
+        let controller = PowerAssertionController(manager: manager)
+
+        controller.setKeepDisplayAwake(true)
+        controller.setPreventIdleSystemSleep(true)
+
+        #expect(controller.keepDisplayAwake == false)
+        #expect(controller.preventIdleSystemSleep == false)
+        #expect(manager.releaseCallCount == 0)
+        #expect(manager.activeIDs.isEmpty)
+    }
 }
 
 @MainActor
@@ -153,6 +176,9 @@ private final class FakePowerAssertionManager: PowerAssertionManaging {
     private(set) var createCallCount = 0
     private(set) var releaseCallCount = 0
     private(set) var activeIDs: Set<IOPMAssertionID> = []
+    private(set) var createdTypes: [String] = []
+    private(set) var createdLevels: [IOPMAssertionLevel] = []
+    var failingTypes: Set<String> = []
     private var nextID: IOPMAssertionID = 100
 
     func create(
@@ -162,6 +188,11 @@ private final class FakePowerAssertionManager: PowerAssertionManaging {
         assertionID: inout IOPMAssertionID
     ) -> IOReturn {
         createCallCount += 1
+        guard !failingTypes.contains(type as String) else {
+            return kIOReturnNotPermitted
+        }
+        createdTypes.append(type as String)
+        createdLevels.append(level)
         nextID += 1
         assertionID = nextID
         activeIDs.insert(nextID)

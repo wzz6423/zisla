@@ -4,6 +4,22 @@ import CoreAudio
 import Darwin
 import Foundation
 
+enum AudioSpectrumAnalysisMode: Sendable {
+    case visualization
+    case audibilityOnly
+
+    var minimumInterval: TimeInterval {
+        switch self {
+        case .visualization: 1.0 / 20.0
+        case .audibilityOnly: 1.0 / 5.0
+        }
+    }
+
+    var includesFrequencyLevels: Bool {
+        self == .visualization
+    }
+}
+
 final class AudioFrequencyAnalyzer {
     static let bandCount = 7
 
@@ -52,6 +68,10 @@ final class AudioFrequencyAnalyzer {
 
     deinit {
         vDSP_destroy_fftsetup(fftSetup)
+    }
+
+    func reset() {
+        history = Array(repeating: 0, count: fftSize)
     }
 
     func process(samples: [Float], sampleRate: Double) -> [Float] {
@@ -142,6 +162,7 @@ public final class AudioSpectrumService: ObservableObject {
 
     private let capture = SystemAudioSpectrumCapture()
     private var isRequested = false
+    private var analysisMode = AudioSpectrumAnalysisMode.visualization
     private var generation: UInt64 = 0
     private var lastAudibleTime: TimeInterval?
 
@@ -155,6 +176,7 @@ public final class AudioSpectrumService: ObservableObject {
         let currentGeneration = generation
         levels = Self.silentLevels
 
+        capture.setAnalysisMode(analysisMode)
         capture.start(
             onFrame: { [weak self] frame in
                 Task { @MainActor [weak self] in
@@ -168,10 +190,20 @@ public final class AudioSpectrumService: ObservableObject {
                 Task { @MainActor [weak self] in
                     guard let self, self.generation == currentGeneration else { return }
                     self.levels = Self.silentLevels
-                    self.isAudible = false
+                    if self.isAudible { self.isAudible = false }
                 }
             }
         )
+    }
+
+    func setVisualizationEnabled(_ enabled: Bool) {
+        let mode: AudioSpectrumAnalysisMode = enabled ? .visualization : .audibilityOnly
+        guard analysisMode != mode else { return }
+        analysisMode = mode
+        capture.setAnalysisMode(mode)
+        if !enabled, levels != Self.silentLevels {
+            levels = Self.silentLevels
+        }
     }
 
     public func stop() {
@@ -180,16 +212,18 @@ public final class AudioSpectrumService: ObservableObject {
         generation &+= 1
         capture.stop()
         levels = Self.silentLevels
-        isAudible = false
+        if isAudible { isAudible = false }
         lastAudibleTime = nil
     }
 
     private func consume(_ frame: AudioSpectrumFrame) {
-        levels = Self.smoothed(previous: levels, target: frame.levels)
+        if analysisMode == .visualization, let frequencyLevels = frame.levels {
+            levels = Self.smoothed(previous: levels, target: frequencyLevels)
+        }
         let now = Date.timeIntervalSinceReferenceDate
         if frame.rootMeanSquare >= 0.004 {
             lastAudibleTime = now
-            isAudible = true
+            if !isAudible { isAudible = true }
         } else if isAudible, now - (lastAudibleTime ?? now) >= 0.45 {
             isAudible = false
         }
@@ -222,6 +256,16 @@ private final class SystemAudioSpectrumCapture: @unchecked Sendable {
     private var ioProcID: AudioDeviceIOProcID?
     private var sampleRate = 48_000.0
     private var lastAnalysisTime: TimeInterval = 0
+    private var analysisMode = AudioSpectrumAnalysisMode.visualization
+
+    func setAnalysisMode(_ mode: AudioSpectrumAnalysisMode) {
+        callbackQueue.async { [weak self] in
+            guard let self, self.analysisMode != mode else { return }
+            self.analysisMode = mode
+            self.analyzer.reset()
+            self.lastAnalysisTime = 0
+        }
+    }
 
     func start(
         onFrame: @escaping @Sendable (AudioSpectrumFrame) -> Void,
@@ -297,7 +341,8 @@ private final class SystemAudioSpectrumCapture: @unchecked Sendable {
         onFrame: @escaping @Sendable (AudioSpectrumFrame) -> Void
     ) {
         let now = Date.timeIntervalSinceReferenceDate
-        guard now - lastAnalysisTime >= 1.0 / 20.0 else { return }
+        let mode = analysisMode
+        guard now - lastAnalysisTime >= mode.minimumInterval else { return }
         lastAnalysisTime = now
 
         let buffers = UnsafeMutableAudioBufferListPointer(
@@ -330,7 +375,9 @@ private final class SystemAudioSpectrumCapture: @unchecked Sendable {
         var rootMeanSquare = Float.zero
         vDSP_rmsqv(mono, 1, &rootMeanSquare, vDSP_Length(mono.count))
         onFrame(AudioSpectrumFrame(
-            levels: analyzer.process(samples: mono, sampleRate: sampleRate),
+            levels: mode.includesFrequencyLevels
+                ? analyzer.process(samples: mono, sampleRate: sampleRate)
+                : nil,
             rootMeanSquare: rootMeanSquare
         ))
     }
@@ -375,6 +422,6 @@ private final class SystemAudioSpectrumCapture: @unchecked Sendable {
 }
 
 private struct AudioSpectrumFrame: Sendable {
-    var levels: [Float]
+    var levels: [Float]?
     var rootMeanSquare: Float
 }

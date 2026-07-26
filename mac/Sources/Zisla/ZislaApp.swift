@@ -18,12 +18,12 @@ enum ZislaMain {
 @MainActor
 private final class SettingsWindow: NSWindow {
     override func performClose(_ sender: Any?) {
-        // 设置窗口没有关闭工作流；保留实例以便从菜单栏恢复。
+        // Settings window has no close workflow; keep the instance alive so it can be restored from the menu bar.
     }
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var overlayCoordinator: OverlayCoordinator?
     private var lockScreenOverlayController: LockScreenOverlayController?
     private var noticePresenter: SideNoticePresenter?
@@ -34,11 +34,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var monitorStatusTitles: [SystemMonitorMenuBarMetric: String] = [:]
     private var lastMonitorStatusRefreshAt = Date.distantPast
     private var settingsWindowController: NSWindowController?
+    private var settingsWindowScreen: NSScreen?
     private var quickNotesEditorController: NSWindowController?
     private var cancellables: Set<AnyCancellable> = []
     private let updateController = UpdateController.shared
     private var expandedSizeUpdateTask: Task<Void, Never>?
-    /// 语音录音开始前的灵动岛面板尺寸，录音结束后恢复。
+    /// Last panel size actually applied to the coordinator; basis for the two-phase
+    /// (union → target) resize that keeps the SwiftUI surface spring unclipped.
+    private var lastAppliedPanelSize: CGSize?
+    /// Panel size saved before voice recording starts; restored when recording ends.
     private var voiceRecordingSavedPanelSize: CGSize?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -48,7 +52,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         NSApp.setActivationPolicy(.accessory)
+        WindowPlacement.installTransientWindowPromotion()
         let model = AppModel.shared
+        updateController.start(
+            automaticallyChecks: model.settingsStore.settings.updateChecksEnabled,
+            automaticallyDownloads: model.settingsStore.settings.automaticUpdatesEnabled,
+            automaticChannel: FeatureSettingsStore.bundledDefaultUpdateChannel
+        )
         model.start()
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
         lockScreenOverlayController.start()
@@ -78,10 +88,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hostingView.sizingOptions = []
         let engine = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
             simulatedIslandSize: CGSize(width: 240, height: 34),
-            expandedSize: model.selectedModule.layout.panelSize,
+            expandedSize: Self.expandedPanelSize(
+                module: model.selectedModule,
+                isMirrorPresented: model.isMirrorPresented,
+                isTeleprompterPresented: model.isTeleprompterPresented,
+                dashboardCardCount: model.dashboardCardCount,
+                includesPet: model.settingsStore.settings.petEnabled
+            ).panelSize,
             horizontalMargin: 12
         ))
-        let coordinator = OverlayCoordinator(contentView: hostingView, layoutEngine: engine)
+        let coordinator = OverlayCoordinator(
+            contentView: hostingView,
+            layoutEngine: engine,
+            persistentContentViewProvider: { [weak petController] layout in
+                guard let petController else { return nil }
+                let persistentPetView = CollapsedPetView(
+                    model: model,
+                    petController: petController,
+                    isOnPhysicalNotch: layout.topology.hasPhysicalNotch
+                )
+                let persistentPetHostingView = NSHostingView(rootView: persistentPetView)
+                persistentPetHostingView.sizingOptions = []
+                return persistentPetHostingView
+            },
+            persistentPanelFrameProvider: { layout in
+                CollapsedPetLayout.frame(
+                    for: layout,
+                    compactBarFrame: Self.collapsedPetCompactBarFrame(
+                        for: layout,
+                        notices: model.notices.left + model.notices.right,
+                        settings: model.settingsStore.settings
+                    )
+                )
+            }
+        )
         coordinator.onVisibilityChanged = { [weak self] visible in
             model.isIslandVisible = visible
             self?.noticePresenter?.setIslandExpanded(visible)
@@ -93,29 +133,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.onCollapsedSizeChanged = { size in
             model.collapsedIslandSize = size
         }
-        model.$selectedModule
-            .map(\.layout.panelSize)
+        coordinator.onActiveDisplayHasPhysicalNotchChanged = { hasPhysicalNotch in
+            model.isIslandOnPhysicalNotch = hasPhysicalNotch
+        }
+        Publishers.CombineLatest(
+            Publishers.CombineLatest4(
+                model.$selectedModule,
+                model.$isMirrorPresented,
+                model.$isTeleprompterPresented,
+                model.$dashboardCardCount
+            ),
+            model.settingsStore.$settings
+                .map(\.petEnabled)
+                .removeDuplicates()
+        )
+            .map { state, includesPet -> CGSize in
+                let (module, isMirrorPresented, isTeleprompterPresented, dashboardCardCount) = state
+                return Self.expandedPanelSize(
+                    module: module,
+                    isMirrorPresented: isMirrorPresented,
+                    isTeleprompterPresented: isTeleprompterPresented,
+                    dashboardCardCount: dashboardCardCount,
+                    includesPet: includesPet
+                ).panelSize
+            }
             .removeDuplicates()
             .sink { [weak self, weak coordinator] size in
+                guard !model.voiceInput.isRecording else { return }
                 self?.scheduleExpandedSizeUpdate(size, coordinator: coordinator)
             }
             .store(in: &cancellables)
+        model.$isMirrorPresented
+            .combineLatest(model.$isTeleprompterPresented)
+            .sink { [weak coordinator, weak model] isMirrorPresented, isTeleprompterPresented in
+                Task { @MainActor in
+                    guard let model else { return }
+                    coordinator?.setPinned(isMirrorPresented || isTeleprompterPresented || model.isPinned)
+                }
+            }
+            .store(in: &cancellables)
         overlayCoordinator = coordinator
-        if model.settingsStore.settings.hoverActivationEnabled {
+        coordinator.setPersistentContentVisible(model.settingsStore.settings.petEnabled)
+        coordinator.setCollapsedOnTop(model.settingsStore.settings.islandCollapsedOnTop)
+        if model.settingsStore.settings.hoverActivationEnabled
+            || model.settingsStore.settings.petEnabled {
             coordinator.start()
         }
         if ProcessInfo.processInfo.environment["ZISLA_VISUAL_TEST_SHOW"] == "1" {
+            coordinator.start()
             model.isPinned = true
             coordinator.setPinned(true)
         }
 
         noticePresenter = SideNoticePresenter(
             queue: model.notices,
+            media: model.media,
+            settingsStore: model.settingsStore,
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs
-        )
-        updateController.start(
-            automaticallyChecks: model.settingsStore.settings.updateChecksEnabled,
-            automaticallyDownloads: model.settingsStore.settings.automaticUpdatesEnabled
         )
         configureMainMenu()
         syncAppStatusItem()
@@ -135,9 +209,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     guard let self else { return }
                     if enabled {
                         self.overlayCoordinator?.start()
-                    } else if !model.isPinned {
+                    } else if !model.settingsStore.settings.petEnabled && !model.isPinned {
                         self.overlayCoordinator?.stop()
                     }
+                }
+            }
+            .store(in: &cancellables)
+
+        model.settingsStore.$settings
+            .map(\.islandCollapsedOnTop)
+            .removeDuplicates()
+            .sink { [weak self] onTop in
+                Task { @MainActor [weak self] in
+                    self?.overlayCoordinator?.setCollapsedOnTop(onTop)
+                }
+            }
+            .store(in: &cancellables)
+
+        model.settingsStore.$settings
+            .map(\.islandVisualStyle)
+            .removeDuplicates()
+            .sink { [weak self] style in
+                Task { @MainActor [weak self] in
+                    self?.overlayCoordinator?.setKeepsNativeGlassActive(style == .transparent)
+                }
+            }
+            .store(in: &cancellables)
+
+        model.settingsStore.$settings
+            .map(\.petEnabled)
+            .removeDuplicates()
+            .sink { [weak coordinator, weak model] enabled in
+                Task { @MainActor in
+                    coordinator?.setPersistentContentVisible(enabled)
+                    guard let model else { return }
+                    if enabled {
+                        coordinator?.start()
+                    } else if !model.settingsStore.settings.hoverActivationEnabled && !model.isPinned {
+                        coordinator?.stop()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        Publishers.MergeMany(
+            model.settingsStore.$settings.map { _ in () }.eraseToAnyPublisher(),
+            model.notices.$left.map { _ in () }.eraseToAnyPublisher(),
+            model.notices.$right.map { _ in () }.eraseToAnyPublisher()
+        )
+            .sink { [weak coordinator] _ in
+                Task { @MainActor in
+                    coordinator?.refreshPersistentPanels()
                 }
             }
             .store(in: &cancellables)
@@ -163,7 +285,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.noticePresenter?.setDisplayIDs(settings.activityNoticeDisplayIDs)
                     self?.updateController.configure(
                         automaticallyChecks: settings.updateChecksEnabled,
-                        automaticallyDownloads: settings.automaticUpdatesEnabled
+                        automaticallyDownloads: settings.automaticUpdatesEnabled,
+                        automaticChannel: FeatureSettingsStore.bundledDefaultUpdateChannel
                     )
                     self?.syncAppStatusItem()
                     self?.syncMonitorStatusItems(force: true)
@@ -171,8 +294,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
-        // 「随记」和邮件需要键盘输入：仅在对应模块可见时允许灵动岛面板成为 key 窗口，
-        // 其余时间保持非 key，避免抢占其他 App 的焦点。
+        // Quick Notes and Mail require keyboard input: allow the island panel to become key only
+        // while the corresponding module is visible; otherwise keep it non-key to avoid stealing
+        // focus from other apps.
         Publishers.CombineLatest(
             model.$selectedModule,
             model.$isIslandVisible
@@ -186,24 +310,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
-        // 语音录音时：灵动岛展开一行，在下方实时显示转写内容。
-        // 录音开始 → 保存当前面板尺寸、切换为紧凑尺寸并展开岛；
-        // 录音结束 → 恢复原面板尺寸并收起岛。
+        // Voice recording: expand the island to one row and show live transcription below.
+        // Recording starts → save current panel size, switch to compact size, expand the island.
+        // Recording ends → restore panel size and collapse the island.
         model.voiceInput.$isRecording
             .removeDuplicates()
             .sink { [weak self] recording in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     if recording {
-                        self.voiceRecordingSavedPanelSize = AppModel.shared.selectedModule.layout.panelSize
-                        self.overlayCoordinator?.updateExpandedSize(
-                            CGSize(width: 660, height: 76)
-                        )
+                        let model = AppModel.shared
+                        self.voiceRecordingSavedPanelSize = Self.expandedPanelSize(
+                            module: model.selectedModule,
+                            isMirrorPresented: model.isMirrorPresented,
+                            isTeleprompterPresented: model.isTeleprompterPresented,
+                            dashboardCardCount: model.dashboardCardCount,
+                            includesPet: model.settingsStore.settings.petEnabled
+                        ).panelSize
+                        // Direct resize (no two-phase): recording swaps layout instantly by design.
+                        self.expandedSizeUpdateTask?.cancel()
+                        let recordingSize = CGSize(width: 660, height: 76)
+                        self.overlayCoordinator?.updateExpandedSize(recordingSize)
+                        self.lastAppliedPanelSize = recordingSize
                         self.overlayCoordinator?.setTransientInteractionVisible(true)
                     } else {
                         self.overlayCoordinator?.setTransientInteractionVisible(false)
                         if let saved = self.voiceRecordingSavedPanelSize {
                             self.overlayCoordinator?.updateExpandedSize(saved)
+                            self.lastAppliedPanelSize = saved
                             self.voiceRecordingSavedPanelSize = nil
                         }
                     }
@@ -211,7 +345,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
-        // 磁盘清理弹窗可见时：保持灵动岛展开，避免指针离开岛区域导致提前收起。
+        // While the disk-cleanup panel is visible: keep the island expanded to prevent it from
+        // collapsing when the pointer leaves the island area.
         model.$isCleanupPanelVisible
             .removeDuplicates()
             .sink { [weak coordinator] visible in
@@ -221,7 +356,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
-        // 磁盘清理完成后：取消固定与临时交互保持，触发灵动岛收起。
+        // After disk cleanup completes: release the pin and transient interaction hold, triggering island collapse.
         model.$islandCollapseRequested
             .removeDuplicates()
             .filter { $0 }
@@ -251,13 +386,73 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ) {
         expandedSizeUpdateTask?.cancel()
         expandedSizeUpdateTask = Task { @MainActor [weak self, weak coordinator] in
-            // 模块按钮的事件处理先提交，下一轮再改 NSPanel frame，避免 AppKit 在点击中途
-            // 重建 hover tracking 而误判鼠标已经离开；连续切换只保留最后一个尺寸。
+        // Defer module button event handling to the next run-loop turn before resizing the NSPanel
+        // frame, avoiding a spurious "mouse exited" AppKit hit-test triggered mid-click.
+        // For rapid module switches, only the last size is applied.
             await Task.yield()
             guard !Task.isCancelled, let coordinator else { return }
-            coordinator.updateExpandedSize(size)
+            // Two-phase resize: the panel window itself never animates (see IslandPanel.resize),
+            // so first grow it to the union of current and target sizes, giving the SwiftUI
+            // surface spring full drawing room in both directions. Once the spring has settled,
+            // tighten the panel down to the exact target so pointer tracking stays accurate.
+            let current = self?.lastAppliedPanelSize
+            let union = CGSize(
+                width: max(size.width, current?.width ?? 0),
+                height: max(size.height, current?.height ?? 0)
+            )
+            if union != current {
+                coordinator.updateExpandedSize(union)
+                self?.lastAppliedPanelSize = union
+            }
+            if union != size {
+                try? await Task.sleep(for: ZislaMotion.surfaceResizeSettleDelay)
+                guard !Task.isCancelled else { return }
+                coordinator.updateExpandedSize(size)
+                self?.lastAppliedPanelSize = size
+            }
             self?.expandedSizeUpdateTask = nil
         }
+    }
+
+    private static func expandedPanelSize(
+        module: IslandModule,
+        isMirrorPresented: Bool,
+        isTeleprompterPresented: Bool,
+        dashboardCardCount: Int,
+        includesPet: Bool
+    ) -> IslandModuleLayout {
+        if isMirrorPresented { return .mirror }
+        if isTeleprompterPresented { return .teleprompter }
+        let layout = IslandModuleLayout.resolved(
+            for: module,
+            dashboardCardCount: dashboardCardCount
+        )
+        return IslandModuleLayout(
+            islandSize: layout.islandSize,
+            panelSize: ExpandedPetLayout.panelSize(
+                for: layout.panelSize,
+                includesPet: includesPet
+            )
+        )
+    }
+
+    private static func collapsedPetCompactBarFrame(
+        for layout: ScreenOverlayLayout,
+        notices: [IslandNotice],
+        settings: FeatureSettings
+    ) -> CGRect? {
+        let presentation = SideNoticeLayoutEngine().presentation(for: notices)
+        let extendsForFocusCountdown = notices.contains {
+            $0.id.hasPrefix("focus-countdown-") || $0.id.hasPrefix("focus-transition")
+        }
+        guard presentation.hasCompactContent || extendsForFocusCountdown else { return nil }
+        let expandsForDetailedMedia = settings.mediaCompactStyle == .detailed
+            && notices.contains { $0.id.hasPrefix("media-active-") }
+        return SideNoticeLayoutEngine().compactBarFrame(
+            for: layout,
+            extendsForFocusCountdown: extendsForFocusCountdown,
+            expandsForDetailedMedia: expandsForDetailedMedia
+        )
     }
 
     private func configureMainMenu() {
@@ -457,19 +652,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch metric {
         case .cpu: "CPU"
         case .gpu: "GPU"
-        case .memory: "MEMORY"
+        case .memory: "Mem"
         case .disk: "Disk"
-        case .network: "Net"
+        case .network: "Int"
         case .fan: "Fan"
         }
     }
 
     private func compactMonitorStatusItemWidth(for metric: SystemMonitorMenuBarMetric) -> CGFloat {
         switch metric {
+        case .cpu, .gpu, .memory, .disk:
+            32
         case .network:
-            68
-        default:
-            48
+            60
+        case .fan:
+            40
         }
     }
 
@@ -477,7 +674,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         value: String,
         metric: SystemMonitorMenuBarMetric
     ) -> NSImage? {
-        let size = NSSize(width: compactMonitorStatusItemWidth(for: metric) - 6, height: 22)
+        let size = NSSize(width: compactMonitorStatusItemWidth(for: metric) - 4, height: 22)
         guard let representation = NSBitmapImageRep(
             bitmapDataPlanes: nil,
             pixelsWide: Int(size.width * 2),
@@ -564,24 +761,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 defer: false
             )
             window.title = "zisla 设置"
+            window.level = WindowPlacement.modalWindowLevel
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: rootView)
-            settingsWindowController = NSWindowController(window: window)
+            window.delegate = self
+            let controller = NSWindowController(window: window)
+            controller.shouldCascadeWindows = false
+            settingsWindowController = controller
         }
+        settingsWindowScreen = targetScreen
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindowController?.showWindow(nil)
         if let window = settingsWindowController?.window {
             WindowPlacement.center(window, on: targetScreen)
+            window.makeKeyAndOrderFront(nil)
         }
-        settingsWindowController?.showWindow(nil)
-        settingsWindowController?.window?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func windowDidResize(_ notification: Notification) {
+        guard let window = notification.object as? SettingsWindow else { return }
+        WindowPlacement.center(window, on: settingsWindowScreen)
     }
 
     @objc private func checkUpdates() {
         AppModel.shared.checkForUpdates(manual: true)
     }
 
-    /// 打开「随记」大窗口编辑：左侧 Markdown 编辑、右侧富预览（图片/表格），
-    /// 区域远大于灵动岛内嵌面板。复用 `AppModel.shared.quickNotes`，编辑当前选中笔记。
+    /// Opens the Quick Notes full editor: Markdown editing on the left, rich preview (images/tables)
+    /// on the right — far more space than the inline island panel. Reuses `AppModel.shared.quickNotes`
+    /// and edits the currently selected note.
     func openQuickNotesEditor() {
         let targetScreen = WindowPlacement.screenUnderMouse()
         if quickNotesEditorController == nil {
@@ -593,9 +801,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 defer: false
             )
             window.title = "随记 · 编辑"
+            window.level = WindowPlacement.modalWindowLevel
+            window.isOpaque = false
+            window.backgroundColor = .clear
+            window.titlebarAppearsTransparent = true
             window.isReleasedWhenClosed = false
             window.minSize = NSSize(width: 640, height: 460)
-            window.contentView = NSHostingView(rootView: rootView)
+            let hostingView = NSHostingView(rootView: rootView)
+            hostingView.wantsLayer = true
+            hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+            window.contentView = hostingView
             quickNotesEditorController = NSWindowController(window: window)
         }
         if let window = quickNotesEditorController?.window {

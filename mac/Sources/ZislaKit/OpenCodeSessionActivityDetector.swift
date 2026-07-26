@@ -2,10 +2,10 @@ import Foundation
 import ZislaCore
 import SQLite3
 
-/// 从 opencode 的 SQLite 数据库推断活动 AI 会话。
+/// Infers active AI sessions from OpenCode's SQLite database.
 ///
-/// 数据库路径：`~/.local/share/opencode/opencode.db`
-/// 活动判定：非归档会话中最新消息为 user（等待响应）或 assistant 未完成（仍在生成）。
+/// Database path: `~/.local/share/opencode/opencode.db`.
+/// A session is active when its latest unarchived message is a waiting user message or an unfinished assistant message.
 public final class OpenCodeSessionActivityDetector: AIActivityDetecting {
     private struct SessionRow {
         var id: String

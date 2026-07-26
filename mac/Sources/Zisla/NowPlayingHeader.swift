@@ -3,16 +3,62 @@ import ZislaCore
 import ZislaKit
 import SwiftUI
 
+/// Text assembly for title/artist/lyrics, shared by the expanded header, lock screen overlay, and compact detail row.
+enum MediaTextFormatting {
+    /// Merges title and artist into a single "title · artist" line; shows only the title when artist is empty or same as title.
+    nonisolated static func titleArtistText(_ item: NowPlayingSnapshot) -> String {
+        let title = item.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let artist = item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        if artist.isEmpty || artist.compare(title, options: .caseInsensitive) == .orderedSame {
+            return title
+        }
+        return "\(title) · \(artist)"
+    }
+
+    /// Uses the program name and cast returned by system MediaRemote, deduplicated for display.
+    nonisolated static func videoSecondaryText(_ item: NowPlayingSnapshot) -> String {
+        let album = item.album?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let artist = item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts: [String]
+        if album.isEmpty {
+            parts = artist.isEmpty ? [] : [artist]
+        } else if artist.isEmpty
+            || artist.compare(album, options: .caseInsensitive) == .orderedSame {
+            parts = [album]
+        } else {
+            parts = [album, artist]
+        }
+        guard !parts.isEmpty else { return "视频正在播放" }
+        return parts.joined(separator: " · ")
+    }
+
+    nonisolated static func lyricLine(
+        _ item: NowPlayingSnapshot,
+        lyrics: SyncedLyrics?,
+        date: Date
+    ) -> String {
+        let elapsed = item.elapsedTime(at: date) ?? 0
+        return if let lyrics {
+            lyrics.currentLine(at: elapsed) ?? "歌词即将开始"
+        } else {
+            "暂无同步歌词"
+        }
+    }
+}
+
 struct NowPlayingHeader: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var media: NowPlayingService
     @ObservedObject private var aiMonitor: AIStateMonitor
+    @ObservedObject private var audioOutput: AudioOutputDeviceService
     @StateObject private var scrubState = MediaScrubState()
 
     init(model: AppModel) {
         _model = ObservedObject(wrappedValue: model)
         _media = ObservedObject(wrappedValue: model.media)
         _aiMonitor = ObservedObject(wrappedValue: model.aiMonitor)
+        _audioOutput = ObservedObject(wrappedValue: model.audioOutput)
     }
 
     var body: some View {
@@ -24,6 +70,9 @@ struct NowPlayingHeader: View {
             }
         }
         .frame(height: 72)
+        .onAppear {
+            audioOutput.refresh()
+        }
     }
 
     private func playingContent(_ item: NowPlayingSnapshot) -> some View {
@@ -40,15 +89,15 @@ struct NowPlayingHeader: View {
         }
     }
 
-    /// 展示歌词与歌曲信息：左侧图标，右侧纵向排列「歌名 · 歌手」（上）与歌词（下）；
-    /// 歌词置于歌名与歌手下方、进度条上方。最右侧保留音浪与播放控制。
-    /// 歌名·歌手 / 歌词过长时自动水平滚动（见 `MarqueeText`）。
+    /// Shows lyrics and track info: album art on the left; "title · artist" (top) and lyrics (bottom) stacked to its right;
+    /// lyrics sit below the title/artist row and above the progress bar. Waveform and playback controls on the far right.
+    /// Title/artist and lyrics scroll horizontally when too long (see `MarqueeText`).
     private func detailedPlayingContent(_ item: NowPlayingSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 10) {
                 artwork(item)
 
-                // 歌名·歌手（上）+ 歌词（下），纵向紧贴图标右侧
+                // Title/artist (top) + lyrics (bottom), stacked vertically flush against the right edge of the artwork.
                 VStack(alignment: .leading, spacing: 3) {
                     MarqueeText(
                         Self.titleArtistText(item),
@@ -81,11 +130,11 @@ struct NowPlayingHeader: View {
         }
     }
 
-    /// 播放进度条：左侧当前时间、中间进度、右侧总时长；播放时实时推进，
-    /// 并支持点击或拖动调整进度。
+    /// Playback progress bar: current time on the left, progress in the middle, total duration on the right;
+    /// advances in real time while playing, and supports tap or drag to seek.
     private func progressBar(_ item: NowPlayingSnapshot) -> some View {
         let track = MediaScrubTrack(item)
-        return TimelineView(.periodic(from: .now, by: 0.5)) { context in
+        return TimelineView(.animation(minimumInterval: 0.5, paused: !item.isPlaying)) { context in
             let duration = item.duration ?? 0
             let elapsed = scrubState.time
                 ?? item.elapsedTime(at: context.date)
@@ -99,7 +148,7 @@ struct NowPlayingHeader: View {
                     .fixedSize()
 
                 GeometryReader { geo in
-                    // 轨道固定 2pt；容器高度给圆点（9pt）与拖动手势，避免 Capsule 被圆点撑粗。
+                    // Track fixed at 2pt; container height accommodates the thumb (9pt) and drag gesture, avoiding Capsule being stretched.
                     let trackHeight: CGFloat = 2
                     let thumbDiameter = min(CGFloat(9), geo.size.width)
                     let thumbCenter = min(
@@ -157,8 +206,8 @@ struct NowPlayingHeader: View {
         }
     }
 
-    /// 简略模式：仅图标与音浪（加播放控制），不展示歌名、歌手与歌词，
-    /// 紧凑居中，不撑满宽度以免中间留出大段空白。
+    /// Compact mode: only album art and waveform (plus playback controls), no title/artist/lyrics;
+    /// centered compactly so the middle doesn't leave a large blank gap.
     private func compactPlayingContent(_ item: NowPlayingSnapshot) -> some View {
         HStack(spacing: 10) {
             artwork(item)
@@ -193,7 +242,7 @@ struct NowPlayingHeader: View {
                     }
                 }
             }
-            if item.favoriteControl != nil, item.isFavorite != nil {
+            if item.favoriteControl != nil {
                 IconButton(
                     symbol: item.isFavorite == true ? "heart.fill" : "heart",
                     help: item.isFavorite == true ? "取消收藏" : "添加收藏",
@@ -203,6 +252,14 @@ struct NowPlayingHeader: View {
                 ) {
                     _ = media.toggleFavorite()
                 }
+            }
+            if !audioOutput.devices.isEmpty {
+                AudioOutputDeviceMenu(
+                    devices: audioOutput.devices,
+                    selectedDeviceID: audioOutput.selectedDeviceID,
+                    onPrepare: { audioOutput.refresh() },
+                    onSelect: { audioOutput.select($0) }
+                )
             }
             IconButton(symbol: "backward.fill", help: "上一首", size: .compact) {
                 _ = media.send(.previous)
@@ -220,48 +277,20 @@ struct NowPlayingHeader: View {
         }
     }
 
-    /// 将歌名与歌手合并为一行「歌名 · 歌手」；歌手为空或与歌名相同时只显示歌名。
+    /// Merges title and artist into a single "title · artist" line; shows only the title when artist is empty or same as title.
     nonisolated private static func titleArtistText(_ item: NowPlayingSnapshot) -> String {
-        let title = item.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let artist = item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
-        if artist.isEmpty || artist.compare(title, options: .caseInsensitive) == .orderedSame {
-            return title
-        }
-        return "\(title) · \(artist)"
-    }
-
-    /// 使用系统 MediaRemote 返回的节目名和演员，去重后展示。
-    nonisolated private static func videoSecondaryText(_ item: NowPlayingSnapshot) -> String {
-        let album = item.album?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let artist = item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
-        let parts: [String]
-        if album.isEmpty {
-            parts = artist.isEmpty ? [] : [artist]
-        } else if artist.isEmpty
-            || artist.compare(album, options: .caseInsensitive) == .orderedSame {
-            parts = [album]
-        } else {
-            parts = [album, artist]
-        }
-        guard !parts.isEmpty else { return "视频正在播放" }
-        return parts.joined(separator: " · ")
+        MediaTextFormatting.titleArtistText(item)
     }
 
     private func currentLyricText(_ item: NowPlayingSnapshot, date: Date) -> String {
         if item.isVideo {
-            return Self.videoSecondaryText(item)
+            return MediaTextFormatting.videoSecondaryText(item)
         }
-        let elapsed = item.elapsedTime(at: date) ?? 0
-        return if let lyrics = item.lyrics {
-            lyrics.currentLine(at: elapsed) ?? "歌词即将开始"
-        } else {
-            "暂无同步歌词"
-        }
+        return MediaTextFormatting.lyricLine(item, lyrics: item.lyrics, date: date)
     }
 
-    /// 当前歌词行，过长时水平滚动（跑马灯）。点击跳转到播放软件。
-    /// 不论灵动岛是否展开，只要正在播放就随进度推进歌词（收起态也滚动）。
+    /// Current lyrics line, scrolling horizontally when too long (marquee). Tapping opens the source app.
+    /// Advances with playback progress whether or not the island is expanded (scrolls in collapsed state too).
     @ViewBuilder
     private func currentLyrics(_ item: NowPlayingSnapshot) -> some View {
         if item.isPlaying {
@@ -378,7 +407,7 @@ struct NowPlayingHeader: View {
     @ViewBuilder
     private func artwork(_ item: NowPlayingSnapshot) -> some View {
         ZStack(alignment: .bottomTrailing) {
-            if let data = item.artworkData, let image = NSImage(data: data) {
+            if let image = MediaArtworkImageCache.image(from: item.artworkData) {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
@@ -395,8 +424,7 @@ struct NowPlayingHeader: View {
                 .frame(width: 54, height: 54)
             }
 
-            if let iconData = item.sourceIconData,
-               let icon = NSImage(data: iconData) {
+            if let icon = MediaArtworkImageCache.image(from: item.sourceIconData) {
                 Image(nsImage: icon)
                     .resizable()
                     .scaledToFill()
@@ -505,6 +533,39 @@ struct PlaybackModeMenu: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("播放模式：\(mode.title)")
+    }
+}
+
+struct AudioOutputDeviceMenu: View {
+    var devices: [AudioOutputDevice]
+    var selectedDeviceID: UInt32?
+    var onPrepare: () -> Void
+    var onSelect: (AudioOutputDevice) -> Void
+
+    var body: some View {
+        Menu {
+            ForEach(devices) { device in
+                Button {
+                    onSelect(device)
+                } label: {
+                    Label(
+                        device.name,
+                        systemImage: device.id == selectedDeviceID
+                            ? "checkmark"
+                            : device.symbolName
+                    )
+                }
+            }
+        } label: {
+            IconButtonLabel(symbol: "airplayaudio", size: .compact)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("选择播放设备")
+        .onHover { isHovering in
+            if isHovering { onPrepare() }
+        }
     }
 }
 

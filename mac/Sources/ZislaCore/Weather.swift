@@ -1,6 +1,6 @@
 import Foundation
 
-/// Open-Meteo Forecast 天气响应的最小解码模型。
+/// Minimal decoding model for the Open-Meteo Forecast weather response.
 public struct OpenMeteoResponse: Decodable, Equatable, Sendable {
     public struct Current: Decodable, Equatable, Sendable {
         public var time: String
@@ -25,7 +25,7 @@ public struct OpenMeteoResponse: Decodable, Equatable, Sendable {
             temperature = try container.decode(Double.self, forKey: .temperature)
             apparentTemperature = try container.decode(Double.self, forKey: .apparentTemperature)
             weatherCode = try container.decode(Int.self, forKey: .weatherCode)
-            // Open-Meteo 用 0/1 表示昼夜。
+            // Open-Meteo encodes day/night as 0/1.
             isDay = try container.decode(Int.self, forKey: .isDay) != 0
             precipitation = try container.decodeIfPresent(Double.self, forKey: .precipitation) ?? 0
         }
@@ -50,7 +50,7 @@ public struct OpenMeteoResponse: Decodable, Equatable, Sendable {
     public var daily: Daily?
 }
 
-/// WMO 天气代码到中文描述与 SF Symbol 的映射，未知码有稳定兜底。
+/// Maps WMO weather codes to Chinese condition descriptions and SF Symbols; unknown codes fall back gracefully.
 public struct WeatherCondition: Equatable, Sendable {
     public let summary: String
     public let symbolName: String
@@ -100,7 +100,8 @@ public struct WeatherCondition: Equatable, Sendable {
     }
 }
 
-/// 由 WeatherKit 或中国天气网透传的预警记录，内容和来源均由气象机构发布。
+/// Weather alert record passed through from WeatherKit or a Chinese weather service;
+/// content and source are issued by the meteorological authority.
 public struct WeatherAlert: Identifiable, Equatable, Sendable {
     public enum Severity: String, Codable, CaseIterable, Sendable {
         case minor

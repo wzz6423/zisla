@@ -1,11 +1,11 @@
 import Foundation
 import ZislaCore
 
-/// 从 TRAE SOLO CN / TRAE Work 的 ai-agent 日志推断活动 AI 任务。
+/// Infers active AI tasks from TRAE SOLO CN / TRAE Work ai-agent logs.
 ///
-/// 日志路径：`~/Library/Application Support/TRAE SOLO CN/logs/<timestamp>/Modular/ai-agent_*_stdout.log`
-/// 日志格式：Rust tracing，`2026-07-23T20:08:01.801423+08:00  LEVEL module_path: message key=value`
-/// 活动信号：module path 含 `do_chat` 且行中有 `task_id=xxx`；ERROR 行标记错误。
+/// Log path: `~/Library/Application Support/TRAE SOLO CN/logs/<timestamp>/Modular/ai-agent_*_stdout.log`
+/// Log format: Rust tracing — `2026-07-23T20:08:01.801423+08:00  LEVEL module_path: message key=value`
+/// Activity signal: module path contains `do_chat` and the line includes `task_id=xxx`; ERROR lines mark errors.
 public final class TraeSessionActivityDetector: AIActivityDetecting {
     private struct Candidate {
         var url: URL
@@ -91,7 +91,7 @@ public final class TraeSessionActivityDetector: AIActivityDetecting {
                 progress: nil,
                 status: status,
                 updatedAt: state.updatedAt,
-                sessionURL: nil,
+                sessionURL: Self.sessionURL(for: state.sessionID),
                 effort: nil,
                 startedAt: state.startedAt
             )
@@ -104,6 +104,15 @@ public final class TraeSessionActivityDetector: AIActivityDetecting {
 
     public static func taskID(forTaskID taskID: String) -> String {
         "trae-task-\(taskID)"
+    }
+
+    private static func sessionURL(for sessionID: String) -> URL? {
+        var components = URLComponents()
+        components.scheme = "solo-cn"
+        components.host = "solo-deeplink.ai"
+        components.path = "/teleport_session"
+        components.queryItems = [URLQueryItem(name: "sid", value: sessionID)]
+        return components.url
     }
 
     public static func defaultLogsRoot(

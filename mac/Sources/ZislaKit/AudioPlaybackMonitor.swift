@@ -29,6 +29,61 @@ public struct AudioPlaybackSource: Equatable, Identifiable, Sendable {
 }
 
 @MainActor
+enum ApplicationIconDataCache {
+    private static let pixelSize = 64
+    private static let cache: NSCache<NSString, NSData> = {
+        let cache = NSCache<NSString, NSData>()
+        cache.countLimit = 64
+        cache.totalCostLimit = 2 * 1_024 * 1_024
+        return cache
+    }()
+
+    static func data(for image: NSImage?, cacheKey: String) -> Data? {
+        guard let image else { return nil }
+        let key = cacheKey as NSString
+        if let cached = cache.object(forKey: key) {
+            return cached as Data
+        }
+        guard let data = renderPNG(from: image) else { return nil }
+        cache.setObject(data as NSData, forKey: key, cost: data.count)
+        return data
+    }
+
+    private static func renderPNG(from image: NSImage) -> Data? {
+        guard let bitmap = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: pixelSize,
+            pixelsHigh: pixelSize,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ), let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return nil }
+
+        let targetRect = NSRect(x: 0, y: 0, width: pixelSize, height: pixelSize)
+        bitmap.size = targetRect.size
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = context
+        context.imageInterpolation = .high
+        context.cgContext.clear(targetRect)
+        image.draw(
+            in: targetRect,
+            from: .zero,
+            operation: .sourceOver,
+            fraction: 1,
+            respectFlipped: false,
+            hints: nil
+        )
+        context.flushGraphics()
+        return bitmap.representation(using: .png, properties: [:])
+    }
+}
+
+@MainActor
 final class AudioPlaybackMonitor {
     private(set) var sources: [AudioPlaybackSource] = []
     var onSourcesChanged: (@MainActor ([AudioPlaybackSource]) -> Void)?
@@ -68,7 +123,7 @@ final class AudioPlaybackMonitor {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 let application = NSWorkspace.shared.frontmostApplication
-                self.refresh(activatedApplication: application)
+                self.prioritizeSource(for: application)
             }
         }
         refresh()
@@ -98,10 +153,6 @@ final class AudioPlaybackMonitor {
     }
 
     func refresh() {
-        refresh(activatedApplication: nil)
-    }
-
-    private func refresh(activatedApplication: NSRunningApplication?) {
         guard #available(macOS 14.4, *) else { return }
         let objects = Self.processList()
         if isRunning { rebuildListeners(for: Set(objects)) }
@@ -114,14 +165,24 @@ final class AudioPlaybackMonitor {
             return pid
         }
         var resolved = Self.resolveSources(for: activePIDs)
-        if let activatedApplication,
-           let activatedSource = resolved.first(where: {
-               $0.processIdentifiers.contains(activatedApplication.processIdentifier)
-                   || ($0.bundleIdentifier != nil
-                       && $0.bundleIdentifier == activatedApplication.bundleIdentifier)
-           }) {
-            preferredSourceID = activatedSource.id
-        }
+        applyPreferredSource(to: &resolved)
+        updateSources(resolved)
+    }
+
+    private func prioritizeSource(for application: NSRunningApplication?) {
+        guard let application,
+              let activatedSource = sources.first(where: {
+                  $0.processIdentifiers.contains(application.processIdentifier)
+                      || ($0.bundleIdentifier != nil
+                          && $0.bundleIdentifier == application.bundleIdentifier)
+              }) else { return }
+        preferredSourceID = activatedSource.id
+        var resolved = sources
+        applyPreferredSource(to: &resolved)
+        updateSources(resolved)
+    }
+
+    private func applyPreferredSource(to resolved: inout [AudioPlaybackSource]) {
         if let preferredSourceID,
            resolved.contains(where: { $0.id == preferredSourceID }) {
             for index in resolved.indices {
@@ -135,7 +196,6 @@ final class AudioPlaybackMonitor {
         } else if preferredSourceID != nil {
             self.preferredSourceID = nil
         }
-        updateSources(resolved)
     }
 
     private func updateSources(_ next: [AudioPlaybackSource]) {
@@ -232,9 +292,9 @@ final class AudioPlaybackMonitor {
             ?? processName(pid)
         guard let applicationName, !applicationName.isEmpty else { return nil }
 
+        let id = bundleIdentifier ?? outerApplicationURL?.path ?? "pid:\(pid)"
         let icon = running?.icon
             ?? outerApplicationURL.map { NSWorkspace.shared.icon(forFile: $0.path) }
-        let id = bundleIdentifier ?? outerApplicationURL?.path ?? "pid:\(pid)"
         let frontmost = NSWorkspace.shared.frontmostApplication.map {
             $0.processIdentifier == pid
                 || (bundleIdentifier != nil && $0.bundleIdentifier == bundleIdentifier)
@@ -244,7 +304,7 @@ final class AudioPlaybackMonitor {
             processIdentifiers: [pid],
             bundleIdentifier: bundleIdentifier,
             applicationName: applicationName,
-            iconData: icon?.tiffRepresentation,
+            iconData: ApplicationIconDataCache.data(for: icon, cacheKey: id),
             isFrontmost: frontmost
         )
     }

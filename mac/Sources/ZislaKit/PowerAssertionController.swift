@@ -2,7 +2,7 @@ import Combine
 import Foundation
 import IOKit.pwr_mgt
 
-/// IOPM assertion 抽象，便于单测注入。
+/// IOPM assertion abstraction for unit test injection.
 @MainActor
 public protocol PowerAssertionManaging: AnyObject {
     func create(
@@ -33,10 +33,11 @@ public final class IOPMPowerAssertionManager: PowerAssertionManaging {
     }
 }
 
-/// 管理亮屏与防闲置系统休眠断言。
-/// - 亮屏：`kIOPMAssertPreventUserIdleDisplaySleep`
-/// - 合盖不熄屏（防闲置系统休眠）：`kIOPMAssertPreventUserIdleSystemSleep`
-/// 文案须说明：合盖、低电量、用户主动休眠或硬件策略仍可能导致睡眠。
+/// Manages display-on and idle-system-sleep-prevention assertions.
+/// - Display on: `kIOPMAssertPreventUserIdleDisplaySleep`
+/// - Prevent idle system sleep: `kIOPMAssertPreventUserIdleSystemSleep`
+/// Both assertions affect idle behaviour only; macOS still sleeps for lid close, low battery,
+/// user-initiated sleep, or hardware policy.
 @MainActor
 public final class PowerAssertionController: ObservableObject {
     public static let clamshellLimitationHint =
@@ -121,7 +122,7 @@ public final class PowerAssertionController: ObservableObject {
         var id: IOPMAssertionID = 0
         let result = manager.create(
             type: kIOPMAssertPreventUserIdleSystemSleep as CFString,
-            name: "zisla Do not Sleep" as CFString,
+            name: "zisla Prevent Idle Sleep" as CFString,
             level: IOPMAssertionLevel(kIOPMAssertionLevelOn),
             assertionID: &id
         )

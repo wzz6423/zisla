@@ -41,7 +41,7 @@ public enum CLIParseError: Error, Equatable, Sendable, CustomStringConvertible {
         case let .progressOutOfRange(value):
             return "进度 \(value) 超出范围，应在 0–100 之间。"
         case let .unknownProvider(value):
-            return "未知的 provider '\(value)'。支持：claude/codex/gemini/grok/gpt/qwen/coder。"
+            return "未知的 provider '\(value)'。支持：claude/codex/gemini/grok/gpt/copilot/qwen/coder。"
         case let .unknownNoticeKind(value):
             return "未知的 kind '\(value)'。支持：info/success/warning/error。"
         case let .unknownNoticeSide(value):
@@ -90,7 +90,7 @@ public enum CLIParser {
         }
     }
 
-    /// 将 `--key value` 序列折叠成字典；无值的旗标（如 --failed）记为 ""。
+    /// Folds a `--key value` sequence into a dictionary; valueless flags (e.g. --failed) are stored as "".
     private static func parseOptions(
         _ tokens: [String],
         allowed: Set<String>
@@ -206,7 +206,7 @@ public enum CLIParser {
         ))
     }
 
-    // MARK: - 取值助手
+    // MARK: - Value helpers
 
     private static func require(_ options: [String: String], _ key: String) throws -> String {
         guard let value = options[key], !value.isEmpty else {

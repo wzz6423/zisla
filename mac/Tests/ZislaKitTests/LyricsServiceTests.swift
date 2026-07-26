@@ -23,6 +23,21 @@ struct LyricsServiceTests {
     }
 
     @Test
+    func currentLineProgressTracksItsTimestampWindow() {
+        let lyrics = SyncedLyrics(lines: [
+            .init(time: 1, text: "第一句"),
+            .init(time: 3, text: "第二句"),
+        ])
+
+        #expect(lyrics.currentLineProgress(at: 0.9, duration: 8) == nil)
+        #expect(lyrics.currentLineProgress(at: 1, duration: 8) == 0)
+        #expect(lyrics.currentLineProgress(at: 2, duration: 8) == 0.5)
+        #expect(lyrics.currentLineProgress(at: 3, duration: 8) == 0)
+        #expect(lyrics.currentLineProgress(at: 5.5, duration: 8) == 0.5)
+        #expect(lyrics.currentLineProgress(at: 9, duration: 8) == 1)
+    }
+
+    @Test
     func lrclibSelectionRequiresNormalizedExactMetadata() throws {
         let data = Data(
             """
@@ -81,8 +96,8 @@ struct LyricsServiceTests {
 
     @Test
     func lrclibMultiArtistMatchReturnsFullArtistName() throws {
-        // MediaRemote 只返回首位歌手 "Gareth.T"，
-        // LRCLIB 返回完整歌手 "Gareth.T, Tray"。
+        // MediaRemote returns only the first artist "Gareth.T",
+        // while LRCLIB returns the full artist "Gareth.T, Tray".
         let data = Data(
             """
             [

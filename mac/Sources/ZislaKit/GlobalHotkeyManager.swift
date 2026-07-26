@@ -9,10 +9,13 @@ public enum GlobalHotkeyRegistrationResult: Equatable, Sendable {
     case registrationFailed
 }
 
-/// 全局快捷键封装：旧通用组合使用 Carbon，带左右侧要求的组合使用只读事件监听。
-/// 事件 tap 被添加到主 RunLoop，因此其回调与注册/注销操作都在主线程串行执行。
+/// Global hotkey wrapper: generic combinations use Carbon; combinations requiring left/right side
+/// modifiers use a read-only event tap.
+/// The event tap is added to the main RunLoop, so its callbacks and register/unregister calls
+/// are all serialized on the main thread.
 public final class GlobalHotkeyManager: @unchecked Sendable {
     private var hotKeyRef: EventHotKeyRef?
+    fileprivate private(set) var registeredCarbonHotkeyID: UInt32?
     private var eventHandler: EventHandlerRef?
     private var eventTap: CFMachPort?
     private var eventTapRunLoopSource: CFRunLoopSource?
@@ -65,6 +68,22 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
         )
     }
 
+    /// Registers a conventional combination hotkey that only needs a press action.
+    @discardableResult
+    public func register(
+        keyCode: UInt32,
+        modifiers: UInt32,
+        action: @escaping () -> Void
+    ) -> GlobalHotkeyRegistrationResult {
+        unregister()
+        return registerCarbon(
+            keyCode: keyCode,
+            modifiers: modifiers,
+            onKeyDown: action,
+            onKeyUp: {}
+        )
+    }
+
     public func unregister() {
         if sideSpecificHotkeyIsPressed {
             sideSpecificHotkeyIsPressed = false
@@ -74,6 +93,7 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
             UnregisterEventHotKey(hotKeyRef)
             self.hotKeyRef = nil
         }
+        registeredCarbonHotkeyID = nil
         if let eventHandler {
             RemoveEventHandler(eventHandler)
             self.eventHandler = nil
@@ -121,7 +141,10 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
             return .registrationFailed
         }
 
-        let hotKeyID = EventHotKeyID(signature: OSType(0x4F524254), id: 1)
+        let hotKeyID = EventHotKeyID(
+            signature: OSType(0x4F524254),
+            id: (keyCode << 16) | (modifiers & 0xFFFF)
+        )
         guard RegisterEventHotKey(
             keyCode,
             modifiers,
@@ -138,6 +161,7 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
             self.onKeyUp = nil
             return .registrationFailed
         }
+        registeredCarbonHotkeyID = hotKeyID.id
         return .registered
     }
 
@@ -242,6 +266,18 @@ private func globalHotkeyEventHandlerCallback(
 ) -> OSStatus {
     guard let event, let userData else { return noErr }
     let manager = Unmanaged<GlobalHotkeyManager>.fromOpaque(userData).takeUnretainedValue()
+    var hotkeyID = EventHotKeyID()
+    guard GetEventParameter(
+        event,
+        EventParamName(kEventParamDirectObject),
+        EventParamType(typeEventHotKeyID),
+        nil,
+        MemoryLayout<EventHotKeyID>.size,
+        nil,
+        &hotkeyID
+    ) == noErr,
+        hotkeyID.id == manager.registeredCarbonHotkeyID
+    else { return noErr }
     let kind = GetEventKind(event)
     MainActor.assumeIsolated {
         if kind == UInt32(kEventHotKeyPressed) {

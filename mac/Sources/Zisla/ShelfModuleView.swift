@@ -61,6 +61,24 @@ struct ShelfModuleView: View {
 
                     if !model.shelf.items.isEmpty {
                         Button {
+                            model.receiveQuickNoteTransferItems(model.shelf.items.map { .file($0.url) })
+                        } label: {
+                            Image(systemName: "note.text")
+                                .frame(width: 24, height: 22)
+                        }
+                        .buttonStyle(.plain)
+                        .help("全部发送到随记")
+
+                        Button {
+                            model.sendTransferItemsToAIAgent(model.shelf.items.map { .file($0.url) })
+                        } label: {
+                            Image(systemName: "sparkles")
+                                .frame(width: 24, height: 22)
+                        }
+                        .buttonStyle(.plain)
+                        .help("全部发送到 AI Agent")
+
+                        Button {
                             model.copyShelfFiles(model.shelf.items.map(\.url))
                         } label: {
                             Image(systemName: "doc.on.doc")
@@ -109,6 +127,12 @@ struct ShelfModuleView: View {
                                     ShelfItemView(
                                         item: item,
                                         onCopy: { model.copyShelfFiles([item.url]) },
+                                        onSendToQuickNote: {
+                                            model.receiveQuickNoteTransferItems([.file(item.url)])
+                                        },
+                                        onSendToAIAgent: {
+                                            model.sendTransferItemsToAIAgent([.file(item.url)])
+                                        },
                                         onRemove: { model.shelf.remove(id: item.id) }
                                     )
                                 }
@@ -127,18 +151,14 @@ struct ShelfModuleView: View {
                     }
                 )
             }
-            .background(
-                dropState.shelfTargeted
-                    ? Color.accentColor.opacity(0.12)
-                    : Color.fillCard
-            )
+            .background {
+                moduleBackground(shape: Self.shelfShape, targeted: dropState.shelfTargeted)
+            }
             .clipShape(Self.shelfShape)
             .overlay {
                 Self.shelfShape
                     .strokeBorder(
-                        dropState.shelfTargeted
-                            ? Color.accentColor
-                            : Color.strokeCard,
+                        moduleStroke(targeted: dropState.shelfTargeted),
                         lineWidth: 1
                     )
             }
@@ -170,26 +190,47 @@ struct ShelfModuleView: View {
         .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(8)
-        .background(
-            dropState.shareTargeted
-                ? Color.accentColor.opacity(0.12)
-                : Color.fillCard
-        )
+        .background {
+            moduleBackground(shape: Self.shareShoulderShape, targeted: dropState.shareTargeted)
+        }
         .clipShape(Self.shareShoulderShape)
         .overlay {
             Self.shareShoulderShape
                 .strokeBorder(
-                    dropState.shareTargeted ? Color.accentColor : Color.strokeCard,
+                    moduleStroke(targeted: dropState.shareTargeted),
                     lineWidth: 1
                 )
         }
         .help("拖入或粘贴后系统共享")
+    }
+
+    /// 中转站/共享块统一用普通卡片填充：Liquid Glass 在这两块上会和内部文件图标抢层次，
+    /// 透明主题下也不再走玻璃分支，只保留拖放命中的 targeted 反馈。
+    @ViewBuilder
+    private func moduleBackground<Surface: Shape>(
+        shape: Surface,
+        targeted: Bool
+    ) -> some View {
+        ZStack {
+            shape.fill(Color.fillCard)
+
+            if targeted {
+                shape.fill(Color.accentColor.opacity(0.12))
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func moduleStroke(targeted: Bool) -> Color {
+        targeted ? .accentColor : .strokeCard
     }
 }
 
 private struct ShelfItemView: View {
     var item: FileShelfItem
     var onCopy: () -> Void
+    var onSendToQuickNote: () -> Void
+    var onSendToAIAgent: () -> Void
     var onRemove: () -> Void
 
     var body: some View {
@@ -231,6 +272,8 @@ private struct ShelfItemView: View {
                 NSWorkspace.shared.activateFileViewerSelecting([item.url])
             }
             Button("复制", action: onCopy)
+            Button("发送到随记", action: onSendToQuickNote)
+            Button("发送到 AI Agent", action: onSendToAIAgent)
             Divider()
             Button("移除", role: .destructive, action: onRemove)
         }

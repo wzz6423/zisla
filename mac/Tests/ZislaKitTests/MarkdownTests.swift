@@ -113,14 +113,32 @@ struct MarkdownParserTests {
 
     @Test
     func doesNotParseInlineImageAsStandaloneBlock() {
-        // 图片标记前后有其它文本时，不应识别为独立图片块
+        // Image markup with surrounding text must not be parsed as a standalone image block
         let blocks = MarkdownParser.parse("看这张 ![图](/x.png) 怎么样")
         #expect(blocks.count == 1)
         if case .paragraph = blocks[0] {
-            // 正确：识别为段落
+            // Correct: parsed as a paragraph
         } else {
             #expect(Bool(false), "应解析为段落，而非独立图片块")
         }
+    }
+
+    @Test
+    func imageMarkerWithoutURLAtLineEndDoesNotCrash() {
+        // `]` 位于行尾时 index(after:) 是 endIndex，回归防护：不得越界崩溃，应按段落处理。
+        #expect(MarkdownParser.parse("![截图]") == [.paragraph(text: "![截图]")])
+        #expect(MarkdownParser.parse("![alt]") == [.paragraph(text: "![alt]")])
+        #expect(MarkdownParser.parse("正文\n![image]") == [.paragraph(text: "正文 ![image]")])
+    }
+
+    @Test
+    func parsesTableImmediatelyAfterParagraph() {
+        // 表格紧跟段落（无空行）时，表头不得被吞进段落、表体不得退化为裸文本。
+        let blocks = MarkdownParser.parse("对比如下：\n| A | B |\n| --- | --- |\n| 1 | 2 |")
+        #expect(blocks == [
+            .paragraph(text: "对比如下："),
+            .table(header: ["A", "B"], rows: [["1", "2"]]),
+        ])
     }
 }
 
@@ -168,6 +186,31 @@ struct MarkdownRendererTests {
 @MainActor
 struct NotesAppBridgeTests {
     @Test
+    func parsesPasswordProtectionFromSummary() throws {
+        let json = #"[{"id":"locked","title":"私密","modified":0,"passwordProtected":true}]"#
+        let summary = try #require(NotesAppBridge.parseSummaries(json)?.first)
+
+        #expect(summary.isPasswordProtected)
+    }
+
+    @Test
+    func extractsVisibleTagsWithoutDuplicates() {
+        #expect(
+            NotesAppBridge.tags(in: "#项目 进展\n#Release-1\n再次 #项目\n普通#文本")
+                == ["项目", "Release-1"]
+        )
+    }
+
+    @Test
+    func migratesLegacyMarkdownToEditableHTML() {
+        let body = MarkdownHTMLRenderer.bodyHTML(from: "# 随记\n\n- 第一项\n- 第二项")
+
+        #expect(body.contains("<h1>随记</h1>"))
+        #expect(body.contains("<ul>"))
+        #expect(body.contains("<li>第一项</li>"))
+    }
+
+    @Test
     func storesMarkdownAsPlainDivLinesNotPre() {
         let markdown = "# 随记\n\n正文 & 代码 <tag>"
         let body = NotesAppBridge.bodyHTML(for: markdown)
@@ -191,14 +234,14 @@ struct NotesAppBridgeTests {
     }
 
     @Test
-    func keepsPlainDivMarkdownEditable() {
+    func preservesPlainDivParagraphsAsNativeHTML() {
         let markdown = "# 随记\n正文"
         let content = NotesAppBridge.NoteContent(
             plainText: markdown,
             bodyHTML: NotesAppBridge.bodyHTML(for: markdown)
         )
 
-        #expect(!content.usesNativeHTML)
+        #expect(content.usesNativeHTML)
         #expect(content.plainText == markdown)
     }
 
@@ -214,20 +257,20 @@ struct NotesAppBridgeTests {
     }
 
     @Test
-    func keepsPlainNativeNoteEditable() {
+    func preservesPlainNativeNoteHTML() {
         let content = NotesAppBridge.NoteContent(
             plainText: "普通备忘录",
             bodyHTML: "<div>普通备忘录</div>"
         )
 
-        #expect(!content.usesNativeHTML)
+        #expect(content.usesNativeHTML)
     }
 
-    // MARK: - 最近删除过滤回归
+    // MARK: - Recently Deleted filtering regression
 
     @Test
     func filtersKnownRecentlyDeletedFolderNames() {
-        // 所有已知语言的「最近删除」文件夹名都应被排除
+        // Every known-language "Recently Deleted" folder name must be excluded
         for name in NotesAppBridge.recentlyDeletedFolderNames {
             #expect(
                 NotesAppBridge.isInRecentlyDeletedFolder(name),
@@ -253,20 +296,20 @@ struct NotesAppBridgeTests {
 
     @Test
     func doesNotFilterRegularOrHistoricalFolderNames() {
-        // 普通文件夹和历史/兼容文件夹均不应被误过滤
+        // Regular and historical/compat folder names must not be filtered by mistake
         let safe: [String] = [
-            "Notes",       // 默认笔记文件夹（英文）
-            "备忘录",        // 默认笔记文件夹（中文）
+            "Notes",       // default Notes folder (English)
+            "备忘录",        // default Notes folder (Chinese)
             "随记",
             "工作",
             "Reading",
             "Todo",
             "Journal",
-            "Zisla",       // 历史兼容
+            "Zisla",       // historical compatibility
             "随记笔记",
             "Zisla",
-            "",            // 空字符串（无容器时）
-            "Recently",    // 近似但不完全匹配
+            "",            // empty string (no container)
+            "Recently",    // approximate but incomplete match
             "Deleted",
             "最近",
             "删除",
@@ -281,16 +324,16 @@ struct NotesAppBridgeTests {
 
     @Test
     func filterIsCaseSensitiveAndExact() {
-        // 系统文件夹名大小写固定；前后空格、大小写变化均不应命中
+        // System folder names have fixed casing; leading/trailing spaces or case changes must not match
         #expect(!NotesAppBridge.isInRecentlyDeletedFolder("recently deleted"))
         #expect(!NotesAppBridge.isInRecentlyDeletedFolder("RECENTLY DELETED"))
-        #expect(!NotesAppBridge.isInRecentlyDeletedFolder("最近删除 "))   // 末尾空格
-        #expect(!NotesAppBridge.isInRecentlyDeletedFolder(" 最近删除"))   // 前置空格
+        #expect(!NotesAppBridge.isInRecentlyDeletedFolder("最近删除 "))   // trailing space
+        #expect(!NotesAppBridge.isInRecentlyDeletedFolder(" 最近删除"))   // leading space
     }
 }
 
 @Suite struct MarkdownImageInlinerTests {
-    /// 生成一个最小的有效 JPEG（1x1 红像素），用于模拟笔记里的本地图片文件。
+    /// Build a minimal valid JPEG (1x1 red pixel) to simulate a local image file in Notes.
     private func makeTestJPEG() -> Data {
         let space = CGColorSpaceCreateDeviceRGB()
         let ctx = CGContext(
@@ -317,12 +360,12 @@ struct NotesAppBridgeTests {
         return mutable as Data
     }
 
-    /// 写到临时目录并在测试结束清理，返回文件路径。
+    /// Write to a temporary directory (cleaned up at test end) and return the file path.
     private func writeTempImage(extension ext: String) throws -> String {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-md-img-\(UUID().uuidString).\(ext)")
         try makeTestJPEG().write(to: url)
-        // 清理在测试体内用 defer 处理
+        // Cleanup is handled with defer inside the test body
         return url.path
     }
 
@@ -403,7 +446,7 @@ struct NotesAppBridgeTests {
     @Test
     func preservesRelativePathWithoutScheme() {
         MarkdownImageInliner.clearCache()
-        // 没有 scheme、不是绝对路径的相对路径会被忽略，保留原样。
+        // Relative paths without a scheme or absolute path are ignored and left as-is.
         let html = #"<p><img src="foo/bar.png" alt="x"></p>"#
         let result = MarkdownImageInliner.inlineLocalImages(in: html)
         #expect(result == html)
@@ -436,15 +479,15 @@ struct NotesAppBridgeTests {
         #expect(!result.contains(p1))
         #expect(!result.contains(p2))
         #expect(result.contains("https://example.com/x.png"), "网络 URL 应保留")
-        // 至少出现两次 data URL（前两张本地图）
+        // At least two data URLs should appear (the first two local images)
         #expect(result.components(separatedBy: "data:image/jpeg;base64,").count - 1 == 2)
     }
 
     @Test
     func inlinesImageWithAmpersandInPath() throws {
         MarkdownImageInliner.clearCache()
-        // 模拟 MarkdownHTMLRenderer 管线：escapeHTML 把 & 转为 &amp;，
-        // attributeEscape 保持 &amp;，inliner 需还原才能正确读文件。
+        // Simulate the MarkdownHTMLRenderer pipeline: escapeHTML turns & into &amp;,
+        // attributeEscape keeps &amp;, and the inliner must unescape to read the file correctly.
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-a&b-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

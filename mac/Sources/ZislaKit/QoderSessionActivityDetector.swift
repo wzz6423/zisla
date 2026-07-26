@@ -1,7 +1,7 @@
 import Foundation
 import ZislaCore
 
-/// Qoder / QoderWork / QoderWake 等多宿主活动检测（结构化 CLI 日志 + 文本 SDK 日志）。
+/// Activity detection for Qoder / QoderWork / QoderWake and other multi-host clients (structured CLI logs + text SDK logs).
 public final class QoderSessionActivityDetector: AIActivityDetecting {
     private struct Candidate {
         enum Kind {
@@ -83,7 +83,7 @@ public final class QoderSessionActivityDetector: AIActivityDetecting {
         discoveryInterval = usesDefaultDiscovery ? 5 : 0
     }
 
-    /// 发现 `~/.qoder*` 配置根（含默认 `~/.qoder`）。
+    /// Discovers `~/.qoder*` config roots (including the default `~/.qoder`).
     public static func defaultConfigRoots(
         home: URL = FileManager.default.homeDirectoryForCurrentUser,
         fileManager: FileManager = .default
@@ -113,7 +113,7 @@ public final class QoderSessionActivityDetector: AIActivityDetecting {
         return roots.sorted { $0.path < $1.path }
     }
 
-    /// Application Support / VS Code 兼容宿主中的 Qoder 日志根。
+    /// Qoder log roots in Application Support and VS Code-compatible hosts.
     public static func defaultTextLogRoots(
         home: URL = FileManager.default.homeDirectoryForCurrentUser,
         fileManager: FileManager = .default
@@ -229,6 +229,9 @@ public final class QoderSessionActivityDetector: AIActivityDetecting {
 
         var merged = duplicate.value
         merged.detail = "Desktop"
+        if let sessionID = Self.sessionID(fromTaskID: merged.id) {
+            merged.sessionURL = Self.sessionURL(for: sessionID)
+        }
         merged.status = Self.dominantActiveStatus(merged.status, task.status)
         merged.updatedAt = max(merged.updatedAt, task.updatedAt)
         merged.startedAt = [merged.startedAt, task.startedAt].compactMap { $0 }.min()
@@ -291,6 +294,21 @@ public final class QoderSessionActivityDetector: AIActivityDetecting {
     public static func taskID(forLogPath path: String) -> String {
         let digest = stableDigest(path)
         return "qoder-log-\(digest)"
+    }
+
+    private static func sessionID(fromTaskID taskID: String) -> String? {
+        let prefix = "qoder-session-"
+        guard taskID.hasPrefix(prefix) else { return nil }
+        let sessionID = String(taskID.dropFirst(prefix.count))
+        return sessionID.isEmpty ? nil : sessionID
+    }
+
+    private static func sessionURL(for sessionID: String) -> URL? {
+        var components = URLComponents()
+        components.scheme = "qoder-work-cn"
+        components.host = "notification-click"
+        components.queryItems = [URLQueryItem(name: "chatId", value: sessionID)]
+        return components.url
     }
 
     // MARK: - Discovery

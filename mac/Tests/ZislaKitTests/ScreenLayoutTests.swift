@@ -207,7 +207,7 @@ struct ScreenLayoutTests {
         )
         let layout = engine.layout(for: screen)
 
-        // 触发区 = 岛身本身（x∈[630,810]，y∈[875,900]），刘海下方（y<875）不触发。
+        // Trigger zone is the island body itself (x∈[630,810], y∈[875,900]); below the notch (y<875) does not trigger.
         #expect(layout.containsTrigger(CGPoint(x: 720, y: 900)))
         #expect(layout.containsTrigger(CGPoint(x: 630, y: 875)))
         #expect(!layout.containsTrigger(CGPoint(x: 720, y: 874.99)))

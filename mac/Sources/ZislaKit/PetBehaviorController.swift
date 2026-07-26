@@ -1,9 +1,9 @@
 import Foundation
 
-/// 宠物行为：根据外部事件（AI 任务状态、用户点击）切换「心情/活动」，
-/// 实际动画由 `PetSpriteView` 按 `activity` 做程序化 idle（浮动/呼吸/小跳）。
+/// Pet behavior: switches "mood/activity" in response to external events (AI task state, user tap).
+/// Actual animation is handled by `PetSpriteView`, which drives programmatic idle (floating/breathing/small jump) based on `activity`.
 ///
-/// 宠物固定在灵动岛内部，不横穿、不跑动。
+/// The pet is fixed inside the Dynamic Island and does not walk or cross sides.
 @MainActor
 public final class PetBehaviorController: ObservableObject {
   @Published public private(set) var activity: Activity = .idle
@@ -23,7 +23,7 @@ public final class PetBehaviorController: ObservableObject {
     tapResetTask?.cancel()
   }
 
-  /// 外部活动事件驱动宠物状态。传入 `nil` 恢复待机。
+  /// Drives pet state from an external activity event. Pass `nil` to return to idle.
   public func setActivity(_ activity: Activity?) {
     externalActivity = activity
     tapResetTask?.cancel()
@@ -31,7 +31,7 @@ public final class PetBehaviorController: ObservableObject {
     self.activity = activity ?? .idle
   }
 
-  /// 点击反馈不能覆盖仍在进行的外部任务状态，否则延迟回调会把工作状态错误重置为待机。
+  /// Tap feedback must not override an ongoing external task state, otherwise the delayed callback would incorrectly reset the working state to idle.
   public func handleTap() {
     guard externalActivity == nil else { return }
 

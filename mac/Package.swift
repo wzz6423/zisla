@@ -13,7 +13,7 @@ let package = Package(
         .executable(name: "zislactl", targets: ["zislactl"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/Lakr233/SkyLightWindow.git", from: "1.0.0"),
+        .package(path: "Vendor/SkyLightWindow"),
     ],
     targets: [
         .target(
@@ -27,6 +27,12 @@ let package = Package(
             dependencies: ["ZislaCore"],
             linkerSettings: [
                 .linkedFramework("WeatherKit"),
+                .linkedFramework("Security"),
+                .linkedFramework("Network"),
+                .linkedFramework("PDFKit"),
+                .linkedFramework("ImageIO"),
+                .linkedFramework("CoreText"),
+                .linkedFramework("AVFoundation"),
                 .linkedLibrary("sqlite3"),
             ]
         ),
@@ -39,14 +45,16 @@ let package = Package(
                 .product(name: "SkyLightWindow", package: "SkyLightWindow"),
             ],
             resources: [
-                // 把内置像素宠物（pet.json + sprite.png）编入 App 包。
-                // 路径相对本 target 源码目录 `mac/Sources/Zisla`，故回退两级到 `mac/Resources/Pets`。
+                // Bundle the built-in pixel pet (pet.json + sprite.png) into the app.
+                // Paths are relative to this target's source directory `mac/Sources/Zisla`, so go up two levels to reach `mac/Resources/Pets`.
                 .copy("../../Resources/Pets"),
+                .copy("../../Resources/QuickNotes"),
                 .copy("../../Resources/BrandIcons"),
             ],
             linkerSettings: [
                 .linkedFramework("Speech"),
                 .linkedFramework("WebKit"),
+                .linkedFramework("AVFoundation"),
             ]
         ),
         .executableTarget(

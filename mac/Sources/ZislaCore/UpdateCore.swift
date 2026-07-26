@@ -4,7 +4,7 @@ public enum SemanticVersionError: Error, Equatable, Sendable {
     case invalid(String)
 }
 
-/// 语义版本，支持可选 `v` 前缀、1–3 段主次修订与 prerelease 标识。
+/// Semantic version with optional `v` prefix, 1–3 numeric components, and prerelease identifiers.
 public struct SemanticVersion: Equatable, Comparable, Sendable {
     public let major: Int
     public let minor: Int
@@ -56,10 +56,10 @@ public struct SemanticVersion: Equatable, Comparable, Sendable {
         return comparePrerelease(lhs.prerelease, rhs.prerelease) < 0
     }
 
-    /// SemVer 规则：有 prerelease 的版本低于无 prerelease 的同核心版本。
+    /// SemVer rule: a version with a prerelease identifier is lower than the same core version without one.
     private static func comparePrerelease(_ lhs: [String], _ rhs: [String]) -> Int {
         if lhs.isEmpty && rhs.isEmpty { return 0 }
-        if lhs.isEmpty { return 1 }   // 正式版 > 预发布版
+        if lhs.isEmpty { return 1 }   // release > pre-release
         if rhs.isEmpty { return -1 }
 
         for (a, b) in zip(lhs, rhs) {
@@ -68,7 +68,7 @@ public struct SemanticVersion: Equatable, Comparable, Sendable {
             case let (.some(x), .some(y)) where x != y:
                 return x < y ? -1 : 1
             case (.some, .none):
-                return -1          // 数值标识优先级低于字母标识
+                return -1          // numeric identifiers have lower precedence than alphanumeric
             case (.none, .some):
                 return 1
             case (.none, .none) where a != b:
@@ -82,7 +82,7 @@ public struct SemanticVersion: Equatable, Comparable, Sendable {
     }
 }
 
-/// GitHub/Gitee Release JSON 的最小解码模型。
+/// Minimal decode model for a GitHub/Gitee Release JSON.
 public struct GitHubRelease: Decodable, Equatable, Sendable {
     public struct Asset: Decodable, Equatable, Sendable {
         public var name: String
@@ -124,12 +124,12 @@ public struct GitHubRelease: Decodable, Equatable, Sendable {
         assets = try container.decodeIfPresent([Asset].self, forKey: .assets) ?? []
     }
 
-    /// 从 tag 解析出的版本；tag 非法时回退到 0.0.0，避免调用点被迫 try。
+    /// Version parsed from the tag; falls back to 0.0.0 on invalid tags so callers don't need to try.
     public var version: SemanticVersion {
         (try? SemanticVersion(tagName)) ?? SemanticVersion(major: 0, minor: 0, patch: 0)
     }
 
-    /// 挑出 macOS 的 .zip 归档及其配套 .sha256 校验文件。
+    /// Picks the macOS .zip archive and its accompanying .sha256 checksum file from the assets.
     public var macUpdateAssets: MacUpdateAssets? {
         guard let archive = assets.first(where: {
             let name = $0.name.lowercased()

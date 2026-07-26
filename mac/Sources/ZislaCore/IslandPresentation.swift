@@ -1,15 +1,16 @@
 import Foundation
 
-/// 灵动岛展示状态机：把指针、拖拽、固定等交互折叠成可预测的可见性状态与副作用。
+/// Island presentation state machine: folds pointer, drag, and pin interactions into predictable
+/// visibility states and side effects.
 public struct IslandPresentationReducer {
     public enum Visibility: Equatable, Sendable {
-        /// 完全隐藏（无面板）。通常在「悬停激活」关闭且未固定时出现。
+        /// Fully hidden (no panel). Occurs when hover-to-activate is off and the island is not pinned.
         case hidden
-        /// 收起为顶部细条。面板保持渲染，用来展示常驻宠物等轻量内容。
+        /// Collapsed to a thin strip at the top. The panel stays rendered for lightweight persistent content such as the pet.
         case collapsed
-        /// 展开为完整功能面板。
+        /// Expanded to the full-featured panel.
         case expanded
-        /// 被固定，保持展开。
+        /// Pinned, staying expanded.
         case pinned
     }
 
@@ -35,7 +36,7 @@ public struct IslandPresentationReducer {
         var dragging = false
         public internal(set) var visibility: Visibility = .hidden
 
-        /// 是否有渲染中的面板（收起或展开）。
+        /// Whether a panel is currently rendered (collapsed or expanded).
         public var isVisible: Bool { visibility != .hidden }
     }
 
@@ -43,12 +44,12 @@ public struct IslandPresentationReducer {
 
     public init() {}
 
-    /// 只要指针在内、被固定或正在拖拽，任何折叠都应被抑制。
+    /// Suppresses any collapse while the pointer is inside, the island is pinned, or a drag is in progress.
     private var isHeldOpen: Bool {
         state.pointerInside || state.pinned || state.dragging
     }
 
-    /// 收到抬手/移出等释放动作后重新评估：不再被任何理由留存则安排折叠。
+    /// Re-evaluates after a release action (pointer exit, drag end, etc.): schedules a collapse if nothing else holds the island open.
     private mutating func reevaluateAfterRelease() -> [Effect] {
         isHeldOpen ? [] : [.scheduleCollapse]
     }
@@ -88,7 +89,7 @@ public struct IslandPresentationReducer {
         }
     }
 
-    /// 启动后默认进入收起态，让常驻内容（如宠物）保持可见。
+    /// On startup, enters the collapsed state by default so persistent content (e.g. the pet) remains visible.
     public mutating func start() -> [Effect] {
         guard state.visibility == .hidden else { return [] }
         state.visibility = .collapsed

@@ -1,6 +1,6 @@
 import Foundation
 
-/// 基于 Foundation Chinese Calendar 的农历换算，纯逻辑、可注入日历便于单测。
+/// Lunar calendar conversion based on Foundation's Chinese Calendar; pure logic with an injectable calendar for unit testing.
 public enum LunarCalendar {
     private static let heavenlyStems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
     private static let earthlyBranches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
@@ -12,7 +12,7 @@ public enum LunarCalendar {
     private static let dayTens = ["初", "十", "廿", "三"]
     private static let dayDigits = ["十", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
 
-    /// 农历日期各组成部分。`isLeapMonth` 为闰月标记。
+    /// Components of a lunar date. `isLeapMonth` indicates a leap month.
     public struct Components: Equatable, Sendable {
         public var yearGanZhi: String
         public var zodiac: String
@@ -34,17 +34,17 @@ public enum LunarCalendar {
             self.isLeapMonth = isLeapMonth
         }
 
-        /// 例：`乙巳蛇年 冬月初八`。
+        /// Example: a full lunar date containing the sexagenary year, zodiac, month, and day.
         public var fullText: String {
             "\(yearGanZhi)\(zodiac)年 \(monthText)\(day)"
         }
 
-        /// 例：`冬月初八`（闰月加“闰”前缀）。
+        /// Example: a lunar month and day; leap months carry a dedicated prefix.
         public var monthDayText: String {
             "\(monthText)\(day)"
         }
 
-        /// 例：`乙巳年冬月初八`，用于空间有限的锁屏展示。
+        /// Example: a compact lunar date for the space-constrained lock screen.
         public var yearMonthDayText: String {
             "\(yearGanZhi)年\(monthText)\(day)"
         }
@@ -64,7 +64,7 @@ public enum LunarCalendar {
         guard let year = parts.year, let month = parts.month, let day = parts.day,
               (1...12).contains(month), (1...30).contains(day) else { return nil }
 
-        // Chinese calendar 的 year 为 1...60 的干支序号。
+        // Chinese calendar year is a ganzhi sequence number in 1...60.
         let stemIndex = (year - 1) % 10
         let branchIndex = (year - 1) % 12
         return Components(
@@ -76,7 +76,7 @@ public enum LunarCalendar {
         )
     }
 
-    /// 农历日的中文写法：初一…初十、十一…廿十、廿一…三十。
+    /// Returns the Chinese written form for a lunar day.
     static func dayText(_ day: Int) -> String {
         switch day {
         case 10: return "初十"

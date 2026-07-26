@@ -5,6 +5,14 @@ import Testing
 
 struct AudioSpectrumServiceTests {
     @Test
+    func audibilityOnlyModeSkipsFFTAndUsesLowerSamplingFrequency() {
+        #expect(AudioSpectrumAnalysisMode.visualization.minimumInterval == 1.0 / 20.0)
+        #expect(AudioSpectrumAnalysisMode.visualization.includesFrequencyLevels)
+        #expect(AudioSpectrumAnalysisMode.audibilityOnly.minimumInterval == 1.0 / 5.0)
+        #expect(!AudioSpectrumAnalysisMode.audibilityOnly.includesFrequencyLevels)
+    }
+
+    @Test
     func silenceProducesNoFrequencyEnergy() {
         let analyzer = AudioFrequencyAnalyzer()
 

@@ -100,13 +100,13 @@ struct MailServiceTests {
     func inboxScriptIsDefensiveAgainstUnreachableAccountsAndMessages() {
         let script = MailService.inboxScript(accountNames: [])
 
-        // 任意一个账户的 inbox 解引用失败时，不应让整次抓取炸掉。
+        // If any account's inbox fails to resolve, the whole fetch must not blow up.
         #expect(script.contains("on error"))
         #expect(script.contains("messages of inbox of mailAccount"))
         #expect(script.contains("set mailAccount to item i of accountList"))
         #expect(script.contains("-- 单封邮件不可读（损坏/超大），跳过"))
         #expect(script.contains("-- 该账户的 inbox 当前不可访问"))
-        // 账户名读不到时，应回填一个占位描述，避免后续下标错位。
+        // When an account name is unreadable, fill a placeholder so later indices stay aligned.
         #expect(script.contains("未知账户"))
     }
 

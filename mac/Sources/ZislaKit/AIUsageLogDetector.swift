@@ -1,8 +1,8 @@
 import Foundation
 import ZislaCore
 
-/// 从各本地 AI 工具的结构化会话日志中读取已记录的 token 用量。
-/// 只解析数值用量字段，不读取或持久化会话正文。
+/// Reads recorded token usage from the structured session logs of local AI tools.
+/// Only parses numeric usage fields; does not read or persist session content.
 public final class AIUsageLogDetector: AIUsageDetecting {
     private struct TokenUsage {
         var input: Int
@@ -20,11 +20,18 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         var modificationDate: Date
         var size: UInt64
         var samples: [AIUsageSample]
+        var readerState: IncrementalJSONLReader.State?
+        var parserState: ParserState?
+    }
+
+    private struct ParserState {
+        var codexPriorTotal: TokenUsage?
+        var grokPriorUsageBySession: [String: TokenUsage] = [:]
+        var copilotHasDetailedUsage = false
     }
 
     private struct LogData {
         var data: Data
-        var startsAtFileStart: Bool
     }
 
     public let codexSessionsDirectory: URL
@@ -33,6 +40,8 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     public let grokSessionsDirectory: URL
     public let qwenProjectsDirectory: URL
     public let qoderRoots: [URL]
+    public let doubaoRoots: [URL]
+    public let copilotUsageLogRoots: [URL]
     public let maxFilesPerProvider: Int
     public let maxBytesPerFile: Int
     public let maxSamplesPerFile: Int
@@ -49,9 +58,11 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         grokSessionsDirectory: URL? = nil,
         qwenProjectsDirectory: URL? = nil,
         qoderRoots: [URL]? = nil,
-        maxFilesPerProvider: Int = 4,
+        doubaoRoots: [URL]? = nil,
+        copilotUsageLogRoots: [URL]? = nil,
+        maxFilesPerProvider: Int = .max,
         maxBytesPerFile: Int = 256 * 1_024,
-        maxSamplesPerFile: Int = 256,
+        maxSamplesPerFile: Int = .max,
         scanInterval: TimeInterval = 60,
         fileManager: FileManager = .default
     ) {
@@ -68,6 +79,20 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             ?? home.appendingPathComponent(".qwen/projects", isDirectory: true)
         self.qoderRoots = qoderRoots
             ?? QoderSessionActivityDetector.defaultConfigRoots(home: home, fileManager: fileManager)
+        self.doubaoRoots = doubaoRoots
+            ?? DoubaoSessionActivityDetector.defaultDataRoots(home: home, fileManager: fileManager)
+        self.copilotUsageLogRoots = copilotUsageLogRoots ?? [
+            home.appendingPathComponent(".copilot/logs", isDirectory: true),
+            home.appendingPathComponent(".copilot/diagnostics", isDirectory: true),
+            home.appendingPathComponent(
+                "Library/Application Support/Code/User/globalStorage/github.copilot-chat/diagnostics",
+                isDirectory: true
+            ),
+            home.appendingPathComponent(
+                "Library/Application Support/Code - Insiders/User/globalStorage/github.copilot-chat/diagnostics",
+                isDirectory: true
+            ),
+        ]
         self.maxFilesPerProvider = max(1, maxFilesPerProvider)
         self.maxBytesPerFile = max(4_096, maxBytesPerFile)
         self.maxSamplesPerFile = max(1, maxSamplesPerFile)
@@ -94,13 +119,11 @@ public final class AIUsageLogDetector: AIUsageDetecting {
                 samples.append(contentsOf: cached.samples)
                 continue
             }
-            let parsed = autoreleasepool { parse(candidate) }
-            cache[key] = CachedSamples(
-                modificationDate: candidate.modificationDate,
-                size: candidate.size,
-                samples: parsed
-            )
-            samples.append(contentsOf: parsed)
+            let updated = autoreleasepool {
+                parsedSamples(for: candidate, cached: cache[key])
+            }
+            cache[key] = updated
+            samples.append(contentsOf: updated.samples)
         }
 
         return uniqueSamples(samples)
@@ -145,6 +168,12 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         ))
         for root in qoderRoots {
             result.append(contentsOf: candidates(provider: .coder, root: root))
+        }
+        for root in doubaoRoots {
+            result.append(contentsOf: candidates(provider: .doubao, root: root))
+        }
+        for root in copilotUsageLogRoots {
+            result.append(contentsOf: candidates(provider: .copilot, root: root))
         }
         return result
     }
@@ -199,34 +228,143 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return url.lastPathComponent.hasPrefix("session-")
         case .coder:
             return url.path.contains("/logs/sessions/")
-        case .trae, .opencode, .harness, .doubao:
+        case .copilot:
+            return true
+        case .kimi, .trae, .opencode, .harness:
             return false
-        case .codex, .claude, .qwen, .gpt:
+        case .codex, .claude, .qwen, .gpt, .doubao:
             return true
         }
+    }
+
+    private func parsedSamples(
+        for candidate: Candidate,
+        cached: CachedSamples?
+    ) -> CachedSamples {
+        if candidate.url.pathExtension == "jsonl" {
+            return parseJSONL(candidate, cached: cached)
+        }
+
+        let samples = parse(candidate)
+        return CachedSamples(
+            modificationDate: candidate.modificationDate,
+            size: candidate.size,
+            samples: samples,
+            readerState: nil,
+            parserState: nil
+        )
     }
 
     private func parse(_ candidate: Candidate) -> [AIUsageSample] {
         guard let logData = trailingData(from: candidate) else { return [] }
         let roots = jsonRoots(from: logData.data, pathExtension: candidate.url.pathExtension)
-        let samples: [AIUsageSample]
+        var samples: [AIUsageSample]
         switch candidate.provider {
         case .codex:
-            samples = parseCodex(
-                roots,
-                candidate: candidate,
-                startsAtFileStart: logData.startsAtFileStart
-            )
+            var parserState = ParserState()
+            samples = roots.flatMap { parseRoot(from: $0, candidate: candidate, parserState: &parserState) }
         case .claude:
-            samples = parseClaude(roots, candidate: candidate)
+            var parserState = ParserState()
+            samples = roots.flatMap { parseRoot(from: $0, candidate: candidate, parserState: &parserState) }
         case .grok:
-            samples = parseGrok(roots, candidate: candidate)
-        case .gemini, .qwen, .coder, .gpt:
-            samples = parseGeneric(roots, candidate: candidate)
-        case .trae, .opencode, .harness, .doubao:
+            var parserState = ParserState()
+            samples = roots.flatMap { parseRoot(from: $0, candidate: candidate, parserState: &parserState) }
+        case .gemini, .qwen, .coder, .gpt, .doubao, .copilot:
+            var parserState = ParserState()
+            samples = roots.flatMap { parseRoot(from: $0, candidate: candidate, parserState: &parserState) }
+            if parserState.copilotHasDetailedUsage {
+                samples.removeAll(where: isCopilotShutdownSummary)
+            }
+        case .kimi, .trae, .opencode, .harness:
             return []
         }
         return Array(samples.suffix(maxSamplesPerFile))
+    }
+
+    private func parseJSONL(
+        _ candidate: Candidate,
+        cached: CachedSamples?
+    ) -> CachedSamples {
+        let canContinue = (cached?.size ?? 0) < candidate.size
+        var readerState: IncrementalJSONLReader.State
+        var parserState: ParserState
+        var samples: [AIUsageSample]
+
+        if canContinue,
+           let cached,
+           let cachedReaderState = cached.readerState,
+           let cachedParserState = cached.parserState {
+            readerState = cachedReaderState
+            parserState = cachedParserState
+            samples = cached.samples
+        } else {
+            readerState = IncrementalJSONLReader(initialTailBytes: .max)
+                .initialState(fileSize: candidate.size)
+            parserState = ParserState()
+            samples = []
+        }
+
+        let reader = IncrementalJSONLReader(
+            initialTailBytes: .max,
+            maximumLineBytes: maxBytesPerFile
+        )
+        do {
+            try reader.readLines(
+                from: candidate.url,
+                fileSize: candidate.size,
+                state: &readerState
+            ) { line in
+                guard let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
+                    return
+                }
+                samples.append(contentsOf: parseRoot(from: root, candidate: candidate, parserState: &parserState))
+            }
+        } catch {
+            return cached ?? CachedSamples(
+                modificationDate: candidate.modificationDate,
+                size: candidate.size,
+                samples: [],
+                readerState: nil,
+                parserState: nil
+            )
+        }
+
+        if parserState.copilotHasDetailedUsage {
+            samples.removeAll(where: isCopilotShutdownSummary)
+        }
+
+        return CachedSamples(
+            modificationDate: candidate.modificationDate,
+            size: candidate.size,
+            samples: Array(samples.suffix(maxSamplesPerFile)),
+            readerState: readerState,
+            parserState: parserState
+        )
+    }
+
+    private func parseRoot(
+        from root: [String: Any],
+        candidate: Candidate,
+        parserState: inout ParserState
+    ) -> [AIUsageSample] {
+        switch candidate.provider {
+        case .codex:
+            return parseCodex(root, candidate: candidate, priorTotal: &parserState.codexPriorTotal).map { [$0] } ?? []
+        case .claude:
+            return parseClaude(root, candidate: candidate).map { [$0] } ?? []
+        case .grok:
+            return parseGrok(
+                root,
+                candidate: candidate,
+                priorUsageBySession: &parserState.grokPriorUsageBySession
+            ).map { [$0] } ?? []
+        case .gemini, .qwen, .coder, .gpt, .doubao:
+            return parseGeneric(root, candidate: candidate)
+        case .copilot:
+            return parseCopilot(root, candidate: candidate, parserState: &parserState)
+        case .kimi, .trae, .opencode, .harness:
+            return []
+        }
     }
 
     private func jsonRoots(from data: Data, pathExtension: String) -> [[String: Any]] {
@@ -243,123 +381,197 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     }
 
     private func parseCodex(
-        _ roots: [[String: Any]],
+        _ root: [String: Any],
         candidate: Candidate,
-        startsAtFileStart: Bool
-    ) -> [AIUsageSample] {
-        var priorTotal: TokenUsage?
+        priorTotal: inout TokenUsage?
+    ) -> AIUsageSample? {
+        guard root["type"] as? String == "event_msg",
+              let payload = root["payload"] as? [String: Any],
+              payload["type"] as? String == "token_count",
+              let info = payload["info"] as? [String: Any],
+              let usage = info["last_token_usage"] as? [String: Any] else {
+            return nil
+        }
 
-        return roots.compactMap { root in
-            guard root["type"] as? String == "event_msg",
-                  let payload = root["payload"] as? [String: Any],
-                  payload["type"] as? String == "token_count",
-                  let info = payload["info"] as? [String: Any],
-                  let usage = info["last_token_usage"] as? [String: Any] else {
-                return nil
-            }
-
-            let current: TokenUsage
-            let permitsZero: Bool
-            if let totalUsage = info["total_token_usage"] as? [String: Any] {
-                let total = tokenUsage(totalUsage, excludingCachedInput: true)
-                if let priorTotal,
-                   total.input >= priorTotal.input,
-                   total.output >= priorTotal.output {
-                    current = TokenUsage(
-                        input: total.input - priorTotal.input,
-                        output: total.output - priorTotal.output
-                    )
-                } else if !startsAtFileStart, priorTotal == nil {
-                    // 尾部缺失前序累计点，首条只能可信地使用本次消耗。
-                    current = tokenUsage(usage, excludingCachedInput: true)
-                } else {
-                    current = total
-                }
-                priorTotal = total
-                permitsZero = true
+        let current: TokenUsage
+        let permitsZero: Bool
+        if let totalUsage = info["total_token_usage"] as? [String: Any] {
+            let total = tokenUsage(totalUsage)
+            if let priorTotal,
+               total.input >= priorTotal.input,
+               total.output >= priorTotal.output {
+                current = TokenUsage(
+                    input: total.input - priorTotal.input,
+                    output: total.output - priorTotal.output
+                )
             } else {
-                current = tokenUsage(usage, excludingCachedInput: true)
-                permitsZero = false
+                current = total
             }
-
-            return usageSample(
-                provider: .codex,
-                sourceID: sourceID(candidate, component: "event-\(stableDigest(root))"),
-                timestamp: timestamp(in: root, fallback: candidate.modificationDate),
-                inputTokens: current.input,
-                outputTokens: current.output,
-                costUSD: nil,
-                model: nil,
-                permitsZero: permitsZero
-            )
+            priorTotal = total
+            permitsZero = true
+        } else {
+            current = tokenUsage(usage)
+            permitsZero = false
         }
+
+        return usageSample(
+            provider: .codex,
+            sourceID: sourceID(candidate, component: "event-\(stableDigest(root))"),
+            timestamp: timestamp(in: root, fallback: candidate.modificationDate),
+            inputTokens: current.input,
+            outputTokens: current.output,
+            costUSD: nil,
+            model: nil,
+            permitsZero: permitsZero
+        )
     }
 
-    private func parseClaude(_ roots: [[String: Any]], candidate: Candidate) -> [AIUsageSample] {
-        roots.compactMap { root in
-            guard root["type"] as? String == "assistant",
-                  let message = root["message"] as? [String: Any],
-                  let messageID = message["id"] as? String,
-                  let usage = message["usage"] as? [String: Any] else {
-                return nil
-            }
-            return sample(
-                provider: .claude,
-                sourceID: sourceID(candidate, component: "message-\(messageID)"),
-                timestamp: timestamp(in: root, fallback: candidate.modificationDate),
-                usage: usage,
-                model: message["model"] as? String,
-                includeClaudeCacheTokens: true
-            )
+    private func parseClaude(_ root: [String: Any], candidate: Candidate) -> AIUsageSample? {
+        guard root["type"] as? String == "assistant",
+              let message = root["message"] as? [String: Any],
+              let messageID = message["id"] as? String,
+              let usage = message["usage"] as? [String: Any] else {
+            return nil
         }
+        return sample(
+            provider: .claude,
+            sourceID: sourceID(candidate, component: "message-\(messageID)"),
+            timestamp: timestamp(in: root, fallback: candidate.modificationDate),
+            usage: usage,
+            model: message["model"] as? String,
+            includeCacheInputTokens: true
+        )
     }
 
-    private func parseGrok(_ roots: [[String: Any]], candidate: Candidate) -> [AIUsageSample] {
-        var priorUsageBySession: [String: (input: Int, output: Int)] = [:]
-        var samples: [AIUsageSample] = []
-        for root in roots {
-            guard root["method"] as? String == "_x.ai/session/update",
-                  let params = root["params"] as? [String: Any],
-                  let sessionID = params["sessionId"] as? String,
-                  let update = params["update"] as? [String: Any],
-                  let promptID = update["prompt_id"] as? String,
-                  let usage = update["usage"] as? [String: Any] else {
-                continue
-            }
-            let input = integer(usage["inputTokens"])
-            let output = integer(usage["outputTokens"])
-            guard input + output > 0 else { continue }
-            let prior = priorUsageBySession[sessionID] ?? (0, 0)
-            priorUsageBySession[sessionID] = (max(prior.input, input), max(prior.output, output))
-            let delta = ["inputTokens": max(0, input - prior.input), "outputTokens": max(0, output - prior.output)]
-            let model = (usage["modelUsage"] as? [String: Any])?.keys.sorted().first
-            if let sample = sample(
-                provider: .grok,
-                sourceID: sourceID(candidate, component: "prompt-\(promptID)"),
-                timestamp: timestamp(in: root, fallback: candidate.modificationDate),
-                usage: delta,
-                model: model
-            ) {
-                samples.append(sample)
-            }
+    private func parseGrok(
+        _ root: [String: Any],
+        candidate: Candidate,
+        priorUsageBySession: inout [String: TokenUsage]
+    ) -> AIUsageSample? {
+        guard root["method"] as? String == "_x.ai/session/update",
+              let params = root["params"] as? [String: Any],
+              let sessionID = params["sessionId"] as? String,
+              let update = params["update"] as? [String: Any],
+              let promptID = update["prompt_id"] as? String,
+              let usage = update["usage"] as? [String: Any] else {
+            return nil
         }
-        return samples
+        let current = TokenUsage(
+            input: integer(usage["inputTokens"]),
+            output: integer(usage["outputTokens"])
+        )
+        guard current.input + current.output > 0 else { return nil }
+        let prior = priorUsageBySession[sessionID] ?? TokenUsage(input: 0, output: 0)
+        priorUsageBySession[sessionID] = TokenUsage(
+            input: max(prior.input, current.input),
+            output: max(prior.output, current.output)
+        )
+        let delta = [
+            "inputTokens": max(0, current.input - prior.input),
+            "outputTokens": max(0, current.output - prior.output),
+        ]
+        let model = (usage["modelUsage"] as? [String: Any])?.keys.sorted().first
+        return sample(
+            provider: .grok,
+            sourceID: sourceID(candidate, component: "prompt-\(promptID)"),
+            timestamp: timestamp(in: root, fallback: candidate.modificationDate),
+            usage: delta,
+            model: model
+        )
     }
 
-    private func parseGeneric(_ roots: [[String: Any]], candidate: Candidate) -> [AIUsageSample] {
-        roots.flatMap { root in
-            usageDictionaries(in: root).enumerated().compactMap { usageIndex, usage in
-                sample(
-                    provider: candidate.provider,
+    private func parseCopilot(
+        _ root: [String: Any],
+        candidate: Candidate,
+        parserState: inout ParserState
+    ) -> [AIUsageSample] {
+        let eventID = (root["id"] as? String) ?? stableDigest(root)
+        let timestamp = timestamp(in: root, fallback: candidate.modificationDate)
+
+        switch root["type"] as? String {
+        case "assistant.usage":
+            guard let data = root["data"] as? [String: Any] else { return [] }
+            parserState.copilotHasDetailedUsage = true
+            return copilotSample(
+                sourceID: sourceID(candidate, component: "assistant-\(eventID)"),
+                timestamp: timestamp,
+                usage: data,
+                model: data["model"] as? String
+            ).map { [$0] } ?? []
+        case "session.shutdown":
+            guard !parserState.copilotHasDetailedUsage,
+                  let data = root["data"] as? [String: Any],
+                  let modelMetrics = data["modelMetrics"] as? [String: Any] else {
+                return []
+            }
+            return modelMetrics.keys.sorted().compactMap { model in
+                guard let metrics = modelMetrics[model] as? [String: Any],
+                      let usage = metrics["usage"] as? [String: Any] else {
+                    return nil
+                }
+                return copilotSample(
                     sourceID: sourceID(
                         candidate,
-                        component: "entry-\(stableDigest(root))-usage-\(usageIndex)"
+                        component: "shutdown-\(eventID)-model-\(stableDigest(model))"
                     ),
-                    timestamp: timestamp(in: root, fallback: candidate.modificationDate),
+                    timestamp: timestamp,
                     usage: usage,
-                    model: model(in: root)
+                    model: model
                 )
             }
+        default:
+            let attributes: [String: Any]?
+            if (root["name"] as? String)?.lowercased() == "llm_request" {
+                attributes = root["attrs"] as? [String: Any]
+            } else {
+                attributes = ((root["llm_request"] as? [String: Any])?["attrs"] as? [String: Any])
+            }
+            guard let attributes else {
+                return []
+            }
+            parserState.copilotHasDetailedUsage = true
+            return copilotSample(
+                sourceID: sourceID(candidate, component: "diagnostic-\(eventID)"),
+                timestamp: timestamp,
+                usage: attributes,
+                model: attributes["model"] as? String
+            ).map { [$0] } ?? []
+        }
+    }
+
+    private func copilotSample(
+        sourceID: String,
+        timestamp: Date,
+        usage: [String: Any],
+        model: String?
+    ) -> AIUsageSample? {
+        let tokens = tokenUsage(usage)
+        return usageSample(
+            provider: .copilot,
+            sourceID: sourceID,
+            timestamp: timestamp,
+            inputTokens: tokens.input
+                + integer(usage["cacheReadTokens"])
+                + integer(usage["cacheWriteTokens"]),
+            outputTokens: tokens.output,
+            costUSD: double(usage["cost"]),
+            model: model
+        )
+    }
+
+    private func parseGeneric(_ root: [String: Any], candidate: Candidate) -> [AIUsageSample] {
+        usageDictionaries(in: root).enumerated().compactMap { usageIndex, usage in
+            sample(
+                provider: candidate.provider,
+                sourceID: sourceID(
+                    candidate,
+                    component: "entry-\(stableDigest(root))-usage-\(usageIndex)"
+                ),
+                timestamp: timestamp(in: root, fallback: candidate.modificationDate),
+                usage: usage,
+                model: model(in: root),
+                includeCacheInputTokens: true
+            )
         }
     }
 
@@ -369,10 +581,10 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         timestamp: Date,
         usage: [String: Any],
         model: String?,
-        includeClaudeCacheTokens: Bool = false
+        includeCacheInputTokens: Bool = false
     ) -> AIUsageSample? {
         var tokens = tokenUsage(usage)
-        if includeClaudeCacheTokens {
+        if includeCacheInputTokens {
             tokens.input += integer(usage["cache_creation_input_tokens"])
             tokens.input += integer(usage["cache_read_input_tokens"])
         }
@@ -388,10 +600,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         )
     }
 
-    private func tokenUsage(
-        _ usage: [String: Any],
-        excludingCachedInput: Bool = false
-    ) -> TokenUsage {
+    private func tokenUsage(_ usage: [String: Any]) -> TokenUsage {
         var input = integer(usage["input_tokens"])
         if input == 0 { input = integer(usage["inputTokens"])
         }
@@ -399,8 +608,9 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         }
         if input == 0 { input = integer(usage["promptTokens"])
         }
-        if excludingCachedInput {
-            input = max(0, input - integer(usage["cached_input_tokens"]))
+        if input == 0 { input = integer(usage["promptTokenCount"])
+        }
+        if input == 0 { input = integer(usage["prompt_token_count"])
         }
         var output = integer(usage["output_tokens"])
         if output == 0 { output = integer(usage["outputTokens"])
@@ -408,6 +618,10 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         if output == 0 { output = integer(usage["completion_tokens"])
         }
         if output == 0 { output = integer(usage["completionTokens"])
+        }
+        if output == 0 { output = integer(usage["candidatesTokenCount"])
+        }
+        if output == 0 { output = integer(usage["candidates_token_count"])
         }
         return TokenUsage(input: input, output: output)
     }
@@ -434,13 +648,19 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         )
     }
 
+    private func isCopilotShutdownSummary(_ sample: AIUsageSample) -> Bool {
+        sample.provider == .copilot && (sample.sourceID?.contains("-shutdown-") ?? false)
+    }
+
     private func usageDictionaries(in value: Any) -> [[String: Any]] {
         if let dictionary = value as? [String: Any] {
             var result: [[String: Any]] = []
             let keys = Set(dictionary.keys)
             if !keys.intersection([
                 "input_tokens", "inputTokens", "prompt_tokens", "promptTokens",
+                "promptTokenCount", "prompt_token_count",
                 "output_tokens", "outputTokens", "completion_tokens", "completionTokens",
+                "candidatesTokenCount", "candidates_token_count",
             ]).isEmpty {
                 result.append(dictionary)
             }
@@ -488,9 +708,10 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     }
 
     private func trailingData(from candidate: Candidate) -> LogData? {
-        guard candidate.size > UInt64(maxBytesPerFile) else {
+        guard candidate.url.pathExtension == "jsonl",
+              candidate.size > UInt64(maxBytesPerFile) else {
             return (try? Data(contentsOf: candidate.url)).map {
-                LogData(data: $0, startsAtFileStart: true)
+                LogData(data: $0)
             }
         }
         guard candidate.url.pathExtension == "jsonl",
@@ -504,10 +725,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
               let tail = try? handle.readToEnd(),
               let firstNewline = tail.firstIndex(of: 0x0A)
         else { return nil }
-        return LogData(
-            data: Data(tail[tail.index(after: firstNewline)...]),
-            startsAtFileStart: false
-        )
+        return LogData(data: Data(tail[tail.index(after: firstNewline)...]))
     }
 
     private func cacheKey(for candidate: Candidate) -> String {

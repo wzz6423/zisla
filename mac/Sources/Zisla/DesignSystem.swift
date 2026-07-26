@@ -1,20 +1,20 @@
 import ZislaCore
 import SwiftUI
 
-/// Zisla 的设计令牌与基础组件库。
+/// Zisla's design tokens and base component library.
 ///
-/// 目标：为灵动岛与设置窗口提供**单一、可复用**的视觉来源，消除散落的
-/// 魔法颜色/字号/描边值，保证各模块观感一致，并为无障碍（对比度、字号下限）
-/// 提供统一的可调点。
+/// Provides a single, reusable visual source for the Dynamic Island and settings window,
+/// eliminating scattered magic color/font/stroke values and ensuring consistent appearance.
+/// Accessibility adjustment points (contrast, minimum font size) are centralized here.
 ///
-/// - 颜色令牌基于 `Color.primary`，在深色灵动岛（primary=white）与
-///   主题自适应的设置窗口（primary 随系统）中都能正确解析。
-/// - 字号令牌设定 9pt 为可阅读微文案的下限（此前存在 7–8pt，低于舒适阈值）。
+/// - Color tokens are based on `Color.primary`, resolving correctly in both the dark Dynamic
+///   Island (primary=white) and the theme-adaptive settings window (primary follows the system).
+/// - Font tokens set 9pt as the minimum readable micro-copy size (previously 7–8pt was used).
 
-// MARK: - 品牌色（AI 供应方，单一来源）
+// MARK: - Brand colors (AI providers, single source of truth)
 
-/// 各 AI 供应方的品牌色。**唯一**定义处；进度条、图标着色等全部引用这里，
-/// 避免同一供应方在不同模块显示成不同颜色。
+/// Brand colors for each AI provider. The **only** definition point; progress bars,
+/// icon tinting, and all other references pull from here to avoid inconsistent colors.
 enum ProviderBrand {
     static func color(for provider: AIProvider) -> Color {
         switch provider {
@@ -23,6 +23,8 @@ enum ProviderBrand {
         case .gemini: Color(red: 0.50, green: 0.68, blue: 1.00)
         case .grok: .primary
         case .gpt: Color(red: 0.42, green: 0.82, blue: 0.72)
+        case .copilot: .primary
+        case .kimi: Color(red: 0.29, green: 0.76, blue: 0.74)
         case .qwen: Color(red: 0.48, green: 0.62, blue: 1.00)
         case .coder: Color(red: 0.98, green: 0.78, blue: 0.30)
         case .trae: Color(red: 0.40, green: 0.56, blue: 1.00)
@@ -33,32 +35,33 @@ enum ProviderBrand {
     }
 }
 
-// MARK: - 颜色令牌
+// MARK: - Color tokens
 
 extension Color {
-    /// 卡片 / 模块容器填充（中等强度）。
+    /// Card / module container fill (medium intensity).
     static let fillCard = Color.primary.opacity(0.12)
-    /// 控件 / 图标按钮的低调填充。
+    /// Subdued fill for controls and icon buttons.
     static let fillControl = Color.primary.opacity(0.10)
-    /// 卡片描边。
+    /// Card border.
     static let strokeCard = Color.primary.opacity(0.14)
-    /// 细分隔线。
+    /// Subtle divider.
     static let dividerSubtle = Color.primary.opacity(0.08)
-    /// 激活态的强调色底。
+    /// Active-state accent background tint.
     static let accentTint = Color.accentColor.opacity(0.16)
 
-    // 语义色：错误=红，警告=橙，成功=绿，信息=青。全局统一，避免混用。
+    // Semantic colors: error=red, warning=orange, success=green, info=cyan. Consistent globally; do not mix.
     static let zislaError = Color.red
     static let zislaWarning = Color.orange
     static let zislaSuccess = Color.green
     static let zislaInfo = Color.cyan
 }
 
-// MARK: - 字号令牌
+// MARK: - Font tokens
 
 extension Font {
-    /// 灵动岛上**可阅读**微文案的下限字号（9pt）。
-    /// 此前图表轴标、进度时间、图例等使用 7–8pt，在 240pt 宽面板上低于舒适阈值。
+    /// Minimum **readable** micro-copy font size on the Dynamic Island (9pt).
+    /// Previously, chart axis labels, progress timestamps, and legends used 7–8pt,
+    /// which is below the comfortable threshold on a 240pt-wide panel.
     static func islandMicro(
         weight: Font.Weight = .medium,
         design: Font.Design = .default
@@ -67,7 +70,7 @@ extension Font {
     }
 }
 
-// MARK: - 灵动岛几何
+// MARK: - Dynamic Island geometry
 
 enum IslandSurfaceGeometry {
     static let expandedBottomCornerRadius: CGFloat = 34
@@ -76,20 +79,184 @@ enum IslandSurfaceGeometry {
     static let moduleInnerCornerRadius: CGFloat = 8
 }
 
-// MARK: - 细分隔线
+private struct IslandVisualStyleKey: EnvironmentKey {
+    static let defaultValue: IslandVisualStyle = .frosted
+}
 
-/// 统一的细分隔线，替代各处的 `Divider().overlay(Color.primary.opacity(0.06))`。
+extension EnvironmentValues {
+    var islandVisualStyle: IslandVisualStyle {
+        get { self[IslandVisualStyleKey.self] }
+        set { self[IslandVisualStyleKey.self] = newValue }
+    }
+}
+
+enum IslandGlassSurfaceKind {
+    case card
+    case input
+}
+
+private struct IslandGlassSurface: ViewModifier {
+    @Environment(\.islandVisualStyle) private var visualStyle
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    let kind: IslandGlassSurfaceKind
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .background { surfaceBackground }
+            .clipShape(shape)
+            .overlay {
+                // Native liquid glass draws its own specular rim; a hand-drawn edge would double it.
+                if !usesNativeLiquidGlass {
+                    shape.strokeBorder(edgeHighlight, lineWidth: 1)
+                }
+            }
+    }
+
+    /// Material follows the island theme: the transparent style gets the real refractive Liquid
+    /// Glass pane, the frosted style gets frosted blur — never a flat black slab on either.
+    @ViewBuilder
+    private var surfaceBackground: some View {
+        if reduceTransparency {
+            shape.fill(reducedTransparencyFill)
+        } else if usesNativeLiquidGlass {
+            ZStack {
+                LiquidGlassPaneBackground(cornerRadius: cornerRadius)
+                if kind == .input {
+                    // The native pane remains clear underneath; this only gives the typing area
+                    // the same black crown → transparent lower reveal as the Liquid Glass island.
+                    LinearGradient(
+                        stops: [
+                            // An opaque leading band intentionally covers the native glass rim.
+                            .init(color: .black, location: 0),
+                            .init(color: .black, location: 0.10),
+                            .init(color: .black.opacity(0.76), location: 0.26),
+                            .init(color: .black.opacity(0.34), location: 0.52),
+                            .init(color: .clear, location: 0.82),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+            }
+            .allowsHitTesting(false)
+        } else {
+            ZStack {
+                VisualEffectBackground(
+                    alphaValue: materialAlpha,
+                    material: kind == .input ? .sidebar : .hudWindow,
+                    blendingMode: kind == .input ? .withinWindow : .behindWindow
+                )
+                shape.fill(tint)
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var usesNativeLiquidGlass: Bool {
+        guard visualStyle == .transparent, !reduceTransparency else { return false }
+        guard #available(macOS 26.0, *) else { return false }
+        return true
+    }
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
+
+    /// Frosted-material translucency: lower lets more desktop through. Input stays densest for
+    /// typing legibility. The transparent cases only serve pre-macOS 26 fallbacks, where the
+    /// island body is bare, so they run denser than on the already-smoked frosted island.
+    private var materialAlpha: CGFloat {
+        switch (visualStyle, kind) {
+        case (.transparent, .input): 0.66
+        case (.transparent, .card): 0.48
+        case (.frosted, .input): 0.42
+        case (.frosted, .card): 0.30
+        }
+    }
+
+    /// Tint over the frosted material: white lifts a "raised" pane out of the smoked island;
+    /// a light black scrim keeps text readable over bright desktops in the fallback path.
+    private var tint: Color {
+        switch (visualStyle, kind) {
+        case (.transparent, .input): .black.opacity(0.12)
+        case (.transparent, .card): .black.opacity(0.08)
+        case (.frosted, .input): .white.opacity(0.05)
+        case (.frosted, .card): .white.opacity(0.08)
+        }
+    }
+
+    /// Top-lit highlight stroke simulating a glass edge (same treatment as the lock-screen card).
+    private var edgeHighlight: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: .white.opacity(kind == .input ? 0.26 : 0.16), location: 0),
+                .init(color: .white.opacity(0.07), location: 0.5),
+                .init(color: .white.opacity(0.03), location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    /// Reduce Transparency: flat fills on the island's opaque fallback surface, no blur.
+    private var reducedTransparencyFill: Color {
+        switch kind {
+        case .card: .fillCard
+        case .input: Color.primary.opacity(0.055)
+        }
+    }
+}
+
+extension View {
+    func islandGlassSurface(
+        _ kind: IslandGlassSurfaceKind,
+        cornerRadius: CGFloat
+    ) -> some View {
+        modifier(IslandGlassSurface(kind: kind, cornerRadius: cornerRadius))
+    }
+}
+
+/// Glass-look inline field: replaces `.roundedBorder`, whose dark-appearance AppKit bezel renders
+/// as a near-black block that pops in and out on the island's glass surfaces.
+private struct IslandGlassField: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(
+                Color.primary.opacity(0.07),
+                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+            }
+    }
+}
+
+extension View {
+    /// Applies the translucent glass well to a `TextField` shown on the island.
+    func islandGlassField() -> some View {
+        modifier(IslandGlassField())
+    }
+}
+
+// MARK: - Hairline divider
+
+/// Unified hairline divider, replacing the scattered `Divider().overlay(Color.primary.opacity(0.06))` pattern.
 struct Hairline: View {
     var body: some View {
         Divider().overlay(Color.dividerSubtle)
     }
 }
 
-// MARK: - 图标按钮（统一实现）
+// MARK: - Icon button (unified implementation)
 
-/// 圆形图标按钮的统一视觉标签；既可直接作为 `IconButton` 的内容，
-/// 也可作为 `Menu` 的标签复用，保证三种入口（工具条 / 媒体控制 / 模块切换）
-/// 观感与激活态完全一致。
+/// Unified visual label for circular icon buttons; can be used directly as `IconButton`'s
+/// content or as a `Menu` label for reuse, ensuring identical appearance and active state
+/// across all three entry points (toolbar / media control / module switcher).
 struct IconButtonLabel: View {
     enum Size {
         case compact
@@ -103,8 +270,16 @@ struct IconButtonLabel: View {
     var isActive = false
     var activeColor: Color? = nil
     var size: Size = .regular
-    /// 非激活时是否用次要色（用于"选中才高亮"的标签式切换，如模块选择器）。
+    /// When inactive, whether to render in secondary color (for label-style toggles like
+    /// the module selector, where only the selected item is highlighted).
     var dimmedWhenInactive = false
+    /// Set to false when the container draws the active fill itself
+    /// (e.g. the module selector's sliding matchedGeometryEffect capsule).
+    var showsActiveBackground = true
+    /// Module selectors keep their resting glyphs quiet; toolbar buttons retain their control fill.
+    var showsInactiveBackground = true
+    /// Selected navigation glyphs get a small positional emphasis while their focus surface moves.
+    var emphasizesSelection = false
 
     var body: some View {
         Image(systemName: symbol)
@@ -113,14 +288,23 @@ struct IconButtonLabel: View {
                 isActive ? (activeColor ?? Color.accentColor) : (dimmedWhenInactive ? .secondary : .primary)
             )
             .frame(width: size.dimension, height: size.dimension)
-            .background(isActive ? (activeColor ?? Color.accentColor).opacity(0.16) : Color.fillControl)
+            .background(backgroundFill)
             .clipShape(Circle())
             .contentShape(Circle())
             .clipped()
+            .scaleEffect(emphasizesSelection ? (isActive ? 1.08 : 0.88) : 1)
+            .opacity(emphasizesSelection && !isActive ? 0.58 : 1)
+            .rotationEffect(.degrees(emphasizesSelection && !isActive ? -2 : 0))
+            .animation(ZislaMotion.selection, value: isActive)
+    }
+
+    private var backgroundFill: Color {
+        guard isActive else { return showsInactiveBackground ? Color.fillControl : .clear }
+        return showsActiveBackground ? (activeColor ?? Color.accentColor).opacity(0.16) : .clear
     }
 }
 
-/// 统一的圆形图标按钮。
+/// Unified circular icon button.
 struct IconButton: View {
     var symbol: String
     var help: String
@@ -140,20 +324,20 @@ struct IconButton: View {
                 dimmedWhenInactive: dimmedWhenInactive
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableStyle())
         .help(help)
     }
 }
 
-// MARK: - 空状态（统一实现）
+// MARK: - Empty state (unified implementation)
 
-/// 紧凑空状态，适配灵动岛的深色玻璃与受限高度。
-/// 替代各模块自绘的空态，保证图标尺度、字号、配色一致。
+/// Compact empty state for the Dynamic Island's dark glass and constrained height.
+/// Replaces per-module implementations to ensure consistent icon scale, font, and color.
 struct EmptyState: View {
     var symbol: String
     var title: String
     var detail: String? = nil
-    /// 整体着色；默认次要色，拖拽悬停等场景可传入强调色。
+    /// Overall tint; defaults to secondary, but can be set to accent color for drag-hover and similar states.
     var tint: Color = .secondary
 
     var body: some View {

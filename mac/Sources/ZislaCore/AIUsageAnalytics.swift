@@ -1,6 +1,6 @@
 import Foundation
 
-/// 一个小时窗口的用量聚合。
+/// Usage aggregate for a one-hour window.
 public struct HourlyBucket: Equatable, Sendable {
     public var start: Date
     public var tokens: Int
@@ -11,7 +11,7 @@ public struct HourlyBucket: Equatable, Sendable {
     }
 }
 
-/// 用量趋势图上的一个采样点（时间戳 + token 数）。
+/// A single sample point on the usage trend chart (timestamp + token count).
 public struct UsagePoint: Equatable, Sendable {
     public var timestamp: Date
     public var tokens: Int
@@ -22,7 +22,7 @@ public struct UsagePoint: Equatable, Sendable {
     }
 }
 
-/// 趋势图中一个自然日的输入、输出与总 token 明细。
+/// Input, output, and total token breakdown for a single calendar day on the trend chart.
 public struct UsageBreakdownPoint: Equatable, Sendable {
     public var timestamp: Date
     public var inputTokens: Int
@@ -37,7 +37,7 @@ public struct UsageBreakdownPoint: Equatable, Sendable {
     public var totalTokens: Int { inputTokens + outputTokens }
 }
 
-/// 累计用量多序列上的一个采样点（总量 / 输入 / 输出）。
+/// A sample point on the cumulative usage multi-series chart (total / input / output).
 public struct CumulativeUsagePoint: Equatable, Sendable {
     public var timestamp: Date
     public var totalTokens: Int
@@ -57,7 +57,7 @@ public struct CumulativeUsagePoint: Equatable, Sendable {
     }
 }
 
-/// 贡献日历中的单日单元（日期 + 当天 token 总量）。
+/// A single-day cell in the contribution calendar (date + total tokens for the day).
 public struct ContributionDay: Equatable, Sendable {
     public var date: Date
     public var tokens: Int
@@ -68,10 +68,10 @@ public struct ContributionDay: Equatable, Sendable {
     }
 }
 
-/// 按 GitHub 风格贡献图阶梯划分的 token 用量强度（供 SwiftUI 上色）。
+/// Token usage intensity bucketed in GitHub-style contribution graph steps (for SwiftUI coloring).
 ///
-/// 阈值：0 / 50M / 100M / 150M / 200M。
-/// `none` 表示无用量；`level4` 为 200M 及以上最深色。
+/// Thresholds: 0 / 50M / 100M / 150M / 200M.
+/// `none` means no usage; `level4` is 200M and above, the darkest shade.
 public enum ContributionIntensity: Int, Equatable, Sendable, CaseIterable, Comparable {
     case none = 0
     case level1 = 1
@@ -91,12 +91,12 @@ public enum ContributionIntensity: Int, Equatable, Sendable, CaseIterable, Compa
         lhs.rawValue < rhs.rawValue
     }
 
-    /// 将 token 总量映射到公开强度分类。
-    /// - 0：无用量
-    /// - (0, 50M]：level1
-    /// - (50M, 100M]：level2
-    /// - (100M, 150M]：level3
-    /// - (150M, +∞)（含 200M 及以上）：level4 最深
+    /// Maps a token total to the corresponding intensity level.
+    /// - 0: no usage
+    /// - (0, 50M]: level1
+    /// - (50M, 100M]: level2
+    /// - (100M, 150M]: level3
+    /// - (150M, +∞) (including 200M and above): level4, darkest
     public static func classify(tokens: Int) -> ContributionIntensity {
         if tokens <= 0 { return .none }
         if tokens <= thresholds[1] { return .level1 }
@@ -107,9 +107,9 @@ public enum ContributionIntensity: Int, Equatable, Sendable, CaseIterable, Compa
 }
 
 public enum AIUsageAnalytics {
-    /// 最近 `days` 个自然日（含 `end` 当天）的总、输入和输出 token 趋势。
+    /// Total, input, and output token trends for the most recent `days` calendar days (inclusive of `end`).
     ///
-    /// 零用量日期也保留在结果中，因此时间轴连续，曲线能真实落到零基线。
+    /// Days with zero usage are still included so the time axis is continuous and the curve can drop to the zero baseline.
     public static func dailyUsageSeries(
         samples: [AIUsageSample],
         endingAt end: Date,
@@ -143,9 +143,9 @@ public enum AIUsageAnalytics {
         }
     }
 
-    /// 使用 5 日二项式加权 [1,4,6,4,1] 平滑日用量，供趋势曲线展示。
-    /// 这样能让折线呈现圆润的流动感，避免单日尖峰或零值造成锐利起伏。
-    /// 原始日汇总仍保留给热力图，避免单日缓存回填让折线产生不自然的陡降。
+    /// Smooths daily usage with a 5-day binomial kernel [1,4,6,4,1] for trend curve display.
+    /// This gives the line a smooth, flowing appearance and avoids sharp spikes or zero-value dips.
+    /// Raw daily totals are still used for the heatmap to avoid unnatural drops from single-day cache backfill.
     public static func smoothedDailyUsageSeries(
         samples: [AIUsageSample],
         endingAt end: Date,
@@ -181,8 +181,8 @@ public enum AIUsageAnalytics {
         }
     }
 
-    /// 截至 end 的最近 `hours` 个滚动小时窗口，最老的桶在前、最新的在后。
-    /// 每个桶为左闭右开区间 [start, start+1h)。
+    /// The most recent `hours` rolling one-hour buckets up to `end`, oldest first.
+    /// Each bucket is a half-open interval [start, start+1h).
     public static func hourlySeries(
         samples: [AIUsageSample],
         endingAt end: Date,
@@ -207,13 +207,13 @@ public enum AIUsageAnalytics {
         }
     }
 
-    /// 截至 `end` 的最近历史用量采样，按时间升序，最多 `limit` 条。
+    /// The most recent historical usage samples up to `end`, in ascending order, capped at `limit`.
     ///
-    /// - 仅保留时间戳不晚于 `end`、且 token 总量为正的采样；忽略未来与零值。
-    /// - 超出 `limit` 时保留最近的 `limit` 条（丢弃更早的）。
-    /// - 在第一条实际采样前插入一个 `tokens == 0` 的基线点（时间戳早于首条采样），
-    ///   使仅有一条历史用量时折线图仍能从零起画出上升趋势。基线点不计入 `limit`。
-    /// - 无有效采样时返回空数组。
+    /// - Only samples with a timestamp not later than `end` and a positive token count are included; future and zero-value samples are ignored.
+    /// - When the result exceeds `limit`, the most recent `limit` samples are kept (older ones are dropped).
+    /// - A baseline point with `tokens == 0` is prepended before the first real sample (timestamp one second earlier),
+    ///   so that a chart with only one data point still draws an upward trend from zero. The baseline does not count toward `limit`.
+    /// - Returns an empty array when there are no valid samples.
     public static func recentUsageSeries(
         samples: [AIUsageSample],
         endingAt end: Date,
@@ -228,23 +228,23 @@ public enum AIUsageAnalytics {
 
         guard let first = recent.first else { return [] }
 
-        // 基线点比首条采样早 1 秒即可保证 x 轴严格递增，从而画出上升趋势。
+        // The baseline point only needs to be 1 second before the first sample to keep the x-axis strictly increasing and draw an upward trend.
         var points: [UsagePoint] = [UsagePoint(timestamp: first.timestamp.addingTimeInterval(-1), tokens: 0)]
         points.append(contentsOf: recent.map { UsagePoint(timestamp: $0.timestamp, tokens: $0.totalTokens) })
         return points
     }
 
-    /// 截至 `end` 的累计用量曲线：每个真实时间点的 `tokens` 为「截至该点的历史累计总量」，
-    /// 用于表达全历史总用量的增长趋势（区别于 `recentUsageSeries` 的单次 token）。
+    /// Cumulative usage series up to `end`: each point's `tokens` is the running total up to that timestamp,
+    /// expressing the growth of all-time usage (unlike `recentUsageSeries` which shows per-sample tokens).
     ///
-    /// - 仅纳入时间戳不晚于 `end`、且 token 总量为正的采样；忽略未来与零值。
-    /// - 按时间升序排列；同一时间戳的多条采样合并为一个点（token 相加），不产生重复时间戳。
-    /// - 在首个采样前插入一个 `tokens == 0` 的基线点（时间戳早于首条采样 1 秒），
-    ///   使仅有一条历史用量时也能从零起画出上升趋势。
-    /// - 每个真实时间点的 `tokens` 为截至该点的累计总量（前缀和）。
-    /// - 若 `end` 晚于最后一个采样点，追加一个位于 `end`、`tokens` 为累计总量的终点，
-    ///   使曲线延伸到当前时刻并保持在总量高度；`end` 恰为末点时不追加。
-    /// - 无有效采样时返回空数组。
+    /// - Only samples with a timestamp not later than `end` and a positive token count are included; future and zero-value samples are ignored.
+    /// - Sorted in ascending order; multiple samples at the same timestamp are merged into one point (tokens summed), producing no duplicate timestamps.
+    /// - A zero baseline point is prepended before the first sample (timestamp 1 second earlier),
+    ///   so a chart with a single data point still draws an upward trend from zero.
+    /// - Each real point's `tokens` is the cumulative total (prefix sum) up to that timestamp.
+    /// - If `end` is later than the last sample, a terminal point at `end` with the cumulative total is appended,
+    ///   extending the curve to the current moment at the total height; not appended if `end` equals the last point.
+    /// - Returns an empty array when there are no valid samples.
     public static func cumulativeUsageSeries(
         samples: [AIUsageSample],
         endingAt end: Date
@@ -259,7 +259,7 @@ public enum AIUsageAnalytics {
         var cumulative = 0
         var index = 0
         while index < valid.count {
-            // 排序后同时间戳采样相邻，合并求和后累计到前缀和，输出单个点。
+            // After sorting, samples at the same timestamp are adjacent; merge them into a single point via prefix sum.
             let timestamp = valid[index].timestamp
             while index < valid.count, valid[index].timestamp == timestamp {
                 cumulative += valid[index].totalTokens
@@ -274,13 +274,13 @@ public enum AIUsageAnalytics {
         return points
     }
 
-    /// 截至 `end` 的累计多序列：每个时间点同时给出总量 / 输入 / 输出的历史累计。
+    /// Cumulative multi-series up to `end`: each point carries the running total for total / input / output tokens.
     ///
-    /// - 仅纳入时间戳不晚于 `end`、且 token 总量为正的采样；忽略未来与零值。
-    /// - 按时间升序；同一时间戳的多条采样合并（input/output 分别相加）。
-    /// - 首个采样前插入零基线点（时间戳早 1 秒）。
-    /// - 若 `end` 晚于末点，追加终点并保持累计高度。
-    /// - 无有效采样时返回空数组。
+    /// - Only samples with a timestamp not later than `end` and a positive token count are included; future and zero-value samples are ignored.
+    /// - Sorted in ascending order; samples at the same timestamp are merged (input/output summed separately).
+    /// - A zero baseline point is prepended before the first sample (timestamp 1 second earlier).
+    /// - If `end` is later than the last point, a terminal point is appended at the cumulative height.
+    /// - Returns an empty array when there are no valid samples.
     public static func cumulativeDetailSeries(
         samples: [AIUsageSample],
         endingAt end: Date
@@ -332,11 +332,11 @@ public enum AIUsageAnalytics {
         return points
     }
 
-    /// 为趋势图纵轴生成「漂亮」刻度（含 0 与覆盖 `maximum` 的上界）。
+    /// Generates "nice" tick marks for the chart Y-axis (including 0 and an upper bound that covers `maximum`).
     ///
-    /// - `maximum <= 0` 时返回 `[0, 1]`，保证 Chart 有合法 domain。
-    /// - `desiredCount` 控制期望刻度数量（含两端），夹在 2...6。
-    /// - 步长取 1/2/5×10^n，标签可用 `formatTokenAxisValue`。
+    /// - Returns `[0, 1]` when `maximum <= 0` to ensure Chart has a valid domain.
+    /// - `desiredCount` controls the desired number of ticks (including both ends), clamped to 2...6.
+    /// - Step size is 1/2/5×10^n; labels can be formatted with `formatTokenAxisValue`.
     public static func tokenAxisTicks(maximum: Int, desiredCount: Int = 3) -> [Int] {
         let count = min(6, max(2, desiredCount))
         guard maximum > 0 else { return [0, 1] }
@@ -373,7 +373,7 @@ public enum AIUsageAnalytics {
         return ticks
     }
 
-    /// 紧凑 token 纵轴标签（K / M / B），供 Chart 与测试共用。
+    /// Compact token Y-axis label (K / M / B), shared between Chart and tests.
     public static func formatTokenAxisValue(_ tokens: Int) -> String {
         let value = abs(tokens)
         let sign = tokens < 0 ? "-" : ""
@@ -403,7 +403,7 @@ public enum AIUsageAnalytics {
         return String(format: "%.1f", tenths)
     }
 
-    /// 过去 7 天（含今天）× 24 小时的 token 热力图。外层索引 0 为最早的一天、6 为今天。
+    /// 7-day × 24-hour token heatmap up to `end`. Outer index 0 is the oldest day, 6 is today.
     public static func weekHeatmap(
         samples: [AIUsageSample],
         endingAt end: Date,
@@ -424,12 +424,12 @@ public enum AIUsageAnalytics {
         return grid
     }
 
-    /// 以 26 个日历周为列、每列 7 天的贡献日历。
+    /// Contribution calendar with 26 columns (calendar weeks) of 7 days each.
     ///
-    /// - 列顺序：最老的一周在前，最近一周在后。
-    /// - 行顺序：与 `Calendar` 的 `firstWeekday` 对齐（行 0 为周首日）。
-    /// - 范围含 `endingAt` 当天；未来日期不出现（对应位置为 `nil`）。
-    /// - 单元含日期（当天 00:00）与该日 token 总量。
+    /// - Column order: oldest week first, most recent week last.
+    /// - Row order: aligned to `Calendar.firstWeekday` (row 0 is the first day of the week).
+    /// - Range includes the day of `endingAt`; future dates do not appear (their cells are `nil`).
+    /// - Each cell contains the date (00:00 of that day) and the total tokens for that day.
     public static func contributionCalendar(
         samples: [AIUsageSample],
         endingAt end: Date,
@@ -439,7 +439,7 @@ public enum AIUsageAnalytics {
         guard weeks > 0 else { return [] }
 
         let endDay = calendar.startOfDay(for: end)
-        // 以 endingAt 所在周为最后一列：找到该周起始日
+        // Find the start of the week containing endingAt, to use as the last column
         let weekday = calendar.component(.weekday, from: endDay)
         let daysFromWeekStart = (weekday - calendar.firstWeekday + 7) % 7
         guard let lastWeekStart = calendar.date(byAdding: .day, value: -daysFromWeekStart, to: endDay) else {
@@ -467,7 +467,7 @@ public enum AIUsageAnalytics {
                     column.append(nil)
                     continue
                 }
-                // 不显示未来日期（严格晚于 endingAt 当天）
+                // Do not show future dates (strictly after the endingAt day)
                 if date > endDay {
                     column.append(nil)
                 } else {

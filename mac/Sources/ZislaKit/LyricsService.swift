@@ -23,6 +23,14 @@ public struct SyncedLyrics: Equatable, Sendable {
         lines.last(where: { $0.time <= elapsedTime })?.text
     }
 
+    public func currentLineProgress(at elapsedTime: Double, duration: Double?) -> Double? {
+        guard let index = lines.lastIndex(where: { $0.time <= elapsedTime }) else { return nil }
+        let startTime = lines[index].time
+        let endTime = lines.indices.contains(index + 1) ? lines[index + 1].time : duration
+        guard let endTime, endTime > startTime else { return nil }
+        return min(max((elapsedTime - startTime) / (endTime - startTime), 0), 1)
+    }
+
     static func parse(_ value: String?) -> SyncedLyrics? {
         guard let value, !value.isEmpty else { return nil }
         let pattern = #"\[(\d{1,3}):(\d{2})(?:[\.:](\d{1,3}))?\]"#
@@ -72,8 +80,9 @@ struct LyricsTrackIdentity: Hashable, Sendable {
     }
 }
 
-/// 歌词搜索结果，同时携带来自 API 的完整歌手名。
-/// MediaRemote 通常只返回首位歌手，这里用 API 返回的完整歌手列表补充展示。
+/// Lyrics search result, also carrying the full artist name from the API.
+/// MediaRemote usually returns only the first artist; this supplements the display
+/// with the complete artist list returned by the API.
 struct LyricsSearchResult: Sendable {
     var lyrics: SyncedLyrics?
     var artistName: String?
@@ -242,8 +251,8 @@ actor LyricsService {
         )
     }
 
-    /// MediaRemote 通常只返回首位歌手，而 LRCLIB 可能返回 "Artist1, Artist2" 形式。
-    /// 先尝试精确匹配，再按分隔符拆分候选歌手逐一匹配。
+    /// MediaRemote usually returns only the first artist, while LRCLIB may return "Artist1, Artist2".
+    /// Tries an exact match first, then splits the candidate by separators and matches each part.
     nonisolated static func artistMatches(_ candidateArtist: String, query: String) -> Bool {
         if normalized(candidateArtist) == query { return true }
         let separators = CharacterSet(charactersIn: ",&/、;|")
@@ -266,7 +275,7 @@ actor LyricsService {
         try selectNetEaseSong(from: data, title: title, artist: artist, duration: duration)?.songID
     }
 
-    /// 选中歌曲的同时返回完整的歌手列表（NetEase API 的 artists 数组）。
+    /// Selects the song while also returning the full artist list (the `artists` array from the NetEase API).
     nonisolated private static func selectNetEaseSong(
         from data: Data,
         title: String,

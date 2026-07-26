@@ -109,6 +109,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 """,
                 on: opened
             )
+            try migrateFileColumns(on: opened)
             connection = opened
             return opened
         } catch {
@@ -117,10 +118,43 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         }
     }
 
+    /// Adds the columns required for file entries to an existing clipboard_history table (idempotent).
+    /// Old databases have only 6 columns; this migrates them incrementally so existing text/image data remains readable.
+    private func migrateFileColumns(on database: OpaquePointer) throws {
+        let existing = try columnNames(of: "clipboard_history", on: database)
+        let additions = [
+            ("file_url", "TEXT"),
+            ("file_display_name", "TEXT"),
+            ("file_bookmark", "BLOB"),
+        ]
+        for (name, type) in additions where !existing.contains(name) {
+            try execute("ALTER TABLE clipboard_history ADD COLUMN \(name) \(type)", on: database)
+        }
+    }
+
+    private func columnNames(of table: String, on database: OpaquePointer) throws -> Set<String> {
+        let statement = try prepare("PRAGMA table_info(\(table))", on: database)
+        defer { sqlite3_finalize(statement) }
+        var names: Set<String> = []
+        while true {
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                if let name = textColumn(statement, index: 1) { names.insert(name) }
+            case SQLITE_DONE:
+                return names
+            default:
+                throw ClipboardHistoryDatabaseError(
+                    message: sqliteMessage(database, fallback: "无法读取剪贴板表结构")
+                )
+            }
+        }
+    }
+
     private func readItems(from database: OpaquePointer) throws -> [ClipboardHistoryItem] {
         let statement = try prepare(
             """
-            SELECT id, content_type, text_value, image_data, last_copied_at, is_pinned
+            SELECT id, content_type, text_value, image_data, last_copied_at, is_pinned,
+                   file_url, file_display_name, file_bookmark
             FROM clipboard_history
             ORDER BY is_pinned DESC, last_copied_at DESC
             """,
@@ -142,6 +176,16 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                     content = .text(textColumn(statement, index: 2) ?? "")
                 case 1:
                     content = .image(dataColumn(statement, index: 3))
+                case 2:
+                    guard let urlString = textColumn(statement, index: 6),
+                          let url = URL(string: urlString) else {
+                        throw ClipboardHistoryDatabaseError(message: "剪贴板数据库包含无效文件路径")
+                    }
+                    content = .file(ClipboardFileReference(
+                        url: url,
+                        displayName: textColumn(statement, index: 7) ?? url.lastPathComponent,
+                        bookmark: dataColumn(statement, index: 8)
+                    ))
                 default:
                     throw ClipboardHistoryDatabaseError(message: "剪贴板数据库包含未知内容类型")
                 }
@@ -191,14 +235,18 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         let statement = try prepare(
             """
             INSERT INTO clipboard_history (
-                id, content_type, text_value, image_data, last_copied_at, is_pinned
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                id, content_type, text_value, image_data, last_copied_at, is_pinned,
+                file_url, file_display_name, file_bookmark
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 content_type = excluded.content_type,
                 text_value = excluded.text_value,
                 image_data = excluded.image_data,
                 last_copied_at = excluded.last_copied_at,
-                is_pinned = excluded.is_pinned
+                is_pinned = excluded.is_pinned,
+                file_url = excluded.file_url,
+                file_display_name = excluded.file_display_name,
+                file_bookmark = excluded.file_bookmark
             """,
             on: database
         )
@@ -213,10 +261,19 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 try check(sqlite3_bind_int(statement, 2, 0), database: database)
                 try bind(value, to: statement, index: 3, database: database)
                 try check(sqlite3_bind_null(statement, 4), database: database)
+                try bindFileNull(statement, database: database)
             case .image(let data):
                 try check(sqlite3_bind_int(statement, 2, 1), database: database)
                 try check(sqlite3_bind_null(statement, 3), database: database)
                 try bind(data, to: statement, index: 4, database: database)
+                try bindFileNull(statement, database: database)
+            case .file(let reference):
+                try check(sqlite3_bind_int(statement, 2, 2), database: database)
+                try check(sqlite3_bind_null(statement, 3), database: database)
+                try check(sqlite3_bind_null(statement, 4), database: database)
+                try bind(reference.url.absoluteString, to: statement, index: 7, database: database)
+                try bind(reference.displayName, to: statement, index: 8, database: database)
+                try bind(reference.bookmark, to: statement, index: 9, database: database)
             }
             try check(
                 sqlite3_bind_double(statement, 5, item.lastCopiedAt.timeIntervalSinceReferenceDate),
@@ -225,6 +282,12 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             try check(sqlite3_bind_int(statement, 6, item.isPinned ? 1 : 0), database: database)
             try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
         }
+    }
+
+    private func bindFileNull(_ statement: OpaquePointer, database: OpaquePointer) throws {
+        try check(sqlite3_bind_null(statement, 7), database: database)
+        try check(sqlite3_bind_null(statement, 8), database: database)
+        try check(sqlite3_bind_null(statement, 9), database: database)
     }
 
     private func delete(_ ids: [UUID], from database: OpaquePointer) throws {

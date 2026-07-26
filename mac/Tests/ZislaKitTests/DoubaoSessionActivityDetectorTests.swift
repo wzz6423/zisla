@@ -5,7 +5,7 @@ import Testing
 
 struct DoubaoSessionActivityDetectorTests {
     @Test
-    func detectsRecentFileAsActive() throws {
+    func detectsRecentFileAsActiveWhenDoubaoIsRunning() throws {
         let root = makeDoubaoTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -14,12 +14,28 @@ struct DoubaoSessionActivityDetectorTests {
         let tasks = try DoubaoSessionActivityDetector(
             dataRoots: [root],
             recencyThreshold: 3600,
-            scanInterval: 0
+            scanInterval: 0,
+            isDoubaoRunning: { true }
         ).activeTasks()
         #expect(tasks.count == 1)
         #expect(tasks[0].provider == .doubao)
         #expect(tasks[0].title == "豆包")
         #expect(tasks[0].status == .running)
+    }
+
+    @Test
+    func doesNotDetectRecentFilesWhenDoubaoIsNotRunning() throws {
+        let root = makeDoubaoTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try Data("bridge configuration".utf8).write(to: root.appendingPathComponent("bridge.json"))
+
+        #expect(try DoubaoSessionActivityDetector(
+            dataRoots: [root],
+            recencyThreshold: 3600,
+            scanInterval: 0,
+            isDoubaoRunning: { false }
+        ).activeTasks().isEmpty)
     }
 
     @Test
@@ -38,7 +54,8 @@ struct DoubaoSessionActivityDetectorTests {
         let tasks = try DoubaoSessionActivityDetector(
             dataRoots: [root],
             recencyThreshold: 60,
-            scanInterval: 0
+            scanInterval: 0,
+            isDoubaoRunning: { true }
         ).activeTasks()
         #expect(tasks.isEmpty)
     }
@@ -49,7 +66,8 @@ struct DoubaoSessionActivityDetectorTests {
             .appendingPathComponent("Zisla-doubao-missing-\(UUID().uuidString)")
         #expect(try DoubaoSessionActivityDetector(
             dataRoots: [missing],
-            scanInterval: 0
+            scanInterval: 0,
+            isDoubaoRunning: { true }
         ).activeTasks().isEmpty)
     }
 
@@ -71,7 +89,8 @@ struct DoubaoSessionActivityDetectorTests {
         let tasks = try DoubaoSessionActivityDetector(
             dataRoots: [root],
             recencyThreshold: 600,
-            scanInterval: 0
+            scanInterval: 0,
+            isDoubaoRunning: { true }
         ).activeTasks()
         #expect(tasks.count == 1)
         #expect(tasks[0].updatedAt > Date().addingTimeInterval(-60))

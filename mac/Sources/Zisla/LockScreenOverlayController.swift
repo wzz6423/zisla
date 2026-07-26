@@ -74,7 +74,7 @@ final class LockScreenOverlayController {
             .removeDuplicates()
             .sink { [weak self] enabled in
                 Task { @MainActor [weak self] in
-                    self?.updateVisibility(enabled: enabled)
+                    self?.updateLockScreenFeature(enabled: enabled)
                 }
             }
         mediaCancellable = model.media.$snapshot
@@ -83,7 +83,21 @@ final class LockScreenOverlayController {
                     self?.updatePlayerVisibility()
                 }
             }
-        sessionPoller = Timer.scheduledTimer(
+    }
+
+    private func updateLockScreenFeature(enabled: Bool) {
+        guard enabled else {
+            stopSessionPolling()
+            updateVisibility(enabled: false)
+            return
+        }
+        startSessionPolling()
+        refreshSessionLockState()
+    }
+
+    private func startSessionPolling() {
+        guard sessionPoller == nil else { return }
+        let poller = Timer.scheduledTimer(
             withTimeInterval: 2,
             repeats: true
         ) { [weak self] _ in
@@ -91,12 +105,17 @@ final class LockScreenOverlayController {
                 self?.refreshSessionLockState()
             }
         }
-        refreshSessionLockState()
+        poller.tolerance = 0.25
+        sessionPoller = poller
+    }
+
+    private func stopSessionPolling() {
+        sessionPoller?.invalidate()
+        sessionPoller = nil
     }
 
     func stop() {
-        sessionPoller?.invalidate()
-        sessionPoller = nil
+        stopSessionPolling()
         settingsCancellable?.cancel()
         settingsCancellable = nil
         mediaCancellable?.cancel()
@@ -218,7 +237,7 @@ final class LockScreenOverlayController {
         case .header:
             y = headerCenterY
         case .status:
-            // 紧接在 header（农历）下方，间距与签名和农历之间的间距一致（5pt）
+            // Placed immediately below the header (lunar calendar), with the same gap as between the signature and lunar calendar (5 pt).
             let headerBottom = headerCenterY - LockScreenOverlayKind.header.size.height / 2
             y = headerBottom - 5 - size.height / 2
         case .player:

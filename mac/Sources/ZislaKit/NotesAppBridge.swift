@@ -1,20 +1,19 @@
 import AppKit
 import Foundation
 
-/// 与系统「备忘录」App 的集成：随记模块以备忘录为数据源，支持列出、查看、编辑、
-/// 新建、删除其中已有的笔记。
+/// Integration with the system Notes app: the Quick Note module uses Notes as its data source,
+/// supporting list, view, edit, create, and delete operations on existing notes.
 ///
-/// 备忘录没有公开 Swift API，统一通过 AppleScript/JXA 操作：
-/// - `listNotes` 用 JXA（`osascript -l JavaScript`）返回 JSON，避免解析 AppleScript 记录描述符；
-/// - `readNote`/`writeNote`/`createNote`/`deleteNote` 用 `NSAppleScript`（进程内、TCC 归属正确）。
+/// Notes has no public Swift API; all operations go through AppleScript/JXA:
+/// - `listNotes` uses JXA (`osascript -l JavaScript`) to return JSON, avoiding AppleScript record descriptor parsing;
+/// - `readNote`/`writeNote`/`createNote`/`deleteNote` use `NSAppleScript` (in-process, correct TCC attribution).
 ///
-/// Zisla 新建/更新的笔记把 Markdown 原文按普通文本行写入备忘录 body（每行一个
-/// `<div>`，空行为 `<div><br></div>`，并转义 `&<>`），在备忘录 App 中显示为普通文本
-/// 而非预格式化代码块；读取时用 `plaintext` 回读源文继续编辑。已有的原生备忘录则
-/// 同时保留 `body` HTML，避免表格和附件在转换成纯文本后丢失。历史以 `<pre>` 存储
-/// 的 Zisla 笔记仍可识别并编辑。
+/// Zisla reads and writes the `body` HTML of notes directly. Legacy Markdown notes are migrated to
+/// rich text by the UI on first edit; existing native HTML is loaded as-is to avoid downgrading
+/// tables and embedded images to plain text in the read/write pipeline.
 ///
-/// 首次调用时 macOS 会弹出自动化授权弹窗，要求允许 Zisla 控制「备忘录」。
+/// On the first call, macOS will present an automation permission dialog asking the user to allow
+/// Zisla to control Notes.
 public enum NotesAppError: Error, Sendable, Equatable {
     case failed(String)
 
@@ -26,36 +25,66 @@ public enum NotesAppError: Error, Sendable, Equatable {
 
 @MainActor
 public enum NotesAppBridge {
-    /// 备忘录中一条笔记的摘要。
+    /// Summary of a single note in Notes.
     public struct NoteSummary: Identifiable, Sendable, Equatable, Hashable {
         public let id: String
         public let title: String
         public let modifiedAt: Date?
+        public let isPasswordProtected: Bool
 
-        public init(id: String, title: String, modifiedAt: Date?) {
+        public init(
+            id: String,
+            title: String,
+            modifiedAt: Date?,
+            isPasswordProtected: Bool = false
+        ) {
             self.id = id
             self.title = title
             self.modifiedAt = modifiedAt
+            self.isPasswordProtected = isPasswordProtected
         }
     }
 
-    /// 笔记的可编辑文本和原始 HTML。含结构化内容的原生笔记只预览，避免纯文本写回破坏附件。
+    /// A native attachment from Notes. The scripting API only exposes metadata and the ability to “show” it, so Quick Note displays attachments read-only.
+    public struct NoteAttachment: Identifiable, Sendable, Equatable, Hashable {
+        public let id: String
+        public let name: String
+        public let contentIdentifier: String
+        public let url: String
+
+        public init(id: String, name: String, contentIdentifier: String, url: String) {
+            self.id = id
+            self.name = name
+            self.contentIdentifier = contentIdentifier
+            self.url = url
+        }
+    }
+
+    /// Editable text, raw HTML, and read-only metadata for a note.
     public struct NoteContent: Sendable, Equatable {
         public let plainText: String
         public let bodyHTML: String
         public let usesNativeHTML: Bool
+        public let isPasswordProtected: Bool
+        public let tags: [String]
+        public let attachments: [NoteAttachment]
 
-        public init(plainText: String, bodyHTML: String) {
+        public init(
+            plainText: String,
+            bodyHTML: String,
+            isPasswordProtected: Bool = false,
+            attachments: [NoteAttachment] = []
+        ) {
             self.plainText = plainText
             self.bodyHTML = bodyHTML
-            usesNativeHTML = Self.requiresNativePreview(bodyHTML)
+            usesNativeHTML = !Self.isMarkdownStorage(bodyHTML)
+            self.isPasswordProtected = isPasswordProtected
+            tags = NotesAppBridge.tags(in: plainText)
+            self.attachments = attachments
         }
 
-        private static func requiresNativePreview(_ bodyHTML: String) -> Bool {
-            guard !isMarkdownStorage(bodyHTML) else { return false }
-            let lowercased = bodyHTML.lowercased()
-            return ["<table", "<img", "<figure", "<video", "<audio", "<object", "<iframe", "attachment"]
-                .contains { lowercased.contains($0) }
+        public var hasReadOnlyMetadata: Bool {
+            isPasswordProtected || !tags.isEmpty || !attachments.isEmpty
         }
 
         private static func isMarkdownStorage(_ bodyHTML: String) -> Bool {
@@ -66,10 +95,10 @@ public enum NotesAppBridge {
         }
     }
 
-    // MARK: - 最近删除过滤
+    // MARK: - Recently Deleted filtering
 
-    /// 已知各系统语言下「最近删除」文件夹的本地化名称。
-    /// 备忘录没有公开 API 直接识别该系统文件夹，通过名称匹配作为最可靠的跨语言方案。
+    /// Known localized names of the "Recently Deleted" folder across system languages.
+    /// Notes has no public API to identify this system folder directly; name matching is the most reliable cross-language approach.
     public static let recentlyDeletedFolderNames: Set<String> = [
         "Recently Deleted",          // en
         "最近删除",                    // zh-Hans
@@ -85,16 +114,16 @@ public enum NotesAppBridge {
         "최근 삭제된 항목",              // ko
     ]
 
-    /// 判断笔记的容器文件夹名是否为系统「最近删除」文件夹，兼容多语言系统。
-    /// 这是可测的纯逻辑 seam，供 `parseSummaries` 和单元测试共用。
+    /// Returns whether a note's container folder name is the system "Recently Deleted" folder, supporting multilingual systems.
+    /// Pure-logic seam that is testable in isolation; shared by `parseSummaries` and unit tests.
     public static func isInRecentlyDeletedFolder(_ containerName: String) -> Bool {
         recentlyDeletedFolderNames.contains(containerName)
     }
 
-    // MARK: - 列出（JXA → JSON）
+    // MARK: - List (JXA → JSON)
 
-    /// 获取备忘录中全部笔记的摘要（id / 标题 / 修改时间），按原顺序返回；排序由调用方处理。
-    /// 已自动排除「最近删除」文件夹中的笔记，兼容多语言系统。
+    /// Returns summaries (id / title / modification date) for all notes in Notes, in original order; sorting is the caller's responsibility.
+    /// Notes in the "Recently Deleted" folder are automatically excluded, across all system languages.
     public static func listNotes() async -> Result<[NoteSummary], NotesAppError> {
         let script = #"""
         (() => {
@@ -102,11 +131,13 @@ public enum NotesAppBridge {
           const out = [];
           const notes = Notes.notes();
           for (const n of notes) {
-            let modified = null;
+            var modified = null;
+            var passwordProtected = false;
             var container = null;
             try { const d = n.modificationDate(); if (d) modified = d.getTime(); } catch (e) {}
+            try { passwordProtected = Boolean(n.passwordProtected()); } catch (e) {}
             try { container = n.container().name(); } catch (e) {}
-            out.push({ id: String(n.id()), title: String(n.name()), modified: modified, container: container });
+            out.push({ id: String(n.id()), title: String(n.name()), modified: modified, passwordProtected: passwordProtected, container: container });
           }
           return JSON.stringify(out);
         })()
@@ -122,30 +153,91 @@ public enum NotesAppBridge {
         }
     }
 
-    // MARK: - 读取
+    // MARK: - Read
 
     public static func readNote(id: String) async -> Result<NoteContent, NotesAppError> {
         let script = """
         tell application "Notes"
             set n to (note id \(escapeForAppleScript(id)))
-            return {plaintext of n, body of n}
+            return {plaintext of n, body of n, password protected of n}
         end tell
         """
         switch await runAppleScriptReturningStrings(script) {
         case .success(let values):
-            guard values.count == 2 else {
+            guard values.count == 3 else {
                 return .failure(.failed("读取备忘录内容失败"))
             }
-            return .success(NoteContent(plainText: values[0], bodyHTML: values[1]))
+            let attachmentResult = await readAttachments(noteID: id)
+            let attachments: [NoteAttachment]
+            switch attachmentResult {
+            case .success(let value): attachments = value
+            case .failure: attachments = []
+            }
+            return .success(NoteContent(
+                plainText: values[0],
+                bodyHTML: values[1],
+                isPasswordProtected: values[2].lowercased() == "true",
+                attachments: attachments
+            ))
         case .failure(let error):
             return .failure(error)
         }
     }
 
-    // MARK: - 编辑（写回 body）
+    /// Reads the lock state separately to avoid routing locked notes into the body-read or rich-text edit path.
+    public static func isPasswordProtected(noteID: String) async -> Result<Bool, NotesAppError> {
+        let script = """
+        tell application "Notes"
+            set n to (note id \(escapeForAppleScript(noteID)))
+            return password protected of n
+        end tell
+        """
+        switch await runAppleScriptReturningStrings(script) {
+        case .success(let values):
+            guard values.count == 1 else {
+                return .failure(.failed("读取备忘录锁定状态失败"))
+            }
+            return .success(["true", "1", "yes"].contains(values[0].lowercased()))
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    /// Reads public attachment metadata; content and modification APIs are not used in Quick Note.
+    public static func readAttachments(noteID: String) async -> Result<[NoteAttachment], NotesAppError> {
+        let script = """
+        tell application "Notes"
+            set n to (note id \(escapeForAppleScript(noteID)))
+            set resultList to {}
+            repeat with a in (attachments of n)
+                set attachmentURL to ""
+                try
+                    set attachmentURL to URL of a as text
+                end try
+                set end of resultList to {id of a as text, name of a as text, content identifier of a as text, attachmentURL}
+            end repeat
+            return resultList
+        end tell
+        """
+        switch await runAppleScriptReturningStringLists(script) {
+        case .success(let values):
+            return .success(values.compactMap { value in
+                guard value.count == 4, !value[0].isEmpty else { return nil }
+                return NoteAttachment(id: value[0], name: value[1], contentIdentifier: value[2], url: value[3])
+            })
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    // MARK: - Edit (write back body)
 
     public static func writeNote(id: String, markdown: String) async -> Result<Void, NotesAppError> {
-        let html = bodyHTML(for: markdown)
+        await writeNote(id: id, html: bodyHTML(for: markdown))
+    }
+
+    /// Writes back rich-text HTML. Images are inlined as data URLs, so no temporary file paths are needed.
+    public static func writeNote(id: String, html: String) async -> Result<Void, NotesAppError> {
         let script = """
         tell application "Notes"
             set n to (note id \(escapeForAppleScript(id)))
@@ -155,10 +247,14 @@ public enum NotesAppBridge {
         return await runAppleScriptVoid(script)
     }
 
-    // MARK: - 新建
+    // MARK: - Create
 
     public static func createNote(title: String, markdown: String) async -> Result<Void, NotesAppError> {
-        let html = bodyHTML(for: markdown)
+        await createNote(title: title, html: bodyHTML(for: markdown))
+    }
+
+    /// Creates a note with a rich-text HTML body.
+    public static func createNote(title: String, html: String) async -> Result<Void, NotesAppError> {
         let script = """
         tell application "Notes"
             make new note with properties {name:\(escapeForAppleScript(title)), body:\(escapeForAppleScript(html))}
@@ -167,7 +263,7 @@ public enum NotesAppBridge {
         return await runAppleScriptVoid(script)
     }
 
-    // MARK: - 删除
+    // MARK: - Delete
 
     public static func deleteNote(id: String) async -> Result<Void, NotesAppError> {
         let script = """
@@ -179,7 +275,7 @@ public enum NotesAppBridge {
         return await runAppleScriptVoid(script)
     }
 
-    // MARK: - 打开备忘录
+    // MARK: - Open Notes
 
     public static func openNotes() {
         if let url = URL(string: "mobilenotes://") {
@@ -189,11 +285,33 @@ public enum NotesAppBridge {
         }
     }
 
-    // MARK: - 存储格式
+    /// Shows the specified note in the system Notes app, e.g. to let the user unlock a password-protected note.
+    public static func showNote(id: String) async -> Result<Void, NotesAppError> {
+        let script = """
+        tell application "Notes"
+            show (note id \(escapeForAppleScript(id)))
+            activate
+        end tell
+        """
+        return await runAppleScriptVoid(script)
+    }
 
-    /// 把 Markdown 原文转成备忘录 body 用的 HTML：按行拆成普通 `<div>` 段落并转义 `&<>`。
-    /// 与备忘录原生纯文本笔记一致，避免 `<pre>` 的等宽预格式化样式；读取 `plaintext`
-    /// 时 Notes 会按段落还原换行，随记编辑器仍得到 Markdown 源文本。
+    /// Shows an attachment in the system Notes app. Quick Note does not provide write, delete, or rename operations for attachments.
+    public static func showAttachment(id: String) async -> Result<Void, NotesAppError> {
+        let script = """
+        tell application "Notes"
+            show (attachment id \(escapeForAppleScript(id)))
+            activate
+        end tell
+        """
+        return await runAppleScriptVoid(script)
+    }
+
+    // MARK: - Storage format
+
+    /// Converts Markdown source to the HTML format used for a Notes body: splits into plain `<div>` paragraphs and escapes `&<>`.
+    /// Matches the format of native plain-text notes in Notes, avoiding the monospaced preformatted style of `<pre>`;
+    /// when Notes returns `plaintext`, it reconstructs newlines from paragraphs so the Quick Note editor still receives Markdown source.
     public static func bodyHTML(for markdown: String) -> String {
         if markdown.isEmpty { return "" }
         return markdown
@@ -209,9 +327,9 @@ public enum NotesAppBridge {
             .joined()
     }
 
-    // MARK: - 执行
+    // MARK: - Execution
 
-    /// 在后台线程运行 JXA（`osascript -l JavaScript`），返回标准输出文本。
+    /// Runs JXA (`osascript -l JavaScript`) on a background thread and returns stdout as text.
     private static func runJXA(_ script: String) async -> Result<String, NotesAppError> {
         await Task.detached(priority: .userInitiated) { () -> Result<String, NotesAppError> in
             let process = Process()
@@ -241,7 +359,7 @@ public enum NotesAppBridge {
         }.value
     }
 
-    /// 进程内执行 AppleScript，返回字符串列表（用于同时读取 plaintext 与 body）。
+    /// Runs AppleScript in-process and returns a list of strings (used to read plaintext and body simultaneously).
     private static func runAppleScriptReturningStrings(
         _ source: String
     ) async -> Result<[String], NotesAppError> {
@@ -265,7 +383,31 @@ public enum NotesAppBridge {
         }.value
     }
 
-    /// 进程内执行 AppleScript，无返回值。
+    /// Runs AppleScript in-process and returns a 2-D list of strings (used to read attachment metadata).
+    private static func runAppleScriptReturningStringLists(
+        _ source: String
+    ) async -> Result<[[String]], NotesAppError> {
+        await Task.detached(priority: .userInitiated) { () -> Result<[[String]], NotesAppError> in
+            let appleScript = NSAppleScript(source: source)
+            var errorInfo: NSDictionary?
+            let descriptor = appleScript?.executeAndReturnError(&errorInfo)
+            if let errorInfo {
+                return .failure(.failureMessage(from: errorInfo))
+            }
+            guard let descriptor else {
+                return .failure(.failed("备忘录没有返回附件"))
+            }
+            guard descriptor.numberOfItems > 0 else { return .success([]) }
+            return .success((1...descriptor.numberOfItems).map { index in
+                guard let item = descriptor.atIndex(index), item.numberOfItems > 0 else { return [] }
+                return (1...item.numberOfItems).map { column in
+                    item.atIndex(column)?.stringValue ?? ""
+                }
+            })
+        }.value
+    }
+
+    /// Runs AppleScript in-process with no return value.
     private static func runAppleScriptVoid(
         _ source: String
     ) async -> Result<Void, NotesAppError> {
@@ -280,7 +422,7 @@ public enum NotesAppBridge {
         }.value
     }
 
-    // MARK: - 工具
+    // MARK: - Utilities
 
     static func parseSummaries(_ json: String) -> [NoteSummary]? {
         guard let data = json.data(using: .utf8),
@@ -288,7 +430,7 @@ public enum NotesAppBridge {
         else { return nil }
         return array.compactMap { item in
             guard let id = item["id"] as? String else { return nil }
-            // 排除「最近删除」文件夹中的笔记（用户在备忘录删除后进入该文件夹，但 Notes.notes() 仍会返回它们）
+            // Exclude notes in the "Recently Deleted" folder (deleted notes land there but are still returned by Notes.notes())
             if let containerName = item["container"] as? String,
                isInRecentlyDeletedFolder(containerName) {
                 return nil
@@ -300,11 +442,32 @@ public enum NotesAppBridge {
             } else if let modified = item["modified"] as? Int, modified > 0 {
                 modifiedAt = Date(timeIntervalSince1970: TimeInterval(modified) / 1000.0)
             }
-            return NoteSummary(id: id, title: title, modifiedAt: modifiedAt)
+            return NoteSummary(
+                id: id,
+                title: title,
+                modifiedAt: modifiedAt,
+                isPasswordProtected: item["passwordProtected"] as? Bool ?? false
+            )
         }
     }
 
-    /// 转义 AppleScript 字符串字面量中的 `\` 与 `"`。
+    /// Extracts visible `#tags` from the note body. Notes has no public tag-metadata API,
+    /// so tags that do not appear in the body text are not surfaced as readable content.
+    nonisolated public static func tags(in plainText: String) -> [String] {
+        guard let expression = try? NSRegularExpression(
+            pattern: #"(?<![\p{L}\p{N}_])#([\p{L}\p{N}_-]+)"#
+        ) else { return [] }
+        let source = plainText as NSString
+        let range = NSRange(location: 0, length: source.length)
+        var seen = Set<String>()
+        return expression.matches(in: plainText, range: range).compactMap { match in
+            let tag = source.substring(with: match.range(at: 1))
+            let key = tag.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            return seen.insert(key).inserted ? tag : nil
+        }
+    }
+
+    /// Escapes `\` and `"` in an AppleScript string literal.
     private static func escapeForAppleScript(_ value: String) -> String {
         let escaped = value
             .replacingOccurrences(of: "\\", with: "\\\\")

@@ -80,6 +80,7 @@ public final class AIStateMonitor: ObservableObject {
     private var lastUsageRefreshAt = Date.distantPast
     private var persistedStorageChangeToken: AIStateStorageChangeToken?
     private var persistedReloadPendingForce = false
+    private var persistedTasks: [AIProgressTask] = []
 
     public convenience init(
         directoryURL: URL = AppPaths.applicationSupport,
@@ -135,6 +136,8 @@ public final class AIStateMonitor: ObservableObject {
         [
             CodexSessionActivityDetector(maxRolloutFiles: 4, initialTailBytes: 256 * 1_024),
             ClaudeSessionActivityDetector(maxTranscriptFiles: 4, initialTailBytes: 256 * 1_024),
+            CopilotSessionActivityDetector(maxTranscriptFiles: 4, maxCLISessions: 4),
+            KimiSessionActivityDetector(maxSessionFiles: 4, initialTailBytes: 256 * 1_024),
             GeminiSessionActivityDetector(
                 maxSessionFiles: 4,
                 initialTailBytes: 256 * 1_024,
@@ -146,6 +149,7 @@ public final class AIStateMonitor: ObservableObject {
             TraeSessionActivityDetector(maxLogFiles: 4, tailBytes: 256 * 1_024),
             OpenCodeSessionActivityDetector(maxSessions: 4),
             HarnessSessionActivityDetector(maxFiles: 4),
+            WorkBuddySessionActivityDetector(),
             DoubaoSessionActivityDetector(maxFiles: 4),
         ]
     }
@@ -233,10 +237,11 @@ public final class AIStateMonitor: ObservableObject {
             },
             includesUsageSamples: includeUsageSamples
         )
+        let storedTasks = persistedTasks
         applyDetector(refreshQueue.sync {
             Self.detectState(
                 using: dependencies,
-                persistedTasks: state.tasks,
+                persistedTasks: storedTasks,
                 persistedUsageBySourceID: persistedUsageBySourceID,
                 anonymousUsageSamples: anonymousUsageSamples,
                 detectsUsage: !usageDetectors.isEmpty,
@@ -245,7 +250,7 @@ public final class AIStateMonitor: ObservableObject {
         })
     }
 
-    /// 折线图和热力图出现时才读取完整 usage 历史。
+    /// Loads the full usage history only when the line chart or heatmap appears.
     public func loadUsageHistory() {
         guard !usageHistoryIsLoaded else { return }
         usageHistoryRequested = true
@@ -253,7 +258,7 @@ public final class AIStateMonitor: ObservableObject {
         schedulePersistedReload(force: true)
     }
 
-    /// 离开 AI 面板后立即释放不再参与常规状态展示的历史样本。
+    /// Immediately releases historical samples that are no longer needed for the normal state display after leaving the AI panel.
     public func unloadUsageHistory() {
         guard usageHistoryRequested || usageHistoryIsLoaded || !state.usageSamples.isEmpty else { return }
         usageHistoryRequested = false
@@ -267,7 +272,7 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
-    /// 为交互路径安排后台刷新，避免在主线程等待大状态文件的完整解码。
+    /// Schedules a background refresh for interactive paths, avoiding a full decode of large state files on the main thread.
     public func refresh() {
         schedulePersistedReload()
     }
@@ -319,7 +324,7 @@ public final class AIStateMonitor: ObservableObject {
         detectorRefreshInFlight = true
         let generation = refreshGeneration
         let dependencies = refreshDependencies()
-        let persistedTasks = state.tasks
+        let storedTasks = persistedTasks
         let usageBySourceID = persistedUsageBySourceID
         let anonymousUsage = anonymousUsageSamples
         let loadsUsageHistory = usageHistoryIsLoaded
@@ -339,7 +344,7 @@ public final class AIStateMonitor: ObservableObject {
         refreshQueue.async {
             let result = Self.detectState(
                 using: dependencies,
-                persistedTasks: persistedTasks,
+                persistedTasks: storedTasks,
                 persistedUsageBySourceID: usageBySourceID,
                 anonymousUsageSamples: anonymousUsage,
                 detectsUsage: detectsUsage,
@@ -459,11 +464,13 @@ public final class AIStateMonitor: ObservableObject {
 
     private func applyPersisted(
         _ result: PersistedRefreshResult,
-        includesUsageSamples: Bool
+        includesUsageSamples: Bool,
+        updatesPersistedTasks: Bool = true
     ) {
         switch result {
         case let .success(nextState, storageChangeToken):
             var next = nextState
+            if updatesPersistedTasks { persistedTasks = nextState.tasks }
             let keepsUsageSamples = includesUsageSamples && usageHistoryRequested
             if !keepsUsageSamples {
                 next.usageSamples.removeAll(keepingCapacity: false)
@@ -496,7 +503,8 @@ public final class AIStateMonitor: ObservableObject {
         case let .state(next):
             applyPersisted(
                 .success(next, repository.storageChangeToken()),
-                includesUsageSamples: true
+                includesUsageSamples: true,
+                updatesPersistedTasks: false
             )
         case .corruptedState:
             errorDescription = "AI 状态文件已损坏，已保留上一次有效数据"

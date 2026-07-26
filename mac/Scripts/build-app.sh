@@ -3,8 +3,9 @@ set -euo pipefail
 
 ROOT="${0:A:h:h}"
 CONFIGURATION="${CONFIGURATION:-release}"
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.1.1}"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
+UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
 OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:-$ROOT/dist}"
 APP="$OUTPUT_DIRECTORY/zisla.app"
 CONTENTS="$APP/Contents"
@@ -12,6 +13,14 @@ IDENTITY="${CODE_SIGN_IDENTITY:--}"
 BUILD_ARCHITECTURES="${BUILD_ARCHITECTURES:-$(uname -m)}"
 ARCHITECTURES=(${=BUILD_ARCHITECTURES})
 BINARIES=()
+
+case "$UPDATE_CHANNEL" in
+  release|preview) ;;
+  *)
+    echo "error: UPDATE_CHANNEL must be release or preview" >&2
+    exit 1
+    ;;
+esac
 
 for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
   TARGET_TRIPLE="${ARCHITECTURE}-apple-macosx"
@@ -32,6 +41,7 @@ fi
 sed \
   -e "s/@VERSION@/$VERSION/g" \
   -e "s/@BUILD_NUMBER@/$BUILD_NUMBER/g" \
+  -e "s/@UPDATE_CHANNEL@/$UPDATE_CHANNEL/g" \
   "$ROOT/Resources/Info.plist" > "$CONTENTS/Info.plist"
 
 if [[ -n "${SPARKLE_PUBLIC_KEY:-}" ]]; then
@@ -44,6 +54,14 @@ fi
 
 if [[ -d "$ROOT/Resources/BrandIcons" ]]; then
   ditto "$ROOT/Resources/BrandIcons" "$CONTENTS/Resources/BrandIcons"
+fi
+
+if [[ -d "$ROOT/Resources/Pets" ]]; then
+  ditto "$ROOT/Resources/Pets" "$CONTENTS/Resources/Pets"
+fi
+
+if [[ -d "$ROOT/Resources/QuickNotes" ]]; then
+  ditto "$ROOT/Resources/QuickNotes" "$CONTENTS/Resources/QuickNotes"
 fi
 
 if [[ -d "$ROOT/Vendor/MediaRemoteAdapter.framework" ]]; then
@@ -76,8 +94,15 @@ fi
 ENTITLEMENTS="$ROOT/Resources/Zisla.entitlements"
 if [[ "$IDENTITY" == "-" ]]; then
   # Ad-hoc signs cannot carry WeatherKit (or other restricted) entitlements.
+  # 注意：adhoc 的 designated requirement 是单次构建的 cdhash，
+  # 每次重新构建都会使 TCC（辅助功能等）授权静默失效。
   echo "warning: ad-hoc code signature (TeamIdentifier empty); WeatherKit unavailable, mainland China uses China Weather alerts" >&2
   codesign --force --deep --sign - "$APP"
+elif [[ "${SIGNING_MODE:-release}" == "dev" ]]; then
+  # 开发签名：稳定证书身份让 TCC 授权跨构建保持有效。
+  # 不带 entitlements（WeatherKit 等受限 entitlement 没有描述文件会被 AMFI 拒载），
+  # 也不启用强化运行时（本地调试不需要）。
+  codesign --force --deep --sign "$IDENTITY" "$APP"
 else
   if [[ ! -f "$ENTITLEMENTS" ]]; then
     echo "error: missing entitlements file: $ENTITLEMENTS" >&2

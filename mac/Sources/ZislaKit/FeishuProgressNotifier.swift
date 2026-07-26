@@ -1,7 +1,7 @@
 import Foundation
 
 public enum FeishuProgressNotifier {
-    /// 只发送任务名和状态，不推送 prompt、回答、附件路径或 API key。
+    /// Sends only the task name and status; does not push the prompt, reply, attachment paths, or API key.
     public static func send(
         webhookURL: String,
         title: String,

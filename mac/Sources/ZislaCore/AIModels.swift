@@ -1,12 +1,14 @@
 import Foundation
 
-/// 支持的 AI 供应方。CLI 与持久化都以其 rawValue 作稳定标识。
+/// Supported AI providers. `rawValue` is used as a stable identifier in CLI output and persistence.
 public enum AIProvider: String, Codable, CaseIterable, Sendable {
     case claude
     case codex
     case gemini
     case grok
     case gpt
+    case copilot
+    case kimi
     case qwen
     case coder
     case trae
@@ -14,7 +16,7 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
     case harness
     case doubao
 
-    /// 大小写与常见别名归一，未知返回 nil 交由上层报错。
+    /// Normalises case and common aliases; returns nil for unknown tokens, letting the caller report the error.
     public init?(token: String) {
         switch token.lowercased() {
         case "claude", "claude-code", "claude-cli", "claude-desktop", "anthropic-claude":
@@ -27,6 +29,10 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
             self = .grok
         case "gpt", "openai", "chatgpt", "chat-gpt", "openai-gpt":
             self = .gpt
+        case "copilot", "github-copilot", "github copilot", "copilot-cli", "copilot-chat", "github.copilot-chat":
+            self = .copilot
+        case "kimi", "kimi-code", "kimi-code-cli", "kimi-vscode", "moonshot-kimi", "moonshot-ai.kimi-code":
+            self = .kimi
         case "qwen", "tongyi", "qwen-code", "qwen-code-cli", "qwen-vscode":
             self = .qwen
         case "coder", "qwen-coder", "qoder", "qoder-cli", "qoderwork", "qoder-work",
@@ -72,7 +78,7 @@ public enum AIProgressStatus: String, Codable, Sendable {
     }
 }
 
-/// 单条 AI 任务进度。progress 为 nil 表示不确定进度（转圈）。
+/// Single AI task progress record. `progress == nil` indicates indeterminate progress (spinner).
 public struct AIProgressTask: Codable, Equatable, Sendable, Identifiable {
     public var id: String
     public var provider: AIProvider
@@ -110,9 +116,9 @@ public struct AIProgressTask: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
-/// 一次 AI 调用的用量采样。cost / model 可缺省。
+/// A sampled AI usage record. `cost` and `model` are optional.
 public struct AIUsageSample: Codable, Equatable, Sendable {
-    /// 本地日志事件的稳定标识；手工 `zislactl usage` 记录保持为空。
+    /// Stable identifier for local log events; empty for manual `zislactl usage` records.
     public var sourceID: String?
     public var provider: AIProvider
     public var timestamp: Date
@@ -162,14 +168,28 @@ public enum NoticeSide: String, Codable, Sendable {
     }
 }
 
-/// 普通、消息和系统状态通知的展示样式；旧状态文件缺省解码为 `.standard`。
+/// Presentation style for regular, message, and system-status notices; old state files decode absent values as `.standard`.
 public enum NoticeStyle: String, Codable, Sendable {
     case standard
     case message
     case status
+    case headphone
 }
 
-/// 岛两侧的临时通知条。
+/// A single battery reading in an accessory notice. `level == nil` means the system did not provide a charge level for that device.
+public struct NoticeBatteryLevel: Codable, Equatable, Sendable, Identifiable {
+    public var label: String
+    public var level: Int?
+
+    public init(label: String, level: Int?) {
+        self.label = label
+        self.level = level.map { min(max($0, 0), 100) }
+    }
+
+    public var id: String { label }
+}
+
+/// Transient notice strip shown on either side of the island.
 public struct IslandNotice: Codable, Equatable, Sendable, Identifiable {
     public var id: String
     public var title: String
@@ -181,14 +201,16 @@ public struct IslandNotice: Codable, Equatable, Sendable, Identifiable {
     /// Optional media artwork used by the compact playback wing. It is not
     /// required for AI or ordinary notices and remains absent in old state files.
     public var artworkData: Data?
-    /// 展示样式；缺省时为 `.standard`。
+    /// Presentation style; defaults to `.standard` when absent.
     public var style: NoticeStyle
-    /// 消息来源 App 显示名（仅 `style == .message` 时有意义）。
+    /// Source app display name (meaningful only when `style == .message`).
     public var appName: String?
-    /// 可选 bundle id，用于解析安装 App 图标。
+    /// Optional bundle ID used to resolve the installed app's icon.
     public var appBundleIdentifier: String?
-    /// 状态通知左侧使用的 SF Symbol 名称。
+    /// SF Symbol name used on the left side of a status notice.
     public var symbolName: String?
+    /// Individual battery readings for attached accessories; when absent, preserves the existing display and decoding behaviour for old notices.
+    public var batteryLevels: [NoticeBatteryLevel]?
 
     public init(
         id: String = UUID().uuidString,
@@ -202,7 +224,8 @@ public struct IslandNotice: Codable, Equatable, Sendable, Identifiable {
         style: NoticeStyle = .standard,
         appName: String? = nil,
         appBundleIdentifier: String? = nil,
-        symbolName: String? = nil
+        symbolName: String? = nil,
+        batteryLevels: [NoticeBatteryLevel]? = nil
     ) {
         self.id = id
         self.title = title
@@ -216,11 +239,12 @@ public struct IslandNotice: Codable, Equatable, Sendable, Identifiable {
         self.appName = appName
         self.appBundleIdentifier = appBundleIdentifier
         self.symbolName = symbolName
+        self.batteryLevels = batteryLevels
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, detail, kind, side, createdAt, progress, artworkData
-        case style, appName, appBundleIdentifier, symbolName
+        case style, appName, appBundleIdentifier, symbolName, batteryLevels
     }
 
     public init(from decoder: Decoder) throws {
@@ -237,10 +261,11 @@ public struct IslandNotice: Codable, Equatable, Sendable, Identifiable {
         appName = try container.decodeIfPresent(String.self, forKey: .appName)
         appBundleIdentifier = try container.decodeIfPresent(String.self, forKey: .appBundleIdentifier)
         symbolName = try container.decodeIfPresent(String.self, forKey: .symbolName)
+        batteryLevels = try container.decodeIfPresent([NoticeBatteryLevel].self, forKey: .batteryLevels)
     }
 }
 
-/// 外部消息经 IPC 推送时的可测试模型：一次生成左右两侧普通 IslandNotice。
+/// Testable model for an inbound IPC message notification: produces a pair of left/right `IslandNotice` values in one shot.
 public struct MessageNotification: Equatable, Sendable {
     public static let maxContentLength = 48
 
@@ -270,7 +295,7 @@ public struct MessageNotification: Equatable, Sendable {
         self.pairID = pairID
     }
 
-    /// 折叠空白/换行并截断到短展示长度，超出加省略号。
+    /// Collapses whitespace/newlines and truncates to the short display length, appending an ellipsis when over the limit.
     public static func normalizeContent(_ raw: String, maxLength: Int = maxContentLength) -> String {
         let parts = raw.split { $0.isWhitespace || $0.isNewline }.filter { !$0.isEmpty }
         let collapsed = parts.joined(separator: " ")
@@ -279,7 +304,7 @@ public struct MessageNotification: Equatable, Sendable {
         return String(collapsed[..<end]) + "…"
     }
 
-    /// 左侧：App + 发件人；右侧：消息正文。共享 pairID 前缀与时间戳。
+    /// Left side: app + sender; right side: message body. Both share the same `pairID` prefix and timestamp.
     public func makeNotices() -> (left: IslandNotice, right: IslandNotice) {
         let left = IslandNotice(
             id: "message-\(pairID)-left",
@@ -307,7 +332,7 @@ public struct MessageNotification: Equatable, Sendable {
     }
 }
 
-/// 落盘的聚合状态。
+/// Persisted aggregate state.
 public struct AIState: Codable, Equatable, Sendable {
     public var tasks: [AIProgressTask]
     public var usageSamples: [AIUsageSample]

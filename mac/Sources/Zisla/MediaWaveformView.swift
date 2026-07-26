@@ -3,6 +3,29 @@ import ZislaKit
 import SwiftUI
 
 @MainActor
+enum MediaArtworkImageCache {
+  private static let cache: NSCache<NSData, NSImage> = {
+    let cache = NSCache<NSData, NSImage>()
+    cache.countLimit = 24
+    cache.totalCostLimit = 48 * 1_024 * 1_024
+    return cache
+  }()
+
+  static func image(from data: Data?) -> NSImage? {
+    guard let data else { return nil }
+    let key = data as NSData
+    if let cached = cache.object(forKey: key) { return cached }
+    guard let image = NSImage(data: data) else { return nil }
+
+    let decodedByteCost = image.representations.reduce(data.count) { cost, representation in
+      max(cost, representation.pixelsWide * representation.pixelsHigh * 4)
+    }
+    cache.setObject(image, forKey: key, cost: decodedByteCost)
+    return image
+  }
+}
+
+@MainActor
 struct MediaWaveformView: View {
   var artworkData: Data?
   var width: CGFloat
@@ -85,23 +108,23 @@ private struct WaveformBars: View {
 @MainActor
 private enum ArtworkWaveformColor {
   static let fallback = Color.white.opacity(0.9)
-  private static let cache: NSCache<NSString, NSColor> = {
-    let cache = NSCache<NSString, NSColor>()
+  private static let cache: NSCache<NSData, NSColor> = {
+    let cache = NSCache<NSData, NSColor>()
     cache.countLimit = 32
     return cache
   }()
 
   static func color(from data: Data?) -> Color {
-    guard let data,
-      let representation = NSBitmapImageRep(data: data),
-      representation.pixelsWide > 0,
-      representation.pixelsHigh > 0
-    else { return fallback }
-
-    let key = NSString(string: stableDigest(data))
+    guard let data else { return fallback }
+    let key = data as NSData
     if let cached = cache.object(forKey: key) {
       return Color(nsColor: cached)
     }
+
+    guard let representation = NSBitmapImageRep(data: data),
+      representation.pixelsWide > 0,
+      representation.pixelsHigh > 0
+    else { return fallback }
 
     let stepX = max(1, representation.pixelsWide / 10)
     let stepY = max(1, representation.pixelsHigh / 10)
@@ -132,14 +155,5 @@ private enum ArtworkWaveformColor {
     )
     cache.setObject(visible, forKey: key)
     return Color(nsColor: visible)
-  }
-
-  private static func stableDigest(_ data: Data) -> String {
-    var hash: UInt64 = 14_695_981_039_346_656_037
-    for byte in data {
-      hash ^= UInt64(byte)
-      hash &*= 1_099_511_628_211
-    }
-    return String(hash, radix: 16)
   }
 }

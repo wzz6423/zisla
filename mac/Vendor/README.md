@@ -16,3 +16,12 @@ The XCFramework is vendored because SwiftPM Git and artifact downloads are not r
 - License: BSD-3-Clause, copied to `Resources/MediaRemoteAdapter/LICENSE`
 
 The helper is vendored so packaged builds can read the system Now Playing session on macOS 15.4 and newer without a network-time dependency.
+
+`SkyLightWindow` is vendored from its upstream 1.0.0 source snapshot without modification:
+
+- Source: `https://github.com/Lakr233/SkyLightWindow`
+- Version: `1.0.0`
+- Commit: `b7bd99f62a0673a99bed4bfd31098ca1dcdd10eb`
+- License: MIT, copied to `SkyLightWindow/LICENSE`
+
+The package is local so SwiftPM does not fetch it during normal builds. To update it, manually replace `SkyLightWindow` with a verified upstream snapshot, retain its license, and update the version and commit recorded above.

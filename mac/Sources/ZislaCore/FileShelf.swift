@@ -1,6 +1,6 @@
 import Foundation
 
-/// 拖拽文件暂存架：按标准化路径去重，按 FIFO 在满容量时淘汰最旧项。
+/// Drop-target file shelf: deduplicates by standardized path, evicts the oldest entry when at capacity (FIFO).
 public struct FileShelf: Equatable, Sendable {
     public let capacity: Int
     public private(set) var urls: [URL]
@@ -10,7 +10,7 @@ public struct FileShelf: Equatable, Sendable {
         self.urls = urls.map(\.standardizedFileURL)
     }
 
-    /// 加入一个文件。已存在（标准化后相等）返回 false；成功加入返回 true。
+    /// Adds a file. Returns false if already present (by standardized path); returns true on success.
     @discardableResult
     public mutating func add(_ url: URL) -> Bool {
         let normalized = url.standardizedFileURL

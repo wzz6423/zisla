@@ -4,7 +4,7 @@ import Combine
 import ZislaKit
 import Speech
 
-/// 用户显式点击后才申请麦克风与语音识别权限；录音内容只交给系统识别器，不写入 Zisla 状态文件。
+/// Microphone and speech recognition permissions are requested only after the user explicitly taps; recorded audio is passed only to the system recognizer and is not written to Zisla state files.
 @MainActor
 final class VoiceInputController: ObservableObject {
     @Published private(set) var isRecording = false
@@ -17,19 +17,27 @@ final class VoiceInputController: ObservableObject {
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private var pendingStartID: UUID?
+    private var recordingID: UUID?
+    private var tapInstalled = false
+    private var finalizationTask: Task<Void, Never>?
     private var authorizationPromptHost: NSWindow?
+
+    var onTranscriptCompleted: ((String) -> Void)?
 
     func toggle() {
         if isRecording || isPreparing {
             stop()
         } else {
-            requestPermissionsAndStart()
+            start()
         }
     }
 
-    /// 按住说话模式：按下快捷键时开始录音。
+    /// Push-to-talk mode: recording starts when the shortcut key is pressed.
     func start() {
         guard !isRecording, !isPreparing else { return }
+        // The previous take may still be waiting for its final result; deliver it now instead of
+        // swallowing this keypress for the whole finalization window.
+        if let recordingID { finishRecording(recordingID: recordingID) }
         requestPermissionsAndStart()
     }
 
@@ -37,14 +45,15 @@ final class VoiceInputController: ObservableObject {
         pendingStartID = nil
         isPreparing = false
         dismissAuthorizationPromptHost()
-        engine?.inputNode.removeTap(onBus: 0)
-        engine?.stop()
-        request?.endAudio()
-        task?.cancel()
-        engine = nil
-        request = nil
-        task = nil
-        isRecording = false
+        guard let recordingID, isRecording else { return }
+        stopAudioInput(for: recordingID)
+    }
+
+    func cancel() {
+        pendingStartID = nil
+        isPreparing = false
+        dismissAuthorizationPromptHost()
+        clearRecordingResources()
     }
 
     private func requestPermissionsAndStart() {
@@ -61,7 +70,9 @@ final class VoiceInputController: ObservableObject {
                 guard self.pendingStartID == startID else { return }
                 self.dismissAuthorizationPromptHost()
                 guard status == .authorized else {
-                    self.finishPendingStart(with: "未获得语音识别权限")
+                    self.finishPendingStart(
+                        with: "未获得语音识别权限。请在系统设置的“隐私与安全性 > 语音识别”中允许 zisla。"
+                    )
                     return
                 }
                 self.requestMicrophoneAccess(startID: startID)
@@ -79,7 +90,9 @@ final class VoiceInputController: ObservableObject {
                 guard self.pendingStartID == startID else { return }
                 self.dismissAuthorizationPromptHost()
                 guard granted else {
-                    self.finishPendingStart(with: "未获得麦克风权限")
+                    self.finishPendingStart(
+                        with: "未获得麦克风权限。请在系统设置的“隐私与安全性 > 麦克风”中允许 zisla。"
+                    )
                     return
                 }
                 self.startRecording(startID: startID)
@@ -105,7 +118,7 @@ final class VoiceInputController: ObservableObject {
         authorizationPromptHost = nil
     }
 
-    // 系统授权完成回调可能在任意队列执行，不能继承控制器的主 actor 隔离。
+    // System authorization callbacks may fire on any queue and cannot inherit the controller's main-actor isolation.
     nonisolated private static func requestSpeechAuthorization(
         _ completion: @escaping @Sendable (SFSpeechRecognizerAuthorizationStatus) -> Void
     ) {
@@ -128,29 +141,100 @@ final class VoiceInputController: ObservableObject {
         let engine = AVAudioEngine()
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
+        request.taskHint = .dictation
+        request.addsPunctuation = true
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            finishPendingStart(with: "未检测到可用的麦克风输入")
+            return
+        }
+        let recordingID = UUID()
+        let task = recognizer?.recognitionTask(with: request) { [weak self] result, error in
+            Task { @MainActor [weak self] in
+                guard let self, self.recordingID == recordingID else { return }
+                if let result {
+                    self.transcript = result.bestTranscription.formattedString
+                    if result.isFinal {
+                        self.finishRecording(recordingID: recordingID)
+                        return
+                    }
+                }
+                if let error {
+                    // Once endAudio() has been called the recognizer reports end-of-stream as an error;
+                    // only a failure that interrupts an active take is worth surfacing.
+                    if self.isRecording {
+                        self.errorDescription = error.localizedDescription
+                    }
+                    self.finishRecording(recordingID: recordingID)
+                }
+            }
+        }
         input.installTap(onBus: 0, bufferSize: 1_024, format: format) { buffer, _ in
             request.append(buffer)
         }
+        tapInstalled = true
         do {
             engine.prepare()
             try engine.start()
             self.engine = engine
             self.request = request
+            self.task = task
+            self.recordingID = recordingID
             pendingStartID = nil
             isPreparing = false
             isRecording = true
-            task = recognizer?.recognitionTask(with: request) { [weak self] result, error in
-                Task { @MainActor in
-                    if let result { self?.transcript = result.bestTranscription.formattedString }
-                    if let error { self?.errorDescription = error.localizedDescription }
-                    if error != nil || result?.isFinal == true { self?.stop() }
-                }
-            }
         } catch {
             input.removeTap(onBus: 0)
+            tapInstalled = false
+            request.endAudio()
+            task?.cancel()
             finishPendingStart(with: error.localizedDescription)
         }
+    }
+
+    private func stopAudioInput(for recordingID: UUID) {
+        guard self.recordingID == recordingID else { return }
+        if tapInstalled {
+            engine?.inputNode.removeTap(onBus: 0)
+            tapInstalled = false
+        }
+        engine?.stop()
+        request?.endAudio()
+        isRecording = false
+        finalizationTask?.cancel()
+        finalizationTask = Task { [weak self] in
+            // Server-side recognition needs a couple of seconds after endAudio() to return the final
+            // transcription, which fixes punctuation and homophones; a shorter wait delivers the partial one.
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            self?.finishRecording(recordingID: recordingID)
+        }
+    }
+
+    private func finishRecording(recordingID: UUID) {
+        guard self.recordingID == recordingID else { return }
+        let completedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        clearRecordingResources()
+        if !completedTranscript.isEmpty {
+            onTranscriptCompleted?(completedTranscript)
+        }
+    }
+
+    private func clearRecordingResources() {
+        finalizationTask?.cancel()
+        finalizationTask = nil
+        if tapInstalled {
+            engine?.inputNode.removeTap(onBus: 0)
+            tapInstalled = false
+        }
+        engine?.stop()
+        request?.endAudio()
+        task?.cancel()
+        engine = nil
+        request = nil
+        task = nil
+        recordingID = nil
+        isRecording = false
     }
 }
