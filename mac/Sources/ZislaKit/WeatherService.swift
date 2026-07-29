@@ -14,9 +14,9 @@ public struct WeatherSnapshot: Equatable, Sendable {
     public var alertErrorDescription: String?
     public var timezone: String
     public var fetchedAt: Date
-    /// 适合 UI 展示的地区名；未解析到时为 nil。
+    /// Location-friendly display name for UI; nil if not resolved.
     public var locationName: String?
-    /// 快照对应的查询坐标。
+    /// Coordinates of the query this snapshot corresponds to.
     public var coordinate: GeoCoordinate
 
     public init(

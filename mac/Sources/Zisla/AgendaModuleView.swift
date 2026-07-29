@@ -475,7 +475,7 @@ struct AgendaModuleView: View {
         alert.addButton(withTitle: "新增")
         alert.addButton(withTitle: "取消")
         NSApp.activate(ignoringOtherApps: true)
-        WindowPlacement.center(alert.window, on: WindowPlacement.screenUnderMouse())
+        WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         do {
@@ -532,7 +532,7 @@ struct AgendaModuleView: View {
             : "该事件会从系统日历中删除。"
         alert.addButton(withTitle: "删除")
         alert.addButton(withTitle: "取消")
-        WindowPlacement.center(alert.window, on: WindowPlacement.screenUnderMouse())
+        WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {
             try calendar.delete(item)

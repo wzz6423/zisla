@@ -44,8 +44,8 @@ public struct NowPlayingSnapshot: Equatable, Sendable {
   public var supportsPlaybackModeControl: Bool
   public var isFavorite: Bool?
   public var favoriteControl: NowPlayingFavoriteControl?
-  /// 播放模式由 app 特化补全而非 MediaRemote 实时上报，
-  /// UI 应显示循环切换按钮而非精确选择菜单。
+  /// Playback mode is approximate — filled in by app specialisation rather than reported precisely by MediaRemote,
+  /// so the UI should show a cycle button rather than a precise selection menu.
   public var playbackModeIsApproximate: Bool
 
   public init(
@@ -223,7 +223,7 @@ public final class NowPlayingService: ObservableObject {
   private var artworkRefreshIdentity: ArtworkRefreshIdentity?
   private var lyricsIdentity: LyricsTrackIdentity?
   public private(set) var resolvedLyrics: SyncedLyrics?
-  /// 从歌词 API 解析出的完整歌手名（MediaRemote 通常只返回首位歌手）。
+  /// Full artist name resolved from the lyrics API (MediaRemote usually returns only the first artist).
   private var resolvedArtist: String?
   private var playbackModeOverride: TimedControlOverride<NowPlayingPlaybackMode>?
   private var playbackStateOverride: TimedControlOverride<Bool>?
@@ -237,6 +237,7 @@ public final class NowPlayingService: ObservableObject {
   private var usesAdapter = false
   private var isRunning = false
   private var spectrumMonitoringEnabled = false
+  private var spectrumVisualizationEnabled = false
   private var spectrumCancellable: AnyCancellable?
   private var systemAudioIsAudible = false
   private var adapterPlaybackMode: NowPlayingPlaybackMode?
@@ -359,9 +360,16 @@ public final class NowPlayingService: ObservableObject {
     updateSpectrumMonitoring()
   }
 
+  public func setSpectrumVisualizationEnabled(_ enabled: Bool) {
+    guard spectrumVisualizationEnabled != enabled else { return }
+    spectrumVisualizationEnabled = enabled
+    updateSpectrumMonitoring()
+  }
+
   public func stop() {
     isRunning = false
     spectrumMonitoringEnabled = false
+    spectrumVisualizationEnabled = false
     for observer in observers {
       NotificationCenter.default.removeObserver(observer)
     }
@@ -422,6 +430,7 @@ public final class NowPlayingService: ObservableObject {
     guard isRunning,
       ProcessInfo.processInfo.environment["ZISLA_VISUAL_MEDIA_FIXTURE"] != "1"
     else { return }
+    AudioSpectrumService.shared.setVisualizationEnabled(spectrumVisualizationEnabled)
     if spectrumMonitoringEnabled {
       AudioSpectrumService.shared.startMonitoring()
     } else {
@@ -440,19 +449,30 @@ public final class NowPlayingService: ObservableObject {
     guard let current = snapshot, current.supportsControls else { return false }
     let sent =
       if let profile = activeProfile,
+        profile.prefersAccessibilityControls,
+        profile.supportsPlaybackControls,
+        command.rawValue <= Command.previous.rawValue,
+        specialist.sendPlaybackCommand(
+          command,
+          pid: current.sourcePID,
+          bundleIdentifier: current.sourceBundleIdentifier
+        ) == true {
+        true
+      } else if usesAdapter, command.rawValue <= Command.previous.rawValue {
+        adapterClient.run(["send", "\(command.rawValue)"])
+      } else if let direct = sendCommandFunction?(command.rawValue, nil), direct {
+        direct
+      } else if let profile = activeProfile,
         profile.supportsPlaybackControls,
         command.rawValue <= Command.previous.rawValue,
         let specialized = specialist.sendPlaybackCommand(
           command,
           pid: current.sourcePID,
           bundleIdentifier: current.sourceBundleIdentifier
-        )
-      {
+        ) {
         specialized
-      } else if usesAdapter, command.rawValue <= Command.previous.rawValue {
-        adapterClient.run(["send", "\(command.rawValue)"])
       } else {
-        sendCommandFunction?(command.rawValue, nil) ?? false
+        false
       }
     guard sent else { return false }
 
@@ -477,13 +497,7 @@ public final class NowPlayingService: ObservableObject {
   @discardableResult
   public func setPlaybackMode(_ mode: NowPlayingPlaybackMode) -> Bool {
     guard let current = snapshot, current.supportsControls else { return false }
-    if specialist.setPlaybackMode(
-      mode,
-      pid: current.sourcePID,
-      bundleIdentifier: current.sourceBundleIdentifier
-    ) == true {
-      // Apple Music 的公开脚本字典提供稳定的随机和循环设置。
-    } else if usesAdapter {
+    if usesAdapter {
       let commands = Self.playbackModeAdapterCommands(mode)
       playbackModeCommandGeneration &+= 1
       let generation = playbackModeCommandGeneration
@@ -498,10 +512,15 @@ public final class NowPlayingService: ObservableObject {
       }
       guard enqueued else { return false }
       adapterPlaybackMode = mode
-    } else {
-      guard let setRepeatModeFunction, let setShuffleModeFunction else { return false }
+    } else if let setRepeatModeFunction, let setShuffleModeFunction {
       setRepeatModeFunction(mode.mediaRemoteRepeatMode)
       setShuffleModeFunction(mode.mediaRemoteShuffleMode)
+    } else if specialist.setPlaybackMode(
+      mode,
+      pid: current.sourcePID,
+      bundleIdentifier: current.sourceBundleIdentifier
+    ) != true {
+      return false
     }
     playbackModeOverride = TimedControlOverride(
       identity: ControlIdentity(current),
@@ -513,29 +532,31 @@ public final class NowPlayingService: ObservableObject {
     return true
   }
 
-  /// 针对不支持精确设置播放模式的特化应用（如 QQ 音乐），
-  /// 通过 Accessibility API 点击播放模式按钮循环切换。
+  /// Cycles to the next playback mode in sequence when the player does not report a precise mode.
   @discardableResult
   public func cyclePlaybackMode() -> Bool {
-    guard let current = snapshot, current.supportsControls,
-      let profile = activeProfile, profile.supportsPlaybackModeCycle
-    else { return false }
-
-    guard specialist.cyclePlaybackMode(
-      pid: current.sourcePID,
-      bundleIdentifier: current.sourceBundleIdentifier,
-      currentMode: current.playbackMode ?? profile.defaultPlaybackMode
-    ) else { return false }
-
-    let next = Self.nextPlaybackMode(after: current.playbackMode ?? profile.defaultPlaybackMode)
-    playbackModeOverride = TimedControlOverride(
-      identity: ControlIdentity(current),
-      value: next,
-      expiresAt: .now.addingTimeInterval(controlOverrideLifetime)
-    )
-    schedulePlaybackModeOverrideExpiration()
-    resolveSnapshot()
-    return true
+    guard let current = snapshot, current.supportsControls else { return false }
+    let fallbackMode = activeProfile?.defaultPlaybackMode ?? .sequential
+    let nextMode = Self.nextPlaybackMode(after: current.playbackMode ?? fallbackMode)
+    if let profile = activeProfile,
+      profile.prefersAccessibilityControls,
+      profile.supportsPlaybackModeCycle,
+      specialist.cyclePlaybackMode(
+        pid: current.sourcePID,
+        bundleIdentifier: current.sourceBundleIdentifier,
+        currentMode: current.playbackMode ?? fallbackMode
+      )
+    {
+      playbackModeOverride = TimedControlOverride(
+        identity: ControlIdentity(current),
+        value: nextMode,
+        expiresAt: .now.addingTimeInterval(controlOverrideLifetime)
+      )
+      schedulePlaybackModeOverrideExpiration()
+      resolveSnapshot()
+      return true
+    }
+    return setPlaybackMode(nextMode)
   }
 
   @discardableResult
@@ -544,18 +565,32 @@ public final class NowPlayingService: ObservableObject {
       let control = current.favoriteControl
     else { return false }
 
-    if let profile = activeProfile, profile.supportsFavorite {
-      guard specialist.toggleFavorite(
-        pid: current.sourcePID,
-        bundleIdentifier: current.sourceBundleIdentifier
-      ) else { return false }
-    } else {
-      let command = Self.favoriteCommand(
-        isFavorite: current.isFavorite == true,
-        control: control
-      )
-      guard sendCommandFunction?(command.rawValue, nil) == true else { return false }
-    }
+    let command = Self.favoriteCommand(
+      isFavorite: current.isFavorite == true,
+      control: control
+    )
+    let sent =
+      if let profile = activeProfile,
+        profile.prefersAccessibilityControls,
+        profile.supportsFavorite,
+        specialist.toggleFavorite(
+          pid: current.sourcePID,
+          bundleIdentifier: current.sourceBundleIdentifier
+        ) {
+        true
+      } else if usesAdapter {
+        adapterClient.run(["send", "\(command.rawValue)"])
+      } else if let direct = sendCommandFunction?(command.rawValue, nil), direct {
+        direct
+      } else if let profile = activeProfile, profile.supportsFavorite {
+        specialist.toggleFavorite(
+          pid: current.sourcePID,
+          bundleIdentifier: current.sourceBundleIdentifier
+        )
+      } else {
+        false
+      }
+    guard sent else { return false }
     favoriteOverride = TimedControlOverride(
       identity: ControlIdentity(current),
       value: current.isFavorite != true,
@@ -765,7 +800,7 @@ public final class NowPlayingService: ObservableObject {
     return merged
   }
 
-  /// 只信任系统 MediaRemote 的媒体类型字段，不根据应用身份推断。
+  /// Only trusts the system MediaRemote media-type field; does not infer video identity from the app's identity.
   nonisolated static func isVideoMedia(
     mediaType: String?,
     isVideosApp: Bool? = nil
@@ -862,7 +897,7 @@ public final class NowPlayingService: ObservableObject {
     return sources.first(where: \.isFrontmost) ?? sources.first
   }
 
-  /// MediaRemote 停留在已暂停会话时，从 Core Audio 的其他有声来源中选择当前来源。
+  /// When MediaRemote is stuck on a paused session, select the active source from other audible Core Audio sources.
   nonisolated static func preferredAudioFallbackSource(
     from sources: [AudioPlaybackSource],
     remotePID: pid_t?,
@@ -890,7 +925,7 @@ public final class NowPlayingService: ObservableObject {
     }
   }
 
-  /// 应用发布了 MediaRemote 状态时以其为准；无远程元数据时才使用 Core Audio 兜底。
+  /// When the app has published a MediaRemote state, use it as the source of truth; fall back to Core Audio only when no remote metadata is available.
   nonisolated static func remotePlaybackIsActive(
     snapshot: NowPlayingSnapshot?,
     playbackState: RemotePlaybackState
@@ -1223,20 +1258,22 @@ public final class NowPlayingService: ObservableObject {
     if let processIdentifier,
       let icon = NSRunningApplication(processIdentifier: processIdentifier)?.icon
     {
-      return icon.tiffRepresentation
+      let cacheKey = bundleIdentifier ?? "pid:\(processIdentifier)"
+      return ApplicationIconDataCache.data(for: icon, cacheKey: cacheKey)
     }
     guard let bundleIdentifier,
       let applicationURL = NSWorkspace.shared.urlForApplication(
         withBundleIdentifier: bundleIdentifier
       )
     else { return nil }
-    return NSWorkspace.shared.icon(forFile: applicationURL.path).tiffRepresentation
+    let icon = NSWorkspace.shared.icon(forFile: applicationURL.path)
+    return ApplicationIconDataCache.data(for: icon, cacheKey: bundleIdentifier)
   }
 
   nonisolated private static func audioFallbackSnapshot(
     for source: AudioPlaybackSource
   ) -> NowPlayingSnapshot {
-    // Core Audio 只能确认应用正在发声，不能据此虚构视频身份。
+    // Core Audio can only confirm that the app is producing audio; do not fabricate a video identity from that alone.
     return NowPlayingSnapshot(
       title: source.applicationName,
       artist: "正在播放音频",
@@ -1296,8 +1333,8 @@ public final class NowPlayingService: ObservableObject {
     }
   }
 
-  /// 当 MediaRemote 未上报收藏/播放模式能力时，
-  /// 根据 app 特化配置补全控制能力标记，使 UI 能显示对应按钮。
+  /// When MediaRemote does not report favorite/playback-mode capabilities,
+  /// fill in the control-capability flags from the app specialisation profile so the UI can display the corresponding buttons.
   private func applySpecialization(to snapshot: inout NowPlayingSnapshot) {
     let profile = specialist.profile(for: snapshot.sourceBundleIdentifier)
     activeProfile = profile
@@ -1319,10 +1356,8 @@ public final class NowPlayingService: ObservableObject {
         if let specialistFavoriteState {
           snapshot.favoriteControl = profile.favoriteControl
           snapshot.isFavorite = specialistFavoriteState
-        } else if snapshot.favoriteControl == nil || snapshot.isFavorite == nil {
-          // 无法确认真实状态时不提供会误导用户的收藏按钮。
-          snapshot.favoriteControl = nil
-          snapshot.isFavorite = nil
+        } else {
+          snapshot.favoriteControl = profile.favoriteControl
         }
       } else {
         snapshot.favoriteControl = profile.favoriteControl

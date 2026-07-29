@@ -6,7 +6,10 @@ public struct SideNoticePresentation: Equatable, Sendable {
     public let activeAINotice: IslandNotice?
     public let activeMediaNotice: IslandNotice?
     public let activeFocusCountdownNotice: IslandNotice?
+    public let activeFocusModeNotice: IslandNotice?
     public let activeToolboxNotice: IslandNotice?
+    public let activeBrowserDownloadNotice: IslandNotice?
+    public let activeVideoDownloadNotice: IslandNotice?
     public let ordinaryNotices: [IslandNotice]
     public let panelSize: CGSize
     public let compactWingsEnabled: Bool
@@ -18,7 +21,10 @@ public struct SideNoticePresentation: Equatable, Sendable {
         activeAINotice: IslandNotice? = nil,
         activeMediaNotice: IslandNotice? = nil,
         activeFocusCountdownNotice: IslandNotice? = nil,
+        activeFocusModeNotice: IslandNotice? = nil,
         activeToolboxNotice: IslandNotice? = nil,
+        activeBrowserDownloadNotice: IslandNotice? = nil,
+        activeVideoDownloadNotice: IslandNotice? = nil,
         ordinaryNotices: [IslandNotice],
         panelSize: CGSize,
         compactWingsEnabled: Bool = true,
@@ -29,7 +35,10 @@ public struct SideNoticePresentation: Equatable, Sendable {
         self.activeAINotice = activeAINotice
         self.activeMediaNotice = activeMediaNotice
         self.activeFocusCountdownNotice = activeFocusCountdownNotice
+        self.activeFocusModeNotice = activeFocusModeNotice
         self.activeToolboxNotice = activeToolboxNotice
+        self.activeBrowserDownloadNotice = activeBrowserDownloadNotice
+        self.activeVideoDownloadNotice = activeVideoDownloadNotice
         self.ordinaryNotices = ordinaryNotices
         self.panelSize = panelSize
         self.compactWingsEnabled = compactWingsEnabled
@@ -39,11 +48,23 @@ public struct SideNoticePresentation: Equatable, Sendable {
 
     public var hasCompactContent: Bool {
         activeAICount > 0 || activeMediaNotice != nil || activeFocusCountdownNotice != nil
-            || activeToolboxNotice != nil || compactPlaceholder
+            || activeFocusModeNotice != nil || activeToolboxNotice != nil
+            || activeBrowserDownloadNotice != nil || activeVideoDownloadNotice != nil
+            || compactPlaceholder
     }
 
     public var shouldExtendCompactBarForFocusCountdown: Bool {
         activeMediaNotice == nil && activeFocusCountdownNotice != nil
+    }
+
+    /// The compact bar renders only one status. Detailed media may widen it only when media wins that priority.
+    public var displaysMediaInCompactBar: Bool {
+        activeMediaNotice != nil
+            && activeVideoDownloadNotice == nil
+            && activeBrowserDownloadNotice == nil
+            && activeFocusCountdownNotice == nil
+            && activeToolboxNotice == nil
+            && activeAICount == 0
     }
 }
 
@@ -71,11 +92,18 @@ public struct CompactBarContourMetrics: Equatable, Sendable {
 }
 
 public struct SideNoticeLayoutEngine: Equatable, Sendable {
+    public static let compactStatusWingWidth: CGFloat = 40
+
     private enum Layout {
-        static let compactWingWidth: CGFloat = 40
-        /// 倒计时长态对齐无刘海设备的 240pt 模拟岛宽，确保 `HH:MM:SS`
-        /// 不受刘海两侧圆角与遮罩挤压。
+        static let compactWingWidth = SideNoticeLayoutEngine.compactStatusWingWidth
+        /// Countdown expanded bar aligned to the simulated 240 pt island width for notch-less devices,
+        /// ensuring `HH:MM:SS` is not squeezed by the notch's corner radii and masks.
         static let compactBarSideExtension: CGFloat = 40
+        /// The music detail view needs to fit cover art + title/artist (left) or waveform + scrolling lyrics (right),
+        /// requiring wider wings than the countdown expanded bar.
+        static let compactBarMediaDetailSideWidth: CGFloat = 160
+        /// Notch-less devices render one continuous media row and do not need the physical-notch center gap.
+        static let compactBarMediaDetailSimulatedWidth: CGFloat = 380
         static let defaultCompactWingHeight: CGFloat = 34
         static let compactBarNavigationInset: CGFloat = 1
         static let compactOverlap: CGFloat = 0
@@ -102,24 +130,41 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let activeFocusCountdownNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("focus-countdown-") })
             : nil
+        let activeFocusModeNotice = compactWingsEnabled
+            ? notices.first(where: { $0.id.hasPrefix("focus-mode-") })
+            : nil
         let activeAINotices = compactWingsEnabled
             ? notices.filter { $0.id.hasPrefix("ai-active-") }
             : []
         let activeToolboxNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("toolbox-reminder-") })
             : nil
+        let activeBrowserDownloadNotice = compactWingsEnabled
+            ? notices.first(where: { $0.id.hasPrefix("browser-download-") })
+            : nil
+        let activeVideoDownloadNotice = compactWingsEnabled
+            ? notices.first(where: { $0.id.hasPrefix("video-download-") })
+            : nil
         let activeAICount = activeAINotices.count
         let ordinaryNotices = notices.filter {
             !$0.id.hasPrefix("ai-active-")
                 && !$0.id.hasPrefix("media-active-")
                 && !$0.id.hasPrefix("focus-countdown-")
+                && !$0.id.hasPrefix("focus-mode-")
+                && !$0.id.hasPrefix("focus-transition")
                 && !$0.id.hasPrefix("toolbox-reminder-")
+                && !$0.id.hasPrefix("browser-download-")
+                && !$0.id.hasPrefix("video-download-")
+                && $0.style != .headphone
         }
         let panelSize = panelSize(
             activeAICount: activeAICount,
             hasMedia: activeMediaNotice != nil,
             hasFocusCountdown: activeFocusCountdownNotice != nil,
+            hasFocusMode: activeFocusModeNotice != nil,
             hasToolbox: activeToolboxNotice != nil,
+            hasBrowserDownload: activeBrowserDownloadNotice != nil,
+            hasVideoDownload: activeVideoDownloadNotice != nil,
             ordinaryCount: ordinaryNotices.count,
             compactWingHeight: normalizedHeight,
             reserveCompactWing: compactWingsEnabled && reserveCompactWing
@@ -129,13 +174,19 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             && activeAICount == 0
             && activeMediaNotice == nil
             && activeFocusCountdownNotice == nil
+            && activeFocusModeNotice == nil
             && activeToolboxNotice == nil
+            && activeBrowserDownloadNotice == nil
+            && activeVideoDownloadNotice == nil
         return SideNoticePresentation(
             activeAICount: activeAICount,
             activeAINotice: activeAINotices.first,
             activeMediaNotice: activeMediaNotice,
             activeFocusCountdownNotice: activeFocusCountdownNotice,
+            activeFocusModeNotice: activeFocusModeNotice,
             activeToolboxNotice: activeToolboxNotice,
+            activeBrowserDownloadNotice: activeBrowserDownloadNotice,
+            activeVideoDownloadNotice: activeVideoDownloadNotice,
             ordinaryNotices: ordinaryNotices,
             panelSize: panelSize,
             compactWingsEnabled: compactWingsEnabled,
@@ -156,20 +207,28 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
 
     public func compactBarFrame(
         for screen: ScreenSnapshot,
-        extendsForFocusCountdown: Bool = false
+        extendsForFocusCountdown: Bool = false,
+        expandsForDetailedMedia: Bool = false
     ) -> CGRect {
         let topology = ScreenLayoutEngine().layout(for: screen).topology
         let anchor = topology.anchorFrame
         let baseWidth: CGFloat
         let height: CGFloat
         if topology.hasPhysicalNotch {
-            let visibleWingWidth = Layout.compactWingWidth
-                + (extendsForFocusCountdown ? Layout.compactBarSideExtension : 0)
-                - Layout.compactOverlap
+            let visibleWingWidth: CGFloat
+            if expandsForDetailedMedia {
+                visibleWingWidth = Layout.compactBarMediaDetailSideWidth - Layout.compactOverlap
+            } else {
+                visibleWingWidth = Layout.compactWingWidth
+                    + (extendsForFocusCountdown ? Layout.compactBarSideExtension : 0)
+                    - Layout.compactOverlap
+            }
             baseWidth = anchor.width + visibleWingWidth * 2
             height = compactBarHeight(for: screen, anchor: anchor)
         } else {
-            baseWidth = anchor.width
+            baseWidth = expandsForDetailedMedia
+                ? Layout.compactBarMediaDetailSimulatedWidth
+                : anchor.width
             height = anchor.height
         }
         let width = min(screen.frame.width, baseWidth)
@@ -181,6 +240,40 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             y: topEdge - height,
             width: width,
             height: height
+        )
+    }
+
+    /// Mirrors `compactBarFrame(for: ScreenSnapshot, ...)` for overlays that already own a screen layout.
+    public func compactBarFrame(
+        for layout: ScreenOverlayLayout,
+        extendsForFocusCountdown: Bool = false,
+        expandsForDetailedMedia: Bool = false
+    ) -> CGRect {
+        let anchor = layout.topology.anchorFrame
+        let baseWidth: CGFloat
+        if layout.topology.hasPhysicalNotch {
+            let visibleWingWidth = expandsForDetailedMedia
+                ? Layout.compactBarMediaDetailSideWidth - Layout.compactOverlap
+                : Layout.compactWingWidth
+                    + (extendsForFocusCountdown ? Layout.compactBarSideExtension : 0)
+                    - Layout.compactOverlap
+            baseWidth = anchor.width + visibleWingWidth * 2
+        } else {
+            baseWidth = expandsForDetailedMedia
+                ? Layout.compactBarMediaDetailSimulatedWidth
+                : anchor.width
+        }
+        let width = min(layout.screenFrame.width, baseWidth)
+        let x = min(
+            max(layout.screenFrame.minX, anchor.midX - width / 2),
+            layout.screenFrame.maxX - width
+        )
+        let topEdge = layout.topology.hasPhysicalNotch ? layout.screenFrame.maxY : anchor.maxY
+        return CGRect(
+            x: x,
+            y: topEdge - anchor.height,
+            width: width,
+            height: anchor.height
         )
     }
 
@@ -218,7 +311,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let x = min(max(idealX, minimumX), maximumX)
         let idealY = presentation.hasCompactContent
             ? screen.frame.maxY - size.height + Layout.compactTopOverlap
-            : anchor.minY - Layout.ordinaryTopGap - size.height
+            : anchor.minY - size.height - Layout.ordinaryTopGap
         let y = max(screen.frame.minY, idealY)
 
         return CGRect(origin: CGPoint(x: x, y: y), size: size)
@@ -228,22 +321,25 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         activeAICount: Int,
         hasMedia: Bool,
         hasFocusCountdown: Bool,
+        hasFocusMode: Bool,
         hasToolbox: Bool,
+        hasBrowserDownload: Bool,
+        hasVideoDownload: Bool,
         ordinaryCount: Int,
         compactWingHeight: CGFloat,
         reserveCompactWing: Bool
     ) -> CGSize {
+        let hasCompact = activeAICount > 0 || hasMedia || hasFocusCountdown || hasFocusMode
+            || hasToolbox || hasBrowserDownload || hasVideoDownload || reserveCompactWing
         guard ordinaryCount > 0 else {
-            return activeAICount > 0 || hasMedia || hasFocusCountdown || hasToolbox || reserveCompactWing
+            return hasCompact
                 ? CGSize(width: Layout.compactWingWidth, height: compactWingHeight)
                 : .zero
         }
 
         let ordinaryHeight = CGFloat(ordinaryCount) * Layout.ordinaryRowHeight
         let ordinarySpacing = CGFloat(max(0, ordinaryCount - 1)) * Layout.rowSpacing
-        let compactHeight = activeAICount > 0 || hasMedia || hasFocusCountdown || hasToolbox || reserveCompactWing
-            ? compactWingHeight + Layout.rowSpacing
-            : 0
+        let compactHeight = hasCompact ? compactWingHeight + Layout.rowSpacing : 0
         return CGSize(
             width: Layout.ordinaryWidth,
             height: compactHeight + ordinaryHeight + ordinarySpacing

@@ -1,6 +1,8 @@
 # 签名与发布
 
-本指南用于创建可自动更新的 Developer ID 发布包。开发构建无需这些步骤，但只能检查版本信息。
+项目的完整发布流程、双更新通道、GitHub/Gitee 的资产同步、Sparkle 与 Gitee 凭据来源，以及 v0.1.0 Preview 的实际经验已沉淀在仓库根目录的 [`skills/zisla-release`](../../skills/zisla-release/SKILL.md)。发布时以该技能为准。
+
+本页保留 Developer ID 与公证的补充说明。免费 ad-hoc Preview 同样可以使用 Sparkle EdDSA 自动更新，但不能公证，首次打开可能需要在系统设置中选择“仍要打开”。
 
 ## 前提
 

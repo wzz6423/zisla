@@ -326,6 +326,41 @@ struct AIStateRepositoryTests {
     }
 
     @Test
+    func repositoryKeepsNewestUsageWhenTrimmedSamplesAreScannedAgain() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory, maximumUsageSamples: 2)
+        let samples = [
+            AIUsageSample(
+                sourceID: "old",
+                provider: .claude,
+                timestamp: Date(timeIntervalSince1970: 100),
+                inputTokens: 10,
+                outputTokens: 1
+            ),
+            AIUsageSample(
+                sourceID: "middle",
+                provider: .grok,
+                timestamp: Date(timeIntervalSince1970: 200),
+                inputTokens: 20,
+                outputTokens: 2
+            ),
+            AIUsageSample(
+                sourceID: "new",
+                provider: .codex,
+                timestamp: Date(timeIntervalSince1970: 300),
+                inputTokens: 30,
+                outputTokens: 3
+            ),
+        ]
+        try repository.recordUsage(samples)
+
+        try repository.recordUsage(samples[0])
+
+        #expect(try repository.load().usageSamples == Array(samples.suffix(2)))
+    }
+
+    @Test
     func repositoryCompactsExistingUsageHistoryWhenItsLimitIsLowered() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -359,6 +394,8 @@ struct CLIParserTests {
         #expect(AIProvider(token: "QoderWork CN") == .coder)
         #expect(AIProvider(token: "qoderwork-cn") == .coder)
         #expect(AIProvider(token: "qoderwake") == .coder)
+        #expect(AIProvider(token: "copilot") == .copilot)
+        #expect(AIProvider(token: "github-copilot") == .copilot)
     }
 
     @Test
@@ -478,7 +515,7 @@ struct MessageNotificationTests {
 
         let long = String(repeating: "a", count: 120)
         let normalized = MessageNotification.normalizeContent(long)
-        #expect(normalized.count == MessageNotification.maxContentLength + 1) // 正文上限加省略号
+        #expect(normalized.count == MessageNotification.maxContentLength + 1) // body limit plus ellipsis
         #expect(normalized.hasSuffix("…"))
         #expect(normalized.dropLast().count == MessageNotification.maxContentLength)
     }
@@ -669,7 +706,7 @@ struct DownloadCoreTests {
             argument(after: "-f", in: arguments)
                 == "(bv*[ext=mp4][vcodec^=avc1][acodec=none]/bv*[ext=mp4][acodec=none],ba[ext=m4a][vcodec=none])/b[ext=mp4]/b"
         )
-        // -o 必须是相对模板；目录通过 --paths home: 指定，避免 yt-dlp 的 --paths 被忽略警告
+        // -o must be a relative template; set directories via --paths home: to avoid yt-dlp ignoring --paths
         #expect(argument(after: "-o", in: arguments)?.hasPrefix("/") == false)
         #expect(arguments.contains("home:\(taskDirectory.path)"))
         #expect(arguments.contains("temp:\(taskDirectory.path)"))
@@ -715,8 +752,8 @@ struct DownloadCoreTests {
 
     @Test
     func pathsAndOutputTemplateNeverConflict() throws {
-        // 回归测试：yt-dlp 警告 "--paths is ignored since an absolute path is given in output template"
-        // 的根因是 -o 包含绝对路径。修复后 -o 只能是相对模板，目录由 --paths home: 提供。
+        // Regression: yt-dlp warns "--paths is ignored since an absolute path is given in output template"
+        // because -o contained an absolute path. After the fix, -o is relative only; directories come from --paths home:.
         let outputDir = URL(fileURLWithPath: "/tmp/Downloads")
         let taskDir = URL(fileURLWithPath: "/tmp/Zisla/task-conflict")
 
@@ -734,7 +771,7 @@ struct DownloadCoreTests {
                 )
 
                 let outputTemplate = argument(after: "-o", in: args)
-                // -o 不能是绝对路径，否则 --paths 会被 yt-dlp 忽略
+                // -o must not be absolute or yt-dlp ignores --paths
                 #expect(
                     outputTemplate?.hasPrefix("/") == false,
                     "mode=\(mode) ffmpeg=\(hasFFmpeg): -o 不应为绝对路径，实际值=\(outputTemplate ?? "nil")"
@@ -743,17 +780,17 @@ struct DownloadCoreTests {
                     for: request,
                     capabilities: .init(hasFFmpeg: hasFFmpeg)
                 ) == .direct ? outputDir : taskDir
-                // 原生封装先落入任务目录，直接下载则直接落入用户选择的目录。
+                // Native remux lands in the task directory; direct download lands in the user-chosen directory.
                 #expect(
                     args.contains("home:\(expectedHomeDirectory.path)"),
                     "mode=\(mode) ffmpeg=\(hasFFmpeg): 缺少 --paths home:\(expectedHomeDirectory.path)"
                 )
-                // --paths temp: 隔离仍然保留
+                // --paths temp: isolation is still retained
                 #expect(
                     args.contains("temp:\(taskDir.path)"),
                     "mode=\(mode) ffmpeg=\(hasFFmpeg): 缺少 --paths temp:\(taskDir.path)"
                 )
-                // URL 必须在 -- 之后，防止注入
+                // URL must follow -- to prevent injection
                 #expect(args.last == "https://youtu.be/abc")
                 #expect(args.dropLast().last == "--")
             }
@@ -924,7 +961,7 @@ struct AIUsageAnalyticsTests {
         #expect(present.allSatisfy { $0.date <= calendar.startOfDay(for: endingAt) })
         #expect(!present.contains(where: { calendar.isDate($0.date, inSameDayAs: future) }))
 
-        // 跨月：2/28 与 3/1 各自聚合，3/1 两笔合并为 200
+        // Cross-month: 2/28 and 3/1 aggregate separately; two entries on 3/1 merge to 200
         let feb28Cell = try #require(present.first { calendar.isDate($0.date, inSameDayAs: feb28) })
         #expect(feb28Cell.tokens == 50)
 
@@ -934,10 +971,10 @@ struct AIUsageAnalyticsTests {
         let mar15Cell = try #require(present.first { calendar.isDate($0.date, inSameDayAs: mar15) })
         #expect(mar15Cell.tokens == 10)
 
-        // 月初日期可定位：3/1 出现在网格中，且为 startOfDay
+        // Month-start date is locatable: 3/1 appears in the grid as startOfDay
         #expect(mar1Cell.date == calendar.startOfDay(for: mar1))
 
-        // 含 endingAt 当天；同列内 endingAt 之后为 nil
+        // Includes endingAt's day; slots after endingAt in the same column are nil
         let endDay = calendar.startOfDay(for: endingAt)
         #expect(present.contains { calendar.isDate($0.date, inSameDayAs: endDay) })
         let futureSlots = flat.filter { cell in
@@ -1034,7 +1071,7 @@ struct AIUsageAnalyticsTests {
 
         let series = AIUsageAnalytics.recentUsageSeries(samples: samples, endingAt: end, limit: 3)
 
-        // 5 条中保留最近 3 条（t3/t4/t5），基线点计在其前、不占 limit 名额。
+        // Keep the latest 3 of 5 samples (t3/t4/t5); the baseline point precedes them and does not count toward limit.
         #expect(series.map(\.tokens) == [0, 30, 40, 50])
         #expect(series.first?.timestamp == Date(timeIntervalSince1970: 3_000).addingTimeInterval(-1))
     }
@@ -1118,7 +1155,7 @@ struct AIUsageAnalyticsTests {
             endingAt: end
         )
 
-        // 单条历史也能画趋势：0 基线 → 采样点(累计=总量) → end 处延伸并保持累计总量。
+        // A single history sample still draws a trend: 0 baseline → sample (cumulative = total) → hold cumulative total at end.
         #expect(series.map(\.timestamp) == [sample.addingTimeInterval(-1), sample, end])
         #expect(series.map(\.tokens) == [0, 100, 100])
     }
@@ -1188,13 +1225,13 @@ struct AIUsageAnalyticsTests {
         #expect(AIUsageAnalytics.tokenAxisTicks(maximum: 0) == [0, 1])
     }
 
-    /// 回归测试：趋势曲线使用每日增量值，高低交替的用量应产生有升有降的折线，
-    /// 而不是单调递增的累积曲线（AreaMark/LineMark 加 unit:.day 会引入累积求和）。
+    /// Regression: the trend series uses daily deltas; alternating high/low usage should rise and fall,
+    /// not a monotonically increasing cumulative curve (AreaMark/LineMark with unit:.day would sum cumulatively).
     @Test
     func smoothedDailyUsageSeriesIsNotMonotonicallyIncreasingForVariedUsage() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        // day2=高用量，day4=低用量，day6=高用量 —— 正确的增量曲线不应单调递增
+        // day2=high, day4=low, day6=high — a correct delta series must not be monotonically increasing
         let base = Date(timeIntervalSince1970: 0)
         let samples = [
             AIUsageSample(provider: .claude, timestamp: base.addingTimeInterval(2 * 86_400 + 100), inputTokens: 500, outputTokens: 200),
@@ -1210,7 +1247,7 @@ struct AIUsageAnalyticsTests {
         )
         let totals = series.map(\.totalTokens)
 
-        // 高低交替的用量必然在某处下降；若全部非负递增则说明算法退化为累积曲线
+        // Alternating usage must decrease somewhere; non-negative monotonic growth means the algorithm degraded to cumulative
         let hasDecrease = zip(totals, totals.dropFirst()).contains { $0 > $1 }
         #expect(hasDecrease, "每日增量曲线在用量高低交替时不应单调递增，实际 totalTokens：\(totals)")
     }

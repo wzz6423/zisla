@@ -1,6 +1,6 @@
 import Foundation
 
-/// 离线每日短句：不联网，按日期稳定选取，同一天恒定返回同一句。
+/// Offline daily quotes selected deterministically by date without network access.
 public struct DailyQuote: Equatable, Sendable {
     public var text: String
     public var author: String?
@@ -10,7 +10,7 @@ public struct DailyQuote: Equatable, Sendable {
         self.author = author
     }
 
-    /// 内置离线句库。顺序稳定，选取只依赖日期序号，不引入随机性。
+    /// Built-in offline quotes with stable ordering and no randomness.
     public static let library: [DailyQuote] = [
         DailyQuote(text: "今天也要好好生活。"),
         DailyQuote(text: "慢慢来，比较快。"),
@@ -44,7 +44,7 @@ public struct DailyQuote: Equatable, Sendable {
         DailyQuote(text: "认真生活的人，运气都不会太差。"),
     ]
 
-    /// 依据日期序号稳定选取当日短句：同一天必然相同，跨天平滑轮换。
+    /// Selects a daily quote deterministically, returning the same quote throughout a day and rotating across days.
     public static func quote(
         for date: Date,
         calendar: Calendar = .current,
@@ -55,7 +55,7 @@ public struct DailyQuote: Equatable, Sendable {
         return library[index]
     }
 
-    /// 以纪元为基准的天序号，保证不随时刻变化、只随自然日推进。
+    /// Returns an era-based day ordinal that changes only at the start of a new calendar day.
     static func dayOrdinal(for date: Date, calendar: Calendar) -> Int {
         let ordinal = calendar.ordinality(of: .day, in: .era, for: date) ?? 0
         return max(0, ordinal)

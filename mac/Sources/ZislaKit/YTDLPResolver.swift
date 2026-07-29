@@ -10,8 +10,13 @@ public struct YTDLPTools: Equatable, Sendable {
     }
 }
 
-public enum YTDLPResolverError: Error, Equatable, Sendable {
+public enum YTDLPResolverError: Error, Equatable, Sendable, LocalizedError {
     case executableNotFound(searched: [URL])
+
+    /// 安装入口已从下载模块迁到设置页，报错必须替用户指路，否则只剩一条裸的 NSError 文案。
+    public var errorDescription: String? {
+        "未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。"
+    }
 }
 
 public struct YTDLPResolver: Sendable {
@@ -34,23 +39,29 @@ public struct YTDLPResolver: Sendable {
     }
 
     private let bundleURL: URL
+    private let managedToolsDirectory: URL
     private let externalYTDLPCandidates: [URL]
     private let externalFFmpegCandidates: [URL]
 
     public init(
         bundleURL: URL = Bundle.main.bundleURL,
+        managedToolsDirectory: URL = AppPaths.managedTools,
         externalYTDLPCandidates: [URL]? = nil,
         externalFFmpegCandidates: [URL]? = nil
     ) {
         self.bundleURL = bundleURL
+        self.managedToolsDirectory = managedToolsDirectory
         self.externalYTDLPCandidates = externalYTDLPCandidates ?? Self.defaultYTDLPCandidates
         self.externalFFmpegCandidates = externalFFmpegCandidates ?? Self.defaultFFmpegCandidates
     }
 
     public func resolve() throws -> YTDLPTools {
         let helperDirectory = bundleURL.appendingPathComponent("Contents/Helpers", isDirectory: true)
-        let ytDLPCandidates = [helperDirectory.appendingPathComponent("yt-dlp")]
-            + externalYTDLPCandidates
+        // The Zisla-downloaded build takes precedence over the bundled one, otherwise the download page's "Update" button would have no effect.
+        let ytDLPCandidates = [
+            managedToolsDirectory.appendingPathComponent("yt-dlp"),
+            helperDirectory.appendingPathComponent("yt-dlp"),
+        ] + externalYTDLPCandidates
         guard let ytDLPURL = ytDLPCandidates.lazy.compactMap(Self.trustedExecutable).first else {
             throw YTDLPResolverError.executableNotFound(searched: ytDLPCandidates)
         }

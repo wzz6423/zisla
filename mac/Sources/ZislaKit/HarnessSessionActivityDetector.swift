@@ -1,11 +1,12 @@
 import Foundation
 import ZislaCore
 
-/// 从 harnext CLI 的本地数据目录推断活动 AI 任务。
+/// Infers active AI tasks from the local data directory of the harnext CLI.
 ///
-/// 数据目录：`~/.harnext/`
-/// 由于 harnext 的日志格式可能随版本变化，采用目录+文件修改时间推断策略：
-/// 扫描 `~/.harnext/` 下最近修改的日志/会话文件，提取文件 ID 作为任务标识。
+/// Data directory: `~/.harnext/`
+/// Because the harnext log format may change between versions, a directory + file modification time
+/// inference strategy is used: scan the most recently modified log/session files under `~/.harnext/`
+/// and extract file IDs as task identifiers.
 public final class HarnessSessionActivityDetector: AIActivityDetecting {
     private struct Candidate {
         var url: URL

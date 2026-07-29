@@ -3,21 +3,21 @@ import Foundation
 import ZislaCore
 
 public enum AIMascotLibrary {
-    /// Qoder 没有随包附带的品牌资源，改为运行时读取本机 App 图标。
-    /// bundle id 优先，`com.qoder.work.cn` 为本机已确认的中国版宿主。
+    /// Prefer reading the official icon from a locally installed Qoder client when present; bundle assets are used as offline fallback.
+    /// Bundle ID takes priority; `com.qoder.work.cn` is the confirmed local CN host.
     public static let coderBundleIdentifiers = [
         "com.qoder.work.cn",
         "com.qoder.work",
     ]
 
-    /// bundle id 查不到时按常见 App 名称回退到 /Applications 等目录。
+    /// Fall back to scanning common App directories like /Applications when a bundle ID lookup fails.
     public static let coderApplicationNames = [
         "QoderWork CN",
         "QoderWork",
         "Qoder",
     ]
 
-    /// TRAE 不随 Zisla 打包，使用本机已安装客户端提供的官方图标。
+    /// Prefer reading the official icon from a locally installed TRAE client when present; bundle assets are used as offline fallback.
     public static let traeBundleIdentifiers = [
         "cn.trae.solo.app",
     ]
@@ -26,7 +26,7 @@ public enum AIMascotLibrary {
         "TRAE SOLO CN",
     ]
 
-    /// harnext 数据目录对应的产品使用 WorkBuddy 官方客户端图标。
+    /// The harnext data directory's product uses the WorkBuddy official client icon.
     public static let workBuddyBundleIdentifiers = [
         "com.workbuddy.workbuddy",
     ]
@@ -35,8 +35,8 @@ public enum AIMascotLibrary {
         "WorkBuddy",
     ]
 
-    /// 定位本机安装的 Qoder/QoderWork.app；找不到返回 nil（保留 SF Symbol 回退）。
-    /// 通过注入闭包保持纯逻辑可测，默认走 NSWorkspace / FileManager。
+    /// Locates the locally installed Qoder/QoderWork.app; returns nil if not found, falling back to bundled brand assets.
+    /// Uses injected closures to keep logic pure and testable; defaults to NSWorkspace / FileManager.
     public static func installedCoderApplicationURL(
         resolveBundleIdentifier: (String) -> URL? = {
             NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0)
@@ -56,7 +56,7 @@ public enum AIMascotLibrary {
         )
     }
 
-    /// 定位本机安装的 TRAE；找不到返回 nil，由 UI 保留通用回退。
+    /// Locates the locally installed TRAE; returns nil if not found, falling back to bundled brand assets.
     public static func installedTraeApplicationURL(
         resolveBundleIdentifier: (String) -> URL? = {
             NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0)
@@ -76,7 +76,7 @@ public enum AIMascotLibrary {
         )
     }
 
-    /// 定位本机安装的 WorkBuddy；找不到返回 nil，由 UI 保留通用回退。
+    /// Locates the locally installed WorkBuddy; returns nil if not found, falling back to bundled brand assets.
     public static func installedWorkBuddyApplicationURL(
         resolveBundleIdentifier: (String) -> URL? = {
             NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0)
@@ -126,12 +126,14 @@ public enum AIMascotLibrary {
         case .gemini: "gemini-color.svg"
         case .grok: "grok.svg"
         case .gpt: "openai.svg"
+        case .copilot: "copilot.svg"
+        case .kimi: "kimi.png"
         case .qwen: "qwen-color.svg"
-        case .coder: nil
-        case .trae: nil
+        case .coder: "qoder.icns"
+        case .trae: "trae.icns"
         case .opencode: "opencode.svg"
-        case .harness: nil
-        case .doubao: "doubao-color.svg"
+        case .harness: "workbuddy.icns"
+        case .doubao: "doubao.png"
         }
     }
 
@@ -142,6 +144,8 @@ public enum AIMascotLibrary {
         case .gemini: "Gemini"
         case .grok: "Grok"
         case .gpt: "ChatGPT"
+        case .copilot: "GitHub Copilot"
+        case .kimi: "Kimi Code"
         case .qwen: "千问"
         case .coder: "Qoder"
         case .trae: "TRAE"

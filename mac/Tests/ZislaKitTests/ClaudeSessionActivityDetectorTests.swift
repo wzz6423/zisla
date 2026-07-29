@@ -203,7 +203,9 @@ struct ClaudeSessionActivityDetectorTests {
 
         let task = try #require(ClaudeSessionActivityDetector(projectsDirectory: root).activeTasks().first)
         #expect(task.provider == .claude)
+        #expect(task.title == "Claude Code (VS Code)")
         #expect(task.status == .running)
+        #expect(task.sessionURL?.absoluteString == "vscode://anthropic.claude-code/open?session=sess-vs")
     }
 
     @Test

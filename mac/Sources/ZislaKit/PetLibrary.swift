@@ -2,18 +2,18 @@ import AppKit
 import Foundation
 import ZislaCore
 
-/// 宠物库：枚举内置（编入 App 包）像素宠物并加载其精灵。
+/// Pet library: enumerates built-in (app-bundled) pixel pets and loads their sprites.
 ///
-/// 内置宠物位于包资源 `Resources/Pets/<id>/`（开发态用 `#filePath` 推导源码根，
-/// 打包态走 `Bundle.main`）。
+/// Built-in pets live at bundle resource `Resources/Pets/<id>/` (in development, `#filePath`
+/// is used to locate the source root; in a packaged build, `Bundle.main` is used).
 ///
-/// 本 App 不提供用户导入或网络安装：所有宠物均为预置打包的 CC0 像素动物，
-/// 用户在设置里只能从内置列表选择。
+/// This app does not support user imports or network installation: all pets are pre-bundled CC0
+/// pixel animals, and users can only choose from the built-in list in Settings.
 public enum PetLibrary {
-    /// 已编入包内的宠物 slug 列表：直接扫描 `Resources/Pets/` 下、含有效 `pet.json` 的子目录。
+    /// Slug list of pets bundled in the app: scans subdirectories of `Resources/Pets/` that contain a valid `pet.json`.
     ///
-    /// 这样「打包了多少只就出现多少只」，无需在此硬编码——把任意宠物的
-    /// `pet.json` + `sprite.png` 放进 `mac/Resources/Pets/<slug>/` 即生效。
+    /// This way "however many pets are bundled, that many appear" — no hardcoding needed here.
+    /// Just drop a pet's `pet.json` + `sprite.png` into `mac/Resources/Pets/<slug>/` and it works.
     public static var builtinPetIDs: [String] {
         guard let root = petsRoot() else { return [] }
         let fm = FileManager.default
@@ -61,7 +61,7 @@ public enum PetLibrary {
         entries().first { $0.id == id }
     }
 
-    /// 加载某个内置宠物的精灵。
+    /// Loads the sprite for a built-in pet.
     @MainActor
     public static func loadSprite(for id: String) -> PetSprite? {
         guard let dir = builtinDirectory(for: id),
@@ -111,8 +111,8 @@ public enum PetLibrary {
         return resourceURL(relativePath: relative)
     }
 
-    /// 资源定位：包资源优先，源码 Resources 兜底。
-    /// 本文件位于 `mac/Sources/ZislaKit/`，向上 3 级到 `mac/`，再加 `Resources`。
+    /// Resource lookup: bundle resources take priority, source-tree Resources directory is the fallback.
+    /// This file is at `mac/Sources/ZislaKit/`; go up 3 levels to `mac/`, then append `Resources`.
     static func resourceURL(relativePath: String) -> URL? {
         let sourceResources = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

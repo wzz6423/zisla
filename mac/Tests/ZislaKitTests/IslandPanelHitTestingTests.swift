@@ -38,6 +38,29 @@ struct IslandPanelHitTestingTests {
     }
 
     @Test @MainActor
+    func mouseInteractionAllowsPanelToReceiveApplicationShortcuts() throws {
+        let panel = IslandPanel(
+            contentView: NSView(),
+            frame: CGRect(x: 0, y: 0, width: 240, height: 34)
+        )
+        let click = try #require(NSEvent.mouseEvent(
+            with: .leftMouseDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: panel.windowNumber,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1
+        ))
+
+        #expect(!panel.canBecomeKey)
+        panel.sendEvent(click)
+        #expect(panel.canBecomeKey)
+    }
+
+    @Test @MainActor
     func repositioningVisiblePanelRestoresItsFinalFrame() {
         let collapsedFrame = CGRect(x: 100, y: 700, width: 240, height: 34)
         let expandedFrame = CGRect(x: 0, y: 400, width: 860, height: 334)
@@ -51,8 +74,65 @@ struct IslandPanelHitTestingTests {
         #expect(panel.frame == expandedFrame)
     }
 
+    /// Re-presenting an unchanged panel is the active-Space recovery path: when another app opens a
+    /// full-screen Space, WindowServer drops the pet panel from that Space's ordering, and only a
+    /// fresh `orderFrontRegardless()` rejoins it. Resolving this case to a no-op made the pet
+    /// permanently invisible behind other apps' full-screen windows.
     @Test @MainActor
-    func panelRemainsVisibleAcrossSpacesAndFullScreen() {
+    func visiblePanelAtUnchangedFrameStillReassertsWindowOrder() {
+        let frame = CGRect(x: 40, y: 600, width: 240, height: 34)
+
+        #expect(
+            IslandPanel.presentationPlan(
+                isVisible: true,
+                currentFrame: frame,
+                targetFrame: frame
+            ) == .refront
+        )
+    }
+
+    @Test @MainActor
+    func hiddenPanelIsPositionedBeforeBeingOrderedIn() {
+        let frame = CGRect(x: 40, y: 600, width: 240, height: 34)
+
+        #expect(
+            IslandPanel.presentationPlan(
+                isVisible: false,
+                currentFrame: .zero,
+                targetFrame: frame
+            ) == .show
+        )
+    }
+
+    @Test @MainActor
+    func visiblePanelMovingToNewFrameLeavesCompositingLayerFirst() {
+        #expect(
+            IslandPanel.presentationPlan(
+                isVisible: true,
+                currentFrame: CGRect(x: 40, y: 600, width: 240, height: 34),
+                targetFrame: CGRect(x: 0, y: 400, width: 860, height: 334)
+            ) == .reposition
+        )
+    }
+
+    @Test @MainActor
+    func reassertingOrderKeepsPanelVisibleAtSameFrameAndFullyOpaque() {
+        let frame = CGRect(x: 40, y: 600, width: 240, height: 34)
+        let panel = IslandPanel(contentView: NSView(), frame: frame)
+        panel.present(at: frame)
+        defer { panel.orderOut(nil) }
+        // Mimics a dismiss fade still in flight when the Space change re-presents the panel.
+        panel.alphaValue = 0
+
+        panel.present(at: frame, animated: false)
+
+        #expect(panel.isVisible)
+        #expect(panel.frame == frame)
+        #expect(panel.alphaValue == 1)
+    }
+
+    @Test @MainActor
+    func panelRemainsVisibleAcrossSpacesAndOtherAppsFullScreen() {
         let panel = IslandPanel(
             contentView: NSView(),
             frame: CGRect(x: 0, y: 0, width: 240, height: 34)
@@ -62,10 +142,11 @@ struct IslandPanelHitTestingTests {
         #expect(panel.collectionBehavior.contains(.fullScreenAuxiliary))
         #expect(panel.collectionBehavior.contains(.canJoinAllApplications))
         #expect(panel.collectionBehavior.contains(.stationary))
+        #expect(!panel.collectionBehavior.contains(.transient))
         #expect(panel.collectionBehavior.contains(.ignoresCycle))
         #expect(panel.level == .statusBar)
         #expect(!panel.isFloatingPanel)
-        // Primary/Auxiliary/CanJoinAllApplications 三者互斥，确保没有误设冲突位。
+        // Primary/Auxiliary/CanJoinAllApplications are mutually exclusive; ensure no conflicting bits are set.
         #expect(!panel.collectionBehavior.contains(.primary))
         #expect(!panel.collectionBehavior.contains(.auxiliary))
     }

@@ -1,7 +1,7 @@
 import Foundation
 import ZislaCore
 
-/// 状态目录：优先 Application Support/zisla，且会迁移此前版本的数据目录。
+/// State directory: prefers Application Support/zisla, and migrates data directories from earlier versions.
 func defaultStateDirectory() -> URL {
     LegacyAppDataMigration.applicationSupportDirectory()
 }
@@ -10,7 +10,7 @@ let helpText = """
 zislactl — 向灵动岛推送 AI 进度、用量与通知
 
 用法：
-  update  --id <id> --provider <claude|codex|gemini|grok|gpt|qwen|coder> --title <标题>
+  update  --id <id> --provider <claude|codex|gemini|grok|gpt|copilot|qwen|coder> --title <标题>
           [--progress <0-100>] [--detail <文本>]
           [--status <running|queued|blocked|error>] [--queued]
   finish  --id <id> [--failed] [--detail <文本>]
@@ -32,7 +32,7 @@ func printError(_ message: String) {
     FileHandle.standardError.write(Data((message + "\n").utf8))
 }
 
-/// 返回进程退出码：0 成功，非 0 表示失败并已向 stderr 打印可操作提示。
+/// Returns the process exit code: 0 on success, non-zero on failure with an actionable message printed to stderr.
 func run(arguments: [String]) -> Int32 {
     let command: CLICommand
     do {

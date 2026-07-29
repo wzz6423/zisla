@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// 只收窄 SwiftUI `ScrollView` 背后的原生滚动条，不改变系统显示策略。
+/// Narrows only the native scroller behind SwiftUI's `ScrollView`; does not change the system display policy.
 extension View {
     func thinScrollChrome() -> some View {
         background(ThinScrollChromeConfigurator())
@@ -76,7 +76,7 @@ final class ThinScrollChromeHost: NSView {
         if let scrollView = ancestor(ofType: NSScrollView.self) {
             return scrollView
         }
-        // SwiftUI 常把 background 挂在 ScrollView 包装层旁系，向上找后向下扫描。
+        // SwiftUI often attaches the background to a sibling of the ScrollView wrapper; walk up then scan downward.
         var node: NSView? = superview
         while let view = node {
             if let found = firstDescendant(ofType: NSScrollView.self, in: view) {
@@ -108,7 +108,7 @@ final class ThinScrollChromeHost: NSView {
 
 @MainActor
 enum ThinScrollChrome {
-    /// 相对系统默认宽度显著收窄。
+    /// Noticeably narrower than the system default width.
     static let width: CGFloat = 5
 
     static func apply(to scrollView: NSScrollView) {
@@ -142,6 +142,6 @@ final class ThinScroller: NSScroller {
     }
 
     override func drawKnobSlot(in slotRect: NSRect, highlight flag: Bool) {
-        // 不绘制槽底，避免细条旁残留粗色带。
+        // Do not draw the slot background to avoid a wide color band beside the thin bar.
     }
 }

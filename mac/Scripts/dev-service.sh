@@ -118,8 +118,19 @@ function stop_service() {
 
 function start_service() {
   local pid
+  local detected_identity
 
   stop_service
+  # 优先用钥匙串里的 Apple Development 证书做稳定签名，
+  # 避免 adhoc 签名在每次构建后使辅助功能等 TCC 授权失效。
+  if [[ -z "${CODE_SIGN_IDENTITY:-}" ]]; then
+    detected_identity="$(security find-identity -v -p codesigning 2>/dev/null \
+      | sed -n 's/.*"\(Apple Development: [^"]*\)".*/\1/p' | head -n 1)"
+    if [[ -n "$detected_identity" ]]; then
+      export CODE_SIGN_IDENTITY="$detected_identity" SIGNING_MODE=dev
+      print -r -- "使用开发证书签名：$detected_identity"
+    fi
+  fi
   "$ROOT/Scripts/build-app.sh"
   [[ -x "$APP_BINARY" ]] || fail "构建未生成 zisla.app 可执行文件"
 

@@ -288,7 +288,8 @@ final class AIStateDatabase {
         let statement = try prepare("""
             DELETE FROM usage_samples
             WHERE position NOT IN (
-                SELECT position FROM usage_samples ORDER BY position DESC LIMIT ?
+                SELECT position FROM usage_samples
+                ORDER BY timestamp DESC, position DESC LIMIT ?
             )
             """)
         defer { sqlite3_finalize(statement) }

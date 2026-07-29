@@ -27,6 +27,8 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     case gemini
     case grok
     case gpt
+    case copilot
+    case kimi
     case qwen
     case coder
     case trae
@@ -43,6 +45,8 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .gemini: self = .gemini
         case .grok: self = .grok
         case .gpt: self = .gpt
+        case .copilot: self = .copilot
+        case .kimi: self = .kimi
         case .qwen: self = .qwen
         case .coder: self = .coder
         case .trae: self = .trae
@@ -66,6 +70,10 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
             self = .gemini
         } else if id.contains("grok") {
             self = .grok
+        } else if id.contains("copilot") {
+            self = .copilot
+        } else if id.contains("kimi") {
+            self = .kimi
         } else if id.contains("qwen") {
             self = .qwen
         } else if id.contains("coder") {
@@ -94,6 +102,8 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .gemini: "sparkles"
         case .grok: "bolt.fill"
         case .gpt: "brain.head.profile"
+        case .copilot: "sparkles.rectangle.stack"
+        case .kimi: "sparkles"
         case .qwen: "cloud.fill"
         case .coder: "terminal.fill"
         case .trae: "wand.and.stars"
@@ -110,6 +120,8 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .gemini: .gemini
         case .grok: .grok
         case .gpt: .gpt
+        case .copilot: .copilot
+        case .kimi: .kimi
         case .qwen: .qwen
         case .coder: .coder
         case .trae: .trae
@@ -125,7 +137,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     }
 
     fileprivate var usesMonochromeProviderAsset: Bool {
-        self == .grok || self == .gpt || self == .opencode
+        self == .grok || self == .gpt || self == .copilot || self == .opencode
     }
 
 }
@@ -144,18 +156,18 @@ struct AIMascotView: View {
 
     var body: some View {
         Group {
-            if let providerImage {
+            if let installedProviderImage {
+                Image(nsImage: installedProviderImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+            } else if let providerImage {
                 Image(nsImage: providerImage)
                     .renderingMode(identity.usesMonochromeProviderAsset ? .template : .original)
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
                     .foregroundStyle(.primary)
-            } else if let installedProviderImage {
-                Image(nsImage: installedProviderImage)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
             } else {
                 Image(systemName: identity.symbolName)
                     .font(.system(size: size * 0.66, weight: .semibold))
@@ -178,7 +190,7 @@ struct AIMascotView: View {
         )
     }
 
-    /// 无随包资源的 provider 运行时读取本机安装 App 的官方图标。
+    /// Installed client's official icon takes priority over the bundled offline asset.
     private var installedProviderImage: NSImage? {
         switch identity {
         case .coder:

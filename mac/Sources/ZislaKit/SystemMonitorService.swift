@@ -8,7 +8,7 @@ import SystemConfiguration
 // MARK: - Snapshots
 
 public struct CPUMetrics: Equatable, Sendable {
-    /// 0...1 的整体占用（user + system）/ total
+    /// Overall usage in 0...1 (user + system) / total
     public var usage: Double
     public var userFraction: Double
     public var systemFraction: Double
@@ -41,7 +41,7 @@ public struct CPUMetrics: Equatable, Sendable {
     )
 }
 
-/// 温度仅在系统提供明确、可验证的传感器读数时展示；不将热状态映射成摄氏温度。
+/// Temperature is displayed only when the system provides a clear, verifiable sensor reading; thermal state is not mapped to Celsius.
 public enum TemperatureMetric: Equatable, Sendable {
     case unavailable(reason: String)
     case celsius(Double)
@@ -115,10 +115,10 @@ public struct DiskMetrics: Equatable, Sendable {
 }
 
 public struct NetworkMetrics: Equatable, Sendable {
-    /// 自启动以来累计字节
+    /// Cumulative bytes since boot
     public var bytesReceived: UInt64
     public var bytesSent: UInt64
-    /// 相对上一采样的速率（B/s）；首次采样为 0
+    /// Rate relative to the previous sample (B/s); 0 on the first sample
     public var receiveBytesPerSecond: Double
     public var sendBytesPerSecond: Double
 
@@ -152,16 +152,16 @@ public struct NetworkIdentity: Equatable, Sendable {
     }
 }
 
-/// 硬件名称只在启动时读取一次，避免把固定信息放进每秒采样路径。
+/// Hardware names are read once at startup to avoid placing fixed info in the per-second sampling path.
 public struct SystemHardwareInfo: Equatable, Sendable {
     public var cpuName: String?
     public var gpuName: String?
     public var gpuCoreCount: Int?
-    /// CPU 总物理核数（来自 system_profiler JSON；不可得时为 nil）
+    /// Total physical core count from system_profiler JSON; nil if unavailable
     public var cpuCoreCount: Int?
-    /// Apple Silicon 性能核（hw.perflevel0.physicalcpu）；不可得时为 nil
+    /// Apple Silicon performance cores (hw.perflevel0.physicalcpu); nil if unavailable
     public var cpuPerformanceCoreCount: Int?
-    /// Apple Silicon 能效核（hw.perflevel1.physicalcpu）；不可得时为 nil
+    /// Apple Silicon efficiency cores (hw.perflevel1.physicalcpu); nil if unavailable
     public var cpuEfficiencyCoreCount: Int?
 
     public init(
@@ -276,7 +276,7 @@ private struct DefaultPublicIPProvider: PublicIPProviding {
     }
 }
 
-/// GPU 历史读数。`IORegistry` 键没有公开稳定契约，调用方必须标注为实验性。
+/// GPU historical readings. `IORegistry` keys have no stable public contract; callers must mark usage as experimental.
 public struct GPUUsageMetrics: Equatable, Sendable {
     public var usage: Double
     public var rendererUsage: Double?
@@ -299,13 +299,13 @@ public struct GPUUsageMetrics: Equatable, Sendable {
     }
 }
 
-/// GPU 无稳定公开 API 时显式不可用，禁止伪造数值。
+/// Explicitly unavailable when there is no stable public GPU API; fabricating values is prohibited.
 public enum GPUMetrics: Equatable, Sendable {
     case unavailable(reason: String)
     case available(GPUUsageMetrics)
 }
 
-/// 风扇无稳定公开 API 时显式不可用，禁止伪造数值。
+/// Explicitly unavailable when there is no stable public fan API; fabricating values is prohibited.
 public enum FanMetrics: Equatable, Sendable {
     case unavailable(reason: String)
     case available(rpm: [Double], detail: String?)
@@ -365,19 +365,21 @@ public struct DiskCleanupCandidate: Equatable, Identifiable, Sendable {
 }
 
 public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
+    /// Rebuilable app, sandbox, and group container caches under the current user's Library.
+    case appCache
     case cache
     case log
     case trash
     case developerArtifacts
     case temporaryFiles
-    /// 包管理器与语言工具链的可重建缓存（非用户项目目录）。
+    /// Rebuilable caches for package managers and language toolchains (not user project directories).
     case packageManagerCache
     case crashReport
     case diskImage
     case largeFile
     case duplicateFile
 
-    /// 同一路径出现在多类扫描时，数值更大者优先保留（更细分类）。
+    /// When the same path appears in multiple scan categories, the higher value (more specific kind) takes precedence.
     public var classificationPriority: Int {
         switch self {
         case .crashReport: 90
@@ -387,6 +389,7 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
         case .diskImage: 60
         case .duplicateFile: 50
         case .largeFile: 40
+        case .appCache: 35
         case .cache: 30
         case .log: 20
         case .trash: 10
@@ -452,14 +455,14 @@ public protocol SystemMonitorFileManaging: Sendable {
     func removeItem(at url: URL) throws
     func createFile(atPath path: String, contents data: Data?) -> Bool
     func contents(atPath path: String) -> Data?
-    /// 返回卷的总容量与可用空间（含可清除空间，匹配 macOS 系统设置）。
-    /// 默认实现使用 URLResourceValues；测试 mock 可返回 nil 以回退到 attributesOfFileSystem。
+    /// Returns the volume's total capacity and available space (including purgeable space, matching macOS System Settings).
+    /// The default implementation uses URLResourceValues; a test mock may return nil to fall back to attributesOfFileSystem.
     func volumeCapacity(for url: URL) -> (total: UInt64, available: UInt64)?
 }
 
 public extension SystemMonitorFileManaging {
-    /// 使用 `volumeAvailableCapacityForImportantUsageKey` 获取可用空间，
-    /// 该值包含 APFS 可清除空间（本地快照、缓存等），与 macOS 系统设置一致。
+    /// Uses `volumeAvailableCapacityForImportantUsageKey` to obtain available space,
+    /// which includes APFS purgeable space (local snapshots, caches, etc.), consistent with macOS System Settings.
     func volumeCapacity(for url: URL) -> (total: UInt64, available: UInt64)? {
         let keys: Set<URLResourceKey> = [
             .volumeTotalCapacityKey,
@@ -562,7 +565,7 @@ private final class DefaultSystemMonitorFileManager: SystemMonitorFileManaging, 
 // MARK: - Pure helpers (testable without live host)
 
 public enum SystemMonitorMath {
-    /// 由两次 host_cpu_load_info 差分计算占用。
+    /// Computes usage from the delta between two host_cpu_load_info samples.
     public static func cpuMetrics(
         previous: host_cpu_load_info,
         current: host_cpu_load_info
@@ -623,7 +626,7 @@ public enum SystemMonitorMath {
 }
 
 public enum SystemMonitorPathSafety {
-    /// 判断 `url` 是否位于任一允许根目录内（标准化后前缀匹配）。
+    /// Returns whether `url` lies within any of the allowed roots (normalized prefix match).
     public static func isURL(_ url: URL, withinAllowedRoots roots: [URL]) -> Bool {
         guard url.isFileURL else { return false }
         let candidate = standardizedPath(url)
@@ -688,9 +691,9 @@ enum SystemSampler {
         var totalSize = size_t(MemoryLayout<UInt64>.size)
         sysctlbyname("hw.memsize", &total, &totalSize, nil, 0)
 
-        // used ≈ active + wired + compressed（与 Activity Monitor 思路接近，非私有 API）
+        // used ≈ active + wired + compressed (consistent with Activity Monitor's approach, no private API)
         let used = active + wired + compressed
-        // 可用 = 空闲 + 非活跃（可回收）+ 投机，与多数第三方监控口径一致（= total - used）
+        // available = free + inactive (reclaimable) + speculative, consistent with most third-party monitors (= total - used)
         let available = free + inactive + speculative
         return MemoryMetrics(
             totalBytes: total,
@@ -708,7 +711,7 @@ enum SystemSampler {
         let volumeName = try? volumeURL.resourceValues(forKeys: [.volumeNameKey]).volumeName
         let temperature = sampleDiskTemperature()
 
-        // 优先用 URLResourceValues（含 APFS 可清除空间，匹配 macOS 系统设置的「可用」）
+        // Prefer URLResourceValues (includes APFS purgeable space, matching macOS System Settings "Available")
         if let capacity = fileManager.volumeCapacity(for: volumeURL) {
             let used = capacity.total >= capacity.available
                 ? capacity.total - capacity.available
@@ -723,7 +726,7 @@ enum SystemSampler {
             )
         }
 
-        // 回退到 statfs（attributesOfFileSystem），不含可清除空间
+        // Fall back to statfs (attributesOfFileSystem), which excludes purgeable space
         do {
             let attrs = try fileManager.attributesOfFileSystem(forPath: volumeURL.path)
             let total = (attrs[.systemSize] as? NSNumber)?.uint64Value ?? 0
@@ -742,7 +745,7 @@ enum SystemSampler {
         }
     }
 
-    /// 读取内置 NVMe/SSD 温度；无法验证读数时返回不可用。
+    /// Reads internal NVMe/SSD temperature; returns unavailable when the reading cannot be verified.
     static func sampleDiskTemperature() -> TemperatureMetric {
         let classNames = ["AppleANS3NVMeController", "IONVMeController", "AppleNVMeController"]
         for className in classNames {
@@ -787,7 +790,7 @@ enum SystemSampler {
         return .unavailable(reason: "内置存储未提供可读取的温度传感器")
     }
 
-    /// 读取 IORegistry 的累计磁盘 I/O 计数；无法验证读数时返回 nil。
+    /// Reads cumulative disk I/O counters from IORegistry; returns nil when the reading cannot be verified.
     static func sampleDiskCounters() -> (read: UInt64, write: UInt64)? {
         var iterator: io_iterator_t = 0
         guard IOServiceGetMatchingServices(
@@ -841,14 +844,14 @@ enum SystemSampler {
         var cursor: UnsafeMutablePointer<ifaddrs>? = first
         while let current = cursor {
             let name = String(cString: current.pointee.ifa_name)
-            // 跳过 loopback
+            // Skip loopback
             if name.hasPrefix("lo") {
                 cursor = current.pointee.ifa_next
                 continue
             }
             if current.pointee.ifa_addr?.pointee.sa_family == UInt8(AF_LINK) {
                 current.pointee.ifa_data.withMemoryRebound(to: if_data.self, capacity: 1) { data in
-                    // ifa_data 对 AF_LINK 指向 if_data
+                    // ifa_data points to if_data for AF_LINK
                 }
                 if let data = current.pointee.ifa_data {
                     let ifdata = data.assumingMemoryBound(to: if_data.self)
@@ -1012,7 +1015,7 @@ private struct AppleSMCSensorSample: Sendable {
     var fan: FanMetrics
 }
 
-/// State 在 Apple Silicon 上使用的 AppleSMC 只读请求布局；不包含任何写入或调速命令。
+/// State — read-only AppleSMC request layout used on Apple Silicon; contains no write or speed-control commands.
 enum AppleSMCSensorReader {
     private static let structureSize = 0x50
     private static let keyInfoOffset = 0x1C
@@ -1024,8 +1027,8 @@ enum AppleSMCSensorReader {
     private static let readBytesCommand: UInt8 = 5
     private static let readKeyInfoCommand: UInt8 = 9
 
-    /// Apple Silicon 各代 CPU/GPU 温度 SMC 键。
-    /// 来源：exelban/stats + MacThrottle 实测（https://stanislas.blog/2025/12/macos-thermal-throttling-app/）。
+    /// CPU/GPU temperature SMC keys for each Apple Silicon generation.
+    /// Sources: exelban/stats + MacThrottle empirical testing (https://stanislas.blog/2025/12/macos-thermal-throttling-app/).
     private enum AppleSiliconGeneration {
         case m1, m2, m3, m4, m5, unknown
 
@@ -1042,19 +1045,19 @@ enum AppleSMCSensorReader {
         var cpuTemperatureKeys: [String] {
             switch self {
             case .m1:
-                // 能效核 + 性能核
+                // Efficiency cores + performance cores
                 ["Tp09", "Tp0T", "Tp01", "Tp05", "Tp0D", "Tp0H", "Tp0L", "Tp0P", "Tp0X", "Tp0b"]
             case .m2:
-                // 能效核 + 性能核
+                // Efficiency cores + performance cores
                 ["Tp1h", "Tp1t", "Tp1p", "Tp1l",
                  "Tp01", "Tp05", "Tp09", "Tp0D", "Tp0X", "Tp0b", "Tp0f", "Tp0j"]
             case .m3:
-                // Te (能效) + Tf (性能)
+                // Te (efficiency) + Tf (performance)
                 ["Te05", "Te0L", "Te0P", "Te0S",
                  "Tf04", "Tf09", "Tf0A", "Tf0B", "Tf0D", "Tf0E",
                  "Tf44", "Tf49", "Tf4A", "Tf4B", "Tf4D", "Tf4E"]
             case .m4:
-                // Te (能效) + Tp (性能)
+                // Te (efficiency) + Tp (performance)
                 ["Te05", "Te0S", "Te09", "Te0H",
                  "Tp01", "Tp05", "Tp09", "Tp0D", "Tp0V", "Tp0Y", "Tp0b", "Tp0e"]
             case .m5:
@@ -1075,7 +1078,7 @@ enum AppleSMCSensorReader {
             case .m4:
                 ["Tg0G", "Tg0H", "Tg1U", "Tg1k", "Tg0K", "Tg0L", "Tg0d", "Tg0e", "Tg0j", "Tg0k"]
             case .m5:
-                // M5 GPU 键尚无公开验证数据，暂用 M4 键作为候选占位
+                // M5 GPU keys have no publicly verified data yet; using M4 keys as candidate placeholders
                 ["Tg0G", "Tg0H", "Tg1U", "Tg1k", "Tg0K", "Tg0L", "Tg0d", "Tg0e", "Tg0j", "Tg0k"]
             case .unknown:
                 []
@@ -1113,6 +1116,10 @@ enum AppleSMCSensorReader {
         let valid = values.filter { (20...110).contains($0) }
         guard !valid.isEmpty else { return nil }
         return valid.reduce(0, +) / Double(valid.count)
+    }
+
+    static func isValidFanRPM(_ value: Double) -> Bool {
+        value.isFinite && (0...20_000).contains(value)
     }
 
     private static func openConnection() -> io_connect_t? {
@@ -1176,7 +1183,7 @@ enum AppleSMCSensorReader {
         let rpm = (0..<count).compactMap { index -> Double? in
             guard let value = read("F\(index)Ac", connection: connection),
                   let rpm = floatingPointValue(value),
-                  (100...20_000).contains(rpm)
+                  isValidFanRPM(rpm)
             else { return nil }
             return rpm
         }
@@ -1302,7 +1309,7 @@ enum SystemHardwareInfoReader {
         )
     }
 
-    /// system_profiler 常见为 `"proc 15:5:10:0"`（总核:性能:能效:...）；缺字段时不猜测。
+    /// system_profiler commonly returns `"proc 15:5:10:0"` (total:performance:efficiency:...); do not guess when the field is absent.
     static func physicalCoreCount(fromHardwareDictionary hardware: [String: Any]?) -> Int? {
         guard let raw = hardware?["number_processors"] else { return nil }
         if let number = raw as? Int {
@@ -1334,7 +1341,7 @@ enum SystemHardwareInfoReader {
     }
 }
 
-/// 通过 sysctl 读取 Apple Silicon 性能/能效物理核；键不存在时保持 nil。
+/// Reads Apple Silicon performance/efficiency physical core counts via sysctl; keeps nil when a key is absent.
 enum CPUCoreTopology {
     struct Counts: Equatable, Sendable {
         var performanceCoreCount: Int?
@@ -1375,16 +1382,16 @@ public enum SystemDiskCleanup {
 
         let home = fileManager.homeDirectoryForCurrentUser()
 
-        // 用户专属临时目录（/private/var/folders/...）
+        // User-specific temporary directory (/private/var/folders/...)
         let temporaryDirectory = fileManager.temporaryDirectoryForCurrentUser().standardizedFileURL
         if isCurrentUserTemporaryDirectory(temporaryDirectory) {
             append(.temporaryFiles, temporaryDirectory)
         }
-        // /tmp 是 /private/tmp 的符号链接（macOS 已知别名）；两者均加入，去重后以 /tmp 扫描。
+        // /tmp is a symlink to /private/tmp (known macOS alias); both are added and /tmp is used after deduplication.
         append(.temporaryFiles, URL(fileURLWithPath: "/tmp", isDirectory: true))
         append(.temporaryFiles, URL(fileURLWithPath: "/private/tmp", isDirectory: true))
 
-        // Xcode / 模拟器：可安全重建的构建与设备支持缓存
+        // Xcode / Simulator: rebuilable build and device-support caches
         let developerPaths = [
             "Library/Developer/Xcode/DerivedData",
             "Library/Developer/Xcode/iOS DeviceSupport",
@@ -1397,7 +1404,7 @@ public enum SystemDiskCleanup {
             append(.developerArtifacts, home.appendingPathComponent(path, isDirectory: true))
         }
 
-        // 包管理器 / 语言工具链缓存（仅缓存与可重建存储，不含用户工程）
+        // Package manager / language toolchain caches (caches and rebuilable storage only, no user projects)
         let packageManagerPaths = [
             ".npm",
             ".pnpm-store",
@@ -1428,28 +1435,30 @@ public enum SystemDiskCleanup {
             append(.packageManagerCache, home.appendingPathComponent(path, isDirectory: true))
         }
 
-        // 用户缓存：应用生成的缓存目录，可安全重建
-        append(.cache, home.appendingPathComponent("Library/Caches", isDirectory: true))
+        // Register only rebuilable app caches; sandbox and group containers allow only their respective Library/Caches subdirectory.
+        for root in applicationCacheRoots(fileManager: fileManager) {
+            append(.appCache, root.url)
+        }
 
-        // 用户日志：应用运行日志，清理不影响功能
+        // User logs: application run logs; safe to clear without affecting functionality
         append(.log, home.appendingPathComponent("Library/Logs", isDirectory: true))
 
-        // 崩溃报告：崩溃与诊断报告，清理不影响功能
+        // Crash reports: crash and diagnostic reports; safe to clear without affecting functionality
         append(.crashReport, home.appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true))
 
-        // 废纸篓：已删除但未清空的文件
+        // Trash: files deleted but not yet emptied
         if let trashURL = fileManager.urls(for: .trashDirectory, in: .userDomainMask).first {
             append(.trash, trashURL)
         }
 
-        // 用户文件目录：用于磁盘镜像、大文件和重复文件扫描（不将目录本身当清理候选项）
+        // User file directories: used for disk image, large file, and duplicate file scans (the directories themselves are not cleanup candidates)
         for searchPath in [FileManager.SearchPathDirectory.downloadsDirectory, .desktopDirectory, .documentDirectory] {
             if let url = fileManager.urls(for: searchPath, in: .userDomainMask).first {
                 append(.diskImage, url)
             }
         }
 
-        // 同一路径只保留更细的分类根；/tmp 与 /private/tmp 是 macOS 已知别名，统一规范为 /tmp。
+        // Keep only the most specific classification root for each path; /tmp and /private/tmp are known macOS aliases, normalized to /tmp.
         var bestByPath: [String: (DiskCleanupKind, URL)] = [:]
         for item in items {
             let rawPath = item.1.path
@@ -1466,9 +1475,80 @@ public enum SystemDiskCleanup {
         return bestByPath.values.sorted { $0.1.path < $1.1.path }
     }
 
+    private enum ApplicationCacheSource {
+        case library
+        case sandboxContainer
+        case groupContainer
+
+        var detailPrefix: String {
+            switch self {
+            case .library: "应用缓存"
+            case .sandboxContainer: "沙盒应用缓存"
+            case .groupContainer: "群组容器缓存"
+            }
+        }
+    }
+
+    private struct ApplicationCacheRoot {
+        var url: URL
+        var identifier: String
+        var source: ApplicationCacheSource
+    }
+
+    /// Only whitelists the explicit `Library/Caches` directory of sandbox containers to avoid expanding app data directories into cleanable scope.
+    private static func applicationCacheRoots(
+        fileManager: SystemMonitorFileManaging
+    ) -> [ApplicationCacheRoot] {
+        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
+        let allowedHome = [home]
+        let libraryCaches = home.appendingPathComponent("Library/Caches", isDirectory: true)
+        var roots = [
+            ApplicationCacheRoot(
+                url: libraryCaches,
+                identifier: "Library/Caches",
+                source: .library
+            ),
+        ]
+
+        let containerSources: [(directory: String, cacheSuffix: String, source: ApplicationCacheSource)] = [
+            ("Library/Containers", "Data/Library/Caches", .sandboxContainer),
+            ("Library/Group Containers", "Library/Caches", .groupContainer),
+        ]
+        for entry in containerSources {
+            let directory = home.appendingPathComponent(entry.directory, isDirectory: true)
+            guard SystemMonitorPathSafety.isURL(directory, withinAllowedRoots: allowedHome),
+                  let containers = try? fileManager.contentsOfDirectory(
+                      at: directory,
+                      includingPropertiesForKeys: nil,
+                      options: [.skipsHiddenFiles]
+                  )
+            else {
+                continue
+            }
+            for container in containers {
+                let identifier = container.lastPathComponent
+                let cacheURL = container
+                    .appendingPathComponent(entry.cacheSuffix, isDirectory: true)
+                    .standardizedFileURL
+                guard fileManager.fileExists(atPath: cacheURL.path),
+                      SystemMonitorPathSafety.isURL(cacheURL, withinAllowedRoots: allowedHome)
+                else {
+                    continue
+                }
+                roots.append(ApplicationCacheRoot(url: cacheURL, identifier: identifier, source: entry.source))
+            }
+        }
+
+        var uniqueRoots: [String: ApplicationCacheRoot] = [:]
+        for root in roots {
+            uniqueRoots[SystemMonitorPathSafety.standardizedPath(root.url)] = root
+        }
+        return uniqueRoots.values.sorted { $0.url.path < $1.url.path }
+    }
+
     public static func allocatedByteSize(of url: URL, fileManager: SystemMonitorFileManaging) -> UInt64 {
         guard fileManager.fileExists(atPath: url.path) else { return 0 }
-        // 用资源值优先
+        // Use resource values first
         if let values = try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isDirectoryKey]) {
             if values.isDirectory == true {
                 return directoryAllocatedSize(at: url, fileManager: fileManager)
@@ -1482,7 +1562,7 @@ public enum SystemDiskCleanup {
         }
         if let attrs = try? fileManager.attributesOfItem(atPath: url.path),
            let size = attrs[.size] as? NSNumber {
-            // 粗判目录：若 contents 可枚举则递归
+            // Rough directory check: recurse if contents are enumerable
             if let children = try? fileManager.contentsOfDirectory(
                 at: url,
                 includingPropertiesForKeys: nil,
@@ -1523,7 +1603,7 @@ public enum SystemDiskCleanup {
         return total
     }
 
-    /// 扫描各类可清理候选项；同路径去重后按体积降序返回。
+    /// Scans all cleanup candidate categories; deduplicates by path and returns sorted by size descending.
     public static func scanCandidates(
         fileManager: SystemMonitorFileManaging,
         kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases),
@@ -1531,7 +1611,11 @@ public enum SystemDiskCleanup {
     ) -> [DiskCleanupCandidate] {
         var result: [DiskCleanupCandidate] = []
 
-        // 目录型扫描：列出已知根目录的直接子项
+        if kinds.contains(.appCache) {
+            result.append(contentsOf: scanApplicationCaches(fileManager: fileManager))
+        }
+
+        // Directory scan: list direct children of known root directories
         let directoryKinds: Set<DiskCleanupKind> = [
             .cache, .log, .trash, .developerArtifacts, .temporaryFiles, .packageManagerCache, .crashReport,
         ]
@@ -1540,17 +1624,17 @@ public enum SystemDiskCleanup {
             result.append(contentsOf: scanDirectoryChildren(fileManager: fileManager, kinds: activeDirKinds))
         }
 
-        // 磁盘镜像：Downloads 下的 .dmg/.iso/.pkg/.ipsw
+        // Disk images: .dmg/.iso/.pkg/.ipsw files under Downloads
         if kinds.contains(.diskImage) {
             result.append(contentsOf: scanDiskImages(fileManager: fileManager))
         }
 
-        // 大文件/旧文件：Downloads/Desktop/Documents 下 >100MB 且 90 天未修改
+        // Large/old files: >100 MB and not modified in 90 days under Downloads/Desktop/Documents
         if kinds.contains(.largeFile) {
             result.append(contentsOf: scanLargeOldFiles(fileManager: fileManager))
         }
 
-        // 重复文件：Downloads/Desktop/Documents 下内容相同的文件
+        // Duplicate files: files with identical content under Downloads/Desktop/Documents
         if kinds.contains(.duplicateFile) {
             result.append(contentsOf: scanDuplicateFiles(fileManager: fileManager))
         }
@@ -1558,7 +1642,73 @@ public enum SystemDiskCleanup {
         return deduplicateCandidates(result).sorted { $0.byteSize > $1.byteSize }
     }
 
-    /// 同一路径只保留分类更细的一条候选项。
+    private static func scanApplicationCaches(
+        fileManager: SystemMonitorFileManaging
+    ) -> [DiskCleanupCandidate] {
+        let roots = applicationCacheRoots(fileManager: fileManager)
+        let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
+        let dedicatedRootPaths = Set(
+            allowedScanRoots(fileManager: fileManager)
+                .filter { $0.kind != .appCache }
+                .map { SystemMonitorPathSafety.standardizedPath($0.url) }
+        )
+        var result: [DiskCleanupCandidate] = []
+
+        for root in roots {
+            guard SystemMonitorPathSafety.isURL(root.url, withinAllowedRoots: allowed) else { continue }
+            switch root.source {
+            case .library:
+                guard fileManager.fileExists(atPath: root.url.path),
+                      let children = try? fileManager.contentsOfDirectory(
+                          at: root.url,
+                          includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .totalFileAllocatedSizeKey],
+                          options: [.skipsHiddenFiles]
+                      )
+                else {
+                    continue
+                }
+                for child in children {
+                    let cacheURL = child.standardizedFileURL
+                    guard SystemMonitorPathSafety.isURL(cacheURL, withinAllowedRoots: allowed),
+                          !dedicatedRootPaths.contains(SystemMonitorPathSafety.standardizedPath(cacheURL))
+                    else {
+                        continue
+                    }
+                    result.append(applicationCacheCandidate(
+                        at: cacheURL,
+                        identifier: cacheURL.lastPathComponent,
+                        source: .library,
+                        fileManager: fileManager
+                    ))
+                }
+            case .sandboxContainer, .groupContainer:
+                result.append(applicationCacheCandidate(
+                    at: root.url,
+                    identifier: root.identifier,
+                    source: root.source,
+                    fileManager: fileManager
+                ))
+            }
+        }
+        return result
+    }
+
+    private static func applicationCacheCandidate(
+        at url: URL,
+        identifier: String,
+        source: ApplicationCacheSource,
+        fileManager: SystemMonitorFileManaging
+    ) -> DiskCleanupCandidate {
+        DiskCleanupCandidate(
+            url: url,
+            kind: .appCache,
+            byteSize: allocatedByteSize(of: url, fileManager: fileManager),
+            displayName: "\(identifier) 缓存",
+            detail: "\(source.detailPrefix) · \(url.path)"
+        )
+    }
+
+    /// Keeps only the more specific candidate for each path.
     public static func deduplicateCandidates(_ candidates: [DiskCleanupCandidate]) -> [DiskCleanupCandidate] {
         var bestByPath: [String: DiskCleanupCandidate] = [:]
         for candidate in candidates {
@@ -1574,7 +1724,7 @@ public enum SystemDiskCleanup {
         return Array(bestByPath.values)
     }
 
-    /// 目录型扫描：列出已知根目录的直接子项（安全候选项）。
+    /// Directory scan: list direct children of known root directories (safe candidates).
     private static func scanDirectoryChildren(
         fileManager: SystemMonitorFileManaging,
         kinds: Set<DiskCleanupKind>
@@ -1582,7 +1732,7 @@ public enum SystemDiskCleanup {
         let allRoots = allowedScanRoots(fileManager: fileManager)
         let roots = allRoots.filter { kinds.contains($0.kind) }
         let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
-        // 已是独立扫描根的路径：不作为更粗父根的直接子项列出，避免重复与体积双计
+        // Paths that are already dedicated scan roots: do not list them as direct children of a coarser parent root to avoid double-counting
         let dedicatedRootPaths = Set(allRoots.map { $0.url.path })
         var result: [DiskCleanupCandidate] = []
 
@@ -1647,7 +1797,7 @@ public enum SystemDiskCleanup {
 
     private static let diskImageExtensions: Set<String> = ["dmg", "iso", "pkg", "ipsw"]
 
-    /// 扫描 Downloads 目录下的磁盘镜像和安装包。
+    /// Scans Downloads directory for disk images and installer packages.
     private static func scanDiskImages(fileManager: SystemMonitorFileManaging) -> [DiskCleanupCandidate] {
         let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
         guard let downloadsURL = fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
@@ -1686,12 +1836,12 @@ public enum SystemDiskCleanup {
         return result
     }
 
-    /// 大文件阈值：100 MB
+    /// Large file threshold: 100 MB
     private static let largeFileThreshold: UInt64 = 100 * 1024 * 1024
-    /// 旧文件阈值：90 天
+    /// Old file threshold: 90 days
     private static let oldFileDays: TimeInterval = 90 * 24 * 3600
 
-    /// 扫描 Downloads/Desktop/Documents 下超过 100MB 且 90 天未修改的文件。
+    /// Scans Downloads/Desktop/Documents for files larger than 100 MB and not modified in 90 days.
     private static func scanLargeOldFiles(fileManager: SystemMonitorFileManaging) -> [DiskCleanupCandidate] {
         let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
         let searchDirs = userFileDirectories(fileManager: fileManager)
@@ -1722,7 +1872,7 @@ public enum SystemDiskCleanup {
         return result
     }
 
-    /// 扫描 Downloads/Desktop/Documents 下的重复文件（SHA256 内容比对）。
+    /// Scans Downloads/Desktop/Documents for duplicate files (SHA256 content comparison).
     private static func scanDuplicateFiles(fileManager: SystemMonitorFileManaging) -> [DiskCleanupCandidate] {
         let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
         let searchDirs = userFileDirectories(fileManager: fileManager)
@@ -1738,7 +1888,7 @@ public enum SystemDiskCleanup {
             }
         }
 
-        // 按文件大小分组，仅对大小相同的文件做哈希
+        // Group files by size; hash only files with identical sizes
         var sizeGroups: [UInt64: [URL]] = [:]
         for entry in allFiles {
             sizeGroups[entry.size, default: []].append(entry.url)
@@ -1746,7 +1896,7 @@ public enum SystemDiskCleanup {
 
         var result: [DiskCleanupCandidate] = []
         for (_, urls) in sizeGroups where urls.count > 1 {
-            // 计算哈希，按哈希分组
+            // Compute hashes and group by hash
             var hashGroups: [String: [URL]] = [:]
             for url in urls {
                 let hash = sha256(of: url, fileManager: fileManager)
@@ -1754,7 +1904,7 @@ public enum SystemDiskCleanup {
                 hashGroups[hash, default: []].append(url)
             }
             for (_, group) in hashGroups where group.count > 1 {
-                // 保留第一个，其余标记为重复
+                // Keep the first; mark the rest as duplicates
                 let original = group[0]
                 for i in 1..<group.count {
                     let dup = group[i]
@@ -1775,13 +1925,13 @@ public enum SystemDiskCleanup {
 
     // MARK: - File helpers
 
-    /// 获取用户文件目录：Downloads / Desktop / Documents
+    /// Returns user file directories: Downloads / Desktop / Documents
     private static func userFileDirectories(fileManager: SystemMonitorFileManaging) -> [URL] {
         let dirs: [FileManager.SearchPathDirectory] = [.downloadsDirectory, .desktopDirectory, .documentDirectory]
         return dirs.compactMap { fileManager.urls(for: $0, in: .userDomainMask).first }
     }
 
-    /// 递归收集目录下的文件（非目录），最多深入 maxDepth 层。
+    /// Recursively collects files (non-directories) under a directory, up to maxDepth levels deep.
     private static func collectFilesRecursively(
         at url: URL,
         fileManager: SystemMonitorFileManaging,
@@ -1816,12 +1966,12 @@ public enum SystemDiskCleanup {
         return files
     }
 
-    /// 判断 URL 是否为目录：优先用 resourceValues，回退到 contentsOfDirectory。
+    /// Returns whether a URL is a directory: prefers resourceValues, falls back to contentsOfDirectory.
     private static func isDirectory(_ url: URL, fileManager: SystemMonitorFileManaging) -> Bool {
         if let isDir = try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory {
             return isDir
         }
-        // 回退：尝试列出子项；有子项则为目录
+        // Fallback: try listing children; if non-empty, treat as directory
         let children = (try? fileManager.contentsOfDirectory(
             at: url,
             includingPropertiesForKeys: nil,
@@ -1830,14 +1980,14 @@ public enum SystemDiskCleanup {
         return !children.isEmpty
     }
 
-    /// 计算文件 SHA256 哈希；读取失败返回空字符串。
+    /// Computes the SHA256 hash of a file; returns an empty string on read failure.
     private static func sha256(of url: URL, fileManager: SystemMonitorFileManaging) -> String {
         guard let data = fileManager.contents(atPath: url.path) else { return "" }
         let digest = SHA256.hash(data: data)
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
-    /// 将选中 URL 移入废纸篓；绝不永久删除。越界 URL 记为失败。
+    /// Moves selected URLs to the Trash; never permanently deletes. Out-of-bounds URLs are recorded as failures.
     public static func trashSelected(
         urls: [URL],
         fileManager: SystemMonitorFileManaging,
@@ -1883,7 +2033,7 @@ public enum SystemDiskCleanup {
 
 // MARK: - Service
 
-/// 面向 SwiftUI 的系统采样与安全清理服务；实验读数均为只读且可显式降级。
+/// SwiftUI-facing system sampling and safe cleanup service; experimental readings are read-only and can be explicitly degraded.
 @MainActor
 public final class SystemMonitorService: ObservableObject {
     @Published public private(set) var snapshot: SystemMetricsSnapshot?
@@ -1902,21 +2052,31 @@ public final class SystemMonitorService: ObservableObject {
     private let hardwareInfoProvider: @Sendable () -> SystemHardwareInfo
     private let volumeURL: URL
     private var timer: AnyCancellable?
+    private var diskCapacityTimer: AnyCancellable?
     private var previousCPU: host_cpu_load_info?
     private var previousNetwork: (received: UInt64, sent: UInt64, at: Date)?
     private var previousDisk: (read: UInt64, write: UInt64, at: Date)?
     private var networkIdentity = NetworkIdentity()
     private var lastPublicIPRefresh: Date?
+    private var lastDiskCapacitySample: Date?
+    private var needsDiskCapacityRefresh = false
     private var hardware = SystemHardwareInfo.unavailable
     private var didLoadHardware = false
+    private var isSampleInProgress = false
+    private var sampleWaiters: [CheckedContinuation<SystemMetricsSnapshot, Never>] = []
+    private let postCleanupDiskRefreshDelay: Duration
+    private let diskCapacityRefreshInterval: TimeInterval
+    private var postCleanupDiskRefreshTask: Task<Void, Never>?
 
     public init(
-        samplingInterval: TimeInterval = 2.0,
+        samplingInterval: TimeInterval = 1.5,
         fileManager: (any SystemMonitorFileManaging)? = nil,
         volumeURL: URL? = nil,
         dateProvider: @escaping @Sendable () -> Date = { Date() },
         publicIPProvider: (any PublicIPProviding)? = nil,
-        hardwareInfoProvider: (@Sendable () -> SystemHardwareInfo)? = nil
+        hardwareInfoProvider: (@Sendable () -> SystemHardwareInfo)? = nil,
+        postCleanupDiskRefreshDelay: Duration = .seconds(30),
+        diskCapacityRefreshInterval: TimeInterval = 3 * 60
     ) {
         let fileManager = fileManager ?? DefaultSystemMonitorFileManager()
         self.samplingInterval = max(0.2, samplingInterval)
@@ -1924,6 +2084,8 @@ public final class SystemMonitorService: ObservableObject {
         self.dateProvider = dateProvider
         self.publicIPProvider = publicIPProvider ?? DefaultPublicIPProvider()
         self.hardwareInfoProvider = hardwareInfoProvider ?? { SystemHardwareInfoReader.read() }
+        self.postCleanupDiskRefreshDelay = max(.zero, postCleanupDiskRefreshDelay)
+        self.diskCapacityRefreshInterval = max(0.01, diskCapacityRefreshInterval)
         self.volumeURL = volumeURL
             ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
             ?? fileManager.homeDirectoryForCurrentUser()
@@ -1932,7 +2094,7 @@ public final class SystemMonitorService: ObservableObject {
     public func start() {
         guard timer == nil else { return }
         isSampling = true
-        // 立即采一次，再按间隔
+        // Sample immediately, then continue at the configured interval.
         Task { await self.sampleOnce() }
         timer = Timer.publish(every: samplingInterval, on: .main, in: .common)
             .autoconnect()
@@ -1940,24 +2102,34 @@ public final class SystemMonitorService: ObservableObject {
                 guard let self else { return }
                 Task { await self.sampleOnce() }
             }
+        diskCapacityTimer = Timer.publish(every: diskCapacityRefreshInterval, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { await self.refresh() }
+            }
     }
 
     public func stop() {
         timer?.cancel()
         timer = nil
+        diskCapacityTimer?.cancel()
+        diskCapacityTimer = nil
+        postCleanupDiskRefreshTask?.cancel()
+        postCleanupDiskRefreshTask = nil
         isSampling = false
     }
 
-    /// 只释放 Zisla 进程自身可归还的缓存页，不干预其他应用或系统内存。
+    /// Releases only reclaimable cache pages owned by Zisla without affecting other apps or system memory.
     @discardableResult
     public func releaseAppMemoryCaches() -> UInt64 {
         URLCache.shared.removeAllCachedResponses()
         return UInt64(malloc_zone_pressure_relief(malloc_default_zone(), 0))
     }
 
-    /// 通过制造短期内存压力迫使内核回收系统级 inactive/compressed 页面。
-    /// 机制与 State 等工具一致：分配并触摸大块内存，迫使内核释放非活跃缓存页，
-    /// 随后归还这片临时内存；返回整理前后的可用内存增量。
+    /// Creates short-lived memory pressure to make the kernel reclaim system inactive and compressed pages.
+    /// Like State and similar tools, it allocates and touches large memory blocks, then releases them and returns
+    /// the resulting increase in available memory.
     @discardableResult
     public func releaseSystemMemoryPressure() async -> UInt64 {
         URLCache.shared.removeAllCachedResponses()
@@ -1980,7 +2152,7 @@ public final class SystemMonitorService: ObservableObject {
                     VM_FLAGS_ANYWHERE
                 )
                 guard kr == KERN_SUCCESS else { break }
-                // 触摸每一页触发物理分配，制造内存压力迫使内核回收其他进程的非活跃页
+                // Touch each page to commit physical memory and trigger reclamation of inactive pages.
                 if let ptr = UnsafeMutableRawPointer(bitPattern: UInt(address)) {
                     for page in 0..<chunkPages {
                         ptr.advanced(by: page * pageBytes)
@@ -1996,7 +2168,7 @@ public final class SystemMonitorService: ObservableObject {
         return afterFree > beforeFree ? afterFree - beforeFree : 0
     }
 
-    /// 手动刷新始终重新查询，避免用户操作被后台轮询节流忽略。
+    /// Manual refreshes always query again so background polling throttling cannot ignore user actions.
     public func refreshPublicIPAddress() async {
         await refreshPublicIPAddress(force: true)
     }
@@ -2025,9 +2197,38 @@ public final class SystemMonitorService: ObservableObject {
         }
     }
 
-    /// 单次采样；CPU/网络 计算在协作线程上完成以避免长时间占用主线程。
+    /// Performs one sample; overlapping requests share it so late stale results cannot overwrite newer data.
     @discardableResult
     public func sampleOnce() async -> SystemMetricsSnapshot {
+        if isSampleInProgress {
+            return await withCheckedContinuation { continuation in
+                sampleWaiters.append(continuation)
+            }
+        }
+
+        isSampleInProgress = true
+        let snapshot = await performSampleOnce()
+        isSampleInProgress = false
+        let waiters = sampleWaiters
+        sampleWaiters.removeAll()
+        for waiter in waiters {
+            waiter.resume(returning: snapshot)
+        }
+        return snapshot
+    }
+
+    /// Resamples after an in-progress sample finishes for operations, such as cleanup, that change disk state.
+    @discardableResult
+    public func refresh() async -> SystemMetricsSnapshot {
+        needsDiskCapacityRefresh = true
+        if isSampleInProgress {
+            _ = await sampleOnce()
+        }
+        return await sampleOnce()
+    }
+
+    /// CPU and network calculations run on a cooperative worker thread to avoid blocking the main thread.
+    private func performSampleOnce() async -> SystemMetricsSnapshot {
         let now = dateProvider()
         let fm = fileManager
         let volume = volumeURL
@@ -2036,6 +2237,10 @@ public final class SystemMonitorService: ObservableObject {
         let prevDisk = previousDisk
         let readHardwareInfo = hardwareInfoProvider
         let currentHardware = hardware
+        let shouldSampleDiskCapacity = needsDiskCapacityRefresh
+            || lastDiskCapacitySample == nil
+            || now.timeIntervalSince(lastDiskCapacitySample!) >= diskCapacityRefreshInterval
+        needsDiskCapacityRefresh = false
 
         let payload = await Task.detached(priority: .utility) { () -> (
             cpuLoad: host_cpu_load_info?,
@@ -2057,7 +2262,9 @@ public final class SystemMonitorService: ObservableObject {
                 cpu = .zero
             }
             let memory = SystemSampler.sampleMemory()
-            let disk = SystemSampler.sampleDisk(fileManager: fm, volumeURL: volume)
+            let disk = shouldSampleDiskCapacity
+                ? SystemSampler.sampleDisk(fileManager: fm, volumeURL: volume)
+                : nil
             let diskCounters = SystemSampler.sampleDiskCounters()
             let counters = SystemSampler.sampleNetworkCounters()
             let privateIP = SystemSampler.samplePrivateIPv4Address()
@@ -2100,6 +2307,9 @@ public final class SystemMonitorService: ObservableObject {
             previousDisk = nil
         }
         networkIdentity.privateIPv4Address = payload.privateIP
+        if shouldSampleDiskCapacity {
+            lastDiskCapacitySample = now
+        }
         if !didLoadHardware {
             didLoadHardware = true
             hardware = await Task.detached(priority: .utility) {
@@ -2117,7 +2327,7 @@ public final class SystemMonitorService: ObservableObject {
             compressedBytes: 0,
             pressureRatio: 0
         )
-        var disk = payload.disk ?? DiskMetrics(
+        var disk = payload.disk ?? snapshot?.disk ?? DiskMetrics(
             totalBytes: 0,
             freeBytes: 0,
             usedBytes: 0,
@@ -2173,8 +2383,27 @@ public final class SystemMonitorService: ObservableObject {
 
     public func trashSelected(_ urls: [URL]) async -> DiskCleanupResult {
         let fm = fileManager
-        return await Task.detached(priority: .utility) {
+        let result = await Task.detached(priority: .utility) {
             SystemDiskCleanup.trashSelected(urls: urls, fileManager: fm)
         }.value
+        await refresh()
+        if result.successCount > 0 {
+            schedulePostCleanupDiskRefresh()
+        }
+        return result
+    }
+
+    private func schedulePostCleanupDiskRefresh() {
+        postCleanupDiskRefreshTask?.cancel()
+        postCleanupDiskRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await Task.sleep(for: postCleanupDiskRefreshDelay)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            _ = await refresh()
+        }
     }
 }

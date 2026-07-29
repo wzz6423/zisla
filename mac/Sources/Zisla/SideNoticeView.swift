@@ -10,11 +10,27 @@ final class SideNoticeDisplayState: ObservableObject {
     @Published var compactWingHeight: CGFloat = 34
     @Published var reserveCompactWing = false
     @Published var compactStatusHidden = false
+    /// Physical notch width; the detailed music layout must leave a gap here in the center. 0 on simulated-island devices.
+    @Published var compactBarCenterInset: CGFloat = 0
 }
 
 private enum CompactStatusMetrics {
     static let wingWidth: CGFloat = 40
     static let horizontalContentInset: CGFloat = 5
+}
+
+private struct CompactNotchBackground: View {
+    var style: IslandNotchBackground
+
+    @ViewBuilder
+    var body: some View {
+        switch style {
+        case .black:
+            Color.black
+        case .frosted:
+            VisualEffectBackground(alphaValue: 0.80)
+        }
+    }
 }
 
 struct SideNoticeRootView: View {
@@ -44,6 +60,13 @@ struct SideNoticeRootView: View {
             } else if let focusCountdownNotice = presentation.activeFocusCountdownNotice {
                 CompactFocusCountdownWing(
                     notice: focusCountdownNotice,
+                    side: side,
+                    height: presentation.compactWingHeight
+                )
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
+            } else if let focusModeNotice = presentation.activeFocusModeNotice {
+                CompactFocusModeWing(
+                    notice: focusModeNotice,
                     side: side,
                     height: presentation.compactWingHeight
                 )
@@ -114,7 +137,11 @@ struct SideNoticeRootView: View {
 struct CompactStatusBarView: View {
     @ObservedObject var queue: SideNoticeQueue
     @ObservedObject var displayState: SideNoticeDisplayState
+    @ObservedObject var media: NowPlayingService
+    @ObservedObject var settingsStore: FeatureSettingsStore
     var onStatusHidden: () -> Void
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private var height: CGFloat { displayState.compactWingHeight }
 
@@ -122,45 +149,11 @@ struct CompactStatusBarView: View {
         GeometryReader { geometry in
             ZStack {
                 if !displayState.compactStatusHidden {
-                    Group {
-                        if let mediaNotice {
-                            HStack(spacing: 0) {
-                                CompactMediaWing(notice: mediaNotice, side: .left, height: height)
-                                Spacer(minLength: 0)
-                                CompactMediaWing(notice: mediaNotice, side: .right, height: height)
-                            }
-                        } else if let focusCountdownNotice {
-                            CompactFocusCountdownBar(notice: focusCountdownNotice, height: height)
-                        } else if let toolboxNotice {
-                            HStack(spacing: 0) {
-                                CompactToolboxWing(notice: toolboxNotice, side: .left, height: height)
-                                Spacer(minLength: 0)
-                                CompactToolboxWing(notice: toolboxNotice, side: .right, height: height)
-                            }
-                        } else if !activeAINotices.isEmpty {
-                            HStack(spacing: 0) {
-                                CompactAIWing(
-                                    notices: activeAINotices,
-                                    count: activeAINotices.count,
-                                    side: .left,
-                                    height: height,
-                                    role: .identity
-                                )
-                                Spacer(minLength: 0)
-                                CompactAIWing(
-                                    notices: activeAINotices,
-                                    count: activeAINotices.count,
-                                    side: .right,
-                                    height: height,
-                                    role: .status
-                                )
-                            }
-                        }
-                    }
+                    compactStatusContent
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
-            .background(Color.black, in: SimulatedIslandShape())
+            .background(compactStatusBackground)
             .clipShape(SimulatedIslandShape())
             .contentShape(SimulatedIslandShape())
             // NSHostingView's safe area can push the SwiftUI content down by a few
@@ -184,22 +177,217 @@ struct CompactStatusBarView: View {
         }
     }
 
+    @ViewBuilder
+    private var compactStatusBackground: some View {
+        if reduceTransparency {
+            Color.black
+        } else {
+            CompactNotchBackground(style: settingsStore.settings.islandNotchBackground)
+        }
+    }
+
+    private var compactWingsUseTransparentBackground: Bool {
+        settingsStore.settings.islandNotchBackground != .black && !reduceTransparency
+    }
+
     private var mediaNotice: IslandNotice? {
         (queue.left + queue.right).first { $0.id.hasPrefix("media-active-") }
+    }
+
+    private var transientNotice: IslandNotice? {
+        (queue.left + queue.right)
+            .filter { $0.id.hasPrefix("focus-transition") || $0.style == .headphone }
+            .max { $0.createdAt < $1.createdAt }
+    }
+
+    /// Detailed mode needs a live snapshot (lyrics advance with playback); the notice strip only carries a static cover and title.
+    private var detailedMediaItem: NowPlayingSnapshot? {
+        guard settingsStore.settings.mediaCompactStyle == .detailed else { return nil }
+        return media.snapshot
     }
 
     private var toolboxNotice: IslandNotice? {
         (queue.left + queue.right).first { $0.id.hasPrefix("toolbox-reminder-") }
     }
 
+    private var browserDownloadNotice: IslandNotice? {
+        (queue.left + queue.right).first { $0.id.hasPrefix("browser-download-") }
+    }
+
+    private var videoDownloadNotice: IslandNotice? {
+        (queue.left + queue.right).first { $0.id.hasPrefix("video-download-") }
+    }
+
     private var focusCountdownNotice: IslandNotice? {
         (queue.left + queue.right).first { $0.id.hasPrefix("focus-countdown-") }
+    }
+
+    private var focusModeNotice: IslandNotice? {
+        (queue.left + queue.right).first { $0.id.hasPrefix("focus-mode-") }
     }
 
     private var activeAINotices: [IslandNotice] {
         (queue.left + queue.right)
             .filter { $0.id.hasPrefix("ai-active-") }
             .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var selectedCompactStatusPriority: CompactStatusPriority? {
+        settingsStore.settings.compactStatusPriority.first(where: compactStatusIsAvailable)
+    }
+
+    private func compactStatusIsAvailable(_ priority: CompactStatusPriority) -> Bool {
+        switch priority {
+        case .transient: transientNotice != nil
+        case .videoDownload: videoDownloadNotice != nil
+        case .browserDownload: browserDownloadNotice != nil
+        case .focusCountdown: focusCountdownNotice != nil
+        case .toolboxReminder: toolboxNotice != nil
+        case .aiActivity: !activeAINotices.isEmpty
+        case .media: mediaNotice != nil
+        case .focusMode: focusModeNotice != nil
+        }
+    }
+
+    @ViewBuilder
+    private var compactStatusContent: some View {
+        switch selectedCompactStatusPriority {
+        case .transient:
+            if let transientNotice {
+                if transientNotice.style == .headphone {
+                    CompactHeadphoneConnectionBar(notice: transientNotice, height: height)
+                } else {
+                    CompactFocusTransitionBar(notice: transientNotice, height: height)
+                }
+            }
+        case .videoDownload:
+            if let videoDownloadNotice {
+                HStack(spacing: 0) {
+                    CompactVideoDownloadWing(
+                        notice: videoDownloadNotice,
+                        side: .left,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                    Spacer(minLength: 0)
+                    CompactVideoDownloadWing(
+                        notice: videoDownloadNotice,
+                        side: .right,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                }
+            }
+        case .browserDownload:
+            if let browserDownloadNotice {
+                HStack(spacing: 0) {
+                    CompactBrowserDownloadWing(
+                        notice: browserDownloadNotice,
+                        side: .left,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                    Spacer(minLength: 0)
+                    CompactBrowserDownloadWing(
+                        notice: browserDownloadNotice,
+                        side: .right,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                }
+            }
+        case .focusCountdown:
+            if let focusCountdownNotice {
+                CompactFocusCountdownBar(notice: focusCountdownNotice, height: height)
+            }
+        case .toolboxReminder:
+            if let toolboxNotice {
+                HStack(spacing: 0) {
+                    CompactToolboxWing(
+                        notice: toolboxNotice,
+                        side: .left,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                    Spacer(minLength: 0)
+                    CompactToolboxWing(
+                        notice: toolboxNotice,
+                        side: .right,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                }
+            }
+        case .aiActivity:
+            if !activeAINotices.isEmpty {
+                HStack(spacing: 0) {
+                    CompactAIWing(
+                        notices: activeAINotices,
+                        count: activeAINotices.count,
+                        side: .left,
+                        height: height,
+                        role: .identity,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                    Spacer(minLength: 0)
+                    CompactAIWing(
+                        notices: activeAINotices,
+                        count: activeAINotices.count,
+                        side: .right,
+                        height: height,
+                        role: .status,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                }
+            }
+        case .media:
+            if let mediaNotice {
+                if let item = detailedMediaItem {
+                    DetailedMediaBar(
+                        item: item,
+                        lyrics: item.lyrics ?? media.resolvedLyrics,
+                        height: height,
+                        centerInset: displayState.compactBarCenterInset
+                    )
+                } else {
+                    HStack(spacing: 0) {
+                        CompactMediaWing(
+                            notice: mediaNotice,
+                            side: .left,
+                            height: height,
+                            usesTransparentBackground: compactWingsUseTransparentBackground
+                        )
+                        Spacer(minLength: 0)
+                        CompactMediaWing(
+                            notice: mediaNotice,
+                            side: .right,
+                            height: height,
+                            usesTransparentBackground: compactWingsUseTransparentBackground
+                        )
+                    }
+                }
+            }
+        case .focusMode:
+            if let focusModeNotice {
+                HStack(spacing: 0) {
+                    CompactFocusModeWing(
+                        notice: focusModeNotice,
+                        side: .left,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                    Spacer(minLength: 0)
+                    CompactFocusModeWing(
+                        notice: focusModeNotice,
+                        side: .right,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                }
+            }
+        case nil:
+            EmptyView()
+        }
     }
 }
 
@@ -212,6 +400,7 @@ private struct NoticeRow: View {
 
     private var isMessage: Bool { notice.style == .message }
     private var isStatus: Bool { notice.style == .status }
+    private var isHeadphone: Bool { notice.style == .headphone }
 
     var body: some View {
         Group {
@@ -219,6 +408,8 @@ private struct NoticeRow: View {
                 messageBody
             } else if isStatus {
                 statusBody
+            } else if isHeadphone {
+                HeadphoneConnectionNotice(notice: notice, onDismiss: onDismiss)
             } else {
                 standardBody
             }
@@ -370,6 +561,212 @@ private struct NoticeRow: View {
     }
 }
 
+private struct HeadphoneConnectionNotice: View {
+    var notice: IslandNotice
+    var onDismiss: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isPresented = false
+
+    var body: some View {
+        HStack(spacing: 9) {
+            HeadphonePairGlyph(isPresented: isPresented)
+                .frame(width: 42, height: 34)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(notice.title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(notice.detail ?? "已连接")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minWidth: 54, maxWidth: .infinity, alignment: .leading)
+
+            HeadphoneBatteryLevels(levels: notice.batteryLevels ?? [])
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .frame(width: 20, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("关闭")
+        }
+        .onAppear {
+            guard !reduceMotion else {
+                isPresented = true
+                return
+            }
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.72)) {
+                isPresented = true
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(accessibilityDescription))
+    }
+
+    private var accessibilityDescription: String {
+        let batteries = (notice.batteryLevels ?? []).map { level in
+            "\(level.label)耳\(level.level.map { "\($0)%" } ?? "电量未知")"
+        }
+        return (["\(notice.title)已连接"] + batteries).joined(separator: "，")
+    }
+}
+
+private struct HeadphonePairGlyph: View {
+    var isPresented: Bool
+
+    var body: some View {
+        ZStack {
+            Image(systemName: "airpod.left")
+                .offset(x: -9, y: isPresented ? -1 : 5)
+                .opacity(isPresented ? 1 : 0)
+                .scaleEffect(isPresented ? 1 : 0.64)
+            Image(systemName: "airpod.right")
+                .offset(x: 9, y: isPresented ? 1 : -5)
+                .opacity(isPresented ? 1 : 0)
+                .scaleEffect(isPresented ? 1 : 0.64)
+        }
+        .font(.system(size: 25, weight: .medium))
+        .foregroundStyle(.white)
+        .shadow(color: .cyan.opacity(0.22), radius: 5, y: 1)
+    }
+}
+
+private struct HeadphoneBatteryLevels: View {
+    var levels: [NoticeBatteryLevel]
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(displayedLevels) { level in
+                HeadphoneBatteryRing(level: level)
+            }
+        }
+        .frame(width: 64, alignment: .trailing)
+    }
+
+    private var displayedLevels: [NoticeBatteryLevel] {
+        let defaults = [
+            NoticeBatteryLevel(label: "左", level: nil),
+            NoticeBatteryLevel(label: "右", level: nil),
+        ]
+        return levels.isEmpty ? defaults : Array(levels.prefix(3))
+    }
+}
+
+private struct HeadphoneBatteryRing: View {
+    var level: NoticeBatteryLevel
+
+    var body: some View {
+        VStack(spacing: 2) {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.14), lineWidth: 2)
+                if let level = level.level {
+                    Circle()
+                        .trim(from: 0, to: CGFloat(level) / 100)
+                        .stroke(fillColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
+                Text(level.level.map(String.init) ?? "--")
+                    .font(.system(size: 7, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(level.level == nil ? 0.42 : 0.9))
+            }
+            .frame(width: 20, height: 20)
+            Text(level.label)
+                .font(.system(size: 7, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(width: 20)
+    }
+
+    private var fillColor: Color {
+        guard let level = level.level else { return .clear }
+        if level <= 15 { return .red }
+        if level <= 35 { return .orange }
+        return .green
+    }
+}
+
+private struct CompactHeadphoneConnectionBar: View {
+    var notice: IslandNotice
+    var height: CGFloat
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isPresented = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            HeadphonePairGlyph(isPresented: isPresented)
+                .frame(width: 42, height: height)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(notice.title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(notice.detail ?? "已连接")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minWidth: 42, maxWidth: .infinity, alignment: .leading)
+
+            HeadphoneBatteryLevels(levels: notice.batteryLevels ?? [])
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            guard !reduceMotion else {
+                isPresented = true
+                return
+            }
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.72)) {
+                isPresented = true
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("耳机已连接：\(notice.title)"))
+    }
+}
+
+private struct CompactFocusTransitionBar: View {
+    var notice: IslandNotice
+    var height: CGFloat
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: notice.symbolName ?? "moon.fill")
+                .font(.system(size: min(15, height * 0.56), weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(notice.title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+                Text(notice.detail ?? "状态已更新")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(notice.kind == .success ? "ON" : "OFF")
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .monospaced()
+                .foregroundStyle(notice.kind == .success ? .green : .secondary)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("\(notice.title)\(notice.detail ?? "状态已更新")"))
+    }
+}
+
 private struct MessageAppIcon: View {
     var bundleIdentifier: String?
 
@@ -494,6 +891,7 @@ private struct CompactAIWing: View {
     var side: NoticeSide
     var height: CGFloat
     var role: CompactAIWingRole
+    var usesTransparentBackground = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -513,14 +911,9 @@ private struct CompactAIWing: View {
                         isAnimated: !reduceMotion
                     )
                     .frame(width: 4, height: 4)
-                    if count > 1 {
-                        Text("\(count)")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                    } else {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 9, weight: .bold))
-                    }
+                    Text("\(count)")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .monospacedDigit()
                 }
                 .foregroundStyle(.white)
             }
@@ -532,18 +925,8 @@ private struct CompactAIWing: View {
             height: height,
             alignment: side == .left ? .leading : .trailing
         )
-        .background(Color.black, in: CompactAIWingShape(side: side))
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
-        .overlay {
-            if role == .status, count == 1, let progress = notices.first?.progress {
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(Color.white.opacity(0.72), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: min(27, height * 0.82), height: min(27, height * 0.82))
-                    .allowsHitTesting(false)
-            }
-        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(
             role == .identity ? "AI 任务图标" : "\(count) 个 AI 任务\(statusDescription)"
@@ -654,6 +1037,7 @@ private struct CompactMediaWing: View {
     var notice: IslandNotice
     var side: NoticeSide
     var height: CGFloat
+    var usesTransparentBackground = false
 
     @ViewBuilder
     var body: some View {
@@ -667,8 +1051,7 @@ private struct CompactMediaWing: View {
     private var sourceIcon: some View {
         ZStack(alignment: .leading) {
             Group {
-                if let artworkData = notice.artworkData,
-                   let artwork = NSImage(data: artworkData) {
+                if let artwork = MediaArtworkImageCache.image(from: notice.artworkData) {
                     Image(nsImage: artwork)
                         .resizable()
                         .scaledToFill()
@@ -683,7 +1066,7 @@ private struct CompactMediaWing: View {
             .padding(.leading, CompactStatusMetrics.horizontalContentInset)
         }
         .frame(width: CompactStatusMetrics.wingWidth, height: height)
-        .background(Color.black, in: CompactAIWingShape(side: side))
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("正在播放 \(notice.title)"))
@@ -707,7 +1090,7 @@ private struct CompactMediaWing: View {
             height: height,
             alignment: .trailing
         )
-        .background(Color.black, in: CompactAIWingShape(side: side))
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("正在播放：\(notice.detail ?? notice.title)"))
@@ -734,10 +1117,168 @@ private struct CompactMediaWing: View {
     }
 }
 
+/// Compact music detail bar: split around a physical notch, or rendered as one continuous row on other displays.
+private struct DetailedMediaBar: View {
+    private static let maximumContentWidth: CGFloat = 160
+    private static let inlineTrackWidth: CGFloat = 130
+
+    var item: NowPlayingSnapshot
+    var lyrics: SyncedLyrics?
+    var height: CGFloat
+    var centerInset: CGFloat
+
+    var body: some View {
+        GeometryReader { geometry in
+            if centerInset > 0 {
+                let reservedCenterWidth = min(centerInset, geometry.size.width)
+                let sideWidth = min(
+                    Self.maximumContentWidth,
+                    max(0, (geometry.size.width - reservedCenterWidth) / 2)
+                )
+                let centerWidth = max(0, geometry.size.width - sideWidth * 2)
+                HStack(spacing: 0) {
+                    trackIdentity
+                        .frame(width: sideWidth, height: height, alignment: .leading)
+                    Spacer(minLength: 0)
+                        .frame(width: centerWidth)
+                    lyricsSection
+                        .frame(width: sideWidth, height: height, alignment: .trailing)
+                        .clipped()
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+            } else {
+                inlineMediaBar
+                    .frame(width: geometry.size.width, height: height, alignment: .leading)
+                    .clipped()
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("正在播放 \(MediaTextFormatting.titleArtistText(item))"))
+        .help("正在播放：\(MediaTextFormatting.titleArtistText(item))")
+    }
+
+    private var trackIdentity: some View {
+        HStack(spacing: 7) {
+            artwork
+            trackText
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.leading, CompactStatusMetrics.horizontalContentInset)
+        .padding(.trailing, 8)
+    }
+
+    private var inlineMediaBar: some View {
+        HStack(spacing: 7) {
+            artwork
+            trackText
+                .frame(width: Self.inlineTrackWidth, alignment: .leading)
+            waveform
+            lyricLine
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
+    }
+
+    private var trackText: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            MarqueeText(
+                item.title,
+                font: .system(size: 10.5, weight: .semibold),
+                textColor: .white
+            )
+            if !artist.isEmpty {
+                MarqueeText(
+                    artist,
+                    font: .system(size: 8.5, weight: .medium),
+                    textColor: .white.opacity(0.62)
+                )
+            }
+        }
+    }
+
+    private var lyricsSection: some View {
+        HStack(spacing: 7) {
+            waveform
+            lyricLine
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, CompactStatusMetrics.horizontalContentInset)
+    }
+
+    private var waveform: some View {
+        MediaWaveformView(
+            artworkData: item.artworkData,
+            width: 20,
+            height: min(18, height * 0.68),
+            isActive: item.isPlaying
+        )
+    }
+
+    /// Advances lyrics with playback; freezes on the current line when paused.
+    @ViewBuilder
+    private var lyricLine: some View {
+        if item.isPlaying {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { context in
+                lyricMarquee(at: context.date)
+            }
+        } else {
+            lyricMarquee(at: .now)
+        }
+    }
+
+    private func lyricMarquee(at date: Date) -> some View {
+        let elapsedTime = item.elapsedTime(at: date) ?? 0
+        let scrollProgress = item.isVideo
+            ? nil
+            : lyrics?.currentLineProgress(at: elapsedTime, duration: item.duration)
+        return MarqueeText(
+            item.isVideo
+                ? MediaTextFormatting.videoSecondaryText(item)
+                : MediaTextFormatting.lyricLine(item, lyrics: lyrics, date: date),
+            font: .system(size: min(14, max(13, height * 0.42)), weight: .medium),
+            textColor: .white.opacity(0.72),
+            scrollDirection: .left,
+            repeats: false,
+            scrollProgress: scrollProgress,
+            clipsOverflowWhenStatic: true
+        )
+    }
+
+    private var artist: String {
+        item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var artworkSize: CGFloat {
+        max(18, min(24, height - 6))
+    }
+
+    @ViewBuilder
+    private var artwork: some View {
+        if let image = MediaArtworkImageCache.image(from: item.artworkData) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: artworkSize, height: artworkSize)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        } else {
+            ZStack {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.white.opacity(0.12))
+                Image(systemName: item.isVideo ? "play.rectangle.fill" : "music.note")
+                    .font(.system(size: artworkSize * 0.5, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: artworkSize, height: artworkSize)
+        }
+    }
+}
+
 private struct CompactToolboxWing: View {
     var notice: IslandNotice
     var side: NoticeSide
     var height: CGFloat
+    var usesTransparentBackground = false
 
     var body: some View {
         Group {
@@ -759,7 +1300,7 @@ private struct CompactToolboxWing: View {
             height: height,
             alignment: side == .left ? .leading : .trailing
         )
-        .background(Color.black, in: CompactAIWingShape(side: side))
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("小工具：\(notice.title)"))
@@ -775,6 +1316,7 @@ private struct CompactFocusCountdownWing: View {
     var notice: IslandNotice
     var side: NoticeSide
     var height: CGFloat
+    var usesTransparentBackground = false
 
     var body: some View {
         Group {
@@ -796,11 +1338,207 @@ private struct CompactFocusCountdownWing: View {
             height: height,
             alignment: side == .left ? .leading : .trailing
         )
-        .background(Color.black, in: CompactAIWingShape(side: side))
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("专注倒计时：\(notice.detail ?? "00:00:00")"))
         .help("专注倒计时：\(notice.detail ?? "00:00:00")")
+    }
+}
+
+private struct CompactFocusModeWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    var body: some View {
+        Group {
+            if side == .left {
+                Image(systemName: notice.symbolName ?? "moon.fill")
+                    .font(.system(size: min(15, height * 0.56), weight: .semibold))
+            } else {
+                Text("ON")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .monospaced()
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
+        .frame(
+            width: CompactStatusMetrics.wingWidth,
+            height: height,
+            alignment: side == .left ? .leading : .trailing
+        )
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+        .contentShape(CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("专注模式：\(notice.title)"))
+        .help("专注模式：\(notice.title)")
+    }
+}
+
+private struct CompactBrowserDownloadWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    private var isFinished: Bool { notice.kind == .success }
+
+    var body: some View {
+        Group {
+            if side == .left {
+                icon
+            } else if isFinished {
+                Image(systemName: "checkmark")
+                    .font(.system(size: min(15, height * 0.56), weight: .bold))
+                    .foregroundStyle(.green)
+            } else {
+                Text(notice.detail ?? "…")
+                    .font(.system(size: min(13, height * 0.5), weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .foregroundStyle(.white)
+            }
+        }
+        .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
+        .frame(
+            width: CompactStatusMetrics.wingWidth,
+            height: height,
+            alignment: side == .left ? .leading : .trailing
+        )
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+        .contentShape(CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(accessibilityLabel))
+        .help(accessibilityLabel)
+    }
+
+    private var iconSize: CGFloat { max(16, min(22, height - 12)) }
+
+    @ViewBuilder
+    private var icon: some View {
+        if let image = resolvedIcon {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: iconSize, height: iconSize)
+        } else {
+            Image(systemName: notice.symbolName ?? "arrow.down.circle.fill")
+                .font(.system(size: min(15, height * 0.56), weight: .semibold))
+                .foregroundStyle(.white)
+        }
+    }
+
+    private var resolvedIcon: NSImage? {
+        guard let bundleIdentifier = notice.appBundleIdentifier, !bundleIdentifier.isEmpty,
+            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+        else { return nil }
+        return NSWorkspace.shared.icon(forFile: url.path)
+    }
+
+    private var accessibilityLabel: String {
+        let source = notice.appName ?? "浏览器"
+        guard isFinished else {
+            return "\(source) 下载中 \(notice.detail ?? "")：\(notice.title)"
+        }
+        return "\(source) 下载完成：\(notice.title)"
+    }
+}
+
+private struct CompactVideoDownloadWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    private var isFinished: Bool { notice.kind == .success }
+
+    var body: some View {
+        Group {
+            if side == .left {
+                icon
+            } else if isFinished {
+                Image(systemName: "checkmark")
+                    .font(.system(size: min(15, height * 0.56), weight: .bold))
+                    .foregroundStyle(.green)
+            } else {
+                Text(notice.detail ?? "…")
+                    .font(.system(size: min(13, height * 0.5), weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .foregroundStyle(.white)
+            }
+        }
+        .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
+        .frame(
+            width: CompactStatusMetrics.wingWidth,
+            height: height,
+            alignment: side == .left ? .leading : .trailing
+        )
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+        .contentShape(CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(accessibilityLabel))
+        .help(accessibilityLabel)
+    }
+
+    private var iconSize: CGFloat { max(16, min(22, height - 12)) }
+
+    @ViewBuilder
+    private var icon: some View {
+        if let image = resolvedIcon {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: iconSize, height: iconSize)
+        } else {
+            Image(systemName: notice.symbolName ?? "arrow.down.circle.fill")
+                .font(.system(size: min(15, height * 0.56), weight: .semibold))
+                .foregroundStyle(.white)
+        }
+    }
+
+    /// Bundled offline logos take priority; sites without one use favicon bytes pre-fetched by AppModel.
+    private var resolvedIcon: NSImage? {
+        if let platform = VideoDownloadPlatform(rawValue: notice.appBundleIdentifier ?? ""),
+            let url = platform.bundledIconURL
+        {
+            return VideoDownloadIconCache.shared.image(
+                for: "platform|\(platform.rawValue)",
+                url: url
+            )
+        }
+        guard let data = notice.artworkData, !data.isEmpty else { return nil }
+        return NSImage(data: data)
+    }
+
+    private var accessibilityLabel: String {
+        let source = notice.appName ?? "视频"
+        guard isFinished else {
+            return "\(source) 下载中 \(notice.detail ?? "")：\(notice.title)"
+        }
+        return "\(source) 下载完成：\(notice.title)"
+    }
+}
+
+/// SVG decoding is not cheap; cache once per resource key.
+@MainActor
+private final class VideoDownloadIconCache {
+    static let shared = VideoDownloadIconCache()
+
+    private var values: [String: NSImage?] = [:]
+
+    func image(for key: String, url: URL) -> NSImage? {
+        if let value = values[key] { return value }
+        let image = NSImage(contentsOf: url)
+        values[key] = image
+        return image
     }
 }
 

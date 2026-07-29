@@ -9,8 +9,12 @@ struct SettingsView: View {
     @StateObject private var input = SettingsInput()
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var searchFieldFocused: Bool
     @State private var draggedWeatherLocationID: String?
+    @State private var sectionSwitchDirection: CGFloat = 1
+    @State private var copiedCommand: String?
+    @Namespace private var sectionSelectionNamespace
 
     var body: some View {
         HStack(spacing: 0) {
@@ -18,7 +22,10 @@ struct SettingsView: View {
             Divider()
             detail
         }
-        .frame(width: 548, height: 510)
+        .frame(
+            width: input.selection.prefersWideLayout ? 980 : 548,
+            height: input.selection.prefersWideLayout ? 640 : 510
+        )
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             launchAtLogin.refresh()
@@ -42,7 +49,7 @@ struct SettingsView: View {
             VStack(spacing: 4) {
                 ForEach(SettingsSection.allCases) { section in
                     Button {
-                        input.selection = section
+                        selectSettingsSection(section)
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: section.symbol)
@@ -57,22 +64,40 @@ struct SettingsView: View {
                         .frame(height: 34)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
                     .foregroundStyle(input.selection == section ? Color.primary : Color.secondary)
-                    .background(
-                        input.selection == section ? Color.accentColor.opacity(0.14) : Color.clear
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .background {
+                        if input.selection == section {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .strokeBorder(
+                                    Color.primary.opacity(colorScheme == .dark ? 0.72 : 0.50),
+                                    lineWidth: 1
+                                )
+                                .matchedGeometryEffect(
+                                    id: "settings-section-selection",
+                                    in: sectionSelectionNamespace
+                                )
+                        }
+                    }
                     .accessibilityLabel("\(section.title)设置")
                 }
             }
             .padding(.top, 20)
+            .animation(reduceMotion ? nil : ZislaMotion.selection, value: input.selection)
 
             Spacer(minLength: 12)
 
-            Text("版本 \(appVersion)")
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(.tertiary)
+            HStack(spacing: 6) {
+                Text("版本 \(appVersion)")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 0)
+                IconButton(symbol: "power", help: "退出应用", size: .compact) {
+                    NSApp.terminate(nil)
+                }
+                .accessibilityLabel("退出应用")
+            }
+            .frame(maxWidth: .infinity)
         }
         .padding(12)
         .frame(width: 148)
@@ -90,11 +115,35 @@ struct SettingsView: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
-                selectedContent
+                DeferredMount {
+                    selectedContent
+                }
+                    .id(input.selection)
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .modulePush(direction: sectionSwitchDirection)
+                    )
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .animation(reduceMotion ? nil : ZislaMotion.settingsPageSwitch, value: input.selection)
+    }
+
+    private func selectSettingsSection(_ section: SettingsSection) {
+        guard section != input.selection else { return }
+        if let currentIndex = SettingsSection.allCases.firstIndex(of: input.selection),
+           let targetIndex = SettingsSection.allCases.firstIndex(of: section) {
+            sectionSwitchDirection = targetIndex > currentIndex ? 1 : -1
+        }
+        if reduceMotion {
+            input.selection = section
+        } else {
+            withAnimation(ZislaMotion.settingsPageSwitch) {
+                input.selection = section
+            }
         }
     }
 
@@ -105,16 +154,18 @@ struct SettingsView: View {
             workflowContent
         case .info:
             infoContent
-        case .aiMonitor:
-            aiMonitorContent
-        case .voice:
-            voiceContent
+        case .ai:
+            aiContent
+        case .models:
+            modelsContent
         case .pet:
             petContent
         case .interaction:
             interactionContent
-        case .services:
-            servicesContent
+        case .download:
+            downloadContent
+        case .weather:
+            weatherContent
         case .updates:
             updatesContent
         }
@@ -171,18 +222,34 @@ struct SettingsView: View {
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
                 rowDivider
+                settingRow(
+                    symbol: "rectangle.topthird.inset.filled",
+                    title: "收起态音乐样式",
+                    detail: model.settingsStore.settings.mediaCompactStyle.detail
+                ) {
+                    Picker(
+                        "",
+                        selection: Binding(
+                            get: { model.settingsStore.settings.mediaCompactStyle },
+                            set: { model.settingsStore.settings.mediaCompactStyle = $0 }
+                        )
+                    ) {
+                        ForEach(MediaCompactStyle.allCases, id: \.self) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .frame(width: 132)
+                    .disabled(!model.settingsStore.settings.mediaEnabled)
+                }
+                rowDivider
                 featureToggle(
                     "文件中转与分享",
                     detail: "暂存文件并调用 AirDrop 或系统分享",
                     symbol: "tray.full.fill",
                     keyPath: \.fileShelfEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "链接下载",
-                    detail: "下载视频或音频",
-                    symbol: "arrow.down.circle.fill",
-                    keyPath: \.downloaderEnabled
                 )
                 rowDivider
                 featureToggle(
@@ -197,6 +264,13 @@ struct SettingsView: View {
                     detail: "Markdown 随手记，可发送到系统备忘录",
                     symbol: "note.text",
                     keyPath: \.quickNotesEnabled
+                )
+                rowDivider
+                featureToggle(
+                    "PDF 工具",
+                    detail: "合并、拆分、加密与转换 PDF",
+                    symbol: "doc.text.fill",
+                    keyPath: \.pdfToolsEnabled
                 )
                 rowDivider
                 featureToggle(
@@ -279,13 +353,6 @@ struct SettingsView: View {
                     detail: "显示接下来的日程与会议",
                     symbol: "calendar",
                     keyPath: \.calendarEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "天气",
-                    detail: "显示当前或自选地区的天气",
-                    symbol: "cloud.sun.fill",
-                    keyPath: \.weatherEnabled
                 )
                 rowDivider
                 featureToggle(
@@ -404,6 +471,58 @@ struct SettingsView: View {
                 }
             }
 
+            settingsGroup("收起态展示优先级") {
+                let priorities = model.settingsStore.settings.compactStatusPriority
+                ForEach(Array(priorities.enumerated()), id: \.element) { index, priority in
+                    if index > 0 { rowDivider }
+                    settingRow(
+                        symbol: compactStatusPrioritySymbol(for: priority),
+                        title: priority.title,
+                        detail: ""
+                    ) {
+                        HStack(spacing: 4) {
+                            IconButton(
+                                symbol: "arrow.up",
+                                help: "上移\(priority.title)",
+                                size: .compact
+                            ) {
+                                moveCompactStatusPriority(priority, by: -1)
+                            }
+                            .disabled(index == priorities.startIndex)
+
+                            IconButton(
+                                symbol: "arrow.down",
+                                help: "下移\(priority.title)",
+                                size: .compact
+                            ) {
+                                moveCompactStatusPriority(priority, by: 1)
+                            }
+                            .disabled(index == priorities.index(before: priorities.endIndex))
+                        }
+                    }
+                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                }
+                rowDivider
+                settingRow(
+                    symbol: "arrow.counterclockwise",
+                    title: "恢复默认顺序",
+                    detail: ""
+                ) {
+                    IconButton(
+                        symbol: "arrow.counterclockwise",
+                        help: "恢复默认顺序",
+                        size: .compact
+                    ) {
+                        model.settingsStore.settings.compactStatusPriority = CompactStatusPriority.defaultOrder
+                    }
+                    .disabled(
+                        model.settingsStore.settings.compactStatusPriority
+                            == CompactStatusPriority.defaultOrder
+                    )
+                }
+                .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+            }
+
             settingsGroup("通知显示器") {
                 let displays = activityNoticeDisplays
                 if displays.count < 2 {
@@ -440,9 +559,10 @@ struct SettingsView: View {
         }
     }
 
-    private var aiMonitorContent: some View {
+    /// AI 监控、语音输入与 AI Agent 行为；模型定义与远端凭据只出现在 模型 页。
+    private var aiContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("通知与用量") {
+            settingsGroup("AI 监控") {
                 featureToggle(
                     "AI 进度与用量",
                     detail: "汇总桌面端与 CLI 工具的运行状态",
@@ -450,12 +570,26 @@ struct SettingsView: View {
                     keyPath: \.aiProgressEnabled
                 )
             }
+
+            voiceInputGroup
+
+            settingsGroup("AI Agent 行为") {
+                featureToggle(
+                    "在灵动岛显示",
+                    detail: "关闭后仅从工具栏隐藏，此处的配置与对话不受影响",
+                    symbol: "sparkles.square.filled.on.square",
+                    keyPath: \.aiAgentEnabled
+                )
+                rowDivider
+                AIAgentModuleView(model: model, configurationScope: .agent)
+                    .frame(minHeight: 430)
+                    .task { await model.aiAgent.refreshAll() }
+            }
         }
     }
 
-    private var voiceContent: some View {
+    private var voiceInputGroup: some View {
         VStack(alignment: .leading, spacing: 20) {
-            // ── 语音输入 ──
             settingsGroup("语音输入") {
                 featureToggle(
                     "启用语音输入",
@@ -523,316 +657,136 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
 
-            // ── 模型端点 ──
-            settingsGroup("模型端点") {
+    private var modelsContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // 模型定义与远端凭据唯一归属这里：先定义模型，再在下方选择。
+            settingsGroup("本地模型") {
+                AIAgentModuleView(model: model, configurationScope: .localModels)
+                    .frame(minHeight: 170)
+            }
+
+            settingsGroup("远端模型与凭据") {
+                AIAgentModuleView(model: model, configurationScope: .remoteModels)
+                    .frame(minHeight: 300)
+                    .task { await model.aiAgent.refreshAll() }
+            }
+
+            settingsGroup("语音整理模型") {
                 settingRow(
-                    symbol: "network",
-                    title: "运行位置",
-                    detail: model.settingsStore.settings.voiceModelEndpointMode.detail
+                    symbol: "cpu",
+                    title: "使用模型",
+                    detail: "从上方已启用的本地或远端模型中选择"
                 ) {
                     Picker(
                         "",
                         selection: Binding(
-                            get: { model.settingsStore.settings.voiceModelEndpointMode },
-                            set: { (newValue: VoiceModelEndpointMode) in
-                                model.settingsStore.settings.voiceModelEndpointMode = newValue
-                                model.discoveredModels = []
-                                model.voiceModelDiscoveryState = .idle
-                            }
+                            get: { model.selectedVoiceModelConfiguration },
+                            set: { model.selectVoiceModelConfiguration($0) }
                         )
                     ) {
-                        ForEach(VoiceModelEndpointMode.allCases, id: \.self) { mode in
-                            Text(mode.displayName).tag(mode)
+                        Text("不使用模型整理").tag(Optional<AIModelConfigurationReference>.none)
+                        ForEach(model.aiAgent.store.state.localModels.filter(\.isEnabled)) { localModel in
+                            Text("本地 · \(localModel.name)")
+                                .tag(Optional(AIModelConfigurationReference.local(localModel.id)))
+                        }
+                        ForEach(model.aiAgent.store.state.channels.filter(\.isEnabled)) { channel in
+                            Text("远端 · \(channel.name)")
+                                .tag(Optional(AIModelConfigurationReference.channel(channel.id)))
                         }
                     }
                     .labelsHidden()
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 138)
+                    .frame(maxWidth: 220)
                 }
-                rowDivider
-                if model.settingsStore.settings.voiceModelEndpointMode == .local {
-                    settingRow(
-                        symbol: "server.rack",
-                        title: "服务类型",
-                        detail: "选择本地运行的模型服务"
-                    ) {
-                        Picker(
-                            "",
-                            selection: Binding(
-                                get: { model.settingsStore.settings.voiceModelEndpointKind },
-                                set: { (newValue: AIEndpointKind) in
-                                    model.settingsStore.settings.voiceModelEndpointKind = newValue
-                                    model.settingsStore.settings.voiceModelBaseURL = newValue.defaultBaseURL
-                                    model.discoveredModels = []
-                                    model.voiceModelDiscoveryState = .idle
-                                }
-                            )
-                        ) {
-                            ForEach(AIEndpointKind.allCases, id: \.self) { kind in
-                                Text(kind.displayName).tag(kind)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                        .controlSize(.small)
-                        .frame(maxWidth: 160)
-                    }
+                if let configuration = model.selectedVoiceModelConfiguration {
                     rowDivider
                     settingRow(
-                        symbol: "link",
-                        title: "服务地址",
-                        detail: "模型的 API 基础地址"
+                        symbol: configuration.source == .channel ? "server.rack" : "desktopcomputer",
+                        title: model.voiceModelConfigurationTitle(configuration),
+                        detail: model.voiceModelConfigurationDetail(configuration)
                     ) {
-                        TextField(
-                            "http://127.0.0.1:1234/v1",
-                            text: Binding(
-                                get: { model.settingsStore.settings.voiceModelBaseURL },
-                                set: { model.settingsStore.settings.voiceModelBaseURL = $0 }
-                            )
-                        )
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11, design: .monospaced))
-                        .frame(width: 200)
-                    }
-                    rowDivider
-                    settingRow(
-                        symbol: "cpu",
-                        title: "模型名称",
-                        detail: "填写服务端使用的模型 ID"
-                    ) {
-                        TextField(
-                            "例如 qwen3:8b",
-                            text: Binding(
-                                get: { model.currentVoiceModelName },
-                                set: { model.updateCurrentVoiceModelName($0) }
-                            )
-                        )
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11, design: .monospaced))
-                        .frame(width: 200)
-                    }
-                } else if let remoteEndpoint = model.selectedVoiceModelRemoteEndpoint {
-                    settingRow(
-                        symbol: "server.rack",
-                        title: "当前端点",
-                        detail: model.settingsStore.settings.voiceModelRemoteLoadBalancingEnabled
-                            ? "LB 开启，连接测试会轮询已启用端点"
-                            : "LB 关闭，手动选择 URL、Key 和模型"
-                    ) {
-                        HStack(spacing: 6) {
-                            Picker(
-                                "",
-                                selection: Binding(
-                                    get: { remoteEndpoint.id },
-                                    set: { model.selectVoiceModelRemoteEndpoint($0) }
-                                )
-                            ) {
-                                ForEach(model.settingsStore.settings.voiceModelRemoteEndpoints) { endpoint in
-                                    Text(endpoint.name).tag(endpoint.id)
+                        HStack(spacing: 8) {
+                            Text(discoveryStatusText)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                            Button {
+                                model.discoverModels()
+                            } label: {
+                                if model.voiceModelDiscoveryState.isTesting {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Text("测试连接")
                                 }
                             }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
+                            .buttonStyle(.bordered)
                             .controlSize(.small)
-                            .frame(width: 138)
-
-                            Button {
-                                model.addVoiceModelRemoteEndpoint()
-                            } label: {
-                                Image(systemName: "plus")
-                            }
-                            .buttonStyle(.borderless)
-                            .help("添加端点")
-
-                            Button {
-                                model.removeSelectedVoiceModelRemoteEndpoint()
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.borderless)
-                            .help("删除当前端点")
+                            .disabled(model.voiceModelDiscoveryState.isTesting)
                         }
-                    }
-                    rowDivider
-                    settingRow(
-                        symbol: "tag",
-                        title: "端点名称",
-                        detail: "仅用于区分不同 URL 组"
-                    ) {
-                        TextField(
-                            "远端端点",
-                            text: Binding(
-                                get: { remoteEndpoint.name },
-                                set: { value in
-                                    model.updateSelectedVoiceModelRemoteEndpoint { $0.name = value }
-                                }
-                            )
-                        )
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 200)
-                    }
-                    rowDivider
-                    settingRow(
-                        symbol: "link",
-                        title: "服务地址",
-                        detail: "此端点的 OpenAI 兼容 API 基础地址"
-                    ) {
-                        TextField(
-                            "https://api.example.com/v1",
-                            text: Binding(
-                                get: { remoteEndpoint.baseURL },
-                                set: { value in
-                                    model.updateSelectedVoiceModelRemoteEndpoint { $0.baseURL = value }
-                                }
-                            )
-                        )
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11, design: .monospaced))
-                        .frame(width: 200)
-                    }
-                    rowDivider
-                    settingRow(
-                        symbol: "cpu",
-                        title: "模型名称",
-                        detail: "填写此端点要使用的模型 ID"
-                    ) {
-                        TextField(
-                            "例如 gpt-4.1-mini",
-                            text: Binding(
-                                get: { remoteEndpoint.modelName },
-                                set: { value in
-                                    model.updateSelectedVoiceModelRemoteEndpoint { $0.modelName = value }
-                                }
-                            )
-                        )
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11, design: .monospaced))
-                        .frame(width: 200)
-                    }
-                    rowDivider
-                    settingRow(
-                        symbol: "key",
-                        title: "API Key",
-                        detail: "仅保存到此 Mac 的 zisla 设置文件"
-                    ) {
-                        SecureField(
-                            "sk-...",
-                            text: Binding(
-                                get: { remoteEndpoint.apiKey ?? "" },
-                                set: { model.updateVoiceModelRemoteAPIKey($0) }
-                            )
-                        )
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11, design: .monospaced))
-                        .frame(width: 200)
-                    }
-                    rowDivider
-                    settingRow(
-                        symbol: "checkmark.circle",
-                        title: "启用端点",
-                        detail: "关闭后不会参与手动使用或 LB"
-                    ) {
-                        Toggle("", isOn: Binding(
-                            get: { remoteEndpoint.isEnabled },
-                            set: { enabled in
-                                model.updateSelectedVoiceModelRemoteEndpoint { $0.isEnabled = enabled }
-                            }
-                        ))
-                        .labelsHidden()
-                        .controlSize(.small)
-                    }
-                    rowDivider
-                    settingRow(
-                        symbol: "arrow.triangle.2.circlepath",
-                        title: "负载均衡",
-                        detail: "开启后在全部已启用端点间轮询"
-                    ) {
-                        Toggle("", isOn: Binding(
-                            get: { model.settingsStore.settings.voiceModelRemoteLoadBalancingEnabled },
-                            set: { model.setVoiceModelRemoteLoadBalancingEnabled($0) }
-                        ))
-                        .labelsHidden()
-                        .controlSize(.small)
                     }
                 } else {
+                    rowDivider
                     settingRow(
-                        symbol: "server.rack",
-                        title: "远端端点",
-                        detail: "添加一个 URL、API Key 和模型配置"
+                        symbol: "sparkles",
+                        title: "尚未选择模型",
+                        detail: model.aiAgent.store.state.localModels.filter(\.isEnabled).isEmpty
+                            && model.aiAgent.store.state.channels.filter(\.isEnabled).isEmpty
+                            ? "在上方添加并启用本地或远端模型后即可选择"
+                            : "选择后会对语音转写进行整理"
                     ) {
-                        Button {
-                            model.addVoiceModelRemoteEndpoint()
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                        .buttonStyle(.borderless)
-                        .help("添加端点")
-                    }
-                }
-                rowDivider
-                settingRow(
-                    symbol: "magnifyingglass.circle",
-                    title: "连接测试",
-                    detail: discoveryStatusText
-                ) {
-                    Button {
-                        model.discoverModels()
-                    } label: {
-                        if model.voiceModelDiscoveryState.isTesting {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Text("测试连接")
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(model.voiceModelDiscoveryState.isTesting)
-                }
-            }
-
-            // ── 模型选择 ──
-            if !model.discoveredModels.isEmpty {
-                settingsGroup("已发现模型") {
-                    ForEach(Array(model.discoveredModels.enumerated()), id: \.element.id) { index, discovered in
-                        if index > 0 { rowDivider }
-                        let isSelected = model.currentVoiceModelName == discovered.name
-                        settingRow(
-                            symbol: isSelected ? "checkmark.circle.fill" : "cpu",
-                            title: discovered.name,
-                            detail: isSelected ? "当前使用" : "点击选择此模型"
-                        ) {
-                            if !isSelected {
-                                Button("选择") {
-                                    model.updateCurrentVoiceModelName(discovered.name)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            }
-                        }
+                        EmptyView()
                     }
                 }
             }
 
-            // ── 硬件档案与推荐 ──
             settingsGroup("设备档案与推荐模型") {
                 if let profile = model.hardwareProfile {
                     settingRow(
                         symbol: "desktopcomputer",
-                        title: profile.machineName,
-                        detail: profile.displayDescription
+                        title: "设备",
+                        detail: profile.compactHardwareDescription,
+                        detailLineLimit: 3
+                    ) {
+                        EmptyView()
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "gauge.with.dots.needle.67percent",
+                        title: "综合推荐",
+                        detail: profile.recommendationDescription,
+                        detailLineLimit: 2
                     ) {
                         EmptyView()
                     }
                     ForEach(Array(AIModelRecommendations.recommended(for: profile).enumerated()), id: \.element.id) { index, rec in
                         rowDivider
-                        settingRow(
-                            symbol: "lightbulb.fill",
-                            title: "\(rec.name) · \(rec.parameterScale)",
-                            detail: rec.reason
-                        ) {
-                            EmptyView()
+                        VStack(alignment: .leading, spacing: 8) {
+                            settingRow(
+                                symbol: "lightbulb.fill",
+                                title: "\(rec.name) · \(rec.parameterScale)",
+                                detail: rec.reason
+                            ) {
+                                EmptyView()
+                            }
+                            VStack(alignment: .leading, spacing: 6) {
+                                commandRow(
+                                    label: "Ollama 下载",
+                                    command: rec.ollamaPullCommand
+                                )
+                                commandRow(
+                                    label: "Ollama 启动",
+                                    command: rec.ollamaRunCommand
+                                )
+                                commandRow(
+                                    label: "LM Studio 搜索",
+                                    command: rec.lmStudioSearchQuery
+                                )
+                            }
+                            .padding(.leading, 38)
+                            .padding(.bottom, 4)
                         }
                     }
                 } else {
@@ -850,25 +804,6 @@ struct SettingsView: View {
                 }
             }
 
-            // ── 提示信息 ──
-            settingsGroup("使用说明") {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("本地模式先启动 LM Studio 或 Ollama", systemImage: "1.circle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    Label("远端模式可添加多组 URL、API Key 和模型", systemImage: "2.circle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    Label("关闭 LB 手动选端点；开启后轮询已启用端点", systemImage: "3.circle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    Label("点击「测试连接」发现模型，或直接输入模型名称", systemImage: "4.circle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 8)
-            }
         }
         .onAppear {
             model.refreshHardwareProfile()
@@ -913,7 +848,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 150)
+                    .frame(width: 150, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
                 rowDivider
@@ -935,7 +870,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 100)
+                    .frame(width: 100, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
             }
@@ -1029,6 +964,33 @@ struct SettingsView: View {
                     .controlSize(.small)
                     .frame(width: 216)
                 }
+                rowDivider
+                settingRow(
+                    symbol: "rectangle.on.rectangle.angled",
+                    title: "灵动岛样式",
+                    detail: model.settingsStore.settings.islandVisualStyle.detail,
+                    detailLineLimit: nil
+                ) {
+                    IslandVisualStylePicker(
+                        selection: Binding(
+                            get: { model.settingsStore.settings.islandVisualStyle },
+                            set: { model.settingsStore.settings.islandVisualStyle = $0 }
+                        )
+                    )
+                }
+                rowDivider
+                settingRow(
+                    symbol: "rectangle.topthird.inset.filled",
+                    title: "刘海背景",
+                    detail: model.settingsStore.settings.islandNotchBackground.detail
+                ) {
+                    IslandNotchBackgroundPicker(
+                        selection: Binding(
+                            get: { model.settingsStore.settings.islandNotchBackground },
+                            set: { model.settingsStore.settings.islandNotchBackground = $0 }
+                        )
+                    )
+                }
             }
 
             settingsGroup("启动") {
@@ -1105,9 +1067,16 @@ struct SettingsView: View {
         }
     }
 
-    private var servicesContent: some View {
+    private var downloadContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("下载") {
+            settingsGroup("下载器") {
+                featureToggle(
+                    "链接下载",
+                    detail: "下载视频或音频",
+                    symbol: "arrow.down.circle.fill",
+                    keyPath: \.downloaderEnabled
+                )
+                rowDivider
                 settingRow(
                     symbol: "folder.fill",
                     title: "默认下载目录",
@@ -1119,7 +1088,108 @@ struct SettingsView: View {
                 }
             }
 
-            settingsGroup("天气位置") {
+            settingsGroup("下载通知") {
+                featureToggle(
+                    "浏览器下载进度",
+                    detail: "在灵动岛显示来源图标与百分比",
+                    symbol: "arrow.down.circle.fill",
+                    keyPath: \.browserDownloadIslandEnabled
+                )
+                .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                rowDivider
+                featureToggle(
+                    "原生下载进度",
+                    detail: "下载器工作时显示来源平台图标与百分比",
+                    symbol: "arrow.down.square.fill",
+                    keyPath: \.videoDownloadIslandEnabled
+                )
+                .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+            }
+
+            settingsGroup("组件") {
+                managedToolRow(.ytDLP, symbol: "terminal.fill")
+                rowDivider
+                managedToolRow(.mas, symbol: "bag.fill")
+                rowDivider
+                managedToolRow(.libreOffice, symbol: "doc.richtext")
+            }
+        }
+        .task {
+            await model.managedTools.refreshInstalledVersions()
+            // 行内的"可更新到 X"依赖最新版本号；静默查询，离线时不打扰。
+            for tool in ManagedTool.allCases {
+                await model.managedTools.checkLatest(tool, quietly: true)
+            }
+        }
+    }
+
+    /// Components follow their declared source so the UI never misrepresents a Homebrew cask as a GitHub binary.
+    @ViewBuilder
+    private func managedToolRow(_ tool: ManagedTool, symbol: String) -> some View {
+        let state = model.managedTools.states[tool] ?? ManagedToolState()
+        settingRow(
+            symbol: symbol,
+            title: tool.displayName,
+            detail: managedToolDetail(tool, state: state)
+        ) {
+            HStack(spacing: 8) {
+                if case .downloading(let fraction) = state.phase, fraction > 0 {
+                    ProgressView(value: fraction)
+                        .frame(width: 52)
+                        .controlSize(.small)
+                } else if state.isBusy {
+                    ProgressView().controlSize(.small)
+                } else if state.isInstalled {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.zislaSuccess)
+                }
+
+                Button(state.isInstalled ? "更新" : "安装") {
+                    Task { await model.managedTools.install(tool) }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(state.isBusy)
+                .help(
+                    state.isInstalled
+                        ? tool.updateHelp
+                        : tool.installHelp
+                )
+            }
+        }
+    }
+
+    private func managedToolDetail(_ tool: ManagedTool, state: ManagedToolState) -> String {
+        if let errorMessage = state.errorMessage { return errorMessage }
+        switch state.phase {
+        case .checking: return "正在查询最新版本…"
+        case .downloading(let fraction):
+            return fraction > 0 ? "正在下载 \(Int(fraction * 100))%" : "正在下载…"
+        case .installing: return "正在安装…"
+        case .idle: break
+        }
+        guard let location = state.location else {
+            return "未安装 · \(tool.purpose) · \(tool.installDetail)"
+        }
+        let version = state.installedVersion ?? "版本未知"
+        if state.hasUpdate, let latest = state.latestVersion {
+            return "\(version) · \(location.label) · 可更新到 \(latest)"
+        }
+        return "\(version) · \(location.label) · \(tool.purpose)"
+    }
+
+    private var weatherContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            settingsGroup("天气显示") {
+                featureToggle(
+                    "天气",
+                    detail: "显示当前或自选地区的天气",
+                    symbol: "cloud.sun.fill",
+                    keyPath: \.weatherEnabled
+                )
+            }
+
+            settingsGroup("地点") {
                 ForEach(Array(model.weatherLocations.locations.enumerated()), id: \.element.id) {
                     index, location in
                     if index > 0 { rowDivider }
@@ -1221,16 +1291,37 @@ struct SettingsView: View {
     private var updatesContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("更新策略") {
+                settingRow(
+                    symbol: "arrow.triangle.branch",
+                    title: "手动检查通道",
+                    detail: "\(model.settingsStore.settings.updateChannel.detail)；不影响自动更新"
+                ) {
+                    Picker(
+                        "",
+                        selection: Binding(
+                            get: { model.settingsStore.settings.updateChannel },
+                            set: { model.settingsStore.settings.updateChannel = $0 }
+                        )
+                    ) {
+                        ForEach(UpdateChannel.allCases, id: \.self) { channel in
+                            Text(channel.menuTitle).tag(channel)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 150)
+                }
+                rowDivider
                 featureToggle(
                     "检查更新",
-                    detail: "定期查询项目的最新发布版本",
+                    detail: "仅检查当前安装包所属的更新通道",
                     symbol: "arrow.triangle.2.circlepath",
                     keyPath: \.updateChecksEnabled
                 )
                 rowDivider
                 featureToggle(
                     "自动安装更新",
-                    detail: "",
+                    detail: "仅自动安装当前安装包所属通道的新构建",
                     symbol: "shippingbox.and.arrow.backward.fill",
                     keyPath: \.automaticUpdatesEnabled
                 )
@@ -1246,20 +1337,30 @@ struct SettingsView: View {
                 }
                 rowDivider
                 VStack(alignment: .leading, spacing: 10) {
-                    Button {
-                        model.checkForUpdates(manual: true)
-                    } label: {
-                        Label("立即检查", systemImage: "arrow.clockwise")
+                    HStack {
+                        Spacer()
+                        Button {
+                            model.checkForUpdates(
+                                manual: true,
+                                channel: model.settingsStore.settings.updateChannel
+                            )
+                        } label: {
+                            Label(
+                                "检查 \(model.settingsStore.settings.updateChannel.menuTitle)",
+                                systemImage: "arrow.clockwise"
+                            )
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
 
                     HStack(spacing: 8) {
                         repositoryLink(
                             "GitHub",
                             symbol: "chevron.left.forwardslash.chevron.right",
                             tint: .primary,
-                            destination: ZislaKitInfo.repositoryURL
+                            destination: ZislaKitInfo.repositoryURL,
+                            brandIconAsset: "github-mark.svg"
                         )
                         repositoryLink(
                             "Gitee",
@@ -1417,10 +1518,33 @@ struct SettingsView: View {
         return selected.count == 1 && selected.contains(accountName)
     }
 
+    private func moveCompactStatusPriority(_ priority: CompactStatusPriority, by offset: Int) {
+        var priorities = model.settingsStore.settings.compactStatusPriority
+        guard let index = priorities.firstIndex(of: priority) else { return }
+        let destination = priorities.index(index, offsetBy: offset)
+        guard priorities.indices.contains(destination) else { return }
+        priorities.swapAt(index, destination)
+        model.settingsStore.settings.compactStatusPriority = priorities
+    }
+
+    private func compactStatusPrioritySymbol(for priority: CompactStatusPriority) -> String {
+        switch priority {
+        case .transient: "bolt.fill"
+        case .videoDownload: "arrow.down.square.fill"
+        case .browserDownload: "arrow.down.circle.fill"
+        case .focusCountdown: "timer"
+        case .toolboxReminder: "wrench.and.screwdriver.fill"
+        case .aiActivity: "sparkles"
+        case .media: "music.note"
+        case .focusMode: "moon.fill"
+        }
+    }
+
     private func settingRow<Trailing: View>(
         symbol: String,
         title: String,
         detail: String,
+        detailLineLimit: Int? = 1,
         @ViewBuilder trailing: () -> Trailing
     ) -> some View {
         HStack(spacing: 10) {
@@ -1437,7 +1561,7 @@ struct SettingsView: View {
                     Text(detail)
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(detailLineLimit)
                         .truncationMode(.middle)
                 }
             }
@@ -1446,22 +1570,34 @@ struct SettingsView: View {
             trailing()
         }
         .padding(.horizontal, 4)
-        .frame(minHeight: 48)
+        .frame(maxWidth: .infinity, minHeight: 48)
     }
 
     private func repositoryLink(
         _ title: String,
         symbol: String,
         tint: Color,
-        destination: URL
+        destination: URL,
+        brandIconAsset: String? = nil
     ) -> some View {
         Button {
             NSWorkspace.shared.open(destination)
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: symbol)
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 16)
+                if let brandIconAsset,
+                   let image = brandIcon(named: brandIconAsset)
+                {
+                    Image(nsImage: image)
+                        .resizable()
+                        .renderingMode(.template)
+                        .scaledToFit()
+                        .frame(width: 14, height: 14)
+                        .frame(width: 16)
+                } else {
+                    Image(systemName: symbol)
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 16)
+                }
                 Text(title)
                     .font(.system(size: 10, weight: .semibold))
                 Spacer(minLength: 0)
@@ -1536,7 +1672,7 @@ struct SettingsView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.1"
     }
 
     private func searchWeatherLocation() {
@@ -1549,7 +1685,7 @@ struct SettingsView: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.directoryURL = model.downloadDirectory
-        WindowPlacement.center(panel, on: WindowPlacement.screenUnderMouse())
+        WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
         guard panel.runModal() == .OK, let url = panel.url else { return }
         model.downloadDirectory = url
         if let bookmark = try? url.bookmarkData(
@@ -1558,6 +1694,58 @@ struct SettingsView: View {
             relativeTo: nil
         ) {
             UserDefaults.standard.set(bookmark, forKey: "download-directory-bookmark")
+        }
+    }
+
+    private func brandIcon(named name: String) -> NSImage? {
+        let sourceRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let candidates = [
+            Bundle.main.resourceURL,
+            sourceRoot.appendingPathComponent("Resources", isDirectory: true),
+        ].compactMap { $0 }
+
+        return candidates
+            .map { $0.appendingPathComponent("BrandIcons/\(name)", isDirectory: false) }
+            .lazy
+            .compactMap(NSImage.init(contentsOf:))
+            .first
+    }
+
+    private func commandRow(label: String, command: String) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 88, alignment: .leading)
+            Text(command)
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            IconButton(
+                symbol: copiedCommand == command ? "checkmark" : "doc.on.doc",
+                help: copiedCommand == command ? "已复制" : "复制\(label)",
+                size: .compact
+            ) {
+                copyToClipboard(command)
+            }
+        }
+        .frame(height: 20)
+    }
+
+    private func copyToClipboard(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        copiedCommand = text
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            if copiedCommand == text {
+                copiedCommand = nil
+            }
         }
     }
 
@@ -1787,24 +1975,31 @@ private final class VoiceInputHotkeyRecorderButton: NSButton {
 private enum SettingsSection: String, CaseIterable, Identifiable {
     case workflow
     case info
-    case aiMonitor
-    case voice
+    case ai
+    case models
     case pet
     case interaction
-    case services
+    case download
+    case weather
     case updates
 
     var id: Self { self }
+
+    /// The two AI pages need the wide layout because they embed the agent's configuration surface.
+    var prefersWideLayout: Bool {
+        self == .ai || self == .models
+    }
 
     var title: String {
         switch self {
         case .workflow: "工作流"
         case .info: "信息"
-        case .aiMonitor: "AI 监控"
-        case .voice: "语音与模型"
+        case .ai: "AI"
+        case .models: "模型"
         case .pet: "桌面宠物"
         case .interaction: "交互"
-        case .services: "下载与天气"
+        case .download: "下载"
+        case .weather: "天气"
         case .updates: "更新"
         }
     }
@@ -1813,11 +2008,12 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .workflow: "square.grid.2x2.fill"
         case .info: "info.circle.fill"
-        case .aiMonitor: "chart.xyaxis.line"
-        case .voice: "mic.and.waveform"
+        case .ai: "sparkles"
+        case .models: "cpu"
         case .pet: "pawprint.fill"
         case .interaction: "cursorarrow.motionlines"
-        case .services: "arrow.down.circle.fill"
+        case .download: "arrow.down.circle.fill"
+        case .weather: "cloud.sun.fill"
         case .updates: "arrow.triangle.2.circlepath"
         }
     }
@@ -1825,12 +2021,13 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .workflow: "管理灵动岛中的工作流模块。"
-        case .info: "配置日历、天气、邮件与通知显示。"
-        case .aiMonitor: "管理 AI 进度监控的显示。"
-        case .voice: "配置语音输入快捷键与本地小模型端点。"
+        case .info: "配置日历、邮件、锁屏与通知显示。"
+        case .ai: "AI 进度、语音输入，以及连接、自动化、CLI 与 Skills 等 Agent 行为。"
+        case .models: "配置本地模型、远端模型与凭据，并选择语音整理使用的模型。"
         case .pet: "设置灵动岛内部的宠物形象。"
         case .interaction: "调整外观、展开方式与隐私行为。"
-        case .services: "管理下载目录和天气数据位置。"
+        case .download: "管理下载目录、下载通知与所需组件。"
+        case .weather: "管理天气显示、地点和刷新。"
         case .updates: "管理版本检查与自动更新。"
         }
     }

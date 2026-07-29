@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 import ZislaCore
 
-/// 从 Qwen Code `${QWEN_HOME:-~/.qwen}/projects/**/*.runtime.json` + transcript 推断活动任务。
+/// Infers active tasks from `${QWEN_HOME:-~/.qwen}/projects/**/*.runtime.json` and transcripts.
 public final class QwenSessionActivityDetector: AIActivityDetecting {
     private struct Candidate {
         var runtimeURL: URL

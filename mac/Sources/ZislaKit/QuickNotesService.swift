@@ -1,16 +1,27 @@
 import Combine
 import Foundation
 
-/// 随记模块的视图模型：以系统「备忘录」为唯一数据源。
+/// View model for the Quick Notes module, backed by the system Notes app with one local welcome item.
 ///
-/// 笔记列表来自 `NotesAppBridge.listNotes()`；选中某条后用 `readNote` 读取文本与原始 HTML。
-/// Markdown 笔记可编辑并防抖写回，原生富内容只预览，防止写回时丢失表格和附件。
+/// The note list comes from `NotesAppBridge.listNotes()`; selecting a note reads its text and raw HTML via `readNote`.
+/// Note bodies are edited as HTML rich text and written back with debouncing, preserving tables and embedded images.
 ///
-/// 不再做本地 JSON 持久化——备忘录即存储后端，避免双份数据与同步问题。
+/// Notes remains the storage backend for user content. The dismissible welcome item is local-only.
 @MainActor
 public final class QuickNotesService: ObservableObject {
     public static let welcomeNoteTitle = "朋友，看这里。"
+    private static let builtInWelcomeNoteID = "zisla.builtin.quick-notes-welcome"
+    private static let welcomeDismissedDefaultsKey = "QuickNotesService.isBuiltInWelcomeNoteDismissed"
+    private static let welcomeNoteResourcePath = "QuickNotes/welcome-note.md"
+    private static let fallbackWelcomeNoteText = """
+    从现在开始，你可以在记事本中写记事了。 那么，你都能做些什么呢？
+    记忆力并不是智慧，但没有记忆力还成什么智慧呢？
+    ——哈柏
 
+    科学证明人脑的记忆力是有限的，但生活中接收并需要记下的信息可太多了，真是糟糕。 不过现在，你不用担心了。随时随地在记事本写上一笔，并设置日历提醒，事情不再错过。 “记忆力并不是智慧”，但灵活地使用记事本，拓展你的记忆，正是你的机智所在。 读书感悟、生活体验、团队计划等等，你都可以放进记事本里。 挑出重要的记事并加上星标吧，让它们像这篇使用说明一样显眼。 已完成的记事，你还可以将它们一键分享到微信、QQ等，或者直接通过邮件发送，便捷而高效。 记事本，记录点滴生活。
+
+    愿你能愉快而轻松地使用这个小工具~
+    """
     @Published public private(set) var notes: [NotesAppBridge.NoteSummary] = []
     @Published public var selectedID: String?
     @Published public private(set) var isLoadingList = false
@@ -19,32 +30,58 @@ public final class QuickNotesService: ObservableObject {
     @Published public var errorMessage: String?
 
     private var saveTask: Task<Void, Never>?
+    private let welcomeDismissalDefaults: UserDefaults
 
-    public init() {}
+    public init(welcomeDismissalDefaults: UserDefaults = .standard) {
+        self.welcomeDismissalDefaults = welcomeDismissalDefaults
+    }
 
     public var selectedNote: NotesAppBridge.NoteSummary? {
         guard let selectedID else { return notes.first }
+        if isBuiltInWelcomeNote(id: selectedID) {
+            return welcomeNote
+        }
         return notes.first { $0.id == selectedID } ?? notes.first
     }
 
     public var welcomeNote: NotesAppBridge.NoteSummary? {
-        Self.welcomeNote(in: notes)
+        guard !welcomeDismissalDefaults.bool(forKey: Self.welcomeDismissedDefaultsKey) else { return nil }
+        return NotesAppBridge.NoteSummary(
+            id: Self.builtInWelcomeNoteID,
+            title: Self.welcomeNoteTitle,
+            modifiedAt: nil
+        )
     }
 
     public var regularNotes: [NotesAppBridge.NoteSummary] {
-        Self.regularNotes(in: notes)
+        notes
     }
 
-    static func welcomeNote(in notes: [NotesAppBridge.NoteSummary]) -> NotesAppBridge.NoteSummary? {
-        notes.first { $0.title == welcomeNoteTitle }
+    public var isBuiltInWelcomeNoteSelected: Bool {
+        selectedID.map(isBuiltInWelcomeNote(id:)) ?? false
     }
 
-    static func regularNotes(in notes: [NotesAppBridge.NoteSummary]) -> [NotesAppBridge.NoteSummary] {
-        guard let welcomeNote = welcomeNote(in: notes) else { return notes }
-        return notes.filter { $0.id != welcomeNote.id }
+    public func isBuiltInWelcomeNote(id: String) -> Bool {
+        id == Self.builtInWelcomeNoteID
     }
 
-    /// 重新拉取备忘录笔记列表；若当前选中项已不存在则回退到第一条。
+    static var welcomeNoteText: String {
+        let sourceResources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources", isDirectory: true)
+        let candidates = [Bundle.main.resourceURL, sourceResources].compactMap { $0 }
+        for root in candidates {
+            let url = root.appendingPathComponent(welcomeNoteResourcePath, isDirectory: false)
+            if let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
+                return text
+            }
+        }
+        return fallbackWelcomeNoteText
+    }
+
+    /// Re-fetches the Notes note list; falls back to the first note if the currently selected item no longer exists.
     public func refresh() async {
         isLoadingList = true
         errorMessage = nil
@@ -58,54 +95,90 @@ public final class QuickNotesService: ObservableObject {
         }
     }
 
-    /// 用外部列表结果更新本地状态（供测试与 `refresh` 共用）。
-    /// 当前选中项若已不在列表中（例如在备忘录 App 中被删除），回退到第一条或清空。
+    /// Updates local state with an external list result (shared by tests and `refresh`).
+    /// If the currently selected item is no longer in the list (e.g. deleted in the Notes app), falls back to the first item or clears selection.
     func applyFetchedNotes(_ fetched: [NotesAppBridge.NoteSummary]) {
-        notes = fetched.sorted { ($0.modifiedAt ?? .distantPast) > ($1.modifiedAt ?? .distantPast) }
-        if selectedID == nil || !notes.contains(where: { $0.id == selectedID }) {
-            selectedID = notes.first?.id
+        // Earlier versions used this reserved title for a generated system note. Leave the
+        // system record untouched, but do not show it alongside the local replacement.
+        notes = fetched
+            .filter { $0.title != Self.welcomeNoteTitle }
+            .sorted { ($0.modifiedAt ?? .distantPast) > ($1.modifiedAt ?? .distantPast) }
+        guard let selectedID else {
+            self.selectedID = welcomeNote?.id ?? notes.first?.id
+            return
+        }
+        if isBuiltInWelcomeNote(id: selectedID) {
+            if welcomeNote == nil {
+                self.selectedID = notes.first?.id
+            }
+        } else if !notes.contains(where: { $0.id == selectedID }) {
+            self.selectedID = notes.first?.id ?? welcomeNote?.id
         }
     }
 
     public func select(id: String) {
-        guard notes.contains(where: { $0.id == id }) else { return }
+        guard (isBuiltInWelcomeNote(id: id) && welcomeNote != nil)
+            || notes.contains(where: { $0.id == id })
+        else { return }
         selectedID = id
     }
 
-    /// 读取当前选中笔记，供编辑器和预览载入。
+    /// Reads the currently selected note for the editor and preview to load.
     public func loadNote() async -> NotesAppBridge.NoteContent? {
         guard let id = selectedID else { return nil }
+        if isBuiltInWelcomeNote(id: id) {
+            return NotesAppBridge.NoteContent(
+                plainText: Self.welcomeNoteText,
+                bodyHTML: NotesAppBridge.bodyHTML(for: Self.welcomeNoteText)
+            )
+        }
         isLoadingNote = true
+        let protectionResult = await NotesAppBridge.isPasswordProtected(noteID: id)
+        if case .success(true) = protectionResult {
+            isLoadingNote = false
+            return NotesAppBridge.NoteContent(
+                plainText: "",
+                bodyHTML: "",
+                isPasswordProtected: true
+            )
+        }
         let result = await NotesAppBridge.readNote(id: id)
         isLoadingNote = false
         switch result {
         case .success(let content):
-            return await normalizeWelcomeNoteIfNeeded(content, id: id)
+            return content
         case .failure(let error):
             errorMessage = error.message
             return nil
         }
     }
 
-    /// 防抖写回：停止输入 0.8 秒后落盘到备忘录，避免每次按键都触发 AppleScript。
+    /// Debounced write-back: flushes to Notes 0.8 seconds after input stops, avoiding an AppleScript call on every keystroke.
     public func scheduleSave(id: String, markdown: String) {
+        scheduleSave(id: id, html: NotesAppBridge.bodyHTML(for: markdown))
+    }
+
+    /// Debounced write-back of rich-text body.
+    public func scheduleSave(id: String, html: String) {
+        guard !isBuiltInWelcomeNote(id: id) else { return }
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(800))
             if Task.isCancelled { return }
-            await self?.performSave(id: id, markdown: markdown)
+            await self?.performSave(id: id, html: html)
         }
     }
 
-    /// 取消尚未落盘的写回（例如切换笔记前）。
+    /// Cancels a pending write-back (e.g. before switching notes).
     public func cancelPendingSave() {
         saveTask?.cancel()
         saveTask = nil
     }
 
-    private func performSave(id: String, markdown: String) async {
+    private func performSave(id: String, html: String) async {
+        guard !isBuiltInWelcomeNote(id: id) else { return }
         isSaving = true
-        let result = await NotesAppBridge.writeNote(id: id, markdown: markdown)
+        let result = await NotesAppBridge.writeNote(id: id, html: html)
         isSaving = false
         switch result {
         case .success:
@@ -121,7 +194,7 @@ public final class QuickNotesService: ObservableObject {
         }
     }
 
-    /// 在备忘录新建一条笔记并刷新列表、选中它。
+    /// Creates a new note in Notes, then refreshes the list and selects it.
     @discardableResult
     public func create(markdown: String = "# 新随记\n") async -> Bool {
         let title = Self.title(for: markdown)
@@ -138,8 +211,32 @@ public final class QuickNotesService: ObservableObject {
         }
     }
 
-    /// 删除备忘录中的指定笔记并刷新列表。
+    /// Creates a rich-text note, then refreshes the list and selects it.
+    @discardableResult
+    public func create(html: String, title: String = "新随记") async -> Bool {
+        isSaving = true
+        let result = await NotesAppBridge.createNote(title: title, html: html)
+        isSaving = false
+        switch result {
+        case .success:
+            await refresh()
+            return true
+        case .failure(let error):
+            errorMessage = error.message
+            return false
+        }
+    }
+
+    /// Deletes the specified note from Notes and refreshes the list.
     public func delete(id: String) async {
+        if isBuiltInWelcomeNote(id: id) {
+            cancelPendingSave()
+            welcomeDismissalDefaults.set(true, forKey: Self.welcomeDismissedDefaultsKey)
+            if selectedID == id {
+                selectedID = notes.first?.id
+            }
+            return
+        }
         let result = await NotesAppBridge.deleteNote(id: id)
         if case .failure(let error) = result {
             errorMessage = error.message
@@ -147,7 +244,26 @@ public final class QuickNotesService: ObservableObject {
         await refresh()
     }
 
-    /// 取 Markdown 首行（去掉 `#` 前缀）作为笔记标题。
+    /// Hands off to the system Notes app to display and unlock the current note; Quick Notes does not handle passwords.
+    public func showSelectedNoteInNotes() {
+        guard let id = selectedID, !isBuiltInWelcomeNote(id: id) else { return }
+        Task {
+            if case .failure(let error) = await NotesAppBridge.showNote(id: id) {
+                errorMessage = error.message
+            }
+        }
+    }
+
+    /// Hands off to the system Notes app to display an attachment; Quick Notes provides a read-only entry point.
+    public func showAttachmentInNotes(id: String) {
+        Task {
+            if case .failure(let error) = await NotesAppBridge.showAttachment(id: id) {
+                errorMessage = error.message
+            }
+        }
+    }
+
+    /// Uses the first line of Markdown (stripped of `#` prefixes) as the note title.
     public static func title(for markdown: String) -> String {
         let firstLine = markdown
             .split(separator: "\n", omittingEmptySubsequences: true)
@@ -160,54 +276,4 @@ public final class QuickNotesService: ObservableObject {
         return stripped.isEmpty ? "新随记" : stripped
     }
 
-    static func normalizedWelcomeText(_ text: String) -> String {
-        let withoutInvisibleWhitespace = text.replacingOccurrences(of: "\u{00A0}", with: "")
-        let withoutChineseSpacing = withoutInvisibleWhitespace.replacingOccurrences(
-            of: #"(?<=[\p{Han}])[\p{Zs}\t]+(?=[\p{Han}])"#,
-            with: "",
-            options: .regularExpression
-        )
-        var normalizedLines: [String] = []
-        var previousLineWasEmpty = false
-        for line in withoutChineseSpacing.components(separatedBy: .newlines) {
-            let isEmpty = line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            if isEmpty {
-                guard !normalizedLines.isEmpty, !previousLineWasEmpty else { continue }
-                normalizedLines.append("")
-            } else {
-                normalizedLines.append(line)
-            }
-            previousLineWasEmpty = isEmpty
-        }
-        while normalizedLines.last?.isEmpty == true {
-            normalizedLines.removeLast()
-        }
-        return normalizedLines.joined(separator: "\n")
-    }
-
-    private func normalizeWelcomeNoteIfNeeded(
-        _ content: NotesAppBridge.NoteContent,
-        id: String
-    ) async -> NotesAppBridge.NoteContent {
-        guard welcomeNote?.id == id else { return content }
-        let normalized = Self.normalizedWelcomeText(content.plainText)
-        guard normalized != content.plainText else { return content }
-
-        isSaving = true
-        let result = await NotesAppBridge.writeNote(id: id, markdown: normalized)
-        isSaving = false
-        switch result {
-        case .success:
-            if let index = notes.firstIndex(where: { $0.id == id }) {
-                notes[index] = NotesAppBridge.NoteSummary(
-                    id: id,
-                    title: notes[index].title,
-                    modifiedAt: Date()
-                )
-            }
-        case .failure(let error):
-            errorMessage = error.message
-        }
-        return NotesAppBridge.NoteContent(plainText: normalized, bodyHTML: content.bodyHTML)
-    }
 }

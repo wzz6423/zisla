@@ -33,7 +33,7 @@ public struct AIChatResponse: Sendable {
     }
 }
 
-/// OpenAI Chat Completions 兼容客户端。Ollama 的 /v1 接口走同一协议，用于本地小模型整理语音输入内容。
+/// OpenAI Chat Completions-compatible client. Ollama's /v1 endpoint speaks the same protocol, used for local small models to process voice input.
 public struct AIChatClient: Sendable {
     private let session: URLSession
 
@@ -45,12 +45,19 @@ public struct AIChatClient: Sendable {
         endpoint: AIEndpoint,
         model: String,
         systemPrompt: String,
-        messages: [AIOutboundMessage]
+        messages: [AIOutboundMessage],
+        apiKey: String? = nil
     ) async throws -> AIChatResponse {
         let url = try completionURL(for: endpoint)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        // Callers are short utility completions the user is actively waiting on, so an unreachable
+        // endpoint must fail long before URLSession's one-minute default.
+        request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let apiKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines), !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         let body: [String: Any] = [
             "model": model,
             "stream": false,

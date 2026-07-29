@@ -22,17 +22,22 @@ public final class OverlayCoordinator: NSObject {
     public var onVisibilityChanged: (@MainActor (Bool) -> Void)?
     public var onDraggingChanged: (@MainActor (Bool) -> Void)?
     public var onCollapsedSizeChanged: (@MainActor (CGSize) -> Void)?
+    public var onActiveDisplayHasPhysicalNotchChanged: (@MainActor (Bool) -> Void)?
+    public private(set) var persistentPanelDisplayIDs: Set<CGDirectDisplayID> = []
 
     public var isVisible: Bool {
         reducer.state.visibility != .hidden
     }
 
     private let contentView: NSView
+    private let persistentContentViewProvider: ((ScreenOverlayLayout) -> NSView?)?
+    private let persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)?
     private var layoutEngine: ScreenLayoutEngine
     private let collapseDelay: Duration
     private var reducer = IslandPresentationReducer()
     private var pointerMonitor: PointerEdgeMonitor?
     private var panel: IslandPanel?
+    private var persistentPanels: [CGDirectDisplayID: IslandPanel] = [:]
     private var collapseTask: Task<Void, Never>?
     private var panelCollapseTask: Task<Void, Never>?
     private var pointerRevalidationTask: Task<Void, Never>?
@@ -41,17 +46,24 @@ public final class OverlayCoordinator: NSObject {
     private var isPointerInside = false
     private var stopsAfterTransientReveal = false
     private var allowsKeyWindow = false
+    private var keepsNativeGlassActive = false
     private var isExternalDragging = false
     private var isTransientInteractionVisible = false
+    private var collapsedOnTop = true
+    private var isPersistentContentVisible = true
 
     public init(
         contentView: NSView,
         layoutEngine: ScreenLayoutEngine = ScreenLayoutEngine(),
-        collapseDelay: Duration = .milliseconds(450)
+        collapseDelay: Duration = .milliseconds(450),
+        persistentContentViewProvider: ((ScreenOverlayLayout) -> NSView?)? = nil,
+        persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)? = nil
     ) {
         self.contentView = contentView
         self.layoutEngine = layoutEngine
         self.collapseDelay = collapseDelay
+        self.persistentContentViewProvider = persistentContentViewProvider
+        self.persistentPanelFrameProvider = persistentPanelFrameProvider
         super.init()
     }
 
@@ -72,7 +84,7 @@ public final class OverlayCoordinator: NSObject {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
-        NotificationCenter.default.addObserver(
+        NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(activeSpaceDidChange),
             name: NSWorkspace.activeSpaceDidChangeNotification,
@@ -87,7 +99,7 @@ public final class OverlayCoordinator: NSObject {
                 name: NSApplication.didChangeScreenParametersNotification,
                 object: nil
             )
-            NotificationCenter.default.removeObserver(
+            NSWorkspace.shared.notificationCenter.removeObserver(
                 self,
                 name: NSWorkspace.activeSpaceDidChangeNotification,
                 object: NSWorkspace.shared
@@ -101,6 +113,7 @@ public final class OverlayCoordinator: NSObject {
         cancelPointerRevalidation()
         let wasVisible = panel?.isVisible == true
         panel?.orderOut(nil)
+        hidePersistentPanels()
         if wasVisible { onVisibilityChanged?(false) }
         reducer = IslandPresentationReducer()
         activeDisplayID = nil
@@ -127,6 +140,7 @@ public final class OverlayCoordinator: NSObject {
             reducer = IslandPresentationReducer()
             activeDisplayID = nil
             isPointerInside = false
+            hidePersistentPanels()
             return
         }
 
@@ -146,6 +160,7 @@ public final class OverlayCoordinator: NSObject {
             }
             presentCurrentLayout()
         }
+        updatePersistentPanels()
     }
 
     public func updateExpandedSize(_ size: CGSize) {
@@ -163,8 +178,11 @@ public final class OverlayCoordinator: NSObject {
         if let panel {
             cancelPendingPanelCollapse()
             onCollapsedSizeChanged?(layout.collapsedFrame.size)
+            onActiveDisplayHasPhysicalNotchChanged?(layout.topology.hasPhysicalNotch)
             panel.resize(to: layout.expandedFrame)
             panel.ignoresMouseEvents = !isExpanded
+            panel.keepsNativeGlassActive = keepsNativeGlassActive && isExpanded
+            applyPanelLevel()
             if isExpanded { schedulePointerRevalidation() }
         } else {
             presentCurrentLayout()
@@ -188,8 +206,9 @@ public final class OverlayCoordinator: NSObject {
         else {
             return
         }
-        // 展开区仅在「已展开」时用于保持打开；折叠态下鼠标进入展开区不触发展开，
-        // 只有悬停在刘海/岛身触发区（triggerFrame）才会展开。
+        // The expanded region is only used to keep the panel open when already expanded;
+        // hovering over the expanded region in the collapsed state does not trigger expansion —
+        // only hovering over the notch/island trigger area (triggerFrame) does.
         let isExpanded = reducer.state.visibility == .expanded
             || reducer.state.visibility == .pinned
         setPointerInside(isExpanded && contains(point, in: activeLayout.expandedFrame))
@@ -203,13 +222,15 @@ public final class OverlayCoordinator: NSObject {
         process(reducer.send(.setPinned(pinned)))
     }
 
-    /// 展开面板但不固定（不修改 isPinned）。适用于菜单栏等外部入口：
-    /// 面板展开供查阅，鼠标离开后按正常规则折叠。
+    /// Expands the panel without pinning it (does not modify isPinned). Intended for external
+    /// entry points such as the menu bar: the panel expands for inspection and collapses
+    /// normally once the pointer leaves.
     public func showExpanded() {
         showExpanded(at: NSEvent.mouseLocation)
     }
 
-    /// 展开面板到指定坐标所在的屏幕，用于菜单栏等跨屏入口。
+    /// Expands the panel on the screen containing the given point; used for cross-screen entry
+    /// points such as the menu bar.
     public func showExpanded(at point: CGPoint) {
         if !isRunning {
             start()
@@ -237,6 +258,62 @@ public final class OverlayCoordinator: NSObject {
     public func setAllowsKeyWindow(_ allows: Bool) {
         allowsKeyWindow = allows
         panel?.allowsKeyWindow = allows
+    }
+
+    /// The window server subdues NSGlassEffectView in inactive non-activating panels.
+    /// This is enabled only while the transparent style's island is expanded.
+    public func setKeepsNativeGlassActive(_ keepsActive: Bool) {
+        guard keepsNativeGlassActive != keepsActive else { return }
+        keepsNativeGlassActive = keepsActive
+        applyNativeGlassActivation()
+    }
+
+    /// Sets the stacking level of the collapsed Dynamic Island.
+    ///
+    /// When on top, it shares the menu-bar level, floating above all other windows. When at the
+    /// bottom, it drops to the normal window level and is covered by other windows and menu-bar
+    /// icons. The expanded state always returns to the on-top level; otherwise the panel can be
+    /// obscured by other windows and become uninteractable.
+    public func setCollapsedOnTop(_ onTop: Bool) {
+        guard collapsedOnTop != onTop else { return }
+        collapsedOnTop = onTop
+        applyPanelLevel()
+        applyPersistentPanelLevels()
+    }
+
+    public func setPersistentContentVisible(_ visible: Bool) {
+        guard isPersistentContentVisible != visible else { return }
+        isPersistentContentVisible = visible
+        updatePersistentPanels()
+    }
+
+    /// Repositions the transparent persistent-content panels after their external anchor changes.
+    public func refreshPersistentPanels() {
+        updatePersistentPanels()
+    }
+
+    private func applyPanelLevel() {
+        guard let panel else { return }
+        let isExpanded = reducer.state.visibility == .expanded
+            || reducer.state.visibility == .pinned
+        let target = (isExpanded || collapsedOnTop)
+            ? IslandPanel.onTopLevel
+            : IslandPanel.onBottomLevel
+        guard panel.level != target else { return }
+        panel.level = target
+    }
+
+    private func applyPersistentPanelLevels() {
+        let target = IslandPanel.onTopLevel
+        for panel in persistentPanels.values where panel.level != target {
+            panel.level = target
+        }
+    }
+
+    private func applyNativeGlassActivation() {
+        let isExpanded = reducer.state.visibility == .expanded
+            || reducer.state.visibility == .pinned
+        panel?.keepsNativeGlassActive = keepsNativeGlassActive && isExpanded
     }
 
     private func setPointerInside(_ inside: Bool) {
@@ -288,13 +365,17 @@ public final class OverlayCoordinator: NSObject {
             case .show:
                 cancelPendingPanelCollapse()
                 presentCurrentLayout()
-                // 收起态的 panel 会复用；这里同步的是展示状态而非 NSPanel 生命周期。
+                // The collapsed panel is reused; what's being synced here is display state, not the NSPanel lifecycle.
                 onVisibilityChanged?(true)
             case .collapse:
-                // 宿主视图在固定的展开尺寸内完成中心遮罩动画；收起时只关闭命中，
-                // 避免修改可见 NSPanel 的 frame 触发窗口服务器重建合成层。
+                // The host view completes the center-mask animation within the fixed expanded size; on collapse
+                // only the hit-testing is disabled — avoids touching the visible NSPanel's frame, which would
+                // trigger window-server compositing layer rebuilds.
                 onVisibilityChanged?(false)
                 panel?.ignoresMouseEvents = true
+                panel?.keepsNativeGlassActive = false
+                applyPanelLevel()
+                updatePersistentPanels()
                 if stopsAfterTransientReveal { schedulePanelDismiss() }
             case .hide:
                 cancelPendingPanelCollapse()
@@ -311,6 +392,10 @@ public final class OverlayCoordinator: NSObject {
 
     private func scheduleCollapse() {
         collapseTask?.cancel()
+        guard collapseDelay != .zero else {
+            process(reducer.send(.collapseDelayElapsed))
+            return
+        }
         let token = collapseGeneration.advance()
         let delay = collapseDelay
         collapseTask = Task { @MainActor [weak self] in
@@ -382,6 +467,9 @@ public final class OverlayCoordinator: NSObject {
 
     func selectActiveDisplay(at point: CGPoint) {
         activeDisplayID = preferredLayout(at: point)?.displayID ?? activeDisplayID
+        if let layout = layout(for: activeDisplayID) {
+            onActiveDisplayHasPhysicalNotchChanged?(layout.topology.hasPhysicalNotch)
+        }
     }
 
     private func preferredLayout(at point: CGPoint) -> ScreenOverlayLayout? {
@@ -395,9 +483,10 @@ public final class OverlayCoordinator: NSObject {
 
     private func presentCurrentLayout() {
         guard let layout = layout(for: activeDisplayID) else { return }
-        // 跨屏重定位后不能让旧屏幕的延迟收起任务提前隐藏共享面板。
+        // After repositioning to a different screen, don't let a pending collapse task on the old screen prematurely hide the shared panel.
         cancelPendingPanelCollapse()
         onCollapsedSizeChanged?(layout.collapsedFrame.size)
+        onActiveDisplayHasPhysicalNotchChanged?(layout.topology.hasPhysicalNotch)
         let isExpanded = reducer.state.visibility == .expanded
             || reducer.state.visibility == .pinned
         let targetFrame = layout.expandedFrame
@@ -413,12 +502,68 @@ public final class OverlayCoordinator: NSObject {
             panel.allowsKeyWindow = allowsKeyWindow
             self.panel = panel
         }
+        panel.keepsNativeGlassActive = keepsNativeGlassActive && isExpanded
         panel.present(
             at: targetFrame,
             from: layout.collapsedFrame,
             animated: !panel.isVisible
         )
         panel.ignoresMouseEvents = !isExpanded
+        applyPanelLevel()
+        updatePersistentPanels()
+    }
+
+    private func updatePersistentPanels() {
+        guard isPersistentContentVisible,
+            let persistentContentViewProvider,
+            let persistentPanelFrameProvider
+        else {
+            hidePersistentPanels()
+            return
+        }
+
+        let interactiveDisplayID: CGDirectDisplayID?
+        switch reducer.state.visibility {
+        case .expanded, .pinned:
+            interactiveDisplayID = activeDisplayID
+        case .hidden, .collapsed:
+            interactiveDisplayID = nil
+        }
+        var visibleDisplayIDs: Set<CGDirectDisplayID> = []
+        for layout in layouts {
+            guard layout.displayID != interactiveDisplayID else {
+                persistentPanels[layout.displayID]?.orderOut(nil)
+                continue
+            }
+            let panel: IslandPanel
+            if let existingPanel = persistentPanels[layout.displayID] {
+                panel = existingPanel
+            } else {
+                guard let contentView = persistentContentViewProvider(layout) else { continue }
+                panel = IslandPanel(
+                    contentView: contentView,
+                    frame: persistentPanelFrameProvider(layout)
+                )
+                persistentPanels[layout.displayID] = panel
+            }
+            panel.allowsKeyWindow = false
+            panel.ignoresMouseEvents = true
+            panel.level = IslandPanel.onTopLevel
+            panel.present(at: persistentPanelFrameProvider(layout), animated: false)
+            visibleDisplayIDs.insert(layout.displayID)
+        }
+
+        for (displayID, panel) in persistentPanels where !visibleDisplayIDs.contains(displayID) {
+            panel.orderOut(nil)
+        }
+        persistentPanelDisplayIDs = visibleDisplayIDs
+    }
+
+    private func hidePersistentPanels() {
+        for panel in persistentPanels.values {
+            panel.orderOut(nil)
+        }
+        persistentPanelDisplayIDs.removeAll()
     }
 
     private func contains(_ point: CGPoint, in frame: CGRect) -> Bool {
@@ -433,7 +578,10 @@ public final class OverlayCoordinator: NSObject {
 
     @objc
     private func activeSpaceDidChange(_ notification: Notification) {
-        guard isVisible else { return }
-        presentCurrentLayout()
+        if isVisible {
+            presentCurrentLayout()
+        } else {
+            updatePersistentPanels()
+        }
     }
 }

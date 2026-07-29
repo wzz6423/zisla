@@ -175,7 +175,7 @@ struct WeatherLocationStoreTests {
         #expect(defaults.object(forKey: "weather-latitude") as? Double == 31.2)
         #expect(defaults.string(forKey: "weather-location-name") == "上海")
 
-        // 已有文件时不再重复迁移追加
+        // Do not re-migrate/append when the file already exists
         store.addSaved(
             name: "其它",
             coordinate: GeoCoordinate(latitude: 10, longitude: 20)

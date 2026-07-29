@@ -3,13 +3,12 @@ import ZislaCore
 import ZislaKit
 import SwiftUI
 
-/// 岛内宠物控制器：在灵动岛「内部」渲染一只像素宠物，原地播放动画。
+/// Island pet controller: renders a pixel pet inside the Dynamic Island, playing animations in place.
 ///
-/// 不另起面板、不贴岛边缘；宠物由 `IslandRootView` 直接嵌入 `IslandSurface`，
-/// 受 `IslandSilhouette()` 裁剪，读起来像「就在岛里面」。
+/// No separate panel; `IslandRootView` renders the pet beside the expanded island and inside the collapsed island.
 ///
-/// 宠物形象为内置资源（编译进 App 包），不支持用户导入或网络安装。
-/// 行为跟随 AI 任务状态：运行中→working、失败→failed、完成→succeeded。
+/// Pet sprites are bundled resources (compiled into the app); user import and network install are not supported.
+/// Behavior follows AI task state: active → working, failed → failed, completed → succeeded.
 @MainActor
 final class IslandPetController: ObservableObject {
     @Published var sprite: PetSprite?

@@ -37,10 +37,10 @@ private enum MailScriptError: Error, Sendable {
     case failed(String)
 }
 
-/// 通过用户已配置的 Mail.app 读取多个收件箱并执行邮件操作。
+/// Reads multiple inboxes and performs mail operations via the user's configured Mail.app.
 ///
-/// Mail.app 是账户和凭据的唯一来源；Zisla 只保存用户选中的账户名称，邮件内容
-/// 仅保留在运行内存中，不会写入 Zisla 的本地目录。
+/// Mail.app is the sole source of accounts and credentials; Zisla only stores the user-selected account names,
+/// and message content is kept in memory only — nothing is written to Zisla's local directory.
 @MainActor
 public final class MailService: ObservableObject {
     @Published public private(set) var accounts: [MailAccount] = []
@@ -75,7 +75,7 @@ public final class MailService: ObservableObject {
         messages.lazy.filter { !$0.isRead }.count
     }
 
-    /// 空集合表示同步系统 Mail.app 中的所有账户。
+    /// An empty set means sync all accounts from the system Mail.app.
     public var activeAccounts: [MailAccount] {
         guard !selectedAccountNames.isEmpty else { return accounts }
         return accounts.filter { selectedAccountNames.contains($0.id) }
@@ -159,7 +159,7 @@ public final class MailService: ObservableObject {
         await perform(Self.deleteScript(message: message))
     }
 
-    /// `fromAddress` 为用户挑选的具体发件邮箱地址；传 nil 表示用系统默认账户。
+    /// `fromAddress` is the specific sender address chosen by the user; pass nil to use the system default account.
     public func send(
         fromAddress: String?,
         to recipients: String,
@@ -225,12 +225,12 @@ public final class MailService: ObservableObject {
             .sorted()
             .map(appleScriptString)
             .joined(separator: ", ")
-        // 用「下标 + try/on error」逐账户抓取：
-        //   1. 任何一个账户（常见于 #1：未加载 / 离线 / 未认证 / On My Mac / RSS 等）
-        //      不能解到 inbox 时，不应让整次抓取整体失败；
-        //   2. 单封邮件读取失败（如正文极大、附件损坏）也要跳过，不能让后续邮件受影响；
-        //   3. 用 count + item i 显式下标访问，避免 `repeat with x in every account`
-        //      在 Mail 内部状态变化时丢引用。
+        // Fetch per-account using index + try/on error:
+        //   1. If any account (commonly #1: not loaded / offline / unauthenticated / On My Mac / RSS etc.)
+        //      cannot resolve its inbox, the entire fetch must not fail;
+        //   2. Individual message read failures (e.g. huge body, corrupt attachment) must be skipped without affecting subsequent messages;
+        //   3. Use count + item i explicit indexing to avoid `repeat with x in every account`
+        //      losing references when Mail's internal state changes.
         return """
         tell application "Mail"
             set accountRows to {}
@@ -423,9 +423,9 @@ public final class MailService: ObservableObject {
                 return result
             }
 
-            // 第一次若失败且看起来是「Mail 还没准备好」的特征（inbox / every account /
-            // item N 这类引用解析错误），再等 2s 重试一次。这种瞬时失败在 Mail 刚被
-            // 唤起做首屏抓取时很常见，不能让用户每次都得手动点「重新读取」。
+            // On first failure, if it looks like "Mail isn't ready yet" (reference resolution errors / can't find item inbox / account unavailable),
+            // wait 2s and retry once. This transient failure is common during the first fetch right after Mail is woken up,
+            // and should not force the user to manually tap "Refresh" every time.
             try? await Task.sleep(for: .seconds(2))
             if let retry = execute(source: source, expectsSnapshot: expectsSnapshot) {
                 return retry
@@ -443,7 +443,7 @@ public final class MailService: ObservableObject {
         !NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Mail").isEmpty
     }
 
-    /// 真正执行一次 AppleScript；返回 nil 表示执行失败且需要外层按需重试。
+    /// Executes one AppleScript run; returns nil to indicate failure requiring a retry by the caller.
     nonisolated private static func execute(
         source: String,
         expectsSnapshot: Bool
@@ -458,7 +458,7 @@ public final class MailService: ObservableObject {
                 ?? (errorInfo[NSLocalizedDescriptionKey] as? String)
                 ?? "无法访问 Mail.app，请检查自动化授权"
             let lower = message.lowercased()
-            // 「Mail 还在加载」的典型表现：引用解析失败 / 找不到某个 item 的 inbox / 账户不可用。
+            // Typical signs of "Mail still loading": reference resolution failure / can't find inbox for item / account unavailable.
             let looksUnready = lower.contains("inbox") ||
                 lower.contains("every account") ||
                 lower.contains("item ") ||

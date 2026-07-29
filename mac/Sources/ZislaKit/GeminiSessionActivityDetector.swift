@@ -1,7 +1,7 @@
 import Foundation
 import ZislaCore
 
-/// 从 Gemini CLI `~/.gemini/tmp/**/chats/session-*` 会话记录推断活动任务。
+/// Infers active tasks from Gemini CLI `~/.gemini/tmp/**/chats/session-*` session files.
 public final class GeminiSessionActivityDetector: AIActivityDetecting {
     private struct Candidate {
         var url: URL

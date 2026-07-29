@@ -1,4 +1,5 @@
 import Foundation
+import ZislaCore
 #if canImport(Sparkle)
 import Sparkle
 #endif
@@ -9,14 +10,20 @@ final class UpdateController {
 
 #if canImport(Sparkle)
     private var controller: SPUStandardUpdaterController?
+    private let feedDelegate = UpdateFeedDelegate()
 
     var isAvailable: Bool { controller != nil }
 
-    func start(automaticallyChecks: Bool, automaticallyDownloads: Bool) {
+    func start(
+        automaticallyChecks: Bool,
+        automaticallyDownloads: Bool,
+        automaticChannel: UpdateChannel
+    ) {
         guard controller == nil, canUseSignedUpdates else { return }
+        feedDelegate.automaticChannel = automaticChannel
         let value = SPUStandardUpdaterController(
             startingUpdater: true,
-            updaterDelegate: nil,
+            updaterDelegate: feedDelegate,
             userDriverDelegate: nil
         )
         value.updater.automaticallyChecksForUpdates = automaticallyChecks
@@ -24,22 +31,34 @@ final class UpdateController {
         controller = value
     }
 
-    func configure(automaticallyChecks: Bool, automaticallyDownloads: Bool) {
+    func configure(
+        automaticallyChecks: Bool,
+        automaticallyDownloads: Bool,
+        automaticChannel: UpdateChannel
+    ) {
         guard let updater = controller?.updater else {
             start(
                 automaticallyChecks: automaticallyChecks,
-                automaticallyDownloads: automaticallyDownloads
+                automaticallyDownloads: automaticallyDownloads,
+                automaticChannel: automaticChannel
             )
             return
         }
+        feedDelegate.automaticChannel = automaticChannel
         updater.automaticallyChecksForUpdates = automaticallyChecks
         updater.automaticallyDownloadsUpdates = automaticallyDownloads
     }
 
     @discardableResult
-    func checkForUpdates() -> Bool {
+    func checkForUpdates(manual: Bool, channel: UpdateChannel? = nil) -> Bool {
         guard let controller else { return false }
-        controller.checkForUpdates(nil)
+        if manual {
+            feedDelegate.manualChannel = channel ?? feedDelegate.automaticChannel
+            controller.checkForUpdates(nil)
+        } else {
+            feedDelegate.manualChannel = nil
+            controller.updater.checkForUpdatesInBackground()
+        }
         return true
     }
 
@@ -53,11 +72,43 @@ final class UpdateController {
 #else
     var isAvailable: Bool { false }
 
-    func start(automaticallyChecks: Bool, automaticallyDownloads: Bool) {}
+    func start(
+        automaticallyChecks: Bool,
+        automaticallyDownloads: Bool,
+        automaticChannel: UpdateChannel
+    ) {}
 
-    func configure(automaticallyChecks: Bool, automaticallyDownloads: Bool) {}
+    func configure(
+        automaticallyChecks: Bool,
+        automaticallyDownloads: Bool,
+        automaticChannel: UpdateChannel
+    ) {}
 
     @discardableResult
-    func checkForUpdates() -> Bool { false }
+    func checkForUpdates(manual: Bool, channel: UpdateChannel? = nil) -> Bool { false }
 #endif
 }
+
+#if canImport(Sparkle)
+private final class UpdateFeedDelegate: NSObject, SPUUpdaterDelegate {
+    var automaticChannel: UpdateChannel = .release
+    var manualChannel: UpdateChannel?
+
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        switch manualChannel ?? automaticChannel {
+        case .release:
+            "https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml"
+        case .preview:
+            "https://github.com/wzz6423/zisla/releases/download/preview/appcast.xml"
+        }
+    }
+
+    func updater(
+        _ updater: SPUUpdater,
+        didFinishUpdateCycleFor updateCheck: SPUUpdateCheck,
+        error: Error?
+    ) {
+        manualChannel = nil
+    }
+}
+#endif

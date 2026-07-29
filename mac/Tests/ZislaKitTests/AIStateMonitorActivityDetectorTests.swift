@@ -64,6 +64,38 @@ struct AIStateMonitorActivityDetectorTests {
         #expect(monitor.state.tasks == [task])
         #expect(monitor.errorDescription == nil)
     }
+
+    @Test @MainActor
+    func scheduledRefreshRemovesFinishedAutomaticTask() async {
+        let directory = monitorTempDirectory("scheduled-finish")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let now = Date(timeIntervalSince1970: 1_910_000_000)
+        let task = AIProgressTask(
+            id: "automatic-finished",
+            provider: .codex,
+            title: "Codex",
+            progress: nil,
+            status: .running,
+            updatedAt: now
+        )
+        let detector = MutableActivityDetector(tasks: [task])
+        let monitor = AIStateMonitor(
+            directoryURL: directory,
+            activityDetectors: [detector],
+            activeTaskTTL: .greatestFiniteMagnitude,
+            detectorRefreshInterval: 1,
+            now: { now }
+        )
+        defer { monitor.stop() }
+
+        monitor.start()
+        let detected = await waitForMonitorState { monitor.state.tasks == [task] }
+        #expect(detected)
+
+        detector.replaceTasks(with: [])
+        let removed = await waitForMonitorState { monitor.state.tasks.isEmpty }
+        #expect(removed)
+    }
 }
 
 private struct StaticActivityDetector: AIActivityDetecting {
@@ -80,6 +112,40 @@ private struct FailingActivityDetector: AIActivityDetecting {
     func activeTasks() throws -> [AIProgressTask] {
         throw DetectionError()
     }
+}
+
+private final class MutableActivityDetector: AIActivityDetecting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var tasks: [AIProgressTask]
+
+    init(tasks: [AIProgressTask]) {
+        self.tasks = tasks
+    }
+
+    func activeTasks() throws -> [AIProgressTask] {
+        lock.lock()
+        defer { lock.unlock() }
+        return tasks
+    }
+
+    func replaceTasks(with tasks: [AIProgressTask]) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.tasks = tasks
+    }
+}
+
+@MainActor
+private func waitForMonitorState(
+    timeout: TimeInterval = 2,
+    matching condition: @escaping () -> Bool
+) async -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if condition() { return true }
+        try? await Task.sleep(for: .milliseconds(25))
+    }
+    return condition()
 }
 
 private func monitorTempDirectory(_ label: String) -> URL {

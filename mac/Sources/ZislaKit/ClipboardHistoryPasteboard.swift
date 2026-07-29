@@ -22,13 +22,40 @@ public enum ClipboardHistoryPasteboard {
         _ content: ClipboardHistoryContent,
         to pasteboard: NSPasteboard = .general
     ) -> Bool {
-        pasteboard.clearContents()
         switch content {
         case .text(let value):
+            pasteboard.clearContents()
             return pasteboard.setString(value, forType: .string)
         case .image(let data):
+            pasteboard.clearContents()
             return pasteboard.setData(data, forType: .png)
+        case .file(let reference):
+            return writeFile(reference, to: pasteboard)
         }
+    }
+
+    /// Writes a file item back to the pasteboard: resolves the bookmark to restore
+    /// the security scope before writing the file URL; falls back to the saved URL if
+    /// the bookmark is stale.
+    private static func writeFile(
+        _ reference: ClipboardFileReference,
+        to pasteboard: NSPasteboard
+    ) -> Bool {
+        var stale = false
+        let resolved = try? URL(
+            resolvingBookmarkData: reference.bookmark,
+            options: [.withSecurityScope, .withoutUI],
+            relativeTo: nil,
+            bookmarkDataIsStale: &stale
+        )
+        let url = (resolved ?? reference.url).standardizedFileURL
+        guard url.isFileURL, FileManager.default.fileExists(atPath: url.path) else {
+            return false
+        }
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+        pasteboard.clearContents()
+        return pasteboard.writeObjects([url as NSURL])
     }
 
     private static func pngData(fromTIFF data: Data) -> Data? {

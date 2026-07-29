@@ -107,8 +107,8 @@ struct LockScreenOverlayView: View {
         }
     }
 
-    /// 纯透射磨砂玻璃卡片：NSVisualEffectView 折射锁屏壁纸，无暗色底，
-    /// 顶部高光描边模拟玻璃边缘。降低 alpha 让壁纸穿透更明显。
+    /// Pure frosted-glass card: NSVisualEffectView refracts the lock screen wallpaper with no dark underlay;
+    /// top highlight stroke simulates a glass edge. Lower alpha makes the wallpaper bleed through more visibly.
     private var glassBackground: some View {
         VisualEffectBackground(alphaValue: 0.55)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -140,7 +140,7 @@ struct LockScreenOverlayView: View {
 
     private func artwork(for item: NowPlayingSnapshot) -> some View {
         Group {
-            if let data = item.artworkData, let image = NSImage(data: data) {
+            if let image = MediaArtworkImageCache.image(from: item.artworkData) {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
@@ -193,17 +193,12 @@ struct LockScreenOverlayView: View {
         }
     }
 
-    /// 将歌名与歌手合并为一行「歌名 · 歌手」；歌手为空或与歌名相同时只显示歌名。
+    /// Merges title and artist into a single "title · artist" line; shows only the title when artist is empty or same as title.
     nonisolated private static func titleArtistText(_ item: NowPlayingSnapshot) -> String {
-        let title = item.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let artist = item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
-        if artist.isEmpty || artist.compare(title, options: .caseInsensitive) == .orderedSame {
-            return title
-        }
-        return "\(title) · \(artist)"
+        MediaTextFormatting.titleArtistText(item)
     }
 
-    /// 当前歌词行，过长时水平滚动（跑马灯）；播放时随进度推进。
+    /// Current lyrics line, scrolling horizontally when too long (marquee); advances with playback progress.
     @ViewBuilder
     private func currentLyrics(_ item: NowPlayingSnapshot) -> some View {
         if item.isPlaying {
@@ -224,18 +219,16 @@ struct LockScreenOverlayView: View {
     }
 
     private func currentLyricText(_ item: NowPlayingSnapshot, date: Date) -> String {
-        let elapsed = item.elapsedTime(at: date) ?? 0
-        // 优先使用 snapshot 内嵌歌词；若 snapshot 尚未携带（如锁屏刚刷新、
-        // applyLyrics 尚未回写），回退到 NowPlayingService 已解析的缓存歌词。
-        let lyrics = item.lyrics ?? media.resolvedLyrics
-        return if let lyrics {
-            lyrics.currentLine(at: elapsed) ?? "歌词即将开始"
-        } else {
-            "暂无同步歌词"
-        }
+        // Prefer lyrics embedded in the snapshot; fall back to NowPlayingService's parsed lyric cache
+        // if the snapshot doesn't carry them yet (e.g. lock screen just refreshed, applyLyrics not yet written back).
+        MediaTextFormatting.lyricLine(
+            item,
+            lyrics: item.lyrics ?? media.resolvedLyrics,
+            date: date
+        )
     }
 
-    /// 播放进度条：播放时实时推进，支持点击或拖动调整进度。
+    /// Playback progress bar: advances in real time while playing; supports tap or drag to seek.
     @ViewBuilder
     private func playbackProgress(for item: NowPlayingSnapshot) -> some View {
         if let duration = item.duration, duration > 0 {

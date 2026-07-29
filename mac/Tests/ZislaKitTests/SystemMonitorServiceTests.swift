@@ -6,12 +6,13 @@ import Testing
 
 // MARK: - Mock FileManager
 
-/// 依赖注入用的假 FileManager；不触碰真实文件系统。
+/// Fake FileManager for dependency injection; never touches the real filesystem.
 final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
     var existingPaths: Set<String> = []
     var directoryContents: [String: [URL]] = [:]
     var fileSystemAttributes: [String: [FileAttributeKey: Any]] = [:]
     var fileAttributes: [String: [FileAttributeKey: Any]] = [:]
+    var volumeCapacities: [String: (total: UInt64, available: UInt64)] = [:]
     var trashResults: [URL: Result<URL, Error>] = [:]
     var homeDirectory: URL = URL(fileURLWithPath: "/Users/test")
     var temporaryDirectory: URL = URL(fileURLWithPath: "/private/var/folders/test/T")
@@ -88,7 +89,7 @@ final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
     }
 
     func volumeCapacity(for url: URL) -> (total: UInt64, available: UInt64)? {
-        nil
+        volumeCapacities[url.path]
     }
 }
 
@@ -98,7 +99,7 @@ private struct StubPublicIPProvider: PublicIPProviding {
     func publicIPAddress() async -> String? { address }
 }
 
-/// 可计数、可按序返回的公网 IP stub；测试在 MainActor 上串行驱动，无需锁。
+/// Countable public-IP stub that returns addresses in order; tests drive it serially on MainActor, so no lock is needed.
 private final class CountingPublicIPProvider: PublicIPProviding, @unchecked Sendable {
     private var addresses: [String?]
     private(set) var callCount = 0
@@ -119,7 +120,7 @@ private final class CountingPublicIPProvider: PublicIPProviding, @unchecked Send
     }
 }
 
-/// 测试用可控时钟；`dateProvider` 为 `@Sendable` 闭包，本类仅在测试串行路径上读写。
+/// Controllable clock for tests; `dateProvider` is a `@Sendable` closure, and this class is only read/written on the serial test path.
 private final class ControllableDateProvider: @unchecked Sendable {
     private var current: Date
 
@@ -136,8 +137,8 @@ private final class ControllableDateProvider: @unchecked Sendable {
 
 // MARK: - Tests
 //
-// 合并为单一 suite，确保 `swift test --filter SystemMonitorServiceTests`
-// 覆盖数学、路径安全、清理与服务集成全部用例。
+// Merged into a single suite so `swift test --filter SystemMonitorServiceTests`
+// covers math, path safety, cleanup, and service integration cases.
 
 @MainActor
 struct SystemMonitorServiceTests {
@@ -176,7 +177,7 @@ struct SystemMonitorServiceTests {
 
     @Test
     func networkRatesHandleCounterRollover() {
-        // 计数器回绕时用当前值作为增量
+        // On counter rollover, treat the current value as the delta
         let (rx, tx) = SystemMonitorMath.networkRates(
             previousReceived: 1000, previousSent: 500,
             currentReceived: 100, currentSent: 50,
@@ -235,6 +236,15 @@ struct SystemMonitorServiceTests {
 
         #expect(average == 67)
         #expect(AppleSMCSensorReader.averageCelsius([0, 125]) == nil)
+    }
+
+    @Test
+    func appleSMCFanRPMAllowsStoppedFanAndRejectsInvalidValues() {
+        #expect(AppleSMCSensorReader.isValidFanRPM(0))
+        #expect(AppleSMCSensorReader.isValidFanRPM(20_000))
+        #expect(!AppleSMCSensorReader.isValidFanRPM(-0.1))
+        #expect(!AppleSMCSensorReader.isValidFanRPM(20_000.1))
+        #expect(!AppleSMCSensorReader.isValidFanRPM(.nan))
     }
 
     @Test
@@ -418,7 +428,7 @@ struct SystemMonitorServiceTests {
 
     @Test
     func pathWithinAllowedRootsRejectsSiblingPrefix() {
-        // 防止 "/a/Caches" 误判 "/a/Caches-evil" 为子路径
+        // Prevent "/a/Caches" from treating "/a/Caches-evil" as a subpath
         let root = URL(fileURLWithPath: "/Users/test/Library/Caches")
         let sibling = URL(fileURLWithPath: "/Users/test/Library/Caches-evil")
         #expect(!SystemMonitorPathSafety.isURL(sibling, withinAllowedRoots: [root]))
@@ -457,7 +467,7 @@ struct SystemMonitorServiceTests {
 
         let roots = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: mock)
 
-        // 开发产物与包管理缓存
+        // Developer artifacts and package-manager caches
         #expect(roots.contains { $0.path.contains("DerivedData") })
         #expect(roots.contains { $0.path.contains("CoreSimulator/Caches") })
         #expect(roots.contains { $0.path.contains(".npm") })
@@ -465,13 +475,13 @@ struct SystemMonitorServiceTests {
         #expect(roots.contains { $0.path.contains(".bun/install/cache") })
         #expect(roots.contains { $0.path.contains(".cache/uv") })
         #expect(roots.contains { $0.path == "/private/var/folders/test/T" })
-        // 用户缓存、日志、废纸篓
+        // User caches, logs, and Trash
         #expect(roots.contains { $0.path == "/Users/test/Library/Caches" })
         #expect(roots.contains { $0.path == "/Users/test/Library/Logs" })
         #expect(roots.contains { $0.path == "/Users/test/.Trash" })
-        // /private/tmp 通过 /tmp 这个 macOS 别名作为 temporaryFiles 根加入
+        // /private/tmp is added as a temporaryFiles root via the macOS /tmp alias
         #expect(roots.contains { $0.path == "/tmp" })
-        // 系统级路径仍被排除
+        // System-level paths remain excluded
         #expect(!roots.contains { $0.path == "/Library/Caches" })
         #expect(!roots.contains { $0.path == "/Library/Logs" })
     }
@@ -511,12 +521,12 @@ struct SystemMonitorServiceTests {
         #expect(roots.contains { $0.kind == .packageManagerCache && $0.url.path.contains("org.carthage.CarthageKit") })
         #expect(roots.contains { $0.kind == .packageManagerCache && $0.url.path.contains(".bun/install/cache") })
         #expect(roots.contains { $0.kind == .packageManagerCache && $0.url.path.contains(".cache/pip") })
-        // 新增类别
-        #expect(roots.contains { $0.kind == .cache && $0.url.path == "/Users/test/Library/Caches" })
+        // Newly added categories
+        #expect(roots.contains { $0.kind == .appCache && $0.url.path == "/Users/test/Library/Caches" })
         #expect(roots.contains { $0.kind == .log && $0.url.path == "/Users/test/Library/Logs" })
         #expect(roots.contains { $0.kind == .crashReport && $0.url.path == "/Users/test/Library/Logs/DiagnosticReports" })
         #expect(roots.contains { $0.kind == .trash && $0.url.path == "/Users/test/.Trash" })
-        // 系统级与敏感路径仍被排除
+        // System-level and sensitive paths remain excluded
         let excludedPaths = [
             "/Users/test/Library/Application Support/CrashReporter",
             "/Users/test/Library/Developer/Xcode/Archives",
@@ -528,7 +538,7 @@ struct SystemMonitorServiceTests {
         for path in excludedPaths {
             #expect(!roots.contains { $0.url.path == path })
         }
-        // Application Support 与用户文档不在扫描根中
+        // Application Support and user documents are not scan roots
         #expect(!roots.contains { $0.url.path.contains("Application Support") })
         #expect(!roots.contains { $0.url.path == "/Users/test/Documents" })
     }
@@ -547,7 +557,7 @@ struct SystemMonitorServiceTests {
         let swiftPM = roots.filter { $0.url.path.contains("org.swift.swiftpm") }
         #expect(swiftPM.count == 1)
         #expect(swiftPM.first?.kind == .packageManagerCache)
-        // 同一路径不得同时以 cache 与 packageManagerCache 注册
+        // The same path must not be registered as both cache and packageManagerCache
         let path = swiftPM.first!.url.path
         #expect(roots.filter { $0.url.path == path }.count == 1)
     }
@@ -573,7 +583,7 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
-    func scanCandidatesSkipsDedicatedPackageRootUnderGenericCache() {
+    func scanCandidatesSkipsDedicatedPackageRootUnderApplicationCache() {
         let mock = MockFileManager()
         mock.homeDirectory = URL(fileURLWithPath: "/Users/test")
         mock.searchPathResults = [
@@ -592,13 +602,13 @@ struct SystemMonitorServiceTests {
 
         let candidates = SystemDiskCleanup.scanCandidates(
             fileManager: mock,
-            kinds: [.cache, .packageManagerCache]
+            kinds: [.appCache, .packageManagerCache]
         )
 
-        #expect(candidates.contains { $0.kind == .cache && $0.displayName == "com.example.app" })
+        #expect(candidates.contains { $0.kind == .appCache && $0.displayName == "com.example.app 缓存" })
         #expect(candidates.contains { $0.kind == .packageManagerCache && $0.displayName == "manifests" })
-        // package 根本身不应再作为通用缓存子项出现
-        #expect(!candidates.contains { $0.kind == .cache && $0.displayName == "org.swift.swiftpm" })
+        // The package root itself must not also appear as an app-cache child
+        #expect(!candidates.contains { $0.kind == .appCache && $0.displayName == "org.swift.swiftpm 缓存" })
         #expect(candidates.filter { $0.url.path == packageChild.path }.count == 1)
     }
 
@@ -629,7 +639,7 @@ struct SystemMonitorServiceTests {
 
         #expect(candidates.count == 2)
         #expect(candidates.allSatisfy { $0.kind == .developerArtifacts })
-        // 按体积降序
+        // Sorted by size descending
         #expect(candidates.first?.displayName == "app2")
     }
 
@@ -648,7 +658,7 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
-    func scanCandidatesFindsUserCacheAndLogChildren() {
+    func scanCandidatesFindsApplicationCacheAndLogChildren() {
         let mock = MockFileManager()
         mock.homeDirectory = URL(fileURLWithPath: "/Users/test")
         mock.searchPathResults = [
@@ -665,10 +675,98 @@ struct SystemMonitorServiceTests {
         mock.fileAttributes[cacheChild.path] = [.size: NSNumber(value: 4096)]
         mock.fileAttributes[logChild.path] = [.size: NSNumber(value: 512)]
 
-        let candidates = SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.cache, .log])
+        let candidates = SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.appCache, .log])
 
-        #expect(candidates.contains { $0.kind == .cache && $0.displayName == "com.example.app" })
+        #expect(candidates.contains { $0.kind == .appCache && $0.displayName == "com.example.app 缓存" })
         #expect(candidates.contains { $0.kind == .log && $0.displayName == "app.log" })
+    }
+
+    @Test
+    func scanCandidatesFindsOnlyApplicationAndContainerCacheDirectories() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+        let libraryCaches = home.appendingPathComponent("Library/Caches")
+        let desktopCache = libraryCaches.appendingPathComponent("com.example.desktop")
+        let containers = home.appendingPathComponent("Library/Containers")
+        let sandbox = containers.appendingPathComponent("com.example.sandbox")
+        let sandboxCache = sandbox.appendingPathComponent("Data/Library/Caches", isDirectory: true)
+        let sandboxSupport = sandbox.appendingPathComponent("Data/Library/Application Support")
+        let groups = home.appendingPathComponent("Library/Group Containers")
+        let group = groups.appendingPathComponent("group.com.example.shared")
+        let groupCache = group.appendingPathComponent("Library/Caches", isDirectory: true)
+        let groupSupport = group.appendingPathComponent("Library/Application Support")
+
+        mock.existingPaths = [
+            libraryCaches.path, desktopCache.path,
+            containers.path, sandbox.path, sandboxCache.path, sandboxSupport.path,
+            groups.path, group.path, groupCache.path, groupSupport.path,
+        ]
+        mock.directoryContents[libraryCaches.path] = [desktopCache]
+        mock.directoryContents[containers.path] = [sandbox]
+        mock.directoryContents[groups.path] = [group]
+        mock.fileAttributes[desktopCache.path] = [.size: NSNumber(value: 4_096)]
+        mock.fileAttributes[sandboxCache.path] = [.size: NSNumber(value: 8_192)]
+        mock.fileAttributes[groupCache.path] = [.size: NSNumber(value: 16_384)]
+
+        let candidates = SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.appCache])
+
+        #expect(candidates.map(\.url).contains(desktopCache.standardizedFileURL))
+        #expect(candidates.map(\.url).contains(sandboxCache.standardizedFileURL))
+        #expect(candidates.map(\.url).contains(groupCache.standardizedFileURL))
+        #expect(candidates.allSatisfy { $0.kind == .appCache })
+        #expect(candidates.contains { $0.displayName == "com.example.sandbox 缓存" })
+        #expect(candidates.contains { $0.detail?.contains("沙盒应用缓存") == true })
+        #expect(!candidates.map(\.url).contains(sandboxSupport.standardizedFileURL))
+        #expect(!candidates.map(\.url).contains(groupSupport.standardizedFileURL))
+    }
+
+    @Test
+    func applicationContainerCleanupRootsExcludeApplicationData() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+        let containers = home.appendingPathComponent("Library/Containers")
+        let sandbox = containers.appendingPathComponent("com.example.sandbox")
+        let cache = sandbox.appendingPathComponent("Data/Library/Caches", isDirectory: true)
+        let applicationSupport = sandbox.appendingPathComponent("Data/Library/Application Support")
+        mock.existingPaths = [containers.path, sandbox.path, cache.path, applicationSupport.path]
+        mock.directoryContents[containers.path] = [sandbox]
+
+        let roots = SystemDiskCleanup.allowedScanRoots(fileManager: mock)
+
+        #expect(roots.contains { $0.kind == .appCache && $0.url == cache.standardizedFileURL })
+        #expect(!roots.contains { $0.url == applicationSupport.standardizedFileURL })
+        #expect(!SystemMonitorPathSafety.isURL(applicationSupport, withinAllowedRoots: roots.map(\.url)))
+    }
+
+    @Test
+    func trashSelectedAllowsContainerCacheButRejectsNeighboringApplicationData() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+        let containers = home.appendingPathComponent("Library/Containers")
+        let sandbox = containers.appendingPathComponent("com.example.sandbox")
+        let cache = sandbox.appendingPathComponent("Data/Library/Caches")
+        let cacheFile = cache.appendingPathComponent("thumbnail")
+        let applicationSupport = sandbox.appendingPathComponent("Data/Library/Application Support")
+        let userData = applicationSupport.appendingPathComponent("database.sqlite")
+        mock.existingPaths = [
+            containers.path, sandbox.path, cache.path, cacheFile.path, applicationSupport.path, userData.path,
+        ]
+        mock.directoryContents[containers.path] = [sandbox]
+        mock.trashResults[cacheFile.standardizedFileURL] = .success(URL(fileURLWithPath: "/Users/test/.Trash/thumbnail"))
+
+        let result = SystemDiskCleanup.trashSelected(
+            urls: [cacheFile, userData],
+            fileManager: mock,
+            sizeProvider: { _ in 1 }
+        )
+
+        #expect(result.successCount == 1)
+        #expect(result.failures.count == 1)
+        #expect(result.failures.first?.url == userData.standardizedFileURL)
+        #expect(result.failures.first?.message.contains("允许清理的用户目录") == true)
     }
 
     @Test
@@ -729,9 +827,9 @@ struct SystemMonitorServiceTests {
 
         let roots = SystemDiskCleanup.allowedScanRoots(fileManager: mock)
 
-        // /private/tmp 通过 /tmp 这个 macOS 别名作为 temporaryFiles 根存在
+        // /private/tmp exists as a temporaryFiles root via the macOS /tmp alias
         #expect(roots.contains { $0.kind == .temporaryFiles && $0.url.path == "/tmp" })
-        // /tmp（符号链接）与 /private/tmp 解析后路径相同，不得重复出现
+        // /tmp (symlink) and /private/tmp resolve to the same path and must not both appear
         #expect(roots.filter { $0.url.path == "/private/tmp" || $0.url.path == "/tmp" }.count == 1)
     }
 
@@ -741,7 +839,7 @@ struct SystemMonitorServiceTests {
         let tmpRoot = URL(fileURLWithPath: "/tmp")
         let stale = tmpRoot.appendingPathComponent("stale-session-cache")
         let recent = tmpRoot.appendingPathComponent("active-process-socket")
-        // temporaryDirectory 指向用户专属目录，不影响 /private/tmp 被加入扫描根
+        // temporaryDirectory points at a user-private dir and must not stop /private/tmp from being a scan root
         mock.temporaryDirectory = URL(fileURLWithPath: "/private/var/folders/test/T")
         mock.existingPaths = [tmpRoot.path, stale.path, recent.path]
         mock.directoryContents[tmpRoot.path] = [stale, recent]
@@ -756,7 +854,7 @@ struct SystemMonitorServiceTests {
 
         let candidates = SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.temporaryFiles])
 
-        // 只有旧文件（≥7 天）被列出
+        // Only stale files (≥7 days) are listed
         #expect(candidates.contains { $0.kind == .temporaryFiles && $0.url == stale.standardizedFileURL })
         #expect(!candidates.contains { $0.url == recent.standardizedFileURL })
     }
@@ -914,7 +1012,7 @@ struct SystemMonitorServiceTests {
     @Test
     func serviceInitializesWithSaneDefaults() {
         let service = SystemMonitorService()
-        #expect(service.samplingInterval >= 0.2)
+        #expect(service.samplingInterval == 1.5)
         #expect(service.snapshot == nil)
         #expect(!service.isSampling)
     }
@@ -946,7 +1044,7 @@ struct SystemMonitorServiceTests {
         #expect(snapshot.disk.freeBytes == 100_000_000_000)
         #expect(snapshot.disk.usedBytes == 400_000_000_000)
 
-        // GPU 无读数时必须显式不可用；有 IOAccelerator 读数时限制在合法范围。
+        // GPU without readings must be explicitly unavailable; IOAccelerator readings stay in a valid range.
         switch snapshot.gpu {
         case let .unavailable(gpuReason): #expect(gpuReason.contains("GPU"))
         case let .available(metrics): #expect((0...1).contains(metrics.usage))
@@ -960,7 +1058,7 @@ struct SystemMonitorServiceTests {
             #expect(detail == "AppleSMC 只读")
         }
 
-        // 首次采样无历史，CPU 与网络速率为 0
+        // First sample has no history, so CPU and network rates are 0
         #expect(snapshot.cpu.usage == 0)
         #expect(snapshot.network.receiveBytesPerSecond == 0)
         #expect(snapshot.network.sendBytesPerSecond == 0)
@@ -1005,11 +1103,45 @@ struct SystemMonitorServiceTests {
         mock.existingPaths = [file.path]
         mock.fileAttributes[file.path] = [.size: NSNumber(value: 1024)]
         mock.trashResults[file.standardizedFileURL] = .success(URL(fileURLWithPath: "/Users/test/.Trash/temp"))
+        mock.volumeCapacities[mock.homeDirectory.path] = (total: 1_000, available: 400)
 
-        let result = await SystemMonitorService(fileManager: mock).trashSelected([file])
+        let service = SystemMonitorService(fileManager: mock, hardwareInfoProvider: { .unavailable })
+        _ = await service.sampleOnce()
+        mock.volumeCapacities[mock.homeDirectory.path] = (total: 1_000, available: 700)
+
+        let result = await service.trashSelected([file])
 
         #expect(result.successCount == 1)
         #expect(result.failures.isEmpty)
+        #expect(service.snapshot?.disk.freeBytes == 700)
+    }
+
+    @Test
+    func successfulCleanupRefreshesDiskCapacityAgainAfterConfiguredDelay() async {
+        let mock = MockFileManager()
+        let volume = URL(fileURLWithPath: "/Users/test")
+        let file = volume.appendingPathComponent(".cache/temp")
+        mock.homeDirectory = volume
+        mock.existingPaths = [file.path]
+        mock.fileAttributes[file.path] = [.size: NSNumber(value: 1024)]
+        mock.trashResults[file.standardizedFileURL] = .success(URL(fileURLWithPath: "/Users/test/.Trash/temp"))
+        mock.volumeCapacities[volume.path] = (total: 1_000, available: 400)
+
+        let service = SystemMonitorService(
+            fileManager: mock,
+            volumeURL: volume,
+            hardwareInfoProvider: { .unavailable },
+            postCleanupDiskRefreshDelay: .milliseconds(10)
+        )
+        _ = await service.sampleOnce()
+        mock.volumeCapacities[volume.path] = (total: 1_000, available: 700)
+
+        _ = await service.trashSelected([file])
+        mock.volumeCapacities[volume.path] = (total: 1_000, available: 900)
+
+        await waitUntil(timeoutSeconds: 2) {
+            service.snapshot?.disk.freeBytes == 900
+        }
     }
 
     @Test
@@ -1027,6 +1159,58 @@ struct SystemMonitorServiceTests {
         #expect(service.isSampling)
         service.stop()
         #expect(!service.isSampling)
+    }
+
+    @Test
+    func diskCapacityTimerRefreshesCapacityIndependentlyOfRegularSampling() async {
+        let mock = MockFileManager()
+        let volume = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = volume
+        mock.volumeCapacities[volume.path] = (total: 1_000, available: 400)
+        let service = SystemMonitorService(
+            samplingInterval: 10,
+            fileManager: mock,
+            volumeURL: volume,
+            hardwareInfoProvider: { .unavailable },
+            diskCapacityRefreshInterval: 0.01
+        )
+        _ = await service.sampleOnce()
+        mock.volumeCapacities[volume.path] = (total: 1_000, available: 700)
+
+        service.start()
+        await waitUntil(timeoutSeconds: 2) {
+            service.snapshot?.disk.freeBytes == 700
+        }
+        service.stop()
+
+        #expect(service.snapshot?.disk.freeBytes == 700)
+    }
+
+    @Test
+    func diskCapacityRefreshesAfterThreeMinutes() async {
+        let mock = MockFileManager()
+        let volume = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = volume
+        mock.volumeCapacities[volume.path] = (total: 1_000, available: 400)
+        let clock = ControllableDateProvider(Date(timeIntervalSince1970: 1_700_000_000))
+        let service = SystemMonitorService(
+            fileManager: mock,
+            volumeURL: volume,
+            dateProvider: { clock.now() },
+            publicIPProvider: StubPublicIPProvider(address: nil),
+            hardwareInfoProvider: { .unavailable }
+        )
+
+        _ = await service.sampleOnce()
+        #expect(service.snapshot?.disk.freeBytes == 400)
+        mock.volumeCapacities[volume.path] = (total: 1_000, available: 700)
+        clock.advance(by: 3 * 60 - 1)
+        _ = await service.sampleOnce()
+        #expect(service.snapshot?.disk.freeBytes == 400)
+
+        clock.advance(by: 1)
+        _ = await service.sampleOnce()
+        #expect(service.snapshot?.disk.freeBytes == 700)
     }
 
     @Test
@@ -1049,21 +1233,21 @@ struct SystemMonitorServiceTests {
             hardwareInfoProvider: { .unavailable }
         )
 
-        // sampleOnce 会调度后台周期查询；首次应写入公网 IP。
+        // sampleOnce schedules a background periodic query; the first call should write the public IP.
         _ = await service.sampleOnce()
         await waitUntil(timeoutSeconds: 2) { provider.callCount >= 1 }
         #expect(provider.callCount == 1)
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.1")
         #expect(service.publicIPAddress == "203.0.113.1")
 
-        // 未满周期：再次采样不应触发 provider。
+        // Within the throttle window: another sample must not hit the provider.
         clock.advance(by: 5 * 60)
         _ = await service.sampleOnce()
         await Task.yield()
         try? await Task.sleep(nanoseconds: 50_000_000)
         #expect(provider.callCount == 1)
 
-        // 满周期后再采样：应自动更新。
+        // After the period elapses, sampling should refresh automatically.
         clock.advance(by: 5 * 60)
         _ = await service.sampleOnce()
         await waitUntil(timeoutSeconds: 2) { provider.callCount >= 2 }
@@ -1096,7 +1280,7 @@ struct SystemMonitorServiceTests {
         #expect(provider.callCount == 1)
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "198.51.100.1")
 
-        // 用户显式点击刷新：即使距上次后台查询不足周期，也必须再次调用并更新快照。
+        // Explicit user refresh must call again and update the snapshot even if the background period has not elapsed.
         clock.advance(by: 1)
         await service.refreshPublicIPAddress()
         #expect(provider.callCount == 2)
@@ -1104,7 +1288,7 @@ struct SystemMonitorServiceTests {
         #expect(service.publicIPAddress == "198.51.100.2")
     }
 
-    /// 轮询直到条件成立或超时；用于等待 sampleOnce 派发的后台公网 IP 任务。
+    /// Poll until the condition holds or times out; used to wait for the public-IP task scheduled by sampleOnce.
     private func waitUntil(
         timeoutSeconds: TimeInterval,
         pollNanoseconds: UInt64 = 10_000_000,

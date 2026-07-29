@@ -63,8 +63,8 @@ public struct FocusModeStatus: Equatable, Sendable {
     }
 }
 
-/// 通过 DoNotDisturb 私有框架监听 macOS 系统专注模式。
-/// 私有接口缺失或签名变化时保持不可用状态，避免影响其他功能。
+/// Monitors macOS Focus Mode via the private DoNotDisturb framework.
+/// Stays unavailable when private APIs are missing or have changed signatures, to avoid affecting other features.
 @MainActor
 public final class FocusModeMonitor: ObservableObject {
     @Published public private(set) var status = FocusModeStatus.inactive

@@ -25,7 +25,7 @@ public struct AIStateStorageChangeToken: Equatable, Sendable {
     }
 }
 
-/// AI 聚合状态的 SQLite 仓库。
+/// SQLite repository for aggregated AI state.
 public struct AIStateRepository {
     public let directoryURL: URL
     private let maximumUsageSamples: Int

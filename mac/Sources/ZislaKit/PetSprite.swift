@@ -1,11 +1,11 @@
 import AppKit
 import Foundation
 
-/// 一只像素宠物的可渲染精灵。
+/// Renderable sprite for a pixel pet.
 ///
-/// 支持两种来源：
-/// - 单帧 PNG：由 `PetSpriteView` 做程序化 idle（浮动/呼吸/偶尔小跳）赋予生命；
-/// - 水平帧带 PNG（`frameWidth` + `frames` 指定）：按 `fps` 循环播放。
+/// Supports two sources:
+/// - Single-frame PNG: `PetSpriteView` animates it programmatically (float/breathe/occasional hop);
+/// - Horizontal sprite sheet PNG (`frameWidth` + `frames` specified): plays back in a loop at `fps`.
 public struct PetSprite: Sendable {
     public let image: NSImage
     public let frameSize: CGSize
@@ -27,7 +27,7 @@ public struct PetSprite: Sendable {
         self.fps = max(1, fps ?? 6)
     }
 
-    /// 取第 index 帧的 NSImage（单帧直接返回整图）。
+    /// Returns the `NSImage` for frame at `index` (returns the full image for a single-frame sprite).
     public func frame(at index: Int) -> NSImage {
         guard frames > 1 else { return image }
         let i = ((index % frames) + frames) % frames

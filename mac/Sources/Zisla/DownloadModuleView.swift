@@ -38,13 +38,18 @@ struct DownloadModuleView: View {
             }
 
             HStack(spacing: 10) {
-                Picker("格式", selection: $model.downloadMode) {
-                    Label("视频", systemImage: "film.fill").tag(DownloadMode.video)
-                    Label("音频", systemImage: "waveform").tag(DownloadMode.audio)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 178)
+                IslandOutlinedPicker(
+                    selection: $model.downloadMode,
+                    options: [.video, .audio],
+                    title: { $0 == .video ? "视频" : "音频" },
+                    selectionID: "download-mode-selection",
+                    symbol: { $0 == .video ? "film.fill" : "waveform" },
+                    fontSize: 11,
+                    width: 178,
+                    height: 28
+                )
                 .disabled(model.downloadState.isRunning)
+                .opacity(model.downloadState.isRunning ? 0.45 : 1)
 
                 Button {
                     chooseDirectory()
@@ -78,7 +83,7 @@ struct DownloadModuleView: View {
                         Label("下载", systemImage: "arrow.down")
                             .frame(width: 76, height: 28)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     .disabled(model.downloadURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
@@ -86,7 +91,7 @@ struct DownloadModuleView: View {
             downloadStatus
                 .frame(maxWidth: .infinity, minHeight: 52, maxHeight: 52)
         }
-        .frame(height: 160)
+        .frame(height: 138)
     }
 
     @ViewBuilder
@@ -153,7 +158,7 @@ struct DownloadModuleView: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.directoryURL = model.downloadDirectory
-        WindowPlacement.center(panel, on: WindowPlacement.screenUnderMouse())
+        WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
         guard panel.runModal() == .OK, let url = panel.url else { return }
         model.downloadDirectory = url
         if let bookmark = try? url.bookmarkData(

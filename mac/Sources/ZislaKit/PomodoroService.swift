@@ -35,17 +35,17 @@ public enum PomodoroPhase: Equatable, Sendable {
     case paused
 }
 
-/// 纯状态/时间计算：用 deadline 推剩余时间，暂停时冻结 remaining。
+/// Pure state/time calculation: derives remaining time from a deadline; freezes remaining when paused.
 public struct PomodoroEngine: Equatable, Sendable {
     public var mode: PomodoroMode
     public var phase: PomodoroPhase
-    /// 运行中：结束时刻；暂停/空闲：未使用。
+    /// Running: end time; paused/idle: unused.
     public var deadline: Date?
-    /// 暂停时冻结的剩余秒数；idle 时等于当前模式时长。
+    /// Remaining seconds frozen at pause; equals the current mode's duration when idle.
     public var remainingWhenPaused: TimeInterval
-    /// 可配置的专注时长（秒），默认 25 分钟。
+    /// Configurable focus duration in seconds; default 25 minutes.
     public var focusDuration: TimeInterval
-    /// 可配置的休息时长（秒），默认 5 分钟。
+    /// Configurable rest duration in seconds; default 5 minutes.
     public var restDuration: TimeInterval
 
     public init(
@@ -64,7 +64,7 @@ public struct PomodoroEngine: Equatable, Sendable {
         self.remainingWhenPaused = remainingWhenPaused ?? (mode == .focus ? focusDuration : restDuration)
     }
 
-    /// 返回指定模式的当前配置时长。
+    /// Returns the configured duration for the given mode.
     public func duration(for mode: PomodoroMode) -> TimeInterval {
         switch mode {
         case .focus: focusDuration
@@ -99,7 +99,7 @@ public struct PomodoroEngine: Equatable, Sendable {
         return String(format: "%02d:%02d", t.minutes, t.seconds)
     }
 
-    /// 始终零补齐的 `HH:MM:SS`（例如 29 分 28 秒 → `00:29:28`）。
+    /// Always zero-padded `HH:MM:SS` (e.g. 29 minutes 28 seconds → `00:29:28`).
     public static func formatHHMMSS(at now: Date = Date(), engine: PomodoroEngine) -> String {
         let t = engine.displayTime(at: now)
         return String(format: "%02d:%02d:%02d", t.minutes / 60, t.minutes % 60, t.seconds)
@@ -132,7 +132,7 @@ public struct PomodoroEngine: Equatable, Sendable {
         remainingWhenPaused = duration(for: mode)
     }
 
-    /// 若运行中且已到/超过 deadline，切换到下一模式并回到 idle；返回是否发生切换。
+    /// If running and the deadline has been reached or passed, switches to the next mode and returns to idle; returns whether a transition occurred.
     @discardableResult
     public mutating func completeIfNeeded(at now: Date = Date()) -> Bool {
         guard phase == .running else { return false }
@@ -145,7 +145,7 @@ public struct PomodoroEngine: Equatable, Sendable {
         return true
     }
 
-    /// 测试辅助：强制以指定剩余时间进入 running。
+    /// Test helper: force-enters the running state with the specified remaining time.
     public mutating func startWithRemaining(_ remaining: TimeInterval, at now: Date = Date()) {
         remainingWhenPaused = max(0, remaining)
         deadline = now.addingTimeInterval(remainingWhenPaused)
@@ -157,6 +157,8 @@ public struct PomodoroEngine: Equatable, Sendable {
 public final class PomodoroService: ObservableObject {
     @Published public private(set) var engine = PomodoroEngine()
     @Published public private(set) var displayClock = "25:00"
+    /// When "mute notifications" is on, Pomodoro completion notifications are suppressed; synced by `AppModel` from settings.
+    public var notificationsMuted = false
 
     private var timer: Timer?
     private let notificationCenter: UNUserNotificationCenter
@@ -297,6 +299,7 @@ public final class PomodoroService: ObservableObject {
     }
 
     private func notifyCompletion(of mode: PomodoroMode) {
+        guard !notificationsMuted else { return }
         let content = UNMutableNotificationContent()
         switch mode {
         case .focus:

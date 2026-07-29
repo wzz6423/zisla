@@ -4,6 +4,15 @@ import Testing
 
 struct FeatureSettingsCompatibilityTests {
     @Test
+    func aiProgressDefaultsEnabledForNewAndLegacySettings() throws {
+        #expect(FeatureSettings.default.aiProgressEnabled)
+
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(decoded.aiProgressEnabled)
+    }
+
+    @Test
     func settingsMissingActivityDurationFailDecoding() {
         let data = Data(#"{"appearanceMode":"light","mediaEnabled":false,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"updateChecksEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true}"#.utf8)
 
@@ -62,6 +71,36 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
+    func mediaCompactStyleDefaultsForLegacySettingsAndRoundTrips() throws {
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let decodedLegacy = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(decodedLegacy.mediaCompactStyle == .compact)
+
+        var settings = FeatureSettings.default
+        settings.mediaCompactStyle = .detailed
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(decoded.mediaCompactStyle == .detailed)
+    }
+
+    @Test
+    func updateChannelDefaultsForLegacySettingsAndRoundTrips() throws {
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let decodedLegacy = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(decodedLegacy.updateChannel == .release)
+
+        var settings = FeatureSettings.default
+        settings.updateChannel = .preview
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(decoded.updateChannel == .preview)
+    }
+
+    @Test
     func activityNoticeDisplaySelectionUsesConnectedScreensWhenUnconfiguredOrUnavailable() {
         var settings = FeatureSettings.default
         let connected: Set<UInt32> = [1, 2]
@@ -111,6 +150,29 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
+    func islandZOrderAndNotificationMuteDefaultWhenMissingFromLegacyJSON() throws {
+        let data = Data(#"{"mediaEnabled":true,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"calendarEnabled":true,"toolboxEnabled":true,"weatherEnabled":true,"updateChecksEnabled":true,"automaticUpdatesEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true,"hoverActivationEnabled":true,"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: data)
+        // Legacy configs lack these keys: collapsed island defaults to on-top; notifications default unmuted.
+        #expect(decoded.islandCollapsedOnTop == true)
+        #expect(decoded.notificationsMuted == false)
+    }
+
+    @Test
+    func islandZOrderAndNotificationMuteRoundTrip() throws {
+        var settings = FeatureSettings.default
+        settings.islandCollapsedOnTop = false
+        settings.notificationsMuted = true
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(decoded.islandCollapsedOnTop == false)
+        #expect(decoded.notificationsMuted == true)
+    }
+
+    @Test
     func focusCountdownIslandDisplayRoundTrips() throws {
         var settings = FeatureSettings.default
         settings.focusCountdownIslandEnabled = false
@@ -121,6 +183,40 @@ struct FeatureSettingsCompatibilityTests {
         )
 
         #expect(decoded.focusCountdownIslandEnabled == false)
+    }
+
+    @Test
+    func browserDownloadIslandDisplayRoundTripsAndDefaultsOnForLegacyJSON() throws {
+        var settings = FeatureSettings.default
+        #expect(settings.browserDownloadIslandEnabled == true)
+        settings.browserDownloadIslandEnabled = false
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(decoded.browserDownloadIslandEnabled == false)
+
+        let legacy = Data(#"{"mediaEnabled":true,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"calendarEnabled":true,"weatherEnabled":true,"updateChecksEnabled":true,"automaticUpdatesEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true,"hoverActivationEnabled":true,"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let legacyDecoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(legacyDecoded.browserDownloadIslandEnabled == true)
+    }
+
+    @Test
+    func videoDownloadIslandDisplayRoundTripsAndDefaultsOnForLegacyJSON() throws {
+        var settings = FeatureSettings.default
+        #expect(settings.videoDownloadIslandEnabled == true)
+        settings.videoDownloadIslandEnabled = false
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(decoded.videoDownloadIslandEnabled == false)
+
+        let legacy = Data(#"{"mediaEnabled":true,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"calendarEnabled":true,"weatherEnabled":true,"updateChecksEnabled":true,"automaticUpdatesEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true,"hoverActivationEnabled":true,"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let legacyDecoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(legacyDecoded.videoDownloadIslandEnabled == true)
     }
 
     @Test
@@ -272,19 +368,129 @@ struct FeatureSettingsCompatibilityTests {
     func voiceInputHotkeyPresetDisplayNames() {
         #expect(VoiceInputHotkeyPreset.optionSpace.displayName == "⌥ Space")
         #expect(VoiceInputHotkeyPreset.controlSpace.displayName == "⌃ Space")
-        // 与旧 enum 展示契约一致：⌘⇧ V
+        // Matches the legacy enum display contract: ⌘⇧ V
         #expect(VoiceInputHotkeyPreset.commandShiftV.displayName == "⌘⇧ V")
         #expect(VoiceInputHotkeyPreset.modifierSymbols(carbonModifiers: 0x0100 | 0x0200) == "⌘⇧")
     }
 
     @Test
     func voiceInputHotkeyPresetLegacyInsideFeatureSettings() throws {
-        // 与其它兼容性测试相同：旧配置仅含必填字段 + 单字符串快捷键预设
+        // Same as other compatibility tests: legacy config has required fields + a single-string hotkey preset only
         let json = Data(#"""
         {"mediaEnabled":true,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"calendarEnabled":true,"weatherEnabled":true,"updateChecksEnabled":true,"automaticUpdatesEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true,"hoverActivationEnabled":true,"activityNoticeDisplayDuration":"threeSeconds","voiceInputHotkeyPreset":"controlSpace"}
         """#.utf8)
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: json)
         #expect(decoded.voiceInputHotkeyPreset == .controlSpace)
         #expect(decoded.voiceInputHotkeyPreset.displayName == "⌃ Space")
+    }
+
+    // MARK: - Island Appearance
+
+    @Test
+    func islandAppearanceDefaultsToBlackBackgroundWithLiquidGlass() throws {
+        #expect(FeatureSettings.default.islandVisualStyle == .transparent)
+        #expect(FeatureSettings.default.islandNotchBackground == .black)
+        #expect(IslandVisualStyle.frosted.title == "磨砂玻璃")
+        #expect(IslandVisualStyle.transparent.title == "Liquid Glass")
+        #expect(IslandNotchBackground.black.title == "刘海")
+        #expect(IslandNotchBackground.frosted.title == "磨砂玻璃")
+
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let decodedLegacy = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(decodedLegacy.islandVisualStyle == .transparent)
+        #expect(decodedLegacy.islandNotchBackground == .black)
+    }
+
+    @Test
+    func islandVisualStyleRoundTrips() throws {
+        var settings = FeatureSettings.default
+        settings.islandVisualStyle = .transparent
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(decoded.islandVisualStyle == .transparent)
+
+        settings.islandVisualStyle = .frosted
+        let decodedFrosted = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(decodedFrosted.islandVisualStyle == .frosted)
+    }
+
+    @Test
+    func islandNotchBackgroundRoundTrips() throws {
+        for background in IslandNotchBackground.allCases {
+            var settings = FeatureSettings.default
+            settings.islandNotchBackground = background
+
+            let decoded = try JSONDecoder().decode(
+                FeatureSettings.self,
+                from: JSONEncoder().encode(settings)
+            )
+
+            #expect(decoded.islandNotchBackground == background)
+        }
+    }
+
+    @Test
+    func removedLiquidGlassNotchBackgroundMigratesToFrosted() throws {
+        let legacy = Data(#""liquidGlass""#.utf8)
+
+        let decoded = try JSONDecoder().decode(IslandNotchBackground.self, from: legacy)
+
+        #expect(decoded == .frosted)
+    }
+
+    @Test
+    func compactStatusPriorityDefaultsForLegacySettings() throws {
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+
+        #expect(decoded.compactStatusPriority == CompactStatusPriority.defaultOrder)
+    }
+
+    @Test
+    func compactStatusPriorityRoundTripsCustomOrder() throws {
+        var settings = FeatureSettings.default
+        settings.compactStatusPriority = [
+            .media,
+            .aiActivity,
+            .focusMode,
+            .transient,
+            .videoDownload,
+            .browserDownload,
+            .focusCountdown,
+            .toolboxReminder,
+        ]
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+
+        #expect(decoded.compactStatusPriority == settings.compactStatusPriority)
+    }
+
+    @Test
+    func compactStatusPriorityDeduplicatesAndAppendsMissingValues() throws {
+        let data = Data(#"""
+        {"activityNoticeDisplayDuration":"threeSeconds","compactStatusPriority":["media","transient","media","aiActivity"]}
+        """#.utf8)
+
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: data)
+
+        #expect(decoded.compactStatusPriority == [
+            .media,
+            .transient,
+            .aiActivity,
+            .videoDownload,
+            .browserDownload,
+            .focusCountdown,
+            .toolboxReminder,
+            .focusMode,
+        ])
     }
 }

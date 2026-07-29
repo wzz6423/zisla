@@ -17,6 +17,7 @@ struct YTDLPResolverTests {
 
         let tools = try YTDLPResolver(
             bundleURL: bundleURL,
+            managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
             externalYTDLPCandidates: [external],
             externalFFmpegCandidates: []
         ).resolve()
@@ -37,6 +38,7 @@ struct YTDLPResolverTests {
 
         let tools = try YTDLPResolver(
             bundleURL: bundleURL,
+            managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
             externalYTDLPCandidates: [unsafeHelper, fallback],
             externalFFmpegCandidates: []
         ).resolve()
@@ -69,6 +71,7 @@ struct YTDLPResolverTests {
 
         let tools = try YTDLPResolver(
             bundleURL: directory.appendingPathComponent("Empty.app"),
+            managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
             externalYTDLPCandidates: [unsafeLink, fallback],
             externalFFmpegCandidates: []
         ).resolve()
@@ -145,6 +148,7 @@ struct DownloadServiceTests {
         try writeExecutable(script, to: executable)
         let resolver = YTDLPResolver(
             bundleURL: directory.appendingPathComponent("Empty.app"),
+            managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
             externalYTDLPCandidates: [executable],
             externalFFmpegCandidates: []
         )
@@ -187,6 +191,7 @@ struct DownloadServiceTests {
         let service = DownloadService(
             resolver: YTDLPResolver(
                 bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
                 externalYTDLPCandidates: [executable],
                 externalFFmpegCandidates: []
             ),
@@ -224,6 +229,7 @@ struct DownloadServiceTests {
         let service = DownloadService(
             resolver: YTDLPResolver(
                 bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
                 externalYTDLPCandidates: [executable],
                 externalFFmpegCandidates: []
             ),
@@ -251,6 +257,7 @@ struct DownloadServiceTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let resolver = YTDLPResolver(
             bundleURL: directory.appendingPathComponent("Empty.app"),
+            managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
             externalYTDLPCandidates: [],
             externalFFmpegCandidates: []
         )
@@ -331,6 +338,7 @@ struct DownloadServiceTests {
         let service = DownloadService(
             resolver: YTDLPResolver(
                 bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
                 externalYTDLPCandidates: [executable],
                 externalFFmpegCandidates: []
             ),

@@ -2,12 +2,13 @@ import AppKit
 import ZislaKit
 import SwiftUI
 
-/// 电脑情况监控页。
+/// System monitor view.
 ///
-/// 视觉上贴合灵动岛：左侧「实时性能」(CPU/GPU 波形) 与右侧「存储与网络」
-/// (RAM/磁盘/风扇/网络) 的非对称双栏，中间用 `Hairline` 分隔；卡片统一使用
-/// `Color.fillCard` / `Color.strokeCard` 令牌，字号收紧到 `islandMicro` ~ 12pt，
-/// 占用条用自绘 `CapacityBar` 替代系统 `ProgressView`，避免仪表盘式的割裂感。
+/// Visually matches the Dynamic Island: an asymmetric two-column layout — left "Real-time Performance"
+/// (CPU/GPU waveforms) and right "Storage & Network" (RAM/disk/fan/network) — separated by a `Hairline`.
+/// Cards uniformly use `Color.fillCard` / `Color.strokeCard` tokens; font sizes are tightened to
+/// `islandMicro` ~ 12pt; usage bars use a custom `CapacityBar` instead of `ProgressView` to avoid
+/// a dashboard-like dissonance.
 struct SystemMonitorView: View {
     @ObservedObject var service: SystemMonitorService
     @State private var isCleanupPresented = false
@@ -42,7 +43,7 @@ struct SystemMonitorView: View {
 
     // MARK: - Columns
 
-    /// 左栏：CPU 与 GPU 的实时波形与占用分解。
+    /// Left column: real-time waveforms and usage breakdown for CPU and GPU.
     private var computeColumn: some View {
         VStack(spacing: 10) {
             cpuCard
@@ -51,7 +52,7 @@ struct SystemMonitorView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// 右栏：内存 / 磁盘 / 风扇 / 网络 的紧凑读数。
+    /// Right column: compact readings for memory / disk / fan / network.
     private var systemColumn: some View {
         VStack(spacing: 10) {
             memoryCard
@@ -344,7 +345,7 @@ struct SystemMonitorView: View {
                 }
             }
         case .unavailable:
-            noFanLabel
+            fanUnavailableLabel
         case .none:
             Text("正在读取风扇状态")
                 .font(.system(size: 10, weight: .medium))
@@ -354,6 +355,12 @@ struct SystemMonitorView: View {
 
     private var noFanLabel: some View {
         Text("无风扇")
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+    }
+
+    private var fanUnavailableLabel: some View {
+        Text("风扇数据不可用")
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)
     }
@@ -458,7 +465,7 @@ struct SystemMonitorView: View {
 
     // MARK: - Semantic tints
 
-    /// 占用条默认中性，仅在偏高时转为警告 / 错误色，避免色彩过度主导岛面。
+    /// Capacity bar defaults to neutral; turns warning/error color only when usage is high, to avoid color dominating the island.
     private func capacityTint(_ ratio: Double) -> Color {
         if ratio > 0.95 { return .zislaError }
         if ratio > 0.85 { return .zislaWarning }
@@ -496,7 +503,7 @@ struct SystemMonitorView: View {
         ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
     }
 
-    /// 内存按二进制 GiB 计算、保留一位小数，后缀沿用 GB（与常见第三方监控一致）
+    /// Memory computed in binary GiB with one decimal place; suffix uses GB (consistent with common third-party monitors).
     private func memoryByteText(_ bytes: UInt64) -> String {
         String(format: "%.1f GB", Double(bytes) / 1024 / 1024 / 1024)
     }
@@ -574,9 +581,9 @@ private struct SystemCleanupPanelPresenter: NSViewRepresentable {
             panel.backgroundColor = .clear
             panel.hasShadow = true
             panel.isReleasedWhenClosed = false
-            // 系统授权会暂时让应用失活；保留面板，授权结束后即可直接继续扫描。
+        // System authorization temporarily deactivates the app; keep the panel so scanning can resume immediately after authorization.
             panel.hidesOnDeactivate = false
-            panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
+            panel.level = WindowPlacement.modalWindowLevel
             panel.collectionBehavior = [.moveToActiveSpace, .transient, .ignoresCycle]
             panel.contentView = NSHostingView(
                 rootView: SystemCleanupSheet(
@@ -679,7 +686,7 @@ private struct CardHeader<Trailing: View>: View {
 
 // MARK: - Capacity bar
 
-/// 自绘占用条，替代系统 `ProgressView`，保持岛内统一的圆角与配色。
+/// Custom capacity bar replacing the system `ProgressView`, keeping consistent rounded corners and colors inside the island.
 private struct CapacityBar: View {
     var ratio: Double
     var tint: Color
@@ -798,7 +805,7 @@ private struct SystemCleanupSheet: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("清理候选项")
                         .font(.system(size: 16, weight: .semibold))
-                    Text("扫描缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件")
+                    Text("扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
@@ -1067,7 +1074,6 @@ private struct SystemCleanupSheet: View {
         candidates.removeAll { candidate in
             !result.failures.contains(where: { $0.url == candidate.url })
         }
-        await service.sampleOnce()
         isCleaning = false
         onCleanupCompleted?()
         onDismiss()
@@ -1107,6 +1113,7 @@ private struct CleanupKindSection: Identifiable {
 private extension DiskCleanupKind {
     var title: String {
         switch self {
+        case .appCache: "应用缓存"
         case .cache: "缓存"
         case .log: "日志"
         case .trash: "废纸篓"
@@ -1122,6 +1129,7 @@ private extension DiskCleanupKind {
 
     var symbol: String {
         switch self {
+        case .appCache: "app.badge.checkmark"
         case .cache: "archivebox.fill"
         case .log: "doc.text.fill"
         case .trash: "trash.fill"
@@ -1137,6 +1145,7 @@ private extension DiskCleanupKind {
 
     var tint: Color {
         switch self {
+        case .appCache: .green
         case .cache: .cyan
         case .log: .orange
         case .trash: .red

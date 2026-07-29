@@ -35,7 +35,27 @@ struct IslandRootView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
+        GeometryReader { proxy in
+            let surfaceSize = IslandSurfaceTransform.fittingSize(
+                contentSize: layout.panelSize,
+                availableSize: proxy.size
+            )
+            let hasPetSlot = !isIslandCollapsed
+                && !model.isMirrorPresented
+                && !model.isTeleprompterPresented
+                && model.settingsStore.settings.petEnabled
+            let petSlotWidth = hasPetSlot
+                ? min(
+                    ExpandedPetLayout.sideSlotWidth,
+                    max(0, proxy.size.width - surfaceSize.width)
+                )
+                : 0
+            let panelSize = CGSize(
+                width: surfaceSize.width + petSlotWidth,
+                height: surfaceSize.height
+            )
+
+            ZStack(alignment: .top) {
             if showsTransferHints {
                 HStack(spacing: 0) {
                     transferShoulder(
@@ -81,7 +101,7 @@ struct IslandRootView: View {
                         }
                     )
                 }
-                .frame(width: layout.panelSize.width)
+                .frame(width: surfaceSize.width)
                 .padding(.top, 62)
                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92)))
                 .zIndex(0)
@@ -90,18 +110,37 @@ struct IslandRootView: View {
             IslandSurface(
                 isCollapsed: isIslandCollapsed,
                 collapsedSize: model.collapsedIslandSize,
-                expandedSize: layout.islandSize
+                expandedSize: surfaceSize,
+                visualStyle: settingsStore.settings.islandVisualStyle,
+                notchBackground: settingsStore.settings.islandNotchBackground
             ) {
-                ZStack(alignment: petAlignment) {
+                if model.isMirrorPresented {
+                    DeferredMount {
+                        CameraMirrorView(onClose: model.dismissMirror)
+                            .frame(
+                                width: surfaceSize.width,
+                                height: surfaceSize.height
+                            )
+                    }
+                } else if model.isTeleprompterPresented {
+                    DeferredMount {
+                        TeleprompterView(onClose: model.dismissTeleprompter)
+                            .frame(
+                                width: surfaceSize.width,
+                                height: surfaceSize.height
+                            )
+                    }
+                } else {
+                    ZStack(alignment: .top) {
                     VStack(spacing: 0) {
                         if voiceInput.isRecording {
-                            // 语音录音紧凑模式：跳过标题栏与工具栏，仅显示一行转写。
+                            // Compact voice-recording mode skips the title bar and toolbar to show one transcript line.
                             Spacer().frame(height: 34)
                             VoiceTranscriptionView(voiceInput: voiceInput)
                                 .padding(.horizontal, 14)
                                 .padding(.bottom, 6)
                         } else if !isIslandCollapsed {
-                            // Black crown chrome always uses dark labels/icons.
+                            // 固定顶部壳层，模块切换时只替换下方功能区域。
                             NowPlayingHeader(model: model)
                                 .padding(.horizontal, 14)
                                 .padding(.top, contentTopInset)
@@ -115,27 +154,35 @@ struct IslandRootView: View {
 
                             Group {
                                 if let activeModule {
-                                    switch activeModule {
-                                    case .shelf:
-                                        ShelfModuleView(model: model)
-                                    case .clipboard:
-                                        ClipboardHistoryModuleView(model: model)
-                                    case .aiMonitor:
-                                        AIProgressModuleView(model: model)
-                                    case .download:
-                                        DownloadModuleView(model: model)
-                                    case .agenda:
-                                        AgendaModuleView(model: model, calendar: model.calendar)
-                                    case .mail:
-                                        MailModuleView(model: model)
-                                    case .quickNotes:
-                                        QuickNoteModuleView(model: model)
-                                    case .toolbox:
-                                        ToolboxModuleView(model: model)
-                                    case .system:
-                                        SystemMonitorView(service: model.systemMonitor)
-                                    case .lockScreen:
-                                        LockScreenModuleView(model: model)
+                                    DeferredMount {
+                                        switch activeModule {
+                                        case .dashboard:
+                                            IslandDashboardView(model: model)
+                                        case .shelf:
+                                            ShelfModuleView(model: model)
+                                        case .clipboard:
+                                            ClipboardHistoryModuleView(model: model)
+                                        case .aiMonitor:
+                                            AIProgressModuleView(model: model)
+                                        case .aiAgent:
+                                            AIAgentModuleView(model: model)
+                                        case .download:
+                                            DownloadModuleView(model: model)
+                                        case .agenda:
+                                            AgendaModuleView(model: model, calendar: model.calendar)
+                                        case .mail:
+                                            MailModuleView(model: model)
+                                        case .quickNotes:
+                                            QuickNoteModuleView(model: model)
+                                        case .pdf:
+                                            PDFToolsModuleView(model: model)
+                                        case .toolbox:
+                                            ToolboxModuleView(model: model)
+                                        case .system:
+                                            SystemMonitorView(service: model.systemMonitor)
+                                        case .lockScreen:
+                                            LockScreenModuleView(model: model)
+                                        }
                                     }
                                 } else {
                                     ContentUnavailableView {
@@ -143,7 +190,14 @@ struct IslandRootView: View {
                                     }
                                 }
                             }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.horizontal, IslandSurfaceGeometry.moduleInset)
+                            .padding(.top, IslandSurfaceGeometry.moduleInset)
+                            .padding(.bottom, IslandSurfaceGeometry.moduleInset)
+                            .frame(
+                                maxWidth: .infinity,
+                                maxHeight: activeModule == .dashboard ? nil : .infinity,
+                                alignment: .top
+                            )
                             .clipShape(
                                 UnevenRoundedRectangle(
                                     cornerRadii: .init(
@@ -155,44 +209,68 @@ struct IslandRootView: View {
                                     style: .continuous
                                 )
                             )
-                            .padding(.horizontal, IslandSurfaceGeometry.moduleInset)
-                            .padding(.bottom, IslandSurfaceGeometry.moduleInset)
                             .id(activeModule?.rawValue)
-                            .transition(reduceMotion ? .identity : .opacity)
-                            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: activeModule)
-                            // 下方模块落在烟灰磨砂玻璃上：切到深色模式，浅色文字保证可读
-                            // （与底部烟灰玻璃、MarkdownWebView 的白字 HTML 保持一致）。
+                            .transition(
+                                reduceMotion
+                                    ? .identity
+                                    : .modulePush(direction: model.moduleSwitchDirection)
+                            )
+                            .animation(reduceMotion ? nil : ZislaMotion.moduleSwitch, value: activeModule)
+                            // Lower modules sit on dark frosted glass, so force dark mode for legible light text.
                             .environment(\.colorScheme, .dark)
                         }
                     }
 
                     if !isIslandCollapsed {
                         uptimeIndicator
-                        expandedPetOverlay
-                    } else {
-                        collapsedPetOverlay
-                            .frame(
-                                width: model.collapsedIslandSize.width,
-                                height: model.collapsedIslandSize.height
-                            )
-                            .frame(
-                                maxWidth: .infinity,
-                                maxHeight: .infinity,
-                                alignment: .top
-                            )
                     }
+                    }
+                    // Must be top-aligned: module pages carry incompressible minimum heights, so
+                    // while the panel is still at the previous module's smaller size this stack is
+                    // taller than `surfaceSize`. Default centering would push the whole chrome above
+                    // the surface (-87pt for dashboard → mail) and slide it back down as the resize
+                    // spring runs — read as the page dropping in from the top. Top alignment keeps
+                    // the crown at y=0 and lets only the module region below overflow into the mask.
+                    .frame(width: surfaceSize.width, height: surfaceSize.height, alignment: .top)
                 }
-                .frame(width: layout.islandSize.width, height: layout.islandSize.height)
             }
-            .frame(width: layout.islandSize.width, height: layout.islandSize.height)
+            .frame(width: surfaceSize.width, height: surfaceSize.height)
+            .frame(
+                width: panelSize.width,
+                height: surfaceSize.height,
+                alignment: islandSurfaceAlignment
+            )
+            // Springs the surface between module layout sizes; the NSPanel itself snaps
+            // (two-phase, see scheduleExpandedSizeUpdate) while all visible motion is drawn here.
+            // With the top-aligned frame above, this resize only moves the island's bottom edge.
+            .animation(reduceMotion ? nil : ZislaMotion.surfaceResize, value: surfaceSize)
             .environment(\.colorScheme, .dark)
+            .environment(\.islandVisualStyle, settingsStore.settings.islandVisualStyle)
             .contentShape(IslandSilhouette())
             .onHover { hovering in
                 if hovering { onPointerEntered() } else { onPointerExited() }
             }
+            .opacity(hidesIslandSurface ? 0 : 1)
             .zIndex(1)
+
+            if petSlotWidth == ExpandedPetLayout.sideSlotWidth {
+                expandedPetOverlay
+                    .frame(
+                        width: panelSize.width,
+                        height: surfaceSize.height,
+                        alignment: expandedPetAlignment
+                    )
+                    .zIndex(2)
+            }
+
+            }
+            .frame(
+                width: panelSize.width,
+                height: surfaceSize.height,
+                alignment: .top
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .clipped()
         .ignoresSafeArea(edges: .top)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: showsTransferHints)
@@ -204,7 +282,7 @@ struct IslandRootView: View {
             Spacer(minLength: 8)
             if settingsStore.settings.systemMonitorEnabled {
                 NavMonitorStrip(monitor: model.systemMonitor) {
-                    model.selectedModule = .system
+                    model.selectModule(.system)
                 }
             }
             IconButton(
@@ -215,9 +293,6 @@ struct IslandRootView: View {
                 model.isPinned.toggle()
                 onPinChanged(model.isPinned)
             }
-            IconButton(symbol: "arrow.down.circle", help: "检查更新") {
-                model.checkForUpdates(manual: true)
-            }
             IconButton(symbol: "gearshape.fill", help: "设置") {
                 onSettingsRequested()
             }
@@ -226,14 +301,18 @@ struct IslandRootView: View {
     }
 
     private var isIslandCollapsed: Bool {
-        !model.isIslandVisible || voiceInput.isRecording
+        (!model.isIslandVisible && !model.isMirrorPresented && !model.isTeleprompterPresented)
+            || (voiceInput.isRecording && !model.isMirrorPresented && !model.isTeleprompterPresented)
     }
 
-    // 展开态宠物布局常量 —— 所有模块页面共享，修改此处即可调整全局避让。
-    // contentTopInset 保证内容顶部始终比宠物底边多 8pt。
-    private let petExpandedSize: CGFloat = 30
-    private let petExpandedTopInset: CGFloat = 8
-    private var contentTopInset: CGFloat { petExpandedTopInset + petExpandedSize + 8 }
+    private var hidesIslandSurface: Bool {
+        !model.isIslandVisible
+            && !voiceInput.isRecording
+            && !model.isMirrorPresented
+            && !model.isTeleprompterPresented
+    }
+
+    private var contentTopInset: CGFloat { ExpandedPetLayout.contentTopInset }
 
     @ViewBuilder
     private var expandedPetOverlay: some View {
@@ -243,12 +322,12 @@ struct IslandRootView: View {
                 sprite: sprite,
                 behavior: petController.behavior,
                 side: model.settingsStore.settings.petSide,
-                size: petExpandedSize
+                size: ExpandedPetLayout.size
             )
-            .padding(.top, petExpandedTopInset)
+            .padding(.top, ExpandedPetLayout.topInset)
             .padding(
                 model.settingsStore.settings.petSide == .right ? .trailing : .leading,
-                12
+                ExpandedPetLayout.outerInset
             )
         }
     }
@@ -261,50 +340,28 @@ struct IslandRootView: View {
                 .monospacedDigit()
                 .fixedSize()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: uptimeAlignment)
-                .padding(.top, 12)
-                .padding(hasRightExpandedPet ? .leading : .trailing, 14)
+                .padding(.top, 4)
+                .padding(.trailing, 14)
         }
         .allowsHitTesting(false)
     }
 
-    private var hasRightExpandedPet: Bool {
-        model.settingsStore.settings.petEnabled
-            && model.settingsStore.settings.petSide == .right
-    }
-
     private var uptimeAlignment: Alignment {
-        hasRightExpandedPet ? .topLeading : .topTrailing
+        .topTrailing
     }
 
-    private var collapsedPetOverlay: some View {
-        GeometryReader { proxy in
-            if model.settingsStore.settings.petEnabled,
-               let sprite = petController.sprite {
-                let horizontalInset = min(12, max(2, proxy.size.width * 0.1))
-                let verticalInset = min(4, max(2, proxy.size.height * 0.1))
-                let size = max(
-                    0,
-                    min(
-                        24,
-                        proxy.size.width - horizontalInset * 2,
-                        proxy.size.height - verticalInset * 2
-                    )
-                )
-                IslandPetView(
-                    sprite: sprite,
-                    behavior: petController.behavior,
-                    side: .left,
-                    size: size
-                )
-                .padding(.leading, horizontalInset)
-                .padding(.top, verticalInset)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-        }
-    }
-
-    private var petAlignment: Alignment {
+    private var expandedPetAlignment: Alignment {
         model.settingsStore.settings.petSide == .right ? .topTrailing : .topLeading
+    }
+
+    private var islandSurfaceAlignment: Alignment {
+        guard model.settingsStore.settings.petEnabled,
+              !isIslandCollapsed,
+              !model.isMirrorPresented,
+              !model.isTeleprompterPresented else {
+            return .top
+        }
+        return model.settingsStore.settings.petSide == .right ? .topLeading : .topTrailing
     }
 
     private var showsTransferHints: Bool {
@@ -326,10 +383,20 @@ struct IslandRootView: View {
     }
 
     private var layout: IslandModuleLayout {
+        if model.isMirrorPresented {
+            return .mirror
+        }
+        if model.isTeleprompterPresented {
+            return .teleprompter
+        }
         if voiceInput.isRecording {
             return .voiceRecording
         }
-        return activeModule?.layout ?? .standard
+        guard let activeModule else { return .standard }
+        return IslandModuleLayout.resolved(
+            for: activeModule,
+            dashboardCardCount: model.dashboardCardCount
+        )
     }
 
     private func shareDetectedLink() {
@@ -377,7 +444,7 @@ struct IslandRootView: View {
                     .frame(height: 2)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableStyle(hoverScale: 1.02, pressedScale: 0.97))
         .help("\(title)：\(detail)")
     }
 
@@ -386,7 +453,63 @@ struct IslandRootView: View {
     }
 }
 
-/// 语音录音时的实时转写视图：红色脉冲圆点 + 实时识别文字。
+enum ExpandedPetLayout {
+    static let size: CGFloat = 30
+    static let topInset: CGFloat = 8
+    static let contentTopInset: CGFloat = 8
+    static let outerInset: CGFloat = 6
+    static let islandGap: CGFloat = 8
+    static let sideSlotWidth = size + outerInset + islandGap
+
+    static func panelSize(for surfaceSize: CGSize, includesPet: Bool) -> CGSize {
+        guard includesPet else { return surfaceSize }
+        return CGSize(width: surfaceSize.width + sideSlotWidth, height: surfaceSize.height)
+    }
+}
+
+struct CollapsedPetView: View {
+    @ObservedObject var model: AppModel
+    @ObservedObject var petController: IslandPetController
+    var isOnPhysicalNotch: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            if model.settingsStore.settings.petEnabled,
+               let sprite = petController.sprite {
+                let horizontalInset = CollapsedPetLayout.outerGap
+                let verticalInset = min(4, max(2, proxy.size.height * 0.1))
+                let size = max(
+                    0,
+                    min(
+                        CollapsedPetLayout.maximumPetSize,
+                        proxy.size.width - horizontalInset * 2,
+                        proxy.size.height - verticalInset * 2
+                    )
+                )
+                let side = model.settingsStore.settings.petSide
+                IslandPetView(
+                    sprite: sprite,
+                    behavior: petController.behavior,
+                    side: side,
+                    size: size
+                )
+                .padding(
+                    side == .right ? .trailing : .leading,
+                    horizontalInset
+                )
+                .padding(.top, verticalInset)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: side == .right ? .topTrailing : .topLeading
+                )
+            }
+        }
+    }
+
+}
+
+/// Live transcription view shown during voice recording, with a pulsing red indicator.
 private struct VoiceTranscriptionView: View {
     @ObservedObject var voiceInput: VoiceInputController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -438,22 +561,22 @@ private final class IslandDropState: ObservableObject {
     @Published var shelfTargeted = false
 }
 
-/// 导航栏内的紧凑监控条：每个指标上行显示百分比、下行显示标签（CPU/GPU/RAM/Disk），
-/// 仅在系统监控启用时出现，点按切换到系统监控模块。占用最小水平空间，
-/// 比例超过阈值时百分比自动转橙/红。
+/// Compact navigation-bar monitor showing percentages above CPU, GPU, RAM, and disk labels.
+/// It appears only when system monitoring is enabled, opens that module when tapped, and changes percentages
+/// to orange or red when they exceed thresholds.
 private struct NavMonitorStrip: View {
     @ObservedObject var monitor: SystemMonitorService
     var onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 7) {
+            HStack(spacing: 4) {
                 metricCell(label: "CPU", ratio: cpuRatio)
                 metricCell(label: "GPU", ratio: gpuRatio)
                 metricCell(label: "RAM", ratio: memRatio)
                 metricCell(label: "Disk", ratio: diskRatio)
             }
-            .padding(.horizontal, 9)
+            .padding(.horizontal, 5)
             .padding(.vertical, 3)
             .background(Color.fillControl)
             .clipShape(Capsule())
@@ -518,43 +641,43 @@ private struct NavMonitorStrip: View {
 
 private struct ModuleSelector: View {
     @ObservedObject var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var selectionNamespace
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             ForEach(visibleModules) { module in
+                let isSelected = model.selectedModule == module
                 Button {
-                    model.selectedModule = module
+                    model.selectModule(module)
                 } label: {
                     IconButtonLabel(
                         symbol: module.symbol,
-                        isActive: model.selectedModule == module,
-                        dimmedWhenInactive: true
+                        isActive: isSelected,
+                        activeColor: .primary,
+                        size: .compact,
+                        dimmedWhenInactive: true,
+                        // The moving focus lens below provides the active surface.
+                        showsActiveBackground: false,
+                        showsInactiveBackground: false,
+                        emphasizesSelection: true
                     )
                 }
-                .buttonStyle(.plain)
+                .frame(width: 30, height: 30)
+                .buttonStyle(PressableStyle(hoverScale: 1.08))
+                .background {
+                    if isSelected {
+                        MotionFocusLens(cornerRadius: 8)
+                            .matchedGeometryEffect(id: "module-selection", in: selectionNamespace)
+                    }
+                }
                 .help(module.title)
             }
         }
+        .animation(reduceMotion ? nil : ZislaMotion.selection, value: model.selectedModule)
     }
 
     private var visibleModules: [IslandModule] {
         IslandModule.allCases.filter { $0.isEnabled(in: model.settingsStore.settings) && $0 != .lockScreen }
-    }
-}
-
-private extension IslandModule {
-    func isEnabled(in settings: FeatureSettings) -> Bool {
-        switch self {
-        case .shelf: settings.fileShelfEnabled
-        case .clipboard: settings.clipboardHistoryEnabled
-        case .aiMonitor: settings.aiProgressEnabled
-        case .download: settings.downloaderEnabled
-        case .agenda: settings.calendarEnabled || settings.weatherEnabled
-        case .mail: settings.mailEnabled
-        case .quickNotes: settings.quickNotesEnabled
-        case .toolbox: settings.toolboxEnabled
-        case .system: settings.systemMonitorEnabled
-        case .lockScreen: settings.lockScreenInfoEnabled
-        }
     }
 }

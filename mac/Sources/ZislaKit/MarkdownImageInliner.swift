@@ -2,37 +2,37 @@ import Foundation
 import ImageIO
 import CoreGraphics
 
-/// 把 Markdown 渲染出的 HTML 中 `<img src="...">` 指向本地文件的部分改写为
-/// base64 data URL，使 `MarkdownWebView`（`WKWebView.loadHTMLString`）能正常显示图片。
+/// Rewrites `<img src="...">` tags in Markdown-rendered HTML that reference local files
+/// to base64 data URLs, so `MarkdownWebView` (`WKWebView.loadHTMLString`) can display images correctly.
 ///
-/// `loadHTMLString(_:baseURL:)` 不会授予 baseURL 目录的文件读取权限，
-/// 因此 `<img src="/Users/.../foo.jpg">` 这类本地引用会被 WKWebView 拒绝、
-/// 显示为破图占位符（在透明背景 + 深色毛玻璃下呈现为"模糊蓝色"）。
-/// 在原生侧把图片预读并内联进 HTML，能完全绕开 WKWebView 的 file:// 子资源限制，
-/// 无需切换到 `loadFileURL(_:allowingReadAccessTo:)`。
+/// `loadHTMLString(_:baseURL:)` does not grant read access to the baseURL directory,
+/// so local references like `<img src="/Users/.../foo.jpg">` are rejected by WKWebView and
+/// shown as broken-image placeholders (appearing as "blurry blue" on transparent dark-frosted-glass backgrounds).
+/// Pre-reading images on the native side and inlining them into the HTML completely bypasses
+/// WKWebView's file:// sub-resource restriction without switching to `loadFileURL(_:allowingReadAccessTo:)`.
 ///
-/// 处理策略：
-/// - `/abs/path`、`~/path`、`file://...` 视为本地文件，读取并内联。
-/// - `http://`、`https://`、`data:` 保留原值（由 WKWebView 直接加载）。
-/// - 读取失败、文件不存在或过大（内联后 >30 MB）的情况保留原值，不引入回归。
-/// - 超过 2 MB 的图片用 ImageIO 解码后缩放至最长边 1600 px 并重编码为 JPEG，
-///   避免 base64 字符串过大导致 WKWebView 渲染卡顿。
+/// Processing strategy:
+/// - `/abs/path`, `~/path`, `file://...` are treated as local files, read and inlined.
+/// - `http://`, `https://`, `data:` are left as-is (loaded directly by WKWebView).
+/// - Files that fail to read, do not exist, or would exceed 30 MB inline are left as-is to avoid regressions.
+/// - Images larger than 2 MB are decoded with ImageIO, scaled to a 1600 px long edge, and re-encoded as JPEG
+///   to prevent oversized base64 strings from causing WKWebView rendering stalls.
 public enum MarkdownImageInliner {
-    /// 内联后仍超过此体积则放弃，避免 HTML 文档过大。
+    /// If the inlined size still exceeds this limit, abandon inlining to avoid an oversized HTML document.
     private static let maxInlineBytes = 30 * 1024 * 1024
-    /// 超过此体积触发缩放。
+    /// Images above this size trigger downscaling.
     private static let downscaleThreshold = 2 * 1024 * 1024
     private static let downscaleMaxDimension = 1600
 
-    /// 简单的 URL → data URL 缓存，避免每次重渲染都重新读盘。
-    /// `NSCache` 自身线程安全，用 `nonisolated(unsafe)` 声明以满足严格并发检查。
+    /// Simple URL → data URL cache to avoid re-reading from disk on every re-render.
+    /// `NSCache` is thread-safe; declared with `nonisolated(unsafe)` to satisfy strict concurrency checking.
     private nonisolated(unsafe) static let cache: NSCache<NSString, NSString> = {
         let c = NSCache<NSString, NSString>()
         c.countLimit = 32
         return c
     }()
 
-    /// 扫描 HTML 中所有 `<img>` 标签，把本地文件 src 改写为 data URL；其余保持原样。
+    /// Scans all `<img>` tags in the HTML and rewrites local file src values to data URLs; others are left unchanged.
     public static func inlineLocalImages(in html: String) -> String {
         replace(html, pattern: #"(?i)<img\b([^>]*)>"#) { match, _ in
             let attrs = match[1]
@@ -45,9 +45,9 @@ public enum MarkdownImageInliner {
 
             let sourceRange = srcMatch.range(at: srcMatch.range(at: 1).location == NSNotFound ? 2 : 1)
             let raw = (attrs as NSString).substring(with: sourceRange)
-            // MarkdownHTMLRenderer 的 escapeHTML + attributeEscape 管线会把
-            // URL 中的 & < > " 转义为 HTML 实体（如 &amp;），此处需还原
-            // 才能正确读取本地文件。
+            // The escapeHTML + attributeEscape pipeline in MarkdownHTMLRenderer encodes
+            // & < > " in URLs as HTML entities (e.g. &amp;); unescape here to correctly
+            // read the local file.
             let unescaped = unescapeHTMLEntities(raw)
             guard let resolved = resolveLocalFileURL(unescaped),
                   let dataURL = dataURL(for: resolved)
@@ -61,14 +61,14 @@ public enum MarkdownImageInliner {
         }
     }
 
-    /// 清空进程内缓存（主要用于测试）。
+    /// Clears the in-process cache (mainly for tests).
     static func clearCache() {
         cache.removeAllObjects()
     }
 
-    // MARK: - URL 解析
+    // MARK: - URL resolution
 
-    /// 还原 escapeHTML / attributeEscape 产生的基本 HTML 实体。
+    /// Restores basic HTML entities produced by escapeHTML / attributeEscape.
     private static func unescapeHTMLEntities(_ string: String) -> String {
         string
             .replacingOccurrences(of: "&amp;", with: "&")
@@ -77,7 +77,7 @@ public enum MarkdownImageInliner {
             .replacingOccurrences(of: "&quot;", with: "\"")
     }
 
-    /// 把 Markdown/HTML 里写的图片 src 解析成本地文件 URL；非本地来源返回 nil。
+    /// Resolves an image src from Markdown/HTML to a local file URL; returns nil for non-local sources.
     private static func resolveLocalFileURL(_ raw: String) -> URL? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -141,7 +141,7 @@ public enum MarkdownImageInliner {
         }
     }
 
-    /// 用 ImageIO 解码 → 生成最长边 1600 px 的缩略图 → 重编码为 JPEG。
+    /// Decodes with ImageIO → creates a thumbnail with the long edge at 1600 px → re-encodes as JPEG.
     private static func downscale(data: Data, maxDimension: Int) -> Data? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let options: [CFString: Any] = [
@@ -167,9 +167,9 @@ public enum MarkdownImageInliner {
         return mutable as Data
     }
 
-    // MARK: - 正则替换
+    // MARK: - Regex replacement
 
-    /// 从后往前替换的简易正则助手（行为与 `MarkdownHTMLRenderer.replace` 一致）。
+    /// Simple back-to-front regex replacement helper (same behavior as `MarkdownHTMLRenderer.replace`).
     private static func replace(
         _ string: String,
         pattern: String,

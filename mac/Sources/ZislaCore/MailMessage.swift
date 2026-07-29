@@ -1,6 +1,6 @@
 import Foundation
 
-/// 系统 Mail.app 中一个已配置的账户。账户名称用于 AppleScript 精确定位。
+/// A configured account in the system Mail.app. The account name is used by AppleScript for precise targeting.
 public struct MailAccount: Identifiable, Equatable, Sendable {
     public let id: String
     public let emailAddresses: [String]
@@ -23,7 +23,7 @@ public struct MailAccount: Identifiable, Equatable, Sendable {
     }
 }
 
-/// Mail.app 收件箱中的一封邮件快照；正文仅保留在运行内存中。
+/// A snapshot of a message in the Mail.app inbox; the body is kept in memory only.
 public struct MailMessage: Identifiable, Equatable, Sendable {
     public let id: String
     public let accountName: String

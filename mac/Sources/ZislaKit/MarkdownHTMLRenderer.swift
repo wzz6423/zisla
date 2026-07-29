@@ -1,29 +1,34 @@
 import Foundation
 
-/// 把 Markdown 源文本渲染为带样式的 HTML 字符串，供 `WKWebView`（`MarkdownWebView`）
-/// 显示。相比 `MarkdownRenderer` 的 `AttributedString`，HTML 能真正渲染**图片**与
-/// **GFM 管道表格**，并保留代码块、引用、列表等富文本结构——满足随记「展示图片、
-/// 表格等各种内容」的需求。
+/// Renders Markdown source text to a styled HTML string for display in a `WKWebView` (`MarkdownWebView`).
+/// Unlike `MarkdownRenderer`'s `AttributedString`, HTML correctly renders **images** and
+/// **GFM pipe tables**, and preserves rich-text structures such as code blocks, blockquotes,
+/// and lists — meeting the Quick Notes requirement to display images, tables, and other content.
 ///
-/// 仅依赖 Foundation（无 SwiftUI），因此可在只装 Command Line Tools 的环境下编译。
+/// Depends only on Foundation (no SwiftUI), so it can compile in a Command Line Tools–only environment.
 public enum MarkdownHTMLRenderer {
-    /// 渲染入口：返回完整 HTML 文档（含 `<style>`）。空输入给出占位提示。
+    /// Rendering entry point: returns a complete HTML document (including `<style>`). Empty input produces a placeholder.
     public static func html(from source: String) -> String {
-        let blocks = MarkdownParser.parse(source)
-        let body = blocks.isEmpty
-            ? "<p class=\"empty\">（空笔记）</p>"
-            : blocks.map(renderBlock).joined(separator: "\n")
-        // 最后一步：把 `<img src="本地路径">` 改写为 base64 data URL，
-        // 绕开 WKWebView `loadHTMLString` 不授予 file:// 读取权限的限制。
+        let body = bodyHTML(from: source)
+        // Final step: rewrite `<img src="local-path">` to base64 data URLs,
+        // working around WKWebView's `loadHTMLString` not granting file:// read access.
         return MarkdownImageInliner.inlineLocalImages(in: document(wrapping: body))
     }
 
-    /// 保留备忘录 `body` 的原生结构，并复用 Markdown 预览的深色样式与本地图片内联能力。
+    /// Migrates a historical Markdown note to an editable HTML fragment for the rich-text editor's initial load.
+    public static func bodyHTML(from source: String) -> String {
+        let blocks = MarkdownParser.parse(source)
+        return blocks.isEmpty
+            ? "<div><br></div>"
+            : blocks.map(renderBlock).joined(separator: "\n")
+    }
+
+    /// Preserves the native structure of a Notes `body`, reusing the Markdown preview's dark style and local image inlining.
     public static func html(fromNotesHTML body: String) -> String {
         MarkdownImageInliner.inlineLocalImages(in: document(wrapping: body))
     }
 
-    // MARK: - 块渲染
+    // MARK: - Block rendering
 
     private static func renderBlock(_ block: MarkdownBlock) -> String {
         switch block {
@@ -53,14 +58,15 @@ public enum MarkdownHTMLRenderer {
         }
     }
 
-    // MARK: - 行内格式
+    // MARK: - Inline formatting
 
-    /// 行内格式：在已转义的文本上依次处理行内代码、图片、链接、粗体、斜体、删除线。
-    /// 先抽出行内代码占位，避免其中的 `*`/`_` 被后续规则误处理。
+    /// Inline formatting: processes inline code, images, links, bold, italic, and strikethrough
+    /// on already-escaped text, in order. Extracts inline code placeholders first to prevent
+    /// `*`/`_` inside them from being mishandled by later rules.
     private static func inline(_ text: String) -> String {
         var result = escapeHTML(text)
 
-        // 1. 行内代码 `code` → 占位（保护内部内容）
+        // 1. Inline code `code` → placeholder (protects inner content)
         var codeStore: [String] = []
         result = replace(result, pattern: "`([^`]+)`") { match, _ in
             let code = escapeHTML(match[1])
@@ -69,41 +75,41 @@ public enum MarkdownHTMLRenderer {
             return token
         }
 
-        // 2. 图片 ![alt](url)
+        // 2. Image ![alt](url)
         result = replace(result, pattern: "!\\[([^\\[]*)\\]\\(([^\\)]+)\\)") { match, _ in
             let alt = match[1]
             let url = match[2].trimmingCharacters(in: .whitespaces)
             return "<img src=\"\(attributeEscape(url))\" alt=\"\(attributeEscape(alt))\">"
         }
 
-        // 3. 链接 [text](url)
+        // 3. Link [text](url)
         result = replace(result, pattern: "\\[([^\\[]+)\\]\\(([^\\)]+)\\)") { match, _ in
             let title = match[1]
             let url = match[2].trimmingCharacters(in: .whitespaces)
             return "<a href=\"\(attributeEscape(url))\">\(title)</a>"
         }
 
-        // 4. 粗体 **x** / __x__
+        // 4. Bold **x** / __x__
         result = replace(result, pattern: "\\*\\*([^*]+)\\*\\*") { match, _ in "<strong>\(match[1])</strong>" }
         result = replace(result, pattern: "__([^_]+)__") { match, _ in "<strong>\(match[1])</strong>" }
 
-        // 5. 斜体 *x* / _x_
+        // 5. Italic *x* / _x_
         result = replace(result, pattern: "\\*([^*]+)\\*") { match, _ in "<em>\(match[1])</em>" }
         result = replace(result, pattern: "_([^_]+)_") { match, _ in "<em>\(match[1])</em>" }
 
-        // 6. 删除线 ~~x~~
+        // 6. Strikethrough ~~x~~
         result = replace(result, pattern: "~~([^~]+)~~") { match, _ in "<del>\(match[1])</del>" }
 
-        // 还原行内代码
+        // Restore inline code placeholders
         for (index, code) in codeStore.enumerated().reversed() {
             result = result.replacingOccurrences(of: "%%CODE\(index)%%", with: code)
         }
         return result
     }
 
-    // MARK: - 工具
+    // MARK: - Utilities
 
-    /// 转义 HTML 文本节点中的 `&` `<` `>`。
+    /// Escapes `&` `<` `>` in HTML text nodes.
     private static func escapeHTML(_ string: String) -> String {
         string
             .replacingOccurrences(of: "&", with: "&amp;")
@@ -111,8 +117,8 @@ public enum MarkdownHTMLRenderer {
             .replacingOccurrences(of: ">", with: "&gt;")
     }
 
-    /// 转义 HTML 属性值中的 `"` `&` `<`。先归一化已存在的 `&amp;`，保证对
-    /// 经过 `escapeHTML` 预转义的文本幂等（避免 `&` → `&amp;amp;`）。
+    /// Escapes `"` `&` `<` in HTML attribute values. First normalizes existing `&amp;` to ensure
+    /// idempotence on text that was already processed by `escapeHTML` (avoids `&` → `&amp;amp;`).
     private static func attributeEscape(_ string: String) -> String {
         string
             .replacingOccurrences(of: "&amp;", with: "&")
@@ -121,8 +127,8 @@ public enum MarkdownHTMLRenderer {
             .replacingOccurrences(of: "\"", with: "&quot;")
     }
 
-    /// 正则替换（从后往前，保证原始 `NSRange` 始终有效）。
-    /// `handler` 接收 `groups` 数组与整段匹配，`groups[0]` 为整段，`groups[1]` 起为捕获组。
+    /// Regex replacement (reversed iteration keeps original `NSRange` values valid).
+    /// `handler` receives a `groups` array and the full match; `groups[0]` is the full match, `groups[1]` onward are capture groups.
     private static func replace(
         _ string: String,
         pattern: String,
@@ -145,7 +151,7 @@ public enum MarkdownHTMLRenderer {
         return result
     }
 
-    // MARK: - 文档外壳
+    // MARK: - Document shell
 
     private static func document(wrapping body: String) -> String {
         let style = """

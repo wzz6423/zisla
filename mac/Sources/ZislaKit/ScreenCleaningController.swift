@@ -10,7 +10,7 @@ public enum KeyboardCleaningStartResult: Equatable, Sendable {
     case registrationFailed
 }
 
-/// 清屏使用全屏黑遮罩；键盘清洁通过辅助功能授权后的全局 event tap 吞掉按键。
+/// Screen cleaning uses a full-screen black overlay; keyboard cleaning swallows key events via a global event tap after accessibility authorization.
 @MainActor
 public final class ScreenCleaningController: ObservableObject {
     @Published public private(set) var isScreenCleaning = false
@@ -28,6 +28,17 @@ public final class ScreenCleaningController: ObservableObject {
 
     public static var hasAccessibilityAccess: Bool {
         AXIsProcessTrusted()
+    }
+
+    @discardableResult
+    public static func requestAccessibilityAccess() -> Bool {
+        let authorizationHost = WindowPlacement.authorizationPromptHost()
+        defer {
+            authorizationHost?.orderOut(nil)
+            authorizationHost?.close()
+        }
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
     }
 
     isolated deinit {
@@ -62,9 +73,22 @@ public final class ScreenCleaningController: ObservableObject {
     public func startKeyboardCleaning() -> KeyboardCleaningStartResult {
         guard !isKeyboardCleaning else { return .alreadyActive }
         endScreenCleaning(notify: false)
-        guard Self.hasAccessibilityAccess else { return .accessibilityPermissionRequired }
-        guard installKeyboardEventTap() else { return .registrationFailed }
+        let result = Self.keyboardCleaningStartResult(
+            eventTapInstalled: installKeyboardEventTap(),
+            hasAccessibilityAccess: Self.hasAccessibilityAccess
+        )
+        guard result == .started else { return result }
         isKeyboardCleaning = true
+        return .started
+    }
+
+    static func keyboardCleaningStartResult(
+        eventTapInstalled: Bool,
+        hasAccessibilityAccess: @autoclosure () -> Bool
+    ) -> KeyboardCleaningStartResult {
+        guard eventTapInstalled else {
+            return hasAccessibilityAccess() ? .registrationFailed : .accessibilityPermissionRequired
+        }
         return .started
     }
 
@@ -86,7 +110,7 @@ public final class ScreenCleaningController: ObservableObject {
 
     private func presentBlackOverlays() {
         tearDownOverlays()
-        // 隐藏 Dock，避免鼠标移到底部时 Dock 浮出遮罩
+        // Hide the Dock so it doesn't float above the overlay when the cursor moves to the bottom.
         savedPresentationOptions = NSApp.presentationOptions
         NSApp.presentationOptions.insert(.hideDock)
         let screens = NSScreen.screens
@@ -94,9 +118,10 @@ public final class ScreenCleaningController: ObservableObject {
             let window = makeOverlayWindow(for: screen)
             overlayWindows.append(window)
             if index == 0 {
-                // 主屏窗口成为 key window，确保能接收鼠标点击（borderless 默认 canBecomeKey=false，
-                // 用子类 CleaningOverlayWindow 覆写为 true；且 acceptsFirstMouse=true 让非前台状态下
-                // 第一次点击也能直接派发 mouseDown，而不是被系统拿去激活窗口）。
+                // The primary-screen window becomes the key window so it can receive mouse clicks
+                // (borderless windows have canBecomeKey=false by default; CleaningOverlayWindow
+                // overrides it to true, and acceptsFirstMouse=true lets the first click while the
+                // app is inactive dispatch mouseDown directly rather than just activating the window).
                 window.makeKeyAndOrderFront(nil)
             } else {
                 window.orderFrontRegardless()
@@ -219,7 +244,7 @@ public final class ScreenCleaningController: ObservableObject {
     }
 }
 
-/// 无边框黑遮罩窗口需要成为 key window，才能接收点击退出。
+/// Borderless black overlay window that must become the key window to receive click-to-dismiss.
 private final class CleaningOverlayWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }

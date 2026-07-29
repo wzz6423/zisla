@@ -6,12 +6,261 @@ import Testing
 
 struct AIUsageLogDetectorTests {
     @Test
-    func defaultScanLimitsBoundIdleResourceUsage() {
+    func defaultScanKeepsEveryUsageSample() {
         let detector = AIUsageLogDetector()
 
-        #expect(detector.maxFilesPerProvider == 4)
+        #expect(detector.maxFilesPerProvider == .max)
         #expect(detector.maxBytesPerFile == 256 * 1_024)
-        #expect(detector.maxSamplesPerFile == 256)
+        #expect(detector.maxSamplesPerFile == .max)
+    }
+
+    @Test
+    func parsesAllStructuredProvidersAfterOversizedLogEntries() throws {
+        let root = temporaryDirectory(named: "usage-log-all-providers")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let claude = root.appendingPathComponent("claude", isDirectory: true)
+        let gemini = root.appendingPathComponent("gemini", isDirectory: true)
+        let grok = root.appendingPathComponent("grok", isDirectory: true)
+        let qwen = root.appendingPathComponent("qwen", isDirectory: true)
+        let qoder = root.appendingPathComponent("qoder", isDirectory: true)
+        let doubao = root.appendingPathComponent("doubao", isDirectory: true)
+        let ignoredPayload = String(repeating: "x", count: 6_000)
+
+        try writeJSONL([
+            "{\"type\":\"ignored\",\"payload\":\"\(ignoredPayload)\"}",
+            """
+            {"type":"assistant","timestamp":"2026-07-26T00:01:00.000Z","message":{"id":"claude-one","model":"claude-opus","usage":{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":20,"cache_read_input_tokens":30}}}
+            """,
+        ], to: claude.appendingPathComponent("session.jsonl"))
+        try writeJSON(
+            """
+            [{"timestamp":"2026-07-26T00:02:00.000Z","ignored":"\(ignoredPayload)","model":"gemini-2.5-pro","usageMetadata":{"promptTokenCount":90,"candidatesTokenCount":12}}]
+            """,
+            to: gemini.appendingPathComponent("session-2026-07-26.json")
+        )
+        try writeJSONL([
+            "{\"type\":\"ignored\",\"payload\":\"\(ignoredPayload)\"}",
+            """
+            {"timestamp":1785024180,"method":"_x.ai/session/update","params":{"sessionId":"grok-session","update":{"prompt_id":"grok-one","usage":{"inputTokens":100,"outputTokens":20,"modelUsage":{"grok-4.5":{}}}}}}
+            """,
+            """
+            {"timestamp":1785024240,"method":"_x.ai/session/update","params":{"sessionId":"grok-session","update":{"prompt_id":"grok-two","usage":{"inputTokens":160,"outputTokens":50,"modelUsage":{"grok-4.5":{}}}}}}
+            """,
+        ], to: grok.appendingPathComponent("session/updates.jsonl"))
+        try writeJSONL([
+            "{\"type\":\"ignored\",\"payload\":\"\(ignoredPayload)\"}",
+            """
+            {"timestamp":"2026-07-26T00:04:00.000Z","model":"qwen3-coder","usage":{"prompt_tokens":15,"completion_tokens":3}}
+            """,
+        ], to: qwen.appendingPathComponent("project/session.jsonl"))
+        try writeJSONL([
+            "{\"type\":\"ignored\",\"payload\":\"\(ignoredPayload)\"}",
+            """
+            {"timestamp":"2026-07-26T00:05:00.000Z","model":"qoder-max","usage":{"input_tokens":6,"output_tokens":4,"cache_creation_input_tokens":7,"cache_read_input_tokens":8}}
+            """,
+        ], to: qoder.appendingPathComponent("logs/sessions/session-one/segments/one.jsonl"))
+        try writeJSONL([
+            "{\"type\":\"ignored\",\"payload\":\"\(ignoredPayload)\"}",
+            """
+            {"timestamp":"2026-07-26T00:06:00.000Z","model":"doubao-seed","usage":{"input_tokens":11,"output_tokens":2}}
+            """,
+        ], to: doubao.appendingPathComponent("history/session.jsonl"))
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: codex,
+            claudeProjectsDirectory: claude,
+            geminiSessionsDirectory: gemini,
+            grokSessionsDirectory: grok,
+            qwenProjectsDirectory: qwen,
+            qoderRoots: [qoder],
+            doubaoRoots: [doubao],
+            maxBytesPerFile: 4_096
+        )
+
+        let samples = try detector.usageSamples()
+        #expect(samples.filter { $0.provider == .claude }.map(\.inputTokens) == [60])
+        #expect(samples.filter { $0.provider == .gemini }.map(\.inputTokens) == [90])
+        #expect(samples.filter { $0.provider == .gemini }.map(\.outputTokens) == [12])
+        #expect(samples.filter { $0.provider == .grok }.map(\.inputTokens) == [100, 60])
+        #expect(samples.filter { $0.provider == .grok }.map(\.outputTokens) == [20, 30])
+        #expect(samples.filter { $0.provider == .qwen }.map(\.inputTokens) == [15])
+        #expect(samples.filter { $0.provider == .coder }.map(\.inputTokens) == [21])
+        #expect(samples.filter { $0.provider == .coder }.map(\.outputTokens) == [4])
+        #expect(samples.filter { $0.provider == .doubao }.map(\.inputTokens) == [11])
+    }
+
+    @Test
+    func appendingGrokUsageRetainsCumulativeSessionState() throws {
+        let root = temporaryDirectory(named: "usage-log-grok-append")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let grok = root.appendingPathComponent("grok", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        let log = grok.appendingPathComponent("session/updates.jsonl")
+
+        try writeJSONL([
+            """
+            {"timestamp":1785024180,"method":"_x.ai/session/update","params":{"sessionId":"grok-session","update":{"prompt_id":"grok-one","usage":{"inputTokens":100,"outputTokens":20}}}}
+            """,
+        ], to: log)
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: empty,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: grok,
+            qwenProjectsDirectory: empty,
+            qoderRoots: [],
+            doubaoRoots: [],
+            scanInterval: 0
+        )
+        #expect(try detector.usageSamples().map(\.inputTokens) == [100])
+
+        try appendJSONL(
+            """
+            {"timestamp":1785024240,"method":"_x.ai/session/update","params":{"sessionId":"grok-session","update":{"prompt_id":"grok-two","usage":{"inputTokens":160,"outputTokens":50}}}}
+            """,
+            to: log
+        )
+
+        let samples = try detector.usageSamples()
+        #expect(samples.map(\.inputTokens) == [100, 60])
+        #expect(samples.map(\.outputTokens) == [20, 30])
+    }
+
+    @Test
+    func parsesCopilotCLIUsageEventsIncludingCacheTokens() throws {
+        let root = temporaryDirectory(named: "usage-log-copilot-cli")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let copilot = root.appendingPathComponent("copilot", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        try writeJSONL([
+            """
+            {"id":"usage-one","timestamp":"2026-07-26T00:07:00.000Z","type":"assistant.usage","data":{"model":"gpt-5","inputTokens":100,"outputTokens":20,"cacheReadTokens":30,"cacheWriteTokens":40}}
+            """,
+        ], to: copilot.appendingPathComponent("events.jsonl"))
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: empty,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            qoderRoots: [],
+            doubaoRoots: [],
+            copilotUsageLogRoots: [copilot]
+        )
+
+        let samples = try detector.usageSamples()
+        #expect(samples.count == 1)
+        #expect(samples[0].provider == .copilot)
+        #expect(samples[0].inputTokens == 170)
+        #expect(samples[0].outputTokens == 20)
+        #expect(samples[0].model == "gpt-5")
+    }
+
+    @Test
+    func parsesCopilotVSCodeDiagnosticUsageAndShutdownSummary() throws {
+        let root = temporaryDirectory(named: "usage-log-copilot-vscode")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let copilot = root.appendingPathComponent("copilot-diagnostics", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        try writeJSONL([
+            """
+            {"id":"diagnostic-one","timestamp":"2026-07-26T00:08:00.000Z","llm_request":{"attrs":{"model":"gpt-4.1","inputTokens":12,"outputTokens":4,"cacheReadTokens":6,"cacheWriteTokens":8}}}
+            """,
+        ], to: copilot.appendingPathComponent("vscode.jsonl"))
+        try writeJSONL([
+            """
+            {"id":"shutdown-one","timestamp":"2026-07-26T00:09:00.000Z","type":"session.shutdown","data":{"modelMetrics":{"claude-sonnet":{"usage":{"inputTokens":120,"outputTokens":15,"cacheReadTokens":20,"cacheWriteTokens":30}}}}}
+            """,
+        ], to: copilot.appendingPathComponent("summary.jsonl"))
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: empty,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            qoderRoots: [],
+            doubaoRoots: [],
+            copilotUsageLogRoots: [copilot]
+        )
+
+        let samples = try detector.usageSamples()
+        #expect(samples.map(\.inputTokens) == [26, 170])
+        #expect(samples.map(\.outputTokens) == [4, 15])
+        #expect(samples.map(\.model) == ["gpt-4.1", "claude-sonnet"])
+    }
+
+    @Test
+    func prefersCopilotDetailedUsageOverSessionShutdownSummary() throws {
+        let root = temporaryDirectory(named: "usage-log-copilot-deduplication")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let copilot = root.appendingPathComponent("copilot", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        try writeJSONL([
+            """
+            {"id":"usage-one","timestamp":"2026-07-26T00:10:00.000Z","type":"assistant.usage","data":{"model":"gpt-5","inputTokens":100,"outputTokens":20}}
+            """,
+            """
+            {"id":"shutdown-one","timestamp":"2026-07-26T00:11:00.000Z","type":"session.shutdown","data":{"modelMetrics":{"gpt-5":{"usage":{"inputTokens":100,"outputTokens":20,"cacheReadTokens":0,"cacheWriteTokens":0}}}}}
+            """,
+        ], to: copilot.appendingPathComponent("events.jsonl"))
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: empty,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            qoderRoots: [],
+            doubaoRoots: [],
+            copilotUsageLogRoots: [copilot]
+        )
+
+        let samples = try detector.usageSamples()
+        #expect(samples.count == 1)
+        #expect(samples[0].inputTokens == 100)
+        #expect(samples[0].outputTokens == 20)
+    }
+
+    @Test
+    func replacingACopilotShutdownSummaryWithLaterDetailedUsageDoesNotDoubleCount() throws {
+        let root = temporaryDirectory(named: "usage-log-copilot-incremental")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let copilot = root.appendingPathComponent("copilot", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        let log = copilot.appendingPathComponent("events.jsonl")
+        try writeJSONL([
+            """
+            {"id":"shutdown-one","timestamp":"2026-07-26T00:12:00.000Z","type":"session.shutdown","data":{"modelMetrics":{"gpt-5":{"usage":{"inputTokens":140,"outputTokens":30,"cacheReadTokens":0,"cacheWriteTokens":0}}}}}
+            """,
+        ], to: log)
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: empty,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            qoderRoots: [],
+            doubaoRoots: [],
+            copilotUsageLogRoots: [copilot],
+            scanInterval: 0
+        )
+        #expect(try detector.usageSamples().map(\.inputTokens) == [140])
+
+        try appendJSONL(
+            """
+            {"id":"usage-one","timestamp":"2026-07-26T00:13:00.000Z","type":"assistant.usage","data":{"model":"gpt-5","inputTokens":100,"outputTokens":20}}
+            """,
+            to: log
+        )
+
+        let samples = try detector.usageSamples()
+        #expect(samples.map(\.inputTokens) == [100])
+        #expect(samples.map(\.outputTokens) == [20])
     }
 
     @Test
@@ -63,7 +312,7 @@ struct AIUsageLogDetectorTests {
 
         let samples = try detector.usageSamples()
         #expect(samples.count == 5)
-        #expect(samples.filter { $0.provider == .codex }.map(\.inputTokens) == [100, 50])
+        #expect(samples.filter { $0.provider == .codex }.map(\.inputTokens) == [1_000, 200])
         #expect(samples.filter { $0.provider == .codex }.map(\.outputTokens) == [50, 25])
         #expect(samples.first(where: { $0.provider == .claude })?.inputTokens == 60)
         #expect(samples.filter { $0.provider == .grok }.map(\.inputTokens) == [100, 60])
@@ -73,7 +322,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
-    func readsRecentJSONLTailWithoutLoadingTheWholeSession() throws {
+    func skipsOversizedNonUsageLinesWithoutSkippingLaterCodexUsage() throws {
         let root = temporaryDirectory(named: "usage-log-tail")
         defer { try? FileManager.default.removeItem(at: root) }
         let codex = root.appendingPathComponent("codex", isDirectory: true)
@@ -106,7 +355,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
-    func truncatedCodexLogUsesLastUsageForItsInitialTokenSample() throws {
+    func readsTheFullCodexLogBeforeDifferencingCumulativeUsage() throws {
         let root = temporaryDirectory(named: "usage-log-truncated-cumulative")
         defer { try? FileManager.default.removeItem(at: root) }
         let codex = root.appendingPathComponent("codex", isDirectory: true)
@@ -135,8 +384,74 @@ struct AIUsageLogDetectorTests {
         )
 
         let samples = try detector.usageSamples()
-        #expect(samples.map(\.inputTokens) == [120, 50])
-        #expect(samples.map(\.outputTokens) == [20, 20])
+        #expect(samples.map(\.inputTokens) == [1_000_000, 50])
+        #expect(samples.map(\.outputTokens) == [200, 20])
+    }
+
+    @Test
+    func defaultScanCountsEveryCodexSessionInsteadOfOnlyTheFourMostRecent() throws {
+        let root = temporaryDirectory(named: "usage-log-all-codex-sessions")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+
+        for index in 1...5 {
+            try writeJSONL([
+                """
+                {"timestamp":"2026-07-25T00:0\(index):00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":\(index * 100),"output_tokens":\(index * 10)},"last_token_usage":{"input_tokens":\(index * 100),"output_tokens":\(index * 10)}}}}
+                """,
+            ], to: codex.appendingPathComponent("2026/07/25/rollout-\(index).jsonl"))
+        }
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: codex,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            qoderRoots: []
+        )
+
+        let samples = try detector.usageSamples()
+        #expect(samples.count == 5)
+        #expect(samples.map(\.inputTokens).reduce(0, +) == 1_500)
+        #expect(samples.map(\.outputTokens).reduce(0, +) == 150)
+    }
+
+    @Test
+    func appendingCodexUsageReadsOnlyTheNewEventAndKeepsItsPriorTotal() throws {
+        let root = temporaryDirectory(named: "usage-log-codex-append")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        let log = codex.appendingPathComponent("2026/07/25/rollout.jsonl")
+        try writeJSONL([
+            """
+            {"timestamp":"2026-07-25T00:00:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":10},"last_token_usage":{"input_tokens":100,"output_tokens":10}}}}
+            """,
+        ], to: log)
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: codex,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            qoderRoots: [],
+            scanInterval: 0
+        )
+        #expect(try detector.usageSamples().map(\.inputTokens) == [100])
+
+        try appendJSONL(
+            """
+            {"timestamp":"2026-07-25T00:01:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":180,"output_tokens":30},"last_token_usage":{"input_tokens":80,"output_tokens":20}}}}
+            """,
+            to: log
+        )
+
+        let samples = try detector.usageSamples()
+        #expect(samples.map(\.inputTokens) == [100, 80])
+        #expect(samples.map(\.outputTokens) == [10, 20])
     }
 
     @Test
@@ -315,6 +630,18 @@ private final class CountingActivityDetector: AIActivityDetecting {
 private func writeJSONL(_ lines: [String], to url: URL) throws {
     try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     try Data((lines.joined(separator: "\n") + "\n").utf8).write(to: url)
+}
+
+private func writeJSON(_ string: String, to url: URL) throws {
+    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data(string.utf8).write(to: url)
+}
+
+private func appendJSONL(_ line: String, to url: URL) throws {
+    let handle = try FileHandle(forWritingTo: url)
+    defer { try? handle.close() }
+    try handle.seekToEnd()
+    try handle.write(contentsOf: Data((line + "\n").utf8))
 }
 
 private func temporaryDirectory(named name: String) -> URL {

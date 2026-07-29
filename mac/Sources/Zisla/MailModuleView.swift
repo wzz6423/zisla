@@ -38,7 +38,6 @@ struct MailModuleView: View {
         HStack(spacing: 0) {
             messageList
                 .frame(width: 232)
-            Hairline()
             contentArea
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -73,7 +72,7 @@ struct MailModuleView: View {
         }
     }
 
-    // MARK: - Content Area（根据 isComposing 切换详情/撰写）
+    // MARK: - Content Area (switches between detail and compose based on isComposing)
 
     @ViewBuilder
     private var contentArea: some View {
@@ -344,7 +343,7 @@ struct MailModuleView: View {
         selectedMessageID = visibleMessages.first?.id
     }
 
-    /// 打开系统偏好设置的「隐私与安全性 → 自动化」页面，引导用户授权 Mail.app 访问。
+    /// Opens the "Privacy & Security → Automation" page in System Settings to guide the user to authorize Mail.app access.
     private func openAutomationSettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
         NSWorkspace.shared.open(url)
@@ -356,7 +355,7 @@ struct MailModuleView: View {
     }
 }
 
-// MARK: - Inline Composer（岛内撰写，非弹窗）
+// MARK: - Inline Composer (composing inside the island, not a popover)
 
 private struct MailComposerView: View {
     @ObservedObject var model: AppModel
@@ -376,14 +375,14 @@ private struct MailComposerView: View {
     private var isReply: Bool { replyTarget != nil }
     private var availableAccounts: [MailAccount] { model.mail.activeAccounts }
 
-    /// 一个可选的发件身份 = 账户名 + 该账户下的一个具体邮箱地址。
+    /// A sender identity = account name + one specific email address under that account.
     private struct SenderIdentity: Identifiable {
         let accountName: String
         let address: String
         var id: String { "\(accountName)\u{1F}\(address)" }
     }
 
-    /// 平铺所有账户下的全部邮箱地址；没有地址的账户以账户名兜底展示。
+    /// Flattens all email addresses across all accounts; accounts with no addresses fall back to the account name.
     private var senderIdentities: [SenderIdentity] {
         availableAccounts.flatMap { account -> [SenderIdentity] in
             guard !account.emailAddresses.isEmpty else {
@@ -402,12 +401,10 @@ private struct MailComposerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // 标题栏 + 关闭按钮
+            // header bar + close button
             composerHeader
 
-            Divider()
-
-            // 表单区域
+            // form area
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 10) {
                     if replyTarget != nil {
@@ -418,10 +415,10 @@ private struct MailComposerView: View {
                         subjectField
                     }
 
-                    // 正文编辑器
+                    // body editor
                     bodyEditor
 
-                    // 附件列表
+                    // attachment list
                     if !attachmentURLs.isEmpty {
                         attachmentList
                     }
@@ -431,9 +428,7 @@ private struct MailComposerView: View {
             .scrollIndicators(.visible)
             .thinScrollChrome()
 
-            Divider()
-
-            // 底部工具栏：附件按钮 + 发送/取消
+            // bottom toolbar: attachment buttons + send/cancel
             toolbar
         }
         .background(Color.fillCard)
@@ -507,7 +502,7 @@ private struct MailComposerView: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 52, alignment: .trailing)
                 Menu {
-                    // 按账户分组，账户内平铺其所有邮箱地址
+                    // group by account, show all addresses under each account inline
                     ForEach(availableAccounts) { account in
                         let identities = senderIdentities.filter { $0.accountName == account.id }
                         Section(account.id) {
@@ -620,9 +615,9 @@ private struct MailComposerView: View {
 
     private var toolbar: some View {
         HStack(spacing: 0) {
-            // 左侧：附件工具按钮
+            // left side: attachment tool buttons
             HStack(spacing: 4) {
-                // 添加文件
+                // add file
                 Button {
                     showsFileImporter = true
                 } label: {
@@ -632,7 +627,7 @@ private struct MailComposerView: View {
                 .buttonStyle(.borderless)
                 .help("添加附件")
 
-                // 添加图片
+                // add image
                 Button {
                     showsImagePicker = true
                 } label: {
@@ -654,7 +649,7 @@ private struct MailComposerView: View {
 
             Spacer()
 
-            // 右侧：取消 / 发送
+            // right side: cancel / send
             HStack(spacing: 8) {
                 Button("取消") { onCancel() }
                     .buttonStyle(.bordered)
@@ -692,8 +687,8 @@ private struct MailComposerView: View {
         Task {
             var body = messageBody
 
-            // 将附件路径信息追加到正文（AppleScript 发送不直接支持附件，
-            // 这里用文本方式提示用户；后续可升级为 Mail.app 的 attachment API）
+            // Append attachment path info to the body (AppleScript send doesn't support attachments directly;
+            // using text as a placeholder for now — can be upgraded to Mail.app's attachment API later)
             if !attachmentURLs.isEmpty {
                 let fileNames = attachmentURLs.map { $0.lastPathComponent }.joined(separator: ", ")
                 body += "\n\n---\n附件：\(fileNames)"

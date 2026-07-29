@@ -2,7 +2,7 @@ import AppKit
 import CoreLocation
 import Foundation
 
-/// 一次性定位/地理编码返回给上层的结果：坐标 + 适合 UI 展示的地区名。
+/// Result returned to callers from a one-shot location/geocoding lookup: coordinates plus a UI-friendly region name.
 public struct GeoLocation: Equatable, Sendable {
     public var latitude: Double
     public var longitude: Double
@@ -15,7 +15,7 @@ public struct GeoLocation: Equatable, Sendable {
     }
 }
 
-/// 纯坐标，隔离非 Sendable 的 `CLLocationCoordinate2D`。
+/// Plain coordinates, isolating the non-`Sendable` `CLLocationCoordinate2D`.
 public struct GeoCoordinate: Equatable, Sendable {
     public var latitude: Double
     public var longitude: Double
@@ -26,7 +26,7 @@ public struct GeoCoordinate: Equatable, Sendable {
     }
 }
 
-/// 定位与地理编码的中文错误。
+/// Localized errors for location and geocoding.
 public enum WeatherLocationError: Error, LocalizedError, Equatable, Sendable {
     case authorizationDenied
     case locationUnavailable
@@ -44,7 +44,7 @@ public enum WeatherLocationError: Error, LocalizedError, Equatable, Sendable {
         }
     }
 }
-/// 从 `CLPlacemark` 抽取的 Sendable 快照，避免非 Sendable 类型跨隔离域。
+/// Sendable snapshot extracted from `CLPlacemark`, avoiding non-`Sendable` types crossing isolation boundaries.
 public struct GeocodedPlace: Equatable, Sendable {
     public var latitude: Double
     public var longitude: Double
@@ -83,7 +83,7 @@ public struct GeocodedPlace: Equatable, Sendable {
         self.country = placemark.country
     }
 
-    /// 组装适合 UI 展示的地区名：优先市/区，必要时用省消歧，最后回退到名称/国家/坐标。
+    /// Assembles a UI-friendly region name: prefers city/district, uses province to disambiguate when needed, falls back to name/country/coordinates.
     func displayName(latitude: Double, longitude: Double) -> String {
         let city = locality ?? subAdministrativeArea
         if let city, !city.isEmpty {
@@ -99,18 +99,18 @@ public struct GeocodedPlace: Equatable, Sendable {
     }
 }
 
-/// 正向/反向地理编码抽象，便于测试注入 stub。
+/// Forward/reverse geocoding abstraction for test injection.
 public protocol PlaceGeocoding: Sendable {
     func geocode(_ query: String) async throws -> [GeocodedPlace]
     func reverseGeocode(latitude: Double, longitude: Double) async throws -> [GeocodedPlace]
 }
 
-/// 一次性当前位置抽象，便于测试注入 stub。
+/// One-shot current location abstraction for test injection.
 public protocol CurrentLocationProviding: Sendable {
     func requestOnce() async throws -> GeoCoordinate
 }
 
-/// 组合定位与地理编码的基础层。无状态，逻辑集中在此以便单测。
+/// Foundation layer combining location and geocoding. Stateless; logic is centralised here for unit testing.
 public struct WeatherLocationService: Sendable {
     private let geocoder: PlaceGeocoding
     private let locationProvider: CurrentLocationProviding
@@ -120,7 +120,7 @@ public struct WeatherLocationService: Sendable {
         self.locationProvider = locationProvider
     }
 
-    /// 默认接线 CoreLocation 实现；需在主线程创建。
+    /// Wires up CoreLocation implementations by default; must be created on the main thread.
     @MainActor
     public init() {
         self.init(
@@ -129,7 +129,7 @@ public struct WeatherLocationService: Sendable {
         )
     }
 
-    /// 一次性获取当前位置并反向解析成地区名。
+    /// Fetches the current location once and reverse-geocodes it to a region name.
     public func currentLocation() async throws -> GeoLocation {
         let coordinate = try await locationProvider.requestOnce()
         let places = try await geocoder.reverseGeocode(
@@ -147,7 +147,7 @@ public struct WeatherLocationService: Sendable {
         )
     }
 
-    /// 按地名查询坐标与展示名。
+    /// Looks up coordinates and a display name by place name.
     public func search(_ query: String) async throws -> GeoLocation {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw WeatherLocationError.emptyQuery }
@@ -161,7 +161,7 @@ public struct WeatherLocationService: Sendable {
     }
 }
 
-/// `CLGeocoder` 的 `@MainActor` 包装：completion 内立即转 Sendable 快照。
+/// `@MainActor` wrapper around `CLGeocoder`: immediately converts results to `Sendable` snapshots inside the completion handler.
 @MainActor
 final class CLGeocoderPlaceGeocoder: PlaceGeocoding {
     private let geocoder = CLGeocoder()
@@ -182,7 +182,7 @@ final class CLGeocoderPlaceGeocoder: PlaceGeocoding {
     ) async throws -> [GeocodedPlace] {
         try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
-                // 在主隔离域内构造 CLLocation，避免非 Sendable 类型跨域捕获。
+                // Construct CLLocation on the main actor to avoid capturing a non-Sendable type across isolation boundaries.
                 let location = CLLocation(latitude: latitude, longitude: longitude)
                 geocoder.reverseGeocodeLocation(location) { placemarks, error in
                     Self.resume(continuation, placemarks: placemarks, error: error)
@@ -211,7 +211,7 @@ final class CLGeocoderPlaceGeocoder: PlaceGeocoding {
     }
 }
 
-/// `CLLocationManager` 的一次性定位包装。`@MainActor` 隔离全部可变状态，delegate 回调用 `assumeIsolated`。
+/// One-shot location wrapper around `CLLocationManager`. All mutable state is `@MainActor`-isolated; delegate callbacks use `assumeIsolated`.
 @MainActor
 final class CoreLocationCurrentLocationProvider:
     NSObject, CurrentLocationProviding, CLLocationManagerDelegate
@@ -289,7 +289,7 @@ final class CoreLocationCurrentLocationProvider:
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        // 先在 nonisolated 上下文取出 Sendable 的授权状态，避免把非 Sendable 的 manager 送入闭包。
+        // Extract the Sendable authorization status in a nonisolated context to avoid sending a non-Sendable manager into the closure.
         let status = manager.authorizationStatus
         MainActor.assumeIsolated {
             guard continuation != nil else { return }
@@ -309,7 +309,7 @@ final class CoreLocationCurrentLocationProvider:
         _ manager: CLLocationManager,
         didUpdateLocations locations: [CLLocation]
     ) {
-        // 先转成 Sendable 的 GeoCoordinate，再跨隔离域。
+        // Convert to a Sendable GeoCoordinate before crossing isolation boundaries.
         let coordinate = locations.last.map {
             GeoCoordinate(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude)
         }
