@@ -636,6 +636,7 @@ struct ReadOnlyNoteMetadata: View {
     let showNote: () -> Void
     let showAttachment: (NotesAppBridge.NoteAttachment) -> Void
     let wordCount: Int
+    var showsWordCount = true
 
     var body: some View {
         HStack(spacing: 8) {
@@ -677,10 +678,12 @@ struct ReadOnlyNoteMetadata: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text("\(wordCount) 字")
-                .font(.islandMicro())
-                .foregroundStyle(.tertiary)
-                .fixedSize()
+            if showsWordCount {
+                Text("\(wordCount) 字")
+                    .font(.islandMicro())
+                    .foregroundStyle(.tertiary)
+                    .fixedSize()
+            }
         }
         .frame(maxWidth: .infinity)
     }

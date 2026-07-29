@@ -10,7 +10,6 @@ import SwiftUI
 /// debounce before writing back.
 struct QuickNoteExpandedView: View {
     @ObservedObject var model: AppModel
-    @ObservedObject private var settingsStore: FeatureSettingsStore
 
     @State private var draftHTML: String = "<div><br></div>"
     @State private var draftPlainText: String = ""
@@ -18,11 +17,6 @@ struct QuickNoteExpandedView: View {
     @State private var editorCommand: RichNoteEditorCommand?
 
     private var service: QuickNotesService { model.quickNotes }
-
-    init(model: AppModel) {
-        _model = ObservedObject(wrappedValue: model)
-        _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,28 +26,27 @@ struct QuickNoteExpandedView: View {
 
             Divider().overlay(Color.dividerSubtle)
 
-            RichNoteToolbar(command: $editorCommand)
+            toolbarWithWordCount
                 .frame(height: 34)
                 .padding(.horizontal, 12)
-                .disabled(service.isBuiltInWelcomeNoteSelected)
 
-            if let noteContent {
+            if let noteContent, shouldShowMetadata(noteContent) {
                 ReadOnlyNoteMetadata(
                     content: noteContent,
                     showNote: service.showSelectedNoteInNotes,
                     showAttachment: { service.showAttachmentInNotes(id: $0.id) },
-                    wordCount: draftPlainText.count
+                    wordCount: draftPlainText.count,
+                    showsWordCount: false
                 )
-                .frame(height: 30)
-                .padding(.horizontal, 12)
+                    .frame(height: 30)
+                    .padding(.horizontal, 12)
             }
 
             editorPane
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .preferredColorScheme(.dark)
         .frame(minWidth: 760, minHeight: 540)
-        .environment(\.islandVisualStyle, settingsStore.settings.islandVisualStyle)
         .task {
             await service.refresh()
             await loadDraft()
@@ -70,6 +63,28 @@ struct QuickNoteExpandedView: View {
         .onChange(of: service.selectedID) { _, _ in
             Task { await loadDraft() }
         }
+    }
+
+    // MARK: - Toolbar with word count
+
+    private var toolbarWithWordCount: some View {
+        HStack(spacing: 0) {
+            RichNoteToolbar(command: $editorCommand)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .disabled(service.isBuiltInWelcomeNoteSelected)
+
+            if noteContent != nil {
+                Text("\(draftPlainText.count) 字")
+                    .font(.islandMicro())
+                    .foregroundStyle(.tertiary)
+                    .fixedSize()
+                    .padding(.leading, 12)
+            }
+        }
+    }
+
+    private func shouldShowMetadata(_ content: NotesAppBridge.NoteContent) -> Bool {
+        content.isPasswordProtected || !content.tags.isEmpty || !content.attachments.isEmpty
     }
 
     // MARK: - Header
@@ -114,7 +129,26 @@ struct QuickNoteExpandedView: View {
                 }
             }
         }
-        .islandGlassSurface(.input, cornerRadius: 12)
+        .background(
+            VisualEffectBackground()
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(edgeHighlight, lineWidth: 1)
+        }
+    }
+
+    private var edgeHighlight: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: .white.opacity(0.26), location: 0),
+                .init(color: .white.opacity(0.07), location: 0.5),
+                .init(color: .white.opacity(0.03), location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     // MARK: - Actions
