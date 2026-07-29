@@ -56,7 +56,7 @@ struct AIMascotLibraryTests {
 
     @Test
     func installedTraeURLPrefersBundleIdentifierThenApplicationName() {
-        let bundleMatched = URL(fileURLWithPath: "/Applications/TRAE SOLO CN.app")
+        let bundleMatched = URL(fileURLWithPath: "/Applications/TRAE SOLO CN.app", isDirectory: true)
         let byBundleIdentifier = AIMascotLibrary.installedTraeApplicationURL(
             resolveBundleIdentifier: { $0 == "cn.trae.solo.app" ? bundleMatched : nil },
             applicationDirectories: [],
@@ -77,7 +77,7 @@ struct AIMascotLibraryTests {
 
     @Test
     func installedWorkBuddyURLPrefersBundleIdentifierThenApplicationName() {
-        let bundleMatched = URL(fileURLWithPath: "/Applications/WorkBuddy.app")
+        let bundleMatched = URL(fileURLWithPath: "/Applications/WorkBuddy.app", isDirectory: true)
         let byBundleIdentifier = AIMascotLibrary.installedWorkBuddyApplicationURL(
             resolveBundleIdentifier: { $0 == "com.workbuddy.workbuddy" ? bundleMatched : nil },
             applicationDirectories: [],

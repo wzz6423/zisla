@@ -1,0 +1,26 @@
+name: Swift Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "publish-v*"
+  push:
+    branches:
+      - main
+      - "publish-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Swift Tests
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: mac
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test

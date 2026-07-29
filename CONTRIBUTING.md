@@ -1,0 +1,28 @@
+# 贡献指南
+
+感谢你为 zisla 做出贡献。开始前请搜索已有的 Issue 和 Discussions；安全漏洞请通过 [安全通告](https://github.com/wzz6423/zisla/security/advisories/new) 私下报告，不要公开提交 Issue。
+
+## 开发
+
+当前 macOS 实现在 `mac/` 目录中，依赖 macOS 14+ 与 Swift 6 / Xcode 16+。
+
+```bash
+cd mac
+swift test
+```
+
+提交前请删除测试、构建和打包产生的二进制产物。
+
+## 分支和提交
+
+- 从最新的 `main` 创建分支，使用 `feature/`、`fix/`、`docs/` 或 `chore/` 前缀，例如 `fix/download-timeout`。
+- 一个分支和一个 PR 应只处理一个明确目标；请避免混入格式化或无关重构。
+- 发布分支 `publish-v*` 仅用于发布维护。除发布修复外，贡献请提交到 `main`。
+
+## Pull Request
+
+- 使用 PR 模板，说明变更、验证方式和关联 Issue。
+- 代码变更必须运行 `cd mac && swift test`；涉及界面时请补充实际验证说明或截图。
+- 更新用户可见行为、构建方式或发布流程时，同步更新相应文档。
+- 不要提交 `.build`、`dist`、下载文件、日志、令牌、签名材料或其他个人数据。
+- `main` 和 `publish-v*` 受保护，只能通过通过检查并完成评审的 PR 合并。

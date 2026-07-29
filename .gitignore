@@ -11,3 +11,11 @@
 /windows/.vs/
 *.suo
 *.user
+
+.vscode/
+.claude/
+.codex/
+.uploads/
+.grok/
+.gemini/
+.idea/

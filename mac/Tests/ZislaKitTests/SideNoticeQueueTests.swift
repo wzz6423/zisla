@@ -38,14 +38,21 @@ struct SideNoticeQueueTests {
     }
 
     @Test @MainActor
-    func temporaryNoticeStillExpires() async throws {
-        let queue = SideNoticeQueue()
+    func temporaryNoticeStillExpires() async {
+        let gate = ExpiryGate()
+        let queue = SideNoticeQueue(
+            capacityPerSide: 3,
+            expirySleeper: { duration in
+                try await gate.sleep(for: duration)
+            }
+        )
         let notice = IslandNotice(id: "temporary-test", title: "临时通知", side: .right)
 
         queue.enqueue(notice, expiresAfter: 0.02)
-        let deadline = ContinuousClock.now + .seconds(1)
-        while !queue.right.isEmpty, ContinuousClock.now < deadline {
-            try await Task.sleep(for: .milliseconds(10))
+        await gate.waitUntilSleeping()
+        await gate.release()
+        for _ in 0..<20 where !queue.right.isEmpty {
+            await Task.yield()
         }
 
         #expect(queue.right.isEmpty)
@@ -80,14 +87,21 @@ struct SideNoticeQueueTests {
     }
 
     @Test @MainActor
-    func updateIfPresentDoesNotReinsertAfterExpiry() async throws {
-        let queue = SideNoticeQueue()
+    func updateIfPresentDoesNotReinsertAfterExpiry() async {
+        let gate = ExpiryGate()
+        let queue = SideNoticeQueue(
+            capacityPerSide: 3,
+            expirySleeper: { duration in
+                try await gate.sleep(for: duration)
+            }
+        )
         let notice = IslandNotice(id: "expired-update", title: "即将过期", side: .right)
 
         queue.enqueue(notice, expiresAfter: 0.03)
-        let deadline = ContinuousClock.now + .seconds(1)
-        while !queue.right.isEmpty, ContinuousClock.now < deadline {
-            try await Task.sleep(for: .milliseconds(10))
+        await gate.waitUntilSleeping()
+        await gate.release()
+        for _ in 0..<20 where !queue.right.isEmpty {
+            await Task.yield()
         }
         #expect(queue.right.isEmpty)
 
