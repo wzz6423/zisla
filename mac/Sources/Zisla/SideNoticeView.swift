@@ -10,6 +10,7 @@ final class SideNoticeDisplayState: ObservableObject {
     @Published var compactWingHeight: CGFloat = 34
     @Published var reserveCompactWing = false
     @Published var compactStatusHidden = false
+    var compactStatusIDs: Set<String> = []
     /// Physical notch width; the detailed music layout must leave a gap here in the center. 0 on simulated-island devices.
     @Published var compactBarCenterInset: CGFloat = 0
 }
@@ -28,7 +29,7 @@ private struct CompactNotchBackground: View {
         case .black:
             Color.black
         case .frosted:
-            VisualEffectBackground(alphaValue: 0.80)
+            VisualEffectBackground(alphaValue: 0.92, material: .popover)
         }
     }
 }

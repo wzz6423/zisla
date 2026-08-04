@@ -251,9 +251,8 @@ struct IslandLightField: View {
                     )
                 }
             } else {
-                // The field moves over tens of seconds, so 20 fps is visually continuous while
-                // avoiding display-rate redraws on ProMotion panels.
-                TimelineView(.periodic(from: .now, by: 1.0 / 20.0)) { timeline in
+                // The field moves over tens of seconds, so 10 fps remains visually continuous.
+                TimelineView(.periodic(from: .now, by: 1.0 / 10.0)) { timeline in
                     let time = timeline.date.timeIntervalSinceReferenceDate
                     Canvas(rendersAsynchronously: true) { context, size in
                         Self.draw(
@@ -404,6 +403,47 @@ struct IslandRimLight: View {
     }
 }
 
+// MARK: - Selection glass background
+
+/// Unified selection state background: subtle frosted glass with soft highlight and shadow.
+/// Shared across Quick Notes rows, PDF tool navigation, and outlined pickers.
+struct SelectionGlassBackground: View {
+    var cornerRadius: CGFloat = 7
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(
+                    reduceTransparency
+                        ? Color.white.opacity(0.12)
+                        : Color.white.opacity(0.08)
+                )
+                .background(
+                    VisualEffectBackground(
+                        material: .hudWindow,
+                        blendingMode: .withinWindow
+                    )
+                    .opacity(reduceTransparency ? 0 : 0.42)
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                )
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white.opacity(0.28), location: 0),
+                            .init(color: .white.opacity(0.08), location: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.5
+                )
+        }
+        .shadow(color: .black.opacity(0.18), radius: 2.5, y: 1)
+    }
+}
+
 // MARK: - Selection illumination
 
 /// A moving dark-glass focus lens: the glyph settles into place while an outer pulse expands
@@ -474,7 +514,7 @@ struct MotionFocusLens: View {
     }
 }
 
-/// A compact text switch with a neutral outlined selection indicator, shared by the settings
+/// A compact text switch with the shared frosted selection background, used by settings
 /// appearance rows and the download format switch.
 struct IslandOutlinedPicker<Option: Hashable>: View {
     @Binding var selection: Option
@@ -537,8 +577,7 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
         .foregroundStyle(isSelected ? Color.primary : Color.secondary)
         .background {
             if isSelected {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.50), lineWidth: 1)
+                SelectionGlassBackground(cornerRadius: 6)
                     .matchedGeometryEffect(id: selectionID, in: selectionNamespace)
             }
         }
@@ -552,7 +591,7 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
             if let symbol {
                 Image(systemName: symbol(option))
             }
-            Text(title(option))
+            AppLocalizedText(title(option))
                 .lineLimit(1)
         }
         .font(.system(size: fontSize, weight: isSelected ? .semibold : .medium))

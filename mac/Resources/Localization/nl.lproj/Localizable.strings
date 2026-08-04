@@ -1,0 +1,513 @@
+/* Localizable.strings - Dutch localization for Zisla macOS */
+
+/* Common */
+"取消" = "Annuleer";
+"确定" = "OK";
+"好" = "OK";
+"继续" = "Ga door";
+"删除" = "Verwijder";
+"关闭" = "Sluit";
+"保存" = "Bewaar";
+"添加" = "Voeg toe";
+"刷新" = "Ververs";
+"重试" = "Probeer opnieuw";
+"退出应用" = "Sluit app";
+"复制" = "Kopieer";
+"拷贝" = "Kopieer";
+"搜索" = "Zoek";
+"清除" = "Wis";
+"打开设置" = "Open Instellingen";
+
+/* Settings */
+"设置" = "Instellingen";
+"工作流" = "Workflow";
+"信息" = "Info";
+"模型" = "Modellen";
+"桌面宠物" = "Bureaubladhuisdier";
+"交互" = "Interactie";
+"下载" = "Downloads";
+"天气" = "Weer";
+"更新" = "Updates";
+
+/* Settings - Workflow */
+"管理灵动岛中的工作流模块。" = "Beheer workflowmodules in Dynamic Island.";
+"工作流模块" = "Workflowmodules";
+"媒体播放" = "Media-afspelen";
+"显示系统正在播放的音乐或视频" = "Toon momenteel afspelende muziek of video";
+"播放来源" = "Afspeelbron";
+"歌词与歌曲信息" = "Songteksten en songinfo";
+"详细模式：图标、歌名、歌手与滚动歌词；关闭为简略模式（仅图标与音浪）" = "Gedetailleerde modus: icoon, titel, artiest en scrollende songteksten; Uit voor compacte modus (alleen icoon en golfvorm)";
+"收起态音乐样式" = "Compacte Muziekstijl";
+"文件中转与分享" = "Bestandsoverdracht en delen";
+"暂存文件并调用 AirDrop 或系统分享" = "Staging van bestanden en aanroepen van AirDrop of systeemdeelfunctie";
+"小工具" = "Hulpmiddelen";
+"番茄钟、亮屏与屏幕清洁" = "Pomodoro, scherm wakker houden en schermreiniging";
+"随记" = "Snelle notities";
+"Markdown 随手记，可发送到系统备忘录" = "Markdown snelle notities, kunnen worden verzonden naar systeem Notities";
+"PDF 工具" = "PDF-hulpmiddelen";
+"合并、拆分、加密与转换 PDF" = "Samenvoegen, splitsen, versleutelen en converteren van PDF's";
+"系统状态与清理" = "Systeemmonitor en opschonen";
+"监控资源并安全清理缓存和日志" = "Monitor bronnen en schoon veilig cache en logbestanden op";
+"显示 zisla 图标" = "Toon zisla-icoon";
+"关闭后不影响已启用的菜单栏监控项" = "Heeft geen invloed op ingeschakelde menubalk-monitoringitems wanneer uitgeschakeld";
+"菜单栏常驻" = "Menubalk persistent";
+"选择一项或多项；点击任一指标直达系统监控" = "Selecteer een of meer; klik op een willekeurige metric om naar systeemmonitor te gaan";
+"监控样式" = "Monitorstijl";
+"紧凑模式隐藏图标并减小字号，减少菜单栏占用" = "Compacte modus verbergt iconen en verkleint lettergrootte om menubalkruimte te minimaliseren";
+
+
+/* Settings - Info */
+"配置日历、邮件、锁屏与通知显示。" = "Configureer agenda, e-mail, vergrendelscherm en meldingweergave.";
+"信息与通知" = "Info en meldingen";
+"日历日程" = "Agenda-evenementen";
+"显示接下来的日程与会议" = "Toon aankomende evenementen en vergaderingen";
+"邮件" = "E-mail";
+"读取已配置的 Mail.app 账户并提醒新邮件" = "Lees geconfigureerde Mail.app-accounts en meld nieuwe e-mail";
+"锁屏信息" = "Vergrendelscherm-info";
+"在系统锁屏页显示状态信息与播放器" = "Toon statusinformatie en speler op systeemvergrendelscherm";
+"锁屏文字" = "Vergrendelscherm-tekst";
+"显示在系统时间上方；留空则不显示" = "Weergegeven boven systeemtijd; laat leeg om te verbergen";
+"输入一句话" = "Voer een bericht in";
+"显示农历" = "Toon maankalender";
+"显示在系统时间上方，可与锁屏文字共存" = "Weergegeven boven systeemtijd, kan naast vergrendelscherm-tekst bestaan";
+"侧翼通知" = "Zijmeldingen";
+"在灵动岛肩部显示任务变化" = "Toon taakwijzigingen op de schouders van Dynamic Island";
+"岛上倒计时" = "Aftellen op eiland";
+"专注时在收起态灵动岛显示剩余时间" = "Toon resterende tijd in ingeklapte Dynamic Island tijdens focussen";
+"活动展示" = "Activiteitenweergave";
+"播放与 AI 任务的折叠时长" = "Samenvouwduur voor afspelen en AI-taken";
+"专注模式展示" = "Focusmodusweergave";
+"开启或切换专注模式时的显示时长" = "Weergaveduur bij inschakelen of wisselen van focusmodus";
+"收起态展示优先级" = "Compacte status prioriteit";
+"上移" = "Verplaats omhoog";
+"下移" = "Verplaats omlaag";
+"恢复默认顺序" = "Herstel standaardvolgorde";
+"通知显示器" = "Meldingsschermen";
+"当前显示器" = "Huidig scherm";
+"连接另一台显示器后可选择通知展示范围" = "Verbind een ander scherm om meldingsbereik te kiezen";
+"播放与 AI 活动通知显示在此屏幕" = "Afspeel- en AI-activiteitsmeldingen worden op dit scherm getoond";
+
+/* Settings - AI */
+"AI 进度、语音输入，以及连接、自动化、CLI 与 Skills 等 Agent 行为。" = "AI-voortgang, spraakinvoer en Agent-gedrag inclusief verbindingen, automatisering, CLI en Skills.";
+"AI 监控" = "AI-monitoring";
+"AI 进度与用量" = "AI-voortgang en gebruik";
+"汇总桌面端与 CLI 工具的运行状态" = "Samenvatting van uitvoeringsstatus van desktop en CLI-hulpmiddelen";
+"语音输入" = "Spraakinvoer";
+"启用语音输入" = "Schakel spraakinvoer in";
+"开启后可通过全局快捷键触发语音输入" = "Schakel spraakinvoer in via globale sneltoets";
+"录音模式" = "Opnamemodus";
+"快捷键" = "Sneltoets";
+"按住说话、松开结束" = "Ingedrukt houden om te praten, loslaten om te stoppen";
+"按一下开始、再按一下结束" = "Druk eenmaal om te starten, druk opnieuw om te stoppen";
+"输入监控" = "Invoermonitoring";
+"左右侧修饰键需要监听全局键盘事件" = "Linker/rechter wijzigingstoetsen vereisen luisteren naar globale toetsenbordgebeurtenissen";
+"已授权" = "Geautoriseerd";
+
+/* Settings - AI Agent */
+"AI Agent 行为" = "AI Agent-gedrag";
+"在灵动岛显示" = "Toon in Dynamic Island";
+"关闭后仅从工具栏隐藏，此处的配置与对话不受影响" = "Verbergt alleen van werkbalk wanneer uitgeschakeld; configuratie en gesprekken hier worden niet beïnvloed";
+
+/* Settings - Models */
+"配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Configureer lokale modellen, externe modellen en inloggegevens, en selecteer het model voor spraakorganisatie.";
+"本地模型" = "Lokale modellen";
+"远端模型与凭据" = "Externe modellen en inloggegevens";
+"语音整理模型" = "Spraakorganisatiemodel";
+"使用模型" = "Gebruik model";
+"从上方已启用的本地或远端模型中选择" = "Selecteer uit ingeschakelde lokale of externe modellen hierboven";
+"不使用模型整理" = "Geen modelorganisatie";
+"本地" = "Lokaal";
+"远端" = "Extern";
+"尚未选择模型" = "Geen model geselecteerd";
+"在上方添加并启用本地或远端模型后即可选择" = "Voeg lokale of externe modellen hierboven toe en schakel ze in om te selecteren";
+"选择后会对语音转写进行整理" = "Zal spraakoverschrijving organiseren na selectie";
+"测试连接" = "Test verbinding";
+"尚未测试连接" = "Niet getest";
+"正在连接…" = "Verbinden…";
+"已发现" = "Gevonden";
+"个模型" = " modellen";
+
+
+/* Settings - Models - Hardware Profile */
+"设备档案与推荐模型" = "Apparaatprofiel en aanbevolen modellen";
+"设备" = "Apparaat";
+"综合推荐" = "Algehele aanbeveling";
+"检测" = "Detecteer";
+"点击下方按钮检测硬件信息" = "Klik op de knop hieronder om hardware-informatie te detecteren";
+
+/* Settings - Pet */
+"设置灵动岛内部的宠物形象。" = "Stel het uiterlijk van het huisdier binnen Dynamic Island in.";
+"岛上宠物伙伴" = "Huisdiermaatje op eiland";
+"在灵动岛养一只小宠物" = "Houd een huisdier in Dynamic Island";
+"当前宠物" = "Huidig huisdier";
+"选择内置的宠物形象" = "Selecteer ingebouwd huisdieruiterlijk";
+"在岛的哪一侧" = "Aan welke kant van het eiland";
+"宠物出现在灵动岛内部的左侧或右侧" = "Huisdier verschijnt links of rechts binnen Dynamic Island";
+"左侧" = "Links";
+"右侧" = "Rechts";
+
+/* Settings - Interaction */
+"调整外观、展开方式与隐私行为。" = "Pas uiterlijk, uitbreidingsmethode en privacygedrag aan.";
+"外观" = "Uiterlijk";
+"界面外观" = "Interface-uiterlijk";
+"灵动岛样式" = "Dynamic Island-stijl";
+"刘海背景" = "Notch-achtergrond";
+"启动" = "Opstarten";
+"登录时启动" = "Start bij inloggen";
+"开机或登录后自动在后台运行" = "Voer automatisch op de achtergrond uit na opstarten of inloggen";
+"需要系统批准" = "Vereist systeemgoedkeuring";
+"在登录项中允许 zisla 后即可生效" = "Wordt van kracht na toestaan van zisla in inlogitems";
+"打开登录项…" = "Open inlogitems…";
+"展开方式" = "Uitbreidingsmethode";
+"鼠标移入展开" = "Uitvouwen bij zweven";
+"鼠标进入屏幕顶部感应区时显示" = "Toon wanneer muis de bovenste detectiezone van het scherm binnenkomt";
+"隐私" = "Privacy";
+"记录剪贴板历史" = "Registreer klembordgeschiedenis";
+"仅本机保存文本和图片，默认关闭" = "Bewaar alleen tekst en afbeeldingen lokaal, standaard uitgeschakeld";
+"检测剪贴板链接" = "Detecteer klembordlinks";
+"发现可下载链接时提示，默认关闭" = "Waarschuw wanneer downloadbare links worden gedetecteerd, standaard uitgeschakeld";
+
+/* Settings - Download */
+"管理下载目录、下载通知与所需组件。" = "Beheer downloadmap, downloadmeldingen en vereiste componenten.";
+"下载器" = "Downloader";
+"链接下载" = "Linkdownload";
+"下载视频或音频" = "Download video's of audio";
+"默认下载目录" = "Standaard downloadmap";
+"选择…" = "Kies…";
+"下载通知" = "Downloadmeldingen";
+"浏览器下载进度" = "Browserdownloadvoortgang";
+"在灵动岛显示来源图标与百分比" = "Toon bronicoon en percentage in Dynamic Island";
+"原生下载进度" = "Systeemeigen downloadvoortgang";
+"下载器工作时显示来源平台图标与百分比" = "Toon bronplatformicoon en percentage tijdens downloaderwerking";
+"组件" = "Componenten";
+"未安装" = "Niet geïnstalleerd";
+"已安装（版本未知）" = "Geïnstalleerd (versie onbekend)";
+"安装" = "Installeer";
+"正在查询最新版本…" = "Nieuwste versie controleren…";
+"正在下载…" = "Downloaden…";
+"正在下载" = "Downloaden";
+"正在安装…" = "Installeren…";
+
+/* Settings - Weather */
+"管理天气显示、地点和刷新。" = "Beheer weerweergave, locaties en verversing.";
+"天气显示" = "Weerweergave";
+"显示当前或自选地区的天气" = "Toon weer van huidige of aangepaste locatie";
+"地点" = "Locaties";
+"默认显示当前所在地" = "Toont standaard huidige locatie";
+"等待刷新" = "Wacht op verversing";
+"拖动调整" = "Sleep om aan te passen";
+"的展示顺序" = " weergavevolgorde";
+"天气数据" = "Weergegevens";
+"刷新当前位置与全部自选地区" = "Ververs huidige locatie en alle aangepaste locaties";
+"城市、区县或地区" = "Stad, district of regio";
+"搜索地区" = "Zoek locatie";
+
+/* Settings - Updates */
+"管理版本检查与自动更新。" = "Beheer versiecontrole en automatische updates.";
+"更新策略" = "Updatestrategie";
+"手动检查通道" = "Handmatig controlekanaal";
+"不影响自动更新" = "Heeft geen invloed op automatische updates";
+"检查更新" = "Controleer op updates";
+"仅检查当前安装包所属的更新通道" = "Controleer alleen updatekanaal van huidige installatie";
+"自动安装更新" = "Installeer updates automatisch";
+"仅自动安装当前安装包所属通道的新构建" = "Installeer alleen automatisch nieuwe builds van het kanaal van huidige installatie";
+"版本" = "Versie";
+"尚未检查更新" = "Niet gecontroleerd op updates";
+"正在检查更新" = "Updates controleren";
+"已是最新版本" = "Al de nieuwste versie";
+"发现" = "Gevonden";
+"新版本" = " nieuwe versie";
+
+
+/* Clipboard History Module */
+"剪贴板" = "Klembord";
+"全部" = "Alles";
+"常用" = "Favorieten";
+"非常用" = "Niet-favorieten";
+"添加常用信息" = "Voeg favoriet toe";
+"清空历史（保留常用）" = "Wis geschiedenis (behoud favorieten)";
+"只看" = "Toon alleen ";
+"还没有剪贴板历史" = "Nog geen klembordgeschiedenis";
+"复制内容后会自动记录" = "Automatisch geregistreerd na kopiëren";
+"还没有常用项" = "Nog geen favorieten";
+"点击右上角加号，添加文字、图片或文件" = "Klik op + rechtsboven om tekst, afbeeldingen of bestanden toe te voegen";
+"这里空空如也" = "Niets hier";
+"添加常用项" = "Voeg favoriet toe";
+"文字" = "Tekst";
+"图片" = "Afbeelding";
+"文件" = "Bestand";
+"添加常用文字" = "Voeg favoriete tekst toe";
+"输入文字或 Emoji" = "Voer tekst of Emoji in";
+"复制到剪贴板" = "Kopieer naar klembord";
+"发送到随记" = "Verstuur naar snelle notities";
+"发送到 AI Agent" = "Verstuur naar AI Agent";
+"移出常用" = "Verwijder uit favorieten";
+"设为常用" = "Voeg toe aan favorieten";
+"文本" = "Tekst";
+
+/* Quick Notes Module */
+"备忘录暂无笔记" = "Geen notities in Notities-app";
+"点 + 新建一条" = "Klik + om er een te maken";
+"刷新备忘录" = "Ververs notities";
+"新建随记" = "Nieuwe snelle notitie";
+"无标题" = "Zonder titel";
+"内置说明" = "Ingebouwde gids";
+"无法读取备忘录" = "Kan notities niet lezen";
+"发送到提词器" = "Verstuur naar teleprompter";
+"展开大窗口编辑" = "Open in groot venster";
+"系统共享" = "Systeemdeelfunctie";
+
+/* AI Agent Module */
+"对话" = "Chat";
+"消息连接" = "Berichtverbindingen";
+"应用增强" = "Toepassingsverbeteringen";
+"自动化" = "Automatisering";
+"CLI 与 Skills" = "CLI en Skills";
+"会话存储" = "Sessieopslag";
+"刷新余额、渠道、CLI 和 Skills" = "Ververs saldo, kanalen, CLI en Skills";
+"统一历史" = "Uniforme geschiedenis";
+"新建对话" = "Nieuw gesprek";
+"添加项目" = "Voeg project toe";
+"添加现有文件夹…" = "Voeg bestaande map toe…";
+"新建文件夹并添加…" = "Maak nieuwe map…";
+"将本地文件夹添加为项目" = "Voeg lokale map toe als project";
+"未归类" = "Ongecategoriseerd";
+"展开项目会话" = "Vouw projectsessies uit";
+"收起项目会话" = "Vouw projectsessies in";
+"选择项目；新建对话会归入此项目" = "Selecteer project; nieuwe gesprekken worden aan dit project toegevoegd";
+"取消置顶项目" = "Maak project los";
+"置顶项目" = "Maak project vast";
+"删除项目" = "Verwijder project";
+"选择或新建对话" = "Selecteer of maak gesprek";
+"你" = "Jij";
+"助手" = "Assistent";
+"执行细节" = "Uitvoeringsdetails";
+"计划模式" = "Planmodus";
+"复制回复" = "Kopieer antwoord";
+"从此回复分叉会话" = "Splits sessie vanaf antwoord";
+"批注" = "Annotatie";
+"添加批注" = "Voeg annotatie toe";
+"将引用和评论发送为新消息" = "Verstuur citaat en commentaar als nieuw bericht";
+"删除批注" = "Verwijder annotatie";
+"发送消息" = "Verstuur bericht";
+"添加文件" = "Voeg bestand toe";
+"添加文件、切换计划模式或目标模式" = "Voeg bestand toe, schakel planmodus of doelmodus in/uit";
+"目标模式" = "Doelmodus";
+"设置外部 CLI 的访问偏好" = "Stel toegangsvoorkeuren voor externe CLI in";
+"选择思考深度偏好" = "Selecteer denkdieptevoorkeur";
+"发送" = "Verstuur";
+
+/* AI Agent - Remote Providers */
+"远端 Provider" = "Externe provider";
+"添加 Provider" = "Voeg provider toe";
+"尚未配置远端 Provider" = "Geen externe providers geconfigureerd";
+"Provider 名称" = "Providernaam";
+"端点" = "Endpoint";
+"凭据" = "Inloggegevens";
+"高级路由" = "Geavanceerde routering";
+"添加端点组" = "Voeg endpointgroep toe";
+"添加额外的 URL/Key 轮换组（高级）" = "Voeg extra URL/Key-rotatiegroep toe (geavanceerd)";
+"尚未关联凭据" = "Geen inloggegevens gekoppeld";
+"关联凭据" = "Koppel inloggegevens";
+"选择已有凭据，或为此 Provider 新建 API Key 凭据" = "Selecteer bestaande inloggegevens of maak nieuwe API Key-inloggegevens voor deze provider";
+"新建 API Key 凭据" = "Nieuwe API Key-inloggegevens";
+"配置文件路径" = "Configuratiebestandspad";
+"认证文件路径" = "Authenticatiebestandspad";
+"导入配置" = "Importeer configuratie";
+"导入认证" = "Importeer authenticatie";
+"配置" = "Configuratie";
+"认证" = "Authenticatie";
+
+
+/* System Monitor */
+"正在识别芯片" = "Chip identificeren";
+"正在识别图形处理器" = "Grafische processor identificeren";
+"用户" = "Gebruiker";
+"系统" = "Systeem";
+"闲置" = "Inactief";
+"利用率" = "Gebruik";
+"渲染" = "Renderer";
+"内存" = "Geheugen";
+"压力" = "Druk";
+"可用" = "Beschikbaar";
+"共" = "Totaal";
+"释放" = "Vrijgeven";
+"整理系统内存，回收非活跃与压缩页面" = "Organiseer systeemgeheugen, herwin inactieve en gecomprimeerde pagina's";
+"已整理系统内存" = "Systeemgeheugen georganiseerd";
+"磁盘" = "Schijf";
+"清理" = "Opschonen";
+"扫描可清理的缓存、日志与开发产物" = "Scan opschoonbare cache, logbestanden en ontwikkelartefacten";
+"风扇" = "Ventilator";
+"无风扇" = "Geen ventilator";
+"风扇数据不可用" = "Ventilatorgegevens niet beschikbaar";
+"正在读取风扇状态" = "Ventilatorstatus lezen";
+"网络" = "Netwerk";
+"通过 ipify 查询公网地址" = "Vraag openbaar IP-adres op via ipify";
+"内网" = "Lokaal IP";
+"公网" = "Openbaar IP";
+"正在识别" = "Identificeren";
+"正在获取" = "Ophalen";
+"暂不可用" = "Niet beschikbaar";
+"建立基线" = "Basislijn vaststellen";
+
+/* System Cleanup */
+"清理候选项" = "Opschoningskandidaten";
+"扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件" = "Scan app-cache, logbestanden, tijdelijke bestanden, ontwikkelartefacten, pakketbeheercache, schijfimages, grote bestanden en dubbele bestanden";
+"取消全选" = "Deselecteer alles";
+"全选" = "Selecteer alles";
+"选择全部候选项" = "Selecteer alle kandidaten";
+"取消所有选择" = "Deselecteer alles";
+"反选" = "Keer selectie om";
+"反转当前选择：已选变未选，未选变已选" = "Keer huidige selectie om: geselecteerd wordt gedeselecteerd, gedeselecteerd wordt geselecteerd";
+"已选中的项取消选中，未选中的项选中" = "Deselecteer geselecteerde items, selecteer gedeselecteerde items";
+"重新扫描" = "Scan opnieuw";
+"正在扫描" = "Scannen";
+"未找到可清理项" = "Geen op te schonen items gevonden";
+"可安全清理的缓存与日志当前为空" = "Veilig opschoonbare cache en logbestanden zijn momenteel leeg";
+"展开" = "Vouw uit";
+"折叠" = "Vouw in";
+"取消选择" = "Deselecteer";
+"已选" = "Geselecteerd";
+"项" = " items";
+"移入废纸篓" = "Verplaats naar prullenbak";
+"将" = "Verplaats ";
+" 项移入废纸篓？" = " items naar prullenbak?";
+"zisla 不会永久删除这些内容。" = "zisla zal deze items niet permanent verwijderen.";
+"已移入废纸篓" = "Verplaatst naar prullenbak";
+"清空废纸篓后可释放" = "Kan vrijgeven na legen van prullenbak";
+"已处理" = "Verwerkt";
+"项未完成" = " items onvolledig";
+
+/* Cleanup Categories */
+"应用缓存" = "App-cache";
+"缓存" = "Cache";
+"日志" = "Logbestanden";
+"废纸篓" = "Prullenbak";
+"开发产物" = "Ontwikkelartefacten";
+"临时文件" = "Tijdelijke bestanden";
+"包管理缓存" = "Pakketbeheercache";
+"崩溃报告" = "Crashrapporten";
+"磁盘镜像" = "Schijfimages";
+"大文件" = "Grote bestanden";
+"重复文件" = "Dubbele bestanden";
+
+/* Toolbox */
+"暂停" = "Pauzeer";
+"开始" = "Start";
+"重置" = "Reset";
+"重置番茄钟" = "Reset Pomodoro";
+"设置时长" = "Stel duur in";
+"小时" = "Uren";
+"分钟" = "Minuten";
+"秒" = "Seconden";
+"分" = "min";
+"提词器" = "Teleprompter";
+"打开提词器" = "Open teleprompter";
+"闹钟" = "Wekker";
+"管理闹钟" = "Beheer wekkers";
+"镜子" = "Spiegel";
+"打开摄像头镜子" = "Open cameraspiegel";
+"清空废纸篓（不可撤销，会先确认）" = "Leeg prullenbak (onomkeerbaar, zal eerst bevestigen)";
+"保持亮屏" = "Houd scherm wakker";
+"防止用户闲置导致显示器休眠" = "Voorkom schermslaapmodus door gebruikersinactiviteit";
+"防止空闲休眠" = "Voorkom slaapstand bij inactiviteit";
+"防止用户闲置导致系统休眠；合盖、低电量或用户主动休眠仍会让 Mac 进入睡眠" = "Voorkom systeemslaapmodus door gebruikersinactiviteit; dekselsluiting, lage batterij of door gebruiker geïnitieerde slaapmodus laat Mac nog steeds slapen";
+"常驻提醒" = "Permanente herinnering";
+"无媒体占用时，在折叠状态显示番茄钟、亮屏或清洁状态" = "Toon Pomodoro, scherm wakker of schoonmaakstatus in ingeklapte staat wanneer geen media actief is";
+"清理屏幕" = "Scherm schoonmaken";
+"全屏黑色遮罩；点击中央「退出清屏」按钮或任意处退出" = "Zwarte overlay over volledig scherm; klik op centrale 'Verlaat schoonmaken'-knop of ergens om te verlaten";
+"清理键盘" = "Toetsenbord schoonmaken";
+"结束清洁" = "Beëindig schoonmaken";
+"恢复键盘输入" = "Herstel toetsenbordinvoer";
+"吞掉键盘输入；再次点击结束" = "Absorbeert toetsenbordinvoer; klik opnieuw om te beëindigen";
+"收起置顶" = "Ingeklapt bovenop";
+"收起置底" = "Ingeklapt onder";
+"收起态压在其他窗口之上（置顶），或被其他窗口和菜单栏图标覆盖（置底）" = "Ingeklapte staat boven andere vensters (bovenop), of bedekt door andere vensters en menubalkiconen (onder)";
+"屏蔽通知" = "Demp meldingen";
+"临时不再推送 Zisla 的系统通知；关闭后恢复正常推送（闹钟不受影响）" = "Stop tijdelijk met pushen van Zisla-systeemmeldingen; herstel normale push wanneer uitgeschakeld (wekkers worden niet beïnvloed)";
+"整理桌面" = "Organiseer bureaublad";
+"按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Lijn bureaublad-iconen uit op raster; verplaatst geen bestanden wanneer 'Stapels' is ingeschakeld";
+"App Store 应用" = "App Store-apps";
+"批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页" = "Update App Store-apps in bulk; open App Store-updatepagina wanneer mas niet is geïnstalleerd";
+
+/* Alarm Editor */
+"还没有闹钟，在下方添加" = "Nog geen wekkers, voeg hieronder toe";
+"打开时钟" = "Open klok";
+"打开系统「时钟」App" = "Open systeem Klok-app";
+"停用" = "Uitschakelen";
+"启用" = "Inschakelen";
+"编辑" = "Bewerk";
+"时" = "Uur";
+"备注" = "Label";
+"仅响一次" = "Eenmalig";
+"每周重复" = "Wekelijkse herhaling";
+
+/* Skills Management */
+"统一存储并同步到已启用的 CLI" = "Uniforme opslag en synchronisatie naar ingeschakelde CLI's";
+"立即同步 Skills" = "Synchroniseer Skills nu";
+"同步方式" = "Synchronisatiemodus";
+"同步目标" = "Synchronisatiedoelen";
+"受管库" = "Beheerde bibliotheek";
+"在访达中打开受管库" = "Open beheerde bibliotheek in Finder";
+"卸载 Skill？" = "Skill deïnstalleren?";
+"卸载" = "Deïnstalleer";
+"普通 Skill 会移到废纸篓；由 npm、pnpm、yarn、bun 或 Homebrew 全局安装的 Skill 会调用对应包管理器卸载。" = "Gewone Skills worden naar prullenbak verplaatst; Skills globaal geïnstalleerd via npm, pnpm, yarn, bun of Homebrew worden gedeïnstalleerd via hun pakketbeheerder.";
+"已发现 Skills（" = "Skills gevonden (";
+"）" = ")";
+
+/* Side Notices */
+"已连接" = "Verbonden";
+"耳机已连接：" = "Koptelefoon verbonden: ";
+"状态已更新" = "Status bijgewerkt";
+"正在播放" = "Nu afspelen";
+"正在播放：" = "Nu afspelen: ";
+"AI 任务图标" = "AI-taakicoon";
+"个 AI 任务" = " AI-taken";
+"有错误" = " met fouten";
+"等待操作" = " wacht op actie";
+"正在运行" = " actief";
+"小工具：" = "Hulpmiddelen: ";
+"工具" = "Hulpmiddel";
+"专注倒计时：" = "Focus aftellen: ";
+"专注模式：" = "Focusmodus: ";
+"下载中" = " downloaden";
+"浏览器" = "Browser";
+"下载完成：" = " download voltooid: ";
+"视频" = "Video";
+
+/* Empty States */
+"无" = "Geen";
+"无可用内容" = "Geen inhoud beschikbaar";
+
+/* Localization and AppKit chrome */
+"外观与语言" = "Uiterlijk en taal";
+"界面语言" = "Interfacetaal";
+"切换后立即应用到支持的界面文本" = "Past onmiddellijk toe op ondersteunde interfacetekst";
+"简体中文" = "Vereenvoudigd Chinees";
+"退出 zisla" = "Sluit zisla";
+"窗口" = "Venster";
+"最小化" = "Minimaliseer";
+"关闭窗口" = "Sluit venster";
+"显示灵动岛" = "Toon Dynamic Island";
+"系统监控" = "Systeemmonitor";
+"设置..." = "Instellingen...";
+"点击打开系统监控" = "Klik om systeemmonitor te openen";
+"zisla 设置" = "zisla-instellingen";
+"随记 · 编辑" = "Snelle notities · bewerken";
+
+/* Presentation options */
+"自动" = "Automatisch";
+"简洁模式" = "Compact";
+"详细模式" = "Gedetailleerd";
+"3 秒" = "3 seconden";
+"5 秒" = "5 seconden";
+"10 秒" = "10 seconden";
+"30 秒" = "30 seconden";
+"始终显示" = "Altijd";
+"跟随系统" = "Systeem";
+"浅色" = "Licht";
+"深色" = "Donker";
+"磨砂玻璃" = "Mat glas";
+"刘海" = "Notch";
+"紧凑" = "Compact";
+"详细" = "Gedetailleerd";

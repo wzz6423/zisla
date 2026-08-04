@@ -138,10 +138,11 @@ struct QuickNoteModuleView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(selected ? Color.white.opacity(0.16) : Color.clear)
-            )
+            .background {
+                if selected {
+                    SelectionGlassBackground(cornerRadius: 7)
+                }
+            }
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)

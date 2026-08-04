@@ -14,7 +14,7 @@ public final class ClipboardHistoryMonitor {
 
     public init(
         pasteboard: NSPasteboard = .general,
-        pollInterval: TimeInterval = 0.8,
+        pollInterval: TimeInterval = 1,
         onContentCaptured: CaptureHandler? = nil
     ) {
         self.pasteboard = pasteboard
@@ -32,8 +32,9 @@ public final class ClipboardHistoryMonitor {
         if enabled {
             lastPasteboardChangeCount = pasteboard.changeCount
             let timer = Timer(timeInterval: pollInterval, repeats: true) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.pollNow() }
+                MainActor.assumeIsolated { self?.pollNow() }
             }
+            timer.tolerance = min(0.2, pollInterval / 2)
             self.timer = timer
             RunLoop.main.add(timer, forMode: .common)
         } else {

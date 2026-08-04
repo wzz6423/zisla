@@ -586,15 +586,18 @@ private struct SystemCleanupPanelPresenter: NSViewRepresentable {
             panel.level = WindowPlacement.modalWindowLevel
             panel.collectionBehavior = [.moveToActiveSpace, .transient, .ignoresCycle]
             panel.contentView = NSHostingView(
-                rootView: SystemCleanupSheet(
-                    service: service,
-                    onDismiss: { [weak self] in
-                        self?.isPresented.wrappedValue = false
-                        self?.dismiss()
-                    },
-                    onCleanupCompleted: {
-                        AppModel.shared.islandCollapseRequested = true
-                    }
+                rootView: AppLanguageEnvironment(
+                    languageStore: AppModel.shared.languageStore,
+                    content: SystemCleanupSheet(
+                        service: service,
+                        onDismiss: { [weak self] in
+                            self?.isPresented.wrappedValue = false
+                            self?.dismiss()
+                        },
+                        onCleanupCompleted: {
+                            AppModel.shared.islandCollapseRequested = true
+                        }
+                    )
                 )
             )
             panel.onCancel = { [weak self] in

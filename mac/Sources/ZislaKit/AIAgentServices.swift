@@ -442,6 +442,82 @@ public struct AIAgentSkillService: Sendable {
     }
 }
 
+enum AgentSkillPackageManager: String, Equatable, Sendable {
+    case npm
+    case pnpm
+    case yarn
+    case bun
+    case brew
+
+    var executableName: String { rawValue }
+}
+
+struct AgentSkillPackageInstallation: Equatable, Sendable {
+    let manager: AgentSkillPackageManager
+    let packageName: String
+
+    var uninstallArguments: [String] {
+        switch manager {
+        case .npm:
+            ["uninstall", "--global", packageName]
+        case .pnpm, .bun:
+            ["remove", "--global", packageName]
+        case .yarn:
+            ["global", "remove", packageName]
+        case .brew:
+            ["uninstall", packageName]
+        }
+    }
+
+    static func detect(at url: URL) -> AgentSkillPackageInstallation? {
+        let standardized = url.standardizedFileURL
+        let components = standardized.pathComponents
+        if let cellarIndex = components.firstIndex(of: "Cellar"),
+           cellarIndex + 1 < components.count {
+            return AgentSkillPackageInstallation(
+                manager: .brew,
+                packageName: components[cellarIndex + 1]
+            )
+        }
+
+        guard let nodeModulesIndex = components.lastIndex(of: "node_modules"),
+              let packageName = packageName(
+                in: components,
+                after: nodeModulesIndex
+              ) else {
+            return nil
+        }
+
+        let path = standardized.path
+        let manager: AgentSkillPackageManager
+        if path.contains("/.bun/install/global/") {
+            manager = .bun
+        } else if path.contains("/Library/pnpm/global/")
+                    || path.contains("/.local/share/pnpm/global/")
+                    || path.contains("/pnpm/global/") {
+            manager = .pnpm
+        } else if path.contains("/.config/yarn/global/") {
+            manager = .yarn
+        } else if path.contains("/lib/node_modules/") {
+            manager = .npm
+        } else {
+            return nil
+        }
+        return AgentSkillPackageInstallation(manager: manager, packageName: packageName)
+    }
+
+    private static func packageName(in components: [String], after index: Int) -> String? {
+        let firstIndex = index + 1
+        guard firstIndex < components.count else { return nil }
+        let first = components[firstIndex]
+        if first.hasPrefix("@") {
+            guard firstIndex + 1 < components.count else { return nil }
+            return "\(first)/\(components[firstIndex + 1])"
+        }
+        return first.isEmpty ? nil : first
+    }
+}
+
 public struct AIAgentCLICommand: Equatable, Sendable {
     public var executableURL: URL
     public var arguments: [String]
@@ -716,6 +792,18 @@ public struct AIAgentCLIService: Sendable {
             }
         }
         return commands
+    }
+
+    func uninstallationCommand(
+        for installation: AgentSkillPackageInstallation
+    ) -> AIAgentCLICommand? {
+        guard let executableURL = executable(named: installation.manager.executableName) else {
+            return nil
+        }
+        return AIAgentCLICommand(
+            executableURL: executableURL,
+            arguments: installation.uninstallArguments
+        )
     }
 
     public func run(_ command: AIAgentCLICommand) async throws -> AIAgentProcessOutput {

@@ -1,0 +1,8 @@
+"NSCalendarsFullAccessUsageDescription" = "zisla는 상단 정보 패널에 다가오는 캘린더 이벤트를 표시하기 위해 액세스가 필요합니다.";
+"NSAudioCaptureUsageDescription" = "zisla는 라이브 파형을 렌더링하기 위해 현재 오디오 스펙트럼을 읽습니다.";
+"NSCameraUsageDescription" = "zisla는 거울이 열려 있을 때만 카메라를 사용합니다.";
+"NSRemindersFullAccessUsageDescription" = "zisla는 날짜가 있는 미리 알림을 읽고 캘린더 이벤트와 함께 표시합니다.";
+"NSLocationWhenInUseUsageDescription" = "zisla는 현재 위치의 날씨와 지역 이름을 표시하기 위해 위치 정보를 사용합니다.";
+"NSMicrophoneUsageDescription" = "zisla는 음성 입력을 시작할 때만 마이크를 사용하여 음성을 현재 AI 대화 텍스트로 변환합니다.";
+"NSSpeechRecognitionUsageDescription" = "zisla는 적극적으로 녹음한 음성을 AI 대화 텍스트로 변환합니다.";
+"NSAppleEventsUsageDescription" = "zisla는 Mail.app을 사용하여 메일을 읽고 관리합니다. 받은 편지함, 읽음 상태, 삭제, 답장이 포함됩니다.";

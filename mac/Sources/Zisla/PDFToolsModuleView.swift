@@ -77,8 +77,7 @@ struct PDFToolsModuleView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                             .background {
                                 if operation == item {
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .strokeBorder(.white, lineWidth: 1)
+                                    SelectionGlassBackground(cornerRadius: 6)
                                         .matchedGeometryEffect(
                                             id: "pdf-tool-operation-selection",
                                             in: operationSelectionNamespace
@@ -154,12 +153,22 @@ struct PDFToolsModuleView: View {
 
         switch operation {
         case .rotate:
-            Picker("旋转", selection: $rotationDegrees) {
-                Text("顺时针 90 度").tag(90)
-                Text("180 度").tag(180)
-                Text("逆时针 90 度").tag(270)
-            }
-            .pickerStyle(.segmented)
+            IslandOutlinedPicker(
+                selection: $rotationDegrees,
+                options: [90, 180, 270],
+                title: { degrees in
+                    switch degrees {
+                    case 90: return "顺时针 90 度"
+                    case 180: return "180 度"
+                    case 270: return "逆时针 90 度"
+                    default: return "\(degrees) 度"
+                    }
+                },
+                selectionID: "pdf-rotation-degrees",
+                fontSize: 9,
+                width: 280,
+                height: 34
+            )
         case .textWatermark:
             TextField("水印文字", text: $watermarkText)
                 .textFieldStyle(.roundedBorder)

@@ -52,6 +52,7 @@ struct ClipboardHistoryModuleView: View {
     @State private var filter: ClipboardFilter = .all
     @State private var additionPresentation: ClipboardAdditionPresentation?
     @State private var draftText = ""
+    @State private var searchText = ""
     @FocusState private var isDraftTextFocused: Bool
     private let copyItem: (ClipboardHistoryItem) -> Void
     private let sendToQuickNote: (ClipboardHistoryItem) -> Void
@@ -76,10 +77,24 @@ struct ClipboardHistoryModuleView: View {
     /// Items visible under the current filter (used for count and empty-state checks).
     private var visibleItems: [ClipboardHistoryItem] {
         switch filter {
-        case .all: return store.pinnedItems + store.historyItems
-        case .pinned: return store.pinnedItems
-        case .history: return store.historyItems
+        case .all: visiblePinnedItems + visibleHistoryItems
+        case .pinned: visiblePinnedItems
+        case .history: visibleHistoryItems
         }
+    }
+
+    private var visiblePinnedItems: [ClipboardHistoryItem] {
+        filtered(store.pinnedItems)
+    }
+
+    private var visibleHistoryItems: [ClipboardHistoryItem] {
+        filtered(store.historyItems)
+    }
+
+    private func filtered(_ items: [ClipboardHistoryItem]) -> [ClipboardHistoryItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return items }
+        return items.filter { $0.content.previewText.localizedCaseInsensitiveContains(query) }
     }
 
     var body: some View {
@@ -88,7 +103,7 @@ struct ClipboardHistoryModuleView: View {
                 Label("剪贴板", systemImage: "clipboard")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Text("\(visibleItems.count)/\(store.capacity)")
+                Text("\(visibleItems.count)")
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
                 if filter == .pinned {
@@ -119,6 +134,31 @@ struct ClipboardHistoryModuleView: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 8)
 
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                TextField("搜索", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.fillControl)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
+
             if visibleItems.isEmpty {
                 EmptyState(
                     symbol: filter == .pinned ? "star" : "clipboard",
@@ -129,15 +169,15 @@ struct ClipboardHistoryModuleView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
                         if filter == .all {
-                            if !store.pinnedItems.isEmpty {
+                            if !visiblePinnedItems.isEmpty {
                                 sectionTitle("常用")
-                                ForEach(store.pinnedItems) { item in
+                                ForEach(visiblePinnedItems) { item in
                                     itemRow(item)
                                 }
                             }
-                            if !store.historyItems.isEmpty {
+                            if !visibleHistoryItems.isEmpty {
                                 sectionTitle("非常用")
-                                ForEach(store.historyItems) { item in
+                                ForEach(visibleHistoryItems) { item in
                                     itemRow(item)
                                 }
                             }

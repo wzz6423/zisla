@@ -1,5 +1,28 @@
 import AppKit
 
+struct PointerEdgeEventThrottle: Equatable, Sendable {
+    let minimumMoveInterval: TimeInterval
+    private var lastMoveTimestamp: TimeInterval?
+
+    init(minimumMoveInterval: TimeInterval = 1.0 / 30.0) {
+        self.minimumMoveInterval = max(0, minimumMoveInterval)
+    }
+
+    mutating func shouldEmit(eventType: NSEvent.EventType, timestamp: TimeInterval) -> Bool {
+        guard eventType == .mouseMoved else {
+            lastMoveTimestamp = nil
+            return true
+        }
+        guard let lastMoveTimestamp,
+              timestamp >= lastMoveTimestamp,
+              timestamp - lastMoveTimestamp < minimumMoveInterval else {
+            self.lastMoveTimestamp = timestamp
+            return true
+        }
+        return false
+    }
+}
+
 @MainActor
 public final class PointerEdgeMonitor {
     public enum Interaction: Equatable, Sendable {
@@ -14,6 +37,7 @@ public final class PointerEdgeMonitor {
     private let dragPasteboard: NSPasteboard
     private var payloadClassifier: DragPayloadSessionClassifier
     private var cachedDragResult: (changeCount: Int, hasSupportedPayload: Bool)?
+    private var eventThrottle = PointerEdgeEventThrottle()
     private var globalMonitor: Any?
     private var localMonitor: Any?
 
@@ -49,6 +73,7 @@ public final class PointerEdgeMonitor {
         ]
         payloadClassifier.reset(initialChangeCount: dragPasteboard.changeCount)
         cachedDragResult = nil
+        eventThrottle = PointerEdgeEventThrottle()
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
             self?.emit(event)
         }
@@ -80,8 +105,13 @@ public final class PointerEdgeMonitor {
 
     private nonisolated func emit(_ event: NSEvent) {
         let eventType = event.type
+        let timestamp = event.timestamp
         // AppKit guarantees event monitor callbacks run on the main thread, avoiding a Task per mouse event.
         MainActor.assumeIsolated {
+            guard eventThrottle.shouldEmit(
+                eventType: eventType,
+                timestamp: timestamp
+            ) else { return }
             let interaction: Interaction
             switch PointerEdgeEventAction(eventType: eventType) {
             case .dragging:

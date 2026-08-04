@@ -1,0 +1,8 @@
+"NSCalendarsFullAccessUsageDescription" = "zisla needs access to upcoming calendar events for the top information panel.";
+"NSAudioCaptureUsageDescription" = "zisla reads the current audio spectrum to render a live waveform.";
+"NSCameraUsageDescription" = "zisla uses the camera only while the mirror is open.";
+"NSRemindersFullAccessUsageDescription" = "zisla reads dated reminders to show them with calendar events.";
+"NSLocationWhenInUseUsageDescription" = "zisla uses your location to show local weather and place names.";
+"NSMicrophoneUsageDescription" = "zisla uses the microphone only when you start voice input, to turn speech into the current AI conversation text.";
+"NSSpeechRecognitionUsageDescription" = "zisla transcribes the speech you actively record into AI conversation text.";
+"NSAppleEventsUsageDescription" = "zisla uses Mail.app to read and manage mail, including inboxes, read status, deletion, and replies.";

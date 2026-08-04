@@ -6,7 +6,7 @@ public final class ClipboardHistoryStore: ObservableObject {
     @Published public private(set) var items: [ClipboardHistoryItem] = []
     @Published public private(set) var errorDescription: String?
 
-    public let capacity: Int
+    public let capacity: Int?
     public let maxImageBytes: Int
 
     private let database: ClipboardHistoryDatabase
@@ -16,12 +16,12 @@ public final class ClipboardHistoryStore: ObservableObject {
 
     public init(
         storageURL: URL = AppPaths.clipboardHistory,
-        capacity: Int = 999,
+        capacity: Int? = nil,
         maxImageBytes: Int = 10 * 1024 * 1024,
         persistenceDelay: Duration = .seconds(1)
     ) {
         database = ClipboardHistoryDatabase(storageURL: storageURL)
-        self.capacity = max(1, capacity)
+        self.capacity = capacity.map { max(1, $0) }
         self.maxImageBytes = max(1, maxImageBytes)
         self.persistenceDelay = persistenceDelay
         load()
@@ -150,6 +150,7 @@ public final class ClipboardHistoryStore: ObservableObject {
     }
 
     private func trimHistoryToCapacity() {
+        guard let capacity else { return }
         let historyIDs = items.filter { !$0.isPinned }.map(\.id)
         guard historyIDs.count > capacity else { return }
         let expired = Set(historyIDs.dropFirst(capacity))

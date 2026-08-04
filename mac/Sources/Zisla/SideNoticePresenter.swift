@@ -9,6 +9,7 @@ final class SideNoticePresenter {
     private let queue: SideNoticeQueue
     private let media: NowPlayingService
     private let settingsStore: FeatureSettingsStore
+    private let languageStore: AppLanguageStore
     private let layoutEngine = SideNoticeLayoutEngine()
     private var panelsByDisplayID: [CGDirectDisplayID: DisplayPanels] = [:]
     private var cancellables: Set<AnyCancellable> = []
@@ -19,11 +20,13 @@ final class SideNoticePresenter {
         queue: SideNoticeQueue,
         media: NowPlayingService,
         settingsStore: FeatureSettingsStore,
+        languageStore: AppLanguageStore,
         displayIDs: Set<UInt32> = []
     ) {
         self.queue = queue
         self.media = media
         self.settingsStore = settingsStore
+        self.languageStore = languageStore
         configuredDisplayIDs = displayIDs
         queue.$left
             .combineLatest(queue.$right)
@@ -117,9 +120,24 @@ final class SideNoticePresenter {
     private func updateCompactBar(screen snapshot: ScreenSnapshot, panels: DisplayPanels) {
         let displayState = panels.displayState
         let compactNotices = queue.left + queue.right
+        let compactStatusIDs = Set(compactNotices.filter(Self.isCompactNotice).map(\.id))
+        if compactStatusIDs != displayState.compactStatusIDs {
+            displayState.compactStatusIDs = compactStatusIDs
+            displayState.compactStatusHidden = false
+        }
+        if CompactStatusVisibilityPolicy.mustRemainVisible(
+            notices: compactNotices,
+            activityDuration: settingsStore.settings.activityNoticeDisplayDuration,
+            focusDuration: settingsStore.settings.focusModeNoticeDisplayDuration
+        ) {
+            displayState.compactStatusHidden = false
+        }
         guard !displayState.compactStatusHidden,
             compactNotices.contains(where: Self.isCompactNotice)
         else {
+            if compactStatusIDs.isEmpty {
+                displayState.compactStatusHidden = false
+            }
             panels.compactBar?.orderOut(nil)
             return
         }
@@ -181,7 +199,9 @@ final class SideNoticePresenter {
             displayState: panels.displayState,
             side: side
         )
-        let hostingView = NSHostingView(rootView: rootView)
+        let hostingView = NSHostingView(
+            rootView: AppLanguageEnvironment(languageStore: languageStore, content: rootView)
+        )
         hostingView.sizingOptions = []
         let panel = IslandPanel(
             contentView: hostingView,
@@ -200,7 +220,9 @@ final class SideNoticePresenter {
             settingsStore: settingsStore,
             onStatusHidden: { [weak self] in self?.updatePanels() }
         )
-        let hostingView = NSHostingView(rootView: rootView)
+        let hostingView = NSHostingView(
+            rootView: AppLanguageEnvironment(languageStore: languageStore, content: rootView)
+        )
         hostingView.sizingOptions = []
         let panel = IslandPanel(
             contentView: hostingView,

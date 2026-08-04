@@ -50,6 +50,7 @@ let package = Package(
                 .copy("../../Resources/Pets"),
                 .copy("../../Resources/QuickNotes"),
                 .copy("../../Resources/BrandIcons"),
+                .process("../../Resources/Localization"),
             ],
             linkerSettings: [
                 .linkedFramework("Speech"),

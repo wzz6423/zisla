@@ -1,0 +1,8 @@
+"NSCalendarsFullAccessUsageDescription" = "zisla 需要存取即將到來的日曆事件以顯示於頂部資訊面板。";
+"NSAudioCaptureUsageDescription" = "zisla 讀取目前音訊頻譜以渲染即時波形。";
+"NSCameraUsageDescription" = "zisla 僅在鏡子開啟時使用相機。";
+"NSRemindersFullAccessUsageDescription" = "zisla 讀取有日期的提醒事項，以便與日曆事件一起顯示。";
+"NSLocationWhenInUseUsageDescription" = "zisla 使用您的位置來顯示當地天氣和地點名稱。";
+"NSMicrophoneUsageDescription" = "zisla 僅在您啟動語音輸入時使用麥克風，以將語音轉換為目前 AI 對話文字。";
+"NSSpeechRecognitionUsageDescription" = "zisla 將您主動錄製的語音轉錄為 AI 對話文字。";
+"NSAppleEventsUsageDescription" = "zisla 使用 Mail.app 來讀取和管理郵件，包括收件匣、已讀狀態、刪除和回覆。";

@@ -7,6 +7,33 @@ import Testing
 @MainActor
 struct AIAgentServicesTests {
     @Test
+    func skillPackageInstallationDetectsGlobalManagersAndScopedPackages() throws {
+        let npm = try #require(AgentSkillPackageInstallation.detect(
+            at: URL(fileURLWithPath: "/Users/test/.nvm/versions/node/v24/lib/node_modules/@scope/tool/skills/review")
+        ))
+        #expect(npm.manager == .npm)
+        #expect(npm.packageName == "@scope/tool")
+        #expect(npm.uninstallArguments == ["uninstall", "--global", "@scope/tool"])
+
+        let pnpm = try #require(AgentSkillPackageInstallation.detect(
+            at: URL(fileURLWithPath: "/Users/test/Library/pnpm/global/5/node_modules/tool/skills/review")
+        ))
+        #expect(pnpm.manager == .pnpm)
+        #expect(pnpm.packageName == "tool")
+
+        let brew = try #require(AgentSkillPackageInstallation.detect(
+            at: URL(fileURLWithPath: "/opt/homebrew/Cellar/tool/1.2.3/share/skills/review")
+        ))
+        #expect(brew.manager == .brew)
+        #expect(brew.packageName == "tool")
+        #expect(brew.uninstallArguments == ["uninstall", "tool"])
+
+        #expect(AgentSkillPackageInstallation.detect(
+            at: URL(fileURLWithPath: "/Users/test/.codex/skills/local-skill")
+        ) == nil)
+    }
+
+    @Test
     func automationLoopOnlyRunsWhileAnEnabledAutomationExists() async {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-ai-agent-automation-\(UUID().uuidString)", isDirectory: true)

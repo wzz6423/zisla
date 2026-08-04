@@ -1,0 +1,8 @@
+"NSCalendarsFullAccessUsageDescription" = "zisla nécessite un accès aux événements de calendrier à venir pour le panneau d'informations supérieur.";
+"NSAudioCaptureUsageDescription" = "zisla lit le spectre audio actuel pour afficher une forme d'onde en direct.";
+"NSCameraUsageDescription" = "zisla utilise la caméra uniquement lorsque le miroir est ouvert.";
+"NSRemindersFullAccessUsageDescription" = "zisla lit les rappels datés pour les afficher avec les événements du calendrier.";
+"NSLocationWhenInUseUsageDescription" = "zisla utilise votre position pour afficher la météo locale et les noms de lieux.";
+"NSMicrophoneUsageDescription" = "zisla utilise le microphone uniquement lorsque vous démarrez la saisie vocale, pour convertir la parole en texte de conversation IA.";
+"NSSpeechRecognitionUsageDescription" = "zisla transcrit la parole que vous enregistrez activement en texte de conversation IA.";
+"NSAppleEventsUsageDescription" = "zisla utilise Mail.app pour lire et gérer les e-mails, y compris les boîtes de réception, l'état de lecture, la suppression et les réponses.";

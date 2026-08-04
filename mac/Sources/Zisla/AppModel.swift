@@ -347,6 +347,7 @@ final class AppModel: ObservableObject {
   @Published var isCleanupPanelVisible = false
 
   let settingsStore = FeatureSettingsStore()
+  let languageStore = AppLanguageStore()
   let aiMonitor = AIStateMonitor()
   let notices = SideNoticeQueue()
   let media = NowPlayingService()

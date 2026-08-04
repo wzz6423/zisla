@@ -68,6 +68,21 @@ public struct SideNoticePresentation: Equatable, Sendable {
     }
 }
 
+public enum CompactStatusVisibilityPolicy {
+    public static func mustRemainVisible(
+        notices: [IslandNotice],
+        activityDuration: ActivityNoticeDisplayDuration,
+        focusDuration: FocusModeNoticeDisplayDuration
+    ) -> Bool {
+        let hasActivity = notices.contains {
+            $0.id.hasPrefix("ai-active-") || $0.id.hasPrefix("media-active-")
+        }
+        let hasFocusMode = notices.contains { $0.id.hasPrefix("focus-mode-") }
+        return (hasActivity && activityDuration == .always)
+            || (hasFocusMode && focusDuration == .always)
+    }
+}
+
 public struct CompactBarContourMetrics: Equatable, Sendable {
     public static let maximumTopInset: CGFloat = 14
 

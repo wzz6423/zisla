@@ -7,7 +7,7 @@ import Testing
 @MainActor
 struct ClipboardHistoryStoreTests {
     @Test
-    func defaultCapacityIs999() throws {
+    func defaultCapacityIsUnlimited() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -15,7 +15,7 @@ struct ClipboardHistoryStoreTests {
             storageURL: directory.appendingPathComponent("clipboard-history.sqlite")
         )
 
-        #expect(store.capacity == 999)
+        #expect(store.capacity == nil)
     }
 
     @Test

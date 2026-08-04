@@ -64,6 +64,10 @@ if [[ -d "$ROOT/Resources/QuickNotes" ]]; then
   ditto "$ROOT/Resources/QuickNotes" "$CONTENTS/Resources/QuickNotes"
 fi
 
+if [[ -d "$ROOT/Resources/Localization" ]]; then
+  ditto "$ROOT/Resources/Localization" "$CONTENTS/Resources"
+fi
+
 if [[ -d "$ROOT/Vendor/MediaRemoteAdapter.framework" ]]; then
   ditto "$ROOT/Vendor/MediaRemoteAdapter.framework" "$CONTENTS/Frameworks/MediaRemoteAdapter.framework"
 fi

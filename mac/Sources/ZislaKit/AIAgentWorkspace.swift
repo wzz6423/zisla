@@ -270,6 +270,46 @@ public final class AIAgentWorkspace: ObservableObject {
         store.state.skills[index].isEnabled = enabled
     }
 
+    public func uninstallSkill(path: String) async -> Bool {
+        guard store.state.skills.contains(where: { $0.path == path }) else {
+            lastError = "未找到要卸载的 Skill"
+            return false
+        }
+        let fileManager = FileManager.default
+        let skillURL = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        let resolvedURL = skillURL.resolvingSymlinksInPath().standardizedFileURL
+        if let installation = AgentSkillPackageInstallation.detect(at: resolvedURL) {
+            guard let command = cliService.uninstallationCommand(for: installation) else {
+                lastError = "找不到 \(installation.manager.executableName) 命令"
+                return false
+            }
+            guard let output = await runCLICommand(command), output.status == 0 else {
+                if lastError == nil {
+                    lastError = "\(installation.manager.rawValue) 卸载失败"
+                }
+                return false
+            }
+            if (try? fileManager.destinationOfSymbolicLink(atPath: skillURL.path)) != nil {
+                var trashedURL: NSURL?
+                try? fileManager.trashItem(at: skillURL, resultingItemURL: &trashedURL)
+            }
+            await refreshSkills()
+            lastError = nil
+            return true
+        }
+
+        do {
+            var trashedURL: NSURL?
+            try fileManager.trashItem(at: skillURL, resultingItemURL: &trashedURL)
+            await refreshSkills()
+            lastError = nil
+            return true
+        } catch {
+            lastError = "无法卸载 Skill：\(error.localizedDescription)"
+            return false
+        }
+    }
+
     public func synchronizeManagedSkills() {
         let configuration = store.state.skillSyncConfiguration
         let mode: AIAgentSkillSynchronizationMode = switch configuration.mode {

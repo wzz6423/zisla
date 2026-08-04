@@ -127,7 +127,7 @@ struct IslandSurface<Content: View>: View {
                 case .black:
                     Color.black
                 case .frosted:
-                    VisualEffectBackground(alphaValue: 0.62)
+                    VisualEffectBackground(alphaValue: 0.92, material: .popover)
                 }
             }
             .frame(width: collapsedSize.width, height: collapsedSize.height)

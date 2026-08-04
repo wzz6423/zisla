@@ -5,6 +5,28 @@ import Testing
 @testable import ZislaKit
 
 struct SideNoticeLayoutTests {
+    @Test
+    func alwaysVisibleActivityAndFocusCannotBeDismissed() {
+        let activity = IslandNotice(id: "ai-active-codex", title: "运行中", side: .left)
+        let focus = IslandNotice(id: "focus-mode-left", title: "专注", side: .left)
+
+        #expect(CompactStatusVisibilityPolicy.mustRemainVisible(
+            notices: [activity],
+            activityDuration: .always,
+            focusDuration: .threeSeconds
+        ))
+        #expect(CompactStatusVisibilityPolicy.mustRemainVisible(
+            notices: [focus],
+            activityDuration: .threeSeconds,
+            focusDuration: .always
+        ))
+        #expect(!CompactStatusVisibilityPolicy.mustRemainVisible(
+            notices: [activity, focus],
+            activityDuration: .threeSeconds,
+            focusDuration: .threeSeconds
+        ))
+    }
+
     private let engine = SideNoticeLayoutEngine()
 
     @Test
