@@ -1,0 +1,64 @@
+name: CodeQL
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "publish-v*"
+  push:
+    branches:
+      - main
+      - "publish-v*"
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actions:
+    name: CodeQL (actions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: actions
+          build-mode: none
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:actions
+
+  swift:
+    name: CodeQL (swift)
+    runs-on: macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mac
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: swift
+          build-mode: manual
+          queries: security-and-quality
+      - run: swift build
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:swift
+      - name: Remove build artifacts
+        if: always()
+        run: rm -rf .build

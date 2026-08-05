@@ -1,0 +1,76 @@
+name: PR Quality Gates
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "publish-v*"
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: PR Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate title and body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          title_pattern='^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\([a-z0-9][a-z0-9-]*\))?!?: [ -~]+$'
+          if [[ ! "$PR_TITLE" =~ $title_pattern ]]; then
+            echo "PR title must use an English Conventional Commit subject."
+            echo "Example: feat(ci): add pull request quality gates"
+            exit 1
+          fi
+
+          require_section() {
+            if ! printf '%s\n' "$PR_BODY" | grep -Fqx "## $1"; then
+              echo "Missing required section: ## $1"
+              exit 1
+            fi
+          }
+
+          require_section "Summary"
+          require_section "Validation"
+          require_section "Risk and Rollback"
+
+          validation_section="$(printf '%s\n' "$PR_BODY" | awk '
+            $0 == "## Validation" { in_section = 1; next }
+            in_section && /^## / { exit }
+            in_section { print }
+          ')"
+
+          status="$(printf '%s\n' "$validation_section" | sed -nE 's/^[[:space:]]*-[[:space:]]*Status:[[:space:]]*(passed|failed|not run)[[:space:]]*$/\1/p' | head -n 1)"
+          if [[ -z "$status" ]]; then
+            echo "Validation must declare one exact status: passed, failed, or not run."
+            exit 1
+          fi
+
+          require_field() {
+            local value
+            value="$(printf '%s\n' "$validation_section" | sed -nE "s/^[[:space:]]*-[[:space:]]*$1:[[:space:]]*(.*)$/\\1/p" | head -n 1)"
+            case "$value" in
+              ''|'<!--'*)
+                echo "Validation must include a non-empty $1 field."
+                exit 1
+                ;;
+            esac
+          }
+
+          if [[ "$status" == "not run" ]]; then
+            require_field "Reason"
+          else
+            require_field "Command"
+            require_field "Result"
+          fi
