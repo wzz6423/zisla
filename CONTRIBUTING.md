@@ -16,13 +16,26 @@ swift test
 ## 分支和提交
 
 - 从最新的 `main` 创建分支，使用 `feature/`、`fix/`、`docs/` 或 `chore/` 前缀，例如 `fix/download-timeout`。
+- 提交信息使用英文 [Conventional Commits](https://www.conventionalcommits.org/) 格式：`type(scope): description`，例如 `fix(ui): resolve layout issue in notch area`。
 - 一个分支和一个 PR 应只处理一个明确目标；请避免混入格式化或无关重构。
 - 发布分支 `publish-v*` 仅用于发布维护。除发布修复外，贡献请提交到 `main`。
 
 ## Pull Request
 
+- **PR 标题**必须使用英文 Conventional Commit 格式，例如：
+  - `feat(ci): add PR quality gates`
+  - `fix(mac): resolve memory leak in overlay`
+  - `docs: update contributing guidelines`
+  允许的类型：`feat`、`fix`、`docs`、`style`、`refactor`、`perf`、`test`、`chore`、`build`、`ci`、`revert`。
+
+- **PR 正文**必须使用英文并包含 `Summary`、`Validation`、`Risk and Rollback` 三节。`Validation` 中每项都必须声明 `passed`、`failed` 或 `not run`：
+  - `passed` 或 `failed` 必须写明执行命令与实际结果。
+  - `not run` 必须说明未执行的原因。
+- `PR Quality` 检查会自动验证上述格式；状态检查未通过时不能合并。
+
 - 使用 PR 模板，说明变更、验证方式和关联 Issue。
-- 代码变更必须运行 `cd mac && swift test`；涉及界面时请补充实际验证说明或截图。
+- macOS 代码变更必须运行 `cd mac && swift test`；涉及界面时请补充实际验证说明或截图。
+- 修改 `windows/` 时，CI 会在 Windows 上执行 CMake Core 测试，并编译 WinUI 应用。完整的 Windows 应用构建不会在 CI 中启动界面或访问用户数据。
 - 更新用户可见行为、构建方式或发布流程时，同步更新相应文档。
 - 不要提交 `.build`、`dist`、下载文件、日志、令牌、签名材料或其他个人数据。
 - `main` 和 `publish-v*` 受保护，只能通过通过检查并完成评审的 PR 合并。

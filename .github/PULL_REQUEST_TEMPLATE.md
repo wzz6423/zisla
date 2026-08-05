@@ -1,19 +1,20 @@
-## 变更说明
+## Summary
 
-<!-- 说明解决的问题和实现方式。-->
+<!-- Describe the purpose and implementation in English. -->
 
-## 验证
+## Validation
 
-<!-- 列出实际执行的命令或手动验证步骤。-->
-- [ ] `cd mac && swift test`
+<!-- Use one Validation block for each relevant test or manual check. -->
+- Status: <!-- passed | failed | not run -->
+- Command: <!-- required for passed or failed -->
+- Result: <!-- required for passed or failed -->
+- Reason: <!-- required for not run; remove otherwise -->
 
-## 关联 Issue
+## Risk and Rollback
 
-<!-- 使用 Closes #123 自动关闭已解决的 Issue；没有则填写“无”。-->
+- Risk: <!-- Describe the affected surface and remaining risk. -->
+- Rollback: <!-- Describe how to revert this change. -->
 
-## 检查清单
+## Related Issue
 
-- [ ] 变更范围聚焦于一个目标，未混入无关重构。
-- [ ] 已补充或更新必要的测试与文档。
-- [ ] 未提交构建产物、二进制文件、日志、凭据或个人数据。
-- [ ] 已处理所有评审意见。
+<!-- Use Closes #123 when applicable; otherwise write None. -->
