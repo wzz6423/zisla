@@ -1468,6 +1468,33 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var mailAccountSettings: some View {
+        settingRow(
+            symbol: "rectangle.split.2x1",
+            title: "新邮件展示",
+            detail: model.settingsStore.settings.mailCompactStyle.detail
+        ) {
+            Picker(
+                "",
+                selection: Binding(
+                    get: { model.settingsStore.settings.mailCompactStyle },
+                    set: { model.settingsStore.settings.mailCompactStyle = $0 }
+                )
+            ) {
+                ForEach(MailCompactStyle.allCases, id: \.self) { style in
+                    Text(style.title).tag(style)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .frame(maxWidth: 108)
+        }
+        rowDivider
+        mailAppAccountSettings
+    }
+
+    @ViewBuilder
+    private var mailAppAccountSettings: some View {
         let accounts = model.mail.accounts
         if accounts.isEmpty {
             settingRow(
@@ -1540,6 +1567,7 @@ struct SettingsView: View {
     private func compactStatusPrioritySymbol(for priority: CompactStatusPriority) -> String {
         switch priority {
         case .transient: "bolt.fill"
+        case .mail: "envelope.fill"
         case .videoDownload: "arrow.down.square.fill"
         case .browserDownload: "arrow.down.circle.fill"
         case .focusCountdown: "timer"

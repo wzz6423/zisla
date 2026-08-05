@@ -45,6 +45,36 @@ struct MailMessageTests {
     }
 
     @Test
+    func mailAppMessagesBuildCompactNotificationPair() {
+        let message = MailMessage(
+            accountName: "工作邮箱",
+            messageID: 42,
+            sender: "Alice",
+            subject: "季度计划",
+            body: "请查收",
+            receivedAt: Date(timeIntervalSince1970: 2_000),
+            isRead: false
+        )
+
+        let pair = MailNotification(
+            message: message,
+            newMessageCount: 3,
+            pairID: "batch"
+        ).makeNotices()
+
+        #expect(message.messageID == 42)
+        #expect(pair.left.id == "mail-notification-batch-left")
+        #expect(pair.left.side == .left)
+        #expect(pair.left.title == "季度计划")
+        #expect(pair.left.detail == "Alice")
+        #expect(pair.left.symbolName == "envelope.fill")
+        #expect(pair.right.id == "mail-notification-batch-right")
+        #expect(pair.right.side == .right)
+        #expect(pair.right.title == "3")
+        #expect(pair.right.detail == "Alice")
+    }
+
+    @Test
     func mailIntegrationDefaultsOffAndLegacySettingsRemainDecodable() throws {
         #expect(FeatureSettings.default.mailEnabled == false)
 
@@ -60,6 +90,7 @@ struct MailMessageTests {
         var settings = FeatureSettings.default
         settings.mailEnabled = true
         settings.mailAccountNames = ["个人邮箱", "工作邮箱"]
+        settings.mailCompactStyle = .detailed
 
         let decoded = try JSONDecoder().decode(
             FeatureSettings.self,
@@ -68,5 +99,6 @@ struct MailMessageTests {
 
         #expect(decoded.mailEnabled == true)
         #expect(decoded.mailAccountNames == ["个人邮箱", "工作邮箱"])
+        #expect(decoded.mailCompactStyle == .detailed)
     }
 }

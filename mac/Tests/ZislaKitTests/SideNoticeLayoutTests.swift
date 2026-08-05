@@ -161,6 +161,29 @@ struct SideNoticeLayoutTests {
     }
 
     @Test
+    func mailNotificationUsesCompactStatusWithoutFallingBackToPopup() {
+        let mail = IslandNotice(
+            id: "mail-notification-batch-left",
+            title: "季度计划",
+            detail: "Alice",
+            side: .left,
+            style: .status,
+            symbolName: "envelope.fill"
+        )
+
+        let presentation = engine.presentation(for: [mail])
+        let disabledPresentation = engine.presentation(for: [mail], compactWingsEnabled: false)
+
+        #expect(presentation.activeMailNotice == mail)
+        #expect(presentation.ordinaryNotices.isEmpty)
+        #expect(presentation.hasCompactContent)
+        #expect(presentation.panelSize == CGSize(width: 40, height: 34))
+        #expect(disabledPresentation.activeMailNotice == nil)
+        #expect(disabledPresentation.ordinaryNotices.isEmpty)
+        #expect(disabledPresentation.panelSize == .zero)
+    }
+
+    @Test
     func transientFocusAndHeadphoneNoticesDoNotRenderAsOrdinaryRows() {
         let focusTransition = IslandNotice(
             id: "focus-transition",

@@ -105,6 +105,25 @@ public enum MediaCompactStyle: String, Codable, CaseIterable, Sendable, Equatabl
     }
 }
 
+public enum MailCompactStyle: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
+    case compact
+    case detailed
+
+    public var title: String {
+        switch self {
+        case .compact: "简洁模式"
+        case .detailed: "详细模式"
+        }
+    }
+
+    public var detail: String {
+        switch self {
+        case .compact: "左侧邮件图标，右侧新邮件数量"
+        case .detailed: "左侧主题，右侧发件人与新邮件数量"
+        }
+    }
+}
+
 /// Visual style of the Dynamic Island surface.
 public enum IslandVisualStyle: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     /// Existing smoky frosted glass; preserves the historical default look.
@@ -262,6 +281,7 @@ public enum SystemMonitorMenuBarDisplayStyle: String, Codable, CaseIterable, Sen
 
 public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case transient
+    case mail
     case videoDownload
     case browserDownload
     case focusCountdown
@@ -272,6 +292,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
 
     public static let defaultOrder: [Self] = [
         .transient,
+        .mail,
         .videoDownload,
         .browserDownload,
         .focusCountdown,
@@ -284,6 +305,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
     public var title: String {
         switch self {
         case .transient: "临时提示"
+        case .mail: "新邮件"
         case .videoDownload: "视频下载"
         case .browserDownload: "浏览器下载"
         case .focusCountdown: "专注倒计时"
@@ -337,6 +359,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mailEnabled: Bool
     /// An empty set means all configured system Mail.app accounts are synced.
     public var mailAccountNames: Set<String>
+    public var mailCompactStyle: MailCompactStyle
     public var updateChecksEnabled: Bool
     public var automaticUpdatesEnabled: Bool
     /// Target channel for manual update checks; automatic updates always follow the channel of the installed build.
@@ -401,6 +424,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         quickNotesEnabled: Bool = true,
         mailEnabled: Bool = false,
         mailAccountNames: Set<String> = [],
+        mailCompactStyle: MailCompactStyle = .compact,
         updateChecksEnabled: Bool = true,
         automaticUpdatesEnabled: Bool = true,
         updateChannel: UpdateChannel = .release,
@@ -451,6 +475,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.quickNotesEnabled = quickNotesEnabled
         self.mailEnabled = mailEnabled
         self.mailAccountNames = mailAccountNames
+        self.mailCompactStyle = mailCompactStyle
         self.updateChecksEnabled = updateChecksEnabled
         self.automaticUpdatesEnabled = automaticUpdatesEnabled
         self.updateChannel = updateChannel
@@ -519,6 +544,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case quickNotesEnabled
         case mailEnabled
         case mailAccountNames
+        case mailCompactStyle
         case updateChecksEnabled
         case automaticUpdatesEnabled
         case updateChannel
@@ -595,6 +621,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         quickNotesEnabled = try container.decodeIfPresent(Bool.self, forKey: .quickNotesEnabled) ?? defaults.quickNotesEnabled
         mailEnabled = try container.decodeIfPresent(Bool.self, forKey: .mailEnabled) ?? defaults.mailEnabled
         mailAccountNames = try container.decodeIfPresent(Set<String>.self, forKey: .mailAccountNames) ?? defaults.mailAccountNames
+        mailCompactStyle = try container.decodeIfPresent(MailCompactStyle.self, forKey: .mailCompactStyle) ?? defaults.mailCompactStyle
         updateChecksEnabled = try container.decodeIfPresent(Bool.self, forKey: .updateChecksEnabled) ?? defaults.updateChecksEnabled
         automaticUpdatesEnabled = try container.decodeIfPresent(Bool.self, forKey: .automaticUpdatesEnabled) ?? defaults.automaticUpdatesEnabled
         updateChannel = try container.decodeIfPresent(UpdateChannel.self, forKey: .updateChannel) ?? defaults.updateChannel

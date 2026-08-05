@@ -464,10 +464,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard presentation.hasCompactContent || extendsForFocusCountdown else { return nil }
         let expandsForDetailedMedia = settings.mediaCompactStyle == .detailed
             && notices.contains { $0.id.hasPrefix("media-active-") }
+        let expandsForDetailedMail = settings.mailCompactStyle == .detailed
+            && notices.contains { $0.id.hasPrefix("mail-notification-") }
         return SideNoticeLayoutEngine().compactBarFrame(
             for: layout,
             extendsForFocusCountdown: extendsForFocusCountdown,
-            expandsForDetailedMedia: expandsForDetailedMedia
+            expandsForDetailedMedia: expandsForDetailedMedia || expandsForDetailedMail
         )
     }
 

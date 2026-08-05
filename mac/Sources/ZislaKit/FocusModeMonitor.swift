@@ -38,6 +38,15 @@ public struct FocusModeStatus: Equatable, Sendable {
         )
     }
 
+    public func preservingMode(from previous: FocusModeStatus) -> FocusModeStatus {
+        guard !isActive, identifier == nil, displayName == nil else { return self }
+        return FocusModeStatus(
+            isActive: false,
+            identifier: previous.identifier,
+            displayName: previous.displayName
+        )
+    }
+
     private static func nonEmpty(_ value: String?) -> String? {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -63,6 +72,36 @@ public struct FocusModeStatus: Equatable, Sendable {
     }
 }
 
+enum FocusModeStatusStore {
+    static let defaultURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/DoNotDisturb/DB/Assertions.json")
+
+    static func decode(_ data: Data) throws -> FocusModeStatus {
+        guard
+            let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let stores = root["data"] as? [[String: Any]]
+        else {
+            return .inactive
+        }
+        let records = stores.flatMap { $0["storeAssertionRecords"] as? [[String: Any]] ?? [] }
+        let activeRecord = records.max { left, right in
+            timestamp(in: left) < timestamp(in: right)
+        }
+        guard
+            let details = activeRecord?["assertionDetails"] as? [String: Any],
+            let identifier = details["assertionDetailsModeIdentifier"] as? String,
+            !identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return .inactive
+        }
+        return FocusModeStatus(isActive: true, identifier: identifier)
+    }
+
+    private static func timestamp(in record: [String: Any]) -> Double {
+        (record["assertionStartDateTimestamp"] as? NSNumber)?.doubleValue ?? 0
+    }
+}
+
 /// Monitors macOS Focus Mode via the private DoNotDisturb framework.
 /// Stays unavailable when private APIs are missing or have changed signatures, to avoid affecting other features.
 @MainActor
@@ -76,6 +115,7 @@ public final class FocusModeMonitor: ObservableObject {
     private var stateService: AnyObject?
     private var stateServiceClass: AnyClass?
     private var listener: FocusStateUpdateListener?
+    private var storePollingTask: Task<Void, Never>?
 
     public init(clientIdentifier: String? = Bundle.main.bundleIdentifier) {
         self.clientIdentifier = clientIdentifier ?? "dev.wzz.zisla"
@@ -84,18 +124,21 @@ public final class FocusModeMonitor: ObservableObject {
     public func start() {
         guard !isRunning else { return }
         isRunning = true
+        startStorePolling()
 
         guard let frameworkHandle = dlopen(
             "/System/Library/PrivateFrameworks/DoNotDisturb.framework/DoNotDisturb",
             RTLD_NOW | RTLD_LOCAL
         ) else {
+            isAvailable = FileManager.default.isReadableFile(atPath: FocusModeStatusStore.defaultURL.path)
             return
         }
         self.frameworkHandle = frameworkHandle
 
         guard let serviceClass = NSClassFromString("DNDStateService"),
               let service = makeStateService(serviceClass: serviceClass) else {
-            stop()
+            releaseFramework()
+            isAvailable = FileManager.default.isReadableFile(atPath: FocusModeStatusStore.defaultURL.path)
             return
         }
 
@@ -105,7 +148,8 @@ public final class FocusModeMonitor: ObservableObject {
             }
         }
         guard add(listener, to: service, serviceClass: serviceClass) else {
-            stop()
+            releaseFramework()
+            isAvailable = FileManager.default.isReadableFile(atPath: FocusModeStatusStore.defaultURL.path)
             return
         }
 
@@ -122,17 +166,43 @@ public final class FocusModeMonitor: ObservableObject {
         stateService = nil
         stateServiceClass = nil
         listener = nil
+        storePollingTask?.cancel()
+        storePollingTask = nil
         isAvailable = false
         isRunning = false
+        releaseFramework()
+    }
+
+    private func consume(_ next: FocusModeStatus) {
+        guard isRunning else { return }
+        let resolved = next.preservingMode(from: status)
+        guard status != resolved else { return }
+        status = resolved
+    }
+
+    private func startStorePolling() {
+        let url = FocusModeStatusStore.defaultURL
+        storePollingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                if let data = try? Data(contentsOf: url),
+                   let next = try? FocusModeStatusStore.decode(data) {
+                    self?.consume(next)
+                    self?.isAvailable = true
+                }
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func releaseFramework() {
         if let frameworkHandle {
             dlclose(frameworkHandle)
             self.frameworkHandle = nil
         }
-    }
-
-    private func consume(_ next: FocusModeStatus) {
-        guard isRunning, status != next else { return }
-        status = next
     }
 
     private func makeStateService(serviceClass: AnyClass) -> AnyObject? {
@@ -219,7 +289,7 @@ private final class FocusStateUpdateListener: NSObject {
         onUpdate(status)
     }
 
-    private static func status(from update: AnyObject) -> FocusModeStatus? {
+    fileprivate static func status(from update: AnyObject) -> FocusModeStatus? {
         let state = dynamicObject(update, for: "state") ?? update
         let stateObjects = [state, update]
         let modeObjects = stateObjects.compactMap {

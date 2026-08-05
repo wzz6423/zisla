@@ -146,10 +146,12 @@ final class SideNoticePresenter {
             || selectedPriority == .focusCountdown
         let usesDetailedMedia = selectedPriority == .media
             && settingsStore.settings.mediaCompactStyle == .detailed
+        let usesDetailedMail = selectedPriority == .mail
+            && settingsStore.settings.mailCompactStyle == .detailed
         let frame = layoutEngine.compactBarFrame(
             for: snapshot,
             extendsForFocusCountdown: extendsForCompactStatus,
-            expandsForDetailedMedia: usesDetailedMedia
+            expandsForDetailedMedia: usesDetailedMedia || usesDetailedMail
         )
         guard frame != .zero else {
             panels.compactBar?.orderOut(nil)
@@ -237,6 +239,7 @@ final class SideNoticePresenter {
             || notice.id.hasPrefix("media-active-")
             || notice.id.hasPrefix("focus-countdown-")
             || notice.id.hasPrefix("focus-mode-")
+            || notice.id.hasPrefix("mail-notification-")
             || isTransientCompactNotice(notice)
             || notice.id.hasPrefix("toolbox-reminder-")
             || notice.id.hasPrefix("browser-download-")
@@ -252,6 +255,8 @@ final class SideNoticePresenter {
             switch priority {
             case .transient:
                 notices.contains(where: Self.isTransientCompactNotice)
+            case .mail:
+                notices.contains { $0.id.hasPrefix("mail-notification-") }
             case .videoDownload:
                 notices.contains { $0.id.hasPrefix("video-download-") }
             case .browserDownload:

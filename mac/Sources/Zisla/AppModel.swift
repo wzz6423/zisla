@@ -1752,6 +1752,7 @@ final class AppModel: ObservableObject {
   private func consumeMailMessages(_ messages: [MailMessage]) {
     let currentIDs = Set(messages.map(\.id))
     defer { knownMailMessageIDs = currentIDs }
+    notices.removeAll(withIDPrefix: "mail-notification-")
     guard settingsStore.settings.mailEnabled else {
       hasLoadedMail = false
       return
@@ -1762,18 +1763,15 @@ final class AppModel: ObservableObject {
     }
     guard settingsStore.settings.sideNoticesEnabled else { return }
 
-    for message in messages where !message.isRead && !knownMailMessageIDs.contains(message.id) {
-      notices.enqueue(
-        IslandNotice(
-          id: "mail-\(message.id)",
-          title: "新邮件",
-          detail:
-            "\(message.accountName) · \(message.sender.isEmpty ? "未知发件人" : message.sender) · \(message.title)",
-          kind: .info,
-          side: .right,
-          createdAt: message.receivedAt
-        ))
-    }
+    let newMessages = messages.filter { !$0.isRead && !knownMailMessageIDs.contains($0.id) }
+    guard let latest = newMessages.max(by: { $0.receivedAt < $1.receivedAt }) else { return }
+    let pair = MailNotification(
+      message: latest,
+      newMessageCount: newMessages.count,
+      pairID: latest.id
+    ).makeNotices()
+    notices.enqueue(pair.left)
+    notices.enqueue(pair.right)
   }
 
   private func reportMailOperation(
@@ -1921,7 +1919,7 @@ final class AppModel: ObservableObject {
     notices.enqueue(
       IslandNotice(
         id: "focus-transition",
-        title: status.isActive ? presentation.title : "专注模式",
+        title: presentation.title,
         detail: status.isActive ? "已开启" : "已关闭",
         kind: status.isActive ? .success : .info,
         side: .left,

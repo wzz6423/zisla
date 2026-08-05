@@ -83,6 +83,14 @@ public final class SideNoticeQueue: ObservableObject {
         right.removeAll()
     }
 
+    public func removeAll(withIDPrefix prefix: String) {
+        let ids = (left + right)
+            .lazy
+            .map(\.id)
+            .filter { $0.hasPrefix(prefix) }
+        for id in Array(ids) { remove(id: id) }
+    }
+
     private func trimOrdinaryOverflow(on side: NoticeSide) {
         let notices: [IslandNotice]
         switch side {
@@ -106,6 +114,7 @@ public final class SideNoticeQueue: ObservableObject {
             || notice.id.hasPrefix("focus-countdown-")
             || notice.id.hasPrefix("focus-mode-")
             || notice.id.hasPrefix("focus-transition")
+            || notice.id.hasPrefix("mail-notification-")
             || notice.id.hasPrefix("toolbox-reminder-")
             || notice.id.hasPrefix("browser-download-")
             || notice.id.hasPrefix("video-download-")

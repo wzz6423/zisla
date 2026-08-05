@@ -227,6 +227,19 @@ struct CompactStatusBarView: View {
         (queue.left + queue.right).first { $0.id.hasPrefix("focus-mode-") }
     }
 
+    private var mailNotices: [IslandNotice] {
+        (queue.left + queue.right)
+            .filter { $0.id.hasPrefix("mail-notification-") }
+    }
+
+    private var mailLeftNotice: IslandNotice? {
+        mailNotices.first { $0.side == .left }
+    }
+
+    private var mailRightNotice: IslandNotice? {
+        mailNotices.first { $0.side == .right }
+    }
+
     private var activeAINotices: [IslandNotice] {
         (queue.left + queue.right)
             .filter { $0.id.hasPrefix("ai-active-") }
@@ -240,6 +253,7 @@ struct CompactStatusBarView: View {
     private func compactStatusIsAvailable(_ priority: CompactStatusPriority) -> Bool {
         switch priority {
         case .transient: transientNotice != nil
+        case .mail: !mailNotices.isEmpty
         case .videoDownload: videoDownloadNotice != nil
         case .browserDownload: browserDownloadNotice != nil
         case .focusCountdown: focusCountdownNotice != nil
@@ -259,6 +273,34 @@ struct CompactStatusBarView: View {
                     CompactHeadphoneConnectionBar(notice: transientNotice, height: height)
                 } else {
                     CompactFocusTransitionBar(notice: transientNotice, height: height)
+                }
+            }
+        case .mail:
+            if let resolvedLeftNotice = mailLeftNotice ?? mailRightNotice {
+                let resolvedRightNotice = mailRightNotice ?? resolvedLeftNotice
+                if settingsStore.settings.mailCompactStyle == .detailed {
+                    DetailedMailBar(
+                        leftNotice: resolvedLeftNotice,
+                        rightNotice: resolvedRightNotice,
+                        height: height,
+                        centerInset: displayState.compactBarCenterInset
+                    )
+                } else {
+                    HStack(spacing: 0) {
+                        CompactMailWing(
+                            notice: resolvedLeftNotice,
+                            side: .left,
+                            height: height,
+                            usesTransparentBackground: compactWingsUseTransparentBackground
+                        )
+                        Spacer(minLength: 0)
+                        CompactMailWing(
+                            notice: resolvedRightNotice,
+                            side: .right,
+                            height: height,
+                            usesTransparentBackground: compactWingsUseTransparentBackground
+                        )
+                    }
                 }
             }
         case .videoDownload:
@@ -1376,6 +1418,92 @@ private struct CompactFocusModeWing: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("专注模式：\(notice.title)"))
         .help("专注模式：\(notice.title)")
+    }
+}
+
+private struct CompactMailWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    var body: some View {
+        Group {
+            if side == .left {
+                Image(systemName: notice.symbolName ?? "envelope.fill")
+                    .font(.system(size: min(15, height * 0.56), weight: .semibold))
+            } else {
+                Text(notice.title)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
+        .frame(
+            width: CompactStatusMetrics.wingWidth,
+            height: height,
+            alignment: side == .left ? .leading : .trailing
+        )
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+        .contentShape(CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(side == .left ? "新邮件" : "新邮件 \(notice.title) 封"))
+    }
+}
+
+private struct DetailedMailBar: View {
+    private static let maximumContentWidth: CGFloat = 160
+
+    var leftNotice: IslandNotice
+    var rightNotice: IslandNotice
+    var height: CGFloat
+    var centerInset: CGFloat
+
+    var body: some View {
+        GeometryReader { geometry in
+            let reservedCenterWidth = min(centerInset, geometry.size.width)
+            let sideWidth = min(
+                Self.maximumContentWidth,
+                max(0, (geometry.size.width - reservedCenterWidth) / 2)
+            )
+            let centerWidth = max(0, geometry.size.width - sideWidth * 2)
+            HStack(spacing: 0) {
+                HStack(spacing: 7) {
+                    Image(systemName: leftNotice.symbolName ?? "envelope.fill")
+                        .font(.system(size: min(15, height * 0.56), weight: .semibold))
+                    Text(leftNotice.title)
+                        .font(.system(size: 10, weight: .semibold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .padding(.leading, CompactStatusMetrics.horizontalContentInset)
+                .padding(.trailing, 8)
+                .frame(width: sideWidth, height: height, alignment: .leading)
+
+                Spacer(minLength: 0)
+                    .frame(width: centerWidth)
+
+                HStack(spacing: 6) {
+                    Text(leftNotice.detail ?? "未知发件人")
+                        .font(.system(size: 9, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Text(rightNotice.title)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+                .padding(.leading, 8)
+                .padding(.trailing, CompactStatusMetrics.horizontalContentInset)
+                .frame(width: sideWidth, height: height, alignment: .trailing)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+        }
+        .foregroundStyle(.white)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("新邮件：\(leftNotice.title)，来自 \(leftNotice.detail ?? "未知发件人")，共 \(rightNotice.title) 封"))
     }
 }
 
