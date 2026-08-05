@@ -42,7 +42,7 @@ jobs:
   swift:
     name: CodeQL (swift)
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: mac
