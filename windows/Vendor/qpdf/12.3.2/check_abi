@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+import os
+import sys
+import argparse
+import subprocess
+import re
+import xml.etree.ElementTree as ET
+from operator import itemgetter
+
+whoami = os.path.basename(sys.argv[0])
+
+
+def warn(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+
+class Main:
+    def main(self, args=sys.argv[1:], prog=whoami):
+        options = self.parse_args(args, prog)
+        if options.action == 'dump':
+            self.dump(options)
+        elif options.action == 'get-sizes':
+            self.get_sizes(options)
+        elif options.action == 'compare':
+            self.compare(options)
+        else:
+            exit(f'{whoami}: unknown action')
+
+    def parse_args(self, args, prog):
+        parser = argparse.ArgumentParser(
+            prog=prog,
+            # formatter_class=argparse.RawDescriptionHelpFormatter,
+            description='Check ABI for changes',
+        )
+
+        subparsers = parser.add_subparsers(
+            dest='action',
+            help='specify subcommand; run action with --help for details',
+            required=True)
+        lib_arg = ('--lib', {'help': 'library file', 'required': True})
+
+        p_dump = subparsers.add_parser(
+            'dump',
+            help='dump qpdf symbols in a library')
+        p_dump.add_argument(lib_arg[0], **lib_arg[1])
+
+        p_get_sizes = subparsers.add_parser(
+            'get-sizes',
+            help='dump sizes of all public classes')
+        p_get_sizes.add_argument('--include',
+                                 help='include path',
+                                 required=True)
+
+        p_compare = subparsers.add_parser(
+            'compare',
+            help='compare libraries and sizes')
+        p_compare.add_argument('--new-lib',
+                               help='new library file',
+                               required=True)
+        p_compare.add_argument('--old-lib',
+                               help='old library file',
+                               required=True)
+        p_compare.add_argument('--old-sizes',
+                               help='output of old sizes',
+                               required=True)
+        p_compare.add_argument('--new-sizes',
+                               help='output of new sizes',
+                               required=True)
+        return parser.parse_args(args)
+
+    def get_versions(self, path):
+        p = os.path.basename(os.path.realpath(path))
+        m = re.match(r'^libqpdf.so.(\d+).(\d+).(\d+)$', p)
+        if not m:
+            exit(f'{whoami}: {path} does end with libqpdf.so.x.y.z')
+        major = int(m.group(1))
+        minor = int(m.group(2))
+        patch = int(m.group(3))
+        return (major, minor, patch)
+
+    def get_symbols(self, path):
+        symbols = set()
+        p = subprocess.run(
+            ['nm', '-D', '--demangle', '--with-symbol-versions', path],
+            stdout=subprocess.PIPE)
+        if p.returncode:
+            exit(f'{whoami}: failed to get symbols from {path}')
+        for line in p.stdout.decode().split('\n'):
+            # The LIBQPDF_\d+ comes from the version tag in
+            # libqpdf.map.in.
+            m = re.match(r'^[0-9a-f]+ (.) (.+)@@LIBQPDF_\d+\s*$', line)
+            if not m:
+                continue
+            symbol = m.group(2)
+            if re.match(r'^((void|int|bool|(.*? for)) )?std::', symbol):
+                # Calling different methods of STL classes causes
+                # different template instantiations to appear.
+                # Standard library methods that sneak into the binary
+                # interface are not considered part of the qpdf ABI.
+                continue
+            symbols.add(symbol)
+        return symbols
+
+    def dump(self, options):
+        # This is just for manual use to investigate surprises.
+        for i in sorted(self.get_symbols(options.lib)):
+            print(i)
+
+    @staticmethod
+    def get_header_sizes(include, filename):
+        print(f'{filename}...', file=sys.stderr)
+        p = subprocess.run([
+            'castxml', '--castxml-output=1', f'-I{include}',
+            f'{include}/{filename}', '-o', '-',
+        ], stdout=subprocess.PIPE, check=True)
+        tree = ET.fromstring(p.stdout)
+        this_file = tree.find(f'.//File[@name="{include}/{filename}"]')
+        if this_file is None:
+            # This file doesn't define anything, e.g., DLL.h
+            return []
+        this_file_id = this_file.attrib["id"]
+        wanted = [
+            'Namespace',
+            'Struct', 'Union', 'Class',  # records
+        ]
+
+        by_id = {}
+        for elem in tree:
+            # Reference
+            # https://github.com/CastXML/CastXML/blob/master/doc/manual/castxml.xsd
+            if elem.tag not in wanted:
+                continue
+            is_record = elem.tag != 'Namespace'
+            record = {
+                'is_record': is_record,
+                'in_file': (elem.get('file') == this_file_id and
+                            elem.get('incomplete') is None),
+                'name': elem.get('name'),
+                'access':  elem.get('access'),
+                'context': elem.get('context'),
+                'size': elem.get('size'),
+            }
+            by_id[elem.attrib['id']] = record
+        classes = []
+        for id_, record in by_id.items():
+            cur = record
+            if not cur['in_file']:
+                continue
+            name = ''
+            private = False
+            while cur is not None:
+                if cur.get('access') == 'private':
+                    private = True
+                parent = cur.get('context')
+                name = f'{cur["name"]}{name}'
+                if parent is None or parent == '_1':
+                    break
+                name = f'::{name}'
+                cur = by_id.get(cur.get('context'))
+            if not private:
+                classes.append([name, record['size']])
+        return classes
+
+    def get_sizes(self, options):
+        classes = []
+        for f in os.listdir(f'{options.include}/qpdf'):
+            if f.startswith('auto_') or f == 'QPDFObject.hh':
+                continue
+            if f.endswith('.h') or f.endswith('.hh'):
+                classes.extend(self.get_header_sizes(
+                    options.include, f"qpdf/{f}"))
+
+        classes.sort(key=itemgetter(0))
+        for c, s in classes:
+            print(c, s)
+
+    def read_sizes(self, filename):
+        sizes = {}
+        with open(filename, 'r') as f:
+            for line in f.readlines():
+                line = line.strip()
+                m = re.match(r'^(.*) (\d+)$', line)
+                if not m:
+                    exit(f'{filename}: bad sizes line: {line}')
+                sizes[m.group(1)] = m.group(2)
+        return sizes
+
+    def compare(self, options):
+        old_version = self.get_versions(options.old_lib)
+        new_version = self.get_versions(options.new_lib)
+        old = self.get_symbols(options.old_lib)
+        new = self.get_symbols(options.new_lib)
+        if old_version > new_version:
+            exit(f'{whoami}: old version is newer than new version')
+        allow_abi_change = new_version[0] > old_version[0]
+        allow_added = allow_abi_change or (new_version[1] > old_version[1])
+        removed = sorted(old - new)
+        added = sorted(new - old)
+        if removed:
+            print('INTERFACES REMOVED:')
+            for i in removed:
+                print(' ', i)
+        else:
+            print('No interfaces were removed')
+        if added:
+            print('INTERFACES ADDED')
+            for i in added:
+                print(' ', i)
+        else:
+            print('No interfaces were added')
+
+        if removed and not allow_abi_change:
+            exit(f'{whoami}: **ERROR**: major version must be bumped')
+        elif added and not allow_added:
+            exit(f'{whoami}: **ERROR**: minor version must be bumped')
+        else:
+            print(f'{whoami}: ABI check passed.')
+
+        old_sizes = self.read_sizes(options.old_sizes)
+        new_sizes = self.read_sizes(options.new_sizes)
+        size_errors = False
+        for k, v in old_sizes.items():
+            if k in new_sizes and v != new_sizes[k]:
+                size_errors = True
+                print(f'{k} changed size from {v} to {new_sizes[k]}')
+        if size_errors:
+            if not allow_abi_change:
+                exit(f'{whoami}:'
+                     'size changes detected; this is an ABI change.')
+        else:
+            print(f'{whoami}: no size changes detected')
+
+
+if __name__ == '__main__':
+    try:
+        subprocess.run(['castxml', '--version'],
+                       stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+    except Exception:
+        exit('f{whoami}: castxml must be installed')
+    try:
+        Main().main()
+    except KeyboardInterrupt:
+        exit(130)

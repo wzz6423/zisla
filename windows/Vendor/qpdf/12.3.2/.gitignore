@@ -1,0 +1,18 @@
+/build
+/build.*
+/cmake-build-*
+appimage/build
+/external-libs
+/distribution/
+.cache
+/html
+Doxyfile
+/CMakeUserPresets.json
+/compile_commands.json
+
+# ./Testing is created if you run ctest from the wrong place.
+/Testing
+
+# macOS junk files
+.DS_Store
+._*

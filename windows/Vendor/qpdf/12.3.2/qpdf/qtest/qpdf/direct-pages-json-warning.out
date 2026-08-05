@@ -1,0 +1,3 @@
+WARNING: direct-pages.pdf, object 2 0 at offset 143: kid 0 (from 0) is direct; converting to indirect
+WARNING: direct-pages.pdf, object 2 0 at offset 143: kid 1 (from 0) is direct; converting to indirect
+qpdf: operation succeeded with warnings

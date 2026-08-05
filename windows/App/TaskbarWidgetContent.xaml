@@ -1,0 +1,31 @@
+<UserControl
+    x:Class="Zisla.TaskbarWidgetContent"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Width="36"
+    Height="36">
+    <Button
+        x:Name="OpenButton"
+        Width="36"
+        Height="36"
+        Padding="0"
+        AutomationProperties.Name="打开 Zisla"
+        Background="Transparent"
+        BorderThickness="0"
+        Click="OpenButton_Click"
+        ToolTipService.ToolTip="打开 Zisla（任务栏伴随浮窗）">
+        <Border
+            x:Name="SurfaceBorder"
+            Background="{ThemeResource OverlaySurfaceBrush}"
+            BorderBrush="{ThemeResource OverlayStrokeBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+            <FontIcon
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                FontSize="15"
+                Foreground="{ThemeResource OverlayAccentBrush}"
+                Glyph="&#xE80F;" />
+        </Border>
+    </Button>
+</UserControl>

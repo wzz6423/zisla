@@ -1,0 +1,183 @@
+#!/usr/bin/env perl
+#
+# This program creates a source distribution of qpdf.  For details,
+# see README-maintainer.
+#
+
+require 5.008;
+use warnings;
+use strict;
+use File::Basename;
+use Cwd;
+use Cwd 'abs_path';
+use IO::File;
+use File::Path qw(rmtree make_path);
+
+my $whoami = basename($0);
+
+my $tmp = $ENV{'TMPDIR'} || '/tmp';
+my $keep_tmp = 0;
+my $ci_mode = 0;
+my $version = undef;
+foreach my $arg (@ARGV)
+{
+    if ($arg eq '--keep-tmp')
+    {
+        $keep_tmp = 1;
+    }
+    elsif ($arg eq '--ci')
+    {
+        $ci_mode = 1;
+    }
+    elsif (! defined $version)
+    {
+        $version = $arg;
+    }
+    else
+    {
+	usage();
+    }
+}
+
+if ($ci_mode && (! defined $version))
+{
+    $version = get_version_from_cmake();
+}
+
+usage() unless defined $version;
+usage() unless $version =~ m/^(\d+\.\d+(?:\.(a|b|rc)?\d+)?)$/;
+my $distname = "qpdf-$version";
+my $tmpdir = "${tmp}/$distname";
+if ((-d $tmpdir) && (! $keep_tmp))
+{
+    rmtree($tmpdir);
+}
+make_path($tmp);
+run("git archive --prefix=qpdf-$version/ HEAD . | (cd $tmp; tar xf -)");
+cd($tmpdir);
+
+# Check versions
+my $cmakeversion = get_version_from_cmake();
+my $code_version = get_version_from_source();
+
+my $version_error = 0;
+if ($version ne $cmakeversion)
+{
+    print "$whoami: cmake version = $cmakeversion\n";
+    $version_error = 1;
+}
+if ($version ne $code_version)
+{
+    print "$whoami: QPDF.cc version = $code_version\n";
+    $version_error = 1;
+}
+if ($version_error)
+{
+    die "$whoami: version numbers are not consistent\n";
+}
+
+cd($tmp);
+run("tar czvf $distname.tar.gz-candidate $distname");
+my $distfile = ($ci_mode ? "$distname-ci.tar.gz" : "$distname.tar.gz");
+rename "$distname.tar.gz-candidate", $distfile or die;
+
+if (! $keep_tmp)
+{
+    rmtree($tmpdir);
+}
+
+print "
+Source distribution created as ${tmp}/$distfile
+If this is a release, don't forget to tag the version control system and
+make a backup of the release tar file.
+
+";
+
+sub get_version_from_cmake
+{
+    my $fh = safe_open("CMakeLists.txt");
+    my $cmake_version = 'unknown';
+    my $saw_project = 0;
+    while (<$fh>)
+    {
+        if (m/project\(qpdf/)
+        {
+            $saw_project = 1;
+        }
+        elsif ($saw_project && m/VERSION (\S+)$/)
+        {
+            $cmake_version = $1;
+            last;
+        }
+    }
+    $fh->close();
+    $cmake_version;
+}
+
+sub get_version_from_source
+{
+    my $fh = safe_open("include/qpdf/DLL.h");
+    my $code_version = 'unknown';
+    my $major = '';
+    my $minor = '';
+    my $patch = '';
+    while (<$fh>)
+    {
+        if (m/QPDF_MAJOR_VERSION (\d+)/)
+        {
+            $major = $1;
+        }
+        elsif (m/QPDF_MINOR_VERSION (\d+)/)
+        {
+            $minor = $1;
+        }
+        elsif (m/QPDF_PATCH_VERSION (\d+)/)
+        {
+            $patch = $1;
+        }
+        elsif (m/QPDF_VERSION \"([^\"]+)\"/)
+        {
+            $code_version = $1;
+        }
+    }
+    my $t = sprintf("%s.%s.%s", $major, $minor, $patch);
+    if ($t ne $code_version)
+    {
+        die "$whoami: version is inconsistent in DLL.h:" .
+            " $t vs $code_version\n";
+    }
+
+    $fh->close();
+    $code_version;
+}
+
+sub safe_open
+{
+    my $file = shift;
+    my $fh = new IO::File("<$file") or die "$whoami: can't open $file: $!";
+    $fh;
+}
+
+sub run
+{
+    my $cmd = shift;
+    system($cmd) == 0 or die "$whoami: $cmd failed\n";
+}
+
+sub cd
+{
+    my $dir = shift;
+    chdir($dir) or die;
+}
+
+sub usage
+{
+    die "
+Usage: $whoami [--keep-tmp] {--ci|version}
+
+$whoami creates ${tmp}/qpdf-<version> and deletes it when done. With
+--keep-tmp, the directory is kept. This can be useful for debugging
+the release process.
+
+";
+}

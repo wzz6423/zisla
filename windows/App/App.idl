@@ -1,0 +1,53 @@
+import "Microsoft.UI.Xaml.idl";
+
+namespace Zisla {
+    [default_interface]
+    runtimeclass OverlayContent : Microsoft.UI.Xaml.Controls.UserControl {
+        OverlayContent();
+    }
+
+    [default_interface]
+    runtimeclass PDFToolsContent : Microsoft.UI.Xaml.Controls.UserControl {
+        PDFToolsContent();
+    }
+
+    [default_interface]
+    runtimeclass AIAgentSkillsContent : Microsoft.UI.Xaml.Controls.UserControl {
+        AIAgentSkillsContent();
+    }
+
+    [default_interface]
+    runtimeclass AIAgentWorkspaceContent : Microsoft.UI.Xaml.Controls.UserControl {
+        AIAgentWorkspaceContent();
+    }
+
+    [default_interface]
+    runtimeclass SettingsContent : Microsoft.UI.Xaml.Controls.UserControl {
+        SettingsContent();
+    }
+
+    [default_interface]
+    runtimeclass SideNoticeContent : Microsoft.UI.Xaml.Controls.UserControl {
+        SideNoticeContent();
+    }
+
+    [default_interface]
+    runtimeclass CleaningContent : Microsoft.UI.Xaml.Controls.UserControl {
+        CleaningContent();
+    }
+
+    [default_interface]
+    runtimeclass TeleprompterContent : Microsoft.UI.Xaml.Controls.UserControl {
+        TeleprompterContent();
+    }
+
+    [default_interface]
+    runtimeclass CameraMirrorContent : Microsoft.UI.Xaml.Controls.UserControl {
+        CameraMirrorContent();
+    }
+
+    [default_interface]
+    runtimeclass TaskbarWidgetContent : Microsoft.UI.Xaml.Controls.UserControl {
+        TaskbarWidgetContent();
+    }
+}

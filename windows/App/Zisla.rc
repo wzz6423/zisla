@@ -1,0 +1,3 @@
+#include "resource.h"
+
+IDI_ZISLA_APP ICON "Assets\\Zisla.ico"

@@ -1,0 +1,68 @@
+<Application
+    x:Class="Zisla.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="OverlaySurfaceBrush" Color="#B8FFFFFF" />
+                    <SolidColorBrush x:Key="OverlayOpaqueSurfaceBrush" Color="#FFF8FAFC" />
+                    <SolidColorBrush x:Key="OverlayCardBrush" Color="#66FFFFFF" />
+                    <SolidColorBrush x:Key="OverlayStrokeBrush" Color="#52FFFFFF" />
+                    <SolidColorBrush x:Key="OverlayPrimaryTextBrush" Color="#E61B1B1B" />
+                    <SolidColorBrush x:Key="OverlaySecondaryTextBrush" Color="#A63D3D3D" />
+                    <SolidColorBrush x:Key="OverlayAccentBrush" Color="#FF087EA4" />
+                    <SolidColorBrush x:Key="OverlayDangerBrush" Color="#FFC42B1C" />
+                    <SolidColorBrush x:Key="SettingsSurfaceBrush" Color="#FFF9F9F9" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="OverlaySurfaceBrush" Color="#A62A2A2A" />
+                    <SolidColorBrush x:Key="OverlayOpaqueSurfaceBrush" Color="#FF202124" />
+                    <SolidColorBrush x:Key="OverlayCardBrush" Color="#26FFFFFF" />
+                    <SolidColorBrush x:Key="OverlayStrokeBrush" Color="#38FFFFFF" />
+                    <SolidColorBrush x:Key="OverlayPrimaryTextBrush" Color="#FFF7F7F7" />
+                    <SolidColorBrush x:Key="OverlaySecondaryTextBrush" Color="#B8E2E2E2" />
+                    <SolidColorBrush x:Key="OverlayAccentBrush" Color="#FF5BC7E8" />
+                    <SolidColorBrush x:Key="OverlayDangerBrush" Color="#FFFFB4AB" />
+                    <SolidColorBrush x:Key="SettingsSurfaceBrush" Color="#FF202020" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush
+                        x:Key="OverlaySurfaceBrush"
+                        Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush
+                        x:Key="OverlayOpaqueSurfaceBrush"
+                        Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush
+                        x:Key="OverlayCardBrush"
+                        Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush
+                        x:Key="OverlayStrokeBrush"
+                        Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush
+                        x:Key="OverlayPrimaryTextBrush"
+                        Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush
+                        x:Key="OverlaySecondaryTextBrush"
+                        Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush
+                        x:Key="OverlayAccentBrush"
+                        Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush
+                        x:Key="OverlayDangerBrush"
+                        Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush
+                        x:Key="SettingsSurfaceBrush"
+                        Color="{ThemeResource SystemColorWindowColor}" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+            <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

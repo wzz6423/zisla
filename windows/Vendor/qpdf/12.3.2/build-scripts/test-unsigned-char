@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e
+sudo apt-get update
+sudo apt-get -y install \
+   build-essential cmake \
+   zlib1g-dev libjpeg-dev libgnutls28-dev libssl-dev
+# Some platforms have unsigned-char by default, but Intel doesn't.
+# This ensures that we catch code that would fail if char were
+# unsigned by default.
+env CFLAGS="-funsigned-char" \
+    CXXFLAGS="-funsigned-char" \
+    cmake -S . -B build \
+    -DCI_MODE=1 -DBUILD_STATIC_LIBS=0 -DCMAKE_BUILD_TYPE=Release \
+    -DREQUIRE_CRYPTO_OPENSSL=1 -DREQUIRE_CRYPTO_GNUTLS=1 \
+    -DENABLE_QTC=1
+cmake --build build --verbose -j$(nproc) -- -k
+cd build
+# Make sure char is unsigned by default. ./build-linux verifies that
+# that build has char signed by default. That way we can be sure we
+# are testing both ways.
+./qpdf/test_char_sign | grep 'char is unsigned'
+ctest --verbose
