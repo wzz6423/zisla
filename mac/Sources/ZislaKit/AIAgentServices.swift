@@ -886,13 +886,7 @@ public struct AIAgentCLIService: Sendable {
     }
 
     private func npmPackage(for kind: AgentCLIKind) -> String? {
-        switch kind {
-        case .claude: "@anthropic-ai/claude-code"
-        case .codex: "@openai/codex"
-        case .gemini: "@google/gemini-cli"
-        case .opencode: "opencode-ai"
-        case .grok: nil
-        }
+        kind.npmPackageName
     }
 
     func executable(named name: String) -> URL? {

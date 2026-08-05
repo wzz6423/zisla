@@ -184,6 +184,24 @@ struct SideNoticeLayoutTests {
     }
 
     @Test
+    func updateAvailabilityUsesTheCompactBarWithoutOccupyingOrdinaryCapacity() {
+        let update = IslandNotice(
+            id: "update-available-cli-codex-left",
+            title: "Codex",
+            side: .left,
+            style: .status,
+            symbolName: "arrow.triangle.2.circlepath"
+        )
+
+        let presentation = engine.presentation(for: [update])
+
+        #expect(presentation.activeUpdateNotice == update)
+        #expect(presentation.ordinaryNotices.isEmpty)
+        #expect(presentation.hasCompactContent)
+        #expect(presentation.panelSize == CGSize(width: 40, height: 34))
+    }
+
+    @Test
     func transientFocusAndHeadphoneNoticesDoNotRenderAsOrdinaryRows() {
         let focusTransition = IslandNotice(
             id: "focus-transition",

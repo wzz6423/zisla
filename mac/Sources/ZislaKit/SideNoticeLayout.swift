@@ -4,6 +4,7 @@ import ZislaCore
 public struct SideNoticePresentation: Equatable, Sendable {
     public let activeAICount: Int
     public let activeAINotice: IslandNotice?
+    public let activeUpdateNotice: IslandNotice?
     public let activeMediaNotice: IslandNotice?
     public let activeFocusCountdownNotice: IslandNotice?
     public let activeFocusModeNotice: IslandNotice?
@@ -20,6 +21,7 @@ public struct SideNoticePresentation: Equatable, Sendable {
     public init(
         activeAICount: Int,
         activeAINotice: IslandNotice? = nil,
+        activeUpdateNotice: IslandNotice? = nil,
         activeMediaNotice: IslandNotice? = nil,
         activeFocusCountdownNotice: IslandNotice? = nil,
         activeFocusModeNotice: IslandNotice? = nil,
@@ -35,6 +37,7 @@ public struct SideNoticePresentation: Equatable, Sendable {
     ) {
         self.activeAICount = activeAICount
         self.activeAINotice = activeAINotice
+        self.activeUpdateNotice = activeUpdateNotice
         self.activeMediaNotice = activeMediaNotice
         self.activeFocusCountdownNotice = activeFocusCountdownNotice
         self.activeFocusModeNotice = activeFocusModeNotice
@@ -51,6 +54,7 @@ public struct SideNoticePresentation: Equatable, Sendable {
 
     public var hasCompactContent: Bool {
         activeAICount > 0 || activeMediaNotice != nil || activeFocusCountdownNotice != nil
+            || activeUpdateNotice != nil
             || activeFocusModeNotice != nil || activeToolboxNotice != nil
             || activeMailNotice != nil
             || activeBrowserDownloadNotice != nil || activeVideoDownloadNotice != nil
@@ -158,6 +162,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let activeAINotices = compactWingsEnabled
             ? notices.filter { $0.id.hasPrefix("ai-active-") }
             : []
+        let activeUpdateNotice = compactWingsEnabled
+            ? notices.first(where: { $0.id.hasPrefix("update-available-") })
+            : nil
         let activeToolboxNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("toolbox-reminder-") })
             : nil
@@ -170,6 +177,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let activeAICount = activeAINotices.count
         let ordinaryNotices = notices.filter {
             !$0.id.hasPrefix("ai-active-")
+                && !$0.id.hasPrefix("update-available-")
                 && !$0.id.hasPrefix("media-active-")
                 && !$0.id.hasPrefix("focus-countdown-")
                 && !$0.id.hasPrefix("focus-mode-")
@@ -182,6 +190,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
         let panelSize = panelSize(
             activeAICount: activeAICount,
+            hasUpdate: activeUpdateNotice != nil,
             hasMedia: activeMediaNotice != nil,
             hasFocusCountdown: activeFocusCountdownNotice != nil,
             hasFocusMode: activeFocusModeNotice != nil,
@@ -196,6 +205,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let compactPlaceholder = compactWingsEnabled
             && reserveCompactWing
             && activeAICount == 0
+            && activeUpdateNotice == nil
             && activeMediaNotice == nil
             && activeFocusCountdownNotice == nil
             && activeFocusModeNotice == nil
@@ -206,6 +216,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         return SideNoticePresentation(
             activeAICount: activeAICount,
             activeAINotice: activeAINotices.first,
+            activeUpdateNotice: activeUpdateNotice,
             activeMediaNotice: activeMediaNotice,
             activeFocusCountdownNotice: activeFocusCountdownNotice,
             activeFocusModeNotice: activeFocusModeNotice,
@@ -345,6 +356,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
 
     private func panelSize(
         activeAICount: Int,
+        hasUpdate: Bool,
         hasMedia: Bool,
         hasFocusCountdown: Bool,
         hasFocusMode: Bool,
@@ -356,7 +368,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         compactWingHeight: CGFloat,
         reserveCompactWing: Bool
     ) -> CGSize {
-        let hasCompact = activeAICount > 0 || hasMedia || hasFocusCountdown || hasFocusMode || hasMail
+        let hasCompact = activeAICount > 0 || hasUpdate || hasMedia || hasFocusCountdown || hasFocusMode || hasMail
             || hasToolbox || hasBrowserDownload || hasVideoDownload || reserveCompactWing
         guard ordinaryCount > 0 else {
             return hasCompact

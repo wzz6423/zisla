@@ -246,6 +246,10 @@ struct CompactStatusBarView: View {
             .sorted { $0.createdAt > $1.createdAt }
     }
 
+    private var updateNotice: IslandNotice? {
+        (queue.left + queue.right).first { $0.id.hasPrefix("update-available-") }
+    }
+
     private var selectedCompactStatusPriority: CompactStatusPriority? {
         settingsStore.settings.compactStatusPriority.first(where: compactStatusIsAvailable)
     }
@@ -253,6 +257,7 @@ struct CompactStatusBarView: View {
     private func compactStatusIsAvailable(_ priority: CompactStatusPriority) -> Bool {
         switch priority {
         case .transient: transientNotice != nil
+        case .updateAvailable: updateNotice != nil
         case .mail: !mailNotices.isEmpty
         case .videoDownload: videoDownloadNotice != nil
         case .browserDownload: browserDownloadNotice != nil
@@ -273,6 +278,24 @@ struct CompactStatusBarView: View {
                     CompactHeadphoneConnectionBar(notice: transientNotice, height: height)
                 } else {
                     CompactFocusTransitionBar(notice: transientNotice, height: height)
+                }
+            }
+        case .updateAvailable:
+            if let updateNotice {
+                HStack(spacing: 0) {
+                    CompactUpdateWing(
+                        notice: updateNotice,
+                        side: .left,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                    Spacer(minLength: 0)
+                    CompactUpdateWing(
+                        notice: updateNotice,
+                        side: .right,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
                 }
             }
         case .mail:
@@ -926,6 +949,43 @@ private struct MessageTextWidthKey: PreferenceKey {
 private enum CompactAIWingRole {
     case identity
     case status
+}
+
+private struct CompactUpdateWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground: Bool
+
+    private var isCLIUpdate: Bool { notice.id.hasPrefix("update-available-cli-") }
+
+    var body: some View {
+        Group {
+            if side == .left {
+                if isCLIUpdate {
+                    AIMascotView(identity: AIMascotIdentity(noticeID: notice.id), size: min(20, height * 0.62))
+                } else {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: min(19, height * 0.58), height: min(19, height * 0.58))
+                }
+            } else {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: min(14, height * 0.46), weight: .semibold))
+                    .foregroundStyle(.cyan)
+            }
+        }
+        .frame(width: CompactStatusMetrics.wingWidth, height: height)
+        .background(
+            usesTransparentBackground ? Color.clear : Color.black,
+            in: CompactAIWingShape(side: side)
+        )
+        .contentShape(CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(side == .left ? "\(notice.title)有可用更新" : "立即升级"))
+    }
 }
 
 private struct CompactAIWing: View {

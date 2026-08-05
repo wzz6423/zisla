@@ -30,11 +30,13 @@ public final class AIAgentWorkspace: ObservableObject {
 
     @Published public private(set) var isRefreshing = false
     @Published public private(set) var lastError: String?
+    @Published public private(set) var cliUpdates: [AIAgentCLIUpdate] = []
 
     private let balanceService: AIAgentBalanceService
     private let channelProbeService: AIAgentChannelProbeService
     private let modelCatalogService: AIAgentModelCatalogService
     private let cliService: AIAgentCLIService
+    private let cliUpdateService: AIAgentCLIUpdateService
     private let cliProfileService: AIAgentCLIProfileService
     private let claudeCodeVSCodeSettingsService: ClaudeCodeVSCodeSettingsService
     private let codexHistoryImporter: CodexSessionHistoryImporter
@@ -56,6 +58,7 @@ public final class AIAgentWorkspace: ObservableObject {
         channelProbeService: AIAgentChannelProbeService = AIAgentChannelProbeService(),
         modelCatalogService: AIAgentModelCatalogService = AIAgentModelCatalogService(),
         cliService: AIAgentCLIService = AIAgentCLIService(),
+        cliUpdateService: AIAgentCLIUpdateService = AIAgentCLIUpdateService(),
         cliProfileService: AIAgentCLIProfileService = AIAgentCLIProfileService(),
         claudeCodeVSCodeSettingsService: ClaudeCodeVSCodeSettingsService = ClaudeCodeVSCodeSettingsService(),
         codexHistoryImporter: CodexSessionHistoryImporter = CodexSessionHistoryImporter(),
@@ -68,6 +71,7 @@ public final class AIAgentWorkspace: ObservableObject {
         self.channelProbeService = channelProbeService
         self.modelCatalogService = modelCatalogService
         self.cliService = cliService
+        self.cliUpdateService = cliUpdateService
         self.cliProfileService = cliProfileService
         self.claudeCodeVSCodeSettingsService = claudeCodeVSCodeSettingsService
         self.codexHistoryImporter = codexHistoryImporter
@@ -198,7 +202,9 @@ public final class AIAgentWorkspace: ObservableObject {
     }
 
     public func refreshCLIs() async {
-        store.replaceCLIStatuses(await cliService.statuses())
+        let statuses = await cliService.statuses()
+        store.replaceCLIStatuses(statuses)
+        cliUpdates = await cliUpdateService.availableUpdates(for: statuses)
     }
 
     public func refreshSkills() async {

@@ -281,6 +281,7 @@ public enum SystemMonitorMenuBarDisplayStyle: String, Codable, CaseIterable, Sen
 
 public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case transient
+    case updateAvailable
     case mail
     case videoDownload
     case browserDownload
@@ -292,6 +293,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
 
     public static let defaultOrder: [Self] = [
         .transient,
+        .updateAvailable,
         .mail,
         .videoDownload,
         .browserDownload,
@@ -305,6 +307,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
     public var title: String {
         switch self {
         case .transient: "临时提示"
+        case .updateAvailable: "可用更新"
         case .mail: "新邮件"
         case .videoDownload: "视频下载"
         case .browserDownload: "浏览器下载"

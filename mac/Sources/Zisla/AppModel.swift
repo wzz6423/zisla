@@ -319,6 +319,7 @@ final class AppModel: ObservableObject {
   @Published private(set) var weatherSnapshotsByLocationID: [String: WeatherSnapshot] = [:]
   @Published var weatherLocationState: WeatherLocationUIState = .idle
   @Published var updateState: UpdateCheckState = .idle
+  @Published private(set) var productUpdateAvailable = false
   @Published var downloadURL = ""
   @Published var downloadMode: DownloadMode = .video
   @Published var downloadDirectory = AppPaths.downloads
@@ -395,6 +396,7 @@ final class AppModel: ObservableObject {
   private var cancellables: Set<AnyCancellable> = []
   private var weatherTask: Task<Void, Never>?
   private var releaseTask: Task<Void, Never>?
+  private var updatePollingTask: Task<Void, Never>?
   private var downloadTask: Task<Void, Never>?
   private var voicePostProcessingTask: Task<Void, Never>?
   private var detectedLinkTask: Task<Void, Never>?
@@ -410,6 +412,7 @@ final class AppModel: ObservableObject {
   private var hasLoadedMail = false
   private var knownMailMessageIDs: Set<String> = []
   private var lastActivityNoticeDisplayDuration: ActivityNoticeDisplayDuration?
+  private var isUpdatePollingEnabled = false
   private let mediaNoticeIDs: Set<String> = [
     "media-active-left",
     "media-active-right",
@@ -434,6 +437,7 @@ final class AppModel: ObservableObject {
     "video-download-left",
     "video-download-right",
   ]
+  private let updateNoticePrefix = "update-available-"
   private var cleaningPowerState:
     (
       keepDisplayAwake: Bool,
@@ -452,6 +456,10 @@ final class AppModel: ObservableObject {
     }
     restoreDownloadDirectory()
     aiAgent.startAutomation()
+    UpdateController.shared.onUpdateAvailabilityChanged = { [weak self] available in
+      self?.productUpdateAvailable = available
+      self?.refreshUpdateNotices()
+    }
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
       _ = self?.clipboardHistory.record(content)
     }
@@ -608,6 +616,13 @@ final class AppModel: ObservableObject {
       }
       .store(in: &cancellables)
 
+    aiAgent.$cliUpdates
+      .dropFirst()
+      .sink { [weak self] _ in
+        Task { @MainActor [weak self] in self?.refreshUpdateNotices() }
+      }
+      .store(in: &cancellables)
+
     // Any source affecting the dashboard height. Pomodoro exposes `phase` as a computed property over
     // its engine, so it can only be observed via `objectWillChange`, which fires before the value lands.
     // Deferring to the next run-loop turn ensures the panel size matches the cards SwiftUI can render.
@@ -651,9 +666,6 @@ final class AppModel: ObservableObject {
     focusMode.start()
     audioOutput.start()
     alarms.rescheduleAll()
-    if settingsStore.settings.updateChecksEnabled {
-      checkForUpdates(manual: false)
-    }
   }
 
   func openVoiceInputInputMonitoringSettings() {
@@ -683,6 +695,7 @@ final class AppModel: ObservableObject {
     clipboardHistory.flushPendingChanges()
     weatherTask?.cancel()
     releaseTask?.cancel()
+    updatePollingTask?.cancel()
     downloadTask?.cancel()
     voicePostProcessingTask?.cancel()
     detectedLinkTask?.cancel()
@@ -1024,18 +1037,14 @@ final class AppModel: ObservableObject {
         switch result {
         case .upToDate:
           self?.updateState = .current
+          self?.productUpdateAvailable = false
+          self?.refreshUpdateNotices()
           if manual { self?.transientMessage = "当前已是最新版本" }
         case .updateAvailable(let release, let source):
           guard let self else { return }
           self.updateState = .available(release, source: source)
-          self.notices.enqueue(
-            IslandNotice(
-              id: "release-\(source)-\(release.tagName)",
-              title: "发现 \(source.displayName) 新版本 \(release.tagName)",
-              detail: source == .github ? "可在设置中选择立即更新" : "可在设置中打开 Gitee Release 下载",
-              kind: .info,
-              side: .right
-            ))
+          self.productUpdateAvailable = true
+          self.refreshUpdateNotices()
           if manual { self.presentUpdateAlert(for: release, source: source) }
         }
       } catch is CancellationError {
@@ -1372,6 +1381,7 @@ final class AppModel: ObservableObject {
     NSApp.appearance = settings.appearanceMode.nsAppearance
     media.setPreferredSource(settings.mediaSource)
     pomodoro.notificationsMuted = settings.notificationsMuted
+    configureUpdatePolling(enabled: settings.updateChecksEnabled)
     if settings.aiProgressEnabled {
       aiMonitor.start()
       if selectedModule == .aiMonitor {
@@ -1435,11 +1445,13 @@ final class AppModel: ObservableObject {
       consumeAIState(aiMonitor.state)
       consumeMediaSnapshot(media.snapshot)
       consumeFocusModeStatus(focusMode.status, showsTransition: false)
+      refreshUpdateNotices()
     } else {
       notices.removeAll()
       activeAINoticeIDs.removeAll()
       activityNoticeShownIDs.removeAll()
       mediaActivityPresented = false
+      notices.removeAll(withIDPrefix: updateNoticePrefix)
     }
     voiceInputInputMonitoringAccessGranted = GlobalHotkeyManager.hasInputMonitoringAccess
     if settings.voiceInputEnabled {
@@ -1470,6 +1482,71 @@ final class AppModel: ObservableObject {
       hotkeyManager.unregister()
     }
     refreshToolboxReminderNotice()
+  }
+
+  private func configureUpdatePolling(enabled: Bool) {
+    guard isUpdatePollingEnabled != enabled else { return }
+    isUpdatePollingEnabled = enabled
+    updatePollingTask?.cancel()
+    updatePollingTask = nil
+    guard enabled else { return }
+
+    updatePollingTask = Task { [weak self] in
+      while !Task.isCancelled {
+        guard let self else { return }
+        await self.aiAgent.refreshCLIs()
+        guard !Task.isCancelled else { return }
+        self.checkForUpdates(manual: false)
+        do {
+          try await Task.sleep(for: .seconds(600))
+        } catch {
+          return
+        }
+      }
+    }
+  }
+
+  private func refreshUpdateNotices() {
+    guard settingsStore.settings.sideNoticesEnabled else {
+      notices.removeAll(withIDPrefix: updateNoticePrefix)
+      return
+    }
+
+    let selectedUpdate: (id: String, title: String, symbol: String)?
+    if productUpdateAvailable {
+      selectedUpdate = ("product", "Zisla", "app.fill")
+    } else if let update = aiAgent.cliUpdates.first {
+      selectedUpdate = ("cli-\(update.kind.rawValue)", update.kind.displayName, "sparkles")
+    } else {
+      selectedUpdate = nil
+    }
+    guard let selectedUpdate else {
+      notices.removeAll(withIDPrefix: updateNoticePrefix)
+      return
+    }
+
+    let left = IslandNotice(
+      id: "\(updateNoticePrefix)\(selectedUpdate.id)-left",
+      title: selectedUpdate.title,
+      kind: .info,
+      side: .left,
+      style: .status,
+      symbolName: selectedUpdate.symbol
+    )
+    let right = IslandNotice(
+      id: "\(updateNoticePrefix)\(selectedUpdate.id)-right",
+      title: "升级",
+      kind: .info,
+      side: .right,
+      style: .status,
+      symbolName: "arrow.triangle.2.circlepath"
+    )
+    let activeIDs = Set([left.id, right.id])
+    for notice in notices.left + notices.right where notice.id.hasPrefix(updateNoticePrefix) && !activeIDs.contains(notice.id) {
+      notices.remove(id: notice.id)
+    }
+    if !notices.updateIfPresent(left) { notices.enqueue(left, expiresAfter: nil) }
+    if !notices.updateIfPresent(right) { notices.enqueue(right, expiresAfter: nil) }
   }
 
   // MARK: - Voice model discovery

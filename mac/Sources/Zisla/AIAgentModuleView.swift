@@ -1719,18 +1719,22 @@ struct AIAgentModuleView: View {
                         Spacer()
                         if isInstalled {
                             let update = agent.commandsForCLIInstallation([kind], update: true)
+                            let availableUpdate = agent.cliUpdates.first { $0.kind == kind }
                             Button {
                                 queueCLIAction(
                                     title: "更新 \(kind.displayName)？",
-                                    message: cliActionMessage("将更新", kinds: [kind]),
+                                    message: availableUpdate.map {
+                                        "将 \(kind.displayName) 从 \($0.installedVersion) 更新到 \($0.latestVersion)"
+                                    } ?? cliActionMessage("将更新", kinds: [kind]),
                                     commands: update
                                 )
                             } label: {
                                 Image(systemName: "arrow.triangle.2.circlepath")
                             }
                             .buttonStyle(.borderless)
+                            .foregroundStyle(availableUpdate == nil ? .secondary : Color.zislaInfo)
                             .disabled(isRunningCLICommands || update.isEmpty)
-                            .help("更新 \(kind.displayName)")
+                            .help(availableUpdate.map { "更新 \(kind.displayName) 到 \($0.latestVersion)" } ?? "更新 \(kind.displayName)")
                             let uninstall = agent.commandsForCLIUninstallation([kind])
                             Button(role: .destructive) {
                                 queueCLIAction(

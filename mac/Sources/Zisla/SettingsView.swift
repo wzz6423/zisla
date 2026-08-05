@@ -1567,6 +1567,7 @@ struct SettingsView: View {
     private func compactStatusPrioritySymbol(for priority: CompactStatusPriority) -> String {
         switch priority {
         case .transient: "bolt.fill"
+        case .updateAvailable: "arrow.triangle.2.circlepath"
         case .mail: "envelope.fill"
         case .videoDownload: "arrow.down.square.fill"
         case .browserDownload: "arrow.down.circle.fill"
@@ -1682,6 +1683,19 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var updateStatusAccessory: some View {
+        if model.productUpdateAvailable {
+            IconButton(
+                symbol: "arrow.triangle.2.circlepath",
+                help: "选择升级",
+                isActive: true,
+                size: .compact
+            ) {
+                model.checkForUpdates(
+                    manual: true,
+                    channel: model.settingsStore.settings.updateChannel
+                )
+            }
+        } else {
         switch model.updateState {
         case .checking:
             ProgressView().controlSize(.small)
@@ -1697,10 +1711,12 @@ struct SettingsView: View {
         case .idle:
             EmptyView()
         }
+        }
     }
 
     private var updateStatusText: String {
-        switch model.updateState {
+        if model.productUpdateAvailable { return "发现可用新版本" }
+        return switch model.updateState {
         case .idle: "尚未检查更新"
         case .checking: "正在检查更新"
         case .current: "已是最新版本"

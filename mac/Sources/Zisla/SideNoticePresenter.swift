@@ -236,6 +236,7 @@ final class SideNoticePresenter {
 
     private static func isCompactNotice(_ notice: IslandNotice) -> Bool {
         notice.id.hasPrefix("ai-active-")
+            || notice.id.hasPrefix("update-available-")
             || notice.id.hasPrefix("media-active-")
             || notice.id.hasPrefix("focus-countdown-")
             || notice.id.hasPrefix("focus-mode-")
@@ -255,6 +256,8 @@ final class SideNoticePresenter {
             switch priority {
             case .transient:
                 notices.contains(where: Self.isTransientCompactNotice)
+            case .updateAvailable:
+                notices.contains { $0.id.hasPrefix("update-available-") }
             case .mail:
                 notices.contains { $0.id.hasPrefix("mail-notification-") }
             case .videoDownload:
