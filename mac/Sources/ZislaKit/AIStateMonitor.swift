@@ -409,6 +409,7 @@ public final class AIStateMonitor: ObservableObject {
                     guard let samples else { continue }
                     automaticUsage.append(contentsOf: samples)
                 }
+                automaticUsage = AIUsageAnalytics.dailyAutomaticUsageSamples(samples: automaticUsage)
             }
             let tasks = mergedTasks(
                 persistedTasks,
@@ -423,13 +424,13 @@ public final class AIStateMonitor: ObservableObject {
                         return persistedUsageBySourceID[sourceID] != sample
                     }
                     if hasNewUsage {
-                        _ = try dependencies.repository.recordUsage(automaticUsage)
+                        _ = try dependencies.repository.recordDetectedUsage(automaticUsage)
                         var next = try dependencies.repository.load(includeUsageSamples: true)
                         next.tasks = tasks
                         return .state(next)
                     }
                 } else {
-                    _ = try dependencies.repository.recordUsage(automaticUsage)
+                    _ = try dependencies.repository.recordDetectedUsage(automaticUsage)
                 }
             }
             return .tasks(tasks)

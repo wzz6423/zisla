@@ -505,8 +505,9 @@ struct AIUsageLogDetectorTests {
         monitor.reload()
         monitor.reload()
 
-        #expect(monitor.state.usageSamples == [sample])
-        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == [sample])
+        let summaries = AIUsageAnalytics.dailyAutomaticUsageSamples(samples: [sample])
+        #expect(monitor.state.usageSamples == summaries)
+        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == summaries)
     }
 
     @Test @MainActor
@@ -529,14 +530,15 @@ struct AIUsageLogDetectorTests {
         monitor.reload(includeUsageSamples: false)
 
         #expect(monitor.state.usageSamples.isEmpty)
-        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == [sample])
+        let summaries = AIUsageAnalytics.dailyAutomaticUsageSamples(samples: [sample])
+        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == summaries)
 
         monitor.reload()
 
-        #expect(monitor.state.usageSamples == [sample])
+        #expect(monitor.state.usageSamples == summaries)
         monitor.unloadUsageHistory()
         #expect(monitor.state.usageSamples.isEmpty)
-        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == [sample])
+        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == summaries)
     }
 
     @Test @MainActor
@@ -582,8 +584,8 @@ struct AIUsageLogDetectorTests {
             outputTokens: 20
         )
 
-        #expect(try repository.recordUsage([original]) == 1)
-        #expect(try repository.recordUsage([corrected]) == 0)
+        #expect(try repository.recordDetectedUsage([original]) == 1)
+        #expect(try repository.recordDetectedUsage([corrected]) == 0)
         #expect(try repository.load().usageSamples == [corrected])
     }
 
@@ -602,8 +604,9 @@ struct AIUsageLogDetectorTests {
 
         let state = try repository.stateRecordingUsage([sample])
 
-        #expect(state.usageSamples == [sample])
-        #expect(try repository.load().usageSamples == [sample])
+        let summaries = AIUsageAnalytics.dailyManualUsageSamples(samples: [sample])
+        #expect(state.usageSamples == summaries)
+        #expect(try repository.load().usageSamples == summaries)
     }
 }
 

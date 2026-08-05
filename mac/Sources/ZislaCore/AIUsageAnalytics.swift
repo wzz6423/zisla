@@ -107,6 +107,55 @@ public enum ContributionIntensity: Int, Equatable, Sendable, CaseIterable, Compa
 }
 
 public enum AIUsageAnalytics {
+    /// Prefix reserved for the stable daily records written from automatically detected session logs.
+    public static let automaticUsageSummaryPrefix = "zisla-daily-usage:"
+    /// Prefix reserved for stable daily records written through `zislactl usage` or repository clients.
+    public static let manualUsageSummaryPrefix = "zisla-daily-manual-usage:"
+
+    /// Compacts automatically detected log events into one stable record per provider and calendar day.
+    ///
+    /// Session logs can emit thousands of token events each day. The progress UI only presents daily
+    /// totals, so persisting these summaries preserves the visible history without allowing event volume
+    /// to evict older days from the bounded state store.
+    public static func dailyAutomaticUsageSamples(
+        samples: [AIUsageSample],
+        calendar: Calendar = .current
+    ) -> [AIUsageSample] {
+        dailyUsageSamples(
+            samples: samples,
+            sourceID: automaticUsageSummarySourceID,
+            calendar: calendar
+        )
+    }
+
+    /// Compacts manually reported usage into one incrementable record per provider and calendar day.
+    public static func dailyManualUsageSamples(
+        samples: [AIUsageSample],
+        calendar: Calendar = .current
+    ) -> [AIUsageSample] {
+        dailyUsageSamples(
+            samples: samples,
+            sourceID: manualUsageSummarySourceID,
+            calendar: calendar
+        )
+    }
+
+    /// Whether a record uses the stable automatic-log daily summary identifier.
+    public static func isAutomaticUsageSummary(_ sample: AIUsageSample) -> Bool {
+        sample.sourceID?.hasPrefix(automaticUsageSummaryPrefix) ?? false
+    }
+
+    /// Whether a record uses the stable manually reported daily summary identifier.
+    public static func isManualUsageSummary(_ sample: AIUsageSample) -> Bool {
+        sample.sourceID?.hasPrefix(manualUsageSummaryPrefix) ?? false
+    }
+
+    /// Whether a pre-summary source identifier was produced by a built-in log detector.
+    public static func isLegacyAutomaticUsageSample(_ sample: AIUsageSample) -> Bool {
+        guard let sourceID = sample.sourceID else { return false }
+        return AIProvider.allCases.contains { sourceID.hasPrefix("\($0.rawValue)-") }
+    }
+
     /// Total, input, and output token trends for the most recent `days` calendar days (inclusive of `end`).
     ///
     /// Days with zero usage are still included so the time axis is continuous and the curve can drop to the zero baseline.
@@ -141,6 +190,45 @@ public enum AIUsageAnalytics {
                 outputTokens: outputByDay[day, default: 0]
             )
         }
+    }
+
+    private static func dailyUsageSamples(
+        samples: [AIUsageSample],
+        sourceID: (AIProvider, Date) -> String,
+        calendar: Calendar
+    ) -> [AIUsageSample] {
+        var summaries: [String: AIUsageSample] = [:]
+
+        for sample in samples {
+            let day = calendar.startOfDay(for: sample.timestamp)
+            let id = sourceID(sample.provider, day)
+            if var summary = summaries[id] {
+                summary.inputTokens += sample.inputTokens
+                summary.outputTokens += sample.outputTokens
+                summaries[id] = summary
+            } else {
+                summaries[id] = AIUsageSample(
+                    sourceID: id,
+                    provider: sample.provider,
+                    timestamp: day,
+                    inputTokens: sample.inputTokens,
+                    outputTokens: sample.outputTokens
+                )
+            }
+        }
+
+        return summaries.values.sorted {
+            if $0.timestamp != $1.timestamp { return $0.timestamp < $1.timestamp }
+            return $0.provider.rawValue < $1.provider.rawValue
+        }
+    }
+
+    private static func automaticUsageSummarySourceID(provider: AIProvider, day: Date) -> String {
+        "\(automaticUsageSummaryPrefix)\(provider.rawValue):\(day.timeIntervalSinceReferenceDate)"
+    }
+
+    private static func manualUsageSummarySourceID(provider: AIProvider, day: Date) -> String {
+        "\(manualUsageSummaryPrefix)\(provider.rawValue):\(day.timeIntervalSinceReferenceDate)"
     }
 
     /// Smooths daily usage with a 5-day binomial kernel [1,4,6,4,1] for trend curve display.

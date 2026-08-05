@@ -116,9 +116,9 @@ public struct AIProgressTask: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
-/// A sampled AI usage record. `cost` and `model` are optional.
+/// A daily AI usage aggregate. `cost` and `model` are optional.
 public struct AIUsageSample: Codable, Equatable, Sendable {
-    /// Stable identifier for local log events; empty for manual `zislactl usage` records.
+    /// Stable identifier for an internally maintained daily aggregate.
     public var sourceID: String?
     public var provider: AIProvider
     public var timestamp: Date
