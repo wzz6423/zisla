@@ -17,7 +17,8 @@ struct SourceResult {
 };
 
 SourceResult fetch_release(zisla::core::ReleaseSource source,
-    zisla::core::UpdateChannel channel) {
+    zisla::core::UpdateChannel channel,
+    WinHttpCancellation& cancellation) {
     const auto url = zisla::core::release_endpoint(source, channel);
     const auto headers = source == zisla::core::ReleaseSource::github
         ? std::wstring_view{
@@ -29,7 +30,8 @@ SourceResult fetch_release(zisla::core::ReleaseSource source,
             "GET",
             url,
             headers,
-            {});
+            {},
+            cancellation);
         if (response.status != 200) {
             return {.error = "更新服务返回 HTTP " + std::to_string(response.status)};
         }
@@ -58,6 +60,7 @@ bool UpdateService::start(HWND target, UINT changed_message) {
     }
     target_ = target;
     changed_message_ = changed_message;
+    cancellation_.reset();
     running_ = true;
     commands_.push_back({.channel = zisla::core::UpdateChannel::release});
     try {
@@ -80,13 +83,14 @@ void UpdateService::stop() noexcept {
             return;
         }
         running_ = false;
+        commands_.clear();
     }
+    cancellation_.cancel();
     condition_.notify_one();
     if (thread_.joinable()) {
         thread_.join();
     }
     std::lock_guard lock(mutex_);
-    commands_.clear();
     target_ = nullptr;
     changed_message_ = 0;
 }
@@ -129,9 +133,13 @@ void UpdateService::run() noexcept {
         try {
             execute(command);
         } catch (const std::exception& error) {
-            publish_error(command.channel, error.what());
+            if (!cancellation_.cancelled()) {
+                publish_error(command.channel, error.what());
+            }
         } catch (...) {
-            publish_error(command.channel, "更新服务发生未知错误");
+            if (!cancellation_.cancelled()) {
+                publish_error(command.channel, "更新服务发生未知错误");
+            }
         }
     }
 }
@@ -145,19 +153,37 @@ void UpdateService::execute(Command command) {
 
     const auto gitee = fetch_release(
         zisla::core::ReleaseSource::gitee,
-        command.channel);
-    const auto github = fetch_release(
-        zisla::core::ReleaseSource::github,
-        command.channel);
-    if (!gitee.release && !github.release) {
-        const auto message = !github.error.empty() ? github.error : gitee.error;
+        command.channel,
+        cancellation_);
+    if (cancellation_.cancelled()) {
+        return;
+    }
+
+    std::optional<SourceResult> github;
+    if (zisla::core::UpdateSourceQueryPolicy::should_query_github(
+            current_version_,
+            gitee.release,
+            command.channel)) {
+        github = fetch_release(
+            zisla::core::ReleaseSource::github,
+            command.channel,
+            cancellation_);
+    }
+    if (cancellation_.cancelled()) {
+        return;
+    }
+
+    if (!gitee.release && (!github || !github->release)) {
+        const auto message = (github && !github->error.empty())
+            ? github->error
+            : gitee.error;
         throw std::runtime_error(message.empty() ? "无法连接更新服务" : message);
     }
 
     const auto selected = zisla::core::UpdateSelector::select(
         current_version_,
         gitee.release,
-        github.release,
+        github ? github->release : std::nullopt,
         command.channel);
     if (selected) {
         publish({

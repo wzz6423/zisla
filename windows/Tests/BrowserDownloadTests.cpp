@@ -328,6 +328,27 @@ void handlesInterruptedDownloads() {
         "interrupted downloads should not contribute to combined progress");
 }
 
+void backsOffBrowserPollingWhileIdle() {
+    expect(BrowserDownloadPollingPolicy::next_interval(true, 99)
+            == std::chrono::seconds(2),
+        "visible download activity should keep the polling interval responsive");
+    expect(BrowserDownloadPollingPolicy::next_interval(false, 0)
+            == std::chrono::seconds(5),
+        "the first idle scan should reduce polling frequency");
+    expect(BrowserDownloadPollingPolicy::next_interval(false, 1)
+            == std::chrono::seconds(5),
+        "the first counted idle scan should use the short backoff");
+    expect(BrowserDownloadPollingPolicy::next_interval(false, 2)
+            == std::chrono::seconds(10),
+        "repeated idle scans should continue backing off");
+    expect(BrowserDownloadPollingPolicy::next_interval(false, 3)
+            == std::chrono::seconds(15),
+        "sustained idle polling should be capped at fifteen seconds");
+    expect(BrowserDownloadPollingPolicy::next_interval(false, 10'000)
+            == std::chrono::seconds(15),
+        "the idle polling interval should remain bounded");
+}
+
 }  // namespace
 
 int main() {
@@ -342,6 +363,7 @@ int main() {
         {"active download priority", sortsActiveDownloadsByPriority},
         {"edge case timestamps", handlesEdgeCaseTimestamps},
         {"interrupted downloads", handlesInterruptedDownloads},
+        {"idle browser polling backoff", backsOffBrowserPollingWhileIdle},
     };
 
     int failures = 0;

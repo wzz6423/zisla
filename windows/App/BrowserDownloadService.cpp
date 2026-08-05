@@ -15,7 +15,6 @@
 namespace winrt::Zisla {
 namespace {
 
-constexpr DWORD poll_interval_ms = 2'000;
 constexpr DWORD retry_interval_ms = 100;
 constexpr int max_open_retries = 3;
 constexpr auto completed_retention = std::chrono::seconds(3);
@@ -251,6 +250,7 @@ BrowserDownloadService::snapshot() const noexcept {
 }
 
 void BrowserDownloadService::run() noexcept {
+    std::size_t consecutive_idle_scans = 0;
     while (running_.load(std::memory_order_acquire)) {
         try {
             std::vector<ScanRow> rows;
@@ -264,8 +264,20 @@ void BrowserDownloadService::run() noexcept {
             publish("浏览器下载状态读取失败");
         }
 
+        const auto current = snapshot();
+        const bool has_visible_activity = current
+            && (current->summary.total_active_count > 0
+                || !current->recently_completed.empty());
+        consecutive_idle_scans = has_visible_activity
+            ? 0
+            : std::min(consecutive_idle_scans + 1, std::size_t{3});
+        const auto interval = zisla::core::BrowserDownloadPollingPolicy::next_interval(
+            has_visible_activity,
+            consecutive_idle_scans);
         if (stop_event_
-            && WaitForSingleObject(stop_event_, poll_interval_ms) == WAIT_OBJECT_0) {
+            && WaitForSingleObject(
+                    stop_event_,
+                    static_cast<DWORD>(interval.count())) == WAIT_OBJECT_0) {
             break;
         }
     }

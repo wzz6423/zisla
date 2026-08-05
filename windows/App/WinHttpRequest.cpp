@@ -50,6 +50,10 @@ public:
         return value_;
     }
 
+    [[nodiscard]] HINTERNET release() noexcept {
+        return std::exchange(value_, nullptr);
+    }
+
 private:
     HINTERNET value_{nullptr};
 };
@@ -184,11 +188,100 @@ bool has_control(std::string_view value) noexcept {
 
 }  // namespace
 
+WinHttpCancellation::~WinHttpCancellation() {
+    cancel();
+}
+
+void WinHttpCancellation::reset() noexcept {
+    std::lock_guard lock(mutex_);
+    if (!request_) {
+        cancelled_ = false;
+    }
+}
+
+void WinHttpCancellation::cancel() noexcept {
+    HINTERNET request = nullptr;
+    {
+        std::lock_guard lock(mutex_);
+        cancelled_ = true;
+        request = std::exchange(request_, nullptr);
+    }
+    if (request) {
+        (void)WinHttpCloseHandle(request);
+    }
+}
+
+bool WinHttpCancellation::cancelled() const noexcept {
+    std::lock_guard lock(mutex_);
+    return cancelled_;
+}
+
+bool WinHttpCancellation::register_request(HINTERNET request) noexcept {
+    std::lock_guard lock(mutex_);
+    if (cancelled_ || request_) {
+        return false;
+    }
+    request_ = request;
+    return true;
+}
+
+void WinHttpCancellation::release_request(HINTERNET request) noexcept {
+    HINTERNET owned_request = nullptr;
+    {
+        std::lock_guard lock(mutex_);
+        if (request_ == request) {
+            owned_request = std::exchange(request_, nullptr);
+        }
+    }
+    if (owned_request) {
+        (void)WinHttpCloseHandle(owned_request);
+    }
+}
+
+class WinHttpCancellation::Registration {
+public:
+    Registration(WinHttpCancellation& cancellation, HINTERNET request)
+        : cancellation_(cancellation), request_(request) {
+        if (!request_ || !cancellation_.register_request(request_)) {
+            if (request_) {
+                (void)WinHttpCloseHandle(request_);
+            }
+            throw std::runtime_error("HTTPS 请求已取消");
+        }
+    }
+
+    ~Registration() {
+        cancellation_.release_request(request_);
+    }
+
+    Registration(const Registration&) = delete;
+    Registration& operator=(const Registration&) = delete;
+
+    [[nodiscard]] HINTERNET get() const noexcept {
+        return request_;
+    }
+
+private:
+    WinHttpCancellation& cancellation_;
+    HINTERNET request_{nullptr};
+};
+
 WinHttpResponse WinHttpRequest::send(
     std::string_view method,
     std::string_view url,
     std::wstring_view headers,
     std::string_view body,
+    std::size_t maximum_response_bytes) {
+    WinHttpCancellation unused;
+    return send(method, url, headers, body, unused, maximum_response_bytes);
+}
+
+WinHttpResponse WinHttpRequest::send(
+    std::string_view method,
+    std::string_view url,
+    std::wstring_view headers,
+    std::string_view body,
+    WinHttpCancellation& cancellation,
     std::size_t maximum_response_bytes) {
     if (method.empty() || has_control(method)
         || method.size() > static_cast<std::size_t>(std::numeric_limits<DWORD>::max())
@@ -248,26 +341,33 @@ WinHttpResponse WinHttpRequest::send(
         throw_http_error("无法禁用 HTTP 重定向");
     }
 
+    WinHttpCancellation::Registration active_request{
+        cancellation,
+        request.release(),
+    };
+    const auto raw_request = active_request.get();
+
     const auto* header_data = headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers.data();
     const auto header_length = headers.empty() ? 0U : static_cast<DWORD>(headers.size());
     auto* request_data = body.empty()
         ? WINHTTP_NO_REQUEST_DATA
         : const_cast<char*>(body.data());
     const auto body_length = static_cast<DWORD>(body.size());
+
     if (!WinHttpSendRequest(
-            request.get(),
+            raw_request,
             header_data,
             header_length,
             request_data,
             body_length,
             body_length,
             0)
-        || !WinHttpReceiveResponse(request.get(), nullptr)) {
+        || !WinHttpReceiveResponse(raw_request, nullptr)) {
         throw_http_error("HTTPS 请求失败");
     }
     return {
-        .status = response_status(request.get()),
-        .body = response_body(request.get(), maximum_response_bytes),
+        .status = response_status(raw_request),
+        .body = response_body(raw_request, maximum_response_bytes),
     };
 }
 

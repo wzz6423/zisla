@@ -158,6 +158,22 @@ BrowserDownloadSummary BrowserDownloadSummarizer::summarize(
     return result;
 }
 
+std::chrono::milliseconds BrowserDownloadPollingPolicy::next_interval(
+    bool has_visible_activity,
+    std::size_t consecutive_idle_scans) noexcept {
+    using namespace std::chrono_literals;
+    if (has_visible_activity) {
+        return 2s;
+    }
+    if (consecutive_idle_scans <= 1) {
+        return 5s;
+    }
+    if (consecutive_idle_scans == 2) {
+        return 10s;
+    }
+    return 15s;
+}
+
 std::optional<std::int64_t> ChromiumDownloadRowReader::read_int64(
     sqlite3_stmt* statement,
     int column_index) noexcept {

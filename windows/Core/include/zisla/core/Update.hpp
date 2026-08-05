@@ -103,4 +103,12 @@ public:
         UpdateChannel channel = UpdateChannel::release);
 };
 
+class UpdateSourceQueryPolicy {
+public:
+    [[nodiscard]] static bool should_query_github(
+        std::string_view current_version,
+        const std::optional<ReleaseInfo>& gitee_release,
+        UpdateChannel channel = UpdateChannel::release);
+};
+
 }  // namespace zisla::core

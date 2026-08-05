@@ -93,6 +93,29 @@ void unsafeOrMalformedReleaseResponsesAreRejected() {
     throw std::runtime_error("non-HTTPS release URLs should be rejected");
 }
 
+void updateSourcePolicyOnlySkipsGitHubForAGiteeUpdate() {
+    const auto newer = ReleaseResponseParser::parse(
+        R"({"tag_name":"v0.1.3","html_url":"https://gitee.com/wzz6423/zisla/releases/tag/v0.1.3"})");
+    const auto current = ReleaseResponseParser::parse(
+        R"({"tag_name":"v0.1.2","html_url":"https://gitee.com/wzz6423/zisla/releases/tag/v0.1.2"})");
+    const auto preview = ReleaseResponseParser::parse(
+        R"({"tag_name":"v0.1.3-preview.1","html_url":"https://gitee.com/wzz6423/zisla/releases/tag/v0.1.3-preview.1","prerelease":true})");
+
+    expect(!UpdateSourceQueryPolicy::should_query_github("0.1.2", newer),
+        "a Gitee update should short-circuit the GitHub request");
+    expect(UpdateSourceQueryPolicy::should_query_github("0.1.2", current),
+        "an up-to-date Gitee release should fall through to GitHub");
+    expect(UpdateSourceQueryPolicy::should_query_github("0.1.2", std::nullopt),
+        "an unavailable Gitee release should fall through to GitHub");
+    expect(UpdateSourceQueryPolicy::should_query_github("0.1.2", preview),
+        "a prerelease should fall through on the release channel");
+    expect(!UpdateSourceQueryPolicy::should_query_github(
+               "0.1.2",
+               preview,
+               UpdateChannel::preview),
+        "a newer Gitee preview should short-circuit the preview channel");
+}
+
 }  // namespace
 
 int main() {
@@ -102,6 +125,7 @@ int main() {
         {"release selection matches macOS source order", releaseSelectionMatchesMacOSSourceOrder},
         {"release endpoints are fixed per channel and source", releaseEndpointsAreFixedPerChannelAndSource},
         {"unsafe or malformed release responses are rejected", unsafeOrMalformedReleaseResponsesAreRejected},
+        {"update source query policy", updateSourcePolicyOnlySkipsGitHubForAGiteeUpdate},
     };
 
     std::size_t passed = 0;

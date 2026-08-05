@@ -1,5 +1,7 @@
 #pragma once
 
+#include "WinHttpRequest.h"
+
 #include <zisla/core/Update.hpp>
 
 #include <windows.h>
@@ -66,6 +68,7 @@ private:
     std::condition_variable condition_;
     std::deque<Command> commands_;
     std::thread thread_;
+    WinHttpCancellation cancellation_;
     bool running_{false};
     HWND target_{nullptr};
     UINT changed_message_{0};

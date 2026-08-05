@@ -128,6 +128,19 @@ std::uint64_t size_member(yyjson_val* object) noexcept {
     return static_cast<std::uint64_t>(number);
 }
 
+bool is_available_release(
+    const SemanticVersion& current,
+    const std::optional<ReleaseInfo>& release,
+    UpdateChannel channel) {
+    if (!release || release->draft
+        || (channel == UpdateChannel::release && release->prerelease)
+        || (channel == UpdateChannel::preview && !release->prerelease)) {
+        return false;
+    }
+    const auto version = SemanticVersion::parse(release->tag_name);
+    return version && current < *version;
+}
+
 }  // namespace
 
 std::string_view update_channel_token(UpdateChannel channel) noexcept {
@@ -374,26 +387,27 @@ std::optional<AvailableUpdate> UpdateSelector::select(
     if (!current) {
         return std::nullopt;
     }
-    const auto candidate = [current, channel](
-                               ReleaseSource source,
-                               const std::optional<ReleaseInfo>& release)
-        -> std::optional<AvailableUpdate> {
-        if (!release || release->draft
-            || (channel == UpdateChannel::release && release->prerelease)
-            || (channel == UpdateChannel::preview && !release->prerelease)) {
-            return std::nullopt;
-        }
-        const auto version = SemanticVersion::parse(release->tag_name);
-        if (!version || !(*current < *version)) {
-            return std::nullopt;
-        }
-        return AvailableUpdate{.source = source, .release = *release};
-    };
-
-    if (const auto selected = candidate(ReleaseSource::gitee, gitee_release)) {
-        return selected;
+    if (is_available_release(*current, gitee_release, channel)) {
+        return AvailableUpdate{
+            .source = ReleaseSource::gitee,
+            .release = *gitee_release,
+        };
     }
-    return candidate(ReleaseSource::github, github_release);
+    if (is_available_release(*current, github_release, channel)) {
+        return AvailableUpdate{
+            .source = ReleaseSource::github,
+            .release = *github_release,
+        };
+    }
+    return std::nullopt;
+}
+
+bool UpdateSourceQueryPolicy::should_query_github(
+    std::string_view current_version,
+    const std::optional<ReleaseInfo>& gitee_release,
+    UpdateChannel channel) {
+    const auto current = SemanticVersion::parse(current_version);
+    return !current || !is_available_release(*current, gitee_release, channel);
 }
 
 }  // namespace zisla::core

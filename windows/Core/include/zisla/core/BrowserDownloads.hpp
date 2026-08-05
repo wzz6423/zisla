@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -86,6 +88,13 @@ class BrowserDownloadSummarizer {
 public:
     [[nodiscard]] static BrowserDownloadSummary summarize(
         const std::vector<BrowserDownloadItem>& downloads) noexcept;
+};
+
+class BrowserDownloadPollingPolicy {
+public:
+    [[nodiscard]] static std::chrono::milliseconds next_interval(
+        bool has_visible_activity,
+        std::size_t consecutive_idle_scans) noexcept;
 };
 
 class ChromiumDownloadRowReader {
