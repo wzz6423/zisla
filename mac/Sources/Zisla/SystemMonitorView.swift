@@ -795,6 +795,7 @@ private struct SystemCleanupSheet: View {
     let onDismiss: () -> Void
     var onCleanupCompleted: (() -> Void)?
     @State private var candidates: [DiskCleanupCandidate] = []
+    @State private var groupedSections: [CleanupKindSection] = []
     @State private var selectedURLs: Set<URL> = []
     @State private var collapsedKinds: Set<DiskCleanupKind> = []
     @State private var isScanning = false
@@ -961,7 +962,10 @@ private struct SystemCleanupSheet: View {
                 Button("取消", action: onDismiss)
                     .buttonStyle(.bordered)
                 Button("移入废纸篓", role: .destructive) {
-                    confirmationPresented = true
+                    Task { @MainActor in
+                        await Task.yield()
+                        confirmationPresented = true
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(selectedURLs.isEmpty || isCleaning)
@@ -995,7 +999,7 @@ private struct SystemCleanupSheet: View {
         !candidates.isEmpty && candidates.allSatisfy { selectedURLs.contains($0.url) }
     }
 
-    private var groupedSections: [CleanupKindSection] {
+    private func makeGroupedSections(from candidates: [DiskCleanupCandidate]) -> [CleanupKindSection] {
         let order = DiskCleanupKind.allCases
         return order.compactMap { kind in
             let items = candidates
@@ -1064,7 +1068,9 @@ private struct SystemCleanupSheet: View {
     private func scan() async {
         isScanning = true
         result = nil
-        candidates = await service.scanCleanupCandidates()
+        let scannedCandidates = await service.scanCleanupCandidates()
+        candidates = scannedCandidates
+        groupedSections = makeGroupedSections(from: scannedCandidates)
         selectedURLs = selectedURLs.intersection(Set(candidates.map(\.url)))
         isScanning = false
     }
@@ -1077,6 +1083,7 @@ private struct SystemCleanupSheet: View {
         candidates.removeAll { candidate in
             !result.failures.contains(where: { $0.url == candidate.url })
         }
+        groupedSections = makeGroupedSections(from: candidates)
         isCleaning = false
         onCleanupCompleted?()
         onDismiss()
