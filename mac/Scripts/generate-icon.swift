@@ -1,87 +1,96 @@
 import AppKit
 import Foundation
 
-guard CommandLine.arguments.count == 3 else {
-    FileHandle.standardError.write(Data("usage: generate-icon <size> <output>\n".utf8))
+enum IconTheme: String {
+    case day
+    case night
+
+    var background: (UInt8, UInt8, UInt8) {
+        switch self {
+        case .day: (255, 255, 255)
+        case .night: (0, 0, 0)
+        }
+    }
+
+    var foreground: (UInt8, UInt8, UInt8) {
+        switch self {
+        case .day: (24, 24, 24)
+        case .night: (216, 216, 216)
+        }
+    }
+}
+
+guard CommandLine.arguments.count == 5 else {
+    FileHandle.standardError.write(
+        Data("usage: generate-icon <source> <day|night> <size> <output>\n".utf8)
+    )
     exit(64)
 }
 
-guard let pixels = Int(CommandLine.arguments[1]), pixels > 0 else { exit(64) }
-let outputURL = URL(fileURLWithPath: CommandLine.arguments[2])
-let size = NSSize(width: pixels, height: pixels)
-let image = NSImage(size: size)
+let sourceURL = URL(fileURLWithPath: CommandLine.arguments[1])
+guard let theme = IconTheme(rawValue: CommandLine.arguments[2]),
+      let pixels = Int(CommandLine.arguments[3]), pixels > 0,
+      let source = NSImage(contentsOf: sourceURL)
+else { exit(64) }
 
-image.lockFocus()
-guard let context = NSGraphicsContext.current?.cgContext else { exit(70) }
-context.setAllowsAntialiasing(true)
-context.setShouldAntialias(true)
+let outputURL = URL(fileURLWithPath: CommandLine.arguments[4])
+guard let bitmap = NSBitmapImageRep(
+    bitmapDataPlanes: nil,
+    pixelsWide: pixels,
+    pixelsHigh: pixels,
+    bitsPerSample: 8,
+    samplesPerPixel: 4,
+    hasAlpha: true,
+    isPlanar: false,
+    colorSpaceName: .deviceRGB,
+    bytesPerRow: 0,
+    bitsPerPixel: 0
+), let context = NSGraphicsContext(bitmapImageRep: bitmap),
+   let data = bitmap.bitmapData
+else { exit(70) }
 
-let canvas = CGRect(origin: .zero, size: CGSize(width: pixels, height: pixels))
-let outerRadius = CGFloat(pixels) * 0.22
-let outer = CGPath(
-    roundedRect: canvas.insetBy(dx: CGFloat(pixels) * 0.045, dy: CGFloat(pixels) * 0.045),
-    cornerWidth: outerRadius,
-    cornerHeight: outerRadius,
-    transform: nil
+bitmap.size = NSSize(width: pixels, height: pixels)
+NSGraphicsContext.saveGraphicsState()
+NSGraphicsContext.current = context
+context.imageInterpolation = .high
+source.draw(
+    in: NSRect(x: 0, y: 0, width: pixels, height: pixels),
+    from: .zero,
+    operation: .copy,
+    fraction: 1
 )
-context.addPath(outer)
-context.setFillColor(NSColor(calibratedRed: 0.035, green: 0.039, blue: 0.047, alpha: 1).cgColor)
-context.fillPath()
+context.flushGraphics()
+NSGraphicsContext.restoreGraphicsState()
 
-let glowRect = canvas.insetBy(dx: CGFloat(pixels) * 0.12, dy: CGFloat(pixels) * 0.12)
-let colors = [
-    NSColor(calibratedRed: 0.35, green: 0.80, blue: 0.98, alpha: 0.35).cgColor,
-    NSColor(calibratedRed: 0.38, green: 0.90, blue: 0.69, alpha: 0).cgColor,
-] as CFArray
-let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1])!
-context.saveGState()
-context.addPath(outer)
-context.clip()
-context.drawRadialGradient(
-    gradient,
-    startCenter: CGPoint(x: glowRect.minX, y: glowRect.maxY),
-    startRadius: 0,
-    endCenter: CGPoint(x: glowRect.midX, y: glowRect.midY),
-    endRadius: CGFloat(pixels) * 0.68,
-    options: []
-)
-context.restoreGState()
-
-let islandRect = CGRect(
-    x: CGFloat(pixels) * 0.17,
-    y: CGFloat(pixels) * 0.37,
-    width: CGFloat(pixels) * 0.66,
-    height: CGFloat(pixels) * 0.27
-)
-let island = CGPath(
-    roundedRect: islandRect,
-    cornerWidth: islandRect.height / 2,
-    cornerHeight: islandRect.height / 2,
-    transform: nil
-)
-context.addPath(island)
-context.setFillColor(NSColor.black.cgColor)
-context.fillPath()
-context.addPath(island)
-context.setStrokeColor(NSColor.white.withAlphaComponent(0.26).cgColor)
-context.setLineWidth(max(1, CGFloat(pixels) * 0.012))
-context.strokePath()
-
-let dotRadius = CGFloat(pixels) * 0.033
-context.setFillColor(NSColor(calibratedRed: 0.35, green: 0.80, blue: 0.98, alpha: 1).cgColor)
-context.fillEllipse(in: CGRect(
-    x: CGFloat(pixels) * 0.5 - dotRadius,
-    y: CGFloat(pixels) * 0.505 - dotRadius,
-    width: dotRadius * 2,
-    height: dotRadius * 2
-))
-
-image.unlockFocus()
-guard
-    let data = image.tiffRepresentation,
-    let bitmap = NSBitmapImageRep(data: data),
-    let png = bitmap.representation(using: .png, properties: [:])
-else {
-    exit(70)
+let background = theme.background
+let foreground = theme.foreground
+for y in 0..<pixels {
+    let row = data.advanced(by: y * bitmap.bytesPerRow)
+    for x in 0..<pixels {
+        let pixel = row.advanced(by: x * 4)
+        let luminance = (
+            0.2126 * Double(pixel[0])
+                + 0.7152 * Double(pixel[1])
+                + 0.0722 * Double(pixel[2])
+        ) / 255
+        let normalized = min(1, max(0, (luminance - 0.35) / 0.30))
+        let smoothBackground = normalized * normalized * (3 - 2 * normalized)
+        let foregroundCoverage = 1 - smoothBackground
+        pixel[0] = UInt8(
+            Double(background.0) * smoothBackground
+                + Double(foreground.0) * foregroundCoverage
+        )
+        pixel[1] = UInt8(
+            Double(background.1) * smoothBackground
+                + Double(foreground.1) * foregroundCoverage
+        )
+        pixel[2] = UInt8(
+            Double(background.2) * smoothBackground
+                + Double(foreground.2) * foregroundCoverage
+        )
+        pixel[3] = 255
+    }
 }
+
+guard let png = bitmap.representation(using: .png, properties: [:]) else { exit(70) }
 try png.write(to: outputURL, options: .atomic)

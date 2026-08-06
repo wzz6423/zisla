@@ -51,6 +51,9 @@ fi
 if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
   install -m 0644 "$ROOT/Resources/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 fi
+if [[ -f "$ROOT/Resources/AppIconNight.icns" ]]; then
+  install -m 0644 "$ROOT/Resources/AppIconNight.icns" "$CONTENTS/Resources/AppIconNight.icns"
+fi
 
 if [[ -d "$ROOT/Resources/BrandIcons" ]]; then
   ditto "$ROOT/Resources/BrandIcons" "$CONTENTS/Resources/BrandIcons"

@@ -1754,11 +1754,13 @@ LRESULT AppHost::handleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
     case WM_DWMCOLORIZATIONCOLORCHANGED:
     case WM_DWMCOMPOSITIONCHANGED:
         refreshBackdrops();
+        tray_icon_.refreshTheme();
         return 0;
     case WM_DISPLAYCHANGE:
     case WM_SETTINGCHANGE:
         if (message == WM_SETTINGCHANGE) {
             refreshBackdrops();
+            tray_icon_.refreshTheme();
             if (pet_window_) {
                 pet_window_->refreshSystemPreferences();
             }

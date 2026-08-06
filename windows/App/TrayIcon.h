@@ -20,6 +20,7 @@ public:
     [[nodiscard]] bool add(HWND owner, UINT callback_message) noexcept;
     [[nodiscard]] bool restore() noexcept;
     void remove() noexcept;
+    void refreshTheme() noexcept;
     [[nodiscard]] std::optional<zisla::core::PixelRect> bounds() const noexcept;
 
 private:

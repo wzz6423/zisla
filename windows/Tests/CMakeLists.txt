@@ -940,6 +940,21 @@ add_test(
     COMMAND zisla_windows_voice_hotkey_tests
 )
 
+add_executable(zisla_windows_tray_icon_tests TrayIconTests.cpp)
+target_link_libraries(zisla_windows_tray_icon_tests PRIVATE zisla_windows_core)
+target_compile_features(zisla_windows_tray_icon_tests PRIVATE cxx_std_20)
+
+if(MSVC)
+    target_compile_options(zisla_windows_tray_icon_tests PRIVATE /W4 /WX /permissive- /utf-8)
+else()
+    target_compile_options(zisla_windows_tray_icon_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+add_test(
+    NAME zisla_windows_tray_icon_tests
+    COMMAND zisla_windows_tray_icon_tests
+)
+
 add_executable(zisla_windows_pdf_processing_tests PDFProcessingTests.cpp)
 target_link_libraries(zisla_windows_pdf_processing_tests PRIVATE zisla_windows_core)
 target_compile_features(zisla_windows_pdf_processing_tests PRIVATE cxx_std_20)

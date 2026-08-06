@@ -85,13 +85,13 @@ cmake -S . -B "$env:TEMP\zisla-windows-build" `
 
 ## Windows 视觉资源
 
-应用图标使用 Windows 专属的浅色卡片标记，不复用 macOS 黑色灵动岛图标。在 macOS 上重新生成 MSIX PNG 和多尺寸 ICO：
+应用图标与 macOS 共用手绘 Z 轮廓：MSIX 和可执行文件使用白底日间版，通知区域图标会随 Windows 系统主题在日间与夜间版本间切换。在 macOS 上重新生成 MSIX PNG 和多尺寸 ICO：
 
 ```bash
 windows/Scripts/generate-assets.sh
 ```
 
-脚本只使用系统 AppKit/Core Graphics，不下载资源；生成结果直接写入 `windows/App/Assets/`。
+脚本复用 `mac/Resources/AppIconSource.png` 和统一配色生成器，只使用系统 AppKit/Core Graphics，不下载资源；生成结果直接写入 `windows/App/Assets/`。
 
 桌面宠物素材随包位于 `windows/App/Assets/Pets/`，来源与 CC0 许可保存在同目录 `CREDITS.md`；运行时不下载或导入宠物资源。
 

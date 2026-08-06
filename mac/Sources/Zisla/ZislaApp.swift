@@ -37,6 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var settingsWindowScreen: NSScreen?
     private var quickNotesEditorController: NSWindowController?
     private var cancellables: Set<AnyCancellable> = []
+    private var effectiveAppearanceObservation: NSKeyValueObservation?
+    private var currentApplicationIconImage: NSImage?
     private let updateController = UpdateController.shared
     private var expandedSizeUpdateTask: Task<Void, Never>?
     /// Last panel size actually applied to the coordinator; basis for the two-phase
@@ -60,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             automaticChannel: FeatureSettingsStore.bundledDefaultUpdateChannel
         )
         model.start()
+        configureApplicationIconUpdates(model: model)
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
         lockScreenOverlayController.start()
         self.lockScreenOverlayController = lockScreenOverlayController
@@ -508,6 +511,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.mainMenu = mainMenu
     }
 
+    private func configureApplicationIconUpdates(model: AppModel) {
+        model.settingsStore.$settings
+            .map(\.appearanceMode)
+            .removeDuplicates()
+            .sink { [weak self] mode in
+                Task { @MainActor [weak self] in
+                    self?.syncApplicationIcon(mode: mode)
+                }
+            }
+            .store(in: &cancellables)
+
+        effectiveAppearanceObservation = NSApp.observe(
+            \.effectiveAppearance,
+            options: [.initial, .new]
+        ) { [weak self, weak model] _, _ in
+            Task { @MainActor [weak self, weak model] in
+                guard let model else { return }
+                self?.syncApplicationIcon(mode: model.settingsStore.settings.appearanceMode)
+            }
+        }
+    }
+
+    private func syncApplicationIcon(mode: AppearanceMode) {
+        let systemIsDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let theme = ApplicationIconTheme.resolve(mode: mode, systemIsDark: systemIsDark)
+        let resourceName = theme == .night ? "AppIconNight" : "AppIcon"
+        guard let url = Bundle.main.url(forResource: resourceName, withExtension: "icns"),
+              let image = NSImage(contentsOf: url)
+        else { return }
+        currentApplicationIconImage = image
+        NSApp.applicationIconImage = image
+        syncStatusItemImage()
+    }
+
+    private func syncStatusItemImage() {
+        guard let image = currentApplicationIconImage?.copy() as? NSImage else { return }
+        image.size = NSSize(width: 18, height: 18)
+        image.isTemplate = false
+        statusItem?.button?.image = image
+    }
+
     private func syncAppStatusItem() {
         guard AppModel.shared.settingsStore.settings.menuBarAppIconEnabled else {
             if let statusItem {
@@ -529,6 +573,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.items.forEach { $0.target = self }
         item.menu = menu
         statusItem = item
+        syncStatusItemImage()
     }
 
     private func syncMonitorStatusItems(force: Bool = false) {

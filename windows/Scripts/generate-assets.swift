@@ -6,7 +6,6 @@ private struct AssetSpec {
     let name: String
     let width: Int
     let height: Int
-    let markScale: CGFloat
 }
 
 private extension Data {
@@ -23,90 +22,12 @@ private extension Data {
     }
 }
 
-private func drawMark(in context: CGContext, rect: CGRect) {
-    let radius = rect.width * 0.22
-    let card = CGPath(
-        roundedRect: rect,
-        cornerWidth: radius,
-        cornerHeight: radius,
-        transform: nil
-    )
-
-    context.saveGState()
-    if rect.width >= 32 {
-        context.setShadow(
-            offset: CGSize(width: 0, height: -rect.width * 0.025),
-            blur: rect.width * 0.08,
-            color: NSColor(calibratedWhite: 0.16, alpha: 0.2).cgColor
-        )
-    }
-    context.addPath(card)
-    context.clip()
-    let surfaceGradient = CGGradient(
-        colorsSpace: CGColorSpaceCreateDeviceRGB(),
-        colors: [
-            NSColor(calibratedWhite: 1, alpha: 1).cgColor,
-            NSColor(calibratedRed: 0.90, green: 0.93, blue: 0.95, alpha: 1).cgColor,
-        ] as CFArray,
-        locations: [0, 1]
-    )!
-    context.drawLinearGradient(
-        surfaceGradient,
-        start: CGPoint(x: rect.midX, y: rect.maxY),
-        end: CGPoint(x: rect.midX, y: rect.minY),
-        options: []
-    )
-    context.restoreGState()
-
-    context.addPath(card)
-    context.setStrokeColor(
-        NSColor(calibratedRed: 0.70, green: 0.76, blue: 0.80, alpha: 0.9).cgColor
-    )
-    context.setLineWidth(max(1, rect.width * 0.025))
-    context.strokePath()
-
-    let zPath = CGMutablePath()
-    zPath.move(to: CGPoint(x: rect.minX + rect.width * 0.29, y: rect.minY + rect.height * 0.69))
-    zPath.addLine(to: CGPoint(x: rect.minX + rect.width * 0.70, y: rect.minY + rect.height * 0.69))
-    zPath.addLine(to: CGPoint(x: rect.minX + rect.width * 0.30, y: rect.minY + rect.height * 0.31))
-    zPath.addLine(to: CGPoint(x: rect.minX + rect.width * 0.71, y: rect.minY + rect.height * 0.31))
-
-    context.saveGState()
-    context.addPath(zPath)
-    context.setLineWidth(max(2, rect.width * 0.105))
-    context.setLineCap(.round)
-    context.setLineJoin(.round)
-    context.replacePathWithStrokedPath()
-    context.clip()
-    let markGradient = CGGradient(
-        colorsSpace: CGColorSpaceCreateDeviceRGB(),
-        colors: [
-            NSColor(calibratedRed: 0.02, green: 0.55, blue: 0.69, alpha: 1).cgColor,
-            NSColor(calibratedRed: 0.04, green: 0.72, blue: 0.55, alpha: 1).cgColor,
-        ] as CFArray,
-        locations: [0, 1]
-    )!
-    context.drawLinearGradient(
-        markGradient,
-        start: CGPoint(x: rect.minX, y: rect.maxY),
-        end: CGPoint(x: rect.maxX, y: rect.minY),
-        options: []
-    )
-    context.restoreGState()
-
-    let statusSize = max(1.5, rect.width * 0.075)
-    context.setFillColor(
-        NSColor(calibratedRed: 0.97, green: 0.34, blue: 0.31, alpha: 1).cgColor
-    )
-    context.fillEllipse(in: CGRect(
-        x: rect.maxX - rect.width * 0.20,
-        y: rect.maxY - rect.height * 0.20,
-        width: statusSize,
-        height: statusSize
-    ))
-}
-
-private func renderPNG(width: Int, height: Int, markScale: CGFloat) throws -> Data {
+private func renderPNG(
+    source: NSImage,
+    background: NSColor,
+    width: Int,
+    height: Int
+) throws -> Data {
     guard
         let bitmap = NSBitmapImageRep(
             bitmapDataPlanes: nil,
@@ -125,19 +46,22 @@ private func renderPNG(width: Int, height: Int, markScale: CGFloat) throws -> Da
         throw CocoaError(.fileWriteUnknown)
     }
 
-    let context = graphicsContext.cgContext
-    context.clear(CGRect(x: 0, y: 0, width: width, height: height))
-    context.setAllowsAntialiasing(true)
-    context.setShouldAntialias(true)
-
-    let markSize = min(CGFloat(width), CGFloat(height)) * markScale
-    let markRect = CGRect(
-        x: (CGFloat(width) - markSize) / 2,
-        y: (CGFloat(height) - markSize) / 2,
-        width: markSize,
-        height: markSize
+    bitmap.size = NSSize(width: width, height: height)
+    let imageSize = min(CGFloat(width), CGFloat(height))
+    let imageRect = NSRect(
+        x: (CGFloat(width) - imageSize) / 2,
+        y: (CGFloat(height) - imageSize) / 2,
+        width: imageSize,
+        height: imageSize
     )
-    drawMark(in: context, rect: markRect)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = graphicsContext
+    background.setFill()
+    NSRect(x: 0, y: 0, width: width, height: height).fill()
+    graphicsContext.imageInterpolation = .high
+    source.draw(in: imageRect, from: .zero, operation: .copy, fraction: 1)
+    graphicsContext.flushGraphics()
+    NSGraphicsContext.restoreGraphicsState()
 
     guard let png = bitmap.representation(using: .png, properties: [:]) else {
         throw CocoaError(.fileWriteUnknown)
@@ -170,30 +94,40 @@ private func makeIcon(frames: [(size: Int, data: Data)]) -> Data {
     return icon
 }
 
-guard CommandLine.arguments.count == 2 else {
-    FileHandle.standardError.write(Data("用法：generate-assets.swift <输出目录>\n".utf8))
+guard CommandLine.arguments.count == 4 else {
+    FileHandle.standardError.write(
+        Data("用法：generate-assets.swift <日间源图> <夜间源图> <输出目录>\n".utf8)
+    )
     exit(64)
 }
 
-let outputDirectory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
+guard let daySource = NSImage(contentsOfFile: CommandLine.arguments[1]),
+      let nightSource = NSImage(contentsOfFile: CommandLine.arguments[2])
+else {
+    FileHandle.standardError.write(Data("无法读取图标源图\n".utf8))
+    exit(66)
+}
+
+let outputDirectory = URL(fileURLWithPath: CommandLine.arguments[3], isDirectory: true)
 try FileManager.default.createDirectory(
     at: outputDirectory,
     withIntermediateDirectories: true
 )
 
 private let assets = [
-    AssetSpec(name: "Square44x44Logo.png", width: 44, height: 44, markScale: 0.82),
-    AssetSpec(name: "StoreLogo.png", width: 50, height: 50, markScale: 0.82),
-    AssetSpec(name: "Square150x150Logo.png", width: 150, height: 150, markScale: 0.82),
-    AssetSpec(name: "Wide310x150Logo.png", width: 310, height: 150, markScale: 0.70),
-    AssetSpec(name: "SplashScreen.png", width: 620, height: 300, markScale: 0.56),
+    AssetSpec(name: "Square44x44Logo.png", width: 44, height: 44),
+    AssetSpec(name: "StoreLogo.png", width: 50, height: 50),
+    AssetSpec(name: "Square150x150Logo.png", width: 150, height: 150),
+    AssetSpec(name: "Wide310x150Logo.png", width: 310, height: 150),
+    AssetSpec(name: "SplashScreen.png", width: 620, height: 300),
 ]
 
 for asset in assets {
     let png = try renderPNG(
+        source: daySource,
+        background: .white,
         width: asset.width,
-        height: asset.height,
-        markScale: asset.markScale
+        height: asset.height
     )
     try png.write(
         to: outputDirectory.appendingPathComponent(asset.name),
@@ -201,10 +135,32 @@ for asset in assets {
     )
 }
 
-let iconFrames = try [16, 20, 24, 32, 40, 48, 64, 256].map { size in
-    (size: size, data: try renderPNG(width: size, height: size, markScale: 0.88))
+let iconSizes = [16, 20, 24, 32, 40, 48, 64, 256]
+let dayIconFrames = try iconSizes.map { size in
+    (size: size, data: try renderPNG(
+        source: daySource,
+        background: .white,
+        width: size,
+        height: size
+    ))
 }
-try makeIcon(frames: iconFrames).write(
+let nightIconFrames = try iconSizes.map { size in
+    (size: size, data: try renderPNG(
+        source: nightSource,
+        background: .black,
+        width: size,
+        height: size
+    ))
+}
+try makeIcon(frames: dayIconFrames).write(
     to: outputDirectory.appendingPathComponent("Zisla.ico"),
+    options: .atomic
+)
+try makeIcon(frames: dayIconFrames).write(
+    to: outputDirectory.appendingPathComponent("TrayIconDay.ico"),
+    options: .atomic
+)
+try makeIcon(frames: nightIconFrames).write(
+    to: outputDirectory.appendingPathComponent("TrayIconNight.ico"),
     options: .atomic
 )
