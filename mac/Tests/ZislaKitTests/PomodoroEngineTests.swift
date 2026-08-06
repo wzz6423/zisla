@@ -156,6 +156,50 @@ struct PowerAssertionControllerTests {
     }
 
     @Test
+    func activeAIKeepsDisplayAwakeWhenIdleSystemSleepPreventionIsEnabled() {
+        let manager = FakePowerAssertionManager()
+        let controller = PowerAssertionController(manager: manager)
+
+        controller.setAIActivityActive(true)
+        #expect(manager.createCallCount == 0)
+
+        controller.setPreventIdleSystemSleep(true)
+        #expect(controller.preventIdleSystemSleep)
+        #expect(manager.createCallCount == 2)
+        #expect(manager.activeIDs.count == 2)
+        #expect(manager.createdTypes == [Self.idleSystemType, Self.displayType])
+
+        controller.setAIActivityActive(false)
+        #expect(manager.activeIDs.count == 1)
+        #expect(manager.releaseCallCount == 1)
+
+        controller.setPreventIdleSystemSleep(false)
+        #expect(manager.activeIDs.isEmpty)
+        #expect(manager.releaseCallCount == 2)
+    }
+
+    @Test
+    func endingAIActivityDoesNotReleaseManualDisplayAssertion() {
+        let manager = FakePowerAssertionManager()
+        let controller = PowerAssertionController(manager: manager)
+
+        controller.setKeepDisplayAwake(true)
+        controller.setPreventIdleSystemSleep(true)
+        controller.setAIActivityActive(true)
+        #expect(manager.activeIDs.count == 3)
+
+        controller.setAIActivityActive(false)
+        #expect(controller.keepDisplayAwake)
+        #expect(manager.activeIDs.count == 2)
+
+        controller.setPreventIdleSystemSleep(false)
+        #expect(controller.keepDisplayAwake)
+        #expect(manager.activeIDs.count == 1)
+        controller.setKeepDisplayAwake(false)
+        #expect(manager.activeIDs.isEmpty)
+    }
+
+    @Test
     func failedCreateDoesNotEnableToggleOrRetainAnAssertionID() {
         let manager = FakePowerAssertionManager()
         manager.failingTypes = [Self.displayType, Self.idleSystemType]

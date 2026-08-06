@@ -1390,7 +1390,9 @@ final class AppModel: ObservableObject {
     } else {
       aiMonitor.stop()
       clearActiveAINotices()
+      powerAssertions.setAIActivityActive(false)
     }
+    syncAIActivityPowerAssertion(aiMonitor.state)
     if settings.mediaEnabled {
       media.start()
       updateSpectrumMonitoring()
@@ -1765,6 +1767,7 @@ final class AppModel: ObservableObject {
 
   private func consumeAIState(_ state: AIState) {
     let settings = settingsStore.settings
+    syncAIActivityPowerAssertion(state)
     guard settings.aiProgressEnabled else { return }
 
     let activeTasks = state.tasks.filter(\.status.isActive)
@@ -1818,6 +1821,12 @@ final class AppModel: ObservableObject {
           ))
       }
     }
+  }
+
+  private func syncAIActivityPowerAssertion(_ state: AIState) {
+    let isActive = settingsStore.settings.aiProgressEnabled
+      && state.tasks.contains { $0.status.isActive }
+    powerAssertions.setAIActivityActive(isActive)
   }
 
   private func clearActiveAINotices() {

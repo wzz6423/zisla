@@ -48,9 +48,12 @@ public final class PowerAssertionController: ObservableObject {
 
     private let manager: any PowerAssertionManaging
     private var displayAssertionID: IOPMAssertionID = 0
+    private var activityDisplayAssertionID: IOPMAssertionID = 0
     private var systemAssertionID: IOPMAssertionID = 0
     private var hasDisplayAssertion = false
+    private var hasActivityDisplayAssertion = false
     private var hasSystemAssertion = false
+    private var aiActivityActive = false
 
     public convenience init() {
         self.init(manager: IOPMPowerAssertionManager())
@@ -64,6 +67,9 @@ public final class PowerAssertionController: ObservableObject {
         // IOKit release is safe from any thread for teardown.
         if hasDisplayAssertion {
             _ = manager.release(assertionID: displayAssertionID)
+        }
+        if hasActivityDisplayAssertion {
+            _ = manager.release(assertionID: activityDisplayAssertionID)
         }
         if hasSystemAssertion {
             _ = manager.release(assertionID: systemAssertionID)
@@ -82,15 +88,32 @@ public final class PowerAssertionController: ObservableObject {
     public func setPreventIdleSystemSleep(_ enabled: Bool) {
         if enabled {
             acquireSystem()
+            if hasSystemAssertion, aiActivityActive {
+                acquireActivityDisplay()
+            }
         } else {
+            releaseActivityDisplay()
             releaseSystem()
         }
         preventIdleSystemSleep = hasSystemAssertion
     }
 
+    /// Keeps the display awake while an AI task is active, but only when the user has
+    /// enabled the separate idle-system-sleep prevention switch.
+    public func setAIActivityActive(_ active: Bool) {
+        aiActivityActive = active
+        guard hasSystemAssertion, active else {
+            releaseActivityDisplay()
+            return
+        }
+        acquireActivityDisplay()
+    }
+
     public func releaseAll() {
         releaseDisplay()
+        releaseActivityDisplay()
         releaseSystem()
+        aiActivityActive = false
         keepDisplayAwake = false
         preventIdleSystemSleep = false
     }
@@ -115,6 +138,28 @@ public final class PowerAssertionController: ObservableObject {
         _ = manager.release(assertionID: displayAssertionID)
         displayAssertionID = 0
         hasDisplayAssertion = false
+    }
+
+    private func acquireActivityDisplay() {
+        guard !hasActivityDisplayAssertion else { return }
+        var id: IOPMAssertionID = 0
+        let result = manager.create(
+            type: kIOPMAssertPreventUserIdleDisplaySleep as CFString,
+            name: "zisla AI Activity Keep Screen On" as CFString,
+            level: IOPMAssertionLevel(kIOPMAssertionLevelOn),
+            assertionID: &id
+        )
+        if result == kIOReturnSuccess {
+            activityDisplayAssertionID = id
+            hasActivityDisplayAssertion = true
+        }
+    }
+
+    private func releaseActivityDisplay() {
+        guard hasActivityDisplayAssertion else { return }
+        _ = manager.release(assertionID: activityDisplayAssertionID)
+        activityDisplayAssertionID = 0
+        hasActivityDisplayAssertion = false
     }
 
     private func acquireSystem() {
