@@ -141,6 +141,7 @@ AIAgentChatRequestPlan AIAgentChatRequestPlanner::make_plan(
     OpenAIChatCompletionRequest request{
         .model = route->model,
         .system_prompt = system_prompt(workspace, thread),
+        .messages = {},
     };
     for (const auto& message : workspace.messages) {
         if (message.thread_id != thread.id

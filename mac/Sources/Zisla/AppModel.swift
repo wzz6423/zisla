@@ -1496,7 +1496,9 @@ final class AppModel: ObservableObject {
         guard let self else { return }
         await self.aiAgent.refreshCLIs()
         guard !Task.isCancelled else { return }
-        self.checkForUpdates(manual: false)
+        if !UpdateController.shared.isAvailable {
+          self.checkForUpdates(manual: false)
+        }
         do {
           try await Task.sleep(for: .seconds(600))
         } catch {

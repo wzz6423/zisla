@@ -138,6 +138,7 @@
     <ClInclude Include="AppHost.h" />
     <ClInclude Include="BackdropPolicy.h" />
     <ClInclude Include="AppNotificationService.h" />
+    <ClInclude Include="AppPersistenceService.h" />
     <ClInclude Include="AIAgentSkillsService.h" />
     <ClInclude Include="AIAgentSkillsContent.xaml.h">
       <DependentUpon>AIAgentSkillsContent.xaml</DependentUpon>
@@ -267,6 +268,7 @@
     </ClCompile>
     <ClCompile Include="AppHost.cpp" />
     <ClCompile Include="AppNotificationService.cpp" />
+    <ClCompile Include="AppPersistenceService.cpp" />
     <ClCompile Include="AIAgentSkillsService.cpp" />
     <ClCompile Include="AIAgentSkillsContent.xaml.cpp">
       <DependentUpon>AIAgentSkillsContent.xaml</DependentUpon>

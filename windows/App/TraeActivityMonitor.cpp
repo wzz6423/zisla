@@ -20,7 +20,7 @@ namespace {
 constexpr DWORD retry_interval_ms = 30'000;
 constexpr DWORD stale_refresh_interval_ms = 60'000;
 constexpr ULONGLONG minimum_refresh_interval_ms = 1'000;
-constexpr DWORD notification_buffer_bytes = 64 * 1'024;
+constexpr DWORD notification_buffer_bytes = 16 * 1'024;
 
 std::optional<std::filesystem::path> known_folder(REFKNOWNFOLDERID folder) noexcept {
     PWSTR raw = nullptr;

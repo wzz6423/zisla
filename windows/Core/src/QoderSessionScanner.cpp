@@ -1,4 +1,5 @@
 #include "zisla/core/QoderSessionScanner.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include <yyjson.h>
 
@@ -366,9 +367,15 @@ bool is_text_candidate(const fs::path& path) {
 std::vector<LogCandidate> discover_candidates(
     const QoderSessionScanOptions& options) {
     std::vector<LogCandidate> candidates;
-    std::unordered_set<std::string> seen_paths;
+    candidates.reserve(options.max_log_files);
+    const auto newer = [](const auto& lhs, const auto& rhs) {
+        if (lhs.modified_at != rhs.modified_at) {
+            return lhs.modified_at > rhs.modified_at;
+        }
+        return lhs.path.native() < rhs.path.native();
+    };
 
-    const auto append_tree = [&candidates, &seen_paths](
+    const auto append_tree = [&candidates, &options, &newer](
                                  const fs::path& root,
                                  CandidateKind kind,
                                  const auto& accept) {
@@ -398,13 +405,21 @@ std::vector<LogCandidate> discover_candidates(
                 const auto modified_at = entry.last_write_time(time_error);
                 if (!time_error) {
                     const auto key = path_key(entry.path());
-                    if (seen_paths.insert(key).second) {
-                        candidates.push_back({
-                            .path = entry.path(),
-                            .kind = kind,
-                            .modified_at = modified_at,
-                            .modified_at_unix_ms = unix_milliseconds(modified_at),
+                    const bool already_seen = std::any_of(
+                        candidates.begin(), candidates.end(), [&key](const auto& candidate) {
+                            return path_key(candidate.path) == key;
                         });
+                    if (!already_seen) {
+                        detail::retain_newest(
+                            candidates,
+                            LogCandidate{
+                                .path = entry.path(),
+                                .kind = kind,
+                                .modified_at = modified_at,
+                                .modified_at_unix_ms = unix_milliseconds(modified_at),
+                            },
+                            options.max_log_files,
+                            newer);
                     }
                 }
             }
@@ -422,15 +437,7 @@ std::vector<LogCandidate> discover_candidates(
         append_tree(root, CandidateKind::text, is_text_candidate);
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.modified_at != rhs.modified_at) {
-            return lhs.modified_at > rhs.modified_at;
-        }
-        return lhs.path.native() < rhs.path.native();
-    });
-    if (candidates.size() > options.max_log_files) {
-        candidates.resize(options.max_log_files);
-    }
+    std::sort(candidates.begin(), candidates.end(), newer);
     return candidates;
 }
 

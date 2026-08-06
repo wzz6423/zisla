@@ -18,7 +18,7 @@ namespace {
 
 constexpr DWORD retry_interval_ms = 30'000;
 constexpr ULONGLONG minimum_refresh_interval_ms = 1'000;
-constexpr DWORD notification_buffer_bytes = 64 * 1'024;
+constexpr DWORD notification_buffer_bytes = 16 * 1'024;
 
 std::optional<std::filesystem::path> configured_home_directory() noexcept {
     const auto required = GetEnvironmentVariableW(L"KIMI_CODE_HOME", nullptr, 0);

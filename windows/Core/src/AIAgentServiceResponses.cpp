@@ -100,6 +100,7 @@ std::optional<AgentBalanceSnapshot> parse_openai_credits(
         .used = used,
         .currency = "USD",
         .checked_at_unix_ms = checked_at_unix_ms,
+        .detail = std::nullopt,
     };
 }
 

@@ -205,11 +205,12 @@ AppNotificationService::~AppNotificationService() {
 
 bool AppNotificationService::start(
     HWND target,
-    UINT activated_message) noexcept {
+    UINT activated_message,
+    UINT alarms_changed_message) noexcept {
     if (registered_) {
         return true;
     }
-    if (!target || activated_message == 0) {
+    if (!target || activated_message == 0 || alarms_changed_message == 0) {
         set_error("Notification activation requires a target window");
         return false;
     }
@@ -229,11 +230,31 @@ bool AppNotificationService::start(
             });
         manager_.Register();
         registered_ = true;
+        bool worker_started = false;
+        {
+            std::lock_guard lock(mutex_);
+            target_ = target;
+            alarms_changed_message_ = alarms_changed_message;
+            running_ = true;
+            try {
+                thread_ = std::thread([this] { run(); });
+                worker_started = true;
+            } catch (...) {
+                running_ = false;
+                target_ = nullptr;
+                alarms_changed_message_ = 0;
+            }
+        }
+        if (!worker_started) {
+            set_error("Unable to start the alarm notification worker");
+            stop();
+            return false;
+        }
         if (manager_.Setting() != AppNotificationSetting::Enabled) {
             set_error("Windows app notifications are disabled");
             return true;
         }
-        last_error_.clear();
+        set_error({});
         return true;
     } catch (const hresult_error& error) {
         set_error(to_string(error.message()));
@@ -245,6 +266,20 @@ bool AppNotificationService::start(
 }
 
 void AppNotificationService::stop() noexcept {
+    {
+        std::lock_guard lock(mutex_);
+        running_ = false;
+    }
+    condition_.notify_one();
+    if (thread_.joinable()) {
+        thread_.join();
+    }
+    {
+        std::lock_guard lock(mutex_);
+        pending_alarms_.reset();
+        target_ = nullptr;
+        alarms_changed_message_ = 0;
+    }
     try {
         notification_invoked_revoker_.revoke();
     } catch (...) {
@@ -262,61 +297,17 @@ void AppNotificationService::stop() noexcept {
 bool AppNotificationService::reschedule_alarms(
     std::span<const zisla::core::AlarmItem> alarms) noexcept {
     try {
-        clear_alarm_schedule();
-        const bool has_enabled_alarm = std::any_of(
-            alarms.begin(), alarms.end(), [](const auto& alarm) {
-                return alarm.enabled;
-            });
-        if (!has_enabled_alarm) {
-            last_error_.clear();
-            return true;
+        {
+            std::lock_guard lock(mutex_);
+            if (!running_) {
+                return false;
+            }
+            pending_alarms_.emplace(alarms.begin(), alarms.end());
         }
-        if (!registered_ || !manager_
-            || manager_.Setting() != AppNotificationSetting::Enabled) {
-            set_error("Windows app notifications are unavailable");
-            return false;
-        }
-
-        auto notifier = ToastNotificationManager::CreateToastNotifier();
-        std::size_t index = 0;
-        for (const auto& candidate : schedule_candidates(alarms)) {
-            const auto title = candidate.alarm->label.empty()
-                ? hstring{L"闹钟"}
-                : to_hstring(candidate.alarm->label);
-            const auto notification = AppNotificationBuilder()
-                .AddArgument(L"action", L"alarms")
-                .AddArgument(L"alarmId", to_hstring(candidate.alarm->id))
-                .AddText(title)
-                .AddText(hstring{alarm_detail(*candidate.alarm)})
-                .SetScenario(AppNotificationScenario::Alarm)
-                .SetAudioEvent(
-                    AppNotificationSoundEvent::Alarm,
-                    AppNotificationAudioLooping::Loop)
-                .BuildNotification();
-
-            XmlDocument document;
-            document.LoadXml(notification.Payload());
-            ScheduledToastNotification scheduled(
-                document,
-                notification_time(candidate.fire_unix_ms));
-            scheduled.Tag(hstring{L"a" + std::to_wstring(index++)});
-            scheduled.Group(hstring{alarm_group});
-            notifier.AddToSchedule(scheduled);
-        }
-        last_error_.clear();
+        condition_.notify_one();
         return true;
-    } catch (const hresult_error& error) {
-        try {
-            clear_alarm_schedule();
-        } catch (...) {
-        }
-        set_error(to_string(error.message()));
     } catch (...) {
-        try {
-            clear_alarm_schedule();
-        } catch (...) {
-        }
-        set_error("Unable to schedule alarms");
+        set_error("Unable to queue alarm notifications");
     }
     return false;
 }
@@ -354,8 +345,13 @@ bool AppNotificationService::registered() const noexcept {
     return registered_;
 }
 
-const std::string& AppNotificationService::last_error() const noexcept {
-    return last_error_;
+std::string AppNotificationService::last_error() const noexcept {
+    try {
+        std::lock_guard lock(mutex_);
+        return last_error_;
+    } catch (...) {
+        return "Unable to read the notification status";
+    }
 }
 
 std::optional<std::int64_t>
@@ -387,9 +383,114 @@ void AppNotificationService::clear_alarm_schedule() {
 
 void AppNotificationService::set_error(std::string message) noexcept {
     try {
+        std::lock_guard lock(mutex_);
         last_error_ = std::move(message);
     } catch (...) {
-        last_error_.clear();
+    }
+}
+
+void AppNotificationService::run() noexcept {
+    try {
+        winrt::init_apartment(winrt::apartment_type::multi_threaded);
+    } catch (...) {
+        {
+            std::lock_guard lock(mutex_);
+            running_ = false;
+            pending_alarms_.reset();
+        }
+        publish_alarm_error("Unable to initialize the alarm notification worker");
+        return;
+    }
+
+    while (true) {
+        std::vector<zisla::core::AlarmItem> alarms;
+        {
+            std::unique_lock lock(mutex_);
+            condition_.wait(lock, [this] {
+                return pending_alarms_.has_value() || !running_;
+            });
+            if (!pending_alarms_ && !running_) {
+                break;
+            }
+            alarms = std::move(*pending_alarms_);
+            pending_alarms_.reset();
+        }
+        publish_alarm_error(reschedule_alarm_notifications(alarms));
+    }
+    winrt::uninit_apartment();
+}
+
+std::string AppNotificationService::reschedule_alarm_notifications(
+    std::span<const zisla::core::AlarmItem> alarms) noexcept {
+    try {
+        clear_alarm_schedule();
+        const bool has_enabled_alarm = std::any_of(
+            alarms.begin(), alarms.end(), [](const auto& alarm) {
+                return alarm.enabled;
+            });
+        if (!has_enabled_alarm) {
+            return {};
+        }
+        const auto manager = AppNotificationManager::Default();
+        if (!manager || manager.Setting() != AppNotificationSetting::Enabled) {
+            return "Windows app notifications are unavailable";
+        }
+
+        auto notifier = ToastNotificationManager::CreateToastNotifier();
+        std::size_t index = 0;
+        for (const auto& candidate : schedule_candidates(alarms)) {
+            const auto title = candidate.alarm->label.empty()
+                ? hstring{L"闹钟"}
+                : to_hstring(candidate.alarm->label);
+            const auto notification = AppNotificationBuilder()
+                .AddArgument(L"action", L"alarms")
+                .AddArgument(L"alarmId", to_hstring(candidate.alarm->id))
+                .AddText(title)
+                .AddText(hstring{alarm_detail(*candidate.alarm)})
+                .SetScenario(AppNotificationScenario::Alarm)
+                .SetAudioEvent(
+                    AppNotificationSoundEvent::Alarm,
+                    AppNotificationAudioLooping::Loop)
+                .BuildNotification();
+
+            XmlDocument document;
+            document.LoadXml(notification.Payload());
+            ScheduledToastNotification scheduled(
+                document,
+                notification_time(candidate.fire_unix_ms));
+            scheduled.Tag(hstring{L"a" + std::to_wstring(index++)});
+            scheduled.Group(hstring{alarm_group});
+            notifier.AddToSchedule(scheduled);
+        }
+        return {};
+    } catch (const hresult_error& error) {
+        try {
+            clear_alarm_schedule();
+        } catch (...) {
+        }
+        return to_string(error.message());
+    } catch (...) {
+        try {
+            clear_alarm_schedule();
+        } catch (...) {
+        }
+        return "Unable to schedule alarms";
+    }
+}
+
+void AppNotificationService::publish_alarm_error(std::string error) noexcept {
+    HWND target = nullptr;
+    UINT message = 0;
+    try {
+        std::lock_guard lock(mutex_);
+        last_error_ = std::move(error);
+        target = target_;
+        message = alarms_changed_message_;
+    } catch (...) {
+        return;
+    }
+    if (target && message != 0) {
+        (void)PostMessageW(target, message, 0, 0);
     }
 }
 

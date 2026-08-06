@@ -1,4 +1,5 @@
 #include "zisla/core/QwenSessionScanner.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include <yyjson.h>
 
@@ -416,6 +417,13 @@ std::vector<RuntimeCandidate> recent_runtimes(const QwenSessionScanOptions& opti
     }
 
     std::vector<RuntimeCandidate> candidates;
+    candidates.reserve(options.max_runtime_files);
+    const auto newer = [](const auto& lhs, const auto& rhs) {
+        if (lhs.activity_modified_at() != rhs.activity_modified_at()) {
+            return lhs.activity_modified_at() > rhs.activity_modified_at();
+        }
+        return lhs.runtime_path.native() < rhs.runtime_path.native();
+    };
     std::error_code error;
     fs::recursive_directory_iterator iterator(
         options.projects_directory,
@@ -458,18 +466,28 @@ std::vector<RuntimeCandidate> recent_runtimes(const QwenSessionScanOptions& opti
                             transcript_modified_at);
                     }
                 }
-                candidates.push_back(std::move(candidate));
+                const bool may_enter = candidates.size() < options.max_runtime_files
+                    || newer(
+                        candidate,
+                        *std::max_element(candidates.begin(), candidates.end(), newer));
+                if (may_enter) {
+                    const auto sidecar = parse_runtime(
+                        candidate.runtime_path,
+                        options.maximum_runtime_bytes);
+                    if (sidecar && options.is_process_alive(sidecar->pid)) {
+                        detail::retain_newest(
+                            candidates,
+                            std::move(candidate),
+                            options.max_runtime_files,
+                            newer);
+                    }
+                }
             }
         }
         iterator.increment(error);
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.activity_modified_at() != rhs.activity_modified_at()) {
-            return lhs.activity_modified_at() > rhs.activity_modified_at();
-        }
-        return lhs.runtime_path.native() < rhs.runtime_path.native();
-    });
+    std::sort(candidates.begin(), candidates.end(), newer);
     return candidates;
 }
 

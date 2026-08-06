@@ -62,7 +62,6 @@ function Configure-And-Install {
     Invoke-CMake -Arguments (@(
         "-S", $Source,
         "-B", $build,
-        "-G", "Visual Studio 17 2022",
         "-A", $Architecture,
         "-DCMAKE_INSTALL_PREFIX=$prefix",
         "-DCMAKE_INSTALL_LIBDIR=lib"

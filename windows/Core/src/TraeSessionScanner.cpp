@@ -1,4 +1,5 @@
 #include "zisla/core/TraeSessionScanner.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -189,7 +190,15 @@ std::vector<LogCandidate> recent_log_files(const TraeSessionScanOptions& options
         std::string name;
     };
 
+    constexpr std::size_t maximum_session_directories = 3;
     std::vector<SessionDirectory> directories;
+    directories.reserve(maximum_session_directories);
+    const auto newer_directory = [](const auto& lhs, const auto& rhs) {
+        if (lhs.name != rhs.name) {
+            return lhs.name > rhs.name;
+        }
+        return lhs.path.native() < rhs.path.native();
+    };
     for (const auto& root : options.logs_roots) {
         std::error_code root_error;
         const auto root_status = fs::symlink_status(root, root_error);
@@ -210,24 +219,26 @@ std::vector<LogCandidate> recent_log_files(const TraeSessionScanOptions& options
             const auto name = utf8_filename(entry.path());
             if (!status_error && fs::is_directory(status) && !fs::is_symlink(status)
                 && !has_hidden_name(entry.path()) && is_session_directory_name(name)) {
-                directories.push_back({entry.path(), name});
+                detail::retain_newest(
+                    directories,
+                    SessionDirectory{entry.path(), name},
+                    maximum_session_directories,
+                    newer_directory);
             }
             iterator.increment(error);
         }
     }
 
-    std::sort(directories.begin(), directories.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.name != rhs.name) {
-            return lhs.name > rhs.name;
-        }
-        return lhs.path.native() < rhs.path.native();
-    });
-    constexpr std::size_t maximum_session_directories = 3;
-    if (directories.size() > maximum_session_directories) {
-        directories.resize(maximum_session_directories);
-    }
+    std::sort(directories.begin(), directories.end(), newer_directory);
 
     std::vector<LogCandidate> candidates;
+    candidates.reserve(options.max_log_files);
+    const auto newer_candidate = [](const auto& lhs, const auto& rhs) {
+        if (lhs.modified_at != rhs.modified_at) {
+            return lhs.modified_at > rhs.modified_at;
+        }
+        return lhs.path.native() < rhs.path.native();
+    };
     for (const auto& directory : directories) {
         const auto modular = directory.path / "Modular";
         std::error_code modular_error;
@@ -251,21 +262,17 @@ std::vector<LogCandidate> recent_log_files(const TraeSessionScanOptions& options
             if (!status_error && !time_error && fs::is_regular_file(status)
                 && !fs::is_symlink(status) && !has_hidden_name(entry.path())
                 && is_agent_log(entry.path())) {
-                candidates.push_back({entry.path(), modified_at});
+                detail::retain_newest(
+                    candidates,
+                    LogCandidate{entry.path(), modified_at},
+                    options.max_log_files,
+                    newer_candidate);
             }
             iterator.increment(error);
         }
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.modified_at != rhs.modified_at) {
-            return lhs.modified_at > rhs.modified_at;
-        }
-        return lhs.path.native() < rhs.path.native();
-    });
-    if (candidates.size() > options.max_log_files) {
-        candidates.resize(options.max_log_files);
-    }
+    std::sort(candidates.begin(), candidates.end(), newer_candidate);
     return candidates;
 }
 

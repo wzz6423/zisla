@@ -1,4 +1,5 @@
 #include "zisla/core/DoubaoSessionScanner.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -8,7 +9,6 @@
 #include <limits>
 #include <string>
 #include <system_error>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -60,14 +60,15 @@ bool has_hidden_name(const fs::path& path) noexcept {
     return !name.empty() && name.front() == static_cast<fs::path::value_type>('.');
 }
 
-std::string path_key(const fs::path& path) {
-    const auto encoded = path.lexically_normal().generic_u8string();
-    return {reinterpret_cast<const char*>(encoded.data()), encoded.size()};
-}
-
 std::vector<FileCandidate> recent_files(const DoubaoSessionScanOptions& options) {
     std::vector<FileCandidate> candidates;
-    std::unordered_set<std::string> seen_paths;
+    candidates.reserve(options.max_files);
+    const auto newer = [](const auto& lhs, const auto& rhs) {
+        if (lhs.modified_at != rhs.modified_at) {
+            return lhs.modified_at > rhs.modified_at;
+        }
+        return lhs.path.native() < rhs.path.native();
+    };
     for (const auto& root : options.data_roots) {
         std::error_code root_error;
         const auto root_status = fs::symlink_status(root, root_error);
@@ -92,26 +93,27 @@ std::vector<FileCandidate> recent_files(const DoubaoSessionScanOptions& options)
                 && !fs::is_symlink(status) && !has_hidden_name(entry.path())) {
                 std::error_code time_error;
                 const auto modified_at = entry.last_write_time(time_error);
-                if (!time_error && seen_paths.insert(path_key(entry.path())).second) {
-                    candidates.push_back({
-                        .path = entry.path(),
-                        .modified_at = modified_at,
-                        .modified_at_unix_ms = unix_milliseconds(modified_at),
+                const auto normalized = entry.path().lexically_normal();
+                const bool already_seen = std::any_of(
+                    candidates.begin(), candidates.end(), [&normalized](const auto& candidate) {
+                        return candidate.path.lexically_normal() == normalized;
                     });
+                if (!time_error && !already_seen) {
+                    detail::retain_newest(
+                        candidates,
+                        FileCandidate{
+                            .path = entry.path(),
+                            .modified_at = modified_at,
+                            .modified_at_unix_ms = unix_milliseconds(modified_at),
+                        },
+                        options.max_files,
+                        newer);
                 }
             }
             iterator.increment(error);
         }
     }
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.modified_at != rhs.modified_at) {
-            return lhs.modified_at > rhs.modified_at;
-        }
-        return lhs.path.native() < rhs.path.native();
-    });
-    if (candidates.size() > options.max_files) {
-        candidates.resize(options.max_files);
-    }
+    std::sort(candidates.begin(), candidates.end(), newer);
     return candidates;
 }
 

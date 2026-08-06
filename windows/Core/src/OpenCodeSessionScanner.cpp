@@ -1,4 +1,5 @@
 #include "zisla/core/OpenCodeSessionScanner.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include <sqlite3.h>
 #include <yyjson.h>
@@ -624,7 +625,13 @@ std::vector<StorageCandidate> storage_candidates(
     std::size_t maximum_files,
     bool messages) {
     std::vector<StorageCandidate> candidates;
-    std::unordered_set<std::string> seen;
+    candidates.reserve(maximum_files);
+    const auto newer = [](const auto& lhs, const auto& rhs) {
+        if (lhs.modified_at != rhs.modified_at) {
+            return lhs.modified_at > rhs.modified_at;
+        }
+        return lhs.path.native() < rhs.path.native();
+    };
     for (const auto& root : roots) {
         for (const auto& scan_root : {root / "storage", root / "project"}) {
             std::error_code root_error;
@@ -668,27 +675,27 @@ std::vector<StorageCandidate> storage_candidates(
                     std::error_code time_error;
                     const auto modified_at = entry.last_write_time(time_error);
                     const auto key = path_key(entry.path());
-                    if (!time_error && seen.insert(key).second) {
-                        candidates.push_back({
-                            .path = entry.path(),
-                            .modified_at = modified_at,
-                            .modified_at_unix_ms = unix_milliseconds(modified_at),
+                    const bool already_seen = std::any_of(
+                        candidates.begin(), candidates.end(), [&key](const auto& candidate) {
+                            return path_key(candidate.path) == key;
                         });
+                    if (!time_error && !already_seen) {
+                        detail::retain_newest(
+                            candidates,
+                            StorageCandidate{
+                                .path = entry.path(),
+                                .modified_at = modified_at,
+                                .modified_at_unix_ms = unix_milliseconds(modified_at),
+                            },
+                            maximum_files,
+                            newer);
                     }
                 }
                 iterator.increment(error);
             }
         }
     }
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.modified_at != rhs.modified_at) {
-            return lhs.modified_at > rhs.modified_at;
-        }
-        return lhs.path.native() < rhs.path.native();
-    });
-    if (candidates.size() > maximum_files) {
-        candidates.resize(maximum_files);
-    }
+    std::sort(candidates.begin(), candidates.end(), newer);
     return candidates;
 }
 

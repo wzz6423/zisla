@@ -15,6 +15,14 @@ private enum ClipboardFilter: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var scope: ClipboardHistoryScope {
+        switch self {
+        case .all: .all
+        case .pinned: .pinned
+        case .history: .history
+        }
+    }
+
     var title: String {
         switch self {
         case .all: "全部"
@@ -74,7 +82,6 @@ struct ClipboardHistoryModuleView: View {
         sendToAIAgent = { model.sendClipboardHistoryItemToAIAgent($0) }
     }
 
-    /// Items visible under the current filter (used for count and empty-state checks).
     private var visibleItems: [ClipboardHistoryItem] {
         switch filter {
         case .all: visiblePinnedItems + visibleHistoryItems
@@ -84,17 +91,15 @@ struct ClipboardHistoryModuleView: View {
     }
 
     private var visiblePinnedItems: [ClipboardHistoryItem] {
-        filtered(store.pinnedItems)
+        store.pinnedItems
     }
 
     private var visibleHistoryItems: [ClipboardHistoryItem] {
-        filtered(store.historyItems)
+        store.historyItems
     }
 
-    private func filtered(_ items: [ClipboardHistoryItem]) -> [ClipboardHistoryItem] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return items }
-        return items.filter { $0.content.previewText.localizedCaseInsensitiveContains(query) }
+    private var queryID: String {
+        filter.rawValue + "\u{0}" + searchText
     }
 
     var body: some View {
@@ -103,7 +108,7 @@ struct ClipboardHistoryModuleView: View {
                 Label("剪贴板", systemImage: "clipboard")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Text("\(visibleItems.count)")
+                Text("\(store.totalItemCount)")
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
                 if filter == .pinned {
@@ -123,7 +128,6 @@ struct ClipboardHistoryModuleView: View {
                 ) {
                     store.removeAllHistory()
                 }
-                .disabled(store.historyItems.isEmpty)
             }
             .frame(height: 30)
             .padding(.horizontal, 10)
@@ -159,7 +163,11 @@ struct ClipboardHistoryModuleView: View {
             .padding(.horizontal, 10)
             .padding(.top, 6)
 
-            if visibleItems.isEmpty {
+            if store.isLoading && visibleItems.isEmpty {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if visibleItems.isEmpty {
                 EmptyState(
                     symbol: filter == .pinned ? "star" : "clipboard",
                     title: emptyStateTitle,
@@ -192,6 +200,37 @@ struct ClipboardHistoryModuleView: View {
                 .scrollIndicators(.visible)
                 .thinScrollChrome()
             }
+
+            if store.pageCount > 1 {
+                Hairline()
+                HStack(spacing: 8) {
+                    Button {
+                        store.loadPreviousPage()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .frame(width: 24, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!store.canLoadPreviousPage)
+                    .help("上一页")
+
+                    Text("\(store.currentPage + 1)/\(store.pageCount)")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 42)
+
+                    Button {
+                        store.loadNextPage()
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .frame(width: 24, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!store.canLoadNextPage)
+                    .help("下一页")
+                }
+                .frame(height: 30)
+            }
         }
         .frame(maxHeight: .infinity)
         .background(Color.fillCard)
@@ -213,6 +252,13 @@ struct ClipboardHistoryModuleView: View {
                 }
                 .zIndex(1)
             }
+        }
+        .task(id: queryID) {
+            if !searchText.isEmpty {
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+            guard !Task.isCancelled else { return }
+            store.updateQuery(scope: filter.scope, searchText: searchText)
         }
     }
 

@@ -1,4 +1,5 @@
 #include "zisla/core/GrokSessionScanner.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include <yyjson.h>
 
@@ -306,6 +307,13 @@ std::vector<EventCandidate> recent_event_files(const GrokSessionScanOptions& opt
     }
 
     std::vector<EventCandidate> candidates;
+    candidates.reserve(options.max_session_files);
+    const auto newer = [](const auto& lhs, const auto& rhs) {
+        if (lhs.modified_at != rhs.modified_at) {
+            return lhs.modified_at > rhs.modified_at;
+        }
+        return lhs.event_path.native() < rhs.event_path.native();
+    };
     std::error_code error;
     fs::recursive_directory_iterator iterator(
         options.sessions_directory,
@@ -327,26 +335,22 @@ std::vector<EventCandidate> recent_event_files(const GrokSessionScanOptions& opt
             std::error_code time_error;
             const auto modified_at = entry.last_write_time(time_error);
             if (!session_id.empty() && !time_error) {
-                candidates.push_back({
-                    .event_path = entry.path(),
-                    .directory_session_id = session_id,
-                    .modified_at = modified_at,
-                    .modified_at_unix_ms = unix_milliseconds(modified_at),
-                });
+                detail::retain_newest(
+                    candidates,
+                    EventCandidate{
+                        .event_path = entry.path(),
+                        .directory_session_id = session_id,
+                        .modified_at = modified_at,
+                        .modified_at_unix_ms = unix_milliseconds(modified_at),
+                    },
+                    options.max_session_files,
+                    newer);
             }
         }
         iterator.increment(error);
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.modified_at != rhs.modified_at) {
-            return lhs.modified_at > rhs.modified_at;
-        }
-        return lhs.event_path.native() < rhs.event_path.native();
-    });
-    if (candidates.size() > options.max_session_files) {
-        candidates.resize(options.max_session_files);
-    }
+    std::sort(candidates.begin(), candidates.end(), newer);
     return candidates;
 }
 

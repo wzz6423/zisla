@@ -1,4 +1,5 @@
 #include "zisla/core/KimiSessionScanner.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include <yyjson.h>
 
@@ -435,7 +436,14 @@ std::vector<SessionCandidate> recent_wire_logs(const KimiSessionScanOptions& opt
         return {};
     }
 
-    std::unordered_map<std::string, SessionCandidate> candidates_by_session_id;
+    std::vector<SessionCandidate> candidates;
+    candidates.reserve(options.max_session_files);
+    const auto newer = [](const auto& lhs, const auto& rhs) {
+        if (lhs.modified_at != rhs.modified_at) {
+            return lhs.modified_at > rhs.modified_at;
+        }
+        return lhs.wire_path.native() < rhs.wire_path.native();
+    };
     std::error_code error;
     fs::recursive_directory_iterator iterator(
         sessions_directory,
@@ -467,12 +475,20 @@ std::vector<SessionCandidate> recent_wire_logs(const KimiSessionScanOptions& opt
                         modified_at,
                         unix_milliseconds(modified_at),
                     };
-                    const auto existing = candidates_by_session_id.find(session_id);
-                    if (existing == candidates_by_session_id.end()
-                        || existing->second.modified_at < candidate.modified_at) {
-                        candidates_by_session_id.insert_or_assign(
-                            session_id,
-                            std::move(candidate));
+                    const auto existing = std::find_if(
+                        candidates.begin(), candidates.end(), [&session_id](const auto& value) {
+                            return value.session_id == session_id;
+                        });
+                    if (existing != candidates.end()) {
+                        if (existing->modified_at < candidate.modified_at) {
+                            *existing = std::move(candidate);
+                        }
+                    } else {
+                        detail::retain_newest(
+                            candidates,
+                            std::move(candidate),
+                            options.max_session_files,
+                            newer);
                     }
                 }
             }
@@ -480,21 +496,7 @@ std::vector<SessionCandidate> recent_wire_logs(const KimiSessionScanOptions& opt
         iterator.increment(error);
     }
 
-    std::vector<SessionCandidate> candidates;
-    candidates.reserve(candidates_by_session_id.size());
-    for (auto& [session_id, candidate] : candidates_by_session_id) {
-        (void)session_id;
-        candidates.push_back(std::move(candidate));
-    }
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.modified_at != rhs.modified_at) {
-            return lhs.modified_at > rhs.modified_at;
-        }
-        return lhs.wire_path.native() < rhs.wire_path.native();
-    });
-    if (candidates.size() > options.max_session_files) {
-        candidates.resize(options.max_session_files);
-    }
+    std::sort(candidates.begin(), candidates.end(), newer);
     return candidates;
 }
 

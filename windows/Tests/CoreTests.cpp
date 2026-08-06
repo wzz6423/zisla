@@ -2,6 +2,7 @@
 #include "zisla/core/FeatureSettings.hpp"
 #include "zisla/core/OverlayPlacementEngine.hpp"
 #include "zisla/core/PresentationEngine.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include <exception>
 #include <functional>
@@ -614,6 +615,38 @@ void sideNoticeGeometryScalesAndStaysInsideTheWorkArea() {
         "side notices should shrink and clamp inside a constrained work area");
 }
 
+void boundedRecentCandidatesRetainOnlyTheNewestValues() {
+    struct Candidate {
+        int timestamp;
+        int tie_breaker;
+    };
+    const auto newer = [](const Candidate& lhs, const Candidate& rhs) {
+        return lhs.timestamp != rhs.timestamp
+            ? lhs.timestamp > rhs.timestamp
+            : lhs.tie_breaker < rhs.tie_breaker;
+    };
+    std::vector<Candidate> candidates;
+    for (const auto candidate : {
+             Candidate{10, 2},
+             Candidate{30, 3},
+             Candidate{20, 4},
+             Candidate{30, 1},
+             Candidate{5, 0},
+         }) {
+        detail::retain_newest(candidates, candidate, 3, newer);
+    }
+    std::sort(candidates.begin(), candidates.end(), newer);
+
+    expect(candidates.size() == 3,
+        "bounded recent candidates should never exceed their capacity");
+    expect(candidates[0].timestamp == 30 && candidates[0].tie_breaker == 1,
+        "the newest tie should retain the normal scanner ordering");
+    expect(candidates[1].timestamp == 30 && candidates[1].tie_breaker == 3,
+        "both newest tied values should be retained");
+    expect(candidates[2].timestamp == 20,
+        "older candidates should be replaced as newer values arrive");
+}
+
 }  // namespace
 
 int main() {
@@ -643,6 +676,7 @@ int main() {
         {"top trigger uses physical edge", topTriggerStaysAtThePhysicalEdgeAboveATopTaskbar},
         {"side notices flank top preview", sideNoticeGeometryFlanksTheTopPreview},
         {"side notices scale and remain visible", sideNoticeGeometryScalesAndStaysInsideTheWorkArea},
+        {"recent candidates stay bounded", boundedRecentCandidatesRetainOnlyTheNewestValues},
     };
 
     std::size_t passed = 0;

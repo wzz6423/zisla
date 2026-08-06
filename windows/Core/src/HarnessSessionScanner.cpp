@@ -1,4 +1,5 @@
 #include "zisla/core/HarnessSessionScanner.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -88,6 +89,13 @@ std::vector<FileCandidate> recent_files(const HarnessSessionScanOptions& options
     }
 
     std::vector<FileCandidate> candidates;
+    candidates.reserve(options.max_files);
+    const auto newer = [](const auto& lhs, const auto& rhs) {
+        if (lhs.modified_at != rhs.modified_at) {
+            return lhs.modified_at > rhs.modified_at;
+        }
+        return lhs.path.native() < rhs.path.native();
+    };
     std::error_code error;
     fs::recursive_directory_iterator iterator(
         options.data_directory,
@@ -109,26 +117,22 @@ std::vector<FileCandidate> recent_files(const HarnessSessionScanOptions& options
             const auto modified_at = entry.last_write_time(time_error);
             const auto file_name = utf8_filename(entry.path());
             if (!time_error && !file_name.empty()) {
-                candidates.push_back({
-                    .path = entry.path(),
-                    .file_name = file_name,
-                    .modified_at = modified_at,
-                    .modified_at_unix_ms = unix_milliseconds(modified_at),
-                });
+                detail::retain_newest(
+                    candidates,
+                    FileCandidate{
+                        .path = entry.path(),
+                        .file_name = file_name,
+                        .modified_at = modified_at,
+                        .modified_at_unix_ms = unix_milliseconds(modified_at),
+                    },
+                    options.max_files,
+                    newer);
             }
         }
         iterator.increment(error);
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.modified_at != rhs.modified_at) {
-            return lhs.modified_at > rhs.modified_at;
-        }
-        return lhs.path.native() < rhs.path.native();
-    });
-    if (candidates.size() > options.max_files) {
-        candidates.resize(options.max_files);
-    }
+    std::sort(candidates.begin(), candidates.end(), newer);
     return candidates;
 }
 

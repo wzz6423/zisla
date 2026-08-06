@@ -1235,7 +1235,9 @@ struct SystemMonitorServiceTests {
 
         // sampleOnce schedules a background periodic query; the first call should write the public IP.
         _ = await service.sampleOnce()
-        await waitUntil(timeoutSeconds: 2) { provider.callCount >= 1 }
+        await waitUntil(timeoutSeconds: 2) {
+            service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.1"
+        }
         #expect(provider.callCount == 1)
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.1")
         #expect(service.publicIPAddress == "203.0.113.1")
@@ -1250,7 +1252,9 @@ struct SystemMonitorServiceTests {
         // After the period elapses, sampling should refresh automatically.
         clock.advance(by: 5 * 60)
         _ = await service.sampleOnce()
-        await waitUntil(timeoutSeconds: 2) { provider.callCount >= 2 }
+        await waitUntil(timeoutSeconds: 2) {
+            service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.2"
+        }
         #expect(provider.callCount == 2)
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.2")
         #expect(service.publicIPAddress == "203.0.113.2")
@@ -1276,7 +1280,9 @@ struct SystemMonitorServiceTests {
             hardwareInfoProvider: { .unavailable }
         )
         _ = await service.sampleOnce()
-        await waitUntil(timeoutSeconds: 2) { provider.callCount >= 1 }
+        await waitUntil(timeoutSeconds: 2) {
+            service.snapshot?.networkIdentity.publicIPAddress == "198.51.100.1"
+        }
         #expect(provider.callCount == 1)
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "198.51.100.1")
 

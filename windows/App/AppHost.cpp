@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "AppHost.h"
 #include "AppNotificationService.h"
+#include "AppPersistenceService.h"
 #include "AIAgentSkillsService.h"
 #include "AIAgentWorkspaceService.h"
 #include "AIStateMonitor.h"
@@ -73,7 +74,6 @@
 namespace winrt::Zisla {
 namespace {
 
-constexpr std::size_t maximum_teleprompter_script_bytes = 4U * 1024U * 1024U;
 constexpr std::int64_t alarm_delivery_grace_ms = 5 * 60 * 1'000;
 constexpr wchar_t message_window_class[] = L"Zisla.MessageWindow";
 constexpr UINT menu_open = 1;
@@ -573,7 +573,8 @@ std::string load_teleprompter_script() {
     }
     std::error_code error;
     const auto size = std::filesystem::file_size(*path, error);
-    if (error || size > maximum_teleprompter_script_bytes) {
+    if (error
+        || size > AppPersistenceService::maximum_teleprompter_script_bytes) {
         return {};
     }
     std::ifstream stream(*path, std::ios::binary);
@@ -584,30 +585,6 @@ std::string load_teleprompter_script() {
         std::istreambuf_iterator<char>{stream},
         std::istreambuf_iterator<char>{},
     };
-}
-
-void save_teleprompter_script(std::string_view script) noexcept {
-    const auto path = teleprompter_script_path();
-    if (!path || script.size() > maximum_teleprompter_script_bytes) {
-        return;
-    }
-    auto temporary = *path;
-    temporary += L".tmp";
-    try {
-        std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
-        stream.write(script.data(), static_cast<std::streamsize>(script.size()));
-        stream.close();
-        if (!stream || !MoveFileExW(
-                temporary.c_str(),
-                path->c_str(),
-                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-            std::error_code error;
-            (void)std::filesystem::remove(temporary, error);
-        }
-    } catch (...) {
-        std::error_code error;
-        (void)std::filesystem::remove(temporary, error);
-    }
 }
 
 }
@@ -940,7 +917,9 @@ void AppHost::start() {
     started_ = true;
     loadAlarms();
     (void)notification_service_->start(
-        message_window_, notification_activated_message);
+        message_window_,
+        notification_activated_message,
+        alarm_notifications_changed_message);
     reconcileAndRescheduleAlarms();
     refreshPomodoro();
     refreshAlarms();
@@ -977,16 +956,6 @@ void AppHost::start() {
         }
     }
 
-    if (const auto state_directory = AIStateMonitor::defaultStateDirectory()) {
-        clipboard_history_service_ = std::make_unique<ClipboardHistoryService>(
-            *state_directory);
-        if (!clipboard_history_service_->start(
-                message_window_,
-                clipboard_history_changed_message,
-                clipboard_link_detected_message)) {
-            clipboard_history_service_.reset();
-        }
-    }
     updateClipboardListener();
 
     if (const auto state_directory = application_state_directory()) {
@@ -1063,9 +1032,8 @@ void AppHost::start() {
                 }));
     }
 
-    mail_service_ = std::make_unique<MailService>(mail_connection_settings_);
-    if (!mail_service_->start(message_window_, mail_changed_message)) {
-        mail_service_.reset();
+    if (settings_.mail_enabled) {
+        (void)startMailService();
     }
     refreshMailView();
 
@@ -1257,102 +1225,110 @@ void AppHost::start() {
             }
         }
 
-        const auto start_file_activity_monitor =
-            [this](std::unique_ptr<FileActivityMonitor>& monitor) {
-                if (!monitor->start(message_window_, ai_activity_changed_message)) {
-                    monitor.reset();
-                }
-            };
-
         auto copilot_workspace_storage_roots =
             default_copilot_workspace_storage_roots();
         const auto copilot_cli_session_state_directory =
             default_copilot_cli_session_state_directory();
-        auto copilot_watch_roots = copilot_workspace_storage_roots;
-        append_unique_path(
-            copilot_watch_roots,
-            copilot_cli_session_state_directory);
-        if (!copilot_watch_roots.empty()) {
-            copilot_activity_monitor_ = std::make_unique<FileActivityMonitor>(
-                std::move(copilot_watch_roots),
-                [workspace_storage_roots = std::move(copilot_workspace_storage_roots),
-                    cli_session_state_directory = copilot_cli_session_state_directory] {
-                    const zisla::core::CopilotSessionScanner scanner({
-                        .workspace_storage_roots = workspace_storage_roots,
-                        .cli_session_state_directory = cli_session_state_directory,
-                        .max_transcript_files = 12,
-                        .max_cli_sessions = 12,
-                        .initial_tail_bytes = 1U * 1024U * 1024U,
-                    });
-                    return scanner.active_tasks();
-                });
-            start_file_activity_monitor(copilot_activity_monitor_);
-        }
-
         auto qoder_config_roots = default_qoder_config_roots();
         auto qoder_text_log_roots = default_qoder_text_log_roots(
             qoder_config_roots);
-        auto qoder_watch_roots = qoder_config_roots;
-        for (const auto& root : qoder_text_log_roots) {
-            append_unique_path(qoder_watch_roots, root);
-        }
-        if (!qoder_watch_roots.empty()) {
-            qoder_activity_monitor_ = std::make_unique<FileActivityMonitor>(
-                std::move(qoder_watch_roots),
-                [config_roots = std::move(qoder_config_roots),
-                    text_log_roots = std::move(qoder_text_log_roots)] {
-                    const zisla::core::QoderSessionScanner scanner({
-                        .config_roots = config_roots,
-                        .text_log_roots = text_log_roots,
-                        .max_log_files = 16,
-                        .initial_tail_bytes = 1U * 1024U * 1024U,
-                    });
-                    return scanner.active_tasks();
-                });
-            start_file_activity_monitor(qoder_activity_monitor_);
-        }
-
         auto doubao_data_roots = default_doubao_data_roots();
-        if (!doubao_data_roots.empty()) {
-            doubao_activity_monitor_ = std::make_unique<FileActivityMonitor>(
-                doubao_data_roots,
-                [data_roots = std::move(doubao_data_roots)] {
-                    const zisla::core::DoubaoSessionScanner scanner({
-                        .data_roots = data_roots,
-                        .max_files = 32,
-                        .recency_threshold_ms = 10 * 60 * 1'000,
-                        .application_running = doubao_process_is_running(),
-                    });
-                    return scanner.active_tasks();
-                });
-            start_file_activity_monitor(doubao_activity_monitor_);
-        }
-
         auto opencode_data_roots = default_opencode_data_roots();
         const auto configured_opencode_database = configured_opencode_database_path(
             opencode_data_roots);
-        auto opencode_watch_roots = opencode_data_roots;
-        if (configured_opencode_database) {
-            append_unique_path(opencode_watch_roots, *configured_opencode_database);
+
+        PathList file_watch_roots;
+        for (const auto& root : copilot_workspace_storage_roots) {
+            append_unique_path(file_watch_roots, root);
         }
-        if (!opencode_watch_roots.empty()) {
-            opencode_activity_monitor_ = std::make_unique<FileActivityMonitor>(
-                std::move(opencode_watch_roots),
-                [data_roots = std::move(opencode_data_roots),
-                    configured_database = configured_opencode_database] {
+        append_unique_path(file_watch_roots, copilot_cli_session_state_directory);
+        for (const auto& root : qoder_config_roots) {
+            append_unique_path(file_watch_roots, root);
+        }
+        for (const auto& root : qoder_text_log_roots) {
+            append_unique_path(file_watch_roots, root);
+        }
+        for (const auto& root : doubao_data_roots) {
+            append_unique_path(file_watch_roots, root);
+        }
+        for (const auto& root : opencode_data_roots) {
+            append_unique_path(file_watch_roots, root);
+        }
+        if (configured_opencode_database) {
+            append_unique_path(file_watch_roots, *configured_opencode_database);
+        }
+
+        if (!file_watch_roots.empty()) {
+            file_activity_monitor_ = std::make_unique<FileActivityMonitor>(
+                std::move(file_watch_roots),
+                [copilot_workspace_storage_roots =
+                     std::move(copilot_workspace_storage_roots),
+                    copilot_cli_session_state_directory,
+                    qoder_config_roots = std::move(qoder_config_roots),
+                    qoder_text_log_roots = std::move(qoder_text_log_roots),
+                    doubao_data_roots = std::move(doubao_data_roots),
+                    opencode_data_roots = std::move(opencode_data_roots),
+                    configured_opencode_database] {
+                    FileActivityMonitor::ActivityList activities;
+                    const auto append = [&activities](auto next) {
+                        activities.insert(
+                            activities.end(),
+                            std::make_move_iterator(next.begin()),
+                            std::make_move_iterator(next.end()));
+                    };
+
+                    if (!copilot_workspace_storage_roots.empty()
+                        || !copilot_cli_session_state_directory.empty()) {
+                        const zisla::core::CopilotSessionScanner scanner({
+                            .workspace_storage_roots = copilot_workspace_storage_roots,
+                            .cli_session_state_directory =
+                                copilot_cli_session_state_directory,
+                            .max_transcript_files = 12,
+                            .max_cli_sessions = 12,
+                            .initial_tail_bytes = 1U * 1024U * 1024U,
+                        });
+                        append(scanner.active_tasks());
+                    }
+                    if (!qoder_config_roots.empty() || !qoder_text_log_roots.empty()) {
+                        const zisla::core::QoderSessionScanner scanner({
+                            .config_roots = qoder_config_roots,
+                            .text_log_roots = qoder_text_log_roots,
+                            .max_log_files = 16,
+                            .initial_tail_bytes = 1U * 1024U * 1024U,
+                        });
+                        append(scanner.active_tasks());
+                    }
+                    if (!doubao_data_roots.empty()) {
+                        const zisla::core::DoubaoSessionScanner scanner({
+                            .data_roots = doubao_data_roots,
+                            .max_files = 32,
+                            .recency_threshold_ms = 10 * 60 * 1'000,
+                            .application_running = doubao_process_is_running(),
+                        });
+                        append(scanner.active_tasks());
+                    }
+                    if (opencode_data_roots.empty()
+                        && !configured_opencode_database) {
+                        return activities;
+                    }
                     const zisla::core::OpenCodeSessionScanner scanner({
                         .database_paths = opencode_database_paths(
-                            data_roots,
-                            configured_database),
-                        .data_roots = data_roots,
+                            opencode_data_roots,
+                            configured_opencode_database),
+                        .data_roots = opencode_data_roots,
                         .max_sessions = 10,
                         .max_storage_files = 64,
                         .maximum_json_bytes = 1U * 1024U * 1024U,
                         .recency_threshold_ms = 30 * 60 * 1'000,
                     });
-                    return scanner.active_tasks();
+                    append(scanner.active_tasks());
+                    return activities;
                 });
-            start_file_activity_monitor(opencode_activity_monitor_);
+            if (!file_activity_monitor_->start(
+                    message_window_,
+                    ai_activity_changed_message)) {
+                file_activity_monitor_.reset();
+            }
         }
     }
     if (settings_.media_enabled) {
@@ -1424,16 +1400,13 @@ void AppHost::shutdown() noexcept {
         notification_service_->stop();
     }
     notification_service_.reset();
-    alarm_repository_.reset();
+    persistence_service_.reset();
     power_request_controller_.reset();
     power_request_service_.reset();
     file_shelf_service_.reset();
     media_session_monitor_.reset();
     ai_state_monitor_.reset();
-    opencode_activity_monitor_.reset();
-    doubao_activity_monitor_.reset();
-    qoder_activity_monitor_.reset();
-    copilot_activity_monitor_.reset();
+    file_activity_monitor_.reset();
     qwen_activity_monitor_.reset();
     kimi_activity_monitor_.reset();
     trae_activity_monitor_.reset();
@@ -1650,6 +1623,12 @@ LRESULT AppHost::handleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
         return 0;
     case update_changed_message:
         refreshUpdate();
+        return 0;
+    case app_persistence_changed_message:
+        handleAppPersistenceChanged();
+        return 0;
+    case alarm_notifications_changed_message:
+        updateAlarmNotificationStatus();
         return 0;
     case pdf_processing_changed_message:
         refreshPDFProcessing();
@@ -2039,17 +2018,8 @@ void AppHost::refreshAIActivities() noexcept {
         const auto qwen_detected = qwen_activity_monitor_
             ? qwen_activity_monitor_->snapshot()
             : std::make_shared<const QwenActivityMonitor::ActivityList>();
-        const auto copilot_detected = copilot_activity_monitor_
-            ? copilot_activity_monitor_->snapshot()
-            : std::make_shared<const FileActivityMonitor::ActivityList>();
-        const auto qoder_detected = qoder_activity_monitor_
-            ? qoder_activity_monitor_->snapshot()
-            : std::make_shared<const FileActivityMonitor::ActivityList>();
-        const auto doubao_detected = doubao_activity_monitor_
-            ? doubao_activity_monitor_->snapshot()
-            : std::make_shared<const FileActivityMonitor::ActivityList>();
-        const auto opencode_detected = opencode_activity_monitor_
-            ? opencode_activity_monitor_->snapshot()
+        const auto file_detected = file_activity_monitor_
+            ? file_activity_monitor_->snapshot()
             : std::make_shared<const FileActivityMonitor::ActivityList>();
 
         std::vector<zisla::core::AIProgressTask> detected;
@@ -2058,8 +2028,7 @@ void AppHost::refreshAIActivities() noexcept {
             + grok_detected->size() + harness_detected->size()
             + workbuddy_detected->size() + trae_detected->size()
             + kimi_detected->size() + qwen_detected->size()
-            + copilot_detected->size() + qoder_detected->size()
-            + doubao_detected->size() + opencode_detected->size());
+            + file_detected->size());
         detected.insert(detected.end(), codex_detected->begin(), codex_detected->end());
         detected.insert(detected.end(), claude_detected->begin(), claude_detected->end());
         detected.insert(detected.end(), gemini_detected->begin(), gemini_detected->end());
@@ -2075,19 +2044,7 @@ void AppHost::refreshAIActivities() noexcept {
         detected.insert(detected.end(), trae_detected->begin(), trae_detected->end());
         detected.insert(detected.end(), kimi_detected->begin(), kimi_detected->end());
         detected.insert(detected.end(), qwen_detected->begin(), qwen_detected->end());
-        detected.insert(
-            detected.end(),
-            copilot_detected->begin(),
-            copilot_detected->end());
-        detected.insert(detected.end(), qoder_detected->begin(), qoder_detected->end());
-        detected.insert(
-            detected.end(),
-            doubao_detected->begin(),
-            doubao_detected->end());
-        detected.insert(
-            detected.end(),
-            opencode_detected->begin(),
-            opencode_detected->end());
+        detected.insert(detected.end(), file_detected->begin(), file_detected->end());
 
         const auto now_unix_ms = now_unix_milliseconds();
         const auto activities = zisla::core::AIActivityMerger::merge(
@@ -2226,6 +2183,22 @@ void AppHost::refreshMailView() noexcept {
             settings_window_->setMail(std::move(snapshot));
         }
     } catch (...) {
+    }
+}
+
+bool AppHost::startMailService() noexcept {
+    if (mail_service_) {
+        return true;
+    }
+    try {
+        auto service = std::make_unique<MailService>(mail_connection_settings_);
+        if (!service->start(message_window_, mail_changed_message)) {
+            return false;
+        }
+        mail_service_ = std::move(service);
+        return true;
+    } catch (...) {
+        return false;
     }
 }
 
@@ -3078,55 +3051,66 @@ void AppHost::stopPomodoroTimer() noexcept {
 
 void AppHost::loadAlarms() noexcept {
     alarm_book_ = zisla::core::AlarmBook{};
-    alarm_repository_.reset();
+    persistence_service_.reset();
+    alarm_persistence_revision_ = 0;
     alarm_storage_error_.clear();
     const auto directory = application_state_directory();
     if (!directory) {
         alarm_storage_error_ = "无法访问闹钟存储目录";
         return;
     }
+    std::unique_ptr<AppPersistenceService> service;
     try {
-        alarm_repository_ = std::make_unique<zisla::core::AlarmRepository>(*directory);
-        alarm_book_ = zisla::core::AlarmBook(alarm_repository_->load());
+        service = std::make_unique<AppPersistenceService>(*directory);
+        alarm_book_ = zisla::core::AlarmBook(service->loadAlarms());
     } catch (const std::exception& error) {
         alarm_storage_error_ = "无法读取闹钟：";
         alarm_storage_error_.append(error.what());
-        alarm_repository_.reset();
     } catch (...) {
         alarm_storage_error_ = "无法读取闹钟";
-        alarm_repository_.reset();
     }
+    bool service_started = false;
+    try {
+        service_started = service
+            && service->start(message_window_, app_persistence_changed_message);
+    } catch (...) {
+    }
+    if (!service_started) {
+        if (alarm_storage_error_.empty()) {
+            alarm_storage_error_ = "无法启动后台存储服务";
+        }
+        return;
+    }
+    persistence_service_ = std::move(service);
 }
 
 bool AppHost::commitAlarms(zisla::core::AlarmBook alarms) noexcept {
-    if (!alarm_repository_) {
+    if (!persistence_service_) {
         alarm_storage_error_ = "无法保存闹钟：存储不可用";
         refreshAlarms();
         return false;
     }
-    try {
-        alarm_repository_->replace(alarms.alarms());
-        alarm_book_ = std::move(alarms);
-        alarm_storage_error_.clear();
-    } catch (const std::exception& error) {
-        alarm_storage_error_ = "无法保存闹钟：";
-        alarm_storage_error_.append(error.what());
-        refreshAlarms();
-        return false;
-    } catch (...) {
-        alarm_storage_error_ = "无法保存闹钟";
+    const auto revision = persistence_service_->persistAlarms(alarms.alarms());
+    if (revision == 0) {
+        alarm_storage_error_ = "无法保存闹钟：存储不可用";
         refreshAlarms();
         return false;
     }
+    alarm_persistence_revision_ = revision;
+    alarm_book_ = std::move(alarms);
+    alarm_storage_error_.clear();
 
     if (notification_service_
         && notification_service_->reschedule_alarms(alarm_book_.alarms())) {
         alarm_notification_error_.clear();
     } else {
         alarm_notification_error_ = "闹钟已保存，但 Windows 通知不可用";
-        if (notification_service_ && !notification_service_->last_error().empty()) {
+        const auto error = notification_service_
+            ? notification_service_->last_error()
+            : std::string{};
+        if (!error.empty()) {
             alarm_notification_error_.append("：");
-            alarm_notification_error_.append(notification_service_->last_error());
+            alarm_notification_error_.append(error);
         }
     }
     refreshAlarms();
@@ -3134,21 +3118,51 @@ bool AppHost::commitAlarms(zisla::core::AlarmBook alarms) noexcept {
     return true;
 }
 
+void AppHost::handleAppPersistenceChanged() noexcept {
+    if (!persistence_service_) {
+        return;
+    }
+    const auto snapshot = persistence_service_->snapshot();
+    if (!snapshot || snapshot->alarm_revision == 0
+        || snapshot->alarm_revision != alarm_persistence_revision_) {
+        return;
+    }
+    if (snapshot->alarm_error.empty()) {
+        alarm_storage_error_.clear();
+    } else {
+        alarm_storage_error_ = "无法保存闹钟：";
+        alarm_storage_error_.append(snapshot->alarm_error);
+    }
+    refreshAlarms();
+}
+
+void AppHost::updateAlarmNotificationStatus() noexcept {
+    const auto error = notification_service_
+        ? notification_service_->last_error()
+        : std::string{"Windows app notifications are unavailable"};
+    if (error.empty()) {
+        alarm_notification_error_.clear();
+    } else {
+        alarm_notification_error_ = "Windows 闹钟通知不可用：";
+        alarm_notification_error_.append(error);
+    }
+    refreshAlarms();
+}
+
 void AppHost::reconcileAndRescheduleAlarms() noexcept {
     stopAlarmTimer();
     const auto now_unix_ms = now_unix_milliseconds();
     auto reconciled = alarm_book_;
     if (reconciled.reconcile(now_unix_ms, alarm_delivery_grace_ms)) {
-        if (alarm_repository_) {
-            try {
-                alarm_repository_->replace(reconciled.alarms());
+        if (persistence_service_) {
+            const auto revision = persistence_service_->persistAlarms(
+                reconciled.alarms());
+            if (revision != 0) {
+                alarm_persistence_revision_ = revision;
                 alarm_book_ = std::move(reconciled);
                 alarm_storage_error_.clear();
-            } catch (const std::exception& error) {
-                alarm_storage_error_ = "无法更新已触发闹钟：";
-                alarm_storage_error_.append(error.what());
-            } catch (...) {
-                alarm_storage_error_ = "无法更新已触发闹钟";
+            } else {
+                alarm_storage_error_ = "无法更新已触发闹钟：存储不可用";
             }
         } else {
             alarm_storage_error_ = "无法更新已触发闹钟：存储不可用";
@@ -3171,9 +3185,12 @@ void AppHost::reconcileAndRescheduleAlarms() noexcept {
         alarm_notification_error_.clear();
     } else {
         alarm_notification_error_ = "Windows 闹钟通知不可用";
-        if (notification_service_ && !notification_service_->last_error().empty()) {
+        const auto error = notification_service_
+            ? notification_service_->last_error()
+            : std::string{};
+        if (!error.empty()) {
             alarm_notification_error_.append("：");
-            alarm_notification_error_.append(notification_service_->last_error());
+            alarm_notification_error_.append(error);
         }
     }
     refreshAlarms();
@@ -3294,19 +3311,39 @@ void AppHost::consumeClipboardLink() noexcept {
 void AppHost::updateClipboardListener() noexcept {
     const bool link_detection_enabled = settings_.downloader_enabled
         && settings_.clipboard_detection_enabled;
+    const bool service_needed = settings_.clipboard_history_enabled
+        || link_detection_enabled;
+    if (service_needed && !clipboard_history_service_) {
+        try {
+            if (const auto state_directory = AIStateMonitor::defaultStateDirectory()) {
+                auto service = std::make_unique<ClipboardHistoryService>(
+                    *state_directory);
+                if (service->start(
+                        message_window_,
+                        clipboard_history_changed_message,
+                        clipboard_link_detected_message)) {
+                    clipboard_history_service_ = std::move(service);
+                }
+            }
+        } catch (...) {
+            clipboard_history_service_.reset();
+        }
+    }
     if (clipboard_history_service_) {
         clipboard_history_service_->configure(
             settings_.clipboard_history_enabled,
             link_detection_enabled);
     }
-    const bool should_listen = clipboard_history_service_
-        && (settings_.clipboard_history_enabled || link_detection_enabled);
+    const bool should_listen = clipboard_history_service_ && service_needed;
     if (should_listen && !clipboard_listener_registered_ && message_window_) {
         clipboard_listener_registered_ =
             AddClipboardFormatListener(message_window_) != FALSE;
     } else if (!should_listen && clipboard_listener_registered_ && message_window_) {
         (void)RemoveClipboardFormatListener(message_window_);
         clipboard_listener_registered_ = false;
+    }
+    if (!service_needed) {
+        clipboard_history_service_.reset();
     }
 }
 
@@ -3952,38 +3989,39 @@ void AppHost::configureMail(MailConnectionSettings settings) {
     }
     mail_connection_settings_ = std::move(settings);
     saveSettings();
-    if (mail_service_) {
+    const bool was_running = mail_service_ != nullptr;
+    if (startMailService() && was_running) {
         mail_service_->configure(mail_connection_settings_);
     }
     refreshMailView();
 }
 
 void AppHost::beginMailAuthorization() {
-    if (mail_service_) {
+    if (startMailService()) {
         mail_service_->begin_authorization();
     }
 }
 
 void AppHost::refreshMail() {
-    if (mail_service_) {
+    if (startMailService()) {
         mail_service_->refresh();
     }
 }
 
 void AppHost::markMailRead(std::string message_id) {
-    if (mail_service_) {
+    if (startMailService()) {
         mail_service_->mark_read(std::move(message_id));
     }
 }
 
 void AppHost::moveMailToJunk(std::string message_id) {
-    if (mail_service_) {
+    if (startMailService()) {
         mail_service_->move_to_junk(std::move(message_id));
     }
 }
 
 void AppHost::deleteMail(std::string message_id) {
-    if (mail_service_) {
+    if (startMailService()) {
         mail_service_->move_to_deleted(std::move(message_id));
     }
 }
@@ -3992,7 +4030,7 @@ void AppHost::sendMail(
     std::vector<zisla::core::MailRecipient> recipients,
     std::string subject,
     std::string body) {
-    if (mail_service_) {
+    if (startMailService()) {
         mail_service_->send(
             std::move(recipients),
             std::move(subject),
@@ -4001,7 +4039,7 @@ void AppHost::sendMail(
 }
 
 void AppHost::replyMail(std::string message_id, std::string body) {
-    if (mail_service_) {
+    if (startMailService()) {
         mail_service_->reply(std::move(message_id), std::move(body));
     }
 }
@@ -4371,12 +4409,15 @@ void AppHost::setTeleprompterSpeed(double speed) {
 }
 
 void AppHost::setTeleprompterScript(std::string script) {
-    if (script.size() > maximum_teleprompter_script_bytes) {
+    if (script.size()
+        > AppPersistenceService::maximum_teleprompter_script_bytes) {
         return;
     }
-    teleprompter_engine_.set_script(std::move(script));
+    teleprompter_engine_.set_script(script);
     stopTeleprompterTimer();
-    save_teleprompter_script(teleprompter_engine_.script());
+    if (persistence_service_) {
+        persistence_service_->persistTeleprompter(std::move(script));
+    }
     refreshTeleprompter();
 }
 

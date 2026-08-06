@@ -1,4 +1,5 @@
 #include "zisla/core/CopilotSessionScanner.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include <yyjson.h>
 
@@ -286,7 +287,13 @@ bool has_jsonl_extension(const fs::path& path) {
 std::vector<TranscriptCandidate> recent_transcript_files(
     const CopilotSessionScanOptions& options) {
     std::vector<TranscriptCandidate> candidates;
-    std::unordered_map<std::string, bool> seen_paths;
+    candidates.reserve(options.max_transcript_files);
+    const auto newer = [](const auto& lhs, const auto& rhs) {
+        if (lhs.modified_at != rhs.modified_at) {
+            return lhs.modified_at > rhs.modified_at;
+        }
+        return lhs.path.native() < rhs.path.native();
+    };
 
     for (const auto& root : options.workspace_storage_roots) {
         std::error_code root_error;
@@ -316,17 +323,21 @@ std::vector<TranscriptCandidate> recent_transcript_files(
                 std::error_code time_error;
                 const auto modified_at = entry.last_write_time(time_error);
                 if (!time_error) {
-                    const auto path_key = entry.path().lexically_normal().generic_u8string();
-                    const std::string normalized_path{
-                        reinterpret_cast<const char*>(path_key.data()),
-                        path_key.size(),
-                    };
-                    if (seen_paths.emplace(normalized_path, true).second) {
-                        candidates.push_back({
-                            .path = entry.path(),
-                            .modified_at = modified_at,
-                            .modified_at_unix_ms = unix_milliseconds(modified_at),
+                    const auto normalized = entry.path().lexically_normal();
+                    const bool already_seen = std::any_of(
+                        candidates.begin(), candidates.end(), [&normalized](const auto& candidate) {
+                            return candidate.path.lexically_normal() == normalized;
                         });
+                    if (!already_seen) {
+                        detail::retain_newest(
+                            candidates,
+                            TranscriptCandidate{
+                                .path = entry.path(),
+                                .modified_at = modified_at,
+                                .modified_at_unix_ms = unix_milliseconds(modified_at),
+                            },
+                            options.max_transcript_files,
+                            newer);
                     }
                 }
             }
@@ -334,15 +345,7 @@ std::vector<TranscriptCandidate> recent_transcript_files(
         }
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.modified_at != rhs.modified_at) {
-            return lhs.modified_at > rhs.modified_at;
-        }
-        return lhs.path.native() < rhs.path.native();
-    });
-    if (candidates.size() > options.max_transcript_files) {
-        candidates.resize(options.max_transcript_files);
-    }
+    std::sort(candidates.begin(), candidates.end(), newer);
     return candidates;
 }
 
@@ -602,6 +605,13 @@ std::vector<CLISession> cli_sessions(const CopilotSessionScanOptions& options) {
     }
 
     std::vector<CLISession> sessions;
+    sessions.reserve(options.max_cli_sessions);
+    const auto newer = [](const auto& lhs, const auto& rhs) {
+        if (lhs.updated_at_unix_ms != rhs.updated_at_unix_ms) {
+            return lhs.updated_at_unix_ms > rhs.updated_at_unix_ms;
+        }
+        return lhs.id < rhs.id;
+    };
     std::error_code error;
     fs::directory_iterator iterator(
         options.cli_session_state_directory,
@@ -627,31 +637,27 @@ std::vector<CLISession> cli_sessions(const CopilotSessionScanOptions& options) {
                     std::error_code time_error;
                     const auto modified_at = fs::last_write_time(workspace, time_error);
                     const auto fallback = time_error ? 0 : unix_milliseconds(modified_at);
-                    sessions.push_back({
-                        .id = *id,
-                        .working_directory = yaml_value(
-                            *contents,
-                            "cwd",
-                            maximum_working_directory_bytes),
-                        .started_at_unix_ms = yaml_timestamp(*contents, "created_at"),
-                        .updated_at_unix_ms = yaml_timestamp(*contents, "updated_at")
-                            .value_or(fallback),
-                    });
+                    detail::retain_newest(
+                        sessions,
+                        CLISession{
+                            .id = *id,
+                            .working_directory = yaml_value(
+                                *contents,
+                                "cwd",
+                                maximum_working_directory_bytes),
+                            .started_at_unix_ms = yaml_timestamp(*contents, "created_at"),
+                            .updated_at_unix_ms = yaml_timestamp(*contents, "updated_at")
+                                .value_or(fallback),
+                        },
+                        options.max_cli_sessions,
+                        newer);
                 }
             }
         }
         iterator.increment(error);
     }
 
-    std::sort(sessions.begin(), sessions.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.updated_at_unix_ms != rhs.updated_at_unix_ms) {
-            return lhs.updated_at_unix_ms > rhs.updated_at_unix_ms;
-        }
-        return lhs.id < rhs.id;
-    });
-    if (sessions.size() > options.max_cli_sessions) {
-        sessions.resize(options.max_cli_sessions);
-    }
+    std::sort(sessions.begin(), sessions.end(), newer);
     return sessions;
 }
 

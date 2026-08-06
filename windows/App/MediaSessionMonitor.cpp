@@ -11,6 +11,7 @@
 #include <iterator>
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -132,6 +133,8 @@ struct MediaSessionMonitor::WorkerState {
         const auto sessions = manager.GetSessions();
         registrations.reserve(sessions.Size());
         std::unordered_map<std::string, std::size_t> duplicate_counts;
+        std::unordered_set<std::string> active_session_ids;
+        active_session_ids.reserve(sessions.Size());
         for (const auto& session : sessions) {
             auto id = to_string(session.SourceAppUserModelId());
             if (id.empty()) {
@@ -145,6 +148,7 @@ struct MediaSessionMonitor::WorkerState {
 
             registrations.push_back({.session = session, .id = std::move(id)});
             auto& registration = registrations.back();
+            active_session_ids.insert(registration.id);
             registration.media_properties_changed = session.MediaPropertiesChanged(
                 [monitor = &owner](auto&&, auto&&) {
                     monitor->metadata_dirty_.store(true, std::memory_order_release);
@@ -155,6 +159,9 @@ struct MediaSessionMonitor::WorkerState {
             registration.timeline_properties_changed = session.TimelinePropertiesChanged(
                 [monitor = &owner](auto&&, auto&&) { monitor->wake(); });
         }
+        std::erase_if(cache, [&active_session_ids](const auto& entry) {
+            return !active_session_ids.contains(entry.first);
+        });
         owner.metadata_dirty_.store(true, std::memory_order_release);
     }
 

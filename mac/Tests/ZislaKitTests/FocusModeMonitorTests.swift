@@ -71,6 +71,17 @@ struct FocusModeMonitorTests {
     }
 
     @Test
+    func assertionStoreLoadsStatusFromDiskAsynchronously() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data(#"{"data":[{"storeAssertionRecords":[]}],"header":{}}"#.utf8)
+            .write(to: url)
+
+        #expect(await FocusModeStatusStore.load(from: url) == .inactive)
+    }
+
+    @Test
     func inactiveTransitionKeepsThePreviousModePresentation() {
         let sleep = FocusModeStatus(
             isActive: true,

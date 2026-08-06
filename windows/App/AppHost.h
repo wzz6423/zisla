@@ -72,6 +72,7 @@ class TeleprompterWindow;
 class CameraMirrorWindow;
 class CameraMirrorService;
 class AppNotificationService;
+class AppPersistenceService;
 class WeatherService;
 class SystemMonitorService;
 class DesktopToolsService;
@@ -320,6 +321,8 @@ private:
     static constexpr UINT ai_agent_workspace_changed_message = WM_APP + 25;
     static constexpr UINT mail_changed_message = WM_APP + 26;
     static constexpr UINT update_changed_message = WM_APP + 27;
+    static constexpr UINT app_persistence_changed_message = WM_APP + 28;
+    static constexpr UINT alarm_notifications_changed_message = WM_APP + 29;
     static constexpr UINT_PTR dismiss_timer_id = 1;
     static constexpr UINT_PTR side_notice_timer_id = 2;
     static constexpr UINT_PTR pomodoro_timer_id = 3;
@@ -330,7 +333,7 @@ private:
     static constexpr UINT dismiss_delay_ms = 450;
     static constexpr UINT pomodoro_timer_interval_ms = 250;
     static constexpr UINT teleprompter_timer_interval_ms = 16;
-    static constexpr UINT top_edge_poll_interval_ms = 40;
+    static constexpr UINT top_edge_poll_interval_ms = 100;
 
     static LRESULT CALLBACK windowProcedure(
         HWND hwnd,
@@ -358,6 +361,7 @@ private:
     void refreshAIAgentSkills() noexcept;
     void refreshCalendar() noexcept;
     void refreshMailView() noexcept;
+    [[nodiscard]] bool startMailService() noexcept;
     void refreshUpdate() noexcept;
     void refreshSystemMonitor() noexcept;
     void refreshDesktopToolsView() noexcept;
@@ -393,6 +397,8 @@ private:
     void stopPomodoroTimer() noexcept;
     void loadAlarms() noexcept;
     [[nodiscard]] bool commitAlarms(zisla::core::AlarmBook alarms) noexcept;
+    void handleAppPersistenceChanged() noexcept;
+    void updateAlarmNotificationStatus() noexcept;
     void reconcileAndRescheduleAlarms() noexcept;
     void scheduleAlarmTimer() noexcept;
     void stopAlarmTimer() noexcept;
@@ -469,10 +475,7 @@ private:
     std::unique_ptr<QwenActivityMonitor> qwen_activity_monitor_;
     std::unique_ptr<TraeActivityMonitor> trae_activity_monitor_;
     std::unique_ptr<WorkBuddyActivityMonitor> workbuddy_activity_monitor_;
-    std::unique_ptr<FileActivityMonitor> copilot_activity_monitor_;
-    std::unique_ptr<FileActivityMonitor> qoder_activity_monitor_;
-    std::unique_ptr<FileActivityMonitor> doubao_activity_monitor_;
-    std::unique_ptr<FileActivityMonitor> opencode_activity_monitor_;
+    std::unique_ptr<FileActivityMonitor> file_activity_monitor_;
     std::unique_ptr<AIStateMonitor> ai_state_monitor_;
     std::unique_ptr<MediaSessionMonitor> media_session_monitor_;
     std::unique_ptr<FileShelfService> file_shelf_service_;
@@ -486,6 +489,7 @@ private:
     std::unique_ptr<UpdateService> update_service_;
     std::unique_ptr<PowerRequestService> power_request_service_;
     std::unique_ptr<AppNotificationService> notification_service_;
+    std::unique_ptr<AppPersistenceService> persistence_service_;
     std::unique_ptr<WeatherService> weather_service_;
     std::unique_ptr<SystemMonitorService> system_monitor_service_;
     std::unique_ptr<DesktopToolsService> desktop_tools_service_;
@@ -509,7 +513,7 @@ private:
     std::uint64_t weather_location_generation_{0};
     std::uint64_t handled_weather_search_generation_{0};
     bool weather_location_pending_{false};
-    std::unique_ptr<zisla::core::AlarmRepository> alarm_repository_;
+    std::uint64_t alarm_persistence_revision_{0};
     std::string alarm_storage_error_;
     std::string alarm_notification_error_;
     std::unique_ptr<zisla::core::PowerRequestController> power_request_controller_;

@@ -110,6 +110,12 @@ public enum ClipboardHistoryContentError: LocalizedError {
     }
 }
 
+public enum ClipboardHistoryScope: Sendable {
+    case all
+    case pinned
+    case history
+}
+
 public struct ClipboardHistoryItem: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var content: ClipboardHistoryContent

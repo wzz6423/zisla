@@ -97,6 +97,13 @@ enum FocusModeStatusStore {
         return FocusModeStatus(isActive: true, identifier: identifier)
     }
 
+    static func load(from url: URL) async -> FocusModeStatus? {
+        await Task.detached(priority: .utility) {
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            return try? decode(data)
+        }.value
+    }
+
     private static func timestamp(in record: [String: Any]) -> Double {
         (record["assertionStartDateTimestamp"] as? NSNumber)?.doubleValue ?? 0
     }
@@ -124,13 +131,12 @@ public final class FocusModeMonitor: ObservableObject {
     public func start() {
         guard !isRunning else { return }
         isRunning = true
-        startStorePolling()
 
         guard let frameworkHandle = dlopen(
             "/System/Library/PrivateFrameworks/DoNotDisturb.framework/DoNotDisturb",
             RTLD_NOW | RTLD_LOCAL
         ) else {
-            isAvailable = FileManager.default.isReadableFile(atPath: FocusModeStatusStore.defaultURL.path)
+            startStoreFallback()
             return
         }
         self.frameworkHandle = frameworkHandle
@@ -138,7 +144,7 @@ public final class FocusModeMonitor: ObservableObject {
         guard let serviceClass = NSClassFromString("DNDStateService"),
               let service = makeStateService(serviceClass: serviceClass) else {
             releaseFramework()
-            isAvailable = FileManager.default.isReadableFile(atPath: FocusModeStatusStore.defaultURL.path)
+            startStoreFallback()
             return
         }
 
@@ -149,7 +155,7 @@ public final class FocusModeMonitor: ObservableObject {
         }
         guard add(listener, to: service, serviceClass: serviceClass) else {
             releaseFramework()
-            isAvailable = FileManager.default.isReadableFile(atPath: FocusModeStatusStore.defaultURL.path)
+            startStoreFallback()
             return
         }
 
@@ -180,12 +186,17 @@ public final class FocusModeMonitor: ObservableObject {
         status = resolved
     }
 
+    private func startStoreFallback() {
+        isAvailable = FileManager.default.isReadableFile(atPath: FocusModeStatusStore.defaultURL.path)
+        startStorePolling()
+    }
+
     private func startStorePolling() {
         let url = FocusModeStatusStore.defaultURL
         storePollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                if let data = try? Data(contentsOf: url),
-                   let next = try? FocusModeStatusStore.decode(data) {
+                if let next = await FocusModeStatusStore.load(from: url) {
+                    guard !Task.isCancelled else { return }
                     self?.consume(next)
                     self?.isAvailable = true
                 }

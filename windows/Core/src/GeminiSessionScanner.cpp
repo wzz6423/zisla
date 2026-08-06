@@ -1,4 +1,5 @@
 #include "zisla/core/GeminiSessionScanner.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include <yyjson.h>
 
@@ -533,6 +534,13 @@ std::vector<SessionCandidate> recent_sessions(const GeminiSessionScanOptions& op
     }
 
     std::vector<SessionCandidate> candidates;
+    candidates.reserve(options.max_session_files);
+    const auto newer = [](const auto& lhs, const auto& rhs) {
+        if (lhs.modified_at != rhs.modified_at) {
+            return lhs.modified_at > rhs.modified_at;
+        }
+        return lhs.path.native() < rhs.path.native();
+    };
     std::error_code error;
     fs::recursive_directory_iterator iterator(
         options.sessions_directory,
@@ -553,27 +561,23 @@ std::vector<SessionCandidate> recent_sessions(const GeminiSessionScanOptions& op
                 std::error_code time_error;
                 const auto modified_at = entry.last_write_time(time_error);
                 if (!time_error) {
-                    candidates.push_back({
-                        entry.path(),
-                        modified_at,
-                        unix_milliseconds(modified_at),
-                        jsonl,
-                    });
+                    detail::retain_newest(
+                        candidates,
+                        SessionCandidate{
+                            entry.path(),
+                            modified_at,
+                            unix_milliseconds(modified_at),
+                            jsonl,
+                        },
+                        options.max_session_files,
+                        newer);
                 }
             }
         }
         iterator.increment(error);
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.modified_at != rhs.modified_at) {
-            return lhs.modified_at > rhs.modified_at;
-        }
-        return lhs.path.native() < rhs.path.native();
-    });
-    if (candidates.size() > options.max_session_files) {
-        candidates.resize(options.max_session_files);
-    }
+    std::sort(candidates.begin(), candidates.end(), newer);
     return candidates;
 }
 

@@ -517,6 +517,7 @@ AgentChannel read_channel(Database& database, sqlite3_stmt* statement) {
         .name = column_text(statement, 1, "channel name"),
         .protocol_kind = *protocol,
         .default_model = column_text(statement, 3, "channel model"),
+        .endpoint_groups = {},
         .is_enabled = column_bool(statement, 4, "channel enabled"),
     };
 
@@ -543,6 +544,8 @@ AgentChannel read_channel(Database& database, sqlite3_stmt* statement) {
         AgentEndpointGroup group{
             .id = column_text(groups.get(), 0, "endpoint group id"),
             .name = column_text(groups.get(), 1, "endpoint group name"),
+            .base_urls = {},
+            .account_ids = {},
             .is_enabled = column_bool(groups.get(), 2, "endpoint group enabled"),
             .priority = static_cast<int>(priority),
         };

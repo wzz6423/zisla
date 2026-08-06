@@ -1,4 +1,5 @@
 #include "zisla/core/CodexSessionScanner.hpp"
+#include "zisla/core/detail/BoundedRecent.hpp"
 
 #include "zisla/core/CodexActivityParser.hpp"
 
@@ -139,6 +140,13 @@ std::vector<RolloutCandidate> recent_rollouts(
     }
 
     std::vector<RolloutCandidate> candidates;
+    candidates.reserve(options.max_rollout_files);
+    const auto newer = [](const auto& lhs, const auto& rhs) {
+        if (lhs.modified_at != rhs.modified_at) {
+            return lhs.modified_at > rhs.modified_at;
+        }
+        return lhs.path.native() < rhs.path.native();
+    };
     for (const auto& directory : rollout_search_directories(options.sessions_directory)) {
         std::error_code error;
         fs::recursive_directory_iterator iterator(
@@ -155,26 +163,22 @@ std::vector<RolloutCandidate> recent_rollouts(
                 std::error_code time_error;
                 const auto modified_at = entry.last_write_time(time_error);
                 if (!time_error) {
-                    candidates.push_back({
-                        entry.path(),
-                        modified_at,
-                        unix_milliseconds(modified_at),
-                    });
+                    detail::retain_newest(
+                        candidates,
+                        RolloutCandidate{
+                            entry.path(),
+                            modified_at,
+                            unix_milliseconds(modified_at),
+                        },
+                        options.max_rollout_files,
+                        newer);
                 }
             }
             iterator.increment(error);
         }
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.modified_at != rhs.modified_at) {
-            return lhs.modified_at > rhs.modified_at;
-        }
-        return lhs.path.native() < rhs.path.native();
-    });
-    if (candidates.size() > options.max_rollout_files) {
-        candidates.resize(options.max_rollout_files);
-    }
+    std::sort(candidates.begin(), candidates.end(), newer);
     return candidates;
 }
 

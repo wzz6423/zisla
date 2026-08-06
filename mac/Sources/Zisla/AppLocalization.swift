@@ -34,15 +34,28 @@ enum AppLocalization {
 
     static func string(_ key: String, locale: Locale) -> String {
         for identifier in localeIdentifiers(for: locale) {
-            for container in [Bundle.main, Bundle.module] {
-                guard let bundle = localizationBundle(in: container, identifier: identifier) else {
-                    continue
-                }
+            if let bundle = localizationBundles[identifier] {
                 return bundle.localizedString(forKey: key, value: key, table: "Localizable")
             }
         }
         return key
     }
+
+    private static let localizationBundles: [String: Bundle] = {
+        var result: [String: Bundle] = [:]
+        for language in AppLanguage.allCases {
+            for identifier in localeIdentifiers(for: language.locale)
+            where result[identifier] == nil {
+                for container in [Bundle.main, Bundle.module] {
+                    if let bundle = localizationBundle(in: container, identifier: identifier) {
+                        result[identifier] = bundle
+                        break
+                    }
+                }
+            }
+        }
+        return result
+    }()
 
     private static func localeIdentifiers(for locale: Locale) -> [String] {
         let identifier = locale.identifier.replacingOccurrences(of: "_", with: "-")

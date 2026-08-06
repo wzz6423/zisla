@@ -38,7 +38,7 @@ Windows App SDK 发布先采用带包身份的框架依赖 MSIX，以降低应�
 
 Windows 外壳负责以下适配器：
 
-- `TopEdgeTrigger`：仅在用户开启时由主消息窗口每 40 ms 采样光标位置，按每显示器物理像素几何判断顶部触发区；不安装全局鼠标 Hook，也不拦截输入。
+- `TopEdgeTrigger`：仅在用户开启时由主消息窗口每 100 ms 采样光标位置，按每显示器物理像素几何判断顶部触发区；不安装全局鼠标 Hook，也不拦截输入。
 - `TrayTrigger`：`Shell_NotifyIcon`、`Shell_NotifyIconGetRect`、悬停进入/离开事件和重启 Explorer 后的图标恢复。
 - `OverlayHost`：WinUI 内容、`AppWindow` 与必要的 HWND 样式互操作。
 - `DisplayTopology`：每显示器 DPI、工作区、负坐标和显示器热插拔。
