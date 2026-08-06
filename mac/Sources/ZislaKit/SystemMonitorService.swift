@@ -468,7 +468,10 @@ public extension SystemMonitorFileManaging {
             .volumeTotalCapacityKey,
             .volumeAvailableCapacityForImportantUsageKey,
         ]
-        guard let values = try? url.resourceValues(forKeys: keys) else { return nil }
+        // Foundation caches URL resource values; invalidate them so cleanup and external changes are visible.
+        var refreshedURL = url
+        refreshedURL.removeAllCachedResourceValues()
+        guard let values = try? refreshedURL.resourceValues(forKeys: keys) else { return nil }
         let total = UInt64(max(0, values.volumeTotalCapacity ?? 0))
         guard let availableInt = values.volumeAvailableCapacityForImportantUsage else { return nil }
         let available = UInt64(max(0, availableInt))

@@ -93,6 +93,72 @@ final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
     }
 }
 
+private struct FoundationVolumeCapacityFileManager: SystemMonitorFileManaging, @unchecked Sendable {
+    private let fileManager = FileManager.default
+
+    func fileExists(atPath path: String) -> Bool {
+        fileManager.fileExists(atPath: path)
+    }
+
+    func urls(for directory: FileManager.SearchPathDirectory, in domainMask: FileManager.SearchPathDomainMask) -> [URL] {
+        fileManager.urls(for: directory, in: domainMask)
+    }
+
+    func homeDirectoryForCurrentUser() -> URL {
+        fileManager.homeDirectoryForCurrentUser
+    }
+
+    func temporaryDirectoryForCurrentUser() -> URL {
+        fileManager.temporaryDirectory
+    }
+
+    func contentsOfDirectory(
+        at url: URL,
+        includingPropertiesForKeys keys: [URLResourceKey]?,
+        options: FileManager.DirectoryEnumerationOptions
+    ) throws -> [URL] {
+        try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: keys, options: options)
+    }
+
+    func attributesOfFileSystem(forPath path: String) throws -> [FileAttributeKey: Any] {
+        try fileManager.attributesOfFileSystem(forPath: path)
+    }
+
+    func attributesOfItem(atPath path: String) throws -> [FileAttributeKey: Any] {
+        try fileManager.attributesOfItem(atPath: path)
+    }
+
+    func enumerator(
+        at url: URL,
+        includingPropertiesForKeys keys: [URLResourceKey]?,
+        options: FileManager.DirectoryEnumerationOptions
+    ) -> FileManager.DirectoryEnumerator? {
+        fileManager.enumerator(at: url, includingPropertiesForKeys: keys, options: options)
+    }
+
+    func trashItem(at url: URL) throws -> URL {
+        var result: NSURL?
+        try fileManager.trashItem(at: url, resultingItemURL: &result)
+        return (result as URL?) ?? url
+    }
+
+    func createDirectory(at url: URL, withIntermediateDirectories: Bool) throws {
+        try fileManager.createDirectory(at: url, withIntermediateDirectories: withIntermediateDirectories, attributes: nil)
+    }
+
+    func removeItem(at url: URL) throws {
+        try fileManager.removeItem(at: url)
+    }
+
+    func createFile(atPath path: String, contents data: Data?) -> Bool {
+        fileManager.createFile(atPath: path, contents: data)
+    }
+
+    func contents(atPath path: String) -> Data? {
+        fileManager.contents(atPath: path)
+    }
+}
+
 private struct StubPublicIPProvider: PublicIPProviding {
     let address: String?
 
@@ -1020,6 +1086,37 @@ struct SystemMonitorServiceTests {
     @Test
     func serviceClampsSamplingIntervalToMinimum() {
         #expect(SystemMonitorService(samplingInterval: 0.01).samplingInterval == 0.2)
+    }
+
+    @Test
+    func defaultVolumeCapacityRefreshesCachedResourceValues() throws {
+        let fileManager = FoundationVolumeCapacityFileManager()
+        let foundation = FileManager.default
+        let volumeURL = foundation.temporaryDirectory
+        let fileURL = volumeURL.appendingPathComponent("zisla-capacity-\(UUID().uuidString)")
+        defer { try? foundation.removeItem(at: fileURL) }
+
+        let initial = try #require(fileManager.volumeCapacity(for: volumeURL))
+        #expect(foundation.createFile(atPath: fileURL.path, contents: nil))
+        let handle = try FileHandle(forWritingTo: fileURL)
+        let chunk = Data(repeating: 0x5A, count: 4 * 1024 * 1024)
+        for _ in 0..<16 {
+            try handle.write(contentsOf: chunk)
+        }
+        try handle.synchronize()
+        try handle.close()
+
+        let expected = try #require(
+            fileManager.volumeCapacity(for: URL(fileURLWithPath: volumeURL.path, isDirectory: true))
+        )
+        let refreshed = try #require(fileManager.volumeCapacity(for: volumeURL))
+        let decrease = initial.available >= expected.available ? initial.available - expected.available : 0
+        let staleDifference = refreshed.available >= expected.available
+            ? refreshed.available - expected.available
+            : expected.available - refreshed.available
+
+        #expect(decrease >= 16 * 1024 * 1024)
+        #expect(staleDifference < 8 * 1024 * 1024)
     }
 
     @Test
