@@ -37,7 +37,7 @@ public struct AIStateRepository {
     public init(
         directoryURL: URL,
         fileManager _: FileManager = .default,
-        maximumUsageSamples: Int = 20_000
+        maximumUsageSamples: Int = 30_000
     ) {
         self.directoryURL = directoryURL
         self.maximumUsageSamples = max(1, maximumUsageSamples)
