@@ -82,19 +82,21 @@ public struct AIStateRepository {
     @discardableResult
     public func recordUsage(_ samples: [AIUsageSample]) throws -> Int {
         try openDatabase().recordUsage(
-            AIUsageAnalytics.dailyManualUsageSamples(samples: samples)
+            AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
         )
     }
 
-    /// Stores already-compacted usage from local log detectors. Re-scans replace each day's detected total.
+    /// Stores detected daily totals as deltas so re-scans cannot duplicate usage or overwrite manual reports.
     @discardableResult
     public func recordDetectedUsage(_ samples: [AIUsageSample]) throws -> Int {
-        try openDatabase().recordUsage(samples)
+        try openDatabase().recordDetectedUsage(
+            AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
+        )
     }
 
     public func stateRecordingUsage(_ samples: [AIUsageSample]) throws -> AIState {
         let database = try openDatabase()
-        _ = try database.recordUsage(AIUsageAnalytics.dailyManualUsageSamples(samples: samples))
+        _ = try database.recordUsage(AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current))
         return try database.load()
     }
 

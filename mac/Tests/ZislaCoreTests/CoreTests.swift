@@ -337,25 +337,26 @@ struct AIStateRepositoryTests {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let repository = AIStateRepository(directoryURL: directory, maximumUsageSamples: 2)
+        let firstDay = Date(timeIntervalSinceReferenceDate: 0)
         let samples = [
             AIUsageSample(
                 sourceID: "old",
                 provider: .claude,
-                timestamp: Date(timeIntervalSince1970: 100),
+                timestamp: firstDay,
                 inputTokens: 10,
                 outputTokens: 1
             ),
             AIUsageSample(
                 sourceID: "middle",
                 provider: .grok,
-                timestamp: Date(timeIntervalSince1970: 200),
+                timestamp: firstDay.addingTimeInterval(86_400),
                 inputTokens: 20,
                 outputTokens: 2
             ),
             AIUsageSample(
                 sourceID: "new",
                 provider: .codex,
-                timestamp: Date(timeIntervalSince1970: 300),
+                timestamp: firstDay.addingTimeInterval(172_800),
                 inputTokens: 30,
                 outputTokens: 3
             ),
@@ -364,7 +365,8 @@ struct AIStateRepositoryTests {
 
         try repository.recordDetectedUsage([samples[0]])
 
-        #expect(try repository.load().usageSamples == Array(samples.suffix(2)))
+        let summaries = AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
+        #expect(try repository.load().usageSamples == Array(summaries.suffix(2)))
     }
 
     @Test
@@ -409,50 +411,118 @@ struct AIStateRepositoryTests {
     }
 
     @Test
-    func repositoryMigratesLegacyAutomaticEventsToDailySummaries() throws {
+    func repositoryStoresOneDailyTotalAcrossProviders() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let repository = AIStateRepository(directoryURL: directory)
-        let day = Date(timeIntervalSinceReferenceDate: 700_000_000)
-        let legacySamples = [
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+
+        try repository.recordUsage(AIUsageSample(
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 10,
+            outputTokens: 2
+        ))
+        try repository.recordDetectedUsage([
             AIUsageSample(
-                sourceID: "codex-session-a-event-one",
-                provider: .codex,
-                timestamp: day.addingTimeInterval(60),
-                inputTokens: 10,
-                outputTokens: 2
-            ),
-            AIUsageSample(
-                sourceID: "codex-session-a-event-two",
-                provider: .codex,
-                timestamp: day.addingTimeInterval(120),
+                provider: .claude,
+                timestamp: timestamp.addingTimeInterval(60),
                 inputTokens: 20,
                 outputTokens: 3
             ),
             AIUsageSample(
-                sourceID: "claude-project-a-message-one",
+                provider: .grok,
+                timestamp: timestamp.addingTimeInterval(120),
+                inputTokens: 30,
+                outputTokens: 4
+            ),
+        ])
+
+        let stored = try repository.load().usageSamples
+
+        #expect(stored.count == 1)
+        #expect(stored.first?.totalTokens == 69)
+    }
+
+    @Test
+    func repositoryAdjustsDetectedDailyTotalWithoutDroppingManualUsage() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let originalDetected = AIUsageSample(
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 100,
+            outputTokens: 20
+        )
+        let correctedDetected = AIUsageSample(
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 80,
+            outputTokens: 20
+        )
+
+        try repository.recordUsage(AIUsageSample(
+            provider: .claude,
+            timestamp: timestamp,
+            inputTokens: 10,
+            outputTokens: 2
+        ))
+        try repository.recordDetectedUsage([originalDetected])
+        try repository.recordDetectedUsage([correctedDetected])
+
+        let stored = try repository.load().usageSamples
+
+        #expect(stored.count == 1)
+        #expect(stored.first?.totalTokens == 112)
+    }
+
+    @Test
+    func repositoryMigratesProviderDailySummariesIntoOneDailyTotal() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        _ = try repository.load()
+        let day = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let legacyAutomaticSummaries = [
+            AIUsageSample(
+                sourceID: "zisla-daily-usage:codex:\(day.timeIntervalSinceReferenceDate)",
+                provider: .codex,
+                timestamp: day,
+                inputTokens: 30,
+                outputTokens: 5
+            ),
+            AIUsageSample(
+                sourceID: "zisla-daily-usage:claude:\(day.timeIntervalSinceReferenceDate)",
                 provider: .claude,
-                timestamp: day.addingTimeInterval(180),
+                timestamp: day,
                 inputTokens: 30,
                 outputTokens: 4
             ),
         ]
         let manualSample = AIUsageSample(
+            sourceID: "zisla-daily-manual-usage:grok:\(day.timeIntervalSinceReferenceDate)",
             provider: .grok,
-            timestamp: day.addingTimeInterval(240),
+            timestamp: day,
             inputTokens: 40,
             outputTokens: 5
         )
-        try repository.recordDetectedUsage(legacySamples)
-        try repository.recordUsage(manualSample)
-        try setSQLiteUserVersion(at: repository.databaseURL, to: 0)
+        for sample in legacyAutomaticSummaries + [manualSample] {
+            try insertUsageSample(sample, into: repository.databaseURL)
+        }
+        try setSQLiteUserVersion(at: repository.databaseURL, to: 2)
 
         let migrated = try AIStateRepository(directoryURL: directory).load().usageSamples
-        let summaries = AIUsageAnalytics.dailyAutomaticUsageSamples(samples: legacySamples)
+        let expected = AIUsageAnalytics.dailyUsageSamples(
+            samples: legacyAutomaticSummaries + [manualSample],
+            calendar: .current
+        )
 
-        #expect(migrated.contains(AIUsageAnalytics.dailyManualUsageSamples(samples: [manualSample])[0]))
-        #expect(migrated.filter(AIUsageAnalytics.isAutomaticUsageSummary) == summaries)
-        #expect(!migrated.contains(where: AIUsageAnalytics.isLegacyAutomaticUsageSample))
+        #expect(migrated == expected)
+        #expect(migrated.first?.totalTokens == 114)
+        #expect(try repository.recordDetectedUsage(legacyAutomaticSummaries) == 0)
+        #expect(try repository.load().usageSamples == expected)
     }
 
     @Test
@@ -1407,13 +1477,18 @@ private func setSQLiteUserVersion(at url: URL, to version: Int) throws {
 }
 
 private func insertLegacyManualUsage(_ sample: AIUsageSample, into url: URL) throws {
+    try insertUsageSample(sample, into: url)
+}
+
+private func insertUsageSample(_ sample: AIUsageSample, into url: URL) throws {
+    let sourceID = sample.sourceID.map { "'\($0)'" } ?? "NULL"
     try executeSQLite(
         at: url,
         sql: """
         INSERT INTO usage_samples(
             source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
         ) VALUES(
-            NULL, '\(sample.provider.rawValue)', \(sample.timestamp.timeIntervalSinceReferenceDate),
+            \(sourceID), '\(sample.provider.rawValue)', \(sample.timestamp.timeIntervalSinceReferenceDate),
             \(sample.inputTokens), \(sample.outputTokens), NULL, NULL
         )
         """
