@@ -69,6 +69,31 @@ struct OverlayCoordinatorTests {
     }
 
     @Test @MainActor
+    func collapsedIslandSwitchesBetweenTopAndBottomWindowLevels() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setCollapsedOnTop(false)
+        coordinator.setPinned(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        #expect(panel.level == IslandPanel.onTopLevel)
+
+        coordinator.setPinned(false)
+        #expect(panel.level == IslandPanel.onBottomLevel)
+        #expect(panel.level.rawValue < NSWindow.Level.normal.rawValue)
+
+        coordinator.setCollapsedOnTop(true)
+        #expect(panel.level == IslandPanel.onTopLevel)
+
+        coordinator.setCollapsedOnTop(false)
+        #expect(panel.level == IslandPanel.onBottomLevel)
+    }
+
+    @Test @MainActor
     func selectingDisplayReportsWhetherItHasAPhysicalNotch() {
         let coordinator = OverlayCoordinator(contentView: NSView())
         coordinator.updateScreens([
