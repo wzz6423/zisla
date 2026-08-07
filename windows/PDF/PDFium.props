@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PDFiumVersion>153.0.7988.0</PDFiumVersion>
+    <PDFiumVendorRoot>$(MSBuildThisFileDirectory)..\Vendor\pdfium\$(PDFiumVersion)</PDFiumVendorRoot>
+    <PDFiumArchitecture Condition="'$(Platform)'=='x64'">x64</PDFiumArchitecture>
+    <PDFiumArchitecture Condition="'$(Platform)'=='ARM64'">arm64</PDFiumArchitecture>
+    <PDFiumRoot Condition="'$(PDFiumArchitecture)'!=''">$(PDFiumVendorRoot)\$(PDFiumArchitecture)</PDFiumRoot>
+    <PDFiumIncludeDirectory>$(PDFiumRoot)\include</PDFiumIncludeDirectory>
+    <PDFiumLibraryDirectory>$(PDFiumRoot)\lib</PDFiumLibraryDirectory>
+    <PDFiumImportLibrary>$(PDFiumLibraryDirectory)\pdfium.dll.lib</PDFiumImportLibrary>
+    <PDFiumDll>$(PDFiumRoot)\bin\pdfium.dll</PDFiumDll>
+  </PropertyGroup>
+</Project>

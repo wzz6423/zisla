@@ -1,0 +1,6 @@
+{
+  "id": "monkey",
+  "displayName": "小猴",
+  "description": "像素小猴，来自 Kenney Animal Pack Redux (CC0)",
+  "spritePath": "sprite.png"
+}

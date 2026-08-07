@@ -1,0 +1,387 @@
+#!/usr/bin/env perl
+require 5.008;
+use warnings;
+use strict;
+
+unshift(@INC, '.');
+require qpdf_test_helpers;
+
+chdir("qpdf") or die "chdir testdir failed: $!\n";
+
+require TestDriver;
+
+cleanup();
+
+my $td = new TestDriver('qpdf-json');
+
+my $n_tests = 0;
+
+my @badfiles = (
+    'no-qpdf-object',
+    'qpdf-not-array',
+    'qpdf-array-too-long',
+    'no-pdf-version',
+    'top-level-scalar',
+    'bad-pdf-version1',
+    'bad-pdf-version2',
+    'top-level-array',
+    'objects-not-dict',
+    'bad-object-key',
+    'object-not-dict',
+    'object-value-indirect',
+    'stream-not-dict',
+    'stream-dict-not-dict',
+    'trailer-not-dict',
+    'trailer-stream',
+    'missing-trailer',
+    'missing-objects',
+    'obj-key-errors',
+    'bad-data',
+    'bad-datafile',
+    'bad-data2',
+    'bad-datafile2',
+    );
+
+$n_tests += scalar(@badfiles);
+
+foreach my $f (@badfiles)
+{
+    $td->runtest("bad: $f",
+                 {$td->COMMAND =>
+                      "qpdf --json-input qjson-$f.json a.pdf"},
+                 {$td->FILE => "qjson-$f.out", $td->EXIT_STATUS => 2},
+                 $td->NORMALIZE_NEWLINES);
+}
+
+my @goodfiles = (
+    'good1.pdf',
+    'good9.pdf',
+    'good13.pdf',
+    'good15.pdf',
+    'inline-images.pdf',
+    ['20-pages.pdf', '--password=user'],
+    'outlines-with-actions.pdf',
+    'form-fields-and-annotations.pdf',
+    'need-appearances.pdf',
+    'fxo-blue.pdf',
+    'weird-tokens.pdf',
+    );
+$n_tests += 6 * scalar(@goodfiles);
+
+foreach my $i (@goodfiles)
+{
+    my $f = $i;
+    my $xargs = "";
+    if (ref($i) eq 'ARRAY') {
+        ($f, $xargs) = @$i;
+    }
+    # explicit "latest" as --json-output version
+    $td->runtest("good: $f -> JSON",
+                 {$td->COMMAND => "qpdf $xargs" .
+                      " --json-output=latest $f a.json"},
+                 {$td->STRING => "", $td->EXIT_STATUS => 0},
+                 $td->NORMALIZE_NEWLINES);
+    # default --json-output version
+    $td->runtest("good: $f JSON -> JSON",
+                 {$td->COMMAND =>
+                      "qpdf --json-input --json-output a.json b.json"},
+                 {$td->STRING => "", $td->EXIT_STATUS => 0},
+                 $td->NORMALIZE_NEWLINES);
+    $td->runtest("good: $f JSON -> QDF",
+                 {$td->COMMAND =>
+                      "qpdf --qdf --json-input --stream-data=preserve" .
+                      " --static-id a.json a.pdf"},
+                 {$td->STRING => "", $td->EXIT_STATUS => 0},
+                 $td->NORMALIZE_NEWLINES);
+    $td->runtest("good: $f compare JSON",
+                 {$td->FILE => "a.json"},
+                 {$td->FILE => "b.json"});
+    my $exp = "json-changed-$f";
+    if (! -f $exp)
+    {
+        $td->runtest("good: $f -> aqdf",
+                     {$td->COMMAND =>
+                          "qpdf $xargs --object-streams=disable --qdf" .
+                          " --stream-data=preserve --static-id $f b.pdf"},
+                     {$td->STRING => "", $td->EXIT_STATUS => 0},
+                     $td->NORMALIZE_NEWLINES);
+        $exp = "b.pdf";
+    }
+    else
+    {
+        # Sometimes passing through json may make semantically
+        # equivalent changes such as
+        #
+        # * adding leading 0 to a floating point (.1 -> 0.1)
+        # * changing the Unicode representation of a string
+        # * changing the representation of a name (/n#65st -> /nest)
+        $td->runtest("good: json changes $f",
+                     {$td->STRING => ""},
+                     {$td->STRING => ""});
+    }
+    $td->runtest("good: $f compare qdf",
+                 {$td->FILE => "a.pdf"}, # from json
+                 {$td->FILE => $exp});   # from original PDF
+}
+
+$n_tests += 6;
+$td->runtest("manual JSON to PDF",
+             {$td->COMMAND => "qpdf --json-input --static-id --qdf" .
+                  " manual-qpdf-json.json a.pdf"},
+             {$td->STRING => "", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check manual JSON to PDF",
+             {$td->FILE => "a.pdf"},
+             {$td->FILE => "manual-qpdf-json.pdf"});
+$td->runtest("check manual JSON to PDF to JSON",
+             {$td->COMMAND => "qpdf --json-output=2 a.pdf -"},
+             {$td->FILE => "manual-qpdf-json-pdf.json", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("manual JSON to JSON",
+             {$td->COMMAND => "qpdf --json-input --json-output=2" .
+                  " manual-qpdf-json.json a.json"},
+             {$td->STRING => "", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check manual JSON to JSON",
+             {$td->FILE => "a.json"},
+             {$td->FILE => "manual-qpdf-json-out.json"},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check manual JSON to JSON to JSON",
+             {$td->COMMAND => "qpdf --json-output=2 --json-input a.json -"},
+             {$td->FILE => "a.json", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+
+$n_tests += 6;
+$td->runtest("json-output with file",
+             {$td->COMMAND => "qpdf --json-output=2" .
+                  " --json-stream-prefix=auto-1 --json-stream-data=file" .
+                  " minimal.pdf a.json"},
+             {$td->STRING => "", $td->EXIT_STATUS => 0});
+$td->runtest("check file mode",
+             {$td->FILE => "a.json"},
+             {$td->FILE => "minimal-json-file.out"},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("JSON to JSON with file",
+             {$td->COMMAND => "qpdf --json-input --json-output=2" .
+                  " --json-stream-prefix=auto-2 --json-stream-data=file" .
+                  " a.json -"},
+             {$td->FILE => "minimal-json-file-2.out", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("JSON with file to qdf",
+             {$td->COMMAND => "qpdf --json-input --qdf --static-id" .
+                  " a.json a.pdf"},
+             {$td->STRING => "", $td->EXIT_STATUS => 0});
+$td->runtest("PDF to qdf",
+             {$td->COMMAND => "qpdf --qdf --static-id minimal.pdf b.pdf"},
+             {$td->STRING => "", $td->EXIT_STATUS => 0});
+$td->runtest("check PDF",
+             {$td->FILE => "a.pdf"},
+             {$td->FILE => "b.pdf"});
+
+# Replace mode tests
+
+$n_tests += 1;
+$td->runtest("create PDF for replace",
+             {$td->COMMAND => "qpdf good13.pdf a.pdf" .
+                  " --update-from-json=qpdf-json-update-errors.json"},
+             {$td->FILE => "update-from-json-errors.out",
+                  $td->EXIT_STATUS => 2},
+             $td->NORMALIZE_NEWLINES);
+
+my @update_files = (
+    "update-stream-dict-only",
+    "update-stream-data",
+    "replace-with-stream",
+    "various-updates",
+    );
+$n_tests += 2 * scalar(@update_files);
+
+foreach my $f (@update_files) {
+    $td->runtest("update: $f",
+                 {$td->COMMAND =>
+                      "qpdf good13.pdf a.pdf --qdf --static-id" .
+                      " --update-from-json=$f.json"},
+                 {$td->STRING => "", $td->EXIT_STATUS => 0});
+    $td->runtest("$f: check updated",
+                 {$td->FILE => "a.pdf"},
+                 {$td->FILE => "$f-updated.pdf"});
+}
+
+# Exercise object description
+$n_tests += 2;
+$td->runtest("json-input object description",
+             {$td->COMMAND => "test_driver 89 manual-qpdf-json.json"},
+             {$td->FILE => "test-89.out", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("update-from-json object description",
+             {$td->COMMAND => "test_driver 90 good13.pdf various-updates.json"},
+             {$td->FILE => "test-90.out", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+
+# Exercise pushedinheritedpageresources and calledgetallpages
+$n_tests += 12;
+$td->runtest("call getAllPages",
+             {$td->COMMAND =>
+                  "qpdf --json-output duplicate-page-inherited.pdf" .
+                  " --json-key=pages a.json"},
+             {$td->FILE => "duplicate-page-inherited.out",
+                  $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check json (1)",
+             {$td->FILE => "a.json"},
+             {$td->FILE => "duplicate-page-inherited-1.json"},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("update (1)",
+             {$td->COMMAND =>
+                  "qpdf" .
+                  " --update-from-json=duplicate-page-inherited-update.json" .
+                  " --json-output duplicate-page-inherited.pdf" .
+                  " a.json"},
+             {$td->FILE => "duplicate-page-inherited.out",
+                  $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check json (2)",
+             {$td->FILE => "a.json"},
+             {$td->FILE => "duplicate-page-inherited-1-fixed.json"},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("create PDF (1)",
+             {$td->COMMAND =>
+                  "qpdf --qdf --static-id --json-input a.json a.pdf"},
+             {$td->STRING => "", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check PDF (1)",
+             {$td->FILE => "a.pdf"},
+             {$td->FILE => "duplicate-page-inherited-1-fixed.pdf"});
+
+$td->runtest("call pushInheritedAttributesToPage",
+             {$td->COMMAND =>
+                  "qpdf --json-output duplicate-page-inherited.pdf" .
+                  " --json-key=pages --pages . -- a.json"},
+             {$td->FILE => "duplicate-page-inherited.out",
+                  $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check json (2)",
+             {$td->FILE => "a.json"},
+             {$td->FILE => "duplicate-page-inherited-2.json"},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("update (2)",
+             {$td->COMMAND =>
+                  "qpdf" .
+                  " --update-from-json=duplicate-page-inherited-update2.json" .
+                  " --json-output duplicate-page-inherited.pdf" .
+                  " a.json"},
+             {$td->FILE => "duplicate-page-inherited.out",
+                  $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check json (3)",
+             {$td->FILE => "a.json"},
+             {$td->FILE => "duplicate-page-inherited-2-fixed.json"},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("create PDF (2)",
+             {$td->COMMAND =>
+                  "qpdf --qdf --static-id --json-input a.json a.pdf"},
+             {$td->STRING => "", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check PDF (2)",
+             {$td->FILE => "a.pdf"},
+             {$td->FILE => "duplicate-page-inherited-2-fixed.pdf"});
+
+$n_tests += 1;
+$td->runtest("simple version of writeJSON",
+             {$td->COMMAND => "test_driver 91 minimal.pdf"},
+             {$td->FILE => "minimal-write-json.json", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+
+$n_tests += 13;
+$td->runtest("C API create from json file",
+             {$td->COMMAND => "qpdf-ctest 42 minimal.json '' a.pdf"},
+             {$td->STRING => "C test 42 done\n", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check C API create from file",
+             {$td->COMMAND => "qpdf-test-compare a.pdf qpdf-ctest-42-43.pdf"},
+             {$td->FILE => "qpdf-ctest-42-43.pdf", $td->EXIT_STATUS => 0});
+$td->runtest("C API create from json buffer",
+             {$td->COMMAND => "qpdf-ctest 43 minimal.json '' a.pdf"},
+             {$td->STRING => "C test 43 done\n", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check C API create from buffer",
+             {$td->COMMAND => "qpdf-test-compare a.pdf qpdf-ctest-42-43.pdf"},
+             {$td->FILE => "qpdf-ctest-42-43.pdf", $td->EXIT_STATUS => 0});
+$td->runtest("C API update from json file",
+             {$td->COMMAND =>
+                  "qpdf-ctest 44 minimal.pdf '' a.pdf minimal-update.json"},
+             {$td->STRING => "C test 44 done\n", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check C API update from file",
+             {$td->COMMAND => "qpdf-test-compare a.pdf qpdf-ctest-44-45.pdf"},
+             {$td->FILE => "qpdf-ctest-44-45.pdf", $td->EXIT_STATUS => 0});
+$td->runtest("C API update from json buffer",
+             {$td->COMMAND =>
+                  "qpdf-ctest 45 minimal.pdf '' a.pdf minimal-update.json"},
+             {$td->STRING => "C test 45 done\n", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check C API update from buffer",
+             {$td->COMMAND => "qpdf-test-compare a.pdf qpdf-ctest-44-45.pdf"},
+             {$td->FILE => "qpdf-ctest-44-45.pdf", $td->EXIT_STATUS => 0});
+$td->runtest("C API write to JSON 1",
+             {$td->COMMAND =>
+                  "qpdf-ctest 46 minimal.pdf '' a.json"},
+             {$td->STRING => "C test 46 done\n", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check C API write to JSON 1",
+             {$td->FILE => "a.json"},
+             {$td->FILE => "qpdf-ctest-46.json"},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("C API write to JSON 2",
+             {$td->COMMAND =>
+                  "qpdf-ctest 47 minimal.pdf '' a.json auto"},
+             {$td->STRING => "C test 47 done\n", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check C API write to JSON 2",
+             {$td->FILE => "a.json"},
+             {$td->FILE => "qpdf-ctest-47.json"},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check C API write to JSON stream",
+             {$td->FILE => "auto-4"},
+             {$td->FILE => "qpdf-ctest-47-4"});
+
+# Bugs #1072 and #1079 illustrate cases that qpdf-json got wrong. In
+# #1072, it was noticed that name tokens containing binary characters
+# (using #xx) would generate invalid JSON, even though qpdf's own JSON
+# parser would accept it. Also, the JSON spec allows real numbers in
+# scientific notation, but the PDF spec does not.
+$n_tests += 7;
+$td->runtest("handle binary names",
+             {$td->COMMAND =>
+                  "qpdf --json-output weird-tokens.pdf a.json"},
+             {$td->STRING => "", $td->EXIT_STATUS => 0});
+# Round-trip back to PDF is tested above.
+$td->runtest("check json",
+             {$td->FILE => "a.json"},
+             {$td->FILE => "weird-tokens.json"},
+             $td->NORMALIZE_NEWLINES);
+# Make sure we can properly handle JSON with scientific notation.
+$td->runtest("weird tokens round trip json",
+             {$td->COMMAND =>
+                  "qpdf --json-input --json-output weird-tokens.json -"},
+             {$td->FILE => "weird-tokens.json", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("weird tokens with scientific notation",
+             {$td->COMMAND =>
+                  "qpdf --json-input --json-output weird-tokens-alt.json -"},
+             {$td->FILE => "weird-tokens.json", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("handle binary names (JSON v1)",
+             {$td->COMMAND =>
+                  "qpdf --json=1 weird-tokens.pdf a.json"},
+             {$td->STRING => "", $td->EXIT_STATUS => 0});
+$td->runtest("check json",
+             {$td->FILE => "a.json"},
+             {$td->FILE => "weird-tokens-v1.json"},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("write JSON to pipeline",
+             {$td->COMMAND => "test_driver 98 minimal.pdf ''"},
+             {$td->STRING => "test 98 done\n", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+cleanup();
+$td->report($n_tests);

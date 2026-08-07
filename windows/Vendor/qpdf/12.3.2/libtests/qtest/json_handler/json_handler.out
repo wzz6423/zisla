@@ -1,0 +1,77 @@
+-- scalar --
+.: string: potato
+-- all --
+.: json: {
+  "five": [
+    "x",
+    false,
+    "y",
+    null,
+    true
+  ],
+  "four": [
+    "a",
+    1
+  ],
+  "one": "potato",
+  "phour": null,
+  "six": {
+    "a": {
+      "Q": "baaa",
+      "b": "quack"
+    },
+    "b": "moo"
+  },
+  "three": true,
+  "two": 3.14
+}
+.five: json: [
+  "x",
+  false,
+  "y",
+  null,
+  true
+]
+.five[0]: string: x
+.five[1]: bool: false
+.five[2]: string: y
+.five[3]: null
+.five[4]: bool: true
+.five: json: array end
+.four: json: [
+  "a",
+  1
+]
+.one: string: potato
+.phour: json: null
+.six: json: {
+  "a": {
+    "Q": "baaa",
+    "b": "quack"
+  },
+  "b": "moo"
+}
+.six.a: json: {
+  "Q": "baaa",
+  "b": "quack"
+}
+.six.a.Q: json: "baaa"
+.six.a.b: string: quack
+.six.a: json: dict end
+.six.b: string: moo
+.six: json: dict end
+.three: bool: true
+.two: number: 3.14
+.: json: dict end
+-- fallback --
+.: json: {
+  "five": "not-array"
+}
+.five: string: not-array
+.: json: dict end
+-- errors --
+bad type at top: JSON handler: value at . is not of expected type
+.: json: {
+  "x": "y"
+}
+unexpected key: JSON handler found unexpected key x in object at .

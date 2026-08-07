@@ -1,0 +1,87 @@
+#!/usr/bin/env perl
+require 5.008;
+use warnings;
+use strict;
+
+unshift(@INC, '.');
+require qpdf_test_helpers;
+
+chdir("qpdf") or die "chdir testdir failed: $!\n";
+
+require TestDriver;
+
+cleanup();
+
+my $td = new TestDriver('pages-tree');
+
+my $n_tests = 17;
+
+$td->runtest("linearize duplicated pages",
+             {$td->COMMAND =>
+                  "qpdf --static-id --linearize --compress-streams=n" .
+                  " page_api_2.pdf a.pdf"},
+             {$td->FILE => "duplicate-page-warning.out",
+                  $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("compare files",
+             {$td->COMMAND => "qpdf-test-compare a.pdf linearize-duplicate-page.pdf"},
+             {$td->FILE => "linearize-duplicate-page.pdf", $td->EXIT_STATUS => 0});
+$td->runtest("extract duplicated pages",
+             {$td->COMMAND =>
+                  "qpdf --static-id page_api_2.pdf" .
+                  " --pages . -- a.pdf"},
+             {$td->FILE => "duplicate-page-warning.out",
+                  $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("compare files",
+             {$td->COMMAND => "qpdf-test-compare a.pdf extract-duplicate-page.pdf"},
+             {$td->FILE => "extract-duplicate-page.pdf", $td->EXIT_STATUS => 0});
+$td->runtest("direct pages",
+             {$td->COMMAND =>
+                  "qpdf --static-id direct-pages.pdf --pages . -- a.pdf"},
+             {$td->FILE => "direct-page-warning.out", $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check output",
+             {$td->COMMAND => "qpdf-test-compare a.pdf direct-pages-fixed.pdf"},
+             {$td->FILE => "direct-pages-fixed.pdf", $td->EXIT_STATUS => 0});
+$td->runtest("show direct pages",
+             {$td->COMMAND =>
+                  "qpdf --show-pages direct-pages.pdf"},
+             {$td->FILE => "direct-pages.out", $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+
+# Json mode for direct and duplicated pages illustrates that the
+# "objects" section the original objects before correction when
+# "pages" is not output but after correct when it is.
+foreach my $f (qw(page_api_2 direct-pages))
+{
+    $td->runtest("json for $f (objects only)",
+                 {$td->COMMAND =>
+                      "qpdf --json=latest $f.pdf" .
+                      " --json-key=qpdf"},
+                 {$td->FILE => "$f-json-objects.out", $td->EXIT_STATUS => 0},
+                 $td->NORMALIZE_NEWLINES);
+    $td->runtest("json for $f (with pages)",
+                 {$td->COMMAND =>
+                      "qpdf --json=latest $f.pdf" .
+                      " --json-key=qpdf --json-key=pages 2>warn.tmpout"},
+                 {$td->FILE => "$f-json-pages.out", $td->EXIT_STATUS => 3},
+                 $td->NORMALIZE_NEWLINES);
+    $td->runtest("check page warnings",
+                 {$td->FILE => "warn.tmpout"},
+                 {$td->FILE => "$f-json-warning.out"},
+                 $td->NORMALIZE_NEWLINES);
+    $td->runtest("json for $f (with push)",
+                 {$td->COMMAND =>
+                      "qpdf --pages . -- --json=latest $f.pdf" .
+                      " --json-key=qpdf --json-key=pages 2>warn2.tmpout"},
+                 {$td->FILE => "$f-json-pages-push.out", $td->EXIT_STATUS => 3},
+                 $td->NORMALIZE_NEWLINES);
+    $td->runtest("check page warnings",
+                 {$td->FILE => "warn2.tmpout"},
+                 {$td->FILE => "$f-json-warning.out"},
+                 $td->NORMALIZE_NEWLINES);
+}
+
+cleanup();
+$td->report($n_tests);

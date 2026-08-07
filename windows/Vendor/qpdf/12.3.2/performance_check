@@ -1,0 +1,369 @@
+#!/usr/bin/env perl
+require 5.008;
+use warnings;
+use strict;
+use File::Basename;
+use Time::HiRes qw(gettimeofday tv_interval);
+use File::Path qw(make_path);
+use IPC::Open3;
+use IO::Pipe;
+
+my $whoami = basename($0);
+$| = 1;
+
+# [ name, [ args ] ]
+# If <IN> appears, it is replaced with the input file name. Otherwise,
+# the input file name is added to the end of the arguments.
+my @tests = (
+    ['no arguments', []],
+    ['generate object streams', ['--object-streams=generate']],
+    ['disable object streams', ['--object-streams=disable']],
+    ['split pages', ['--split-pages', '--remove-unreferenced-resources=no']],
+    ['shared resource check', ['--split-pages', '--remove-unreferenced-resources=auto']],
+    ['linearize', ['--linearize']],
+    ['encrypt', ['--encrypt', 'u', 'o', '256', '--']],
+    ['extract first page', ['--empty', '--pages', '<IN>', '1', '--']],
+    ['json-output', ['--json-output']],
+    ['json-input', ['--json-input']],
+    );
+
+# If arg is not found in help output, look here. If not here, skip test.
+# { new => old } -- if new is not found, replace with old; if old is
+#                   if old is empty, remove argument
+my %arg_compat = (
+    '--remove-unreferenced-resources=no' => '--preserve-unreferenced-resources',
+    '--remove-unreferenced-resources=yes' => '',
+    '--remove-unreferenced-resources=auto' => undef,
+    '--report-memory-usage' => '',
+    );
+
+my $executable = undef;
+my $test_dir = undef;
+my $test_file = undef;
+my $workdir = undef;
+my $maxtime = undef;
+my $iterations = undef;
+
+my $default_executable = 'build/qpdf/qpdf';
+my $default_test_dir = '../performance-test-files';
+my $default_test_file = undef;
+my $default_workdir = 'build/perf';
+my $default_maxtime = 20;
+my $default_iterations = 20;
+
+sub usage
+{
+    warn "
+Usage: $whoami [ args ]
+  --dir dir           test on all files in dir (default: $default_test_dir)
+  --file file         test only on the named file
+  --executable qpdf   use the specified qpdf (default: $default_executable)
+  --workdir           where to write output pdfs (default: $default_workdir)
+  --maxtime           maximum time for a test; 0 means unlimited (default: $default_maxtime)
+  --iterations        number of iterations (default: $default_iterations)
+  --test regexp       run only tests that match specified pattern
+
+Populate $test_dir with files you want to use for performance
+benchmarking. PDF files and qpdf JSON files are allowed. The qpdf
+release process uses a clone of
+https://github.com/qpdf/performance-test-files for this purpose.
+
+Tests:
+";
+    foreach my $t (@tests)
+    {
+        warn "  $t->[0]\n";
+    }
+    exit 2;
+}
+
+my $test_re = undef;
+while (@ARGV)
+{
+    my $arg = shift(@ARGV);
+    if ('--dir' eq $arg)
+    {
+        usage() unless @ARGV;
+        $test_dir = shift(@ARGV);
+        $test_file = undef;
+    }
+    elsif ('--file' eq $arg)
+    {
+        usage() unless @ARGV;
+        $test_file = shift(@ARGV);
+        $test_dir = undef;
+    }
+    elsif ('--executable' eq $arg)
+    {
+        usage() unless @ARGV;
+        $executable = shift(@ARGV);
+    }
+    elsif ('--workdir' eq $arg)
+    {
+        usage() unless @ARGV;
+        $workdir = shift(@ARGV);
+    }
+    elsif ('--maxtime' eq $arg)
+    {
+        usage() unless @ARGV;
+        $maxtime = shift(@ARGV);
+    }
+    elsif ('--iterations' eq $arg)
+    {
+        usage() unless @ARGV;
+        $iterations = shift(@ARGV);
+    }
+    elsif ('--test' eq $arg)
+    {
+        usage() unless @ARGV;
+        $test_re = shift(@ARGV);
+    }
+    else
+    {
+        usage();
+    }
+}
+
+if ((! defined $test_dir) && (! defined $test_file))
+{
+    $test_dir = $default_test_dir;
+}
+if (! defined $executable)
+{
+    $executable = $default_executable;
+}
+if (! defined $workdir)
+{
+    $workdir = $default_workdir;
+}
+if (! defined $maxtime)
+{
+    $maxtime = $default_maxtime;
+}
+if (! defined $iterations)
+{
+    $iterations = $default_iterations;
+}
+
+my @test_files = ();
+my @json_test_files = ();
+{ # private scope
+    my @tmp = ();
+    if (defined $test_file)
+    {
+        push(@tmp, $test_file);
+    }
+    else
+    {
+        opendir(D, $test_dir) or die "
+$whoami: can't open test directory: $!
+
+Configured test directory: $test_dir
+
+Populate $test_dir with a clone of the
+qpdf/performance-test-files github repository.
+Run $whoami --help for details.
+
+Repository URL: https://github.com/qpdf/performance-test-files
+
+";
+        my @entries = readdir(D);
+        closedir(D);
+        for (sort @entries)
+        {
+            my $file = "$test_dir/$_";
+            if (-f $file && $file =~ m/.(pdf|json)$/i)
+            {
+                push(@tmp, $file);
+            }
+        }
+    }
+    foreach my $i (@tmp)
+    {
+        if ($i =~ m/.json$/)
+        {
+            push(@json_test_files, $i);
+        }
+        else
+        {
+            push(@test_files, $i);
+        }
+    }
+}
+
+my $report_mem = filter_args(["--report-memory-usage"]);
+{
+    my ($r, $mem) = run_cmd($executable, @$report_mem,
+                            "--empty", File::Spec->devnull());
+    if ($r != 0)
+    {
+        die "$whoami: $executable doesn't seem to work\n";
+    }
+    if ($mem == 0)
+    {
+        print "** Note: memory information is not available **\n";
+    }
+}
+
+run_tests();
+print "\n";
+
+sub filter_args
+{
+    my $args = shift;
+    my $help = `$executable --help=all`;
+    my $new_args = [];
+    foreach my $arg (@$args)
+    {
+        my $to_check = $arg;
+        $to_check =~ s/=.*$//;
+        if (($to_check =~ m/^-/) && (index($help, $to_check) == -1))
+        {
+            my $new_arg = $arg_compat{$arg};
+            if (! defined $new_arg)
+            {
+                return undef;
+            }
+            if ($new_arg ne '')
+            {
+                print "  replacing $arg with $new_arg\n";
+                push(@$new_args, $new_arg);
+            }
+        }
+        else
+        {
+            push(@$new_args, $arg);
+        }
+    }
+    $new_args;
+}
+
+sub run_tests
+{
+    my $args = shift;
+
+    chomp(my $commit = `git describe @`);
+    print "commit: $commit\n";
+    print "Format: time-in-seconds  RAM-in-MiB  filename\n";
+    make_path($workdir);
+    foreach my $test (@tests)
+    {
+        my ($name, $args) = @$test;
+        if ((defined $test_re) && $name !~ m/$test_re/)
+        {
+            print " skipping test $name\n";
+            next;
+        }
+        print " test: $name\n";
+        $args = filter_args($args);
+        if (! defined $args)
+        {
+            print "  skipping (unknown arguments)\n";
+            next;
+        }
+        my $test_files = \@test_files;
+        foreach my $arg (@$args)
+        {
+            if ($arg eq '--json-input')
+            {
+                $test_files = \@json_test_files;
+                last;
+            }
+        }
+        foreach my $file (@$test_files)
+        {
+            my $time = run_test($file, $args);
+            if (defined $time)
+            {
+                print "  $time  " . basename($file) ."\n";
+            }
+            else
+            {
+                print "   $file skipped\n";
+            }
+        }
+    }
+}
+
+sub run_test
+{
+    my ($file, $args) = @_;
+
+    my $outfile = "out.pdf";
+    my $found_in = 0;
+    my @cmd = ($executable, @$report_mem);
+    for (@$args)
+    {
+        my $arg = $_;
+        if ($arg eq '--json-output')
+        {
+            $outfile = "out.json";
+        }
+        elsif ($arg eq '<IN>')
+        {
+            $found_in = 1;
+            $arg = $file;
+        }
+        push(@cmd, $arg);
+    }
+    if (! $found_in)
+    {
+        push(@cmd, $file);
+    }
+    push(@cmd, "$workdir/$outfile");
+    # Run once and discard to update caches
+    system("sync");
+    run_cmd(@cmd);
+    my $i = 0;
+    my $total = 0;
+    my $max_mem = 0;
+    while ($i < $iterations)
+    {
+        my $start = [gettimeofday];
+        my ($r, $mem) = run_cmd(@cmd);
+        if ($r == 2)
+        {
+            # interrupt
+            exit(2);
+        }
+        my $end = [gettimeofday];
+        if ($r != 0)
+        {
+            print "  command failed; ignoring results\n";
+            return undef;
+        }
+        $max_mem = $mem > $max_mem ? $mem : $max_mem;
+        my $elapsed = tv_interval($start, $end);
+        $total += $elapsed;
+        ++$i;
+        if (($maxtime > 0) && ($total >= $maxtime) && ($i >= 3))
+        {
+            # This is taking too long, so take what we have
+            last;
+        }
+    }
+    return sprintf("%8.4f  %8.4f", $total / $i, $max_mem / 1048576);
+}
+
+sub run_cmd
+{
+    my @cmd = @_;
+    my $pipe = IO::Pipe->new();
+    my $pid = open3(my $child_in, '>&STDOUT', $pipe->writer(), @cmd);
+    $child_in->close();
+    waitpid($pid, 0);
+    my $r = $?;
+    my $mem = 0;
+    while (<$pipe>)
+    {
+        if (m/qpdf-max-memory-usage (\d+)/)
+        {
+            $mem = $1;
+        }
+        else
+        {
+            warn $_;
+        }
+    }
+    ($r, $mem);
+}
