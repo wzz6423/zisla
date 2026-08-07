@@ -8,7 +8,13 @@
 # Future Windows build outputs
 /windows/[Bb]in/
 /windows/[Oo]bj/
+/windows/**/[Bb]in/
+/windows/**/[Oo]bj/
 /windows/.vs/
+/windows/App/Generated Files/
+/windows/cmake-build-*/
+/windows/*.log
+/windows/Docs/
 *.suo
 *.user
 

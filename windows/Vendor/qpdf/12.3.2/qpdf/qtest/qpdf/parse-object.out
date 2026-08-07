@@ -1,0 +1,14 @@
+[ /name 16059 3.14159 false << /key true /other [ (string1) (string2) ] >> null ]
+logic error parsing indirect: Parser::parse called without context on an object with indirect references
+trailing data: parsed object (trailing test): trailing data found parsing object from string
+WARNING: parsed object (offset 9): unknown token while reading object; treating as string
+WARNING: parsed object: treating unexpected brace token as null
+WARNING: parsed object: treating unexpected brace token as null
+WARNING: parsed object: unexpected dictionary close token
+WARNING: bad-parse.qdf (object 7 0, offset 1121): unexpected EOF
+WARNING: parsed object (offset 5): treating bad indirect reference (0 0 R) as null
+WARNING: parsed object (offset 12): treating bad indirect reference (-1 0 R) as null
+WARNING: parsed object (offset 22): treating bad indirect reference (1 65535 R) as null
+WARNING: parsed object (offset 33): treating bad indirect reference (1 100000 R) as null
+WARNING: parsed object (offset 40): treating bad indirect reference (1 -1 R) as null
+test 31 done

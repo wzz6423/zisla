@@ -1,0 +1,53 @@
+#!/bin/sh
+
+# Formatting rules are in .clang-format.
+
+# To protect a block of code from automatic formatting, enclose in
+# comments such as
+#
+#  // clang-format off
+#  ...
+#  // clang-format on
+
+# Sometimes, a comment of the form `// line-break` may appear in the
+# code to prevent clang-format from removing an intentional line
+# break.
+
+# For emacs users, the file `.dir-locals.el` configures cc-mode for an
+# indentation style that is close to but not exactly like what
+# clang-format produces. clang-format is authoritative.
+
+# Please see "Code Formatting" in the manual for additional notes.
+
+# If a newer version of clang-format causes changes to the output that
+# are improvements, bump the minimum required version of clang-format
+# here, and update manual/contributing.rst. There's a comment there
+# that refers to this comment. See also .clang-format.
+min_version=20
+
+clang_format=clang-format
+if clang-format-$min_version --version >/dev/null 2>&1; then
+    clang_format=clang-format-$min_version
+else
+    clang_version=$(clang-format --version | \
+        awk '{for (i=1; i<=NF; i++) if ($i == "version") {print int($(i+1)); exit}}')
+    if [ "$clang_version" -lt "$min_version" ]; then
+        echo "clang-format version >= $min_version is required"
+        exit 2
+    fi
+fi
+
+cd $(dirname $0)
+for i in $(find . -name '*build*' -prune -o '(' \
+		-name '*.hh' -o -name '*.h' -o -name '*.cc' -o -name '*.c' \
+		')' -print); do
+    if $clang_format < $i >| $i.new; then
+	if diff -q $i $i.new >/dev/null 2>/dev/null; then
+	    echo "okay:    $i"
+	    rm $i.new
+	else
+	    echo "updated: $i"
+	    mv $i.new $i
+	fi
+    fi
+done

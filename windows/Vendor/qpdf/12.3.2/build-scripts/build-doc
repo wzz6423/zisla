@@ -1,0 +1,17 @@
+#!/bin/bash
+# The manual references this file.
+cd $(dirname $0)/..
+set -ex
+sudo apt-get update
+sudo apt-get -y install \
+   autoconf build-essential cmake zlib1g-dev libjpeg-dev \
+   python3-pip texlive-latex-extra latexmk
+pip3 install sphinx sphinx_rtd_theme
+cmake -S . -B build -DBUILD_DOC=1
+cmake --build build --verbose --target doc_dist
+zip -r doc.zip build/manual/doc-dist
+version=$(grep -E '^ +VERSION [1-9]' CMakeLists.txt | awk '{print $2}')
+mv build/manual/doc-dist qpdf-${version}-doc
+mkdir distribution
+zip -r distribution/qpdf-${version}-doc-ci.zip qpdf-${version}-doc
+sha256sum distribution/*
