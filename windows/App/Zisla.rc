@@ -1,5 +1,0 @@
-#include "resource.h"
-
-IDI_ZISLA_APP ICON "Assets\\Zisla.ico"
-IDI_ZISLA_TRAY_DAY ICON "Assets\\TrayIconDay.ico"
-IDI_ZISLA_TRAY_NIGHT ICON "Assets\\TrayIconNight.ico"

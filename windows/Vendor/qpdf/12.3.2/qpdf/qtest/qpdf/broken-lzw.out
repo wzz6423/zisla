@@ -1,3 +1,0 @@
-WARNING: broken-lzw.pdf (offset 444): error decoding stream data for object 4 0: LZWDecoder: bad code received
-WARNING: broken-lzw.pdf (offset 444): stream will be re-processed without filtering to avoid data loss
-qpdf: operation succeeded with warnings; resulting file may have some problems

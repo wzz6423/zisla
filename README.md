@@ -13,11 +13,10 @@ zisla 是一个使用 SwiftUI 和 AppKit 构建的原生 macOS 工作空间。�
 ## 仓库结构
 
 - `mac/`：当前的 macOS 实现，使用 Swift、AppKit 和 SwiftUI 构建。
-- `windows/`：开发中的 Windows 实现，使用 C++20、C++/WinRT、WinUI 3 和 Windows App SDK；纯 C++ 核心可在 macOS 上验证。
 
 ## 系统兼容性
 
-当前发布版本仅支持搭载 Apple 芯片且运行 macOS 14 或更高版本的 Mac。macOS 14 之前的系统和 Intel 芯片机型虽有对应的发布版本，但不保证可用性。Windows 11 版本正在开发，尚未发布；WinUI 外壳必须在 Windows 实机完成构建和运行验证。
+目前仅支持搭载 Apple 芯片且运行 macOS 14 或更高版本的 Mac。macOS 14 之前的系统和 Intel 芯片机型虽有对应的发布版本，但不保证可用性；欢迎持有相关设备的贡献者协助适配、测试和修复 Bug。
 
 ## macOS 开发
 
@@ -27,15 +26,3 @@ swift run zisla
 ```
 
 macOS Swift target、Bundle ID、本地数据目录和 `zislactl` 均使用 zisla 标识。升级时会自动迁移此前版本的本地数据和偏好设置。macOS 的功能、构建和测试说明见 [`mac/README.md`](mac/README.md)。
-
-## Windows 开发
-
-当前 Mac 可验证不依赖 WinRT 的 C++20 核心：
-
-```bash
-cmake -S windows -B /tmp/zisla-windows-build -DCMAKE_BUILD_TYPE=Debug
-cmake --build /tmp/zisla-windows-build --parallel
-ctest --test-dir /tmp/zisla-windows-build --output-on-failure
-```
-
-Windows 架构、功能范围和实机要求见 [`windows/README.md`](windows/README.md)。
