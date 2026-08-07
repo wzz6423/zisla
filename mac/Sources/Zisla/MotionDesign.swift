@@ -86,7 +86,6 @@ struct PressableStyle: ButtonStyle {
 
 private struct ModulePushModifier: ViewModifier {
     var offsetX: CGFloat
-    var blurRadius: CGFloat
     var scale: CGFloat
     var opacity: Double
 
@@ -95,13 +94,12 @@ private struct ModulePushModifier: ViewModifier {
             .scaleEffect(scale)
             .offset(x: offsetX)
             .opacity(opacity)
-            .blur(radius: blurRadius, opaque: false)
     }
 }
 
 extension AnyTransition {
     /// Directional push between module pages: the incoming page slides in from the
-    /// navigation direction with a slight blur, the outgoing page continues onward.
+    /// navigation direction with scale and fade, the outgoing page continues onward.
     /// `direction` is +1 when moving right in the module order, -1 when moving left.
     static func modulePush(direction: CGFloat) -> AnyTransition {
         let d: CGFloat = direction >= 0 ? 1 : -1
@@ -109,20 +107,18 @@ extension AnyTransition {
             insertion: .modifier(
                 active: ModulePushModifier(
                     offsetX: 26 * d,
-                    blurRadius: 5,
                     scale: ZislaMotion.moduleDepthScale,
                     opacity: 0
                 ),
-                identity: ModulePushModifier(offsetX: 0, blurRadius: 0, scale: 1, opacity: 1)
+                identity: ModulePushModifier(offsetX: 0, scale: 1, opacity: 1)
             ),
             removal: .modifier(
                 active: ModulePushModifier(
                     offsetX: -26 * d,
-                    blurRadius: 5,
                     scale: ZislaMotion.moduleDepthScale,
                     opacity: 0
                 ),
-                identity: ModulePushModifier(offsetX: 0, blurRadius: 0, scale: 1, opacity: 1)
+                identity: ModulePushModifier(offsetX: 0, scale: 1, opacity: 1)
             )
         )
     }

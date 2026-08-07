@@ -154,7 +154,7 @@ struct IslandRootView: View {
 
                             ZStack {
                                 if let activeModule {
-                                    DeferredMount {
+                                    Group {
                                         switch activeModule {
                                         case .dashboard:
                                             IslandDashboardView(model: model)
