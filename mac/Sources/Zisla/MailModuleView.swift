@@ -11,7 +11,6 @@ struct MailModuleView: View {
     @State private var selectedAccountName: String?
     @State private var isComposing = false
     @State private var replyTarget: MailMessage?
-    @State private var deleteTarget: MailMessage?
 
     private var mail: MailService { model.mail }
 
@@ -53,22 +52,6 @@ struct MailModuleView: View {
                 self.selectedAccountName = nil
             }
             selectFirstMessageIfNeeded()
-        }
-        .confirmationDialog(
-            "将邮件移到废纸篓？",
-            isPresented: Binding(
-                get: { deleteTarget != nil },
-                set: { if !$0 { deleteTarget = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("移到废纸篓", role: .destructive) {
-                guard let deleteTarget else { return }
-                self.deleteTarget = nil
-                Task { await model.deleteMail(deleteTarget) }
-            }
-        } message: {
-            Text("这封邮件可在 Mail.app 的废纸篓中恢复。")
         }
     }
 
@@ -210,6 +193,9 @@ struct MailModuleView: View {
                 size: .compact
             )
         }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
         .help(selectedAccount?.displayName ?? "全部已启用账户")
     }
 
@@ -226,6 +212,7 @@ struct MailModuleView: View {
             }
             selectedMessageID = message.id
             if !message.isRead {
+                mail.markReadLocally(message)
                 Task { await model.markMailRead(message) }
             }
         } label: {
@@ -311,22 +298,37 @@ struct MailModuleView: View {
     // MARK: - Action Rail
 
     private func actionRail(for message: MailMessage) -> some View {
-        HStack(spacing: 3) {
-            IconButton(symbol: "arrowshape.turn.up.left", help: "回复", size: .compact) {
+        HStack(spacing: 6) {
+            Button {
                 replyTarget = message
                 withAnimation(.easeInOut(duration: 0.2)) { isComposing = true }
+            } label: {
+                Label("回复", systemImage: "arrowshape.turn.up.left")
+                    .font(.islandMicro(weight: .semibold))
             }
-            IconButton(symbol: "envelope.open", help: "标记已读", size: .compact) {
-                Task { await model.markMailRead(message) }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .help("打开回复编辑器")
+
+            Menu {
+                Button {
+                    Task { await model.markMailJunk(message) }
+                } label: {
+                    Label("标记为垃圾邮件", systemImage: "exclamationmark.triangle")
+                }
+                Divider()
+                Button(role: .destructive) {
+                    confirmDelete(message)
+                } label: {
+                    Label("移到废纸篓", systemImage: "trash")
+                }
+            } label: {
+                Label("其他操作", systemImage: "ellipsis.circle")
+                    .font(.islandMicro(weight: .semibold))
             }
-            .disabled(message.isRead || mail.isMutating)
-            IconButton(symbol: "exclamationmark.triangle", help: "标记为垃圾邮件", size: .compact) {
-                Task { await model.markMailJunk(message) }
-            }
-            .disabled(mail.isMutating)
-            IconButton(symbol: "trash", help: "移到废纸篓", size: .compact) {
-                deleteTarget = message
-            }
+            .menuStyle(.borderlessButton)
+            .controlSize(.mini)
+            .help("标记为垃圾邮件或移到废纸篓")
             .disabled(mail.isMutating)
         }
     }
@@ -341,6 +343,18 @@ struct MailModuleView: View {
     private func selectFirstMessageIfNeeded() {
         guard !visibleMessages.contains(where: { $0.id == selectedMessageID }) else { return }
         selectedMessageID = visibleMessages.first?.id
+    }
+
+    private func confirmDelete(_ message: MailMessage) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "将邮件移到废纸篓？"
+        alert.informativeText = "这封邮件可在 Mail.app 的废纸篓中恢复。"
+        alert.addButton(withTitle: "移到废纸篓")
+        alert.addButton(withTitle: "取消")
+        WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        Task { await model.deleteMail(message) }
     }
 
     /// Opens the "Privacy & Security → Automation" page in System Settings to guide the user to authorize Mail.app access.
@@ -369,8 +383,6 @@ private struct MailComposerView: View {
     @State private var messageBody = ""
     @State private var isSending = false
     @State private var attachmentURLs: [URL] = []
-    @State private var showsFileImporter = false
-    @State private var showsImagePicker = false
 
     private var isReply: Bool { replyTarget != nil }
     private var availableAccounts: [MailAccount] { model.mail.activeAccounts }
@@ -405,40 +417,36 @@ private struct MailComposerView: View {
             composerHeader
 
             // form area
-            ScrollView(.vertical) {
+            if isReply {
                 VStack(alignment: .leading, spacing: 10) {
-                    if replyTarget != nil {
-                        replyInfo
-                    } else {
-                        senderPicker
-                        recipientField
-                        subjectField
-                    }
-
-                    // body editor
+                    replyInfo
                     bodyEditor
+                        .frame(maxHeight: .infinity)
 
-                    // attachment list
+                    if !attachmentURLs.isEmpty {
+                        attachmentList
+                    }
+                }
+                .padding(.top, 12)
+                .frame(maxHeight: .infinity)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    senderPicker
+                    recipientField
+                    subjectField
+                    bodyEditor
+                        .frame(maxHeight: .infinity)
+
                     if !attachmentURLs.isEmpty {
                         attachmentList
                     }
                 }
                 .padding(.vertical, 12)
+                .frame(maxHeight: .infinity)
             }
-            .scrollIndicators(.visible)
-            .thinScrollChrome()
 
             // bottom toolbar: attachment buttons + send/cancel
             toolbar
-        }
-        .background(Color.fillCard)
-        .fileImporter(
-            isPresented: $showsFileImporter,
-            allowedContentTypes: [.item],
-            allowsMultipleSelection: true
-        ) { result in
-            guard case let .success(urls) = result else { return }
-            attachmentURLs.append(contentsOf: urls)
         }
         .onAppear { selectFirstSenderIfNeeded() }
         .onChange(of: availableAccounts) { _, _ in selectFirstSenderIfNeeded() }
@@ -500,7 +508,7 @@ private struct MailComposerView: View {
                 Text("发件人")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .frame(width: 52, alignment: .trailing)
+                    .frame(width: 52, alignment: .leading)
                 Menu {
                     // group by account, show all addresses under each account inline
                     ForEach(availableAccounts) { account in
@@ -543,7 +551,7 @@ private struct MailComposerView: View {
                 Text("发件人")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .frame(width: 52, alignment: .trailing)
+                    .frame(width: 52, alignment: .leading)
                 Text(identity.address)
                     .font(.system(size: 11, weight: .medium))
                 if identity.accountName != identity.address {
@@ -561,7 +569,7 @@ private struct MailComposerView: View {
             Text("收件人")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .trailing)
+                .frame(width: 52, alignment: .leading)
             TextField("多个地址用逗号分隔", text: $recipients)
                 .font(.system(size: 11))
                 .textFieldStyle(.plain)
@@ -573,7 +581,7 @@ private struct MailComposerView: View {
             Text("主题")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .trailing)
+                .frame(width: 52, alignment: .leading)
             TextField("邮件主题", text: $subject)
                 .font(.system(size: 11))
                 .textFieldStyle(.plain)
@@ -619,22 +627,24 @@ private struct MailComposerView: View {
             HStack(spacing: 4) {
                 // add file
                 Button {
-                    showsFileImporter = true
+                    chooseAttachments(title: "添加附件", allowedContentTypes: [.item])
                 } label: {
                     Label("添加文件", systemImage: "paperclip")
                         .font(.system(size: 10.5))
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
                 .help("添加附件")
 
                 // add image
                 Button {
-                    showsImagePicker = true
+                    chooseAttachments(title: "添加图片", allowedContentTypes: [.image])
                 } label: {
                     Label("添加图片", systemImage: "photo")
                         .font(.system(size: 10.5))
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
                 .help("插入图片")
 
                 Divider()
@@ -671,10 +681,22 @@ private struct MailComposerView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(Color.fillControl)
     }
 
     // MARK: Logic
+
+    private func chooseAttachments(title: String, allowedContentTypes: [UTType]) {
+        let panel = NSOpenPanel()
+        panel.title = title
+        panel.prompt = "添加"
+        panel.allowedContentTypes = allowedContentTypes
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
+        guard panel.runModal() == .OK else { return }
+        attachmentURLs.append(contentsOf: panel.urls)
+    }
 
     private func selectFirstSenderIfNeeded() {
         guard !isReply else { return }

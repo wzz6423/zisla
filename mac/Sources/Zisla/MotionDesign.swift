@@ -409,30 +409,19 @@ struct IslandRimLight: View {
 /// Shared across Quick Notes rows, PDF tool navigation, and outlined pickers.
 struct SelectionGlassBackground: View {
     var cornerRadius: CGFloat = 7
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(
-                    reduceTransparency
-                        ? Color.white.opacity(0.12)
-                        : Color.white.opacity(0.08)
-                )
-                .background(
-                    VisualEffectBackground(
-                        material: .hudWindow,
-                        blendingMode: .withinWindow
-                    )
-                    .opacity(reduceTransparency ? 0 : 0.42)
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                )
+                .fill(fillColor)
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(
                     LinearGradient(
                         stops: [
-                            .init(color: .white.opacity(0.28), location: 0),
-                            .init(color: .white.opacity(0.08), location: 1),
+                            .init(color: edgeColor.opacity(0.10), location: 0),
+                            .init(color: edgeColor.opacity(0.03), location: 1),
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -440,7 +429,18 @@ struct SelectionGlassBackground: View {
                     lineWidth: 0.5
                 )
         }
-        .shadow(color: .black.opacity(0.18), radius: 2.5, y: 1)
+        .shadow(color: .black.opacity(0.025), radius: 1, y: 0.5)
+    }
+
+    private var fillColor: Color {
+        let opacity = colorScheme == .dark
+            ? (reduceTransparency ? 0.12 : 0.10)
+            : (reduceTransparency ? 0.08 : 0.055)
+        return Color.primary.opacity(opacity)
+    }
+
+    private var edgeColor: Color {
+        colorScheme == .dark ? .white : .black
     }
 }
 
@@ -525,6 +525,7 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
     var fontSize: CGFloat = 9
     var width: CGFloat = 168
     var height: CGFloat = 34
+    var usesGlassSelection = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var selectionNamespace
 
@@ -536,7 +537,8 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
         symbol: ((Option) -> String)? = nil,
         fontSize: CGFloat = 9,
         width: CGFloat = 168,
-        height: CGFloat = 34
+        height: CGFloat = 34,
+        usesGlassSelection: Bool = true
     ) {
         _selection = selection
         self.options = options
@@ -546,6 +548,7 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
         self.fontSize = fontSize
         self.width = width
         self.height = height
+        self.usesGlassSelection = usesGlassSelection
     }
 
     var body: some View {
@@ -577,12 +580,22 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
         .foregroundStyle(isSelected ? Color.primary : Color.secondary)
         .background {
             if isSelected {
-                SelectionGlassBackground(cornerRadius: 6)
+                selectionBackground
                     .matchedGeometryEffect(id: selectionID, in: selectionNamespace)
             }
         }
         .accessibilityLabel(title(option))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private var selectionBackground: some View {
+        if usesGlassSelection {
+            SelectionGlassBackground(cornerRadius: 6)
+        } else {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.white.opacity(0.16))
+        }
     }
 
     @ViewBuilder

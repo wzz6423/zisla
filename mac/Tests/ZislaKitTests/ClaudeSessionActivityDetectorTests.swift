@@ -95,14 +95,17 @@ struct ClaudeSessionActivityDetectorTests {
                     timestamp: "2026-07-19T01:00:02.000Z",
                     sessionId: "sess-e",
                     toolUseId: "t1",
-                    isError: true
+                    isError: true,
+                    content: "Permission denied"
                 ),
             ],
             modifiedAt: Date(timeIntervalSince1970: 1_900_000_120)
         )
 
         let detector = ClaudeSessionActivityDetector(projectsDirectory: root)
-        #expect(try detector.activeTasks().first?.status == .error)
+        let failed = try #require(detector.activeTasks().first)
+        #expect(failed.status == .error)
+        #expect(failed.failureReason == "Permission denied")
 
         try appendJSONLLine(
             claudeUserToolResult(
@@ -113,7 +116,9 @@ struct ClaudeSessionActivityDetectorTests {
             ),
             to: root.appendingPathComponent(relative)
         )
-        #expect(try detector.activeTasks().first?.status == .running)
+        let recovered = try #require(detector.activeTasks().first)
+        #expect(recovered.status == .running)
+        #expect(recovered.failureReason == nil)
     }
 
     @Test
@@ -251,9 +256,11 @@ struct ClaudeSessionActivityDetectorTests {
             modifiedAt: Date(timeIntervalSince1970: 1_910_000_200)
         )
 
-        #expect(try ClaudeSessionActivityDetector(
+        let task = try #require(ClaudeSessionActivityDetector(
             projectsDirectory: root
-        ).activeTasks().first?.status == .error)
+        ).activeTasks().first)
+        #expect(task.status == .error)
+        #expect(task.failureReason == "upstream failed")
     }
 
     @Test
@@ -324,10 +331,11 @@ private func claudeUserToolResult(
     timestamp: String,
     sessionId: String,
     toolUseId: String,
-    isError: Bool
+    isError: Bool,
+    content: String = "ok"
 ) -> String {
     """
-    {"type":"user","timestamp":"\(timestamp)","sessionId":"\(sessionId)","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"\(toolUseId)","is_error":\(isError),"content":"ok"}]}}
+    {"type":"user","timestamp":"\(timestamp)","sessionId":"\(sessionId)","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"\(toolUseId)","is_error":\(isError),"content":"\(content)"}]}}
     """
 }
 

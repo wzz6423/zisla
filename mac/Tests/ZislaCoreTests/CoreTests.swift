@@ -103,6 +103,7 @@ struct AIStateRepositoryTests {
         #expect(task.sessionURL == nil)
         #expect(task.effort == nil)
         #expect(task.startedAt == nil)
+        #expect(task.failureReason == nil)
     }
 
     @Test
@@ -1327,6 +1328,29 @@ struct AIUsageAnalyticsTests {
     }
 
     @Test
+    func dailyUsageSeriesCentersEachValueWithinItsCalendarDay() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let end = Date(timeIntervalSince1970: 3 * 86_400 + 3_600)
+        let sample = AIUsageSample(
+            provider: .codex,
+            timestamp: Date(timeIntervalSince1970: 3 * 86_400 + 30),
+            inputTokens: 80,
+            outputTokens: 20
+        )
+
+        let point = try #require(AIUsageAnalytics.dailyUsageSeries(
+            samples: [sample],
+            endingAt: end,
+            days: 1,
+            calendar: calendar
+        ).first)
+
+        #expect(point.timestamp == Date(timeIntervalSince1970: 3 * 86_400 + 12 * 3_600))
+        #expect(point.totalTokens == 100)
+    }
+
+    @Test
     func dailyUsageSeriesCombinesInputAndOutputAndKeepsEmptyDates() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -1346,9 +1370,9 @@ struct AIUsageAnalyticsTests {
         )
 
         #expect(series.map(\.timestamp) == [
-            Date(timeIntervalSince1970: 3 * 86_400),
-            Date(timeIntervalSince1970: 4 * 86_400),
-            Date(timeIntervalSince1970: 5 * 86_400),
+            Date(timeIntervalSince1970: 3 * 86_400 + 12 * 3_600),
+            Date(timeIntervalSince1970: 4 * 86_400 + 12 * 3_600),
+            Date(timeIntervalSince1970: 5 * 86_400 + 12 * 3_600),
         ])
         #expect(series.map(\.inputTokens) == [60, 0, 10])
         #expect(series.map(\.outputTokens) == [40, 0, 5])
@@ -1372,21 +1396,21 @@ struct AIUsageAnalyticsTests {
         )
 
         #expect(series.map(\.timestamp) == [
-            Date(timeIntervalSince1970: 0),
-            Date(timeIntervalSince1970: 86_400),
-            Date(timeIntervalSince1970: 2 * 86_400),
-            Date(timeIntervalSince1970: 3 * 86_400),
-            Date(timeIntervalSince1970: 4 * 86_400),
+            Date(timeIntervalSince1970: 12 * 3_600),
+            Date(timeIntervalSince1970: 86_400 + 12 * 3_600),
+            Date(timeIntervalSince1970: 2 * 86_400 + 12 * 3_600),
+            Date(timeIntervalSince1970: 3 * 86_400 + 12 * 3_600),
+            Date(timeIntervalSince1970: 4 * 86_400 + 12 * 3_600),
         ])
         #expect(series.map(\.inputTokens) == [6, 25, 38, 25, 6])
         #expect(series.map(\.outputTokens) == [1, 5, 8, 5, 1])
     }
 
     @Test
-    func tokenAxisTicksCoverTheHighestUsage() {
+    func tokenAxisTicksExposeDailyUsageAcrossOrdersOfMagnitude() {
         #expect(
-            AIUsageAnalytics.tokenAxisTicks(maximum: 320_000_000, desiredCount: 6)
-                == [0, 100_000_000, 200_000_000, 300_000_000, 400_000_000]
+            AIUsageAnalytics.tokenAxisTicks(maximum: 3_200_000_000, desiredCount: 5)
+                == [0, 10_000_000, 100_000_000, 1_000_000_000, 10_000_000_000]
         )
         #expect(AIUsageAnalytics.tokenAxisTicks(maximum: 0) == [0, 1])
     }

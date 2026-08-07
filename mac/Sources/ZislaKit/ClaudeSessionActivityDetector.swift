@@ -17,6 +17,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         var model: String?
         var pendingAskToolUseIDs: Set<String> = []
         var hasError = false
+        var failureReason: String?
         var isVSCode = false
     }
 
@@ -232,7 +233,8 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
             updatedAt: updatedAt,
             sessionURL: active.value.isVSCode ? Self.vsCodeSessionURL(for: active.key) : nil,
             effort: nil,
-            startedAt: active.value.startedAt
+            startedAt: active.value.startedAt,
+            failureReason: status == .error ? active.value.failureReason : nil
         )
         return next
     }
@@ -264,9 +266,11 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
                 }
                 if result["is_error"] as? Bool == true || result["isError"] as? Bool == true {
                     state.hasError = true
+                    state.failureReason = Self.failureReason(from: result["content"] ?? result["error"])
                 } else {
                     // Successful tool_result can clear error.
                     state.hasError = false
+                    state.failureReason = nil
                 }
             }
             state.updatedAt = max(state.updatedAt, timestamp)
@@ -280,6 +284,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         // Ordinary user message starts a new turn.
         state.isActive = true
         state.hasError = false
+        state.failureReason = nil
         state.pendingAskToolUseIDs.removeAll()
         state.startedAt = timestamp
         state.updatedAt = timestamp
@@ -295,6 +300,8 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
             || root["error"] != nil {
             state.isActive = true
             state.hasError = true
+            state.failureReason = Self.failureReason(from: root["error"])
+                ?? Self.apiFailureReason(from: root["apiErrorStatus"])
             state.updatedAt = max(state.updatedAt, timestamp)
             if state.startedAt == nil {
                 state.startedAt = timestamp
@@ -374,6 +381,40 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
             return model
         }
         return nil
+    }
+
+    private static func failureReason(from value: Any?) -> String? {
+        guard let value, !(value is NSNull) else { return nil }
+        if let text = value as? String {
+            return normalizedFailureReason(text)
+        }
+        if let values = value as? [Any] {
+            return values.lazy.compactMap(failureReason(from:)).first
+        }
+        if let object = value as? [String: Any] {
+            for key in ["error", "message", "text", "content"] {
+                if let reason = failureReason(from: object[key]) {
+                    return reason
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func apiFailureReason(from value: Any?) -> String {
+        if let status = value as? NSNumber { return "API 请求失败（HTTP \(status.intValue)）" }
+        if let status = value as? String, !status.isEmpty { return "API 请求失败（HTTP \(status)）" }
+        return "API 请求失败，未提供详细原因"
+    }
+
+    private static func normalizedFailureReason(_ raw: String) -> String? {
+        let collapsed = raw.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+            .joined(separator: " ")
+        guard !collapsed.isEmpty else { return nil }
+        let maximumLength = 200
+        guard collapsed.count > maximumLength else { return collapsed }
+        let end = collapsed.index(collapsed.startIndex, offsetBy: maximumLength)
+        return String(collapsed[..<end]) + "…"
     }
 
     private static func parseTimestamp(_ value: Any?) -> Date? {

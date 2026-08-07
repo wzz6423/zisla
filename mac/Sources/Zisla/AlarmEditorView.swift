@@ -32,6 +32,7 @@ struct AlarmEditorView: View {
                         }
                     }
                 }
+                .thinScrollChrome()
                 .frame(maxHeight: 148)
             }
 

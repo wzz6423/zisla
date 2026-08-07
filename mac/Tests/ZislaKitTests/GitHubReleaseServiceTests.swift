@@ -79,6 +79,67 @@ struct GitHubReleaseServiceTests {
         }
     }
 
+    @Test
+    func previewChannelAcceptsGiteeAssetsWithoutPageURLOrSize() async throws {
+        let giteeReleases = Data(
+            """
+            [{"tag_name":"v1.1.0-preview.1","html_url":null,"draft":false,"prerelease":true,"assets":[
+              {"name":"zisla-v1.1.0-preview.1-macOS-universal.zip","browser_download_url":"https://gitee.com/wzz6423/zisla/releases/download/v1.1.0-preview.1/zisla.zip"}
+            ]}]
+            """.utf8
+        )
+        let stub = ReleaseRequestStub(responses: [
+            GitHubReleaseService.giteeReleasesURL: .success(giteeReleases),
+        ])
+        let service = GitHubReleaseService(loadData: { request in
+            try await stub.load(request)
+        })
+
+        let result = try await service.check(currentVersion: "1.0.0", channel: .preview)
+
+        switch result {
+        case .updateAvailable(let release, .gitee):
+            #expect(release.htmlURL == nil)
+            #expect(release.assets.first?.size == 0)
+            #expect(release.macUpdateAssets?.archive.downloadURL.absoluteString == "https://gitee.com/wzz6423/zisla/releases/download/v1.1.0-preview.1/zisla.zip")
+        default:
+            Issue.record("Preview 应识别 Gitee 的简化 Release 响应")
+        }
+    }
+
+    @Test
+    func previewChannelFallsBackToGitHubReleaseList() async throws {
+        let githubReleases = Data(
+            """
+            [
+              {"tag_name":"preview","html_url":"https://github.com/wzz6423/zisla/releases/tag/preview","draft":false,"prerelease":true,"assets":[]},
+              {"tag_name":"v1.2.0-preview.1","html_url":"https://github.com/wzz6423/zisla/releases/tag/v1.2.0-preview.1","draft":false,"prerelease":true,"assets":[]}
+            ]
+            """.utf8
+        )
+        let stub = ReleaseRequestStub(responses: [
+            GitHubReleaseService.giteeReleasesURL: .status(503),
+            GitHubReleaseService.githubReleasesURL: .success(githubReleases),
+        ])
+        let service = GitHubReleaseService(loadData: { request in
+            try await stub.load(request)
+        })
+
+        let result = try await service.check(currentVersion: "1.0.0", channel: .preview)
+
+        switch result {
+        case .updateAvailable(let release, .github):
+            #expect(release.tagName == "v1.2.0-preview.1")
+            #expect(release.prerelease)
+        default:
+            Issue.record("Preview 应在 Gitee 不可用时从 GitHub 发布列表选择最新预览版本")
+        }
+        #expect(await stub.requestedURLs() == [
+            GitHubReleaseService.giteeReleasesURL,
+            GitHubReleaseService.githubReleasesURL,
+        ])
+    }
+
     private static func release(tag: String) -> Data {
         Data(
             """

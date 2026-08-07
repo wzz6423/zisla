@@ -162,6 +162,7 @@ public enum AIUsageAnalytics {
     /// Total, input, and output token trends for the most recent `days` calendar days (inclusive of `end`).
     ///
     /// Days with zero usage are still included so the time axis is continuous and the curve can drop to the zero baseline.
+    /// Each aggregate is positioned at the midpoint of its calendar day so it aligns with the center of that day on a time axis.
     public static func dailyUsageSeries(
         samples: [AIUsageSample],
         endingAt end: Date,
@@ -184,11 +185,14 @@ public enum AIUsageAnalytics {
         }
 
         return (0..<days).compactMap { offset in
-            guard let day = calendar.date(byAdding: .day, value: offset, to: startDay) else {
+            guard
+                let day = calendar.date(byAdding: .day, value: offset, to: startDay),
+                let nextDay = calendar.date(byAdding: .day, value: 1, to: day)
+            else {
                 return nil
             }
             return UsageBreakdownPoint(
-                timestamp: day,
+                timestamp: day.addingTimeInterval(nextDay.timeIntervalSince(day) / 2),
                 inputTokens: inputByDay[day, default: 0],
                 outputTokens: outputByDay[day, default: 0]
             )
@@ -417,43 +421,25 @@ public enum AIUsageAnalytics {
         return points
     }
 
-    /// Generates "nice" tick marks for the chart Y-axis (including 0 and an upper bound that covers `maximum`).
+    /// Generates power-of-ten tick marks for the symmetric-log trend axis.
     ///
     /// - Returns `[0, 1]` when `maximum <= 0` to ensure Chart has a valid domain.
     /// - `desiredCount` controls the desired number of ticks (including both ends), clamped to 2...6.
-    /// - Step size is 1/2/5×10^n; labels can be formatted with `formatTokenAxisValue`.
+    /// - The final tick is the first power of ten that covers `maximum`.
     public static func tokenAxisTicks(maximum: Int, desiredCount: Int = 3) -> [Int] {
         let count = min(6, max(2, desiredCount))
         guard maximum > 0 else { return [0, 1] }
 
-        let rawStep = Double(maximum) / Double(count - 1)
-        let magnitude = pow(10.0, floor(log10(max(rawStep, 1))))
-        let residual = rawStep / magnitude
-        let niceResidual: Double
-        if residual <= 1 {
-            niceResidual = 1
-        } else if residual <= 2 {
-            niceResidual = 2
-        } else if residual <= 5 {
-            niceResidual = 5
-        } else {
-            niceResidual = 10
-        }
-        let step = max(1, Int((niceResidual * magnitude).rounded()))
-        let upper = ((maximum + step - 1) / step) * step
-
-        var ticks: [Int] = []
-        var value = 0
-        while value < upper {
-            ticks.append(value)
-            value += step
-            if ticks.count > 8 { break }
-        }
-        if ticks.last != upper {
-            ticks.append(upper)
-        }
-        if ticks.count == 1 {
-            ticks.append(upper == 0 ? 1 : upper)
+        let upperExponent = max(0, Int(ceil(log10(Double(maximum)))))
+        let lowerExponent = max(0, upperExponent - (count - 2))
+        var ticks = [0]
+        for exponent in lowerExponent...upperExponent {
+            let value = pow(10.0, Double(exponent))
+            guard value <= Double(Int.max) else {
+                ticks.append(Int.max)
+                break
+            }
+            ticks.append(Int(value.rounded()))
         }
         return ticks
     }

@@ -972,7 +972,7 @@ private struct CompactUpdateWing: View {
                         .frame(width: min(19, height * 0.58), height: min(19, height * 0.58))
                 }
             } else {
-                Image(systemName: "arrow.triangle.2.circlepath")
+                Image(systemName: "arrow.up.circle")
                     .font(.system(size: min(14, height * 0.46), weight: .semibold))
                     .foregroundStyle(.cyan)
             }
@@ -1032,7 +1032,7 @@ private struct CompactAIWing: View {
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(
-            role == .identity ? "AI 任务图标" : "\(count) 个 AI 任务\(statusDescription)"
+            role == .identity ? "AI 任务图标" : "\(count) 个 AI 任务\(statusDescription)\(errorAccessibilityText)"
         ))
     }
 
@@ -1069,6 +1069,14 @@ private struct CompactAIWing: View {
         if notices.contains(where: { $0.kind == .error }) { return "有错误" }
         if notices.contains(where: { $0.kind == .warning }) { return "等待操作" }
         return "正在运行"
+    }
+
+    private var errorCount: Int {
+        notices.count(where: { $0.kind == .error })
+    }
+
+    private var errorAccessibilityText: String {
+        errorCount > 0 ? "，其中 \(errorCount) 个错误" : ""
     }
 }
 

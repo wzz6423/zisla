@@ -406,14 +406,12 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
     case diskImage
     case largeFile
     case duplicateFile
-    /// 与已卸载应用的 bundle ID 精确对应的用户级残留文件。
-    case applicationLeftovers
 
     public var safetyLevel: DiskCleanupSafetyLevel {
         switch self {
         case .appCache, .cache, .developerArtifacts, .packageManagerCache:
             .safeToClean
-        case .log, .trash, .temporaryFiles, .crashReport, .diskImage, .largeFile, .duplicateFile, .applicationLeftovers:
+        case .log, .trash, .temporaryFiles, .crashReport, .diskImage, .largeFile, .duplicateFile:
             .requiresManualReview
         }
     }
@@ -421,7 +419,6 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
     /// When the same path appears in multiple scan categories, the higher value (more specific kind) takes precedence.
     public var classificationPriority: Int {
         switch self {
-        case .applicationLeftovers: 95
         case .crashReport: 90
         case .temporaryFiles: 85
         case .packageManagerCache: 80
@@ -1504,11 +1501,6 @@ public enum SystemDiskCleanup {
             append(.appCache, root.url)
         }
 
-        // 仅在精确 bundle ID 已确认未安装后，才把单项残留加入白名单。
-        for root in applicationLeftoverRoots(fileManager: fileManager) {
-            append(.applicationLeftovers, root.url)
-        }
-
         // User logs: application run logs; safe to clear without affecting functionality
         append(.log, home.appendingPathComponent("Library/Logs", isDirectory: true))
 
@@ -1613,106 +1605,6 @@ public enum SystemDiskCleanup {
             uniqueRoots[SystemMonitorPathSafety.standardizedPath(root.url)] = root
         }
         return uniqueRoots.values.sorted { $0.url.path < $1.url.path }
-    }
-
-    private struct ApplicationLeftoverRoot {
-        var url: URL
-        var bundleIdentifier: String
-        var source: String
-    }
-
-    /// 只接受以 bundle ID 命名的精确用户级路径，避免把应用名称或普通资料目录当作残留。
-    private static func applicationLeftoverRoots(
-        fileManager: SystemMonitorFileManaging
-    ) -> [ApplicationLeftoverRoot] {
-        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
-        let installedBundleIdentifiers = installedApplicationBundleIdentifiers(fileManager: fileManager)
-        var roots: [ApplicationLeftoverRoot] = []
-
-        func appendChildren(
-            in directory: URL,
-            source: String,
-            bundleIdentifier: (String) -> String?
-        ) {
-            guard fileManager.fileExists(atPath: directory.path),
-                  let children = try? fileManager.contentsOfDirectory(
-                      at: directory,
-                      includingPropertiesForKeys: [.isSymbolicLinkKey],
-                      options: [.skipsHiddenFiles]
-                  )
-            else {
-                return
-            }
-
-            for child in children {
-                let standardized = child.standardizedFileURL
-                guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: [directory]),
-                      (try? child.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true,
-                      let identifier = bundleIdentifier(standardized.lastPathComponent),
-                      isOrphanedApplicationBundleIdentifier(identifier, installed: installedBundleIdentifiers)
-                else {
-                    continue
-                }
-                roots.append(ApplicationLeftoverRoot(url: standardized, bundleIdentifier: identifier, source: source))
-            }
-        }
-
-        appendChildren(
-            in: home.appendingPathComponent("Library/Preferences", isDirectory: true),
-            source: "偏好设置",
-            bundleIdentifier: bundleIdentifierFromPreferenceName
-        )
-        appendChildren(
-            in: home.appendingPathComponent("Library/Application Support", isDirectory: true),
-            source: "应用支持文件",
-            bundleIdentifier: bundleIdentifierFromExactName
-        )
-        appendChildren(
-            in: home.appendingPathComponent("Library/Saved Application State", isDirectory: true),
-            source: "已保存状态",
-            bundleIdentifier: bundleIdentifierFromSavedStateName
-        )
-        appendChildren(
-            in: home.appendingPathComponent("Library/WebKit", isDirectory: true),
-            source: "WebKit 数据",
-            bundleIdentifier: bundleIdentifierFromExactName
-        )
-        var uniqueRoots: [String: ApplicationLeftoverRoot] = [:]
-        for root in roots {
-            uniqueRoots[SystemMonitorPathSafety.standardizedPath(root.url)] = root
-        }
-        return uniqueRoots.values.sorted { $0.url.path < $1.url.path }
-    }
-
-    private static func bundleIdentifierFromPreferenceName(_ name: String) -> String? {
-        guard name.hasSuffix(".plist") else { return nil }
-        return bundleIdentifierFromExactName(String(name.dropLast(".plist".count)))
-    }
-
-    private static func bundleIdentifierFromSavedStateName(_ name: String) -> String? {
-        guard name.hasSuffix(".savedState") else { return nil }
-        return bundleIdentifierFromExactName(String(name.dropLast(".savedState".count)))
-    }
-
-    private static func bundleIdentifierFromExactName(_ name: String) -> String? {
-        let components = name.split(separator: ".", omittingEmptySubsequences: false)
-        guard components.count >= 2,
-              components.allSatisfy({ component in
-                  !component.isEmpty && component.allSatisfy { character in
-                      character.isLetter || character.isNumber || character == "-"
-                  }
-              })
-        else {
-            return nil
-        }
-        return name
-    }
-
-    private static func isOrphanedApplicationBundleIdentifier(
-        _ bundleIdentifier: String,
-        installed: Set<String>
-    ) -> Bool {
-        !bundleIdentifier.hasPrefix("com.apple.") && !installed.contains(bundleIdentifier)
     }
 
     public static func allocatedByteSize(of url: URL, fileManager: SystemMonitorFileManaging) -> UInt64 {
@@ -1834,6 +1726,42 @@ public enum SystemDiskCleanup {
         return results.flattened()
     }
 
+    private static func executeScanTasksWithProgress(
+        _ tasks: [CleanupScanTask],
+        workerLimit: Int,
+        onProgress: @escaping @Sendable ([DiskCleanupCandidate]) -> Void
+    ) -> [DiskCleanupCandidate] {
+        guard tasks.count > 1, workerLimit > 1 else {
+            var accumulated: [DiskCleanupCandidate] = []
+            for task in tasks {
+                accumulated.append(contentsOf: task.run())
+                onProgress(deduplicateCandidates(accumulated).sorted { $0.byteSize > $1.byteSize })
+            }
+            return accumulated
+        }
+
+        let results = CleanupScanResults(count: tasks.count)
+        let queue = OperationQueue()
+        queue.name = "dev.wzz.zisla.disk-cleanup-scan"
+        queue.qualityOfService = .utility
+        queue.maxConcurrentOperationCount = workerLimit
+        let progressLock = NSLock()
+
+        for (index, task) in tasks.enumerated() {
+            queue.addOperation {
+                let candidates = autoreleasepool { task.run() }
+                results.store(candidates, at: index)
+
+                // Serialize updates so a later completion never publishes an older snapshot.
+                progressLock.lock()
+                onProgress(deduplicateCandidates(results.flattened()).sorted { $0.byteSize > $1.byteSize })
+                progressLock.unlock()
+            }
+        }
+        queue.waitUntilAllOperationsAreFinished()
+        return results.flattened()
+    }
+
     /// Scans all cleanup candidate categories; deduplicates by path and returns sorted by size descending.
     public static func scanCandidates(
         fileManager: SystemMonitorFileManaging,
@@ -1868,16 +1796,50 @@ public enum SystemDiskCleanup {
             })
         }
 
-        // 卸载应用残留：只扫描具备精确 bundle ID 证据的用户级路径。
-        if kinds.contains(.applicationLeftovers) {
-            tasks.append(CleanupScanTask {
-                scanApplicationLeftovers(fileManager: fileManager)
-            })
-        }
-
         let result = executeScanTasks(
             tasks,
             workerLimit: scanWorkerLimit(requested: maxConcurrentScans)
+        )
+        return deduplicateCandidates(result).sorted { $0.byteSize > $1.byteSize }
+    }
+
+    /// Publishes an accumulated candidate snapshot as each scan category completes.
+    public static func scanCandidatesWithProgress(
+        fileManager: SystemMonitorFileManaging,
+        kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases),
+        maxConcurrentScans: Int? = nil,
+        onProgress: @escaping @Sendable ([DiskCleanupCandidate]) -> Void
+    ) -> [DiskCleanupCandidate] {
+        var tasks: [CleanupScanTask] = []
+
+        if kinds.contains(.appCache) {
+            tasks.append(CleanupScanTask {
+                scanApplicationCaches(fileManager: fileManager)
+            })
+        }
+
+        let directoryKinds: Set<DiskCleanupKind> = [
+            .cache, .log, .trash, .developerArtifacts, .temporaryFiles, .packageManagerCache, .crashReport,
+        ]
+        let activeDirKinds = kinds.intersection(directoryKinds)
+        if !activeDirKinds.isEmpty {
+            tasks.append(CleanupScanTask {
+                scanDirectoryChildren(fileManager: fileManager, kinds: activeDirKinds)
+            })
+        }
+
+        let userFileKinds: Set<DiskCleanupKind> = [.diskImage, .largeFile, .duplicateFile]
+        let activeUserFileKinds = kinds.intersection(userFileKinds)
+        if !activeUserFileKinds.isEmpty {
+            tasks.append(CleanupScanTask {
+                scanUserFileCandidates(fileManager: fileManager, kinds: activeUserFileKinds)
+            })
+        }
+
+        let result = executeScanTasksWithProgress(
+            tasks,
+            workerLimit: scanWorkerLimit(requested: maxConcurrentScans),
+            onProgress: onProgress
         )
         return deduplicateCandidates(result).sorted { $0.byteSize > $1.byteSize }
     }
@@ -2173,51 +2135,6 @@ public enum SystemDiskCleanup {
         }
     }
 
-    /// 扫描带有未安装 bundle ID 的残留。扫描结果不会被默认选中，用户必须逐项确认。
-    private static func scanApplicationLeftovers(fileManager: SystemMonitorFileManaging) -> [DiskCleanupCandidate] {
-        let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
-        return applicationLeftoverRoots(fileManager: fileManager).compactMap { root in
-            guard SystemMonitorPathSafety.isURL(root.url, withinAllowedRoots: allowed) else {
-                return nil
-            }
-            return DiskCleanupCandidate(
-                url: root.url,
-                kind: .applicationLeftovers,
-                byteSize: allocatedByteSize(of: root.url, fileManager: fileManager),
-                displayName: "\(root.bundleIdentifier) 残留",
-                detail: "\(root.source) · 已确认 \(root.bundleIdentifier) 未安装 · \(root.url.path)"
-            )
-        }
-    }
-
-    /// 返回 /Applications 与 ~/Applications 中已安装应用的 bundle ID。
-    private static func installedApplicationBundleIdentifiers(fileManager: SystemMonitorFileManaging) -> Set<String> {
-        var identifiers = Set<String>()
-        let appDirs = [
-            URL(fileURLWithPath: "/Applications"),
-            fileManager.homeDirectoryForCurrentUser().appendingPathComponent("Applications"),
-        ]
-
-        for appDir in appDirs {
-            guard fileManager.fileExists(atPath: appDir.path),
-                  let apps = try? fileManager.contentsOfDirectory(
-                      at: appDir,
-                      includingPropertiesForKeys: nil,
-                      options: [.skipsHiddenFiles]
-                  ) else { continue }
-
-            for app in apps where app.pathExtension == "app" {
-                let infoPlist = app.appendingPathComponent("Contents/Info.plist")
-                guard let data = fileManager.contents(atPath: infoPlist.path),
-                      let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
-                      let bundleID = plist["CFBundleIdentifier"] as? String else { continue }
-                identifiers.insert(bundleID)
-            }
-        }
-
-        return identifiers
-    }
-
     /// 先按大小分组，再对可能重复的文件做流式 SHA256 比对。
     private static func duplicateFileCandidates(
         from files: [ScannedUserFile],
@@ -2406,7 +2323,7 @@ public final class SystemMonitorService: ObservableObject {
         publicIPProvider: (any PublicIPProviding)? = nil,
         hardwareInfoProvider: (@Sendable () -> SystemHardwareInfo)? = nil,
         postCleanupDiskRefreshDelay: Duration = .seconds(30),
-        diskCapacityRefreshInterval: TimeInterval = 3 * 60
+        diskCapacityRefreshInterval: TimeInterval = 20
     ) {
         let fileManager = fileManager ?? DefaultSystemMonitorFileManager()
         self.samplingInterval = max(0.2, samplingInterval)
@@ -2708,6 +2625,20 @@ public final class SystemMonitorService: ObservableObject {
         let fm = fileManager
         return await Task.detached(priority: .utility) {
             SystemDiskCleanup.scanCandidates(fileManager: fm, kinds: kinds)
+        }.value
+    }
+
+    public func scanCleanupCandidatesWithProgress(
+        kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases),
+        onProgress: @escaping @Sendable ([DiskCleanupCandidate]) -> Void
+    ) async -> [DiskCleanupCandidate] {
+        let fm = fileManager
+        return await Task.detached(priority: .utility) {
+            SystemDiskCleanup.scanCandidatesWithProgress(
+                fileManager: fm,
+                kinds: kinds,
+                onProgress: onProgress
+            )
         }.value
     }
 

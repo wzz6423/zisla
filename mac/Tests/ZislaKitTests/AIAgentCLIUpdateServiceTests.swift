@@ -42,4 +42,21 @@ struct AIAgentCLIUpdateServiceTests {
 
         #expect(updates.isEmpty)
     }
+
+    @Test
+    func skipsNPMRegistryWhenCLIIsHomebrewManaged() async {
+        let service = AIAgentCLIUpdateService { kind in
+            kind == .opencode ? "1.18.15" : nil
+        }
+
+        let updates = await service.availableUpdates(for: [
+            AgentCLIStatus(
+                kind: .opencode,
+                executablePath: "/opt/homebrew/Cellar/opencode/1.18.14/bin/opencode",
+                version: "1.18.14"
+            ),
+        ])
+
+        #expect(updates.isEmpty)
+    }
 }

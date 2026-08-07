@@ -52,7 +52,7 @@ struct OverlayCoordinatorTests {
     }
 
     @Test @MainActor
-    func persistentPetRemainsAboveFullScreenAppsWhenIslandIsSetToBottom() throws {
+    func persistentPetRemainsAboveAppsWhenIslandIsSetToBottom() throws {
         let probe = PersistentPetPanelProbe()
         let coordinator = OverlayCoordinator(
             contentView: NSView(),
@@ -66,6 +66,40 @@ struct OverlayCoordinatorTests {
 
         let petPanel = try #require(probe.panel(for: Self.builtInID))
         #expect(petPanel.level == IslandPanel.onTopLevel)
+
+        coordinator.refreshPersistentPanels()
+        #expect(petPanel.level == IslandPanel.onTopLevel)
+
+        coordinator.setCollapsedOnTop(true)
+        #expect(petPanel.level == IslandPanel.onTopLevel)
+    }
+
+    @Test @MainActor
+    func collapsedIslandAtBottomShrinksPanelToAvoidBlockingMenuBarIcons() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setCollapsedOnTop(false)
+        coordinator.setPinned(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        let engine = ScreenLayoutEngine()
+        let layout = engine.layout(for: Self.builtInScreen)
+
+        // 展开时应该是 expandedFrame
+        #expect(panel.frame == layout.expandedFrame)
+
+        coordinator.setPinned(false)
+
+        // 折叠置底后窗口应缩小到 collapsedFrame，不遮挡菜单栏图标
+        #expect(panel.frame == layout.collapsedFrame)
+        #expect(panel.frame.width == layout.collapsedFrame.width)
+        #expect(panel.frame.width < layout.expandedFrame.width)
+        #expect(panel.ignoresMouseEvents == true)
+        #expect(panel.level == IslandPanel.onBottomLevel)
     }
 
     @Test @MainActor
@@ -86,11 +120,19 @@ struct OverlayCoordinatorTests {
         #expect(panel.level == IslandPanel.onBottomLevel)
         #expect(panel.level.rawValue < NSWindow.Level.normal.rawValue)
 
+        // 折叠置底时窗口应缩小到 collapsedFrame
+        let engine = ScreenLayoutEngine()
+        let layout = engine.layout(for: Self.builtInScreen)
+        #expect(panel.frame == layout.collapsedFrame)
+
         coordinator.setCollapsedOnTop(true)
         #expect(panel.level == IslandPanel.onTopLevel)
+        // 恢复置顶时窗口应恢复到 expandedFrame
+        #expect(panel.frame == layout.expandedFrame)
 
         coordinator.setCollapsedOnTop(false)
         #expect(panel.level == IslandPanel.onBottomLevel)
+        #expect(panel.frame == layout.collapsedFrame)
     }
 
     @Test @MainActor
@@ -217,6 +259,41 @@ struct OverlayCoordinatorTests {
         )
 
         #expect(probe.frameRequestCount > baseline)
+    }
+
+    @Test @MainActor
+    func persistentPetPanelsAppearOnAllScreensWhenEnabled() throws {
+        let probe = PersistentPetPanelProbe()
+        let coordinator = OverlayCoordinator(
+            contentView: NSView(),
+            collapseDelay: .zero,
+            persistentContentViewProvider: { probe.contentView(for: $0) },
+            persistentPanelFrameProvider: { probe.frame(for: $0) }
+        )
+        defer { coordinator.stop() }
+
+        // Initially disable persistent content
+        coordinator.setPersistentContentVisible(false)
+        coordinator.updateScreens(
+            [Self.builtInScreen, Self.externalWindowedScreen],
+            repositionVisiblePanel: false
+        )
+
+        #expect(coordinator.persistentPanelDisplayIDs.isEmpty)
+
+        // Enable persistent content - should show on all screens
+        coordinator.setPersistentContentVisible(true)
+
+        #expect(coordinator.persistentPanelDisplayIDs == [Self.builtInID, Self.externalID])
+
+        coordinator.setCollapsedOnTop(false)
+
+        let builtInPanel = try #require(probe.panel(for: Self.builtInID))
+        let externalPanel = try #require(probe.panel(for: Self.externalID))
+        #expect(builtInPanel.isVisible)
+        #expect(externalPanel.isVisible)
+        #expect(builtInPanel.level == IslandPanel.onTopLevel)
+        #expect(externalPanel.level == IslandPanel.onTopLevel)
     }
 
     private static let builtInID: CGDirectDisplayID = 9_001

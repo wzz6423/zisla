@@ -351,7 +351,7 @@
 "建立基线" = "Thiết lập đường cơ sở";
 
 /* System Cleanup */
-"清理候选项" = "Ứng viên Dọn dẹp";
+"清理磁盘" = "Dọn dẹp ổ đĩa";
 "扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件" = "Quét bộ nhớ cache ứng dụng, nhật ký, tệp tạm thời, hiện vật xây dựng, bộ nhớ cache trình quản lý gói, hình ảnh đĩa, tệp lớn và bản sao";
 "取消全选" = "Bỏ chọn Tất cả";
 "全选" = "Chọn Tất cả";

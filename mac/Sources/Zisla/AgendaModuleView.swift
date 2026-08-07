@@ -260,11 +260,12 @@ struct AgendaModuleView: View {
     private var weekDayPicker: some View {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let days = CalendarService.daysOfWeek(
-            containing: selection.selectedDay,
+        let days = CalendarService.daysOfWeeks(
+            containing: today,
+            count: CalendarService.agendaWeekCount,
             calendar: calendar
         )
-        return HStack(spacing: 4) {
+        return HStack(spacing: 2) {
             ForEach(days, id: \.timeIntervalSince1970) { day in
                 let isSelected = calendar.isDate(day, inSameDayAs: selection.selectedDay)
                 let isToday = calendar.isDate(day, inSameDayAs: today)
@@ -274,9 +275,10 @@ struct AgendaModuleView: View {
                     VStack(spacing: 1) {
                         Text(weekdayLabel(day, calendar: calendar))
                             .font(.islandMicro())
-                            .foregroundStyle(isSelected ? .primary : .secondary)
+                            .foregroundStyle(isToday ? Color.blue : isSelected ? Color.primary : Color.secondary)
                         Text("\(calendar.component(.day, from: day))")
                             .font(.system(size: 11, weight: isSelected || isToday ? .bold : .semibold, design: .rounded))
+                            .foregroundStyle(isToday ? Color.blue : Color.primary)
                             .monospacedDigit()
                     }
                     .frame(maxWidth: .infinity)

@@ -130,9 +130,9 @@ public final class AIStateMonitor: ObservableObject {
         self.now = now
     }
 
-    private static func defaultActivityDetectors() -> [any AIActivityDetecting] {
+    static func defaultActivityDetectors() -> [any AIActivityDetecting] {
         [
-            CodexSessionActivityDetector(maxRolloutFiles: 4, initialTailBytes: 256 * 1_024),
+            CodexSessionActivityDetector(),
             ClaudeSessionActivityDetector(maxTranscriptFiles: 4, initialTailBytes: 256 * 1_024),
             CopilotSessionActivityDetector(maxTranscriptFiles: 4, maxCLISessions: 4),
             KimiSessionActivityDetector(maxSessionFiles: 4, initialTailBytes: 256 * 1_024),
@@ -430,9 +430,12 @@ public final class AIStateMonitor: ObservableObject {
         using dependencies: RefreshDependencies
     ) -> [AIProgressTask] {
         var tasks = persistedTasks
+        var detectedTaskIDs: Set<String> = []
+
         for detector in dependencies.activityDetectors {
             guard let automaticTasks = try? detector.activeTasks() else { continue }
             for task in automaticTasks {
+                detectedTaskIDs.insert(task.id)
                 if let index = tasks.firstIndex(where: { $0.id == task.id }) {
                     tasks[index] = task
                 } else {
@@ -440,8 +443,16 @@ public final class AIStateMonitor: ObservableObject {
                 }
             }
         }
+
+        // 移除不再被检测器返回的活动任务（任务已完成/中止）
         tasks.removeAll { task in
             guard task.status.isActive else { return false }
+            // 如果任务不在持久化列表中且检测器不再返回它，说明任务已结束
+            let isPersistedTask = persistedTasks.contains(where: { $0.id == task.id })
+            if !isPersistedTask && !detectedTaskIDs.contains(task.id) {
+                return true
+            }
+            // TTL 超时检查
             return dependencies.now().timeIntervalSince(task.updatedAt) > dependencies.activeTaskTTL
         }
         return tasks

@@ -135,6 +135,7 @@ struct CalendarMutationCommands {
 @MainActor
 public final class CalendarService: ObservableObject {
     public nonisolated static let weekDayCount = 7
+    public nonisolated static let agendaWeekCount = 2
     private static let refreshDebounce: Duration = .milliseconds(180)
 
     @Published public private(set) var events: [CalendarEventSnapshot] = []
@@ -209,7 +210,7 @@ public final class CalendarService: ObservableObject {
             store.refreshSourcesIfNecessary()
 
             let calendar = Calendar.current
-            guard let week = Self.weekDateInterval(containing: referenceDate, calendar: calendar) else {
+            guard let interval = Self.agendaDateInterval(containing: referenceDate, calendar: calendar) else {
                 completeRefresh(
                     with: [],
                     generation: generation,
@@ -217,8 +218,8 @@ public final class CalendarService: ObservableObject {
                 )
                 return
             }
-            let start = week.start
-            let end = week.end
+            let start = interval.start
+            let end = interval.end
             var nextItems: [CalendarEventSnapshot] = []
             if readsEvents {
                 let predicate = store.predicateForEvents(
@@ -624,12 +625,35 @@ public final class CalendarService: ObservableObject {
         calendar.dateInterval(of: .weekOfYear, for: date)
     }
 
+    public nonisolated static func agendaDateInterval(
+        containing date: Date,
+        calendar: Calendar = .current
+    ) -> DateInterval? {
+        guard let week = weekDateInterval(containing: date, calendar: calendar),
+              let end = calendar.date(
+                  byAdding: .day,
+                  value: weekDayCount * agendaWeekCount,
+                  to: week.start
+              )
+        else { return nil }
+        return DateInterval(start: week.start, end: end)
+    }
+
     public nonisolated static func daysOfWeek(
         containing date: Date,
         calendar: Calendar = .current
     ) -> [Date] {
+        daysOfWeeks(containing: date, count: 1, calendar: calendar)
+    }
+
+    public nonisolated static func daysOfWeeks(
+        containing date: Date,
+        count: Int,
+        calendar: Calendar = .current
+    ) -> [Date] {
+        guard count > 0 else { return [] }
         guard let week = weekDateInterval(containing: date, calendar: calendar) else { return [] }
-        return (0..<weekDayCount).compactMap { offset in
+        return (0..<(weekDayCount * count)).compactMap { offset in
             calendar.date(byAdding: .day, value: offset, to: week.start)
                 .map { calendar.startOfDay(for: $0) }
         }

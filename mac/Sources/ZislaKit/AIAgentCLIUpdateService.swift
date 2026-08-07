@@ -44,7 +44,8 @@ public actor AIAgentCLIUpdateService {
                 guard kind.npmPackageName != nil,
                       let status = statusesByKind[kind],
                       status.executablePath != nil,
-                      let installedVersion = status.version
+                      let installedVersion = status.version,
+                      !Self.isHomebrewManaged(status)
                 else { continue }
                 group.addTask { [loadLatestVersion] in
                     guard let installed = Self.semanticVersion(in: installedVersion),
@@ -67,6 +68,11 @@ public actor AIAgentCLIUpdateService {
         return updates.sorted { lhs, rhs in
             AgentCLIKind.allCases.firstIndex(of: lhs.kind)! < AgentCLIKind.allCases.firstIndex(of: rhs.kind)!
         }
+    }
+
+    private static func isHomebrewManaged(_ status: AgentCLIStatus) -> Bool {
+        guard let executablePath = status.executablePath else { return false }
+        return AgentSkillPackageInstallation.detect(at: URL(fileURLWithPath: executablePath))?.manager == .brew
     }
 
     private static func semanticVersion(in rawValue: String) -> SemanticVersion? {

@@ -41,6 +41,12 @@ public actor GitHubReleaseService {
     public static let latestReleaseURL = URL(
         string: "https://api.github.com/repos/wzz6423/zisla/releases/latest"
     )!
+    public static let giteeReleasesURL = URL(
+        string: "https://gitee.com/api/v5/repos/wzz6423/zisla/releases?per_page=100"
+    )!
+    public static let githubReleasesURL = URL(
+        string: "https://api.github.com/repos/wzz6423/zisla/releases?per_page=100"
+    )!
     public typealias ReleaseDataLoader = @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
 
     private enum SourceCheckResult {
@@ -74,7 +80,10 @@ public actor GitHubReleaseService {
         self.loadData = loadData
     }
 
-    public func check(currentVersion: String) async throws -> ReleaseCheckResult {
+    public func check(
+        currentVersion: String,
+        channel: UpdateChannel = .release
+    ) async throws -> ReleaseCheckResult {
         let current: SemanticVersion
         do {
             current = try SemanticVersion(currentVersion)
@@ -85,7 +94,8 @@ public actor GitHubReleaseService {
         let giteeResult = try? await checkLatestRelease(
             source: .gitee,
             currentVersion: current,
-            currentVersionText: currentVersion
+            currentVersionText: currentVersion,
+            channel: channel
         )
         if case let .updateAvailable(release)? = giteeResult {
             return .updateAvailable(release, source: .gitee)
@@ -95,7 +105,8 @@ public actor GitHubReleaseService {
             let githubResult = try await checkLatestRelease(
                 source: .github,
                 currentVersion: current,
-                currentVersionText: currentVersion
+                currentVersionText: currentVersion,
+                channel: channel
             )
             switch githubResult {
             case .upToDate:
@@ -114,9 +125,16 @@ public actor GitHubReleaseService {
     private func checkLatestRelease(
         source: ReleaseSource,
         currentVersion: SemanticVersion,
-        currentVersionText: String
+        currentVersionText: String,
+        channel: UpdateChannel
     ) async throws -> SourceCheckResult {
-        let url = source == .gitee ? Self.latestGiteeReleaseURL : Self.latestReleaseURL
+        let url: URL
+        switch (source, channel) {
+        case (.gitee, .release): url = Self.latestGiteeReleaseURL
+        case (.github, .release): url = Self.latestReleaseURL
+        case (.gitee, .preview): url = Self.giteeReleasesURL
+        case (.github, .preview): url = Self.githubReleasesURL
+        }
         var request = URLRequest(url: url)
         request.setValue("zisla/\(currentVersionText)", forHTTPHeaderField: "User-Agent")
         switch source {
@@ -133,11 +151,31 @@ public actor GitHubReleaseService {
             throw GitHubReleaseServiceError.invalidResponse
         }
 
+        if channel == .preview {
+            let releases = try JSONDecoder().decode([GitHubRelease].self, from: data)
+            guard let release = latestPreviewRelease(in: releases) else { return .upToDate }
+            guard let version = try? SemanticVersion(release.tagName) else {
+                return .upToDate
+            }
+            return version > currentVersion ? .updateAvailable(release) : .upToDate
+        }
+
         let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
         guard !release.draft, !release.prerelease else { return .upToDate }
         guard let version = try? SemanticVersion(release.tagName) else {
             throw GitHubReleaseServiceError.invalidReleaseVersion
         }
         return version > currentVersion ? .updateAvailable(release) : .upToDate
+    }
+
+    private func latestPreviewRelease(in releases: [GitHubRelease]) -> GitHubRelease? {
+        releases
+            .filter { !$0.draft && $0.prerelease }
+            .compactMap { release -> (release: GitHubRelease, version: SemanticVersion)? in
+                guard let version = try? SemanticVersion(release.tagName) else { return nil }
+                return (release, version)
+            }
+            .max { $0.version < $1.version }?
+            .release
     }
 }

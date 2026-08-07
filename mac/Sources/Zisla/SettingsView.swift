@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject private var settingsStore: FeatureSettingsStore
     @StateObject private var input = SettingsInput()
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @Environment(\.colorScheme) private var colorScheme
@@ -15,6 +16,11 @@ struct SettingsView: View {
     @State private var sectionSwitchDirection: CGFloat = 1
     @State private var copiedCommand: String?
     @Namespace private var sectionSelectionNamespace
+
+    init(model: AppModel) {
+        self.model = model
+        _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -125,6 +131,7 @@ struct SettingsView: View {
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .thinScrollChrome()
         .animation(reduceMotion ? nil : ZislaMotion.settingsPageSwitch, value: input.selection)
     }
 
@@ -2090,7 +2097,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .interaction: "cursorarrow.motionlines"
         case .download: "arrow.down.circle.fill"
         case .weather: "cloud.sun.fill"
-        case .updates: "arrow.triangle.2.circlepath"
+        case .updates: "arrow.up.circle"
         }
     }
 

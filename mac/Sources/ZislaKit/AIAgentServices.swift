@@ -521,11 +521,23 @@ struct AgentSkillPackageInstallation: Equatable, Sendable {
 public struct AIAgentCLICommand: Equatable, Sendable {
     public var executableURL: URL
     public var arguments: [String]
+    public var timeout: TimeInterval
 
-    public init(executableURL: URL, arguments: [String]) {
+    public init(
+        executableURL: URL,
+        arguments: [String],
+        timeout: TimeInterval = 120
+    ) {
         self.executableURL = executableURL
         self.arguments = arguments
+        self.timeout = timeout
     }
+}
+
+public enum AIAgentGrokUpdateState: Equatable, Sendable {
+    case unknown
+    case upToDate
+    case updateAvailable(AIAgentCLIUpdate)
 }
 
 public enum AIAgentCLIProfileError: LocalizedError, Sendable {
@@ -691,6 +703,8 @@ public enum AIAgentCLIRelayError: LocalizedError, Sendable {
 }
 
 public struct AIAgentCLIService: Sendable {
+    private static let updateCommandTimeout: TimeInterval = 10 * 60
+
     private let environment: [String: String]
     private let homeDirectory: URL
 
@@ -714,22 +728,125 @@ public struct AIAgentCLIService: Sendable {
         guard let executableURL = executableURL(for: kind) else {
             return AgentCLIStatus(kind: kind)
         }
+        let packageVersion = installedPackageVersion(for: kind, executableURL: executableURL)
         do {
             let output = try await AIAgentProcessRunner.run(
                 executableURL: executableURL,
                 arguments: ["--version"],
+                environment: commandEnvironment,
                 timeout: 8
             )
-            let version = String(decoding: output.standardOutput, as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
             return AgentCLIStatus(
                 kind: kind,
                 executablePath: executableURL.path,
-                version: output.status == 0 ? version : nil
+                version: output.status == 0 ? version(in: output) ?? packageVersion : packageVersion
             )
         } catch {
-            return AgentCLIStatus(kind: kind, executablePath: executableURL.path)
+            return AgentCLIStatus(kind: kind, executablePath: executableURL.path, version: packageVersion)
         }
+    }
+
+    public func grokUpdateState() async -> AIAgentGrokUpdateState {
+        guard let grok = executableURL(for: .grok) else { return .unknown }
+        do {
+            let output = try await AIAgentProcessRunner.run(
+                executableURL: grok,
+                arguments: ["update", "--check", "--json"],
+                environment: commandEnvironment,
+                timeout: 15
+            )
+            guard output.status == 0,
+                  let check = try? JSONDecoder().decode(GrokUpdateCheck.self, from: output.standardOutput),
+                  check.error == nil
+            else { return .unknown }
+            guard check.updateAvailable else { return .upToDate }
+            return .updateAvailable(AIAgentCLIUpdate(
+                kind: .grok,
+                installedVersion: check.currentVersion,
+                latestVersion: check.latestVersion
+            ))
+        } catch {
+            return .unknown
+        }
+    }
+
+    public func homebrewUpdates(for statuses: [AgentCLIStatus]) async -> [AIAgentCLIUpdate] {
+        guard let brew = executable(named: AgentSkillPackageManager.brew.executableName) else { return [] }
+        let candidates = statuses.compactMap { status -> (AgentCLIStatus, AgentSkillPackageInstallation)? in
+            guard let executablePath = status.executablePath,
+                  let installation = AgentSkillPackageInstallation.detect(at: URL(fileURLWithPath: executablePath)),
+                  installation.manager == .brew,
+                  status.version != nil
+            else { return nil }
+            return (status, installation)
+        }
+        guard !candidates.isEmpty else { return [] }
+
+        return await withTaskGroup(of: AIAgentCLIUpdate?.self, returning: [AIAgentCLIUpdate].self) { group in
+            for (status, installation) in candidates {
+                group.addTask {
+                    await homebrewUpdate(for: status, installation: installation, brew: brew)
+                }
+            }
+            var updates: [AIAgentCLIUpdate] = []
+            for await update in group {
+                if let update { updates.append(update) }
+            }
+            return updates.sorted {
+                AgentCLIKind.allCases.firstIndex(of: $0.kind)! < AgentCLIKind.allCases.firstIndex(of: $1.kind)!
+            }
+        }
+    }
+
+    private func homebrewUpdate(
+        for status: AgentCLIStatus,
+        installation: AgentSkillPackageInstallation,
+        brew: URL
+    ) async -> AIAgentCLIUpdate? {
+        do {
+            let output = try await AIAgentProcessRunner.run(
+                executableURL: brew,
+                arguments: ["outdated", "--json=v2", installation.packageName],
+                environment: commandEnvironment,
+                timeout: 15
+            )
+            guard output.status == 0,
+                  let outdated = try? JSONDecoder().decode(HomebrewOutdatedPackages.self, from: output.standardOutput),
+                  let formula = outdated.formulae.first(where: { $0.name == installation.packageName }),
+                  let installedVersion = status.version
+            else { return nil }
+            return AIAgentCLIUpdate(
+                kind: status.kind,
+                installedVersion: installedVersion,
+                latestVersion: formula.currentVersion
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    private func installedPackageVersion(for kind: AgentCLIKind, executableURL: URL) -> String? {
+        guard let packageName = kind.npmPackageName else { return nil }
+        var directory = executableURL.deletingLastPathComponent()
+        for _ in 0..<4 {
+            let packageURL = directory.appendingPathComponent("package.json")
+            if let data = try? Data(contentsOf: packageURL),
+               let metadata = try? JSONDecoder().decode(InstalledNPMPackageMetadata.self, from: data),
+               metadata.name == packageName,
+               !metadata.version.isEmpty {
+                return metadata.version
+            }
+            directory.deleteLastPathComponent()
+        }
+        return nil
+    }
+
+    private func version(in output: AIAgentProcessOutput) -> String? {
+        let stdout = String(decoding: output.standardOutput, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !stdout.isEmpty { return stdout }
+        let stderr = output.standardError.trimmingCharacters(in: .whitespacesAndNewlines)
+        return stderr.isEmpty ? nil : stderr
     }
 
     /// Returns an npm command for later confirmation without modifying the system.
@@ -737,12 +854,15 @@ public struct AIAgentCLIService: Sendable {
         installationCommands(for: [kind], update: update).first
     }
 
-    /// Groups npm-managed CLIs into one invocation while preserving the official Grok installer/updater.
+    /// Updates managed CLIs with the installer that owns the discovered executable.
     public func installationCommands(for kinds: [AgentCLIKind], update: Bool) -> [AIAgentCLICommand] {
         let requested = Set(kinds)
+        if update {
+            return updateCommands(for: requested)
+        }
         let packages = AgentCLIKind.allCases.compactMap { kind -> String? in
             guard requested.contains(kind), let package = npmPackage(for: kind) else { return nil }
-            return update ? "\(package)@latest" : package
+            return package
         }
         var commands: [AIAgentCLICommand] = []
         if !packages.isEmpty, let npm = executable(named: "npm") {
@@ -752,16 +872,72 @@ public struct AIAgentCLIService: Sendable {
             ))
         }
         if requested.contains(.grok) {
-            if update, let grok = executableURL(for: .grok) {
-                commands.append(AIAgentCLICommand(executableURL: grok, arguments: ["update"]))
-            } else if !update {
-                commands.append(AIAgentCLICommand(
-                    executableURL: URL(fileURLWithPath: "/bin/bash"),
-                    arguments: ["-c", "curl -fsSL https://x.ai/cli/install.sh | bash"]
-                ))
-            }
+            commands.append(AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/bash"),
+                arguments: ["-c", "curl -fsSL https://x.ai/cli/install.sh | bash"]
+            ))
         }
         return commands
+    }
+
+    private func updateCommands(for requested: Set<AgentCLIKind>) -> [AIAgentCLICommand] {
+        var commands: [AIAgentCLICommand] = []
+        var managedKinds = Set<AgentCLIKind>()
+
+        for manager in [AgentSkillPackageManager.npm, .pnpm, .yarn, .bun, .brew] {
+            let packages = AgentCLIKind.allCases.compactMap { kind -> String? in
+                guard requested.contains(kind),
+                      let executableURL = executableURL(for: kind),
+                      let installation = AgentSkillPackageInstallation.detect(at: executableURL),
+                      installation.manager == manager
+                else { return nil }
+                managedKinds.insert(kind)
+                return installation.packageName
+            }
+            guard !packages.isEmpty, let executableURL = executable(named: manager.executableName) else {
+                continue
+            }
+            commands.append(AIAgentCLICommand(
+                executableURL: executableURL,
+                arguments: updateArguments(for: manager, packages: packages),
+                timeout: Self.updateCommandTimeout
+            ))
+        }
+
+        let fallbackPackages = AgentCLIKind.allCases.compactMap { kind -> String? in
+            guard requested.contains(kind), !managedKinds.contains(kind), let package = npmPackage(for: kind) else {
+                return nil
+            }
+            return "\(package)@latest"
+        }
+        if !fallbackPackages.isEmpty, let npm = executable(named: "npm") {
+            commands.append(AIAgentCLICommand(
+                executableURL: npm,
+                arguments: ["install", "--global"] + fallbackPackages,
+                timeout: Self.updateCommandTimeout
+            ))
+        }
+        if requested.contains(.grok), let grok = executableURL(for: .grok) {
+            commands.append(AIAgentCLICommand(
+                executableURL: grok,
+                arguments: ["update"],
+                timeout: Self.updateCommandTimeout
+            ))
+        }
+        return commands
+    }
+
+    private func updateArguments(for manager: AgentSkillPackageManager, packages: [String]) -> [String] {
+        switch manager {
+        case .npm:
+            ["install", "--global"] + packages.map { "\($0)@latest" }
+        case .pnpm, .bun:
+            ["update", "--global"] + packages.map { "\($0)@latest" }
+        case .yarn:
+            ["global", "add"] + packages.map { "\($0)@latest" }
+        case .brew:
+            ["upgrade"] + packages
+        }
     }
 
     public func uninstallationCommand(for kind: AgentCLIKind) -> AIAgentCLICommand? {
@@ -810,7 +986,8 @@ public struct AIAgentCLIService: Sendable {
         try await AIAgentProcessRunner.run(
             executableURL: command.executableURL,
             arguments: command.arguments,
-            timeout: 120
+            environment: commandEnvironment,
+            timeout: command.timeout
         )
     }
 
@@ -837,6 +1014,7 @@ public struct AIAgentCLIService: Sendable {
             executableURL: executableURL,
             arguments: relayArguments(for: kind, prompt: prompt),
             standardInput: Data(prompt.utf8),
+            environment: commandEnvironment,
             workingDirectoryURL: relayWorkingDirectory(for: project),
             timeout: 300
         )
@@ -898,6 +1076,18 @@ public struct AIAgentCLIService: Sendable {
         .map { $0.appendingPathComponent(name) }
         .first { fileManager.isExecutableFile(atPath: $0.path) }
         .map { $0.resolvingSymlinksInPath().standardizedFileURL }
+    }
+
+    private var commandEnvironment: [String: String] {
+        var environment = environment
+        let directories = Self.executableSearchDirectories(
+            environment: environment,
+            homeDirectory: homeDirectory
+        ).map(\.path)
+        let existing = (environment["PATH"] ?? "").split(separator: ":").map(String.init)
+        var seen = Set<String>()
+        environment["PATH"] = (directories + existing).filter { seen.insert($0).inserted }.joined(separator: ":")
+        return environment
     }
 
     static func executableSearchDirectories(
@@ -1031,12 +1221,40 @@ public struct AIAgentProcessOutput: Sendable {
     public var status: Int32
     public var standardOutput: Data
     public var standardError: String
+    public var didTimeout: Bool
+}
+
+private struct InstalledNPMPackageMetadata: Decodable {
+    let name: String
+    let version: String
+}
+
+private struct GrokUpdateCheck: Decodable {
+    let currentVersion: String
+    let latestVersion: String
+    let updateAvailable: Bool
+    let error: String?
+}
+
+private struct HomebrewOutdatedPackages: Decodable {
+    let formulae: [HomebrewOutdatedFormula]
+}
+
+private struct HomebrewOutdatedFormula: Decodable {
+    let name: String
+    let currentVersion: String
+
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case currentVersion = "current_version"
+    }
 }
 
 private final class AIAgentProcessCapture: @unchecked Sendable {
     private let lock = NSLock()
     private var output = Data()
     private var error = Data()
+    private var didTimeout = false
 
     func setOutput(_ data: Data) {
         lock.lock()
@@ -1050,10 +1268,16 @@ private final class AIAgentProcessCapture: @unchecked Sendable {
         lock.unlock()
     }
 
-    func values() -> (Data, Data) {
+    func markTimedOut() {
+        lock.lock()
+        didTimeout = true
+        lock.unlock()
+    }
+
+    func values() -> (Data, Data, Bool) {
         lock.lock()
         defer { lock.unlock() }
-        return (output, error)
+        return (output, error, didTimeout)
     }
 }
 
@@ -1062,6 +1286,7 @@ public enum AIAgentProcessRunner {
         executableURL: URL,
         arguments: [String] = [],
         standardInput: Data? = nil,
+        environment: [String: String]? = nil,
         workingDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser,
         timeout: TimeInterval = 15
     ) async throws -> AIAgentProcessOutput {
@@ -1073,6 +1298,7 @@ public enum AIAgentProcessRunner {
                 let input = Pipe()
                 process.executableURL = executableURL
                 process.arguments = arguments
+                process.environment = environment
                 process.currentDirectoryURL = workingDirectoryURL
                 process.standardOutput = output
                 process.standardError = error
@@ -1099,6 +1325,7 @@ public enum AIAgentProcessRunner {
                     }
                     let timeoutWork = DispatchWorkItem {
                         guard process.isRunning else { return }
+                        capture.markTimedOut()
                         process.terminate()
                         DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
                             if process.isRunning { Darwin.kill(process.processIdentifier, SIGKILL) }
@@ -1108,12 +1335,13 @@ public enum AIAgentProcessRunner {
                     process.waitUntilExit()
                     timeoutWork.cancel()
                     readers.wait()
-                    let (standardOutput, standardErrorData) = capture.values()
+                    let (standardOutput, standardErrorData, didTimeout) = capture.values()
                     let standardError = String(decoding: standardErrorData, as: UTF8.self)
                     continuation.resume(returning: AIAgentProcessOutput(
                         status: process.terminationStatus,
                         standardOutput: standardOutput,
-                        standardError: standardError.trimmingCharacters(in: .whitespacesAndNewlines)
+                        standardError: standardError.trimmingCharacters(in: .whitespacesAndNewlines),
+                        didTimeout: didTimeout
                     ))
                 } catch {
                     continuation.resume(throwing: error)

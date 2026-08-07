@@ -159,7 +159,7 @@ struct QuickNoteModuleView: View {
         VStack(alignment: .leading, spacing: 0) {
             editorToolbar
                 .frame(height: 34)
-                .padding(.bottom, 6)
+                .padding(.bottom, 2)
 
             if let noteContent {
                 ReadOnlyNoteMetadata(
@@ -168,8 +168,8 @@ struct QuickNoteModuleView: View {
                     showAttachment: { service.showAttachmentInNotes(id: $0.id) },
                     wordCount: draftPlainText.count
                 )
-                .frame(height: 28)
-                .padding(.bottom, 5)
+                .frame(height: 20)
+                .padding(.bottom, 2)
             }
 
             editorPane

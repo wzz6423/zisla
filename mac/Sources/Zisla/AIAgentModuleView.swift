@@ -48,7 +48,9 @@ struct AIAgentModuleView: View {
 
     @ObservedObject var model: AppModel
     @ObservedObject private var agent: AIAgentWorkspace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let configurationScope: ConfigurationScope?
+    @Namespace private var sectionSelectionNamespace
     @State private var section: Section = .chat
     @State private var selectedThreadID: UUID?
     @State private var draft = ""
@@ -68,8 +70,8 @@ struct AIAgentModuleView: View {
     @State private var pendingCLICommands: [AIAgentCLICommand] = []
     @State private var pendingCLIActionTitle = ""
     @State private var pendingCLIActionMessage = ""
+    @State private var pendingCLIKinds: [AgentCLIKind] = []
     @State private var showCLIConfirmation = false
-    @State private var isRunningCLICommands = false
     @State private var profileImportRequest: ProfileImportRequest?
     @State private var isChatTransferTarget = false
     @State private var isModelPickerPresented = false
@@ -126,16 +128,16 @@ struct AIAgentModuleView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .alert(pendingCLIActionTitle, isPresented: $showCLIConfirmation) {
-            Button("取消", role: .cancel) { pendingCLICommands = [] }
+            Button("取消", role: .cancel) {
+                pendingCLICommands = []
+                pendingCLIKinds = []
+            }
             Button("继续") {
                 let commands = pendingCLICommands
                 guard !commands.isEmpty else { return }
                 pendingCLICommands = []
-                Task {
-                    isRunningCLICommands = true
-                    _ = await agent.runCLICommands(commands)
-                    isRunningCLICommands = false
-                }
+                agent.startCLICommands(commands, title: pendingCLIActionTitle, kinds: pendingCLIKinds)
+                pendingCLIKinds = []
             }
         } message: {
             Text(pendingCLIActionMessage)
@@ -220,14 +222,7 @@ struct AIAgentModuleView: View {
         return VStack(spacing: 8) {
             // A single-section scope needs no switcher; the settings group title already names it.
             if sections.count > 1 {
-                Picker("行为分类", selection: $section) {
-                    ForEach(sections) { section in
-                        Text(section.title).tag(section)
-                    }
-                }
-                .pickerStyle(.menu)
-                .controlSize(.small)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                sectionPicker(sections)
             }
 
             Group {
@@ -254,12 +249,57 @@ struct AIAgentModuleView: View {
         }
     }
 
+    private func sectionPicker(_ sections: [Section]) -> some View {
+        HStack(spacing: 8) {
+            Text("行为分类")
+
+            HStack(spacing: 0) {
+                ForEach(sections) { candidate in
+                    let isSelected = section == candidate
+                    Button {
+                        guard !isSelected else { return }
+                        if reduceMotion {
+                            section = candidate
+                        } else {
+                            withAnimation(ZislaMotion.selection) {
+                                section = candidate
+                            }
+                        }
+                    } label: {
+                        Text(candidate.title)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                            .background {
+                                if isSelected {
+                                    SelectionGlassBackground(cornerRadius: 5)
+                                        .matchedGeometryEffect(
+                                            id: "ai-agent-section-selection",
+                                            in: sectionSelectionNamespace
+                                        )
+                                }
+                            }
+                    }
+                    .buttonStyle(PressableStyle(hoverScale: 1.025, pressedScale: 0.95))
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                }
+            }
+            .padding(2)
+            .background(Color.fillControl)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(reduceMotion ? nil : ZislaMotion.selection, value: section)
+    }
+
     private var header: some View {
         HStack(spacing: 8) {
             Label("AI Agent", systemImage: "sparkles")
                 .font(.system(size: 12, weight: .semibold))
             Spacer()
-            if let error = agent.lastError, !error.isEmpty {
+            if let error = headerErrorText {
                 Text(error)
                     .font(.system(size: 9))
                     .foregroundStyle(.orange)
@@ -278,6 +318,16 @@ struct AIAgentModuleView: View {
             .help("刷新余额、渠道、CLI 和 Skills")
             .disabled(agent.isRefreshing)
         }
+    }
+
+    private var headerErrorText: String? {
+        guard let error = agent.lastError, !error.isEmpty else { return nil }
+        guard let progress = agent.cliCommandProgress,
+              progress.state == .failed,
+              progress.detail == error else {
+            return error
+        }
+        return "CLI 操作失败"
     }
 
     private var chatContent: some View {
@@ -1646,7 +1696,8 @@ struct AIAgentModuleView: View {
         let installedKinds = cliKinds(installed: true)
         let missingKinds = cliKinds(installed: false)
         let installCommands = agent.commandsForCLIInstallation(missingKinds, update: false)
-        let updateCommands = agent.commandsForCLIInstallation(installedKinds, update: true)
+        let updateKinds = agent.cliUpdates.map(\.kind)
+        let updateCommands = agent.commandsForCLIInstallation(updateKinds, update: true)
         let uninstallCommands = agent.commandsForCLIUninstallation(installedKinds)
         return ScrollView {
             VStack(alignment: .leading, spacing: 10) {
@@ -1660,44 +1711,50 @@ struct AIAgentModuleView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                     .buttonStyle(.borderless)
-                    .disabled(isRunningCLICommands)
+                    .disabled(agent.isRunningCLICommands)
                     .help("重新检测本机 CLI")
                     Button {
                         queueCLIAction(
                             title: "下载缺失 CLI？",
                             message: cliActionMessage("将下载并安装", kinds: missingKinds),
+                            kinds: missingKinds,
                             commands: installCommands
                         )
                     } label: {
                         Image(systemName: "arrow.down.circle")
                     }
                     .buttonStyle(.borderless)
-                    .disabled(isRunningCLICommands || installCommands.isEmpty)
+                    .disabled(agent.isRunningCLICommands || installCommands.isEmpty)
                     .help("一键下载所有未安装的 CLI")
                     Button {
                         queueCLIAction(
                             title: "更新已安装 CLI？",
                             message: cliActionMessage("将更新", kinds: installedKinds),
+                            kinds: installedKinds,
                             commands: updateCommands
                         )
                     } label: {
-                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Image(systemName: "arrow.up.circle")
                     }
                     .buttonStyle(.borderless)
-                    .disabled(isRunningCLICommands || updateCommands.isEmpty)
+                    .disabled(agent.isRunningCLICommands || updateCommands.isEmpty)
                     .help("一键更新所有已安装的 CLI")
                     Button(role: .destructive) {
                         queueCLIAction(
                             title: "卸载已安装 CLI？",
                             message: cliActionMessage("将卸载", kinds: installedKinds),
+                            kinds: installedKinds,
                             commands: uninstallCommands
                         )
                     } label: {
                         Image(systemName: "trash")
                     }
                     .buttonStyle(.borderless)
-                    .disabled(isRunningCLICommands || uninstallCommands.isEmpty)
+                    .disabled(agent.isRunningCLICommands || uninstallCommands.isEmpty)
                     .help("一键卸载所有受支持的 CLI")
+                }
+                if let progress = agent.cliCommandProgress {
+                    cliCommandProgressView(progress)
                 }
                 ForEach(AgentCLIKind.allCases, id: \.self) { kind in
                     let status = agent.store.state.cliStatuses.first { $0.kind == kind }
@@ -1720,33 +1777,54 @@ struct AIAgentModuleView: View {
                         if isInstalled {
                             let update = agent.commandsForCLIInstallation([kind], update: true)
                             let availableUpdate = agent.cliUpdates.first { $0.kind == kind }
-                            Button {
-                                queueCLIAction(
-                                    title: "更新 \(kind.displayName)？",
-                                    message: availableUpdate.map {
-                                        "将 \(kind.displayName) 从 \($0.installedVersion) 更新到 \($0.latestVersion)"
-                                    } ?? cliActionMessage("将更新", kinds: [kind]),
-                                    commands: update
-                                )
-                            } label: {
-                                Image(systemName: "arrow.triangle.2.circlepath")
+                            if let availableUpdate {
+                                Button {
+                                    queueCLIAction(
+                                        title: "更新 \(kind.displayName)？",
+                                        message: "将 \(kind.displayName) 从 \(availableUpdate.installedVersion) 更新到 \(availableUpdate.latestVersion)",
+                                        kinds: [kind],
+                                        commands: update
+                                    )
+                                } label: {
+                                    Image(systemName: "arrow.up.circle")
+                                }
+                                .buttonStyle(.borderless)
+                                .foregroundStyle(Color.zislaInfo)
+                                .disabled(agent.isRunningCLICommands || update.isEmpty)
+                                .help("已确认新版本 \(availableUpdate.latestVersion)，更新 \(kind.displayName)")
+                            } else if status?.version != nil {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(kind == .grok && agent.grokUpdateState == .upToDate ? .green : .secondary)
+                                    .help(kind == .grok && agent.grokUpdateState == .upToDate ? "Grok 已是最新版本" : "当前未检测到可用更新")
+                            } else {
+                                Button {
+                                    queueCLIAction(
+                                        title: "更新 \(kind.displayName)？",
+                                        message: cliActionMessage("将更新", kinds: [kind]),
+                                        kinds: [kind],
+                                        commands: update
+                                    )
+                                } label: {
+                                    Image(systemName: "arrow.up.circle")
+                                }
+                                .buttonStyle(.borderless)
+                                .foregroundStyle(.secondary)
+                                .disabled(agent.isRunningCLICommands || update.isEmpty)
+                                .help("版本未知，可尝试更新 \(kind.displayName)")
                             }
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(availableUpdate == nil ? .secondary : Color.zislaInfo)
-                            .disabled(isRunningCLICommands || update.isEmpty)
-                            .help(availableUpdate.map { "更新 \(kind.displayName) 到 \($0.latestVersion)" } ?? "更新 \(kind.displayName)")
                             let uninstall = agent.commandsForCLIUninstallation([kind])
                             Button(role: .destructive) {
                                 queueCLIAction(
                                     title: "卸载 \(kind.displayName)？",
                                     message: cliActionMessage("将卸载", kinds: [kind]),
+                                    kinds: [kind],
                                     commands: uninstall
                                 )
                             } label: {
                                 Image(systemName: "trash")
                             }
                             .buttonStyle(.borderless)
-                            .disabled(isRunningCLICommands || uninstall.isEmpty)
+                            .disabled(agent.isRunningCLICommands || uninstall.isEmpty)
                             .help("卸载 \(kind.displayName)")
                         } else {
                             let install = agent.commandsForCLIInstallation([kind], update: false)
@@ -1754,13 +1832,14 @@ struct AIAgentModuleView: View {
                                 queueCLIAction(
                                     title: "下载 \(kind.displayName)？",
                                     message: cliActionMessage("将下载并安装", kinds: [kind]),
+                                    kinds: [kind],
                                     commands: install
                                 )
                             } label: {
                                 Image(systemName: "arrow.down.circle")
                             }
                             .buttonStyle(.borderless)
-                            .disabled(isRunningCLICommands || install.isEmpty)
+                            .disabled(agent.isRunningCLICommands || install.isEmpty)
                             .help("下载并安装 \(kind.displayName)")
                         }
                     }
@@ -1792,13 +1871,51 @@ struct AIAgentModuleView: View {
     private func queueCLIAction(
         title: String,
         message: String,
+        kinds: [AgentCLIKind],
         commands: [AIAgentCLICommand]
     ) {
         guard !commands.isEmpty else { return }
         pendingCLIActionTitle = title
         pendingCLIActionMessage = message
+        pendingCLIKinds = kinds
         pendingCLICommands = commands
         showCLIConfirmation = true
+    }
+
+    private func cliCommandProgressView(_ progress: AIAgentCLICommandProgress) -> some View {
+        HStack(spacing: 6) {
+            switch progress.state {
+            case .running:
+                ProgressView().controlSize(.small)
+            case .succeeded:
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            case .failed:
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(cliCommandProgressTitle(progress))
+                    .font(.system(size: 10, weight: .medium))
+            }
+            Spacer(minLength: 6)
+            ProgressView(value: progress.fractionCompleted)
+                .progressViewStyle(.linear)
+                .frame(width: 72)
+            Text("\(progress.completedCount)/\(progress.totalCount)")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(width: 24, alignment: .trailing)
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func cliCommandProgressTitle(_ progress: AIAgentCLICommandProgress) -> String {
+        let action = progress.title.replacingOccurrences(of: "？", with: "")
+        switch progress.state {
+        case .running: return "正在\(action)"
+        case .succeeded: return "\(action) 已完成"
+        case .failed: return "\(action) 失败"
+        }
     }
 
     private var storageContent: some View {

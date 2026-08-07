@@ -351,7 +351,7 @@
 "建立基线" = "Membangun baseline";
 
 /* System Cleanup */
-"清理候选项" = "Kandidat Pembersihan";
+"清理磁盘" = "Bersihkan Disk";
 "扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件" = "Pindai cache aplikasi, log, file sementara, artefak build, cache package manager, disk image, file besar, dan duplikat";
 "取消全选" = "Batalkan Pilih Semua";
 "全选" = "Pilih Semua";

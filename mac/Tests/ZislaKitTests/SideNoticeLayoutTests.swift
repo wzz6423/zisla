@@ -186,11 +186,11 @@ struct SideNoticeLayoutTests {
     @Test
     func updateAvailabilityUsesTheCompactBarWithoutOccupyingOrdinaryCapacity() {
         let update = IslandNotice(
-            id: "update-available-cli-codex-left",
-            title: "Codex",
+            id: "update-available-cli-claude-left",
+            title: "Claude",
             side: .left,
             style: .status,
-            symbolName: "arrow.triangle.2.circlepath"
+            symbolName: "sparkles"
         )
 
         let presentation = engine.presentation(for: [update])

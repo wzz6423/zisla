@@ -90,6 +90,7 @@ public struct AIProgressTask: Codable, Equatable, Sendable, Identifiable {
     public var sessionURL: URL?
     public var effort: String?
     public var startedAt: Date?
+    public var failureReason: String?
 
     public init(
         id: String,
@@ -101,7 +102,8 @@ public struct AIProgressTask: Codable, Equatable, Sendable, Identifiable {
         updatedAt: Date,
         sessionURL: URL? = nil,
         effort: String? = nil,
-        startedAt: Date? = nil
+        startedAt: Date? = nil,
+        failureReason: String? = nil
     ) {
         self.id = id
         self.provider = provider
@@ -113,6 +115,7 @@ public struct AIProgressTask: Codable, Equatable, Sendable, Identifiable {
         self.sessionURL = sessionURL
         self.effort = effort
         self.startedAt = startedAt
+        self.failureReason = failureReason
     }
 }
 
@@ -211,6 +214,8 @@ public struct IslandNotice: Codable, Equatable, Sendable, Identifiable {
     public var symbolName: String?
     /// Individual battery readings for attached accessories; when absent, preserves the existing display and decoding behaviour for old notices.
     public var batteryLevels: [NoticeBatteryLevel]?
+    /// Arbitrary metadata for domain-specific actions (mail operations, downloads, etc.).
+    public var metadata: [String: String]?
 
     public init(
         id: String = UUID().uuidString,
@@ -225,7 +230,8 @@ public struct IslandNotice: Codable, Equatable, Sendable, Identifiable {
         appName: String? = nil,
         appBundleIdentifier: String? = nil,
         symbolName: String? = nil,
-        batteryLevels: [NoticeBatteryLevel]? = nil
+        batteryLevels: [NoticeBatteryLevel]? = nil,
+        metadata: [String: String]? = nil
     ) {
         self.id = id
         self.title = title
@@ -240,11 +246,12 @@ public struct IslandNotice: Codable, Equatable, Sendable, Identifiable {
         self.appBundleIdentifier = appBundleIdentifier
         self.symbolName = symbolName
         self.batteryLevels = batteryLevels
+        self.metadata = metadata
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, detail, kind, side, createdAt, progress, artworkData
-        case style, appName, appBundleIdentifier, symbolName, batteryLevels
+        case style, appName, appBundleIdentifier, symbolName, batteryLevels, metadata
     }
 
     public init(from decoder: Decoder) throws {
@@ -262,6 +269,7 @@ public struct IslandNotice: Codable, Equatable, Sendable, Identifiable {
         appBundleIdentifier = try container.decodeIfPresent(String.self, forKey: .appBundleIdentifier)
         symbolName = try container.decodeIfPresent(String.self, forKey: .symbolName)
         batteryLevels = try container.decodeIfPresent([NoticeBatteryLevel].self, forKey: .batteryLevels)
+        metadata = try container.decodeIfPresent([String: String].self, forKey: .metadata)
     }
 }
 

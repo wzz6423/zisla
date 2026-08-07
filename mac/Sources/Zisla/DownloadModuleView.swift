@@ -46,7 +46,8 @@ struct DownloadModuleView: View {
                     symbol: { $0 == .video ? "film.fill" : "waveform" },
                     fontSize: 11,
                     width: 178,
-                    height: 28
+                    height: 28,
+                    usesGlassSelection: false
                 )
                 .disabled(model.downloadState.isRunning)
                 .opacity(model.downloadState.isRunning ? 0.45 : 1)
@@ -73,17 +74,21 @@ struct DownloadModuleView: View {
                         model.cancelDownload()
                     } label: {
                         Label("取消", systemImage: "stop.fill")
-                            .frame(width: 76, height: 28)
+                            .frame(width: 76)
                     }
                     .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .frame(height: 28)
                 } else {
                     Button {
                         model.startDownload()
                     } label: {
                         Label("下载", systemImage: "arrow.down")
-                            .frame(width: 76, height: 28)
+                            .frame(width: 76)
                     }
                     .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .frame(height: 28)
                     .disabled(model.downloadURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }

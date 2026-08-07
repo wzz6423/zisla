@@ -483,8 +483,7 @@ private struct ClipboardFilterSegmentedControl: View {
                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                     .background {
                         if isActive {
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .strokeBorder(.white, lineWidth: 1)
+                            SelectionGlassBackground(cornerRadius: 5)
                                 .matchedGeometryEffect(
                                     id: "clipboard-filter-selection",
                                     in: selectionNamespace

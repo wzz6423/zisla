@@ -352,7 +352,7 @@
 "建立基线" = "Erstelle Baseline";
 
 /* System Cleanup */
-"清理候选项" = "Bereinigungskandidaten";
+"清理磁盘" = "Datenträger bereinigen";
 "扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件" = "App-Caches, Protokolle, temporäre Dateien, Build-Artefakte, Paketmanager-Caches, Disk-Images, große Dateien und Duplikate scannen";
 "取消全选" = "Alle abwählen";
 "全选" = "Alle auswählen";

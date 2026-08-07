@@ -47,6 +47,56 @@ struct CalendarServiceTests {
     }
 
     @Test
+    func agendaDateIntervalCoversBothVisibleWeeks() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "Asia/Shanghai"))
+        calendar.firstWeekday = 1
+        let friday = try #require(calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 7, hour: 15)
+        ))
+
+        let interval = try #require(CalendarService.agendaDateInterval(
+            containing: friday,
+            calendar: calendar
+        ))
+        let expectedStart = try #require(calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 2)
+        ))
+        let expectedEnd = try #require(calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 16)
+        ))
+
+        #expect(interval.start == expectedStart)
+        #expect(interval.end == expectedEnd)
+    }
+
+    @Test
+    func twoWeekRangeCoversFourteenConsecutiveCalendarDays() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "Asia/Shanghai"))
+        calendar.firstWeekday = 2
+        let wednesday = try #require(calendar.date(
+            from: DateComponents(year: 2026, month: 7, day: 22, hour: 15)
+        ))
+
+        let days = CalendarService.daysOfWeeks(
+            containing: wednesday,
+            count: 2,
+            calendar: calendar
+        )
+
+        #expect(days.count == 14)
+        #expect(calendar.isDate(
+            days[0],
+            inSameDayAs: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 20)))
+        ))
+        #expect(calendar.isDate(
+            days[13],
+            inSameDayAs: try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 2)))
+        ))
+    }
+
+    @Test
     func itemOccursOnMatchesCrossMidnightAndPointReminders() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try #require(TimeZone(identifier: "Asia/Shanghai"))

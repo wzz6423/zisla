@@ -351,7 +351,7 @@
 "建立基线" = "Estableciendo línea base";
 
 /* System Cleanup */
-"清理候选项" = "Candidatos de Limpieza";
+"清理磁盘" = "Limpiar disco";
 "扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件" = "Escanear cachés de aplicaciones, registros, archivos temporales, artefactos de compilación, cachés de gestores de paquetes, imágenes de disco, archivos grandes y duplicados";
 "取消全选" = "Deseleccionar Todo";
 "全选" = "Seleccionar Todo";

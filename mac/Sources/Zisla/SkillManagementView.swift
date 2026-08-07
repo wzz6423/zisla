@@ -5,6 +5,8 @@ import ZislaKit
 
 struct SkillManagementView: View {
     @ObservedObject var agent: AIAgentWorkspace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var syncModeSelectionNamespace
     @State private var pendingUninstallSkill: AgentSkill?
 
     var body: some View {
@@ -32,13 +34,7 @@ struct SkillManagementView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text("同步方式")
                     .font(.system(size: 10, weight: .medium))
-                Picker("同步方式", selection: syncModeBinding) {
-                    ForEach(AgentSkillSyncMode.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
+                syncModePicker
                 Text(agent.store.state.skillSyncConfiguration.mode.detail)
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
@@ -114,6 +110,46 @@ struct SkillManagementView: View {
             get: { agent.store.state.skillSyncConfiguration.mode },
             set: { agent.updateManagedSkillSyncMode($0) }
         )
+    }
+
+    private var syncModePicker: some View {
+        HStack(spacing: 0) {
+            ForEach(AgentSkillSyncMode.allCases, id: \.self) { mode in
+                let isSelected = syncModeBinding.wrappedValue == mode
+                Button {
+                    guard !isSelected else { return }
+                    if reduceMotion {
+                        syncModeBinding.wrappedValue = mode
+                    } else {
+                        withAnimation(ZislaMotion.selection) {
+                            syncModeBinding.wrappedValue = mode
+                        }
+                    }
+                } label: {
+                    Text(mode.displayName)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .background {
+                            if isSelected {
+                                SelectionGlassBackground(cornerRadius: 5)
+                                    .matchedGeometryEffect(
+                                        id: "skill-sync-mode-selection",
+                                        in: syncModeSelectionNamespace
+                                    )
+                            }
+                        }
+                }
+                .buttonStyle(PressableStyle(hoverScale: 1.025, pressedScale: 0.95))
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(Color.fillControl)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .animation(reduceMotion ? nil : ZislaMotion.selection, value: syncModeBinding.wrappedValue)
     }
 
     private func destinationRow(_ destination: AgentSkillSyncDestination) -> some View {

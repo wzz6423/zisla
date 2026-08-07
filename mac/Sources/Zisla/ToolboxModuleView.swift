@@ -11,9 +11,7 @@ struct ToolboxModuleView: View {
 
     private enum Metrics {
         static let controlHeight: CGFloat = 40
-        static let shortcutWidth: CGFloat = 64
-        static let shortcutHeight: CGFloat = 88
-        static let toolContentHeight = shortcutHeight * 2 + 8
+        static let toolContentHeight: CGFloat = 136
     }
 
     init(model: AppModel) {
@@ -31,30 +29,28 @@ struct ToolboxModuleView: View {
     }
 
     private var focusPanel: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(pomodoro.mode.title)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            HStack {
+                Text(pomodoro.mode.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
 
-            Spacer(minLength: 12)
-
+            Spacer(minLength: 0)
             durationDisplay
                 .frame(maxWidth: .infinity, alignment: .center)
-
-            Spacer(minLength: 12)
+            Spacer(minLength: 0)
 
             HStack(spacing: 8) {
                 Button {
                     pomodoro.toggleStartPause()
                 } label: {
-                    Label(
-                        startPauseTitle,
-                        systemImage: startPauseSymbol
-                    )
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 30)
-                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    Text(startPauseTitle)
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Metrics.controlHeight)
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .background(Color.fillCard)
@@ -64,10 +60,10 @@ struct ToolboxModuleView: View {
                 Button {
                     pomodoro.reset()
                 } label: {
-                    Label("重置", systemImage: "arrow.counterclockwise")
+                    Text("重置")
                         .font(.system(size: 11, weight: .semibold))
                         .frame(maxWidth: .infinity)
-                        .frame(height: 30)
+                        .frame(height: Metrics.controlHeight)
                         .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -75,6 +71,7 @@ struct ToolboxModuleView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .help("重置番茄钟")
             }
+            .frame(maxWidth: .infinity)
         }
         .padding(10)
         .frame(width: 236, height: Metrics.toolContentHeight)
@@ -129,56 +126,86 @@ struct ToolboxModuleView: View {
     }
 
     private var toolActions: some View {
-        HStack(alignment: .top, spacing: 8) {
-            VStack(spacing: 8) {
-                toolTogglesRow
-                islandBehaviorRow
-                cleaningRow
-                desktopRow
+        VStack(spacing: 8) {
+            toolTogglesRow
+
+            HStack(spacing: 8) {
+                Button {
+                    model.startScreenCleaning()
+                } label: {
+                    Label("清理屏幕", systemImage: "rectangle.dashed")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Metrics.controlHeight)
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .background(Color.fillCard)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .help("全屏黑色遮罩；点击中央「退出清屏」按钮或任意处退出")
+
+                Button {
+                    if model.screenCleaning.isKeyboardCleaning {
+                        model.screenCleaning.endKeyboardCleaning()
+                    } else {
+                        model.startKeyboardCleaning()
+                    }
+                } label: {
+                    Label(
+                        model.screenCleaning.isKeyboardCleaning ? "结束清洁" : "清理键盘",
+                        systemImage: "keyboard"
+                    )
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Metrics.controlHeight)
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .background(Color.fillCard)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .help(
+                    model.screenCleaning.isKeyboardCleaning
+                        ? "恢复键盘输入"
+                        : "吞掉键盘输入；再次点击结束"
+                )
+
+                ToolShortcutButton(
+                    title: "提词器",
+                    symbol: "text.viewfinder",
+                    help: "打开提词器"
+                ) {
+                    model.presentTeleprompter()
+                }
             }
-            .frame(maxWidth: .infinity)
 
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    ToolShortcutButton(
-                        title: "提词器",
-                        symbol: "text.viewfinder",
-                        help: "打开提词器"
-                    ) {
-                        model.presentTeleprompter()
-                    }
-
-                    ToolShortcutButton(
-                        title: "闹钟",
-                        symbol: "alarm",
-                        help: "管理闹钟"
-                    ) {
-                        isAlarmEditorPresented = true
-                    }
-                    .popover(isPresented: $isAlarmEditorPresented, arrowEdge: .bottom) {
-                        AlarmEditorView(service: model.alarms)
-                    }
+            HStack(spacing: 8) {
+                ToolShortcutButton(
+                    title: "闹钟",
+                    symbol: "alarm",
+                    help: "管理闹钟"
+                ) {
+                    isAlarmEditorPresented = true
+                }
+                .popover(isPresented: $isAlarmEditorPresented, arrowEdge: .bottom) {
+                    AlarmEditorView(service: model.alarms)
                 }
 
-                HStack(spacing: 8) {
-                    ToolShortcutButton(
-                        title: "镜子",
-                        symbol: "camera.viewfinder",
-                        help: "打开摄像头镜子"
-                    ) {
-                        model.presentMirror()
-                    }
+                ToolShortcutButton(
+                    title: "镜子",
+                    symbol: "camera.viewfinder",
+                    help: "打开摄像头镜子"
+                ) {
+                    model.presentMirror()
+                }
 
-                    ToolShortcutButton(
-                        title: "废纸篓",
-                        symbol: "trash",
-                        help: "清空废纸篓（不可撤销，会先确认）"
-                    ) {
-                        model.emptyTrash()
-                    }
+                ToolShortcutButton(
+                    title: "废纸篓",
+                    symbol: "trash",
+                    help: "清空废纸篓（不可撤销，会先确认）"
+                ) {
+                    model.emptyTrash()
                 }
             }
-            .frame(width: 136)
         }
         .frame(maxWidth: .infinity, alignment: .top)
     }
@@ -292,97 +319,6 @@ struct ToolboxModuleView: View {
         }
     }
 
-    private var cleaningRow: some View {
-        HStack(spacing: 8) {
-            Button {
-                model.startScreenCleaning()
-            } label: {
-                Label("清理屏幕", systemImage: "rectangle.dashed")
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: Metrics.controlHeight)
-                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .background(Color.fillCard)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .help("全屏黑色遮罩；点击中央「退出清屏」按钮或任意处退出")
-
-            Button {
-                if model.screenCleaning.isKeyboardCleaning {
-                    model.screenCleaning.endKeyboardCleaning()
-                } else {
-                    model.startKeyboardCleaning()
-                }
-            } label: {
-                Label(
-                    model.screenCleaning.isKeyboardCleaning ? "结束清洁" : "清理键盘",
-                    systemImage: "keyboard"
-                )
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: Metrics.controlHeight)
-                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .background(Color.fillCard)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .help(
-                model.screenCleaning.isKeyboardCleaning
-                    ? "恢复键盘输入"
-                    : "吞掉键盘输入；再次点击结束"
-            )
-        }
-    }
-
-    /// Collapsed-state window level and notification muting: both write directly to settings; AppModel / ZislaApp subscribes and applies.
-    private var islandBehaviorRow: some View {
-        HStack(spacing: 8) {
-            ToolToggleButton(
-                title: model.settingsStore.settings.islandCollapsedOnTop ? "收起置顶" : "收起置底",
-                symbol: model.settingsStore.settings.islandCollapsedOnTop
-                    ? "square.3.layers.3d.top.filled"
-                    : "square.3.layers.3d.bottom.filled",
-                isOn: model.settingsStore.settings.islandCollapsedOnTop,
-                help: "收起态压在其他窗口之上（置顶），或被其他窗口和菜单栏图标覆盖（置底）"
-            ) {
-                model.settingsStore.settings.islandCollapsedOnTop.toggle()
-            }
-
-            ToolToggleButton(
-                title: "屏蔽通知",
-                symbol: model.settingsStore.settings.notificationsMuted
-                    ? "bell.slash.fill"
-                    : "bell.fill",
-                isOn: model.settingsStore.settings.notificationsMuted,
-                help: "临时不再推送 Zisla 的系统通知；关闭后恢复正常推送（闹钟不受影响）"
-            ) {
-                model.settingsStore.settings.notificationsMuted.toggle()
-            }
-        }
-    }
-
-    private var desktopRow: some View {
-        HStack(spacing: 8) {
-            ToolActionButton(
-                title: "整理桌面",
-                symbol: "square.grid.3x3",
-                help: "按网格对齐桌面图标；已开启「叠放」时不动任何文件"
-            ) {
-                model.tidyDesktop()
-            }
-
-            ToolActionButton(
-                title: "更新",
-                subtitle: "App Store 应用",
-                symbol: "arrow.down.app",
-                help: "批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页"
-            ) {
-                model.updateAppStoreApps()
-            }
-        }
-    }
-
     private struct ToolToggleButton: View {
         let title: String
         let symbol: String
@@ -429,57 +365,6 @@ struct ToolboxModuleView: View {
         }
     }
 
-    /// One-shot action button matching the style of `cleaningRow` buttons — no toggle state.
-    private struct ToolActionButton: View {
-        let title: String
-        let subtitle: String?
-        let symbol: String
-        let help: String
-        let action: () -> Void
-
-        init(
-            title: String,
-            subtitle: String? = nil,
-            symbol: String,
-            help: String,
-            action: @escaping () -> Void
-        ) {
-            self.title = title
-            self.subtitle = subtitle
-            self.symbol = symbol
-            self.help = help
-            self.action = action
-        }
-
-        var body: some View {
-            Button(action: action) {
-                HStack(spacing: 6) {
-                    Image(systemName: symbol)
-                    if let subtitle {
-                        VStack(alignment: .center, spacing: 0) {
-                            Text(title)
-                            Text(subtitle)
-                        }
-                        .lineLimit(1)
-                        .multilineTextAlignment(.center)
-                    } else {
-                        Text(title)
-                            .lineLimit(1)
-                    }
-                }
-                    .font(.system(size: 11, weight: .semibold))
-                    .minimumScaleFactor(0.75)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: Metrics.controlHeight)
-                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .background(Color.fillCard)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .help(help)
-        }
-    }
-
     private struct ToolShortcutButton: View {
         let title: String
         let symbol: String
@@ -488,24 +373,16 @@ struct ToolboxModuleView: View {
 
         var body: some View {
             Button(action: action) {
-                VStack(spacing: 5) {
-                    Image(systemName: symbol)
-                        .font(.system(size: 18, weight: .semibold))
-                    Text(title)
-                        .font(.islandMicro(weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                .frame(width: Metrics.shortcutWidth, height: Metrics.shortcutHeight)
-                .background(Color.fillCard)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Color.strokeCard, lineWidth: 1)
-                }
-                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                Label(title, systemImage: symbol)
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Metrics.controlHeight)
+                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
+            .background(Color.fillCard)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .accessibilityLabel(title)
             .help(help)
         }
     }

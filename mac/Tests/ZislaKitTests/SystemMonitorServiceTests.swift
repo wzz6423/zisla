@@ -93,6 +93,23 @@ final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
     }
 }
 
+private final class CleanupScanProgressCapture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [[DiskCleanupCandidate]] = []
+
+    func append(_ candidates: [DiskCleanupCandidate]) {
+        lock.lock()
+        values.append(candidates)
+        lock.unlock()
+    }
+
+    func snapshots() -> [[DiskCleanupCandidate]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return values
+    }
+}
+
 private struct FoundationVolumeCapacityFileManager: SystemMonitorFileManaging, @unchecked Sendable {
     private let fileManager = FileManager.default
 
@@ -763,6 +780,39 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
+    func cleanupScanPublishesCandidatesAsEachCategoryCompletes() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+        mock.searchPathResults = [
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        let caches = home.appendingPathComponent("Library/Caches")
+        let cacheChild = caches.appendingPathComponent("com.example.app")
+        let logs = home.appendingPathComponent("Library/Logs")
+        let logChild = logs.appendingPathComponent("example.log")
+        mock.existingPaths = [caches.path, cacheChild.path, logs.path, logChild.path]
+        mock.directoryContents[caches.path] = [cacheChild]
+        mock.directoryContents[logs.path] = [logChild]
+        mock.fileAttributes[cacheChild.path] = [.size: NSNumber(value: 8_192)]
+        mock.fileAttributes[logChild.path] = [.size: NSNumber(value: 4_096)]
+
+        let updates = CleanupScanProgressCapture()
+        let result = SystemDiskCleanup.scanCandidatesWithProgress(
+            fileManager: mock,
+            kinds: [.appCache, .log],
+            maxConcurrentScans: 1
+        ) { candidates in
+            updates.append(candidates)
+        }
+        let snapshots = updates.snapshots()
+
+        #expect(snapshots.count == 2)
+        #expect(snapshots[0].map(\.kind) == [.appCache])
+        #expect(snapshots.last == result)
+    }
+
+    @Test
     func scanCandidatesExcludesSystemWideCacheChildren() {
         let mock = MockFileManager()
         let cacheRoot = URL(fileURLWithPath: "/Library/Caches")
@@ -810,7 +860,6 @@ struct SystemMonitorServiceTests {
         #expect(DiskCleanupKind.duplicateFile.safetyLevel == .requiresManualReview)
         #expect(DiskCleanupKind.largeFile.safetyLevel == .requiresManualReview)
         #expect(DiskCleanupKind.diskImage.safetyLevel == .requiresManualReview)
-        #expect(DiskCleanupKind.applicationLeftovers.safetyLevel == .requiresManualReview)
         #expect(DiskCleanupKind.crashReport.safetyLevel == .requiresManualReview)
     }
 
@@ -852,85 +901,6 @@ struct SystemMonitorServiceTests {
         #expect(candidates.contains { $0.detail?.contains("沙盒应用缓存") == true })
         #expect(!candidates.map(\.url).contains(sandboxSupport.standardizedFileURL))
         #expect(!candidates.map(\.url).contains(groupSupport.standardizedFileURL))
-    }
-
-    @Test
-    func scanCandidatesFindsOnlyExactBundleIDApplicationLeftovers() throws {
-        let mock = MockFileManager()
-        let home = URL(fileURLWithPath: "/Users/test")
-        mock.homeDirectory = home
-
-        let preferences = home.appendingPathComponent("Library/Preferences")
-        let applicationSupport = home.appendingPathComponent("Library/Application Support")
-        let savedState = home.appendingPathComponent("Library/Saved Application State")
-        let webKit = home.appendingPathComponent("Library/WebKit")
-        let orphanID = "com.example.removed"
-        let activeID = "com.example.active"
-        let expected = Set([
-            preferences.appendingPathComponent("\(orphanID).plist").standardizedFileURL,
-            applicationSupport.appendingPathComponent(orphanID).standardizedFileURL,
-            savedState.appendingPathComponent("\(orphanID).savedState").standardizedFileURL,
-            webKit.appendingPathComponent(orphanID).standardizedFileURL,
-        ])
-        let activePreference = preferences.appendingPathComponent("\(activeID).plist")
-        let activeSupport = applicationSupport.appendingPathComponent(activeID)
-        let systemPreference = preferences.appendingPathComponent("com.apple.TextEdit.plist")
-        let nonBundleSupport = applicationSupport.appendingPathComponent("Example Editor")
-        let installedApplication = URL(fileURLWithPath: "/Applications/Example.app")
-        let installedInfo = installedApplication.appendingPathComponent("Contents/Info.plist")
-
-        mock.existingPaths = Set([
-            preferences.path, applicationSupport.path, savedState.path, webKit.path,
-            "/Applications", installedApplication.path, installedInfo.path,
-            activePreference.path, activeSupport.path, systemPreference.path, nonBundleSupport.path,
-        ] + expected.map(\.path))
-        mock.directoryContents[preferences.path] = [
-            expected.first { $0.pathExtension == "plist" }!, activePreference, systemPreference,
-        ]
-        mock.directoryContents[applicationSupport.path] = [
-            expected.first { $0.path == applicationSupport.appendingPathComponent(orphanID).path }!, activeSupport, nonBundleSupport,
-        ]
-        mock.directoryContents[savedState.path] = [
-            expected.first { $0.path == savedState.appendingPathComponent("\(orphanID).savedState").path }!,
-        ]
-        mock.directoryContents[webKit.path] = [
-            expected.first { $0.path == webKit.appendingPathComponent(orphanID).path }!,
-        ]
-        mock.directoryContents["/Applications"] = [installedApplication]
-        mock.fileContentsData[installedInfo.path] = try PropertyListSerialization.data(
-            fromPropertyList: ["CFBundleIdentifier": activeID],
-            format: .xml,
-            options: 0
-        )
-
-        let candidates = SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.applicationLeftovers])
-
-        #expect(Set(candidates.map(\.url)) == expected)
-        #expect(candidates.allSatisfy { $0.detail?.contains("已确认 \(orphanID) 未安装") == true })
-    }
-
-    @Test
-    func trashSelectedAllowsExactApplicationLeftoverButRejectsNeighboringSupportData() {
-        let mock = MockFileManager()
-        let home = URL(fileURLWithPath: "/Users/test")
-        mock.homeDirectory = home
-        let support = home.appendingPathComponent("Library/Application Support")
-        let orphan = support.appendingPathComponent("com.example.removed")
-        let neighbor = support.appendingPathComponent("Example Editor")
-        mock.existingPaths = [support.path, orphan.path, neighbor.path]
-        mock.directoryContents[support.path] = [orphan, neighbor]
-        mock.trashResults[orphan.standardizedFileURL] = .success(URL(fileURLWithPath: "/Users/test/.Trash/com.example.removed"))
-
-        let result = SystemDiskCleanup.trashSelected(
-            urls: [orphan, neighbor],
-            fileManager: mock,
-            sizeProvider: { _ in 1 }
-        )
-
-        #expect(result.successCount == 1)
-        #expect(result.failures.count == 1)
-        #expect(result.failures.first?.url == neighbor.standardizedFileURL)
-        #expect(result.failures.first?.message.contains("允许清理的用户目录") == true)
     }
 
     @Test
@@ -1445,7 +1415,7 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
-    func diskCapacityRefreshesAfterThreeMinutes() async {
+    func diskCapacityRefreshesAfterTwentySeconds() async {
         let mock = MockFileManager()
         let volume = URL(fileURLWithPath: "/Users/test")
         mock.homeDirectory = volume
@@ -1462,7 +1432,7 @@ struct SystemMonitorServiceTests {
         _ = await service.sampleOnce()
         #expect(service.snapshot?.disk.freeBytes == 400)
         mock.volumeCapacities[volume.path] = (total: 1_000, available: 700)
-        clock.advance(by: 3 * 60 - 1)
+        clock.advance(by: 20 - 1)
         _ = await service.sampleOnce()
         #expect(service.snapshot?.disk.freeBytes == 400)
 

@@ -135,7 +135,7 @@ struct IslandModuleLayout: Equatable {
     )
   }
 
-  static let toolbox = compactModule(contentHeight: 184)
+  static let toolbox = compactModule(contentHeight: 136)
   static let download = compactModule(contentHeight: 138)
   static let agenda = compactModule(contentHeight: 160)
   /// PDF tools need the full-width toolbar plus enough vertical room for the operation list.
@@ -1024,6 +1024,7 @@ final class AppModel: ObservableObject {
     if UpdateController.shared.checkForUpdates(manual: manual, channel: selectedChannel) {
       return
     }
+    let fallbackChannel = selectedChannel ?? FeatureSettingsStore.bundledDefaultUpdateChannel
     releaseTask?.cancel()
     updateState = .checking
     let version =
@@ -1032,7 +1033,10 @@ final class AppModel: ObservableObject {
       ) as? String ?? "0.1.1"
     releaseTask = Task { [weak self, releaseService] in
       do {
-        let result = try await releaseService.check(currentVersion: version)
+        let result = try await releaseService.check(
+          currentVersion: version,
+          channel: fallbackChannel
+        )
         guard !Task.isCancelled else { return }
         switch result {
         case .upToDate:
@@ -1066,7 +1070,11 @@ final class AppModel: ObservableObject {
       NSApp.activate(ignoringOtherApps: true)
       WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
       guard alert.runModal() == .alertFirstButtonReturn else { return }
-      NSWorkspace.shared.open(release.htmlURL)
+      guard let url = release.htmlURL ?? release.macUpdateAssets?.archive.downloadURL else {
+        transientMessage = "Gitee Release 未提供可用下载地址"
+        return
+      }
+      NSWorkspace.shared.open(url)
       return
     }
 
@@ -1543,7 +1551,7 @@ final class AppModel: ObservableObject {
       kind: .info,
       side: .right,
       style: .status,
-      symbolName: "arrow.triangle.2.circlepath"
+      symbolName: "arrow.up.circle"
     )
     let activeIDs = Set([left.id, right.id])
     for notice in notices.left + notices.right where notice.id.hasPrefix(updateNoticePrefix) && !activeIDs.contains(notice.id) {

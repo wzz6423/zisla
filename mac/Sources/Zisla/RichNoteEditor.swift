@@ -209,12 +209,12 @@ struct RichNoteEditor: NSViewRepresentable {
             font: 14px -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
             line-height: 1.55;
           }
-          #editor { box-sizing: border-box; min-height: 100vh; outline: none; padding: 8px 14px 20px; background: transparent !important; caret-color: transparent; }
+          #editor { box-sizing: border-box; min-height: 100vh; outline: none; padding: 4px 14px 20px; background: transparent !important; caret-color: transparent; }
           #caret { background: rgba(255,255,255,0.92); border-radius: 0.5px; display: none; height: 14px; left: 0; pointer-events: none; position: fixed; top: 0; transform: translate3d(-9999px, -9999px, 0); width: 1px; z-index: 1; }
           #caret.is-visible { animation: caret-blink 1s steps(1, end) infinite; display: block; }
           @keyframes caret-blink { 50% { opacity: 0; } }
           @media (prefers-reduced-motion: reduce) { #caret.is-visible { animation: none; } }
-          #editor > :first-child { margin-top: 4px; }
+          #editor > :first-child { margin-top: 0; }
           h1 { font-size: 23px; margin: 4px 0; }
           h1 + div, h1 + p { margin-top: 3px; }
           h2 { font-size: 19px; margin: 11px 0 6px; }
