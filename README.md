@@ -9,7 +9,7 @@ Current implementation: **macOS 14+**. Apple Silicon is the supported configurat
 ## Repository layout
 
 - `mac/`: the current macOS implementation, built with Swift, AppKit, and SwiftUI.
-- `windows/`: a Windows implementation in development, built with C++20, C++/WinRT, WinUI 3, and the Windows App SDK; its platform-independent C++ core can be validated on macOS.
+- `windows/`: a Windows implementation, built with C++20, C++/WinRT, WinUI 3, and the Windows App SDK.
 
 ## Why it belongs at the top of your screen
 
@@ -87,15 +87,13 @@ The downloader requires `yt-dlp`; `ffmpeg` is optional. Office-to-PDF conversion
 
 ### Windows development
 
-The platform-independent C++20 core can be validated on macOS:
+The Windows core uses standard CMake:
 
 ```bash
-cmake -S windows -B /tmp/zisla-windows-build -DCMAKE_BUILD_TYPE=Debug
-cmake --build /tmp/zisla-windows-build --parallel
-ctest --test-dir /tmp/zisla-windows-build --output-on-failure
+cmake -S windows -B build/windows -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/windows --parallel
+ctest --test-dir build/windows --output-on-failure
 ```
-
-The native Windows shell, MSIX, WinUI, and multi-monitor behavior need to be built and run on Windows 11 hardware.
 
 ## Designed to stay out of the way
 
