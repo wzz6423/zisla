@@ -47,7 +47,7 @@ final class SideNoticePresenter {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
-        NotificationCenter.default.addObserver(
+        NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(activeSpaceDidChange),
             name: NSWorkspace.activeSpaceDidChangeNotification,
@@ -62,7 +62,16 @@ final class SideNoticePresenter {
     }
 
     func stop() {
-        NotificationCenter.default.removeObserver(self)
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+        NSWorkspace.shared.notificationCenter.removeObserver(
+            self,
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: NSWorkspace.shared
+        )
         hideAllPanels()
         panelsByDisplayID.removeAll()
         cancellables.removeAll()
