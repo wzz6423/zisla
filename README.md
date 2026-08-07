@@ -17,7 +17,7 @@ zisla 是一个使用 SwiftUI 和 AppKit 构建的原生 macOS 工作空间。�
 
 ## 系统兼容性
 
-当前发布版本支持搭载 Apple 芯片且运行 macOS 14 或更高版本的 Mac。macOS 14 之前的系统和 Intel 芯片机型虽有对应的发布版本，但不保证可用性。
+当前发布版本仅支持搭载 Apple 芯片且运行 macOS 14 或更高版本的 Mac。macOS 14 之前的系统和 Intel 芯片机型虽有对应的发布版本，但不保证可用性。
 
 ## macOS 开发
 
