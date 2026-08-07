@@ -4,7 +4,7 @@
 
 **zisla is a native macOS workspace that appears when you need it, then gets out of the way.** Move the pointer to the top center of the screen to open one lightweight place for active AI work, media, handoff, downloads, and desktop utilities. Displays without a notch use the same simulated status area.
 
-Current implementation: **macOS 14+**. Apple Silicon is the supported configuration; Intel release packages may work, but compatibility is not guaranteed.
+Current implementation: **macOS 14+ on Apple Silicon**. Intel release packages may work, but compatibility is not guaranteed.
 
 ## Repository layout
 
