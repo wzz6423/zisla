@@ -1772,16 +1772,81 @@ public enum SystemDiskCleanup {
         return total
     }
 
+    private static let maximumConcurrentScanWorkers = 3
+
+    private struct CleanupScanTask: @unchecked Sendable {
+        let run: () -> [DiskCleanupCandidate]
+    }
+
+    private final class CleanupScanResults: @unchecked Sendable {
+        private let lock = NSLock()
+        private var values: [[DiskCleanupCandidate]?]
+
+        init(count: Int) {
+            values = Array(repeating: nil, count: count)
+        }
+
+        func store(_ candidates: [DiskCleanupCandidate], at index: Int) {
+            lock.lock()
+            values[index] = candidates
+            lock.unlock()
+        }
+
+        func flattened() -> [DiskCleanupCandidate] {
+            lock.lock()
+            let snapshot = values
+            lock.unlock()
+            return snapshot.compactMap { $0 }.flatMap { $0 }
+        }
+    }
+
+    /// Keeps background scan work bounded so cache discovery cannot saturate CPU or storage I/O.
+    static func scanWorkerLimit(
+        requested: Int?,
+        processorCount: Int = ProcessInfo.processInfo.activeProcessorCount
+    ) -> Int {
+        let availableProcessors = max(1, processorCount)
+        let defaultLimit = min(maximumConcurrentScanWorkers, max(1, availableProcessors - 1))
+        return min(maximumConcurrentScanWorkers, max(1, requested ?? defaultLimit))
+    }
+
+    private static func executeScanTasks(
+        _ tasks: [CleanupScanTask],
+        workerLimit: Int
+    ) -> [DiskCleanupCandidate] {
+        guard tasks.count > 1, workerLimit > 1 else {
+            return tasks.flatMap { $0.run() }
+        }
+
+        let results = CleanupScanResults(count: tasks.count)
+        let queue = OperationQueue()
+        queue.name = "dev.wzz.zisla.disk-cleanup-scan"
+        queue.qualityOfService = .utility
+        queue.maxConcurrentOperationCount = workerLimit
+
+        for (index, task) in tasks.enumerated() {
+            queue.addOperation {
+                let candidates = autoreleasepool { task.run() }
+                results.store(candidates, at: index)
+            }
+        }
+        queue.waitUntilAllOperationsAreFinished()
+        return results.flattened()
+    }
+
     /// Scans all cleanup candidate categories; deduplicates by path and returns sorted by size descending.
     public static func scanCandidates(
         fileManager: SystemMonitorFileManaging,
         kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases),
-        maxDepthChildrenOnly: Bool = true
+        maxDepthChildrenOnly: Bool = true,
+        maxConcurrentScans: Int? = nil
     ) -> [DiskCleanupCandidate] {
-        var result: [DiskCleanupCandidate] = []
+        var tasks: [CleanupScanTask] = []
 
         if kinds.contains(.appCache) {
-            result.append(contentsOf: scanApplicationCaches(fileManager: fileManager))
+            tasks.append(CleanupScanTask {
+                scanApplicationCaches(fileManager: fileManager)
+            })
         }
 
         // Directory scan: list direct children of known root directories
@@ -1790,29 +1855,30 @@ public enum SystemDiskCleanup {
         ]
         let activeDirKinds = kinds.intersection(directoryKinds)
         if !activeDirKinds.isEmpty {
-            result.append(contentsOf: scanDirectoryChildren(fileManager: fileManager, kinds: activeDirKinds))
+            tasks.append(CleanupScanTask {
+                scanDirectoryChildren(fileManager: fileManager, kinds: activeDirKinds)
+            })
         }
 
-        // Disk images: .dmg/.iso/.pkg/.ipsw files under Downloads
-        if kinds.contains(.diskImage) {
-            result.append(contentsOf: scanDiskImages(fileManager: fileManager))
-        }
-
-        // Large/old files: >100 MB and not modified in 90 days under Downloads/Desktop/Documents
-        if kinds.contains(.largeFile) {
-            result.append(contentsOf: scanLargeOldFiles(fileManager: fileManager))
-        }
-
-        // Duplicate files: files with identical content under Downloads/Desktop/Documents
-        if kinds.contains(.duplicateFile) {
-            result.append(contentsOf: scanDuplicateFiles(fileManager: fileManager))
+        let userFileKinds: Set<DiskCleanupKind> = [.diskImage, .largeFile, .duplicateFile]
+        let activeUserFileKinds = kinds.intersection(userFileKinds)
+        if !activeUserFileKinds.isEmpty {
+            tasks.append(CleanupScanTask {
+                scanUserFileCandidates(fileManager: fileManager, kinds: activeUserFileKinds)
+            })
         }
 
         // 卸载应用残留：只扫描具备精确 bundle ID 证据的用户级路径。
         if kinds.contains(.applicationLeftovers) {
-            result.append(contentsOf: scanApplicationLeftovers(fileManager: fileManager))
+            tasks.append(CleanupScanTask {
+                scanApplicationLeftovers(fileManager: fileManager)
+            })
         }
 
+        let result = executeScanTasks(
+            tasks,
+            workerLimit: scanWorkerLimit(requested: maxConcurrentScans)
+        )
         return deduplicateCandidates(result).sorted { $0.byteSize > $1.byteSize }
     }
 
@@ -2015,35 +2081,96 @@ public enum SystemDiskCleanup {
     /// Old file threshold: 90 days
     private static let oldFileDays: TimeInterval = 90 * 24 * 3600
 
-    /// Scans Downloads/Desktop/Documents for files larger than 100 MB and not modified in 90 days.
-    private static func scanLargeOldFiles(fileManager: SystemMonitorFileManaging) -> [DiskCleanupCandidate] {
+    private struct ScannedUserFile {
+        let url: URL
+        let byteSize: UInt64
+        let modificationDate: Date?
+    }
+
+    private static func scanUserFileCandidates(
+        fileManager: SystemMonitorFileManaging,
+        kinds: Set<DiskCleanupKind>
+    ) -> [DiskCleanupCandidate] {
+        var result: [DiskCleanupCandidate] = []
+        if kinds.contains(.diskImage) {
+            result.append(contentsOf: scanDiskImages(fileManager: fileManager))
+        }
+
+        let needsLargeFiles = kinds.contains(.largeFile)
+        let needsDuplicates = kinds.contains(.duplicateFile)
+        guard needsLargeFiles || needsDuplicates else { return result }
+
+        let files = collectScannedUserFiles(
+            fileManager: fileManager,
+            includesModificationDate: needsLargeFiles
+        )
+        if needsLargeFiles {
+            result.append(contentsOf: largeOldFileCandidates(from: files))
+        }
+        if needsDuplicates {
+            result.append(contentsOf: duplicateFileCandidates(from: files, fileManager: fileManager))
+        }
+        return result
+    }
+
+    /// Downloads、Desktop 和 Documents 只递归一次，供大文件与重复文件检测共用。
+    private static func collectScannedUserFiles(
+        fileManager: SystemMonitorFileManaging,
+        includesModificationDate: Bool
+    ) -> [ScannedUserFile] {
         let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
         let searchDirs = userFileDirectories(fileManager: fileManager)
-        let cutoff = Date().addingTimeInterval(-oldFileDays)
-        var result: [DiskCleanupCandidate] = []
+        var seenPaths = Set<String>()
+        var result: [ScannedUserFile] = []
 
         for dir in searchDirs {
             guard SystemMonitorPathSafety.isURL(dir, withinAllowedRoots: allowed) else { continue }
             let files = collectFilesRecursively(at: dir, fileManager: fileManager, maxDepth: 5, allowed: allowed)
             for fileURL in files {
                 let size = allocatedByteSize(of: fileURL, fileManager: fileManager)
-                guard size >= largeFileThreshold else { continue }
-                guard let attrs = try? fileManager.attributesOfItem(atPath: fileURL.path),
-                      let modDate = attrs[.modificationDate] as? Date else { continue }
-                guard modDate < cutoff else { continue }
-                let days = Int(Date().timeIntervalSince(modDate) / 86400)
+                guard size > 0 else { continue }
+                let standardized = fileURL.standardizedFileURL
+                guard seenPaths.insert(SystemMonitorPathSafety.standardizedPath(standardized)).inserted else {
+                    continue
+                }
+                let modificationDate: Date?
+                if includesModificationDate {
+                    modificationDate = (try? fileManager.attributesOfItem(atPath: standardized.path)[.modificationDate]) as? Date
+                } else {
+                    modificationDate = nil
+                }
                 result.append(
-                    DiskCleanupCandidate(
-                        url: fileURL,
-                        kind: .largeFile,
+                    ScannedUserFile(
+                        url: standardized,
                         byteSize: size,
-                        displayName: fileURL.lastPathComponent,
-                        detail: "\(days) 天前修改"
+                        modificationDate: modificationDate
                     )
                 )
             }
         }
         return result
+    }
+
+    private static func largeOldFileCandidates(
+        from files: [ScannedUserFile]
+    ) -> [DiskCleanupCandidate] {
+        let cutoff = Date().addingTimeInterval(-oldFileDays)
+        return files.compactMap { file in
+            guard file.byteSize >= largeFileThreshold,
+                  let modificationDate = file.modificationDate,
+                  modificationDate < cutoff
+            else {
+                return nil
+            }
+            let days = Int(Date().timeIntervalSince(modificationDate) / 86400)
+            return DiskCleanupCandidate(
+                url: file.url,
+                kind: .largeFile,
+                byteSize: file.byteSize,
+                displayName: file.url.lastPathComponent,
+                detail: "\(days) 天前修改"
+            )
+        }
     }
 
     /// 扫描带有未安装 bundle ID 的残留。扫描结果不会被默认选中，用户必须逐项确认。
@@ -2091,49 +2218,34 @@ public enum SystemDiskCleanup {
         return identifiers
     }
 
-    /// Scans Downloads/Desktop/Documents for duplicate files (SHA256 content comparison).
-    private static func scanDuplicateFiles(fileManager: SystemMonitorFileManaging) -> [DiskCleanupCandidate] {
-        let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
-        let searchDirs = userFileDirectories(fileManager: fileManager)
-        var allFiles: [(url: URL, size: UInt64)] = []
-
-        for dir in searchDirs {
-            guard SystemMonitorPathSafety.isURL(dir, withinAllowedRoots: allowed) else { continue }
-            let files = collectFilesRecursively(at: dir, fileManager: fileManager, maxDepth: 5, allowed: allowed)
-            for fileURL in files {
-                let size = allocatedByteSize(of: fileURL, fileManager: fileManager)
-                guard size > 0 else { continue }
-                allFiles.append((fileURL, size))
-            }
-        }
-
-        // Group files by size; hash only files with identical sizes
-        var sizeGroups: [UInt64: [URL]] = [:]
-        for entry in allFiles {
-            sizeGroups[entry.size, default: []].append(entry.url)
+    /// 先按大小分组，再对可能重复的文件做流式 SHA256 比对。
+    private static func duplicateFileCandidates(
+        from files: [ScannedUserFile],
+        fileManager: SystemMonitorFileManaging
+    ) -> [DiskCleanupCandidate] {
+        var sizeGroups: [UInt64: [ScannedUserFile]] = [:]
+        for file in files {
+            sizeGroups[file.byteSize, default: []].append(file)
         }
 
         var result: [DiskCleanupCandidate] = []
-        for (_, urls) in sizeGroups where urls.count > 1 {
-            // Compute hashes and group by hash
-            var hashGroups: [String: [URL]] = [:]
-            for url in urls {
-                let hash = sha256(of: url, fileManager: fileManager)
+        for (_, filesWithSameSize) in sizeGroups where filesWithSameSize.count > 1 {
+            var hashGroups: [String: [ScannedUserFile]] = [:]
+            for file in filesWithSameSize {
+                let hash = sha256(of: file.url, fileManager: fileManager)
                 guard !hash.isEmpty else { continue }
-                hashGroups[hash, default: []].append(url)
+                hashGroups[hash, default: []].append(file)
             }
             for (_, group) in hashGroups where group.count > 1 {
-                // Keep the first; mark the rest as duplicates
                 let original = group[0]
-                for i in 1..<group.count {
-                    let dup = group[i]
+                for duplicate in group.dropFirst() {
                     result.append(
                         DiskCleanupCandidate(
-                            url: dup,
+                            url: duplicate.url,
                             kind: .duplicateFile,
-                            byteSize: allFiles.first(where: { $0.url == dup })?.size ?? 0,
-                            displayName: dup.lastPathComponent,
-                            detail: "与 \(original.lastPathComponent) 重复 · 保留副本：\(original.path)"
+                            byteSize: duplicate.byteSize,
+                            displayName: duplicate.url.lastPathComponent,
+                            detail: "与 \(original.url.lastPathComponent) 重复 · 保留副本：\(original.url.path)"
                         )
                     )
                 }

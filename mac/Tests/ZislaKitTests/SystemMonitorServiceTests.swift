@@ -710,6 +710,59 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
+    func cleanupScanWorkerLimitStaysWithinResourceBudget() {
+        #expect(SystemDiskCleanup.scanWorkerLimit(requested: nil, processorCount: 1) == 1)
+        #expect(SystemDiskCleanup.scanWorkerLimit(requested: nil, processorCount: 3) == 2)
+        #expect(SystemDiskCleanup.scanWorkerLimit(requested: nil, processorCount: 8) == 3)
+        #expect(SystemDiskCleanup.scanWorkerLimit(requested: 99, processorCount: 128) == 3)
+        #expect(SystemDiskCleanup.scanWorkerLimit(requested: 0, processorCount: 8) == 1)
+    }
+
+    @Test
+    func concurrentCleanupScanMatchesSingleWorkerResults() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+        let caches = home.appendingPathComponent("Library/Caches")
+        let cacheChild = caches.appendingPathComponent("com.example.app")
+        let logs = home.appendingPathComponent("Library/Logs")
+        let logChild = logs.appendingPathComponent("example.log")
+        let downloads = home.appendingPathComponent("Downloads")
+        let installer = downloads.appendingPathComponent("Installer.pkg")
+
+        mock.searchPathResults = [
+            .downloadsDirectory: [downloads],
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        mock.existingPaths = [
+            caches.path, cacheChild.path,
+            logs.path, logChild.path,
+            downloads.path, installer.path,
+        ]
+        mock.directoryContents[caches.path] = [cacheChild]
+        mock.directoryContents[logs.path] = [logChild]
+        mock.directoryContents[downloads.path] = [installer]
+        mock.fileAttributes[cacheChild.path] = [.size: NSNumber(value: 8_192)]
+        mock.fileAttributes[logChild.path] = [.size: NSNumber(value: 4_096)]
+        mock.fileAttributes[installer.path] = [.size: NSNumber(value: 2_048)]
+
+        let kinds: Set<DiskCleanupKind> = [.appCache, .log, .diskImage]
+        let singleWorker = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: kinds,
+            maxConcurrentScans: 1
+        )
+        let concurrent = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: kinds,
+            maxConcurrentScans: 99
+        )
+
+        #expect(concurrent == singleWorker)
+        #expect(concurrent.map(\.displayName) == ["com.example.app 缓存", "example.log", "Installer.pkg"])
+    }
+
+    @Test
     func scanCandidatesExcludesSystemWideCacheChildren() {
         let mock = MockFileManager()
         let cacheRoot = URL(fileURLWithPath: "/Library/Caches")
