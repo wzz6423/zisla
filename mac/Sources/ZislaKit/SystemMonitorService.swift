@@ -351,16 +351,44 @@ public struct DiskCleanupCandidate: Equatable, Identifiable, Sendable {
     public var id: URL { url }
     public var url: URL
     public var kind: DiskCleanupKind
+    public var safetyLevel: DiskCleanupSafetyLevel
     public var byteSize: UInt64
     public var displayName: String
     public var detail: String?
 
-    public init(url: URL, kind: DiskCleanupKind, byteSize: UInt64, displayName: String, detail: String? = nil) {
+    public init(
+        url: URL,
+        kind: DiskCleanupKind,
+        byteSize: UInt64,
+        displayName: String,
+        detail: String? = nil,
+        safetyLevel: DiskCleanupSafetyLevel? = nil
+    ) {
         self.url = url
         self.kind = kind
+        self.safetyLevel = safetyLevel ?? kind.safetyLevel
         self.byteSize = byteSize
         self.displayName = displayName
         self.detail = detail
+    }
+}
+
+public enum DiskCleanupSafetyLevel: String, Equatable, Sendable {
+    case safeToClean
+    case requiresManualReview
+
+    public var title: String {
+        switch self {
+        case .safeToClean: "可安全清理"
+        case .requiresManualReview: "需人工复核"
+        }
+    }
+
+    public var reason: String {
+        switch self {
+        case .safeToClean: "可再生数据；下次使用时可能重新生成或下载"
+        case .requiresManualReview: "可能是用户文件、诊断资料或仍有保留价值的数据"
+        }
     }
 }
 
@@ -380,6 +408,15 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
     case duplicateFile
     /// 与已卸载应用的 bundle ID 精确对应的用户级残留文件。
     case applicationLeftovers
+
+    public var safetyLevel: DiskCleanupSafetyLevel {
+        switch self {
+        case .appCache, .cache, .developerArtifacts, .packageManagerCache:
+            .safeToClean
+        case .log, .trash, .temporaryFiles, .crashReport, .diskImage, .largeFile, .duplicateFile, .applicationLeftovers:
+            .requiresManualReview
+        }
+    }
 
     /// When the same path appears in multiple scan categories, the higher value (more specific kind) takes precedence.
     public var classificationPriority: Int {
@@ -458,12 +495,19 @@ public protocol SystemMonitorFileManaging: Sendable {
     func removeItem(at url: URL) throws
     func createFile(atPath path: String, contents data: Data?) -> Bool
     func contents(atPath path: String) -> Data?
+    func sha256Digest(at url: URL) -> Data?
     /// Returns the volume's total capacity and available space (including purgeable space, matching macOS System Settings).
     /// The default implementation uses URLResourceValues; a test mock may return nil to fall back to attributesOfFileSystem.
     func volumeCapacity(for url: URL) -> (total: UInt64, available: UInt64)?
 }
 
 public extension SystemMonitorFileManaging {
+    /// 测试替身可沿用内存数据；生产文件管理器会用流式读取避免大文件占满内存。
+    func sha256Digest(at url: URL) -> Data? {
+        guard let data = contents(atPath: url.path) else { return nil }
+        return Data(SHA256.hash(data: data))
+    }
+
     /// Uses `volumeAvailableCapacityForImportantUsageKey` to obtain available space,
     /// which includes APFS purgeable space (local snapshots, caches, etc.), consistent with macOS System Settings.
     func volumeCapacity(for url: URL) -> (total: UInt64, available: UInt64)? {
@@ -565,6 +609,21 @@ private final class DefaultSystemMonitorFileManager: SystemMonitorFileManaging, 
 
     func contents(atPath path: String) -> Data? {
         fileManager.contents(atPath: path)
+    }
+
+    func sha256Digest(at url: URL) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+
+        var hasher = SHA256()
+        do {
+            while let chunk = try handle.read(upToCount: 1_048_576), !chunk.isEmpty {
+                hasher.update(data: chunk)
+            }
+            return Data(hasher.finalize())
+        } catch {
+            return nil
+        }
     }
 }
 
@@ -1403,7 +1462,6 @@ public enum SystemDiskCleanup {
             "Library/Developer/Xcode/iOS DeviceSupport",
             "Library/Developer/Xcode/watchOS DeviceSupport",
             "Library/Developer/CoreSimulator/Caches",
-            "Library/Developer/CoreSimulator/Devices",
             ".cache",
         ]
         for path in developerPaths {
@@ -2075,7 +2133,7 @@ public enum SystemDiskCleanup {
                             kind: .duplicateFile,
                             byteSize: allFiles.first(where: { $0.url == dup })?.size ?? 0,
                             displayName: dup.lastPathComponent,
-                            detail: "与 \(original.lastPathComponent) 重复"
+                            detail: "与 \(original.lastPathComponent) 重复 · 保留副本：\(original.path)"
                         )
                     )
                 }
@@ -2141,10 +2199,9 @@ public enum SystemDiskCleanup {
         return !children.isEmpty
     }
 
-    /// Computes the SHA256 hash of a file; returns an empty string on read failure.
+    /// 生产文件管理器会流式计算 SHA256，避免将完整文件载入内存。
     private static func sha256(of url: URL, fileManager: SystemMonitorFileManaging) -> String {
-        guard let data = fileManager.contents(atPath: url.path) else { return "" }
-        let digest = SHA256.hash(data: data)
+        guard let digest = fileManager.sha256Digest(at: url) else { return "" }
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 

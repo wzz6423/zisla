@@ -745,6 +745,20 @@ struct SystemMonitorServiceTests {
 
         #expect(candidates.contains { $0.kind == .appCache && $0.displayName == "com.example.app 缓存" })
         #expect(candidates.contains { $0.kind == .log && $0.displayName == "app.log" })
+        #expect(candidates.first { $0.kind == .appCache }?.safetyLevel == .safeToClean)
+        #expect(candidates.first { $0.kind == .log }?.safetyLevel == .requiresManualReview)
+    }
+
+    @Test
+    func cleanupKindsKeepUserFilesAndDiagnosticsOutOfSafeBatchSelection() {
+        #expect(DiskCleanupKind.appCache.safetyLevel == .safeToClean)
+        #expect(DiskCleanupKind.cache.safetyLevel == .safeToClean)
+        #expect(DiskCleanupKind.packageManagerCache.safetyLevel == .safeToClean)
+        #expect(DiskCleanupKind.duplicateFile.safetyLevel == .requiresManualReview)
+        #expect(DiskCleanupKind.largeFile.safetyLevel == .requiresManualReview)
+        #expect(DiskCleanupKind.diskImage.safetyLevel == .requiresManualReview)
+        #expect(DiskCleanupKind.applicationLeftovers.safetyLevel == .requiresManualReview)
+        #expect(DiskCleanupKind.crashReport.safetyLevel == .requiresManualReview)
     }
 
     @Test
@@ -883,6 +897,19 @@ struct SystemMonitorServiceTests {
         #expect(roots.contains { $0.kind == .appCache && $0.url == cache.standardizedFileURL })
         #expect(!roots.contains { $0.url == applicationSupport.standardizedFileURL })
         #expect(!SystemMonitorPathSafety.isURL(applicationSupport, withinAllowedRoots: roots.map(\.url)))
+    }
+
+    @Test
+    func cleanupRootsExcludeSimulatorDevicesBecauseTheyContainAppData() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+        let simulatorDevices = home.appendingPathComponent("Library/Developer/CoreSimulator/Devices")
+
+        let roots = SystemDiskCleanup.allowedScanRoots(fileManager: mock)
+
+        #expect(!roots.contains { $0.url == simulatorDevices.standardizedFileURL })
+        #expect(!SystemMonitorPathSafety.isURL(simulatorDevices, withinAllowedRoots: roots.map(\.url)))
     }
 
     @Test
@@ -1059,6 +1086,8 @@ struct SystemMonitorServiceTests {
         #expect(candidates.count == 1)
         #expect(candidates.first?.kind == .duplicateFile)
         #expect(candidates.first?.detail?.contains("重复") == true)
+        #expect(candidates.first?.detail?.contains(fileA.path) == true)
+        #expect(candidates.first?.safetyLevel == .requiresManualReview)
     }
 
     @Test

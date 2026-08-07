@@ -809,35 +809,24 @@ private struct SystemCleanupSheet: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("清理候选项")
                         .font(.system(size: 16, weight: .semibold))
-                    Text("扫描应用缓存、卸载应用残留、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件")
+                    Text("检测可再生缓存与常见临时数据；用户文件、重复文件和安装包仅供人工复核")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button {
-                    toggleSelectAll()
+                    toggleSafeSelection()
                 } label: {
                     Label(
-                        allCandidatesSelected ? "取消全选" : "全选",
-                        systemImage: allCandidatesSelected ? "checkmark.square.fill" : "checkmark.square"
+                        allSafeCandidatesSelected ? "取消安全项" : "选择安全项",
+                        systemImage: allSafeCandidatesSelected ? "checkmark.shield.fill" : "checkmark.shield"
                     )
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help(allCandidatesSelected ? "取消所有选择" : "选择全部候选项")
-                .accessibilityLabel(allCandidatesSelected ? "取消全选" : "全选")
-                .disabled(candidates.isEmpty || isScanning || isCleaning)
-                Button {
-                    invertSelection()
-                } label: {
-                    Label("反选", systemImage: "arrow.left.arrow.right.square")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help("反转当前选择：已选变未选，未选变已选")
-                .accessibilityLabel("反选")
-                .accessibilityHint("已选中的项取消选中，未选中的项选中")
-                .disabled(candidates.isEmpty || isScanning || isCleaning)
+                .help(allSafeCandidatesSelected ? "取消所有可安全清理项" : "仅选择可再生缓存与开发缓存")
+                .accessibilityLabel(allSafeCandidatesSelected ? "取消安全项" : "选择安全项")
+                .disabled(safeCandidateURLs.isEmpty || isScanning || isCleaning)
                 Button {
                     Task { await scan() }
                 } label: {
@@ -872,15 +861,29 @@ private struct SystemCleanupSheet: View {
                                                     .foregroundStyle(candidate.kind.tint)
                                                     .frame(width: 18)
                                                 VStack(alignment: .leading, spacing: 2) {
-                                                    Text(candidate.displayName)
-                                                        .font(.system(size: 11, weight: .medium))
-                                                        .lineLimit(1)
+                                                    HStack(spacing: 5) {
+                                                        Text(candidate.displayName)
+                                                            .font(.system(size: 11, weight: .medium))
+                                                            .lineLimit(1)
+                                                        Text(candidate.safetyLevel.title)
+                                                            .font(.system(size: 9, weight: .medium))
+                                                            .foregroundStyle(
+                                                                candidate.safetyLevel == .safeToClean
+                                                                    ? Color.zislaSuccess
+                                                                    : Color.zislaWarning
+                                                            )
+                                                    }
                                                     if let detail = candidate.detail {
                                                         Text(detail)
                                                             .font(.system(size: 9))
                                                             .foregroundStyle(.secondary)
                                                             .lineLimit(1)
+                                                            .help(detail)
                                                     }
+                                                    Text(candidate.safetyLevel.reason)
+                                                        .font(.system(size: 9))
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(1)
                                                 }
                                                 Spacer(minLength: 8)
                                                 Text(byteText(candidate.byteSize))
@@ -919,22 +922,14 @@ private struct SystemCleanupSheet: View {
                                         .font(.system(size: 9, design: .monospaced))
                                         .foregroundStyle(.secondary)
                                     IconButton(
-                                        symbol: section.allSelected(in: selectedURLs) ? "checkmark.square.fill" : "checkmark.square",
-                                        help: section.allSelected(in: selectedURLs) ? "取消选择\(section.kind.title)" : "全选\(section.kind.title)",
-                                        isActive: section.allSelected(in: selectedURLs),
+                                        symbol: section.allSafeSelected(in: selectedURLs) ? "checkmark.shield.fill" : "checkmark.shield",
+                                        help: section.allSafeSelected(in: selectedURLs) ? "取消选择\(section.kind.title)中的安全项" : "选择\(section.kind.title)中的安全项",
+                                        isActive: section.allSafeSelected(in: selectedURLs),
                                         size: .compact
                                     ) {
-                                        toggleSectionSelection(section)
+                                        toggleSectionSafeSelection(section)
                                     }
-                                    .disabled(isCleaning)
-                                    IconButton(
-                                        symbol: "arrow.left.arrow.right.square",
-                                        help: "反选\(section.kind.title)",
-                                        size: .compact
-                                    ) {
-                                        invertSelection(in: section)
-                                    }
-                                    .disabled(isCleaning)
+                                    .disabled(isCleaning || section.safeURLs.isEmpty)
                                 }
                                 .textCase(nil)
                                 .padding(.vertical, 1)
@@ -985,7 +980,11 @@ private struct SystemCleanupSheet: View {
                 Task { await cleanSelected() }
             }
         } message: {
-            Text("zisla 不会永久删除这些内容。")
+            Text(
+                selectedManualReviewCount > 0
+                    ? "其中 \(selectedManualReviewCount) 项需人工复核。zisla 不会永久删除这些内容。"
+                    : "zisla 不会永久删除这些内容。"
+            )
         }
     }
 
@@ -995,8 +994,18 @@ private struct SystemCleanupSheet: View {
             .reduce(0) { $0 + $1.byteSize }
     }
 
-    private var allCandidatesSelected: Bool {
-        !candidates.isEmpty && candidates.allSatisfy { selectedURLs.contains($0.url) }
+    private var selectedManualReviewCount: Int {
+        candidates.count {
+            selectedURLs.contains($0.url) && $0.safetyLevel == .requiresManualReview
+        }
+    }
+
+    private var safeCandidateURLs: Set<URL> {
+        Set(candidates.lazy.filter { $0.safetyLevel == .safeToClean }.map(\.url))
+    }
+
+    private var allSafeCandidatesSelected: Bool {
+        !safeCandidateURLs.isEmpty && safeCandidateURLs.isSubset(of: selectedURLs)
     }
 
     private func makeGroupedSections(from candidates: [DiskCleanupCandidate]) -> [CleanupKindSection] {
@@ -1011,17 +1020,12 @@ private struct SystemCleanupSheet: View {
         }
     }
 
-    private func toggleSelectAll() {
-        if allCandidatesSelected {
-            selectedURLs.removeAll()
+    private func toggleSafeSelection() {
+        if allSafeCandidatesSelected {
+            selectedURLs.subtract(safeCandidateURLs)
         } else {
-            selectedURLs = Set(candidates.map(\.url))
+            selectedURLs.formUnion(safeCandidateURLs)
         }
-    }
-
-    private func invertSelection() {
-        let all = Set(candidates.map(\.url))
-        selectedURLs = all.subtracting(selectedURLs)
     }
 
     private func isSectionCollapsed(_ section: CleanupKindSection) -> Bool {
@@ -1036,20 +1040,12 @@ private struct SystemCleanupSheet: View {
         }
     }
 
-    private func toggleSectionSelection(_ section: CleanupKindSection) {
-        let urls = section.urls
-        if urls.isSubset(of: selectedURLs) {
-            selectedURLs.subtract(urls)
+    private func toggleSectionSafeSelection(_ section: CleanupKindSection) {
+        if section.allSafeSelected(in: selectedURLs) {
+            selectedURLs.subtract(section.safeURLs)
         } else {
-            selectedURLs.formUnion(urls)
+            selectedURLs.formUnion(section.safeURLs)
         }
-    }
-
-    private func invertSelection(in section: CleanupKindSection) {
-        let urls = section.urls
-        let unselected = urls.subtracting(selectedURLs)
-        selectedURLs.subtract(urls)
-        selectedURLs.formUnion(unselected)
     }
 
     private func selectionBinding(for url: URL) -> Binding<Bool> {
@@ -1111,12 +1107,16 @@ private struct CleanupKindSection: Identifiable {
         Set(items.map(\.url))
     }
 
+    var safeURLs: Set<URL> {
+        Set(items.lazy.filter { $0.safetyLevel == .safeToClean }.map(\.url))
+    }
+
     func selectedCount(in selection: Set<URL>) -> Int {
         urls.intersection(selection).count
     }
 
-    func allSelected(in selection: Set<URL>) -> Bool {
-        !urls.isEmpty && urls.isSubset(of: selection)
+    func allSafeSelected(in selection: Set<URL>) -> Bool {
+        !safeURLs.isEmpty && safeURLs.isSubset(of: selection)
     }
 }
 
