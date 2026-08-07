@@ -815,18 +815,29 @@ private struct SystemCleanupSheet: View {
                 }
                 Spacer()
                 Button {
-                    toggleSafeSelection()
+                    toggleSelectAll()
                 } label: {
                     Label(
-                        allSafeCandidatesSelected ? "取消安全项" : "选择安全项",
-                        systemImage: allSafeCandidatesSelected ? "checkmark.shield.fill" : "checkmark.shield"
+                        allCandidatesSelected ? "取消全选" : "全选",
+                        systemImage: allCandidatesSelected ? "checkmark.square.fill" : "checkmark.square"
                     )
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help(allSafeCandidatesSelected ? "取消所有可安全清理项" : "仅选择可再生缓存与开发缓存")
-                .accessibilityLabel(allSafeCandidatesSelected ? "取消安全项" : "选择安全项")
-                .disabled(safeCandidateURLs.isEmpty || isScanning || isCleaning)
+                .help(allCandidatesSelected ? "取消所有选择" : "选择全部候选项")
+                .accessibilityLabel(allCandidatesSelected ? "取消全选" : "全选")
+                .disabled(candidates.isEmpty || isScanning || isCleaning)
+                Button {
+                    invertSelection()
+                } label: {
+                    Label("反选", systemImage: "arrow.left.arrow.right.square")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("反转当前选择：已选变未选，未选变已选")
+                .accessibilityLabel("反选")
+                .accessibilityHint("已选中的项取消选中，未选中的项选中")
+                .disabled(candidates.isEmpty || isScanning || isCleaning)
                 Button {
                     Task { await scan() }
                 } label: {
@@ -922,14 +933,22 @@ private struct SystemCleanupSheet: View {
                                         .font(.system(size: 9, design: .monospaced))
                                         .foregroundStyle(.secondary)
                                     IconButton(
-                                        symbol: section.allSafeSelected(in: selectedURLs) ? "checkmark.shield.fill" : "checkmark.shield",
-                                        help: section.allSafeSelected(in: selectedURLs) ? "取消选择\(section.kind.title)中的安全项" : "选择\(section.kind.title)中的安全项",
-                                        isActive: section.allSafeSelected(in: selectedURLs),
+                                        symbol: section.allSelected(in: selectedURLs) ? "checkmark.square.fill" : "checkmark.square",
+                                        help: section.allSelected(in: selectedURLs) ? "取消选择\(section.kind.title)" : "全选\(section.kind.title)",
+                                        isActive: section.allSelected(in: selectedURLs),
                                         size: .compact
                                     ) {
-                                        toggleSectionSafeSelection(section)
+                                        toggleSectionSelection(section)
                                     }
-                                    .disabled(isCleaning || section.safeURLs.isEmpty)
+                                    .disabled(isCleaning)
+                                    IconButton(
+                                        symbol: "arrow.left.arrow.right.square",
+                                        help: "反选\(section.kind.title)",
+                                        size: .compact
+                                    ) {
+                                        invertSelection(in: section)
+                                    }
+                                    .disabled(isCleaning)
                                 }
                                 .textCase(nil)
                                 .padding(.vertical, 1)
@@ -1000,12 +1019,8 @@ private struct SystemCleanupSheet: View {
         }
     }
 
-    private var safeCandidateURLs: Set<URL> {
-        Set(candidates.lazy.filter { $0.safetyLevel == .safeToClean }.map(\.url))
-    }
-
-    private var allSafeCandidatesSelected: Bool {
-        !safeCandidateURLs.isEmpty && safeCandidateURLs.isSubset(of: selectedURLs)
+    private var allCandidatesSelected: Bool {
+        !candidates.isEmpty && candidates.allSatisfy { selectedURLs.contains($0.url) }
     }
 
     private func makeGroupedSections(from candidates: [DiskCleanupCandidate]) -> [CleanupKindSection] {
@@ -1020,12 +1035,17 @@ private struct SystemCleanupSheet: View {
         }
     }
 
-    private func toggleSafeSelection() {
-        if allSafeCandidatesSelected {
-            selectedURLs.subtract(safeCandidateURLs)
+    private func toggleSelectAll() {
+        if allCandidatesSelected {
+            selectedURLs.removeAll()
         } else {
-            selectedURLs.formUnion(safeCandidateURLs)
+            selectedURLs = Set(candidates.map(\.url))
         }
+    }
+
+    private func invertSelection() {
+        let all = Set(candidates.map(\.url))
+        selectedURLs = all.subtracting(selectedURLs)
     }
 
     private func isSectionCollapsed(_ section: CleanupKindSection) -> Bool {
@@ -1040,12 +1060,20 @@ private struct SystemCleanupSheet: View {
         }
     }
 
-    private func toggleSectionSafeSelection(_ section: CleanupKindSection) {
-        if section.allSafeSelected(in: selectedURLs) {
-            selectedURLs.subtract(section.safeURLs)
+    private func toggleSectionSelection(_ section: CleanupKindSection) {
+        let urls = section.urls
+        if urls.isSubset(of: selectedURLs) {
+            selectedURLs.subtract(urls)
         } else {
-            selectedURLs.formUnion(section.safeURLs)
+            selectedURLs.formUnion(urls)
         }
+    }
+
+    private func invertSelection(in section: CleanupKindSection) {
+        let urls = section.urls
+        let unselected = urls.subtracting(selectedURLs)
+        selectedURLs.subtract(urls)
+        selectedURLs.formUnion(unselected)
     }
 
     private func selectionBinding(for url: URL) -> Binding<Bool> {
@@ -1107,16 +1135,12 @@ private struct CleanupKindSection: Identifiable {
         Set(items.map(\.url))
     }
 
-    var safeURLs: Set<URL> {
-        Set(items.lazy.filter { $0.safetyLevel == .safeToClean }.map(\.url))
-    }
-
     func selectedCount(in selection: Set<URL>) -> Int {
         urls.intersection(selection).count
     }
 
-    func allSafeSelected(in selection: Set<URL>) -> Bool {
-        !safeURLs.isEmpty && safeURLs.isSubset(of: selection)
+    func allSelected(in selection: Set<URL>) -> Bool {
+        !urls.isEmpty && urls.isSubset(of: selection)
     }
 }
 
