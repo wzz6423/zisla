@@ -378,10 +378,13 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
     case diskImage
     case largeFile
     case duplicateFile
+    /// 与已卸载应用的 bundle ID 精确对应的用户级残留文件。
+    case applicationLeftovers
 
     /// When the same path appears in multiple scan categories, the higher value (more specific kind) takes precedence.
     public var classificationPriority: Int {
         switch self {
+        case .applicationLeftovers: 95
         case .crashReport: 90
         case .temporaryFiles: 85
         case .packageManagerCache: 80
@@ -1443,6 +1446,11 @@ public enum SystemDiskCleanup {
             append(.appCache, root.url)
         }
 
+        // 仅在精确 bundle ID 已确认未安装后，才把单项残留加入白名单。
+        for root in applicationLeftoverRoots(fileManager: fileManager) {
+            append(.applicationLeftovers, root.url)
+        }
+
         // User logs: application run logs; safe to clear without affecting functionality
         append(.log, home.appendingPathComponent("Library/Logs", isDirectory: true))
 
@@ -1549,6 +1557,106 @@ public enum SystemDiskCleanup {
         return uniqueRoots.values.sorted { $0.url.path < $1.url.path }
     }
 
+    private struct ApplicationLeftoverRoot {
+        var url: URL
+        var bundleIdentifier: String
+        var source: String
+    }
+
+    /// 只接受以 bundle ID 命名的精确用户级路径，避免把应用名称或普通资料目录当作残留。
+    private static func applicationLeftoverRoots(
+        fileManager: SystemMonitorFileManaging
+    ) -> [ApplicationLeftoverRoot] {
+        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
+        let installedBundleIdentifiers = installedApplicationBundleIdentifiers(fileManager: fileManager)
+        var roots: [ApplicationLeftoverRoot] = []
+
+        func appendChildren(
+            in directory: URL,
+            source: String,
+            bundleIdentifier: (String) -> String?
+        ) {
+            guard fileManager.fileExists(atPath: directory.path),
+                  let children = try? fileManager.contentsOfDirectory(
+                      at: directory,
+                      includingPropertiesForKeys: [.isSymbolicLinkKey],
+                      options: [.skipsHiddenFiles]
+                  )
+            else {
+                return
+            }
+
+            for child in children {
+                let standardized = child.standardizedFileURL
+                guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: [directory]),
+                      (try? child.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true,
+                      let identifier = bundleIdentifier(standardized.lastPathComponent),
+                      isOrphanedApplicationBundleIdentifier(identifier, installed: installedBundleIdentifiers)
+                else {
+                    continue
+                }
+                roots.append(ApplicationLeftoverRoot(url: standardized, bundleIdentifier: identifier, source: source))
+            }
+        }
+
+        appendChildren(
+            in: home.appendingPathComponent("Library/Preferences", isDirectory: true),
+            source: "偏好设置",
+            bundleIdentifier: bundleIdentifierFromPreferenceName
+        )
+        appendChildren(
+            in: home.appendingPathComponent("Library/Application Support", isDirectory: true),
+            source: "应用支持文件",
+            bundleIdentifier: bundleIdentifierFromExactName
+        )
+        appendChildren(
+            in: home.appendingPathComponent("Library/Saved Application State", isDirectory: true),
+            source: "已保存状态",
+            bundleIdentifier: bundleIdentifierFromSavedStateName
+        )
+        appendChildren(
+            in: home.appendingPathComponent("Library/WebKit", isDirectory: true),
+            source: "WebKit 数据",
+            bundleIdentifier: bundleIdentifierFromExactName
+        )
+        var uniqueRoots: [String: ApplicationLeftoverRoot] = [:]
+        for root in roots {
+            uniqueRoots[SystemMonitorPathSafety.standardizedPath(root.url)] = root
+        }
+        return uniqueRoots.values.sorted { $0.url.path < $1.url.path }
+    }
+
+    private static func bundleIdentifierFromPreferenceName(_ name: String) -> String? {
+        guard name.hasSuffix(".plist") else { return nil }
+        return bundleIdentifierFromExactName(String(name.dropLast(".plist".count)))
+    }
+
+    private static func bundleIdentifierFromSavedStateName(_ name: String) -> String? {
+        guard name.hasSuffix(".savedState") else { return nil }
+        return bundleIdentifierFromExactName(String(name.dropLast(".savedState".count)))
+    }
+
+    private static func bundleIdentifierFromExactName(_ name: String) -> String? {
+        let components = name.split(separator: ".", omittingEmptySubsequences: false)
+        guard components.count >= 2,
+              components.allSatisfy({ component in
+                  !component.isEmpty && component.allSatisfy { character in
+                      character.isLetter || character.isNumber || character == "-"
+                  }
+              })
+        else {
+            return nil
+        }
+        return name
+    }
+
+    private static func isOrphanedApplicationBundleIdentifier(
+        _ bundleIdentifier: String,
+        installed: Set<String>
+    ) -> Bool {
+        !bundleIdentifier.hasPrefix("com.apple.") && !installed.contains(bundleIdentifier)
+    }
+
     public static func allocatedByteSize(of url: URL, fileManager: SystemMonitorFileManaging) -> UInt64 {
         guard fileManager.fileExists(atPath: url.path) else { return 0 }
         // Use resource values first
@@ -1640,6 +1748,11 @@ public enum SystemDiskCleanup {
         // Duplicate files: files with identical content under Downloads/Desktop/Documents
         if kinds.contains(.duplicateFile) {
             result.append(contentsOf: scanDuplicateFiles(fileManager: fileManager))
+        }
+
+        // 卸载应用残留：只扫描具备精确 bundle ID 证据的用户级路径。
+        if kinds.contains(.applicationLeftovers) {
+            result.append(contentsOf: scanApplicationLeftovers(fileManager: fileManager))
         }
 
         return deduplicateCandidates(result).sorted { $0.byteSize > $1.byteSize }
@@ -1873,6 +1986,51 @@ public enum SystemDiskCleanup {
             }
         }
         return result
+    }
+
+    /// 扫描带有未安装 bundle ID 的残留。扫描结果不会被默认选中，用户必须逐项确认。
+    private static func scanApplicationLeftovers(fileManager: SystemMonitorFileManaging) -> [DiskCleanupCandidate] {
+        let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
+        return applicationLeftoverRoots(fileManager: fileManager).compactMap { root in
+            guard SystemMonitorPathSafety.isURL(root.url, withinAllowedRoots: allowed) else {
+                return nil
+            }
+            return DiskCleanupCandidate(
+                url: root.url,
+                kind: .applicationLeftovers,
+                byteSize: allocatedByteSize(of: root.url, fileManager: fileManager),
+                displayName: "\(root.bundleIdentifier) 残留",
+                detail: "\(root.source) · 已确认 \(root.bundleIdentifier) 未安装 · \(root.url.path)"
+            )
+        }
+    }
+
+    /// 返回 /Applications 与 ~/Applications 中已安装应用的 bundle ID。
+    private static func installedApplicationBundleIdentifiers(fileManager: SystemMonitorFileManaging) -> Set<String> {
+        var identifiers = Set<String>()
+        let appDirs = [
+            URL(fileURLWithPath: "/Applications"),
+            fileManager.homeDirectoryForCurrentUser().appendingPathComponent("Applications"),
+        ]
+
+        for appDir in appDirs {
+            guard fileManager.fileExists(atPath: appDir.path),
+                  let apps = try? fileManager.contentsOfDirectory(
+                      at: appDir,
+                      includingPropertiesForKeys: nil,
+                      options: [.skipsHiddenFiles]
+                  ) else { continue }
+
+            for app in apps where app.pathExtension == "app" {
+                let infoPlist = app.appendingPathComponent("Contents/Info.plist")
+                guard let data = fileManager.contents(atPath: infoPlist.path),
+                      let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                      let bundleID = plist["CFBundleIdentifier"] as? String else { continue }
+                identifiers.insert(bundleID)
+            }
+        }
+
+        return identifiers
     }
 
     /// Scans Downloads/Desktop/Documents for duplicate files (SHA256 content comparison).

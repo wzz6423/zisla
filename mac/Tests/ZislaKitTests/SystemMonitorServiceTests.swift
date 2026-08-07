@@ -788,6 +788,85 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
+    func scanCandidatesFindsOnlyExactBundleIDApplicationLeftovers() throws {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+
+        let preferences = home.appendingPathComponent("Library/Preferences")
+        let applicationSupport = home.appendingPathComponent("Library/Application Support")
+        let savedState = home.appendingPathComponent("Library/Saved Application State")
+        let webKit = home.appendingPathComponent("Library/WebKit")
+        let orphanID = "com.example.removed"
+        let activeID = "com.example.active"
+        let expected = Set([
+            preferences.appendingPathComponent("\(orphanID).plist").standardizedFileURL,
+            applicationSupport.appendingPathComponent(orphanID).standardizedFileURL,
+            savedState.appendingPathComponent("\(orphanID).savedState").standardizedFileURL,
+            webKit.appendingPathComponent(orphanID).standardizedFileURL,
+        ])
+        let activePreference = preferences.appendingPathComponent("\(activeID).plist")
+        let activeSupport = applicationSupport.appendingPathComponent(activeID)
+        let systemPreference = preferences.appendingPathComponent("com.apple.TextEdit.plist")
+        let nonBundleSupport = applicationSupport.appendingPathComponent("Example Editor")
+        let installedApplication = URL(fileURLWithPath: "/Applications/Example.app")
+        let installedInfo = installedApplication.appendingPathComponent("Contents/Info.plist")
+
+        mock.existingPaths = Set([
+            preferences.path, applicationSupport.path, savedState.path, webKit.path,
+            "/Applications", installedApplication.path, installedInfo.path,
+            activePreference.path, activeSupport.path, systemPreference.path, nonBundleSupport.path,
+        ] + expected.map(\.path))
+        mock.directoryContents[preferences.path] = [
+            expected.first { $0.pathExtension == "plist" }!, activePreference, systemPreference,
+        ]
+        mock.directoryContents[applicationSupport.path] = [
+            expected.first { $0.path == applicationSupport.appendingPathComponent(orphanID).path }!, activeSupport, nonBundleSupport,
+        ]
+        mock.directoryContents[savedState.path] = [
+            expected.first { $0.path == savedState.appendingPathComponent("\(orphanID).savedState").path }!,
+        ]
+        mock.directoryContents[webKit.path] = [
+            expected.first { $0.path == webKit.appendingPathComponent(orphanID).path }!,
+        ]
+        mock.directoryContents["/Applications"] = [installedApplication]
+        mock.fileContentsData[installedInfo.path] = try PropertyListSerialization.data(
+            fromPropertyList: ["CFBundleIdentifier": activeID],
+            format: .xml,
+            options: 0
+        )
+
+        let candidates = SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.applicationLeftovers])
+
+        #expect(Set(candidates.map(\.url)) == expected)
+        #expect(candidates.allSatisfy { $0.detail?.contains("已确认 \(orphanID) 未安装") == true })
+    }
+
+    @Test
+    func trashSelectedAllowsExactApplicationLeftoverButRejectsNeighboringSupportData() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+        let support = home.appendingPathComponent("Library/Application Support")
+        let orphan = support.appendingPathComponent("com.example.removed")
+        let neighbor = support.appendingPathComponent("Example Editor")
+        mock.existingPaths = [support.path, orphan.path, neighbor.path]
+        mock.directoryContents[support.path] = [orphan, neighbor]
+        mock.trashResults[orphan.standardizedFileURL] = .success(URL(fileURLWithPath: "/Users/test/.Trash/com.example.removed"))
+
+        let result = SystemDiskCleanup.trashSelected(
+            urls: [orphan, neighbor],
+            fileManager: mock,
+            sizeProvider: { _ in 1 }
+        )
+
+        #expect(result.successCount == 1)
+        #expect(result.failures.count == 1)
+        #expect(result.failures.first?.url == neighbor.standardizedFileURL)
+        #expect(result.failures.first?.message.contains("允许清理的用户目录") == true)
+    }
+
+    @Test
     func applicationContainerCleanupRootsExcludeApplicationData() {
         let mock = MockFileManager()
         let home = URL(fileURLWithPath: "/Users/test")

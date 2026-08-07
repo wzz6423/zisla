@@ -809,7 +809,7 @@ private struct SystemCleanupSheet: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("清理候选项")
                         .font(.system(size: 16, weight: .semibold))
-                    Text("扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件")
+                    Text("扫描应用缓存、卸载应用残留、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
@@ -1134,6 +1134,7 @@ private extension DiskCleanupKind {
         case .diskImage: "磁盘镜像"
         case .largeFile: "大文件"
         case .duplicateFile: "重复文件"
+        case .applicationLeftovers: "卸载应用残留"
         }
     }
 
@@ -1150,6 +1151,7 @@ private extension DiskCleanupKind {
         case .diskImage: "opticaldisc.fill"
         case .largeFile: "doc.zipper.fill"
         case .duplicateFile: "rectangle.stack.fill"
+        case .applicationLeftovers: "app.badge.xmark"
         }
     }
 
@@ -1166,6 +1168,7 @@ private extension DiskCleanupKind {
         case .diskImage: .blue
         case .largeFile: .indigo
         case .duplicateFile: .pink
+        case .applicationLeftovers: .gray
         }
     }
 }
