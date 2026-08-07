@@ -291,19 +291,28 @@ final class AppModel: ObservableObject {
     }
   }
   /// Module switch direction (+1 rightward in module order, -1 leftward) driving the
-  /// directional page transition. Updated immediately before selectedModule changes.
+  /// directional page transition. Committed one run-loop turn before `selectedModule`
+  /// changes so the outgoing view's removal transition also carries the fresh direction.
   @Published private(set) var moduleSwitchDirection: CGFloat = 1
+  private var pendingModuleSelection: IslandModule?
 
   /// Preferred entry point for switching modules: records the navigation direction for
-  /// the directional transition, then applies the switch immediately in a single transaction.
+  /// the directional transition, then applies the switch on the next run-loop turn.
   func selectModule(_ module: IslandModule) {
-    guard module != selectedModule else { return }
+    let current = pendingModuleSelection ?? selectedModule
+    guard module != current else { return }
     let order = IslandModule.allCases
-    if let from = order.firstIndex(of: selectedModule),
+    if let from = order.firstIndex(of: current),
        let to = order.firstIndex(of: module) {
       moduleSwitchDirection = to > from ? 1 : -1
     }
-    selectedModule = module
+    pendingModuleSelection = module
+    DispatchQueue.main.async { [weak self] in
+      guard let self, let target = self.pendingModuleSelection else { return }
+      self.pendingModuleSelection = nil
+      guard target != self.selectedModule else { return }
+      self.selectedModule = target
+    }
   }
 
   @Published var isPinned = false

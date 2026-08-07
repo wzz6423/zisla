@@ -152,9 +152,9 @@ struct IslandRootView: View {
                                 .padding(.bottom, 7)
                                 .environment(\.colorScheme, .dark)
 
-                            ZStack {
+                            Group {
                                 if let activeModule {
-                                    Group {
+                                    DeferredMount {
                                         switch activeModule {
                                         case .dashboard:
                                             IslandDashboardView(model: model)
@@ -184,12 +184,6 @@ struct IslandRootView: View {
                                             LockScreenModuleView(model: model)
                                         }
                                     }
-                                    .id(activeModule.rawValue)
-                                    .transition(
-                                        reduceMotion
-                                            ? .identity
-                                            : .modulePush(direction: model.moduleSwitchDirection)
-                                    )
                                 } else {
                                     ContentUnavailableView {
                                         Label("没有启用模块", systemImage: "rectangle.slash")
@@ -214,6 +208,12 @@ struct IslandRootView: View {
                                     ),
                                     style: .continuous
                                 )
+                            )
+                            .id(activeModule?.rawValue)
+                            .transition(
+                                reduceMotion
+                                    ? .identity
+                                    : .modulePush(direction: model.moduleSwitchDirection)
                             )
                             .animation(reduceMotion ? nil : ZislaMotion.moduleSwitch, value: activeModule)
                             // Lower modules sit on dark frosted glass, so force dark mode for legible light text.
