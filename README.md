@@ -6,6 +6,11 @@
 
 Current implementation: **macOS 14+**. Apple Silicon is the supported configuration; Intel release packages may work, but compatibility is not guaranteed.
 
+## Repository layout
+
+- `mac/`: the current macOS implementation, built with Swift, AppKit, and SwiftUI.
+- `windows/`: a Windows implementation in development, built with C++20, C++/WinRT, WinUI 3, and the Windows App SDK; its platform-independent C++ core can be validated on macOS.
+
 ## Why it belongs at the top of your screen
 
 - **On demand, without stealing focus.** Expand it from the top edge, pin it when needed, and keep working in the current app.
@@ -79,6 +84,18 @@ swift run zisla
 ```
 
 The downloader requires `yt-dlp`; `ffmpeg` is optional. Office-to-PDF conversion requires LibreOffice or OpenOffice. Build, test, and packaging instructions are in the [macOS development guide](mac/README.md).
+
+### Windows development
+
+The platform-independent C++20 core can be validated on macOS:
+
+```bash
+cmake -S windows -B /tmp/zisla-windows-build -DCMAKE_BUILD_TYPE=Debug
+cmake --build /tmp/zisla-windows-build --parallel
+ctest --test-dir /tmp/zisla-windows-build --output-on-failure
+```
+
+The native Windows shell, MSIX, WinUI, and multi-monitor behavior need to be built and run on Windows 11 hardware.
 
 ## Designed to stay out of the way
 

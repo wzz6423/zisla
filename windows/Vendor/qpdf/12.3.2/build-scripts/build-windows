@@ -1,0 +1,45 @@
+#!/bin/bash
+set -ex
+cd $(dirname $0)/..
+wordsize=$1
+tool=$2
+
+declare -a cmake_xargs
+declare -a ctest_xargs
+config=Release
+if [[ $tool == mingw ]]; then
+    pacman -Sy --noconfirm make base-devel tar zip unzip
+    if [ ! -x /c/msys64/mingw$wordsize/bin/g++.exe ]; then
+        if [[ $wordsize == 64 ]]; then
+            pacman -Sy --noconfirm mingw-w64-x86_64-toolchain
+        else
+            pacman -Sy --noconfirm mingw-w64-i686-toolchain
+        fi
+    fi
+    PATH="/c/msys64/mingw$wordsize/bin:$PATH"
+    cmake_xargs=(-- -k)
+    g++ -v
+elif [[ $tool == msvc ]]; then
+    cl
+    cmake_xargs=(--config $config)
+    ctest_xargs=(-C $config)
+fi
+
+mkdir build distribution
+unzip doc.zip
+unzip qpdf-external-libs-bin.zip
+
+cd build
+../cmake-win $tool ci $config
+cmake --build . --verbose -j$(nproc) "${cmake_xargs[@]}"
+ctest --verbose "${ctest_xargs[@]}"
+cpack -G NSIS -C $config
+cpack -G ZIP -C $config
+for i in qpdf-*.exe; do
+    mv $i ../distribution/$(echo $i | sed -e 's/.exe/-ci.exe/')
+done
+for i in qpdf-*.zip; do
+    mv $i ../distribution/$(echo $i | sed -e 's/.zip/-ci.zip/')
+done
+cd ..
+sha256sum distribution/*

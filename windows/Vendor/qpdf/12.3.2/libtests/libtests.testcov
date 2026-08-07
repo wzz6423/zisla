@@ -1,0 +1,75 @@
+ignored-scope: qpdf
+Pl_LZWDecoder intermediate reset 0
+Pl_ASCII85Decoder ignore space 0
+Pl_ASCII85Decoder partial flush 1
+bits leftover 1
+bits bit_offset 2
+bits iterations 2
+bits zero bits wanted 0
+bits write iterations 2
+bits write leftover 0
+bits write pipeline 0
+bits write zero bits 0
+Pl_ASCIIHexDecoder ignore space 0
+Pl_ASCIIHexDecoder no-op flush 0
+Pl_ASCIIHexDecoder partial flush 1
+InputSource read next block 1
+InputSource find EOF 1
+InputSource out of range 0
+InputSource first char matched but not string 0
+InputSource start_chars matched but not check 0
+InputSource not enough bytes 0
+InputSource findLast found more than one 0
+InputSource found match at buf[0] 0
+Pl_RunLength: switch to run 1
+Pl_RunLength flush full buffer 1
+Pl_RunLength flush empty buffer 0
+Pl_DCT empty_pipeline_output_buffer 0
+Pl_DCT term_pipeline_destination 0
+Pl_PNGFilter decodeSub 0
+Pl_PNGFilter decodeUp 0
+Pl_PNGFilter decodeAverage 0
+Pl_PNGFilter decodePaeth 0
+Pl_TIFFPredictor processRow 1
+QPDFArgParser read args from stdin 0
+QPDFArgParser read args from file 0
+QPDFArgParser required choices 0
+QPDFArgParser required parameter 0
+QPDFArgParser missing -- 0
+QPDFArgParser single dash 0
+QPDFArgParser help option 0
+QPDFArgParser positional 0
+QPDFArgParser unrecognized 0
+QPDFArgParser complete choices 0
+JSON parse junk after object 0
+JSON parse invalid keyword 0
+JSON parse expected colon 0
+JSON parse expected , or } 0
+JSON parse expected, or ] 0
+JSON parse string as dict key 0
+JSON parse unexpected } 0
+JSON parse unexpected ] 0
+JSON parse unexpected : 0
+JSON parse unexpected , 0
+JSON parse premature EOF 0
+JSON parse null character 0
+JSON parse bad character 0
+JSON parse point after e 0
+JSON parse duplicate point 0
+JSON parse duplicate e 0
+JSON parse unexpected sign 0
+JSON parse numeric bad character 0
+JSON parse number minus no digits 0
+JSON parse incomplete number 0
+JSON parse keyword bad character 0
+JSON parse backslash bad character 0
+JSON parse control char in string 0
+JSON parse leading zero 0
+JSON parse ls premature end of input 0
+JSON parse bad hex after u 0
+JSONHandler unhandled value 0
+JSONHandler unexpected key 0
+JSON optional key 0
+JSON 16 high high 0
+JSON 16 low not after high 0
+JSON 16 dangling high 0

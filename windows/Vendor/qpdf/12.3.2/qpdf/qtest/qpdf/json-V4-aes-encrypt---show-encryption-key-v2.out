@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "parameters": {
+    "decodelevel": "generalized"
+  },
+  "encrypt": {
+    "capabilities": {
+      "accessibility": true,
+      "extract": true,
+      "modify": true,
+      "modifyannotations": true,
+      "modifyassembly": true,
+      "modifyforms": true,
+      "modifyother": true,
+      "printhigh": true,
+      "printlow": true
+    },
+    "encrypted": true,
+    "ownerpasswordmatched": true,
+    "parameters": {
+      "P": -4,
+      "R": 4,
+      "V": 4,
+      "bits": 128,
+      "filemethod": "AESv2",
+      "key": "474258b004f2ce0017adeb6e79574357",
+      "method": "AESv2",
+      "streammethod": "AESv2",
+      "stringmethod": "AESv2"
+    },
+    "recovereduserpassword": null,
+    "userpasswordmatched": true
+  }
+}

@@ -1,0 +1,50 @@
+qpdf: processing underlay/overlay
+  page 1
+    fxo-blue.pdf underlay 16
+    fxo-green.pdf overlay 7
+  page 2
+    fxo-blue.pdf underlay 15
+    fxo-green.pdf overlay 8
+  page 3
+    fxo-blue.pdf underlay 14
+    fxo-green.pdf overlay 7
+  page 4
+    fxo-blue.pdf underlay 13
+    fxo-green.pdf overlay 8
+  page 5
+    fxo-blue.pdf underlay 12
+    fxo-green.pdf overlay 7
+  page 6
+    fxo-blue.pdf underlay 11
+    fxo-green.pdf overlay 8
+  page 7
+    fxo-blue.pdf underlay 10
+    fxo-green.pdf overlay 7
+  page 8
+    fxo-blue.pdf underlay 9
+    fxo-green.pdf overlay 8
+  page 9
+    fxo-blue.pdf underlay 8
+    fxo-green.pdf overlay 7
+  page 10
+    fxo-blue.pdf underlay 7
+    fxo-green.pdf overlay 8
+  page 11
+    fxo-blue.pdf underlay 6
+    fxo-green.pdf overlay 7
+  page 12
+    fxo-blue.pdf underlay 5
+    fxo-green.pdf overlay 8
+  page 13
+    fxo-blue.pdf underlay 4
+    fxo-green.pdf overlay 7
+  page 14
+    fxo-blue.pdf underlay 3
+    fxo-green.pdf overlay 8
+  page 15
+    fxo-blue.pdf underlay 2
+    fxo-green.pdf overlay 7
+  page 16
+    fxo-blue.pdf underlay 1
+    fxo-green.pdf overlay 8
+qpdf: wrote file a.pdf

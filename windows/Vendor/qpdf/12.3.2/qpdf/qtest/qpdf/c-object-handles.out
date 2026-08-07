@@ -1,0 +1,23 @@
+page dictionary key: /Contents
+page dictionary key: /MediaBox
+page dictionary key: /Parent
+page dictionary key: /Resources
+page dictionary key: /Type
+item 0: 0 0.00
+item 1: 0 0.00
+item 2: 612 612.00
+item 3: 792 792.00
+minimal.pdf (C API object handle 6): attempted access to unknown object handle
+minimal.pdf (C API object handle 9): attempted access to unknown object handle
+minimal.pdf (C API object handle 9): attempted access to unknown object handle
+warning: minimal.pdf: C API function caught an exception that it isn't returning; please point the application developer to ERROR HANDLING in qpdf-c.h
+  code: 1
+  file: minimal.pdf
+  pos: 0
+  text: C API function caught an exception that it isn't returning; please point the application developer to ERROR HANDLING in qpdf-c.h
+error: minimal.pdf (C API object handle 9): attempted access to unknown object handle
+  code: 1
+  file: minimal.pdf
+  pos: 0
+  text: attempted access to unknown object handle
+C test 24 done

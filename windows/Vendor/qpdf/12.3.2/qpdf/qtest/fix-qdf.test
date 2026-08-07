@@ -1,0 +1,77 @@
+#!/usr/bin/env perl
+require 5.008;
+use warnings;
+use strict;
+
+unshift(@INC, '.');
+require qpdf_test_helpers;
+
+chdir("qpdf") or die "chdir testdir failed: $!\n";
+
+require TestDriver;
+
+cleanup();
+
+my $td = new TestDriver('fix-qdf');
+
+my $n_tests = 11;
+
+for (my $n = 1; $n <= 2; ++$n)
+{
+    $td->runtest("fix-qdf $n",
+                 {$td->COMMAND => "fix-qdf fix$n.qdf"},
+                 {$td->FILE => "fix$n.qdf.out",
+                  $td->EXIT_STATUS => 0});
+
+    $td->runtest("fix-qdf $n with named output",
+                 {$td->COMMAND => "fix-qdf fix$n.qdf a.pdf"},
+                 {$td->STRING => "",
+                  $td->EXIT_STATUS => 0});
+
+    $td->runtest("check fix-qdf $n output",
+                 {$td->FILE => "a.pdf"},
+                 {$td->FILE => "fix$n.qdf.out"});
+
+    $td->runtest("identity fix-qdf $n",
+                 {$td->COMMAND => "fix-qdf fix$n.qdf.out"},
+                 {$td->FILE => "fix$n.qdf.out",
+                  $td->EXIT_STATUS => 0});
+}
+if (! (($^O eq 'MSWin32') || ($^O eq 'Win32') || ($^O eq 'msys') || ($^O eq 'cygwin')))
+{
+    # The pipe tests are unstable on Windows. It has not been
+    # determined whether this is because the code doesn't work or the
+    # tests don't work, but as of September 2023, I think it works
+    # with MSVC and not with mingw. Fixing fix-qdf to read from pipes
+    # on Windows is not a high priority, but patches are welcome.
+    $n_tests += 4;
+    for (my $n = 1; $n <= 2; ++$n)
+    {
+        $td->runtest("fix-qdf $n from pipe (os=$^O)",
+                     {$td->COMMAND => "cat fix$n.qdf | fix-qdf "},
+                     {$td->FILE => "fix$n.qdf.out",
+                          $td->EXIT_STATUS => 0});
+
+        $td->runtest("identity fix-qdf $n (os=$^O)",
+                     {$td->COMMAND => "fix-qdf fix$n.qdf.out"},
+                     {$td->FILE => "fix$n.qdf.out",
+                          $td->EXIT_STATUS => 0});
+}
+    }
+$td->runtest("fix-qdf with big object stream", # > 255 objects in a stream
+             {$td->COMMAND => "fix-qdf big-ostream.pdf"},
+             {$td->FILE => "big-ostream.pdf",
+              $td->EXIT_STATUS => 0});
+
+$td->runtest("fix-qdf error opening input",
+             {$td->COMMAND => "fix-qdf /does/not/exist/potato.pdf"},
+             {$td->REGEXP => "^fix-qdf: error: open .*/does/not/exist/potato.pdf: .*",
+              $td->EXIT_STATUS => 2});
+
+$td->runtest("fix-qdf error opening output", # > 255 objects in a stream
+             {$td->COMMAND => "fix-qdf fix1.qdf /does/not/exist/salad.pdf"},
+             {$td->REGEXP => "^fix-qdf: error: open .*/does/not/exist/salad.pdf: .*",
+              $td->EXIT_STATUS => 2});
+
+cleanup();
+$td->report($n_tests);

@@ -1,0 +1,17 @@
+#!/bin/bash
+set -ex
+export WORK=$PWD/work
+export OUT=$PWD/out
+mkdir -p $WORK $OUT
+sudo apt-get update
+sudo apt-get -y install build-essential cmake zlib1g-dev libjpeg-dev
+./fuzz/oss-fuzz-build
+ls -l out/qpdf_fuzzer
+ls -l out/
+for fuzzer in qpdf_fuzzer future_qpdf_fuzzer; do
+    if ldd out/$fuzzer | grep -E 'libjpeg|libz|libqpdf'; then
+        echo 1>&2 "*** Fuzzers linked dynamically with some dependent libraries."
+        ldd out/$fuzzer
+        exit 2
+    fi
+done
