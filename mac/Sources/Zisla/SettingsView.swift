@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject private var settingsStore: FeatureSettingsStore
     @StateObject private var input = SettingsInput()
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @Environment(\.colorScheme) private var colorScheme
@@ -15,6 +16,11 @@ struct SettingsView: View {
     @State private var sectionSwitchDirection: CGFloat = 1
     @State private var copiedCommand: String?
     @Namespace private var sectionSelectionNamespace
+
+    init(model: AppModel) {
+        self.model = model
+        _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -55,7 +61,7 @@ struct SettingsView: View {
                             Image(systemName: section.symbol)
                                 .font(.system(size: 12, weight: .semibold))
                                 .frame(width: 17)
-                            Text(section.title)
+                            AppLocalizedText(section.title)
                                 .font(.system(size: 11, weight: .medium))
                                 .lineLimit(1)
                             Spacer(minLength: 0)
@@ -68,11 +74,7 @@ struct SettingsView: View {
                     .foregroundStyle(input.selection == section ? Color.primary : Color.secondary)
                     .background {
                         if input.selection == section {
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(
-                                    Color.primary.opacity(colorScheme == .dark ? 0.72 : 0.50),
-                                    lineWidth: 1
-                                )
+                            SelectionGlassBackground(cornerRadius: 6)
                                 .matchedGeometryEffect(
                                     id: "settings-section-selection",
                                     in: sectionSelectionNamespace
@@ -109,9 +111,9 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(input.selection.title)
+                    AppLocalizedText(input.selection.title)
                         .font(.system(size: 20, weight: .semibold))
-                    Text(input.selection.subtitle)
+                    AppLocalizedText(input.selection.subtitle)
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
@@ -129,6 +131,7 @@ struct SettingsView: View {
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .thinScrollChrome()
         .animation(reduceMotion ? nil : ZislaMotion.settingsPageSwitch, value: input.selection)
     }
 
@@ -194,7 +197,7 @@ struct SettingsView: View {
                         )
                     ) {
                         ForEach(MediaSourcePreference.allCases, id: \.self) { source in
-                            Text(source.title).tag(source)
+                            AppLocalizedText(source.title).tag(source)
                         }
                     }
                     .labelsHidden()
@@ -235,7 +238,7 @@ struct SettingsView: View {
                         )
                     ) {
                         ForEach(MediaCompactStyle.allCases, id: \.self) { style in
-                            Text(style.title).tag(style)
+                            AppLocalizedText(style.title).tag(style)
                         }
                     }
                     .labelsHidden()
@@ -309,23 +312,20 @@ struct SettingsView: View {
                     settingRow(
                         symbol: "rectangle.compress.vertical",
                         title: "监控样式",
-                    detail: "紧凑模式隐藏图标并减小字号，减少菜单栏占用"
+                        detail: "紧凑模式隐藏图标并减小字号，减少菜单栏占用"
                     ) {
-                        Picker(
-                            "",
+                        IslandOutlinedPicker(
                             selection: Binding(
                                 get: { model.settingsStore.settings.systemMonitorMenuBarDisplayStyle },
                                 set: { model.settingsStore.settings.systemMonitorMenuBarDisplayStyle = $0 }
-                            )
-                        ) {
-                            ForEach(SystemMonitorMenuBarDisplayStyle.allCases, id: \.self) { style in
-                                Text(style.menuTitle).tag(style)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .controlSize(.small)
-                        .frame(width: 128)
+                            ),
+                            options: Array(SystemMonitorMenuBarDisplayStyle.allCases),
+                            title: { $0.menuTitle },
+                            selectionID: "system-monitor-menu-bar-display-style-selection",
+                            fontSize: 9,
+                            width: 128,
+                            height: 28
+                        )
                     }
                     ForEach(SystemMonitorMenuBarMetric.allCases, id: \.self) { metric in
                         rowDivider
@@ -437,7 +437,7 @@ struct SettingsView: View {
                         )
                     ) {
                         ForEach(ActivityNoticeDisplayDuration.allCases, id: \.self) { duration in
-                            Text(duration.menuTitle).tag(duration)
+                            AppLocalizedText(duration.menuTitle).tag(duration)
                         }
                     }
                     .labelsHidden()
@@ -460,7 +460,7 @@ struct SettingsView: View {
                         )
                     ) {
                         ForEach(FocusModeNoticeDisplayDuration.allCases, id: \.self) { duration in
-                            Text(duration.menuTitle).tag(duration)
+                            AppLocalizedText(duration.menuTitle).tag(duration)
                         }
                     }
                     .labelsHidden()
@@ -612,7 +612,7 @@ struct SettingsView: View {
                             )
                         ) {
                             ForEach(VoiceInputMode.allCases, id: \.self) { mode in
-                                Text(mode.displayName).tag(mode)
+                                AppLocalizedText(mode.displayName).tag(mode)
                             }
                         }
                         .labelsHidden()
@@ -942,27 +942,46 @@ struct SettingsView: View {
 
     private var interactionContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("外观") {
+            settingsGroup("外观与语言") {
+                settingRow(
+                    symbol: "character.bubble",
+                    title: "界面语言",
+                    detail: "切换后立即应用到支持的界面文本"
+                ) {
+                    Picker(
+                        "",
+                        selection: Binding(
+                            get: { model.languageStore.language },
+                            set: { model.languageStore.language = $0 }
+                        )
+                    ) {
+                        ForEach(AppLanguage.allCases, id: \.self) { language in
+                            Text(languageDisplayName(language)).tag(language)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .frame(width: 180)
+                }
+                rowDivider
                 settingRow(
                     symbol: "circle.lefthalf.filled",
                     title: "界面外观",
                     detail: ""
                 ) {
-                    Picker(
-                        "",
+                    IslandOutlinedPicker(
                         selection: Binding(
                             get: { model.settingsStore.settings.appearanceMode },
                             set: { model.settingsStore.settings.appearanceMode = $0 }
-                        )
-                    ) {
-                        ForEach(AppearanceMode.allCases, id: \.self) { mode in
-                            Text(mode.menuTitle).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .controlSize(.small)
-                    .frame(width: 216)
+                        ),
+                        options: Array(AppearanceMode.allCases),
+                        title: { $0.menuTitle },
+                        selectionID: "appearance-mode-selection",
+                        fontSize: 9,
+                        width: 216,
+                        height: 28
+                    )
                 }
                 rowDivider
                 settingRow(
@@ -1296,20 +1315,18 @@ struct SettingsView: View {
                     title: "手动检查通道",
                     detail: "\(model.settingsStore.settings.updateChannel.detail)；不影响自动更新"
                 ) {
-                    Picker(
-                        "",
+                    IslandOutlinedPicker(
                         selection: Binding(
                             get: { model.settingsStore.settings.updateChannel },
                             set: { model.settingsStore.settings.updateChannel = $0 }
-                        )
-                    ) {
-                        ForEach(UpdateChannel.allCases, id: \.self) { channel in
-                            Text(channel.menuTitle).tag(channel)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 150)
+                        ),
+                        options: Array(UpdateChannel.allCases),
+                        title: { $0.menuTitle },
+                        selectionID: "update-channel-selection",
+                        fontSize: 9,
+                        width: 150,
+                        height: 28
+                    )
                 }
                 rowDivider
                 featureToggle(
@@ -1458,6 +1475,33 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var mailAccountSettings: some View {
+        settingRow(
+            symbol: "rectangle.split.2x1",
+            title: "新邮件展示",
+            detail: model.settingsStore.settings.mailCompactStyle.detail
+        ) {
+            Picker(
+                "",
+                selection: Binding(
+                    get: { model.settingsStore.settings.mailCompactStyle },
+                    set: { model.settingsStore.settings.mailCompactStyle = $0 }
+                )
+            ) {
+                ForEach(MailCompactStyle.allCases, id: \.self) { style in
+                    Text(style.title).tag(style)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .frame(maxWidth: 108)
+        }
+        rowDivider
+        mailAppAccountSettings
+    }
+
+    @ViewBuilder
+    private var mailAppAccountSettings: some View {
         let accounts = model.mail.accounts
         if accounts.isEmpty {
             settingRow(
@@ -1530,6 +1574,8 @@ struct SettingsView: View {
     private func compactStatusPrioritySymbol(for priority: CompactStatusPriority) -> String {
         switch priority {
         case .transient: "bolt.fill"
+        case .updateAvailable: "arrow.triangle.2.circlepath"
+        case .mail: "envelope.fill"
         case .videoDownload: "arrow.down.square.fill"
         case .browserDownload: "arrow.down.circle.fill"
         case .focusCountdown: "timer"
@@ -1553,12 +1599,12 @@ struct SettingsView: View {
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                AppLocalizedText(title)
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
                     .truncationMode(.tail)
                 if !detail.isEmpty {
-                    Text(detail)
+                    AppLocalizedText(detail)
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .lineLimit(detailLineLimit)
@@ -1598,7 +1644,7 @@ struct SettingsView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .frame(width: 16)
                 }
-                Text(title)
+                AppLocalizedText(title)
                     .font(.system(size: 10, weight: .semibold))
                 Spacer(minLength: 0)
                 Image(systemName: "arrow.up.right")
@@ -1627,7 +1673,7 @@ struct SettingsView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(title)
+            AppLocalizedText(title)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.secondary)
             VStack(spacing: 0) {
@@ -1644,6 +1690,19 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var updateStatusAccessory: some View {
+        if model.productUpdateAvailable {
+            IconButton(
+                symbol: "arrow.triangle.2.circlepath",
+                help: "选择升级",
+                isActive: true,
+                size: .compact
+            ) {
+                model.checkForUpdates(
+                    manual: true,
+                    channel: model.settingsStore.settings.updateChannel
+                )
+            }
+        } else {
         switch model.updateState {
         case .checking:
             ProgressView().controlSize(.small)
@@ -1659,10 +1718,12 @@ struct SettingsView: View {
         case .idle:
             EmptyView()
         }
+        }
     }
 
     private var updateStatusText: String {
-        switch model.updateState {
+        if model.productUpdateAvailable { return "发现可用新版本" }
+        return switch model.updateState {
         case .idle: "尚未检查更新"
         case .checking: "正在检查更新"
         case .current: "已是最新版本"
@@ -1716,7 +1777,7 @@ struct SettingsView: View {
 
     private func commandRow(label: String, command: String) -> some View {
         HStack(spacing: 8) {
-            Text(label)
+            AppLocalizedText(label)
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 88, alignment: .leading)
@@ -1746,6 +1807,28 @@ struct SettingsView: View {
             if copiedCommand == text {
                 copiedCommand = nil
             }
+        }
+    }
+
+    private func languageDisplayName(_ language: AppLanguage) -> String {
+        switch language {
+        case .simplifiedChinese: return "简体中文"
+        case .traditionalChinese: return "繁體中文"
+        case .english: return "English"
+        case .japanese: return "日本語"
+        case .korean: return "한국어"
+        case .french: return "Français"
+        case .german: return "Deutsch"
+        case .spanish: return "Español"
+        case .brazilianPortuguese: return "Português (Brasil)"
+        case .italian: return "Italiano"
+        case .dutch: return "Nederlands"
+        case .russian: return "Русский"
+        case .arabic: return "العربية"
+        case .thai: return "ไทย"
+        case .indonesian: return "Bahasa Indonesia"
+        case .vietnamese: return "Tiếng Việt"
+        case .turkish: return "Türkçe"
         }
     }
 
@@ -2014,7 +2097,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .interaction: "cursorarrow.motionlines"
         case .download: "arrow.down.circle.fill"
         case .weather: "cloud.sun.fill"
-        case .updates: "arrow.triangle.2.circlepath"
+        case .updates: "arrow.up.circle"
         }
     }
 

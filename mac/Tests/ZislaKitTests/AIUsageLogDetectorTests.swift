@@ -505,8 +505,43 @@ struct AIUsageLogDetectorTests {
         monitor.reload()
         monitor.reload()
 
-        #expect(monitor.state.usageSamples == [sample])
-        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == [sample])
+        let summaries = AIUsageAnalytics.dailyAutomaticUsageSamples(samples: [sample])
+        #expect(monitor.state.usageSamples == summaries)
+        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == summaries)
+    }
+
+    @Test @MainActor
+    func monitorKeepsDailyTotalWhenAUsageDetectorFails() throws {
+        let directory = temporaryDirectory(named: "usage-incomplete-scan")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let original = AIUsageSample(
+            provider: .codex,
+            timestamp: Date(timeIntervalSince1970: 100),
+            inputTokens: 100,
+            outputTokens: 20
+        )
+        try repository.recordDetectedUsage([original])
+        let monitor = AIStateMonitor(
+            directoryURL: directory,
+            activityDetectors: [],
+            usageDetectors: [
+                StaticUsageDetector(samples: [AIUsageSample(
+                    provider: .codex,
+                    timestamp: original.timestamp,
+                    inputTokens: 80,
+                    outputTokens: 20
+                )]),
+                FailingUsageDetector(),
+            ]
+        )
+
+        monitor.reload()
+
+        #expect(try repository.load().usageSamples == AIUsageAnalytics.dailyUsageSamples(
+            samples: [original],
+            calendar: .current
+        ))
     }
 
     @Test @MainActor
@@ -529,14 +564,15 @@ struct AIUsageLogDetectorTests {
         monitor.reload(includeUsageSamples: false)
 
         #expect(monitor.state.usageSamples.isEmpty)
-        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == [sample])
+        let summaries = AIUsageAnalytics.dailyAutomaticUsageSamples(samples: [sample])
+        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == summaries)
 
         monitor.reload()
 
-        #expect(monitor.state.usageSamples == [sample])
+        #expect(monitor.state.usageSamples == summaries)
         monitor.unloadUsageHistory()
         #expect(monitor.state.usageSamples.isEmpty)
-        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == [sample])
+        #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == summaries)
     }
 
     @Test @MainActor
@@ -563,7 +599,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
-    func repositoryRevisesExistingLogSampleWhenParserCorrectsIt() throws {
+    func repositoryRevisesDetectedDailyTotalWhenParserCorrectsIt() throws {
         let directory = temporaryDirectory(named: "usage-correction")
         defer { try? FileManager.default.removeItem(at: directory) }
         let repository = AIStateRepository(directoryURL: directory)
@@ -582,9 +618,12 @@ struct AIUsageLogDetectorTests {
             outputTokens: 20
         )
 
-        #expect(try repository.recordUsage([original]) == 1)
-        #expect(try repository.recordUsage([corrected]) == 0)
-        #expect(try repository.load().usageSamples == [corrected])
+        #expect(try repository.recordDetectedUsage([original]) == 1)
+        #expect(try repository.recordDetectedUsage([corrected]) == 1)
+        #expect(
+            try repository.load().usageSamples
+                == AIUsageAnalytics.dailyUsageSamples(samples: [corrected], calendar: .current)
+        )
     }
 
     @Test
@@ -602,8 +641,9 @@ struct AIUsageLogDetectorTests {
 
         let state = try repository.stateRecordingUsage([sample])
 
-        #expect(state.usageSamples == [sample])
-        #expect(try repository.load().usageSamples == [sample])
+        let summaries = AIUsageAnalytics.dailyManualUsageSamples(samples: [sample])
+        #expect(state.usageSamples == summaries)
+        #expect(try repository.load().usageSamples == summaries)
     }
 }
 
@@ -611,6 +651,14 @@ private struct StaticUsageDetector: AIUsageDetecting {
     var samples: [AIUsageSample]
 
     func usageSamples() throws -> [AIUsageSample] { samples }
+}
+
+private struct FailingUsageDetector: AIUsageDetecting {
+    func usageSamples() throws -> [AIUsageSample] { throw UsageDetectorTestError.failed }
+}
+
+private enum UsageDetectorTestError: Error {
+    case failed
 }
 
 private final class CountingActivityDetector: AIActivityDetecting {

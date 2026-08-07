@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT="${0:A:h:h}"
 CONFIGURATION="${CONFIGURATION:-release}"
-VERSION="${VERSION:-0.1.1}"
-BUILD_NUMBER="${BUILD_NUMBER:-1}"
+VERSION="${VERSION:-0.1.2}"
+BUILD_NUMBER="${BUILD_NUMBER:-5}"
 UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
 OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:-$ROOT/dist}"
 APP="$OUTPUT_DIRECTORY/zisla.app"
@@ -21,6 +21,19 @@ case "$UPDATE_CHANNEL" in
     exit 1
     ;;
 esac
+
+if [[ -z "${SPARKLE_PUBLIC_KEY:-}" ]]; then
+  echo "error: SPARKLE_PUBLIC_KEY is required for every packaged build" >&2
+  exit 1
+fi
+if ! print -rn -- "$SPARKLE_PUBLIC_KEY" | base64 -D >/dev/null 2>&1; then
+  echo "error: SPARKLE_PUBLIC_KEY must be valid base64" >&2
+  exit 1
+fi
+if [[ "$(print -rn -- "$SPARKLE_PUBLIC_KEY" | base64 -D | wc -c | tr -d ' ')" != "32" ]]; then
+  echo "error: SPARKLE_PUBLIC_KEY must decode to 32 bytes" >&2
+  exit 1
+fi
 
 for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
   TARGET_TRIPLE="${ARCHITECTURE}-apple-macosx"
@@ -44,12 +57,13 @@ sed \
   -e "s/@UPDATE_CHANNEL@/$UPDATE_CHANNEL/g" \
   "$ROOT/Resources/Info.plist" > "$CONTENTS/Info.plist"
 
-if [[ -n "${SPARKLE_PUBLIC_KEY:-}" ]]; then
-  /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$CONTENTS/Info.plist"
-fi
+/usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$CONTENTS/Info.plist"
 
 if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
   install -m 0644 "$ROOT/Resources/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
+fi
+if [[ -f "$ROOT/Resources/AppIconNight.icns" ]]; then
+  install -m 0644 "$ROOT/Resources/AppIconNight.icns" "$CONTENTS/Resources/AppIconNight.icns"
 fi
 
 if [[ -d "$ROOT/Resources/BrandIcons" ]]; then
@@ -62,6 +76,10 @@ fi
 
 if [[ -d "$ROOT/Resources/QuickNotes" ]]; then
   ditto "$ROOT/Resources/QuickNotes" "$CONTENTS/Resources/QuickNotes"
+fi
+
+if [[ -d "$ROOT/Resources/Localization" ]]; then
+  ditto "$ROOT/Resources/Localization" "$CONTENTS/Resources"
 fi
 
 if [[ -d "$ROOT/Vendor/MediaRemoteAdapter.framework" ]]; then

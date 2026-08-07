@@ -242,6 +242,7 @@ private final class TeleprompterScrollContainer: NSScrollView {
         hasHorizontalScroller = false
         autohidesScrollers = true
         scrollerStyle = .overlay
+        ThinScrollChrome.apply(to: self)
         textView.drawsBackground = false
         textView.isEditable = false
         textView.isSelectable = true

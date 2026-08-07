@@ -5,6 +5,28 @@ import Testing
 @testable import ZislaKit
 
 struct SideNoticeLayoutTests {
+    @Test
+    func alwaysVisibleActivityAndFocusCannotBeDismissed() {
+        let activity = IslandNotice(id: "ai-active-codex", title: "运行中", side: .left)
+        let focus = IslandNotice(id: "focus-mode-left", title: "专注", side: .left)
+
+        #expect(CompactStatusVisibilityPolicy.mustRemainVisible(
+            notices: [activity],
+            activityDuration: .always,
+            focusDuration: .threeSeconds
+        ))
+        #expect(CompactStatusVisibilityPolicy.mustRemainVisible(
+            notices: [focus],
+            activityDuration: .threeSeconds,
+            focusDuration: .always
+        ))
+        #expect(!CompactStatusVisibilityPolicy.mustRemainVisible(
+            notices: [activity, focus],
+            activityDuration: .threeSeconds,
+            focusDuration: .threeSeconds
+        ))
+    }
+
     private let engine = SideNoticeLayoutEngine()
 
     @Test
@@ -135,6 +157,47 @@ struct SideNoticeLayoutTests {
 
         #expect(presentation.activeFocusModeNotice == focusMode)
         #expect(presentation.ordinaryNotices.isEmpty)
+        #expect(presentation.panelSize == CGSize(width: 40, height: 34))
+    }
+
+    @Test
+    func mailNotificationUsesCompactStatusWithoutFallingBackToPopup() {
+        let mail = IslandNotice(
+            id: "mail-notification-batch-left",
+            title: "季度计划",
+            detail: "Alice",
+            side: .left,
+            style: .status,
+            symbolName: "envelope.fill"
+        )
+
+        let presentation = engine.presentation(for: [mail])
+        let disabledPresentation = engine.presentation(for: [mail], compactWingsEnabled: false)
+
+        #expect(presentation.activeMailNotice == mail)
+        #expect(presentation.ordinaryNotices.isEmpty)
+        #expect(presentation.hasCompactContent)
+        #expect(presentation.panelSize == CGSize(width: 40, height: 34))
+        #expect(disabledPresentation.activeMailNotice == nil)
+        #expect(disabledPresentation.ordinaryNotices.isEmpty)
+        #expect(disabledPresentation.panelSize == .zero)
+    }
+
+    @Test
+    func updateAvailabilityUsesTheCompactBarWithoutOccupyingOrdinaryCapacity() {
+        let update = IslandNotice(
+            id: "update-available-cli-claude-left",
+            title: "Claude",
+            side: .left,
+            style: .status,
+            symbolName: "sparkles"
+        )
+
+        let presentation = engine.presentation(for: [update])
+
+        #expect(presentation.activeUpdateNotice == update)
+        #expect(presentation.ordinaryNotices.isEmpty)
+        #expect(presentation.hasCompactContent)
         #expect(presentation.panelSize == CGSize(width: 40, height: 34))
     }
 

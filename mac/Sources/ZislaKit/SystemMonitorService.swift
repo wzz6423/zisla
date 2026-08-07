@@ -351,16 +351,44 @@ public struct DiskCleanupCandidate: Equatable, Identifiable, Sendable {
     public var id: URL { url }
     public var url: URL
     public var kind: DiskCleanupKind
+    public var safetyLevel: DiskCleanupSafetyLevel
     public var byteSize: UInt64
     public var displayName: String
     public var detail: String?
 
-    public init(url: URL, kind: DiskCleanupKind, byteSize: UInt64, displayName: String, detail: String? = nil) {
+    public init(
+        url: URL,
+        kind: DiskCleanupKind,
+        byteSize: UInt64,
+        displayName: String,
+        detail: String? = nil,
+        safetyLevel: DiskCleanupSafetyLevel? = nil
+    ) {
         self.url = url
         self.kind = kind
+        self.safetyLevel = safetyLevel ?? kind.safetyLevel
         self.byteSize = byteSize
         self.displayName = displayName
         self.detail = detail
+    }
+}
+
+public enum DiskCleanupSafetyLevel: String, Equatable, Sendable {
+    case safeToClean
+    case requiresManualReview
+
+    public var title: String {
+        switch self {
+        case .safeToClean: "可安全清理"
+        case .requiresManualReview: "需人工复核"
+        }
+    }
+
+    public var reason: String {
+        switch self {
+        case .safeToClean: "可再生数据；下次使用时可能重新生成或下载"
+        case .requiresManualReview: "可能是用户文件、诊断资料或仍有保留价值的数据"
+        }
     }
 }
 
@@ -378,6 +406,15 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
     case diskImage
     case largeFile
     case duplicateFile
+
+    public var safetyLevel: DiskCleanupSafetyLevel {
+        switch self {
+        case .appCache, .cache, .developerArtifacts, .packageManagerCache:
+            .safeToClean
+        case .log, .trash, .temporaryFiles, .crashReport, .diskImage, .largeFile, .duplicateFile:
+            .requiresManualReview
+        }
+    }
 
     /// When the same path appears in multiple scan categories, the higher value (more specific kind) takes precedence.
     public var classificationPriority: Int {
@@ -455,12 +492,19 @@ public protocol SystemMonitorFileManaging: Sendable {
     func removeItem(at url: URL) throws
     func createFile(atPath path: String, contents data: Data?) -> Bool
     func contents(atPath path: String) -> Data?
+    func sha256Digest(at url: URL) -> Data?
     /// Returns the volume's total capacity and available space (including purgeable space, matching macOS System Settings).
     /// The default implementation uses URLResourceValues; a test mock may return nil to fall back to attributesOfFileSystem.
     func volumeCapacity(for url: URL) -> (total: UInt64, available: UInt64)?
 }
 
 public extension SystemMonitorFileManaging {
+    /// 测试替身可沿用内存数据；生产文件管理器会用流式读取避免大文件占满内存。
+    func sha256Digest(at url: URL) -> Data? {
+        guard let data = contents(atPath: url.path) else { return nil }
+        return Data(SHA256.hash(data: data))
+    }
+
     /// Uses `volumeAvailableCapacityForImportantUsageKey` to obtain available space,
     /// which includes APFS purgeable space (local snapshots, caches, etc.), consistent with macOS System Settings.
     func volumeCapacity(for url: URL) -> (total: UInt64, available: UInt64)? {
@@ -468,7 +512,10 @@ public extension SystemMonitorFileManaging {
             .volumeTotalCapacityKey,
             .volumeAvailableCapacityForImportantUsageKey,
         ]
-        guard let values = try? url.resourceValues(forKeys: keys) else { return nil }
+        // Foundation caches URL resource values; invalidate them so cleanup and external changes are visible.
+        var refreshedURL = url
+        refreshedURL.removeAllCachedResourceValues()
+        guard let values = try? refreshedURL.resourceValues(forKeys: keys) else { return nil }
         let total = UInt64(max(0, values.volumeTotalCapacity ?? 0))
         guard let availableInt = values.volumeAvailableCapacityForImportantUsage else { return nil }
         let available = UInt64(max(0, availableInt))
@@ -559,6 +606,21 @@ private final class DefaultSystemMonitorFileManager: SystemMonitorFileManaging, 
 
     func contents(atPath path: String) -> Data? {
         fileManager.contents(atPath: path)
+    }
+
+    func sha256Digest(at url: URL) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+
+        var hasher = SHA256()
+        do {
+            while let chunk = try handle.read(upToCount: 1_048_576), !chunk.isEmpty {
+                hasher.update(data: chunk)
+            }
+            return Data(hasher.finalize())
+        } catch {
+            return nil
+        }
     }
 }
 
@@ -1397,7 +1459,6 @@ public enum SystemDiskCleanup {
             "Library/Developer/Xcode/iOS DeviceSupport",
             "Library/Developer/Xcode/watchOS DeviceSupport",
             "Library/Developer/CoreSimulator/Caches",
-            "Library/Developer/CoreSimulator/Devices",
             ".cache",
         ]
         for path in developerPaths {
@@ -1603,16 +1664,117 @@ public enum SystemDiskCleanup {
         return total
     }
 
+    private static let maximumConcurrentScanWorkers = 3
+
+    private struct CleanupScanTask: @unchecked Sendable {
+        let run: () -> [DiskCleanupCandidate]
+    }
+
+    private final class CleanupScanResults: @unchecked Sendable {
+        private let lock = NSLock()
+        private var values: [[DiskCleanupCandidate]?]
+
+        init(count: Int) {
+            values = Array(repeating: nil, count: count)
+        }
+
+        func store(_ candidates: [DiskCleanupCandidate], at index: Int) {
+            lock.lock()
+            values[index] = candidates
+            lock.unlock()
+        }
+
+        func flattened() -> [DiskCleanupCandidate] {
+            lock.lock()
+            let snapshot = values
+            lock.unlock()
+            return snapshot.compactMap { $0 }.flatMap { $0 }
+        }
+    }
+
+    /// Keeps background scan work bounded so cache discovery cannot saturate CPU or storage I/O.
+    static func scanWorkerLimit(
+        requested: Int?,
+        processorCount: Int = ProcessInfo.processInfo.activeProcessorCount
+    ) -> Int {
+        let availableProcessors = max(1, processorCount)
+        let defaultLimit = min(maximumConcurrentScanWorkers, max(1, availableProcessors - 1))
+        return min(maximumConcurrentScanWorkers, max(1, requested ?? defaultLimit))
+    }
+
+    private static func executeScanTasks(
+        _ tasks: [CleanupScanTask],
+        workerLimit: Int
+    ) -> [DiskCleanupCandidate] {
+        guard tasks.count > 1, workerLimit > 1 else {
+            return tasks.flatMap { $0.run() }
+        }
+
+        let results = CleanupScanResults(count: tasks.count)
+        let queue = OperationQueue()
+        queue.name = "dev.wzz.zisla.disk-cleanup-scan"
+        queue.qualityOfService = .utility
+        queue.maxConcurrentOperationCount = workerLimit
+
+        for (index, task) in tasks.enumerated() {
+            queue.addOperation {
+                let candidates = autoreleasepool { task.run() }
+                results.store(candidates, at: index)
+            }
+        }
+        queue.waitUntilAllOperationsAreFinished()
+        return results.flattened()
+    }
+
+    private static func executeScanTasksWithProgress(
+        _ tasks: [CleanupScanTask],
+        workerLimit: Int,
+        onProgress: @escaping @Sendable ([DiskCleanupCandidate]) -> Void
+    ) -> [DiskCleanupCandidate] {
+        guard tasks.count > 1, workerLimit > 1 else {
+            var accumulated: [DiskCleanupCandidate] = []
+            for task in tasks {
+                accumulated.append(contentsOf: task.run())
+                onProgress(deduplicateCandidates(accumulated).sorted { $0.byteSize > $1.byteSize })
+            }
+            return accumulated
+        }
+
+        let results = CleanupScanResults(count: tasks.count)
+        let queue = OperationQueue()
+        queue.name = "dev.wzz.zisla.disk-cleanup-scan"
+        queue.qualityOfService = .utility
+        queue.maxConcurrentOperationCount = workerLimit
+        let progressLock = NSLock()
+
+        for (index, task) in tasks.enumerated() {
+            queue.addOperation {
+                let candidates = autoreleasepool { task.run() }
+                results.store(candidates, at: index)
+
+                // Serialize updates so a later completion never publishes an older snapshot.
+                progressLock.lock()
+                onProgress(deduplicateCandidates(results.flattened()).sorted { $0.byteSize > $1.byteSize })
+                progressLock.unlock()
+            }
+        }
+        queue.waitUntilAllOperationsAreFinished()
+        return results.flattened()
+    }
+
     /// Scans all cleanup candidate categories; deduplicates by path and returns sorted by size descending.
     public static func scanCandidates(
         fileManager: SystemMonitorFileManaging,
         kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases),
-        maxDepthChildrenOnly: Bool = true
+        maxDepthChildrenOnly: Bool = true,
+        maxConcurrentScans: Int? = nil
     ) -> [DiskCleanupCandidate] {
-        var result: [DiskCleanupCandidate] = []
+        var tasks: [CleanupScanTask] = []
 
         if kinds.contains(.appCache) {
-            result.append(contentsOf: scanApplicationCaches(fileManager: fileManager))
+            tasks.append(CleanupScanTask {
+                scanApplicationCaches(fileManager: fileManager)
+            })
         }
 
         // Directory scan: list direct children of known root directories
@@ -1621,24 +1783,64 @@ public enum SystemDiskCleanup {
         ]
         let activeDirKinds = kinds.intersection(directoryKinds)
         if !activeDirKinds.isEmpty {
-            result.append(contentsOf: scanDirectoryChildren(fileManager: fileManager, kinds: activeDirKinds))
+            tasks.append(CleanupScanTask {
+                scanDirectoryChildren(fileManager: fileManager, kinds: activeDirKinds)
+            })
         }
 
-        // Disk images: .dmg/.iso/.pkg/.ipsw files under Downloads
-        if kinds.contains(.diskImage) {
-            result.append(contentsOf: scanDiskImages(fileManager: fileManager))
+        let userFileKinds: Set<DiskCleanupKind> = [.diskImage, .largeFile, .duplicateFile]
+        let activeUserFileKinds = kinds.intersection(userFileKinds)
+        if !activeUserFileKinds.isEmpty {
+            tasks.append(CleanupScanTask {
+                scanUserFileCandidates(fileManager: fileManager, kinds: activeUserFileKinds)
+            })
         }
 
-        // Large/old files: >100 MB and not modified in 90 days under Downloads/Desktop/Documents
-        if kinds.contains(.largeFile) {
-            result.append(contentsOf: scanLargeOldFiles(fileManager: fileManager))
+        let result = executeScanTasks(
+            tasks,
+            workerLimit: scanWorkerLimit(requested: maxConcurrentScans)
+        )
+        return deduplicateCandidates(result).sorted { $0.byteSize > $1.byteSize }
+    }
+
+    /// Publishes an accumulated candidate snapshot as each scan category completes.
+    public static func scanCandidatesWithProgress(
+        fileManager: SystemMonitorFileManaging,
+        kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases),
+        maxConcurrentScans: Int? = nil,
+        onProgress: @escaping @Sendable ([DiskCleanupCandidate]) -> Void
+    ) -> [DiskCleanupCandidate] {
+        var tasks: [CleanupScanTask] = []
+
+        if kinds.contains(.appCache) {
+            tasks.append(CleanupScanTask {
+                scanApplicationCaches(fileManager: fileManager)
+            })
         }
 
-        // Duplicate files: files with identical content under Downloads/Desktop/Documents
-        if kinds.contains(.duplicateFile) {
-            result.append(contentsOf: scanDuplicateFiles(fileManager: fileManager))
+        let directoryKinds: Set<DiskCleanupKind> = [
+            .cache, .log, .trash, .developerArtifacts, .temporaryFiles, .packageManagerCache, .crashReport,
+        ]
+        let activeDirKinds = kinds.intersection(directoryKinds)
+        if !activeDirKinds.isEmpty {
+            tasks.append(CleanupScanTask {
+                scanDirectoryChildren(fileManager: fileManager, kinds: activeDirKinds)
+            })
         }
 
+        let userFileKinds: Set<DiskCleanupKind> = [.diskImage, .largeFile, .duplicateFile]
+        let activeUserFileKinds = kinds.intersection(userFileKinds)
+        if !activeUserFileKinds.isEmpty {
+            tasks.append(CleanupScanTask {
+                scanUserFileCandidates(fileManager: fileManager, kinds: activeUserFileKinds)
+            })
+        }
+
+        let result = executeScanTasksWithProgress(
+            tasks,
+            workerLimit: scanWorkerLimit(requested: maxConcurrentScans),
+            onProgress: onProgress
+        )
         return deduplicateCandidates(result).sorted { $0.byteSize > $1.byteSize }
     }
 
@@ -1841,42 +2043,47 @@ public enum SystemDiskCleanup {
     /// Old file threshold: 90 days
     private static let oldFileDays: TimeInterval = 90 * 24 * 3600
 
-    /// Scans Downloads/Desktop/Documents for files larger than 100 MB and not modified in 90 days.
-    private static func scanLargeOldFiles(fileManager: SystemMonitorFileManaging) -> [DiskCleanupCandidate] {
-        let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
-        let searchDirs = userFileDirectories(fileManager: fileManager)
-        let cutoff = Date().addingTimeInterval(-oldFileDays)
-        var result: [DiskCleanupCandidate] = []
+    private struct ScannedUserFile {
+        let url: URL
+        let byteSize: UInt64
+        let modificationDate: Date?
+    }
 
-        for dir in searchDirs {
-            guard SystemMonitorPathSafety.isURL(dir, withinAllowedRoots: allowed) else { continue }
-            let files = collectFilesRecursively(at: dir, fileManager: fileManager, maxDepth: 5, allowed: allowed)
-            for fileURL in files {
-                let size = allocatedByteSize(of: fileURL, fileManager: fileManager)
-                guard size >= largeFileThreshold else { continue }
-                guard let attrs = try? fileManager.attributesOfItem(atPath: fileURL.path),
-                      let modDate = attrs[.modificationDate] as? Date else { continue }
-                guard modDate < cutoff else { continue }
-                let days = Int(Date().timeIntervalSince(modDate) / 86400)
-                result.append(
-                    DiskCleanupCandidate(
-                        url: fileURL,
-                        kind: .largeFile,
-                        byteSize: size,
-                        displayName: fileURL.lastPathComponent,
-                        detail: "\(days) 天前修改"
-                    )
-                )
-            }
+    private static func scanUserFileCandidates(
+        fileManager: SystemMonitorFileManaging,
+        kinds: Set<DiskCleanupKind>
+    ) -> [DiskCleanupCandidate] {
+        var result: [DiskCleanupCandidate] = []
+        if kinds.contains(.diskImage) {
+            result.append(contentsOf: scanDiskImages(fileManager: fileManager))
+        }
+
+        let needsLargeFiles = kinds.contains(.largeFile)
+        let needsDuplicates = kinds.contains(.duplicateFile)
+        guard needsLargeFiles || needsDuplicates else { return result }
+
+        let files = collectScannedUserFiles(
+            fileManager: fileManager,
+            includesModificationDate: needsLargeFiles
+        )
+        if needsLargeFiles {
+            result.append(contentsOf: largeOldFileCandidates(from: files))
+        }
+        if needsDuplicates {
+            result.append(contentsOf: duplicateFileCandidates(from: files, fileManager: fileManager))
         }
         return result
     }
 
-    /// Scans Downloads/Desktop/Documents for duplicate files (SHA256 content comparison).
-    private static func scanDuplicateFiles(fileManager: SystemMonitorFileManaging) -> [DiskCleanupCandidate] {
+    /// Downloads、Desktop 和 Documents 只递归一次，供大文件与重复文件检测共用。
+    private static func collectScannedUserFiles(
+        fileManager: SystemMonitorFileManaging,
+        includesModificationDate: Bool
+    ) -> [ScannedUserFile] {
         let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
         let searchDirs = userFileDirectories(fileManager: fileManager)
-        var allFiles: [(url: URL, size: UInt64)] = []
+        var seenPaths = Set<String>()
+        var result: [ScannedUserFile] = []
 
         for dir in searchDirs {
             guard SystemMonitorPathSafety.isURL(dir, withinAllowedRoots: allowed) else { continue }
@@ -1884,37 +2091,78 @@ public enum SystemDiskCleanup {
             for fileURL in files {
                 let size = allocatedByteSize(of: fileURL, fileManager: fileManager)
                 guard size > 0 else { continue }
-                allFiles.append((fileURL, size))
+                let standardized = fileURL.standardizedFileURL
+                guard seenPaths.insert(SystemMonitorPathSafety.standardizedPath(standardized)).inserted else {
+                    continue
+                }
+                let modificationDate: Date?
+                if includesModificationDate {
+                    modificationDate = (try? fileManager.attributesOfItem(atPath: standardized.path)[.modificationDate]) as? Date
+                } else {
+                    modificationDate = nil
+                }
+                result.append(
+                    ScannedUserFile(
+                        url: standardized,
+                        byteSize: size,
+                        modificationDate: modificationDate
+                    )
+                )
             }
         }
+        return result
+    }
 
-        // Group files by size; hash only files with identical sizes
-        var sizeGroups: [UInt64: [URL]] = [:]
-        for entry in allFiles {
-            sizeGroups[entry.size, default: []].append(entry.url)
+    private static func largeOldFileCandidates(
+        from files: [ScannedUserFile]
+    ) -> [DiskCleanupCandidate] {
+        let cutoff = Date().addingTimeInterval(-oldFileDays)
+        return files.compactMap { file in
+            guard file.byteSize >= largeFileThreshold,
+                  let modificationDate = file.modificationDate,
+                  modificationDate < cutoff
+            else {
+                return nil
+            }
+            let days = Int(Date().timeIntervalSince(modificationDate) / 86400)
+            return DiskCleanupCandidate(
+                url: file.url,
+                kind: .largeFile,
+                byteSize: file.byteSize,
+                displayName: file.url.lastPathComponent,
+                detail: "\(days) 天前修改"
+            )
+        }
+    }
+
+    /// 先按大小分组，再对可能重复的文件做流式 SHA256 比对。
+    private static func duplicateFileCandidates(
+        from files: [ScannedUserFile],
+        fileManager: SystemMonitorFileManaging
+    ) -> [DiskCleanupCandidate] {
+        var sizeGroups: [UInt64: [ScannedUserFile]] = [:]
+        for file in files {
+            sizeGroups[file.byteSize, default: []].append(file)
         }
 
         var result: [DiskCleanupCandidate] = []
-        for (_, urls) in sizeGroups where urls.count > 1 {
-            // Compute hashes and group by hash
-            var hashGroups: [String: [URL]] = [:]
-            for url in urls {
-                let hash = sha256(of: url, fileManager: fileManager)
+        for (_, filesWithSameSize) in sizeGroups where filesWithSameSize.count > 1 {
+            var hashGroups: [String: [ScannedUserFile]] = [:]
+            for file in filesWithSameSize {
+                let hash = sha256(of: file.url, fileManager: fileManager)
                 guard !hash.isEmpty else { continue }
-                hashGroups[hash, default: []].append(url)
+                hashGroups[hash, default: []].append(file)
             }
             for (_, group) in hashGroups where group.count > 1 {
-                // Keep the first; mark the rest as duplicates
                 let original = group[0]
-                for i in 1..<group.count {
-                    let dup = group[i]
+                for duplicate in group.dropFirst() {
                     result.append(
                         DiskCleanupCandidate(
-                            url: dup,
+                            url: duplicate.url,
                             kind: .duplicateFile,
-                            byteSize: allFiles.first(where: { $0.url == dup })?.size ?? 0,
-                            displayName: dup.lastPathComponent,
-                            detail: "与 \(original.lastPathComponent) 重复"
+                            byteSize: duplicate.byteSize,
+                            displayName: duplicate.url.lastPathComponent,
+                            detail: "与 \(original.url.lastPathComponent) 重复 · 保留副本：\(original.url.path)"
                         )
                     )
                 }
@@ -1980,10 +2228,9 @@ public enum SystemDiskCleanup {
         return !children.isEmpty
     }
 
-    /// Computes the SHA256 hash of a file; returns an empty string on read failure.
+    /// 生产文件管理器会流式计算 SHA256，避免将完整文件载入内存。
     private static func sha256(of url: URL, fileManager: SystemMonitorFileManaging) -> String {
-        guard let data = fileManager.contents(atPath: url.path) else { return "" }
-        let digest = SHA256.hash(data: data)
+        guard let digest = fileManager.sha256Digest(at: url) else { return "" }
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
@@ -2076,7 +2323,7 @@ public final class SystemMonitorService: ObservableObject {
         publicIPProvider: (any PublicIPProviding)? = nil,
         hardwareInfoProvider: (@Sendable () -> SystemHardwareInfo)? = nil,
         postCleanupDiskRefreshDelay: Duration = .seconds(30),
-        diskCapacityRefreshInterval: TimeInterval = 3 * 60
+        diskCapacityRefreshInterval: TimeInterval = 20
     ) {
         let fileManager = fileManager ?? DefaultSystemMonitorFileManager()
         self.samplingInterval = max(0.2, samplingInterval)
@@ -2378,6 +2625,20 @@ public final class SystemMonitorService: ObservableObject {
         let fm = fileManager
         return await Task.detached(priority: .utility) {
             SystemDiskCleanup.scanCandidates(fileManager: fm, kinds: kinds)
+        }.value
+    }
+
+    public func scanCleanupCandidatesWithProgress(
+        kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases),
+        onProgress: @escaping @Sendable ([DiskCleanupCandidate]) -> Void
+    ) async -> [DiskCleanupCandidate] {
+        let fm = fileManager
+        return await Task.detached(priority: .utility) {
+            SystemDiskCleanup.scanCandidatesWithProgress(
+                fileManager: fm,
+                kinds: kinds,
+                onProgress: onProgress
+            )
         }.value
     }
 

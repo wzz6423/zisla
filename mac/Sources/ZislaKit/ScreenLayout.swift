@@ -301,10 +301,15 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
             max(0, auxiliaryHeight)
         )
         guard height > 0 else { return nil }
+        let width = maxX - minX
+        let centeredX = min(
+            max(screen.frame.minX, screen.frame.midX - width / 2),
+            screen.frame.maxX - width
+        )
         return CGRect(
-            x: minX,
+            x: centeredX,
             y: screen.frame.maxY - height,
-            width: maxX - minX,
+            width: width,
             height: height
         )
     }

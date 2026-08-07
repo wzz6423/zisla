@@ -20,7 +20,7 @@ public final class IslandPanel: NSPanel {
     /// Window level used when the collapsed island sits above other windows (same layer as the menu bar).
     public static let onTopLevel = NSWindow.Level.statusBar
     /// Window level used when the collapsed island sinks below the menu bar: lower than both the menu bar (24) and normal windows, so they cover it.
-    public static let onBottomLevel = NSWindow.Level.normal
+    public static let onBottomLevel = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
 
     public override var canBecomeKey: Bool {
         allowsKeyWindow || allowsKeyboardFocusAfterInteraction || keepsNativeGlassActive

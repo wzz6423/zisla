@@ -791,12 +791,14 @@ public final class NowPlayingService: ObservableObject {
     var merged = update
     merged.artworkData = update.artworkData ?? previous.artworkData
     merged.album = update.album ?? previous.album
-    merged.sourceIconData = update.sourceIconData ?? previous.sourceIconData
-    merged.isVideo = update.isVideo || previous.isVideo
-    merged.sourceApplication = update.sourceApplication ?? previous.sourceApplication
-    merged.sourceBundleIdentifier =
-      update.sourceBundleIdentifier
-      ?? previous.sourceBundleIdentifier
+    if !sourceChanged(update, previous) {
+      merged.sourceIconData = update.sourceIconData ?? previous.sourceIconData
+      merged.isVideo = update.isVideo || previous.isVideo
+      merged.sourceApplication = update.sourceApplication ?? previous.sourceApplication
+      merged.sourceBundleIdentifier =
+        update.sourceBundleIdentifier
+        ?? previous.sourceBundleIdentifier
+    }
     return merged
   }
 
@@ -1422,14 +1424,21 @@ public final class NowPlayingService: ObservableObject {
     }
   }
 
-  private func applyLyrics(to snapshot: inout NowPlayingSnapshot) {
+  func applyLyrics(to snapshot: inout NowPlayingSnapshot) {
     guard
       let identity = LyricsTrackIdentity(
         title: snapshot.title,
         artist: snapshot.artist,
         duration: snapshot.duration
       )
-    else { return }
+    else {
+      lyricsTask?.cancel()
+      lyricsTask = nil
+      lyricsIdentity = nil
+      resolvedLyrics = nil
+      resolvedArtist = nil
+      return
+    }
 
     if let embedded = snapshot.lyrics {
       lyricsTask?.cancel()
@@ -1492,6 +1501,23 @@ public final class NowPlayingService: ObservableObject {
   ) -> Bool {
     guard let lhs, let rhs, lhs > 0, rhs > 0 else { return true }
     return abs(lhs - rhs) <= 2
+  }
+
+  nonisolated private static func sourceChanged(
+    _ update: NowPlayingSnapshot,
+    _ previous: NowPlayingSnapshot
+  ) -> Bool {
+    if let updateBundleIdentifier = update.sourceBundleIdentifier,
+      let previousBundleIdentifier = previous.sourceBundleIdentifier
+    {
+      return updateBundleIdentifier != previousBundleIdentifier
+    }
+    guard update.sourceBundleIdentifier == nil,
+      previous.sourceBundleIdentifier == nil,
+      let updatePID = update.sourcePID,
+      let previousPID = previous.sourcePID
+    else { return false }
+    return updatePID != previousPID
   }
 
   private func loadSymbol<T>(_ name: String, from handle: UnsafeMutableRawPointer) -> T? {

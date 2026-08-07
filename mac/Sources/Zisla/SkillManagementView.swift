@@ -5,6 +5,9 @@ import ZislaKit
 
 struct SkillManagementView: View {
     @ObservedObject var agent: AIAgentWorkspace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var syncModeSelectionNamespace
+    @State private var pendingUninstallSkill: AgentSkill?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -31,13 +34,7 @@ struct SkillManagementView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text("同步方式")
                     .font(.system(size: 10, weight: .medium))
-                Picker("同步方式", selection: syncModeBinding) {
-                    ForEach(AgentSkillSyncMode.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
+                syncModePicker
                 Text(agent.store.state.skillSyncConfiguration.mode.detail)
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
@@ -58,7 +55,25 @@ struct SkillManagementView: View {
             .background(Color.primary.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-            managedSkillsList
+            skillsList
+        }
+        .alert(
+            "卸载 Skill？",
+            isPresented: Binding(
+                get: { pendingUninstallSkill != nil },
+                set: { if !$0 { pendingUninstallSkill = nil } }
+            ),
+            presenting: pendingUninstallSkill
+        ) { skill in
+            Button("卸载", role: .destructive) {
+                pendingUninstallSkill = nil
+                uninstallSkill(skill)
+            }
+            Button("取消", role: .cancel) {
+                pendingUninstallSkill = nil
+            }
+        } message: { _ in
+            Text("普通 Skill 会移到废纸篓；由 npm、pnpm、yarn、bun 或 Homebrew 全局安装的 Skill 会调用对应包管理器卸载。")
         }
     }
 
@@ -97,6 +112,46 @@ struct SkillManagementView: View {
         )
     }
 
+    private var syncModePicker: some View {
+        HStack(spacing: 0) {
+            ForEach(AgentSkillSyncMode.allCases, id: \.self) { mode in
+                let isSelected = syncModeBinding.wrappedValue == mode
+                Button {
+                    guard !isSelected else { return }
+                    if reduceMotion {
+                        syncModeBinding.wrappedValue = mode
+                    } else {
+                        withAnimation(ZislaMotion.selection) {
+                            syncModeBinding.wrappedValue = mode
+                        }
+                    }
+                } label: {
+                    Text(mode.displayName)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .background {
+                            if isSelected {
+                                SelectionGlassBackground(cornerRadius: 5)
+                                    .matchedGeometryEffect(
+                                        id: "skill-sync-mode-selection",
+                                        in: syncModeSelectionNamespace
+                                    )
+                            }
+                        }
+                }
+                .buttonStyle(PressableStyle(hoverScale: 1.025, pressedScale: 0.95))
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(Color.fillControl)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .animation(reduceMotion ? nil : ZislaMotion.selection, value: syncModeBinding.wrappedValue)
+    }
+
     private func destinationRow(_ destination: AgentSkillSyncDestination) -> some View {
         HStack(spacing: 7) {
             Toggle("", isOn: Binding(
@@ -121,11 +176,11 @@ struct SkillManagementView: View {
     }
 
     @ViewBuilder
-    private var managedSkillsList: some View {
-        if !agent.managedSkills.isEmpty {
-            Text("受管 Skills（\(agent.managedSkills.count)）")
+    private var skillsList: some View {
+        if !agent.store.state.skills.isEmpty {
+            Text("已发现 Skills（\(agent.store.state.skills.count)）")
                 .font(.system(size: 10, weight: .medium))
-            ForEach(agent.managedSkills) { skill in
+            ForEach(agent.store.state.skills) { skill in
                 HStack(spacing: 7) {
                     Toggle("", isOn: skillEnabledBinding(skill.path))
                         .labelsHidden()
@@ -139,9 +194,24 @@ struct SkillManagementView: View {
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    Button {
+                        pendingUninstallSkill = skill
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 9))
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .help("卸载 Skill")
                 }
                 .padding(.vertical, 2)
             }
+        }
+    }
+
+    private func uninstallSkill(_ skill: AgentSkill) {
+        Task {
+            _ = await agent.uninstallSkill(path: skill.path)
         }
     }
 

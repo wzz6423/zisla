@@ -138,10 +138,11 @@ struct QuickNoteModuleView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(selected ? Color.white.opacity(0.16) : Color.clear)
-            )
+            .background {
+                if selected {
+                    SelectionGlassBackground(cornerRadius: 7)
+                }
+            }
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -158,7 +159,7 @@ struct QuickNoteModuleView: View {
         VStack(alignment: .leading, spacing: 0) {
             editorToolbar
                 .frame(height: 34)
-                .padding(.bottom, 6)
+                .padding(.bottom, 2)
 
             if let noteContent {
                 ReadOnlyNoteMetadata(
@@ -167,8 +168,8 @@ struct QuickNoteModuleView: View {
                     showAttachment: { service.showAttachmentInNotes(id: $0.id) },
                     wordCount: draftPlainText.count
                 )
-                .frame(height: 28)
-                .padding(.bottom, 5)
+                .frame(height: 20)
+                .padding(.bottom, 2)
             }
 
             editorPane

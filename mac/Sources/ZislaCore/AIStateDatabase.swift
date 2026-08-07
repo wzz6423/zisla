@@ -62,11 +62,19 @@ final class AIStateDatabase {
                 ON usage_samples(timestamp)
                 """)
             try execute("""
+                CREATE TABLE IF NOT EXISTS detected_usage_totals (
+                    timestamp REAL PRIMARY KEY,
+                    input_tokens INTEGER NOT NULL,
+                    output_tokens INTEGER NOT NULL
+                )
+                """)
+            try execute("""
                 CREATE TABLE IF NOT EXISTS notices (
                     position INTEGER PRIMARY KEY AUTOINCREMENT,
                     payload BLOB NOT NULL
                 )
-                """)
+            """)
+            try migrateUsageToDailyTotalsIfNeeded()
         } catch {
             close()
             throw error
@@ -130,54 +138,15 @@ final class AIStateDatabase {
     func recordUsage(_ samples: [AIUsageSample]) throws -> Int {
         guard !samples.isEmpty else { return 0 }
         return try transaction {
-            let lookup = try prepare("""
-                SELECT provider, timestamp, input_tokens, output_tokens, cost_usd, model
-                FROM usage_samples WHERE source_id = ? LIMIT 1
-                """)
-            defer { sqlite3_finalize(lookup) }
-            let insert = try prepare("""
-                INSERT INTO usage_samples(
-                    source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
-                ) VALUES(?, ?, ?, ?, ?, ?, ?)
-                """)
-            defer { sqlite3_finalize(insert) }
-            let update = try prepare("""
-                UPDATE usage_samples SET
-                    provider = ?, timestamp = ?, input_tokens = ?, output_tokens = ?,
-                    cost_usd = ?, model = ?
-                WHERE source_id = ?
-                """)
-            defer { sqlite3_finalize(update) }
+            try recordUsageDeltasInCurrentTransaction(samples)
+        }
+    }
 
-            var inserted = 0
-            for sample in samples {
-                if let sourceID = sample.sourceID {
-                    sqlite3_reset(lookup)
-                    sqlite3_clear_bindings(lookup)
-                    try bind(sourceID, to: 1, in: lookup)
-                    if sqlite3_step(lookup) == SQLITE_ROW {
-                        let existing = try usageSample(
-                            from: lookup,
-                            sourceID: sourceID,
-                            columnOffset: 0
-                        )
-                        guard existing != sample else { continue }
-                        sqlite3_reset(update)
-                        sqlite3_clear_bindings(update)
-                        try bindUpdate(sample, to: update)
-                        try stepDone(update)
-                        continue
-                    }
-                }
-
-                sqlite3_reset(insert)
-                sqlite3_clear_bindings(insert)
-                try bind(sample, to: insert)
-                try stepDone(insert)
-                inserted += 1
-            }
-            try trimUsageIfNeeded()
-            return inserted
+    @discardableResult
+    func recordDetectedUsage(_ samples: [AIUsageSample]) throws -> Int {
+        guard !samples.isEmpty else { return 0 }
+        return try transaction {
+            try recordDetectedUsageInCurrentTransaction(samples)
         }
     }
 
@@ -220,6 +189,152 @@ final class AIStateDatabase {
             ))
         }
         return result
+    }
+
+    private func migrateUsageToDailyTotalsIfNeeded() throws {
+        guard try usageSchemaVersion() < 3 else { return }
+
+        let samples = try loadUsage()
+        let dailyTotals = AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
+        let detectedTotals = AIUsageAnalytics.dailyUsageSamples(
+            samples: samples.filter(AIUsageAnalytics.isLegacyDetectedUsageSample),
+            calendar: .current
+        )
+
+        try transaction {
+            try execute("DELETE FROM usage_samples")
+            try execute("DELETE FROM detected_usage_totals")
+            _ = try recordUsageDeltasInCurrentTransaction(dailyTotals)
+            for total in detectedTotals {
+                try replaceDetectedUsageTotal(total)
+            }
+            try setUsageSchemaVersion(3)
+        }
+    }
+
+    private func recordUsageDeltasInCurrentTransaction(_ samples: [AIUsageSample]) throws -> Int {
+        let lookup = try prepare("""
+            SELECT provider, timestamp, input_tokens, output_tokens, cost_usd, model
+            FROM usage_samples WHERE source_id = ? LIMIT 1
+            """)
+        defer { sqlite3_finalize(lookup) }
+        let insert = try prepare("""
+            INSERT INTO usage_samples(
+                source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+            ) VALUES(?, ?, ?, ?, ?, ?, ?)
+            """)
+        defer { sqlite3_finalize(insert) }
+        let update = try prepare("""
+            UPDATE usage_samples SET
+                provider = ?, timestamp = ?, input_tokens = ?, output_tokens = ?,
+                cost_usd = ?, model = ?
+            WHERE source_id = ?
+            """)
+        defer { sqlite3_finalize(update) }
+
+        var inserted = 0
+        for sample in samples {
+            guard let sourceID = sample.sourceID else { continue }
+            sqlite3_reset(lookup)
+            sqlite3_clear_bindings(lookup)
+            try bind(sourceID, to: 1, in: lookup)
+            if sqlite3_step(lookup) == SQLITE_ROW {
+                let existing = try usageSample(
+                    from: lookup,
+                    sourceID: sourceID,
+                    columnOffset: 0
+                )
+                let next = AIUsageSample(
+                    sourceID: sourceID,
+                    provider: existing.provider,
+                    timestamp: existing.timestamp,
+                    inputTokens: existing.inputTokens + sample.inputTokens,
+                    outputTokens: existing.outputTokens + sample.outputTokens
+                )
+                guard existing != next else { continue }
+                sqlite3_reset(update)
+                sqlite3_clear_bindings(update)
+                try bindUpdate(next, to: update)
+                try stepDone(update)
+                inserted += 1
+                continue
+            }
+
+            sqlite3_reset(insert)
+            sqlite3_clear_bindings(insert)
+            try bind(sample, to: insert)
+            try stepDone(insert)
+            inserted += 1
+        }
+        try trimUsageIfNeeded()
+        return inserted
+    }
+
+    private func recordDetectedUsageInCurrentTransaction(_ samples: [AIUsageSample]) throws -> Int {
+        var changed = 0
+        for sample in samples {
+            let previous = try detectedUsageTotal(at: sample.timestamp)
+            guard previous.inputTokens != sample.inputTokens
+                || previous.outputTokens != sample.outputTokens else {
+                continue
+            }
+            try replaceDetectedUsageTotal(sample)
+            let delta = AIUsageSample(
+                sourceID: sample.sourceID,
+                provider: sample.provider,
+                timestamp: sample.timestamp,
+                inputTokens: sample.inputTokens - previous.inputTokens,
+                outputTokens: sample.outputTokens - previous.outputTokens
+            )
+            changed += try recordUsageDeltasInCurrentTransaction([delta])
+        }
+        return changed
+    }
+
+    private func detectedUsageTotal(at timestamp: Date) throws -> AIUsageSample {
+        let statement = try prepare("""
+            SELECT input_tokens, output_tokens
+            FROM detected_usage_totals WHERE timestamp = ? LIMIT 1
+            """)
+        defer { sqlite3_finalize(statement) }
+        try check(sqlite3_bind_double(statement, 1, timestamp.timeIntervalSinceReferenceDate))
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            return AIUsageSample(provider: .codex, timestamp: timestamp, inputTokens: 0, outputTokens: 0)
+        }
+        return AIUsageSample(
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: Int(sqlite3_column_int64(statement, 0)),
+            outputTokens: Int(sqlite3_column_int64(statement, 1))
+        )
+    }
+
+    private func replaceDetectedUsageTotal(_ sample: AIUsageSample) throws {
+        let statement = try prepare("""
+            INSERT INTO detected_usage_totals(timestamp, input_tokens, output_tokens)
+            VALUES(?, ?, ?)
+            ON CONFLICT(timestamp) DO UPDATE SET
+                input_tokens = excluded.input_tokens,
+                output_tokens = excluded.output_tokens
+            """)
+        defer { sqlite3_finalize(statement) }
+        try check(sqlite3_bind_double(statement, 1, sample.timestamp.timeIntervalSinceReferenceDate))
+        try check(sqlite3_bind_int64(statement, 2, Int64(sample.inputTokens)))
+        try check(sqlite3_bind_int64(statement, 3, Int64(sample.outputTokens)))
+        try stepDone(statement)
+    }
+
+    private func usageSchemaVersion() throws -> Int {
+        let statement = try prepare("PRAGMA user_version")
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            throw AIStateRepositoryError.storageFailure("无法读取 AI 用量存储版本")
+        }
+        return Int(sqlite3_column_int64(statement, 0))
+    }
+
+    private func setUsageSchemaVersion(_ version: Int) throws {
+        try execute("PRAGMA user_version = \(version)")
     }
 
     private func loadNotices() throws -> [IslandNotice] {

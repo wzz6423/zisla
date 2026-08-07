@@ -461,6 +461,16 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
 
     public var displayName: String { rawValue.capitalized }
     public var executableName: String { rawValue }
+
+    public var npmPackageName: String? {
+        switch self {
+        case .claude: "@anthropic-ai/claude-code"
+        case .codex: "@openai/codex"
+        case .gemini: "@google/gemini-cli"
+        case .opencode: "opencode-ai"
+        case .grok: nil
+        }
+    }
 }
 
 /// The original VS Code values captured before Zisla changes the Claude Code extension settings.
@@ -570,6 +580,19 @@ public struct AgentCLIStatus: Identifiable, Codable, Equatable, Sendable {
         self.executablePath = executablePath
         self.version = version
         self.checkedAt = checkedAt
+    }
+}
+
+public struct AIAgentCLIUpdate: Identifiable, Equatable, Sendable {
+    public var id: AgentCLIKind { kind }
+    public var kind: AgentCLIKind
+    public var installedVersion: String
+    public var latestVersion: String
+
+    public init(kind: AgentCLIKind, installedVersion: String, latestVersion: String) {
+        self.kind = kind
+        self.installedVersion = installedVersion
+        self.latestVersion = latestVersion
     }
 }
 

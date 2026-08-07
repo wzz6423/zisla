@@ -7,6 +7,33 @@ import Testing
 @MainActor
 struct AIAgentServicesTests {
     @Test
+    func skillPackageInstallationDetectsGlobalManagersAndScopedPackages() throws {
+        let npm = try #require(AgentSkillPackageInstallation.detect(
+            at: URL(fileURLWithPath: "/Users/test/.nvm/versions/node/v24/lib/node_modules/@scope/tool/skills/review")
+        ))
+        #expect(npm.manager == .npm)
+        #expect(npm.packageName == "@scope/tool")
+        #expect(npm.uninstallArguments == ["uninstall", "--global", "@scope/tool"])
+
+        let pnpm = try #require(AgentSkillPackageInstallation.detect(
+            at: URL(fileURLWithPath: "/Users/test/Library/pnpm/global/5/node_modules/tool/skills/review")
+        ))
+        #expect(pnpm.manager == .pnpm)
+        #expect(pnpm.packageName == "tool")
+
+        let brew = try #require(AgentSkillPackageInstallation.detect(
+            at: URL(fileURLWithPath: "/opt/homebrew/Cellar/tool/1.2.3/share/skills/review")
+        ))
+        #expect(brew.manager == .brew)
+        #expect(brew.packageName == "tool")
+        #expect(brew.uninstallArguments == ["uninstall", "tool"])
+
+        #expect(AgentSkillPackageInstallation.detect(
+            at: URL(fileURLWithPath: "/Users/test/.codex/skills/local-skill")
+        ) == nil)
+    }
+
+    @Test
     func automationLoopOnlyRunsWhileAnEnabledAutomationExists() async {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-ai-agent-automation-\(UUID().uuidString)", isDirectory: true)
@@ -31,6 +58,149 @@ struct AIAgentServicesTests {
         store.updateAutomation(automation)
         await Task.yield()
         #expect(!workspace.isAutomationLoopRunning)
+    }
+
+    @Test
+    func cliCommandProgressPersistsOutsideTheSettingsView() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-command-progress-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let workspace = AIAgentWorkspace(
+            store: AIAgentStore(storageURL: directory.appendingPathComponent("state.json")),
+            cliService: AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: directory),
+            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { _ in nil })
+        )
+        let command = AIAgentCLICommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "sleep 0.15"]
+        )
+
+        workspace.startCLICommands([command], title: "更新测试 CLI", kinds: [.codex])
+
+        #expect(workspace.isRunningCLICommands)
+        #expect(workspace.cliCommandProgress?.state == .running)
+        #expect(workspace.cliCommandProgress?.completedCount == 0)
+        try await Task.sleep(for: .milliseconds(25))
+        #expect(workspace.isRunningCLICommands)
+        await waitForCLICommandRunToFinish(workspace)
+
+        #expect(!workspace.isRunningCLICommands)
+        #expect(workspace.cliCommandProgress?.state == .succeeded)
+        #expect(workspace.cliCommandProgress?.completedCount == 1)
+        #expect(workspace.cliCommandProgress?.detail == "已重新检测 CLI 版本")
+    }
+
+    @Test
+    func cliCommandProgressKeepsTheFailureDetail() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-command-failure-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let workspace = AIAgentWorkspace(
+            store: AIAgentStore(storageURL: directory.appendingPathComponent("state.json")),
+            cliService: AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: directory),
+            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { _ in nil })
+        )
+        let command = AIAgentCLICommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "echo upgrade-failed >&2; exit 9"]
+        )
+
+        workspace.startCLICommands([command], title: "更新测试 CLI", kinds: [.gemini])
+        await waitForCLICommandRunToFinish(workspace)
+
+        #expect(workspace.cliCommandProgress?.state == .failed)
+        #expect(workspace.cliCommandProgress?.detail == "upgrade-failed")
+        #expect(workspace.lastError == "upgrade-failed")
+    }
+
+    @Test
+    func cliCommandProgressExplainsTheHomebrewTrustRequirement() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-command-homebrew-trust-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let workspace = AIAgentWorkspace(
+            store: AIAgentStore(storageURL: directory.appendingPathComponent("state.json")),
+            cliService: AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: directory),
+            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { _ in nil })
+        )
+        let command = AIAgentCLICommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "printf '%s\\n' 'Error: Refusing to load formula anomalyco/tap/opencode from untrusted tap anomalyco/tap.' 'Run `brew trust --formula anomalyco/tap/opencode` or `brew trust anomalyco/tap` to trust it.' >&2; exit 1"]
+        )
+
+        workspace.startCLICommands([command], title: "更新测试 CLI", kinds: [.opencode])
+        await waitForCLICommandRunToFinish(workspace)
+
+        #expect(workspace.cliCommandProgress?.detail == "Homebrew 需要先信任该公式：brew trust --formula anomalyco/tap/opencode")
+    }
+
+    @Test
+    func cliCommandProgressRunsIndependentCommandsInParallel() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-command-parallel-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let workspace = AIAgentWorkspace(
+            store: AIAgentStore(storageURL: directory.appendingPathComponent("state.json")),
+            cliService: AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: directory),
+            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { _ in nil })
+        )
+        let firstStarted = directory.appendingPathComponent("first-started")
+        let secondStarted = directory.appendingPathComponent("second-started")
+        let commands = [
+            AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/sh"),
+                arguments: ["-c", parallelCommand(startedAt: firstStarted, waitingFor: secondStarted)]
+            ),
+            AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/sh"),
+                arguments: ["-c", parallelCommand(startedAt: secondStarted, waitingFor: firstStarted)]
+            ),
+        ]
+
+        workspace.startCLICommands(commands, title: "更新测试 CLI", kinds: [.claude, .codex])
+        await waitForCLICommandRunToFinish(workspace)
+
+        #expect(workspace.cliCommandProgress?.state == .succeeded)
+        #expect(workspace.cliCommandProgress?.completedCount == 2)
+    }
+
+    @Test
+    func cliCommandProgressWaitsForOtherCommandsAfterAFailure() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-command-independent-failure-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let completionFile = directory.appendingPathComponent("successful-update")
+        let workspace = AIAgentWorkspace(
+            store: AIAgentStore(storageURL: directory.appendingPathComponent("state.json")),
+            cliService: AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: directory),
+            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { _ in nil })
+        )
+        let commands = [
+            AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", "echo failed-update >&2; exit 9"]),
+            AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", "sleep 0.1; touch \(completionFile.path)"]),
+        ]
+
+        workspace.startCLICommands(commands, title: "更新测试 CLI", kinds: [.gemini, .grok])
+        await waitForCLICommandRunToFinish(workspace)
+
+        #expect(FileManager.default.fileExists(atPath: completionFile.path))
+        #expect(workspace.cliCommandProgress?.state == .failed)
+        #expect(workspace.cliCommandProgress?.completedCount == 2)
+        #expect(workspace.lastError == "failed-update")
+    }
+
+    @Test
+    func processRunnerMarksTimedOutCommands() async throws {
+        let output = try await AIAgentProcessRunner.run(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "sleep 0.2"],
+            timeout: 0.02
+        )
+
+        #expect(output.didTimeout)
+        #expect(output.status != 0)
     }
 
     @Test
@@ -297,6 +467,136 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func cliVersionDetectionUsesTheDiscoveredNodeRuntime() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-version-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let runtimeDirectory = root.appendingPathComponent("toolchain/bin", isDirectory: true)
+        let node = runtimeDirectory.appendingPathComponent("node")
+        try writeExecutable(at: node, contents: "#!/bin/sh\necho 'codex-cli 0.145.0'\n")
+
+        let packageRoot = root.appendingPathComponent(".npm-global/lib/node_modules/@openai/codex", isDirectory: true)
+        let target = packageRoot.appendingPathComponent("bin/codex.js")
+        try writeExecutable(at: target, contents: "#!/usr/bin/env node\n")
+        try Data(#"{"name":"@openai/codex","version":"0.145.0"}"#.utf8)
+            .write(to: packageRoot.appendingPathComponent("package.json"))
+        let launcher = root.appendingPathComponent(".npm-global/bin/codex")
+        try FileManager.default.createDirectory(at: launcher.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+
+        let service = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin", "NPM_CONFIG_PREFIX": runtimeDirectory.deletingLastPathComponent().path],
+            homeDirectory: root
+        )
+
+        let status = await service.status(for: .codex)
+
+        #expect(status.executablePath == target.path)
+        #expect(status.version == "codex-cli 0.145.0")
+    }
+
+    @Test
+    func cliVersionDetectionFallsBackToInstalledPackageMetadata() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-package-version-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let packageRoot = root.appendingPathComponent(".npm-global/lib/node_modules/@google/gemini-cli", isDirectory: true)
+        let target = packageRoot.appendingPathComponent("bundle/gemini.js")
+        try writeExecutable(at: target, contents: "#!/usr/bin/env unavailable-node\n")
+        try Data(#"{"name":"@google/gemini-cli","version":"0.46.0"}"#.utf8)
+            .write(to: packageRoot.appendingPathComponent("package.json"))
+        let launcher = root.appendingPathComponent(".npm-global/bin/gemini")
+        try FileManager.default.createDirectory(at: launcher.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+
+        let status = await AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+            .status(for: .gemini)
+
+        #expect(status.executablePath == target.path)
+        #expect(status.version == "0.46.0")
+    }
+
+    @Test
+    func grokUpdateCheckDistinguishesCurrentAndAvailableVersions() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-grok-update-check-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let grok = root.appendingPathComponent(".grok/bin/grok")
+        try writeExecutable(
+            at: grok,
+            contents: "#!/bin/sh\nprintf '%s' '{\"currentVersion\":\"1.0.0\",\"latestVersion\":\"1.0.0\",\"updateAvailable\":false,\"error\":null}'\n"
+        )
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(await service.grokUpdateState() == .upToDate)
+
+        try writeExecutable(
+            at: grok,
+            contents: "#!/bin/sh\nprintf '%s' '{\"currentVersion\":\"1.0.0\",\"latestVersion\":\"1.1.0\",\"updateAvailable\":true,\"error\":null}'\n"
+        )
+
+        #expect(await service.grokUpdateState() == .updateAvailable(AIAgentCLIUpdate(
+            kind: .grok,
+            installedVersion: "1.0.0",
+            latestVersion: "1.1.0"
+        )))
+    }
+
+    @Test
+    func homebrewUpdateCheckUsesHomebrewReportedVersion() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-homebrew-update-check-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let brew = root.appendingPathComponent("toolchain/bin/brew")
+        try writeExecutable(
+            at: brew,
+            contents: "#!/bin/sh\nprintf '%s' '{\"formulae\":[{\"name\":\"opencode\",\"current_version\":\"1.18.15\"}],\"casks\":[]}'\n"
+        )
+        let executable = root.appendingPathComponent("Cellar/opencode/1.18.14/bin/opencode")
+        try writeExecutable(at: executable)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin", "NPM_CONFIG_PREFIX": root.appendingPathComponent("toolchain").path],
+            homeDirectory: root
+        )
+
+        let updates = await service.homebrewUpdates(for: [
+            AgentCLIStatus(kind: .opencode, executablePath: executable.path, version: "1.18.14"),
+        ])
+
+        #expect(updates == [
+            AIAgentCLIUpdate(kind: .opencode, installedVersion: "1.18.14", latestVersion: "1.18.15"),
+        ])
+    }
+
+    @Test
+    func cliUpdateUsesTheDetectedPackageManager() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-update-manager-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let toolDirectory = root.appendingPathComponent("toolchain/bin", isDirectory: true)
+        let brew = toolDirectory.appendingPathComponent("brew")
+        try writeExecutable(at: brew)
+        let target = root.appendingPathComponent("Cellar/opencode/1.4.6/bin/opencode")
+        try writeExecutable(at: target)
+        let launcher = root.appendingPathComponent(".local/bin/opencode")
+        try FileManager.default.createDirectory(at: launcher.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin", "NPM_CONFIG_PREFIX": toolDirectory.deletingLastPathComponent().path],
+            homeDirectory: root
+        )
+
+        let commands = service.installationCommands(for: [.opencode], update: true)
+
+        #expect(commands == [AIAgentCLICommand(
+            executableURL: brew,
+            arguments: ["upgrade", "opencode"],
+            timeout: 600
+        )])
+        #expect(commands.first?.timeout == 600)
+    }
+
+    @Test
     func cliManagementBuildsBatchInstallUpdateAndUninstallCommands() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-cli-commands-\(UUID().uuidString)", isDirectory: true)
@@ -318,6 +618,8 @@ struct AIAgentServicesTests {
         let updateGrok = try #require(updates.first { $0.executableURL == grok })
         #expect(updateNPM.arguments == ["install", "--global", "@anthropic-ai/claude-code@latest"])
         #expect(updateGrok.arguments == ["update"])
+        #expect(updateNPM.timeout == 600)
+        #expect(updateGrok.timeout == 600)
 
         let uninstalls = service.uninstallationCommands(for: [.claude, .codex, .grok])
         let uninstallNPM = try #require(uninstalls.first { $0.executableURL == npm })
@@ -326,13 +628,23 @@ struct AIAgentServicesTests {
         #expect(uninstallGrok.arguments == [grok.path])
     }
 
-    private func writeExecutable(at url: URL) throws {
+    private func writeExecutable(at url: URL, contents: String = "#!/bin/sh\nexit 0\n") throws {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: url)
+        try Data(contents.utf8).write(to: url)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
+    private func waitForCLICommandRunToFinish(_ workspace: AIAgentWorkspace) async {
+        for _ in 0..<100 where workspace.isRunningCLICommands {
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+    }
+
+    private func parallelCommand(startedAt: URL, waitingFor peer: URL) -> String {
+        "touch '\(startedAt.path)'; for _ in $(seq 1 50); do [ -f '\(peer.path)' ] && exit 0; sleep 0.01; done; exit 1"
     }
 }
 

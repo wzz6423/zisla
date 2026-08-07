@@ -93,6 +93,89 @@ final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
     }
 }
 
+private final class CleanupScanProgressCapture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [[DiskCleanupCandidate]] = []
+
+    func append(_ candidates: [DiskCleanupCandidate]) {
+        lock.lock()
+        values.append(candidates)
+        lock.unlock()
+    }
+
+    func snapshots() -> [[DiskCleanupCandidate]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return values
+    }
+}
+
+private struct FoundationVolumeCapacityFileManager: SystemMonitorFileManaging, @unchecked Sendable {
+    private let fileManager = FileManager.default
+
+    func fileExists(atPath path: String) -> Bool {
+        fileManager.fileExists(atPath: path)
+    }
+
+    func urls(for directory: FileManager.SearchPathDirectory, in domainMask: FileManager.SearchPathDomainMask) -> [URL] {
+        fileManager.urls(for: directory, in: domainMask)
+    }
+
+    func homeDirectoryForCurrentUser() -> URL {
+        fileManager.homeDirectoryForCurrentUser
+    }
+
+    func temporaryDirectoryForCurrentUser() -> URL {
+        fileManager.temporaryDirectory
+    }
+
+    func contentsOfDirectory(
+        at url: URL,
+        includingPropertiesForKeys keys: [URLResourceKey]?,
+        options: FileManager.DirectoryEnumerationOptions
+    ) throws -> [URL] {
+        try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: keys, options: options)
+    }
+
+    func attributesOfFileSystem(forPath path: String) throws -> [FileAttributeKey: Any] {
+        try fileManager.attributesOfFileSystem(forPath: path)
+    }
+
+    func attributesOfItem(atPath path: String) throws -> [FileAttributeKey: Any] {
+        try fileManager.attributesOfItem(atPath: path)
+    }
+
+    func enumerator(
+        at url: URL,
+        includingPropertiesForKeys keys: [URLResourceKey]?,
+        options: FileManager.DirectoryEnumerationOptions
+    ) -> FileManager.DirectoryEnumerator? {
+        fileManager.enumerator(at: url, includingPropertiesForKeys: keys, options: options)
+    }
+
+    func trashItem(at url: URL) throws -> URL {
+        var result: NSURL?
+        try fileManager.trashItem(at: url, resultingItemURL: &result)
+        return (result as URL?) ?? url
+    }
+
+    func createDirectory(at url: URL, withIntermediateDirectories: Bool) throws {
+        try fileManager.createDirectory(at: url, withIntermediateDirectories: withIntermediateDirectories, attributes: nil)
+    }
+
+    func removeItem(at url: URL) throws {
+        try fileManager.removeItem(at: url)
+    }
+
+    func createFile(atPath path: String, contents data: Data?) -> Bool {
+        fileManager.createFile(atPath: path, contents: data)
+    }
+
+    func contents(atPath path: String) -> Data? {
+        fileManager.contents(atPath: path)
+    }
+}
+
 private struct StubPublicIPProvider: PublicIPProviding {
     let address: String?
 
@@ -644,6 +727,92 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
+    func cleanupScanWorkerLimitStaysWithinResourceBudget() {
+        #expect(SystemDiskCleanup.scanWorkerLimit(requested: nil, processorCount: 1) == 1)
+        #expect(SystemDiskCleanup.scanWorkerLimit(requested: nil, processorCount: 3) == 2)
+        #expect(SystemDiskCleanup.scanWorkerLimit(requested: nil, processorCount: 8) == 3)
+        #expect(SystemDiskCleanup.scanWorkerLimit(requested: 99, processorCount: 128) == 3)
+        #expect(SystemDiskCleanup.scanWorkerLimit(requested: 0, processorCount: 8) == 1)
+    }
+
+    @Test
+    func concurrentCleanupScanMatchesSingleWorkerResults() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+        let caches = home.appendingPathComponent("Library/Caches")
+        let cacheChild = caches.appendingPathComponent("com.example.app")
+        let logs = home.appendingPathComponent("Library/Logs")
+        let logChild = logs.appendingPathComponent("example.log")
+        let downloads = home.appendingPathComponent("Downloads")
+        let installer = downloads.appendingPathComponent("Installer.pkg")
+
+        mock.searchPathResults = [
+            .downloadsDirectory: [downloads],
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        mock.existingPaths = [
+            caches.path, cacheChild.path,
+            logs.path, logChild.path,
+            downloads.path, installer.path,
+        ]
+        mock.directoryContents[caches.path] = [cacheChild]
+        mock.directoryContents[logs.path] = [logChild]
+        mock.directoryContents[downloads.path] = [installer]
+        mock.fileAttributes[cacheChild.path] = [.size: NSNumber(value: 8_192)]
+        mock.fileAttributes[logChild.path] = [.size: NSNumber(value: 4_096)]
+        mock.fileAttributes[installer.path] = [.size: NSNumber(value: 2_048)]
+
+        let kinds: Set<DiskCleanupKind> = [.appCache, .log, .diskImage]
+        let singleWorker = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: kinds,
+            maxConcurrentScans: 1
+        )
+        let concurrent = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: kinds,
+            maxConcurrentScans: 99
+        )
+
+        #expect(concurrent == singleWorker)
+        #expect(concurrent.map(\.displayName) == ["com.example.app 缓存", "example.log", "Installer.pkg"])
+    }
+
+    @Test
+    func cleanupScanPublishesCandidatesAsEachCategoryCompletes() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+        mock.searchPathResults = [
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        let caches = home.appendingPathComponent("Library/Caches")
+        let cacheChild = caches.appendingPathComponent("com.example.app")
+        let logs = home.appendingPathComponent("Library/Logs")
+        let logChild = logs.appendingPathComponent("example.log")
+        mock.existingPaths = [caches.path, cacheChild.path, logs.path, logChild.path]
+        mock.directoryContents[caches.path] = [cacheChild]
+        mock.directoryContents[logs.path] = [logChild]
+        mock.fileAttributes[cacheChild.path] = [.size: NSNumber(value: 8_192)]
+        mock.fileAttributes[logChild.path] = [.size: NSNumber(value: 4_096)]
+
+        let updates = CleanupScanProgressCapture()
+        let result = SystemDiskCleanup.scanCandidatesWithProgress(
+            fileManager: mock,
+            kinds: [.appCache, .log],
+            maxConcurrentScans: 1
+        ) { candidates in
+            updates.append(candidates)
+        }
+        let snapshots = updates.snapshots()
+
+        #expect(snapshots.count == 2)
+        #expect(snapshots[0].map(\.kind) == [.appCache])
+        #expect(snapshots.last == result)
+    }
+
+    @Test
     func scanCandidatesExcludesSystemWideCacheChildren() {
         let mock = MockFileManager()
         let cacheRoot = URL(fileURLWithPath: "/Library/Caches")
@@ -679,6 +848,19 @@ struct SystemMonitorServiceTests {
 
         #expect(candidates.contains { $0.kind == .appCache && $0.displayName == "com.example.app 缓存" })
         #expect(candidates.contains { $0.kind == .log && $0.displayName == "app.log" })
+        #expect(candidates.first { $0.kind == .appCache }?.safetyLevel == .safeToClean)
+        #expect(candidates.first { $0.kind == .log }?.safetyLevel == .requiresManualReview)
+    }
+
+    @Test
+    func cleanupKindsKeepUserFilesAndDiagnosticsOutOfSafeBatchSelection() {
+        #expect(DiskCleanupKind.appCache.safetyLevel == .safeToClean)
+        #expect(DiskCleanupKind.cache.safetyLevel == .safeToClean)
+        #expect(DiskCleanupKind.packageManagerCache.safetyLevel == .safeToClean)
+        #expect(DiskCleanupKind.duplicateFile.safetyLevel == .requiresManualReview)
+        #expect(DiskCleanupKind.largeFile.safetyLevel == .requiresManualReview)
+        #expect(DiskCleanupKind.diskImage.safetyLevel == .requiresManualReview)
+        #expect(DiskCleanupKind.crashReport.safetyLevel == .requiresManualReview)
     }
 
     @Test
@@ -738,6 +920,19 @@ struct SystemMonitorServiceTests {
         #expect(roots.contains { $0.kind == .appCache && $0.url == cache.standardizedFileURL })
         #expect(!roots.contains { $0.url == applicationSupport.standardizedFileURL })
         #expect(!SystemMonitorPathSafety.isURL(applicationSupport, withinAllowedRoots: roots.map(\.url)))
+    }
+
+    @Test
+    func cleanupRootsExcludeSimulatorDevicesBecauseTheyContainAppData() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+        let simulatorDevices = home.appendingPathComponent("Library/Developer/CoreSimulator/Devices")
+
+        let roots = SystemDiskCleanup.allowedScanRoots(fileManager: mock)
+
+        #expect(!roots.contains { $0.url == simulatorDevices.standardizedFileURL })
+        #expect(!SystemMonitorPathSafety.isURL(simulatorDevices, withinAllowedRoots: roots.map(\.url)))
     }
 
     @Test
@@ -914,6 +1109,8 @@ struct SystemMonitorServiceTests {
         #expect(candidates.count == 1)
         #expect(candidates.first?.kind == .duplicateFile)
         #expect(candidates.first?.detail?.contains("重复") == true)
+        #expect(candidates.first?.detail?.contains(fileA.path) == true)
+        #expect(candidates.first?.safetyLevel == .requiresManualReview)
     }
 
     @Test
@@ -1020,6 +1217,37 @@ struct SystemMonitorServiceTests {
     @Test
     func serviceClampsSamplingIntervalToMinimum() {
         #expect(SystemMonitorService(samplingInterval: 0.01).samplingInterval == 0.2)
+    }
+
+    @Test
+    func defaultVolumeCapacityRefreshesCachedResourceValues() throws {
+        let fileManager = FoundationVolumeCapacityFileManager()
+        let foundation = FileManager.default
+        let volumeURL = foundation.temporaryDirectory
+        let fileURL = volumeURL.appendingPathComponent("zisla-capacity-\(UUID().uuidString)")
+        defer { try? foundation.removeItem(at: fileURL) }
+
+        let initial = try #require(fileManager.volumeCapacity(for: volumeURL))
+        #expect(foundation.createFile(atPath: fileURL.path, contents: nil))
+        let handle = try FileHandle(forWritingTo: fileURL)
+        let chunk = Data(repeating: 0x5A, count: 4 * 1024 * 1024)
+        for _ in 0..<16 {
+            try handle.write(contentsOf: chunk)
+        }
+        try handle.synchronize()
+        try handle.close()
+
+        let expected = try #require(
+            fileManager.volumeCapacity(for: URL(fileURLWithPath: volumeURL.path, isDirectory: true))
+        )
+        let refreshed = try #require(fileManager.volumeCapacity(for: volumeURL))
+        let decrease = initial.available >= expected.available ? initial.available - expected.available : 0
+        let staleDifference = refreshed.available >= expected.available
+            ? refreshed.available - expected.available
+            : expected.available - refreshed.available
+
+        #expect(decrease >= 16 * 1024 * 1024)
+        #expect(staleDifference < 8 * 1024 * 1024)
     }
 
     @Test
@@ -1187,7 +1415,7 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
-    func diskCapacityRefreshesAfterThreeMinutes() async {
+    func diskCapacityRefreshesAfterTwentySeconds() async {
         let mock = MockFileManager()
         let volume = URL(fileURLWithPath: "/Users/test")
         mock.homeDirectory = volume
@@ -1204,7 +1432,7 @@ struct SystemMonitorServiceTests {
         _ = await service.sampleOnce()
         #expect(service.snapshot?.disk.freeBytes == 400)
         mock.volumeCapacities[volume.path] = (total: 1_000, available: 700)
-        clock.advance(by: 3 * 60 - 1)
+        clock.advance(by: 20 - 1)
         _ = await service.sampleOnce()
         #expect(service.snapshot?.disk.freeBytes == 400)
 
@@ -1235,7 +1463,9 @@ struct SystemMonitorServiceTests {
 
         // sampleOnce schedules a background periodic query; the first call should write the public IP.
         _ = await service.sampleOnce()
-        await waitUntil(timeoutSeconds: 2) { provider.callCount >= 1 }
+        await waitUntil(timeoutSeconds: 2) {
+            service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.1"
+        }
         #expect(provider.callCount == 1)
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.1")
         #expect(service.publicIPAddress == "203.0.113.1")
@@ -1250,7 +1480,9 @@ struct SystemMonitorServiceTests {
         // After the period elapses, sampling should refresh automatically.
         clock.advance(by: 5 * 60)
         _ = await service.sampleOnce()
-        await waitUntil(timeoutSeconds: 2) { provider.callCount >= 2 }
+        await waitUntil(timeoutSeconds: 2) {
+            service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.2"
+        }
         #expect(provider.callCount == 2)
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.2")
         #expect(service.publicIPAddress == "203.0.113.2")
@@ -1276,7 +1508,9 @@ struct SystemMonitorServiceTests {
             hardwareInfoProvider: { .unavailable }
         )
         _ = await service.sampleOnce()
-        await waitUntil(timeoutSeconds: 2) { provider.callCount >= 1 }
+        await waitUntil(timeoutSeconds: 2) {
+            service.snapshot?.networkIdentity.publicIPAddress == "198.51.100.1"
+        }
         #expect(provider.callCount == 1)
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "198.51.100.1")
 

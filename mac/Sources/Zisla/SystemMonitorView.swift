@@ -585,18 +585,26 @@ private struct SystemCleanupPanelPresenter: NSViewRepresentable {
             panel.hidesOnDeactivate = false
             panel.level = WindowPlacement.modalWindowLevel
             panel.collectionBehavior = [.moveToActiveSpace, .transient, .ignoresCycle]
-            panel.contentView = NSHostingView(
-                rootView: SystemCleanupSheet(
-                    service: service,
-                    onDismiss: { [weak self] in
-                        self?.isPresented.wrappedValue = false
-                        self?.dismiss()
-                    },
-                    onCleanupCompleted: {
-                        AppModel.shared.islandCollapseRequested = true
-                    }
+            let hostingView = NSHostingView(
+                rootView: AppLanguageEnvironment(
+                    languageStore: AppModel.shared.languageStore,
+                    content: SystemCleanupSheet(
+                        service: service,
+                        onDismiss: { [weak self] in
+                            self?.isPresented.wrappedValue = false
+                            self?.dismiss()
+                        },
+                        onCleanupCompleted: {
+                            AppModel.shared.islandCollapseRequested = true
+                        }
+                    )
                 )
             )
+            hostingView.wantsLayer = true
+            hostingView.layer?.cornerRadius = 18
+            hostingView.layer?.cornerCurve = .continuous
+            hostingView.layer?.masksToBounds = true
+            panel.contentView = hostingView
             panel.onCancel = { [weak self] in
                 self?.isPresented.wrappedValue = false
                 self?.dismiss()
@@ -792,12 +800,14 @@ private struct SystemCleanupSheet: View {
     let onDismiss: () -> Void
     var onCleanupCompleted: (() -> Void)?
     @State private var candidates: [DiskCleanupCandidate] = []
+    @State private var groupedSections: [CleanupKindSection] = []
     @State private var selectedURLs: Set<URL> = []
     @State private var collapsedKinds: Set<DiskCleanupKind> = []
     @State private var isScanning = false
     @State private var isCleaning = false
     @State private var confirmationPresented = false
     @State private var result: DiskCleanupResult?
+    @State private var cachedManualReviewCount: Int = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -805,7 +815,7 @@ private struct SystemCleanupSheet: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("清理候选项")
                         .font(.system(size: 16, weight: .semibold))
-                    Text("扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件")
+                    Text("检测可再生缓存与常见临时数据；用户文件、重复文件和安装包仅供人工复核")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
@@ -847,7 +857,7 @@ private struct SystemCleanupSheet: View {
             }
 
             Group {
-                if isScanning {
+                if candidates.isEmpty && isScanning {
                     ProgressView("正在扫描")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if candidates.isEmpty {
@@ -858,6 +868,17 @@ private struct SystemCleanupSheet: View {
                     )
                 } else {
                     List {
+                        if isScanning {
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("正在扫描更多项目...")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                            }
+                            .listRowSeparator(.hidden)
+                        }
                         ForEach(groupedSections) { section in
                             Section {
                                 if !isSectionCollapsed(section) {
@@ -868,15 +889,29 @@ private struct SystemCleanupSheet: View {
                                                     .foregroundStyle(candidate.kind.tint)
                                                     .frame(width: 18)
                                                 VStack(alignment: .leading, spacing: 2) {
-                                                    Text(candidate.displayName)
-                                                        .font(.system(size: 11, weight: .medium))
-                                                        .lineLimit(1)
+                                                    HStack(spacing: 5) {
+                                                        Text(candidate.displayName)
+                                                            .font(.system(size: 11, weight: .medium))
+                                                            .lineLimit(1)
+                                                        Text(candidate.safetyLevel.title)
+                                                            .font(.system(size: 9, weight: .medium))
+                                                            .foregroundStyle(
+                                                                candidate.safetyLevel == .safeToClean
+                                                                    ? Color.zislaSuccess
+                                                                    : Color.zislaWarning
+                                                            )
+                                                    }
                                                     if let detail = candidate.detail {
                                                         Text(detail)
                                                             .font(.system(size: 9))
                                                             .foregroundStyle(.secondary)
                                                             .lineLimit(1)
+                                                            .help(detail)
                                                     }
+                                                    Text(candidate.safetyLevel.reason)
+                                                        .font(.system(size: 9))
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(1)
                                                 }
                                                 Spacer(minLength: 8)
                                                 Text(byteText(candidate.byteSize))
@@ -978,7 +1013,11 @@ private struct SystemCleanupSheet: View {
                 Task { await cleanSelected() }
             }
         } message: {
-            Text("zisla 不会永久删除这些内容。")
+            Text(
+                cachedManualReviewCount > 0
+                    ? "其中 \(cachedManualReviewCount) 项需人工复核。zisla 不会永久删除这些内容。"
+                    : "zisla 不会永久删除这些内容。"
+            )
         }
     }
 
@@ -988,11 +1027,12 @@ private struct SystemCleanupSheet: View {
             .reduce(0) { $0 + $1.byteSize }
     }
 
+
     private var allCandidatesSelected: Bool {
         !candidates.isEmpty && candidates.allSatisfy { selectedURLs.contains($0.url) }
     }
 
-    private var groupedSections: [CleanupKindSection] {
+    private func makeGroupedSections(from candidates: [DiskCleanupCandidate]) -> [CleanupKindSection] {
         let order = DiskCleanupKind.allCases
         return order.compactMap { kind in
             let items = candidates
@@ -1007,14 +1047,17 @@ private struct SystemCleanupSheet: View {
     private func toggleSelectAll() {
         if allCandidatesSelected {
             selectedURLs.removeAll()
+            cachedManualReviewCount = 0
         } else {
             selectedURLs = Set(candidates.map(\.url))
+            cachedManualReviewCount = candidates.count { $0.safetyLevel == .requiresManualReview }
         }
     }
 
     private func invertSelection() {
         let all = Set(candidates.map(\.url))
         selectedURLs = all.subtracting(selectedURLs)
+        cachedManualReviewCount = computeManualReviewCount()
     }
 
     private func isSectionCollapsed(_ section: CleanupKindSection) -> Bool {
@@ -1036,6 +1079,7 @@ private struct SystemCleanupSheet: View {
         } else {
             selectedURLs.formUnion(urls)
         }
+        cachedManualReviewCount = computeManualReviewCount()
     }
 
     private func invertSelection(in section: CleanupKindSection) {
@@ -1043,6 +1087,7 @@ private struct SystemCleanupSheet: View {
         let unselected = urls.subtracting(selectedURLs)
         selectedURLs.subtract(urls)
         selectedURLs.formUnion(unselected)
+        cachedManualReviewCount = computeManualReviewCount()
     }
 
     private func selectionBinding(for url: URL) -> Binding<Bool> {
@@ -1054,15 +1099,35 @@ private struct SystemCleanupSheet: View {
                 } else {
                     selectedURLs.remove(url)
                 }
+                cachedManualReviewCount = computeManualReviewCount()
             }
         )
+    }
+
+    private func computeManualReviewCount() -> Int {
+        candidates.count {
+            selectedURLs.contains($0.url) && $0.safetyLevel == .requiresManualReview
+        }
     }
 
     private func scan() async {
         isScanning = true
         result = nil
-        candidates = await service.scanCleanupCandidates()
+        candidates = []
+        groupedSections = []
+        let scannedCandidates = await service.scanCleanupCandidatesWithProgress { progressCandidates in
+            Task { @MainActor in
+                let mergedCandidates = SystemDiskCleanup
+                    .deduplicateCandidates(candidates + progressCandidates)
+                    .sorted { $0.byteSize > $1.byteSize }
+                candidates = mergedCandidates
+                groupedSections = makeGroupedSections(from: mergedCandidates)
+            }
+        }
+        candidates = scannedCandidates
+        groupedSections = makeGroupedSections(from: scannedCandidates)
         selectedURLs = selectedURLs.intersection(Set(candidates.map(\.url)))
+        cachedManualReviewCount = computeManualReviewCount()
         isScanning = false
     }
 
@@ -1071,9 +1136,11 @@ private struct SystemCleanupSheet: View {
         let result = await service.trashSelected(Array(selectedURLs))
         self.result = result
         selectedURLs = []
+        cachedManualReviewCount = 0
         candidates.removeAll { candidate in
             !result.failures.contains(where: { $0.url == candidate.url })
         }
+        groupedSections = makeGroupedSections(from: candidates)
         isCleaning = false
         onCleanupCompleted?()
         onDismiss()

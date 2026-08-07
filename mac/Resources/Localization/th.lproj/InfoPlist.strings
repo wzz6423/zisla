@@ -1,0 +1,8 @@
+"NSCalendarsFullAccessUsageDescription" = "zisla ต้องการเข้าถึงกิจกรรมปฏิทินที่กำลังจะมาถึงสำหรับแผงข้อมูลด้านบน";
+"NSAudioCaptureUsageDescription" = "zisla อ่านสเปกตรัมเสียงปัจจุบันเพื่อแสดงคลื่นเสียงสด";
+"NSCameraUsageDescription" = "zisla ใช้กล้องเฉพาะเมื่อเปิดกระจกเท่านั้น";
+"NSRemindersFullAccessUsageDescription" = "zisla อ่านการเตือนความจำที่มีวันที่เพื่อแสดงพร้อมกับกิจกรรมปฏิทิน";
+"NSLocationWhenInUseUsageDescription" = "zisla ใช้ตำแหน่งของคุณเพื่อแสดงสภาพอากาศท้องถิ่นและชื่อสถานที่";
+"NSMicrophoneUsageDescription" = "zisla ใช้ไมโครโฟนเฉพาะเมื่อคุณเริ่มป้อนเสียง เพื่อเปลี่ยนคำพูดเป็นข้อความการสนทนา AI";
+"NSSpeechRecognitionUsageDescription" = "zisla ถอดความคำพูดที่คุณบันทึกไว้อย่างจริงจังเป็นข้อความการสนทนา AI";
+"NSAppleEventsUsageDescription" = "zisla ใช้ Mail.app เพื่ออ่านและจัดการอีเมล รวมถึงกล่องจดหมาย สถานะการอ่าน การลบ และการตอบกลับ";

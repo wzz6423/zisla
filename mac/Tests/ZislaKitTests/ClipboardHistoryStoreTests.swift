@@ -7,23 +7,25 @@ import Testing
 @MainActor
 struct ClipboardHistoryStoreTests {
     @Test
-    func defaultCapacityIs999() throws {
+    func defaultCapacityIsUnlimited() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
 
         let store = ClipboardHistoryStore(
             storageURL: directory.appendingPathComponent("clipboard-history.sqlite")
         )
+        await store.waitUntilLoaded()
 
-        #expect(store.capacity == 999)
+        #expect(store.capacity == nil)
     }
 
     @Test
-    func pinnedItemsSurviveHistoryCapacityAndPersist() throws {
+    func pinnedItemsSurviveHistoryCapacityAndPersist() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
         let store = ClipboardHistoryStore(storageURL: storageURL, capacity: 2)
+        await store.waitUntilLoaded()
 
         #expect(store.record(.text("常用信息")))
         let pinnedID = try #require(store.items.first?.id)
@@ -37,17 +39,19 @@ struct ClipboardHistoryStoreTests {
 
         store.flushPendingChanges()
         let restored = ClipboardHistoryStore(storageURL: storageURL, capacity: 2)
+        await restored.waitUntilLoaded()
         #expect(restored.items == store.items)
     }
 
     @Test
-    func recordingExistingContentMovesItToTheLatestHistoryPosition() throws {
+    func recordingExistingContentMovesItToTheLatestHistoryPosition() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = ClipboardHistoryStore(
             storageURL: directory.appendingPathComponent("clipboard-history.sqlite"),
             capacity: 3
         )
+        await store.waitUntilLoaded()
 
         #expect(store.record(.text("first")))
         #expect(store.record(.text("second")))
@@ -58,20 +62,21 @@ struct ClipboardHistoryStoreTests {
     }
 
     @Test
-    func rejectsImagesOverConfiguredLimit() throws {
+    func rejectsImagesOverConfiguredLimit() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = ClipboardHistoryStore(
             storageURL: directory.appendingPathComponent("clipboard-history.sqlite"),
             maxImageBytes: 3
         )
+        await store.waitUntilLoaded()
 
         #expect(!store.record(.image(Data([0, 1, 2, 3]))))
         #expect(store.items.isEmpty)
     }
 
     @Test
-    func changesAreCoalescedUntilTheyAreFlushed() throws {
+    func changesAreCoalescedUntilTheyAreFlushed() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
@@ -79,6 +84,7 @@ struct ClipboardHistoryStoreTests {
             storageURL: storageURL,
             persistenceDelay: .seconds(60)
         )
+        await store.waitUntilLoaded()
 
         #expect(store.record(.text("first")))
         #expect(store.record(.text("second")))
@@ -87,15 +93,17 @@ struct ClipboardHistoryStoreTests {
         store.flushPendingChanges()
 
         let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
         #expect(restored.historyItems.map(\.content) == [.text("second"), .text("first")])
     }
 
     @Test
-    func removalsAndHistoryClearArePersistedIncrementally() throws {
+    func removalsAndHistoryClearArePersistedIncrementally() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
         let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
 
         #expect(store.record(.text("pinned")))
         let pinnedID = try #require(store.items.first?.id)
@@ -110,12 +118,41 @@ struct ClipboardHistoryStoreTests {
         store.flushPendingChanges()
 
         let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
         #expect(restored.items.map(\.content) == [.text("pinned")])
         #expect(restored.items.first?.isPinned == true)
     }
 
     @Test
-    func oldJSONStorageIsIgnored() throws {
+    func historyClearRemovesItemsBeyondCurrentPage() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2)
+        await store.waitUntilLoaded()
+
+        #expect(store.record(.text("older history")))
+        #expect(store.record(.text("newer history")))
+        #expect(store.recordPinned(.text("older pinned")))
+        #expect(store.recordPinned(.text("newer pinned")))
+        store.flushPendingChanges()
+
+        let firstPage = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2)
+        await firstPage.waitUntilLoaded()
+        #expect(firstPage.items.allSatisfy { $0.isPinned })
+        #expect(firstPage.totalItemCount == 4)
+
+        firstPage.removeAllHistory()
+        firstPage.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2)
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 2)
+        #expect(restored.items.allSatisfy { $0.isPinned })
+    }
+
+    @Test
+    func oldJSONStorageIsIgnored() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let legacyURL = directory.appendingPathComponent("clipboard-history.json")
@@ -124,6 +161,7 @@ struct ClipboardHistoryStoreTests {
         try JSONEncoder().encode(legacyItems).write(to: legacyURL)
 
         let store = ClipboardHistoryStore(storageURL: databaseURL)
+        await store.waitUntilLoaded()
 
         #expect(store.items.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: databaseURL.path))
@@ -131,7 +169,7 @@ struct ClipboardHistoryStoreTests {
     }
 
     @Test
-    func corruptedDatabaseIsNotOverwritten() throws {
+    func corruptedDatabaseIsNotOverwritten() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
@@ -139,6 +177,7 @@ struct ClipboardHistoryStoreTests {
         try corrupted.write(to: storageURL)
 
         let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
         #expect(store.errorDescription != nil)
 
         #expect(store.record(.text("new value")))
@@ -149,11 +188,12 @@ struct ClipboardHistoryStoreTests {
     }
 
     @Test
-    func updatingTextDoesNotRewriteUnchangedImageBlob() throws {
+    func updatingTextDoesNotRewriteUnchangedImageBlob() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
         let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
 
         #expect(store.record(.image(Data([0, 1, 2, 3]))))
         #expect(store.record(.text("text")))
@@ -175,15 +215,17 @@ struct ClipboardHistoryStoreTests {
 
         #expect(store.errorDescription == nil)
         let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
         #expect(restored.items.map(\.content) == store.items.map(\.content))
     }
 
     @Test
-    func recordPinnedAddsEmojiTextAndKeepsItPinnedAcrossRestart() throws {
+    func recordPinnedAddsEmojiTextAndKeepsItPinnedAcrossRestart() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
         let store = ClipboardHistoryStore(storageURL: storageURL, capacity: 2)
+        await store.waitUntilLoaded()
 
         let emoji = "常用信息 🎉👨‍👩‍👧‍👦🚀"
         #expect(store.recordPinned(.text(emoji)))
@@ -197,17 +239,19 @@ struct ClipboardHistoryStoreTests {
 
         store.flushPendingChanges()
         let restored = ClipboardHistoryStore(storageURL: storageURL, capacity: 2)
+        await restored.waitUntilLoaded()
         #expect(restored.pinnedItems.map(\.content) == [.text(emoji)])
         #expect(restored.pinnedItems.first?.isPinned == true)
     }
 
     @Test
-    func recordPinnedDeduplicatesRepeatedRecords() throws {
+    func recordPinnedDeduplicatesRepeatedRecords() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = ClipboardHistoryStore(
             storageURL: directory.appendingPathComponent("clipboard-history.sqlite")
         )
+        await store.waitUntilLoaded()
 
         #expect(store.recordPinned(.text("重复")))
         #expect(store.recordPinned(.text("重复")))
@@ -218,7 +262,7 @@ struct ClipboardHistoryStoreTests {
     }
 
     @Test
-    func fileItemIsWrittenAndRestoredAfterRestart() throws {
+    func fileItemIsWrittenAndRestoredAfterRestart() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
@@ -226,6 +270,7 @@ struct ClipboardHistoryStoreTests {
         try Data("hello".utf8).write(to: fileURL)
 
         let store = ClipboardHistoryStore(storageURL: storageURL, capacity: 2)
+        await store.waitUntilLoaded()
         let content = try ClipboardHistoryContent.file(at: fileURL)
         #expect(store.recordPinned(content))
 
@@ -240,6 +285,7 @@ struct ClipboardHistoryStoreTests {
 
         store.flushPendingChanges()
         let restored = ClipboardHistoryStore(storageURL: storageURL, capacity: 2)
+        await restored.waitUntilLoaded()
         let restoredItem = try #require(restored.pinnedItems.first)
         #expect(restoredItem.isPinned)
         guard case .file(let restoredReference) = restoredItem.content else {
@@ -251,7 +297,7 @@ struct ClipboardHistoryStoreTests {
     }
 
     @Test
-    func missingFileItemIsDroppedOnLoad() throws {
+    func missingFileItemIsDroppedOnLoad() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
@@ -259,17 +305,19 @@ struct ClipboardHistoryStoreTests {
         try Data("bye".utf8).write(to: fileURL)
 
         let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
         #expect(store.recordPinned(try ClipboardHistoryContent.file(at: fileURL)))
         #expect(store.record(.text("保留文字")))
         store.flushPendingChanges()
 
         try FileManager.default.removeItem(at: fileURL)
         let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
         #expect(restored.items.map(\.content) == [.text("保留文字")])
     }
 
     @Test
-    func legacyTextAndImageRowsRemainReadableAfterMigration() throws {
+    func legacyTextAndImageRowsRemainReadableAfterMigration() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
@@ -293,6 +341,7 @@ struct ClipboardHistoryStoreTests {
         )
 
         let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
         #expect(store.errorDescription == nil)
         #expect(store.pinnedItems.map(\.content) == [.text("旧文字")])
         #expect(store.historyItems.map(\.content) == [.image(Data([0, 1, 2, 3]))])
@@ -304,8 +353,43 @@ struct ClipboardHistoryStoreTests {
         store.flushPendingChanges()
 
         let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
         #expect(restored.items.contains { $0.content == .text("旧文字") })
         #expect(restored.items.contains { if case .file = $0.content { return true }; return false })
+    }
+
+    @Test
+    func historyIsPagedAndOlderItemsRemainSearchable() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2)
+        await store.waitUntilLoaded()
+
+        #expect(store.record(.text("old searchable value")))
+        #expect(store.record(.text("middle value")))
+        #expect(store.record(.text("latest value")))
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2)
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 3)
+        #expect(restored.items.count == 2)
+        #expect(restored.historyItems.map(\.content) == [
+            .text("latest value"),
+            .text("middle value"),
+        ])
+
+        restored.updateQuery(scope: .all, searchText: "old searchable")
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 1)
+        #expect(restored.items.map(\.content) == [.text("old searchable value")])
+
+        restored.updateQuery(scope: .all, searchText: "")
+        await restored.waitUntilLoaded()
+        restored.loadNextPage()
+        await restored.waitUntilLoaded()
+        #expect(restored.items.map(\.content) == [.text("old searchable value")])
     }
 
     private func makeDirectory() throws -> URL {

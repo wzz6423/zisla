@@ -98,7 +98,7 @@ private struct UsageTrendChart: View {
     var series: [UsageBreakdownPoint]
 
     private var ticks: [Int] {
-        AIUsageAnalytics.tokenAxisTicks(maximum: maximumTokens, desiredCount: 6)
+        AIUsageAnalytics.tokenAxisTicks(maximum: maximumTokens, desiredCount: 5)
     }
 
     private var maximumTokens: Int {
@@ -116,7 +116,16 @@ private struct UsageTrendChart: View {
             let now = Date()
             return now...now
         }
-        return first...last
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: first)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: last)) else {
+            return first...last
+        }
+        return start...end
+    }
+
+    private var xAxisValues: [Date] {
+        series.map(\.timestamp)
     }
 
     var body: some View {
@@ -153,7 +162,8 @@ private struct UsageTrendChart: View {
             .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
         }
         .chartXScale(domain: xDomain)
-        .chartYScale(domain: 0...(ticks.last ?? 1))
+        // Preserve the zero baseline while keeping quieter days visible beside order-of-magnitude spikes.
+        .chartYScale(domain: 0...(ticks.last ?? 1), type: .symmetricLog(slopeAtZero: 0.000_001))
         .chartYAxis {
             AxisMarks(position: .leading, values: ticks) { value in
                 AxisGridLine().foregroundStyle(Color.primary.opacity(0.12))
@@ -167,8 +177,8 @@ private struct UsageTrendChart: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: .stride(by: .day)) { value in
-                AxisValueLabel {
+            AxisMarks(values: xAxisValues) { value in
+                AxisValueLabel(anchor: .top) {
                     if let date = value.as(Date.self) {
                         Text(date, format: .dateTime.month(.twoDigits).day(.twoDigits))
                             .font(.islandMicro(design: .monospaced))
@@ -210,6 +220,17 @@ private struct TaskProgressRow: View {
                     Text(task.title)
                         .font(.system(size: 11, weight: .semibold))
                         .lineLimit(1)
+                    if let failureReason {
+                        HStack(spacing: 3) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                            Text(failureReason)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.red)
+                        .help(failureReason)
+                    }
                     Spacer()
                     Text(task.provider.rawValue.uppercased())
                         .font(.islandMicro(weight: .bold, design: .monospaced))
@@ -260,7 +281,12 @@ private struct TaskProgressRow: View {
                     .layoutPriority(1)
 
                     Spacer(minLength: 2)
-                    if let progress = task.progress {
+                    if task.status == .error {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.red)
+                            .help(failureReason ?? "任务失败")
+                    } else if let progress = task.progress {
                         ProgressView(value: progress)
                             .tint(providerColor)
                             .frame(width: 32)
@@ -271,6 +297,11 @@ private struct TaskProgressRow: View {
                 }
                 .frame(height: 12)
             }
+        } else if task.status == .error {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.red)
+                .help(failureReason ?? "任务失败")
         } else if let progress = task.progress {
             ProgressView(value: progress)
                 .tint(providerColor)
@@ -308,6 +339,11 @@ private struct TaskProgressRow: View {
 
     private var providerColor: Color {
         ProviderBrand.color(for: task.provider)
+    }
+
+    private var failureReason: String? {
+        guard task.status == .error else { return nil }
+        return task.failureReason ?? "任务失败，未提供详细原因"
     }
 }
 

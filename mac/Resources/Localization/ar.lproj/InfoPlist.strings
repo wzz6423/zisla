@@ -1,0 +1,8 @@
+"NSCalendarsFullAccessUsageDescription" = "يحتاج zisla إلى الوصول إلى أحداث التقويم القادمة للوحة المعلومات العلوية.";
+"NSAudioCaptureUsageDescription" = "يقرأ zisla طيف الصوت الحالي لعرض الموجة الحية.";
+"NSCameraUsageDescription" = "يستخدم zisla الكاميرا فقط أثناء فتح المرآة.";
+"NSRemindersFullAccessUsageDescription" = "يقرأ zisla التذكيرات المؤرخة لعرضها مع أحداث التقويم.";
+"NSLocationWhenInUseUsageDescription" = "يستخدم zisla موقعك لعرض الطقس المحلي وأسماء الأماكن.";
+"NSMicrophoneUsageDescription" = "يستخدم zisla الميكروفون فقط عند بدء الإدخال الصوتي لتحويل الكلام إلى نص محادثة AI.";
+"NSSpeechRecognitionUsageDescription" = "ينسخ zisla الكلام الذي تسجله بنشاط إلى نص محادثة AI.";
+"NSAppleEventsUsageDescription" = "يستخدم zisla تطبيق Mail.app لقراءة وإدارة البريد، بما في ذلك صناديق الوارد وحالة القراءة والحذف والردود.";

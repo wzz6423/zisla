@@ -24,17 +24,57 @@ private actor AIAgentCLIRelayLock {
     }
 }
 
+public enum AIAgentCLICommandProgressState: Equatable, Sendable {
+    case running
+    case succeeded
+    case failed
+}
+
+public struct AIAgentCLICommandProgress: Equatable, Sendable {
+    public let title: String
+    public let kinds: [AgentCLIKind]
+    public let completedCount: Int
+    public let totalCount: Int
+    public let state: AIAgentCLICommandProgressState
+    public let detail: String?
+
+    public init(
+        title: String,
+        kinds: [AgentCLIKind],
+        completedCount: Int,
+        totalCount: Int,
+        state: AIAgentCLICommandProgressState,
+        detail: String? = nil
+    ) {
+        self.title = title
+        self.kinds = kinds
+        self.completedCount = completedCount
+        self.totalCount = totalCount
+        self.state = state
+        self.detail = detail
+    }
+
+    public var fractionCompleted: Double {
+        guard totalCount > 0 else { return 0 }
+        return min(1, Double(completedCount) / Double(totalCount))
+    }
+}
+
 @MainActor
 public final class AIAgentWorkspace: ObservableObject {
     public let store: AIAgentStore
 
     @Published public private(set) var isRefreshing = false
     @Published public private(set) var lastError: String?
+    @Published public private(set) var cliUpdates: [AIAgentCLIUpdate] = []
+    @Published public private(set) var grokUpdateState: AIAgentGrokUpdateState = .unknown
+    @Published public private(set) var cliCommandProgress: AIAgentCLICommandProgress?
 
     private let balanceService: AIAgentBalanceService
     private let channelProbeService: AIAgentChannelProbeService
     private let modelCatalogService: AIAgentModelCatalogService
     private let cliService: AIAgentCLIService
+    private let cliUpdateService: AIAgentCLIUpdateService
     private let cliProfileService: AIAgentCLIProfileService
     private let claudeCodeVSCodeSettingsService: ClaudeCodeVSCodeSettingsService
     private let codexHistoryImporter: CodexSessionHistoryImporter
@@ -46,6 +86,7 @@ public final class AIAgentWorkspace: ObservableObject {
     private var relayCursors: [UUID: Int] = [:]
     private var apiRouteRouter = AgentRouteRouter()
     private var automationTask: Task<Void, Never>?
+    private var cliCommandTask: Task<Void, Never>?
     private var automationMonitoringRequested = false
     private var skillRefreshGeneration = 0
     private var cancellables: Set<AnyCancellable> = []
@@ -56,6 +97,7 @@ public final class AIAgentWorkspace: ObservableObject {
         channelProbeService: AIAgentChannelProbeService = AIAgentChannelProbeService(),
         modelCatalogService: AIAgentModelCatalogService = AIAgentModelCatalogService(),
         cliService: AIAgentCLIService = AIAgentCLIService(),
+        cliUpdateService: AIAgentCLIUpdateService = AIAgentCLIUpdateService(),
         cliProfileService: AIAgentCLIProfileService = AIAgentCLIProfileService(),
         claudeCodeVSCodeSettingsService: ClaudeCodeVSCodeSettingsService = ClaudeCodeVSCodeSettingsService(),
         codexHistoryImporter: CodexSessionHistoryImporter = CodexSessionHistoryImporter(),
@@ -68,6 +110,7 @@ public final class AIAgentWorkspace: ObservableObject {
         self.channelProbeService = channelProbeService
         self.modelCatalogService = modelCatalogService
         self.cliService = cliService
+        self.cliUpdateService = cliUpdateService
         self.cliProfileService = cliProfileService
         self.claudeCodeVSCodeSettingsService = claudeCodeVSCodeSettingsService
         self.codexHistoryImporter = codexHistoryImporter
@@ -93,6 +136,7 @@ public final class AIAgentWorkspace: ObservableObject {
 
     deinit {
         automationTask?.cancel()
+        cliCommandTask?.cancel()
     }
 
     public func refreshAll() async {
@@ -198,7 +242,24 @@ public final class AIAgentWorkspace: ObservableObject {
     }
 
     public func refreshCLIs() async {
-        store.replaceCLIStatuses(await cliService.statuses())
+        let statuses = await cliService.statuses()
+        store.replaceCLIStatuses(statuses)
+        async let registryUpdates = cliUpdateService.availableUpdates(for: statuses)
+        async let managedUpdates = cliService.homebrewUpdates(for: statuses)
+        async let checkedGrokUpdateState = cliService.grokUpdateState()
+        var updates = await registryUpdates + managedUpdates
+        let checkedState = await checkedGrokUpdateState
+        if case let .updateAvailable(update) = checkedState {
+            updates.append(update)
+        }
+        if case .unknown = checkedState {
+            // Preserve a completed Grok update while its remote check is temporarily unreachable.
+        } else {
+            grokUpdateState = checkedState
+        }
+        cliUpdates = updates.sorted {
+            AgentCLIKind.allCases.firstIndex(of: $0.kind)! < AgentCLIKind.allCases.firstIndex(of: $1.kind)!
+        }
     }
 
     public func refreshSkills() async {
@@ -270,6 +331,46 @@ public final class AIAgentWorkspace: ObservableObject {
         store.state.skills[index].isEnabled = enabled
     }
 
+    public func uninstallSkill(path: String) async -> Bool {
+        guard store.state.skills.contains(where: { $0.path == path }) else {
+            lastError = "未找到要卸载的 Skill"
+            return false
+        }
+        let fileManager = FileManager.default
+        let skillURL = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        let resolvedURL = skillURL.resolvingSymlinksInPath().standardizedFileURL
+        if let installation = AgentSkillPackageInstallation.detect(at: resolvedURL) {
+            guard let command = cliService.uninstallationCommand(for: installation) else {
+                lastError = "找不到 \(installation.manager.executableName) 命令"
+                return false
+            }
+            guard let output = await runCLICommand(command), output.status == 0 else {
+                if lastError == nil {
+                    lastError = "\(installation.manager.rawValue) 卸载失败"
+                }
+                return false
+            }
+            if (try? fileManager.destinationOfSymbolicLink(atPath: skillURL.path)) != nil {
+                var trashedURL: NSURL?
+                try? fileManager.trashItem(at: skillURL, resultingItemURL: &trashedURL)
+            }
+            await refreshSkills()
+            lastError = nil
+            return true
+        }
+
+        do {
+            var trashedURL: NSURL?
+            try fileManager.trashItem(at: skillURL, resultingItemURL: &trashedURL)
+            await refreshSkills()
+            lastError = nil
+            return true
+        } catch {
+            lastError = "无法卸载 Skill：\(error.localizedDescription)"
+            return false
+        }
+    }
+
     public func synchronizeManagedSkills() {
         let configuration = store.state.skillSyncConfiguration
         let mode: AIAgentSkillSynchronizationMode = switch configuration.mode {
@@ -322,15 +423,38 @@ public final class AIAgentWorkspace: ObservableObject {
         await runCLICommands([command]).first
     }
 
+    public var isRunningCLICommands: Bool {
+        cliCommandProgress?.state == .running
+    }
+
+    public func startCLICommands(
+        _ commands: [AIAgentCLICommand],
+        title: String,
+        kinds: [AgentCLIKind]
+    ) {
+        guard !commands.isEmpty, !isRunningCLICommands else { return }
+        lastError = nil
+        cliCommandProgress = AIAgentCLICommandProgress(
+            title: title,
+            kinds: kinds,
+            completedCount: 0,
+            totalCount: commands.count,
+            state: .running
+        )
+        cliCommandTask = Task { [weak self] in
+            await self?.performCLICommands(commands, title: title, kinds: kinds)
+        }
+    }
+
     public func runCLICommands(_ commands: [AIAgentCLICommand]) async -> [AIAgentProcessOutput] {
         var outputs: [AIAgentProcessOutput] = []
+        lastError = nil
         for command in commands {
             do {
                 let output = try await cliService.run(command)
                 outputs.append(output)
                 guard output.status == 0 else {
-                    let detail = output.standardError.trimmingCharacters(in: .whitespacesAndNewlines)
-                    lastError = detail.isEmpty ? "CLI 命令执行失败（退出码 \(output.status)）" : detail
+                    lastError = Self.cliCommandFailureMessage(for: command, output: output)
                     break
                 }
             } catch {
@@ -340,6 +464,89 @@ public final class AIAgentWorkspace: ObservableObject {
         }
         await refreshCLIs()
         return outputs
+    }
+
+    private func performCLICommands(
+        _ commands: [AIAgentCLICommand],
+        title: String,
+        kinds: [AgentCLIKind]
+    ) async {
+        defer { cliCommandTask = nil }
+        let cliService = cliService
+        var failures: [String] = []
+        var completedCount = 0
+
+        await withTaskGroup(of: String?.self) { group in
+            for command in commands {
+                group.addTask {
+                    do {
+                        let output = try await cliService.run(command)
+                        guard output.status != 0 else { return nil }
+                        return Self.cliCommandFailureMessage(for: command, output: output)
+                    } catch {
+                        return error.localizedDescription
+                    }
+                }
+            }
+            for await failure in group {
+                completedCount += 1
+                if let failure { failures.append(failure) }
+                cliCommandProgress = AIAgentCLICommandProgress(
+                    title: title,
+                    kinds: kinds,
+                    completedCount: completedCount,
+                    totalCount: commands.count,
+                    state: .running,
+                    detail: "正在并行执行 · \(completedCount)/\(commands.count) 已完成"
+                )
+            }
+        }
+
+        let failureDetail: String?
+        if failures.isEmpty {
+            failureDetail = nil
+        } else if failures.count == 1, let failure = failures.first {
+            failureDetail = failure
+        } else {
+            failureDetail = "\(failures.count) 项命令失败：\(failures.joined(separator: "；"))"
+        }
+        if failureDetail == nil, kinds.contains(.grok) {
+            grokUpdateState = .upToDate
+        }
+        cliCommandProgress = AIAgentCLICommandProgress(
+            title: title,
+            kinds: kinds,
+            completedCount: commands.count,
+            totalCount: commands.count,
+            state: .running,
+            detail: "正在重新检测 CLI 版本"
+        )
+        await refreshCLIs()
+        cliCommandProgress = AIAgentCLICommandProgress(
+            title: title,
+            kinds: kinds,
+            completedCount: commands.count,
+            totalCount: commands.count,
+            state: failureDetail == nil ? .succeeded : .failed,
+            detail: failureDetail ?? "已重新检测 CLI 版本"
+        )
+        lastError = failureDetail
+    }
+
+    nonisolated private static func cliCommandFailureMessage(
+        for command: AIAgentCLICommand,
+        output: AIAgentProcessOutput
+    ) -> String {
+        if output.didTimeout {
+            return "CLI 命令超时（超过 \(Int(command.timeout / 60)) 分钟），请检查网络后重试"
+        }
+        let detail = output.standardError.trimmingCharacters(in: .whitespacesAndNewlines)
+        if detail.contains("untrusted tap"),
+           let trustCommand = detail.components(separatedBy: "`").dropFirst().first,
+           !trustCommand.isEmpty {
+            return "Homebrew 需要先信任该公式：\(trustCommand)"
+        }
+        return detail.isEmpty ? "CLI 命令执行失败（退出码 \(output.status)）" : detail
     }
 
     public func importCLIProfileFile(_ data: Data, for accountID: UUID, authentication: Bool) {

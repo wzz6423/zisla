@@ -10,6 +10,7 @@ final class SideNoticeDisplayState: ObservableObject {
     @Published var compactWingHeight: CGFloat = 34
     @Published var reserveCompactWing = false
     @Published var compactStatusHidden = false
+    var compactStatusIDs: Set<String> = []
     /// Physical notch width; the detailed music layout must leave a gap here in the center. 0 on simulated-island devices.
     @Published var compactBarCenterInset: CGFloat = 0
 }
@@ -28,7 +29,7 @@ private struct CompactNotchBackground: View {
         case .black:
             Color.black
         case .frosted:
-            VisualEffectBackground(alphaValue: 0.80)
+            VisualEffectBackground(alphaValue: 0.92, material: .popover)
         }
     }
 }
@@ -226,10 +227,27 @@ struct CompactStatusBarView: View {
         (queue.left + queue.right).first { $0.id.hasPrefix("focus-mode-") }
     }
 
+    private var mailNotices: [IslandNotice] {
+        (queue.left + queue.right)
+            .filter { $0.id.hasPrefix("mail-notification-") }
+    }
+
+    private var mailLeftNotice: IslandNotice? {
+        mailNotices.first { $0.side == .left }
+    }
+
+    private var mailRightNotice: IslandNotice? {
+        mailNotices.first { $0.side == .right }
+    }
+
     private var activeAINotices: [IslandNotice] {
         (queue.left + queue.right)
             .filter { $0.id.hasPrefix("ai-active-") }
             .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var updateNotice: IslandNotice? {
+        (queue.left + queue.right).first { $0.id.hasPrefix("update-available-") }
     }
 
     private var selectedCompactStatusPriority: CompactStatusPriority? {
@@ -239,6 +257,8 @@ struct CompactStatusBarView: View {
     private func compactStatusIsAvailable(_ priority: CompactStatusPriority) -> Bool {
         switch priority {
         case .transient: transientNotice != nil
+        case .updateAvailable: updateNotice != nil
+        case .mail: !mailNotices.isEmpty
         case .videoDownload: videoDownloadNotice != nil
         case .browserDownload: browserDownloadNotice != nil
         case .focusCountdown: focusCountdownNotice != nil
@@ -258,6 +278,52 @@ struct CompactStatusBarView: View {
                     CompactHeadphoneConnectionBar(notice: transientNotice, height: height)
                 } else {
                     CompactFocusTransitionBar(notice: transientNotice, height: height)
+                }
+            }
+        case .updateAvailable:
+            if let updateNotice {
+                HStack(spacing: 0) {
+                    CompactUpdateWing(
+                        notice: updateNotice,
+                        side: .left,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                    Spacer(minLength: 0)
+                    CompactUpdateWing(
+                        notice: updateNotice,
+                        side: .right,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                }
+            }
+        case .mail:
+            if let resolvedLeftNotice = mailLeftNotice ?? mailRightNotice {
+                let resolvedRightNotice = mailRightNotice ?? resolvedLeftNotice
+                if settingsStore.settings.mailCompactStyle == .detailed {
+                    DetailedMailBar(
+                        leftNotice: resolvedLeftNotice,
+                        rightNotice: resolvedRightNotice,
+                        height: height,
+                        centerInset: displayState.compactBarCenterInset
+                    )
+                } else {
+                    HStack(spacing: 0) {
+                        CompactMailWing(
+                            notice: resolvedLeftNotice,
+                            side: .left,
+                            height: height,
+                            usesTransparentBackground: compactWingsUseTransparentBackground
+                        )
+                        Spacer(minLength: 0)
+                        CompactMailWing(
+                            notice: resolvedRightNotice,
+                            side: .right,
+                            height: height,
+                            usesTransparentBackground: compactWingsUseTransparentBackground
+                        )
+                    }
                 }
             }
         case .videoDownload:
@@ -885,6 +951,43 @@ private enum CompactAIWingRole {
     case status
 }
 
+private struct CompactUpdateWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground: Bool
+
+    private var isCLIUpdate: Bool { notice.id.hasPrefix("update-available-cli-") }
+
+    var body: some View {
+        Group {
+            if side == .left {
+                if isCLIUpdate {
+                    AIMascotView(identity: AIMascotIdentity(noticeID: notice.id), size: min(20, height * 0.62))
+                } else {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: min(19, height * 0.58), height: min(19, height * 0.58))
+                }
+            } else {
+                Image(systemName: "arrow.up.circle")
+                    .font(.system(size: min(14, height * 0.46), weight: .semibold))
+                    .foregroundStyle(.cyan)
+            }
+        }
+        .frame(width: CompactStatusMetrics.wingWidth, height: height)
+        .background(
+            usesTransparentBackground ? Color.clear : Color.black,
+            in: CompactAIWingShape(side: side)
+        )
+        .contentShape(CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(side == .left ? "\(notice.title)有可用更新" : "立即升级"))
+    }
+}
+
 private struct CompactAIWing: View {
     var notices: [IslandNotice]
     var count: Int
@@ -929,7 +1032,7 @@ private struct CompactAIWing: View {
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(
-            role == .identity ? "AI 任务图标" : "\(count) 个 AI 任务\(statusDescription)"
+            role == .identity ? "AI 任务图标" : "\(count) 个 AI 任务\(statusDescription)\(errorAccessibilityText)"
         ))
     }
 
@@ -966,6 +1069,14 @@ private struct CompactAIWing: View {
         if notices.contains(where: { $0.kind == .error }) { return "有错误" }
         if notices.contains(where: { $0.kind == .warning }) { return "等待操作" }
         return "正在运行"
+    }
+
+    private var errorCount: Int {
+        notices.count(where: { $0.kind == .error })
+    }
+
+    private var errorAccessibilityText: String {
+        errorCount > 0 ? "，其中 \(errorCount) 个错误" : ""
     }
 }
 
@@ -1375,6 +1486,92 @@ private struct CompactFocusModeWing: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("专注模式：\(notice.title)"))
         .help("专注模式：\(notice.title)")
+    }
+}
+
+private struct CompactMailWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    var body: some View {
+        Group {
+            if side == .left {
+                Image(systemName: notice.symbolName ?? "envelope.fill")
+                    .font(.system(size: min(15, height * 0.56), weight: .semibold))
+            } else {
+                Text(notice.title)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
+        .frame(
+            width: CompactStatusMetrics.wingWidth,
+            height: height,
+            alignment: side == .left ? .leading : .trailing
+        )
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+        .contentShape(CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(side == .left ? "新邮件" : "新邮件 \(notice.title) 封"))
+    }
+}
+
+private struct DetailedMailBar: View {
+    private static let maximumContentWidth: CGFloat = 160
+
+    var leftNotice: IslandNotice
+    var rightNotice: IslandNotice
+    var height: CGFloat
+    var centerInset: CGFloat
+
+    var body: some View {
+        GeometryReader { geometry in
+            let reservedCenterWidth = min(centerInset, geometry.size.width)
+            let sideWidth = min(
+                Self.maximumContentWidth,
+                max(0, (geometry.size.width - reservedCenterWidth) / 2)
+            )
+            let centerWidth = max(0, geometry.size.width - sideWidth * 2)
+            HStack(spacing: 0) {
+                HStack(spacing: 7) {
+                    Image(systemName: leftNotice.symbolName ?? "envelope.fill")
+                        .font(.system(size: min(15, height * 0.56), weight: .semibold))
+                    Text(leftNotice.title)
+                        .font(.system(size: 10, weight: .semibold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .padding(.leading, CompactStatusMetrics.horizontalContentInset)
+                .padding(.trailing, 8)
+                .frame(width: sideWidth, height: height, alignment: .leading)
+
+                Spacer(minLength: 0)
+                    .frame(width: centerWidth)
+
+                HStack(spacing: 6) {
+                    Text(leftNotice.detail ?? "未知发件人")
+                        .font(.system(size: 9, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Text(rightNotice.title)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+                .padding(.leading, 8)
+                .padding(.trailing, CompactStatusMetrics.horizontalContentInset)
+                .frame(width: sideWidth, height: height, alignment: .trailing)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+        }
+        .foregroundStyle(.white)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("新邮件：\(leftNotice.title)，来自 \(leftNotice.detail ?? "未知发件人")，共 \(rightNotice.title) 封"))
     }
 }
 

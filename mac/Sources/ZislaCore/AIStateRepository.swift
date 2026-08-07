@@ -37,7 +37,7 @@ public struct AIStateRepository {
     public init(
         directoryURL: URL,
         fileManager _: FileManager = .default,
-        maximumUsageSamples: Int = 20_000
+        maximumUsageSamples: Int = 30_000
     ) {
         self.directoryURL = directoryURL
         self.maximumUsageSamples = max(1, maximumUsageSamples)
@@ -81,12 +81,22 @@ public struct AIStateRepository {
 
     @discardableResult
     public func recordUsage(_ samples: [AIUsageSample]) throws -> Int {
-        try openDatabase().recordUsage(samples)
+        try openDatabase().recordUsage(
+            AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
+        )
+    }
+
+    /// Stores detected daily totals as deltas so re-scans cannot duplicate usage or overwrite manual reports.
+    @discardableResult
+    public func recordDetectedUsage(_ samples: [AIUsageSample]) throws -> Int {
+        try openDatabase().recordDetectedUsage(
+            AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
+        )
     }
 
     public func stateRecordingUsage(_ samples: [AIUsageSample]) throws -> AIState {
         let database = try openDatabase()
-        _ = try database.recordUsage(samples)
+        _ = try database.recordUsage(AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current))
         return try database.load()
     }
 

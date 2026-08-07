@@ -107,7 +107,7 @@ Codex、ChatGPT、Gemini、Grok、Qoder、Qwen 只需替换 `--provider`。ChatG
 
 AI 运行列表和折叠状态使用各工具的官方 Logo 标识任务来源。
 
-完整参数见 [CLI 参考](Docs/cli-reference.md)。
+接入协议见 [CLI 接入设计](Docs/cli-reference.md)。
 
 ## 下载器
 
@@ -177,8 +177,8 @@ python3 -m http.server 4173
 ## 文档
 
 - [架构与性能设计](Docs/architecture.md)
-- [CLI 参考](Docs/cli-reference.md)
-- [签名与发布](Docs/releasing.md)
+- [CLI 接入设计](Docs/cli-reference.md)
+- [签名与发布设计](Docs/releasing.md)
 
 ## 系统限制
 

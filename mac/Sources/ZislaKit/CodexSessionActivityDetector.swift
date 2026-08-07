@@ -2,6 +2,8 @@ import Foundation
 import ZislaCore
 
 public final class CodexSessionActivityDetector {
+    public static let defaultMaximumRolloutAge: TimeInterval = 30 * 24 * 60 * 60
+
     private struct Candidate {
         var url: URL
         var modificationDate: Date
@@ -21,21 +23,22 @@ public final class CodexSessionActivityDetector {
     }
 
     private struct StatusSignal {
-        enum Kind {
-            case blocked(callID: String)
-            case output(callID: String?, failed: Bool)
-        }
-
         var turnID: String
-        var kind: Kind
+        var failed: Bool
         var timestamp: Date
+        var reason: String?
     }
 
     private struct ParsedResponseItem {
         var turnID: String?
         var callID: String?
-        var signal: StatusSignal.Kind?
+        var failed: Bool?
         var timestamp: Date
+        var failureReason: String?
+    }
+
+    private struct RecordEnvelope: Decodable {
+        var type: String
     }
 
     private struct EventEnvelope: Decodable {
@@ -122,9 +125,11 @@ public final class CodexSessionActivityDetector {
     public let sessionsDirectory: URL
     public let sessionIndexURL: URL
     public let maxRolloutFiles: Int
+    public let maximumRolloutAge: TimeInterval
 
     private let fileManager: FileManager
     private let jsonlReader: IncrementalJSONLReader
+    private let now: () -> Date
     private var cache: [URL: CachedRollout] = [:]
     private var sessionIndexCache: CachedSessionIndex?
 
@@ -132,17 +137,21 @@ public final class CodexSessionActivityDetector {
         sessionsDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".codex/sessions", isDirectory: true),
         sessionIndexURL: URL? = nil,
-        maxRolloutFiles: Int = 12,
-        initialTailBytes: Int = 1_024 * 1_024,
-        fileManager: FileManager = .default
+        maxRolloutFiles: Int = .max,
+        initialTailBytes: Int = .max,
+        maximumRolloutAge: TimeInterval = CodexSessionActivityDetector.defaultMaximumRolloutAge,
+        fileManager: FileManager = .default,
+        now: @escaping () -> Date = Date.init
     ) {
         self.sessionsDirectory = sessionsDirectory
         self.sessionIndexURL = sessionIndexURL
             ?? sessionsDirectory.deletingLastPathComponent()
                 .appendingPathComponent("session_index.jsonl")
         self.maxRolloutFiles = max(1, maxRolloutFiles)
+        self.maximumRolloutAge = max(0, maximumRolloutAge)
         jsonlReader = IncrementalJSONLReader(initialTailBytes: initialTailBytes)
         self.fileManager = fileManager
+        self.now = now
     }
 
     public func activeTasks() throws -> [AIProgressTask] {
@@ -159,6 +168,18 @@ public final class CodexSessionActivityDetector {
             sessionID: String?
         )] = []
         var statusSignalsByTurnID: [String: [StatusSignal]] = [:]
+        var mergedModelsByTurnID: [String: String] = [:]
+        var mergedEffortsByTurnID: [String: String] = [:]
+
+        for candidate in candidates {
+            let activity = try activity(in: candidate)
+            mergedModelsByTurnID.merge(activity.modelsByTurnID) { _, new in new }
+            mergedEffortsByTurnID.merge(activity.effortsByTurnID) { _, new in new }
+            for signal in activity.statusSignals {
+                statusSignalsByTurnID[signal.turnID, default: []].append(signal)
+            }
+        }
+
         for candidate in candidates {
             let activity = try activity(in: candidate)
             let candidateEvents = activity.events
@@ -173,14 +194,11 @@ public final class CodexSessionActivityDetector {
                 return (
                     event,
                     activityDate,
-                    activity.modelsByTurnID[event.turnID],
-                    activity.effortsByTurnID[event.turnID],
+                    mergedModelsByTurnID[event.turnID],
+                    mergedEffortsByTurnID[event.turnID],
                     activity.sessionID
                 )
             })
-            for signal in activity.statusSignals {
-                statusSignalsByTurnID[signal.turnID, default: []].append(signal)
-            }
         }
         allEvents.sort {
             if $0.event.timestamp != $1.event.timestamp {
@@ -206,12 +224,13 @@ public final class CodexSessionActivityDetector {
             }
         }
 
-        return active.values
+        let activeTurnIDs = Set(active.keys)
+        let tasks = active.values
             .map { record in
                 let event = record.event
                 let provider = Self.provider(forModel: record.model)
                 let fallbackTitle = provider == .gpt ? "ChatGPT" : "Codex"
-                let status = Self.status(
+                let (status, reason) = Self.statusAndReason(
                     from: statusSignalsByTurnID[event.turnID] ?? [],
                     startedAt: event.timestamp
                 )
@@ -225,13 +244,16 @@ public final class CodexSessionActivityDetector {
                     updatedAt: record.activityDate,
                     sessionURL: record.sessionID.flatMap(Self.sessionURL(for:)),
                     effort: record.effort,
-                    startedAt: event.timestamp
+                    startedAt: event.timestamp,
+                    failureReason: reason
                 )
             }
             .sorted {
                 if $0.updatedAt != $1.updatedAt { return $0.updatedAt > $1.updatedAt }
                 return $0.id < $1.id
             }
+        retainOnlyActiveActivity(for: activeTurnIDs)
+        return tasks
     }
 
     public static func taskID(forTurnID turnID: String) -> String {
@@ -252,23 +274,14 @@ public final class CodexSessionActivityDetector {
         }
     }
 
-    private static func status(from signals: [StatusSignal], startedAt: Date) -> AIProgressStatus {
-        var blockedCallIDs: Set<String> = []
-        var hasError = false
-        for signal in signals
+    private static func statusAndReason(from signals: [StatusSignal], startedAt: Date) -> (AIProgressStatus, String?) {
+        let latestSignal = signals
             .filter({ $0.timestamp >= startedAt })
-            .sorted(by: { $0.timestamp < $1.timestamp }) {
-            switch signal.kind {
-            case let .blocked(callID):
-                blockedCallIDs.insert(callID)
-            case let .output(callID, failed):
-                if let callID { blockedCallIDs.remove(callID) }
-                hasError = failed
-            }
+            .max(by: { $0.timestamp < $1.timestamp })
+        guard latestSignal?.failed == true else {
+            return (.running, nil)
         }
-        if hasError { return .error }
-        if !blockedCallIDs.isEmpty { return .blocked }
-        return .running
+        return (.error, latestSignal?.reason)
     }
 
     private func recentRollouts() -> [Candidate] {
@@ -276,84 +289,46 @@ public final class CodexSessionActivityDetector {
             return []
         }
 
-        var candidatesByURL: [URL: Candidate] = [:]
-        for directory in rolloutSearchDirectories() {
-            guard let enumerator = fileManager.enumerator(
-                at: directory,
-                includingPropertiesForKeys: [
+        guard let enumerator = fileManager.enumerator(
+            at: sessionsDirectory,
+            includingPropertiesForKeys: [
+                .isRegularFileKey,
+                .contentModificationDateKey,
+                .fileSizeKey,
+            ],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        let minimumModificationDate = now().addingTimeInterval(-maximumRolloutAge)
+        var candidates: [Candidate] = []
+        for case let url as URL in enumerator {
+            guard url.lastPathComponent.hasPrefix("rollout-"),
+                  url.pathExtension == "jsonl",
+                  let values = try? url.resourceValues(forKeys: [
                     .isRegularFileKey,
                     .contentModificationDateKey,
                     .fileSizeKey,
-                ],
-                options: [.skipsHiddenFiles]
-            ) else {
+                  ]),
+                  values.isRegularFile == true else {
                 continue
             }
-
-            for case let url as URL in enumerator {
-                guard url.lastPathComponent.hasPrefix("rollout-"),
-                      url.pathExtension == "jsonl",
-                      let values = try? url.resourceValues(forKeys: [
-                        .isRegularFileKey,
-                        .contentModificationDateKey,
-                        .fileSizeKey,
-                      ]),
-                      values.isRegularFile == true else {
-                    continue
-                }
-                candidatesByURL[url] = Candidate(
-                    url: url,
-                    modificationDate: values.contentModificationDate ?? .distantPast,
-                    size: UInt64(max(0, values.fileSize ?? 0))
-                )
-            }
+            let modificationDate = values.contentModificationDate ?? .distantPast
+            guard modificationDate >= minimumModificationDate else { continue }
+            candidates.append(Candidate(
+                url: url,
+                modificationDate: modificationDate,
+                size: UInt64(max(0, values.fileSize ?? 0))
+            ))
         }
 
-        return Array(candidatesByURL.values.sorted {
+        return Array(candidates.sorted {
             if $0.modificationDate != $1.modificationDate {
                 return $0.modificationDate > $1.modificationDate
             }
             return $0.url.path < $1.url.path
         }.prefix(maxRolloutFiles))
-    }
-
-    private func rolloutSearchDirectories() -> [URL] {
-        let years = numericDirectories(at: sessionsDirectory, componentLength: 4, limit: 2)
-        guard !years.isEmpty else { return [sessionsDirectory] }
-
-        var days: [URL] = []
-        for year in years {
-            for month in numericDirectories(at: year, componentLength: 2, limit: 2) {
-                days.append(contentsOf: numericDirectories(
-                    at: month,
-                    componentLength: 2,
-                    limit: 4
-                ))
-            }
-        }
-        return days.isEmpty ? [sessionsDirectory] : days
-    }
-
-    private func numericDirectories(
-        at root: URL,
-        componentLength: Int,
-        limit: Int
-    ) -> [URL] {
-        guard let entries = try? fileManager.contentsOfDirectory(
-            at: root,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return []
-        }
-        return Array(entries.filter { url in
-            guard url.lastPathComponent.count == componentLength,
-                  Int(url.lastPathComponent) != nil,
-                  let values = try? url.resourceValues(forKeys: [.isDirectoryKey]) else {
-                return false
-            }
-            return values.isDirectory == true
-        }.sorted { $0.lastPathComponent > $1.lastPathComponent }.prefix(limit))
     }
 
     private func activity(in candidate: Candidate) throws -> RolloutActivity {
@@ -401,32 +376,44 @@ public final class CodexSessionActivityDetector {
             fileSize: candidate.size,
             state: &readerState
         ) { data in
-            if let sessionID = parseSessionID(data) {
-                next.sessionID = sessionID
-            } else if let context = parseTurnContext(data) {
+            guard let type = parseRecordType(data) else { return }
+            switch type {
+            case "session_meta":
+                if let sessionID = parseSessionID(data) {
+                    next.sessionID = sessionID
+                }
+            case "turn_context":
+                if let context = parseTurnContext(data) {
                 next.modelsByTurnID[context.turnID] = context.model
                 if let effort = context.effort {
                     next.effortsByTurnID[context.turnID] = effort
                 }
-            } else if let item = parseResponseItem(data) {
+                }
+            case "response_item":
+                guard let item = parseResponseItem(data) else { return }
                 if let callID = item.callID, let turnID = item.turnID {
                     next.turnIDsByCallID[callID] = turnID
                 }
                 let turnID = item.turnID ?? item.callID.flatMap { next.turnIDsByCallID[$0] }
-                if let turnID, let signal = item.signal {
+                if let turnID, let failed = item.failed {
                     next.statusSignals.append(StatusSignal(
                         turnID: turnID,
-                        kind: signal,
-                        timestamp: item.timestamp
+                        failed: failed,
+                        timestamp: item.timestamp,
+                        reason: item.failureReason
                     ))
                 }
-            } else if let event = parseEvent(data) {
-                next.events.append(event)
+            case "event_msg":
+                if let event = parseEvent(data) {
+                    next.events.append(event)
+                }
+            default:
+                break
             }
         }
         next.readerState = readerState
         next.modificationDate = candidate.modificationDate
-        pruneCachedActivity(&next)
+        coalesceCachedActivity(&next)
 
         cache[candidate.url] = next
         return RolloutActivity(
@@ -438,20 +425,41 @@ public final class CodexSessionActivityDetector {
         )
     }
 
-    private func pruneCachedActivity(_ cached: inout CachedRollout) {
-        let maximumEvents = 256
-        if cached.events.count > maximumEvents {
-            cached.events.removeFirst(cached.events.count - maximumEvents)
+    private func coalesceCachedActivity(_ cached: inout CachedRollout) {
+        var latestEvents: [String: Event] = [:]
+        for event in cached.events {
+            guard let previous = latestEvents[event.turnID] else {
+                latestEvents[event.turnID] = event
+                continue
+            }
+            if event.timestamp > previous.timestamp
+                || (event.timestamp == previous.timestamp
+                    && Self.sortOrder(for: event.kind) >= Self.sortOrder(for: previous.kind)) {
+                latestEvents[event.turnID] = event
+            }
         }
-        let trackedTurnIDs = Set(cached.events.map(\.turnID))
-        cached.modelsByTurnID = cached.modelsByTurnID.filter { trackedTurnIDs.contains($0.key) }
-        cached.effortsByTurnID = cached.effortsByTurnID.filter { trackedTurnIDs.contains($0.key) }
-        cached.turnIDsByCallID = cached.turnIDsByCallID.filter {
-            trackedTurnIDs.contains($0.value)
+        cached.events = Array(latestEvents.values)
+
+        var latestStatusSignals: [String: StatusSignal] = [:]
+        for signal in cached.statusSignals {
+            if latestStatusSignals[signal.turnID]?.timestamp ?? .distantPast <= signal.timestamp {
+                latestStatusSignals[signal.turnID] = signal
+            }
         }
-        cached.statusSignals = Array(cached.statusSignals
-            .filter { trackedTurnIDs.contains($0.turnID) }
-            .suffix(512))
+        cached.statusSignals = Array(latestStatusSignals.values)
+    }
+
+    private func retainOnlyActiveActivity(for activeTurnIDs: Set<String>) {
+        for (url, var cached) in cache {
+            cached.events = cached.events.filter { activeTurnIDs.contains($0.turnID) }
+            cached.statusSignals = cached.statusSignals.filter { activeTurnIDs.contains($0.turnID) }
+            cached.modelsByTurnID = cached.modelsByTurnID.filter { activeTurnIDs.contains($0.key) }
+            cached.effortsByTurnID = cached.effortsByTurnID.filter { activeTurnIDs.contains($0.key) }
+            cached.turnIDsByCallID = cached.turnIDsByCallID.filter {
+                activeTurnIDs.contains($0.value)
+            }
+            cache[url] = cached
+        }
     }
 
     private func sessionTitlesByID() -> [String: String] {
@@ -509,39 +517,24 @@ public final class CodexSessionActivityDetector {
         let metadata = payload["internal_chat_message_metadata_passthrough"] as? [String: Any]
         let turnID = metadata?["turn_id"] as? String
         let callID = payload["call_id"] as? String
-        let signal: StatusSignal.Kind?
+        let failed: Bool?
+        let failureReason: String?
         switch payloadType {
-        case "function_call", "custom_tool_call":
-            let name = (payload["name"] as? String)?.lowercased()
-            let input = (payload["arguments"] as? String) ?? (payload["input"] as? String) ?? ""
-            if (name == "request_user_input" || Self.requiresApproval(input)),
-               let callID {
-                signal = .blocked(callID: callID)
-            } else {
-                signal = nil
-            }
         case "function_call_output", "custom_tool_call_output":
-            signal = .output(
-                callID: callID,
-                failed: Self.outputIndicatesError(payload["output"])
-            )
+            let output = payload["output"]
+            failed = Self.outputIndicatesError(output)
+            failureReason = failed == true ? Self.extractFailureReason(from: output) : nil
         default:
-            signal = nil
+            failed = nil
+            failureReason = nil
         }
         return ParsedResponseItem(
             turnID: turnID,
             callID: callID,
-            signal: signal,
-            timestamp: timestamp
+            failed: failed,
+            timestamp: timestamp,
+            failureReason: failureReason
         )
-    }
-
-    private static func requiresApproval(_ input: String) -> Bool {
-        let compact = input.lowercased().filter { !$0.isWhitespace }
-        return compact.contains(#"sandbox_permissions:"require_escalated""#)
-            || compact.contains(#""sandbox_permissions":"require_escalated""#)
-            || compact.contains("sandbox_permissions:'require_escalated'")
-            || compact.contains("'sandbox_permissions':'require_escalated'")
     }
 
     private static func outputIndicatesError(_ value: Any?) -> Bool {
@@ -573,6 +566,67 @@ public final class CodexSessionActivityDetector {
         return false
     }
 
+    private static func extractFailureReason(from value: Any?) -> String? {
+        guard let value, !(value is NSNull) else { return nil }
+        if let values = value as? [Any] {
+            for item in values {
+                if let reason = extractFailureReason(from: item) {
+                    return reason
+                }
+            }
+            return nil
+        }
+        if let object = value as? [String: Any] {
+            if let output = object["output"] as? String, !output.isEmpty {
+                if let nestedData = output.data(using: .utf8),
+                   let nested = try? JSONSerialization.jsonObject(with: nestedData),
+                   let nestedReason = extractFailureReason(from: nested) {
+                    return nestedReason
+                }
+                return normalizeFailureReason(output)
+            }
+            if let text = object["text"] as? String, !text.isEmpty {
+                if let nestedData = text.data(using: .utf8),
+                   let nested = try? JSONSerialization.jsonObject(with: nestedData),
+                   let nestedReason = extractFailureReason(from: nested) {
+                    return nestedReason
+                }
+                return normalizeFailureReason(text)
+            }
+            if let message = object["message"] as? String, !message.isEmpty {
+                return normalizeFailureReason(message)
+            }
+            for key in ["structuredContent", "result"] {
+                if let reason = extractFailureReason(from: object[key]) {
+                    return reason
+                }
+            }
+            return nil
+        }
+        if let text = value as? String {
+            if let nestedData = text.data(using: .utf8),
+               let nested = try? JSONSerialization.jsonObject(with: nestedData),
+               let reason = extractFailureReason(from: nested) {
+                return reason
+            }
+            return text.isEmpty ? nil : normalizeFailureReason(text)
+        }
+        return nil
+    }
+
+    private static func normalizeFailureReason(_ raw: String) -> String? {
+        let parts = raw.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+            .filter { !$0.isEmpty }
+        let collapsed = parts.joined(separator: " ")
+        guard !collapsed.isEmpty else { return nil }
+        let maxLength = 200
+        guard collapsed.count > maxLength else {
+            return collapsed
+        }
+        let end = collapsed.index(collapsed.startIndex, offsetBy: maxLength)
+        return String(collapsed[..<end]) + "…"
+    }
+
     private static func integerValue(_ value: Any?) -> Int? {
         if let number = value as? NSNumber { return number.intValue }
         if let string = value as? String { return Int(string) }
@@ -584,6 +638,10 @@ public final class CodexSessionActivityDetector {
             return date
         }
         return try? Date.ISO8601FormatStyle().parse(value)
+    }
+
+    private func parseRecordType(_ data: Data) -> String? {
+        try? JSONDecoder().decode(RecordEnvelope.self, from: data).type
     }
 
     private func parseEvent(_ data: Data) -> Event? {

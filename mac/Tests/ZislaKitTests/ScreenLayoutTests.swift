@@ -66,6 +66,24 @@ struct ScreenLayoutTests {
     }
 
     @Test
+    func physicalNotchStaysCenteredWhenAuxiliaryAreasAreAsymmetric() {
+        let screen = ScreenSnapshot(
+            displayID: 43,
+            frame: CGRect(x: -1_920, y: -180, width: 1_920, height: 1_080),
+            visibleFrame: CGRect(x: -1_920, y: -180, width: 1_920, height: 1_048),
+            safeAreaInsets: ScreenInsets(top: 32),
+            auxiliaryTopLeftArea: CGRect(x: -1_920, y: 868, width: 860, height: 32),
+            auxiliaryTopRightArea: CGRect(x: -940, y: 868, width: 940, height: 32)
+        )
+
+        let layout = engine.layout(for: screen)
+
+        #expect(layout.collapsedFrame.width == 120)
+        #expect(layout.collapsedFrame.midX == screen.frame.midX)
+        #expect(layout.expandedFrame.midX == screen.frame.midX)
+    }
+
+    @Test
     func physicalNotchAndExternalIslandKeepIndependentTopAnchors() throws {
         let notchedScreen = ScreenSnapshot(
             displayID: 42,

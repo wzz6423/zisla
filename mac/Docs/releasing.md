@@ -1,8 +1,8 @@
-# 签名与发布
+# 签名与发布设计
 
-项目的完整发布流程、双更新通道、GitHub/Gitee 的资产同步、Sparkle 与 Gitee 凭据来源，以及 v0.1.0 Preview 的实际经验已沉淀在仓库根目录的 [`skills/zisla-release`](../../skills/zisla-release/SKILL.md)。发布时以该技能为准。
+项目的完整发布流程、双更新通道、GitHub/Gitee 的资产同步，以及 Sparkle 与 Gitee 凭据来源由仓库根目录的 [`skills/zisla-release`](../../skills/zisla-release/SKILL.md) 统一维护。本页只说明签名、公证和更新包的设计约束；发布时以该技能为准。
 
-本页保留 Developer ID 与公证的补充说明。免费 ad-hoc Preview 同样可以使用 Sparkle EdDSA 自动更新，但不能公证，首次打开可能需要在系统设置中选择“仍要打开”。
+Developer ID 发布包需要公证；免费 ad-hoc Preview 可以使用 Sparkle EdDSA 自动更新，但不能公证，首次打开可能需要在系统设置中选择“仍要打开”。
 
 ## 前提
 

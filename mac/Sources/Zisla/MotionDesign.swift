@@ -251,9 +251,8 @@ struct IslandLightField: View {
                     )
                 }
             } else {
-                // The field moves over tens of seconds, so 20 fps is visually continuous while
-                // avoiding display-rate redraws on ProMotion panels.
-                TimelineView(.periodic(from: .now, by: 1.0 / 20.0)) { timeline in
+                // The field moves over tens of seconds, so 10 fps remains visually continuous.
+                TimelineView(.periodic(from: .now, by: 1.0 / 10.0)) { timeline in
                     let time = timeline.date.timeIntervalSinceReferenceDate
                     Canvas(rendersAsynchronously: true) { context, size in
                         Self.draw(
@@ -404,6 +403,47 @@ struct IslandRimLight: View {
     }
 }
 
+// MARK: - Selection glass background
+
+/// Unified selection state background: subtle frosted glass with soft highlight and shadow.
+/// Shared across Quick Notes rows, PDF tool navigation, and outlined pickers.
+struct SelectionGlassBackground: View {
+    var cornerRadius: CGFloat = 7
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(fillColor)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        stops: [
+                            .init(color: edgeColor.opacity(0.10), location: 0),
+                            .init(color: edgeColor.opacity(0.03), location: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.5
+                )
+        }
+        .shadow(color: .black.opacity(0.025), radius: 1, y: 0.5)
+    }
+
+    private var fillColor: Color {
+        let opacity = colorScheme == .dark
+            ? (reduceTransparency ? 0.12 : 0.10)
+            : (reduceTransparency ? 0.08 : 0.055)
+        return Color.primary.opacity(opacity)
+    }
+
+    private var edgeColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+}
+
 // MARK: - Selection illumination
 
 /// A moving dark-glass focus lens: the glyph settles into place while an outer pulse expands
@@ -474,7 +514,7 @@ struct MotionFocusLens: View {
     }
 }
 
-/// A compact text switch with a neutral outlined selection indicator, shared by the settings
+/// A compact text switch with the shared frosted selection background, used by settings
 /// appearance rows and the download format switch.
 struct IslandOutlinedPicker<Option: Hashable>: View {
     @Binding var selection: Option
@@ -485,6 +525,7 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
     var fontSize: CGFloat = 9
     var width: CGFloat = 168
     var height: CGFloat = 34
+    var usesGlassSelection = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var selectionNamespace
 
@@ -496,7 +537,8 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
         symbol: ((Option) -> String)? = nil,
         fontSize: CGFloat = 9,
         width: CGFloat = 168,
-        height: CGFloat = 34
+        height: CGFloat = 34,
+        usesGlassSelection: Bool = true
     ) {
         _selection = selection
         self.options = options
@@ -506,6 +548,7 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
         self.fontSize = fontSize
         self.width = width
         self.height = height
+        self.usesGlassSelection = usesGlassSelection
     }
 
     var body: some View {
@@ -537,8 +580,7 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
         .foregroundStyle(isSelected ? Color.primary : Color.secondary)
         .background {
             if isSelected {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.50), lineWidth: 1)
+                selectionBackground
                     .matchedGeometryEffect(id: selectionID, in: selectionNamespace)
             }
         }
@@ -547,12 +589,22 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
     }
 
     @ViewBuilder
+    private var selectionBackground: some View {
+        if usesGlassSelection {
+            SelectionGlassBackground(cornerRadius: 6)
+        } else {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.white.opacity(0.16))
+        }
+    }
+
+    @ViewBuilder
     private func optionLabel(_ option: Option, isSelected: Bool) -> some View {
         HStack(spacing: 4) {
             if let symbol {
                 Image(systemName: symbol(option))
             }
-            Text(title(option))
+            AppLocalizedText(title(option))
                 .lineLimit(1)
         }
         .font(.system(size: fontSize, weight: isSelected ? .semibold : .medium))

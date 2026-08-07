@@ -15,6 +15,14 @@ private enum ClipboardFilter: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var scope: ClipboardHistoryScope {
+        switch self {
+        case .all: .all
+        case .pinned: .pinned
+        case .history: .history
+        }
+    }
+
     var title: String {
         switch self {
         case .all: "全部"
@@ -52,6 +60,7 @@ struct ClipboardHistoryModuleView: View {
     @State private var filter: ClipboardFilter = .all
     @State private var additionPresentation: ClipboardAdditionPresentation?
     @State private var draftText = ""
+    @State private var searchText = ""
     @FocusState private var isDraftTextFocused: Bool
     private let copyItem: (ClipboardHistoryItem) -> Void
     private let sendToQuickNote: (ClipboardHistoryItem) -> Void
@@ -73,13 +82,24 @@ struct ClipboardHistoryModuleView: View {
         sendToAIAgent = { model.sendClipboardHistoryItemToAIAgent($0) }
     }
 
-    /// Items visible under the current filter (used for count and empty-state checks).
     private var visibleItems: [ClipboardHistoryItem] {
         switch filter {
-        case .all: return store.pinnedItems + store.historyItems
-        case .pinned: return store.pinnedItems
-        case .history: return store.historyItems
+        case .all: visiblePinnedItems + visibleHistoryItems
+        case .pinned: visiblePinnedItems
+        case .history: visibleHistoryItems
         }
+    }
+
+    private var visiblePinnedItems: [ClipboardHistoryItem] {
+        store.pinnedItems
+    }
+
+    private var visibleHistoryItems: [ClipboardHistoryItem] {
+        store.historyItems
+    }
+
+    private var queryID: String {
+        filter.rawValue + "\u{0}" + searchText
     }
 
     var body: some View {
@@ -88,7 +108,7 @@ struct ClipboardHistoryModuleView: View {
                 Label("剪贴板", systemImage: "clipboard")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Text("\(visibleItems.count)/\(store.capacity)")
+                Text("\(store.totalItemCount)")
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
                 if filter == .pinned {
@@ -108,7 +128,6 @@ struct ClipboardHistoryModuleView: View {
                 ) {
                     store.removeAllHistory()
                 }
-                .disabled(store.historyItems.isEmpty)
             }
             .frame(height: 30)
             .padding(.horizontal, 10)
@@ -119,7 +138,36 @@ struct ClipboardHistoryModuleView: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 8)
 
-            if visibleItems.isEmpty {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                TextField("搜索", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.fillControl)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
+
+            if store.isLoading && visibleItems.isEmpty {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if visibleItems.isEmpty {
                 EmptyState(
                     symbol: filter == .pinned ? "star" : "clipboard",
                     title: emptyStateTitle,
@@ -129,15 +177,15 @@ struct ClipboardHistoryModuleView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
                         if filter == .all {
-                            if !store.pinnedItems.isEmpty {
+                            if !visiblePinnedItems.isEmpty {
                                 sectionTitle("常用")
-                                ForEach(store.pinnedItems) { item in
+                                ForEach(visiblePinnedItems) { item in
                                     itemRow(item)
                                 }
                             }
-                            if !store.historyItems.isEmpty {
+                            if !visibleHistoryItems.isEmpty {
                                 sectionTitle("非常用")
-                                ForEach(store.historyItems) { item in
+                                ForEach(visibleHistoryItems) { item in
                                     itemRow(item)
                                 }
                             }
@@ -151,6 +199,37 @@ struct ClipboardHistoryModuleView: View {
                 }
                 .scrollIndicators(.visible)
                 .thinScrollChrome()
+            }
+
+            if store.pageCount > 1 {
+                Hairline()
+                HStack(spacing: 8) {
+                    Button {
+                        store.loadPreviousPage()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .frame(width: 24, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!store.canLoadPreviousPage)
+                    .help("上一页")
+
+                    Text("\(store.currentPage + 1)/\(store.pageCount)")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 42)
+
+                    Button {
+                        store.loadNextPage()
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .frame(width: 24, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!store.canLoadNextPage)
+                    .help("下一页")
+                }
+                .frame(height: 30)
             }
         }
         .frame(maxHeight: .infinity)
@@ -173,6 +252,13 @@ struct ClipboardHistoryModuleView: View {
                 }
                 .zIndex(1)
             }
+        }
+        .task(id: queryID) {
+            if !searchText.isEmpty {
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+            guard !Task.isCancelled else { return }
+            store.updateQuery(scope: filter.scope, searchText: searchText)
         }
     }
 
@@ -397,8 +483,7 @@ private struct ClipboardFilterSegmentedControl: View {
                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                     .background {
                         if isActive {
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .strokeBorder(.white, lineWidth: 1)
+                            SelectionGlassBackground(cornerRadius: 5)
                                 .matchedGeometryEffect(
                                     id: "clipboard-filter-selection",
                                     in: selectionNamespace

@@ -10,6 +10,15 @@ struct AIStateMonitorActivityDetectorTests {
     }
 
     @Test @MainActor
+    func defaultCodexDetectorScansAllRollouts() throws {
+        let detector = try #require(AIStateMonitor.defaultActivityDetectors()
+            .compactMap { $0 as? CodexSessionActivityDetector }
+            .first)
+
+        #expect(detector.maxRolloutFiles == .max)
+    }
+
+    @Test @MainActor
     func reloadMergesEveryInjectedProvider() {
         let directory = monitorTempDirectory("providers")
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -95,6 +104,35 @@ struct AIStateMonitorActivityDetectorTests {
         detector.replaceTasks(with: [])
         let removed = await waitForMonitorState { monitor.state.tasks.isEmpty }
         #expect(removed)
+    }
+
+    @Test @MainActor
+    func reloadImmediatelyRemovesTaskNoLongerReturnedByDetector() {
+        let directory = monitorTempDirectory("immediate-removal")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let now = Date(timeIntervalSince1970: 1_910_000_000)
+        let task = AIProgressTask(
+            id: "automatic-removed",
+            provider: .codex,
+            title: "Codex",
+            progress: nil,
+            status: .running,
+            updatedAt: now
+        )
+        let detector = MutableActivityDetector(tasks: [task])
+        let monitor = AIStateMonitor(
+            directoryURL: directory,
+            activityDetectors: [detector],
+            activeTaskTTL: .greatestFiniteMagnitude,
+            now: { now }
+        )
+
+        monitor.reload()
+        #expect(monitor.state.tasks == [task])
+
+        detector.replaceTasks(with: [])
+        monitor.reload()
+        #expect(monitor.state.tasks.isEmpty)
     }
 }
 

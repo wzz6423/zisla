@@ -14,6 +14,7 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 - Release 包自动检查并安装 Release feed；Preview 包自动检查并安装 Preview feed。设置页的跨通道选择只在用户主动检查时生效，不能改变后续自动更新通道。
 - 为每次可安装构建分配全局严格递增的 `BUILD_NUMBER`，不要按通道分别从 1 计数。
 - 将 `CFBundleShortVersionString` 用作用户可见版本，将 `CFBundleVersion`（即 `BUILD_NUMBER`）用作 Sparkle 与 macOS 的安装顺序。
+- 每次打包都必须从发布机或 CI 的安全构建配置注入同一份 `SPARKLE_PUBLIC_KEY`。构建脚本会拒绝缺失、非 Base64 或解码后不是 32 字节的公钥；不得把密钥常量写入仓库。
 - 不要声称 Sparkle 支持真正的降级。Sparkle 会拒绝较低的 `CFBundleVersion`；历史版本回退只能手动下载 DMG 安装。
 - 保留 Preview 为 prerelease；只有正式 Release 才应成为 GitHub 的 Latest。
 
@@ -24,7 +25,7 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 1. 确认工作树中只有预期的源代码与文档变更，并确定实际发布 tag。
 2. 为本次构建分配大于所有历史 Preview/Release 的 `BUILD_NUMBER`。
 3. 确认 `UPDATE_CHANNEL`：Preview 使用 `preview`，正式版使用 `release`。
-4. 确认 Sparkle 公钥来自登录钥匙串，私钥从不写入仓库、Release 正文、shell 历史或日志。
+4. 确认本次 shell 或 CI 已导出 `SPARKLE_PUBLIC_KEY`，且它来自同一套 Sparkle EdDSA 密钥；私钥从不写入仓库、Release 正文、shell 历史或日志。
 5. 确认 GitHub CLI 已登录，Gitee Release API 令牌和 Sparkle 私钥都在 macOS Keychain 中。
 
 ```zsh
@@ -42,7 +43,8 @@ export VERSION='0.1.1-preview.1'
 export BUILD_NUMBER='2'
 export UPDATE_CHANNEL='preview'
 export CODE_SIGN_IDENTITY=-
-export SPARKLE_PUBLIC_KEY='<从钥匙串对应的公钥读取，不要提交私钥>'
+: "${SPARKLE_PUBLIC_KEY:?必须从发布机或 CI 的安全构建配置注入 Sparkle 公钥}"
+export SPARKLE_PUBLIC_KEY
 export SPARKLE_GENERATE_APPCAST='/absolute/path/to/generate_appcast'
 export SPARKLE_APPCAST_ACCOUNT='dev.wzz.zisla'
 export SPARKLE_APPCAST_DOWNLOAD_URL_PREFIX="https://github.com/wzz6423/zisla/releases/download/v${VERSION}/"
@@ -98,6 +100,7 @@ https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml
 - 通过 `GET /repos/wzz6423/zisla/releases/<id>/attach_files` 先获得旧附件 ID。
 - 更新 Release 时，Gitee API 的 PATCH 必须携带 `tag_name`，否则返回 `400: tag_name is missing`。
 - 上传新文件后再删除同名旧附件，避免 Release 出现空档。
+- Gitee 的 Release JSON 允许 `html_url` 为 `null`，且附件可能没有 `size`；检查客户端兼容性时应以 `tag_name` 和 `browser_download_url` 为准，不能将这些缺失字段视为无效 Release。
 - 自动更新仍从 GitHub 获取 appcast 和 ZIP；Gitee 是下载镜像与国内访问入口。
 
 ## 验证与清理
@@ -108,6 +111,7 @@ https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml
 zsh -n Scripts/build-app.sh Scripts/package-release.sh
 codesign --verify --deep --strict --all-architectures --verbose=4 "$ARCHIVE_DIRECTORY/zisla.app"
 lipo -archs "$ARCHIVE_DIRECTORY/zisla.app/Contents/MacOS/zisla"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$ARCHIVE_DIRECTORY/zisla.app/Contents/Info.plist")" == "$SPARKLE_PUBLIC_KEY" ]]
 xmllint --noout "$ARCHIVE_DIRECTORY/appcast.xml"
 shasum -a 256 -c "$ARCHIVE_DIRECTORY/zisla-v${VERSION}-macOS-universal.zip.sha256"
 ```

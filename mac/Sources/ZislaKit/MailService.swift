@@ -148,7 +148,34 @@ public final class MailService: ObservableObject {
     }
 
     public func markRead(_ message: MailMessage) async -> MailOperationResult {
-        await perform(Self.markReadScript(message: message))
+        markReadLocally(message)
+        let result = await perform(Self.markReadScript(message: message))
+        switch result {
+        case .success:
+            markReadLocally(message)
+        case .failed:
+            setReadLocally(message, isRead: message.isRead)
+        }
+        return result
+    }
+
+    public func markReadLocally(_ message: MailMessage) {
+        setReadLocally(message, isRead: true)
+    }
+
+    private func setReadLocally(_ message: MailMessage, isRead: Bool) {
+        messages = messages.map { current in
+            guard current.id == message.id, current.isRead != isRead else { return current }
+            return MailMessage(
+                accountName: current.accountName,
+                messageID: current.messageID,
+                sender: current.sender,
+                subject: current.subject,
+                body: current.body,
+                receivedAt: current.receivedAt,
+                isRead: isRead
+            )
+        }
     }
 
     public func markJunk(_ message: MailMessage) async -> MailOperationResult {

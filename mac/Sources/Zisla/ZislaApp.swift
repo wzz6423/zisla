@@ -37,6 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var settingsWindowScreen: NSScreen?
     private var quickNotesEditorController: NSWindowController?
     private var cancellables: Set<AnyCancellable> = []
+    private var effectiveAppearanceObservation: NSKeyValueObservation?
+    private var currentApplicationIconImage: NSImage?
     private let updateController = UpdateController.shared
     private var expandedSizeUpdateTask: Task<Void, Never>?
     /// Last panel size actually applied to the coordinator; basis for the two-phase
@@ -60,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             automaticChannel: FeatureSettingsStore.bundledDefaultUpdateChannel
         )
         model.start()
+        configureApplicationIconUpdates(model: model)
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
         lockScreenOverlayController.start()
         self.lockScreenOverlayController = lockScreenOverlayController
@@ -84,7 +87,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self?.showSettings()
             }
         )
-        let hostingView = NSHostingView(rootView: rootView)
+        let hostingView = NSHostingView(
+            rootView: AppLanguageEnvironment(languageStore: model.languageStore, content: rootView)
+        )
         hostingView.sizingOptions = []
         let engine = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
             simulatedIslandSize: CGSize(width: 240, height: 34),
@@ -107,7 +112,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     petController: petController,
                     isOnPhysicalNotch: layout.topology.hasPhysicalNotch
                 )
-                let persistentPetHostingView = NSHostingView(rootView: persistentPetView)
+                let persistentPetHostingView = NSHostingView(
+                    rootView: AppLanguageEnvironment(
+                        languageStore: model.languageStore,
+                        content: persistentPetView
+                    )
+                )
                 persistentPetHostingView.sizingOptions = []
                 return persistentPetHostingView
             },
@@ -189,11 +199,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             queue: model.notices,
             media: model.media,
             settingsStore: model.settingsStore,
+            languageStore: model.languageStore,
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs
         )
         configureMainMenu()
         syncAppStatusItem()
         syncMonitorStatusItems(force: true)
+
+        model.languageStore.$language
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.refreshLocalizedChrome()
+            }
+            .store(in: &cancellables)
 
         model.systemMonitor.$snapshot
             .sink { [weak self] _ in
@@ -448,10 +467,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard presentation.hasCompactContent || extendsForFocusCountdown else { return nil }
         let expandsForDetailedMedia = settings.mediaCompactStyle == .detailed
             && notices.contains { $0.id.hasPrefix("media-active-") }
+        let expandsForDetailedMail = settings.mailCompactStyle == .detailed
+            && notices.contains { $0.id.hasPrefix("mail-notification-") }
         return SideNoticeLayoutEngine().compactBarFrame(
             for: layout,
             extendsForFocusCountdown: extendsForFocusCountdown,
-            expandsForDetailedMedia: expandsForDetailedMedia
+            expandsForDetailedMedia: expandsForDetailedMedia || expandsForDetailedMail
         )
     }
 
@@ -461,7 +482,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let applicationMenuItem = NSMenuItem(title: "zisla", action: nil, keyEquivalent: "")
         let applicationMenu = NSMenu(title: "zisla")
         let quitItem = applicationMenu.addItem(
-            withTitle: "退出 zisla",
+            withTitle: localized("退出 zisla"),
             action: #selector(quit),
             keyEquivalent: "q"
         )
@@ -470,16 +491,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         applicationMenuItem.submenu = applicationMenu
         mainMenu.addItem(applicationMenuItem)
 
-        let windowMenuItem = NSMenuItem(title: "窗口", action: nil, keyEquivalent: "")
-        let windowMenu = NSMenu(title: "窗口")
+        let windowMenuItem = NSMenuItem(title: localized("窗口"), action: nil, keyEquivalent: "")
+        let windowMenu = NSMenu(title: localized("窗口"))
         let minimizeItem = windowMenu.addItem(
-            withTitle: "最小化",
+            withTitle: localized("最小化"),
             action: #selector(NSWindow.miniaturize(_:)),
             keyEquivalent: "m"
         )
         minimizeItem.keyEquivalentModifierMask = .command
         let closeItem = windowMenu.addItem(
-            withTitle: "关闭窗口",
+            withTitle: localized("关闭窗口"),
             action: #selector(NSWindow.performClose(_:)),
             keyEquivalent: "w"
         )
@@ -488,6 +509,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         mainMenu.addItem(windowMenuItem)
 
         NSApp.mainMenu = mainMenu
+    }
+
+    private func configureApplicationIconUpdates(model: AppModel) {
+        model.settingsStore.$settings
+            .map(\.appearanceMode)
+            .removeDuplicates()
+            .sink { [weak self] mode in
+                Task { @MainActor [weak self] in
+                    self?.syncApplicationIcon(mode: mode)
+                }
+            }
+            .store(in: &cancellables)
+
+        effectiveAppearanceObservation = NSApp.observe(
+            \.effectiveAppearance,
+            options: [.initial, .new]
+        ) { [weak self, weak model] _, _ in
+            Task { @MainActor [weak self, weak model] in
+                guard let model else { return }
+                self?.syncApplicationIcon(mode: model.settingsStore.settings.appearanceMode)
+            }
+        }
+    }
+
+    private func syncApplicationIcon(mode: AppearanceMode) {
+        let systemIsDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let theme = ApplicationIconTheme.resolve(mode: mode, systemIsDark: systemIsDark)
+        let resourceName = theme == .night ? "AppIconNight" : "AppIcon"
+        guard let url = Bundle.main.url(forResource: resourceName, withExtension: "icns"),
+              let image = NSImage(contentsOf: url)
+        else { return }
+        currentApplicationIconImage = image
+        NSApp.applicationIconImage = image
+        syncStatusItemImage()
+    }
+
+    private func syncStatusItemImage() {
+        guard let image = currentApplicationIconImage?.copy() as? NSImage else { return }
+        image.size = NSSize(width: 18, height: 18)
+        image.isTemplate = false
+        statusItem?.button?.image = image
     }
 
     private func syncAppStatusItem() {
@@ -502,15 +564,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "capsule.inset.filled", accessibilityDescription: "zisla")
         let menu = NSMenu()
-        menu.addItem(withTitle: "显示灵动岛", action: #selector(showIsland), keyEquivalent: "")
-        menu.addItem(withTitle: "系统监控", action: #selector(showSystemMonitor), keyEquivalent: "")
-        menu.addItem(withTitle: "设置...", action: #selector(showSettings), keyEquivalent: ",")
-        menu.addItem(withTitle: "检查更新", action: #selector(checkUpdates), keyEquivalent: "")
+        menu.addItem(withTitle: localized("显示灵动岛"), action: #selector(showIsland), keyEquivalent: "")
+        menu.addItem(withTitle: localized("系统监控"), action: #selector(showSystemMonitor), keyEquivalent: "")
+        menu.addItem(withTitle: localized("设置..."), action: #selector(showSettings), keyEquivalent: ",")
+        menu.addItem(withTitle: localized("检查更新"), action: #selector(checkUpdates), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "退出 zisla", action: #selector(quit), keyEquivalent: "q")
+        menu.addItem(withTitle: localized("退出 zisla"), action: #selector(quit), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
         item.menu = menu
         statusItem = item
+        syncStatusItemImage()
     }
 
     private func syncMonitorStatusItems(force: Bool = false) {
@@ -541,7 +604,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 configureMonitorStatusItem(item, metric: metric, style: style)
                 monitorStatusItemStyles[metric] = style
                 monitorStatusTitles.removeValue(forKey: metric)
-                item.button?.toolTip = "\(metric.menuTitle)：点击打开系统监控"
+                item.button?.toolTip = "\(localized(metric.menuTitle)): \(localized("点击打开系统监控"))"
                 if style == .compact {
                     item.length = compactMonitorStatusItemWidth(for: metric)
                 }
@@ -575,7 +638,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .detailed:
             button.image = NSImage(
                 systemSymbolName: metric.symbolName,
-                accessibilityDescription: metric.menuTitle
+                accessibilityDescription: localized(metric.menuTitle)
             )
             button.imagePosition = .imageLeading
             button.alignment = .natural
@@ -598,7 +661,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if style == .compact {
             return compactMonitorStatusValue(for: metric, snapshot: snapshot)
         }
-        guard let snapshot else { return "\(metric.menuTitle) --" }
+        guard let snapshot else { return "\(localized(metric.menuTitle)) --" }
         switch metric {
         case .cpu:
             return "CPU \(percent(snapshot.cpu.usage))"
@@ -608,16 +671,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .memory:
             return "RAM \(byteText(snapshot.memory.usedBytes))"
         case .disk:
-            guard snapshot.disk.totalBytes > 0 else { return "磁盘 --" }
+            guard snapshot.disk.totalBytes > 0 else { return "\(localized("磁盘")) --" }
             let usage = Double(snapshot.disk.usedBytes) / Double(snapshot.disk.totalBytes)
-            return "磁盘 \(percent(usage))"
+            return "\(localized("磁盘")) \(percent(usage))"
         case .network:
-            return "网络 ↓\(rateText(snapshot.network.receiveBytesPerSecond)) ↑\(rateText(snapshot.network.sendBytesPerSecond))"
+            return "\(localized("网络")) ↓\(rateText(snapshot.network.receiveBytesPerSecond)) ↑\(rateText(snapshot.network.sendBytesPerSecond))"
         case .fan:
             guard case let .available(rpm, _) = snapshot.fan, let first = rpm.first else {
-                return "风扇 --"
+                return "\(localized("风扇")) --"
             }
-            return "风扇 \(Int(first.rounded()))"
+            return "\(localized("风扇")) \(Int(first.rounded()))"
         }
     }
 
@@ -652,11 +715,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         switch metric {
         case .cpu: "CPU"
         case .gpu: "GPU"
-        case .memory: "Mem"
-        case .disk: "Disk"
-        case .network: "Int"
-        case .fan: "Fan"
+        case .memory: localized("内存")
+        case .disk: localized("磁盘")
+        case .network: localized("网络")
+        case .fan: localized("风扇")
         }
+    }
+
+    private func localized(_ key: String) -> String {
+        AppLocalization.string(key, language: AppModel.shared.languageStore.language)
+    }
+
+    private func refreshLocalizedChrome() {
+        configureMainMenu()
+        if let statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+            self.statusItem = nil
+        }
+        syncAppStatusItem()
+        monitorStatusItemStyles.removeAll()
+        monitorStatusTitles.removeAll()
+        syncMonitorStatusItems(force: true)
+        settingsWindowController?.window?.title = localized("zisla 设置")
+        quickNotesEditorController?.window?.title = localized("随记 · 编辑")
     }
 
     private func compactMonitorStatusItemWidth(for metric: SystemMonitorMenuBarMetric) -> CGFloat {
@@ -760,10 +841,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "zisla 设置"
+            window.title = localized("zisla 设置")
             window.level = WindowPlacement.modalWindowLevel
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: rootView)
+            window.contentView = NSHostingView(
+                rootView: AppLanguageEnvironment(
+                    languageStore: AppModel.shared.languageStore,
+                    content: rootView
+                )
+            )
             window.delegate = self
             let controller = NSWindowController(window: window)
             controller.shouldCascadeWindows = false
@@ -800,14 +886,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "随记 · 编辑"
+            window.title = localized("随记 · 编辑")
             window.level = WindowPlacement.modalWindowLevel
             window.isOpaque = false
             window.backgroundColor = .clear
             window.titlebarAppearsTransparent = true
             window.isReleasedWhenClosed = false
             window.minSize = NSSize(width: 640, height: 460)
-            let hostingView = NSHostingView(rootView: rootView)
+            let hostingView = NSHostingView(
+                rootView: AppLanguageEnvironment(
+                    languageStore: AppModel.shared.languageStore,
+                    content: rootView
+                )
+            )
             hostingView.wantsLayer = true
             hostingView.layer?.backgroundColor = NSColor.clear.cgColor
             window.contentView = hostingView

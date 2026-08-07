@@ -109,7 +109,7 @@ final class ThinScrollChromeHost: NSView {
 @MainActor
 enum ThinScrollChrome {
     /// Noticeably narrower than the system default width.
-    static let width: CGFloat = 5
+    static let width: CGFloat = 3
 
     static func apply(to scrollView: NSScrollView) {
         scrollView.scrollerKnobStyle = .default

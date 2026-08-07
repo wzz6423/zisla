@@ -148,6 +148,28 @@ struct SideNoticeQueueTests {
         }
         #expect(controlledQueue.left.isEmpty)
     }
+
+    @Test @MainActor
+    func removesOnlyNoticesMatchingIDPrefix() {
+        let queue = SideNoticeQueue()
+        queue.enqueue(
+            IslandNotice(id: "mail-notification-batch-left", title: "邮件", side: .left),
+            expiresAfter: nil
+        )
+        queue.enqueue(
+            IslandNotice(id: "mail-notification-batch-right", title: "1", side: .right),
+            expiresAfter: nil
+        )
+        queue.enqueue(
+            IslandNotice(id: "focus-mode-left", title: "睡眠", side: .left),
+            expiresAfter: nil
+        )
+
+        queue.removeAll(withIDPrefix: "mail-notification-")
+
+        #expect(queue.left.map(\.id) == ["focus-mode-left"])
+        #expect(queue.right.isEmpty)
+    }
 }
 
 private actor ExpiryGate {

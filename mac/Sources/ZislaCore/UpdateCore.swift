@@ -94,6 +94,13 @@ public struct GitHubRelease: Decodable, Equatable, Sendable {
             case downloadURL = "browser_download_url"
             case size
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            name = try container.decode(String.self, forKey: .name)
+            downloadURL = try container.decode(URL.self, forKey: .downloadURL)
+            size = try container.decodeIfPresent(Int.self, forKey: .size) ?? 0
+        }
     }
 
     public struct MacUpdateAssets: Equatable, Sendable {
@@ -102,7 +109,7 @@ public struct GitHubRelease: Decodable, Equatable, Sendable {
     }
 
     public var tagName: String
-    public var htmlURL: URL
+    public var htmlURL: URL?
     public var draft: Bool
     public var prerelease: Bool
     public var assets: [Asset]
@@ -118,7 +125,7 @@ public struct GitHubRelease: Decodable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         tagName = try container.decode(String.self, forKey: .tagName)
-        htmlURL = try container.decode(URL.self, forKey: .htmlURL)
+        htmlURL = try container.decodeIfPresent(URL.self, forKey: .htmlURL)
         draft = try container.decodeIfPresent(Bool.self, forKey: .draft) ?? false
         prerelease = try container.decodeIfPresent(Bool.self, forKey: .prerelease) ?? false
         assets = try container.decodeIfPresent([Asset].self, forKey: .assets) ?? []

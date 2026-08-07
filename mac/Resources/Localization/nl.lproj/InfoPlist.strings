@@ -1,0 +1,8 @@
+"NSCalendarsFullAccessUsageDescription" = "zisla heeft toegang nodig tot aankomende agenda-evenementen voor het bovenste informatiepaneel.";
+"NSAudioCaptureUsageDescription" = "zisla leest het huidige audiospectrum om een live golfvorm weer te geven.";
+"NSCameraUsageDescription" = "zisla gebruikt de camera alleen als de spiegel open is.";
+"NSRemindersFullAccessUsageDescription" = "zisla leest gedateerde herinneringen om ze samen met agenda-evenementen te tonen.";
+"NSLocationWhenInUseUsageDescription" = "zisla gebruikt je locatie om lokaal weer en plaatsnamen te tonen.";
+"NSMicrophoneUsageDescription" = "zisla gebruikt de microfoon alleen wanneer je spraakinvoer start, om spraak om te zetten naar de huidige AI-gesprekstekst.";
+"NSSpeechRecognitionUsageDescription" = "zisla transcribeert de spraak die je actief opneemt naar AI-gesprekstekst.";
+"NSAppleEventsUsageDescription" = "zisla gebruikt Mail.app om e-mail te lezen en beheren, inclusief postvakken, gelezen status, verwijdering en antwoorden.";

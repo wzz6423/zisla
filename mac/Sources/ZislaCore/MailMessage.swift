@@ -65,3 +65,41 @@ public struct MailMessage: Identifiable, Equatable, Sendable {
         return normalized.isEmpty ? "没有可显示的正文" : normalized
     }
 }
+
+public struct MailNotification: Equatable, Sendable {
+    public let message: MailMessage
+    public let newMessageCount: Int
+    public let pairID: String
+
+    public init(message: MailMessage, newMessageCount: Int, pairID: String = UUID().uuidString) {
+        self.message = message
+        self.newMessageCount = max(1, newMessageCount)
+        self.pairID = pairID
+    }
+
+    public func makeNotices() -> (left: IslandNotice, right: IslandNotice) {
+        let sender = message.sender.isEmpty ? "未知发件人" : message.sender
+        let prefix = "mail-notification-\(pairID)"
+        return (
+            IslandNotice(
+                id: "\(prefix)-left",
+                title: message.title,
+                detail: sender,
+                kind: .info,
+                side: .left,
+                createdAt: message.receivedAt,
+                style: .status,
+                symbolName: "envelope.fill"
+            ),
+            IslandNotice(
+                id: "\(prefix)-right",
+                title: String(newMessageCount),
+                detail: sender,
+                kind: .info,
+                side: .right,
+                createdAt: message.receivedAt,
+                style: .status
+            )
+        )
+    }
+}

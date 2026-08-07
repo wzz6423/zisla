@@ -35,7 +35,7 @@ struct CodexSessionActivityDetectorTests {
     }
 
     @Test
-    func pendingUserInputBlocksUntilTheMatchingOutputArrives() throws {
+    func pendingUserInputRemainsARunningTask() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let relativePath = "2026/07/19/rollout-question.jsonl"
@@ -57,77 +57,6 @@ struct CodexSessionActivityDetectorTests {
             modifiedAt: Date(timeIntervalSince1970: 1_800_000_110)
         )
         let detector = CodexSessionActivityDetector(sessionsDirectory: root)
-
-        #expect(try detector.activeTasks().first?.status == .blocked)
-
-        try appendLine(
-            try responseItemLine(
-                timestamp: "2026-07-19T01:00:01.500Z",
-                turnID: "turn-question",
-                payload: [
-                    "type": "function_call_output",
-                    "call_id": "call-unrelated",
-                    "output": "ok",
-                ]
-            ),
-            to: root.appendingPathComponent(relativePath)
-        )
-
-        #expect(try detector.activeTasks().first?.status == .blocked)
-
-        try appendLine(
-            try responseItemLine(
-                timestamp: "2026-07-19T01:00:02.000Z",
-                payload: [
-                    "type": "function_call_output",
-                    "call_id": "call-question",
-                    "output": "answered",
-                ]
-            ),
-            to: root.appendingPathComponent(relativePath)
-        )
-
-        #expect(try detector.activeTasks().first?.status == .running)
-    }
-
-    @Test
-    func pendingEscalatedCommandBlocksUntilApprovalCompletes() throws {
-        let root = makeSessionsRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let relativePath = "2026/07/19/rollout-approval.jsonl"
-        try writeRollout(
-            under: root,
-            relativePath: relativePath,
-            lines: [
-                eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "turn-approval"),
-                try responseItemLine(
-                    timestamp: "2026-07-19T01:00:01.000Z",
-                    turnID: "turn-approval",
-                    payload: [
-                        "type": "custom_tool_call",
-                        "name": "exec",
-                        "call_id": "call-approval",
-                        "input": #"tools.exec_command({sandbox_permissions: "require_escalated"})"#,
-                    ]
-                ),
-            ],
-            modifiedAt: Date(timeIntervalSince1970: 1_800_000_120)
-        )
-        let detector = CodexSessionActivityDetector(sessionsDirectory: root)
-
-        #expect(try detector.activeTasks().first?.status == .blocked)
-
-        try appendLine(
-            try responseItemLine(
-                timestamp: "2026-07-19T01:00:02.000Z",
-                payload: [
-                    "type": "custom_tool_call_output",
-                    "call_id": "call-approval",
-                    "output": "approved",
-                ]
-            ),
-            to: root.appendingPathComponent(relativePath)
-        )
 
         #expect(try detector.activeTasks().first?.status == .running)
     }
@@ -159,7 +88,9 @@ struct CodexSessionActivityDetectorTests {
         )
         let detector = CodexSessionActivityDetector(sessionsDirectory: root)
 
-        #expect(try detector.activeTasks().first?.status == .error)
+        let task = try #require(detector.activeTasks().first)
+        #expect(task.status == .error)
+        #expect(task.failureReason == "failed")
 
         try appendLine(
             try responseItemLine(
@@ -177,7 +108,9 @@ struct CodexSessionActivityDetectorTests {
             to: root.appendingPathComponent(relativePath)
         )
 
-        #expect(try detector.activeTasks().first?.status == .running)
+        let recovered = try #require(detector.activeTasks().first)
+        #expect(recovered.status == .running)
+        #expect(recovered.failureReason == nil)
     }
 
     @Test
@@ -430,6 +363,36 @@ struct CodexSessionActivityDetectorTests {
     }
 
     @Test
+    func ignoresRolloutsWithoutRecentWrites() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let now = iso8601Date("2026-08-07T12:00:00.000Z")
+        try writeRollout(
+            under: root,
+            relativePath: "2026/06/01/rollout-old.jsonl",
+            lines: [
+                eventLine(timestamp: "2026-06-01T01:00:00.000Z", payloadType: "task_started", turnID: "turn-old"),
+            ],
+            modifiedAt: now.addingTimeInterval(-31 * 24 * 60 * 60)
+        )
+        try writeRollout(
+            under: root,
+            relativePath: "2026/08/07/rollout-recent.jsonl",
+            lines: [
+                eventLine(timestamp: "2026-08-07T01:00:00.000Z", payloadType: "task_started", turnID: "turn-recent"),
+            ],
+            modifiedAt: now.addingTimeInterval(-24 * 60 * 60)
+        )
+
+        let tasks = try CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            now: { now }
+        ).activeTasks()
+
+        #expect(tasks.map(\.id) == [CodexSessionActivityDetector.taskID(forTurnID: "turn-recent")])
+    }
+
+    @Test
     func pairsCompletionAcrossRecentlyScannedFiles() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -537,6 +500,205 @@ struct CodexSessionActivityDetectorTests {
         #expect(tasks[0].id == CodexSessionActivityDetector.taskID(forTurnID: "turn-vscode"))
         #expect(tasks[0].status == .running)
         #expect(tasks[0].sessionURL?.absoluteString == "codex://threads/session-vscode")
+    }
+
+    @Test
+    func detectsEveryActiveTurnAcrossMoreThanTheFormerRolloutLimit() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        for index in 0..<13 {
+            try writeRollout(
+                under: root,
+                relativePath: "2026/07/19/rollout-concurrent-\(index).jsonl",
+                lines: [
+                    eventLine(
+                        timestamp: "2026-07-19T01:00:00.000Z",
+                        payloadType: "task_started",
+                        turnID: "turn-concurrent-\(index)"
+                    ),
+                ],
+                modifiedAt: Date(timeIntervalSince1970: 1_800_002_000 + Double(index))
+            )
+        }
+
+        let tasks = try CodexSessionActivityDetector(sessionsDirectory: root).activeTasks()
+
+        #expect(Set(tasks.map(\.id)) == Set((0..<13).map {
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-concurrent-\($0)")
+        }))
+    }
+
+    @Test
+    func detectsLongRunningTurnWhoseStartPrecedesTheFormerTailLimit() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let filler = String(repeating: "x", count: 4_096)
+        let lines = [
+            eventLine(
+                timestamp: "2026-07-19T01:00:00.000Z",
+                payloadType: "task_started",
+                turnID: "turn-long-running"
+            ),
+        ] + (0..<300).map { index in
+            #"{"timestamp":"2026-07-19T01:00:01.000Z","type":"ignored","index":\#(index),"text":"\#(filler)"}"#
+        }
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-long-running.jsonl",
+            lines: lines,
+            modifiedAt: Date(timeIntervalSince1970: 1_800_002_100)
+        )
+
+        let tasks = try CodexSessionActivityDetector(sessionsDirectory: root).activeTasks()
+
+        #expect(tasks.map(\.id) == [CodexSessionActivityDetector.taskID(forTurnID: "turn-long-running")])
+    }
+
+    @Test
+    func detectsLongRunningTurnAfterManyCompletedLifecycleEvents() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let completedLines = (0..<300).flatMap { index in
+            [
+                eventLine(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-completed-\(index)"
+                ),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:02.000Z",
+                    payloadType: "task_complete",
+                    turnID: "turn-completed-\(index)"
+                ),
+            ]
+        }
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-many-lifecycle-events.jsonl",
+            lines: [
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-still-running"
+                ),
+            ] + completedLines,
+            modifiedAt: Date(timeIntervalSince1970: 1_800_002_150)
+        )
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root)
+
+        #expect(try detector.activeTasks().map(\.id) == [
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-still-running"),
+        ])
+        #expect(try detector.activeTasks().map(\.id) == [
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-still-running"),
+        ])
+    }
+
+    @Test
+    func turnContextInDifferentFileStillMapsProviderCorrectly() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-context.jsonl",
+            lines: [
+                turnContextLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    turnID: "turn-gpt-split",
+                    model: "gpt-5.6-sol",
+                    effort: "high"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_001_200)
+        )
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-event.jsonl",
+            lines: [
+                eventLine(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-gpt-split"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_001_250)
+        )
+
+        let tasks = try CodexSessionActivityDetector(sessionsDirectory: root).activeTasks()
+        let task = try #require(tasks.first)
+
+        #expect(tasks.count == 1)
+        #expect(task.id == CodexSessionActivityDetector.taskID(forTurnID: "turn-gpt-split"))
+        #expect(task.provider == .gpt)
+        #expect(task.title == "ChatGPT")
+        #expect(task.detail == "gpt-5.6-sol")
+        #expect(task.effort == "high")
+        #expect(task.status == .running)
+    }
+
+    @Test
+    func extractsAndTruncatesFailureReasonFromToolOutput() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let longMessage = String(repeating: "error ", count: 50)
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-reason.jsonl",
+            lines: [
+                eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "turn-reason"),
+                try responseItemLine(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    turnID: "turn-reason",
+                    payload: [
+                        "type": "function_call_output",
+                        "call_id": "call-reason",
+                        "output": [[
+                            "type": "input_text",
+                            "text": #"{"exit_code":1,"output":"\#(longMessage)"}"#,
+                        ]],
+                    ]
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_000_140)
+        )
+
+        let task = try #require(CodexSessionActivityDetector(sessionsDirectory: root).activeTasks().first)
+        #expect(task.status == .error)
+        #expect(task.failureReason != nil)
+        #expect((task.failureReason?.count ?? 0) <= 201)
+        #expect(task.failureReason?.hasSuffix("…") == true)
+    }
+
+    @Test
+    func normalizesWhitespaceInFailureReason() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-whitespace.jsonl",
+            lines: [
+                eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "turn-ws"),
+                try responseItemLine(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    turnID: "turn-ws",
+                    payload: [
+                        "type": "custom_tool_call_output",
+                        "call_id": "call-ws",
+                        "output": [[
+                            "type": "input_text",
+                            "text": #"{"exit_code":1,"output":"build  failed\n\ndue   to\tsyntax error"}"#,
+                        ]],
+                    ]
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_000_145)
+        )
+
+        let task = try #require(CodexSessionActivityDetector(sessionsDirectory: root).activeTasks().first)
+        #expect(task.status == .error)
+        #expect(task.failureReason == "build failed due to syntax error")
     }
 
 

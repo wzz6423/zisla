@@ -107,9 +107,62 @@ public enum ContributionIntensity: Int, Equatable, Sendable, CaseIterable, Compa
 }
 
 public enum AIUsageAnalytics {
+    /// Prefix used by the provider-level automatic summaries written before schema version 3.
+    public static let automaticUsageSummaryPrefix = "zisla-daily-usage:"
+    /// Prefix used by the provider-level manual summaries written before schema version 3.
+    public static let manualUsageSummaryPrefix = "zisla-daily-manual-usage:"
+    /// Prefix reserved for the sole daily total record retained by the current schema.
+    public static let dailyUsageSummaryPrefix = "zisla-daily-total:"
+
+    /// Compacts automatically detected log events into one stable record per calendar day.
+    ///
+    /// Session logs can emit thousands of token events each day. The progress UI only presents daily
+    /// totals, so persisting these summaries preserves the visible history without allowing event volume
+    /// to evict older days from the bounded state store.
+    public static func dailyAutomaticUsageSamples(
+        samples: [AIUsageSample],
+        calendar: Calendar = .current
+    ) -> [AIUsageSample] {
+        dailyUsageSamples(samples: samples, calendar: calendar)
+    }
+
+    /// Compacts manually reported usage into one incrementable record per calendar day.
+    public static func dailyManualUsageSamples(
+        samples: [AIUsageSample],
+        calendar: Calendar = .current
+    ) -> [AIUsageSample] {
+        dailyUsageSamples(samples: samples, calendar: calendar)
+    }
+
+    /// Whether a record uses the provider-level automatic-log identifier from the previous schema.
+    public static func isAutomaticUsageSummary(_ sample: AIUsageSample) -> Bool {
+        sample.sourceID?.hasPrefix(automaticUsageSummaryPrefix) ?? false
+    }
+
+    /// Whether a record uses the provider-level manual identifier from the previous schema.
+    public static func isManualUsageSummary(_ sample: AIUsageSample) -> Bool {
+        sample.sourceID?.hasPrefix(manualUsageSummaryPrefix) ?? false
+    }
+
+    public static func isDailyUsageSummary(_ sample: AIUsageSample) -> Bool {
+        sample.sourceID?.hasPrefix(dailyUsageSummaryPrefix) ?? false
+    }
+
+    /// Whether a pre-summary source identifier was produced by a built-in log detector.
+    public static func isLegacyAutomaticUsageSample(_ sample: AIUsageSample) -> Bool {
+        guard let sourceID = sample.sourceID else { return false }
+        return AIProvider.allCases.contains { sourceID.hasPrefix("\($0.rawValue)-") }
+    }
+
+    /// Whether a pre-v3 record originated from automatic log detection.
+    public static func isLegacyDetectedUsageSample(_ sample: AIUsageSample) -> Bool {
+        isLegacyAutomaticUsageSample(sample) || isAutomaticUsageSummary(sample)
+    }
+
     /// Total, input, and output token trends for the most recent `days` calendar days (inclusive of `end`).
     ///
     /// Days with zero usage are still included so the time axis is continuous and the curve can drop to the zero baseline.
+    /// Each aggregate is positioned at the midpoint of its calendar day so it aligns with the center of that day on a time axis.
     public static func dailyUsageSeries(
         samples: [AIUsageSample],
         endingAt end: Date,
@@ -132,15 +185,51 @@ public enum AIUsageAnalytics {
         }
 
         return (0..<days).compactMap { offset in
-            guard let day = calendar.date(byAdding: .day, value: offset, to: startDay) else {
+            guard
+                let day = calendar.date(byAdding: .day, value: offset, to: startDay),
+                let nextDay = calendar.date(byAdding: .day, value: 1, to: day)
+            else {
                 return nil
             }
             return UsageBreakdownPoint(
-                timestamp: day,
+                timestamp: day.addingTimeInterval(nextDay.timeIntervalSince(day) / 2),
                 inputTokens: inputByDay[day, default: 0],
                 outputTokens: outputByDay[day, default: 0]
             )
         }
+    }
+
+    /// Compacts all usage into the single visible aggregate for each calendar day.
+    public static func dailyUsageSamples(
+        samples: [AIUsageSample],
+        calendar: Calendar
+    ) -> [AIUsageSample] {
+        var summaries: [Date: AIUsageSample] = [:]
+
+        for sample in samples {
+            let day = calendar.startOfDay(for: sample.timestamp)
+            if var summary = summaries[day] {
+                summary.inputTokens += sample.inputTokens
+                summary.outputTokens += sample.outputTokens
+                summaries[day] = summary
+            } else {
+                summaries[day] = AIUsageSample(
+                    sourceID: dailyUsageSummarySourceID(day: day),
+                    provider: sample.provider,
+                    timestamp: day,
+                    inputTokens: sample.inputTokens,
+                    outputTokens: sample.outputTokens
+                )
+            }
+        }
+
+        return summaries.values.sorted {
+            $0.timestamp < $1.timestamp
+        }
+    }
+
+    private static func dailyUsageSummarySourceID(day: Date) -> String {
+        "\(dailyUsageSummaryPrefix)\(day.timeIntervalSinceReferenceDate)"
     }
 
     /// Smooths daily usage with a 5-day binomial kernel [1,4,6,4,1] for trend curve display.
@@ -332,43 +421,25 @@ public enum AIUsageAnalytics {
         return points
     }
 
-    /// Generates "nice" tick marks for the chart Y-axis (including 0 and an upper bound that covers `maximum`).
+    /// Generates power-of-ten tick marks for the symmetric-log trend axis.
     ///
     /// - Returns `[0, 1]` when `maximum <= 0` to ensure Chart has a valid domain.
     /// - `desiredCount` controls the desired number of ticks (including both ends), clamped to 2...6.
-    /// - Step size is 1/2/5×10^n; labels can be formatted with `formatTokenAxisValue`.
+    /// - The final tick is the first power of ten that covers `maximum`.
     public static func tokenAxisTicks(maximum: Int, desiredCount: Int = 3) -> [Int] {
         let count = min(6, max(2, desiredCount))
         guard maximum > 0 else { return [0, 1] }
 
-        let rawStep = Double(maximum) / Double(count - 1)
-        let magnitude = pow(10.0, floor(log10(max(rawStep, 1))))
-        let residual = rawStep / magnitude
-        let niceResidual: Double
-        if residual <= 1 {
-            niceResidual = 1
-        } else if residual <= 2 {
-            niceResidual = 2
-        } else if residual <= 5 {
-            niceResidual = 5
-        } else {
-            niceResidual = 10
-        }
-        let step = max(1, Int((niceResidual * magnitude).rounded()))
-        let upper = ((maximum + step - 1) / step) * step
-
-        var ticks: [Int] = []
-        var value = 0
-        while value < upper {
-            ticks.append(value)
-            value += step
-            if ticks.count > 8 { break }
-        }
-        if ticks.last != upper {
-            ticks.append(upper)
-        }
-        if ticks.count == 1 {
-            ticks.append(upper == 0 ? 1 : upper)
+        let upperExponent = max(0, Int(ceil(log10(Double(maximum)))))
+        let lowerExponent = max(0, upperExponent - (count - 2))
+        var ticks = [0]
+        for exponent in lowerExponent...upperExponent {
+            let value = pow(10.0, Double(exponent))
+            guard value <= Double(Int.max) else {
+                ticks.append(Int.max)
+                break
+            }
+            ticks.append(Int(value.rounded()))
         }
         return ticks
     }

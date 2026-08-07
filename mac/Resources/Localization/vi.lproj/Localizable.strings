@@ -1,0 +1,513 @@
+/* Localizable.strings - Vietnamese localization for Zisla macOS */
+
+/* Common */
+"取消" = "Hủy";
+"确定" = "OK";
+"好" = "OK";
+"继续" = "Tiếp tục";
+"删除" = "Xóa";
+"关闭" = "Đóng";
+"保存" = "Lưu";
+"添加" = "Thêm";
+"刷新" = "Làm mới";
+"重试" = "Thử lại";
+"退出应用" = "Thoát ứng dụng";
+"复制" = "Sao chép";
+"拷贝" = "Sao chép";
+"搜索" = "Tìm kiếm";
+"清除" = "Xóa";
+"打开设置" = "Mở Cài đặt";
+
+/* Settings */
+"设置" = "Cài đặt";
+"工作流" = "Quy trình";
+"信息" = "Thông tin";
+"模型" = "Mô hình";
+"桌面宠物" = "Thú cưng Desktop";
+"交互" = "Tương tác";
+"下载" = "Tải xuống";
+"天气" = "Thời tiết";
+"更新" = "Cập nhật";
+
+/* Settings - Workflow */
+"管理灵动岛中的工作流模块。" = "Quản lý các mô-đun quy trình trong Dynamic Island.";
+"工作流模块" = "Mô-đun Quy trình";
+"媒体播放" = "Phát Media";
+"显示系统正在播放的音乐或视频" = "Hiển thị nhạc hoặc video đang phát";
+"播放来源" = "Nguồn phát";
+"歌词与歌曲信息" = "Lời bài hát và Thông tin Bài hát";
+"详细模式：图标、歌名、歌手与滚动歌词；关闭为简略模式（仅图标与音浪）" = "Chế độ chi tiết: biểu tượng, tiêu đề, nghệ sĩ và lời bài hát cuộn; Tắt cho chế độ gọn (chỉ biểu tượng và sóng âm)";
+"收起态音乐样式" = "Kiểu nhạc thu gọn";
+"文件中转与分享" = "Chuyển và Chia sẻ Tệp";
+"暂存文件并调用 AirDrop 或系统分享" = "Lưu tệp tạm thời và gọi AirDrop hoặc chia sẻ hệ thống";
+"小工具" = "Hộp công cụ";
+"番茄钟、亮屏与屏幕清洁" = "Pomodoro, giữ sáng và làm sạch màn hình";
+"随记" = "Ghi chú nhanh";
+"Markdown 随手记，可发送到系统备忘录" = "Ghi chú nhanh Markdown, có thể gửi đến Notes hệ thống";
+"PDF 工具" = "Công cụ PDF";
+"合并、拆分、加密与转换 PDF" = "Hợp nhất, tách, mã hóa và chuyển đổi PDF";
+"系统状态与清理" = "Giám sát Hệ thống và Dọn dẹp";
+"监控资源并安全清理缓存和日志" = "Giám sát tài nguyên và dọn dẹp bộ nhớ cache và nhật ký an toàn";
+"显示 zisla 图标" = "Hiển thị Biểu tượng zisla";
+"关闭后不影响已启用的菜单栏监控项" = "Không ảnh hưởng đến các mục giám sát thanh menu đã bật khi tắt";
+"菜单栏常驻" = "Luôn ở Thanh Menu";
+"选择一项或多项；点击任一指标直达系统监控" = "Chọn một hoặc nhiều; nhấp vào bất kỳ chỉ số nào để đến giám sát hệ thống";
+"监控样式" = "Kiểu giám sát";
+"紧凑模式隐藏图标并减小字号，减少菜单栏占用" = "Chế độ gọn ẩn biểu tượng và giảm kích thước font để tối thiểu không gian thanh menu";
+
+
+/* Settings - Info */
+"配置日历、邮件、锁屏与通知显示。" = "Cấu hình lịch, thư, màn hình khóa và thông báo.";
+"信息与通知" = "Thông tin và Thông báo";
+"日历日程" = "Sự kiện Lịch";
+"显示接下来的日程与会议" = "Hiển thị các sự kiện và cuộc họp sắp tới";
+"邮件" = "Thư";
+"读取已配置的 Mail.app 账户并提醒新邮件" = "Đọc các tài khoản Mail.app đã cấu hình và thông báo thư mới";
+"锁屏信息" = "Thông tin Màn hình Khóa";
+"在系统锁屏页显示状态信息与播放器" = "Hiển thị thông tin trạng thái và trình phát trên màn hình khóa hệ thống";
+"锁屏文字" = "Văn bản Màn hình Khóa";
+"显示在系统时间上方；留空则不显示" = "Hiển thị phía trên thời gian hệ thống; để trống để ẩn";
+"输入一句话" = "Nhập tin nhắn";
+"显示农历" = "Hiển thị Lịch Âm";
+"显示在系统时间上方，可与锁屏文字共存" = "Hiển thị phía trên thời gian hệ thống, có thể cùng tồn tại với văn bản màn hình khóa";
+"侧翼通知" = "Thông báo Bên";
+"在灵动岛肩部显示任务变化" = "Hiển thị thay đổi nhiệm vụ ở vai Dynamic Island";
+"岛上倒计时" = "Đếm ngược Island";
+"专注时在收起态灵动岛显示剩余时间" = "Hiển thị thời gian còn lại trong Dynamic Island thu gọn khi tập trung";
+"活动展示" = "Hiển thị Hoạt động";
+"播放与 AI 任务的折叠时长" = "Thời lượng thu gọn cho phát và nhiệm vụ AI";
+"专注模式展示" = "Hiển thị Chế độ Tập trung";
+"开启或切换专注模式时的显示时长" = "Thời lượng hiển thị khi bật hoặc chuyển chế độ tập trung";
+"收起态展示优先级" = "Ưu tiên Trạng thái Gọn";
+"上移" = "Di chuyển Lên";
+"下移" = "Di chuyển Xuống";
+"恢复默认顺序" = "Khôi phục Thứ tự Mặc định";
+"通知显示器" = "Màn hình Thông báo";
+"当前显示器" = "Màn hình Hiện tại";
+"连接另一台显示器后可选择通知展示范围" = "Kết nối màn hình khác để chọn phạm vi thông báo";
+"播放与 AI 活动通知显示在此屏幕" = "Thông báo hoạt động phát và AI hiển thị trên màn hình này";
+
+/* Settings - AI */
+"AI 进度、语音输入，以及连接、自动化、CLI 与 Skills 等 Agent 行为。" = "Tiến độ AI, nhập giọng nói và hành vi Agent bao gồm kết nối, tự động hóa, CLI và Skills.";
+"AI 监控" = "Giám sát AI";
+"AI 进度与用量" = "Tiến độ và Sử dụng AI";
+"汇总桌面端与 CLI 工具的运行状态" = "Tóm tắt trạng thái desktop và công cụ CLI đang chạy";
+"语音输入" = "Nhập Giọng nói";
+"启用语音输入" = "Bật Nhập Giọng nói";
+"开启后可通过全局快捷键触发语音输入" = "Bật nhập giọng nói qua phím tắt toàn cục";
+"录音模式" = "Chế độ Ghi âm";
+"快捷键" = "Phím tắt";
+"按住说话、松开结束" = "Nhấn để nói, thả để kết thúc";
+"按一下开始、再按一下结束" = "Nhấn một lần để bắt đầu, nhấn lại để kết thúc";
+"输入监控" = "Giám sát Đầu vào";
+"左右侧修饰键需要监听全局键盘事件" = "Phím bổ trợ trái/phải yêu cầu lắng nghe sự kiện bàn phím toàn cục";
+"已授权" = "Đã Ủy quyền";
+
+/* Settings - AI Agent */
+"AI Agent 行为" = "Hành vi AI Agent";
+"在灵动岛显示" = "Hiển thị trong Dynamic Island";
+"关闭后仅从工具栏隐藏，此处的配置与对话不受影响" = "Chỉ ẩn khỏi thanh công cụ khi tắt; cấu hình và cuộc trò chuyện ở đây không bị ảnh hưởng";
+
+/* Settings - Models */
+"配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Cấu hình mô hình cục bộ, mô hình từ xa và thông tin xác thực, và chọn mô hình cho tổ chức giọng nói.";
+"本地模型" = "Mô hình Cục bộ";
+"远端模型与凭据" = "Mô hình Từ xa và Thông tin Xác thực";
+"语音整理模型" = "Mô hình Tổ chức Giọng nói";
+"使用模型" = "Sử dụng Mô hình";
+"从上方已启用的本地或远端模型中选择" = "Chọn từ các mô hình cục bộ hoặc từ xa đã bật ở trên";
+"不使用模型整理" = "Không Tổ chức Mô hình";
+"本地" = "Cục bộ";
+"远端" = "Từ xa";
+"尚未选择模型" = "Chưa Chọn Mô hình";
+"在上方添加并启用本地或远端模型后即可选择" = "Thêm và bật mô hình cục bộ hoặc từ xa ở trên để chọn";
+"选择后会对语音转写进行整理" = "Sẽ tổ chức phiên âm giọng nói sau khi chọn";
+"测试连接" = "Kiểm tra Kết nối";
+"尚未测试连接" = "Chưa được kiểm tra";
+"正在连接…" = "Đang kết nối…";
+"已发现" = "Đã tìm thấy";
+"个模型" = " mô hình";
+
+
+/* Settings - Models - Hardware Profile */
+"设备档案与推荐模型" = "Hồ sơ Thiết bị và Mô hình Được Đề xuất";
+"设备" = "Thiết bị";
+"综合推荐" = "Đề xuất Tổng thể";
+"检测" = "Phát hiện";
+"点击下方按钮检测硬件信息" = "Nhấp vào nút bên dưới để phát hiện thông tin phần cứng";
+
+/* Settings - Pet */
+"设置灵动岛内部的宠物形象。" = "Thiết lập ngoại hình thú cưng bên trong Dynamic Island.";
+"岛上宠物伙伴" = "Bạn đồng hành Thú cưng Island";
+"在灵动岛养一只小宠物" = "Nuôi một thú cưng trong Dynamic Island";
+"当前宠物" = "Thú cưng Hiện tại";
+"选择内置的宠物形象" = "Chọn ngoại hình thú cưng tích hợp";
+"在岛的哪一侧" = "Phía nào của Island";
+"宠物出现在灵动岛内部的左侧或右侧" = "Thú cưng xuất hiện ở bên trái hoặc bên phải bên trong Dynamic Island";
+"左侧" = "Trái";
+"右侧" = "Phải";
+
+/* Settings - Interaction */
+"调整外观、展开方式与隐私行为。" = "Điều chỉnh giao diện, phương pháp mở rộng và hành vi riêng tư.";
+"外观" = "Giao diện";
+"界面外观" = "Giao diện UI";
+"灵动岛样式" = "Kiểu Dynamic Island";
+"刘海背景" = "Nền Notch";
+"启动" = "Khởi động";
+"登录时启动" = "Khởi chạy khi Đăng nhập";
+"开机或登录后自动在后台运行" = "Tự động chạy ở chế độ nền sau khi khởi động hoặc đăng nhập";
+"需要系统批准" = "Cần Phê duyệt Hệ thống";
+"在登录项中允许 zisla 后即可生效" = "Có hiệu lực sau khi cho phép zisla trong các mục đăng nhập";
+"打开登录项…" = "Mở Mục Đăng nhập…";
+"展开方式" = "Phương pháp Mở rộng";
+"鼠标移入展开" = "Di chuột để Mở rộng";
+"鼠标进入屏幕顶部感应区时显示" = "Hiển thị khi chuột vào vùng phát hiện ở đỉnh màn hình";
+"隐私" = "Quyền riêng tư";
+"记录剪贴板历史" = "Ghi Lịch sử Clipboard";
+"仅本机保存文本和图片，默认关闭" = "Chỉ lưu văn bản và hình ảnh cục bộ, tắt theo mặc định";
+"检测剪贴板链接" = "Phát hiện Liên kết Clipboard";
+"发现可下载链接时提示，默认关闭" = "Nhắc khi phát hiện liên kết có thể tải xuống, tắt theo mặc định";
+
+/* Settings - Download */
+"管理下载目录、下载通知与所需组件。" = "Quản lý thư mục tải xuống, thông báo tải xuống và các thành phần cần thiết.";
+"下载器" = "Trình tải xuống";
+"链接下载" = "Tải xuống Liên kết";
+"下载视频或音频" = "Tải xuống video hoặc âm thanh";
+"默认下载目录" = "Thư mục Tải xuống Mặc định";
+"选择…" = "Chọn…";
+"下载通知" = "Thông báo Tải xuống";
+"浏览器下载进度" = "Tiến độ Tải xuống Trình duyệt";
+"在灵动岛显示来源图标与百分比" = "Hiển thị biểu tượng nguồn và phần trăm trong Dynamic Island";
+"原生下载进度" = "Tiến độ Tải xuống Gốc";
+"下载器工作时显示来源平台图标与百分比" = "Hiển thị biểu tượng nền tảng nguồn và phần trăm khi trình tải xuống hoạt động";
+"组件" = "Thành phần";
+"未安装" = "Chưa Cài đặt";
+"已安装（版本未知）" = "Đã cài đặt (phiên bản không xác định)";
+"安装" = "Cài đặt";
+"正在查询最新版本…" = "Đang kiểm tra phiên bản mới nhất…";
+"正在下载…" = "Đang tải xuống…";
+"正在下载" = "Đang tải xuống";
+"正在安装…" = "Đang cài đặt…";
+
+/* Settings - Weather */
+"管理天气显示、地点和刷新。" = "Quản lý hiển thị thời tiết, vị trí và làm mới.";
+"天气显示" = "Hiển thị Thời tiết";
+"显示当前或自选地区的天气" = "Hiển thị thời tiết vị trí hiện tại hoặc tùy chỉnh";
+"地点" = "Vị trí";
+"默认显示当前所在地" = "Mặc định hiển thị vị trí hiện tại";
+"等待刷新" = "Đang chờ làm mới";
+"拖动调整" = "Kéo để điều chỉnh";
+"的展示顺序" = " thứ tự hiển thị";
+"天气数据" = "Dữ liệu Thời tiết";
+"刷新当前位置与全部自选地区" = "Làm mới vị trí hiện tại và tất cả vị trí tùy chỉnh";
+"城市、区县或地区" = "Thành phố, quận hoặc khu vực";
+"搜索地区" = "Tìm kiếm Vị trí";
+
+/* Settings - Updates */
+"管理版本检查与自动更新。" = "Quản lý kiểm tra phiên bản và cập nhật tự động.";
+"更新策略" = "Chiến lược Cập nhật";
+"手动检查通道" = "Kênh Kiểm tra Thủ công";
+"不影响自动更新" = "Không ảnh hưởng đến cập nhật tự động";
+"检查更新" = "Kiểm tra Cập nhật";
+"仅检查当前安装包所属的更新通道" = "Chỉ kiểm tra kênh cập nhật của gói cài đặt hiện tại";
+"自动安装更新" = "Tự động Cài đặt Cập nhật";
+"仅自动安装当前安装包所属通道的新构建" = "Chỉ tự động cài đặt bản build mới từ kênh của gói cài đặt hiện tại";
+"版本" = "Phiên bản";
+"尚未检查更新" = "Chưa kiểm tra cập nhật";
+"正在检查更新" = "Đang kiểm tra cập nhật";
+"已是最新版本" = "Đã là phiên bản mới nhất";
+"发现" = "Đã tìm thấy";
+"新版本" = " phiên bản mới";
+
+
+/* Clipboard History Module */
+"剪贴板" = "Clipboard";
+"全部" = "Tất cả";
+"常用" = "Yêu thích";
+"非常用" = "Không yêu thích";
+"添加常用信息" = "Thêm Yêu thích";
+"清空历史（保留常用）" = "Xóa Lịch sử (Giữ Yêu thích)";
+"只看" = "Chỉ hiển thị ";
+"还没有剪贴板历史" = "Chưa có lịch sử clipboard";
+"复制内容后会自动记录" = "Tự động ghi lại sau khi sao chép";
+"还没有常用项" = "Chưa có mục yêu thích";
+"点击右上角加号，添加文字、图片或文件" = "Nhấp vào + ở góc trên bên phải để thêm văn bản, hình ảnh hoặc tệp";
+"这里空空如也" = "Không có gì ở đây";
+"添加常用项" = "Thêm Yêu thích";
+"文字" = "Văn bản";
+"图片" = "Hình ảnh";
+"文件" = "Tệp";
+"添加常用文字" = "Thêm Văn bản Yêu thích";
+"输入文字或 Emoji" = "Nhập văn bản hoặc Emoji";
+"复制到剪贴板" = "Sao chép vào Clipboard";
+"发送到随记" = "Gửi đến Ghi chú Nhanh";
+"发送到 AI Agent" = "Gửi đến AI Agent";
+"移出常用" = "Xóa khỏi Yêu thích";
+"设为常用" = "Thêm vào Yêu thích";
+"文本" = "Văn bản";
+
+/* Quick Notes Module */
+"备忘录暂无笔记" = "Không có ghi chú trong ứng dụng Notes";
+"点 + 新建一条" = "Nhấp + để tạo một cái";
+"刷新备忘录" = "Làm mới Notes";
+"新建随记" = "Ghi chú Nhanh Mới";
+"无标题" = "Không tiêu đề";
+"内置说明" = "Hướng dẫn Tích hợp";
+"无法读取备忘录" = "Không thể đọc Notes";
+"发送到提词器" = "Gửi đến Teleprompter";
+"展开大窗口编辑" = "Mở trong Cửa sổ Lớn";
+"系统共享" = "Chia sẻ Hệ thống";
+
+/* AI Agent Module */
+"对话" = "Trò chuyện";
+"消息连接" = "Kết nối Tin nhắn";
+"应用增强" = "Cải tiến Ứng dụng";
+"自动化" = "Tự động hóa";
+"CLI 与 Skills" = "CLI và Skills";
+"会话存储" = "Lưu trữ Phiên";
+"刷新余额、渠道、CLI 和 Skills" = "Làm mới số dư, kênh, CLI và Skills";
+"统一历史" = "Lịch sử Thống nhất";
+"新建对话" = "Cuộc trò chuyện Mới";
+"添加项目" = "Thêm Dự án";
+"添加现有文件夹…" = "Thêm Thư mục Hiện có…";
+"新建文件夹并添加…" = "Tạo Thư mục Mới…";
+"将本地文件夹添加为项目" = "Thêm thư mục cục bộ làm dự án";
+"未归类" = "Chưa Phân loại";
+"展开项目会话" = "Mở rộng phiên dự án";
+"收起项目会话" = "Thu gọn phiên dự án";
+"选择项目；新建对话会归入此项目" = "Chọn dự án; cuộc trò chuyện mới sẽ được thêm vào dự án này";
+"取消置顶项目" = "Bỏ Ghim Dự án";
+"置顶项目" = "Ghim Dự án";
+"删除项目" = "Xóa Dự án";
+"选择或新建对话" = "Chọn hoặc tạo cuộc trò chuyện";
+"你" = "Bạn";
+"助手" = "Trợ lý";
+"执行细节" = "Chi tiết Thực thi";
+"计划模式" = "Chế độ Kế hoạch";
+"复制回复" = "Sao chép Trả lời";
+"从此回复分叉会话" = "Rẽ nhánh Phiên từ Trả lời";
+"批注" = "Chú thích";
+"添加批注" = "Thêm Chú thích";
+"将引用和评论发送为新消息" = "Gửi trích dẫn và nhận xét làm tin nhắn mới";
+"删除批注" = "Xóa Chú thích";
+"发送消息" = "Gửi Tin nhắn";
+"添加文件" = "Thêm Tệp";
+"添加文件、切换计划模式或目标模式" = "Thêm tệp, chuyển chế độ kế hoạch hoặc chế độ mục tiêu";
+"目标模式" = "Chế độ Mục tiêu";
+"设置外部 CLI 的访问偏好" = "Đặt tùy chọn truy cập CLI bên ngoài";
+"选择思考深度偏好" = "Chọn tùy chọn độ sâu suy nghĩ";
+"发送" = "Gửi";
+
+/* AI Agent - Remote Providers */
+"远端 Provider" = "Nhà cung cấp Từ xa";
+"添加 Provider" = "Thêm Nhà cung cấp";
+"尚未配置远端 Provider" = "Chưa có nhà cung cấp từ xa được cấu hình";
+"Provider 名称" = "Tên Nhà cung cấp";
+"端点" = "Endpoint";
+"凭据" = "Thông tin xác thực";
+"高级路由" = "Định tuyến Nâng cao";
+"添加端点组" = "Thêm Nhóm Endpoint";
+"添加额外的 URL/Key 轮换组（高级）" = "Thêm nhóm luân chuyển URL/Key bổ sung (nâng cao)";
+"尚未关联凭据" = "Chưa có thông tin xác thực được liên kết";
+"关联凭据" = "Liên kết Thông tin xác thực";
+"选择已有凭据，或为此 Provider 新建 API Key 凭据" = "Chọn thông tin xác thực hiện có hoặc tạo thông tin xác thực API Key mới cho nhà cung cấp này";
+"新建 API Key 凭据" = "Thông tin xác thực API Key Mới";
+"配置文件路径" = "Đường dẫn Tệp Cấu hình";
+"认证文件路径" = "Đường dẫn Tệp Auth";
+"导入配置" = "Nhập Cấu hình";
+"导入认证" = "Nhập Auth";
+"配置" = "Cấu hình";
+"认证" = "Auth";
+
+
+/* System Monitor */
+"正在识别芯片" = "Đang xác định chip";
+"正在识别图形处理器" = "Đang xác định bộ xử lý đồ họa";
+"用户" = "Người dùng";
+"系统" = "Hệ thống";
+"闲置" = "Rảnh rỗi";
+"利用率" = "Sử dụng";
+"渲染" = "Renderer";
+"内存" = "Bộ nhớ";
+"压力" = "Áp lực";
+"可用" = "Có sẵn";
+"共" = "Tổng";
+"释放" = "Giải phóng";
+"整理系统内存，回收非活跃与压缩页面" = "Sắp xếp bộ nhớ hệ thống, thu hồi các trang không hoạt động và nén";
+"已整理系统内存" = "Bộ nhớ hệ thống đã được sắp xếp";
+"磁盘" = "Đĩa";
+"清理" = "Dọn dẹp";
+"扫描可清理的缓存、日志与开发产物" = "Quét bộ nhớ cache, nhật ký và hiện vật xây dựng có thể dọn dẹp";
+"风扇" = "Quạt";
+"无风扇" = "Không có Quạt";
+"风扇数据不可用" = "Dữ liệu quạt không khả dụng";
+"正在读取风扇状态" = "Đang đọc trạng thái quạt";
+"网络" = "Mạng";
+"通过 ipify 查询公网地址" = "Truy vấn địa chỉ IP công khai qua ipify";
+"内网" = "IP Cục bộ";
+"公网" = "IP Công khai";
+"正在识别" = "Đang xác định";
+"正在获取" = "Đang lấy";
+"暂不可用" = "Không khả dụng";
+"建立基线" = "Thiết lập đường cơ sở";
+
+/* System Cleanup */
+"清理磁盘" = "Dọn dẹp ổ đĩa";
+"扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件" = "Quét bộ nhớ cache ứng dụng, nhật ký, tệp tạm thời, hiện vật xây dựng, bộ nhớ cache trình quản lý gói, hình ảnh đĩa, tệp lớn và bản sao";
+"取消全选" = "Bỏ chọn Tất cả";
+"全选" = "Chọn Tất cả";
+"选择全部候选项" = "Chọn tất cả ứng viên";
+"取消所有选择" = "Bỏ chọn tất cả";
+"反选" = "Đảo Chọn";
+"反转当前选择：已选变未选，未选变已选" = "Đảo chọn hiện tại: đã chọn thành chưa chọn, chưa chọn thành đã chọn";
+"已选中的项取消选中，未选中的项选中" = "Bỏ chọn các mục đã chọn, chọn các mục chưa chọn";
+"重新扫描" = "Quét lại";
+"正在扫描" = "Đang quét";
+"未找到可清理项" = "Không tìm thấy mục dọn dẹp";
+"可安全清理的缓存与日志当前为空" = "Bộ nhớ cache và nhật ký có thể dọn dẹp an toàn hiện đang trống";
+"展开" = "Mở rộng";
+"折叠" = "Thu gọn";
+"取消选择" = "Bỏ chọn";
+"已选" = "Đã chọn";
+"项" = " mục";
+"移入废纸篓" = "Di chuyển vào Thùng rác";
+"将" = "Di chuyển ";
+" 项移入废纸篓？" = " mục vào Thùng rác?";
+"zisla 不会永久删除这些内容。" = "zisla sẽ không xóa vĩnh viễn các mục này.";
+"已移入废纸篓" = "Đã di chuyển vào Thùng rác";
+"清空废纸篓后可释放" = "Có thể giải phóng sau khi làm trống Thùng rác";
+"已处理" = "Đã xử lý";
+"项未完成" = " mục chưa hoàn thành";
+
+/* Cleanup Categories */
+"应用缓存" = "Bộ nhớ Cache Ứng dụng";
+"缓存" = "Cache";
+"日志" = "Nhật ký";
+"废纸篓" = "Thùng rác";
+"开发产物" = "Hiện vật Xây dựng";
+"临时文件" = "Tệp Tạm thời";
+"包管理缓存" = "Bộ nhớ Cache Trình quản lý Gói";
+"崩溃报告" = "Báo cáo Sự cố";
+"磁盘镜像" = "Hình ảnh Đĩa";
+"大文件" = "Tệp Lớn";
+"重复文件" = "Tệp Trùng lặp";
+
+/* Toolbox */
+"暂停" = "Tạm dừng";
+"开始" = "Bắt đầu";
+"重置" = "Đặt lại";
+"重置番茄钟" = "Đặt lại Pomodoro";
+"设置时长" = "Đặt Thời lượng";
+"小时" = "Giờ";
+"分钟" = "Phút";
+"秒" = "Giây";
+"分" = "phút";
+"提词器" = "Teleprompter";
+"打开提词器" = "Mở Teleprompter";
+"闹钟" = "Báo thức";
+"管理闹钟" = "Quản lý Báo thức";
+"镜子" = "Gương";
+"打开摄像头镜子" = "Mở Gương Camera";
+"清空废纸篓（不可撤销，会先确认）" = "Làm trống Thùng rác (không thể hoàn tác, sẽ xác nhận trước)";
+"保持亮屏" = "Giữ Sáng";
+"防止用户闲置导致显示器休眠" = "Ngăn ngủ màn hình do không hoạt động của người dùng";
+"防止空闲休眠" = "Ngăn Ngủ Rảnh rỗi";
+"防止用户闲置导致系统休眠；合盖、低电量或用户主动休眠仍会让 Mac 进入睡眠" = "Ngăn ngủ hệ thống do không hoạt động của người dùng; đóng nắp, pin yếu hoặc ngủ do người dùng khởi xướng vẫn hoạt động";
+"常驻提醒" = "Nhắc nhở Liên tục";
+"无媒体占用时，在折叠状态显示番茄钟、亮屏或清洁状态" = "Hiển thị trạng thái Pomodoro, giữ sáng hoặc làm sạch trong trạng thái thu gọn khi không có phương tiện hoạt động";
+"清理屏幕" = "Làm sạch Màn hình";
+"全屏黑色遮罩；点击中央「退出清屏」按钮或任意处退出" = "Lớp phủ đen toàn màn hình; nhấp vào nút 'Thoát Làm sạch' ở giữa hoặc bất kỳ đâu để thoát";
+"清理键盘" = "Làm sạch Bàn phím";
+"结束清洁" = "Kết thúc Làm sạch";
+"恢复键盘输入" = "Khôi phục đầu vào bàn phím";
+"吞掉键盘输入；再次点击结束" = "Nuốt đầu vào bàn phím; nhấp lại để kết thúc";
+"收起置顶" = "Thu gọn Ở Trên";
+"收起置底" = "Thu gọn Ở Dưới";
+"收起态压在其他窗口之上（置顶），或被其他窗口和菜单栏图标覆盖（置底）" = "Trạng thái thu gọn ở trên các cửa sổ khác (ở trên), hoặc bị che bởi các cửa sổ khác và biểu tượng thanh menu (ở dưới)";
+"屏蔽通知" = "Tắt tiếng Thông báo";
+"临时不再推送 Zisla 的系统通知；关闭后恢复正常推送（闹钟不受影响）" = "Tạm dừng đẩy thông báo hệ thống Zisla; khôi phục đẩy bình thường khi tắt (báo thức không bị ảnh hưởng)";
+"整理桌面" = "Sắp xếp Desktop";
+"按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Căn chỉnh biểu tượng desktop theo lưới; không di chuyển bất kỳ tệp nào khi 'Stacks' được bật";
+"App Store 应用" = "Ứng dụng App Store";
+"批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页" = "Cập nhật hàng loạt ứng dụng App Store; mở trang cập nhật App Store khi mas chưa cài đặt";
+
+/* Alarm Editor */
+"还没有闹钟，在下方添加" = "Chưa có báo thức, thêm bên dưới";
+"打开时钟" = "Mở Đồng hồ";
+"打开系统「时钟」App" = "Mở ứng dụng Đồng hồ hệ thống";
+"停用" = "Vô hiệu hóa";
+"启用" = "Kích hoạt";
+"编辑" = "Chỉnh sửa";
+"时" = "Giờ";
+"备注" = "Nhãn";
+"仅响一次" = "Một lần";
+"每周重复" = "Lặp lại Hàng tuần";
+
+/* Skills Management */
+"统一存储并同步到已启用的 CLI" = "Lưu trữ thống nhất và đồng bộ hóa với CLI đã bật";
+"立即同步 Skills" = "Đồng bộ Skills Ngay";
+"同步方式" = "Chế độ Đồng bộ";
+"同步目标" = "Đích Đồng bộ";
+"受管库" = "Thư viện Được Quản lý";
+"在访达中打开受管库" = "Mở Thư viện Được Quản lý trong Finder";
+"卸载 Skill？" = "Gỡ cài đặt Skill?";
+"卸载" = "Gỡ cài đặt";
+"普通 Skill 会移到废纸篓；由 npm、pnpm、yarn、bun 或 Homebrew 全局安装的 Skill 会调用对应包管理器卸载。" = "Skill thông thường di chuyển vào Thùng rác; Skill được cài đặt toàn cục qua npm, pnpm, yarn, bun hoặc Homebrew được gỡ cài đặt qua trình quản lý gói của chúng.";
+"已发现 Skills（" = "Đã tìm thấy Skills (";
+"）" = ")";
+
+/* Side Notices */
+"已连接" = "Đã kết nối";
+"耳机已连接：" = "Tai nghe đã kết nối: ";
+"状态已更新" = "Trạng thái đã cập nhật";
+"正在播放" = "Đang phát";
+"正在播放：" = "Đang phát: ";
+"AI 任务图标" = "Biểu tượng Nhiệm vụ AI";
+"个 AI 任务" = " nhiệm vụ AI";
+"有错误" = " có lỗi";
+"等待操作" = " đang chờ hành động";
+"正在运行" = " đang chạy";
+"小工具：" = "Hộp công cụ: ";
+"工具" = "Công cụ";
+"专注倒计时：" = "Đếm ngược tập trung: ";
+"专注模式：" = "Chế độ tập trung: ";
+"下载中" = " đang tải xuống";
+"浏览器" = "Trình duyệt";
+"下载完成：" = " tải xuống hoàn tất: ";
+"视频" = "Video";
+
+/* Empty States */
+"无" = "Không có";
+"无可用内容" = "Không Có Nội dung Khả dụng";
+
+/* Localization and AppKit chrome */
+"外观与语言" = "Giao diện và Ngôn ngữ";
+"界面语言" = "Ngôn ngữ Giao diện";
+"切换后立即应用到支持的界面文本" = "Áp dụng ngay lập tức cho văn bản giao diện được hỗ trợ";
+"简体中文" = "Tiếng Trung Giản thể";
+"退出 zisla" = "Thoát zisla";
+"窗口" = "Cửa sổ";
+"最小化" = "Thu nhỏ";
+"关闭窗口" = "Đóng Cửa sổ";
+"显示灵动岛" = "Hiển thị Dynamic Island";
+"系统监控" = "Giám sát Hệ thống";
+"设置..." = "Cài đặt...";
+"点击打开系统监控" = "Nhấp để mở Giám sát Hệ thống";
+"zisla 设置" = "Cài đặt zisla";
+"随记 · 编辑" = "Ghi chú Nhanh · Chỉnh sửa";
+
+/* Presentation options */
+"自动" = "Tự động";
+"简洁模式" = "Gọn";
+"详细模式" = "Chi tiết";
+"3 秒" = "3 giây";
+"5 秒" = "5 giây";
+"10 秒" = "10 giây";
+"30 秒" = "30 giây";
+"始终显示" = "Luôn luôn";
+"跟随系统" = "Hệ thống";
+"浅色" = "Sáng";
+"深色" = "Tối";
+"磨砂玻璃" = "Kính Mờ";
+"刘海" = "Notch";
+"紧凑" = "Gọn";
+"详细" = "Chi tiết";

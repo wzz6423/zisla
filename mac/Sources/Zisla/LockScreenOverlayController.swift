@@ -101,9 +101,7 @@ final class LockScreenOverlayController {
             withTimeInterval: 2,
             repeats: true
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.refreshSessionLockState()
-            }
+            MainActor.assumeIsolated { self?.refreshSessionLockState() }
         }
         poller.tolerance = 0.25
         sessionPoller = poller
@@ -215,7 +213,10 @@ final class LockScreenOverlayController {
         ]
 
         let hostingView = NSHostingView(
-            rootView: LockScreenOverlayView(model: model, kind: kind)
+            rootView: AppLanguageEnvironment(
+                languageStore: model.languageStore,
+                content: LockScreenOverlayView(model: model, kind: kind)
+            )
         )
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor

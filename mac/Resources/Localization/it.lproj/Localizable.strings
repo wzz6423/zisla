@@ -1,0 +1,513 @@
+/* Localizable.strings - Italian localization for Zisla macOS */
+
+/* Common */
+"取消" = "Annulla";
+"确定" = "OK";
+"好" = "OK";
+"继续" = "Continua";
+"删除" = "Elimina";
+"关闭" = "Chiudi";
+"保存" = "Salva";
+"添加" = "Aggiungi";
+"刷新" = "Aggiorna";
+"重试" = "Riprova";
+"退出应用" = "Esci dall'app";
+"复制" = "Copia";
+"拷贝" = "Copia";
+"搜索" = "Cerca";
+"清除" = "Cancella";
+"打开设置" = "Apri Impostazioni";
+
+/* Settings */
+"设置" = "Impostazioni";
+"工作流" = "Workflow";
+"信息" = "Info";
+"模型" = "Modelli";
+"桌面宠物" = "Pet Desktop";
+"交互" = "Interazione";
+"下载" = "Download";
+"天气" = "Meteo";
+"更新" = "Aggiornamenti";
+
+/* Settings - Workflow */
+"管理灵动岛中的工作流模块。" = "Gestisci i moduli workflow in Dynamic Island.";
+"工作流模块" = "Moduli Workflow";
+"媒体播放" = "Riproduzione Media";
+"显示系统正在播放的音乐或视频" = "Mostra musica o video in riproduzione";
+"播放来源" = "Sorgente Riproduzione";
+"歌词与歌曲信息" = "Testi e Info Brano";
+"详细模式：图标、歌名、歌手与滚动歌词；关闭为简略模式（仅图标与音浪）" = "Modalità dettagliata: icona, titolo, artista e testo scorrevole; Off per modalità compatta (solo icona e forma d'onda)";
+"收起态音乐样式" = "Stile Musica Compatto";
+"文件中转与分享" = "Trasferimento e Condivisione File";
+"暂存文件并调用 AirDrop 或系统分享" = "Staging file e invoca AirDrop o condivisione di sistema";
+"小工具" = "Strumenti";
+"番茄钟、亮屏与屏幕清洁" = "Pomodoro, mantieni sveglio e pulizia schermo";
+"随记" = "Note Rapide";
+"Markdown 随手记，可发送到系统备忘录" = "Note rapide Markdown, possono essere inviate all'app Note di sistema";
+"PDF 工具" = "Strumenti PDF";
+"合并、拆分、加密与转换 PDF" = "Unisci, dividi, cripta e converti PDF";
+"系统状态与清理" = "Monitor Sistema e Pulizia";
+"监控资源并安全清理缓存和日志" = "Monitora risorse e pulisci in sicurezza cache e log";
+"显示 zisla 图标" = "Mostra Icona zisla";
+"关闭后不影响已启用的菜单栏监控项" = "Non influisce sugli elementi di monitoraggio della barra dei menu quando disattivato";
+"菜单栏常驻" = "Barra Menu Persistente";
+"选择一项或多项；点击任一指标直达系统监控" = "Seleziona uno o più; fai clic su qualsiasi metrica per andare al monitor di sistema";
+"监控样式" = "Stile Monitor";
+"紧凑模式隐藏图标并减小字号，减少菜单栏占用" = "La modalità compatta nasconde le icone e riduce la dimensione del carattere per minimizzare lo spazio della barra dei menu";
+
+
+/* Settings - Info */
+"配置日历、邮件、锁屏与通知显示。" = "Configura calendario, posta, schermata di blocco e notifiche.";
+"信息与通知" = "Info e Notifiche";
+"日历日程" = "Eventi Calendario";
+"显示接下来的日程与会议" = "Mostra eventi e riunioni imminenti";
+"邮件" = "Posta";
+"读取已配置的 Mail.app 账户并提醒新邮件" = "Leggi gli account Mail.app configurati e notifica nuove email";
+"锁屏信息" = "Info Schermata di Blocco";
+"在系统锁屏页显示状态信息与播放器" = "Mostra info di stato e lettore sulla schermata di blocco del sistema";
+"锁屏文字" = "Testo Schermata di Blocco";
+"显示在系统时间上方；留空则不显示" = "Visualizzato sopra l'ora di sistema; lascia vuoto per nascondere";
+"输入一句话" = "Inserisci un messaggio";
+"显示农历" = "Mostra Calendario Lunare";
+"显示在系统时间上方，可与锁屏文字共存" = "Visualizzato sopra l'ora di sistema, può coesistere con il testo della schermata di blocco";
+"侧翼通知" = "Notifiche Laterali";
+"在灵动岛肩部显示任务变化" = "Mostra cambiamenti di attività sulle spalle di Dynamic Island";
+"岛上倒计时" = "Conto alla Rovescia sull'Isola";
+"专注时在收起态灵动岛显示剩余时间" = "Mostra il tempo rimanente in Dynamic Island compatta quando sei concentrato";
+"活动展示" = "Visualizzazione Attività";
+"播放与 AI 任务的折叠时长" = "Durata di compressione per riproduzione e attività AI";
+"专注模式展示" = "Visualizzazione Modalità Focus";
+"开启或切换专注模式时的显示时长" = "Durata di visualizzazione quando si abilita o si cambia modalità focus";
+"收起态展示优先级" = "Priorità Stato Compatto";
+"上移" = "Sposta su";
+"下移" = "Sposta giù";
+"恢复默认顺序" = "Ripristina Ordine Predefinito";
+"通知显示器" = "Display Notifiche";
+"当前显示器" = "Display Corrente";
+"连接另一台显示器后可选择通知展示范围" = "Collega un altro display per scegliere l'ambito delle notifiche";
+"播放与 AI 活动通知显示在此屏幕" = "Le notifiche di riproduzione e attività AI vengono mostrate su questo schermo";
+
+/* Settings - AI */
+"AI 进度、语音输入，以及连接、自动化、CLI 与 Skills 等 Agent 行为。" = "Progressi AI, input vocale e comportamenti Agent tra cui connessioni, automazione, CLI e Skills.";
+"AI 监控" = "Monitoraggio AI";
+"AI 进度与用量" = "Progressi e Utilizzo AI";
+"汇总桌面端与 CLI 工具的运行状态" = "Riepilogo dello stato di esecuzione di desktop e strumenti CLI";
+"语音输入" = "Input Vocale";
+"启用语音输入" = "Abilita Input Vocale";
+"开启后可通过全局快捷键触发语音输入" = "Abilita l'input vocale tramite scorciatoia globale";
+"录音模式" = "Modalità Registrazione";
+"快捷键" = "Scorciatoia";
+"按住说话、松开结束" = "Premi per parlare, rilascia per finire";
+"按一下开始、再按一下结束" = "Premi una volta per iniziare, premi di nuovo per finire";
+"输入监控" = "Monitoraggio Input";
+"左右侧修饰键需要监听全局键盘事件" = "I tasti modificatori sinistro/destro richiedono l'ascolto degli eventi della tastiera globale";
+"已授权" = "Autorizzato";
+
+/* Settings - AI Agent */
+"AI Agent 行为" = "Comportamento AI Agent";
+"在灵动岛显示" = "Mostra in Dynamic Island";
+"关闭后仅从工具栏隐藏，此处的配置与对话不受影响" = "Si nasconde solo dalla barra degli strumenti quando disattivato; configurazione e conversazioni qui non sono influenzate";
+
+/* Settings - Models */
+"配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Configura modelli locali, modelli remoti e credenziali, e seleziona il modello per l'organizzazione vocale.";
+"本地模型" = "Modelli Locali";
+"远端模型与凭据" = "Modelli Remoti e Credenziali";
+"语音整理模型" = "Modello Organizzazione Vocale";
+"使用模型" = "Usa Modello";
+"从上方已启用的本地或远端模型中选择" = "Seleziona dai modelli locali o remoti abilitati sopra";
+"不使用模型整理" = "Nessuna Organizzazione Modello";
+"本地" = "Locale";
+"远端" = "Remoto";
+"尚未选择模型" = "Nessun Modello Selezionato";
+"在上方添加并启用本地或远端模型后即可选择" = "Aggiungi e abilita modelli locali o remoti sopra per selezionare";
+"选择后会对语音转写进行整理" = "Organizzerà la trascrizione vocale dopo la selezione";
+"测试连接" = "Testa Connessione";
+"尚未测试连接" = "Non testato";
+"正在连接…" = "Connessione in corso…";
+"已发现" = "Trovati";
+"个模型" = " modelli";
+
+
+/* Settings - Models - Hardware Profile */
+"设备档案与推荐模型" = "Profilo Dispositivo e Modelli Consigliati";
+"设备" = "Dispositivo";
+"综合推荐" = "Raccomandazione Complessiva";
+"检测" = "Rileva";
+"点击下方按钮检测硬件信息" = "Fai clic sul pulsante qui sotto per rilevare le informazioni hardware";
+
+/* Settings - Pet */
+"设置灵动岛内部的宠物形象。" = "Imposta l'aspetto del pet all'interno di Dynamic Island.";
+"岛上宠物伙伴" = "Compagno Pet sull'Isola";
+"在灵动岛养一只小宠物" = "Alleva un pet in Dynamic Island";
+"当前宠物" = "Pet Corrente";
+"选择内置的宠物形象" = "Seleziona l'aspetto del pet integrato";
+"在岛的哪一侧" = "Su Quale Lato dell'Isola";
+"宠物出现在灵动岛内部的左侧或右侧" = "Il pet appare a sinistra o a destra all'interno di Dynamic Island";
+"左侧" = "Sinistra";
+"右侧" = "Destra";
+
+/* Settings - Interaction */
+"调整外观、展开方式与隐私行为。" = "Regola aspetto, metodo di espansione e comportamento della privacy.";
+"外观" = "Aspetto";
+"界面外观" = "Aspetto Interfaccia";
+"灵动岛样式" = "Stile Dynamic Island";
+"刘海背景" = "Sfondo Notch";
+"启动" = "Avvio";
+"登录时启动" = "Avvia al Login";
+"开机或登录后自动在后台运行" = "Esegui automaticamente in background dopo l'avvio o il login";
+"需要系统批准" = "Richiede Approvazione del Sistema";
+"在登录项中允许 zisla 后即可生效" = "Ha effetto dopo aver consentito zisla negli elementi di login";
+"打开登录项…" = "Apri Elementi di Login…";
+"展开方式" = "Metodo di Espansione";
+"鼠标移入展开" = "Espandi al Passaggio del Mouse";
+"鼠标进入屏幕顶部感应区时显示" = "Mostra quando il mouse entra nella zona di rilevamento superiore dello schermo";
+"隐私" = "Privacy";
+"记录剪贴板历史" = "Registra Cronologia Appunti";
+"仅本机保存文本和图片，默认关闭" = "Salva solo testo e immagini localmente, disattivato per impostazione predefinita";
+"检测剪贴板链接" = "Rileva Link negli Appunti";
+"发现可下载链接时提示，默认关闭" = "Richiedi quando vengono rilevati link scaricabili, disattivato per impostazione predefinita";
+
+/* Settings - Download */
+"管理下载目录、下载通知与所需组件。" = "Gestisci directory di download, notifiche di download e componenti richiesti.";
+"下载器" = "Downloader";
+"链接下载" = "Download Link";
+"下载视频或音频" = "Scarica video o audio";
+"默认下载目录" = "Directory di Download Predefinita";
+"选择…" = "Scegli…";
+"下载通知" = "Notifiche Download";
+"浏览器下载进度" = "Progresso Download Browser";
+"在灵动岛显示来源图标与百分比" = "Mostra icona sorgente e percentuale in Dynamic Island";
+"原生下载进度" = "Progresso Download Nativo";
+"下载器工作时显示来源平台图标与百分比" = "Mostra icona piattaforma sorgente e percentuale quando il downloader è in funzione";
+"组件" = "Componenti";
+"未安装" = "Non Installato";
+"已安装（版本未知）" = "Installato (versione sconosciuta)";
+"安装" = "Installa";
+"正在查询最新版本…" = "Verifica ultima versione in corso…";
+"正在下载…" = "Download in corso…";
+"正在下载" = "Download in corso";
+"正在安装…" = "Installazione in corso…";
+
+/* Settings - Weather */
+"管理天气显示、地点和刷新。" = "Gestisci visualizzazione meteo, località e aggiornamento.";
+"天气显示" = "Visualizzazione Meteo";
+"显示当前或自选地区的天气" = "Mostra il meteo della località corrente o personalizzata";
+"地点" = "Località";
+"默认显示当前所在地" = "Mostra la località corrente per impostazione predefinita";
+"等待刷新" = "In attesa di aggiornamento";
+"拖动调整" = "Trascina per regolare";
+"的展示顺序" = " ordine di visualizzazione";
+"天气数据" = "Dati Meteo";
+"刷新当前位置与全部自选地区" = "Aggiorna posizione corrente e tutte le località personalizzate";
+"城市、区县或地区" = "Città, distretto o regione";
+"搜索地区" = "Cerca Località";
+
+/* Settings - Updates */
+"管理版本检查与自动更新。" = "Gestisci controllo versione e aggiornamenti automatici.";
+"更新策略" = "Strategia di Aggiornamento";
+"手动检查通道" = "Canale Controllo Manuale";
+"不影响自动更新" = "Non influisce sugli aggiornamenti automatici";
+"检查更新" = "Controlla Aggiornamenti";
+"仅检查当前安装包所属的更新通道" = "Controlla solo il canale di aggiornamento dell'installazione corrente";
+"自动安装更新" = "Installa Aggiornamenti Automaticamente";
+"仅自动安装当前安装包所属通道的新构建" = "Installa automaticamente solo nuove build dal canale dell'installazione corrente";
+"版本" = "Versione";
+"尚未检查更新" = "Non controllato per aggiornamenti";
+"正在检查更新" = "Controllo aggiornamenti in corso";
+"已是最新版本" = "Già l'ultima versione";
+"发现" = "Trovata";
+"新版本" = " nuova versione";
+
+
+/* Clipboard History Module */
+"剪贴板" = "Appunti";
+"全部" = "Tutti";
+"常用" = "Preferiti";
+"非常用" = "Non preferiti";
+"添加常用信息" = "Aggiungi Preferito";
+"清空历史（保留常用）" = "Cancella Cronologia (Mantieni Preferiti)";
+"只看" = "Mostra solo ";
+"还没有剪贴板历史" = "Nessuna cronologia appunti ancora";
+"复制内容后会自动记录" = "Registrato automaticamente dopo la copia";
+"还没有常用项" = "Nessun preferito ancora";
+"点击右上角加号，添加文字、图片或文件" = "Fai clic su + in alto a destra per aggiungere testo, immagini o file";
+"这里空空如也" = "Niente qui";
+"添加常用项" = "Aggiungi Preferito";
+"文字" = "Testo";
+"图片" = "Immagine";
+"文件" = "File";
+"添加常用文字" = "Aggiungi Testo Preferito";
+"输入文字或 Emoji" = "Inserisci testo o Emoji";
+"复制到剪贴板" = "Copia negli Appunti";
+"发送到随记" = "Invia a Note Rapide";
+"发送到 AI Agent" = "Invia a AI Agent";
+"移出常用" = "Rimuovi dai Preferiti";
+"设为常用" = "Aggiungi ai Preferiti";
+"文本" = "Testo";
+
+/* Quick Notes Module */
+"备忘录暂无笔记" = "Nessuna nota nell'app Note";
+"点 + 新建一条" = "Fai clic su + per crearne una";
+"刷新备忘录" = "Aggiorna Note";
+"新建随记" = "Nuova Nota Rapida";
+"无标题" = "Senza titolo";
+"内置说明" = "Guida Integrata";
+"无法读取备忘录" = "Impossibile leggere Note";
+"发送到提词器" = "Invia al Teleprompter";
+"展开大窗口编辑" = "Apri in Finestra Grande";
+"系统共享" = "Condivisione Sistema";
+
+/* AI Agent Module */
+"对话" = "Chat";
+"消息连接" = "Connessioni Messaggi";
+"应用增强" = "Miglioramenti Applicazione";
+"自动化" = "Automazione";
+"CLI 与 Skills" = "CLI e Skills";
+"会话存储" = "Archiviazione Sessione";
+"刷新余额、渠道、CLI 和 Skills" = "Aggiorna saldo, canali, CLI e Skills";
+"统一历史" = "Cronologia Unificata";
+"新建对话" = "Nuova Conversazione";
+"添加项目" = "Aggiungi Progetto";
+"添加现有文件夹…" = "Aggiungi Cartella Esistente…";
+"新建文件夹并添加…" = "Crea Nuova Cartella…";
+"将本地文件夹添加为项目" = "Aggiungi cartella locale come progetto";
+"未归类" = "Non categorizzato";
+"展开项目会话" = "Espandi sessioni progetto";
+"收起项目会话" = "Comprimi sessioni progetto";
+"选择项目；新建对话会归入此项目" = "Seleziona progetto; le nuove conversazioni verranno aggiunte a questo progetto";
+"取消置顶项目" = "Rimuovi Pin Progetto";
+"置顶项目" = "Fissa Progetto";
+"删除项目" = "Elimina Progetto";
+"选择或新建对话" = "Seleziona o crea conversazione";
+"你" = "Tu";
+"助手" = "Assistente";
+"执行细节" = "Dettagli Esecuzione";
+"计划模式" = "Modalità Piano";
+"复制回复" = "Copia Risposta";
+"从此回复分叉会话" = "Biforca Sessione da Risposta";
+"批注" = "Annotazione";
+"添加批注" = "Aggiungi Annotazione";
+"将引用和评论发送为新消息" = "Invia citazione e commento come nuovo messaggio";
+"删除批注" = "Elimina Annotazione";
+"发送消息" = "Invia Messaggio";
+"添加文件" = "Aggiungi File";
+"添加文件、切换计划模式或目标模式" = "Aggiungi file, attiva/disattiva modalità piano o obiettivo";
+"目标模式" = "Modalità Obiettivo";
+"设置外部 CLI 的访问偏好" = "Imposta preferenze di accesso CLI esterno";
+"选择思考深度偏好" = "Seleziona preferenza profondità di pensiero";
+"发送" = "Invia";
+
+/* AI Agent - Remote Providers */
+"远端 Provider" = "Provider Remoto";
+"添加 Provider" = "Aggiungi Provider";
+"尚未配置远端 Provider" = "Nessun provider remoto configurato";
+"Provider 名称" = "Nome Provider";
+"端点" = "Endpoint";
+"凭据" = "Credenziali";
+"高级路由" = "Routing Avanzato";
+"添加端点组" = "Aggiungi Gruppo Endpoint";
+"添加额外的 URL/Key 轮换组（高级）" = "Aggiungi gruppo di rotazione URL/Key aggiuntivo (avanzato)";
+"尚未关联凭据" = "Nessuna credenziale collegata";
+"关联凭据" = "Collega Credenziali";
+"选择已有凭据，或为此 Provider 新建 API Key 凭据" = "Seleziona credenziali esistenti o crea nuove credenziali API Key per questo provider";
+"新建 API Key 凭据" = "Nuove Credenziali API Key";
+"配置文件路径" = "Percorso File di Configurazione";
+"认证文件路径" = "Percorso File di Autenticazione";
+"导入配置" = "Importa Configurazione";
+"导入认证" = "Importa Autenticazione";
+"配置" = "Configurazione";
+"认证" = "Autenticazione";
+
+
+/* System Monitor */
+"正在识别芯片" = "Identificazione chip in corso";
+"正在识别图形处理器" = "Identificazione processore grafico in corso";
+"用户" = "Utente";
+"系统" = "Sistema";
+"闲置" = "Inattivo";
+"利用率" = "Utilizzo";
+"渲染" = "Renderer";
+"内存" = "Memoria";
+"压力" = "Pressione";
+"可用" = "Disponibile";
+"共" = "Totale";
+"释放" = "Libera";
+"整理系统内存，回收非活跃与压缩页面" = "Organizza memoria di sistema, recupera pagine inattive e compresse";
+"已整理系统内存" = "Memoria di sistema organizzata";
+"磁盘" = "Disco";
+"清理" = "Pulizia";
+"扫描可清理的缓存、日志与开发产物" = "Scansiona cache, log e artefatti di sviluppo pulibili";
+"风扇" = "Ventola";
+"无风扇" = "Nessuna Ventola";
+"风扇数据不可用" = "Dati ventola non disponibili";
+"正在读取风扇状态" = "Lettura stato ventola in corso";
+"网络" = "Rete";
+"通过 ipify 查询公网地址" = "Interroga indirizzo IP pubblico tramite ipify";
+"内网" = "IP Locale";
+"公网" = "IP Pubblico";
+"正在识别" = "Identificazione in corso";
+"正在获取" = "Recupero in corso";
+"暂不可用" = "Non disponibile";
+"建立基线" = "Stabilimento baseline";
+
+/* System Cleanup */
+"清理磁盘" = "Pulisci disco";
+"扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件" = "Scansiona cache app, log, file temporanei, artefatti di sviluppo, cache gestori pacchetti, immagini disco, file grandi e duplicati";
+"取消全选" = "Deseleziona Tutto";
+"全选" = "Seleziona Tutto";
+"选择全部候选项" = "Seleziona tutti i candidati";
+"取消所有选择" = "Deseleziona tutto";
+"反选" = "Inverti Selezione";
+"反转当前选择：已选变未选，未选变已选" = "Inverti selezione corrente: selezionati diventano deselezionati, deselezionati diventano selezionati";
+"已选中的项取消选中，未选中的项选中" = "Deseleziona elementi selezionati, seleziona elementi deselezionati";
+"重新扫描" = "Riscansiona";
+"正在扫描" = "Scansione in corso";
+"未找到可清理项" = "Nessun elemento da pulire trovato";
+"可安全清理的缓存与日志当前为空" = "Cache e log pulibili in sicurezza sono attualmente vuoti";
+"展开" = "Espandi";
+"折叠" = "Comprimi";
+"取消选择" = "Deseleziona";
+"已选" = "Selezionati";
+"项" = " elementi";
+"移入废纸篓" = "Sposta nel Cestino";
+"将" = "Sposta ";
+" 项移入废纸篓？" = " elementi nel Cestino?";
+"zisla 不会永久删除这些内容。" = "zisla non eliminerà permanentemente questi elementi.";
+"已移入废纸篓" = "Spostato nel Cestino";
+"清空废纸篓后可释放" = "Può liberare dopo aver svuotato il Cestino";
+"已处理" = "Elaborati";
+"项未完成" = " elementi incompleti";
+
+/* Cleanup Categories */
+"应用缓存" = "Cache App";
+"缓存" = "Cache";
+"日志" = "Log";
+"废纸篓" = "Cestino";
+"开发产物" = "Artefatti di Sviluppo";
+"临时文件" = "File Temporanei";
+"包管理缓存" = "Cache Gestori Pacchetti";
+"崩溃报告" = "Rapporti di Crash";
+"磁盘镜像" = "Immagini Disco";
+"大文件" = "File Grandi";
+"重复文件" = "File Duplicati";
+
+/* Toolbox */
+"暂停" = "Pausa";
+"开始" = "Avvia";
+"重置" = "Ripristina";
+"重置番茄钟" = "Ripristina Pomodoro";
+"设置时长" = "Imposta Durata";
+"小时" = "Ore";
+"分钟" = "Minuti";
+"秒" = "Secondi";
+"分" = "min";
+"提词器" = "Teleprompter";
+"打开提词器" = "Apri Teleprompter";
+"闹钟" = "Sveglia";
+"管理闹钟" = "Gestisci Sveglie";
+"镜子" = "Specchio";
+"打开摄像头镜子" = "Apri Specchio Fotocamera";
+"清空废纸篓（不可撤销，会先确认）" = "Svuota Cestino (irreversibile, verrà confermato prima)";
+"保持亮屏" = "Mantieni Display Attivo";
+"防止用户闲置导致显示器休眠" = "Impedisci lo spegnimento del display a causa di inattività dell'utente";
+"防止空闲休眠" = "Impedisci Sospensione per Inattività";
+"防止用户闲置导致系统休眠；合盖、低电量或用户主动休眠仍会让 Mac 进入睡眠" = "Impedisci la sospensione del sistema a causa di inattività dell'utente; la chiusura del coperchio, batteria scarica o sospensione avviata dall'utente farà comunque dormire il Mac";
+"常驻提醒" = "Promemoria Persistente";
+"无媒体占用时，在折叠状态显示番茄钟、亮屏或清洁状态" = "Mostra Pomodoro, display attivo o stato pulizia in stato compresso quando nessun media è attivo";
+"清理屏幕" = "Pulisci Schermo";
+"全屏黑色遮罩；点击中央「退出清屏」按钮或任意处退出" = "Overlay nero a schermo intero; fai clic sul pulsante centrale 'Esci da Pulizia' o ovunque per uscire";
+"清理键盘" = "Pulisci Tastiera";
+"结束清洁" = "Termina Pulizia";
+"恢复键盘输入" = "Ripristina input tastiera";
+"吞掉键盘输入；再次点击结束" = "Assorbe input tastiera; fai clic di nuovo per terminare";
+"收起置顶" = "Compresso Sopra";
+"收起置底" = "Compresso Sotto";
+"收起态压在其他窗口之上（置顶），或被其他窗口和菜单栏图标覆盖（置底）" = "Stato compresso sopra altre finestre (sopra), o coperto da altre finestre e icone della barra dei menu (sotto)";
+"屏蔽通知" = "Silenzia Notifiche";
+"临时不再推送 Zisla 的系统通知；关闭后恢复正常推送（闹钟不受影响）" = "Interrompi temporaneamente le notifiche di sistema di Zisla; ripristina il push normale quando disattivato (le sveglie non sono influenzate)";
+"整理桌面" = "Organizza Scrivania";
+"按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Allinea le icone della scrivania alla griglia; non sposta file quando 'Pile' è abilitato";
+"App Store 应用" = "App di App Store";
+"批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页" = "Aggiorna in batch le app di App Store; apri la pagina aggiornamenti di App Store quando mas non è installato";
+
+/* Alarm Editor */
+"还没有闹钟，在下方添加" = "Nessuna sveglia ancora, aggiungi qui sotto";
+"打开时钟" = "Apri Orologio";
+"打开系统「时钟」App" = "Apri l'app Orologio di sistema";
+"停用" = "Disabilita";
+"启用" = "Abilita";
+"编辑" = "Modifica";
+"时" = "Ora";
+"备注" = "Etichetta";
+"仅响一次" = "Una Volta";
+"每周重复" = "Ripetizione Settimanale";
+
+/* Skills Management */
+"统一存储并同步到已启用的 CLI" = "Archiviazione unificata e sincronizzazione con CLI abilitate";
+"立即同步 Skills" = "Sincronizza Skills Ora";
+"同步方式" = "Modalità Sincronizzazione";
+"同步目标" = "Destinazioni Sincronizzazione";
+"受管库" = "Libreria Gestita";
+"在访达中打开受管库" = "Apri Libreria Gestita nel Finder";
+"卸载 Skill？" = "Disinstallare Skill?";
+"卸载" = "Disinstalla";
+"普通 Skill 会移到废纸篓；由 npm、pnpm、yarn、bun 或 Homebrew 全局安装的 Skill 会调用对应包管理器卸载。" = "Le Skills normali vengono spostate nel Cestino; le Skills installate globalmente tramite npm, pnpm, yarn, bun o Homebrew vengono disinstallate tramite il loro gestore pacchetti.";
+"已发现 Skills（" = "Skills Trovate (";
+"）" = ")";
+
+/* Side Notices */
+"已连接" = "Connesso";
+"耳机已连接：" = "Cuffie connesse: ";
+"状态已更新" = "Stato aggiornato";
+"正在播放" = "In Riproduzione";
+"正在播放：" = "In riproduzione: ";
+"AI 任务图标" = "Icona Attività AI";
+"个 AI 任务" = " attività AI";
+"有错误" = " con errori";
+"等待操作" = " in attesa di azione";
+"正在运行" = " in esecuzione";
+"小工具：" = "Strumenti: ";
+"工具" = "Strumento";
+"专注倒计时：" = "Conto alla rovescia focus: ";
+"专注模式：" = "Modalità focus: ";
+"下载中" = " in download";
+"浏览器" = "Browser";
+"下载完成：" = " download completato: ";
+"视频" = "Video";
+
+/* Empty States */
+"无" = "Nessuno";
+"无可用内容" = "Nessun Contenuto Disponibile";
+
+/* Localization and AppKit chrome */
+"外观与语言" = "Aspetto e Lingua";
+"界面语言" = "Lingua Interfaccia";
+"切换后立即应用到支持的界面文本" = "Applica immediatamente al testo dell'interfaccia supportato";
+"简体中文" = "Cinese Semplificato";
+"退出 zisla" = "Esci da zisla";
+"窗口" = "Finestra";
+"最小化" = "Minimizza";
+"关闭窗口" = "Chiudi Finestra";
+"显示灵动岛" = "Mostra Dynamic Island";
+"系统监控" = "Monitor Sistema";
+"设置..." = "Impostazioni...";
+"点击打开系统监控" = "Fai clic per aprire Monitor Sistema";
+"zisla 设置" = "Impostazioni zisla";
+"随记 · 编辑" = "Note Rapide · Modifica";
+
+/* Presentation options */
+"自动" = "Automatico";
+"简洁模式" = "Compatto";
+"详细模式" = "Dettagliato";
+"3 秒" = "3 secondi";
+"5 秒" = "5 secondi";
+"10 秒" = "10 secondi";
+"30 秒" = "30 secondi";
+"始终显示" = "Sempre";
+"跟随系统" = "Sistema";
+"浅色" = "Chiaro";
+"深色" = "Scuro";
+"磨砂玻璃" = "Vetro Smerigliato";
+"刘海" = "Notch";
+"紧凑" = "Compatto";
+"详细" = "Dettagliato";

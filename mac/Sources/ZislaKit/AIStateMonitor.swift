@@ -73,8 +73,6 @@ public final class AIStateMonitor: ObservableObject {
     private var detectorRefreshInFlight = false
     private var detectorRefreshPending = false
     private var refreshGeneration: UInt64 = 0
-    private var persistedUsageBySourceID: [String: AIUsageSample] = [:]
-    private var anonymousUsageSamples: [AIUsageSample] = []
     private var usageHistoryRequested = false
     private var usageHistoryIsLoaded = false
     private var lastUsageRefreshAt = Date.distantPast
@@ -132,9 +130,9 @@ public final class AIStateMonitor: ObservableObject {
         self.now = now
     }
 
-    private static func defaultActivityDetectors() -> [any AIActivityDetecting] {
+    static func defaultActivityDetectors() -> [any AIActivityDetecting] {
         [
-            CodexSessionActivityDetector(maxRolloutFiles: 4, initialTailBytes: 256 * 1_024),
+            CodexSessionActivityDetector(),
             ClaudeSessionActivityDetector(maxTranscriptFiles: 4, initialTailBytes: 256 * 1_024),
             CopilotSessionActivityDetector(maxTranscriptFiles: 4, maxCLISessions: 4),
             KimiSessionActivityDetector(maxSessionFiles: 4, initialTailBytes: 256 * 1_024),
@@ -242,8 +240,6 @@ public final class AIStateMonitor: ObservableObject {
             Self.detectState(
                 using: dependencies,
                 persistedTasks: storedTasks,
-                persistedUsageBySourceID: persistedUsageBySourceID,
-                anonymousUsageSamples: anonymousUsageSamples,
                 detectsUsage: !usageDetectors.isEmpty,
                 loadsUsageHistory: includeUsageSamples
             )
@@ -263,8 +259,6 @@ public final class AIStateMonitor: ObservableObject {
         guard usageHistoryRequested || usageHistoryIsLoaded || !state.usageSamples.isEmpty else { return }
         usageHistoryRequested = false
         usageHistoryIsLoaded = false
-        persistedUsageBySourceID.removeAll(keepingCapacity: false)
-        anonymousUsageSamples.removeAll(keepingCapacity: false)
         let shouldRelieveMemory = !state.usageSamples.isEmpty
         state.usageSamples.removeAll(keepingCapacity: false)
         if shouldRelieveMemory {
@@ -325,8 +319,6 @@ public final class AIStateMonitor: ObservableObject {
         let generation = refreshGeneration
         let dependencies = refreshDependencies()
         let storedTasks = persistedTasks
-        let usageBySourceID = persistedUsageBySourceID
-        let anonymousUsage = anonymousUsageSamples
         let loadsUsageHistory = usageHistoryIsLoaded
         let detectsUsage = !usageDetectors.isEmpty
             && now().timeIntervalSince(lastUsageRefreshAt) >= usageRefreshInterval
@@ -345,8 +337,6 @@ public final class AIStateMonitor: ObservableObject {
             let result = Self.detectState(
                 using: dependencies,
                 persistedTasks: storedTasks,
-                persistedUsageBySourceID: usageBySourceID,
-                anonymousUsageSamples: anonymousUsage,
                 detectsUsage: detectsUsage,
                 loadsUsageHistory: loadsUsageHistory
             )
@@ -396,40 +386,35 @@ public final class AIStateMonitor: ObservableObject {
     private nonisolated static func detectState(
         using dependencies: RefreshDependencies,
         persistedTasks: [AIProgressTask],
-        persistedUsageBySourceID: [String: AIUsageSample],
-        anonymousUsageSamples: [AIUsageSample],
         detectsUsage: Bool,
         loadsUsageHistory: Bool
     ) -> DetectorRefreshResult {
         do {
             var automaticUsage: [AIUsageSample] = []
+            var usageScanComplete = true
             if detectsUsage {
                 for detector in dependencies.usageDetectors {
                     let samples = autoreleasepool { try? detector.usageSamples() }
-                    guard let samples else { continue }
+                    guard let samples else {
+                        usageScanComplete = false
+                        continue
+                    }
                     automaticUsage.append(contentsOf: samples)
                 }
+                automaticUsage = AIUsageAnalytics.dailyAutomaticUsageSamples(samples: automaticUsage)
             }
             let tasks = mergedTasks(
                 persistedTasks,
                 using: dependencies
             )
-            if detectsUsage {
+            if detectsUsage, usageScanComplete {
+                let usageChanged = try dependencies.repository.recordDetectedUsage(automaticUsage)
                 if loadsUsageHistory {
-                    let hasNewUsage = automaticUsage.contains { sample in
-                        guard let sourceID = sample.sourceID else {
-                            return !anonymousUsageSamples.contains(sample)
-                        }
-                        return persistedUsageBySourceID[sourceID] != sample
-                    }
-                    if hasNewUsage {
-                        _ = try dependencies.repository.recordUsage(automaticUsage)
+                    if usageChanged > 0 {
                         var next = try dependencies.repository.load(includeUsageSamples: true)
                         next.tasks = tasks
                         return .state(next)
                     }
-                } else {
-                    _ = try dependencies.repository.recordUsage(automaticUsage)
                 }
             }
             return .tasks(tasks)
@@ -445,9 +430,12 @@ public final class AIStateMonitor: ObservableObject {
         using dependencies: RefreshDependencies
     ) -> [AIProgressTask] {
         var tasks = persistedTasks
+        var detectedTaskIDs: Set<String> = []
+
         for detector in dependencies.activityDetectors {
             guard let automaticTasks = try? detector.activeTasks() else { continue }
             for task in automaticTasks {
+                detectedTaskIDs.insert(task.id)
                 if let index = tasks.firstIndex(where: { $0.id == task.id }) {
                     tasks[index] = task
                 } else {
@@ -455,8 +443,16 @@ public final class AIStateMonitor: ObservableObject {
                 }
             }
         }
+
+        // 移除不再被检测器返回的活动任务（任务已完成/中止）
         tasks.removeAll { task in
             guard task.status.isActive else { return false }
+            // 如果任务不在持久化列表中且检测器不再返回它，说明任务已结束
+            let isPersistedTask = persistedTasks.contains(where: { $0.id == task.id })
+            if !isPersistedTask && !detectedTaskIDs.contains(task.id) {
+                return true
+            }
+            // TTL 超时检查
             return dependencies.now().timeIntervalSince(task.updatedAt) > dependencies.activeTaskTTL
         }
         return tasks
@@ -478,11 +474,8 @@ public final class AIStateMonitor: ObservableObject {
             if next != state { state = next }
             if keepsUsageSamples {
                 usageHistoryIsLoaded = true
-                updateUsageIndex(for: next.usageSamples)
             } else {
                 usageHistoryIsLoaded = false
-                persistedUsageBySourceID.removeAll(keepingCapacity: false)
-                anonymousUsageSamples.removeAll(keepingCapacity: false)
             }
             persistedStorageChangeToken = storageChangeToken
             errorDescription = nil
@@ -513,12 +506,4 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
-    private func updateUsageIndex(for samples: [AIUsageSample]) {
-        persistedUsageBySourceID = Dictionary(
-            uniqueKeysWithValues: samples.compactMap { sample in
-                sample.sourceID.map { ($0, sample) }
-            }
-        )
-        anonymousUsageSamples = samples.filter { $0.sourceID == nil }
-    }
 }

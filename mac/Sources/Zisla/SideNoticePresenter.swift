@@ -9,6 +9,7 @@ final class SideNoticePresenter {
     private let queue: SideNoticeQueue
     private let media: NowPlayingService
     private let settingsStore: FeatureSettingsStore
+    private let languageStore: AppLanguageStore
     private let layoutEngine = SideNoticeLayoutEngine()
     private var panelsByDisplayID: [CGDirectDisplayID: DisplayPanels] = [:]
     private var cancellables: Set<AnyCancellable> = []
@@ -19,11 +20,13 @@ final class SideNoticePresenter {
         queue: SideNoticeQueue,
         media: NowPlayingService,
         settingsStore: FeatureSettingsStore,
+        languageStore: AppLanguageStore,
         displayIDs: Set<UInt32> = []
     ) {
         self.queue = queue
         self.media = media
         self.settingsStore = settingsStore
+        self.languageStore = languageStore
         configuredDisplayIDs = displayIDs
         queue.$left
             .combineLatest(queue.$right)
@@ -44,7 +47,7 @@ final class SideNoticePresenter {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
-        NotificationCenter.default.addObserver(
+        NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(activeSpaceDidChange),
             name: NSWorkspace.activeSpaceDidChangeNotification,
@@ -59,7 +62,16 @@ final class SideNoticePresenter {
     }
 
     func stop() {
-        NotificationCenter.default.removeObserver(self)
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+        NSWorkspace.shared.notificationCenter.removeObserver(
+            self,
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: NSWorkspace.shared
+        )
         hideAllPanels()
         panelsByDisplayID.removeAll()
         cancellables.removeAll()
@@ -117,9 +129,24 @@ final class SideNoticePresenter {
     private func updateCompactBar(screen snapshot: ScreenSnapshot, panels: DisplayPanels) {
         let displayState = panels.displayState
         let compactNotices = queue.left + queue.right
+        let compactStatusIDs = Set(compactNotices.filter(Self.isCompactNotice).map(\.id))
+        if compactStatusIDs != displayState.compactStatusIDs {
+            displayState.compactStatusIDs = compactStatusIDs
+            displayState.compactStatusHidden = false
+        }
+        if CompactStatusVisibilityPolicy.mustRemainVisible(
+            notices: compactNotices,
+            activityDuration: settingsStore.settings.activityNoticeDisplayDuration,
+            focusDuration: settingsStore.settings.focusModeNoticeDisplayDuration
+        ) {
+            displayState.compactStatusHidden = false
+        }
         guard !displayState.compactStatusHidden,
             compactNotices.contains(where: Self.isCompactNotice)
         else {
+            if compactStatusIDs.isEmpty {
+                displayState.compactStatusHidden = false
+            }
             panels.compactBar?.orderOut(nil)
             return
         }
@@ -128,10 +155,12 @@ final class SideNoticePresenter {
             || selectedPriority == .focusCountdown
         let usesDetailedMedia = selectedPriority == .media
             && settingsStore.settings.mediaCompactStyle == .detailed
+        let usesDetailedMail = selectedPriority == .mail
+            && settingsStore.settings.mailCompactStyle == .detailed
         let frame = layoutEngine.compactBarFrame(
             for: snapshot,
             extendsForFocusCountdown: extendsForCompactStatus,
-            expandsForDetailedMedia: usesDetailedMedia
+            expandsForDetailedMedia: usesDetailedMedia || usesDetailedMail
         )
         guard frame != .zero else {
             panels.compactBar?.orderOut(nil)
@@ -181,7 +210,9 @@ final class SideNoticePresenter {
             displayState: panels.displayState,
             side: side
         )
-        let hostingView = NSHostingView(rootView: rootView)
+        let hostingView = NSHostingView(
+            rootView: AppLanguageEnvironment(languageStore: languageStore, content: rootView)
+        )
         hostingView.sizingOptions = []
         let panel = IslandPanel(
             contentView: hostingView,
@@ -200,7 +231,9 @@ final class SideNoticePresenter {
             settingsStore: settingsStore,
             onStatusHidden: { [weak self] in self?.updatePanels() }
         )
-        let hostingView = NSHostingView(rootView: rootView)
+        let hostingView = NSHostingView(
+            rootView: AppLanguageEnvironment(languageStore: languageStore, content: rootView)
+        )
         hostingView.sizingOptions = []
         let panel = IslandPanel(
             contentView: hostingView,
@@ -212,9 +245,11 @@ final class SideNoticePresenter {
 
     private static func isCompactNotice(_ notice: IslandNotice) -> Bool {
         notice.id.hasPrefix("ai-active-")
+            || notice.id.hasPrefix("update-available-")
             || notice.id.hasPrefix("media-active-")
             || notice.id.hasPrefix("focus-countdown-")
             || notice.id.hasPrefix("focus-mode-")
+            || notice.id.hasPrefix("mail-notification-")
             || isTransientCompactNotice(notice)
             || notice.id.hasPrefix("toolbox-reminder-")
             || notice.id.hasPrefix("browser-download-")
@@ -230,6 +265,10 @@ final class SideNoticePresenter {
             switch priority {
             case .transient:
                 notices.contains(where: Self.isTransientCompactNotice)
+            case .updateAvailable:
+                notices.contains { $0.id.hasPrefix("update-available-") }
+            case .mail:
+                notices.contains { $0.id.hasPrefix("mail-notification-") }
             case .videoDownload:
                 notices.contains { $0.id.hasPrefix("video-download-") }
             case .browserDownload:

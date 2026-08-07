@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 @testable import ZislaCore
 
@@ -102,6 +103,7 @@ struct AIStateRepositoryTests {
         #expect(task.sessionURL == nil)
         #expect(task.effort == nil)
         #expect(task.startedAt == nil)
+        #expect(task.failureReason == nil)
     }
 
     @Test
@@ -195,16 +197,17 @@ struct AIStateRepositoryTests {
         try legacyData.write(to: legacyURL)
         _ = try repository.load()
 
-        try repository.recordUsage(AIUsageSample(
+        let sample = AIUsageSample(
             sourceID: "new-usage",
             provider: .claude,
             timestamp: Date(timeIntervalSince1970: 200),
             inputTokens: 20,
             outputTokens: 5
-        ))
+        )
+        try repository.recordUsage(sample)
 
         #expect(try Data(contentsOf: legacyURL) == legacyData)
-        #expect(try repository.load().usageSamples.map(\.sourceID) == ["new-usage"])
+        #expect(try repository.load().usageSamples == AIUsageAnalytics.dailyManualUsageSamples(samples: [sample]))
     }
 
     @Test
@@ -252,7 +255,7 @@ struct AIStateRepositoryTests {
         try repository.enqueueNotice(notice)
 
         let state = try repository.load()
-        #expect(state.usageSamples == [sample])
+        #expect(state.usageSamples == AIUsageAnalytics.dailyManualUsageSamples(samples: [sample]))
         #expect(state.notices == [notice])
     }
 
@@ -306,7 +309,10 @@ struct AIStateRepositoryTests {
         let recreatedRepository = AIStateRepository(directoryURL: directory)
         try recreatedRepository.clearTasks()
 
-        #expect(try recreatedRepository.load().usageSamples == samples)
+        #expect(
+            try recreatedRepository.load().usageSamples
+                == AIUsageAnalytics.dailyManualUsageSamples(samples: samples)
+        )
     }
 
     @Test
@@ -314,15 +320,17 @@ struct AIStateRepositoryTests {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let repository = AIStateRepository(directoryURL: directory, maximumUsageSamples: 2)
+        let firstDay = Date(timeIntervalSinceReferenceDate: 0)
         let samples = [
-            AIUsageSample(provider: .claude, timestamp: Date(timeIntervalSince1970: 100), inputTokens: 10, outputTokens: 1),
-            AIUsageSample(provider: .grok, timestamp: Date(timeIntervalSince1970: 200), inputTokens: 20, outputTokens: 2),
-            AIUsageSample(provider: .codex, timestamp: Date(timeIntervalSince1970: 300), inputTokens: 30, outputTokens: 3),
+            AIUsageSample(provider: .claude, timestamp: firstDay, inputTokens: 10, outputTokens: 1),
+            AIUsageSample(provider: .grok, timestamp: firstDay.addingTimeInterval(86_400), inputTokens: 20, outputTokens: 2),
+            AIUsageSample(provider: .codex, timestamp: firstDay.addingTimeInterval(172_800), inputTokens: 30, outputTokens: 3),
         ]
 
         try repository.recordUsage(samples)
 
-        #expect(try repository.load().usageSamples == Array(samples.suffix(2)))
+        let summaries = AIUsageAnalytics.dailyManualUsageSamples(samples: samples)
+        #expect(try repository.load().usageSamples == Array(summaries.suffix(2)))
     }
 
     @Test
@@ -330,34 +338,36 @@ struct AIStateRepositoryTests {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let repository = AIStateRepository(directoryURL: directory, maximumUsageSamples: 2)
+        let firstDay = Date(timeIntervalSinceReferenceDate: 0)
         let samples = [
             AIUsageSample(
                 sourceID: "old",
                 provider: .claude,
-                timestamp: Date(timeIntervalSince1970: 100),
+                timestamp: firstDay,
                 inputTokens: 10,
                 outputTokens: 1
             ),
             AIUsageSample(
                 sourceID: "middle",
                 provider: .grok,
-                timestamp: Date(timeIntervalSince1970: 200),
+                timestamp: firstDay.addingTimeInterval(86_400),
                 inputTokens: 20,
                 outputTokens: 2
             ),
             AIUsageSample(
                 sourceID: "new",
                 provider: .codex,
-                timestamp: Date(timeIntervalSince1970: 300),
+                timestamp: firstDay.addingTimeInterval(172_800),
                 inputTokens: 30,
                 outputTokens: 3
             ),
         ]
-        try repository.recordUsage(samples)
+        try repository.recordDetectedUsage(samples)
 
-        try repository.recordUsage(samples[0])
+        try repository.recordDetectedUsage([samples[0]])
 
-        #expect(try repository.load().usageSamples == Array(samples.suffix(2)))
+        let summaries = AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
+        #expect(try repository.load().usageSamples == Array(summaries.suffix(2)))
     }
 
     @Test
@@ -367,7 +377,7 @@ struct AIStateRepositoryTests {
         let samples = (0..<4).map { index in
             AIUsageSample(
                 provider: .claude,
-                timestamp: Date(timeIntervalSince1970: TimeInterval(index)),
+                timestamp: Date(timeIntervalSinceReferenceDate: TimeInterval(index * 86_400)),
                 inputTokens: index,
                 outputTokens: index
             )
@@ -376,8 +386,165 @@ struct AIStateRepositoryTests {
 
         let compacted = AIStateRepository(directoryURL: directory, maximumUsageSamples: 2)
 
-        #expect(try compacted.load().usageSamples == Array(samples.suffix(2)))
-        #expect(try AIStateRepository(directoryURL: directory, maximumUsageSamples: 4).load().usageSamples == Array(samples.suffix(2)))
+        let summaries = AIUsageAnalytics.dailyManualUsageSamples(samples: samples)
+        #expect(try compacted.load().usageSamples == Array(summaries.suffix(2)))
+        #expect(try AIStateRepository(directoryURL: directory, maximumUsageSamples: 4).load().usageSamples == Array(summaries.suffix(2)))
+    }
+
+    @Test
+    func repositoryAccumulatesManualUsageIntoOneDailyTotal() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let samples = [
+            AIUsageSample(provider: .codex, timestamp: timestamp, inputTokens: 10, outputTokens: 2),
+            AIUsageSample(provider: .codex, timestamp: timestamp.addingTimeInterval(60), inputTokens: 20, outputTokens: 3),
+        ]
+
+        for sample in samples {
+            try repository.recordUsage(sample)
+        }
+
+        let stored = try repository.load().usageSamples
+        #expect(stored == AIUsageAnalytics.dailyManualUsageSamples(samples: samples))
+        #expect(stored.first?.totalTokens == 35)
+    }
+
+    @Test
+    func repositoryStoresOneDailyTotalAcrossProviders() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+
+        try repository.recordUsage(AIUsageSample(
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 10,
+            outputTokens: 2
+        ))
+        try repository.recordDetectedUsage([
+            AIUsageSample(
+                provider: .claude,
+                timestamp: timestamp.addingTimeInterval(60),
+                inputTokens: 20,
+                outputTokens: 3
+            ),
+            AIUsageSample(
+                provider: .grok,
+                timestamp: timestamp.addingTimeInterval(120),
+                inputTokens: 30,
+                outputTokens: 4
+            ),
+        ])
+
+        let stored = try repository.load().usageSamples
+
+        #expect(stored.count == 1)
+        #expect(stored.first?.totalTokens == 69)
+    }
+
+    @Test
+    func repositoryAdjustsDetectedDailyTotalWithoutDroppingManualUsage() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let originalDetected = AIUsageSample(
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 100,
+            outputTokens: 20
+        )
+        let correctedDetected = AIUsageSample(
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 80,
+            outputTokens: 20
+        )
+
+        try repository.recordUsage(AIUsageSample(
+            provider: .claude,
+            timestamp: timestamp,
+            inputTokens: 10,
+            outputTokens: 2
+        ))
+        try repository.recordDetectedUsage([originalDetected])
+        try repository.recordDetectedUsage([correctedDetected])
+
+        let stored = try repository.load().usageSamples
+
+        #expect(stored.count == 1)
+        #expect(stored.first?.totalTokens == 112)
+    }
+
+    @Test
+    func repositoryMigratesProviderDailySummariesIntoOneDailyTotal() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        _ = try repository.load()
+        let day = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let legacyAutomaticSummaries = [
+            AIUsageSample(
+                sourceID: "zisla-daily-usage:codex:\(day.timeIntervalSinceReferenceDate)",
+                provider: .codex,
+                timestamp: day,
+                inputTokens: 30,
+                outputTokens: 5
+            ),
+            AIUsageSample(
+                sourceID: "zisla-daily-usage:claude:\(day.timeIntervalSinceReferenceDate)",
+                provider: .claude,
+                timestamp: day,
+                inputTokens: 30,
+                outputTokens: 4
+            ),
+        ]
+        let manualSample = AIUsageSample(
+            sourceID: "zisla-daily-manual-usage:grok:\(day.timeIntervalSinceReferenceDate)",
+            provider: .grok,
+            timestamp: day,
+            inputTokens: 40,
+            outputTokens: 5
+        )
+        for sample in legacyAutomaticSummaries + [manualSample] {
+            try insertUsageSample(sample, into: repository.databaseURL)
+        }
+        try setSQLiteUserVersion(at: repository.databaseURL, to: 2)
+
+        let migrated = try AIStateRepository(directoryURL: directory).load().usageSamples
+        let expected = AIUsageAnalytics.dailyUsageSamples(
+            samples: legacyAutomaticSummaries + [manualSample],
+            calendar: .current
+        )
+
+        #expect(migrated == expected)
+        #expect(migrated.first?.totalTokens == 114)
+        #expect(try repository.recordDetectedUsage(legacyAutomaticSummaries) == 0)
+        #expect(try repository.load().usageSamples == expected)
+    }
+
+    @Test
+    func repositoryMigratesLegacyManualEventsToDailySummaries() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        _ = try repository.load()
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let legacySamples = [
+            AIUsageSample(provider: .grok, timestamp: timestamp, inputTokens: 10, outputTokens: 2),
+            AIUsageSample(provider: .grok, timestamp: timestamp.addingTimeInterval(60), inputTokens: 20, outputTokens: 3),
+        ]
+        for sample in legacySamples {
+            try insertLegacyManualUsage(sample, into: repository.databaseURL)
+        }
+        try setSQLiteUserVersion(at: repository.databaseURL, to: 1)
+
+        let migrated = try AIStateRepository(directoryURL: directory).load().usageSamples
+
+        #expect(migrated == AIUsageAnalytics.dailyManualUsageSamples(samples: legacySamples))
     }
 }
 
@@ -1161,6 +1328,29 @@ struct AIUsageAnalyticsTests {
     }
 
     @Test
+    func dailyUsageSeriesCentersEachValueWithinItsCalendarDay() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let end = Date(timeIntervalSince1970: 3 * 86_400 + 3_600)
+        let sample = AIUsageSample(
+            provider: .codex,
+            timestamp: Date(timeIntervalSince1970: 3 * 86_400 + 30),
+            inputTokens: 80,
+            outputTokens: 20
+        )
+
+        let point = try #require(AIUsageAnalytics.dailyUsageSeries(
+            samples: [sample],
+            endingAt: end,
+            days: 1,
+            calendar: calendar
+        ).first)
+
+        #expect(point.timestamp == Date(timeIntervalSince1970: 3 * 86_400 + 12 * 3_600))
+        #expect(point.totalTokens == 100)
+    }
+
+    @Test
     func dailyUsageSeriesCombinesInputAndOutputAndKeepsEmptyDates() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -1180,9 +1370,9 @@ struct AIUsageAnalyticsTests {
         )
 
         #expect(series.map(\.timestamp) == [
-            Date(timeIntervalSince1970: 3 * 86_400),
-            Date(timeIntervalSince1970: 4 * 86_400),
-            Date(timeIntervalSince1970: 5 * 86_400),
+            Date(timeIntervalSince1970: 3 * 86_400 + 12 * 3_600),
+            Date(timeIntervalSince1970: 4 * 86_400 + 12 * 3_600),
+            Date(timeIntervalSince1970: 5 * 86_400 + 12 * 3_600),
         ])
         #expect(series.map(\.inputTokens) == [60, 0, 10])
         #expect(series.map(\.outputTokens) == [40, 0, 5])
@@ -1206,21 +1396,21 @@ struct AIUsageAnalyticsTests {
         )
 
         #expect(series.map(\.timestamp) == [
-            Date(timeIntervalSince1970: 0),
-            Date(timeIntervalSince1970: 86_400),
-            Date(timeIntervalSince1970: 2 * 86_400),
-            Date(timeIntervalSince1970: 3 * 86_400),
-            Date(timeIntervalSince1970: 4 * 86_400),
+            Date(timeIntervalSince1970: 12 * 3_600),
+            Date(timeIntervalSince1970: 86_400 + 12 * 3_600),
+            Date(timeIntervalSince1970: 2 * 86_400 + 12 * 3_600),
+            Date(timeIntervalSince1970: 3 * 86_400 + 12 * 3_600),
+            Date(timeIntervalSince1970: 4 * 86_400 + 12 * 3_600),
         ])
         #expect(series.map(\.inputTokens) == [6, 25, 38, 25, 6])
         #expect(series.map(\.outputTokens) == [1, 5, 8, 5, 1])
     }
 
     @Test
-    func tokenAxisTicksCoverTheHighestUsage() {
+    func tokenAxisTicksExposeDailyUsageAcrossOrdersOfMagnitude() {
         #expect(
-            AIUsageAnalytics.tokenAxisTicks(maximum: 320_000_000, desiredCount: 6)
-                == [0, 100_000_000, 200_000_000, 300_000_000, 400_000_000]
+            AIUsageAnalytics.tokenAxisTicks(maximum: 3_200_000_000, desiredCount: 5)
+                == [0, 10_000_000, 100_000_000, 1_000_000_000, 10_000_000_000]
         )
         #expect(AIUsageAnalytics.tokenAxisTicks(maximum: 0) == [0, 1])
     }
@@ -1304,4 +1494,46 @@ private func argument(after flag: String, in arguments: [String]) -> String? {
         return nil
     }
     return arguments[index + 1]
+}
+
+private func setSQLiteUserVersion(at url: URL, to version: Int) throws {
+    try executeSQLite(at: url, sql: "PRAGMA user_version = \(version)")
+}
+
+private func insertLegacyManualUsage(_ sample: AIUsageSample, into url: URL) throws {
+    try insertUsageSample(sample, into: url)
+}
+
+private func insertUsageSample(_ sample: AIUsageSample, into url: URL) throws {
+    let sourceID = sample.sourceID.map { "'\($0)'" } ?? "NULL"
+    try executeSQLite(
+        at: url,
+        sql: """
+        INSERT INTO usage_samples(
+            source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+        ) VALUES(
+            \(sourceID), '\(sample.provider.rawValue)', \(sample.timestamp.timeIntervalSinceReferenceDate),
+            \(sample.inputTokens), \(sample.outputTokens), NULL, NULL
+        )
+        """
+    )
+}
+
+private func executeSQLite(at url: URL, sql: String) throws {
+    var database: OpaquePointer?
+    guard sqlite3_open(url.path, &database) == SQLITE_OK, let database else {
+        sqlite3_close(database)
+        throw SQLiteTestError.openFailed
+    }
+    defer { sqlite3_close(database) }
+
+    var errorMessage: UnsafeMutablePointer<CChar>?
+    let result = sqlite3_exec(database, sql, nil, nil, &errorMessage)
+    defer { sqlite3_free(errorMessage) }
+    guard result == SQLITE_OK else { throw SQLiteTestError.statementFailed }
+}
+
+private enum SQLiteTestError: Error {
+    case openFailed
+    case statementFailed
 }

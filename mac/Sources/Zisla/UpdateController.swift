@@ -8,6 +8,14 @@ import Sparkle
 final class UpdateController {
     static let shared = UpdateController()
 
+    var onUpdateAvailabilityChanged: ((Bool) -> Void)? {
+        didSet {
+#if canImport(Sparkle)
+            feedDelegate.onUpdateAvailabilityChanged = onUpdateAvailabilityChanged
+#endif
+        }
+    }
+
 #if canImport(Sparkle)
     private var controller: SPUStandardUpdaterController?
     private let feedDelegate = UpdateFeedDelegate()
@@ -90,9 +98,11 @@ final class UpdateController {
 }
 
 #if canImport(Sparkle)
+@MainActor
 private final class UpdateFeedDelegate: NSObject, SPUUpdaterDelegate {
     var automaticChannel: UpdateChannel = .release
     var manualChannel: UpdateChannel?
+    var onUpdateAvailabilityChanged: ((Bool) -> Void)?
 
     func feedURLString(for updater: SPUUpdater) -> String? {
         switch manualChannel ?? automaticChannel {
@@ -109,6 +119,14 @@ private final class UpdateFeedDelegate: NSObject, SPUUpdaterDelegate {
         error: Error?
     ) {
         manualChannel = nil
+    }
+
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        onUpdateAvailabilityChanged?(true)
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+        onUpdateAvailabilityChanged?(false)
     }
 }
 #endif

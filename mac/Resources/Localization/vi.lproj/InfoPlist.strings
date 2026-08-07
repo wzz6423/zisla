@@ -1,0 +1,8 @@
+"NSCalendarsFullAccessUsageDescription" = "zisla cần quyền truy cập các sự kiện lịch sắp tới cho bảng thông tin trên cùng.";
+"NSAudioCaptureUsageDescription" = "zisla đọc phổ âm thanh hiện tại để hiển thị dạng sóng trực tiếp.";
+"NSCameraUsageDescription" = "zisla chỉ sử dụng camera khi gương được mở.";
+"NSRemindersFullAccessUsageDescription" = "zisla đọc các lời nhắc có ngày để hiển thị chúng cùng với sự kiện lịch.";
+"NSLocationWhenInUseUsageDescription" = "zisla sử dụng vị trí của bạn để hiển thị thời tiết địa phương và tên địa điểm.";
+"NSMicrophoneUsageDescription" = "zisla chỉ sử dụng micrô khi bạn bắt đầu nhập giọng nói, để chuyển lời nói thành văn bản hội thoại AI hiện tại.";
+"NSSpeechRecognitionUsageDescription" = "zisla sao chép lời nói bạn ghi âm chủ động thành văn bản hội thoại AI.";
+"NSAppleEventsUsageDescription" = "zisla sử dụng Mail.app để đọc và quản lý thư, bao gồm hộp thư đến, trạng thái đã đọc, xóa và trả lời.";

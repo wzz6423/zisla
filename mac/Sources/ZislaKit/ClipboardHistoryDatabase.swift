@@ -10,6 +10,17 @@ private struct ClipboardHistoryDatabaseError: LocalizedError {
     var errorDescription: String? { message }
 }
 
+struct ClipboardHistoryPage: Sendable {
+    var items: [ClipboardHistoryItem]
+    var totalCount: Int
+}
+
+enum ClipboardHistoryMutation: Sendable {
+    case upsert(ClipboardHistoryItem, capacity: Int?)
+    case remove(UUID)
+    case removeHistory
+}
+
 final class ClipboardHistoryDatabase: @unchecked Sendable {
     private let storageURL: URL
     private let queue = DispatchQueue(
@@ -18,7 +29,6 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
     )
     private let queueKey = DispatchSpecificKey<UInt8>()
     private var connection: OpaquePointer?
-    private var persistedItems: [ClipboardHistoryItem] = []
 
     init(storageURL: URL) {
         self.storageURL = storageURL
@@ -33,26 +43,41 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         }
     }
 
-    func load() throws -> [ClipboardHistoryItem] {
-        try queue.sync {
-            guard FileManager.default.fileExists(atPath: storageURL.path) else {
-                persistedItems = []
-                return []
+    func loadPage(
+        scope: ClipboardHistoryScope,
+        searchText: String,
+        offset: Int,
+        limit: Int
+    ) async throws -> ClipboardHistoryPage {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async { [self] in
+                do {
+                    guard FileManager.default.fileExists(atPath: storageURL.path) else {
+                        continuation.resume(returning: ClipboardHistoryPage(items: [], totalCount: 0))
+                        return
+                    }
+                    continuation.resume(returning: try readPage(
+                        from: database(),
+                        scope: scope,
+                        searchText: searchText,
+                        offset: max(0, offset),
+                        limit: max(1, limit)
+                    ))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
             }
-            let items = try readItems(from: database())
-            persistedItems = items
-            return items
         }
     }
 
     func persist(
-        _ snapshot: [ClipboardHistoryItem],
+        _ mutations: [ClipboardHistoryMutation],
         completion: @escaping @MainActor @Sendable (String?) -> Void
     ) {
         queue.async { [self] in
             let errorDescription: String?
             do {
-                try persistChanges(snapshot)
+                try applyMutations(mutations)
                 errorDescription = nil
             } catch {
                 errorDescription = error.localizedDescription
@@ -61,9 +86,22 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         }
     }
 
-    func flush(_ snapshot: [ClipboardHistoryItem]) throws {
+    func apply(_ mutations: [ClipboardHistoryMutation]) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async { [self] in
+                do {
+                    try applyMutations(mutations)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func flush(_ mutations: [ClipboardHistoryMutation]) throws {
         try queue.sync {
-            try persistChanges(snapshot)
+            try applyMutations(mutations)
         }
     }
 
@@ -110,6 +148,13 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 on: opened
             )
             try migrateFileColumns(on: opened)
+            try execute(
+                """
+                CREATE INDEX IF NOT EXISTS clipboard_history_display_order
+                ON clipboard_history(is_pinned DESC, last_copied_at DESC)
+                """,
+                on: opened
+            )
             connection = opened
             return opened
         } catch {
@@ -150,53 +195,55 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         }
     }
 
-    private func readItems(from database: OpaquePointer) throws -> [ClipboardHistoryItem] {
+    private func readPage(
+        from database: OpaquePointer,
+        scope: ClipboardHistoryScope,
+        searchText: String,
+        offset: Int,
+        limit: Int
+    ) throws -> ClipboardHistoryPage {
+        let query = queryClause(scope: scope, searchText: searchText)
+        let countStatement = try prepare(
+            "SELECT COUNT(*) FROM clipboard_history\(query.sql)",
+            on: database
+        )
+        defer { sqlite3_finalize(countStatement) }
+        try bind(query.values, to: countStatement, database: database)
+        guard sqlite3_step(countStatement) == SQLITE_ROW else {
+            throw ClipboardHistoryDatabaseError(
+                message: sqliteMessage(database, fallback: "无法统计剪贴板记录")
+            )
+        }
+        let totalCount = Int(sqlite3_column_int64(countStatement, 0))
+
         let statement = try prepare(
             """
             SELECT id, content_type, text_value, image_data, last_copied_at, is_pinned,
                    file_url, file_display_name, file_bookmark
             FROM clipboard_history
+            \(query.sql)
             ORDER BY is_pinned DESC, last_copied_at DESC
+            LIMIT ? OFFSET ?
             """,
             on: database
         )
         defer { sqlite3_finalize(statement) }
+        try bind(query.values, to: statement, database: database)
+        let limitIndex = Int32(query.values.count + 1)
+        try check(sqlite3_bind_int64(statement, limitIndex, sqlite3_int64(limit)), database: database)
+        try check(
+            sqlite3_bind_int64(statement, limitIndex + 1, sqlite3_int64(offset)),
+            database: database
+        )
 
         var items: [ClipboardHistoryItem] = []
+        items.reserveCapacity(min(limit, totalCount))
         while true {
             switch sqlite3_step(statement) {
             case SQLITE_ROW:
-                guard let idText = textColumn(statement, index: 0),
-                      let id = UUID(uuidString: idText) else {
-                    throw ClipboardHistoryDatabaseError(message: "剪贴板数据库包含无效 ID")
-                }
-                let content: ClipboardHistoryContent
-                switch sqlite3_column_int(statement, 1) {
-                case 0:
-                    content = .text(textColumn(statement, index: 2) ?? "")
-                case 1:
-                    content = .image(dataColumn(statement, index: 3))
-                case 2:
-                    guard let urlString = textColumn(statement, index: 6),
-                          let url = URL(string: urlString) else {
-                        throw ClipboardHistoryDatabaseError(message: "剪贴板数据库包含无效文件路径")
-                    }
-                    content = .file(ClipboardFileReference(
-                        url: url,
-                        displayName: textColumn(statement, index: 7) ?? url.lastPathComponent,
-                        bookmark: dataColumn(statement, index: 8)
-                    ))
-                default:
-                    throw ClipboardHistoryDatabaseError(message: "剪贴板数据库包含未知内容类型")
-                }
-                items.append(ClipboardHistoryItem(
-                    id: id,
-                    content: content,
-                    lastCopiedAt: Date(timeIntervalSinceReferenceDate: sqlite3_column_double(statement, 4)),
-                    isPinned: sqlite3_column_int(statement, 5) != 0
-                ))
+                items.append(try readItem(from: statement))
             case SQLITE_DONE:
-                return items
+                return ClipboardHistoryPage(items: items, totalCount: totalCount)
             default:
                 throw ClipboardHistoryDatabaseError(
                     message: sqliteMessage(database, fallback: "无法读取剪贴板数据库")
@@ -205,29 +252,188 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         }
     }
 
-    private func persistChanges(_ snapshot: [ClipboardHistoryItem]) throws {
-        guard snapshot != persistedItems else { return }
-
-        let previousByID = Dictionary(uniqueKeysWithValues: persistedItems.map { ($0.id, $0) })
-        let currentIDs = Set(snapshot.map(\.id))
-        let upserts = snapshot.filter { previousByID[$0.id] != $0 }
-        let deletedIDs = persistedItems.lazy.map(\.id).filter { !currentIDs.contains($0) }
-        guard !upserts.isEmpty || !deletedIDs.isEmpty else {
-            persistedItems = snapshot
-            return
-        }
-
+    private func applyMutations(_ mutations: [ClipboardHistoryMutation]) throws {
+        guard !mutations.isEmpty else { return }
         let database = try database()
         try execute("BEGIN IMMEDIATE TRANSACTION", on: database)
         do {
-            try upsert(upserts, into: database)
-            try delete(Array(deletedIDs), from: database)
+            for mutation in mutations {
+                switch mutation {
+                case .upsert(var item, let capacity):
+                    if try matchingItemIsPinned(item.content, excluding: item.id, in: database) {
+                        item.isPinned = true
+                    }
+                    try deleteMatching(item.content, excluding: item.id, from: database)
+                    try upsert([item], into: database)
+                    if let capacity {
+                        try trimHistory(to: capacity, in: database)
+                    }
+                case .remove(let id):
+                    try delete([id], from: database)
+                case .removeHistory:
+                    try execute("DELETE FROM clipboard_history WHERE is_pinned = 0", on: database)
+                }
+            }
             try execute("COMMIT", on: database)
-            persistedItems = snapshot
         } catch {
             try? execute("ROLLBACK", on: database)
             throw error
         }
+    }
+
+    private func readItem(from statement: OpaquePointer) throws -> ClipboardHistoryItem {
+        guard let idText = textColumn(statement, index: 0),
+              let id = UUID(uuidString: idText) else {
+            throw ClipboardHistoryDatabaseError(message: "剪贴板数据库包含无效 ID")
+        }
+        let content: ClipboardHistoryContent
+        switch sqlite3_column_int(statement, 1) {
+        case 0:
+            content = .text(textColumn(statement, index: 2) ?? "")
+        case 1:
+            content = .image(dataColumn(statement, index: 3))
+        case 2:
+            guard let urlString = textColumn(statement, index: 6),
+                  let url = URL(string: urlString) else {
+                throw ClipboardHistoryDatabaseError(message: "剪贴板数据库包含无效文件路径")
+            }
+            content = .file(ClipboardFileReference(
+                url: url,
+                displayName: textColumn(statement, index: 7) ?? url.lastPathComponent,
+                bookmark: dataColumn(statement, index: 8)
+            ))
+        default:
+            throw ClipboardHistoryDatabaseError(message: "剪贴板数据库包含未知内容类型")
+        }
+        return ClipboardHistoryItem(
+            id: id,
+            content: content,
+            lastCopiedAt: Date(timeIntervalSinceReferenceDate: sqlite3_column_double(statement, 4)),
+            isPinned: sqlite3_column_int(statement, 5) != 0
+        )
+    }
+
+    private func queryClause(
+        scope: ClipboardHistoryScope,
+        searchText: String
+    ) -> (sql: String, values: [String]) {
+        var clauses: [String] = []
+        switch scope {
+        case .all:
+            break
+        case .pinned:
+            clauses.append("is_pinned = 1")
+        case .history:
+            clauses.append("is_pinned = 0")
+        }
+
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var values: [String] = []
+        if !trimmed.isEmpty {
+            clauses.append(
+                """
+                CASE content_type
+                    WHEN 0 THEN COALESCE(text_value, '')
+                    WHEN 1 THEN '图片'
+                    WHEN 2 THEN COALESCE(file_display_name, '')
+                    ELSE ''
+                END LIKE ? ESCAPE '\\' COLLATE NOCASE
+                """
+            )
+            let escaped = trimmed
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "%", with: "\\%")
+                .replacingOccurrences(of: "_", with: "\\_")
+            values = ["%\(escaped)%"]
+        }
+        return (clauses.isEmpty ? "" : " WHERE " + clauses.joined(separator: " AND "), values)
+    }
+
+    private func matchingItemIsPinned(
+        _ content: ClipboardHistoryContent,
+        excluding id: UUID,
+        in database: OpaquePointer
+    ) throws -> Bool {
+        let statement = try prepare(
+            "SELECT is_pinned FROM clipboard_history WHERE id <> ? AND \(contentPredicate(content)) LIMIT 1",
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+        try bind(id.uuidString, to: statement, index: 1, database: database)
+        try bind(content, to: statement, index: 2, database: database)
+        switch sqlite3_step(statement) {
+        case SQLITE_ROW:
+            return sqlite3_column_int(statement, 0) != 0
+        case SQLITE_DONE:
+            return false
+        default:
+            throw ClipboardHistoryDatabaseError(
+                message: sqliteMessage(database, fallback: "无法检查重复剪贴板记录")
+            )
+        }
+    }
+
+    private func deleteMatching(
+        _ content: ClipboardHistoryContent,
+        excluding id: UUID,
+        from database: OpaquePointer
+    ) throws {
+        let statement = try prepare(
+            "DELETE FROM clipboard_history WHERE id <> ? AND \(contentPredicate(content))",
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+        try bind(id.uuidString, to: statement, index: 1, database: database)
+        try bind(content, to: statement, index: 2, database: database)
+        try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
+    }
+
+    private func contentPredicate(_ content: ClipboardHistoryContent) -> String {
+        switch content {
+        case .text:
+            "content_type = 0 AND text_value = ?"
+        case .image:
+            "content_type = 1 AND image_data = ?"
+        case .file:
+            "content_type = 2 AND file_url = ?"
+        }
+    }
+
+    private func bind(
+        _ content: ClipboardHistoryContent,
+        to statement: OpaquePointer,
+        index: Int32,
+        database: OpaquePointer
+    ) throws {
+        switch content {
+        case .text(let value):
+            try bind(value, to: statement, index: index, database: database)
+        case .image(let data):
+            try bind(data, to: statement, index: index, database: database)
+        case .file(let reference):
+            try bind(reference.url.absoluteString, to: statement, index: index, database: database)
+        }
+    }
+
+    private func trimHistory(to capacity: Int, in database: OpaquePointer) throws {
+        let statement = try prepare(
+            """
+            DELETE FROM clipboard_history
+            WHERE is_pinned = 0 AND id IN (
+                SELECT id FROM clipboard_history
+                WHERE is_pinned = 0
+                ORDER BY last_copied_at DESC
+                LIMIT -1 OFFSET ?
+            )
+            """,
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+        try check(
+            sqlite3_bind_int64(statement, 1, sqlite3_int64(max(1, capacity))),
+            database: database
+        )
+        try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
     }
 
     private func upsert(_ items: [ClipboardHistoryItem], into database: OpaquePointer) throws {
@@ -336,6 +542,16 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             sqlite3_bind_text(statement, index, $0, -1, clipboardSQLiteTransient)
         }
         try check(result, database: database)
+    }
+
+    private func bind(
+        _ values: [String],
+        to statement: OpaquePointer,
+        database: OpaquePointer
+    ) throws {
+        for (offset, value) in values.enumerated() {
+            try bind(value, to: statement, index: Int32(offset + 1), database: database)
+        }
     }
 
     private func bind(
