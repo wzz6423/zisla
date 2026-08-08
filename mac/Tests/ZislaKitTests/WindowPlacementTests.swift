@@ -126,4 +126,13 @@ struct WindowPlacementTests {
         #expect(abs(host.frame.midX - screen.visibleFrame.midX) <= 1)
         #expect(abs(host.frame.midY - screen.visibleFrame.midY) <= 1)
     }
+
+    @Test @MainActor
+    func authorizationPromptHostStaysAboveDynamicIsland() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let host = try #require(WindowPlacement.makeAuthorizationPromptHost(on: screen))
+
+        #expect(host.level == WindowPlacement.modalWindowLevel)
+        #expect(host.level.rawValue > IslandPanel.onTopLevel.rawValue)
+    }
 }

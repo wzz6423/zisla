@@ -83,4 +83,48 @@ struct IslandSurfaceTransformTests {
         ) == CGSize(width: 0, height: 524)
         )
     }
+
+    @Test
+    func revealAnimationExpandsFromHorizontalCenterAndTopEdge() {
+        let expanded = CGSize(width: 748, height: 324)
+        let collapsed = CGSize(width: 240, height: 34)
+
+        let collapsedFrame = IslandSurfaceTransform(
+            collapsedSize: collapsed,
+            expandedSize: expanded,
+            revealProgress: 0
+        ).visibleFrame(in: expanded)
+
+        let midFrame = IslandSurfaceTransform(
+            collapsedSize: collapsed,
+            expandedSize: expanded,
+            revealProgress: 0.5
+        ).visibleFrame(in: expanded)
+
+        let expandedFrame = IslandSurfaceTransform(
+            collapsedSize: collapsed,
+            expandedSize: expanded,
+            revealProgress: 1
+        ).visibleFrame(in: expanded)
+
+        // 水平中心在整个展开过程中保持固定
+        #expect(abs(collapsedFrame.midX - expanded.width / 2) < 0.001)
+        #expect(abs(midFrame.midX - expanded.width / 2) < 0.001)
+        #expect(abs(expandedFrame.midX - expanded.width / 2) < 0.001)
+
+        // 顶部边缘在整个展开过程中保持在 y=0
+        #expect(collapsedFrame.minY == 0)
+        #expect(midFrame.minY == 0)
+        #expect(expandedFrame.minY == 0)
+
+        // 左右边缘从中心向外展开（左边缘向左移动，右边缘向右移动）
+        #expect(midFrame.minX < collapsedFrame.minX)
+        #expect(midFrame.maxX > collapsedFrame.maxX)
+        #expect(expandedFrame.minX < midFrame.minX)
+        #expect(expandedFrame.maxX > midFrame.maxX)
+
+        // 底部边缘向下展开
+        #expect(midFrame.maxY > collapsedFrame.maxY)
+        #expect(expandedFrame.maxY > midFrame.maxY)
+    }
 }

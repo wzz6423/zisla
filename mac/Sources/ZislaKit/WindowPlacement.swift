@@ -110,6 +110,7 @@ public enum WindowPlacement {
         // on close() — combined with ARC's strong reference this results in an over-release and a
         // guaranteed crash after the authorization flow calls close(). Setting it to false prevents this.
         host.isReleasedWhenClosed = false
+        host.level = modalWindowLevel
         host.isOpaque = false
         host.backgroundColor = .clear
         host.hasShadow = false

@@ -38,11 +38,38 @@ struct IslandPanelHitTestingTests {
     }
 
     @Test @MainActor
-    func mouseInteractionAllowsPanelToReceiveApplicationShortcuts() throws {
+    func genericClickDoesNotClaimFocusWhenPanelAllowsKeyboardInput() throws {
         let panel = IslandPanel(
             contentView: NSView(),
             frame: CGRect(x: 0, y: 0, width: 240, height: 34)
         )
+        panel.allowsKeyWindow = true
+        panel.present(at: panel.frame, animated: false)
+        defer { panel.orderOut(nil) }
+        let click = try #require(NSEvent.mouseEvent(
+            with: .leftMouseDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: panel.windowNumber,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1
+        ))
+
+        #expect(panel.canBecomeKey)
+        panel.sendEvent(click)
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test @MainActor
+    func nonKeyWindowPanelDoesNotStealFocusOnClick() throws {
+        let panel = IslandPanel(
+            contentView: NSView(),
+            frame: CGRect(x: 0, y: 0, width: 240, height: 34)
+        )
+        panel.allowsKeyWindow = false
         let click = try #require(NSEvent.mouseEvent(
             with: .leftMouseDown,
             location: .zero,
@@ -57,7 +84,40 @@ struct IslandPanelHitTestingTests {
 
         #expect(!panel.canBecomeKey)
         panel.sendEvent(click)
+        #expect(!panel.canBecomeKey)
+    }
+
+    @Test @MainActor
+    func keepsNativeGlassActiveAllowsPanelToBecomeKey() {
+        let panel = IslandPanel(
+            contentView: NSView(),
+            frame: CGRect(x: 0, y: 0, width: 240, height: 34)
+        )
+        panel.allowsKeyWindow = false
+        panel.keepsNativeGlassActive = true
+
         #expect(panel.canBecomeKey)
+    }
+
+    @Test @MainActor
+    func panelWithGlassActiveReclaimsKeyAfterResigning() async {
+        let panel = IslandPanel(
+            contentView: NSView(),
+            frame: CGRect(x: 0, y: 0, width: 240, height: 34)
+        )
+        panel.allowsKeyWindow = false
+        panel.keepsNativeGlassActive = true
+        panel.present(at: panel.frame, animated: false)
+        defer { panel.orderOut(nil) }
+
+        #expect(panel.isKeyWindow)
+
+        panel.resignKey()
+        // WindowServer downgrades NSGlassEffectView before AppKit can redraw it on resign.
+        // The async reclaim keeps the native glass compositor in its active mode.
+        try? await Task.sleep(for: .milliseconds(50))
+
+        #expect(panel.isKeyWindow)
     }
 
     @Test @MainActor

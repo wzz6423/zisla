@@ -1,6 +1,7 @@
 import AppKit
 @preconcurrency import AVFoundation
 import SwiftUI
+import ZislaKit
 
 /// Camera "mirror" preview: fills the available space with a live mirrored feed, for the Dynamic Island as a grooming aid.
 ///
@@ -273,6 +274,20 @@ private final class CameraMirrorController: ObservableObject {
     nonisolated private static func requestVideoAccess(
         _ completion: @escaping @Sendable (Bool) -> Void
     ) {
-        AVCaptureDevice.requestAccess(for: .video, completionHandler: completion)
+        Task { @MainActor in
+            guard let host = WindowPlacement.authorizationPromptHost() else {
+                completion(false)
+                return
+            }
+            Task.detached {
+                AVCaptureDevice.requestAccess(for: .video) { granted in
+                    Task { @MainActor in
+                        host.orderOut(nil)
+                        host.close()
+                        completion(granted)
+                    }
+                }
+            }
+        }
     }
 }
