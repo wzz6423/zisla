@@ -46,11 +46,8 @@ enum AppLocalization {
         for language in AppLanguage.allCases {
             for identifier in localeIdentifiers(for: language.locale)
             where result[identifier] == nil {
-                for container in [Bundle.main, Bundle.module] {
-                    if let bundle = localizationBundle(in: container, identifier: identifier) {
-                        result[identifier] = bundle
-                        break
-                    }
+                if let bundle = localizationBundle(in: .main, identifier: identifier) {
+                    result[identifier] = bundle
                 }
             }
         }
