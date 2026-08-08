@@ -339,3 +339,74 @@ private final class PersistentPetPanelProbe {
         contentViews[displayID]?.window as? IslandPanel
     }
 }
+
+extension OverlayCoordinatorTests {
+    @Test @MainActor
+    func firstShowDelaysGlassActivationUntilAfterVisibilityChanged() async throws {
+        let contentView = NSView()
+        var visibilityEvents: [Bool] = []
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        coordinator.onVisibilityChanged = { visibilityEvents.append($0) }
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setPinned(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        #expect(visibilityEvents == [true])
+        #expect(panel.keepsNativeGlassActive == false)
+        panel.orderOut(nil)
+
+        try await Task.sleep(for: .milliseconds(10))
+        #expect(panel.keepsNativeGlassActive == true)
+    }
+
+    @Test @MainActor
+    func collapseCancelsPendingGlassActivation() async throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setPinned(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        coordinator.setPinned(false)
+
+        try await Task.sleep(for: .milliseconds(10))
+        #expect(panel.keepsNativeGlassActive == false)
+    }
+
+    @Test @MainActor
+    func stoppingClearsGlassActivationBeforeNextShow() async throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setPinned(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        panel.orderOut(nil)
+        try await Task.sleep(for: .milliseconds(10))
+        #expect(panel.keepsNativeGlassActive == true)
+
+        coordinator.stop()
+        #expect(panel.keepsNativeGlassActive == false)
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setPinned(true)
+
+        #expect(panel.keepsNativeGlassActive == false)
+        panel.orderOut(nil)
+        try await Task.sleep(for: .milliseconds(10))
+        #expect(panel.keepsNativeGlassActive == true)
+    }
+}

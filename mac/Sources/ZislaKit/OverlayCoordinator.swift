@@ -43,6 +43,7 @@ public final class OverlayCoordinator: NSObject {
     private var pointerRevalidationTask: Task<Void, Never>?
     private var collapseGeneration = CollapseGenerationTracker()
     private var panelCollapseGeneration = CollapseGenerationTracker()
+    private var glassActivationGeneration = CollapseGenerationTracker()
     private var isPointerInside = false
     private var stopsAfterTransientReveal = false
     private var allowsKeyWindow = false
@@ -111,7 +112,9 @@ public final class OverlayCoordinator: NSObject {
         cancelScheduledCollapse()
         cancelPendingPanelCollapse()
         cancelPointerRevalidation()
+        cancelPendingGlassActivation()
         let wasVisible = panel?.isVisible == true
+        panel?.keepsNativeGlassActive = false
         panel?.orderOut(nil)
         hidePersistentPanels()
         if wasVisible { onVisibilityChanged?(false) }
@@ -365,9 +368,10 @@ public final class OverlayCoordinator: NSObject {
             case .show:
                 cancelPendingPanelCollapse()
                 presentCurrentLayout()
-                // The collapsed panel is reused; what's being synced here is display state, not the NSPanel lifecycle.
                 onVisibilityChanged?(true)
+                scheduleGlassActivation()
             case .collapse:
+                cancelPendingGlassActivation()
                 // The host view completes the center-mask animation within the fixed expanded size; on collapse
                 // only the hit-testing is disabled — avoids touching the visible NSPanel's frame, which would
                 // trigger window-server compositing layer rebuilds.
@@ -379,7 +383,9 @@ public final class OverlayCoordinator: NSObject {
                 if stopsAfterTransientReveal { schedulePanelDismiss() }
             case .hide:
                 cancelPendingPanelCollapse()
+                cancelPendingGlassActivation()
                 panel?.ignoresMouseEvents = true
+                panel?.keepsNativeGlassActive = false
                 panel?.dismiss(to: layout(for: activeDisplayID)?.collapsedFrame)
                 onVisibilityChanged?(false)
             case .scheduleCollapse:
@@ -458,6 +464,18 @@ public final class OverlayCoordinator: NSObject {
         pointerRevalidationTask = nil
     }
 
+    private func scheduleGlassActivation() {
+        let token = glassActivationGeneration.advance()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, glassActivationGeneration.isCurrent(token) else { return }
+            applyNativeGlassActivation()
+        }
+    }
+
+    private func cancelPendingGlassActivation() {
+        _ = glassActivationGeneration.advance()
+    }
+
     private func ensureActiveDisplay() {
         guard activeDisplayID == nil else { return }
         activeDisplayID =
@@ -502,7 +520,6 @@ public final class OverlayCoordinator: NSObject {
             panel.allowsKeyWindow = allowsKeyWindow
             self.panel = panel
         }
-        panel.keepsNativeGlassActive = keepsNativeGlassActive && isExpanded
         panel.present(
             at: targetFrame,
             from: layout.collapsedFrame,
