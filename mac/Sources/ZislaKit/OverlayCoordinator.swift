@@ -277,21 +277,6 @@ public final class OverlayCoordinator: NSObject {
     public func setCollapsedOnTop(_ onTop: Bool) {
         guard collapsedOnTop != onTop else { return }
         collapsedOnTop = onTop
-        // 动态切换置底选项时，在折叠状态下调整窗口尺寸
-        let isCollapsed = reducer.state.visibility == .collapsed
-        if isCollapsed, let layout = layout(for: activeDisplayID), let panel {
-            if onTop {
-                // 恢复到 expandedFrame
-                if panel.frame != layout.expandedFrame {
-                    panel.resize(to: layout.expandedFrame, animated: false)
-                }
-            } else {
-                // 缩小到 collapsedFrame
-                if panel.frame != layout.collapsedFrame {
-                    panel.resize(to: layout.collapsedFrame, animated: false)
-                }
-            }
-        }
         applyPanelLevel()
         applyPersistentPanelLevels()
     }
@@ -379,10 +364,6 @@ public final class OverlayCoordinator: NSObject {
             switch effect {
             case .show:
                 cancelPendingPanelCollapse()
-                // 展开前恢复到 expandedFrame（如果之前因置底被缩小）
-                if let layout = layout(for: activeDisplayID), panel?.frame != layout.expandedFrame {
-                    panel?.resize(to: layout.expandedFrame, animated: false)
-                }
                 presentCurrentLayout()
                 // The collapsed panel is reused; what's being synced here is display state, not the NSPanel lifecycle.
                 onVisibilityChanged?(true)
@@ -393,10 +374,6 @@ public final class OverlayCoordinator: NSObject {
                 onVisibilityChanged?(false)
                 panel?.ignoresMouseEvents = true
                 panel?.keepsNativeGlassActive = false
-                // 折叠置底时缩小窗口到实际的 collapsedFrame，避免遮挡菜单栏图标
-                if !collapsedOnTop, let layout = layout(for: activeDisplayID) {
-                    panel?.resize(to: layout.collapsedFrame, animated: false)
-                }
                 applyPanelLevel()
                 updatePersistentPanels()
                 if stopsAfterTransientReveal { schedulePanelDismiss() }

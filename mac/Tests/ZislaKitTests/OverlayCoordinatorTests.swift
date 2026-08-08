@@ -75,7 +75,7 @@ struct OverlayCoordinatorTests {
     }
 
     @Test @MainActor
-    func collapsedIslandAtBottomShrinksPanelToAvoidBlockingMenuBarIcons() throws {
+    func collapsedIslandAtBottomKeepsExpandedCanvasForCenteredReveal() throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
         defer { coordinator.stop() }
@@ -89,15 +89,11 @@ struct OverlayCoordinatorTests {
         let engine = ScreenLayoutEngine()
         let layout = engine.layout(for: Self.builtInScreen)
 
-        // 展开时应该是 expandedFrame
         #expect(panel.frame == layout.expandedFrame)
 
         coordinator.setPinned(false)
 
-        // 折叠置底后窗口应缩小到 collapsedFrame，不遮挡菜单栏图标
-        #expect(panel.frame == layout.collapsedFrame)
-        #expect(panel.frame.width == layout.collapsedFrame.width)
-        #expect(panel.frame.width < layout.expandedFrame.width)
+        #expect(panel.frame == layout.expandedFrame)
         #expect(panel.ignoresMouseEvents == true)
         #expect(panel.level == IslandPanel.onBottomLevel)
     }
@@ -120,19 +116,17 @@ struct OverlayCoordinatorTests {
         #expect(panel.level == IslandPanel.onBottomLevel)
         #expect(panel.level.rawValue < NSWindow.Level.normal.rawValue)
 
-        // 折叠置底时窗口应缩小到 collapsedFrame
         let engine = ScreenLayoutEngine()
         let layout = engine.layout(for: Self.builtInScreen)
-        #expect(panel.frame == layout.collapsedFrame)
+        #expect(panel.frame == layout.expandedFrame)
 
         coordinator.setCollapsedOnTop(true)
         #expect(panel.level == IslandPanel.onTopLevel)
-        // 恢复置顶时窗口应恢复到 expandedFrame
         #expect(panel.frame == layout.expandedFrame)
 
         coordinator.setCollapsedOnTop(false)
         #expect(panel.level == IslandPanel.onBottomLevel)
-        #expect(panel.frame == layout.collapsedFrame)
+        #expect(panel.frame == layout.expandedFrame)
     }
 
     @Test @MainActor

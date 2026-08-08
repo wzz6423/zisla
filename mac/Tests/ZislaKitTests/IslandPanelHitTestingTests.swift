@@ -88,20 +88,36 @@ struct IslandPanelHitTestingTests {
     }
 
     @Test @MainActor
-    func panelDoesNotReclaimFocusAfterResigningKey() {
+    func keepsNativeGlassActiveAllowsPanelToBecomeKey() {
         let panel = IslandPanel(
             contentView: NSView(),
             frame: CGRect(x: 0, y: 0, width: 240, height: 34)
         )
         panel.allowsKeyWindow = false
         panel.keepsNativeGlassActive = true
-        panel.present(at: panel.frame)
+
+        #expect(panel.canBecomeKey)
+    }
+
+    @Test @MainActor
+    func panelWithGlassActiveReclaimsKeyAfterResigning() async {
+        let panel = IslandPanel(
+            contentView: NSView(),
+            frame: CGRect(x: 0, y: 0, width: 240, height: 34)
+        )
+        panel.allowsKeyWindow = false
+        panel.keepsNativeGlassActive = true
+        panel.present(at: panel.frame, animated: false)
         defer { panel.orderOut(nil) }
 
-        panel.resignKey()
+        #expect(panel.isKeyWindow)
 
-        #expect(!panel.canBecomeKey)
-        #expect(!panel.isKeyWindow)
+        panel.resignKey()
+        // WindowServer downgrades NSGlassEffectView before AppKit can redraw it on resign.
+        // The async reclaim keeps the native glass compositor in its active mode.
+        try? await Task.sleep(for: .milliseconds(50))
+
+        #expect(panel.isKeyWindow)
     }
 
     @Test @MainActor

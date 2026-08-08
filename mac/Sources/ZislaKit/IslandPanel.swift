@@ -11,7 +11,9 @@ private final class ClickBlockingContentView: NSView {
 @MainActor
 public final class IslandPanel: NSPanel {
   public var allowsKeyWindow = false
-  public var keepsNativeGlassActive = false
+  public var keepsNativeGlassActive = false {
+    didSet { restoreNativeGlassActivationIfNeeded() }
+  }
   private var transitionGeneration: UInt64 = 0
 
     /// Window level used when the collapsed island sits above other windows (same layer as the menu bar).
@@ -19,8 +21,27 @@ public final class IslandPanel: NSPanel {
     /// Window level used when the collapsed island sinks below the menu bar: lower than both the menu bar (24) and normal windows, so they cover it.
     public static let onBottomLevel = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
 
-    public override var canBecomeKey: Bool { allowsKeyWindow }
+    public override var canBecomeKey: Bool { allowsKeyWindow || keepsNativeGlassActive }
     public override var canBecomeMain: Bool { false }
+
+    public override func resignKey() {
+        guard keepsNativeGlassActive, isVisible else {
+            super.resignKey()
+            return
+        }
+
+        // WindowServer downgrades NSGlassEffectView before AppKit can redraw it on resign.
+        // Reclaiming key on the next run loop keeps the native glass compositor in its active mode.
+        DispatchQueue.main.async { [weak self] in
+            self?.restoreNativeGlassActivationIfNeeded()
+        }
+    }
+
+    private func restoreNativeGlassActivationIfNeeded() {
+        guard keepsNativeGlassActive, isVisible else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        makeKeyAndOrderFront(nil)
+    }
 
     public override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         frameRect
@@ -108,6 +129,7 @@ public final class IslandPanel: NSPanel {
     alphaValue = 1
     if plan != .refront { setFrame(frame, display: true) }
     orderFrontRegardless()
+    restoreNativeGlassActivationIfNeeded()
   }
 
   public func resize(to frame: CGRect, animated: Bool = true) {
