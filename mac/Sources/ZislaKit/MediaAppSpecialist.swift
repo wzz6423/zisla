@@ -180,6 +180,13 @@ final class MediaAppSpecialist {
             return trusted
         }
         hasRequestedQQMusicAccessibilityAccess = true
+        guard let host = WindowPlacement.authorizationPromptHost() else {
+            return trusted
+        }
+        defer {
+            host.orderOut(nil)
+            host.close()
+        }
         let options = [
             "AXTrustedCheckOptionPrompt": true,
         ] as CFDictionary
