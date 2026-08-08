@@ -1,4 +1,5 @@
 import Accelerate
+import AppKit
 import Combine
 import CoreAudio
 import Darwin
@@ -302,6 +303,18 @@ private final class SystemAudioSpectrumCapture: @unchecked Sendable {
         tapDescription = description
 
         var newTapID = AudioObjectID(kAudioObjectUnknown)
+        var host: NSWindow?
+        DispatchQueue.main.sync {
+            host = WindowPlacement.authorizationPromptHost()
+        }
+        defer {
+            if let host {
+                DispatchQueue.main.async {
+                    host.orderOut(nil)
+                    host.close()
+                }
+            }
+        }
         try check(AudioHardwareCreateProcessTap(description, &newTapID))
         tapID = newTapID
 
