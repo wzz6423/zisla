@@ -480,6 +480,7 @@ private struct ClipboardFilterSegmentedControl: View {
                     .foregroundStyle(isActive ? .primary : .secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
+                    .contentShape(Rectangle())
                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                     .background {
                         if isActive {

@@ -1,9 +1,17 @@
 import AppKit
+import SwiftUI
 import Testing
 
 @testable import ZislaKit
 
 struct IslandPanelHitTestingTests {
+    @Test @MainActor
+    func interactiveIslandHostingViewAcceptsFirstMouse() {
+        let hostingView = IslandHostingView(rootView: EmptyView())
+
+        #expect(hostingView.acceptsFirstMouse(for: nil))
+    }
+
     @Test @MainActor
     func expandedPanelInterceptsTransparentCoveredArea() throws {
         let frame = CGRect(x: 0, y: 0, width: 748, height: 324)

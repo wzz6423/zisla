@@ -81,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self?.showSettings()
             }
         )
-        let hostingView = NSHostingView(
+        let hostingView = IslandHostingView(
             rootView: AppLanguageEnvironment(languageStore: model.languageStore, content: rootView)
         )
         hostingView.sizingOptions = []

@@ -1,10 +1,19 @@
 import AppKit
+import SwiftUI
 
 private final class ClickBlockingContentView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         // WindowServer routes fully transparent window pixels to the window underneath.
         NSColor.black.withAlphaComponent(1.0 / 255.0).setFill()
         NSBezierPath(rect: dirtyRect).fill()
+    }
+}
+
+@MainActor
+public final class IslandHostingView<Content: View>: NSHostingView<Content> {
+    public override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        // 非激活灵动岛的控件也必须接收首击，避免首次点击只用于激活窗口。
+        true
     }
 }
 
