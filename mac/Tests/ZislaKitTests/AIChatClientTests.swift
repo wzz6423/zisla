@@ -5,6 +5,7 @@ import Testing
 @testable import ZislaKit
 
 @MainActor
+@Suite(.serialized)
 struct AIChatClientTests {
     @Test
     func sendsConfiguredAuthorizationAndTranscriptMessages() async throws {
@@ -36,6 +37,46 @@ struct AIChatClientTests {
         #expect(messages[0]["role"] == "system")
         #expect(messages[1]["content"] == "<transcript>\n明天十点开会\n</transcript>")
     }
+
+    @Test
+    func throwsInvalidResponseWhenContentIsMissing() async throws {
+        StubURLProtocol.reset()
+        StubURLProtocol.nextResponseBody = #"{"choices":[{"message":{}}]}"#
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let client = AIChatClient(session: session)
+        let endpoint = AIEndpoint(name: "测试", baseURL: "https://test.example/v1")
+
+        await #expect(throws: AIChatClientError.invalidResponse) {
+            try await client.complete(
+                endpoint: endpoint,
+                model: "test-model",
+                systemPrompt: "system",
+                messages: [AIOutboundMessage(role: .user, content: "test")]
+            )
+        }
+    }
+
+    @Test
+    func throwsInvalidResponseWhenContentIsWhitespaceOnly() async throws {
+        StubURLProtocol.reset()
+        StubURLProtocol.nextResponseBody = #"{"choices":[{"message":{"content":"  \n\t  "}}]}"#
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let client = AIChatClient(session: session)
+        let endpoint = AIEndpoint(name: "测试", baseURL: "https://test.example/v1")
+
+        await #expect(throws: AIChatClientError.invalidResponse) {
+            try await client.complete(
+                endpoint: endpoint,
+                model: "test-model",
+                systemPrompt: "system",
+                messages: [AIOutboundMessage(role: .user, content: "test")]
+            )
+        }
+    }
 }
 
 private func requestBody(_ request: URLRequest) -> Data? {
@@ -56,6 +97,7 @@ private func requestBody(_ request: URLRequest) -> Data? {
 
 private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var lastRequest: URLRequest?
+    nonisolated(unsafe) static var nextResponseBody: String?
 
     nonisolated static override func canInit(with request: URLRequest) -> Bool { true }
 
@@ -70,7 +112,8 @@ private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
             headerFields: ["Content-Type": "application/json"]
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Data(#"{"choices":[{"message":{"content":"明天十点开会。"}}]}"#.utf8))
+        let body = Self.nextResponseBody ?? #"{"choices":[{"message":{"content":"明天十点开会。"}}]}"#
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
         client?.urlProtocolDidFinishLoading(self)
     }
 
@@ -79,5 +122,6 @@ private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
     @MainActor
     static func reset() {
         lastRequest = nil
+        nextResponseBody = nil
     }
 }

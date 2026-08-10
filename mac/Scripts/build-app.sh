@@ -22,19 +22,6 @@ case "$UPDATE_CHANNEL" in
     ;;
 esac
 
-if [[ -z "${SPARKLE_PUBLIC_KEY:-}" ]]; then
-  echo "error: SPARKLE_PUBLIC_KEY is required for every packaged build" >&2
-  exit 1
-fi
-if ! print -rn -- "$SPARKLE_PUBLIC_KEY" | base64 -D >/dev/null 2>&1; then
-  echo "error: SPARKLE_PUBLIC_KEY must be valid base64" >&2
-  exit 1
-fi
-if [[ "$(print -rn -- "$SPARKLE_PUBLIC_KEY" | base64 -D | wc -c | tr -d ' ')" != "32" ]]; then
-  echo "error: SPARKLE_PUBLIC_KEY must decode to 32 bytes" >&2
-  exit 1
-fi
-
 for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
   TARGET_TRIPLE="${ARCHITECTURE}-apple-macosx"
   swift build --package-path "$ROOT" -c "$CONFIGURATION" --disable-sandbox --triple "$TARGET_TRIPLE" --product zisla
@@ -56,8 +43,6 @@ sed \
   -e "s/@BUILD_NUMBER@/$BUILD_NUMBER/g" \
   -e "s/@UPDATE_CHANNEL@/$UPDATE_CHANNEL/g" \
   "$ROOT/Resources/Info.plist" > "$CONTENTS/Info.plist"
-
-/usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$CONTENTS/Info.plist"
 
 if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
   install -m 0644 "$ROOT/Resources/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
@@ -94,14 +79,6 @@ if [[ -f "$ROOT/Resources/MediaRemoteAdapter/mediaremote-adapter.pl" ]]; then
   install -m 0644 \
     "$ROOT/Resources/MediaRemoteAdapter/LICENSE" \
     "$CONTENTS/Resources/MediaRemoteAdapter/LICENSE"
-fi
-
-sparkle_framework="$(find "$ROOT/.build" -type d -name Sparkle.framework -print -quit)"
-if [[ -n "$sparkle_framework" ]]; then
-  ditto "$sparkle_framework" "$CONTENTS/Frameworks/Sparkle.framework"
-  if ! otool -l "$CONTENTS/MacOS/zisla" | grep -Fq "path @executable_path/../Frameworks"; then
-    install_name_tool -add_rpath @executable_path/../Frameworks "$CONTENTS/MacOS/zisla"
-  fi
 fi
 
 helper="${YTDLP_BINARY:-$ROOT/Tools/yt-dlp}"

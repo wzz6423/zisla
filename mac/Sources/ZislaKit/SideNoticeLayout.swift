@@ -314,6 +314,60 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         )
     }
 
+    public func compactBarFrame(
+        for layout: ScreenOverlayLayout,
+        notices: [IslandNotice],
+        settings: FeatureSettings
+    ) -> CGRect? {
+        let selectedPriority = settings.compactStatusPriority.first {
+            Self.compactStatusIsAvailable($0, notices: notices)
+        }
+        guard let selectedPriority else { return nil }
+        let extendsForCompactStatus = selectedPriority == .transient
+            || selectedPriority == .focusCountdown
+        let expandsForDetailedStatus = switch selectedPriority {
+        case .media:
+            settings.mediaCompactStyle == .detailed
+        case .mail:
+            settings.mailCompactStyle == .detailed
+        default:
+            false
+        }
+        return compactBarFrame(
+            for: layout,
+            extendsForFocusCountdown: extendsForCompactStatus,
+            expandsForDetailedMedia: expandsForDetailedStatus
+        )
+    }
+
+    private static func compactStatusIsAvailable(
+        _ priority: CompactStatusPriority,
+        notices: [IslandNotice]
+    ) -> Bool {
+        switch priority {
+        case .transient:
+            notices.contains { $0.id.hasPrefix("focus-transition") || $0.style == .headphone }
+        case .updateAvailable:
+            notices.contains { $0.id.hasPrefix("update-available-") }
+        case .mail:
+            notices.contains { $0.id.hasPrefix("mail-notification-") }
+        case .videoDownload:
+            notices.contains { $0.id.hasPrefix("video-download-") }
+        case .browserDownload:
+            notices.contains { $0.id.hasPrefix("browser-download-") }
+        case .focusCountdown:
+            notices.contains { $0.id.hasPrefix("focus-countdown-") }
+        case .toolboxReminder:
+            notices.contains { $0.id.hasPrefix("toolbox-reminder-") }
+        case .aiActivity:
+            notices.contains { $0.id.hasPrefix("ai-active-") }
+        case .media:
+            notices.contains { $0.id.hasPrefix("media-active-") }
+        case .focusMode:
+            notices.contains { $0.id.hasPrefix("focus-mode-") }
+        }
+    }
+
     private func compactBarHeight(for screen: ScreenSnapshot, anchor: CGRect) -> CGFloat {
         let navigationBarHeight = max(0, screen.topBarHeight)
         let desiredHeight = max(

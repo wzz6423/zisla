@@ -899,6 +899,23 @@ public final class NowPlayingService: ObservableObject {
     return sources.first(where: \.isFrontmost) ?? sources.first
   }
 
+  /// Core Audio is authoritative for the app that is currently emitting sound when it reports one unambiguous source.
+  nonisolated static func audioSourceCorrectingRemoteAttribution(
+    from sources: [AudioPlaybackSource],
+    remotePID: pid_t?,
+    remoteBundleIdentifier: String?
+  ) -> AudioPlaybackSource? {
+    guard sources.count == 1, let source = sources.first else { return nil }
+
+    if let remoteBundleIdentifier, let sourceBundleIdentifier = source.bundleIdentifier {
+      return remoteBundleIdentifier == sourceBundleIdentifier ? nil : source
+    }
+    if let remotePID {
+      return source.processIdentifiers.contains(remotePID) ? nil : source
+    }
+    return nil
+  }
+
   /// When MediaRemote is stuck on a paused session, select the active source from other audible Core Audio sources.
   nonisolated static func preferredAudioFallbackSource(
     from sources: [AudioPlaybackSource],
@@ -1181,18 +1198,33 @@ public final class NowPlayingService: ObservableObject {
         snapshot: remote,
         playbackState: remotePlaybackState
       )
-      remote.sourceApplication = remote.sourceApplication ?? remoteSource?.applicationName
-      remote.sourceBundleIdentifier =
-        remote.sourceBundleIdentifier
-        ?? remoteSource?.bundleIdentifier
-      remote.sourcePID = remote.sourcePID ?? remotePID ?? remoteSource?.processIdentifiers.first
-      remote.sourceIconData =
-        remote.sourceIconData
-        ?? Self.applicationIconData(
-          source: remoteSource,
-          bundleIdentifier: remote.sourceBundleIdentifier,
-          processIdentifier: remote.sourcePID
+      if let source = Self.audioSourceCorrectingRemoteAttribution(
+        from: sources,
+        remotePID: remotePID,
+        remoteBundleIdentifier: remote.sourceBundleIdentifier
+      ) {
+        remote.sourceApplication = source.applicationName
+        remote.sourceBundleIdentifier = source.bundleIdentifier
+        remote.sourcePID = source.processIdentifiers.first
+        remote.sourceIconData = Self.applicationIconData(
+          source: source,
+          bundleIdentifier: source.bundleIdentifier,
+          processIdentifier: source.processIdentifiers.first
         )
+      } else {
+        remote.sourceApplication = remote.sourceApplication ?? remoteSource?.applicationName
+        remote.sourceBundleIdentifier =
+          remote.sourceBundleIdentifier
+          ?? remoteSource?.bundleIdentifier
+        remote.sourcePID = remote.sourcePID ?? remotePID ?? remoteSource?.processIdentifiers.first
+        remote.sourceIconData =
+          remote.sourceIconData
+          ?? Self.applicationIconData(
+            source: remoteSource,
+            bundleIdentifier: remote.sourceBundleIdentifier,
+            processIdentifier: remote.sourcePID
+          )
+      }
       guard Self.matchesPreferredSource(
         remote.sourceBundleIdentifier,
         preference: preferredSource

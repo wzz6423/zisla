@@ -376,6 +376,7 @@ final class AppModel: ObservableObject {
   private var videoDownloadHost: String?
   let mail = MailService()
   let voiceInput = VoiceInputController()
+  let voiceHistory = VoiceHistoryStore()
   let aiAgent = AIAgentWorkspace()
 
   /// Model discovery state: used by the settings page to show connection test results and the available model list.
@@ -390,15 +391,17 @@ final class AppModel: ObservableObject {
   private let weatherService = WeatherService()
   private let weatherLocationService = WeatherLocationService()
   private let releaseService = GitHubReleaseService()
+  private let releasePackageDownloadService = ReleasePackageDownloadService()
   private let downloadService = DownloadService()
   private let hotkeyManager = GlobalHotkeyManager()
+  private let voicePostProcessingQueue = VoicePostProcessingQueue()
   private var voiceModelChannelRouter = AgentRouteRouter()
   private var cancellables: Set<AnyCancellable> = []
   private var weatherTask: Task<Void, Never>?
   private var releaseTask: Task<Void, Never>?
+  private var releasePackageDownloadTask: Task<Void, Never>?
   private var updatePollingTask: Task<Void, Never>?
   private var downloadTask: Task<Void, Never>?
-  private var voicePostProcessingTask: Task<Void, Never>?
   private var detectedLinkTask: Task<Void, Never>?
   private var activeDownloadID: UUID?
   private var knownNoticeIDs: Set<String> = []
@@ -446,6 +449,7 @@ final class AppModel: ObservableObject {
   private let launchDate = Date()
   private let sharingPickerDelegate = SharingPickerDelegateProxy()
   private var sharingPicker: NSSharingServicePicker?
+  private var voicePreviewSound: NSSound?
 
   private init() {
     sharingPickerDelegate.onCompletion = { [weak self] picker in
@@ -456,10 +460,6 @@ final class AppModel: ObservableObject {
     }
     restoreDownloadDirectory()
     aiAgent.startAutomation()
-    UpdateController.shared.onUpdateAvailabilityChanged = { [weak self] available in
-      self?.productUpdateAvailable = available
-      self?.refreshUpdateNotices()
-    }
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
       _ = self?.clipboardHistory.record(content)
     }
@@ -488,8 +488,8 @@ final class AppModel: ObservableObject {
           ))
       }
     }
-    voiceInput.onTranscriptCompleted = { [weak self] transcript in
-      self?.deliverVoiceTranscript(transcript)
+    voiceInput.onTranscriptCompleted = { [weak self] recording in
+      self?.deliverVoiceRecording(recording)
     }
     // The in-island transcript HUD only exists while recording, so a permission or start-up failure
     // would otherwise leave the shortcut looking like it did nothing at all.
@@ -527,6 +527,7 @@ final class AppModel: ObservableObject {
       focusMode.objectWillChange,
       quickNotes.objectWillChange,
       mail.objectWillChange,
+      voiceHistory.objectWillChange,
       aiAgent.objectWillChange,
       managedTools.objectWillChange,
     ]
@@ -695,9 +696,10 @@ final class AppModel: ObservableObject {
     clipboardHistory.flushPendingChanges()
     weatherTask?.cancel()
     releaseTask?.cancel()
+    releasePackageDownloadTask?.cancel()
     updatePollingTask?.cancel()
     downloadTask?.cancel()
-    voicePostProcessingTask?.cancel()
+    voicePostProcessingQueue.cancelAll()
     detectedLinkTask?.cancel()
     voiceInput.cancel()
     hotkeyManager.unregister()
@@ -751,21 +753,6 @@ final class AppModel: ObservableObject {
   }
 
   // MARK: - Desktop and Trash
-
-  /// Updates App Store apps in one click. If `mas` is installed it upgrades in bulk; otherwise opens the App Store Updates page.
-  func updateAppStoreApps() {
-    Task { @MainActor [weak self] in
-      guard let self else { return }
-      switch await DesktopOrganizer.updateAppStoreApps(
-        masExecutable: managedTools.resolvedExecutable(for: .mas)?.url
-      ) {
-      case .success(let message):
-        transientMessage = message
-      case .failure(let error):
-        transientMessage = error.message
-      }
-    }
-  }
 
   /// Snaps desktop icons to the grid in one click; does nothing if Stacks are enabled.
   func tidyDesktop() {
@@ -1021,9 +1008,6 @@ final class AppModel: ObservableObject {
 
   func checkForUpdates(manual: Bool, channel: UpdateChannel? = nil) {
     let selectedChannel = channel ?? (manual ? settingsStore.settings.updateChannel : nil)
-    if UpdateController.shared.checkForUpdates(manual: manual, channel: selectedChannel) {
-      return
-    }
     let fallbackChannel = selectedChannel ?? FeatureSettingsStore.bundledDefaultUpdateChannel
     releaseTask?.cancel()
     updateState = .checking
@@ -1049,7 +1033,11 @@ final class AppModel: ObservableObject {
           self.updateState = .available(release, source: source)
           self.productUpdateAvailable = true
           self.refreshUpdateNotices()
-          if manual { self.presentUpdateAlert(for: release, source: source) }
+          if manual {
+            self.presentUpdateAlert(for: release, source: source)
+          } else if self.settingsStore.settings.automaticDownloadEnabled {
+            self.downloadUpdateInBackground(release: release)
+          }
         }
       } catch is CancellationError {
         return
@@ -1061,35 +1049,97 @@ final class AppModel: ObservableObject {
   }
 
   private func presentUpdateAlert(for release: GitHubRelease, source: ReleaseSource) {
-    if source == .gitee {
-      let alert = NSAlert()
-      alert.messageText = "发现 Gitee 新版本 \(release.tagName)"
-      alert.informativeText = "Gitee Release 需要在浏览器中下载安装。"
-      alert.addButton(withTitle: "打开 Gitee Release")
+    let alert = NSAlert()
+    let diskImage = release.macDiskImage
+    alert.messageText = "发现 \(source.displayName) 新版本 \(release.tagName)"
+    if let diskImage {
+      alert.informativeText = """
+      更新包下载完成后，请先退出 zisla，再打开 DMG 并将 zisla 拖入 Applications 替换旧版本。
+
+      可以下载到默认目录，或为本次下载选择其他目录。
+      """
+      alert.addButton(withTitle: "下载到默认目录")
+      alert.addButton(withTitle: "选择目录…")
       alert.addButton(withTitle: "稍后")
       NSApp.activate(ignoringOtherApps: true)
       WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
-      guard alert.runModal() == .alertFirstButtonReturn else { return }
-      guard let url = release.htmlURL ?? release.macUpdateAssets?.archive.downloadURL else {
-        transientMessage = "Gitee Release 未提供可用下载地址"
+      switch alert.runModal() {
+      case .alertFirstButtonReturn:
+        downloadUpdatePackage(diskImage, to: downloadDirectory, revealInFinder: true)
+      case .alertSecondButtonReturn:
+        guard let directory = selectUpdateDownloadDirectory() else { return }
+        downloadUpdatePackage(diskImage, to: directory, revealInFinder: true)
+      default:
         return
       }
-      NSWorkspace.shared.open(url)
       return
     }
 
-    let updateController = UpdateController.shared
-    let canInstall = updateController.isAvailable
-    let alert = NSAlert()
-    alert.messageText = "发现新版本 \(release.tagName)"
-    alert.informativeText = canInstall ? "是否立即更新？" : "当前安装包不支持自动更新。"
-    alert.addButton(withTitle: canInstall ? "立即更新" : "知道了")
-    if canInstall { alert.addButton(withTitle: "稍后") }
+    alert.informativeText = "此 Release 未提供可下载的 DMG。请在退出 zisla 后，从 Release 页面下载并手动安装。"
+    alert.addButton(withTitle: "打开 Release")
+    alert.addButton(withTitle: "稍后")
     NSApp.activate(ignoringOtherApps: true)
     WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
-    guard canInstall, alert.runModal() == .alertFirstButtonReturn else { return }
-    guard !updateController.checkForUpdates(manual: true) else { return }
-    transientMessage = "当前安装包不支持自动更新"
+    guard alert.runModal() == .alertFirstButtonReturn else { return }
+    guard let url = release.htmlURL else {
+      transientMessage = "Release 未提供可用下载地址"
+      return
+    }
+    NSWorkspace.shared.open(url)
+  }
+
+  private func downloadUpdateInBackground(release: GitHubRelease) {
+    guard let diskImage = release.macDiskImage else { return }
+    downloadUpdatePackage(diskImage, to: downloadDirectory, revealInFinder: false)
+  }
+
+  private func selectUpdateDownloadDirectory() -> URL? {
+    let panel = NSOpenPanel()
+    panel.canChooseFiles = false
+    panel.canChooseDirectories = true
+    panel.allowsMultipleSelection = false
+    panel.canCreateDirectories = true
+    panel.directoryURL = downloadDirectory
+    panel.prompt = "选择保存位置"
+    panel.message = "选择更新包保存位置"
+    WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
+    guard panel.runModal() == .OK else { return nil }
+    return panel.url
+  }
+
+  private func downloadUpdatePackage(
+    _ diskImage: GitHubRelease.Asset,
+    to targetDirectory: URL,
+    revealInFinder: Bool
+  ) {
+    releasePackageDownloadTask?.cancel()
+    transientMessage = "正在下载更新…"
+    let scopedAccess = targetDirectory.startAccessingSecurityScopedResource()
+    let fileName = (diskImage.name as NSString).lastPathComponent
+    let expectedURL = targetDirectory.appendingPathComponent(fileName, isDirectory: false)
+    let existedBeforeDownload = FileManager.default.fileExists(atPath: expectedURL.path)
+    releasePackageDownloadTask = Task { [weak self, releasePackageDownloadService] in
+      defer {
+        if scopedAccess { targetDirectory.stopAccessingSecurityScopedResource() }
+      }
+      do {
+        let destination = try await releasePackageDownloadService.download(
+          asset: diskImage,
+          to: targetDirectory
+        )
+        guard !Task.isCancelled else { return }
+        if revealInFinder {
+          NSWorkspace.shared.activateFileViewerSelecting([destination])
+        }
+        let action = existedBeforeDownload ? "更新包已在" : "更新包已下载到"
+        self?.transientMessage = "\(action) \(destination.path)，请退出 zisla 后手动安装"
+      } catch is CancellationError {
+        return
+      } catch {
+        guard !Task.isCancelled else { return }
+        self?.transientMessage = "下载更新失败：\(error.localizedDescription)"
+      }
+    }
   }
 
   func selectSystemMonitor() {
@@ -1506,9 +1556,7 @@ final class AppModel: ObservableObject {
         guard let self else { return }
         await self.aiAgent.refreshCLIs()
         guard !Task.isCancelled else { return }
-        if !UpdateController.shared.isAvailable {
-          self.checkForUpdates(manual: false)
-        }
+        self.checkForUpdates(manual: false)
         do {
           try await Task.sleep(for: .seconds(600))
         } catch {
@@ -1547,11 +1595,11 @@ final class AppModel: ObservableObject {
     )
     let right = IslandNotice(
       id: "\(updateNoticePrefix)\(selectedUpdate.id)-right",
-      title: "升级",
+      title: "查看更新",
       kind: .info,
       side: .right,
       style: .status,
-      symbolName: "arrow.up.circle"
+      symbolName: "arrow.down.circle"
     )
     let activeIDs = Set([left.id, right.id])
     for notice in notices.left + notices.right where notice.id.hasPrefix(updateNoticePrefix) && !activeIDs.contains(notice.id) {
@@ -1563,18 +1611,26 @@ final class AppModel: ObservableObject {
 
   // MARK: - Voice model discovery
 
-  private func deliverVoiceTranscript(_ transcript: String) {
-    let rawTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !rawTranscript.isEmpty else { return }
-    voicePostProcessingTask?.cancel()
+  private func deliverVoiceRecording(_ recording: VoiceRecordingResult) {
+    let rawTranscript = recording.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+    let historySaved = voiceHistory.record(recording)
+    guard !rawTranscript.isEmpty else {
+      transientMessage = historySaved
+        ? "录音已保存，但未识别到文字"
+        : "录音文件已保留，但记录索引保存失败"
+      return
+    }
     guard let target = voicePostProcessingTarget() else {
-      copyVoiceTranscript(rawTranscript, message: "语音转写已复制")
+      copyVoiceTranscript(
+        rawTranscript,
+        message: historySaved ? "语音转写已复制并保存" : "语音转写已复制；记录保存失败"
+      )
       return
     }
     // Recording already ended and the island HUD is gone, so without this the cleanup round-trip
     // looks like the shortcut simply swallowed the dictation.
     transientMessage = "正在整理语音…"
-    voicePostProcessingTask = Task { [weak self] in
+    voicePostProcessingQueue.enqueue { [weak self] in
       guard let self else { return }
       do {
         let response = try await self.complete(
@@ -1587,12 +1643,21 @@ final class AppModel: ObservableObject {
           response,
           fallback: rawTranscript
         )
-        copyVoiceTranscript(delivered, message: "语音整理后已复制")
+        let processedTranscriptSaved = self.voiceHistory.updateProcessedTranscript(
+          id: recording.id,
+          transcript: delivered
+        )
+        self.copyVoiceTranscript(
+          delivered,
+          message: historySaved && processedTranscriptSaved
+            ? "语音整理后已复制并保存"
+            : "语音整理后已复制；记录保存失败"
+        )
       } catch is CancellationError {
         return
       } catch {
         guard !Task.isCancelled else { return }
-        copyVoiceTranscript(rawTranscript, message: "语音转写已复制；整理失败")
+        self.copyVoiceTranscript(rawTranscript, message: "语音转写已复制；整理失败")
       }
     }
   }
@@ -1661,6 +1726,53 @@ final class AppModel: ObservableObject {
       return
     }
     transientMessage = message
+  }
+
+  func playVoiceRecording(id: UUID) {
+    guard let entry = voiceHistory.entries.first(where: { $0.id == id }),
+          let url = voiceHistory.audioURL(for: entry),
+          let sound = NSSound(contentsOf: url, byReference: true) else {
+      transientMessage = "无法播放该语音原文件"
+      return
+    }
+    voicePreviewSound?.stop()
+    voicePreviewSound = sound
+    if !sound.play() {
+      transientMessage = "无法播放该语音原文件"
+    }
+  }
+
+  func revealVoiceRecording(id: UUID) {
+    guard let entry = voiceHistory.entries.first(where: { $0.id == id }),
+          let url = voiceHistory.audioURL(for: entry) else {
+      transientMessage = "未找到该语音原文件"
+      return
+    }
+    NSWorkspace.shared.activateFileViewerSelecting([url])
+  }
+
+  func openVoiceRecordingsDirectory() {
+    do {
+      try FileManager.default.createDirectory(
+        at: AppPaths.voiceRecordings,
+        withIntermediateDirectories: true
+      )
+      NSWorkspace.shared.open(AppPaths.voiceRecordings)
+    } catch {
+      transientMessage = "无法打开语音记录目录：\(error.localizedDescription)"
+    }
+  }
+
+  func removeVoiceRecording(id: UUID) {
+    voicePreviewSound?.stop()
+    voicePreviewSound = nil
+    voiceHistory.remove(id: id)
+  }
+
+  func removeAllVoiceRecordings() {
+    voicePreviewSound?.stop()
+    voicePreviewSound = nil
+    voiceHistory.removeAll()
   }
 
   /// Tests the current model endpoint and discovers available models.

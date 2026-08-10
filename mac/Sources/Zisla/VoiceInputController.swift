@@ -4,7 +4,7 @@ import Combine
 import ZislaKit
 import Speech
 
-/// Microphone and speech recognition permissions are requested only after the user explicitly taps; recorded audio is passed only to the system recognizer and is not written to Zisla state files.
+/// Microphone and speech recognition permissions are requested only after the user explicitly taps.
 @MainActor
 final class VoiceInputController: ObservableObject {
     @Published private(set) var isRecording = false
@@ -18,11 +18,14 @@ final class VoiceInputController: ObservableObject {
     private var task: SFSpeechRecognitionTask?
     private var pendingStartID: UUID?
     private var recordingID: UUID?
+    private var recordingStartedAt: Date?
+    private var recordingFileURL: URL?
+    private var recordingFile: AVAudioFile?
     private var tapInstalled = false
     private var finalizationTask: Task<Void, Never>?
     private var authorizationPromptHost: NSWindow?
 
-    var onTranscriptCompleted: ((String) -> Void)?
+    var onTranscriptCompleted: ((VoiceRecordingResult) -> Void)?
 
     func toggle() {
         if isRecording || isPreparing {
@@ -53,7 +56,7 @@ final class VoiceInputController: ObservableObject {
         pendingStartID = nil
         isPreparing = false
         dismissAuthorizationPromptHost()
-        clearRecordingResources()
+        clearRecordingResources(deleteAudioFile: true)
     }
 
     private func requestPermissionsAndStart() {
@@ -150,6 +153,20 @@ final class VoiceInputController: ObservableObject {
             return
         }
         let recordingID = UUID()
+        let recordingFileURL = AppPaths.voiceRecordings
+            .appendingPathComponent("\(recordingID.uuidString).caf", isDirectory: false)
+        let recordingFile: AVAudioFile
+        do {
+            try FileManager.default.createDirectory(
+                at: AppPaths.voiceRecordings,
+                withIntermediateDirectories: true
+            )
+            recordingFile = try AVAudioFile(forWriting: recordingFileURL, settings: format.settings)
+        } catch {
+            finishPendingStart(with: "无法保存录音：\(error.localizedDescription)")
+            try? FileManager.default.removeItem(at: recordingFileURL)
+            return
+        }
         let task = recognizer?.recognitionTask(with: request) { [weak self] result, error in
             Task { @MainActor [weak self] in
                 guard let self, self.recordingID == recordingID else { return }
@@ -170,25 +187,32 @@ final class VoiceInputController: ObservableObject {
                 }
             }
         }
-        input.installTap(onBus: 0, bufferSize: 1_024, format: format) { buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 1_024, format: format) { [weak self] buffer, _ in
             request.append(buffer)
+            do {
+                try recordingFile.write(from: buffer)
+            } catch {
+                Task { @MainActor [weak self] in
+                    self?.failRecordingWrite(recordingID: recordingID, error: error)
+                }
+            }
         }
         tapInstalled = true
+        self.engine = engine
+        self.request = request
+        self.task = task
+        self.recordingID = recordingID
+        self.recordingStartedAt = Date()
+        self.recordingFileURL = recordingFileURL
+        self.recordingFile = recordingFile
         do {
             engine.prepare()
             try engine.start()
-            self.engine = engine
-            self.request = request
-            self.task = task
-            self.recordingID = recordingID
             pendingStartID = nil
             isPreparing = false
             isRecording = true
         } catch {
-            input.removeTap(onBus: 0)
-            tapInstalled = false
-            request.endAudio()
-            task?.cancel()
+            clearRecordingResources(deleteAudioFile: true)
             finishPendingStart(with: error.localizedDescription)
         }
     }
@@ -215,13 +239,35 @@ final class VoiceInputController: ObservableObject {
     private func finishRecording(recordingID: UUID) {
         guard self.recordingID == recordingID else { return }
         let completedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        clearRecordingResources()
-        if !completedTranscript.isEmpty {
-            onTranscriptCompleted?(completedTranscript)
+        let createdAt = recordingStartedAt ?? Date()
+        let fallbackDuration = max(0, Date().timeIntervalSince(createdAt))
+        let recordedDuration = recordingFile.map {
+            guard $0.fileFormat.sampleRate > 0 else { return fallbackDuration }
+            return Double($0.length) / $0.fileFormat.sampleRate
+        } ?? fallbackDuration
+        guard let recordingFileURL else {
+            clearRecordingResources(deleteAudioFile: true)
+            errorDescription = "录音文件未能保存"
+            return
         }
+        clearRecordingResources(deleteAudioFile: false)
+        onTranscriptCompleted?(VoiceRecordingResult(
+            id: recordingID,
+            audioFileURL: recordingFileURL,
+            transcript: completedTranscript,
+            duration: recordedDuration,
+            createdAt: createdAt
+        ))
     }
 
-    private func clearRecordingResources() {
+    private func failRecordingWrite(recordingID: UUID, error: Error) {
+        guard self.recordingID == recordingID else { return }
+        errorDescription = "无法保存录音：\(error.localizedDescription)"
+        clearRecordingResources(deleteAudioFile: true)
+    }
+
+    private func clearRecordingResources(deleteAudioFile: Bool) {
+        let fileURL = recordingFileURL
         finalizationTask?.cancel()
         finalizationTask = nil
         if tapInstalled {
@@ -234,7 +280,13 @@ final class VoiceInputController: ObservableObject {
         engine = nil
         request = nil
         task = nil
+        recordingFile = nil
+        recordingFileURL = nil
+        recordingStartedAt = nil
         recordingID = nil
         isRecording = false
+        if deleteAudioFile, let fileURL {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
     }
 }

@@ -424,7 +424,6 @@
 "整理桌面" = "Organiser le bureau";
 "按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Aligner les icônes du bureau sur la grille ; ne déplace aucun fichier lorsque 'Piles' est activé";
 "App Store 应用" = "Applications App Store";
-"批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页" = "Mettre à jour en masse les applications App Store ; ouvrir la page de mises à jour de l'App Store lorsque mas n'est pas installé";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Aucune alarme, ajouter ci-dessous";

@@ -3,29 +3,63 @@ import Foundation
 enum ManagedToolInstallationSource: Sendable, Equatable {
     case githubRelease(repository: String)
     case homebrewCask(name: String)
+    case homebrewFormula(name: String)
 }
 
 /// Command-line tools Zisla can download/upgrade on its own.
 public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     case ytDLP
-    case mas
     case libreOffice
+    case fzf
+    case ripgrep
+    case lazygit
+    case neovim
+    case yazi
+    case starship
+    case tldr
+    case jq
+    case tree
+    case kaku
+    case kero
+    case markdownPreview
 
     public var id: String { rawValue }
 
     public var displayName: String {
         switch self {
         case .ytDLP: "yt-dlp"
-        case .mas: "mas"
         case .libreOffice: "LibreOffice"
+        case .fzf: "fzf"
+        case .ripgrep: "ripgrep"
+        case .lazygit: "lazygit"
+        case .neovim: "Neovim"
+        case .yazi: "Yazi"
+        case .starship: "Starship"
+        case .tldr: "tldr"
+        case .jq: "jq"
+        case .tree: "tree"
+        case .kaku: "Kaku"
+        case .kero: "Kero"
+        case .markdownPreview: "Markdown Preview"
         }
     }
 
     public var purpose: String {
         switch self {
         case .ytDLP: "视频音频下载"
-        case .mas: "App Store 应用更新"
         case .libreOffice: "Office 转 PDF"
+        case .fzf: "模糊查找工具"
+        case .ripgrep: "快速文本搜索"
+        case .lazygit: "Git 可视化界面"
+        case .neovim: "现代化编辑器"
+        case .yazi: "终端文件管理器"
+        case .starship: "跨 Shell 提示符"
+        case .tldr: "简化版命令手册"
+        case .jq: "JSON 处理工具"
+        case .tree: "目录树展示"
+        case .kaku: "面向 AI 编码的终端"
+        case .kero: "终端工作区"
+        case .markdownPreview: "Markdown 预览"
         }
     }
 
@@ -33,22 +67,60 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     public var executableName: String {
         switch self {
         case .ytDLP: "yt-dlp"
-        case .mas: "mas"
         case .libreOffice: "soffice"
+        case .fzf: "fzf"
+        case .ripgrep: "rg"
+        case .lazygit: "lazygit"
+        case .neovim: "nvim"
+        case .yazi: "yazi"
+        case .starship: "starship"
+        case .tldr: "tldr"
+        case .jq: "jq"
+        case .tree: "tree"
+        case .kaku: "kaku"
+        case .kero: "kero"
+        case .markdownPreview: "mdp"
         }
     }
 
     var installationSource: ManagedToolInstallationSource {
         switch self {
         case .ytDLP: .githubRelease(repository: "yt-dlp/yt-dlp")
-        case .mas: .githubRelease(repository: "mas-cli/mas")
         case .libreOffice: .homebrewCask(name: "libreoffice")
+        case .fzf: .homebrewFormula(name: "fzf")
+        case .ripgrep: .homebrewFormula(name: "ripgrep")
+        case .lazygit: .homebrewFormula(name: "lazygit")
+        case .neovim: .homebrewFormula(name: "neovim")
+        case .yazi: .homebrewFormula(name: "yazi")
+        case .starship: .homebrewFormula(name: "starship")
+        case .tldr: .homebrewFormula(name: "tldr")
+        case .jq: .homebrewFormula(name: "jq")
+        case .tree: .homebrewFormula(name: "tree")
+        case .kaku: .homebrewCask(name: "kakuku")
+        case .kero: .homebrewCask(name: "kero")
+        case .markdownPreview: .homebrewCask(name: "markdown-preview")
+        }
+    }
+
+    var usesNativeApplicationVersion: Bool {
+        switch self {
+        case .kaku, .kero, .markdownPreview: true
+        default: false
         }
     }
 
     var usesHomebrewCask: Bool {
         if case .homebrewCask = installationSource { return true }
         return false
+    }
+
+    var usesHomebrewFormula: Bool {
+        if case .homebrewFormula = installationSource { return true }
+        return false
+    }
+
+    var usesHomebrew: Bool {
+        usesHomebrewCask || usesHomebrewFormula
     }
 
     public var installDetail: String {
@@ -69,62 +141,71 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
             : "下载最新版并替换当前使用的 \(displayName)"
     }
 
-    /// Arguments that print the version. Both tools support it, but the subcommand name differs.
+    /// Arguments that print the installed version.
     var versionArguments: [String] {
         switch self {
         case .ytDLP: ["--version"]
-        case .mas: ["version"]
         case .libreOffice: ["--version"]
+        case .fzf: ["--version"]
+        case .ripgrep: ["--version"]
+        case .lazygit: ["--version"]
+        case .neovim: ["--version"]
+        case .yazi: ["--version"]
+        case .starship: ["--version"]
+        case .tldr: ["--version"]
+        case .jq: ["--version"]
+        case .tree: ["--version"]
+        case .kaku: ["--version"]
+        case .kero: ["--version"]
+        case .markdownPreview: ["--version"]
         }
     }
 
     func normalizedInstalledVersion(from raw: String) -> String? {
         guard let normalized = ManagedToolService.normalizeVersion(raw) else { return nil }
-        guard self == .libreOffice else { return normalized }
-        guard let range = normalized.range(
-            of: #"\d+(?:\.\d+)+"#,
-            options: .regularExpression
-        ) else { return nil }
-        return normalized[range]
-            .split(separator: ".")
-            .prefix(3)
-            .joined(separator: ".")
+
+        // LibreOffice 版本格式特殊处理
+        if self == .libreOffice {
+            guard let range = normalized.range(
+                of: #"\d+(?:\.\d+)+"#,
+                options: .regularExpression
+            ) else { return nil }
+            return normalized[range]
+                .split(separator: ".")
+                .prefix(3)
+                .joined(separator: ".")
+        }
+
+        // neovim 输出格式: "NVIM v0.9.5"
+        if self == .neovim {
+            guard let range = normalized.range(
+                of: #"\d+(?:\.\d+)+"#,
+                options: .regularExpression
+            ) else { return nil }
+            return String(normalized[range])
+        }
+
+        // jq 输出格式: "jq-1.7.1"
+        if self == .jq {
+            if let range = normalized.range(
+                of: #"\d+(?:\.\d+)+"#,
+                options: .regularExpression
+            ) {
+                return String(normalized[range])
+            }
+        }
+
+        return normalized
     }
 
-    /// Matching rule for release asset names. mas only publishes per-architecture .pkg files, so pick by the current architecture.
+    /// Matching rule for release asset names.
     func matchesAsset(name: String) -> Bool {
         switch self {
         case .ytDLP:
             return name == "yt-dlp_macos"
-        case .mas:
-            return name.hasSuffix("-\(Self.currentArchitecture).pkg")
-        case .libreOffice:
+        case .libreOffice, .fzf, .ripgrep, .lazygit, .neovim, .yazi, .starship, .tldr, .jq, .tree, .kaku, .kero, .markdownPreview:
             return false
         }
-    }
-
-    /// Whether the download is a .pkg — it must be extracted before the executable is available.
-    var needsPackageExtraction: Bool {
-        self == .mas
-    }
-
-    /// Relative path to the executable inside an extracted `.pkg`.
-    ///
-    /// mas's `bin/mas` is only a zsh wrapper script (it relies on jq for output formatting); the real binary
-    /// lives at `libexec/bin/mas`, links only system libraries and the system Swift runtime, and runs standalone outside the pkg.
-    var payloadExecutablePath: String? {
-        switch self {
-        case .mas: "Payload/usr/local/opt/mas/libexec/bin/mas"
-        case .ytDLP, .libreOffice: nil
-        }
-    }
-
-    static var currentArchitecture: String {
-        #if arch(arm64)
-        return "arm64"
-        #else
-        return "x86_64"
-        #endif
     }
 }
 
@@ -180,10 +261,9 @@ public struct ManagedToolState: Sendable, Equatable {
 
 public enum ManagedToolError: Error, Sendable, Equatable {
     case releaseUnavailable(String)
-    case assetNotFound(tool: String, architecture: String)
+    case assetNotFound(tool: String)
     case untrustedHost(String)
     case downloadFailed(String)
-    case extractionFailed(String)
     case notExecutable(String)
     case homebrewUnavailable
     case homebrewFailed(String)
@@ -192,14 +272,12 @@ public enum ManagedToolError: Error, Sendable, Equatable {
         switch self {
         case .releaseUnavailable(let value):
             "获取版本信息失败：\(value)"
-        case .assetNotFound(let tool, let architecture):
-            "\(tool) 没有提供 \(architecture) 架构的下载"
+        case .assetNotFound(let tool):
+            "\(tool) 没有可用下载"
         case .untrustedHost(let host):
             "下载地址不可信：\(host)"
         case .downloadFailed(let value):
             "下载失败：\(value)"
-        case .extractionFailed(let value):
-            "解包失败：\(value)"
         case .notExecutable(let value):
             "安装后无法执行：\(value)"
         case .homebrewUnavailable:

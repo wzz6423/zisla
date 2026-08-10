@@ -972,7 +972,7 @@ private struct CompactUpdateWing: View {
                         .frame(width: min(19, height * 0.58), height: min(19, height * 0.58))
                 }
             } else {
-                Image(systemName: "arrow.up.circle")
+                    Image(systemName: "arrow.down.circle")
                     .font(.system(size: min(14, height * 0.46), weight: .semibold))
                     .foregroundStyle(.cyan)
             }
@@ -984,7 +984,7 @@ private struct CompactUpdateWing: View {
         )
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(side == .left ? "\(notice.title)有可用更新" : "立即升级"))
+        .accessibilityLabel(Text(side == .left ? "\(notice.title)有可用更新" : "查看更新"))
     }
 }
 

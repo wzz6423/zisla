@@ -1452,9 +1452,10 @@ struct UpdateCoreTests {
     }
 
     @Test
-    func releaseDecoderSelectsMacArchiveAndChecksum() throws {
+    func releaseDecoderSelectsMacInstallAssetsAndVersionFromPrefixedTag() throws {
         let json = """
-        {"tag_name":"v1.4.0","html_url":"https://github.com/wzz6423/zisla/releases/tag/v1.4.0","draft":false,"prerelease":false,"assets":[
+        {"tag_name":"release/v1.4.0","html_url":"https://github.com/wzz6423/zisla/releases/tag/release/v1.4.0","draft":false,"prerelease":false,"assets":[
+          {"name":"zisla-macos.dmg","browser_download_url":"https://example.com/app.dmg","size":1234},
           {"name":"zisla-macos.zip","browser_download_url":"https://example.com/app.zip","size":1234},
           {"name":"zisla-macos.zip.sha256","browser_download_url":"https://example.com/app.zip.sha256","size":64}
         ]}
@@ -1467,6 +1468,7 @@ struct UpdateCoreTests {
         #expect(release.version == expectedVersion)
         #expect(selection?.archive.name == "zisla-macos.zip")
         #expect(selection?.checksum?.name.hasSuffix(".sha256") == true)
+        #expect(release.macDiskImage?.name == "zisla-macos.dmg")
     }
 }
 

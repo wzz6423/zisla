@@ -25,6 +25,40 @@ public enum VoiceTranscriptPostProcessor {
 
     public static func deliveredText(_ response: String, fallback: String) -> String {
         let normalized = response.trimmingCharacters(in: .whitespacesAndNewlines)
-        return normalized.isEmpty ? fallback : normalized
+        guard !normalized.isEmpty else { return fallback }
+        let normalizedFallback = fallback.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if isWrappedInMarkdownFence(normalized), !isWrappedInMarkdownFence(normalizedFallback) {
+            return fallback
+        }
+        if isWrappedInTranscriptTag(normalized), !isWrappedInTranscriptTag(normalizedFallback) {
+            return fallback
+        }
+        if hasCommonCleanupPrefix(normalized), !hasCommonCleanupPrefix(normalizedFallback) {
+            return fallback
+        }
+
+        return normalized
+    }
+
+    private static func isWrappedInMarkdownFence(_ text: String) -> Bool {
+        ["```", "~~~"].contains { marker in
+            text.hasPrefix(marker) && text.hasSuffix(marker) && text.count > marker.count * 2
+        }
+    }
+
+    private static func isWrappedInTranscriptTag(_ text: String) -> Bool {
+        let lowercased = text.lowercased()
+        return lowercased.hasPrefix("<transcript>") && lowercased.hasSuffix("</transcript>")
+    }
+
+    private static func hasCommonCleanupPrefix(_ text: String) -> Bool {
+        let prefixes = [
+            "当然，整理如下：",
+            "整理如下：",
+            "整理后的文本：",
+            "整理后：",
+        ]
+        return prefixes.contains { text.hasPrefix($0) }
     }
 }

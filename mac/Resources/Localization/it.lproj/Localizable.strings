@@ -428,7 +428,6 @@
 "整理桌面" = "Organizza Scrivania";
 "按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Allinea le icone della scrivania alla griglia; non sposta file quando 'Pile' è abilitato";
 "App Store 应用" = "App di App Store";
-"批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页" = "Aggiorna in batch le app di App Store; apri la pagina aggiornamenti di App Store quando mas non è installato";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Nessuna sveglia ancora, aggiungi qui sotto";

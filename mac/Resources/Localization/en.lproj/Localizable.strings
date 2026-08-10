@@ -428,7 +428,6 @@
 "整理桌面" = "Organize Desktop";
 "按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Align desktop icons to grid; does not move files when 'Stacks' enabled";
 "App Store 应用" = "App Store Apps";
-"批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页" = "Batch update App Store apps; open App Store updates page when mas not installed";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "No alarms yet, add below";

@@ -428,7 +428,6 @@
 "整理桌面" = "Organizar Escritorio";
 "按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Alinear iconos del escritorio a la cuadrícula; no mueve archivos cuando 'Pilas' está habilitado";
 "App Store 应用" = "Apps de App Store";
-"批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页" = "Actualizar apps de App Store en lote; abrir página de actualizaciones de App Store cuando mas no esté instalado";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Aún no hay alarmas, añadir abajo";

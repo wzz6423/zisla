@@ -68,12 +68,6 @@
 	<string>zisla 需要将你主动录入的语音转换为 AI 对话文字。</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>zisla 需要通过 Mail.app 读取和管理你的邮件，包括收件箱列表、标记已读、删除和回复。</string>
-	<key>SUEnableAutomaticChecks</key>
-    <true/>
-    <key>SUAutomaticallyUpdate</key>
-    <true/>
-    <key>SUFeedURL</key>
-    <string>https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml</string>
     <key>ZislaDefaultUpdateChannel</key>
     <string>@UPDATE_CHANNEL@</string>
 </dict>

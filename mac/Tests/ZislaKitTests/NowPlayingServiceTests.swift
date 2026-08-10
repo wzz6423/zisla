@@ -785,6 +785,42 @@ struct NowPlayingServiceTests {
     }
 
     @Test
+    func soleCoreAudioSourceCorrectsConflictingMediaRemoteAttribution() throws {
+        let bilibili = source(id: "bilibili", pid: 42, isFrontmost: true)
+
+        let selected = try #require(
+            NowPlayingService.audioSourceCorrectingRemoteAttribution(
+                from: [bilibili],
+                remotePID: 1339,
+                remoteBundleIdentifier: "com.tencent.QQMusicMac"
+            )
+        )
+
+        #expect(selected.id == "bilibili")
+        #expect(
+            NowPlayingService.audioSourceCorrectingRemoteAttribution(
+                from: [bilibili],
+                remotePID: 42,
+                remoteBundleIdentifier: "test.bilibili"
+            ) == nil
+        )
+    }
+
+    @Test
+    func multipleCoreAudioSourcesDoNotGuessRemoteAttribution() {
+        let bilibili = source(id: "bilibili", pid: 42, isFrontmost: true)
+        let qqMusic = source(id: "qqmusic", pid: 1339, isFrontmost: false)
+
+        #expect(
+            NowPlayingService.audioSourceCorrectingRemoteAttribution(
+                from: [bilibili, qqMusic],
+                remotePID: 1339,
+                remoteBundleIdentifier: "com.tencent.QQMusicMac"
+            ) == nil
+        )
+    }
+
+    @Test
     func pausedRemoteSnapshotIsNotTreatedAsPlayingByAudioFallback() {
         let paused = NowPlayingSnapshot(
             title: "暂停的曲目",

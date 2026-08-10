@@ -1,7 +1,7 @@
 import Foundation
 import ZislaCore
 
-public enum AIChatClientError: LocalizedError {
+public enum AIChatClientError: LocalizedError, Equatable {
     case invalidEndpoint(String)
     case invalidResponse
     case http(statusCode: Int, body: String)
@@ -74,9 +74,10 @@ public struct AIChatClient: Sendable {
         }
         let decoded = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
         guard let message = decoded.choices.first?.message else { throw AIChatClientError.invalidResponse }
-        return AIChatResponse(
-            content: message.content?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        )
+        guard let content = message.content else { throw AIChatClientError.invalidResponse }
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw AIChatClientError.invalidResponse }
+        return AIChatResponse(content: trimmed)
     }
 
     private func completionURL(for endpoint: AIEndpoint) throws -> URL {

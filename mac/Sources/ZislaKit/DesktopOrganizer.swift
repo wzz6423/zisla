@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// Bulk operations for the desktop and Trash, plus an App Store update entry point.
+/// Bulk operations for the desktop and Trash.
 ///
 /// All implemented via Finder's AppleScript interface (same pattern as `NotesAppBridge` —
 /// in-process `NSAppleScript` ensures correct TCC attribution). The first call prompts
@@ -108,85 +108,6 @@ public enum DesktopOrganizer {
         end tell
         """
         return await runAppleScriptVoid(script)
-    }
-
-    // MARK: - App Store updates
-
-    /// One-tap App Store app update.
-    ///
-    /// macOS has no public App Store update API: `CommerceKit`'s `CKUpdateController`
-    /// requires a private entitlement, and an unauthorized process cannot even establish the XPC
-    /// connection. Therefore:
-    /// - If `mas` is available, run `mas upgrade` for a true one-tap experience.
-    /// - Otherwise open the App Store Updates page and let the user click "Update All".
-    ///
-    /// Locating `mas` is delegated to `ManagedToolService` (the download page can install/upgrade it);
-    /// this only consumes the result, so the search paths are not maintained in two places.
-    public static func updateAppStoreApps(
-        masExecutable: URL?
-    ) async -> Result<String, DesktopOrganizerError> {
-        guard let mas = masExecutable else {
-            openAppStoreUpdatesPage()
-            return .success("未安装 mas，已打开 App Store 更新页")
-        }
-        switch await run(mas, arguments: ["upgrade"]) {
-        case .success(let output):
-            let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty || trimmed.localizedCaseInsensitiveContains("everything is up-to-date") {
-                return .success("App Store 应用均已是最新")
-            }
-            let updated = trimmed
-                .components(separatedBy: .newlines)
-                .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-                .count
-            return .success("已通过 mas 更新 \(updated) 项")
-        case .failure(let error):
-            return .failure(error)
-        }
-    }
-
-    public static func openAppStoreUpdatesPage() {
-        if let url = URL(string: "macappstore://showUpdatesPage") {
-            NSWorkspace.shared.open(url)
-        } else {
-            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/App Store.app"))
-        }
-    }
-
-    // MARK: - Execution
-
-    private static func run(
-        _ executable: URL,
-        arguments: [String]
-    ) async -> Result<String, DesktopOrganizerError> {
-        await Task.detached(priority: .userInitiated) { () -> Result<String, DesktopOrganizerError> in
-            let process = Process()
-            process.executableURL = executable
-            process.arguments = arguments
-            let stdout = Pipe()
-            let stderr = Pipe()
-            process.standardOutput = stdout
-            process.standardError = stderr
-            do {
-                try process.run()
-            } catch {
-                return .failure(.failed("无法启动 \(executable.lastPathComponent)：\(error.localizedDescription)"))
-            }
-            let data = stdout.fileHandleForReading.readDataToEndOfFile()
-            let errData = stderr.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            if process.terminationStatus != 0 {
-                let message = String(data: errData, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                let fallback = String(data: data, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                return .failure(.failed(
-                    [message, fallback].compactMap { $0 }.first { !$0.isEmpty }
-                        ?? "\(executable.lastPathComponent) 执行失败"
-                ))
-            }
-            return .success(String(data: data, encoding: .utf8) ?? "")
-        }.value
     }
 
     private static func runAppleScriptReturningString(

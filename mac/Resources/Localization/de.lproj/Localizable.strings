@@ -429,7 +429,6 @@
 "整理桌面" = "Schreibtisch organisieren";
 "按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Schreibtischsymbole am Raster ausrichten; verschiebt keine Dateien, wenn „Stapel\" aktiviert";
 "App Store 应用" = "App Store-Apps";
-"批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页" = "App Store-Apps im Stapel aktualisieren; öffnet App Store-Update-Seite, wenn mas nicht installiert";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Noch keine Wecker, unten hinzufügen";

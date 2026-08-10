@@ -204,6 +204,52 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func processRunnerPropagatesTaskCancellation() async throws {
+        let task = Task {
+            try await AIAgentProcessRunner.run(
+                executableURL: URL(fileURLWithPath: "/bin/sleep"),
+                arguments: ["5"],
+                timeout: 10
+            )
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        let cancellationStartedAt = Date()
+
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            Issue.record("Cancelled process should throw")
+        } catch {
+            #expect(error is CancellationError)
+        }
+        #expect(Date().timeIntervalSince(cancellationStartedAt) < 1)
+    }
+
+    @Test
+    func processRunnerCancellationDoesNotWaitForDescendantHoldingPipes() async throws {
+        let task = Task {
+            try await AIAgentProcessRunner.run(
+                executableURL: URL(fileURLWithPath: "/bin/sh"),
+                arguments: ["-c", "sleep 2 & wait"],
+                timeout: 10
+            )
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        let cancellationStartedAt = Date()
+
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            Issue.record("Cancelled process should throw")
+        } catch {
+            #expect(error is CancellationError)
+        }
+        #expect(Date().timeIntervalSince(cancellationStartedAt) < 1)
+    }
+
+    @Test
     func newAPIQuotaProbeUsesRootUserEndpointAndParsesAvailableQuota() async throws {
         AIAgentURLProtocol.responseData = Data(#"{"data":{"quota":100,"used_quota":25}}"#.utf8)
         AIAgentURLProtocol.statusCode = 200

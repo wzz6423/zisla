@@ -65,7 +65,7 @@ public enum AppearanceMode: String, Codable, CaseIterable, Sendable, Equatable {
     }
 }
 
-/// Sparkle update channel selectable when checking for updates manually.
+/// Update channel selectable when checking for updates manually.
 public enum UpdateChannel: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case release
     case preview
@@ -364,8 +364,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mailAccountNames: Set<String>
     public var mailCompactStyle: MailCompactStyle
     public var updateChecksEnabled: Bool
-    public var automaticUpdatesEnabled: Bool
-    /// Target channel for manual update checks; automatic updates always follow the channel of the installed build.
+    public var automaticDownloadEnabled: Bool
+    /// Target channel for manual update checks.
     public var updateChannel: UpdateChannel
     /// Whether to save clipboard text and images locally; defaults to off to avoid inadvertently recording sensitive content.
     public var clipboardHistoryEnabled: Bool
@@ -429,7 +429,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mailAccountNames: Set<String> = [],
         mailCompactStyle: MailCompactStyle = .compact,
         updateChecksEnabled: Bool = true,
-        automaticUpdatesEnabled: Bool = true,
+        automaticDownloadEnabled: Bool = false,
         updateChannel: UpdateChannel = .release,
         clipboardHistoryEnabled: Bool = false,
         clipboardDetectionEnabled: Bool = false,
@@ -480,7 +480,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.mailAccountNames = mailAccountNames
         self.mailCompactStyle = mailCompactStyle
         self.updateChecksEnabled = updateChecksEnabled
-        self.automaticUpdatesEnabled = automaticUpdatesEnabled
+        self.automaticDownloadEnabled = automaticDownloadEnabled
         self.updateChannel = updateChannel
         self.clipboardHistoryEnabled = clipboardHistoryEnabled
         self.clipboardDetectionEnabled = clipboardDetectionEnabled
@@ -549,7 +549,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case mailAccountNames
         case mailCompactStyle
         case updateChecksEnabled
-        case automaticUpdatesEnabled
+        case automaticDownloadEnabled
         case updateChannel
         case clipboardHistoryEnabled
         case clipboardDetectionEnabled
@@ -573,6 +573,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case voiceInputMode
         case voiceInputHotkeyPreset
         case voiceModelConfiguration
+    }
+
+    private enum LegacyCodingKeys: String, CodingKey {
+        case automaticUpdatesEnabled
     }
 
     public init(from decoder: Decoder) throws {
@@ -626,7 +630,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mailAccountNames = try container.decodeIfPresent(Set<String>.self, forKey: .mailAccountNames) ?? defaults.mailAccountNames
         mailCompactStyle = try container.decodeIfPresent(MailCompactStyle.self, forKey: .mailCompactStyle) ?? defaults.mailCompactStyle
         updateChecksEnabled = try container.decodeIfPresent(Bool.self, forKey: .updateChecksEnabled) ?? defaults.updateChecksEnabled
-        automaticUpdatesEnabled = try container.decodeIfPresent(Bool.self, forKey: .automaticUpdatesEnabled) ?? defaults.automaticUpdatesEnabled
+        if let automaticDownload = try container.decodeIfPresent(Bool.self, forKey: .automaticDownloadEnabled) {
+            automaticDownloadEnabled = automaticDownload
+        } else {
+            let legacyContainer = try decoder.container(keyedBy: LegacyCodingKeys.self)
+            automaticDownloadEnabled = try legacyContainer.decodeIfPresent(Bool.self, forKey: .automaticUpdatesEnabled) ?? defaults.automaticDownloadEnabled
+        }
         updateChannel = try container.decodeIfPresent(UpdateChannel.self, forKey: .updateChannel) ?? defaults.updateChannel
         clipboardHistoryEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardHistoryEnabled) ?? defaults.clipboardHistoryEnabled
         clipboardDetectionEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardDetectionEnabled) ?? defaults.clipboardDetectionEnabled

@@ -26,19 +26,34 @@ struct ManagedToolServiceTests {
     }
 
     @Test
-    func masMatchesOnlyTheCurrentArchitecturePackage() {
-        let architecture = ManagedTool.currentArchitecture
-        #expect(ManagedTool.mas.matchesAsset(name: "mas-7.0.0-\(architecture).pkg"))
-        let other = architecture == "arm64" ? "x86_64" : "arm64"
-        #expect(ManagedTool.mas.matchesAsset(name: "mas-7.0.0-\(other).pkg") == false)
-    }
-
-    @Test
     func libreOfficeUsesTheHomebrewCaskAndExpectedExecutablePaths() {
         #expect(ManagedTool.libreOffice.installationSource == .homebrewCask(name: "libreoffice"))
         #expect(ManagedTool.libreOffice.executableName == "soffice")
         #expect(ManagedToolService.externalPaths(for: .libreOffice).contains(
             "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+        ))
+    }
+
+    @Test
+    func fzfUsesTheHomebrewFormulaAndExpectedExecutablePaths() {
+        #expect(ManagedTool.fzf.installationSource == .homebrewFormula(name: "fzf"))
+        #expect(ManagedTool.fzf.executableName == "fzf")
+        #expect(ManagedToolService.externalPaths(for: .fzf).contains("/opt/homebrew/bin/fzf"))
+    }
+
+    @Test
+    func ripgrepUsesTheHomebrewFormulaAndExpectedExecutablePaths() {
+        #expect(ManagedTool.ripgrep.installationSource == .homebrewFormula(name: "ripgrep"))
+        #expect(ManagedTool.ripgrep.executableName == "rg")
+        #expect(ManagedToolService.externalPaths(for: .ripgrep).contains("/opt/homebrew/bin/rg"))
+    }
+
+    @Test
+    func kakuUsesTheHomebrewCaskAndExpectedExecutablePaths() {
+        #expect(ManagedTool.kaku.installationSource == .homebrewCask(name: "kakuku"))
+        #expect(ManagedTool.kaku.executableName == "kaku")
+        #expect(ManagedToolService.externalPaths(for: .kaku).contains(
+            "/Applications/Kaku.app/Contents/MacOS/kaku"
         ))
     }
 
@@ -59,25 +74,62 @@ struct ManagedToolServiceTests {
     }
 
     @Test
-    func parseReleaseStripsLeadingVAndPicksTheMatchingAsset() throws {
-        let data = releaseJSON(tag: "v7.0.0", assets: [
-            "mas-7.0.0-arm64.pkg",
-            "mas-7.0.0-x86_64.pkg",
-        ])
-        let release = try ManagedToolService.parseRelease(data, tool: .mas)
-        #expect(release.version == "7.0.0")
-        #expect(release.assetURL.lastPathComponent
-            == "mas-7.0.0-\(ManagedTool.currentArchitecture).pkg")
+    func parsesTheStableVersionFromHomebrewFormulaMetadata() throws {
+        let data = Data("""
+        {"formulae":[{"name":"fzf","versions":{"stable":"0.55.0"}}]}
+        """.utf8)
+
+        let version = try ManagedToolService.parseHomebrewFormulaInfo(
+            data,
+            formulaName: "fzf",
+            tool: .fzf
+        )
+
+        #expect(version == "0.55.0")
     }
 
     @Test
-    func parseReleaseFailsWhenNoAssetMatchesThisArchitecture() {
-        let data = releaseJSON(tag: "v7.0.0", assets: ["mas-7.0.0-riscv.pkg"])
-        #expect(throws: ManagedToolError.assetNotFound(
-            tool: "mas",
-            architecture: ManagedTool.currentArchitecture
-        )) {
-            try ManagedToolService.parseRelease(data, tool: .mas)
+    func parseHomebrewFormulaInfoHandlesMultipleFormulae() throws {
+        let data = Data("""
+        {"formulae":[{"name":"other","versions":{"stable":"1.0.0"}},{"name":"jq","versions":{"stable":"1.7.1"}}]}
+        """.utf8)
+
+        let version = try ManagedToolService.parseHomebrewFormulaInfo(
+            data,
+            formulaName: "jq",
+            tool: .jq
+        )
+
+        #expect(version == "1.7.1")
+    }
+
+    @Test
+    func parseHomebrewFormulaInfoFailsWhenFormulaNotFound() {
+        let data = Data("""
+        {"formulae":[{"name":"other","versions":{"stable":"1.0.0"}}]}
+        """.utf8)
+
+        #expect(throws: ManagedToolError.homebrewFailed("无法读取 fzf 的版本信息")) {
+            try ManagedToolService.parseHomebrewFormulaInfo(data, formulaName: "fzf", tool: .fzf)
+        }
+    }
+
+    @Test
+    func parseReleaseStripsLeadingVAndPicksTheMatchingAsset() throws {
+        let data = releaseJSON(tag: "v7.0.0", assets: [
+            "yt-dlp_macos.zip",
+            "yt-dlp_macos",
+        ])
+        let release = try ManagedToolService.parseRelease(data, tool: .ytDLP)
+        #expect(release.version == "7.0.0")
+        #expect(release.assetURL.lastPathComponent == "yt-dlp_macos")
+    }
+
+    @Test
+    func parseReleaseFailsWhenNoAssetMatches() {
+        let data = releaseJSON(tag: "v7.0.0", assets: ["yt-dlp_linux"])
+        #expect(throws: ManagedToolError.assetNotFound(tool: "yt-dlp")) {
+            try ManagedToolService.parseRelease(data, tool: .ytDLP)
         }
     }
 
@@ -95,17 +147,17 @@ struct ManagedToolServiceTests {
     func downloadHostsAreRestrictedToGitHub() throws {
         // Without checksum verification, provenance rests on TLS plus the host allowlist alone, so this constraint must hold.
         try ManagedToolService.validate(
-            #require(URL(string: "https://github.com/o/r/releases/download/v1/mas.pkg"))
+            #require(URL(string: "https://github.com/o/r/releases/download/v1/tool"))
         )
         try ManagedToolService.validate(
             #require(URL(string: "https://objects.githubusercontent.com/x"))
         )
 
         for rejected in [
-            "http://github.com/o/r/mas.pkg",
-            "https://evil.example.com/mas.pkg",
-            "https://github.com.evil.example.com/mas.pkg",
-            "file:///tmp/mas.pkg",
+            "http://github.com/o/r/releases/download/v1/tool",
+            "https://evil.example.com/tool",
+            "https://github.com.evil.example.com/tool",
+            "file:///tmp/tool",
         ] {
             let url = try #require(URL(string: rejected))
             #expect(throws: ManagedToolError.self) {
@@ -170,10 +222,10 @@ struct ManagedToolServiceTests {
                 .appendingPathComponent(UUID().uuidString, isDirectory: true),
             releaseLoader: { _ in throw ManagedToolError.releaseUnavailable("HTTP 503") }
         )
-        let version = await service.checkLatest(.mas)
+        let version = await service.checkLatest(.ytDLP)
         #expect(version == nil)
-        #expect(service.states[.mas]?.errorMessage == "获取版本信息失败：HTTP 503")
-        #expect(service.states[.mas]?.phase == .idle)
+        #expect(service.states[.ytDLP]?.errorMessage == "获取版本信息失败：HTTP 503")
+        #expect(service.states[.ytDLP]?.phase == .idle)
     }
 
     @Test
@@ -242,7 +294,7 @@ struct ManagedToolServiceTests {
             bundleURL: empty,
             releaseLoader: { _ in Data() }
         )
-        // This directory holds no executables, and mas/yt-dlp are not necessarily installed system-wide, so only the directory resolution part is asserted here.
+        // This directory holds no executables, and yt-dlp is not necessarily installed system-wide, so only the directory resolution part is asserted here.
         #expect(service.resolvedExecutable(for: .ytDLP)?.location != .managed)
     }
 

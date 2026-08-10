@@ -428,7 +428,6 @@
 "整理桌面" = "Masaüstünü Düzenle";
 "按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Masaüstü simgelerini ızgaraya hizala; 'Yığınlar' etkinken hiçbir dosyayı taşımaz";
 "App Store 应用" = "App Store Uygulamaları";
-"批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页" = "App Store uygulamalarını toplu güncelle; mas kurulu değilken App Store güncelleme sayfasını aç";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Henüz alarm yok, aşağıdan ekle";

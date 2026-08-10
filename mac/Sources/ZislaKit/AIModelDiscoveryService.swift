@@ -27,6 +27,7 @@ public struct AIModelDiscoveryService: Sendable {
     public func models(for endpoint: AIEndpoint, apiKey: String? = nil) async throws -> [AIDiscoveredModel] {
         let url = try modelsURL(for: endpoint)
         var request = URLRequest(url: url)
+        request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let authorization = Self.authorizationHeader(for: apiKey) {
             request.setValue(authorization, forHTTPHeaderField: "Authorization")

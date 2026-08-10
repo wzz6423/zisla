@@ -41,7 +41,6 @@ let package = Package(
             dependencies: [
                 "ZislaCore",
                 "ZislaKit",
-                "Sparkle",
                 .product(name: "SkyLightWindow", package: "SkyLightWindow"),
             ],
             resources: [
@@ -69,10 +68,6 @@ let package = Package(
         .testTarget(
             name: "ZislaKitTests",
             dependencies: ["ZislaCore", "ZislaKit"]
-        ),
-        .binaryTarget(
-            name: "Sparkle",
-            path: "Vendor/Sparkle.xcframework"
         ),
     ]
 )

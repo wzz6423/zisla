@@ -1,10 +1,6 @@
 import Foundation
 
 /// Tool management for the download page: locating, checking for updates, and installing managed components.
-///
-/// The user chose "only check the latest version, no verification" — the official mas publishes no checksum file, and
-/// the `.pkg` itself carries no package signature (`pkgutil --check-signature` returns no signature), so the only
-/// provenance guarantee here is GitHub's TLS: download URLs come solely from the GitHub API response, with HTTPS and a host allowlist enforced.
 @MainActor
 public final class ManagedToolService: ObservableObject {
     @Published public private(set) var states: [ManagedTool: ManagedToolState] = [:]
@@ -55,7 +51,7 @@ public final class ManagedToolService: ObservableObject {
     /// Resolution order: Zisla-downloaded > bundled > system-installed.
     /// The downloaded build wins, otherwise clicking "Update" would be pointless.
     public func resolvedExecutable(for tool: ManagedTool) -> (url: URL, location: ManagedToolState.Location)? {
-        if !tool.usesHomebrewCask {
+        if !tool.usesHomebrew {
             let managed = toolsDirectory.appendingPathComponent(tool.executableName, isDirectory: false)
             if let trusted = trustedExecutable(managed) {
                 return (trusted, .managed)
@@ -69,13 +65,14 @@ public final class ManagedToolService: ObservableObject {
         }
         for path in Self.externalPaths(for: tool) {
             if let trusted = trustedExecutable(URL(fileURLWithPath: path)) {
-                return (trusted, tool.usesHomebrewCask ? .homebrew : .external(path))
+                return (trusted, tool.usesHomebrew ? .homebrew : .external(path))
             }
         }
         return nil
     }
 
     static func externalPaths(for tool: ManagedTool) -> [String] {
+        // Cask 应用的路径
         if tool == .libreOffice {
             return [
                 "/Applications/LibreOffice.app/Contents/MacOS/soffice",
@@ -84,6 +81,23 @@ public final class ManagedToolService: ObservableObject {
                 "/usr/local/bin/soffice",
             ]
         }
+        if tool == .kaku {
+            return [
+                "/opt/homebrew/bin/kaku",
+                "/Applications/Kaku.app/Contents/MacOS/kaku",
+            ]
+        }
+        if tool == .kero {
+            return ["/Applications/Kero.app/Contents/MacOS/kero"]
+        }
+        if tool == .markdownPreview {
+            return [
+                "/opt/homebrew/bin/mdp",
+                "/Applications/Markdown Preview.app/Contents/Resources/bin/markdown-preview",
+            ]
+        }
+
+        // 命令行工具的通用路径
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return [
             "/opt/homebrew/bin/\(tool.executableName)",
@@ -123,13 +137,27 @@ public final class ManagedToolService: ObservableObject {
     }
 
     static func readVersion(of tool: ManagedTool, at url: URL) async -> String? {
+        if tool.usesNativeApplicationVersion {
+            return nativeApplicationVersion(at: url)
+        }
         guard case .success(let output) = await runProcess(url, arguments: tool.versionArguments) else {
             return nil
         }
         return tool.normalizedInstalledVersion(from: output)
     }
 
-    /// yt-dlp prints a bare version number, mas prints `7.0.0`; normalize by trimming whitespace and stripping a leading v.
+    private static func nativeApplicationVersion(at executableURL: URL) -> String? {
+        guard let appPath = executableURL.pathComponents.first(where: { $0.hasSuffix(".app") }) else {
+            return nil
+        }
+        guard let appIndex = executableURL.pathComponents.firstIndex(of: appPath) else { return nil }
+        let appURL = URL(fileURLWithPath: String(
+            executableURL.pathComponents.prefix(appIndex + 1).joined(separator: "/")
+        ))
+        return Bundle(url: appURL)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    }
+
+    /// Normalize a version by trimming whitespace and stripping a leading v.
     nonisolated static func normalizeVersion(_ raw: String) -> String? {
         let trimmed = raw
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -148,6 +176,19 @@ public final class ManagedToolService: ObservableObject {
               let normalized = tool.normalizedInstalledVersion(from: version)
         else {
             throw ManagedToolError.homebrewFailed("无法读取 \(caskName) 的版本信息")
+        }
+        return normalized
+    }
+
+    static func parseHomebrewFormulaInfo(_ data: Data, formulaName: String, tool: ManagedTool) throws -> String {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let formulae = root["formulae"] as? [[String: Any]],
+              let formula = formulae.first(where: { ($0["name"] as? String) == formulaName }),
+              let versions = formula["versions"] as? [String: Any],
+              let version = versions["stable"] as? String,
+              let normalized = tool.normalizedInstalledVersion(from: version)
+        else {
+            throw ManagedToolError.homebrewFailed("无法读取 \(formulaName) 的版本信息")
         }
         return normalized
     }
@@ -181,10 +222,7 @@ public final class ManagedToolService: ObservableObject {
               let urlString = matched["browser_download_url"] as? String,
               let url = URL(string: urlString)
         else {
-            throw ManagedToolError.assetNotFound(
-                tool: tool.displayName,
-                architecture: ManagedTool.currentArchitecture
-            )
+            throw ManagedToolError.assetNotFound(tool: tool.displayName)
         }
         try validate(url)
         return Release(version: version, assetURL: url)
@@ -228,6 +266,13 @@ public final class ManagedToolService: ObservableObject {
                     caskName: caskName,
                     tool: tool
                 )
+            case .homebrewFormula(let formulaName):
+                let output = try await runHomebrew(["info", "--formula", "--json=v2", formulaName])
+                latestVersion = try Self.parseHomebrewFormulaInfo(
+                    Data(output.utf8),
+                    formulaName: formulaName,
+                    tool: tool
+                )
             }
             states[tool]?.latestVersion = latestVersion
             latestVersionCheckedAt[tool] = Date()
@@ -258,6 +303,8 @@ public final class ManagedToolService: ObservableObject {
                 try await installGitHubRelease(tool, repository: repository)
             case .homebrewCask(let caskName):
                 try await installHomebrewCask(tool, caskName: caskName)
+            case .homebrewFormula(let formulaName):
+                try await installHomebrewFormula(tool, formulaName: formulaName)
             }
             states[tool]?.phase = .idle
         } catch let error as ManagedToolError {
@@ -298,10 +345,7 @@ public final class ManagedToolService: ObservableObject {
         defer { try? FileManager.default.removeItem(at: downloaded.deletingLastPathComponent()) }
 
         states[tool]?.phase = .installing
-        let executable = tool.needsPackageExtraction
-            ? try await Self.extractExecutable(from: downloaded, tool: tool)
-            : downloaded
-        let installed = try install(executable, as: tool)
+        let installed = try install(downloaded, as: tool)
         guard let version = await Self.readVersion(of: tool, at: installed) else {
             throw ManagedToolError.notExecutable(tool.displayName)
         }
@@ -322,6 +366,31 @@ public final class ManagedToolService: ObservableObject {
         states[tool]?.phase = .installing
         let action = states[tool]?.isInstalled == true ? "upgrade" : "install"
         _ = try await runHomebrew([action, "--cask", caskName])
+        refreshedInstalledVersions.remove(tool)
+
+        guard let resolved = resolvedExecutable(for: tool),
+              let version = await Self.readVersion(of: tool, at: resolved.url)
+        else {
+            throw ManagedToolError.notExecutable(tool.displayName)
+        }
+        states[tool]?.installedVersion = version
+        states[tool]?.location = resolved.location
+        states[tool]?.latestVersion = version
+        refreshedInstalledVersions.insert(tool)
+        persistCachedStates()
+    }
+
+    private func installHomebrewFormula(_ tool: ManagedTool, formulaName: String) async throws {
+        let metadata = try await runHomebrew(["info", "--formula", "--json=v2", formulaName])
+        states[tool]?.latestVersion = try Self.parseHomebrewFormulaInfo(
+            Data(metadata.utf8),
+            formulaName: formulaName,
+            tool: tool
+        )
+
+        states[tool]?.phase = .installing
+        let action = states[tool]?.isInstalled == true ? "upgrade" : "install"
+        _ = try await runHomebrew([action, "--formula", formulaName])
         refreshedInstalledVersions.remove(tool)
 
         guard let resolved = resolvedExecutable(for: tool),
@@ -427,36 +496,6 @@ public final class ManagedToolService: ObservableObject {
         return destination
     }
 
-    /// Extracts the real executable out of the `.pkg` without going through `installer` (which would need admin rights).
-    static func extractExecutable(from packageURL: URL, tool: ManagedTool) async throws -> URL {
-        guard let relativePath = tool.payloadExecutablePath else {
-            throw ManagedToolError.extractionFailed("\(tool.displayName) 未定义解包路径")
-        }
-        let expanded = packageURL.deletingLastPathComponent()
-            .appendingPathComponent("expanded", isDirectory: true)
-        switch await runProcess(
-            URL(fileURLWithPath: "/usr/sbin/pkgutil"),
-            arguments: ["--expand-full", packageURL.path, expanded.path]
-        ) {
-        case .failure(let error):
-            throw ManagedToolError.extractionFailed(error.message)
-        case .success:
-            break
-        }
-        // The top-level component name is not fixed (mas.pkg / mas-7.0.0.pkg, etc.), so search by relative path.
-        let candidates = (try? FileManager.default.contentsOfDirectory(
-            at: expanded,
-            includingPropertiesForKeys: nil
-        )) ?? []
-        let matches = ([expanded] + candidates)
-            .map { $0.appendingPathComponent(relativePath) }
-            .filter { FileManager.default.isExecutableFile(atPath: $0.path) }
-        guard let executable = matches.first else {
-            throw ManagedToolError.extractionFailed("包内未找到 \(relativePath)")
-        }
-        return executable
-    }
-
     private func install(_ executable: URL, as tool: ManagedTool) throws -> URL {
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: toolsDirectory, withIntermediateDirectories: true)
@@ -487,7 +526,7 @@ public final class ManagedToolService: ObservableObject {
         return trusted
     }
 
-    /// URLSession downloads carry no quarantine flag, but files extracted from a pkg may, so clear it to be safe.
+    /// Clear a quarantine flag should the download source add one.
     static func clearQuarantine(_ url: URL) {
         url.withUnsafeFileSystemRepresentation { path in
             guard let path else { return }
@@ -540,13 +579,13 @@ public final class ManagedToolService: ObservableObject {
                         .compactMap { String(data: $0, encoding: .utf8)?
                             .trimmingCharacters(in: .whitespacesAndNewlines) }
                         .first { !$0.isEmpty }
-                    return .failure(.extractionFailed(
+                    return .failure(.notExecutable(
                         message ?? "\(executable.lastPathComponent) 退出码 \(process.terminationStatus)"
                     ))
                 }
                 return .success(String(data: data, encoding: .utf8) ?? "")
             } catch {
-                return .failure(.extractionFailed(error.localizedDescription))
+                return .failure(.notExecutable(error.localizedDescription))
             }
         }.value
     }

@@ -4,7 +4,7 @@
 <!--
   Zisla — Developer ID notarization entitlements.
 
-  This file is intended for the Developer ID + notarization + Sparkle signed-update
+  This file is intended for the Developer ID + notarization
   path, NOT for Mac App Store submission. The app loads the private MediaRemote
   framework for Now Playing metadata; private frameworks are incompatible with the
   strict App Sandbox, so MAS submission is not supported. See README "系统限制".
@@ -17,8 +17,8 @@
 -->
 <dict>
   <!-- Hardened runtime requires library validation disabled because the app
-       dlopens MediaRemote.framework (private, not signed by Apple) and loads
-       Sparkle.framework. Without this, dyld rejects the private framework. -->
+       dlopens MediaRemote.framework (private, not signed by Apple). Without this,
+       dyld rejects the private framework. -->
   <key>com.apple.security.cs.disable-library-validation</key>
   <true/>
 
@@ -26,8 +26,8 @@
   <key>com.apple.security.automation.apple-events</key>
   <true/>
 
-  <!-- Outbound network: Open-Meteo weather, GitHub Releases API, Bilibili
-       fallback download, Sparkle appcast + update download. -->
+  <!-- Outbound network: Open-Meteo weather, GitHub/Gitee Releases API, Bilibili
+       fallback download, and update package download. -->
   <key>com.apple.security.network.client</key>
   <true/>
 

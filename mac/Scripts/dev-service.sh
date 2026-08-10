@@ -20,20 +20,6 @@ function fail() {
   exit 1
 }
 
-function load_sparkle_public_key() {
-  local sparkle_public_key
-
-  [[ -n "${SPARKLE_PUBLIC_KEY:-}" ]] && return
-  sparkle_public_key="$(
-    security find-generic-password -s 'https://sparkle-project.org' -a 'dev.wzz.zisla' 2>&1 \
-      | sed -nE 's/.*\\012\\012([A-Za-z0-9+\\/=]+)".*/\1/p' \
-      | head -n 1 \
-      || true
-  )"
-  [[ -n "$sparkle_public_key" ]] || fail "未在登录钥匙串中找到 Sparkle 公钥"
-  export SPARKLE_PUBLIC_KEY="$sparkle_public_key"
-}
-
 function matching_pids() {
   local pid
   local process_command
@@ -134,7 +120,6 @@ function start_service() {
   local pid
 
   stop_service
-  load_sparkle_public_key
   "$ROOT/Scripts/build-app.sh"
   [[ -x "$APP_BINARY" ]] || fail "构建未生成 zisla.app 可执行文件"
 

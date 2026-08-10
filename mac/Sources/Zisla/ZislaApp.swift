@@ -39,7 +39,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var cancellables: Set<AnyCancellable> = []
     private var effectiveAppearanceObservation: NSKeyValueObservation?
     private var currentApplicationIconImage: NSImage?
-    private let updateController = UpdateController.shared
     private var expandedSizeUpdateTask: Task<Void, Never>?
     /// Last panel size actually applied to the coordinator; basis for the two-phase
     /// (union → target) resize that keeps the SwiftUI surface spring unclipped.
@@ -56,11 +55,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.setActivationPolicy(.accessory)
         WindowPlacement.installTransientWindowPromotion()
         let model = AppModel.shared
-        updateController.start(
-            automaticallyChecks: model.settingsStore.settings.updateChecksEnabled,
-            automaticallyDownloads: model.settingsStore.settings.automaticUpdatesEnabled,
-            automaticChannel: FeatureSettingsStore.bundledDefaultUpdateChannel
-        )
         model.start()
         configureApplicationIconUpdates(model: model)
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
@@ -124,7 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             persistentPanelFrameProvider: { layout in
                 CollapsedPetLayout.frame(
                     for: layout,
-                    compactBarFrame: Self.collapsedPetCompactBarFrame(
+                    compactBarFrame: SideNoticeLayoutEngine().compactBarFrame(
                         for: layout,
                         notices: model.notices.left + model.notices.right,
                         settings: model.settingsStore.settings
@@ -302,11 +296,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .sink { [weak self] settings in
                 Task { @MainActor [weak self] in
                     self?.noticePresenter?.setDisplayIDs(settings.activityNoticeDisplayIDs)
-                    self?.updateController.configure(
-                        automaticallyChecks: settings.updateChecksEnabled,
-                        automaticallyDownloads: settings.automaticUpdatesEnabled,
-                        automaticChannel: FeatureSettingsStore.bundledDefaultUpdateChannel
-                    )
                     self?.syncAppStatusItem()
                     self?.syncMonitorStatusItems(force: true)
                 }
@@ -452,27 +441,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 for: layout.panelSize,
                 includesPet: includesPet
             )
-        )
-    }
-
-    private static func collapsedPetCompactBarFrame(
-        for layout: ScreenOverlayLayout,
-        notices: [IslandNotice],
-        settings: FeatureSettings
-    ) -> CGRect? {
-        let presentation = SideNoticeLayoutEngine().presentation(for: notices)
-        let extendsForFocusCountdown = notices.contains {
-            $0.id.hasPrefix("focus-countdown-") || $0.id.hasPrefix("focus-transition")
-        }
-        guard presentation.hasCompactContent || extendsForFocusCountdown else { return nil }
-        let expandsForDetailedMedia = settings.mediaCompactStyle == .detailed
-            && notices.contains { $0.id.hasPrefix("media-active-") }
-        let expandsForDetailedMail = settings.mailCompactStyle == .detailed
-            && notices.contains { $0.id.hasPrefix("mail-notification-") }
-        return SideNoticeLayoutEngine().compactBarFrame(
-            for: layout,
-            extendsForFocusCountdown: extendsForFocusCountdown,
-            expandsForDetailedMedia: expandsForDetailedMedia || expandsForDetailedMail
         )
     }
 
