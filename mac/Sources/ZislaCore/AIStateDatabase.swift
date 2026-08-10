@@ -6,11 +6,13 @@ private let aiSQLiteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.se
 final class AIStateDatabase {
     let url: URL
     private let maximumUsageSamples: Int
+    private let legacyDetectedUsageCursor: Date?
     private var connection: OpaquePointer?
 
     init(url: URL, maximumUsageSamples: Int) throws {
         self.url = url
         self.maximumUsageSamples = max(1, maximumUsageSamples)
+        legacyDetectedUsageCursor = Self.latestModificationDate(for: url)
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -62,10 +64,9 @@ final class AIStateDatabase {
                 ON usage_samples(timestamp)
                 """)
             try execute("""
-                CREATE TABLE IF NOT EXISTS detected_usage_totals (
-                    timestamp REAL PRIMARY KEY,
-                    input_tokens INTEGER NOT NULL,
-                    output_tokens INTEGER NOT NULL
+                CREATE TABLE IF NOT EXISTS detected_usage_cursor (
+                    id INTEGER PRIMARY KEY CHECK(id = 1),
+                    timestamp REAL NOT NULL
                 )
                 """)
             try execute("""
@@ -75,6 +76,7 @@ final class AIStateDatabase {
                 )
             """)
             try migrateUsageToDailyTotalsIfNeeded()
+            try migrateDetectedUsageCursorIfNeeded()
         } catch {
             close()
             throw error
@@ -196,19 +198,24 @@ final class AIStateDatabase {
 
         let samples = try loadUsage()
         let dailyTotals = AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
-        let detectedTotals = AIUsageAnalytics.dailyUsageSamples(
-            samples: samples.filter(AIUsageAnalytics.isLegacyDetectedUsageSample),
-            calendar: .current
-        )
 
         try transaction {
             try execute("DELETE FROM usage_samples")
-            try execute("DELETE FROM detected_usage_totals")
             _ = try recordUsageDeltasInCurrentTransaction(dailyTotals)
-            for total in detectedTotals {
-                try replaceDetectedUsageTotal(total)
-            }
             try setUsageSchemaVersion(3)
+        }
+    }
+
+    private func migrateDetectedUsageCursorIfNeeded() throws {
+        guard try usageSchemaVersion() < 5 else { return }
+
+        try transaction {
+            if let legacyDetectedUsageCursor {
+                try replaceDetectedUsageCursor(legacyDetectedUsageCursor)
+            }
+            try execute("DROP TABLE IF EXISTS detected_usage_totals")
+            try execute("DROP TABLE IF EXISTS detected_usage_events")
+            try setUsageSchemaVersion(5)
         }
     }
 
@@ -271,56 +278,38 @@ final class AIStateDatabase {
     }
 
     private func recordDetectedUsageInCurrentTransaction(_ samples: [AIUsageSample]) throws -> Int {
-        var changed = 0
-        for sample in samples {
-            let previous = try detectedUsageTotal(at: sample.timestamp)
-            guard previous.inputTokens != sample.inputTokens
-                || previous.outputTokens != sample.outputTokens else {
-                continue
-            }
-            try replaceDetectedUsageTotal(sample)
-            let delta = AIUsageSample(
-                sourceID: sample.sourceID,
-                provider: sample.provider,
-                timestamp: sample.timestamp,
-                inputTokens: sample.inputTokens - previous.inputTokens,
-                outputTokens: sample.outputTokens - previous.outputTokens
-            )
-            changed += try recordUsageDeltasInCurrentTransaction([delta])
+        let cursor = try detectedUsageCursor()
+        let newSamples = samples.filter { sample in
+            guard let cursor else { return true }
+            return sample.timestamp > cursor
+        }
+        guard !newSamples.isEmpty else { return 0 }
+
+        let dailyDeltas = AIUsageAnalytics.dailyUsageSamples(
+            samples: newSamples.filter { $0.inputTokens != 0 || $0.outputTokens != 0 },
+            calendar: .current
+        )
+        let changed = try recordUsageDeltasInCurrentTransaction(dailyDeltas)
+        if let latestTimestamp = newSamples.map(\.timestamp).max() {
+            try replaceDetectedUsageCursor(latestTimestamp)
         }
         return changed
     }
 
-    private func detectedUsageTotal(at timestamp: Date) throws -> AIUsageSample {
+    private func detectedUsageCursor() throws -> Date? {
+        let statement = try prepare("SELECT timestamp FROM detected_usage_cursor WHERE id = 1 LIMIT 1")
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        return Date(timeIntervalSinceReferenceDate: sqlite3_column_double(statement, 0))
+    }
+
+    private func replaceDetectedUsageCursor(_ timestamp: Date) throws {
         let statement = try prepare("""
-            SELECT input_tokens, output_tokens
-            FROM detected_usage_totals WHERE timestamp = ? LIMIT 1
+            INSERT INTO detected_usage_cursor(id, timestamp) VALUES(1, ?)
+            ON CONFLICT(id) DO UPDATE SET timestamp = excluded.timestamp
             """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, timestamp.timeIntervalSinceReferenceDate))
-        guard sqlite3_step(statement) == SQLITE_ROW else {
-            return AIUsageSample(provider: .codex, timestamp: timestamp, inputTokens: 0, outputTokens: 0)
-        }
-        return AIUsageSample(
-            provider: .codex,
-            timestamp: timestamp,
-            inputTokens: Int(sqlite3_column_int64(statement, 0)),
-            outputTokens: Int(sqlite3_column_int64(statement, 1))
-        )
-    }
-
-    private func replaceDetectedUsageTotal(_ sample: AIUsageSample) throws {
-        let statement = try prepare("""
-            INSERT INTO detected_usage_totals(timestamp, input_tokens, output_tokens)
-            VALUES(?, ?, ?)
-            ON CONFLICT(timestamp) DO UPDATE SET
-                input_tokens = excluded.input_tokens,
-                output_tokens = excluded.output_tokens
-            """)
-        defer { sqlite3_finalize(statement) }
-        try check(sqlite3_bind_double(statement, 1, sample.timestamp.timeIntervalSinceReferenceDate))
-        try check(sqlite3_bind_int64(statement, 2, Int64(sample.inputTokens)))
-        try check(sqlite3_bind_int64(statement, 3, Int64(sample.outputTokens)))
         try stepDone(statement)
     }
 
@@ -515,6 +504,12 @@ final class AIStateDatabase {
         guard let connection else { return }
         sqlite3_close_v2(connection)
         self.connection = nil
+    }
+
+    private static func latestModificationDate(for url: URL) -> Date? {
+        [url, URL(fileURLWithPath: url.path + "-wal")].compactMap { candidate in
+            try? candidate.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        }.max()
     }
 
     private func sqliteMessage(_ database: OpaquePointer?, fallback: String) -> String {

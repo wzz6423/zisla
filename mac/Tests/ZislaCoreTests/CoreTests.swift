@@ -371,6 +371,41 @@ struct AIStateRepositoryTests {
     }
 
     @Test
+    func repositoryAppendsNewDetectedUsageAfterOlderSamplesAreNoLongerScanned() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let original = AIUsageSample(
+            sourceID: "detected-event-a",
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 100,
+            outputTokens: 20
+        )
+        let new = AIUsageSample(
+            sourceID: "detected-event-b",
+            provider: .codex,
+            timestamp: timestamp.addingTimeInterval(60),
+            inputTokens: 30,
+            outputTokens: 5
+        )
+
+        let firstRepository = AIStateRepository(directoryURL: directory)
+        #expect(try firstRepository.recordDetectedUsage([original]) == 1)
+
+        let recreatedRepository = AIStateRepository(directoryURL: directory)
+        #expect(try recreatedRepository.recordDetectedUsage([new]) == 1)
+
+        let expected = AIUsageAnalytics.dailyUsageSamples(
+            samples: [original, new],
+            calendar: .current
+        )
+        #expect(try recreatedRepository.load().usageSamples == expected)
+        #expect(try recreatedRepository.recordDetectedUsage([new]) == 0)
+        #expect(try recreatedRepository.load().usageSamples == expected)
+    }
+
+    @Test
     func repositoryCompactsExistingUsageHistoryWhenItsLimitIsLowered() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -446,7 +481,7 @@ struct AIStateRepositoryTests {
     }
 
     @Test
-    func repositoryAdjustsDetectedDailyTotalWithoutDroppingManualUsage() throws {
+    func repositoryDoesNotReduceDetectedDailyTotalWhenRescanFindsLessUsage() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let repository = AIStateRepository(directoryURL: directory)
@@ -470,13 +505,52 @@ struct AIStateRepositoryTests {
             inputTokens: 10,
             outputTokens: 2
         ))
-        try repository.recordDetectedUsage([originalDetected])
-        try repository.recordDetectedUsage([correctedDetected])
+        #expect(try repository.recordDetectedUsage([originalDetected]) == 1)
+        #expect(try repository.recordDetectedUsage([correctedDetected]) == 0)
 
         let stored = try repository.load().usageSamples
 
         #expect(stored.count == 1)
-        #expect(stored.first?.totalTokens == 112)
+        #expect(stored.first?.totalTokens == 132)
+    }
+
+    @Test
+    func repositoryMigratesLegacyDailyTotalToTimestampCursor() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        _ = try repository.load()
+        let cutoff = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let legacyDetected = AIUsageSample(
+            provider: .codex,
+            timestamp: cutoff,
+            inputTokens: 20,
+            outputTokens: 5
+        )
+        let legacyTotal = AIUsageAnalytics.dailyUsageSamples(
+            samples: [legacyDetected],
+            calendar: .current
+        )
+        for sample in legacyTotal {
+            try insertUsageSample(sample, into: repository.databaseURL)
+        }
+        try createLegacyDetectedUsageTotals(at: repository.databaseURL)
+        try setSQLiteUserVersion(at: repository.databaseURL, to: 3)
+        try setSQLiteModificationDate(cutoff, at: repository.databaseURL)
+
+        let new = AIUsageSample(
+            provider: .codex,
+            timestamp: cutoff.addingTimeInterval(60),
+            inputTokens: 30,
+            outputTokens: 5
+        )
+
+        #expect(try repository.recordDetectedUsage([legacyDetected, new]) == 1)
+        #expect(try repository.load().usageSamples == AIUsageAnalytics.dailyUsageSamples(
+            samples: [legacyDetected, new],
+            calendar: .current
+        ))
+        #expect(try repository.recordDetectedUsage([new]) == 0)
     }
 
     @Test
@@ -1502,8 +1576,29 @@ private func setSQLiteUserVersion(at url: URL, to version: Int) throws {
     try executeSQLite(at: url, sql: "PRAGMA user_version = \(version)")
 }
 
+private func setSQLiteModificationDate(_ date: Date, at url: URL) throws {
+    let fileManager = FileManager.default
+    for candidate in [url, URL(fileURLWithPath: url.path + "-wal")]
+    where fileManager.fileExists(atPath: candidate.path) {
+        try fileManager.setAttributes([.modificationDate: date], ofItemAtPath: candidate.path)
+    }
+}
+
 private func insertLegacyManualUsage(_ sample: AIUsageSample, into url: URL) throws {
     try insertUsageSample(sample, into: url)
+}
+
+private func createLegacyDetectedUsageTotals(at url: URL) throws {
+    try executeSQLite(
+        at: url,
+        sql: """
+        CREATE TABLE detected_usage_totals (
+            timestamp REAL PRIMARY KEY,
+            input_tokens INTEGER NOT NULL,
+            output_tokens INTEGER NOT NULL
+        )
+        """
+    )
 }
 
 private func insertUsageSample(_ sample: AIUsageSample, into url: URL) throws {

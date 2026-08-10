@@ -10,6 +10,11 @@ struct AIStateMonitorActivityDetectorTests {
     }
 
     @Test @MainActor
+    func defaultUsageRefreshChecksEveryThreeMinutes() {
+        #expect(AIStateMonitor.defaultUsageRefreshInterval == 3 * 60)
+    }
+
+    @Test @MainActor
     func defaultCodexDetectorScansAllRollouts() throws {
         let detector = try #require(AIStateMonitor.defaultActivityDetectors()
             .compactMap { $0 as? CodexSessionActivityDetector }

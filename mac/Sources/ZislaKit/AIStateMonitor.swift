@@ -48,7 +48,7 @@ public final class AIStateMonitor: ObservableObject {
 
     public static let defaultActiveTaskTTL: TimeInterval = 30 * 60
     public static let defaultDetectorRefreshInterval: TimeInterval = 30
-    public static let defaultUsageRefreshInterval: TimeInterval = 5 * 60
+    public static let defaultUsageRefreshInterval: TimeInterval = 3 * 60
 
     @Published public private(set) var state: AIState = .empty
     @Published public private(set) var errorDescription: String?
@@ -401,7 +401,6 @@ public final class AIStateMonitor: ObservableObject {
                     }
                     automaticUsage.append(contentsOf: samples)
                 }
-                automaticUsage = AIUsageAnalytics.dailyAutomaticUsageSamples(samples: automaticUsage)
             }
             let tasks = mergedTasks(
                 persistedTasks,
