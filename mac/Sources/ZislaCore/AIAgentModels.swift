@@ -1453,6 +1453,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
     public var channelProbes: [AgentChannelProbe]
     public var channelModelCatalogs: [AgentChannelModelCatalog]
     public var cliStatuses: [AgentCLIStatus]
+    public var cliAutoUpdateEnabled: Bool
     public var skills: [AgentSkill]
     public var skillSyncConfiguration: AgentSkillSyncConfiguration
     public var applicationEnhancements: AgentApplicationEnhancements
@@ -1476,6 +1477,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         channelProbes: [AgentChannelProbe] = [],
         channelModelCatalogs: [AgentChannelModelCatalog] = [],
         cliStatuses: [AgentCLIStatus] = [],
+        cliAutoUpdateEnabled: Bool = false,
         skills: [AgentSkill] = [],
         skillSyncConfiguration: AgentSkillSyncConfiguration = AgentSkillSyncConfiguration(),
         applicationEnhancements: AgentApplicationEnhancements = AgentApplicationEnhancements(),
@@ -1496,6 +1498,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         self.channelProbes = channelProbes
         self.channelModelCatalogs = channelModelCatalogs
         self.cliStatuses = cliStatuses
+        self.cliAutoUpdateEnabled = cliAutoUpdateEnabled
         self.skills = skills
         self.skillSyncConfiguration = skillSyncConfiguration
         self.applicationEnhancements = applicationEnhancements
@@ -1518,6 +1521,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         case channelProbes
         case channelModelCatalogs
         case cliStatuses
+        case cliAutoUpdateEnabled
         case skills
         case skillSyncConfiguration
         case applicationEnhancements
@@ -1541,6 +1545,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         channelProbes = try container.decodeIfPresent([AgentChannelProbe].self, forKey: .channelProbes) ?? []
         channelModelCatalogs = try container.decodeIfPresent([AgentChannelModelCatalog].self, forKey: .channelModelCatalogs) ?? []
         cliStatuses = try container.decodeIfPresent([AgentCLIStatus].self, forKey: .cliStatuses) ?? []
+        cliAutoUpdateEnabled = try container.decodeIfPresent(Bool.self, forKey: .cliAutoUpdateEnabled) ?? false
         skills = try container.decodeIfPresent([AgentSkill].self, forKey: .skills) ?? []
         skillSyncConfiguration = try container.decodeIfPresent(AgentSkillSyncConfiguration.self, forKey: .skillSyncConfiguration) ?? AgentSkillSyncConfiguration()
         applicationEnhancements = try container.decodeIfPresent(AgentApplicationEnhancements.self, forKey: .applicationEnhancements) ?? AgentApplicationEnhancements()

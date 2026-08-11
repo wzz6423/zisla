@@ -1753,6 +1753,35 @@ struct AIAgentModuleView: View {
                     .disabled(agent.isRunningCLICommands || uninstallCommands.isEmpty)
                     .help("一键卸载所有受支持的 CLI")
                 }
+
+                HStack(alignment: .center, spacing: 9) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 28, height: 28)
+                        .background(Color.fillControl)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("自动更新 CLI")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    Toggle("", isOn: Binding(
+                        get: { agent.store.state.cliAutoUpdateEnabled },
+                        set: { agent.setCLIAutoUpdateEnabled($0) }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                }
+                .padding(8)
+                .background(Color.primary.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
                 if let progress = agent.cliCommandProgress {
                     cliCommandProgressView(progress)
                 }

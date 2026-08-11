@@ -10,6 +10,23 @@ struct AIAgentModelsTests {
         #expect(state.skillSyncConfiguration == AgentSkillSyncConfiguration())
         #expect(state.skillSyncConfiguration.mode == .symbolicLink)
         #expect(state.skillSyncConfiguration.enabledDestinations.isEmpty)
+        #expect(!state.cliAutoUpdateEnabled)
+    }
+
+    @Test
+    func cliAutoUpdateSettingDefaultsOffForLegacyStateAndRoundTrips() throws {
+        let legacy = try JSONDecoder().decode(
+            AIAgentState.self,
+            from: Data(#"{"accounts":[],"channels":[],"cliStatuses":[]}"#.utf8)
+        )
+        let enabled = AIAgentState(cliAutoUpdateEnabled: true)
+        let roundTripped = try JSONDecoder().decode(
+            AIAgentState.self,
+            from: JSONEncoder().encode(enabled)
+        )
+
+        #expect(!legacy.cliAutoUpdateEnabled)
+        #expect(roundTripped.cliAutoUpdateEnabled)
     }
 
     @Test

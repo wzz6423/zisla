@@ -86,6 +86,7 @@ public final class AIAgentWorkspace: ObservableObject {
     private var relayCursors: [UUID: Int] = [:]
     private var apiRouteRouter = AgentRouteRouter()
     private var automationTask: Task<Void, Never>?
+    private var cliAutoUpdateTask: Task<Void, Never>?
     private var cliCommandTask: Task<Void, Never>?
     private var automationMonitoringRequested = false
     private var skillRefreshGeneration = 0
@@ -132,10 +133,12 @@ public final class AIAgentWorkspace: ObservableObject {
             }
             .store(in: &cancellables)
         refreshMessageConnections()
+        updateCLIAutoUpdateLoop(enabled: store.state.cliAutoUpdateEnabled)
     }
 
     deinit {
         automationTask?.cancel()
+        cliAutoUpdateTask?.cancel()
         cliCommandTask?.cancel()
     }
 
@@ -260,6 +263,19 @@ public final class AIAgentWorkspace: ObservableObject {
         cliUpdates = updates.sorted {
             AgentCLIKind.allCases.firstIndex(of: $0.kind)! < AgentCLIKind.allCases.firstIndex(of: $1.kind)!
         }
+        startAutomaticCLIUpdateIfNeeded(for: cliUpdates)
+    }
+
+    private func startAutomaticCLIUpdateIfNeeded(for updates: [AIAgentCLIUpdate]) {
+        guard store.state.cliAutoUpdateEnabled,
+              !Task.isCancelled,
+              !isRunningCLICommands,
+              cliCommandTask == nil else { return }
+        let kinds = updates.map(\.kind)
+        let commands = commandsForCLIInstallation(kinds, update: true)
+        guard !commands.isEmpty else { return }
+        let names = kinds.map(\.displayName).joined(separator: "、")
+        startCLICommands(commands, title: "正在自动更新 \(names)", kinds: kinds)
     }
 
     public func refreshSkills() async {
@@ -644,6 +660,30 @@ public final class AIAgentWorkspace: ObservableObject {
         var enhancements = store.state.applicationEnhancements
         enhancements.skipsClaudeCodeOnboarding = enabled
         reconcileClaudeCodeVSCodeSettings(enhancements: enhancements)
+    }
+
+    public func setCLIAutoUpdateEnabled(_ enabled: Bool) {
+        store.setCLIAutoUpdateEnabled(enabled)
+        updateCLIAutoUpdateLoop(enabled: enabled)
+    }
+
+    private func updateCLIAutoUpdateLoop(enabled: Bool) {
+        guard enabled else {
+            cliAutoUpdateTask?.cancel()
+            cliAutoUpdateTask = nil
+            return
+        }
+        guard cliAutoUpdateTask == nil else { return }
+        cliAutoUpdateTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshCLIs()
+                do {
+                    try await Task.sleep(for: .seconds(600))
+                } catch {
+                    return
+                }
+            }
+        }
     }
 
     public func refreshMessageConnections() {

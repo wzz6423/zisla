@@ -61,6 +61,48 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func cliAutoUpdateRequiresExplicitOptIn() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-auto-update-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let toolDirectory = directory.appendingPathComponent("toolchain/bin", isDirectory: true)
+        let updateMarker = directory.appendingPathComponent("updated")
+        let codex = toolDirectory.appendingPathComponent("codex")
+        let npm = toolDirectory.appendingPathComponent("npm")
+        try writeExecutable(at: codex, contents: "#!/bin/sh\nprintf '1.0.0\\n'\n")
+        try writeExecutable(at: npm, contents: "#!/bin/sh\ntouch '\(updateMarker.path)'\n")
+        let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"))
+        let workspace = AIAgentWorkspace(
+            store: store,
+            cliService: AIAgentCLIService(
+                environment: ["PATH": "\(toolDirectory.path):/usr/bin:/bin"],
+                homeDirectory: directory
+            ),
+            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { kind in
+                kind == .codex ? "1.1.0" : nil
+            })
+        )
+
+        await workspace.refreshCLIs()
+
+        #expect(!store.state.cliAutoUpdateEnabled)
+        #expect(!FileManager.default.fileExists(atPath: updateMarker.path))
+        #expect(workspace.cliUpdates == [
+            AIAgentCLIUpdate(kind: .codex, installedVersion: "1.0.0", latestVersion: "1.1.0"),
+        ])
+
+        workspace.setCLIAutoUpdateEnabled(true)
+        await waitForFile(at: updateMarker)
+        await waitForCLICommandRunToFinish(workspace)
+
+        #expect(store.state.cliAutoUpdateEnabled)
+        #expect(FileManager.default.fileExists(atPath: updateMarker.path))
+
+        workspace.setCLIAutoUpdateEnabled(false)
+        #expect(!store.state.cliAutoUpdateEnabled)
+    }
+
+    @Test
     func cliCommandProgressPersistsOutsideTheSettingsView() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-cli-command-progress-\(UUID().uuidString)", isDirectory: true)
@@ -685,6 +727,12 @@ struct AIAgentServicesTests {
 
     private func waitForCLICommandRunToFinish(_ workspace: AIAgentWorkspace) async {
         for _ in 0..<100 where workspace.isRunningCLICommands {
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+    }
+
+    private func waitForFile(at url: URL) async {
+        for _ in 0..<100 where !FileManager.default.fileExists(atPath: url.path) {
             try? await Task.sleep(for: .milliseconds(25))
         }
     }

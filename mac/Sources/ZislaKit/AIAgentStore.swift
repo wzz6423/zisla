@@ -322,6 +322,10 @@ public final class AIAgentStore: ObservableObject {
         state.cliStatuses = statuses
     }
 
+    public func setCLIAutoUpdateEnabled(_ enabled: Bool) {
+        state.cliAutoUpdateEnabled = enabled
+    }
+
     public func replaceSkills(_ skills: [AgentSkill]) {
         state.skills = skills
     }
