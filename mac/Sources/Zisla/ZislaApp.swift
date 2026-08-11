@@ -133,6 +133,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         coordinator.onDraggingChanged = { dragging in
             model.isExternalDragging = dragging
+            if dragging, model.settingsStore.settings.fileShelfEnabled {
+                model.selectModule(.shelf)
+            }
         }
         coordinator.onCollapsedSizeChanged = { size in
             model.collapsedIslandSize = size
