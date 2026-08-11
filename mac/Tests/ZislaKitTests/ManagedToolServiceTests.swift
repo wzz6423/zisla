@@ -58,6 +58,16 @@ struct ManagedToolServiceTests {
     }
 
     @Test
+    func kekaUsesTheHomebrewCaskAndExpectedExecutablePaths() {
+        #expect(ManagedTool.keka.installationSource == .homebrewCask(name: "keka"))
+        #expect(ManagedTool.keka.executableName == "keka")
+        #expect(ManagedTool.keka.usesNativeApplicationVersion)
+        #expect(ManagedToolService.externalPaths(for: .keka).contains(
+            "/Applications/Keka.app/Contents/MacOS/Keka"
+        ))
+    }
+
+    @Test
     func parsesTheStableVersionFromHomebrewCaskMetadata() throws {
         let data = Data("""
         {"casks":[{"token":"libreoffice","version":"26.2.5.2"}]}

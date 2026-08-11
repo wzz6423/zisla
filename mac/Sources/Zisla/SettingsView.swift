@@ -1461,7 +1461,7 @@ struct SettingsView: View {
     }
 
     private var utilityRecommendationTools: [ManagedTool] {
-        [.ytDLP, .libreOffice]
+        [.ytDLP, .libreOffice, .keka]
     }
 
     private var desktopRecommendationTools: [ManagedTool] {
@@ -1549,6 +1549,7 @@ struct SettingsView: View {
         case .libreOffice: "doc.richtext"
         case .kaku: "terminal.fill"
         case .markdownPreview: "doc.text.magnifyingglass"
+        case .keka: "archivebox.fill"
         case .kero: "terminal"
         }
     }

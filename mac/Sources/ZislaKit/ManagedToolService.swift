@@ -96,6 +96,12 @@ public final class ManagedToolService: ObservableObject {
                 "/Applications/Markdown Preview.app/Contents/Resources/bin/markdown-preview",
             ]
         }
+        if tool == .keka {
+            return [
+                "/opt/homebrew/bin/keka",
+                "/Applications/Keka.app/Contents/MacOS/Keka",
+            ]
+        }
 
         // 命令行工具的通用路径
         let home = FileManager.default.homeDirectoryForCurrentUser.path

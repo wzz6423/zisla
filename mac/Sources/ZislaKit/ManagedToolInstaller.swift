@@ -22,6 +22,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     case kaku
     case kero
     case markdownPreview
+    case keka
 
     public var id: String { rawValue }
 
@@ -41,6 +42,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kaku: "Kaku"
         case .kero: "Kero"
         case .markdownPreview: "Markdown Preview"
+        case .keka: "Keka"
         }
     }
 
@@ -60,6 +62,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kaku: "面向 AI 编码的终端"
         case .kero: "终端工作区"
         case .markdownPreview: "Markdown 预览"
+        case .keka: "压缩与解压"
         }
     }
 
@@ -80,6 +83,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kaku: "kaku"
         case .kero: "kero"
         case .markdownPreview: "mdp"
+        case .keka: "keka"
         }
     }
 
@@ -99,12 +103,13 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kaku: .homebrewCask(name: "kakuku")
         case .kero: .homebrewCask(name: "kero")
         case .markdownPreview: .homebrewCask(name: "markdown-preview")
+        case .keka: .homebrewCask(name: "keka")
         }
     }
 
     var usesNativeApplicationVersion: Bool {
         switch self {
-        case .kaku, .kero, .markdownPreview: true
+        case .kaku, .kero, .markdownPreview, .keka: true
         default: false
         }
     }
@@ -158,6 +163,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kaku: ["--version"]
         case .kero: ["--version"]
         case .markdownPreview: ["--version"]
+        case .keka: ["--version"]
         }
     }
 
@@ -203,7 +209,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .ytDLP:
             return name == "yt-dlp_macos"
-        case .libreOffice, .fzf, .ripgrep, .lazygit, .neovim, .yazi, .starship, .tldr, .jq, .tree, .kaku, .kero, .markdownPreview:
+        case .libreOffice, .fzf, .ripgrep, .lazygit, .neovim, .yazi, .starship, .tldr, .jq, .tree, .kaku, .kero, .markdownPreview, .keka:
             return false
         }
     }
