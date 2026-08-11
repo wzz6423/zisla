@@ -137,6 +137,7 @@ struct ShelfModuleView: View {
                                     )
                                 }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 7)
                         }
