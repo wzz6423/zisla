@@ -247,11 +247,11 @@ export const repositoryLinks = {
 };
 
 export const latestRelease = {
-  version: 'v0.1.3',
+  version: 'v0.1.2',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/release/v0.1.3',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-v0.1.3-macOS-universal.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-v0.1.3-macOS-universal.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-v0.1.3-macOS-universal.zip.sha256',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/release/v0.1.2',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.2/zisla-v0.1.2-macOS-universal.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.2/zisla-v0.1.2-macOS-universal.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.2/zisla-v0.1.2-macOS-universal.zip.sha256',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/preview',
 };

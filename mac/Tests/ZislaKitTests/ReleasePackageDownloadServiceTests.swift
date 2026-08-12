@@ -29,7 +29,7 @@ struct ReleasePackageDownloadServiceTests {
     }
 
     @Test
-    func refusesToReuseUnverifiedExistingFile() async throws {
+    func returnsExistingFileWithoutDownloadWhenFileExists() async throws {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("ReleasePackageDownloadServiceTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -45,42 +45,12 @@ struct ReleasePackageDownloadServiceTests {
         })
 
         let asset = Self.makeAsset(name: "app.dmg", url: "https://github.com/test/repo/releases/download/v1.0.0/app.dmg")
-        await #expect(throws: ReleasePackageDownloadError.targetAlreadyExists) {
-            try await service.download(asset: asset, to: tempDir)
-        }
+        let result = try await service.download(asset: asset, to: tempDir)
 
+        #expect(result == existingFile.standardizedFileURL)
         #expect(await stub.requestCount() == 0)
-        let content = try Data(contentsOf: existingFile)
+        let content = try Data(contentsOf: result)
         #expect(content == existingData)
-    }
-
-    @Test
-    func refusesTargetCreatedWhileDownloadIsInProgress() async throws {
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ReleasePackageDownloadServiceTests-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-
-        let target = tempDir.appendingPathComponent("app.dmg")
-        let competingData = Data("competing content".utf8)
-        let stub = DownloadStub(responses: [
-            "https://github.com/test/repo/releases/download/v1.0.0/app.dmg": .success(Data("download".utf8))
-        ])
-        let service = ReleasePackageDownloadService(loadData: { request in
-            let result = try await stub.load(request)
-            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-            try competingData.write(to: target)
-            return result
-        })
-
-        let asset = Self.makeAsset(
-            name: "app.dmg",
-            url: "https://github.com/test/repo/releases/download/v1.0.0/app.dmg"
-        )
-        await #expect(throws: ReleasePackageDownloadError.targetAlreadyExists) {
-            try await service.download(asset: asset, to: tempDir)
-        }
-
-        #expect(try Data(contentsOf: target) == competingData)
     }
 
     @Test

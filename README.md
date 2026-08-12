@@ -102,7 +102,6 @@ zisla 仅在启用并首次使用相关功能时请求系统权限。你可以�
 | 文件与下载目录 | 使用用户选择目录的安全书签；文件中转不复制原文件。 |
 | 剪贴板 | 链接检测默认关闭，不会自动联网、下载、清空或写回剪贴板。 |
 | 网络 | 天气访问 Open-Meteo、WeatherKit 及相应公开预警服务；更新检查访问 GitHub/Gitee Release API；下载器仅在你发起下载后访问对应站点。 |
-| AI CLI 自动更新 | 用户显式开启后，会访问 npm Registry，并调用 Homebrew 或 Grok 的更新检查；发现更新后通过原安装器（npm、pnpm、yarn、bun、Homebrew）或 Grok 自更新，修改已安装的 Claude Code、Codex、Gemini CLI、OpenCode、Grok CLI。 |
 
 媒体模块通过 MediaRemote 获取系统媒体元数据，并用 Core Audio 判断实际音频输出；不会采集音频内容。更多边界与限制见 [macOS 开发指南的“权限和隐私”章节](mac/README.md#权限和隐私)。
 

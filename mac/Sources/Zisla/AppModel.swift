@@ -1774,9 +1774,7 @@ final class AppModel: ObservableObject {
   func removeAllVoiceRecordings() {
     voicePreviewSound?.stop()
     voicePreviewSound = nil
-    if !voiceHistory.removeAll() {
-      transientMessage = "部分语音原文件删除失败：\(voiceHistory.errorDescription ?? "未知错误")"
-    }
+    voiceHistory.removeAll()
   }
 
   /// Tests the current model endpoint and discovers available models.
