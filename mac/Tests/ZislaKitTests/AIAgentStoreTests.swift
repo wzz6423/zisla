@@ -540,8 +540,8 @@ struct AIAgentStoreTests {
             secretStore: StubSecretStore(),
             persistenceDelay: 0.05,
             persistenceWriter: { state, url in
-                writes.record(state)
                 try AIAgentStore.write(state, to: url)
+                writes.record(state)
             }
         )
 
