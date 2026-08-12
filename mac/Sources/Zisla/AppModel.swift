@@ -262,7 +262,7 @@ private final class SharingPickerDelegateProxy: NSObject,
 @MainActor
 final class AppModel: ObservableObject {
   private enum AIProcessingTarget {
-    case http(endpoint: AIEndpoint, model: String, apiKey: String?)
+    case http(endpoint: AIEndpoint, protocolKind: AgentChannelProtocol, model: String, apiKey: String?)
     case cliProfile(accountID: UUID, model: String)
   }
 
@@ -694,6 +694,7 @@ final class AppModel: ObservableObject {
   func stop() {
     settingsStore.flushPendingChanges()
     clipboardHistory.flushPendingChanges()
+    aiAgent.store.flushPendingChanges()
     weatherTask?.cancel()
     releaseTask?.cancel()
     releasePackageDownloadTask?.cancel()
@@ -1671,7 +1672,7 @@ final class AppModel: ObservableObject {
       }
       let model = configuration.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !model.isEmpty else { return nil }
-      return .http(endpoint: configuration.endpoint, model: model, apiKey: nil)
+      return .http(endpoint: configuration.endpoint, protocolKind: .openAICompatible, model: model, apiKey: nil)
     case .channel:
       guard let channel = aiAgent.store.channel(id: reference.id), channel.isEnabled,
             let route = voiceModelChannelRouter.nextRoute(
@@ -1683,9 +1684,9 @@ final class AppModel: ObservableObject {
       }
       switch account.credentialKind {
       case .apiKey:
-        guard channel.protocolKind == .openAICompatible else { return nil }
         return .http(
           endpoint: AIEndpoint(name: channel.name, baseURL: route.baseURL, kind: .openAICompatible),
+          protocolKind: channel.protocolKind,
           model: route.model,
           apiKey: try? aiAgent.store.secret(for: account)
         )
@@ -1702,9 +1703,10 @@ final class AppModel: ObservableObject {
     messages: [AIOutboundMessage]
   ) async throws -> String {
     switch target {
-    case let .http(endpoint, model, apiKey):
+    case let .http(endpoint, protocolKind, model, apiKey):
       return try await AIChatClient().complete(
         endpoint: endpoint,
+        protocolKind: protocolKind,
         model: model,
         systemPrompt: systemPrompt,
         messages: messages,
@@ -1772,7 +1774,9 @@ final class AppModel: ObservableObject {
   func removeAllVoiceRecordings() {
     voicePreviewSound?.stop()
     voicePreviewSound = nil
-    voiceHistory.removeAll()
+    if !voiceHistory.removeAll() {
+      transientMessage = "部分语音原文件删除失败：\(voiceHistory.errorDescription ?? "未知错误")"
+    }
   }
 
   /// Tests the current model endpoint and discovers available models.
@@ -1782,7 +1786,7 @@ final class AppModel: ObservableObject {
       discoveredModels = []
       return
     }
-    guard case let .http(endpoint, _, apiKey) = target else {
+    guard case let .http(endpoint, _, _, apiKey) = target else {
       voiceModelDiscoveryState = .failed("官方 CLI 档案不支持 API 模型发现")
       discoveredModels = []
       return

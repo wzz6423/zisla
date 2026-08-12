@@ -20,5 +20,5 @@ npm run build
 
 - 源码：https://github.com/wzz6423/zisla
 - Release：https://github.com/wzz6423/zisla/releases/latest
-- macOS DMG：https://github.com/wzz6423/zisla/releases/download/release/v0.1.2/zisla-v0.1.2-macOS-universal.dmg
-- macOS ZIP：https://github.com/wzz6423/zisla/releases/download/release/v0.1.2/zisla-v0.1.2-macOS-universal.zip
+- macOS DMG：https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-v0.1.3-macOS-universal.dmg
+- macOS ZIP：https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-v0.1.3-macOS-universal.zip

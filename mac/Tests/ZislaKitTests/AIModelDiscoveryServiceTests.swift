@@ -3,6 +3,7 @@ import Testing
 @testable import ZislaCore
 @testable import ZislaKit
 
+@Suite(.serialized)
 struct AIModelDiscoveryServiceTests {
     @Test
     func authorizationHeaderUsesNonEmptyTrimmedAPIKey() {
@@ -26,10 +27,43 @@ struct AIModelDiscoveryServiceTests {
         let request = try #require(DiscoveryStubURLProtocol.lastRequest)
         #expect(request.timeoutInterval == 30)
     }
+
+    @Test
+    func rejectsInsecureEndpointsAndRedactsHTTPResponseBody() async throws {
+        let service = AIModelDiscoveryService()
+        let impersonator = AIEndpoint(
+            name: "Remote",
+            baseURL: "http://127.evil.example/v1",
+            kind: .openAICompatible
+        )
+
+        await #expect(throws: AIModelDiscoveryError.self) {
+            try await service.models(for: impersonator, apiKey: "secret-api-key")
+        }
+
+        DiscoveryStubURLProtocol.reset()
+        DiscoveryStubURLProtocol.statusCode = 403
+        DiscoveryStubURLProtocol.nextResponseBody = #"{"error":"secret-provider-body"}"#
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DiscoveryStubURLProtocol.self]
+        let stubbed = AIModelDiscoveryService(session: URLSession(configuration: configuration))
+        do {
+            _ = try await stubbed.models(
+                for: AIEndpoint(name: "Remote", baseURL: "https://api.example/v1"),
+                apiKey: "secret-api-key"
+            )
+            Issue.record("HTTP 错误应抛出异常")
+        } catch {
+            #expect(error.localizedDescription == "读取模型目录失败（HTTP 403）")
+            #expect(!error.localizedDescription.contains("secret-provider-body"))
+            #expect(!error.localizedDescription.contains("secret-api-key"))
+        }
+    }
 }
 private final class DiscoveryStubURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var lastRequest: URLRequest?
     nonisolated(unsafe) static var nextResponseBody: String?
+    nonisolated(unsafe) static var statusCode = 200
 
     nonisolated static override func canInit(with request: URLRequest) -> Bool { true }
 
@@ -39,7 +73,7 @@ private final class DiscoveryStubURLProtocol: URLProtocol, @unchecked Sendable {
         Self.lastRequest = request
         let response = HTTPURLResponse(
             url: request.url!,
-            statusCode: 200,
+            statusCode: Self.statusCode,
             httpVersion: nil,
             headerFields: ["Content-Type": "application/json"]
         )!
@@ -54,5 +88,6 @@ private final class DiscoveryStubURLProtocol: URLProtocol, @unchecked Sendable {
     static func reset() {
         lastRequest = nil
         nextResponseBody = nil
+        statusCode = 200
     }
 }

@@ -523,7 +523,7 @@ public final class CodexSessionActivityDetector {
         case "function_call_output", "custom_tool_call_output":
             let output = payload["output"]
             failed = Self.outputIndicatesError(output)
-            failureReason = failed == true ? Self.extractFailureReason(from: output) : nil
+            failureReason = failed == true ? "工具执行失败" : nil
         default:
             failed = nil
             failureReason = nil
@@ -564,67 +564,6 @@ public final class CodexSessionActivityDetector {
             return outputIndicatesError(nested)
         }
         return false
-    }
-
-    private static func extractFailureReason(from value: Any?) -> String? {
-        guard let value, !(value is NSNull) else { return nil }
-        if let values = value as? [Any] {
-            for item in values {
-                if let reason = extractFailureReason(from: item) {
-                    return reason
-                }
-            }
-            return nil
-        }
-        if let object = value as? [String: Any] {
-            if let output = object["output"] as? String, !output.isEmpty {
-                if let nestedData = output.data(using: .utf8),
-                   let nested = try? JSONSerialization.jsonObject(with: nestedData),
-                   let nestedReason = extractFailureReason(from: nested) {
-                    return nestedReason
-                }
-                return normalizeFailureReason(output)
-            }
-            if let text = object["text"] as? String, !text.isEmpty {
-                if let nestedData = text.data(using: .utf8),
-                   let nested = try? JSONSerialization.jsonObject(with: nestedData),
-                   let nestedReason = extractFailureReason(from: nested) {
-                    return nestedReason
-                }
-                return normalizeFailureReason(text)
-            }
-            if let message = object["message"] as? String, !message.isEmpty {
-                return normalizeFailureReason(message)
-            }
-            for key in ["structuredContent", "result"] {
-                if let reason = extractFailureReason(from: object[key]) {
-                    return reason
-                }
-            }
-            return nil
-        }
-        if let text = value as? String {
-            if let nestedData = text.data(using: .utf8),
-               let nested = try? JSONSerialization.jsonObject(with: nestedData),
-               let reason = extractFailureReason(from: nested) {
-                return reason
-            }
-            return text.isEmpty ? nil : normalizeFailureReason(text)
-        }
-        return nil
-    }
-
-    private static func normalizeFailureReason(_ raw: String) -> String? {
-        let parts = raw.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
-            .filter { !$0.isEmpty }
-        let collapsed = parts.joined(separator: " ")
-        guard !collapsed.isEmpty else { return nil }
-        let maxLength = 200
-        guard collapsed.count > maxLength else {
-            return collapsed
-        }
-        let end = collapsed.index(collapsed.startIndex, offsetBy: maxLength)
-        return String(collapsed[..<end]) + "…"
     }
 
     private static func integerValue(_ value: Any?) -> Int? {

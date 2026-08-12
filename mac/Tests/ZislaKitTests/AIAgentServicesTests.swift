@@ -343,6 +343,36 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func apiFailuresDoNotExposeProviderResponseBody() async throws {
+        AIAgentURLProtocol.responseData = Data(#"{"error":"secret-provider-body"}"#.utf8)
+        AIAgentURLProtocol.statusCode = 500
+        defer {
+            AIAgentURLProtocol.responseData = Data()
+            AIAgentURLProtocol.statusCode = 200
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AIAgentURLProtocol.self]
+        let account = AgentAccount(
+            name: "测试账号",
+            provider: "New API",
+            balanceProbe: AgentBalanceProbe(kind: .newAPIQuota)
+        )
+
+        do {
+            _ = try await AIAgentBalanceService(session: URLSession(configuration: configuration)).check(
+                account: account,
+                baseURL: "https://gateway.example/v1",
+                apiKey: "secret-api-key"
+            )
+            Issue.record("HTTP 错误应抛出异常")
+        } catch {
+            #expect(error.localizedDescription == "渠道请求失败（HTTP 500）")
+            #expect(!error.localizedDescription.contains("secret-provider-body"))
+            #expect(!error.localizedDescription.contains("secret-api-key"))
+        }
+    }
+
+    @Test
     func failedModelRefreshKeepsExistingCatalog() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-ai-agent-catalog-\(UUID().uuidString)", isDirectory: true)
@@ -473,6 +503,48 @@ struct AIAgentServicesTests {
         #expect(prompt.contains("模型：gpt-5.6"))
         #expect(prompt.contains("思考深度：极高"))
         #expect(prompt.components(separatedBy: "[调用 Skills]").count == 2)
+    }
+
+    @Test
+    func outboundMessagesRetainRichReferencesAndBoundHistory() throws {
+        let attachment = AgentChatAttachment(
+            fileName: "report.txt",
+            mimeType: "text/plain",
+            byteCount: 12,
+            storagePath: "report.txt",
+            kind: .file
+        )
+        let reference = AgentChatContextReference(
+            threadID: UUID(),
+            title: "关联会话",
+            messages: [AgentChatContextMessage(role: .assistant, content: "上下文结论")]
+        )
+        var messages = (0..<39).map { index in
+            AgentChatMessage(role: .user, content: "历史消息 \(index)")
+        }
+        messages.append(AgentChatMessage(
+            role: .user,
+            content: "检查发布风险",
+            attachments: [attachment],
+            contextReferences: [reference],
+            appReferences: [AgentChatAppReference(
+                name: "Xcode",
+                bundleIdentifier: "com.apple.dt.Xcode",
+                processIdentifier: 84
+            )],
+            skillReferences: [AgentChatSkillReference(name: "code-review", path: "/skills/code-review")]
+        ))
+
+        let outbound = AIAgentCLIService().outboundMessages(messages)
+
+        #expect(outbound.count == 32)
+        #expect(outbound.first?.content.contains("历史消息 8") == true)
+        let latest = try #require(outbound.last?.content)
+        #expect(latest.contains("report.txt"))
+        #expect(latest.contains("关联会话"))
+        #expect(latest.contains("上下文结论"))
+        #expect(latest.contains("com.apple.dt.Xcode"))
+        #expect(latest.contains("code-review：/skills/code-review"))
     }
 
     @Test
@@ -638,10 +710,12 @@ struct AIAgentServicesTests {
         let brew = root.appendingPathComponent("toolchain/bin/brew")
         try writeExecutable(
             at: brew,
-            contents: "#!/bin/sh\nprintf '%s' '{\"formulae\":[{\"name\":\"opencode\",\"current_version\":\"1.18.15\"}],\"casks\":[]}'\n"
+            contents: "#!/bin/sh\nprintf '%s' '{\"formulae\":[{\"name\":\"opencode\",\"current_version\":\"1.18.15\"},{\"name\":\"kimi-code\",\"current_version\":\"0.35.0\"}],\"casks\":[]}'\n"
         )
         let executable = root.appendingPathComponent("Cellar/opencode/1.18.14/bin/opencode")
+        let detectedOnlyExecutable = root.appendingPathComponent("Cellar/kimi-code/0.34.0/bin/kimi")
         try writeExecutable(at: executable)
+        try writeExecutable(at: detectedOnlyExecutable)
         let service = AIAgentCLIService(
             environment: ["PATH": "/usr/bin", "NPM_CONFIG_PREFIX": root.appendingPathComponent("toolchain").path],
             homeDirectory: root
@@ -649,6 +723,7 @@ struct AIAgentServicesTests {
 
         let updates = await service.homebrewUpdates(for: [
             AgentCLIStatus(kind: .opencode, executablePath: executable.path, version: "1.18.14"),
+            AgentCLIStatus(kind: .kimi, executablePath: detectedOnlyExecutable.path, version: "0.34.0"),
         ])
 
         #expect(updates == [
@@ -739,6 +814,296 @@ struct AIAgentServicesTests {
 
     private func parallelCommand(startedAt: URL, waitingFor peer: URL) -> String {
         "touch '\(startedAt.path)'; for _ in $(seq 1 50); do [ -f '\(peer.path)' ] && exit 0; sleep 0.01; done; exit 1"
+    }
+
+    @Test
+    func relayArgumentsMapsModelForAllCLIs() {
+        let service = AIAgentCLIService()
+
+        let claudeArgs = service.relayArguments(
+            for: .claude,
+            prompt: "test",
+            model: "claude-opus-5",
+            thinkingDepth: .high,
+            accessMode: .autoReview
+        )
+        #expect(claudeArgs.contains("--model"))
+        #expect(claudeArgs.contains("claude-opus-5"))
+
+        let codexArgs = service.relayArguments(
+            for: .codex,
+            prompt: "test",
+            model: "o3",
+            thinkingDepth: .high,
+            accessMode: .autoReview
+        )
+        #expect(codexArgs.contains("--model"))
+        #expect(codexArgs.contains("o3"))
+
+        let grokArgs = service.relayArguments(
+            for: .grok,
+            prompt: "test",
+            model: "grok-3",
+            thinkingDepth: .high,
+            accessMode: .autoReview
+        )
+        #expect(grokArgs.contains("--model"))
+        #expect(grokArgs.contains("grok-3"))
+
+        let geminiArgs = service.relayArguments(
+            for: .gemini,
+            prompt: "test",
+            model: "gemini-2.0-flash-thinking-exp",
+            thinkingDepth: .high,
+            accessMode: .autoReview
+        )
+        #expect(geminiArgs.contains("--model"))
+        #expect(geminiArgs.contains("gemini-2.0-flash-thinking-exp"))
+
+        let opencodeArgs = service.relayArguments(
+            for: .opencode,
+            prompt: "test",
+            model: "anthropic/claude-opus-5",
+            thinkingDepth: .high,
+            accessMode: .autoReview
+        )
+        #expect(opencodeArgs.contains("--model"))
+        #expect(opencodeArgs.contains("anthropic/claude-opus-5"))
+    }
+
+    @Test
+    func relayArgumentsMapsThinkingDepthToSupportedCLIParameters() {
+        let service = AIAgentCLIService()
+
+        let claudeLow = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .low, accessMode: .autoReview)
+        #expect(claudeLow.contains("--effort"))
+        #expect(claudeLow.contains("low"))
+
+        let claudeHigh = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
+        #expect(claudeHigh.contains("--effort"))
+        #expect(claudeHigh.contains("high"))
+
+        let claudeExtraHigh = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .extraHigh, accessMode: .autoReview)
+        #expect(claudeExtraHigh.contains("--effort"))
+        #expect(claudeExtraHigh.contains("xhigh"))
+
+        let opencodeLow = service.relayArguments(for: .opencode, prompt: "test", model: nil, thinkingDepth: .low, accessMode: .autoReview)
+        #expect(opencodeLow.contains("--variant"))
+        #expect(opencodeLow.contains("minimal"))
+
+        let opencodeHigh = service.relayArguments(for: .opencode, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
+        #expect(opencodeHigh.contains("--variant"))
+        #expect(opencodeHigh.contains("high"))
+
+        let opencodeExtraHigh = service.relayArguments(for: .opencode, prompt: "test", model: nil, thinkingDepth: .extraHigh, accessMode: .autoReview)
+        #expect(opencodeExtraHigh.contains("--variant"))
+        #expect(opencodeExtraHigh.contains("max"))
+
+        let codexArgs = service.relayArguments(for: .codex, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
+        #expect(codexArgs.contains("--config"))
+        #expect(codexArgs.contains(#"model_reasoning_effort="high""#))
+
+        let geminiArgs = service.relayArguments(for: .gemini, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
+        #expect(!geminiArgs.contains("--effort"))
+        #expect(!geminiArgs.contains("--reasoning-effort"))
+
+        let grokArgs = service.relayArguments(for: .grok, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
+        #expect(grokArgs.contains("--reasoning-effort"))
+        #expect(grokArgs.contains("high"))
+    }
+
+    @Test
+    func relayArgumentsMapsAccessModeToPermissionParameters() {
+        let service = AIAgentCLIService()
+
+        let claudeFullAccess = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .fullAccess)
+        #expect(claudeFullAccess.contains("--dangerously-skip-permissions"))
+
+        let claudeAutoReview = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
+        #expect(claudeAutoReview.contains("--permission-mode"))
+        #expect(claudeAutoReview.contains("auto"))
+
+        let claudeReadOnly = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .readOnly)
+        #expect(claudeReadOnly.contains("--permission-mode"))
+        #expect(claudeReadOnly.contains("plan"))
+
+        let claudeWorkspaceWrite = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .workspaceWrite)
+        #expect(claudeWorkspaceWrite.contains("acceptEdits"))
+
+        let geminiFullAccess = service.relayArguments(for: .gemini, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .fullAccess)
+        #expect(geminiFullAccess.contains("--approval-mode"))
+        #expect(geminiFullAccess.contains("yolo"))
+
+        let geminiAutoReview = service.relayArguments(for: .gemini, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
+        #expect(geminiAutoReview.contains("--approval-mode"))
+        #expect(geminiAutoReview.contains("auto_edit"))
+
+        let geminiReadOnly = service.relayArguments(for: .gemini, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .readOnly)
+        #expect(geminiReadOnly.contains("--approval-mode"))
+        #expect(geminiReadOnly.contains("plan"))
+
+        let grokFullAccess = service.relayArguments(for: .grok, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .fullAccess)
+        #expect(grokFullAccess.contains("--permission-mode"))
+        #expect(grokFullAccess.contains("bypassPermissions"))
+
+        let grokReadOnly = service.relayArguments(for: .grok, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .readOnly)
+        #expect(grokReadOnly.contains("plan"))
+
+        let opencodeFullAccess = service.relayArguments(for: .opencode, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .fullAccess)
+        #expect(opencodeFullAccess.contains("--auto"))
+
+        let codexAutoReview = service.relayArguments(for: .codex, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
+        #expect(codexAutoReview.contains("--approve-for-me"))
+
+        let codexReadOnly = service.relayArguments(for: .codex, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .readOnly)
+        #expect(codexReadOnly.contains("--sandbox"))
+        #expect(codexReadOnly.contains("read-only"))
+
+        let codexWorkspaceWrite = service.relayArguments(for: .codex, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .workspaceWrite)
+        #expect(codexWorkspaceWrite.contains("--sandbox"))
+        #expect(codexWorkspaceWrite.contains("workspace-write"))
+
+        let codexFullAccess = service.relayArguments(for: .codex, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .fullAccess)
+        #expect(codexFullAccess.contains("--dangerously-bypass-approvals-and-sandbox"))
+    }
+
+    @Test
+    func relayArgumentsSkipsNilModel() {
+        let service = AIAgentCLIService()
+
+        let claudeArgs = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
+        #expect(!claudeArgs.contains("--model"))
+
+        let emptyModelArgs = service.relayArguments(for: .claude, prompt: "test", model: "  ", thinkingDepth: .high, accessMode: .autoReview)
+        #expect(!emptyModelArgs.contains("--model"))
+    }
+
+    @Test
+    func additionalCLIDiscoveryAndVersionDetection() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-additional-cli-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let kimi = root.appendingPathComponent(".kimi-code/bin/kimi")
+        let qwen = root.appendingPathComponent(".local/bin/qwen")
+        let qoder = root.appendingPathComponent(".local/bin/qodercli")
+        let copilot = root.appendingPathComponent(".npm-global/bin/copilot")
+        try writeExecutable(at: kimi, contents: "#!/bin/sh\nprintf '0.34.0\\n'\n")
+        try writeExecutable(at: qwen, contents: "#!/bin/sh\nprintf '0.21.10\\n'\n")
+        try writeExecutable(at: qoder, contents: "#!/bin/sh\nprintf '0.5.0\\n'\n")
+        try writeExecutable(at: copilot, contents: "#!/bin/sh\nprintf 'GitHub Copilot CLI 1.0.34.\\n'\n")
+
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: root)
+
+        let statuses = await service.statuses()
+        let searchPaths = AIAgentCLIService.executableSearchDirectories(
+            environment: ["PATH": "/usr/bin:/bin"],
+            homeDirectory: root
+        ).map(\.path)
+
+        #expect(statuses.first { $0.kind == .kimi }?.executablePath == kimi.path)
+        #expect(statuses.first { $0.kind == .kimi }?.version == "0.34.0")
+        #expect(statuses.first { $0.kind == .qwen }?.executablePath == qwen.path)
+        #expect(statuses.first { $0.kind == .qwen }?.version == "0.21.10")
+        #expect(statuses.first { $0.kind == .qoder }?.executablePath == qoder.path)
+        #expect(statuses.first { $0.kind == .qoder }?.version == "0.5.0")
+        #expect(statuses.first { $0.kind == .copilot }?.executablePath == copilot.path)
+        #expect(statuses.first { $0.kind == .copilot }?.version == "GitHub Copilot CLI 1.0.34.")
+        #expect(searchPaths.contains(root.appendingPathComponent(".kimi-code/bin").path))
+        #expect(!searchPaths.contains(root.appendingPathComponent(".kimi/bin").path))
+    }
+
+    @Test
+    func detectionOnlyCLIsDoNotProduceManagementCommands() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-detection-only-cli-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let npm = root.appendingPathComponent(".npm-global/bin/npm")
+        try writeExecutable(at: npm)
+        let target = root.appendingPathComponent(
+            ".npm-global/lib/node_modules/@qwen-code/qwen-code/dist/qwen.js"
+        )
+        try writeExecutable(at: target)
+        let launcher = root.appendingPathComponent(".npm-global/bin/qwen")
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: root)
+        let kinds = [AgentCLIKind.kimi, .qwen, .qoder, .copilot]
+
+        #expect(service.installationCommands(for: kinds, update: false).isEmpty)
+        #expect(service.installationCommands(for: kinds, update: true).isEmpty)
+        #expect(service.uninstallationCommands(for: kinds).isEmpty)
+    }
+
+    @Test
+    func relayRejectsDetectionOnlyCLIBeforeLaunchingIt() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-detection-only-relay-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let marker = root.appendingPathComponent("launched")
+        let kimi = root.appendingPathComponent(".kimi-code/bin/kimi")
+        try writeExecutable(at: kimi, contents: "#!/bin/sh\ntouch '\(marker.path)'\nprintf 'unexpected\\n'\n")
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: root)
+
+        do {
+            _ = try await service.relay(
+                messages: [AgentChatMessage(role: .user, content: "测试")],
+                to: .kimi
+            )
+            Issue.record("仅检测的 CLI 不应进入消息中继")
+        } catch {
+            #expect(error.localizedDescription.contains("暂不支持消息中继"))
+        }
+        #expect(!FileManager.default.fileExists(atPath: marker.path))
+    }
+
+    @Test
+    func relayFailureDoesNotExposeCommandOutput() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-relay-redaction-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("bin/codex")
+        try writeExecutable(
+            at: codex,
+            contents: "#!/bin/sh\nprintf 'secret-command-output\\n' >&2\nexit 9\n"
+        )
+        let service = AIAgentCLIService(
+            environment: ["PATH": codex.deletingLastPathComponent().path],
+            homeDirectory: root
+        )
+
+        do {
+            _ = try await service.relay(
+                messages: [AgentChatMessage(role: .user, content: "测试")],
+                to: .codex
+            )
+            Issue.record("CLI 失败应抛出异常")
+        } catch {
+            #expect(error.localizedDescription == "Agent CLI 执行失败：退出状态 9")
+            #expect(!error.localizedDescription.contains("secret-command-output"))
+        }
+    }
+
+    @Test
+    func homebrewUpdateCheckSkipsDetectionOnlyCLIs() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-detection-only-homebrew-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let brew = root.appendingPathComponent("toolchain/bin/brew")
+        try writeExecutable(
+            at: brew,
+            contents: "#!/bin/sh\nprintf '%s' '{\"formulae\":[{\"name\":\"qwen-code\",\"current_version\":\"0.22.0\"}],\"casks\":[]}'\n"
+        )
+        let qwen = root.appendingPathComponent("Cellar/qwen-code/0.21.10/bin/qwen")
+        try writeExecutable(at: qwen)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin", "NPM_CONFIG_PREFIX": root.appendingPathComponent("toolchain").path],
+            homeDirectory: root
+        )
+
+        let updates = await service.homebrewUpdates(for: [
+            AgentCLIStatus(kind: .qwen, executablePath: qwen.path, version: "0.21.10"),
+        ])
+
+        #expect(updates.isEmpty)
     }
 }
 

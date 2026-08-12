@@ -86,7 +86,7 @@ public struct AIStateRepository {
         )
     }
 
-    /// Appends detected usage newer than the saved cursor and keeps the visible history aggregated by day.
+    /// Deduplicates detected events by source and keeps the visible history aggregated by day.
     @discardableResult
     public func recordDetectedUsage(_ samples: [AIUsageSample]) throws -> Int {
         try openDatabase().recordDetectedUsage(samples)

@@ -203,6 +203,7 @@ struct AIAgentStoreTests {
 
         try store.upsertAccount(account, secret: "sk-test")
         store.upsertChannel(channel)
+        store.flushPendingChanges()
 
         let restored = AIAgentStore(
             storageURL: directory.appendingPathComponent("state.json"),
@@ -259,6 +260,7 @@ struct AIAgentStoreTests {
 
         store.toggleProjectPinned(id: first.id)
         store.setProjectCollapsed(true, for: first.id)
+        store.flushPendingChanges()
 
         #expect(store.sortedProjects().map(\.id) == [first.id, second.id])
         #expect(store.project(id: first.id)?.directoryPath == "/tmp/docs")
@@ -353,6 +355,7 @@ struct AIAgentStoreTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let thread = store.createThread(title: "会话")
         store.archiveThread(id: thread.id)
+        store.flushPendingChanges()
 
         let reloaded = AIAgentStore(
             storageURL: directory.appendingPathComponent("state.json"),
@@ -510,6 +513,7 @@ struct AIAgentStoreTests {
         store.append(AgentChatMessage(role: .user, content: "新", createdAt: Date(timeIntervalSince1970: 200)), to: recent.id)
 
         store.toggleThreadPinned(id: pinned.id)
+        store.flushPendingChanges()
 
         #expect(store.activeThreads().map(\.id) == [pinned.id, recent.id])
         let reloaded = AIAgentStore(
@@ -522,6 +526,57 @@ struct AIAgentStoreTests {
         store.toggleThreadPinned(id: pinned.id)
 
         #expect(store.activeThreads().map(\.id) == [recent.id, pinned.id])
+    }
+
+    @Test
+    func persistenceCoalescesRapidChangesAndWritesTheLatestSnapshot() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-ai-agent-persistence-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let writes = PersistenceWriteCounter()
+        let storageURL = directory.appendingPathComponent("state.json")
+        let store = AIAgentStore(
+            storageURL: storageURL,
+            secretStore: StubSecretStore(),
+            persistenceDelay: 0.05,
+            persistenceWriter: { state, url in
+                writes.record(state)
+                try AIAgentStore.write(state, to: url)
+            }
+        )
+
+        _ = store.createGoal(title: "第一个")
+        _ = store.createGoal(title: "第二个")
+        _ = store.createGoal(title: "最终目标")
+
+        for _ in 0..<50 where writes.count == 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(writes.count == 1)
+        #expect(writes.lastState?.goals.first?.title == "最终目标")
+        let persisted = try JSONDecoder().decode(AIAgentState.self, from: Data(contentsOf: storageURL))
+        #expect(persisted.goals.first?.title == "最终目标")
+        #expect(store.persistenceError == nil)
+    }
+
+    @Test
+    func persistenceFailureIsObservable() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-ai-agent-persistence-error-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let parentFile = directory.appendingPathComponent("not-a-directory")
+        try Data("occupied".utf8).write(to: parentFile)
+        let store = AIAgentStore(
+            storageURL: parentFile.appendingPathComponent("state.json"),
+            secretStore: StubSecretStore()
+        )
+
+        _ = store.createGoal(title: "无法落盘")
+        store.flushPendingChanges()
+
+        #expect(store.persistenceError != nil)
     }
 
     @Test
@@ -599,4 +654,27 @@ private struct StubSecretStore: AIAgentSecretStoring {
     func secret(for reference: String) throws -> String? { nil }
     func setSecret(_ secret: String, for reference: String) throws {}
     func removeSecret(for reference: String) throws {}
+}
+
+private final class PersistenceWriteCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var states: [AIAgentState] = []
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return states.count
+    }
+
+    var lastState: AIAgentState? {
+        lock.lock()
+        defer { lock.unlock() }
+        return states.last
+    }
+
+    func record(_ state: AIAgentState) {
+        lock.lock()
+        defer { lock.unlock() }
+        states.append(state)
+    }
 }

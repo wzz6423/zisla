@@ -1211,7 +1211,7 @@ struct AIAgentModuleView: View {
                 Text("")
                     .frame(width: 60)
                 Picker("", selection: accountCLIKindBinding(account.id)) {
-                    ForEach(AgentCLIKind.allCases, id: \.self) { kind in
+                    ForEach(AgentCLIKind.profileCases, id: \.self) { kind in
                         Text(kind.displayName).tag(kind)
                     }
                 }
@@ -1440,7 +1440,7 @@ struct AIAgentModuleView: View {
             HStack(spacing: 7) {
                 Picker("", selection: messageConnectionCLIKindBinding(connection.id)) {
                     Text("自动选择 Agent").tag(Optional<AgentCLIKind>.none)
-                    ForEach(AgentCLIKind.allCases, id: \.self) { kind in
+                    ForEach(AgentCLIKind.relayCases, id: \.self) { kind in
                         Text(kind.displayName).tag(Optional(kind))
                     }
                 }
@@ -1785,7 +1785,7 @@ struct AIAgentModuleView: View {
                 if let progress = agent.cliCommandProgress {
                     cliCommandProgressView(progress)
                 }
-                ForEach(AgentCLIKind.allCases, id: \.self) { kind in
+                ForEach(AgentCLIKind.detectableCases, id: \.self) { kind in
                     let status = agent.store.state.cliStatuses.first { $0.kind == kind }
                     let isInstalled = status?.executablePath != nil
                     HStack(spacing: 8) {
@@ -1803,7 +1803,7 @@ struct AIAgentModuleView: View {
                             }
                         }
                         Spacer()
-                        if isInstalled {
+                        if AgentCLIKind.managedCases.contains(kind), isInstalled {
                             let update = agent.commandsForCLIInstallation([kind], update: true)
                             let availableUpdate = agent.cliUpdates.first { $0.kind == kind }
                             if let availableUpdate {
@@ -1855,7 +1855,7 @@ struct AIAgentModuleView: View {
                             .buttonStyle(.borderless)
                             .disabled(agent.isRunningCLICommands || uninstall.isEmpty)
                             .help("卸载 \(kind.displayName)")
-                        } else {
+                        } else if AgentCLIKind.managedCases.contains(kind) {
                             let install = agent.commandsForCLIInstallation([kind], update: false)
                             Button {
                                 queueCLIAction(
@@ -1883,7 +1883,7 @@ struct AIAgentModuleView: View {
     }
 
     private func cliKinds(installed: Bool) -> [AgentCLIKind] {
-        AgentCLIKind.allCases.filter { kind in
+        AgentCLIKind.managedCases.filter { kind in
             let isInstalled = agent.store.state.cliStatuses.first { $0.kind == kind }?.executablePath != nil
             return isInstalled == installed
         }

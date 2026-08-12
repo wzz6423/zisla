@@ -86,7 +86,7 @@ public enum AgentAccountCredentialKind: String, Codable, CaseIterable, Sendable 
     }
 }
 
-/// A CLI profile consists of configuration and authentication files. File contents are stored in the app-private database; only target paths are kept in the state file.
+/// CLI 配置由配置文件和认证文件组成。文件内容保存在安全凭据存储中，状态文件只记录目标路径。
 public struct AgentCLIProfile: Codable, Equatable, Sendable {
     public var cliKind: AgentCLIKind
     public var configurationFilePath: String
@@ -122,11 +122,13 @@ public struct AgentCLIProfile: Codable, Equatable, Sendable {
             ("\(home)/.grok/config.toml", "\(home)/.grok/auth.json")
         case .opencode:
             ("\(home)/.config/opencode/opencode.json", "\(home)/.local/share/opencode/auth.json")
+        case .kimi, .qwen, .qoder, .copilot:
+            ("", "")
         }
     }
 }
 
-/// Each account maps to one app-private database entry. `secretReference` is not the API Key itself.
+/// 每个账号映射到一项安全凭据存储记录，`secretReference` 不是 API Key 本身。
 public struct AgentAccount: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var name: String
@@ -331,7 +333,20 @@ public struct AgentRoute: Equatable, Sendable {
 
 /// Polls round-robin across the highest-priority available URL/Key combinations in stable order.
 public struct AgentRouteRouter: Sendable {
+    private struct EndpointKey: Hashable, Sendable {
+        var channelID: UUID
+        var endpointGroupID: UUID
+        var baseURL: String
+    }
+
+    private struct EndpointFailure: Sendable {
+        var count: Int
+        var lastFailureAt: Date
+        var disabledUntil: Date?
+    }
+
     private var cursors: [UUID: Int] = [:]
+    private var endpointFailures: [EndpointKey: EndpointFailure] = [:]
 
     public init() {}
 
@@ -342,7 +357,25 @@ public struct AgentRouteRouter: Sendable {
         at date: Date = Date(),
         unavailableEndpointGroupIDs: Set<UUID> = []
     ) -> AgentRoute? {
-        guard channel.isEnabled else { return nil }
+        routes(
+            for: channel,
+            accounts: accounts,
+            model: model,
+            at: date,
+            unavailableEndpointGroupIDs: unavailableEndpointGroupIDs
+        ).first
+    }
+
+    public mutating func routes(
+        for channel: AgentChannel,
+        accounts: [AgentAccount],
+        model: String? = nil,
+        at date: Date = Date(),
+        unavailableEndpointGroupIDs: Set<UUID> = []
+    ) -> [AgentRoute] {
+        guard channel.isEnabled else { return [] }
+        let selectedModel = (model ?? channel.defaultModel).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !selectedModel.isEmpty else { return [] }
         let accountByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
         let groups = channel.endpointGroups.enumerated()
             .filter { $0.element.isEnabled && !unavailableEndpointGroupIDs.contains($0.element.id) }
@@ -354,34 +387,92 @@ public struct AgentRouteRouter: Sendable {
             }
             .map(\.element)
         let priorities = Array(Set(groups.map(\.priority))).sorted(by: >)
-        var selectedCandidates: [(group: AgentEndpointGroup, url: String, account: AgentAccount)] = []
+        var candidatesByPriority: [[(group: AgentEndpointGroup, url: String, account: AgentAccount)]] = []
         for priority in priorities {
             let candidates = groups.filter { $0.priority == priority }.flatMap { group in
                 let eligibleAccounts = group.accountIDs.compactMap { id in
                     accountByID[id].flatMap { $0.isEligible(at: date) ? $0 : nil }
                 }
-                return group.baseURLs.flatMap { url in
+                return group.baseURLs.filter { url in
+                    endpointIsAvailable(
+                        channelID: channel.id,
+                        endpointGroupID: group.id,
+                        baseURL: url,
+                        at: date
+                    )
+                }.flatMap { url in
                     eligibleAccounts.map { (group: group, url: url, account: $0) }
                 }
             }
-            if !candidates.isEmpty {
-                selectedCandidates = candidates
-                break
+            if !candidates.isEmpty { candidatesByPriority.append(candidates) }
+        }
+        guard let leadingCandidates = candidatesByPriority.first else { return [] }
+        let cursor = cursors[channel.id, default: 0]
+        cursors[channel.id] = (cursor + 1) % leadingCandidates.count
+        return candidatesByPriority.flatMap { candidates in
+            let offset = cursor % candidates.count
+            let ordered = Array(candidates[offset...]) + Array(candidates[..<offset])
+            return ordered.map { candidate in
+                AgentRoute(
+                    channelID: channel.id,
+                    endpointGroupID: candidate.group.id,
+                    accountID: candidate.account.id,
+                    baseURL: candidate.url,
+                    protocolKind: channel.protocolKind,
+                    model: selectedModel
+                )
             }
         }
-        guard !selectedCandidates.isEmpty else { return nil }
-        let cursor = cursors[channel.id, default: 0]
-        let candidate = selectedCandidates[cursor % selectedCandidates.count]
-        cursors[channel.id] = (cursor + 1) % selectedCandidates.count
-        let selectedModel = (model ?? channel.defaultModel).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !selectedModel.isEmpty else { return nil }
-        return AgentRoute(
-            channelID: channel.id,
-            endpointGroupID: candidate.group.id,
-            accountID: candidate.account.id,
-            baseURL: candidate.url,
-            protocolKind: channel.protocolKind,
-            model: selectedModel
+    }
+
+    public mutating func recordFailure(for route: AgentRoute, at date: Date = Date()) {
+        let key = endpointKey(for: route)
+        var failure = endpointFailures[key] ?? EndpointFailure(
+            count: 0,
+            lastFailureAt: date,
+            disabledUntil: nil
+        )
+        if date.timeIntervalSince(failure.lastFailureAt) >= 5 * 60 {
+            failure.count = 0
+        }
+        failure.count += 1
+        failure.lastFailureAt = date
+        if failure.count >= 2 {
+            failure.disabledUntil = date.addingTimeInterval(5 * 60)
+        }
+        endpointFailures[key] = failure
+    }
+
+    public mutating func recordSuccess(for route: AgentRoute) {
+        endpointFailures.removeValue(forKey: endpointKey(for: route))
+    }
+
+    private mutating func endpointIsAvailable(
+        channelID: UUID,
+        endpointGroupID: UUID,
+        baseURL: String,
+        at date: Date
+    ) -> Bool {
+        let key = EndpointKey(
+            channelID: channelID,
+            endpointGroupID: endpointGroupID,
+            baseURL: baseURL
+        )
+        guard let failure = endpointFailures[key], let disabledUntil = failure.disabledUntil else {
+            return true
+        }
+        guard disabledUntil > date else {
+            endpointFailures.removeValue(forKey: key)
+            return true
+        }
+        return false
+    }
+
+    private func endpointKey(for route: AgentRoute) -> EndpointKey {
+        EndpointKey(
+            channelID: route.channelID,
+            endpointGroupID: route.endpointGroupID,
+            baseURL: route.baseURL
         )
     }
 }
@@ -458,9 +549,32 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
     case gemini
     case grok
     case opencode
+    case kimi
+    case qwen
+    case qoder
+    case copilot
 
-    public var displayName: String { rawValue.capitalized }
-    public var executableName: String { rawValue }
+    public static let detectableCases = allCases
+    public static let relayCases: [Self] = [.claude, .codex, .gemini, .grok, .opencode]
+    public static let profileCases = relayCases
+    public static let managedCases = relayCases
+
+    public var displayName: String {
+        switch self {
+        case .kimi: "Kimi Code"
+        case .qwen: "Qwen Code"
+        case .qoder: "Qoder CLI"
+        case .copilot: "Copilot"
+        default: rawValue.capitalized
+        }
+    }
+
+    public var executableName: String {
+        switch self {
+        case .qoder: "qodercli"
+        default: rawValue
+        }
+    }
 
     public var npmPackageName: String? {
         switch self {
@@ -468,7 +582,7 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
         case .codex: "@openai/codex"
         case .gemini: "@google/gemini-cli"
         case .opencode: "opencode-ai"
-        case .grok: nil
+        case .grok, .kimi, .qwen, .qoder, .copilot: nil
         }
     }
 }
@@ -1354,7 +1468,7 @@ public enum AgentMessageConnectionKind: String, Codable, CaseIterable, Sendable 
     }
 }
 
-/// Platform passwords and tokens are stored separately in the app-private database; state files retain only connection behavior and callback locations.
+/// 平台密码和 Token 单独保存在安全凭据存储中，状态文件只记录连接行为和回调地址。
 public struct AgentMessageConnectionCredentials: Codable, Equatable, Sendable {
     public var appID: String
     public var appSecret: String

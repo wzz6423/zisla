@@ -3,6 +3,54 @@ import Foundation
 import UniformTypeIdentifiers
 import ZislaCore
 
+private final class AIAgentStatePersistence: @unchecked Sendable {
+    typealias Writer = @Sendable (AIAgentState, URL) throws -> Void
+
+    private let storageURL: URL
+    private let delay: TimeInterval
+    private let writer: Writer
+    private let queue = DispatchQueue(label: "com.zisla.ai-agent.state", qos: .utility)
+    private let lock = NSLock()
+    private var generation = 0
+
+    init(storageURL: URL, delay: TimeInterval, writer: @escaping Writer) {
+        self.storageURL = storageURL
+        self.delay = max(0, delay)
+        self.writer = writer
+    }
+
+    func schedule(
+        _ state: AIAgentState,
+        completion: @escaping @Sendable (Result<Void, Error>) -> Void
+    ) {
+        let scheduledGeneration = advanceGeneration()
+        queue.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, self.isCurrent(scheduledGeneration) else { return }
+            let result = Result { try self.writer(state, self.storageURL) }
+            guard self.isCurrent(scheduledGeneration) else { return }
+            completion(result)
+        }
+    }
+
+    func flush(_ state: AIAgentState) -> Result<Void, Error> {
+        _ = advanceGeneration()
+        return queue.sync { Result { try writer(state, storageURL) } }
+    }
+
+    private func advanceGeneration() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        generation += 1
+        return generation
+    }
+
+    private func isCurrent(_ value: Int) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return generation == value
+    }
+}
+
 public enum AIAgentAttachmentStoreError: LocalizedError, Sendable {
     case unsupportedFile(String)
     case tooLarge(String)
@@ -20,20 +68,42 @@ public enum AIAgentAttachmentStoreError: LocalizedError, Sendable {
 @MainActor
 public final class AIAgentStore: ObservableObject {
     @Published public var state: AIAgentState {
-        didSet { persist() }
+        didSet { schedulePersistence() }
     }
+    @Published public private(set) var persistenceError: String?
 
     private let storageURL: URL
     private let secretStore: AIAgentSecretStoring
+    private let persistence: AIAgentStatePersistence
     private let fileManager = FileManager.default
+    private var latestPersistenceID: UUID?
     private static let maximumAttachmentByteCount: Int64 = 25 * 1_024 * 1_024
 
-    public init(
+    public convenience init(
         storageURL: URL = AppPaths.aiAgent,
-        secretStore: AIAgentSecretStoring = DatabaseAIAgentSecretStore()
+        secretStore: AIAgentSecretStoring? = nil
+    ) {
+        self.init(
+            storageURL: storageURL,
+            secretStore: secretStore ?? AIAgentSecretStoreFactory.makeDefault(),
+            persistenceDelay: 0.25,
+            persistenceWriter: Self.write
+        )
+    }
+
+    init(
+        storageURL: URL,
+        secretStore: AIAgentSecretStoring,
+        persistenceDelay: TimeInterval,
+        persistenceWriter: @escaping @Sendable (AIAgentState, URL) throws -> Void
     ) {
         self.storageURL = storageURL
         self.secretStore = secretStore
+        self.persistence = AIAgentStatePersistence(
+            storageURL: storageURL,
+            delay: persistenceDelay,
+            writer: persistenceWriter
+        )
         state = Self.load(from: storageURL)
     }
 
@@ -787,18 +857,39 @@ public final class AIAgentStore: ObservableObject {
         return decoded
     }
 
-    private func persist() {
-        do {
-            try FileManager.default.createDirectory(
-                at: storageURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(state)
-            try data.write(to: storageURL, options: .atomic)
-        } catch {
-            // On local config write failure, keep the in-memory state to avoid losing the user's current edits due to a single disk error.
+    public func flushPendingChanges() {
+        latestPersistenceID = UUID()
+        recordPersistenceResult(persistence.flush(state))
+    }
+
+    nonisolated static func write(_ state: AIAgentState, to storageURL: URL) throws {
+        try FileManager.default.createDirectory(
+            at: storageURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(state)
+        try data.write(to: storageURL, options: .atomic)
+    }
+
+    private func schedulePersistence() {
+        let persistenceID = UUID()
+        latestPersistenceID = persistenceID
+        persistence.schedule(state) { [weak self] result in
+            Task { @MainActor [weak self] in
+                guard self?.latestPersistenceID == persistenceID else { return }
+                self?.recordPersistenceResult(result)
+            }
+        }
+    }
+
+    private func recordPersistenceResult(_ result: Result<Void, Error>) {
+        switch result {
+        case .success:
+            persistenceError = nil
+        case let .failure(error):
+            persistenceError = error.localizedDescription
         }
     }
 

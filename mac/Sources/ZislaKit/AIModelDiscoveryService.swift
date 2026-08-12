@@ -5,13 +5,13 @@ import ZislaCore
 public enum AIModelDiscoveryError: LocalizedError, Sendable {
     case invalidEndpoint(String)
     case invalidResponse
-    case http(statusCode: Int, body: String)
+    case http(statusCode: Int)
 
     public var errorDescription: String? {
         switch self {
-        case let .invalidEndpoint(value): "端点地址无效：\(value)"
+        case .invalidEndpoint: "端点地址无效"
         case .invalidResponse: "端点返回了无法识别的模型目录"
-        case let .http(statusCode, body): "读取模型目录失败（HTTP \(statusCode)）：\(body.prefix(180))"
+        case let .http(statusCode): "读取模型目录失败（HTTP \(statusCode)）"
         }
     }
 }
@@ -36,10 +36,7 @@ public struct AIModelDiscoveryService: Sendable {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw AIModelDiscoveryError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
-            throw AIModelDiscoveryError.http(
-                statusCode: http.statusCode,
-                body: String(decoding: data, as: UTF8.self)
-            )
+            throw AIModelDiscoveryError.http(statusCode: http.statusCode)
         }
 
         let names: [String]
@@ -87,9 +84,8 @@ public struct AIModelDiscoveryService: Sendable {
     private func baseURL(from endpoint: AIEndpoint) throws -> URL {
         let source = endpoint.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard var components = URLComponents(string: source),
-              let scheme = components.scheme,
-              scheme == "http" || scheme == "https",
-              let url = components.url else {
+              let url = components.url,
+              AIEndpointSecurity.permits(url) else {
             throw AIModelDiscoveryError.invalidEndpoint(source)
         }
         components.query = nil

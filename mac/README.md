@@ -147,6 +147,7 @@ URL 作为独立 argv 传给 `Process`，不经过 shell。运行时强制忽略
 - 媒体：通过 MediaRemote 获取系统元数据，并用 Core Audio 的进程输出状态确认是否正在播放。MediaRemote 是非公开框架，因此当前构建不适合直接提交 Mac App Store；无元数据时降级显示实际出声的来源应用。
 - 网络：天气访问 Open-Meteo；中国大陆地点的官方预警访问中国天气网公开数据，其他地点优先使用 WeatherKit；更新检查先访问 Gitee API，未发现新版本或 Gitee 不可用时再访问 GitHub API，确认下载时访问对应 Release 的 DMG；B 站备用下载访问其只读视频信息、播放地址和媒体 CDN；识别剪贴板链接本身不联网。
 - 自动化：随记通过 AppleScript/JXA 读写系统「备忘录」App 中的笔记（列出、查看、编辑、新建、删除），首次使用需在弹窗中授权 zisla 控制「备忘录」；随记不联网，笔记数据存在备忘录中。
+- AI CLI 自动更新：用户显式开启后，会检查已安装的 Claude Code、Codex、Gemini CLI、OpenCode 和 Grok CLI；版本检查会访问 npm Registry，并调用 Homebrew 或 Grok 自带的更新检查；发现更新后会通过原安装器（npm、pnpm、yarn、bun、Homebrew）或 Grok 自更新修改对应 CLI。
 
 ## 测试
 
@@ -169,10 +170,11 @@ swift test \
 
 ```bash
 cd ../Web
-python3 -m http.server 4173
+npm install
+npm run dev
 ```
 
-打开 `http://localhost:4173`。
+打开 `http://localhost:5173`。
 
 ## 文档
 

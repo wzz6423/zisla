@@ -4,6 +4,7 @@ import ZislaCore
 public enum ReleasePackageDownloadError: Error, LocalizedError, Equatable, Sendable {
     case invalidAssetName
     case invalidTargetDirectory
+    case targetAlreadyExists
     case httpError(Int)
     case responseTooLarge
     case downloadFailed(String)
@@ -12,6 +13,7 @@ public enum ReleasePackageDownloadError: Error, LocalizedError, Equatable, Senda
         switch self {
         case .invalidAssetName: "Asset 文件名无效"
         case .invalidTargetDirectory: "目标目录无效"
+        case .targetAlreadyExists: "目标位置已存在无法验证来源的同名文件"
         case .httpError(let code): "HTTP 请求失败（状态码 \(code)）"
         case .responseTooLarge: "下载文件超过大小限制"
         case .downloadFailed(let message): "下载失败：\(message)"
@@ -67,7 +69,7 @@ public actor ReleasePackageDownloadService {
             .standardizedFileURL
 
         if FileManager.default.fileExists(atPath: targetURL.path) {
-            return targetURL
+            throw ReleasePackageDownloadError.targetAlreadyExists
         }
 
         var request = URLRequest(url: asset.downloadURL)
@@ -103,14 +105,12 @@ public actor ReleasePackageDownloadService {
             throw ReleasePackageDownloadError.downloadFailed(error.localizedDescription)
         }
 
-        if FileManager.default.fileExists(atPath: targetURL.path) {
-            try? FileManager.default.removeItem(at: tempURL)
-            return targetURL
-        }
-
         do {
             try FileManager.default.moveItem(at: tempURL, to: targetURL)
             return targetURL
+        } catch let error as CocoaError where error.code == .fileWriteFileExists {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw ReleasePackageDownloadError.targetAlreadyExists
         } catch {
             try? FileManager.default.removeItem(at: tempURL)
             throw ReleasePackageDownloadError.downloadFailed(error.localizedDescription)

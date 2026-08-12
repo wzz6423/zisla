@@ -3,6 +3,8 @@ import Foundation
 import Network
 import ZislaCore
 
+private let aiAgentMaximumRequestByteCount = 1_048_576
+
 public struct AIAgentInboundHTTPRequest: Sendable {
     public var method: String
     public var path: String
@@ -64,7 +66,7 @@ public enum AIAgentMessageConnectionError: LocalizedError, Sendable {
     case missingCredentials
     case unsupportedEncryptedEvent
     case invalidPlatformResponse
-    case http(Int, String)
+    case http(Int)
 
     public var errorDescription: String? {
         switch self {
@@ -72,7 +74,7 @@ public enum AIAgentMessageConnectionError: LocalizedError, Sendable {
         case .missingCredentials: "连接凭证尚未配置完整"
         case .unsupportedEncryptedEvent: "当前不支持平台回调加密；请在平台侧关闭事件加密后重试"
         case .invalidPlatformResponse: "平台返回了无法识别的结果"
-        case let .http(status, body): "平台发送失败（HTTP \(status)）：\(body.prefix(180))"
+        case let .http(status): "平台发送失败（HTTP \(status)）"
         }
     }
 }
@@ -281,9 +283,10 @@ public struct AIAgentMessageConnectionService: Sendable {
         replyingTo message: AIAgentInboundMessage,
         credentials: AgentMessageConnectionCredentials
     ) async throws {
-        guard let url = URL(string: credentials.outboundURL),
-              let scheme = url.scheme,
-              scheme == "https" || scheme == "http" else {
+        let outboundURL = credentials.outboundURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: outboundURL),
+              url.scheme?.lowercased() == "https",
+              url.host != nil else {
             throw AIAgentMessageConnectionError.missingCredentials
         }
         var request = try jsonRequest(
@@ -318,16 +321,16 @@ public struct AIAgentMessageConnectionService: Sendable {
             throw AIAgentMessageConnectionError.invalidPlatformResponse
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw AIAgentMessageConnectionError.http(http.statusCode, String(decoding: data, as: UTF8.self))
+            throw AIAgentMessageConnectionError.http(http.statusCode)
         }
         guard let object = jsonObject(data) else {
             throw AIAgentMessageConnectionError.invalidPlatformResponse
         }
         if let code = object["code"] as? Int, code != 0 {
-            throw AIAgentMessageConnectionError.http(code, String(describing: object["msg"] ?? ""))
+            throw AIAgentMessageConnectionError.http(code)
         }
         if let code = object["errcode"] as? Int, code != 0 {
-            throw AIAgentMessageConnectionError.http(code, String(describing: object["errmsg"] ?? ""))
+            throw AIAgentMessageConnectionError.http(code)
         }
         return object
     }
@@ -388,16 +391,100 @@ private final class AIAgentXMLValuesParser: NSObject, XMLParserDelegate {
     }
 }
 
+final class AIAgentConnectionRegistry: @unchecked Sendable {
+    struct Token: Hashable, Sendable {
+        fileprivate let id = UUID()
+    }
+
+    private struct State {
+        var deadline: DispatchWorkItem?
+    }
+
+    private let maximumActiveConnections: Int
+    private let readTimeout: TimeInterval
+    private let queue: DispatchQueue
+    private let lock = NSLock()
+    private var states: [Token: State] = [:]
+
+    init(maximumActiveConnections: Int, readTimeout: TimeInterval, queue: DispatchQueue) {
+        self.maximumActiveConnections = max(1, maximumActiveConnections)
+        self.readTimeout = max(0.001, readTimeout)
+        self.queue = queue
+    }
+
+    var activeCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return states.count
+    }
+
+    func begin(onTimeout: @escaping @Sendable () -> Void) -> Token? {
+        lock.lock()
+        guard states.count < maximumActiveConnections else {
+            lock.unlock()
+            return nil
+        }
+        let token = Token()
+        let deadline = DispatchWorkItem { [weak self] in
+            guard self?.expire(token) == true else { return }
+            onTimeout()
+        }
+        states[token] = State(deadline: deadline)
+        lock.unlock()
+        queue.asyncAfter(deadline: .now() + readTimeout, execute: deadline)
+        return token
+    }
+
+    func completeRead(_ token: Token) -> Bool {
+        lock.lock()
+        guard let deadline = states[token]?.deadline else {
+            lock.unlock()
+            return false
+        }
+        states[token]?.deadline = nil
+        lock.unlock()
+        deadline.cancel()
+        return true
+    }
+
+    func finish(_ token: Token) {
+        lock.lock()
+        let deadline = states.removeValue(forKey: token)?.deadline
+        lock.unlock()
+        deadline?.cancel()
+    }
+
+    private func expire(_ token: Token) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard states[token]?.deadline != nil else { return false }
+        states.removeValue(forKey: token)
+        return true
+    }
+}
+
 /// The local HTTP listener only hands callbacks over to the workspace; the public internet can reach this port through the user's existing reverse proxy or tunnel.
 @MainActor
 final class AIAgentMessageConnectionServer {
     typealias Handler = @MainActor (AIAgentInboundHTTPRequest) async -> AIAgentInboundHTTPResponse
 
     private let handler: Handler
-    private let queue = DispatchQueue(label: "com.zisla.ai-agent.message-connections", qos: .utility)
+    private let queue: DispatchQueue
+    private let connectionRegistry: AIAgentConnectionRegistry
     private var listeners: [Int: NWListener] = [:]
 
-    init(handler: @escaping Handler) {
+    init(
+        maximumActiveConnections: Int = 100,
+        readTimeout: TimeInterval = 30,
+        handler: @escaping Handler
+    ) {
+        let queue = DispatchQueue(label: "com.zisla.ai-agent.message-connections", qos: .utility)
+        self.queue = queue
+        self.connectionRegistry = AIAgentConnectionRegistry(
+            maximumActiveConnections: maximumActiveConnections,
+            readTimeout: readTimeout,
+            queue: queue
+        )
         self.handler = handler
     }
 
@@ -412,7 +499,7 @@ final class AIAgentMessageConnectionServer {
             do {
                 let listener = try NWListener(using: .tcp, on: NWEndpoint.Port(rawValue: UInt16(port))!)
                 listener.newConnectionHandler = { [weak self] connection in
-                    self?.receive(connection, buffered: Data())
+                    self?.accept(connection)
                 }
                 listener.start(queue: queue)
                 listeners[port] = listener
@@ -428,32 +515,73 @@ final class AIAgentMessageConnectionServer {
         listeners = [:]
     }
 
-    private nonisolated func receive(_ connection: NWConnection, buffered: Data) {
+    private nonisolated func accept(_ connection: NWConnection) {
         connection.start(queue: queue)
+        guard let token = connectionRegistry.begin(onTimeout: { [weak connection] in
+            guard let connection else { return }
+            connection.send(
+                content: Self.serialized(.text("request timeout", statusCode: 408)),
+                completion: .contentProcessed { _ in connection.cancel() }
+            )
+        }) else {
+            connection.send(
+                content: Self.serialized(.text("service unavailable", statusCode: 503)),
+                completion: .contentProcessed { _ in connection.cancel() }
+            )
+            return
+        }
+        receive(connection, buffered: Data(), token: token)
+    }
+
+    private nonisolated func receive(
+        _ connection: NWConnection,
+        buffered: Data,
+        token: AIAgentConnectionRegistry.Token
+    ) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, complete, error in
             guard let self else { connection.cancel(); return }
             var dataBuffer = buffered
             if let data { dataBuffer.append(data) }
+            if dataBuffer.count >= aiAgentMaximumRequestByteCount {
+                guard self.connectionRegistry.completeRead(token) else {
+                    connection.cancel()
+                    return
+                }
+                connection.send(
+                    content: Self.serialized(.text("payload too large", statusCode: 413)),
+                    completion: .contentProcessed { _ in
+                        self.connectionRegistry.finish(token)
+                        connection.cancel()
+                    }
+                )
+                return
+            }
             if let request = Self.parseRequest(dataBuffer) {
-                Task { @MainActor [weak self] in
+                guard self.connectionRegistry.completeRead(token) else {
+                    connection.cancel()
+                    return
+                }
+                let registry = self.connectionRegistry
+                Task { @MainActor [weak self, registry] in
                     let response = await self?.handler(request) ?? .text("service unavailable", statusCode: 503)
-                    connection.send(content: Self.serialized(response), completion: .contentProcessed { _ in connection.cancel() })
+                    connection.send(content: Self.serialized(response), completion: .contentProcessed { _ in
+                        registry.finish(token)
+                        connection.cancel()
+                    })
                 }
                 return
             }
-            if dataBuffer.count >= 1_048_576 {
-                connection.send(content: Self.serialized(.text("payload too large", statusCode: 413)), completion: .contentProcessed { _ in connection.cancel() })
-                return
-            }
             guard error == nil, !complete else {
+                self.connectionRegistry.finish(token)
                 connection.cancel()
                 return
             }
-            self.receive(connection, buffered: dataBuffer)
+            self.receive(connection, buffered: dataBuffer, token: token)
         }
     }
 
-    private nonisolated static func parseRequest(_ data: Data) -> AIAgentInboundHTTPRequest? {
+    nonisolated static func parseRequest(_ data: Data) -> AIAgentInboundHTTPRequest? {
+        guard data.count < aiAgentMaximumRequestByteCount else { return nil }
         let separator = Data("\r\n\r\n".utf8)
         guard let headerRange = data.range(of: separator),
               let headerText = String(data: data[..<headerRange.lowerBound], encoding: .utf8) else {
@@ -475,9 +603,9 @@ final class AIAgentMessageConnectionServer {
         guard data.distance(from: bodyStart, to: data.endIndex) >= contentLength else { return nil }
         let target = parts[1]
         let components = URLComponents(string: "http://localhost\(target)")
-        let query = Dictionary(uniqueKeysWithValues: (components?.queryItems ?? []).compactMap { item in
-            item.value.map { (item.name, $0) }
-        })
+        let query = (components?.queryItems ?? []).reduce(into: [String: String]()) { values, item in
+            if let value = item.value { values[item.name] = value }
+        }
         let body = Data(data[bodyStart..<data.index(bodyStart, offsetBy: contentLength)])
         return AIAgentInboundHTTPRequest(
             method: parts[0].uppercased(),
@@ -493,6 +621,7 @@ final class AIAgentMessageConnectionServer {
         case 200: "OK"
         case 400: "Bad Request"
         case 401: "Unauthorized"
+        case 408: "Request Timeout"
         case 404: "Not Found"
         case 413: "Payload Too Large"
         case 422: "Unprocessable Content"

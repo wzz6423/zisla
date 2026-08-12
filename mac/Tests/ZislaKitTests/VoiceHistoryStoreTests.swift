@@ -237,6 +237,68 @@ struct VoiceHistoryStoreTests {
     }
 
     @Test
+    func failedAudioRemovalDuringRemoveAllKeepsOnlyUndeletableEntryPersisted() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let fileManager = FailingVoiceFileManager()
+        let store = fixture.makeStore(fileManager: fileManager)
+        let blockedID = UUID()
+        let removableID = UUID()
+        let blockedURL = store.recordingURL(for: blockedID)
+        let removableURL = store.recordingURL(for: removableID)
+        try fixture.writeAudio(at: blockedURL)
+        try fixture.writeAudio(at: removableURL)
+        #expect(store.record(VoiceRecordingResult(
+            id: blockedID,
+            audioFileURL: blockedURL,
+            transcript: "保留录音",
+            duration: 1
+        )))
+        #expect(store.record(VoiceRecordingResult(
+            id: removableID,
+            audioFileURL: removableURL,
+            transcript: "删除录音",
+            duration: 1
+        )))
+
+        fileManager.blockedURL = blockedURL
+        let removed = store.removeAll()
+
+        #expect(!removed)
+        #expect(store.entries.map(\.id) == [blockedID])
+        #expect(FileManager.default.fileExists(atPath: blockedURL.path))
+        #expect(!FileManager.default.fileExists(atPath: removableURL.path))
+        #expect(fixture.makeStore().entries.map(\.id) == [blockedID])
+        #expect(store.errorDescription != nil)
+    }
+
+    @Test
+    func failedFinalPersistenceStillRemovesDeletedAudioFromPublishedEntries() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let fileManager = FailingVoiceFileManager()
+        let store = fixture.makeStore(fileManager: fileManager)
+        let id = UUID()
+        let audioURL = store.recordingURL(for: id)
+        try fixture.writeAudio(at: audioURL)
+        #expect(store.record(VoiceRecordingResult(
+            id: id,
+            audioFileURL: audioURL,
+            transcript: "待删除录音",
+            duration: 1
+        )))
+        fileManager.createDirectoryCallsBeforeFailure = 2
+
+        let removed = store.removeAll()
+
+        #expect(!removed)
+        #expect(store.entries.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: audioURL.path))
+        #expect(store.errorDescription != nil)
+        #expect(fixture.makeStore().entries.isEmpty)
+    }
+
+    @Test
     func removingEntriesAlsoRemovesTheirAudioFiles() throws {
         let fixture = try makeFixture()
         defer { fixture.cleanup() }
@@ -403,6 +465,26 @@ private struct VoiceHistoryFixture {
 
 private final class FailingVoiceFileManager: FileManager {
     var blockedURL: URL?
+    var createDirectoryCallsBeforeFailure: Int?
+
+    override func createDirectory(
+        at url: URL,
+        withIntermediateDirectories createIntermediates: Bool,
+        attributes: [FileAttributeKey: Any]? = nil
+    ) throws {
+        if let remaining = createDirectoryCallsBeforeFailure {
+            guard remaining > 0 else {
+                createDirectoryCallsBeforeFailure = nil
+                throw CocoaError(.fileWriteUnknown)
+            }
+            createDirectoryCallsBeforeFailure = remaining - 1
+        }
+        try super.createDirectory(
+            at: url,
+            withIntermediateDirectories: createIntermediates,
+            attributes: attributes
+        )
+    }
 
     override func removeItem(at url: URL) throws {
         if let blockedURL, url.standardizedFileURL == blockedURL.standardizedFileURL {

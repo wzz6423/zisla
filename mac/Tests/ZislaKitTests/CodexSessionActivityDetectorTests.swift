@@ -90,7 +90,7 @@ struct CodexSessionActivityDetectorTests {
 
         let task = try #require(detector.activeTasks().first)
         #expect(task.status == .error)
-        #expect(task.failureReason == "failed")
+        #expect(task.failureReason == "工具执行失败")
 
         try appendLine(
             try responseItemLine(
@@ -639,7 +639,7 @@ struct CodexSessionActivityDetectorTests {
     }
 
     @Test
-    func extractsAndTruncatesFailureReasonFromToolOutput() throws {
+    func doesNotExposeLongFailureOutput() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let longMessage = String(repeating: "error ", count: 50)
@@ -666,13 +666,12 @@ struct CodexSessionActivityDetectorTests {
 
         let task = try #require(CodexSessionActivityDetector(sessionsDirectory: root).activeTasks().first)
         #expect(task.status == .error)
-        #expect(task.failureReason != nil)
-        #expect((task.failureReason?.count ?? 0) <= 201)
-        #expect(task.failureReason?.hasSuffix("…") == true)
+        #expect(task.failureReason == "工具执行失败")
+        #expect(task.failureReason?.contains(longMessage) == false)
     }
 
     @Test
-    func normalizesWhitespaceInFailureReason() throws {
+    func doesNotExposeWhitespaceNormalizedFailureOutput() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         try writeRollout(
@@ -698,7 +697,8 @@ struct CodexSessionActivityDetectorTests {
 
         let task = try #require(CodexSessionActivityDetector(sessionsDirectory: root).activeTasks().first)
         #expect(task.status == .error)
-        #expect(task.failureReason == "build failed due to syntax error")
+        #expect(task.failureReason == "工具执行失败")
+        #expect(task.failureReason?.contains("syntax error") == false)
     }
 
 

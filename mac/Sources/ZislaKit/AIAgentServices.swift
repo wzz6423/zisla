@@ -7,19 +7,19 @@ public enum AIAgentServiceError: LocalizedError, Sendable {
     case missingAPIKey
     case unsupportedBalanceProbe
     case invalidScript(String)
-    case scriptFailed(String)
+    case scriptFailed(Int32)
     case invalidResponse
-    case http(statusCode: Int, body: String)
+    case http(statusCode: Int)
 
     public var errorDescription: String? {
         switch self {
-        case let .invalidBaseURL(value): "渠道地址无效：\(value)"
+        case .invalidBaseURL: "渠道地址无效"
         case .missingAPIKey: "账号未配置 API Key"
         case .unsupportedBalanceProbe: "当前余额检测方式不支持该渠道"
         case let .invalidScript(path): "余额脚本不可执行：\(path)"
-        case let .scriptFailed(detail): "余额脚本执行失败：\(detail)"
+        case let .scriptFailed(status): "余额脚本执行失败（退出状态 \(status)）"
         case .invalidResponse: "渠道返回了无法识别的结果"
-        case let .http(statusCode, body): "渠道请求失败（HTTP \(statusCode)）：\(body.prefix(180))"
+        case let .http(statusCode): "渠道请求失败（HTTP \(statusCode)）"
         }
     }
 }
@@ -31,8 +31,7 @@ private enum AIAgentURLBuilder {
         dropVersionComponent: Bool = false
     ) throws -> URL {
         let raw = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard var url = URL(string: raw), let scheme = url.scheme,
-              scheme == "http" || scheme == "https" else {
+        guard var url = URL(string: raw), AIEndpointSecurity.permits(url) else {
             throw AIAgentServiceError.invalidBaseURL(raw)
         }
         if dropVersionComponent,
@@ -75,7 +74,7 @@ private enum AIAgentURLBuilder {
             request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
             request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         case .geminiGenerateContent:
-            break
+            request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         }
         return request
     }
@@ -225,7 +224,7 @@ public struct AIAgentBalanceService: Sendable {
             timeout: 15
         )
         guard output.status == 0 else {
-            throw AIAgentServiceError.scriptFailed(output.standardError)
+            throw AIAgentServiceError.scriptFailed(output.status)
         }
         guard let object = try JSONSerialization.jsonObject(with: output.standardOutput) as? [String: Any] else {
             throw AIAgentServiceError.invalidResponse
@@ -245,10 +244,7 @@ public struct AIAgentBalanceService: Sendable {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw AIAgentServiceError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
-            throw AIAgentServiceError.http(
-                statusCode: http.statusCode,
-                body: String(decoding: data, as: UTF8.self)
-            )
+            throw AIAgentServiceError.http(statusCode: http.statusCode)
         }
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AIAgentServiceError.invalidResponse
@@ -303,13 +299,10 @@ public struct AIAgentChannelProbeService: Sendable {
                 url = components?.url ?? url
                 request = AIAgentURLBuilder.request(url: url, apiKey: apiKey, protocolKind: route.protocolKind)
             case .geminiGenerateContent:
-                var url = try AIAgentURLBuilder.url(baseURL: route.baseURL, pathComponents: ["v1beta", "models"])
-                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-                components?.queryItems = [URLQueryItem(name: "key", value: apiKey)]
-                url = components?.url ?? url
+                let url = try AIAgentURLBuilder.url(baseURL: route.baseURL, pathComponents: ["v1beta", "models"])
                 request = AIAgentURLBuilder.request(url: url, apiKey: apiKey, protocolKind: route.protocolKind)
             }
-            let (data, response) = try await session.data(for: request)
+            let (_, response) = try await session.data(for: request)
             let latency = Int(Date().timeIntervalSince(startedAt) * 1_000)
             guard let http = response as? HTTPURLResponse else { throw AIAgentServiceError.invalidResponse }
             let health: AgentChannelHealth
@@ -324,7 +317,7 @@ public struct AIAgentChannelProbeService: Sendable {
                 baseURL: route.baseURL,
                 health: health,
                 latencyMilliseconds: latency,
-                detail: health == .healthy ? nil : String(decoding: data, as: UTF8.self).prefixString(180)
+                detail: health == .healthy ? nil : "渠道请求失败（HTTP \(http.statusCode)）"
             )
         } catch {
             return AgentChannelProbe(
@@ -352,7 +345,7 @@ public struct AIAgentModelCatalogService: Sendable {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw AIAgentServiceError.invalidResponse }
             guard (200..<300).contains(http.statusCode) else {
-                throw AIAgentServiceError.http(statusCode: http.statusCode, body: String(decoding: data, as: UTF8.self))
+                throw AIAgentServiceError.http(statusCode: http.statusCode)
             }
             guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 throw AIAgentServiceError.invalidResponse
@@ -385,10 +378,7 @@ public struct AIAgentModelCatalogService: Sendable {
                 protocolKind: route.protocolKind
             )
         case .geminiGenerateContent:
-            var url = try AIAgentURLBuilder.url(baseURL: route.baseURL, pathComponents: ["v1beta", "models"])
-            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            components?.queryItems = [URLQueryItem(name: "key", value: apiKey)]
-            url = components?.url ?? url
+            let url = try AIAgentURLBuilder.url(baseURL: route.baseURL, pathComponents: ["v1beta", "models"])
             return AIAgentURLBuilder.request(url: url, apiKey: apiKey, protocolKind: route.protocolKind)
         }
     }
@@ -689,12 +679,14 @@ public struct AIAgentCLIProfileService: Sendable {
 }
 
 public enum AIAgentCLIRelayError: LocalizedError, Sendable {
+    case unsupportedRelay(AgentCLIKind)
     case unavailable(AgentCLIKind)
     case failed(String)
     case emptyResponse
 
     public var errorDescription: String? {
         switch self {
+        case let .unsupportedRelay(kind): "\(kind.displayName) 暂不支持消息中继"
         case let .unavailable(kind): "未找到 \(kind.displayName) CLI"
         case let .failed(detail): "Agent CLI 执行失败：\(detail)"
         case .emptyResponse: "Agent CLI 没有返回消息"
@@ -718,7 +710,7 @@ public struct AIAgentCLIService: Sendable {
 
     public func statuses() async -> [AgentCLIStatus] {
         var results: [AgentCLIStatus] = []
-        for kind in AgentCLIKind.allCases {
+        for kind in AgentCLIKind.detectableCases {
             results.append(await status(for: kind))
         }
         return results
@@ -773,7 +765,8 @@ public struct AIAgentCLIService: Sendable {
     public func homebrewUpdates(for statuses: [AgentCLIStatus]) async -> [AIAgentCLIUpdate] {
         guard let brew = executable(named: AgentSkillPackageManager.brew.executableName) else { return [] }
         let candidates = statuses.compactMap { status -> (AgentCLIStatus, AgentSkillPackageInstallation)? in
-            guard let executablePath = status.executablePath,
+            guard AgentCLIKind.managedCases.contains(status.kind),
+                  let executablePath = status.executablePath,
                   let installation = AgentSkillPackageInstallation.detect(at: URL(fileURLWithPath: executablePath)),
                   installation.manager == .brew,
                   status.version != nil
@@ -860,7 +853,7 @@ public struct AIAgentCLIService: Sendable {
         if update {
             return updateCommands(for: requested)
         }
-        let packages = AgentCLIKind.allCases.compactMap { kind -> String? in
+        let packages = AgentCLIKind.managedCases.compactMap { kind -> String? in
             guard requested.contains(kind), let package = npmPackage(for: kind) else { return nil }
             return package
         }
@@ -885,7 +878,7 @@ public struct AIAgentCLIService: Sendable {
         var managedKinds = Set<AgentCLIKind>()
 
         for manager in [AgentSkillPackageManager.npm, .pnpm, .yarn, .bun, .brew] {
-            let packages = AgentCLIKind.allCases.compactMap { kind -> String? in
+            let packages = AgentCLIKind.managedCases.compactMap { kind -> String? in
                 guard requested.contains(kind),
                       let executableURL = executableURL(for: kind),
                       let installation = AgentSkillPackageInstallation.detect(at: executableURL),
@@ -904,7 +897,7 @@ public struct AIAgentCLIService: Sendable {
             ))
         }
 
-        let fallbackPackages = AgentCLIKind.allCases.compactMap { kind -> String? in
+        let fallbackPackages = AgentCLIKind.managedCases.compactMap { kind -> String? in
             guard requested.contains(kind), !managedKinds.contains(kind), let package = npmPackage(for: kind) else {
                 return nil
             }
@@ -947,7 +940,7 @@ public struct AIAgentCLIService: Sendable {
     /// Removes only the CLI executable for Grok, retaining its account and local configuration data.
     public func uninstallationCommands(for kinds: [AgentCLIKind]) -> [AIAgentCLICommand] {
         let requested = Set(kinds)
-        let packages = AgentCLIKind.allCases.compactMap { kind -> String? in
+        let packages = AgentCLIKind.managedCases.compactMap { kind -> String? in
             guard requested.contains(kind) else { return nil }
             return npmPackage(for: kind)
         }
@@ -1000,6 +993,9 @@ public struct AIAgentCLIService: Sendable {
         thinkingDepth: AgentChatThinkingDepth = .high,
         to kind: AgentCLIKind
     ) async throws -> String {
+        guard AgentCLIKind.relayCases.contains(kind) else {
+            throw AIAgentCLIRelayError.unsupportedRelay(kind)
+        }
         guard let executableURL = executableURL(for: kind) else {
             throw AIAgentCLIRelayError.unavailable(kind)
         }
@@ -1012,17 +1008,20 @@ public struct AIAgentCLIService: Sendable {
         )
         let output = try await AIAgentProcessRunner.run(
             executableURL: executableURL,
-            arguments: relayArguments(for: kind, prompt: prompt),
+            arguments: relayArguments(
+                for: kind,
+                prompt: prompt,
+                model: model,
+                thinkingDepth: thinkingDepth,
+                accessMode: accessMode
+            ),
             standardInput: Data(prompt.utf8),
             environment: commandEnvironment,
             workingDirectoryURL: relayWorkingDirectory(for: project),
             timeout: 300
         )
         guard output.status == 0 else {
-            let detail = output.standardError.isEmpty
-                ? String(decoding: output.standardOutput, as: UTF8.self)
-                : output.standardError
-            throw AIAgentCLIRelayError.failed(String(detail.prefix(500)))
+            throw AIAgentCLIRelayError.failed("退出状态 \(output.status)")
         }
         let response = String(decoding: output.standardOutput, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1044,18 +1043,128 @@ public struct AIAgentCLIService: Sendable {
         return URL(fileURLWithPath: path, isDirectory: true)
     }
 
-    public func relayArguments(for kind: AgentCLIKind, prompt: String) -> [String] {
+    public func relayArguments(
+        for kind: AgentCLIKind,
+        prompt: String,
+        model: String? = nil,
+        thinkingDepth: AgentChatThinkingDepth = .high,
+        accessMode: AgentChatAccessMode = .autoReview
+    ) -> [String] {
+        var args: [String] = []
+
         switch kind {
         case .claude:
-            ["-p"]
+            args.append("-p")
+            if let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedModel.isEmpty {
+                args.append(contentsOf: ["--model", trimmedModel])
+            }
+            args.append(contentsOf: ["--effort", effortLevel(for: thinkingDepth)])
+            if accessMode == .fullAccess {
+                args.append("--dangerously-skip-permissions")
+            } else {
+                args.append(contentsOf: ["--permission-mode", claudePermissionMode(for: accessMode)])
+            }
+
         case .codex:
-            ["exec", "--skip-git-repo-check", "-"]
+            args.append(contentsOf: ["exec", "--skip-git-repo-check"])
+            if let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedModel.isEmpty {
+                args.append(contentsOf: ["--model", trimmedModel])
+            }
+            args.append(contentsOf: [
+                "--config",
+                "model_reasoning_effort=\"\(effortLevel(for: thinkingDepth))\"",
+            ])
+            switch accessMode {
+            case .autoReview:
+                args.append("--approve-for-me")
+            case .readOnly:
+                args.append(contentsOf: ["--sandbox", "read-only"])
+            case .workspaceWrite:
+                args.append(contentsOf: ["--sandbox", "workspace-write"])
+            case .fullAccess:
+                args.append("--dangerously-bypass-approvals-and-sandbox")
+            }
+            args.append("-")
+
         case .gemini:
-            ["-p", "-"]
+            args.append("-p")
+            if let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedModel.isEmpty {
+                args.append(contentsOf: ["--model", trimmedModel])
+            }
+            args.append(contentsOf: ["--approval-mode", geminiApprovalMode(for: accessMode)])
+            args.append("-")
+
         case .grok:
-            ["--prompt-file", "-"]
+            if let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedModel.isEmpty {
+                args.append(contentsOf: ["--model", trimmedModel])
+            }
+            args.append(contentsOf: ["--reasoning-effort", effortLevel(for: thinkingDepth)])
+            args.append(contentsOf: ["--permission-mode", grokPermissionMode(for: accessMode)])
+            args.append(contentsOf: ["--prompt-file", "-"])
+
         case .opencode:
-            ["run", "-"]
+            args.append("run")
+            if let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedModel.isEmpty {
+                args.append(contentsOf: ["--model", trimmedModel])
+            }
+            let variant = opencodeVariant(for: thinkingDepth)
+            if !variant.isEmpty {
+                args.append(contentsOf: ["--variant", variant])
+            }
+            if accessMode == .fullAccess {
+                args.append("--auto")
+            }
+            args.append("-")
+
+        case .kimi, .qwen, .qoder, .copilot:
+            return []
+        }
+
+        return args
+    }
+
+    private func effortLevel(for depth: AgentChatThinkingDepth) -> String {
+        switch depth {
+        case .low: "low"
+        case .medium: "medium"
+        case .high: "high"
+        case .extraHigh: "xhigh"
+        }
+    }
+
+    private func claudePermissionMode(for accessMode: AgentChatAccessMode) -> String {
+        switch accessMode {
+        case .fullAccess: "bypassPermissions"
+        case .autoReview: "auto"
+        case .readOnly: "plan"
+        case .workspaceWrite: "acceptEdits"
+        }
+    }
+
+    private func grokPermissionMode(for accessMode: AgentChatAccessMode) -> String {
+        switch accessMode {
+        case .fullAccess: "bypassPermissions"
+        case .autoReview: "auto"
+        case .readOnly: "plan"
+        case .workspaceWrite: "acceptEdits"
+        }
+    }
+
+    private func geminiApprovalMode(for accessMode: AgentChatAccessMode) -> String {
+        switch accessMode {
+        case .fullAccess: "yolo"
+        case .autoReview: "auto_edit"
+        case .readOnly: "plan"
+        case .workspaceWrite: "auto_edit"
+        }
+    }
+
+    private func opencodeVariant(for depth: AgentChatThinkingDepth) -> String {
+        switch depth {
+        case .low: "minimal"
+        case .medium: ""
+        case .high: "high"
+        case .extraHigh: "max"
         }
     }
 
@@ -1118,6 +1227,7 @@ public struct AIAgentCLIService: Sendable {
             homeDirectory.appendingPathComponent("Library/pnpm", isDirectory: true),
             homeDirectory.appendingPathComponent(".bun/bin", isDirectory: true),
             homeDirectory.appendingPathComponent(".grok/bin", isDirectory: true),
+            homeDirectory.appendingPathComponent(".kimi-code/bin", isDirectory: true),
             URL(fileURLWithPath: "/opt/homebrew/bin", isDirectory: true),
             URL(fileURLWithPath: "/usr/local/bin", isDirectory: true),
         ]
@@ -1138,6 +1248,17 @@ public struct AIAgentCLIService: Sendable {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedDescending }
     }
 
+    func outboundMessages(_ messages: [AgentChatMessage]) -> [AIOutboundMessage] {
+        boundedSerializedMessages(messages).map { item in
+            let role: AIChatRole = switch item.message.role {
+            case .system: .system
+            case .user: .user
+            case .assistant: .assistant
+            }
+            return AIOutboundMessage(role: role, content: item.content)
+        }
+    }
+
     func relayPrompt(
         _ messages: [AgentChatMessage],
         project: AgentChatProject? = nil,
@@ -1145,63 +1266,9 @@ public struct AIAgentCLIService: Sendable {
         model: String? = nil,
         thinkingDepth: AgentChatThinkingDepth = .high
     ) -> String {
-        let retainedMessages = Array(messages.suffix(32))
-        let history = retainedMessages.enumerated().map { index, message in
-            let role: String
-            switch message.role {
-            case .system: role = "系统"
-            case .user: role = "用户"
-            case .assistant: role = "Agent"
-            }
-            var sections = ["[\(role)]\n\(message.content)"]
-            if message.mode == .plan {
-                sections.append("[计划模式]\n请给出可执行计划、当前进展和下一步。")
-            }
-            // 计划模式与目标模式互相独立，目标存在时都要单独声明当前会话的 Prompt。
-            if let goal = message.goalTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !goal.isEmpty {
-                sections.append("[目标模式]\n当前会话目标：\(goal)\n请围绕该目标推进，不要偏离。")
-            }
-            let attachments = message.attachments.compactMap { attachment -> String? in
-                guard attachment.state != .deleted,
-                      !attachment.storagePath.isEmpty else { return nil }
-                let path = AppPaths.aiAgentAttachments
-                    .appendingPathComponent(attachment.storagePath, isDirectory: false)
-                    .path
-                return "- \(attachment.kind.displayName)：\(attachment.fileName)（\(attachment.mimeType)，\(path)）"
-            }
-            if !attachments.isEmpty {
-                sections.append("[附件]\n\(attachments.joined(separator: "\n"))\n可在本机路径读取附件；不要假设附件内容已写入本条文本。")
-            }
-            let apps = message.appReferences.map { app in
-                "- \(app.name)（\(app.bundleIdentifier)，PID \(app.processIdentifier)）"
-            }
-            if !apps.isEmpty {
-                sections.append("[@本机 App]\n\(apps.joined(separator: "\n"))\n这些应用正在用户本机运行；仅在本机环境允许时读取它们的公开上下文。")
-            }
-            let skills = index == retainedMessages.count - 1 ? message.skillReferences.compactMap { skill -> String? in
-                let name = skill.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                let path = skill.path.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !name.isEmpty, !path.isEmpty else { return nil }
-                return "- \(name)：\(path)"
-            } : []
-            if !skills.isEmpty {
-                sections.append("[调用 Skills]\n\(skills.joined(separator: "\n"))\n这是用户显式选择的 Skill。仅当本机可读取对应路径时加载其 SKILL.md；不要假设本应用执行了该 Skill。")
-            }
-            for reference in message.contextReferences {
-                let context = reference.messages.map { contextMessage in
-                    let contextRole: String
-                    switch contextMessage.role {
-                    case .system: contextRole = "系统"
-                    case .user: contextRole = "用户"
-                    case .assistant: contextRole = "Agent"
-                    }
-                    return "[\(contextRole)] \(contextMessage.content)"
-                }.joined(separator: "\n")
-                sections.append("[@会话：\(reference.title)]\n\(context)")
-            }
-            return sections.joined(separator: "\n\n")
-        }.joined(separator: "\n\n")
+        let history = boundedSerializedMessages(messages)
+            .map(\.content)
+            .joined(separator: "\n\n")
         let projectContext: String
         if let project {
             let instructions = project.instructions.isEmpty ? "" : "\n项目说明：\(project.instructions)"
@@ -1214,6 +1281,73 @@ public struct AIAgentCLIService: Sendable {
         let relayPreferences = "[转发偏好]\n访问模式：\(accessMode.displayName)\(modelPreference)\n思考深度：\(thinkingDepth.displayName)\n请在外部 CLI 自身允许的权限范围内遵守这些偏好。"
         let sections = [relayPreferences, projectContext, history].filter { !$0.isEmpty }.joined(separator: "\n\n")
         return "以下是从统一聊天历史转发的消息。请直接回复最后一条用户消息；不要声称此应用本身是 Agent。\n\n\(sections)"
+    }
+
+    private func boundedSerializedMessages(
+        _ messages: [AgentChatMessage]
+    ) -> [(message: AgentChatMessage, content: String)] {
+        let retained = Array(messages.suffix(32))
+        let serialized = retained.enumerated().map { index, message in
+            (message, serializedMessage(message, includesSkills: index == retained.count - 1))
+        }
+        var remainingCharacters = 96_000
+        var bounded: [(message: AgentChatMessage, content: String)] = []
+        for item in serialized.reversed() where remainingCharacters > 0 {
+            let content = String(item.1.prefix(remainingCharacters))
+            bounded.append((item.0, content))
+            remainingCharacters -= content.count
+        }
+        return Array(bounded.reversed())
+    }
+
+    private func serializedMessage(_ message: AgentChatMessage, includesSkills: Bool) -> String {
+        let role: String = switch message.role {
+        case .system: "系统"
+        case .user: "用户"
+        case .assistant: "Agent"
+        }
+        var sections = ["[\(role)]\n\(message.content)"]
+        if message.mode == .plan {
+            sections.append("[计划模式]\n请给出可执行计划、当前进展和下一步。")
+        }
+        if let goal = message.goalTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !goal.isEmpty {
+            sections.append("[目标模式]\n当前会话目标：\(goal)\n请围绕该目标推进，不要偏离。")
+        }
+        let attachments = message.attachments.compactMap { attachment -> String? in
+            guard attachment.state != .deleted, !attachment.storagePath.isEmpty else { return nil }
+            let path = AppPaths.aiAgentAttachments
+                .appendingPathComponent(attachment.storagePath, isDirectory: false).path
+            return "- \(attachment.kind.displayName)：\(attachment.fileName)（\(attachment.mimeType)，\(path)）"
+        }
+        if !attachments.isEmpty {
+            sections.append("[附件]\n\(attachments.joined(separator: "\n"))\n可在本机路径读取附件；不要假设附件内容已写入本条文本。")
+        }
+        let apps = message.appReferences.map {
+            "- \($0.name)（\($0.bundleIdentifier)，PID \($0.processIdentifier)）"
+        }
+        if !apps.isEmpty {
+            sections.append("[@本机 App]\n\(apps.joined(separator: "\n"))\n这些应用正在用户本机运行；仅在本机环境允许时读取它们的公开上下文。")
+        }
+        let skills = includesSkills ? message.skillReferences.compactMap { skill -> String? in
+            let name = skill.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let path = skill.path.trimmingCharacters(in: .whitespacesAndNewlines)
+            return name.isEmpty || path.isEmpty ? nil : "- \(name)：\(path)"
+        } : []
+        if !skills.isEmpty {
+            sections.append("[调用 Skills]\n\(skills.joined(separator: "\n"))\n这是用户显式选择的 Skill。仅当本机可读取对应路径时加载其 SKILL.md；不要假设本应用执行了该 Skill。")
+        }
+        for reference in message.contextReferences {
+            let context = reference.messages.map { contextMessage in
+                let contextRole: String = switch contextMessage.role {
+                case .system: "系统"
+                case .user: "用户"
+                case .assistant: "Agent"
+                }
+                return "[\(contextRole)] \(contextMessage.content)"
+            }.joined(separator: "\n")
+            sections.append("[@会话：\(reference.title)]\n\(context)")
+        }
+        return sections.joined(separator: "\n\n")
     }
 }
 

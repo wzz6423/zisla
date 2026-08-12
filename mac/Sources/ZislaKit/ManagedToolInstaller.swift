@@ -169,39 +169,22 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
 
     func normalizedInstalledVersion(from raw: String) -> String? {
         guard let normalized = ManagedToolService.normalizeVersion(raw) else { return nil }
-
-        // LibreOffice 版本格式特殊处理
-        if self == .libreOffice {
-            guard let range = normalized.range(
-                of: #"\d+(?:\.\d+)+"#,
-                options: .regularExpression
-            ) else { return nil }
-            return normalized[range]
+        switch self {
+        case .libreOffice:
+            return Self.dottedVersion(in: normalized)?
                 .split(separator: ".")
                 .prefix(3)
                 .joined(separator: ".")
+        case .fzf, .ripgrep, .lazygit, .neovim, .yazi, .starship, .tldr, .jq, .tree:
+            return Self.dottedVersion(in: normalized)
+        default:
+            return normalized
         }
+    }
 
-        // neovim 输出格式: "NVIM v0.9.5"
-        if self == .neovim {
-            guard let range = normalized.range(
-                of: #"\d+(?:\.\d+)+"#,
-                options: .regularExpression
-            ) else { return nil }
-            return String(normalized[range])
-        }
-
-        // jq 输出格式: "jq-1.7.1"
-        if self == .jq {
-            if let range = normalized.range(
-                of: #"\d+(?:\.\d+)+"#,
-                options: .regularExpression
-            ) {
-                return String(normalized[range])
-            }
-        }
-
-        return normalized
+    private static func dottedVersion(in text: String) -> String? {
+        text.range(of: #"\d+(?:\.\d+)+"#, options: .regularExpression)
+            .map { String(text[$0]) }
     }
 
     /// Matching rule for release asset names.

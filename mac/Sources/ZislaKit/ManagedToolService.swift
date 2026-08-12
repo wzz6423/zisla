@@ -65,10 +65,30 @@ public final class ManagedToolService: ObservableObject {
         }
         for path in Self.externalPaths(for: tool) {
             if let trusted = trustedExecutable(URL(fileURLWithPath: path)) {
-                return (trusted, tool.usesHomebrew ? .homebrew : .external(path))
+                return (trusted, Self.classifyExternalLocation(
+                    resolvedPath: trusted.path,
+                    discoveredPath: path,
+                    tool: tool
+                ))
             }
         }
         return nil
+    }
+
+    static func classifyExternalLocation(
+        resolvedPath: String,
+        discoveredPath: String,
+        tool: ManagedTool
+    ) -> ManagedToolState.Location {
+        let homebrewRoots = [
+            "/opt/homebrew/Cellar/",
+            "/opt/homebrew/Caskroom/",
+            "/usr/local/Cellar/",
+            "/usr/local/Caskroom/",
+        ]
+        let isHomebrewManaged = tool.usesHomebrew
+            && homebrewRoots.contains(where: resolvedPath.hasPrefix)
+        return isHomebrewManaged ? .homebrew : .external(discoveredPath)
     }
 
     static func externalPaths(for tool: ManagedTool) -> [String] {
@@ -370,7 +390,7 @@ public final class ManagedToolService: ObservableObject {
         )
 
         states[tool]?.phase = .installing
-        let action = states[tool]?.isInstalled == true ? "upgrade" : "install"
+        let action = Self.homebrewInstallAction(for: states[tool]?.location)
         _ = try await runHomebrew([action, "--cask", caskName])
         refreshedInstalledVersions.remove(tool)
 
@@ -395,7 +415,7 @@ public final class ManagedToolService: ObservableObject {
         )
 
         states[tool]?.phase = .installing
-        let action = states[tool]?.isInstalled == true ? "upgrade" : "install"
+        let action = Self.homebrewInstallAction(for: states[tool]?.location)
         _ = try await runHomebrew([action, "--formula", formulaName])
         refreshedInstalledVersions.remove(tool)
 
@@ -409,6 +429,10 @@ public final class ManagedToolService: ObservableObject {
         states[tool]?.latestVersion = version
         refreshedInstalledVersions.insert(tool)
         persistCachedStates()
+    }
+
+    static func homebrewInstallAction(for location: ManagedToolState.Location?) -> String {
+        location == .homebrew ? "upgrade" : "install"
     }
 
     // MARK: - Cached state

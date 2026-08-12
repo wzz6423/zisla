@@ -406,6 +406,165 @@ struct AIStateRepositoryTests {
     }
 
     @Test
+    func repositoryRecordsLateDetectedUsageAcrossProvidersAndTimestamps() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let first = AIUsageSample(
+            sourceID: "event-later",
+            provider: .claude,
+            timestamp: timestamp.addingTimeInterval(100),
+            inputTokens: 100,
+            outputTokens: 10
+        )
+        let late = AIUsageSample(
+            sourceID: "event-earlier",
+            provider: .grok,
+            timestamp: timestamp,
+            inputTokens: 50,
+            outputTokens: 5
+        )
+
+        #expect(try repository.recordDetectedUsage([first]) == 1)
+        #expect(try repository.recordDetectedUsage([late]) == 1)
+        #expect(try repository.load().usageSamples.first?.totalTokens == 165)
+    }
+
+    @Test
+    func repositoryRecordsDifferentDetectedEventsWithTheSameTimestamp() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let first = AIUsageSample(
+            sourceID: "same-time-a",
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 20,
+            outputTokens: 2
+        )
+        let second = AIUsageSample(
+            sourceID: "same-time-b",
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 30,
+            outputTokens: 3
+        )
+
+        #expect(try repository.recordDetectedUsage([first]) == 1)
+        #expect(try repository.recordDetectedUsage([second]) == 1)
+        #expect(try repository.load().usageSamples.first?.totalTokens == 55)
+    }
+
+    @Test
+    func repositoryRecordsNormalEventAfterFutureDatedEvent() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let future = AIUsageSample(
+            sourceID: "future-event",
+            provider: .codex,
+            timestamp: timestamp.addingTimeInterval(86_400),
+            inputTokens: 40,
+            outputTokens: 4
+        )
+        let normal = AIUsageSample(
+            sourceID: "normal-event",
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 20,
+            outputTokens: 2
+        )
+
+        #expect(try repository.recordDetectedUsage([future]) == 1)
+        #expect(try repository.recordDetectedUsage([normal]) == 1)
+        #expect(try repository.load().usageSamples.map(\.totalTokens).reduce(0, +) == 66)
+    }
+
+    @Test
+    func repositoryReconcilesLegacyDetectedTotalWithoutUsingDatabaseModificationDate() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        _ = try repository.load()
+
+        let cutoff = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let legacy = AIUsageSample(
+            sourceID: "legacy-event",
+            provider: .codex,
+            timestamp: cutoff,
+            inputTokens: 20,
+            outputTokens: 5
+        )
+        for sample in AIUsageAnalytics.dailyUsageSamples(samples: [legacy], calendar: .current) {
+            try insertUsageSample(sample, into: repository.databaseURL)
+        }
+        try createLegacyDetectedUsageTotals(at: repository.databaseURL)
+        try insertLegacyDetectedUsageTotal(
+            at: Calendar.current.startOfDay(for: cutoff),
+            into: repository.databaseURL
+        )
+        try setSQLiteUserVersion(at: repository.databaseURL, to: 3)
+        try setSQLiteModificationDate(cutoff.addingTimeInterval(3_600), at: repository.databaseURL)
+
+        let late = AIUsageSample(
+            sourceID: "migration-late-event",
+            provider: .codex,
+            timestamp: cutoff.addingTimeInterval(60),
+            inputTokens: 30,
+            outputTokens: 5
+        )
+
+        #expect(try repository.recordDetectedUsage([legacy, late]) == 1)
+        #expect(try repository.load().usageSamples.first?.totalTokens == 60)
+    }
+
+    @Test
+    func repositoryKeepsLegacyCursorUntilANonEmptyScanBuildsTheEventBaseline() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        _ = try repository.load()
+
+        let cutoff = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let day = Calendar.current.startOfDay(for: cutoff)
+        try insertUsageSample(AIUsageSample(
+            sourceID: "zisla-daily-total:\(day.timeIntervalSinceReferenceDate)",
+            provider: .codex,
+            timestamp: day,
+            inputTokens: 20,
+            outputTokens: 5
+        ), into: repository.databaseURL)
+        try insertDetectedUsageCursor(at: cutoff, into: repository.databaseURL)
+        try setSQLiteUserVersion(at: repository.databaseURL, to: 5)
+
+        let migrated = AIStateRepository(directoryURL: directory)
+        #expect(try migrated.recordDetectedUsage([]) == 0)
+
+        let alreadyCounted = AIUsageSample(
+            sourceID: "legacy-event",
+            provider: .codex,
+            timestamp: cutoff.addingTimeInterval(-60),
+            inputTokens: 20,
+            outputTokens: 5
+        )
+        #expect(try migrated.recordDetectedUsage([alreadyCounted]) == 0)
+        #expect(try migrated.load().usageSamples.first?.totalTokens == 25)
+
+        let new = AIUsageSample(
+            sourceID: "new-event",
+            provider: .codex,
+            timestamp: cutoff.addingTimeInterval(60),
+            inputTokens: 10,
+            outputTokens: 2
+        )
+        #expect(try migrated.recordDetectedUsage([alreadyCounted, new]) == 1)
+        #expect(try migrated.load().usageSamples.first?.totalTokens == 37)
+    }
+
+    @Test
     func repositoryCompactsExistingUsageHistoryWhenItsLimitIsLowered() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -515,7 +674,35 @@ struct AIStateRepositoryTests {
     }
 
     @Test
-    func repositoryMigratesLegacyDailyTotalToTimestampCursor() throws {
+    func repositoryAddsOnlyPositiveTokenDeltaWhenDetectedEventGrows() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let original = AIUsageSample(
+            sourceID: "growing-event",
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 10,
+            outputTokens: 2
+        )
+        let corrected = AIUsageSample(
+            sourceID: "growing-event",
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 15,
+            outputTokens: 1
+        )
+
+        #expect(try repository.recordDetectedUsage([original]) == 1)
+        #expect(try repository.recordDetectedUsage([corrected]) == 1)
+        #expect(try repository.load().usageSamples.first?.totalTokens == 17)
+        #expect(try repository.recordDetectedUsage([original]) == 0)
+        #expect(try repository.load().usageSamples.first?.totalTokens == 17)
+    }
+
+    @Test
+    func repositoryReconcilesLegacyDailyTotalWithDetectedEvents() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let repository = AIStateRepository(directoryURL: directory)
@@ -535,6 +722,10 @@ struct AIStateRepositoryTests {
             try insertUsageSample(sample, into: repository.databaseURL)
         }
         try createLegacyDetectedUsageTotals(at: repository.databaseURL)
+        try insertLegacyDetectedUsageTotal(
+            at: Calendar.current.startOfDay(for: cutoff),
+            into: repository.databaseURL
+        )
         try setSQLiteUserVersion(at: repository.databaseURL, to: 3)
         try setSQLiteModificationDate(cutoff, at: repository.databaseURL)
 
@@ -1597,6 +1788,28 @@ private func createLegacyDetectedUsageTotals(at url: URL) throws {
             input_tokens INTEGER NOT NULL,
             output_tokens INTEGER NOT NULL
         )
+        """
+    )
+}
+
+private func insertLegacyDetectedUsageTotal(at timestamp: Date, into url: URL) throws {
+    try executeSQLite(
+        at: url,
+        sql: """
+        INSERT INTO detected_usage_totals(timestamp, input_tokens, output_tokens)
+        VALUES(
+            \(timestamp.timeIntervalSinceReferenceDate), 20, 5
+        )
+        """
+    )
+}
+
+private func insertDetectedUsageCursor(at timestamp: Date, into url: URL) throws {
+    try executeSQLite(
+        at: url,
+        sql: """
+        INSERT OR REPLACE INTO detected_usage_cursor(id, timestamp)
+        VALUES(1, \(timestamp.timeIntervalSinceReferenceDate))
         """
     )
 }

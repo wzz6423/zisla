@@ -113,6 +113,47 @@ struct AIAgentModelsTests {
     }
 
     @Test
+    func routerProvidesAllCombinationsAndIsolatesFailuresByURL() throws {
+        let first = AgentAccount(name: "账号一", provider: "OpenAI")
+        let second = AgentAccount(name: "账号二", provider: "OpenAI")
+        let group = AgentEndpointGroup(
+            name: "主组",
+            baseURLs: ["https://one.example/v1", "https://two.example/v1"],
+            accountIDs: [first.id, second.id]
+        )
+        let channel = AgentChannel(
+            name: "渠道",
+            defaultModel: "model",
+            endpointGroups: [group]
+        )
+        let now = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        var router = AgentRouteRouter()
+
+        let initial = router.routes(for: channel, accounts: [first, second], at: now)
+
+        #expect(initial.count == 4)
+        let failed = try #require(initial.first { $0.baseURL == "https://one.example/v1" })
+        router.recordFailure(for: failed, at: now)
+        router.recordFailure(for: failed, at: now)
+
+        let remaining = router.routes(
+            for: channel,
+            accounts: [first, second],
+            at: now.addingTimeInterval(1)
+        )
+        #expect(remaining.count == 2)
+        #expect(remaining.allSatisfy { $0.baseURL == "https://two.example/v1" })
+        #expect(Set(remaining.map(\.accountID)) == Set([first.id, second.id]))
+
+        let recovered = router.routes(
+            for: channel,
+            accounts: [first, second],
+            at: now.addingTimeInterval(301)
+        )
+        #expect(recovered.count == 4)
+    }
+
+    @Test
     func legacyAgentStateWithoutLocalModelsRemainsReadable() throws {
         let data = Data(#"{"accounts":[],"channels":[]}"#.utf8)
         let state = try JSONDecoder().decode(AIAgentState.self, from: data)
@@ -358,5 +399,26 @@ struct AIAgentModelsTests {
             try AgentChatSlashCommandParser.parse("/disabled 运行", skills: [disabled])
         }
         #expect(try AgentChatSlashCommandParser.parse("/goal", skills: []) == .setGoalPrompt(content: ""))
+    }
+
+    @Test
+    func detectableCLIKindsIncludeSupportedCodingAgents() {
+        #expect(AgentCLIKind.kimi.displayName == "Kimi Code")
+        #expect(AgentCLIKind.kimi.executableName == "kimi")
+        #expect(AgentCLIKind.qwen.displayName == "Qwen Code")
+        #expect(AgentCLIKind.qwen.executableName == "qwen")
+        #expect(AgentCLIKind.qoder.displayName == "Qoder CLI")
+        #expect(AgentCLIKind.qoder.executableName == "qodercli")
+        #expect(AgentCLIKind.copilot.displayName == "Copilot")
+        #expect(AgentCLIKind.copilot.executableName == "copilot")
+
+        #expect(AgentCLIKind.detectableCases.contains(.kimi))
+        #expect(AgentCLIKind.detectableCases.contains(.qwen))
+        #expect(AgentCLIKind.detectableCases.contains(.qoder))
+        #expect(AgentCLIKind.detectableCases.contains(.copilot))
+        #expect(!AgentCLIKind.relayCases.contains(.kimi))
+        #expect(!AgentCLIKind.profileCases.contains(.kimi))
+        #expect(!AgentCLIKind.managedCases.contains(.kimi))
+        #expect(AgentCLIKind.allCases.prefix(5) == [.claude, .codex, .gemini, .grok, .opencode])
     }
 }

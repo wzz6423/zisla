@@ -193,29 +193,49 @@ public final class VoiceHistoryStore: ObservableObject {
         entries = candidate
     }
 
-    public func removeAll() {
-        guard persistCandidate([]) else { return }
-        entries.removeAll()
+    @discardableResult
+    public func removeAll() -> Bool {
         let audioURLs: [URL]
-        do {
-            audioURLs = try fileManager.contentsOfDirectory(
-                at: recordingsDirectory,
-                includingPropertiesForKeys: [.isDirectoryKey]
-            ).filter { url in
-                url.pathExtension.lowercased() == "caf"
-                    && (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true
+        if fileManager.fileExists(atPath: recordingsDirectory.path) {
+            do {
+                audioURLs = try fileManager.contentsOfDirectory(
+                    at: recordingsDirectory,
+                    includingPropertiesForKeys: [.isDirectoryKey]
+                ).filter { url in
+                    url.pathExtension.lowercased() == "caf"
+                        && (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true
+                }
+            } catch {
+                errorDescription = error.localizedDescription
+                return false
             }
-        } catch {
-            errorDescription = error.localizedDescription
-            return
+        } else {
+            audioURLs = []
         }
+        // 先确认索引可写，避免持久化失败时删掉仍被引用的音频。
+        guard persistCandidate(entries) else { return false }
+
+        var failedAudioPaths: Set<String> = []
+        var removalErrorDescription: String?
         for audioURL in audioURLs {
             do {
                 try fileManager.removeItem(at: audioURL)
             } catch {
-                errorDescription = error.localizedDescription
+                failedAudioPaths.insert(audioURL.standardizedFileURL.path)
+                removalErrorDescription = removalErrorDescription ?? error.localizedDescription
             }
         }
+
+        let candidate = entries.filter { entry in
+            failedAudioPaths.contains(recordingURL(for: entry.id).standardizedFileURL.path)
+        }
+        guard persistCandidate(candidate) else {
+            entries = candidate
+            return false
+        }
+        entries = candidate
+        errorDescription = removalErrorDescription
+        return removalErrorDescription == nil
     }
 
     private func load() {

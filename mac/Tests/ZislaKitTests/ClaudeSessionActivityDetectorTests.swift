@@ -105,7 +105,8 @@ struct ClaudeSessionActivityDetectorTests {
         let detector = ClaudeSessionActivityDetector(projectsDirectory: root)
         let failed = try #require(detector.activeTasks().first)
         #expect(failed.status == .error)
-        #expect(failed.failureReason == "Permission denied")
+        #expect(failed.failureReason == "工具执行失败")
+        #expect(failed.failureReason?.contains("Permission denied") == false)
 
         try appendJSONLLine(
             claudeUserToolResult(
@@ -260,7 +261,8 @@ struct ClaudeSessionActivityDetectorTests {
             projectsDirectory: root
         ).activeTasks().first)
         #expect(task.status == .error)
-        #expect(task.failureReason == "upstream failed")
+        #expect(task.failureReason == "API 请求失败（HTTP 502）")
+        #expect(task.failureReason?.contains("upstream failed") == false)
     }
 
     @Test

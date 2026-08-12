@@ -73,6 +73,7 @@ public final class AIAgentWorkspace: ObservableObject {
     private let balanceService: AIAgentBalanceService
     private let channelProbeService: AIAgentChannelProbeService
     private let modelCatalogService: AIAgentModelCatalogService
+    private let chatClient: AIChatClient
     private let cliService: AIAgentCLIService
     private let cliUpdateService: AIAgentCLIUpdateService
     private let cliProfileService: AIAgentCLIProfileService
@@ -97,6 +98,7 @@ public final class AIAgentWorkspace: ObservableObject {
         balanceService: AIAgentBalanceService = AIAgentBalanceService(),
         channelProbeService: AIAgentChannelProbeService = AIAgentChannelProbeService(),
         modelCatalogService: AIAgentModelCatalogService = AIAgentModelCatalogService(),
+        chatClient: AIChatClient = AIChatClient(),
         cliService: AIAgentCLIService = AIAgentCLIService(),
         cliUpdateService: AIAgentCLIUpdateService = AIAgentCLIUpdateService(),
         cliProfileService: AIAgentCLIProfileService = AIAgentCLIProfileService(),
@@ -110,6 +112,7 @@ public final class AIAgentWorkspace: ObservableObject {
         self.balanceService = balanceService
         self.channelProbeService = channelProbeService
         self.modelCatalogService = modelCatalogService
+        self.chatClient = chatClient
         self.cliService = cliService
         self.cliUpdateService = cliUpdateService
         self.cliProfileService = cliProfileService
@@ -829,17 +832,8 @@ public final class AIAgentWorkspace: ObservableObject {
         }
         do {
             let systemPrompt = relaySystemPrompt(for: thread, messages: messages)
-            let outbound = messages
-                .filter { $0.role != .system }
-                .map { message in
-                    let role: AIChatRole = switch message.role {
-                    case .system: .system
-                    case .user: .user
-                    case .assistant: .assistant
-                    }
-                    return AIOutboundMessage(role: role, content: message.content)
-                }
-            let response = try await AIChatClient().complete(
+            let outbound = cliService.outboundMessages(messages.filter { $0.role != .system })
+            let response = try await chatClient.complete(
                 endpoint: localModel.endpoint,
                 model: model,
                 systemPrompt: systemPrompt,
@@ -860,51 +854,74 @@ public final class AIAgentWorkspace: ObservableObject {
     ) async -> (attempted: Bool, response: String?) {
         guard let channelID = thread.channelID,
               let channel = store.channel(id: channelID),
-              channel.isEnabled,
-              channel.protocolKind == .openAICompatible else {
+              channel.isEnabled else {
             return (false, nil)
         }
         let apiAccounts = store.state.accounts.filter { $0.credentialKind == .apiKey }
-        guard let route = apiRouteRouter.nextRoute(
+        let routes = apiRouteRouter.routes(
             for: channel,
             accounts: apiAccounts,
             model: thread.selectedModel
-        ), let account = store.account(id: route.accountID) else {
+        )
+        guard !routes.isEmpty else {
             return (false, nil)
         }
-        do {
-            let apiKey = try store.secret(for: account)
-            let systemPrompt = relaySystemPrompt(for: thread, messages: messages)
-            let outbound = messages
-                .filter { $0.role != .system }
-                .map { message in
-                    let role: AIChatRole = switch message.role {
-                    case .system: .system
-                    case .user: .user
-                    case .assistant: .assistant
-                    }
-                    return AIOutboundMessage(role: role, content: message.content)
+        let systemPrompt = relaySystemPrompt(for: thread, messages: messages)
+        let outbound = cliService.outboundMessages(messages.filter { $0.role != .system })
+        for route in routes {
+            guard let account = store.account(id: route.accountID) else { continue }
+            let apiKey: String
+            do {
+                guard let storedKey = try store.secret(for: account),
+                      !storedKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    lastError = "渠道账号尚未配置 API Key"
+                    continue
                 }
-            let response = try await AIChatClient().complete(
-                endpoint: AIEndpoint(
-                    name: channel.name,
-                    baseURL: route.baseURL,
-                    kind: .openAICompatible
-                ),
-                model: route.model,
-                systemPrompt: systemPrompt,
-                messages: outbound,
-                apiKey: apiKey
-            ).content
-            store.append(AgentChatMessage(role: .assistant, content: response, accountID: account.id), to: thread.id)
-            store.updateThreadTarget(id: thread.id, cliKind: nil, accountID: account.id)
-            lastError = nil
-            return (true, response)
-        } catch {
-            store.recordRouteFailure(for: account.id)
-            lastError = error.localizedDescription
-            return (true, nil)
+                apiKey = storedKey
+            } catch {
+                lastError = error.localizedDescription
+                continue
+            }
+            do {
+                let response = try await chatClient.complete(
+                    endpoint: AIEndpoint(
+                        name: channel.name,
+                        baseURL: route.baseURL,
+                        kind: .openAICompatible
+                    ),
+                    protocolKind: route.protocolKind,
+                    model: route.model,
+                    systemPrompt: systemPrompt,
+                    messages: outbound,
+                    apiKey: apiKey
+                ).content
+                apiRouteRouter.recordSuccess(for: route)
+                store.append(
+                    AgentChatMessage(role: .assistant, content: response, accountID: account.id),
+                    to: thread.id
+                )
+                store.updateThreadTarget(id: thread.id, cliKind: nil, accountID: account.id)
+                lastError = nil
+                return (true, response)
+            } catch {
+                if shouldQuarantineAPIEndpoint(after: error) {
+                    apiRouteRouter.recordFailure(for: route)
+                }
+                lastError = error.localizedDescription
+            }
         }
+        return (true, nil)
+    }
+
+    private func shouldQuarantineAPIEndpoint(after error: Error) -> Bool {
+        if error is URLError || (error as NSError).domain == NSURLErrorDomain {
+            return true
+        }
+        guard let chatError = error as? AIChatClientError,
+              case let .http(statusCode) = chatError else {
+            return false
+        }
+        return statusCode == 429 || (500...599).contains(statusCode)
     }
 
     private func handleMessageConnectionRequest(
