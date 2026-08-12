@@ -138,6 +138,42 @@ public final class AIAgentStore: ObservableObject {
         }
     }
 
+    @discardableResult
+    public func importProviders(_ providers: [AIAgentImportedProvider]) throws -> Int {
+        var importedCount = 0
+        var nextState = state
+        var references: [String] = []
+        do {
+            for provider in providers {
+                let normalizedURL = provider.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                guard !provider.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      !normalizedURL.isEmpty,
+                      !provider.apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      !nextState.channels.contains(where: { channel in
+                          channel.name.caseInsensitiveCompare(provider.name) == .orderedSame
+                              && channel.endpointGroups.flatMap(\.baseURLs).contains { $0.trimmingCharacters(in: CharacterSet(charactersIn: "/")).caseInsensitiveCompare(normalizedURL) == .orderedSame }
+                      }) else { continue }
+                let account = AgentAccount(name: provider.name, provider: provider.name, balanceProbe: AgentBalanceProbe())
+                let channel = AgentChannel(
+                    name: provider.name,
+                    protocolKind: provider.protocolKind,
+                    defaultModel: provider.defaultModel,
+                    endpointGroups: [AgentEndpointGroup(name: "默认端点", baseURLs: [provider.baseURL], accountIDs: [account.id])]
+                )
+                try secretStore.setSecret(provider.apiKey, for: account.secretReference)
+                references.append(account.secretReference)
+                nextState.accounts.append(account)
+                nextState.channels.append(channel)
+                importedCount += 1
+            }
+            state = nextState
+            return importedCount
+        } catch {
+            for reference in references { try? secretStore.removeSecret(for: reference) }
+            throw error
+        }
+    }
+
     public func removeAccount(id: UUID) throws {
         guard let account = account(id: id) else { return }
         var firstError: Error?

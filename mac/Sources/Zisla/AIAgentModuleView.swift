@@ -73,6 +73,8 @@ struct AIAgentModuleView: View {
     @State private var pendingCLIKinds: [AgentCLIKind] = []
     @State private var showCLIConfirmation = false
     @State private var profileImportRequest: ProfileImportRequest?
+    @State private var providerImportRequest: ProviderImportRequest?
+    @State private var providerImportMessage: String?
     @State private var isChatTransferTarget = false
     @State private var isModelPickerPresented = false
 
@@ -85,6 +87,11 @@ struct AIAgentModuleView: View {
         let id = UUID()
         let accountID: UUID
         let fileKind: ProfileFileKind
+    }
+
+    private struct ProviderImportRequest: Identifiable {
+        let id = UUID()
+        let source: AIAgentConfigurationImportSource
     }
 
     private struct AnnotationSelection: Equatable {
@@ -151,6 +158,26 @@ struct AIAgentModuleView: View {
             allowsMultipleSelection: false,
             onCompletion: importCLIProfileFile
         )
+        .fileImporter(
+            isPresented: Binding(
+                get: { providerImportRequest != nil },
+                set: { if !$0 { providerImportRequest = nil } }
+            ),
+            allowedContentTypes: [.json, UTType(filenameExtension: "db") ?? .data],
+            allowsMultipleSelection: false,
+            onCompletion: importProviderConfigurationFile
+        )
+        .alert(
+            "Provider 导入",
+            isPresented: Binding(
+                get: { providerImportMessage != nil },
+                set: { if !$0 { providerImportMessage = nil } }
+            )
+        ) {
+            Button("好") { providerImportMessage = nil }
+        } message: {
+            Text(providerImportMessage ?? "")
+        }
         .alert(
             "无法添加附件",
             isPresented: Binding(
@@ -1057,6 +1084,7 @@ struct AIAgentModuleView: View {
                     }
                     .buttonStyle(.borderless)
                     .help("添加远端 Provider")
+                    importConfigurationMenu()
                 }
 
                 ForEach(agent.store.state.channels) { channel in
@@ -3055,5 +3083,55 @@ struct AIAgentModuleView: View {
             for: request.accountID,
             authentication: request.fileKind == .authentication
         )
+    }
+
+    private func importConfigurationMenu() -> some View {
+        Menu {
+            Button("自动导入 Codex++") { importProviderConfiguration(.codexPlusPlus, from: nil) }
+            Button("选择 Codex++ 配置文件…") { providerImportRequest = ProviderImportRequest(source: .codexPlusPlus) }
+            Divider()
+            Button("自动导入 CC Switch") { importProviderConfiguration(.ccSwitch, from: nil) }
+            Button("选择 CC Switch 数据库…") { providerImportRequest = ProviderImportRequest(source: .ccSwitch) }
+        } label: {
+            Label("导入 Provider", systemImage: "square.and.arrow.down")
+                .font(.system(size: 10))
+        }
+        .buttonStyle(.borderless)
+        .help("从 Codex++ 或 CC Switch 导入 Provider")
+    }
+
+    private func importProviderConfiguration(_ source: AIAgentConfigurationImportSource, from selectedURL: URL?) {
+        let importer = AIAgentConfigurationImporter()
+        let candidates = selectedURL.map { [$0] } ?? importer.automaticURLs(for: source)
+        guard let url = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
+            providerImportMessage = "未找到 \(source.displayName) 配置文件，请选择文件导入。"
+            return
+        }
+        let accessed = selectedURL != nil && url.startAccessingSecurityScopedResource()
+        defer {
+            if accessed { url.stopAccessingSecurityScopedResource() }
+        }
+        do {
+            let providers: [AIAgentImportedProvider]
+            switch source {
+            case .codexPlusPlus:
+                providers = try importer.importCodexPlusPlus(data: Data(contentsOf: url))
+            case .ccSwitch:
+                providers = try importer.importCCSwitch(databaseURL: url)
+            }
+            let count = try agent.store.importProviders(providers)
+            providerImportMessage = count == 0
+                ? "没有新增 Provider，可能已存在相同名称和地址。"
+                : "已导入 \(count) 个 Provider。"
+        } catch {
+            providerImportMessage = error.localizedDescription
+        }
+    }
+
+    private func importProviderConfigurationFile(_ result: Result<[URL], Error>) {
+        guard let request = providerImportRequest else { return }
+        providerImportRequest = nil
+        guard case let .success(urls) = result, let url = urls.first else { return }
+        importProviderConfiguration(request.source, from: url)
     }
 }
