@@ -703,6 +703,25 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func grokUpdateCheckFallsBackToInstallerVersionCache() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-grok-update-cache-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let grok = root.appendingPathComponent(".grok/bin/grok")
+        try writeExecutable(at: grok, contents: "#!/bin/sh\nprintf 'grok 1.0.0 (build)'\n")
+        let cache = root.appendingPathComponent(".grok/version.json")
+        try FileManager.default.createDirectory(at: cache.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{\"version\":\"1.0.3\"}".utf8).write(to: cache)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(await service.grokUpdateState() == .updateAvailable(AIAgentCLIUpdate(
+            kind: .grok,
+            installedVersion: "grok 1.0.0 (build)",
+            latestVersion: "1.0.3"
+        )))
+    }
+
+    @Test
     func homebrewUpdateCheckUsesHomebrewReportedVersion() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-homebrew-update-check-\(UUID().uuidString)", isDirectory: true)
@@ -710,7 +729,7 @@ struct AIAgentServicesTests {
         let brew = root.appendingPathComponent("toolchain/bin/brew")
         try writeExecutable(
             at: brew,
-            contents: "#!/bin/sh\nprintf '%s' '{\"formulae\":[{\"name\":\"opencode\",\"current_version\":\"1.18.15\"},{\"name\":\"kimi-code\",\"current_version\":\"0.35.0\"}],\"casks\":[]}'\n"
+            contents: "#!/bin/sh\nprintf '%s' '{\"formulae\":[{\"name\":\"anomalyco/tap/opencode\",\"current_version\":\"1.18.15\"},{\"name\":\"kimi-code\",\"current_version\":\"0.35.0\"}],\"casks\":[]}'\n"
         )
         let executable = root.appendingPathComponent("Cellar/opencode/1.18.14/bin/opencode")
         let detectedOnlyExecutable = root.appendingPathComponent("Cellar/kimi-code/0.34.0/bin/kimi")

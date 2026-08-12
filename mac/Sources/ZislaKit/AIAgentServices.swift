@@ -747,19 +747,30 @@ public struct AIAgentCLIService: Sendable {
                 environment: commandEnvironment,
                 timeout: 15
             )
-            guard output.status == 0,
-                  let check = try? JSONDecoder().decode(GrokUpdateCheck.self, from: output.standardOutput),
-                  check.error == nil
-            else { return .unknown }
-            guard check.updateAvailable else { return .upToDate }
-            return .updateAvailable(AIAgentCLIUpdate(
+            if output.status == 0,
+               let check = try? JSONDecoder().decode(GrokUpdateCheck.self, from: output.standardOutput),
+               check.error == nil {
+                guard check.updateAvailable else { return .upToDate }
+                return .updateAvailable(AIAgentCLIUpdate(
+                    kind: .grok,
+                    installedVersion: check.currentVersion,
+                    latestVersion: check.latestVersion
+                ))
+            }
+        } catch {}
+
+        guard let installedVersion = await currentVersion(of: .grok, at: grok),
+              let latestVersion = cachedGrokLatestVersion(),
+              let installed = semanticVersion(in: installedVersion),
+              let latest = semanticVersion(in: latestVersion)
+        else { return .unknown }
+        return latest > installed
+            ? .updateAvailable(AIAgentCLIUpdate(
                 kind: .grok,
-                installedVersion: check.currentVersion,
-                latestVersion: check.latestVersion
+                installedVersion: installedVersion,
+                latestVersion: latestVersion
             ))
-        } catch {
-            return .unknown
-        }
+            : .upToDate
     }
 
     public func homebrewUpdates(for statuses: [AgentCLIStatus]) async -> [AIAgentCLIUpdate] {
@@ -805,7 +816,7 @@ public struct AIAgentCLIService: Sendable {
             )
             guard output.status == 0,
                   let outdated = try? JSONDecoder().decode(HomebrewOutdatedPackages.self, from: output.standardOutput),
-                  let formula = outdated.formulae.first(where: { $0.name == installation.packageName }),
+                  let formula = outdated.formulae.first(where: { $0.packageName == installation.packageName }),
                   let installedVersion = status.version
             else { return nil }
             return AIAgentCLIUpdate(
@@ -840,6 +851,29 @@ public struct AIAgentCLIService: Sendable {
         if !stdout.isEmpty { return stdout }
         let stderr = output.standardError.trimmingCharacters(in: .whitespacesAndNewlines)
         return stderr.isEmpty ? nil : stderr
+    }
+
+    private func currentVersion(of kind: AgentCLIKind, at executableURL: URL) async -> String? {
+        guard let output = try? await AIAgentProcessRunner.run(
+            executableURL: executableURL,
+            arguments: ["--version"],
+            environment: commandEnvironment,
+            timeout: 8
+        ), output.status == 0 else { return nil }
+        return version(in: output)
+    }
+
+    private func cachedGrokLatestVersion() -> String? {
+        let cache = homeDirectory.appendingPathComponent(".grok/version.json")
+        guard let data = try? Data(contentsOf: cache) else { return nil }
+        return try? JSONDecoder().decode(GrokVersionCache.self, from: data).version
+    }
+
+    private func semanticVersion(in rawValue: String) -> SemanticVersion? {
+        let candidates = rawValue.split { character in
+            !(character.isNumber || character == "." || character == "-" || character == "+" || character == "v")
+        }
+        return candidates.compactMap { try? SemanticVersion(String($0)) }.first
     }
 
     /// Returns an npm command for later confirmation without modifying the system.
@@ -1370,6 +1404,10 @@ private struct GrokUpdateCheck: Decodable {
     let error: String?
 }
 
+private struct GrokVersionCache: Decodable {
+    let version: String
+}
+
 private struct HomebrewOutdatedPackages: Decodable {
     let formulae: [HomebrewOutdatedFormula]
 }
@@ -1377,6 +1415,10 @@ private struct HomebrewOutdatedPackages: Decodable {
 private struct HomebrewOutdatedFormula: Decodable {
     let name: String
     let currentVersion: String
+
+    var packageName: String {
+        name.split(separator: "/").last.map(String.init) ?? name
+    }
 
     private enum CodingKeys: String, CodingKey {
         case name
