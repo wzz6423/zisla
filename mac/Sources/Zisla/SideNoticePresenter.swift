@@ -8,6 +8,7 @@ import SwiftUI
 final class SideNoticePresenter {
     private let queue: SideNoticeQueue
     private let media: NowPlayingService
+    private let browserDownloads: BrowserDownloadMonitor
     private let settingsStore: FeatureSettingsStore
     private let languageStore: AppLanguageStore
     private let layoutEngine = SideNoticeLayoutEngine()
@@ -19,12 +20,14 @@ final class SideNoticePresenter {
     init(
         queue: SideNoticeQueue,
         media: NowPlayingService,
+        browserDownloads: BrowserDownloadMonitor,
         settingsStore: FeatureSettingsStore,
         languageStore: AppLanguageStore,
         displayIDs: Set<UInt32> = []
     ) {
         self.queue = queue
         self.media = media
+        self.browserDownloads = browserDownloads
         self.settingsStore = settingsStore
         self.languageStore = languageStore
         configuredDisplayIDs = displayIDs
@@ -228,6 +231,7 @@ final class SideNoticePresenter {
             queue: queue,
             displayState: panels.displayState,
             media: media,
+            browserDownloads: browserDownloads,
             settingsStore: settingsStore,
             onStatusHidden: { [weak self] in self?.updatePanels() }
         )

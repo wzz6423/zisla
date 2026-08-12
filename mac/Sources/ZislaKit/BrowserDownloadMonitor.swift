@@ -195,6 +195,12 @@ struct BrowserDownloadTracker: Sendable {
         return active.isEmpty ? finishedSnapshot.map { [$0] } ?? [] : active
     }
 
+    /// 按最近下载优先顺序返回去重后的浏览器。
+    var uniqueAgents: [BrowserDownloadAgent] {
+        var seen = Set<BrowserDownloadAgent>()
+        return snapshots.compactMap(\.agent).filter { seen.insert($0).inserted }
+    }
+
     /// Multiple in-progress downloads are represented by one compact-island summary whose fraction is their arithmetic mean.
     var snapshot: BrowserDownloadSnapshot? {
         let active = snapshots
@@ -260,6 +266,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
 
     @Published public private(set) var snapshot: BrowserDownloadSnapshot?
     @Published public private(set) var snapshots: [BrowserDownloadSnapshot] = []
+    public var uniqueAgents: [BrowserDownloadAgent] { tracker.uniqueAgents }
 
     private var tracker = BrowserDownloadTracker()
     private var subscriberTokens: [Any] = []

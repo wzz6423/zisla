@@ -139,6 +139,7 @@ struct CompactStatusBarView: View {
     @ObservedObject var queue: SideNoticeQueue
     @ObservedObject var displayState: SideNoticeDisplayState
     @ObservedObject var media: NowPlayingService
+    @ObservedObject var browserDownloads: BrowserDownloadMonitor
     @ObservedObject var settingsStore: FeatureSettingsStore
     var onStatusHidden: () -> Void
 
@@ -349,6 +350,8 @@ struct CompactStatusBarView: View {
                 HStack(spacing: 0) {
                     CompactBrowserDownloadWing(
                         notice: browserDownloadNotice,
+                        snapshots: browserDownloads.snapshots,
+                        uniqueAgents: browserDownloads.uniqueAgents,
                         side: .left,
                         height: height,
                         usesTransparentBackground: compactWingsUseTransparentBackground
@@ -356,6 +359,8 @@ struct CompactStatusBarView: View {
                     Spacer(minLength: 0)
                     CompactBrowserDownloadWing(
                         notice: browserDownloadNotice,
+                        snapshots: browserDownloads.snapshots,
+                        uniqueAgents: browserDownloads.uniqueAgents,
                         side: .right,
                         height: height,
                         usesTransparentBackground: compactWingsUseTransparentBackground
@@ -1577,27 +1582,23 @@ private struct DetailedMailBar: View {
 
 private struct CompactBrowserDownloadWing: View {
     var notice: IslandNotice
+    var snapshots: [BrowserDownloadSnapshot]
+    var uniqueAgents: [BrowserDownloadAgent]
     var side: NoticeSide
     var height: CGFloat
     var usesTransparentBackground = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private var isFinished: Bool { notice.kind == .success }
+    private var downloadCount: Int { max(1, snapshots.count) }
 
     var body: some View {
         Group {
             if side == .left {
-                icon
-            } else if isFinished {
-                Image(systemName: "checkmark")
-                    .font(.system(size: min(15, height * 0.56), weight: .bold))
-                    .foregroundStyle(.green)
+                leftContent
             } else {
-                Text(notice.detail ?? "…")
-                    .font(.system(size: min(13, height * 0.5), weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.65)
-                    .foregroundStyle(.white)
+                rightContent
             }
         }
         .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
@@ -1613,26 +1614,122 @@ private struct CompactBrowserDownloadWing: View {
         .help(accessibilityLabel)
     }
 
-    private var iconSize: CGFloat { max(16, min(22, height - 12)) }
-
     @ViewBuilder
-    private var icon: some View {
-        if let image = resolvedIcon {
-            Image(nsImage: image)
-                .resizable()
-                .interpolation(.high)
-                .aspectRatio(contentMode: .fit)
-                .frame(width: iconSize, height: iconSize)
+    private var leftContent: some View {
+        if downloadCount == 1, let agent = snapshots.first?.agent {
+            singleBrowserIcon(agent)
+        } else if !uniqueAgents.isEmpty {
+            browserIconStack
         } else {
-            Image(systemName: notice.symbolName ?? "arrow.down.circle.fill")
-                .font(.system(size: min(15, height * 0.56), weight: .semibold))
-                .foregroundStyle(.white)
+            fallbackIcon
         }
     }
 
-    private var resolvedIcon: NSImage? {
-        guard let bundleIdentifier = notice.appBundleIdentifier, !bundleIdentifier.isEmpty,
-            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+    @ViewBuilder
+    private var rightContent: some View {
+        if isFinished {
+            Image(systemName: "checkmark")
+                .font(.system(size: min(15, height * 0.56), weight: .bold))
+                .foregroundStyle(.green)
+        } else if downloadCount == 1 {
+            Text(notice.detail ?? "…")
+                .font(.system(size: min(13, height * 0.5), weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+                .foregroundStyle(.white)
+        } else if downloadCount == 2 {
+            twoFileProgressStack
+        } else {
+            multiFileStatusDot
+        }
+    }
+
+    private func singleBrowserIcon(_ agent: BrowserDownloadAgent) -> some View {
+        Group {
+            if let image = browserIcon(for: agent) {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: iconSize, height: iconSize)
+            } else {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: min(15, height * 0.56), weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+        }
+    }
+
+    private var browserIconStack: some View {
+        let agents = Array(uniqueAgents.prefix(3))
+        return Group {
+            if agents.count == 1, let agent = agents.first {
+                singleBrowserIcon(agent)
+            } else {
+                HStack(spacing: -10) {
+                    ForEach(agents, id: \.self) { agent in
+                        Group {
+                            if let image = browserIcon(for: agent) {
+                                Image(nsImage: image)
+                                    .resizable()
+                                    .interpolation(.high)
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: stackIconSize, height: stackIconSize)
+                            } else {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .font(.system(size: stackIconSize * 0.7, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: stackIconSize, height: stackIconSize)
+                            }
+                        }
+                        .padding(1)
+                        .background(Color.black, in: Circle())
+                    }
+                }
+            }
+        }
+    }
+
+    private var fallbackIcon: some View {
+        Image(systemName: notice.symbolName ?? "arrow.down.circle.fill")
+            .font(.system(size: min(15, height * 0.56), weight: .semibold))
+            .foregroundStyle(.white)
+    }
+
+    private var twoFileProgressStack: some View {
+        VStack(spacing: 1) {
+            ForEach(Array(snapshots.prefix(2))) { snapshot in
+                Text(snapshot.progressText)
+                    .font(.system(size: min(9, height * 0.35), weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(maxHeight: min(22, height * 0.72))
+    }
+
+    private var multiFileStatusDot: some View {
+        HStack(spacing: 5) {
+            CompactStatusPulseView(
+                color: .systemGreen,
+                isAnimated: !reduceMotion
+            )
+            .frame(width: 4, height: 4)
+            Text("\(downloadCount)")
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .monospacedDigit()
+        }
+        .foregroundStyle(.white)
+    }
+
+    private var iconSize: CGFloat { max(16, min(22, height - 12)) }
+    private var stackIconSize: CGFloat { max(14, min(16, height * 0.54)) }
+
+    private func browserIcon(for agent: BrowserDownloadAgent) -> NSImage? {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: agent.bundleIdentifier)
         else { return nil }
         return NSWorkspace.shared.icon(forFile: url.path)
     }
@@ -1640,7 +1737,11 @@ private struct CompactBrowserDownloadWing: View {
     private var accessibilityLabel: String {
         let source = notice.appName ?? "浏览器"
         guard isFinished else {
-            return "\(source) 下载中 \(notice.detail ?? "")：\(notice.title)"
+            if downloadCount == 1 {
+                return "\(source) 下载中 \(notice.detail ?? "")：\(notice.title)"
+            } else {
+                return "\(source) 正在下载 \(downloadCount) 个文件"
+            }
         }
         return "\(source) 下载完成：\(notice.title)"
     }
