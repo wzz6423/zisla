@@ -1948,8 +1948,7 @@ struct AIAgentModuleView: View {
                     state: .working,
                     size: 20,
                     theme: .dark,
-                    speed: 0.9,
-                    tint: .secondary
+                    speed: 0.9
                 )
             case .succeeded:
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)

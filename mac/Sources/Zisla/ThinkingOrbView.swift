@@ -69,7 +69,7 @@ enum ThinkingOrbTheme: Sendable {
 
 /// 纯 SwiftUI 点阵指示器，用于 AI 工作和其他不确定进度状态。
 ///
-/// 使用单个 Canvas 和共享动画时钟，保证 20pt 内联版本开销可控，同时让 64pt 版本具备足够的点数；
+/// 使用单个 Canvas 和 TimelineView 动画时钟，保证 20pt 内联版本开销可控，同时让 64pt 版本具备足够的点数；
 /// 每种模式都由确定性数学轨迹生成，状态切换不会引入随机跳变。
 struct ThinkingOrbView: View {
     var state: ThinkingOrbState = .working
