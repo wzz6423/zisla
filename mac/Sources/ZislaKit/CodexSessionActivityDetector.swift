@@ -130,6 +130,7 @@ public final class CodexSessionActivityDetector {
     private let fileManager: FileManager
     private let jsonlReader: IncrementalJSONLReader
     private let now: () -> Date
+    private let processIdentifiersForOpenFiles: ([URL]) -> [URL: Int32]
     private var cache: [URL: CachedRollout] = [:]
     private var sessionIndexCache: CachedSessionIndex?
 
@@ -141,6 +142,8 @@ public final class CodexSessionActivityDetector {
         initialTailBytes: Int = .max,
         maximumRolloutAge: TimeInterval = CodexSessionActivityDetector.defaultMaximumRolloutAge,
         fileManager: FileManager = .default,
+        processIdentifiersForOpenFiles: @escaping ([URL]) -> [URL: Int32]
+            = CodexSessionActivityDetector.defaultProcessIdentifiersForOpenFiles,
         now: @escaping () -> Date = Date.init
     ) {
         self.sessionsDirectory = sessionsDirectory
@@ -151,6 +154,7 @@ public final class CodexSessionActivityDetector {
         self.maximumRolloutAge = max(0, maximumRolloutAge)
         jsonlReader = IncrementalJSONLReader(initialTailBytes: initialTailBytes)
         self.fileManager = fileManager
+        self.processIdentifiersForOpenFiles = processIdentifiersForOpenFiles
         self.now = now
     }
 
@@ -165,7 +169,8 @@ public final class CodexSessionActivityDetector {
             activityDate: Date,
             model: String?,
             effort: String?,
-            sessionID: String?
+            sessionID: String?,
+            rolloutURL: URL
         )] = []
         var statusSignalsByTurnID: [String: [StatusSignal]] = [:]
         var mergedModelsByTurnID: [String: String] = [:]
@@ -196,7 +201,8 @@ public final class CodexSessionActivityDetector {
                     activityDate,
                     mergedModelsByTurnID[event.turnID],
                     mergedEffortsByTurnID[event.turnID],
-                    activity.sessionID
+                    activity.sessionID,
+                    candidate.url.standardizedFileURL
                 )
             })
         }
@@ -212,7 +218,8 @@ public final class CodexSessionActivityDetector {
             activityDate: Date,
             model: String?,
             effort: String?,
-            sessionID: String?
+            sessionID: String?,
+            rolloutURL: URL
         )] = [:]
         for record in allEvents {
             let event = record.event
@@ -225,11 +232,16 @@ public final class CodexSessionActivityDetector {
         }
 
         let activeTurnIDs = Set(active.keys)
+        let processIdentifiersByURL = processIdentifiersForOpenFiles(
+            Array(Set(active.values.map(\.rolloutURL)))
+        )
         let tasks = active.values
             .map { record in
                 let event = record.event
                 let provider = Self.provider(forModel: record.model)
                 let fallbackTitle = provider == .gpt ? "ChatGPT" : "Codex"
+                let threadTitle = record.sessionID.flatMap { titlesBySessionID[$0] }
+                let displayTitle = threadTitle ?? fallbackTitle
                 let (status, reason) = Self.statusAndReason(
                     from: statusSignalsByTurnID[event.turnID] ?? [],
                     startedAt: event.timestamp
@@ -237,7 +249,7 @@ public final class CodexSessionActivityDetector {
                 return AIProgressTask(
                     id: Self.taskID(forTurnID: event.turnID),
                     provider: provider,
-                    title: record.sessionID.flatMap { titlesBySessionID[$0] } ?? fallbackTitle,
+                    title: displayTitle,
                     detail: record.model,
                     progress: nil,
                     status: status,
@@ -245,7 +257,8 @@ public final class CodexSessionActivityDetector {
                     sessionURL: record.sessionID.flatMap(Self.sessionURL(for:)),
                     effort: record.effort,
                     startedAt: event.timestamp,
-                    failureReason: reason
+                    failureReason: reason,
+                    processIdentifier: processIdentifiersByURL[record.rolloutURL]
                 )
             }
             .sorted {
@@ -258,6 +271,51 @@ public final class CodexSessionActivityDetector {
 
     public static func taskID(forTurnID turnID: String) -> String {
         "codex-turn-\(turnID)"
+    }
+
+    public static func defaultProcessIdentifiersForOpenFiles(_ urls: [URL]) -> [URL: Int32] {
+        let standardizedURLs = Set(urls.map(\.standardizedFileURL))
+        guard !standardizedURLs.isEmpty else { return [:] }
+
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        process.arguments = ["-F", "pn", "--"] + standardizedURLs.map(\.path).sorted()
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return [:]
+        }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return parseOpenFileProcessIdentifiers(data, matching: standardizedURLs)
+    }
+
+    static func parseOpenFileProcessIdentifiers(
+        _ data: Data,
+        matching urls: Set<URL>
+    ) -> [URL: Int32] {
+        guard let output = String(data: data, encoding: .utf8) else { return [:] }
+        var currentProcessIdentifier: Int32?
+        var result: [URL: Int32] = [:]
+        for line in output.split(whereSeparator: \.isNewline) {
+            guard let field = line.first else { continue }
+            let value = line.dropFirst()
+            switch field {
+            case "p":
+                currentProcessIdentifier = Int32(value)
+            case "n":
+                guard let currentProcessIdentifier, currentProcessIdentifier > 0 else { continue }
+                let url = URL(fileURLWithPath: String(value)).standardizedFileURL
+                guard urls.contains(url), result[url] == nil else { continue }
+                result[url] = currentProcessIdentifier
+            default:
+                continue
+            }
+        }
+        return result
     }
 
     private static func provider(forModel model: String?) -> AIProvider {

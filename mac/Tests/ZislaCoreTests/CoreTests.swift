@@ -104,6 +104,7 @@ struct AIStateRepositoryTests {
         #expect(task.effort == nil)
         #expect(task.startedAt == nil)
         #expect(task.failureReason == nil)
+        #expect(task.processIdentifier == nil)
     }
 
     @Test
@@ -844,6 +845,30 @@ struct CLIParserTests {
         #expect(task.provider == .qwen)
         #expect(task.progress == 0.42)
         #expect(task.detail == "4/10")
+    }
+
+    @Test
+    func updateAcceptsOptionalProcessIdentifier() throws {
+        let command = try CLIParser.parse(arguments: [
+            "update", "--id", "job", "--provider", "claude",
+            "--title", "Indexing", "--pid", "1122",
+        ])
+
+        guard case let .update(task) = command else {
+            Issue.record("Expected update command")
+            return
+        }
+        #expect(task.processIdentifier == 1122)
+    }
+
+    @Test
+    func updateRejectsInvalidProcessIdentifier() {
+        #expect(throws: CLIParseError.self) {
+            try CLIParser.parse(arguments: [
+                "update", "--id", "job", "--provider", "claude",
+                "--title", "Indexing", "--pid", "0",
+            ])
+        }
     }
 
     @Test

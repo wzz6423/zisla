@@ -155,6 +155,67 @@ struct CodexSessionActivityDetectorTests {
     }
 
     @Test
+    func mapsOpenRolloutProcessIdentifierToTask() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-pid.jsonl"
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                sessionMetadataLine(sessionID: "session-pid"),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-pid"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_000_126)
+        )
+        let rolloutURL = root.appendingPathComponent(relativePath).standardizedFileURL
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { urls in
+                #expect(urls.contains(rolloutURL))
+                return [rolloutURL: 2468]
+            }
+        )
+
+        let task = try #require(detector.activeTasks().first)
+
+        #expect(task.processIdentifier == 2468)
+    }
+
+    @Test
+    func parsesLsofFieldOutputForRequestedRollouts() {
+        let first = URL(fileURLWithPath: "/tmp/codex/first.jsonl").standardizedFileURL
+        let second = URL(fileURLWithPath: "/tmp/codex/second.jsonl").standardizedFileURL
+        let output = Data("p2468\nf12\nn\(first.path)\np9753\nf19\nn/other.jsonl\n".utf8)
+
+        let result = CodexSessionActivityDetector.parseOpenFileProcessIdentifiers(
+            output,
+            matching: [first, second]
+        )
+
+        #expect(result == [first: 2468])
+    }
+
+    @Test
+    func resolvesCurrentProcessForActuallyOpenRollout() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let rolloutURL = root.appendingPathComponent("open-rollout.jsonl").standardizedFileURL
+        try Data().write(to: rolloutURL)
+        let handle = try FileHandle(forWritingTo: rolloutURL)
+        defer { try? handle.close() }
+
+        let result = CodexSessionActivityDetector.defaultProcessIdentifiersForOpenFiles([rolloutURL])
+
+        #expect(result[rolloutURL] == ProcessInfo.processInfo.processIdentifier)
+    }
+
+    @Test
     func blankSessionTitleFallsBackToProviderName() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }

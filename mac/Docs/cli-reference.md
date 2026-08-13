@@ -26,11 +26,12 @@
 
 ```text
 zislactl update --id <id> --provider <provider> --title <标题>
-  [--progress <0-100>] [--detail <文本>]
+  [--progress <0-100>] [--detail <文本>] [--pid <进程 PID>]
   [--status <running|queued|blocked|error>] [--queued]
 ```
 
 - `--progress` 缺省时显示不确定进度。
+- `--pid` 可选；仅在调用方能确认任务所属进程时传入。
 - `--status` 可显式上报运行、排队、等待用户操作或运行中错误。
 - `--queued` 是 `--status queued` 的兼容写法；未指定状态时为运行中。
 

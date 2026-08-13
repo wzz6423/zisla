@@ -271,14 +271,11 @@ private struct TaskProgressRow: View {
         if let startedAt = task.startedAt {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 HStack(spacing: 4) {
-                    Text(
-                        "开始 \(startTimeText(startedAt)) · "
-                            + "运行 \(elapsedText(from: startedAt, to: context.date))"
-                    )
-                    .font(.islandMicro(design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .layoutPriority(1)
+                    Text(statusTimeText(startedAt, context.date))
+                        .font(.islandMicro(design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .layoutPriority(1)
 
                     Spacer(minLength: 2)
                     if task.status == .error {
@@ -309,6 +306,16 @@ private struct TaskProgressRow: View {
             ProgressView()
                 .controlSize(.mini)
         }
+    }
+
+    private func statusTimeText(_ startedAt: Date, _ now: Date) -> String {
+        var parts: [String] = []
+        parts.append("开始 \(startTimeText(startedAt))")
+        if let processIdentifier = task.processIdentifier {
+            parts.append("PID \(processIdentifier)")
+        }
+        parts.append("运行 \(elapsedText(from: startedAt, to: now))")
+        return parts.joined(separator: " · ")
     }
 
     private func startTimeText(_ date: Date) -> String {
