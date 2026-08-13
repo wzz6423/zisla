@@ -184,30 +184,9 @@ struct IslandSurface<Content: View>: View {
 
     // MARK: - Transparent glass (macOS 27 / Liquid Glass approximation)
 
-    /// The clear layer keeps the lower edge refractive; the regular layer above it restores
-    /// enough frosted contrast for module content to remain readable.
+    /// Keep the full body on the native clear material so the desktop remains visible through it.
     private var transparentLiquidGlassShell: some View {
-        ZStack {
-            NativeLiquidGlassShell(isCollapsed: isCollapsed, material: .clear)
-            NativeLiquidGlassShell(isCollapsed: isCollapsed, material: .regular)
-                .mask(alignment: .bottom) {
-                    // A single gradient avoids an AppKit compositor seam at the boundary
-                    // between separately laid-out opaque and fading mask views.
-                    LinearGradient(
-                        stops: [
-                            .init(color: .black, location: 0),
-                            .init(color: .black, location: 0.72),
-                            .init(color: .black.opacity(0.92), location: 0.78),
-                            .init(color: .black.opacity(0.70), location: 0.84),
-                            .init(color: .black.opacity(0.38), location: 0.90),
-                            .init(color: .black.opacity(0.12), location: 0.96),
-                            .init(color: .clear, location: 1),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                }
-        }
+        NativeLiquidGlassShell(isCollapsed: isCollapsed, material: .clear)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

@@ -137,6 +137,18 @@ public enum AIMascotLibrary {
         }
     }
 
+    public static func providerAssetURL(
+        for provider: AIProvider,
+        resourceRoots: [URL],
+        fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL? {
+        guard let assetName = providerAssetName(for: provider) else { return nil }
+        return resourceRoots
+            .lazy
+            .map { $0.appendingPathComponent("BrandIcons/\(assetName)", isDirectory: false) }
+            .first(where: fileExists)
+    }
+
     public static func providerDisplayName(for provider: AIProvider) -> String {
         switch provider {
         case .claude: "Claude"

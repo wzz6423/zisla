@@ -77,6 +77,7 @@ struct AIAgentModuleView: View {
     @State private var providerImportMessage: String?
     @State private var isChatTransferTarget = false
     @State private var isModelPickerPresented = false
+    @State private var respondingThreadIDs = Set<UUID>()
 
     private enum ProfileFileKind {
         case configuration
@@ -471,6 +472,20 @@ struct AIAgentModuleView: View {
                             ForEach(thread.messages) { message in
                                 chatMessage(message, in: thread.id)
                             }
+                            if respondingThreadIDs.contains(thread.id) {
+                                HStack(spacing: 7) {
+                                    ThinkingOrbView(
+                                        state: .solving,
+                                        size: 20,
+                                        theme: .dark,
+                                        accessibilityLabel: "AI 正在思考"
+                                    )
+                                    Text("正在思考")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .accessibilityElement(children: .combine)
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -704,7 +719,10 @@ struct AIAgentModuleView: View {
                                 Image(systemName: "paperplane.fill")
                             }
                             .buttonStyle(.borderless)
-                            .disabled(annotationDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .disabled(
+                                annotationDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    || respondingThreadIDs.contains(threadID)
+                            )
                             .help("将引用和评论发送为新消息")
                         }
                     }
@@ -971,7 +989,8 @@ struct AIAgentModuleView: View {
         threadID: UUID,
         isCompact: Bool
     ) -> some View {
-        let canSend = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !draftAttachments.isEmpty
+        let canSend = (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !draftAttachments.isEmpty)
+            && !respondingThreadIDs.contains(threadID)
         let isGoalMode = thread.goalPrompt != nil
         return HStack(spacing: isCompact ? 6 : 8) {
             Menu {
@@ -2147,6 +2166,7 @@ struct AIAgentModuleView: View {
     }
 
     private func sendDraft(to threadID: UUID) {
+        guard !respondingThreadIDs.contains(threadID) else { return }
         let command: AgentChatSlashCommand
         do {
             command = try AgentChatSlashCommandParser.parse(
@@ -2194,6 +2214,7 @@ struct AIAgentModuleView: View {
         skillReferences: [AgentChatSkillReference] = [],
         to threadID: UUID
     ) {
+        guard !respondingThreadIDs.contains(threadID) else { return }
         let attachments = draftAttachments
         let references = referencedThreadIDs
         let apps = referencedApps
@@ -2201,6 +2222,7 @@ struct AIAgentModuleView: View {
         draftAttachments = []
         referencedThreadIDs = []
         referencedApps = []
+        respondingThreadIDs.insert(threadID)
         Task {
             await agent.send(
                 content,
@@ -2210,6 +2232,7 @@ struct AIAgentModuleView: View {
                 skillReferences: skillReferences,
                 to: threadID
             )
+            respondingThreadIDs.remove(threadID)
         }
     }
 
@@ -2696,8 +2719,10 @@ struct AIAgentModuleView: View {
     }
 
     private func sendAnnotationAsMessage(selectedText: String, comment: String, to threadID: UUID) {
+        guard !respondingThreadIDs.contains(threadID) else { return }
         let quotedText = selectedText.split(separator: "\n").map { "> \($0)" }.joined(separator: "\n")
         let content = "\(quotedText)\n\n\(comment)"
+        respondingThreadIDs.insert(threadID)
         Task {
             await agent.send(
                 content,
@@ -2707,6 +2732,7 @@ struct AIAgentModuleView: View {
                 skillReferences: [],
                 to: threadID
             )
+            respondingThreadIDs.remove(threadID)
         }
     }
 

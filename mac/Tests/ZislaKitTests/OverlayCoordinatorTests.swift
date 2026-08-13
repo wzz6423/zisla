@@ -360,9 +360,8 @@ extension OverlayCoordinatorTests {
         #expect(panel.isVisible)
         #expect(!panel.ignoresMouseEvents)
         #expect(!panel.allowsKeyWindow)
-        #expect(!panel.keepsNativeGlassActive)
-        #expect(!panel.canBecomeKey)
-        #expect(!panel.isKeyWindow)
+        #expect(panel.keepsNativeGlassActive)
+        #expect(panel.canBecomeKey)
     }
 
     @Test @MainActor
@@ -383,14 +382,15 @@ extension OverlayCoordinatorTests {
         #expect(panel.canBecomeKey)
         #expect(!panel.isKeyWindow)
 
+        coordinator.setKeepsNativeGlassActive(true)
+        #expect(panel.keepsNativeGlassActive)
         coordinator.setPinned(true)
 
         #expect(panel.isVisible)
         #expect(!panel.ignoresMouseEvents)
         #expect(!panel.allowsKeyWindow)
-        #expect(!panel.keepsNativeGlassActive)
-        #expect(!panel.canBecomeKey)
-        #expect(!panel.isKeyWindow)
+        #expect(panel.keepsNativeGlassActive)
+        #expect(panel.canBecomeKey)
     }
 
     @Test @MainActor
@@ -424,7 +424,7 @@ extension OverlayCoordinatorTests {
         #expect(panel.keepsNativeGlassActive)
         coordinator.setPinned(true)
 
-        #expect(activatedPIDs == [externalPID])
+        #expect(activatedPIDs.isEmpty)
     }
 
     @Test @MainActor

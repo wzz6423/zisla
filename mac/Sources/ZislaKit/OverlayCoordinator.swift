@@ -283,9 +283,7 @@ public final class OverlayCoordinator: NSObject {
         }
         process(reducer.send(.setPinned(pinned)))
         applyPanelFocusPolicy(allowGlassActivation: false)
-        if pinned {
-            restoreApplicationFocusIfNeeded()
-        } else {
+        if !pinned {
             scheduleGlassActivation()
         }
     }
@@ -386,11 +384,10 @@ public final class OverlayCoordinator: NSObject {
         guard let panel else { return }
         let isExpanded = reducer.state.visibility == .expanded
             || reducer.state.visibility == .pinned
-        let canAcceptFocus = !isPinned && isExpanded
-        let shouldKeepGlassActive = keepsNativeGlassActive && canAcceptFocus
+        let shouldKeepGlassActive = keepsNativeGlassActive && isExpanded
         let wasKeyWindow = panel.isKeyWindow
 
-        panel.allowsKeyWindow = allowsKeyWindow && canAcceptFocus
+        panel.allowsKeyWindow = allowsKeyWindow && !isPinned && isExpanded
         if allowGlassActivation || !shouldKeepGlassActive {
             panel.keepsNativeGlassActive = shouldKeepGlassActive
         }
