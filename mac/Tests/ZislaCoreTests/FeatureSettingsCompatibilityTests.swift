@@ -490,10 +490,10 @@ struct FeatureSettingsCompatibilityTests {
             .aiActivity,
             .videoDownload,
             .browserDownload,
-            .focusCountdown,
             .toolboxReminder,
             .mail,
             .updateAvailable,
+            .focusCountdown,
             .focusMode,
         ])
     }
