@@ -94,4 +94,50 @@ struct FocusModeMonitorTests {
         #expect(inactive.identifier == sleep.identifier)
         #expect(inactive.presentation.symbolName == "bed.double.fill")
     }
+
+    @Test @MainActor
+    func readableAssertionStoreTakesPriorityOverPrivateFramework() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let url = directory.appendingPathComponent("Assertions.json")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try inactiveAssertionData.write(to: url, options: .atomic)
+
+        let monitor = FocusModeMonitor(
+            clientIdentifier: "dev.wzz.zisla.focus-test",
+            statusStoreURL: url,
+            storePollingInterval: .milliseconds(10)
+        )
+        monitor.start()
+        defer { monitor.stop() }
+
+        try activeAssertionData.write(to: url, options: .atomic)
+        #expect(await waitUntil { monitor.status.isActive })
+
+        try inactiveAssertionData.write(to: url, options: .atomic)
+        #expect(await waitUntil { !monitor.status.isActive })
+        #expect(monitor.status.identifier == "com.apple.donotdisturb.mode.work")
+    }
+
+    private var activeAssertionData: Data {
+        Data(#"{"data":[{"storeAssertionRecords":[{"assertionStartDateTimestamp":200,"assertionDetails":{"assertionDetailsModeIdentifier":"com.apple.donotdisturb.mode.work"}}]}],"header":{}}"#.utf8)
+    }
+
+    private var inactiveAssertionData: Data {
+        Data(#"{"data":[{"storeInvalidationRecords":[]}],"header":{}}"#.utf8)
+    }
+
+    @MainActor
+    private func waitUntil(
+        timeout: TimeInterval = 1,
+        condition: () -> Bool
+    ) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return condition()
+    }
 }
