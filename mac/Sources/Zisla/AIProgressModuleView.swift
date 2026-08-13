@@ -292,14 +292,14 @@ private struct TaskProgressRow: View {
                     } else {
                         ThinkingOrbView(
                             state: ThinkingOrbState.forTask(task),
-                            size: 24,
+                            size: 20,
                             speed: task.status == .blocked ? 0.65 : 1,
                             tint: .white,
                             accessibilityLabel: "AI 正在工作"
                         )
                     }
                 }
-                .frame(height: 24)
+                .frame(height: 20)
             }
         } else if task.status == .error {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -312,7 +312,7 @@ private struct TaskProgressRow: View {
         } else {
             ThinkingOrbView(
                 state: ThinkingOrbState.forTask(task),
-                size: 24,
+                size: 20,
                 speed: task.status == .blocked ? 0.65 : 1,
                 tint: .white,
                 accessibilityLabel: "AI 正在工作"

@@ -69,5 +69,9 @@ let package = Package(
             name: "ZislaKitTests",
             dependencies: ["ZislaCore", "ZislaKit"]
         ),
+        .testTarget(
+            name: "ZislaTests",
+            dependencies: ["Zisla"]
+        ),
     ]
 )
