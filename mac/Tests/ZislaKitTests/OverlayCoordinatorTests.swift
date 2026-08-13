@@ -394,6 +394,73 @@ extension OverlayCoordinatorTests {
     }
 
     @Test @MainActor
+    func pinningRestoresTheApplicationThatWasFrontmostBeforeGlassActivation() async throws {
+        let externalPID: pid_t = 42
+        var activatedPIDs: [pid_t] = []
+        let focusRestorer = ApplicationFocusRestorer(
+            currentApplicationPID: 7,
+            frontmostApplicationPID: { externalPID },
+            activateApplication: {
+                activatedPIDs.append($0)
+                return true
+            }
+        )
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(
+            contentView: contentView,
+            collapseDelay: .zero,
+            applicationFocusRestorer: focusRestorer
+        )
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setDragging(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        panel.activateNativeGlass = { _ in }
+        try await Task.sleep(for: .milliseconds(10))
+        #expect(panel.keepsNativeGlassActive)
+        coordinator.setPinned(true)
+
+        #expect(activatedPIDs == [externalPID])
+    }
+
+    @Test @MainActor
+    func pinningDoesNotSwitchApplicationsWhenZislaWasAlreadyFrontmost() async throws {
+        let zislaPID: pid_t = 7
+        var activatedPIDs: [pid_t] = []
+        let focusRestorer = ApplicationFocusRestorer(
+            currentApplicationPID: zislaPID,
+            frontmostApplicationPID: { zislaPID },
+            activateApplication: {
+                activatedPIDs.append($0)
+                return true
+            }
+        )
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(
+            contentView: contentView,
+            collapseDelay: .zero,
+            applicationFocusRestorer: focusRestorer
+        )
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setDragging(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        panel.activateNativeGlass = { _ in }
+        try await Task.sleep(for: .milliseconds(10))
+        coordinator.setPinned(true)
+
+        #expect(activatedPIDs.isEmpty)
+    }
+
+    @Test @MainActor
     func firstShowDelaysGlassActivationUntilAfterVisibilityChanged() async throws {
         let contentView = NSView()
         var visibilityEvents: [Bool] = []

@@ -23,6 +23,11 @@ public final class IslandPanel: NSPanel {
   public var keepsNativeGlassActive = false {
     didSet { restoreNativeGlassActivationIfNeeded() }
   }
+  var onWillActivateApplicationForNativeGlass: (@MainActor () -> Void)?
+  var activateNativeGlass: @MainActor (IslandPanel) -> Void = { panel in
+    NSApp.activate(ignoringOtherApps: true)
+    panel.makeKeyAndOrderFront(nil)
+  }
   private var transitionGeneration: UInt64 = 0
 
     /// Window level used when the collapsed island sits above other windows (same layer as the menu bar).
@@ -48,8 +53,8 @@ public final class IslandPanel: NSPanel {
 
     private func restoreNativeGlassActivationIfNeeded() {
         guard keepsNativeGlassActive, isVisible else { return }
-        NSApp.activate(ignoringOtherApps: true)
-        makeKeyAndOrderFront(nil)
+        onWillActivateApplicationForNativeGlass?()
+        activateNativeGlass(self)
     }
 
     public override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {

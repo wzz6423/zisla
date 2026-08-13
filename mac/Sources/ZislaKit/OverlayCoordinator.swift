@@ -15,6 +15,39 @@ struct CollapseGenerationTracker: Equatable, Sendable {
 }
 
 @MainActor
+struct ApplicationFocusRestorer {
+    let currentApplicationPID: pid_t
+    let frontmostApplicationPID: @MainActor () -> pid_t?
+    let activateApplication: @MainActor (pid_t) -> Bool
+
+    static var live: Self {
+        Self(
+            currentApplicationPID: NSRunningApplication.current.processIdentifier,
+            frontmostApplicationPID: {
+                NSWorkspace.shared.frontmostApplication?.processIdentifier
+            },
+            activateApplication: { processIdentifier in
+                NSRunningApplication(processIdentifier: processIdentifier)?
+                    .activate(options: [.activateAllWindows]) == true
+            }
+        )
+    }
+
+    func frontmostExternalApplicationPID() -> pid_t? {
+        guard let processIdentifier = frontmostApplicationPID(),
+            processIdentifier != currentApplicationPID
+        else {
+            return nil
+        }
+        return processIdentifier
+    }
+
+    func restoreApplication(processIdentifier: pid_t) {
+        _ = activateApplication(processIdentifier)
+    }
+}
+
+@MainActor
 public final class OverlayCoordinator: NSObject {
     public private(set) var layouts: [ScreenOverlayLayout] = []
     public private(set) var activeDisplayID: CGDirectDisplayID?
@@ -32,6 +65,7 @@ public final class OverlayCoordinator: NSObject {
     private let contentView: NSView
     private let persistentContentViewProvider: ((ScreenOverlayLayout) -> NSView?)?
     private let persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)?
+    private let applicationFocusRestorer: ApplicationFocusRestorer
     private var layoutEngine: ScreenLayoutEngine
     private let collapseDelay: Duration
     private var reducer = IslandPresentationReducer()
@@ -49,23 +83,43 @@ public final class OverlayCoordinator: NSObject {
     private var isPinned = false
     private var allowsKeyWindow = false
     private var keepsNativeGlassActive = false
+    private var applicationToRestorePID: pid_t?
     private var isExternalDragging = false
     private var isTransientInteractionVisible = false
     private var collapsedOnTop = true
     private var isPersistentContentVisible = true
 
-    public init(
+    public convenience init(
         contentView: NSView,
         layoutEngine: ScreenLayoutEngine = ScreenLayoutEngine(),
         collapseDelay: Duration = .milliseconds(450),
         persistentContentViewProvider: ((ScreenOverlayLayout) -> NSView?)? = nil,
         persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)? = nil
     ) {
+        self.init(
+            contentView: contentView,
+            layoutEngine: layoutEngine,
+            collapseDelay: collapseDelay,
+            persistentContentViewProvider: persistentContentViewProvider,
+            persistentPanelFrameProvider: persistentPanelFrameProvider,
+            applicationFocusRestorer: .live
+        )
+    }
+
+    init(
+        contentView: NSView,
+        layoutEngine: ScreenLayoutEngine = ScreenLayoutEngine(),
+        collapseDelay: Duration = .milliseconds(450),
+        persistentContentViewProvider: ((ScreenOverlayLayout) -> NSView?)? = nil,
+        persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)? = nil,
+        applicationFocusRestorer: ApplicationFocusRestorer
+    ) {
         self.contentView = contentView
         self.layoutEngine = layoutEngine
         self.collapseDelay = collapseDelay
         self.persistentContentViewProvider = persistentContentViewProvider
         self.persistentPanelFrameProvider = persistentPanelFrameProvider
+        self.applicationFocusRestorer = applicationFocusRestorer
         super.init()
     }
 
@@ -118,6 +172,7 @@ public final class OverlayCoordinator: NSObject {
         panel?.keepsNativeGlassActive = false
         panel?.allowsKeyWindow = false
         panel?.orderOut(nil)
+        restoreApplicationFocusIfNeeded()
         hidePersistentPanels()
         if wasVisible { onVisibilityChanged?(false) }
         reducer = IslandPresentationReducer()
@@ -228,7 +283,11 @@ public final class OverlayCoordinator: NSObject {
         }
         process(reducer.send(.setPinned(pinned)))
         applyPanelFocusPolicy(allowGlassActivation: false)
-        if !pinned { scheduleGlassActivation() }
+        if pinned {
+            restoreApplicationFocusIfNeeded()
+        } else {
+            scheduleGlassActivation()
+        }
     }
 
     /// Expands the panel without pinning it (does not modify isPinned). Intended for external
@@ -338,14 +397,19 @@ public final class OverlayCoordinator: NSObject {
 
         guard wasKeyWindow, !panel.canBecomeKey else { return }
         panel.resignKey()
-        DispatchQueue.main.async { [weak panel] in
-            guard let panel, panel.isVisible, !panel.canBecomeKey, NSApp.isActive,
-                NSApp.keyWindow == nil
-            else {
-                return
-            }
-            NSApp.deactivate()
-        }
+    }
+
+    private func restoreApplicationFocusIfNeeded() {
+        guard let processIdentifier = applicationToRestorePID else { return }
+        applicationToRestorePID = nil
+        applicationFocusRestorer.restoreApplication(processIdentifier: processIdentifier)
+    }
+
+    private func recordFrontmostApplicationForRestoration() {
+        guard let processIdentifier =
+            applicationFocusRestorer.frontmostExternalApplicationPID()
+        else { return }
+        applicationToRestorePID = processIdentifier
     }
 
     private func setPointerInside(_ inside: Bool) {
@@ -407,6 +471,7 @@ public final class OverlayCoordinator: NSObject {
                 onVisibilityChanged?(false)
                 panel?.ignoresMouseEvents = true
                 applyPanelFocusPolicy(allowGlassActivation: false)
+                restoreApplicationFocusIfNeeded()
                 applyPanelLevel()
                 updatePersistentPanels()
                 if stopsAfterTransientReveal { schedulePanelDismiss() }
@@ -415,6 +480,7 @@ public final class OverlayCoordinator: NSObject {
                 cancelPendingGlassActivation()
                 panel?.ignoresMouseEvents = true
                 applyPanelFocusPolicy(allowGlassActivation: false)
+                restoreApplicationFocusIfNeeded()
                 panel?.dismiss(to: layout(for: activeDisplayID)?.collapsedFrame)
                 onVisibilityChanged?(false)
             case .scheduleCollapse:
@@ -550,6 +616,9 @@ public final class OverlayCoordinator: NSObject {
                 frame: targetFrame,
                 blocksClicksInTransparentAreas: true
             )
+            panel.onWillActivateApplicationForNativeGlass = { [weak self] in
+                self?.recordFrontmostApplicationForRestoration()
+            }
             self.panel = panel
         }
         applyPanelFocusPolicy(allowGlassActivation: false)
