@@ -293,12 +293,12 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
 
     public static let defaultOrder: [Self] = [
         .transient,
-        .updateAvailable,
-        .mail,
         .videoDownload,
         .browserDownload,
         .focusCountdown,
         .toolboxReminder,
+        .mail,
+        .updateAvailable,
         .aiActivity,
         .media,
         .focusMode,

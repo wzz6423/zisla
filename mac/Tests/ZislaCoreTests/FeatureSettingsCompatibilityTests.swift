@@ -488,12 +488,12 @@ struct FeatureSettingsCompatibilityTests {
             .media,
             .transient,
             .aiActivity,
-            .updateAvailable,
-            .mail,
             .videoDownload,
             .browserDownload,
             .focusCountdown,
             .toolboxReminder,
+            .mail,
+            .updateAvailable,
             .focusMode,
         ])
     }
