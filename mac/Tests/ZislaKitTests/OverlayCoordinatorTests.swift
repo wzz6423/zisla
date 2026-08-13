@@ -342,6 +342,58 @@ private final class PersistentPetPanelProbe {
 
 extension OverlayCoordinatorTests {
     @Test @MainActor
+    func pinnedPanelStaysVisibleWithoutAcceptingFocus() async throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setPinned(true)
+        coordinator.setAllowsKeyWindow(true)
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setDragging(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        try await Task.sleep(for: .milliseconds(10))
+
+        #expect(panel.isVisible)
+        #expect(!panel.ignoresMouseEvents)
+        #expect(!panel.allowsKeyWindow)
+        #expect(!panel.keepsNativeGlassActive)
+        #expect(!panel.canBecomeKey)
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test @MainActor
+    func pinningAnExpandedPanelRevokesFocusEligibility() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setDragging(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        coordinator.setAllowsKeyWindow(true)
+
+        #expect(panel.allowsKeyWindow)
+        #expect(!panel.keepsNativeGlassActive)
+        #expect(panel.canBecomeKey)
+        #expect(!panel.isKeyWindow)
+
+        coordinator.setPinned(true)
+
+        #expect(panel.isVisible)
+        #expect(!panel.ignoresMouseEvents)
+        #expect(!panel.allowsKeyWindow)
+        #expect(!panel.keepsNativeGlassActive)
+        #expect(!panel.canBecomeKey)
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test @MainActor
     func firstShowDelaysGlassActivationUntilAfterVisibilityChanged() async throws {
         let contentView = NSView()
         var visibilityEvents: [Bool] = []
@@ -352,7 +404,7 @@ extension OverlayCoordinatorTests {
         coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
         coordinator.setKeepsNativeGlassActive(true)
-        coordinator.setPinned(true)
+        coordinator.setDragging(true)
 
         let panel = try #require(contentView.window as? IslandPanel)
         #expect(visibilityEvents == [true])
@@ -372,10 +424,10 @@ extension OverlayCoordinatorTests {
         coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
         coordinator.setKeepsNativeGlassActive(true)
-        coordinator.setPinned(true)
+        coordinator.setDragging(true)
 
         let panel = try #require(contentView.window as? IslandPanel)
-        coordinator.setPinned(false)
+        coordinator.setDragging(false)
 
         try await Task.sleep(for: .milliseconds(10))
         #expect(panel.keepsNativeGlassActive == false)
@@ -390,7 +442,7 @@ extension OverlayCoordinatorTests {
         coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
         coordinator.setKeepsNativeGlassActive(true)
-        coordinator.setPinned(true)
+        coordinator.setDragging(true)
 
         let panel = try #require(contentView.window as? IslandPanel)
         panel.orderOut(nil)
@@ -402,7 +454,7 @@ extension OverlayCoordinatorTests {
 
         coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
-        coordinator.setPinned(true)
+        coordinator.setDragging(true)
 
         #expect(panel.keepsNativeGlassActive == false)
         panel.orderOut(nil)
