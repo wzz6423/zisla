@@ -69,6 +69,7 @@ public final class AIAgentWorkspace: ObservableObject {
     @Published public private(set) var cliUpdates: [AIAgentCLIUpdate] = []
     @Published public private(set) var grokUpdateState: AIAgentGrokUpdateState = .unknown
     @Published public private(set) var cliCommandProgress: AIAgentCLICommandProgress?
+    @Published public private(set) var activeThreadIDs: Set<UUID> = []
 
     private let balanceService: AIAgentBalanceService
     private let channelProbeService: AIAgentChannelProbeService
@@ -92,6 +93,8 @@ public final class AIAgentWorkspace: ObservableObject {
     private var automationMonitoringRequested = false
     private var skillRefreshGeneration = 0
     private var cancellables: Set<AnyCancellable> = []
+    private var activeThreadStartedAt: [UUID: Date] = [:]
+    private var activeThreadReferenceCounts: [UUID: Int] = [:]
 
     public init(
         store: AIAgentStore = AIAgentStore(),
@@ -707,6 +710,8 @@ public final class AIAgentWorkspace: ObservableObject {
         skillReferences: [AgentChatSkillReference] = [],
         to threadID: UUID
     ) async {
+        beginThreadActivity(threadID)
+        defer { endThreadActivity(threadID) }
         await relayLock.acquire()
         _ = await sendLocked(
             content,
@@ -717,6 +722,69 @@ public final class AIAgentWorkspace: ObservableObject {
             to: threadID
         )
         await relayLock.release()
+    }
+
+    public func activeTasks(now: Date = Date()) -> [AIProgressTask] {
+        activeThreadIDs.compactMap { threadID in
+            guard let thread = store.state.chatThreads.first(where: { $0.id == threadID }) else {
+                return nil
+            }
+            let startedAt = activeThreadStartedAt[threadID] ?? now
+            return AIProgressTask(
+                id: "zisla-agent-thread-\(threadID.uuidString.lowercased())",
+                provider: Self.provider(for: thread),
+                title: thread.title,
+                detail: Self.detail(for: thread),
+                progress: nil,
+                status: .running,
+                updatedAt: now,
+                startedAt: startedAt
+            )
+        }
+        .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    func beginThreadActivity(_ threadID: UUID) {
+        activeThreadIDs.insert(threadID)
+        activeThreadReferenceCounts[threadID, default: 0] += 1
+        if activeThreadStartedAt[threadID] == nil {
+            activeThreadStartedAt[threadID] = Date()
+        }
+    }
+
+    func endThreadActivity(_ threadID: UUID) {
+        guard let count = activeThreadReferenceCounts[threadID] else { return }
+        if count > 1 {
+            activeThreadReferenceCounts[threadID] = count - 1
+        } else {
+            activeThreadReferenceCounts.removeValue(forKey: threadID)
+            activeThreadIDs.remove(threadID)
+            activeThreadStartedAt.removeValue(forKey: threadID)
+        }
+    }
+
+    private static func provider(for thread: AgentChatThread) -> AIProvider {
+        if let cliKind = thread.cliKind {
+            switch cliKind {
+            case .claude: return .claude
+            case .codex: return .codex
+            case .gemini: return .gemini
+            case .grok: return .grok
+            case .opencode: return .opencode
+            case .kimi: return .kimi
+            case .qwen: return .qwen
+            case .qoder: return .coder
+            case .copilot: return .copilot
+            }
+        }
+        return .gpt
+    }
+
+    private static func detail(for thread: AgentChatThread) -> String? {
+        if let model = thread.selectedModel?.trimmingCharacters(in: .whitespacesAndNewlines), !model.isEmpty {
+            return model
+        }
+        return thread.cliKind?.displayName
     }
 
     private func sendLocked(

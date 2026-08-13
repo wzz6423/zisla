@@ -164,6 +164,11 @@ public final class CodexSessionActivityDetector {
         cache = cache.filter { selectedURLs.contains($0.key) }
 
         let titlesBySessionID = sessionTitlesByID()
+        // Rollout 文件可能在扫描期间被 Codex 追加写入；单个文件读取失败不应丢弃其他会话。
+        let activities: [(candidate: Candidate, activity: RolloutActivity)] = candidates.compactMap { candidate in
+            guard let activity = try? activity(in: candidate) else { return nil }
+            return (candidate, activity)
+        }
         var allEvents: [(
             event: Event,
             activityDate: Date,
@@ -176,8 +181,8 @@ public final class CodexSessionActivityDetector {
         var mergedModelsByTurnID: [String: String] = [:]
         var mergedEffortsByTurnID: [String: String] = [:]
 
-        for candidate in candidates {
-            let activity = try activity(in: candidate)
+        for item in activities {
+            let activity = item.activity
             mergedModelsByTurnID.merge(activity.modelsByTurnID) { _, new in new }
             mergedEffortsByTurnID.merge(activity.effortsByTurnID) { _, new in new }
             for signal in activity.statusSignals {
@@ -185,8 +190,9 @@ public final class CodexSessionActivityDetector {
             }
         }
 
-        for candidate in candidates {
-            let activity = try activity(in: candidate)
+        for item in activities {
+            let candidate = item.candidate
+            let activity = item.activity
             let candidateEvents = activity.events
             let latestStartedTurnID = candidateEvents
                 .filter { $0.kind == .started }

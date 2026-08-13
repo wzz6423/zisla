@@ -7,10 +7,12 @@ import SwiftUI
 struct AIProgressModuleView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var monitor: AIStateMonitor
+    @ObservedObject private var agent: AIAgentWorkspace
 
     init(model: AppModel) {
         _model = ObservedObject(wrappedValue: model)
         _monitor = ObservedObject(wrappedValue: model.aiMonitor)
+        _agent = ObservedObject(wrappedValue: model.aiAgent)
     }
 
     var body: some View {
@@ -29,7 +31,7 @@ struct AIProgressModuleView: View {
     }
 
     private var activeTasks: [AIProgressTask] {
-        monitor.state.tasks
+        (monitor.state.tasks + agent.activeTasks())
             .filter(\.status.isActive)
             .sorted { $0.updatedAt > $1.updatedAt }
     }
@@ -290,13 +292,13 @@ private struct TaskProgressRow: View {
                     } else {
                         ThinkingOrbView(
                             state: ThinkingOrbState.forTask(task),
-                            size: 14,
+                            size: 18,
                             speed: task.status == .blocked ? 0.65 : 1,
                             tint: providerColor
                         )
                     }
                 }
-                .frame(height: 12)
+                .frame(height: 18)
             }
         } else if task.status == .error {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -309,7 +311,7 @@ private struct TaskProgressRow: View {
         } else {
             ThinkingOrbView(
                 state: ThinkingOrbState.forTask(task),
-                size: 14,
+                size: 18,
                 speed: task.status == .blocked ? 0.65 : 1,
                 tint: providerColor
             )

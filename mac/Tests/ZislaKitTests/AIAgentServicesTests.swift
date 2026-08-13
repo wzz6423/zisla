@@ -1344,6 +1344,37 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func sendPublishesActiveThreadTaskUntilRelayFinishes() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-active-thread-task-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = AIAgentStore(
+            storageURL: root.appendingPathComponent("state.json"),
+            secretStore: ActiveThreadSecretStore()
+        )
+        let account = AgentAccount(
+            name: "Codex",
+            provider: "Codex",
+            credentialKind: .cliProfile,
+            cliProfile: AgentCLIProfile(cliKind: .codex)
+        )
+        try store.upsertAccount(account)
+        try store.replaceCLIProfile(configuration: Data("{}".utf8), authentication: Data("{}".utf8), for: account.id)
+        let thread = store.createThread(cliKind: .codex, accountID: account.id)
+        let workspace = AIAgentWorkspace(store: store)
+
+        workspace.beginThreadActivity(thread.id)
+        #expect(workspace.activeThreadIDs == [thread.id])
+        #expect(workspace.activeTasks().map(\.id) == [
+            "zisla-agent-thread-\(thread.id.uuidString.lowercased())",
+        ])
+
+        workspace.endThreadActivity(thread.id)
+        #expect(workspace.activeThreadIDs.isEmpty)
+        #expect(workspace.activeTasks().isEmpty)
+    }
+
+    @Test
     func homebrewUpdateCheckSupportsManagedAdditionalCLIs() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-detection-only-homebrew-\(UUID().uuidString)", isDirectory: true)
@@ -1368,6 +1399,14 @@ struct AIAgentServicesTests {
             AIAgentCLIUpdate(kind: .qwen, installedVersion: "0.21.10", latestVersion: "0.22.0"),
         ])
     }
+}
+
+private final class ActiveThreadSecretStore: AIAgentSecretStoring, @unchecked Sendable {
+    private var values: [String: String] = [:]
+
+    func secret(for reference: String) throws -> String? { values[reference] }
+    func setSecret(_ secret: String, for reference: String) throws { values[reference] = secret }
+    func removeSecret(for reference: String) throws { values.removeValue(forKey: reference) }
 }
 
 private final class AIAgentURLProtocol: URLProtocol, @unchecked Sendable {
