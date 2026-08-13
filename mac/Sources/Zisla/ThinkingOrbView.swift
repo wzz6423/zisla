@@ -14,36 +14,9 @@ enum ThinkingOrbState: String, CaseIterable, Sendable {
     case shaping
 
     static func forTask(_ task: AIProgressTask) -> Self {
-        switch task.status {
-        case .queued:
-            return .connecting
-        case .blocked:
-            return .breathing
-        case .error:
-            return .shaping
-        case .succeeded, .failed:
-            return .breathing
-        case .running:
-            let detail = [task.title, task.detail, task.effort]
-                .compactMap { $0?.lowercased() }
-                .joined(separator: " ")
-            if detail.contains("search") || detail.contains("scan") || detail.contains("搜索") || detail.contains("检索") {
-                return .searching
-            }
-            if detail.contains("listen") || detail.contains("voice") || detail.contains("等待输入") {
-                return .listening
-            }
-            if detail.contains("plan") || detail.contains("solve") || detail.contains("分析") || detail.contains("思考") {
-                return .solving
-            }
-            if detail.contains("write") || detail.contains("compose") || detail.contains("生成") || detail.contains("编写") {
-                return .composing
-            }
-            if detail.contains("weav") || detail.contains("organize") || detail.contains("整理") || detail.contains("组织") {
-                return .weaving
-            }
-            return .working
-        }
+        // 同一任务保持同一动效，避免视图刷新时随机切换。
+        let index = Int(UInt(bitPattern: task.id.hashValue) % UInt(allCases.count))
+        return allCases[index]
     }
 
     var accessibilityLabel: String {
@@ -172,7 +145,7 @@ private enum ThinkingOrbRenderer {
 
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let radius = side * 0.39
-        let dotScale = isLarge ? 1 : 0.84
+        let dotScale = isLarge ? 1 : 0.96
         let dotFloor = isLarge ? 0.72 : 0.78
         var dots: [Dot] = []
         var lines: [Line] = []

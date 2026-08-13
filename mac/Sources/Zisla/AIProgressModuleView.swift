@@ -253,7 +253,7 @@ private struct TaskProgressRow: View {
                 statusContent
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 68, maxHeight: 68, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 54, maxHeight: 54, alignment: .leading)
         .padding(.horizontal, 2)
         .contentShape(Rectangle())
     }
@@ -292,13 +292,14 @@ private struct TaskProgressRow: View {
                     } else {
                         ThinkingOrbView(
                             state: ThinkingOrbState.forTask(task),
-                            size: 36,
+                            size: 24,
                             speed: task.status == .blocked ? 0.65 : 1,
-                            tint: providerColor
+                            tint: .white,
+                            accessibilityLabel: "AI 正在工作"
                         )
                     }
                 }
-                .frame(height: 36)
+                .frame(height: 24)
             }
         } else if task.status == .error {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -311,9 +312,10 @@ private struct TaskProgressRow: View {
         } else {
             ThinkingOrbView(
                 state: ThinkingOrbState.forTask(task),
-                size: 36,
+                size: 24,
                 speed: task.status == .blocked ? 0.65 : 1,
-                tint: providerColor
+                tint: .white,
+                accessibilityLabel: "AI 正在工作"
             )
         }
     }

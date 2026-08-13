@@ -472,18 +472,9 @@ struct AIAgentModuleView: View {
                                 chatMessage(message, in: thread.id)
                             }
                             if agent.activeThreadIDs.contains(thread.id) {
-                                HStack(spacing: 7) {
-                                    ThinkingOrbView(
-                                        state: .solving,
-                                        size: 20,
-                                        theme: .dark,
-                                        accessibilityLabel: "AI 正在思考"
-                                    )
-                                    Text("正在思考")
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundStyle(.secondary)
-                                }
-                                .accessibilityElement(children: .combine)
+                                Text("正在思考")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.secondary)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1962,12 +1953,7 @@ struct AIAgentModuleView: View {
         HStack(spacing: 6) {
             switch progress.state {
             case .running:
-                ThinkingOrbView(
-                    state: .working,
-                    size: 20,
-                    theme: .dark,
-                    speed: 0.9
-                )
+                Image(systemName: "clock")
             case .succeeded:
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             case .failed:
