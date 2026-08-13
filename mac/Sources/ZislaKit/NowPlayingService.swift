@@ -245,6 +245,7 @@ public final class NowPlayingService: ObservableObject {
   private var spectrumVisualizationEnabled = false
   private var spectrumCancellable: AnyCancellable?
   private var systemAudioIsAudible = false
+  private var playbackRefreshGeneration: UInt64 = 0
   private var adapterPlaybackMode: NowPlayingPlaybackMode?
   private var playbackModeCommandGeneration: UInt64 = 0
   private var preferredSource: MediaSourcePreference = .automatic
@@ -344,8 +345,17 @@ public final class NowPlayingService: ObservableObject {
       .sink { [weak self] audible in
         Task { @MainActor [weak self] in
           guard let self else { return }
+          let wasAudible = self.systemAudioIsAudible
           self.systemAudioIsAudible = audible
+          if audible { self.playbackRefreshGeneration &+= 1 }
           self.audioMonitor.refresh()
+          if Self.shouldRefreshPlaybackAfterAudioChange(
+            wasAudible: wasAudible,
+            isAudible: audible,
+            snapshot: self.snapshot
+          ) {
+            self.refreshPlaybackAfterAudioStops()
+          }
           self.resolveSnapshot()
         }
       }
@@ -384,6 +394,7 @@ public final class NowPlayingService: ObservableObject {
     spectrumCancellable?.cancel()
     spectrumCancellable = nil
     systemAudioIsAudible = false
+    playbackRefreshGeneration &+= 1
     AudioSpectrumService.shared.stop()
     usesAdapter = false
     adapterClient.stop()
@@ -482,6 +493,7 @@ public final class NowPlayingService: ObservableObject {
     guard sent else { return false }
 
     if let value = Self.optimisticPlaybackValue(after: command, current: current.isPlaying) {
+      playbackRefreshGeneration &+= 1
       playbackStateOverride = TimedControlOverride(
         identity: ControlIdentity(current),
         value: value,
@@ -962,6 +974,14 @@ public final class NowPlayingService: ObservableObject {
     }
   }
 
+  nonisolated static func shouldRefreshPlaybackAfterAudioChange(
+    wasAudible: Bool,
+    isAudible: Bool,
+    snapshot: NowPlayingSnapshot?
+  ) -> Bool {
+    wasAudible && !isAudible && snapshot?.isPlaying == true
+  }
+
   nonisolated static func audioFallbackIsAllowed(
     source: AudioPlaybackSource,
     remotePID: pid_t?,
@@ -1077,8 +1097,9 @@ public final class NowPlayingService: ObservableObject {
   }
 
   private func consumeAdapterEvent(_ event: MediaRemoteAdapterEvent) {
+    playbackRefreshGeneration &+= 1
     remotePIDPending = false
-    guard var value = Self.parseAdapter(event.payload) else {
+    guard let value = Self.parseAdapter(event.payload) else {
       remoteInfoState = .empty
       remotePlaybackState = .paused
       remotePID = nil
@@ -1086,6 +1107,12 @@ public final class NowPlayingService: ObservableObject {
       resolveSnapshot()
       return
     }
+
+    consumeAdapterSnapshot(value)
+  }
+
+  private func consumeAdapterSnapshot(_ snapshot: NowPlayingSnapshot) {
+    var value = snapshot
 
     if let playbackMode = value.playbackMode {
       adapterPlaybackMode = playbackMode
@@ -1100,8 +1127,30 @@ public final class NowPlayingService: ObservableObject {
     resolveSnapshot()
   }
 
+  private func refreshPlaybackAfterAudioStops() {
+    guard usesAdapter else {
+      refreshRemoteInfo()
+      return
+    }
+
+    playbackRefreshGeneration &+= 1
+    let generation = playbackRefreshGeneration
+    _ = adapterClient.fetchNowPlayingInfo { [weak self] payload in
+      guard let self,
+        self.playbackRefreshGeneration == generation,
+        self.usesAdapter,
+        !self.systemAudioIsAudible,
+        self.snapshot?.isPlaying == true,
+        let payload,
+        let value = Self.parseAdapter(payload)
+      else { return }
+      self.consumeAdapterSnapshot(value)
+    }
+  }
+
   private func adapterDidTerminate() {
     guard usesAdapter else { return }
+    playbackRefreshGeneration &+= 1
     artworkRefreshTask?.cancel()
     artworkRefreshTask = nil
     artworkRefreshIdentity = nil

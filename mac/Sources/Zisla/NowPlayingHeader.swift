@@ -341,6 +341,12 @@ struct NowPlayingHeader: View {
                 identity: AIMascotIdentity(provider: task.provider, taskID: task.id),
                 size: 30
             )
+            ThinkingOrbView(
+                state: ThinkingOrbState.forTask(task),
+                size: 20,
+                speed: task.status == .blocked ? 0.65 : 1,
+                tint: ProviderBrand.color(for: task.provider)
+            )
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
                     .font(.system(size: 12, weight: .semibold))

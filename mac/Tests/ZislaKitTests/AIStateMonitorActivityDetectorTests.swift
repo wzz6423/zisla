@@ -112,6 +112,37 @@ struct AIStateMonitorActivityDetectorTests {
     }
 
     @Test @MainActor
+    func refreshDetectsNewActivityWhenPersistedStateIsUnchanged() async {
+        let directory = monitorTempDirectory("unchanged-state-refresh")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let now = Date(timeIntervalSince1970: 1_910_000_000)
+        let task = AIProgressTask(
+            id: "automatic-newly-active",
+            provider: .codex,
+            title: "Codex",
+            progress: nil,
+            status: .running,
+            updatedAt: now
+        )
+        let detector = MutableActivityDetector(tasks: [])
+        let monitor = AIStateMonitor(
+            directoryURL: directory,
+            activityDetectors: [detector],
+            detectorRefreshInterval: 60,
+            now: { now }
+        )
+        defer { monitor.stop() }
+
+        monitor.start()
+        #expect(await waitForDetectorCall(detector))
+
+        detector.replaceTasks(with: [task])
+        monitor.refresh()
+
+        #expect(await waitForMonitorState { monitor.state.tasks == [task] })
+    }
+
+    @Test @MainActor
     func reloadImmediatelyRemovesTaskNoLongerReturnedByDetector() {
         let directory = monitorTempDirectory("immediate-removal")
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -160,6 +191,7 @@ private struct FailingActivityDetector: AIActivityDetecting {
 private final class MutableActivityDetector: AIActivityDetecting, @unchecked Sendable {
     private let lock = NSLock()
     private var tasks: [AIProgressTask]
+    private var callCount = 0
 
     init(tasks: [AIProgressTask]) {
         self.tasks = tasks
@@ -168,6 +200,7 @@ private final class MutableActivityDetector: AIActivityDetecting, @unchecked Sen
     func activeTasks() throws -> [AIProgressTask] {
         lock.lock()
         defer { lock.unlock() }
+        callCount += 1
         return tasks
     }
 
@@ -176,6 +209,25 @@ private final class MutableActivityDetector: AIActivityDetecting, @unchecked Sen
         defer { lock.unlock() }
         self.tasks = tasks
     }
+
+    var hasBeenCalled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return callCount > 0
+    }
+}
+
+@MainActor
+private func waitForDetectorCall(
+    _ detector: MutableActivityDetector,
+    timeout: TimeInterval = 2
+) async -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if detector.hasBeenCalled { return true }
+        try? await Task.sleep(for: .milliseconds(25))
+    }
+    return detector.hasBeenCalled
 }
 
 @MainActor

@@ -28,6 +28,12 @@ struct AIAgentServicesTests {
         #expect(brew.packageName == "tool")
         #expect(brew.uninstallArguments == ["uninstall", "tool"])
 
+        let cask = try #require(AgentSkillPackageInstallation.detect(
+            at: URL(fileURLWithPath: "/opt/homebrew/Caskroom/copilot-cli/1.0.34/copilot")
+        ))
+        #expect(cask.manager == .brew)
+        #expect(cask.packageName == "copilot-cli")
+
         #expect(AgentSkillPackageInstallation.detect(
             at: URL(fileURLWithPath: "/Users/test/.codex/skills/local-skill")
         ) == nil)
@@ -810,6 +816,176 @@ struct AIAgentServicesTests {
         #expect(uninstallGrok.arguments == [grok.path])
     }
 
+    @Test
+    func additionalManagedCLIsBuildNPMManagementCommands() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-additional-cli-commands-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let npm = root.appendingPathComponent(".npm-global/bin/npm")
+        try writeExecutable(at: npm)
+        let packages: [(AgentCLIKind, String, String)] = [
+            (.qwen, "@qwen-code/qwen-code", "qwen"),
+            (.qoder, "@qoder-ai/qodercli", "qodercli"),
+            (.copilot, "@github/copilot", "copilot"),
+        ]
+        for (_, package, executable) in packages {
+            let target = root.appendingPathComponent(".npm-global/lib/node_modules/\(package)/\(executable).js")
+            try writeExecutable(at: target)
+            let launcher = root.appendingPathComponent(".npm-global/bin/\(executable)")
+            try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+        }
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: root)
+        let kinds = packages.map { $0.0 }
+
+        let installs = service.installationCommands(for: kinds, update: false)
+        #expect(installs == [AIAgentCLICommand(
+            executableURL: npm,
+            arguments: [
+                "install", "--global",
+                "@qwen-code/qwen-code", "@qoder-ai/qodercli", "@github/copilot",
+            ]
+        )])
+
+        let updates = service.installationCommands(for: kinds, update: true)
+        #expect(updates == [AIAgentCLICommand(
+            executableURL: npm,
+            arguments: [
+                "install", "--global",
+                "@qwen-code/qwen-code@latest", "@qoder-ai/qodercli@latest", "@github/copilot@latest",
+            ],
+            timeout: 600
+        )])
+
+        let uninstalls = service.uninstallationCommands(for: kinds)
+        #expect(uninstalls == [AIAgentCLICommand(
+            executableURL: npm,
+            arguments: [
+                "uninstall", "--global",
+                "@qwen-code/qwen-code", "@qoder-ai/qodercli", "@github/copilot",
+            ]
+        )])
+    }
+
+    @Test
+    func additionalManagedCLIsHaveInstallScriptsWithoutNPM() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-additional-cli-install-scripts-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: root)
+
+        let commands = service.installationCommands(for: [.qwen, .qoder, .copilot], update: false)
+        let scripts = commands.filter { $0.executableURL.path == "/bin/bash" }
+        if scripts.isEmpty {
+            #expect(commands.count == 1)
+            #expect(commands[0].arguments == [
+                "install", "--global",
+                "@qwen-code/qwen-code", "@qoder-ai/qodercli", "@github/copilot",
+            ])
+        } else {
+            #expect(scripts.map(\.arguments) == [
+                ["-c", "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh | bash"],
+                ["-c", "curl -fsSL https://qoder.com/install | bash"],
+                ["-c", "curl -fsSL https://gh.io/copilot-install | bash"],
+            ])
+        }
+    }
+
+    @Test
+    func copilotHomebrewInstallationUsesHomebrewForManagement() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-copilot-cask-management-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let brew = root.appendingPathComponent("toolchain/bin/brew")
+        let target = root.appendingPathComponent("Caskroom/copilot-cli/1.0.34/copilot")
+        let launcher = root.appendingPathComponent("bin/copilot")
+        try writeExecutable(at: brew)
+        try writeExecutable(at: target)
+        try FileManager.default.createDirectory(at: launcher.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "\(root.appendingPathComponent("bin").path):/usr/bin", "NPM_CONFIG_PREFIX": root.appendingPathComponent("toolchain").path],
+            homeDirectory: root
+        )
+
+        #expect(service.installationCommands(for: [.copilot], update: true) == [
+            AIAgentCLICommand(executableURL: brew, arguments: ["upgrade", "copilot-cli"], timeout: 600),
+        ])
+        #expect(service.uninstallationCommands(for: [.copilot]) == [
+            AIAgentCLICommand(executableURL: brew, arguments: ["uninstall", "copilot-cli"]),
+        ])
+    }
+
+    @Test
+    func homebrewUpdateCheckUsesCaskReportedVersion() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-copilot-cask-update-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let brew = root.appendingPathComponent("toolchain/bin/brew")
+        try writeExecutable(
+            at: brew,
+            contents: "#!/bin/sh\nprintf '%s' '{\"formulae\":[],\"casks\":[{\"name\":\"copilot-cli\",\"current_version\":\"1.0.35\"}]}'\n"
+        )
+        let copilot = root.appendingPathComponent("Caskroom/copilot-cli/1.0.34/copilot")
+        try writeExecutable(at: copilot)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin", "NPM_CONFIG_PREFIX": root.appendingPathComponent("toolchain").path],
+            homeDirectory: root
+        )
+
+        let updates = await service.homebrewUpdates(for: [
+            AgentCLIStatus(kind: .copilot, executablePath: copilot.path, version: "1.0.34"),
+        ])
+
+        #expect(updates == [
+            AIAgentCLIUpdate(kind: .copilot, installedVersion: "1.0.34", latestVersion: "1.0.35"),
+        ])
+    }
+
+    @Test
+    func standaloneCopilotUninstallRemovesOnlyTheOfficialUserBinary() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-copilot-standalone-uninstall-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let copilot = root.appendingPathComponent(".local/bin/copilot")
+        try writeExecutable(at: copilot)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(service.uninstallationCommands(for: [.copilot]) == [
+            AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/rm"), arguments: [copilot.path]),
+        ])
+    }
+
+    @Test
+    func standaloneQwenUsesOfficialUninstaller() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-qwen-standalone-uninstall-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let qwen = root.appendingPathComponent(".local/bin/qwen")
+        try writeExecutable(at: qwen)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(service.uninstallationCommands(for: [.qwen]) == [
+            AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/bash"),
+                arguments: ["-c", "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/uninstall-qwen-standalone.sh | bash"]
+            ),
+        ])
+    }
+
+    @Test
+    func standaloneQoderUninstallRemovesOnlyTheOfficialUserBinary() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-qoder-standalone-uninstall-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let qoder = root.appendingPathComponent(".local/bin/qodercli")
+        try writeExecutable(at: qoder)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(service.uninstallationCommands(for: [.qoder]) == [
+            AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/rm"), arguments: [qoder.path]),
+        ])
+    }
+
     private func writeExecutable(at url: URL, contents: String = "#!/bin/sh\nexit 0\n") throws {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
@@ -1032,24 +1208,90 @@ struct AIAgentServicesTests {
     }
 
     @Test
-    func detectionOnlyCLIsDoNotProduceManagementCommands() throws {
+    func kimiDiscoveryUsesConfiguredInstallationDirectory() throws {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("zisla-detection-only-cli-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("zisla-kimi-configured-installation-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        let npm = root.appendingPathComponent(".npm-global/bin/npm")
-        try writeExecutable(at: npm)
-        let target = root.appendingPathComponent(
-            ".npm-global/lib/node_modules/@qwen-code/qwen-code/dist/qwen.js"
-        )
-        try writeExecutable(at: target)
-        let launcher = root.appendingPathComponent(".npm-global/bin/qwen")
-        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
-        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: root)
-        let kinds = [AgentCLIKind.kimi, .qwen, .qoder, .copilot]
+        let configuredInstall = root.appendingPathComponent("configured-install", isDirectory: true)
+        let installedKimi = configuredInstall.appendingPathComponent("bin/kimi")
+        try writeExecutable(at: installedKimi)
 
-        #expect(service.installationCommands(for: kinds, update: false).isEmpty)
-        #expect(service.installationCommands(for: kinds, update: true).isEmpty)
-        #expect(service.uninstallationCommands(for: kinds).isEmpty)
+        let installedService = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin:/bin", "KIMI_INSTALL_DIR": configuredInstall.path],
+            homeDirectory: root
+        )
+
+        #expect(try #require(installedService.executableURL(for: .kimi)).path == installedKimi.path)
+    }
+
+    @Test
+    func kimiManagementBuildsOfficialCommands() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-kimi-management-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let installRoot = root.appendingPathComponent("kimi-install", isDirectory: true)
+        let kimi = installRoot.appendingPathComponent("bin/kimi")
+        try writeExecutable(at: kimi)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin:/bin", "KIMI_INSTALL_DIR": installRoot.path],
+            homeDirectory: root
+        )
+
+        #expect(service.installationCommands(for: [.kimi], update: false) == [
+            AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/bash"),
+                arguments: ["-c", "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"]
+            ),
+        ])
+        #expect(service.installationCommands(for: [.kimi], update: true) == [
+            AIAgentCLICommand(executableURL: kimi, arguments: ["upgrade"], timeout: 600),
+        ])
+        #expect(service.uninstallationCommands(for: [.kimi]) == [
+            AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/rm"), arguments: [kimi.path]),
+        ])
+    }
+
+    @Test
+    func kimiUninstallRefusesExecutablesOutsideTrustedInstallationRoots() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-kimi-untrusted-uninstall-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let untrustedDirectory = root.appendingPathComponent("untrusted/bin", isDirectory: true)
+        let kimi = untrustedDirectory.appendingPathComponent("kimi")
+        try writeExecutable(at: kimi)
+        let service = AIAgentCLIService(
+            environment: [
+                "PATH": "\(untrustedDirectory.path):/usr/bin:/bin",
+                "KIMI_INSTALL_DIR": root.appendingPathComponent("trusted-install").path,
+            ],
+            homeDirectory: root
+        )
+
+        #expect(service.installationCommands(for: [.kimi], update: true) == [
+            AIAgentCLICommand(executableURL: kimi, arguments: ["upgrade"], timeout: 600),
+        ])
+        #expect(service.uninstallationCommands(for: [.kimi]).isEmpty)
+    }
+
+    @Test
+    func kimiUninstallRemovesTrustedLauncherInsteadOfSymlinkTarget() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-kimi-symlink-uninstall-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let installRoot = root.appendingPathComponent("kimi-install", isDirectory: true)
+        let launcher = installRoot.appendingPathComponent("bin/kimi")
+        let target = root.appendingPathComponent("external/kimi")
+        try writeExecutable(at: target)
+        try FileManager.default.createDirectory(at: launcher.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin:/bin", "KIMI_INSTALL_DIR": installRoot.path],
+            homeDirectory: root
+        )
+
+        #expect(service.uninstallationCommands(for: [.kimi]) == [
+            AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/rm"), arguments: [launcher.path]),
+        ])
     }
 
     @Test
@@ -1102,7 +1344,7 @@ struct AIAgentServicesTests {
     }
 
     @Test
-    func homebrewUpdateCheckSkipsDetectionOnlyCLIs() async throws {
+    func homebrewUpdateCheckSupportsManagedAdditionalCLIs() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-detection-only-homebrew-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -1122,7 +1364,9 @@ struct AIAgentServicesTests {
             AgentCLIStatus(kind: .qwen, executablePath: qwen.path, version: "0.21.10"),
         ])
 
-        #expect(updates.isEmpty)
+        #expect(updates == [
+            AIAgentCLIUpdate(kind: .qwen, installedVersion: "0.21.10", latestVersion: "0.22.0"),
+        ])
     }
 }
 

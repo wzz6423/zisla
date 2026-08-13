@@ -355,7 +355,7 @@ extension OverlayCoordinatorTests {
         coordinator.setDragging(true)
 
         let panel = try #require(contentView.window as? IslandPanel)
-        try await Task.sleep(for: .milliseconds(10))
+        try await Task.sleep(for: .milliseconds(2_200))
 
         #expect(panel.isVisible)
         #expect(!panel.ignoresMouseEvents)

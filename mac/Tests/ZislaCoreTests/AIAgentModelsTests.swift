@@ -405,6 +405,9 @@ struct AIAgentModelsTests {
     func detectableCLIKindsIncludeSupportedCodingAgents() {
         #expect(AgentCLIKind.kimi.displayName == "Kimi Code")
         #expect(AgentCLIKind.kimi.executableName == "kimi")
+        #expect(AgentCLIKind.qwen.npmPackageName == "@qwen-code/qwen-code")
+        #expect(AgentCLIKind.qoder.npmPackageName == "@qoder-ai/qodercli")
+        #expect(AgentCLIKind.copilot.npmPackageName == "@github/copilot")
         #expect(AgentCLIKind.qwen.displayName == "Qwen Code")
         #expect(AgentCLIKind.qwen.executableName == "qwen")
         #expect(AgentCLIKind.qoder.displayName == "Qoder CLI")
@@ -418,7 +421,10 @@ struct AIAgentModelsTests {
         #expect(AgentCLIKind.detectableCases.contains(.copilot))
         #expect(!AgentCLIKind.relayCases.contains(.kimi))
         #expect(!AgentCLIKind.profileCases.contains(.kimi))
-        #expect(!AgentCLIKind.managedCases.contains(.kimi))
+        #expect(AgentCLIKind.managedCases.contains(.kimi))
+        #expect(AgentCLIKind.managedCases.contains(.qwen))
+        #expect(AgentCLIKind.managedCases.contains(.qoder))
+        #expect(AgentCLIKind.managedCases.contains(.copilot))
         #expect(AgentCLIKind.allCases.prefix(5) == [.claude, .codex, .gemini, .grok, .opencode])
     }
 }

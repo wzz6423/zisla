@@ -1849,7 +1849,7 @@ struct AIAgentModuleView: View {
                                 .foregroundStyle(Color.zislaInfo)
                                 .disabled(agent.isRunningCLICommands || update.isEmpty)
                                 .help("已确认新版本 \(availableUpdate.latestVersion)，更新 \(kind.displayName)")
-                            } else if status?.version != nil {
+                            } else if status?.version != nil, kind != .kimi {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(kind == .grok && agent.grokUpdateState == .upToDate ? .green : .secondary)
                                     .help(kind == .grok && agent.grokUpdateState == .upToDate ? "Grok 已是最新版本" : "当前未检测到可用更新")
@@ -1867,7 +1867,7 @@ struct AIAgentModuleView: View {
                                 .buttonStyle(.borderless)
                                 .foregroundStyle(.secondary)
                                 .disabled(agent.isRunningCLICommands || update.isEmpty)
-                                .help("版本未知，可尝试更新 \(kind.displayName)")
+                                .help(status?.version == nil ? "版本未知，可尝试更新 \(kind.displayName)" : "检查并升级 \(kind.displayName)")
                             }
                             let uninstall = agent.commandsForCLIUninstallation([kind])
                             Button(role: .destructive) {
@@ -1919,10 +1919,11 @@ struct AIAgentModuleView: View {
 
     private func cliActionMessage(_ action: String, kinds: [AgentCLIKind]) -> String {
         let names = kinds.map(\.displayName).joined(separator: "、")
-        let grokNote = kinds.contains(.grok) && action.contains("卸载")
-            ? "Grok 只会移除 CLI 可执行文件，保留账号和本地配置。"
+        let standaloneKinds = kinds.filter { $0 == .grok || $0 == .kimi }
+        let uninstallNote = !standaloneKinds.isEmpty && action.contains("卸载")
+            ? "\(standaloneKinds.map(\.displayName).joined(separator: "、")) 只会移除 CLI 可执行文件，保留账号和本地配置。"
             : "命令会在本机执行，完成后将重新检测安装状态。"
-        return "\(action)：\(names)。\(grokNote)"
+        return "\(action)：\(names)。\(uninstallNote)"
     }
 
     private func queueCLIAction(
@@ -1943,7 +1944,13 @@ struct AIAgentModuleView: View {
         HStack(spacing: 6) {
             switch progress.state {
             case .running:
-                ProgressView().controlSize(.small)
+                ThinkingOrbView(
+                    state: .working,
+                    size: 20,
+                    theme: .dark,
+                    speed: 0.9,
+                    tint: .secondary
+                )
             case .succeeded:
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             case .failed:

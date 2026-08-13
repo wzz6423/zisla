@@ -469,6 +469,13 @@ struct AgentSkillPackageInstallation: Equatable, Sendable {
                 packageName: components[cellarIndex + 1]
             )
         }
+        if let caskroomIndex = components.firstIndex(of: "Caskroom"),
+           caskroomIndex + 1 < components.count {
+            return AgentSkillPackageInstallation(
+                manager: .brew,
+                packageName: components[caskroomIndex + 1]
+            )
+        }
 
         guard let nodeModulesIndex = components.lastIndex(of: "node_modules"),
               let packageName = packageName(
@@ -776,7 +783,8 @@ public struct AIAgentCLIService: Sendable {
     public func homebrewUpdates(for statuses: [AgentCLIStatus]) async -> [AIAgentCLIUpdate] {
         guard let brew = executable(named: AgentSkillPackageManager.brew.executableName) else { return [] }
         let candidates = statuses.compactMap { status -> (AgentCLIStatus, AgentSkillPackageInstallation)? in
-            guard AgentCLIKind.managedCases.contains(status.kind),
+            guard status.kind != .kimi,
+                  AgentCLIKind.managedCases.contains(status.kind),
                   let executablePath = status.executablePath,
                   let installation = AgentSkillPackageInstallation.detect(at: URL(fileURLWithPath: executablePath)),
                   installation.manager == .brew,
@@ -816,13 +824,13 @@ public struct AIAgentCLIService: Sendable {
             )
             guard output.status == 0,
                   let outdated = try? JSONDecoder().decode(HomebrewOutdatedPackages.self, from: output.standardOutput),
-                  let formula = outdated.formulae.first(where: { $0.packageName == installation.packageName }),
+                  let package = outdated.packages.first(where: { $0.packageName == installation.packageName }),
                   let installedVersion = status.version
             else { return nil }
             return AIAgentCLIUpdate(
                 kind: status.kind,
                 installedVersion: installedVersion,
-                latestVersion: formula.currentVersion
+                latestVersion: package.currentVersion
             )
         } catch {
             return nil
@@ -876,7 +884,7 @@ public struct AIAgentCLIService: Sendable {
         return candidates.compactMap { try? SemanticVersion(String($0)) }.first
     }
 
-    /// Returns an npm command for later confirmation without modifying the system.
+    /// Returns an installation command for later confirmation without modifying the system.
     public func installationCommand(for kind: AgentCLIKind, update: Bool) -> AIAgentCLICommand? {
         installationCommands(for: [kind], update: update).first
     }
@@ -892,17 +900,42 @@ public struct AIAgentCLIService: Sendable {
             return package
         }
         var commands: [AIAgentCLICommand] = []
-        if !packages.isEmpty, let npm = executable(named: "npm") {
-            commands.append(AIAgentCLICommand(
-                executableURL: npm,
-                arguments: ["install", "--global"] + packages
-            ))
+        if !packages.isEmpty {
+            if let npm = executable(named: "npm") {
+                commands.append(AIAgentCLICommand(
+                    executableURL: npm,
+                    arguments: ["install", "--global"] + packages
+                ))
+            } else {
+                for kind in requested.sorted(by: Self.cliKindOrder) {
+                    guard let script = standaloneInstallScript(for: kind) else { continue }
+                    commands.append(AIAgentCLICommand(
+                        executableURL: URL(fileURLWithPath: "/bin/bash"),
+                        arguments: ["-c", script]
+                    ))
+                }
+            }
         }
         if requested.contains(.grok) {
             commands.append(AIAgentCLICommand(
                 executableURL: URL(fileURLWithPath: "/bin/bash"),
                 arguments: ["-c", "curl -fsSL https://x.ai/cli/install.sh | bash"]
             ))
+        }
+        if requested.contains(.kimi) {
+            commands.append(AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/bash"),
+                arguments: ["-c", "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"]
+            ))
+        }
+        if requested.contains(.qwen), !packages.contains("@qwen-code/qwen-code"), let script = standaloneInstallScript(for: .qwen) {
+            commands.append(AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/bash"), arguments: ["-c", script]))
+        }
+        if requested.contains(.qoder), !packages.contains("@qoder-ai/qodercli"), let script = standaloneInstallScript(for: .qoder) {
+            commands.append(AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/bash"), arguments: ["-c", script]))
+        }
+        if requested.contains(.copilot), !packages.contains("@github/copilot"), let script = standaloneInstallScript(for: .copilot) {
+            commands.append(AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/bash"), arguments: ["-c", script]))
         }
         return commands
     }
@@ -913,7 +946,9 @@ public struct AIAgentCLIService: Sendable {
 
         for manager in [AgentSkillPackageManager.npm, .pnpm, .yarn, .bun, .brew] {
             let packages = AgentCLIKind.managedCases.compactMap { kind -> String? in
-                guard requested.contains(kind),
+                guard kind != .kimi,
+                      kind != .grok,
+                      requested.contains(kind),
                       let executableURL = executableURL(for: kind),
                       let installation = AgentSkillPackageInstallation.detect(at: executableURL),
                       installation.manager == manager
@@ -932,7 +967,13 @@ public struct AIAgentCLIService: Sendable {
         }
 
         let fallbackPackages = AgentCLIKind.managedCases.compactMap { kind -> String? in
-            guard requested.contains(kind), !managedKinds.contains(kind), let package = npmPackage(for: kind) else {
+            guard kind != .qwen,
+                  kind != .qoder,
+                  kind != .copilot,
+                  requested.contains(kind),
+                  !managedKinds.contains(kind),
+                  let package = npmPackage(for: kind)
+            else {
                 return nil
             }
             return "\(package)@latest"
@@ -950,6 +991,22 @@ public struct AIAgentCLIService: Sendable {
                 arguments: ["update"],
                 timeout: Self.updateCommandTimeout
             ))
+        }
+        if requested.contains(.kimi), let kimi = executableURL(for: .kimi) {
+            commands.append(AIAgentCLICommand(
+                executableURL: kimi,
+                arguments: ["upgrade"],
+                timeout: Self.updateCommandTimeout
+            ))
+        }
+        for kind in [AgentCLIKind.qwen, .qoder, .copilot] where requested.contains(kind) && !managedKinds.contains(kind) {
+            if let executable = executableURL(for: kind) {
+                commands.append(AIAgentCLICommand(
+                    executableURL: executable,
+                    arguments: ["update"],
+                    timeout: Self.updateCommandTimeout
+                ))
+            }
         }
         return commands
     }
@@ -971,19 +1028,43 @@ public struct AIAgentCLIService: Sendable {
         uninstallationCommands(for: [kind]).first
     }
 
-    /// Removes only the CLI executable for Grok, retaining its account and local configuration data.
+    /// Removes only trusted standalone CLI executables, retaining account and local configuration data.
     public func uninstallationCommands(for kinds: [AgentCLIKind]) -> [AIAgentCLICommand] {
         let requested = Set(kinds)
-        let packages = AgentCLIKind.managedCases.compactMap { kind -> String? in
-            guard requested.contains(kind) else { return nil }
-            return npmPackage(for: kind)
-        }
         var commands: [AIAgentCLICommand] = []
-        if !packages.isEmpty, let npm = executable(named: "npm") {
-            commands.append(AIAgentCLICommand(
-                executableURL: npm,
-                arguments: ["uninstall", "--global"] + packages
-            ))
+        var managedKinds = Set<AgentCLIKind>()
+        for manager in [AgentSkillPackageManager.npm, .pnpm, .yarn, .bun, .brew] {
+            var packages = AgentCLIKind.managedCases.compactMap { kind -> String? in
+                guard requested.contains(kind),
+                      let executableURL = executableURL(for: kind),
+                      let installation = AgentSkillPackageInstallation.detect(at: executableURL),
+                      installation.manager == manager
+                else { return nil }
+                managedKinds.insert(kind)
+                return installation.packageName
+            }
+            if manager == .npm {
+                let legacyPackages = [AgentCLIKind.claude, .codex, .gemini, .opencode].compactMap { kind -> String? in
+                    guard requested.contains(kind), !managedKinds.contains(kind) else { return nil }
+                    return npmPackage(for: kind)
+                }
+                packages.append(contentsOf: legacyPackages)
+            }
+            guard !packages.isEmpty,
+                  let managerExecutable = executable(named: manager.executableName)
+            else { continue }
+            let arguments: [String]
+            switch manager {
+            case .npm:
+                arguments = ["uninstall", "--global"] + packages
+            case .pnpm, .bun:
+                arguments = ["remove", "--global"] + packages
+            case .yarn:
+                arguments = ["global", "remove"] + packages
+            case .brew:
+                arguments = ["uninstall"] + packages
+            }
+            commands.append(AIAgentCLICommand(executableURL: managerExecutable, arguments: arguments))
         }
         if requested.contains(.grok) {
             let managedGrok = homeDirectory.appendingPathComponent(".grok/bin/grok")
@@ -994,7 +1075,59 @@ public struct AIAgentCLIService: Sendable {
                 ))
             }
         }
+        if requested.contains(.kimi), let managedKimi = managedKimiExecutable() {
+            commands.append(AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/rm"),
+                arguments: [managedKimi.path]
+            ))
+        }
+        if requested.contains(.qwen), !managedKinds.contains(.qwen), executableURL(for: .qwen) != nil {
+            commands.append(AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/bash"),
+                arguments: [
+                    "-c",
+                    "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/uninstall-qwen-standalone.sh | bash",
+                ]
+            ))
+        }
+        for kind in [AgentCLIKind.qoder, .copilot] where requested.contains(kind) && !managedKinds.contains(kind) {
+            guard let executable = executableURL(for: kind), isTrustedStandaloneExecutable(executable, for: kind) else {
+                continue
+            }
+            commands.append(AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/rm"),
+                arguments: [executable.path]
+            ))
+        }
         return commands
+    }
+
+    private func isTrustedStandaloneExecutable(_ executable: URL, for kind: AgentCLIKind) -> Bool {
+        executable.standardizedFileURL.path == homeDirectory
+            .appendingPathComponent(".local/bin", isDirectory: true)
+            .appendingPathComponent(kind.executableName)
+            .standardizedFileURL
+            .path
+    }
+
+    private func standaloneInstallScript(for kind: AgentCLIKind) -> String? {
+        switch kind {
+        case .qwen:
+            "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh | bash"
+        case .qoder:
+            "curl -fsSL https://qoder.com/install | bash"
+        case .copilot:
+            "curl -fsSL https://gh.io/copilot-install | bash"
+        default:
+            nil
+        }
+    }
+
+    private static func cliKindOrder(_ lhs: AgentCLIKind, _ rhs: AgentCLIKind) -> Bool {
+        guard let left = AgentCLIKind.allCases.firstIndex(of: lhs),
+              let right = AgentCLIKind.allCases.firstIndex(of: rhs)
+        else { return lhs.rawValue < rhs.rawValue }
+        return left < right
     }
 
     func uninstallationCommand(
@@ -1203,7 +1336,26 @@ public struct AIAgentCLIService: Sendable {
     }
 
     func executableURL(for kind: AgentCLIKind) -> URL? {
-        executable(named: kind.executableName)
+        if kind == .kimi {
+            if let executable = kimiExecutableURL(resolveSymlinks: true) { return executable }
+        }
+        return executable(named: kind.executableName)
+    }
+
+    private func managedKimiExecutable() -> URL? {
+        kimiExecutableURL(resolveSymlinks: false)
+    }
+
+    private func kimiExecutableURL(resolveSymlinks: Bool) -> URL? {
+        let fileManager = FileManager.default
+        guard let executable = Self.kimiInstallationRoots(
+            environment: environment,
+            homeDirectory: homeDirectory
+        )
+        .map({ $0.appendingPathComponent("bin/kimi").standardizedFileURL })
+        .first(where: { fileManager.isExecutableFile(atPath: $0.path) })
+        else { return nil }
+        return resolveSymlinks ? executable.resolvingSymlinksInPath().standardizedFileURL : executable
     }
 
     private func npmPackage(for kind: AgentCLIKind) -> String? {
@@ -1245,6 +1397,10 @@ public struct AIAgentCLIService: Sendable {
             URL(fileURLWithPath: $0, isDirectory: true)
                 .appendingPathComponent("bin", isDirectory: true)
         }
+        let kimiDirectories = kimiInstallationRoots(
+            environment: environment,
+            homeDirectory: homeDirectory
+        ).map { $0.appendingPathComponent("bin", isDirectory: true) }
         let nvmDirectories = versionDirectories(
             in: homeDirectory.appendingPathComponent(".nvm/versions/node", isDirectory: true)
         ).map { $0.appendingPathComponent("bin", isDirectory: true) }
@@ -1261,14 +1417,31 @@ public struct AIAgentCLIService: Sendable {
             homeDirectory.appendingPathComponent("Library/pnpm", isDirectory: true),
             homeDirectory.appendingPathComponent(".bun/bin", isDirectory: true),
             homeDirectory.appendingPathComponent(".grok/bin", isDirectory: true),
-            homeDirectory.appendingPathComponent(".kimi-code/bin", isDirectory: true),
             URL(fileURLWithPath: "/opt/homebrew/bin", isDirectory: true),
             URL(fileURLWithPath: "/usr/local/bin", isDirectory: true),
         ]
         let candidates = pathDirectories + (configuredPrefix.map { [$0] } ?? [])
-            + defaults + fnmDirectories + nvmDirectories
+            + kimiDirectories + defaults + fnmDirectories + nvmDirectories
         var seen = Set<String>()
         return candidates.filter { seen.insert($0.standardizedFileURL.path).inserted }
+    }
+
+    private static func kimiInstallationRoots(
+        environment: [String: String],
+        homeDirectory: URL
+    ) -> [URL] {
+        let configured = [environment["KIMI_INSTALL_DIR"]].compactMap { value -> URL? in
+            guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+                return nil
+            }
+            let path = value == "~"
+                ? homeDirectory.path
+                : value.replacingOccurrences(of: "~/", with: "\(homeDirectory.path)/", options: .anchored)
+            return URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        }
+        let defaults = [homeDirectory.appendingPathComponent(".kimi-code", isDirectory: true)]
+        var seen = Set<String>()
+        return (configured + defaults).filter { seen.insert($0.path).inserted }
     }
 
     private static func versionDirectories(in root: URL) -> [URL] {
@@ -1410,6 +1583,9 @@ private struct GrokVersionCache: Decodable {
 
 private struct HomebrewOutdatedPackages: Decodable {
     let formulae: [HomebrewOutdatedFormula]
+    let casks: [HomebrewOutdatedFormula]
+
+    var packages: [HomebrewOutdatedFormula] { formulae + casks }
 }
 
 private struct HomebrewOutdatedFormula: Decodable {

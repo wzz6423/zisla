@@ -557,7 +557,7 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
     public static let detectableCases = allCases
     public static let relayCases: [Self] = [.claude, .codex, .gemini, .grok, .opencode]
     public static let profileCases = relayCases
-    public static let managedCases = relayCases
+    public static let managedCases = allCases
 
     public var displayName: String {
         switch self {
@@ -582,7 +582,10 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
         case .codex: "@openai/codex"
         case .gemini: "@google/gemini-cli"
         case .opencode: "opencode-ai"
-        case .grok, .kimi, .qwen, .qoder, .copilot: nil
+        case .qwen: "@qwen-code/qwen-code"
+        case .qoder: "@qoder-ai/qodercli"
+        case .copilot: "@github/copilot"
+        case .grok, .kimi: nil
         }
     }
 }

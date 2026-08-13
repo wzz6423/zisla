@@ -33,9 +33,13 @@ public final class AIStateMonitor: ObservableObject {
         case corruptedState
         case failure(String)
 
-        var hasPersistedState: Bool {
-            if case .success = self { return true }
-            return false
+        var allowsDetectorRefresh: Bool {
+            switch self {
+            case .success, .unchanged:
+                true
+            case .corruptedState, .failure:
+                false
+            }
         }
     }
 
@@ -289,7 +293,7 @@ public final class AIStateMonitor: ObservableObject {
             guard let self, self.refreshGeneration == generation else { return }
             self.persistedReloadInFlight = false
             self.applyPersisted(result, includesUsageSamples: includesUsageSamples)
-            if refreshDetectorsAfterLoad, result.hasPersistedState {
+            if refreshDetectorsAfterLoad, result.allowsDetectorRefresh {
                 self.scheduleDetectorRefresh()
             }
             if self.persistedReloadPending {

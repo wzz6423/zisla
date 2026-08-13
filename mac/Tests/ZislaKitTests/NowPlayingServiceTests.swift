@@ -1063,4 +1063,71 @@ struct NowPlayingServiceTests {
             isFrontmost: isFrontmost
         )
     }
+
+    @Test
+    func confirmedAudioStopRequestsPlaybackStateRefresh() {
+        let playing = NowPlayingSnapshot(
+            title: "Track",
+            artist: "Artist",
+            album: nil,
+            artworkData: nil,
+            duration: 180,
+            elapsedTime: 30,
+            isPlaying: true
+        )
+        var paused = playing
+        paused.isPlaying = false
+
+        #expect(
+            NowPlayingService.shouldRefreshPlaybackAfterAudioChange(
+                wasAudible: true,
+                isAudible: false,
+                snapshot: playing
+            )
+        )
+        #expect(
+            !NowPlayingService.shouldRefreshPlaybackAfterAudioChange(
+                wasAudible: false,
+                isAudible: false,
+                snapshot: playing
+            )
+        )
+        #expect(
+            !NowPlayingService.shouldRefreshPlaybackAfterAudioChange(
+                wasAudible: true,
+                isAudible: true,
+                snapshot: playing
+            )
+        )
+        #expect(
+            !NowPlayingService.shouldRefreshPlaybackAfterAudioChange(
+                wasAudible: true,
+                isAudible: false,
+                snapshot: paused
+            )
+        )
+    }
+
+    @Test
+    func refreshedAdapterSnapshotFreezesPlaybackClockWhenStopped() throws {
+        let data = try #require(
+            """
+            {
+              "title": "Track",
+              "artist": "Artist",
+              "duration": 180,
+              "elapsedTime": 30,
+              "timestamp": "2026-08-13T05:04:59Z",
+              "playing": false,
+              "playbackRate": 1
+            }
+            """.data(using: .utf8)
+        )
+        let payload = try #require(MediaRemoteAdapterClient.decodeNowPlayingInfo(data))
+        let snapshot = try #require(NowPlayingService.parseAdapter(payload))
+        let later = try #require(snapshot.timestamp).addingTimeInterval(20)
+
+        #expect(!snapshot.isPlaying)
+        #expect(snapshot.elapsedTime(at: later) == 30)
+    }
 }

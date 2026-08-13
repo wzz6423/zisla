@@ -288,8 +288,12 @@ private struct TaskProgressRow: View {
                             .tint(providerColor)
                             .frame(width: 32)
                     } else {
-                        ProgressView()
-                            .controlSize(.mini)
+                        ThinkingOrbView(
+                            state: ThinkingOrbState.forTask(task),
+                            size: 14,
+                            speed: task.status == .blocked ? 0.65 : 1,
+                            tint: providerColor
+                        )
                     }
                 }
                 .frame(height: 12)
@@ -303,8 +307,12 @@ private struct TaskProgressRow: View {
             ProgressView(value: progress)
                 .tint(providerColor)
         } else {
-            ProgressView()
-                .controlSize(.mini)
+            ThinkingOrbView(
+                state: ThinkingOrbState.forTask(task),
+                size: 14,
+                speed: task.status == .blocked ? 0.65 : 1,
+                tint: providerColor
+            )
         }
     }
 

@@ -83,6 +83,13 @@ struct IslandDashboardView: View {
                         size: 24
                     )
 
+                    ThinkingOrbView(
+                        state: ThinkingOrbState.forTask(task),
+                        size: 20,
+                        speed: task.status == .blocked ? 0.65 : 1,
+                        tint: ProviderBrand.color(for: task.provider)
+                    )
+
                     VStack(alignment: .leading, spacing: 3) {
                         Text(task.title)
                             .font(.system(size: 10, weight: .semibold))
