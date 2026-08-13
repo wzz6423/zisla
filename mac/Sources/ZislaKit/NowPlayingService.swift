@@ -96,7 +96,12 @@ public struct NowPlayingSnapshot: Equatable, Sendable {
     guard let elapsedTime else { return nil }
     guard isPlaying, let timestamp else { return elapsedTime }
     let advanced = elapsedTime + max(0, date.timeIntervalSince(timestamp))
-    if let duration, duration > 0 { return min(advanced, duration) }
+    if let duration, duration > 0 {
+      if playbackMode == .repeatOne, advanced >= duration {
+        return advanced.truncatingRemainder(dividingBy: duration)
+      }
+      return min(advanced, duration)
+    }
     return advanced
   }
 }

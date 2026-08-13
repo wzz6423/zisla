@@ -1015,6 +1015,44 @@ struct NowPlayingServiceTests {
         #expect(selected.id == "video")
     }
 
+    @Test
+    func repeatOnePlaybackClockWrapsAtTrackBoundary() {
+        let timestamp = Date(timeIntervalSince1970: 1_000)
+        let snapshot = NowPlayingSnapshot(
+            title: "Track",
+            artist: "Artist",
+            album: nil,
+            artworkData: nil,
+            duration: 180,
+            elapsedTime: 178,
+            timestamp: timestamp,
+            isPlaying: true,
+            playbackMode: .repeatOne
+        )
+
+        #expect(snapshot.elapsedTime(at: timestamp.addingTimeInterval(2)) == 0)
+        #expect(snapshot.elapsedTime(at: timestamp.addingTimeInterval(5)) == 3)
+        #expect(snapshot.elapsedTime(at: timestamp.addingTimeInterval(185)) == 3)
+    }
+
+    @Test
+    func sequentialPlaybackClockStillStopsAtTrackEnd() {
+        let timestamp = Date(timeIntervalSince1970: 1_000)
+        let snapshot = NowPlayingSnapshot(
+            title: "Track",
+            artist: "Artist",
+            album: nil,
+            artworkData: nil,
+            duration: 180,
+            elapsedTime: 178,
+            timestamp: timestamp,
+            isPlaying: true,
+            playbackMode: .sequential
+        )
+
+        #expect(snapshot.elapsedTime(at: timestamp.addingTimeInterval(5)) == 180)
+    }
+
     private func source(id: String, pid: pid_t, isFrontmost: Bool) -> AudioPlaybackSource {
         AudioPlaybackSource(
             id: id,
