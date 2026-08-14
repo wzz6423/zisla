@@ -72,7 +72,7 @@ public final class ManagedToolService: ObservableObject {
     }
 
     static func externalPaths(for tool: ManagedTool) -> [String] {
-        // Cask 应用的路径
+        // Paths for Cask applications.
         if tool == .libreOffice {
             return [
                 "/Applications/LibreOffice.app/Contents/MacOS/soffice",
@@ -103,7 +103,7 @@ public final class ManagedToolService: ObservableObject {
             ]
         }
 
-        // 命令行工具的通用路径
+        // Common paths for command-line tools.
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return [
             "/opt/homebrew/bin/\(tool.executableName)",
@@ -120,7 +120,7 @@ public final class ManagedToolService: ObservableObject {
     /// Refreshes every tool's install status and version (no network access).
     public func refreshInstalledVersions() async {
         for tool in ManagedTool.allCases {
-            // install() 结束时会写入自己的最终状态，安装期间的旧解析结果不应覆盖它。
+            // install() writes its own final state; stale resolution results must not overwrite it during installation.
             guard states[tool]?.isBusy != true else { continue }
             guard !refreshedInstalledVersions.contains(tool) else { continue }
             guard let resolved = resolvedExecutable(for: tool) else {
@@ -131,7 +131,7 @@ public final class ManagedToolService: ObservableObject {
                 continue
             }
             let version = await Self.readVersion(of: tool, at: resolved.url)
-            // 读版本约需一秒，期间可能有安装完成；解析结果过期就放弃本轮，下次刷新自然纠正。
+            // Version reads take about a second, during which installation may finish; discard stale resolution results and let the next refresh correct them.
             guard states[tool]?.isBusy != true,
                   resolvedExecutable(for: tool)?.url == resolved.url
             else { continue }
@@ -245,8 +245,8 @@ public final class ManagedToolService: ObservableObject {
         guard trusted else { throw ManagedToolError.untrustedHost(host) }
     }
 
-    /// `quietly` 用于进入设置页时的后台自动检查：失败（如离线）不写 errorMessage，
-    /// 避免把行内的版本信息替换成用户没有主动触发的报错。
+    /// `quietly` supports automatic background checks when entering Settings: failures (such as being offline) do not write errorMessage,
+    /// preventing inline version information from being replaced by an error the user did not trigger.
     @discardableResult
     public func checkLatest(_ tool: ManagedTool, quietly: Bool = false) async -> String? {
         guard states[tool]?.isBusy != true else { return states[tool]?.latestVersion }
@@ -299,7 +299,7 @@ public final class ManagedToolService: ObservableObject {
 
     /// Installs or updates a component using its declared source.
     public func install(_ tool: ManagedTool) async {
-        // 状态未及时重绘时用户可能连点按钮；后到的安装直接放弃，避免两个任务互踩文件和状态。
+        // Rendering may lag behind state, allowing repeated taps; discard later installs to prevent two tasks from racing over files and state.
         guard states[tool]?.isBusy != true else { return }
         states[tool]?.errorMessage = nil
         states[tool]?.phase = .checking

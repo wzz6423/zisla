@@ -22,7 +22,7 @@
   <key>com.apple.security.cs.disable-library-validation</key>
   <true/>
 
-  <!-- Apple Music 与 Spotify 的公开脚本字典控制。 -->
+  <!-- Automation through the public Apple Music and Spotify scripting dictionaries. -->
   <key>com.apple.security.automation.apple-events</key>
   <true/>
 
@@ -31,11 +31,11 @@
   <key>com.apple.security.network.client</key>
   <true/>
 
-  <!-- VoiceInputController 仅在用户主动点击语音输入后访问麦克风。 -->
+  <!-- VoiceInputController accesses the microphone only after the user explicitly starts voice input. -->
   <key>com.apple.security.device.audio-input</key>
   <true/>
 
-  <!-- WeatherKit 返回所选地点的气象机构官方预警。 -->
+  <!-- WeatherKit returns official weather-agency alerts for the selected location. -->
   <key>com.apple.developer.weatherkit</key>
   <true/>
 

@@ -57,7 +57,7 @@ struct AIAgentStoreTests {
         store.setThreadGoalMode(false, for: thread.id)
         #expect(store.state.chatThreads.first?.goalPrompt == nil)
 
-        // Writes are ignored while 目标模式 is off.
+        // Writes are ignored while goal mode is off.
         store.updateThreadGoalPrompt("不应写入", for: thread.id)
         #expect(store.state.chatThreads.first?.goalPrompt == nil)
         #expect(store.state.goals.isEmpty)

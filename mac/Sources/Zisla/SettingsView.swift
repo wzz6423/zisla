@@ -59,7 +59,7 @@ struct SettingsView: View {
                 Task { await performRecommendedToolAction(action) }
             }
         } message: {
-            Text(pendingRecommendedToolAction?.message ?? "")
+            Text(recommendedToolActionMessage)
         }
         .alert("清空所有语音记录？", isPresented: $isVoiceHistoryClearConfirmationPresented) {
             Button("取消", role: .cancel) {}
@@ -591,7 +591,7 @@ struct SettingsView: View {
         }
     }
 
-    /// AI 监控与 AI Agent 行为；模型定义与远端凭据只出现在 模型 页。
+    /// AI monitoring and agent behavior; model definitions and remote credentials appear only on the Models page.
     private var aiContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("AI 监控") {
@@ -878,7 +878,7 @@ struct SettingsView: View {
 
     private var modelsContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            // 模型定义与远端凭据唯一归属这里：先定义模型，再在下方选择。
+            // Model definitions and remote credentials belong only here: define models first, then select them below.
             settingsGroup("本地模型") {
                 AIAgentModuleView(model: model, configurationScope: .localModels)
                     .frame(minHeight: 170)
@@ -1349,7 +1349,7 @@ struct SettingsView: View {
         }
         .task {
             await model.managedTools.refreshInstalledVersions()
-            // 行内的"可更新到 X"依赖最新版本号；静默查询，离线时不打扰。
+            // The inline "Update to X" label depends on the latest version; query silently to avoid offline interruptions.
             for tool in ManagedTool.allCases {
                 await model.managedTools.checkLatest(tool, quietly: true)
             }
@@ -1446,6 +1446,8 @@ struct SettingsView: View {
             }
 
             recommendedToolGroup("终端效率", tools: terminalRecommendationTools)
+            recommendedToolGroup("网络与数据", tools: networkRecommendationTools)
+            recommendedToolGroup("开发工具链", tools: developmentRecommendationTools)
             recommendedToolGroup("实用组件", tools: utilityRecommendationTools)
             recommendedToolGroup("桌面应用", tools: desktopRecommendationTools)
         }
@@ -1453,19 +1455,31 @@ struct SettingsView: View {
     }
 
     private var recommendedTools: [ManagedTool] {
-        terminalRecommendationTools + utilityRecommendationTools + desktopRecommendationTools
+        terminalRecommendationTools
+            + networkRecommendationTools
+            + developmentRecommendationTools
+            + utilityRecommendationTools
+            + desktopRecommendationTools
     }
 
     private var terminalRecommendationTools: [ManagedTool] {
         [.fzf, .ripgrep, .lazygit, .neovim, .yazi, .starship, .tldr, .jq, .tree]
     }
 
+    private var networkRecommendationTools: [ManagedTool] {
+        []
+    }
+
+    private var developmentRecommendationTools: [ManagedTool] {
+        []
+    }
+
     private var utilityRecommendationTools: [ManagedTool] {
-        [.ytDLP, .libreOffice, .keka]
+        []
     }
 
     private var desktopRecommendationTools: [ManagedTool] {
-        [.kaku, .markdownPreview]
+        [.ytDLP, .libreOffice, .kaku, .kero, .markdownPreview, .keka]
     }
 
     private var missingRecommendedTools: [ManagedTool] {
@@ -1569,6 +1583,15 @@ struct SettingsView: View {
         for tool in tools {
             await model.managedTools.install(tool)
         }
+    }
+
+    private var recommendedToolActionMessage: String {
+        guard let action = pendingRecommendedToolAction else { return "" }
+        let itemCount = switch action {
+        case .install: missingRecommendedTools.count
+        case .update: installedRecommendedTools.count
+        }
+        return action.message(itemCount: itemCount)
     }
 
     private var weatherContent: some View {
@@ -2120,7 +2143,7 @@ struct SettingsView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.1"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.3"
     }
 
     private func searchWeatherLocation() {
@@ -2506,7 +2529,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .download: "管理下载目录、下载通知与所需组件。"
         case .weather: "管理天气显示、地点和刷新。"
         case .updates: "管理版本检查与自动更新。"
-        case .recommendations: "一键下载和更新精选终端工具。"
+        case .recommendations: "一键下载和更新精选效率、网络、开发与桌面工具。"
         }
     }
 }
@@ -2543,10 +2566,12 @@ private enum RecommendedToolAction {
         }
     }
 
-    var message: String {
+    func message(itemCount: Int) -> String {
         switch self {
-        case .install: "将通过工具的官方安装来源下载并安装所有缺失项。"
-        case .update: "将通过工具的官方安装来源更新所有已安装项。"
+        case .install:
+            "将通过官方安装来源下载并安装 \(itemCount) 项缺失工具。工具较多时可能需要一些时间。"
+        case .update:
+            "将通过官方安装来源更新 \(itemCount) 项已安装工具。工具较多时可能需要一些时间。"
         }
     }
 }

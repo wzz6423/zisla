@@ -495,7 +495,7 @@ public final class AIAgentStore: ObservableObject {
         state.chatThreads[index].updatedAt = Date()
     }
 
-    /// 目标模式 is an independent switch: turning it on only arms the session prompt slot,
+    /// Goal mode is an independent switch: turning it on only arms the session prompt slot,
     /// it never creates an external `AgentGoal`.
     public func setThreadGoalMode(_ isEnabled: Bool, for id: UUID) {
         guard let index = state.chatThreads.firstIndex(where: { $0.id == id }) else { return }
@@ -503,7 +503,7 @@ public final class AIAgentStore: ObservableObject {
         state.chatThreads[index].updatedAt = Date()
     }
 
-    /// Records the composer input as this session's goal prompt; ignored when 目标模式 is off.
+    /// Records the composer input as this session's goal prompt; ignored when goal mode is off.
     public func updateThreadGoalPrompt(_ prompt: String, for id: UUID) {
         guard let index = state.chatThreads.firstIndex(where: { $0.id == id }),
               state.chatThreads[index].goalPrompt != nil else { return }

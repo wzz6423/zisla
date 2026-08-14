@@ -125,7 +125,7 @@ struct MarkdownParserTests {
 
     @Test
     func imageMarkerWithoutURLAtLineEndDoesNotCrash() {
-        // `]` 位于行尾时 index(after:) 是 endIndex，回归防护：不得越界崩溃，应按段落处理。
+        // When `]` ends the line, index(after:) is endIndex; regression coverage requires paragraph handling without an out-of-bounds crash.
         #expect(MarkdownParser.parse("![截图]") == [.paragraph(text: "![截图]")])
         #expect(MarkdownParser.parse("![alt]") == [.paragraph(text: "![alt]")])
         #expect(MarkdownParser.parse("正文\n![image]") == [.paragraph(text: "正文 ![image]")])
@@ -133,7 +133,7 @@ struct MarkdownParserTests {
 
     @Test
     func parsesTableImmediatelyAfterParagraph() {
-        // 表格紧跟段落（无空行）时，表头不得被吞进段落、表体不得退化为裸文本。
+        // When a table immediately follows a paragraph without a blank line, its header must not be consumed and its body must not degrade into bare text.
         let blocks = MarkdownParser.parse("对比如下：\n| A | B |\n| --- | --- |\n| 1 | 2 |")
         #expect(blocks == [
             .paragraph(text: "对比如下："),

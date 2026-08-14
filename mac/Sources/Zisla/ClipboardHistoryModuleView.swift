@@ -58,10 +58,12 @@ private enum ClipboardAdditionPresentation: Equatable {
 struct ClipboardHistoryModuleView: View {
     @ObservedObject private var store: ClipboardHistoryStore
     @State private var filter: ClipboardFilter = .all
+    @State private var categoryFilter: FileShelfCategory = .all
     @State private var additionPresentation: ClipboardAdditionPresentation?
     @State private var draftText = ""
     @State private var searchText = ""
     @FocusState private var isDraftTextFocused: Bool
+    @FocusState private var isSearchFocused: Bool
     private let copyItem: (ClipboardHistoryItem) -> Void
     private let sendToQuickNote: (ClipboardHistoryItem) -> Void
     private let sendToAIAgent: (ClipboardHistoryItem) -> Void
@@ -83,11 +85,17 @@ struct ClipboardHistoryModuleView: View {
     }
 
     private var visibleItems: [ClipboardHistoryItem] {
+        let baseItems: [ClipboardHistoryItem]
         switch filter {
-        case .all: visiblePinnedItems + visibleHistoryItems
-        case .pinned: visiblePinnedItems
-        case .history: visibleHistoryItems
+        case .all: baseItems = visiblePinnedItems + visibleHistoryItems
+        case .pinned: baseItems = visiblePinnedItems
+        case .history: baseItems = visibleHistoryItems
         }
+
+        if categoryFilter == .all {
+            return baseItems
+        }
+        return baseItems.filter { $0.category == categoryFilter }
     }
 
     private var visiblePinnedItems: [ClipboardHistoryItem] {
@@ -99,7 +107,7 @@ struct ClipboardHistoryModuleView: View {
     }
 
     private var queryID: String {
-        filter.rawValue + "\u{0}" + searchText
+        filter.rawValue + "\u{0}" + categoryFilter.rawValue + "\u{0}" + searchText
     }
 
     var body: some View {
@@ -138,6 +146,10 @@ struct ClipboardHistoryModuleView: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 8)
 
+            categoryFilterBar
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
@@ -145,6 +157,7 @@ struct ClipboardHistoryModuleView: View {
                 TextField("搜索", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11))
+                    .focused($isSearchFocused)
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
@@ -158,10 +171,10 @@ struct ClipboardHistoryModuleView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color.fillControl)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .padding(.horizontal, 10)
             .padding(.top, 6)
+
+            Hairline()
 
             if store.isLoading && visibleItems.isEmpty {
                 ProgressView()
@@ -447,6 +460,58 @@ struct ClipboardHistoryModuleView: View {
     private func addPinned(_ content: ClipboardHistoryContent) {
         _ = store.recordPinned(content)
     }
+
+    private var categoryFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(FileShelfCategory.allCases) { category in
+                    let count = categoryCount(for: category)
+                    let isSelected = categoryFilter == category
+                    let hasItems = category == .all || count > 0
+
+                    Button {
+                        categoryFilter = category
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: category.symbol)
+                                .font(.system(size: 10, weight: .medium))
+                            Text(category.rawValue)
+                                .font(.system(size: 10, weight: .medium))
+                            if category != .all {
+                                Text("\(count)")
+                                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background {
+                            if isSelected {
+                                RoundedRectangle(cornerRadius: 999, style: .continuous)
+                                    .fill(Color.fillCard)
+                                    .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(hasItems ? .primary : .tertiary)
+                    .disabled(!hasItems)
+                }
+            }
+        }
+        .frame(height: 28)
+    }
+
+    private func categoryCount(for category: FileShelfCategory) -> Int {
+        guard category != .all else { return 0 }
+        let baseItems: [ClipboardHistoryItem]
+        switch filter {
+        case .all: baseItems = store.pinnedItems + store.historyItems
+        case .pinned: baseItems = store.pinnedItems
+        case .history: baseItems = store.historyItems
+        }
+        return baseItems.filter { $0.category == category }.count
+    }
 }
 
 /// Top All / Favorites / Non-favorites segmented control.
@@ -484,7 +549,9 @@ private struct ClipboardFilterSegmentedControl: View {
                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                     .background {
                         if isActive {
-                            SelectionGlassBackground(cornerRadius: 5)
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color.fillCard)
+                                .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
                                 .matchedGeometryEffect(
                                     id: "clipboard-filter-selection",
                                     in: selectionNamespace
@@ -497,7 +564,6 @@ private struct ClipboardFilterSegmentedControl: View {
             }
         }
         .padding(2)
-        .background(Color.fillControl)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .animation(reduceMotion ? nil : ZislaMotion.selection, value: selection)
     }
@@ -544,8 +610,14 @@ private struct ClipboardHistoryItemRow: View, Equatable {
             Button {
                 onSendToQuickNote(item)
             } label: {
-                Image(systemName: "note.text")
-                    .frame(width: 24, height: 24)
+                HStack(spacing: 3) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 10))
+                    Text("随记")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
@@ -554,8 +626,14 @@ private struct ClipboardHistoryItemRow: View, Equatable {
             Button {
                 onSendToAIAgent(item)
             } label: {
-                Image(systemName: "sparkles")
-                    .frame(width: 24, height: 24)
+                HStack(spacing: 3) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 10))
+                    Text("AI")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
@@ -565,8 +643,14 @@ private struct ClipboardHistoryItemRow: View, Equatable {
             Button {
                 onSetPinned(!item.isPinned)
             } label: {
-                Image(systemName: item.isPinned ? "star.fill" : "star")
-                    .frame(width: 24, height: 24)
+                HStack(spacing: 3) {
+                    Image(systemName: item.isPinned ? "star.fill" : "star")
+                        .font(.system(size: 10))
+                    Text("常用")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
             }
             .buttonStyle(.plain)
             .foregroundStyle(item.isPinned ? Color.accentColor : .secondary)
@@ -575,8 +659,14 @@ private struct ClipboardHistoryItemRow: View, Equatable {
             Button {
                 onRemove()
             } label: {
-                Image(systemName: "xmark")
-                    .frame(width: 24, height: 24)
+                HStack(spacing: 3) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10))
+                    Text("删除")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)

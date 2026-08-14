@@ -164,7 +164,7 @@ public final class CodexSessionActivityDetector {
         cache = cache.filter { selectedURLs.contains($0.key) }
 
         let titlesBySessionID = sessionTitlesByID()
-        // Rollout 文件可能在扫描期间被 Codex 追加写入；单个文件读取失败不应丢弃其他会话。
+        // Codex may append to rollout files while scanning; one unreadable file must not discard other sessions.
         let activities: [(candidate: Candidate, activity: RolloutActivity)] = candidates.compactMap { candidate in
             guard let activity = try? activity(in: candidate) else { return nil }
             return (candidate, activity)

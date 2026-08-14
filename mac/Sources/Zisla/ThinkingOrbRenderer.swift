@@ -182,7 +182,12 @@ enum ThinkingOrbRenderer {
     private static func orbits(size: Double, time: Double) -> Frame {
         let center = size / 2
         let sphereRadius = center * 0.82
-        let project = projection(yaw: time * 0.12, tilt: 0.3, center: center, scale: 1)
+        let project = projection(
+            yaw: sin(time * 0.12) * Double.pi / 12,
+            tilt: 0.3,
+            center: center,
+            scale: 1
+        )
         let radiusScale = radiusScale(size)
         var dots: [Dot] = []
 

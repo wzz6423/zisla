@@ -170,7 +170,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     func normalizedInstalledVersion(from raw: String) -> String? {
         guard let normalized = ManagedToolService.normalizeVersion(raw) else { return nil }
 
-        // LibreOffice 版本格式特殊处理
+        // LibreOffice uses a special version format.
         if self == .libreOffice {
             guard let range = normalized.range(
                 of: #"\d+(?:\.\d+)+"#,
@@ -182,7 +182,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
                 .joined(separator: ".")
         }
 
-        // neovim 输出格式: "NVIM v0.9.5"
+        // Neovim output format: "NVIM v0.9.5"
         if self == .neovim {
             guard let range = normalized.range(
                 of: #"\d+(?:\.\d+)+"#,
@@ -191,7 +191,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
             return String(normalized[range])
         }
 
-        // jq 输出格式: "jq-1.7.1"
+        // jq output format: "jq-1.7.1"
         if self == .jq {
             if let range = normalized.range(
                 of: #"\d+(?:\.\d+)+"#,

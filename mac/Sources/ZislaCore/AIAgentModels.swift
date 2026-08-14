@@ -86,7 +86,7 @@ public enum AgentAccountCredentialKind: String, Codable, CaseIterable, Sendable 
     }
 }
 
-/// CLI 配置由配置文件和认证文件组成。文件内容保存在安全凭据存储中，状态文件只记录目标路径。
+/// A CLI configuration consists of config and authentication files. Their contents are stored in secure credentials; state records only their target paths.
 public struct AgentCLIProfile: Codable, Equatable, Sendable {
     public var cliKind: AgentCLIKind
     public var configurationFilePath: String
@@ -128,7 +128,7 @@ public struct AgentCLIProfile: Codable, Equatable, Sendable {
     }
 }
 
-/// 每个账号映射到一项安全凭据存储记录，`secretReference` 不是 API Key 本身。
+/// Each account maps to one secure credential record; `secretReference` is not the API key itself.
 public struct AgentAccount: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var name: String
@@ -1333,7 +1333,7 @@ public struct AgentChatThread: Identifiable, Codable, Equatable, Sendable {
     public var externalHistoryID: String?
     public var mode: AgentChatMode
     public var goalID: UUID?
-    /// Non-nil while 目标模式 is on: the composer input becomes this session's goal prompt
+    /// Non-nil while goal mode is enabled: the composer input becomes this session's goal prompt.
     /// instead of creating an external `AgentGoal`.
     public var goalPrompt: String?
     public var projectID: UUID?
@@ -1471,7 +1471,7 @@ public enum AgentMessageConnectionKind: String, Codable, CaseIterable, Sendable 
     }
 }
 
-/// 平台密码和 Token 单独保存在安全凭据存储中，状态文件只记录连接行为和回调地址。
+/// Platform passwords and tokens are stored separately in secure credentials; state records only connection behavior and callback addresses.
 public struct AgentMessageConnectionCredentials: Codable, Equatable, Sendable {
     public var appID: String
     public var appSecret: String

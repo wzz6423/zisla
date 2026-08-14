@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="${0:A:h:h}"
 CONFIGURATION="${CONFIGURATION:-release}"
-VERSION="${VERSION:-0.1.2}"
+VERSION="${VERSION:-0.1.3}"
 BUILD_NUMBER="${BUILD_NUMBER:-5}"
 UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
 OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:-$ROOT/dist}"
@@ -89,14 +89,14 @@ fi
 ENTITLEMENTS="$ROOT/Resources/Zisla.entitlements"
 if [[ "$IDENTITY" == "-" ]]; then
   # Ad-hoc signs cannot carry WeatherKit (or other restricted) entitlements.
-  # 注意：adhoc 的 designated requirement 是单次构建的 cdhash，
-  # 每次重新构建都会使 TCC（辅助功能等）授权静默失效。
+  # Note: an ad hoc designated requirement is the build-specific cdhash,
+  # so every rebuild silently invalidates TCC permissions (such as Accessibility).
   echo "warning: ad-hoc code signature (TeamIdentifier empty); WeatherKit unavailable, mainland China uses China Weather alerts" >&2
   codesign --force --deep --sign - "$APP"
 elif [[ "${SIGNING_MODE:-release}" == "dev" ]]; then
-  # 开发签名：稳定证书身份让 TCC 授权跨构建保持有效。
-  # 不带 entitlements（WeatherKit 等受限 entitlement 没有描述文件会被 AMFI 拒载），
-  # 也不启用强化运行时（本地调试不需要）。
+  # Development signing: a stable certificate identity keeps TCC permissions valid across builds.
+  # Do not include entitlements because restricted entitlements such as WeatherKit are rejected by AMFI without a provisioning profile,
+  # and do not enable the hardened runtime because local debugging does not require it.
   codesign --force --deep --sign "$IDENTITY" "$APP"
 else
   if [[ ! -f "$ENTITLEMENTS" ]]; then

@@ -75,8 +75,8 @@ final class SelectableChatMessageNSTextView: NSTextView {
 
     override var intrinsicContentSize: NSSize {
         guard let layoutManager, let textContainer else { return super.intrinsicContentSize }
-        // LazyVStack 物化新行会在赋 frame 之前询问高度，此时容器宽度仍是初始 0，
-        // 零宽排版会得到每行一字的天文高度，引发首帧跳变；拿到真实宽度后 layout() 会再失效重算。
+        // LazyVStack asks for a new row's height before assigning its frame, when the container width is still zero.
+        // Zero-width layout yields one character per line and an enormous height; invalidate and recalculate once the true width is available.
         guard textContainer.size.width > 0 else {
             return NSSize(width: NSView.noIntrinsicMetric, height: 16)
         }
@@ -112,9 +112,9 @@ enum ChatMessageMarkdown {
         let alt: String
     }
 
-    /// `withAlphaComponent` 会把 catalog 动态色按调用瞬间的外观固化成静态色；构建发生在
-    /// `setContent` 而非绘制时，固化结果随系统亮暗漂移且被 renderedSource 缓存永久留存。
-    /// 包一层 dynamicProvider 推迟到绘制时按实际外观解析。
+    /// `withAlphaComponent` freezes a catalog dynamic color as a static color for the current appearance. Because construction happens in
+    /// `setContent` rather than during drawing, the frozen result drifts with light and dark mode and remains in the renderedSource cache.
+    /// Wrapping it in a dynamicProvider defers resolution to drawing time for the actual appearance.
     private static let codeChipBackground = NSColor(name: nil) { _ in
         NSColor.quaternaryLabelColor.withAlphaComponent(0.28)
     }

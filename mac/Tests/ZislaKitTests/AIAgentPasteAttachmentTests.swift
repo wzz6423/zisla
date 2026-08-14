@@ -54,7 +54,7 @@ struct AIAgentPasteAttachmentTests {
         let (store, directory) = makeStore()
         defer { try? FileManager.default.removeItem(at: directory) }
 
-        // 生成超过 25 MiB 的文本
+        // Generate text larger than 25 MiB.
         let hugeText = String(repeating: "x", count: 26 * 1024 * 1024)
 
         #expect(throws: AIAgentAttachmentStoreError.self) {

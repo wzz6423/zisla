@@ -800,7 +800,7 @@ public final class AIAgentWorkspace: ObservableObject {
               let thread = store.state.chatThreads.first(where: { $0.id == threadID }) else {
             return nil
         }
-        // 目标模式将 Prompt 保存在会话内；旧会话仍可回退到关联的历史目标。
+        // Goal mode stores the prompt in the session; older sessions can still fall back to their linked historical goal.
         let sessionGoal = thread.goalPrompt?.trimmingCharacters(in: .whitespacesAndNewlines)
         let goalTitle = (sessionGoal?.isEmpty == false ? sessionGoal : nil)
             ?? thread.goalID.flatMap { store.goal(id: $0)?.title }

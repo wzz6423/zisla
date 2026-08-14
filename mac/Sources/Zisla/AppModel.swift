@@ -90,7 +90,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
 }
 
 extension IslandModule {
-  /// 原为 IslandRootView 的私有扩展；AppModel 需要在设置变化时回退被禁用的选中模块，移到定义处共享。
+  /// Formerly a private IslandRootView extension; AppModel also needs it to fall back from a disabled selected module after settings changes.
   func isEnabled(in settings: FeatureSettings) -> Bool {
     switch self {
     case .dashboard: true
@@ -143,8 +143,8 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: 660, height: 600),
     panelSize: CGSize(width: 860, height: 604)
   )
-  /// Shelf content is fixed at 228pt and scrolls internally when it contains more files.
-  static let shelf = compactModule(contentHeight: 228)
+  /// Shelf content is fixed at 320pt and scrolls internally when it contains more files.
+  static let shelf = compactModule(contentHeight: 320)
   /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
   /// Width matches standard (panelSize keeps 200pt shoulder clearance); only the island body is taller.
   static let clipboard = IslandModuleLayout(
@@ -270,7 +270,7 @@ final class AppModel: ObservableObject {
 
   @Published var selectedModule: IslandModule = .dashboard {
     didSet {
-      // 卸载不能放在 default 分支：切到 agenda/mail 等具名 case 时会整体跳过，用量历史将常驻内存。
+      // Do not put teardown in default: named cases such as agenda and mail would skip it, leaving usage history resident in memory.
       if oldValue == .aiMonitor, selectedModule != .aiMonitor {
         aiMonitor.unloadUsageHistory()
       }
@@ -355,6 +355,7 @@ final class AppModel: ObservableObject {
   let audioOutput = AudioOutputDeviceService()
   let calendar = CalendarService()
   let shelf = FileShelfStore()
+  @Published var selectedShelfCategory: FileShelfCategory = .all
   let weatherLocations = WeatherLocationStore()
   let clipboardMonitor = ClipboardLinkMonitor()
   let clipboardHistory = ClipboardHistoryStore()
@@ -500,13 +501,13 @@ final class AppModel: ObservableObject {
       }
       .store(in: &cancellables)
 
-    // 在设置里关掉"正打开的模块"时，岛面内容会回退成仪表盘，但面板尺寸管线只订阅
-    // selectedModule；选中态不跟着回退会留下错位的 NSPanel 几何和失效的图标高亮。
+    // Disabling the open module in Settings falls the island back to the dashboard, but the panel sizing pipeline observes only
+    // selectedModule; failing to reset selection leaves misaligned NSPanel geometry and stale icon highlighting.
     settingsStore.$settings
       .sink { [weak self] _ in
         Task { @MainActor [weak self] in
           guard let self else { return }
-          // 读实时值而非发射快照：快速连开连关时不会因过期快照误回退。
+          // Read the live value rather than the emitted snapshot to avoid an incorrect fallback during rapid toggles.
           guard !self.selectedModule.isEnabled(in: self.settingsStore.settings) else { return }
           self.selectedModule = .dashboard
         }
@@ -1248,8 +1249,8 @@ final class AppModel: ObservableObject {
       cliKind: profileAccount?.cliProfile?.cliKind,
       accountID: profileAccount?.id
     )
-    // 设计上关闭开关只隐藏模块、不影响对话，所以照常发送；但不能跳到一个不可见的
-    // 模块（会触发面板尺寸错位），改为提示去向。
+    // The toggle only hides the module and does not affect conversations, so send normally; do not navigate to a hidden
+    // module because that misaligns the panel size, and show a destination hint instead.
     if settingsStore.settings.aiAgentEnabled {
       selectModule(.aiAgent)
     } else {

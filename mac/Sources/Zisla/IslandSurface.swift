@@ -184,9 +184,30 @@ struct IslandSurface<Content: View>: View {
 
     // MARK: - Transparent glass (macOS 27 / Liquid Glass approximation)
 
-    /// Keep the full body on the native clear material so the desktop remains visible through it.
+    /// The clear layer keeps the lower edge refractive; the regular layer above it restores
+    /// enough frosted contrast for module content to remain readable.
     private var transparentLiquidGlassShell: some View {
-        NativeLiquidGlassShell(isCollapsed: isCollapsed, material: .clear)
+        ZStack {
+            NativeLiquidGlassShell(isCollapsed: isCollapsed, material: .clear)
+            NativeLiquidGlassShell(isCollapsed: isCollapsed, material: .regular)
+                .mask(alignment: .bottom) {
+                    // A single gradient avoids an AppKit compositor seam at the boundary
+                    // between separately laid-out opaque and fading mask views.
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black, location: 0.72),
+                            .init(color: .black.opacity(0.92), location: 0.78),
+                            .init(color: .black.opacity(0.70), location: 0.84),
+                            .init(color: .black.opacity(0.38), location: 0.90),
+                            .init(color: .black.opacity(0.12), location: 0.96),
+                            .init(color: .clear, location: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -434,16 +455,16 @@ private final class LiquidGlassShellView: NSGlassEffectView {
         guard didExpand else { return }
 
         refreshGeneration &+= 1
-        let generation = refreshGeneration
-        refreshAfterReveal(generation: generation, delay: 0)
-        refreshAfterReveal(generation: generation, delay: 0.24)
+        scheduleRevealRefreshes()
     }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard window != nil, !isCollapsed else { return }
-        refreshGeneration &+= 1
-        refreshAfterReveal(generation: refreshGeneration, delay: 0)
+        if refreshGeneration == 0 {
+            refreshGeneration &+= 1
+        }
+        scheduleRevealRefreshes()
     }
 
     /// NSGlassEffectView guarantees its full compositing path for `contentView`; an empty shell
@@ -456,6 +477,12 @@ private final class LiquidGlassShellView: NSGlassEffectView {
         host.wantsLayer = true
         host.layer?.backgroundColor = NSColor.clear.cgColor
         contentView = host
+    }
+
+    private func scheduleRevealRefreshes() {
+        let generation = refreshGeneration
+        refreshAfterReveal(generation: generation, delay: 0)
+        refreshAfterReveal(generation: generation, delay: 0.24)
     }
 
     private func refreshAfterReveal(generation: Int, delay: TimeInterval) {

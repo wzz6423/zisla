@@ -195,7 +195,7 @@ struct BrowserDownloadTracker: Sendable {
         return active.isEmpty ? finishedSnapshot.map { [$0] } ?? [] : active
     }
 
-    /// 按最近下载优先顺序返回去重后的浏览器。
+    /// Returns deduplicated browsers ordered by most recent download.
     var uniqueAgents: [BrowserDownloadAgent] {
         var seen = Set<BrowserDownloadAgent>()
         return snapshots.compactMap(\.agent).filter { seen.insert($0).inserted }

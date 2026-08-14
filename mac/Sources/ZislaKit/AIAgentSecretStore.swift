@@ -164,7 +164,7 @@ final class MigratingAIAgentSecretStore: AIAgentSecretStoring, @unchecked Sendab
             try database.removeStorage()
             usesLegacyStore = false
         } catch {
-            // 保留旧库，后续按引用读取时仍可重试迁移。
+            // Keep the old store so a later read by reference can retry the migration.
         }
     }
 }

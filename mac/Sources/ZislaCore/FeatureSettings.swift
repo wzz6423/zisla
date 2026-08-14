@@ -358,7 +358,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether to show the lunar calendar above the native lock-screen clock; can be shown alongside the custom message.
     public var lockScreenShowsLunar: Bool
     public var quickNotesEnabled: Bool
-    /// Mail integration defaults to off to avoid reading inbox metadata before the user has confirmed authorization.
+    /// Mail integration; users can disable it in Settings if they don't want inbox metadata to be read.
     public var mailEnabled: Bool
     /// An empty set means all configured system Mail.app accounts are synced.
     public var mailAccountNames: Set<String>
@@ -367,8 +367,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var automaticDownloadEnabled: Bool
     /// Target channel for manual update checks.
     public var updateChannel: UpdateChannel
-    /// Whether to save clipboard text and images locally; defaults to off to avoid inadvertently recording sensitive content.
+    /// Whether to save clipboard text and images locally; users can disable it in Settings if concerned about sensitive content.
     public var clipboardHistoryEnabled: Bool
+    /// Whether to detect downloadable links in clipboard; users can disable it in Settings.
     public var clipboardDetectionEnabled: Bool
     public var sideNoticesEnabled: Bool
     public var compactStatusPriority: [CompactStatusPriority]
@@ -425,14 +426,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         lockScreenMessage: String = "",
         lockScreenShowsLunar: Bool = true,
         quickNotesEnabled: Bool = true,
-        mailEnabled: Bool = false,
+        mailEnabled: Bool = true,
         mailAccountNames: Set<String> = [],
         mailCompactStyle: MailCompactStyle = .compact,
         updateChecksEnabled: Bool = true,
         automaticDownloadEnabled: Bool = false,
         updateChannel: UpdateChannel = .release,
-        clipboardHistoryEnabled: Bool = false,
-        clipboardDetectionEnabled: Bool = false,
+        clipboardHistoryEnabled: Bool = true,
+        clipboardDetectionEnabled: Bool = true,
         sideNoticesEnabled: Bool = true,
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
         notificationsMuted: Bool = false,
@@ -449,7 +450,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         islandVisualStyle: IslandVisualStyle = .transparent,
         islandNotchBackground: IslandNotchBackground = .black,
         islandCollapsedOnTop: Bool = true,
-        voiceInputEnabled: Bool = false,
+        voiceInputEnabled: Bool = true,
         voiceInputMode: VoiceInputMode = .toggle,
         voiceInputHotkeyPreset: VoiceInputHotkeyPreset = .optionSpace,
         voiceModelConfiguration: AIModelConfigurationReference? = nil

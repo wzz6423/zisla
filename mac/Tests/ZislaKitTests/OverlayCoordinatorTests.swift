@@ -342,75 +342,84 @@ private final class PersistentPetPanelProbe {
 
 extension OverlayCoordinatorTests {
     @Test @MainActor
-    func pinnedPanelStaysVisibleWithoutAcceptingFocus() async throws {
+    func pinningBeforePendingGlassActivationKeepsGlassWithoutEnablingKeyboardInput() async throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
         defer { coordinator.stop() }
 
         coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
-        coordinator.setPinned(true)
-        coordinator.setAllowsKeyWindow(true)
         coordinator.setKeepsNativeGlassActive(true)
         coordinator.setDragging(true)
 
         let panel = try #require(contentView.window as? IslandPanel)
-        try await Task.sleep(for: .milliseconds(2_200))
+        coordinator.setPinned(true)
 
-        #expect(panel.isVisible)
-        #expect(!panel.ignoresMouseEvents)
-        #expect(!panel.allowsKeyWindow)
+        try await Task.sleep(for: .milliseconds(10))
+
         #expect(panel.keepsNativeGlassActive)
+        #expect(panel.allowsNativeGlassActivation)
+        #expect(!panel.allowsKeyWindow)
         #expect(panel.canBecomeKey)
+        #expect(panel.isPinned)
     }
 
     @Test @MainActor
-    func pinningAnExpandedPanelRevokesFocusEligibility() throws {
+    func pinnedPanelRemainsPassiveWhenItsSizeChanges() throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
         defer { coordinator.stop() }
 
         coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setDragging(true)
+        coordinator.setPinned(true)
+        coordinator.setAllowsKeyWindow(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        coordinator.updateExpandedSize(CGSize(width: 900, height: 360))
+
+        #expect(panel.keepsNativeGlassActive)
+        #expect(panel.allowsNativeGlassActivation)
+        #expect(!panel.allowsKeyWindow)
+        #expect(panel.canBecomeKey)
+        #expect(panel.isPinned)
+    }
+
+    @Test @MainActor
+    func pinningExpandedGlassPanelStopsReclaimingFocus() async throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
         coordinator.setDragging(true)
 
         let panel = try #require(contentView.window as? IslandPanel)
-        coordinator.setAllowsKeyWindow(true)
-
-        #expect(panel.allowsKeyWindow)
-        #expect(!panel.keepsNativeGlassActive)
+        try await Task.sleep(for: .milliseconds(10))
+        #expect(panel.keepsNativeGlassActive)
         #expect(panel.canBecomeKey)
+        #expect(!panel.isPinned)
+
+        coordinator.setPinned(true)
+        #expect(panel.keepsNativeGlassActive)
+        #expect(!panel.allowsKeyWindow)
+        #expect(panel.canBecomeKey)
+        #expect(panel.isPinned)
+
+        panel.resignKey()
+        try await Task.sleep(for: .milliseconds(50))
+
         #expect(!panel.isKeyWindow)
-
-        coordinator.setKeepsNativeGlassActive(true)
-        #expect(panel.keepsNativeGlassActive)
-        coordinator.setPinned(true)
-
-        #expect(panel.isVisible)
-        #expect(!panel.ignoresMouseEvents)
-        #expect(!panel.allowsKeyWindow)
-        #expect(panel.keepsNativeGlassActive)
-        #expect(panel.canBecomeKey)
     }
 
     @Test @MainActor
-    func pinningRestoresTheApplicationThatWasFrontmostBeforeGlassActivation() async throws {
-        let externalPID: pid_t = 42
-        var activatedPIDs: [pid_t] = []
-        let focusRestorer = ApplicationFocusRestorer(
-            currentApplicationPID: 7,
-            frontmostApplicationPID: { externalPID },
-            activateApplication: {
-                activatedPIDs.append($0)
-                return true
-            }
-        )
+    func reexpandingVisiblePanelRestoresGlassBeforeItsFirstFrame() async throws {
         let contentView = NSView()
-        let coordinator = OverlayCoordinator(
-            contentView: contentView,
-            collapseDelay: .zero,
-            applicationFocusRestorer: focusRestorer
-        )
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
         defer { coordinator.stop() }
 
         coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
@@ -419,45 +428,14 @@ extension OverlayCoordinatorTests {
         coordinator.setDragging(true)
 
         let panel = try #require(contentView.window as? IslandPanel)
-        panel.activateNativeGlass = { _ in }
         try await Task.sleep(for: .milliseconds(10))
         #expect(panel.keepsNativeGlassActive)
-        coordinator.setPinned(true)
 
-        #expect(activatedPIDs.isEmpty)
-    }
+        coordinator.setDragging(false)
+        #expect(!panel.keepsNativeGlassActive)
 
-    @Test @MainActor
-    func pinningDoesNotSwitchApplicationsWhenZislaWasAlreadyFrontmost() async throws {
-        let zislaPID: pid_t = 7
-        var activatedPIDs: [pid_t] = []
-        let focusRestorer = ApplicationFocusRestorer(
-            currentApplicationPID: zislaPID,
-            frontmostApplicationPID: { zislaPID },
-            activateApplication: {
-                activatedPIDs.append($0)
-                return true
-            }
-        )
-        let contentView = NSView()
-        let coordinator = OverlayCoordinator(
-            contentView: contentView,
-            collapseDelay: .zero,
-            applicationFocusRestorer: focusRestorer
-        )
-        defer { coordinator.stop() }
-
-        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
-        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
-        coordinator.setKeepsNativeGlassActive(true)
         coordinator.setDragging(true)
-
-        let panel = try #require(contentView.window as? IslandPanel)
-        panel.activateNativeGlass = { _ in }
-        try await Task.sleep(for: .milliseconds(10))
-        coordinator.setPinned(true)
-
-        #expect(activatedPIDs.isEmpty)
+        #expect(panel.keepsNativeGlassActive)
     }
 
     @Test @MainActor
@@ -475,7 +453,7 @@ extension OverlayCoordinatorTests {
 
         let panel = try #require(contentView.window as? IslandPanel)
         #expect(visibilityEvents == [true])
-        #expect(panel.keepsNativeGlassActive == false)
+        #expect(panel.keepsNativeGlassActive == true)
         panel.orderOut(nil)
 
         try await Task.sleep(for: .milliseconds(10))
@@ -523,7 +501,7 @@ extension OverlayCoordinatorTests {
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
         coordinator.setDragging(true)
 
-        #expect(panel.keepsNativeGlassActive == false)
+        #expect(panel.keepsNativeGlassActive == true)
         panel.orderOut(nil)
         try await Task.sleep(for: .milliseconds(10))
         #expect(panel.keepsNativeGlassActive == true)

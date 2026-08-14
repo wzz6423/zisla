@@ -523,7 +523,7 @@ struct NowPlayingServiceTests {
         #expect(MediaAppSpecialist.favoriteState(for: ["添加到我喜欢"]) == false)
         #expect(MediaAppSpecialist.favoriteState(for: ["取消收藏此歌曲"]) == true)
         #expect(MediaAppSpecialist.favoriteState(for: ["添加到收藏"]) == false)
-        // QQ 音乐 11.7 菜单栏“播放控制”里的收藏菜单项实测文案。
+        // Observed favorite-menu label in the QQ Music 11.7 menu bar playback controls.
         #expect(MediaAppSpecialist.favoriteState(for: ["取消喜欢"]) == true)
         #expect(MediaAppSpecialist.favoriteState(for: ["喜欢歌曲"]) == false)
         #expect(MediaAppSpecialist.favoriteState(for: ["播放", "下一首"]) == nil)

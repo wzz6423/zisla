@@ -230,12 +230,12 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
-    func clipboardHistoryDefaultsToDisabledWhenMissingFromExistingJSON() throws {
+    func clipboardHistoryDefaultsToEnabledWhenMissingFromExistingJSON() throws {
         let data = Data(#"{"mediaEnabled":true,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"calendarEnabled":true,"weatherEnabled":true,"updateChecksEnabled":true,"automaticUpdatesEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true,"hoverActivationEnabled":true,"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
 
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: data)
 
-        #expect(!decoded.clipboardHistoryEnabled)
+        #expect(decoded.clipboardHistoryEnabled)
     }
 
     @Test

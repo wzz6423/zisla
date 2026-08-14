@@ -1,17 +1,9 @@
 import AppKit
-import SwiftUI
 import Testing
 
 @testable import ZislaKit
 
 struct IslandPanelHitTestingTests {
-    @Test @MainActor
-    func interactiveIslandHostingViewAcceptsFirstMouse() {
-        let hostingView = IslandHostingView(rootView: EmptyView())
-
-        #expect(hostingView.acceptsFirstMouse(for: nil))
-    }
-
     @Test @MainActor
     func expandedPanelInterceptsTransparentCoveredArea() throws {
         let frame = CGRect(x: 0, y: 0, width: 748, height: 324)
@@ -102,30 +94,51 @@ struct IslandPanelHitTestingTests {
             frame: CGRect(x: 0, y: 0, width: 240, height: 34)
         )
         panel.allowsKeyWindow = false
+        panel.allowsNativeGlassActivation = true
         panel.keepsNativeGlassActive = true
 
         #expect(panel.canBecomeKey)
     }
 
     @Test @MainActor
-    func panelWithGlassActiveReclaimsKeyAfterResigning() async {
+    func panelWithGlassActiveRetainsActivationEligibilityAfterResigning() async {
         let panel = IslandPanel(
             contentView: NSView(),
             frame: CGRect(x: 0, y: 0, width: 240, height: 34)
         )
         panel.allowsKeyWindow = false
+        panel.allowsNativeGlassActivation = true
         panel.keepsNativeGlassActive = true
         panel.present(at: panel.frame, animated: false)
         defer { panel.orderOut(nil) }
 
-        #expect(panel.isKeyWindow)
+        #expect(panel.canBecomeKey)
 
         panel.resignKey()
-        // WindowServer downgrades NSGlassEffectView before AppKit can redraw it on resign.
-        // The async reclaim keeps the native glass compositor in its active mode.
         try? await Task.sleep(for: .milliseconds(50))
 
-        #expect(panel.isKeyWindow)
+        #expect(panel.keepsNativeGlassActive)
+        #expect(panel.canBecomeKey)
+    }
+
+    @Test @MainActor
+    func disablingGlassActivationStopsPendingKeyReclaim() async {
+        let panel = IslandPanel(
+            contentView: NSView(),
+            frame: CGRect(x: 0, y: 0, width: 240, height: 34)
+        )
+        panel.allowsNativeGlassActivation = true
+        panel.keepsNativeGlassActive = true
+        panel.present(at: panel.frame, animated: false)
+        defer { panel.orderOut(nil) }
+
+        panel.resignKey()
+        panel.allowsNativeGlassActivation = false
+        try? await Task.sleep(for: .milliseconds(50))
+
+        #expect(panel.keepsNativeGlassActive)
+        #expect(!panel.canBecomeKey)
+        #expect(!panel.isKeyWindow)
     }
 
     @Test @MainActor
@@ -217,6 +230,27 @@ struct IslandPanelHitTestingTests {
         // Primary/Auxiliary/CanJoinAllApplications are mutually exclusive; ensure no conflicting bits are set.
         #expect(!panel.collectionBehavior.contains(.primary))
         #expect(!panel.collectionBehavior.contains(.auxiliary))
+    }
+
+    @Test @MainActor
+    func pinnedPanelKeepsGlassActiveWithoutActivatingApp() async {
+        let panel = IslandPanel(
+            contentView: NSView(),
+            frame: CGRect(x: 0, y: 0, width: 240, height: 34)
+        )
+        panel.allowsNativeGlassActivation = true
+        panel.keepsNativeGlassActive = true
+        panel.isPinned = true
+        panel.present(at: panel.frame, animated: false)
+        defer { panel.orderOut(nil) }
+
+        #expect(panel.canBecomeKey)
+
+        panel.resignKey()
+        try? await Task.sleep(for: .milliseconds(50))
+
+        #expect(panel.canBecomeKey)
+        #expect(panel.keepsNativeGlassActive)
     }
 }
 

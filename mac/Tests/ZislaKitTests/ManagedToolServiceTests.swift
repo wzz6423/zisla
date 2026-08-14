@@ -68,6 +68,76 @@ struct ManagedToolServiceTests {
     }
 
     @Test
+    func recommendedCatalogIncludesEveryVerifiedHomebrewTool() {
+        let expected: [(ManagedTool, ManagedToolInstallationSource, String)] = [
+            (.delta, .homebrewFormula(name: "git-delta"), "delta"),
+            (.githubCLI, .homebrewFormula(name: "gh"), "gh"),
+            (.curl, .homebrewFormula(name: "curl"), "curl"),
+            (.wget, .homebrewFormula(name: "wget"), "wget"),
+            (.rclone, .homebrewFormula(name: "rclone"), "rclone"),
+            (.posting, .homebrewFormula(name: "posting"), "posting"),
+            (.poppler, .homebrewFormula(name: "poppler"), "pdftotext"),
+            (.wireshark, .homebrewFormula(name: "wireshark"), "tshark"),
+            (.mysql, .homebrewFormula(name: "mysql"), "mysql"),
+            (.cmake, .homebrewFormula(name: "cmake"), "cmake"),
+            (.gnuMake, .homebrewFormula(name: "make"), "gmake"),
+            (.ninja, .homebrewFormula(name: "ninja"), "ninja"),
+            (.gcc, .homebrewFormula(name: "gcc"), "gcc-16"),
+            (.go, .homebrewFormula(name: "go"), "go"),
+            (.rust, .homebrewFormula(name: "rust"), "rustc"),
+            (.nodeJS, .homebrewFormula(name: "node"), "node"),
+            (.deno, .homebrewFormula(name: "deno"), "deno"),
+            (.python, .homebrewFormula(name: "python"), "python3"),
+            (.ruby, .homebrewFormula(name: "ruby"), "ruby"),
+            (.openJDK17, .homebrewFormula(name: "openjdk@17"), "java"),
+            (.maven, .homebrewFormula(name: "maven"), "mvn"),
+            (.groovy, .homebrewFormula(name: "groovy"), "groovy"),
+            (.cocoaPods, .homebrewFormula(name: "cocoapods"), "pod"),
+            (.pyenv, .homebrewFormula(name: "pyenv"), "pyenv"),
+            (.pipx, .homebrewFormula(name: "pipx"), "pipx"),
+            (.uv, .homebrewFormula(name: "uv"), "uv"),
+            (.pnpm, .homebrewFormula(name: "pnpm"), "pnpm"),
+            (.tectonic, .homebrewFormula(name: "tectonic"), "tectonic"),
+            (.packer, .homebrewFormula(name: "packer"), "packer"),
+            (.ytt, .homebrewFormula(name: "ytt"), "ytt"),
+            (.kero, .homebrewCask(name: "egoist/tap/kero"), "kero"),
+        ]
+
+        #expect(ManagedTool.allCases.count == 45)
+        for (tool, source, executableName) in expected {
+            #expect(tool.installationSource == source)
+            #expect(tool.executableName == executableName)
+        }
+        #expect(ManagedTool.kero.requiredHomebrewTap == "egoist/tap")
+    }
+
+    @Test
+    func everyManagedToolAppearsInARecommendationGroup() {
+        func count(_ group: ManagedToolRecommendationGroup) -> Int {
+            ManagedTool.allCases.filter { $0.recommendationGroup == group }.count
+        }
+
+        #expect(count(.terminalEfficiency) == 11)
+        #expect(count(.networkAndData) == 7)
+        #expect(count(.developmentToolchain) == 21)
+        #expect(count(.utility) == 3)
+        #expect(count(.desktopApplication) == 3)
+    }
+
+    @Test
+    func kegOnlyAndVersionedFormulaeUseDiscoverableExecutablePaths() {
+        #expect(ManagedToolService.externalPaths(for: .curl).contains(
+            "/opt/homebrew/opt/curl/bin/curl"
+        ))
+        #expect(ManagedToolService.externalPaths(for: .openJDK17).contains(
+            "/opt/homebrew/opt/openjdk@17/bin/java"
+        ))
+        #expect(ManagedToolService.externalPaths(for: .gcc).contains(
+            "/opt/homebrew/bin/gcc-16"
+        ))
+    }
+
+    @Test
     func parsesTheStableVersionFromHomebrewCaskMetadata() throws {
         let data = Data("""
         {"casks":[{"token":"libreoffice","version":"26.2.5.2"}]}
@@ -111,6 +181,53 @@ struct ManagedToolServiceTests {
         )
 
         #expect(version == "1.7.1")
+    }
+
+    @Test
+    func parsesFormulaAliasesAndHomebrewRevisions() throws {
+        let pythonData = Data("""
+        {"formulae":[{"name":"python@3.14","aliases":["python","python3"],"versions":{"stable":"3.14.7"},"revision":0}]}
+        """.utf8)
+        let postingData = Data("""
+        {"formulae":[{"name":"posting","versions":{"stable":"2.10.0"},"revision":2}]}
+        """.utf8)
+
+        #expect(try ManagedToolService.parseHomebrewFormulaInfo(
+            pythonData,
+            formulaName: "python",
+            tool: .python
+        ) == "3.14.7")
+        #expect(try ManagedToolService.parseHomebrewFormulaInfo(
+            postingData,
+            formulaName: "posting",
+            tool: .posting
+        ) == "2.10.0_2")
+    }
+
+    @Test
+    func parsesTappedCaskMetadataByFullToken() throws {
+        let data = Data("""
+        {"casks":[{"token":"kero","full_token":"egoist/tap/kero","version":"0.1.47"}]}
+        """.utf8)
+
+        #expect(try ManagedToolService.parseHomebrewCaskInfo(
+            data,
+            caskName: "egoist/tap/kero",
+            tool: .kero
+        ) == "0.1.47")
+    }
+
+    @Test
+    func parsesInstalledHomebrewFormulaVersions() {
+        #expect(ManagedToolService.parseHomebrewInstalledVersion(
+            "posting 2.10.0_2\n",
+            tool: .posting
+        ) == "2.10.0_2")
+        #expect(ManagedToolService.parseHomebrewInstalledVersion(
+            "python@3.14 3.14.6\n",
+            tool: .python
+        ) == "3.14.6")
+        #expect(ManagedToolService.parseHomebrewInstalledVersion("", tool: .fzf) == nil)
     }
 
     @Test
@@ -193,6 +310,22 @@ struct ManagedToolServiceTests {
         #expect(ManagedToolService.normalizeVersion("2026.06.09\nextra") == "2026.06.09")
         #expect(ManagedToolService.normalizeVersion("   ") == nil)
         #expect(ManagedToolService.normalizeVersion("") == nil)
+    }
+
+    @Test
+    func executableVersionNormalizationExtractsTheSemanticVersion() {
+        #expect(ManagedTool.fzf.normalizedInstalledVersion(from: "0.74.2 (Homebrew)") == "0.74.2")
+        #expect(ManagedTool.lazygit.normalizedInstalledVersion(
+            from: "commit=, build date=, build source=homebrew, version=0.64.1, os=darwin"
+        ) == "0.64.1")
+        #expect(ManagedTool.yazi.normalizedInstalledVersion(
+            from: "Yazi 26.1.22 (Homebrew 2026-01-22)"
+        ) == "26.1.22")
+        #expect(ManagedTool.starship.normalizedInstalledVersion(from: "starship 1.26.0") == "1.26.0")
+        #expect(ManagedTool.tldr.normalizedInstalledVersion(from: "tldr 3.4.0") == "3.4.0")
+        #expect(ManagedTool.tree.normalizedInstalledVersion(from: "tree v2.3.2 (c) 1996") == "2.3.2")
+        #expect(ManagedTool.delta.normalizedInstalledVersion(from: "delta 0.19.2") == "0.19.2")
+        #expect(ManagedTool.fzf.installDetail.contains("Homebrew"))
     }
 
     @Test

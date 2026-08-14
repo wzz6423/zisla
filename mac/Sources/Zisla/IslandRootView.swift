@@ -140,7 +140,7 @@ struct IslandRootView: View {
                                 .padding(.horizontal, 14)
                                 .padding(.bottom, 6)
                         } else if !isIslandCollapsed {
-                            // 固定顶部壳层，模块切换时只替换下方功能区域。
+                            // Keep the top shell fixed so module changes replace only the functional area below.
                             NowPlayingHeader(model: model)
                                 .padding(.horizontal, 14)
                                 .padding(.top, contentTopInset)

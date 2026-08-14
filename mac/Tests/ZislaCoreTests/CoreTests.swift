@@ -1764,14 +1764,15 @@ struct UpdateCoreTests {
 
 struct FeatureSettingsTests {
     @Test
-    func privacySensitiveDetectionDefaultsOffAndCoreModulesDefaultOn() {
+    func coreModulesAndClipboardFeaturesDefaultOn() {
         let settings = FeatureSettings.default
         #expect(settings.mediaEnabled)
         #expect(settings.fileShelfEnabled)
         #expect(settings.aiProgressEnabled)
         #expect(settings.downloaderEnabled)
         #expect(settings.updateChecksEnabled)
-        #expect(!settings.clipboardDetectionEnabled)
+        #expect(settings.clipboardDetectionEnabled)
+        #expect(settings.clipboardHistoryEnabled)
         #expect(settings.sideNoticesEnabled)
     }
 }

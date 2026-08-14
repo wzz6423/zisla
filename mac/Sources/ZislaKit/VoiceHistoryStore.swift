@@ -184,7 +184,7 @@ public final class VoiceHistoryStore: ObservableObject {
             do {
                 try fileManager.removeItem(at: audioURL)
             } catch {
-                // 文件系统拒绝删除时回滚索引，避免下次启动因音频仍存在而恢复记录。
+                // Roll back the index when the file system rejects deletion, so an existing audio file does not restore the entry at next launch.
                 _ = persistCandidate(entries)
                 errorDescription = error.localizedDescription
                 return

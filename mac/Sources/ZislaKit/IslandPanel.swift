@@ -1,5 +1,4 @@
 import AppKit
-import SwiftUI
 
 private final class ClickBlockingContentView: NSView {
     override func draw(_ dirtyRect: NSRect) {
@@ -10,24 +9,13 @@ private final class ClickBlockingContentView: NSView {
 }
 
 @MainActor
-public final class IslandHostingView<Content: View>: NSHostingView<Content> {
-    public override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
-        // 非激活灵动岛的控件也必须接收首击，避免首次点击只用于激活窗口。
-        true
-    }
-}
-
-@MainActor
 public final class IslandPanel: NSPanel {
   public var allowsKeyWindow = false
+  public var allowsNativeGlassActivation = true
   public var keepsNativeGlassActive = false {
     didSet { restoreNativeGlassActivationIfNeeded() }
   }
-  var onWillActivateApplicationForNativeGlass: (@MainActor () -> Void)?
-  var activateNativeGlass: @MainActor (IslandPanel) -> Void = { panel in
-    NSApp.activate(ignoringOtherApps: true)
-    panel.makeKeyAndOrderFront(nil)
-  }
+  public var isPinned = false
   private var transitionGeneration: UInt64 = 0
 
     /// Window level used when the collapsed island sits above other windows (same layer as the menu bar).
@@ -35,26 +23,28 @@ public final class IslandPanel: NSPanel {
     /// Window level used when the collapsed island sinks below the menu bar: lower than both the menu bar (24) and normal windows, so they cover it.
     public static let onBottomLevel = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
 
-    public override var canBecomeKey: Bool { allowsKeyWindow || keepsNativeGlassActive }
+    public override var canBecomeKey: Bool {
+        allowsKeyWindow || (allowsNativeGlassActivation && keepsNativeGlassActive)
+    }
     public override var canBecomeMain: Bool { false }
 
     public override func resignKey() {
-        guard keepsNativeGlassActive, isVisible else {
+        guard allowsNativeGlassActivation, keepsNativeGlassActive, isVisible else {
             super.resignKey()
             return
         }
 
-        // WindowServer downgrades NSGlassEffectView before AppKit can redraw it on resign.
-        // Reclaiming key on the next run loop keeps the native glass compositor in its active mode.
         DispatchQueue.main.async { [weak self] in
             self?.restoreNativeGlassActivationIfNeeded()
         }
     }
 
     private func restoreNativeGlassActivationIfNeeded() {
-        guard keepsNativeGlassActive, isVisible else { return }
-        onWillActivateApplicationForNativeGlass?()
-        activateNativeGlass(self)
+        guard allowsNativeGlassActivation, keepsNativeGlassActive, isVisible else { return }
+        if !isPinned {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        makeKeyAndOrderFront(nil)
     }
 
     public override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {

@@ -529,7 +529,7 @@ struct SideNoticeLayoutTests {
 
         #expect(presentation.panelSize == CGSize(width: 252, height: 54))
         let frame = engine.frame(side: .right, presentation: presentation, screen: screen)
-        // 浮层紧贴在岛的底边上方（y坐标比岛底边小，但浮层顶部紧贴岛底部）
+        // The overlay sits directly above the island's bottom edge.
         #expect(frame == CGRect(x: 840, y: anchor.minY - 54 - 4, width: 252, height: 54))
         #expect(frame.maxY == anchor.minY - 4)
     }

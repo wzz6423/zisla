@@ -39,7 +39,7 @@ struct AIAgentModuleView: View {
         }
     }
 
-    /// 模型与凭据只在模型页维护，AI 页只展示 Agent 行为设置。
+    /// Models and credentials are maintained only on the Models page; the AI page shows agent behavior settings only.
     enum ConfigurationScope {
         case agent
         case localModels
@@ -568,7 +568,7 @@ struct AIAgentModuleView: View {
                         if !normalized.isEmpty {
                             annotationSelection = AnnotationSelection(threadID: threadID, messageID: message.id, text: normalized)
                         } else if annotationSelection?.messageID == message.id {
-                            // 只有持有当前选区的消息取消选区才收起批注框；误点其他消息不应丢掉输入中的草稿。
+                            // Only deselecting the message that owns the current selection closes the annotation field; selecting another message must preserve the draft.
                             annotationSelection = nil
                             annotationDraft = ""
                         }
@@ -628,7 +628,7 @@ struct AIAgentModuleView: View {
                     .lineLimit(1)
                 }
 
-                // 执行细节内容区（可展开/收起）
+                // Expandable execution-details content area.
                 if expandedMessageIDs.contains(message.id) {
                     VStack(alignment: .leading, spacing: 4) {
                         if !detailAttachments.isEmpty {
@@ -753,7 +753,7 @@ struct AIAgentModuleView: View {
         .padding(.trailing, 4)
         .contentShape(.rect)
         .onHover { hovering in
-            // enter/exit 事件到达顺序无保证：旧行的 exit 可能晚于新行的 enter，无条件置 nil 会清掉新行的 hover。
+            // Event order is not guaranteed: an old row's exit can arrive after a new row's enter, so clearing unconditionally would remove the new hover state.
             if hovering {
                 hoveredMessageID = message.id
             } else if hoveredMessageID == message.id {
@@ -990,7 +990,7 @@ struct AIAgentModuleView: View {
                     Label("添加文件", systemImage: "paperclip")
                 }
                 Divider()
-                // 直接发送是默认行为，所以菜单里只有两个互相独立的开关。
+                // Direct sending is the default, so the menu contains only two independent switches.
                 Toggle(isOn: Binding(
                     get: { thread.mode == .plan },
                     set: { agent.store.updateThreadMode($0 ? .plan : .standard, for: threadID) }
@@ -1241,7 +1241,7 @@ struct AIAgentModuleView: View {
         }
     }
 
-    /// CLI Profile 配置区块
+    /// CLI profile configuration section.
     private func cliProfileSection(_ account: AgentAccount) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 7) {
@@ -2075,8 +2075,8 @@ struct AIAgentModuleView: View {
         return agent.store.activeThreads().first
     }
 
-    /// 会话行自己承担选中态：`List(selection:)` 的系统蓝高亮无法在 macOS 上被安全改色，
-    /// 改成自定义选中按钮与直接操作按钮后，可保留中性描边并提供置顶、归档入口。
+    /// The session row owns its selection state because the system-blue highlight from `List(selection:)` cannot be safely recolored on macOS.
+    /// Custom selection and direct-action buttons retain a neutral border while exposing pin and archive actions.
     private func chatThreadRow(_ thread: AgentChatThread) -> some View {
         let isSelected = selectedThreadID == thread.id
         return HStack(spacing: 0) {
@@ -2141,8 +2141,8 @@ struct AIAgentModuleView: View {
         }
     }
 
-    /// 归档当前选中的会话后，选中态必须跟着交给下一条活动会话，
-    /// 否则 `selectedThreadID` 会指向已从列表消失的会话，行高亮与右侧记录不一致。
+    /// After archiving the selected session, pass selection to the next active session;
+    /// otherwise `selectedThreadID` points to a removed row and the highlight no longer matches the right-side record.
     private func archiveThread(_ thread: AgentChatThread) {
         agent.store.archiveThread(id: thread.id)
         if selectedThreadID == thread.id {

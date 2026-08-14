@@ -47,7 +47,7 @@ struct ThinkingOrbGeometryTests {
     @Test
     func smallPresetMatchesOfficialAspectRatios() {
         let expected: [ThinkingOrbState: [Double]] = [
-            .working: [1.122, 1.227, 1.274, 1.421],
+            .working: [1.122, 1.189, 1.169, 1.168],
             .searching: [1.012, 0.999, 1.008, 1.007],
             .solving: [1.060, 1.032, 1.009, 1.026],
             .listening: [0.997, 0.955, 1.004, 1.003],
@@ -69,9 +69,22 @@ struct ThinkingOrbGeometryTests {
     }
 
     @Test
+    func workingAspectRatioStaysAboveLimitThroughoutMotionCycle() {
+        let cycle = 2 * Double.pi / (0.12 * 3.9)
+        let samples = 96
+        let minimumRatio = (0...samples).map { index in
+            let time = cycle * Double(index) / Double(samples)
+            let bounds = ThinkingOrbRenderer.frame(state: .working, size: 20, time: time).renderedBounds
+            return bounds.width / bounds.height
+        }.min() ?? 0
+
+        #expect(minimumRatio >= 1)
+    }
+
+    @Test
     func smallPresetMatchesOfficialGeometrySignatures() {
         let expected: [ThinkingOrbState: Double] = [
-            .working: 25_677.561_615_676,
+            .working: 25_901.163_474_847,
             .searching: 46_576.996_510_874,
             .solving: 15_440.862_956_790,
             .listening: 30_527.108_710_205,

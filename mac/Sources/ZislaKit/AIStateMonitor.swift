@@ -447,15 +447,15 @@ public final class AIStateMonitor: ObservableObject {
             }
         }
 
-        // 移除不再被检测器返回的活动任务（任务已完成/中止）
+        // Remove active tasks no longer returned by detectors (completed or aborted).
         tasks.removeAll { task in
             guard task.status.isActive else { return false }
-            // 如果任务不在持久化列表中且检测器不再返回它，说明任务已结束
+            // A task absent from both persistence and detector results has ended.
             let isPersistedTask = persistedTasks.contains(where: { $0.id == task.id })
             if !isPersistedTask && !detectedTaskIDs.contains(task.id) {
                 return true
             }
-            // TTL 超时检查
+            // Check TTL expiry.
             return dependencies.now().timeIntervalSince(task.updatedAt) > dependencies.activeTaskTTL
         }
         return tasks

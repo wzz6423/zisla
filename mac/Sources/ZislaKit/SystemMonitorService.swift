@@ -499,7 +499,7 @@ public protocol SystemMonitorFileManaging: Sendable {
 }
 
 public extension SystemMonitorFileManaging {
-    /// 测试替身可沿用内存数据；生产文件管理器会用流式读取避免大文件占满内存。
+    /// Test doubles may retain in-memory data; the production file manager streams reads to avoid loading large files into memory.
     func sha256Digest(at url: URL) -> Data? {
         guard let data = contents(atPath: url.path) else { return nil }
         return Data(SHA256.hash(data: data))
@@ -2075,7 +2075,7 @@ public enum SystemDiskCleanup {
         return result
     }
 
-    /// Downloads、Desktop 和 Documents 只递归一次，供大文件与重复文件检测共用。
+    /// Downloads, Desktop, and Documents are traversed only once for both large-file and duplicate-file detection.
     private static func collectScannedUserFiles(
         fileManager: SystemMonitorFileManaging,
         includesModificationDate: Bool
@@ -2135,7 +2135,7 @@ public enum SystemDiskCleanup {
         }
     }
 
-    /// 先按大小分组，再对可能重复的文件做流式 SHA256 比对。
+    /// Group by size first, then compare possible duplicates with streaming SHA256 checksums.
     private static func duplicateFileCandidates(
         from files: [ScannedUserFile],
         fileManager: SystemMonitorFileManaging
@@ -2228,7 +2228,7 @@ public enum SystemDiskCleanup {
         return !children.isEmpty
     }
 
-    /// 生产文件管理器会流式计算 SHA256，避免将完整文件载入内存。
+    /// The production file manager calculates SHA256 incrementally to avoid loading whole files into memory.
     private static func sha256(of url: URL, fileManager: SystemMonitorFileManaging) -> String {
         guard let digest = fileManager.sha256Digest(at: url) else { return "" }
         return digest.map { String(format: "%02x", $0) }.joined()
