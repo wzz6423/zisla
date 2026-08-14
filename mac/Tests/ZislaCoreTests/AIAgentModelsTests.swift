@@ -412,8 +412,9 @@ struct AIAgentModelsTests {
         #expect(AgentCLIKind.qwen.executableName == "qwen")
         #expect(AgentCLIKind.qoder.displayName == "Qoder CLI")
         #expect(AgentCLIKind.qoder.executableName == "qodercli")
-        #expect(AgentCLIKind.copilot.displayName == "Copilot")
+        #expect(AgentCLIKind.copilot.displayName == "GitHub Copilot")
         #expect(AgentCLIKind.copilot.executableName == "copilot")
+        #expect(AgentCLIKind.allCases.last == .copilot)
 
         #expect(AgentCLIKind.detectableCases.contains(.kimi))
         #expect(AgentCLIKind.detectableCases.contains(.qwen))

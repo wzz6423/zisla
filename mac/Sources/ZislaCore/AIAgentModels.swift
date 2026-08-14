@@ -552,8 +552,8 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
     case kimi
     case qwen
     case qoder
-    case copilot
     case glm
+    case copilot
 
     public static let detectableCases = allCases
     public static let relayCases: [Self] = [.claude, .codex, .gemini, .grok, .opencode]
@@ -565,7 +565,7 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
         case .kimi: "Kimi Code"
         case .qwen: "Qwen Code"
         case .qoder: "Qoder CLI"
-        case .copilot: "Copilot"
+        case .copilot: "GitHub Copilot"
         case .glm: "GLM Coding"
         default: rawValue.capitalized
         }

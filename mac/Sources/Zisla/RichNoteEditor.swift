@@ -262,8 +262,9 @@ struct RichNoteEditor: NSViewRepresentable {
             let rect = [...range.getClientRects()].find(candidate => candidate.height > 0);
             if (!rect) {
               const boundingRect = range.getBoundingClientRect();
-              if (boundingRect.width === 0 && boundingRect.height === 0) return hideCaret();
-              rect = boundingRect;
+              const startElement = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+              rect = boundingRect.height > 0 ? boundingRect : startElement?.getBoundingClientRect();
+              if (!rect?.height) return hideCaret();
             }
             const height = Math.min(Math.max(rect.height * 0.72, 14), 20);
             caret.style.height = `${height}px`;

@@ -326,6 +326,16 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func processRunnerHandlesChildClosingStandardInputEarly() async throws {
+        let output = try await AIAgentProcessRunner.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/false"),
+            standardInput: Data(repeating: 0x61, count: 1_048_576)
+        )
+
+        #expect(output.status == 1)
+    }
+
+    @Test
     func processRunnerPropagatesTaskCancellation() async throws {
         let task = Task {
             try await AIAgentProcessRunner.run(

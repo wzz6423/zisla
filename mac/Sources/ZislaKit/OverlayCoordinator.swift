@@ -332,7 +332,7 @@ public final class OverlayCoordinator: NSObject {
         let isExpanded = reducer.state.visibility == .expanded
             || reducer.state.visibility == .pinned
         let shouldKeepGlassActive = keepsNativeGlassActive && isExpanded
-        let shouldAllowKeyWindow = allowsKeyWindow && isExpanded
+        let shouldAllowKeyWindow = allowsKeyWindow && !isPinned && isExpanded
         let shouldAllowNativeGlassActivation = shouldKeepGlassActive
 
         panel.isPinned = isPinned

@@ -1682,7 +1682,10 @@ public enum AIAgentProcessRunner {
         process.currentDirectoryURL = workingDirectoryURL
         process.standardOutput = output
         process.standardError = error
-        if standardInput != nil { process.standardInput = input }
+        if standardInput != nil {
+            process.standardInput = input
+            _ = fcntl(input.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
+        }
 
         return try await withTaskCancellationHandler {
             try Task.checkCancellation()
@@ -1708,7 +1711,7 @@ public enum AIAgentProcessRunner {
                         }
                         if let standardInput {
                             DispatchQueue.global(qos: .userInitiated).async {
-                                input.fileHandleForWriting.write(standardInput)
+                                try? input.fileHandleForWriting.write(contentsOf: standardInput)
                                 try? input.fileHandleForWriting.close()
                             }
                         }

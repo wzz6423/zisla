@@ -282,7 +282,9 @@ private struct TaskProgressRow: View {
                     Spacer(minLength: 2)
                     if task.status == .error {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 9, weight: .semibold))
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 16, height: 16)
                             .foregroundStyle(.red)
                             .help(failureReason ?? "任务失败")
                     } else if let progress = task.progress {
@@ -303,7 +305,9 @@ private struct TaskProgressRow: View {
             }
         } else if task.status == .error {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 10, weight: .semibold))
+                .resizable()
+                .scaledToFit()
+                .frame(width: 16, height: 16)
                 .foregroundStyle(.red)
                 .help(failureReason ?? "任务失败")
         } else if let progress = task.progress {
