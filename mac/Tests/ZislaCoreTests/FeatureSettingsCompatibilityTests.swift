@@ -39,9 +39,9 @@ struct FeatureSettingsCompatibilityTests {
     func systemMonitorMenuBarSelectionAndDisplayStyleDefaultForLegacySettingsAndRoundTrip() throws {
         let legacy = Data(#"{"mediaEnabled":true,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"calendarEnabled":true,"weatherEnabled":true,"updateChecksEnabled":true,"automaticUpdatesEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true,"hoverActivationEnabled":true,"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
         let decodedLegacy = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
-        #expect(decodedLegacy.systemMonitorMenuBarMetrics == [.cpu])
+        #expect(decodedLegacy.systemMonitorMenuBarMetrics == Set(SystemMonitorMenuBarMetric.allCases))
         #expect(decodedLegacy.systemMonitorMenuBarDisplayStyle == .detailed)
-        #expect(!decodedLegacy.menuBarAppIconEnabled)
+        #expect(decodedLegacy.menuBarAppIconEnabled)
 
         var settings = FeatureSettings.default
         settings.systemMonitorMenuBarMetrics = [.gpu, .memory, .fan]
@@ -143,7 +143,7 @@ struct FeatureSettingsCompatibilityTests {
         let data = Data(#"{"mediaEnabled":false,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"calendarEnabled":true,"weatherEnabled":true,"updateChecksEnabled":true,"automaticUpdatesEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true,"hoverActivationEnabled":true,"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: data)
         #expect(decoded.toolboxEnabled == true)
-        #expect(decoded.toolboxReminderEnabled == false)
+        #expect(decoded.toolboxReminderEnabled == true)
         #expect(decoded.focusCountdownIslandEnabled == true)
         #expect(decoded.focusModeNoticeDisplayDuration == .threeSeconds)
         #expect(decoded.mediaEnabled == false)

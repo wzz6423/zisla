@@ -1764,16 +1764,48 @@ struct UpdateCoreTests {
 
 struct FeatureSettingsTests {
     @Test
-    func coreModulesAndClipboardFeaturesDefaultOn() {
+    func featuresDefaultOn() {
         let settings = FeatureSettings.default
+
         #expect(settings.mediaEnabled)
         #expect(settings.fileShelfEnabled)
         #expect(settings.aiProgressEnabled)
+        #expect(settings.aiAgentEnabled)
         #expect(settings.downloaderEnabled)
+        #expect(settings.calendarEnabled)
+        #expect(settings.toolboxEnabled)
+        #expect(settings.pdfToolsEnabled)
+        #expect(settings.toolboxReminderEnabled)
+        #expect(settings.focusCountdownIslandEnabled)
+        #expect(settings.browserDownloadIslandEnabled)
+        #expect(settings.videoDownloadIslandEnabled)
+        #expect(settings.systemMonitorEnabled)
+        #expect(settings.systemMonitorMenuBarMetrics == Set(SystemMonitorMenuBarMetric.allCases))
+        #expect(settings.menuBarAppIconEnabled)
+        #expect(settings.weatherEnabled)
+        #expect(settings.lockScreenInfoEnabled)
+        #expect(settings.lockScreenShowsLunar)
+        #expect(settings.quickNotesEnabled)
+        #expect(settings.mailEnabled)
         #expect(settings.updateChecksEnabled)
+        #expect(settings.automaticDownloadEnabled)
         #expect(settings.clipboardDetectionEnabled)
         #expect(settings.clipboardHistoryEnabled)
         #expect(settings.sideNoticesEnabled)
+        #expect(!settings.notificationsMuted)
+        #expect(settings.hoverActivationEnabled)
+        #expect(settings.mediaShowLyricsAndInfo)
+        #expect(settings.islandCollapsedOnTop)
+        #expect(settings.voiceInputEnabled)
+    }
+
+    @Test
+    func petDefaultsToEnabledPandaOnTheLeft() {
+        let settings = FeatureSettings.default
+
+        #expect(settings.petEnabled)
+        #expect(settings.petID == "panda")
+        #expect(settings.petSide == .left)
     }
 }
 

@@ -326,7 +326,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
     }
 }
 
-/// Feature module toggles. Privacy-sensitive items (clipboard detection) default to off; core modules default to on.
+/// Feature module toggles default to on.
 public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mediaEnabled: Bool
     public var mediaSource: MediaSourcePreference
@@ -413,14 +413,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         calendarEnabled: Bool = true,
         toolboxEnabled: Bool = true,
         pdfToolsEnabled: Bool = true,
-        toolboxReminderEnabled: Bool = false,
+        toolboxReminderEnabled: Bool = true,
         focusCountdownIslandEnabled: Bool = true,
         browserDownloadIslandEnabled: Bool = true,
         videoDownloadIslandEnabled: Bool = true,
         systemMonitorEnabled: Bool = true,
-        systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric> = [.cpu],
+        systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric> = Set(SystemMonitorMenuBarMetric.allCases),
         systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle = .detailed,
-        menuBarAppIconEnabled: Bool = false,
+        menuBarAppIconEnabled: Bool = true,
         weatherEnabled: Bool = true,
         lockScreenInfoEnabled: Bool = true,
         lockScreenMessage: String = "",
@@ -430,7 +430,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mailAccountNames: Set<String> = [],
         mailCompactStyle: MailCompactStyle = .compact,
         updateChecksEnabled: Bool = true,
-        automaticDownloadEnabled: Bool = false,
+        automaticDownloadEnabled: Bool = true,
         updateChannel: UpdateChannel = .release,
         clipboardHistoryEnabled: Bool = true,
         clipboardDetectionEnabled: Bool = true,
@@ -443,8 +443,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         activityNoticeDisplayIDs: Set<UInt32> = [],
         appearanceMode: AppearanceMode = .system,
         petEnabled: Bool = true,
-        petID: String = "dog",
-        petSide: PetSide = .right,
+        petID: String = "panda",
+        petSide: PetSide = .left,
         mediaShowLyricsAndInfo: Bool = true,
         mediaCompactStyle: MediaCompactStyle = .compact,
         islandVisualStyle: IslandVisualStyle = .transparent,
