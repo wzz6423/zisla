@@ -105,11 +105,25 @@ public final class ManagedToolService: ObservableObject {
 
         // Common paths for command-line tools.
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return [
+        let commonPaths = [
             "/opt/homebrew/bin/\(tool.executableName)",
             "/usr/local/bin/\(tool.executableName)",
             "\(home)/.local/bin/\(tool.executableName)",
         ]
+        switch tool {
+        case .curl:
+            return [
+                "/opt/homebrew/opt/curl/bin/curl",
+                "/usr/local/opt/curl/bin/curl",
+            ] + commonPaths
+        case .openJDK17:
+            return [
+                "/opt/homebrew/opt/openjdk@17/bin/java",
+                "/usr/local/opt/openjdk@17/bin/java",
+            ] + commonPaths
+        default:
+            return commonPaths
+        }
     }
 
     private func trustedExecutable(_ url: URL) -> URL? {
@@ -130,7 +144,7 @@ public final class ManagedToolService: ObservableObject {
                 persistCachedStates()
                 continue
             }
-            let version = await Self.readVersion(of: tool, at: resolved.url)
+            let version = await installedVersion(of: tool, at: resolved.url)
             // Version reads take about a second, during which installation may finish; discard stale resolution results and let the next refresh correct them.
             guard states[tool]?.isBusy != true,
                   resolvedExecutable(for: tool)?.url == resolved.url
@@ -140,6 +154,17 @@ public final class ManagedToolService: ObservableObject {
             refreshedInstalledVersions.insert(tool)
             persistCachedStates()
         }
+    }
+
+    private func installedVersion(of tool: ManagedTool, at executableURL: URL) async -> String? {
+        guard case .homebrewFormula(let formulaName) = tool.installationSource else {
+            return await Self.readVersion(of: tool, at: executableURL)
+        }
+        if let output = try? await runHomebrew(["list", "--versions", "--formula", formulaName]),
+           let version = Self.parseHomebrewInstalledVersion(output, tool: tool) {
+            return version
+        }
+        return await Self.readVersion(of: tool, at: executableURL)
     }
 
     static func readVersion(of tool: ManagedTool, at url: URL) async -> String? {
@@ -175,9 +200,14 @@ public final class ManagedToolService: ObservableObject {
     }
 
     static func parseHomebrewCaskInfo(_ data: Data, caskName: String, tool: ManagedTool) throws -> String {
+        let token = caskName.split(separator: "/").last.map(String.init)
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let casks = root["casks"] as? [[String: Any]],
-              let cask = casks.first(where: { ($0["token"] as? String) == caskName }),
+              let cask = casks.first(where: {
+                  ($0["token"] as? String) == caskName
+                      || ($0["full_token"] as? String) == caskName
+                      || ($0["token"] as? String) == token
+              }),
               let version = cask["version"] as? String,
               let normalized = tool.normalizedInstalledVersion(from: version)
         else {
@@ -189,14 +219,26 @@ public final class ManagedToolService: ObservableObject {
     static func parseHomebrewFormulaInfo(_ data: Data, formulaName: String, tool: ManagedTool) throws -> String {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let formulae = root["formulae"] as? [[String: Any]],
-              let formula = formulae.first(where: { ($0["name"] as? String) == formulaName }),
+              let formula = formulae.first(where: {
+                  ($0["name"] as? String) == formulaName
+                      || ($0["full_name"] as? String) == formulaName
+                      || (($0["aliases"] as? [String])?.contains(formulaName) == true)
+              }),
               let versions = formula["versions"] as? [String: Any],
               let version = versions["stable"] as? String,
               let normalized = tool.normalizedInstalledVersion(from: version)
         else {
             throw ManagedToolError.homebrewFailed("无法读取 \(formulaName) 的版本信息")
         }
-        return normalized
+        let revision = formula["revision"] as? Int ?? 0
+        return revision > 0 ? "\(normalized)_\(revision)" : normalized
+    }
+
+    static func parseHomebrewInstalledVersion(_ output: String, tool: ManagedTool) -> String? {
+        guard let line = output.split(whereSeparator: \.isNewline).first,
+              let version = line.split(whereSeparator: \.isWhitespace).last
+        else { return nil }
+        return tool.normalizedInstalledVersion(from: String(version))
     }
 
     // MARK: - Latest version lookup
@@ -304,6 +346,9 @@ public final class ManagedToolService: ObservableObject {
         states[tool]?.errorMessage = nil
         states[tool]?.phase = .checking
         do {
+            if let tap = tool.requiredHomebrewTap {
+                _ = try await runHomebrew(["tap", tap])
+            }
             switch tool.installationSource {
             case .githubRelease(let repository):
                 try await installGitHubRelease(tool, repository: repository)
@@ -374,9 +419,10 @@ public final class ManagedToolService: ObservableObject {
         _ = try await runHomebrew([action, "--cask", caskName])
         refreshedInstalledVersions.remove(tool)
 
-        guard let resolved = resolvedExecutable(for: tool),
-              let version = await Self.readVersion(of: tool, at: resolved.url)
-        else {
+        guard let resolved = resolvedExecutable(for: tool) else {
+            throw ManagedToolError.notExecutable(tool.displayName)
+        }
+        guard let version = await installedVersion(of: tool, at: resolved.url) else {
             throw ManagedToolError.notExecutable(tool.displayName)
         }
         states[tool]?.installedVersion = version
@@ -399,9 +445,10 @@ public final class ManagedToolService: ObservableObject {
         _ = try await runHomebrew([action, "--formula", formulaName])
         refreshedInstalledVersions.remove(tool)
 
-        guard let resolved = resolvedExecutable(for: tool),
-              let version = await Self.readVersion(of: tool, at: resolved.url)
-        else {
+        guard let resolved = resolvedExecutable(for: tool) else {
+            throw ManagedToolError.notExecutable(tool.displayName)
+        }
+        guard let version = await installedVersion(of: tool, at: resolved.url) else {
             throw ManagedToolError.notExecutable(tool.displayName)
         }
         states[tool]?.installedVersion = version

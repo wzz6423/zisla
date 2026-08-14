@@ -27,7 +27,6 @@ let package = Package(
             dependencies: ["ZislaCore"],
             linkerSettings: [
                 .linkedFramework("WeatherKit"),
-                .linkedFramework("Security"),
                 .linkedFramework("Network"),
                 .linkedFramework("PDFKit"),
                 .linkedFramework("ImageIO"),

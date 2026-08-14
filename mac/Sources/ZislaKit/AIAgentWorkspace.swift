@@ -288,7 +288,7 @@ public final class AIAgentWorkspace: ObservableObject {
         skillRefreshGeneration &+= 1
         let generation = skillRefreshGeneration
         let disabledPaths = Set(store.state.skills.filter { !$0.isEnabled }.map(\.path))
-        let roots = AIAgentSkillService.defaultRoots + [managedSkillsDirectory]
+        let roots = [managedSkillsDirectory] + AIAgentSkillService.defaultRoots
         let skills = await Task.detached(priority: .utility) { [skillService] in
             skillService.scan(roots: roots, enabledPaths: disabledPaths)
         }.value
@@ -299,6 +299,15 @@ public final class AIAgentWorkspace: ObservableObject {
     public var managedSkillsDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".zisla/skills", isDirectory: true)
+    }
+
+    public var managedSkillBackupRootDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".zisla/skill-backups", isDirectory: true)
+    }
+
+    public func managedSkillBackupDirectory(for destination: AgentSkillSyncDestination) -> URL {
+        managedSkillBackupRootDirectory.appendingPathComponent(destination.rawValue, isDirectory: true)
     }
 
     public var managedSkills: [AgentSkill] {
@@ -319,7 +328,7 @@ public final class AIAgentWorkspace: ObservableObject {
         case .agents:
             root = home.appendingPathComponent(".agents/skills", isDirectory: true)
         }
-        return root.appendingPathComponent("zisla-managed", isDirectory: true)
+        return root
     }
 
     @discardableResult
@@ -407,12 +416,14 @@ public final class AIAgentWorkspace: ObservableObject {
                     try skillSynchronizationService.synchronize(
                         managedDirectory: managedSkillsDirectory,
                         to: directory,
-                        mode: mode
+                        mode: mode,
+                        backupRoot: managedSkillBackupDirectory(for: destination)
                     )
                 } else {
                     try skillSynchronizationService.disable(
                         at: directory,
-                        managedDirectory: managedSkillsDirectory
+                        managedDirectory: managedSkillsDirectory,
+                        backupRoot: managedSkillBackupDirectory(for: destination)
                     )
                 }
             }
@@ -775,6 +786,7 @@ public final class AIAgentWorkspace: ObservableObject {
             case .qwen: return .qwen
             case .qoder: return .coder
             case .copilot: return .copilot
+            case .glm: return .gpt
             }
         }
         return .gpt

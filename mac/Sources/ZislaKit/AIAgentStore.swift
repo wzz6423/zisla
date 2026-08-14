@@ -140,19 +140,29 @@ public final class AIAgentStore: ObservableObject {
 
     @discardableResult
     public func importProviders(_ providers: [AIAgentImportedProvider]) throws -> Int {
-        var importedCount = 0
+        var synchronizedCount = 0
         var nextState = state
-        var references: [String] = []
+        var newReferences: [String] = []
+        var updatedSecrets: [(reference: String, previous: String?)] = []
         do {
             for provider in providers {
                 let normalizedURL = provider.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
                 guard !provider.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                       !normalizedURL.isEmpty,
-                      !provider.apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                      !nextState.channels.contains(where: { channel in
-                          channel.name.caseInsensitiveCompare(provider.name) == .orderedSame
-                              && channel.endpointGroups.flatMap(\.baseURLs).contains { $0.trimmingCharacters(in: CharacterSet(charactersIn: "/")).caseInsensitiveCompare(normalizedURL) == .orderedSame }
-                      }) else { continue }
+                      !provider.apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                if let existingChannel = nextState.channels.first(where: { channel in
+                    channel.name.caseInsensitiveCompare(provider.name) == .orderedSame
+                        && channel.endpointGroups.flatMap(\.baseURLs).contains { $0.trimmingCharacters(in: CharacterSet(charactersIn: "/")).caseInsensitiveCompare(normalizedURL) == .orderedSame }
+                }) {
+                    guard let account = existingChannel.endpointGroups
+                        .flatMap(\.accountIDs)
+                        .compactMap({ accountID in nextState.accounts.first { $0.id == accountID } })
+                        .first else { continue }
+                    updatedSecrets.append((account.secretReference, try secretStore.secret(for: account.secretReference)))
+                    try secretStore.setSecret(provider.apiKey, for: account.secretReference)
+                    synchronizedCount += 1
+                    continue
+                }
                 let account = AgentAccount(name: provider.name, provider: provider.name, balanceProbe: AgentBalanceProbe())
                 let channel = AgentChannel(
                     name: provider.name,
@@ -160,16 +170,23 @@ public final class AIAgentStore: ObservableObject {
                     defaultModel: provider.defaultModel,
                     endpointGroups: [AgentEndpointGroup(name: "默认端点", baseURLs: [provider.baseURL], accountIDs: [account.id])]
                 )
+                newReferences.append(account.secretReference)
                 try secretStore.setSecret(provider.apiKey, for: account.secretReference)
-                references.append(account.secretReference)
                 nextState.accounts.append(account)
                 nextState.channels.append(channel)
-                importedCount += 1
+                synchronizedCount += 1
             }
             state = nextState
-            return importedCount
+            return synchronizedCount
         } catch {
-            for reference in references { try? secretStore.removeSecret(for: reference) }
+            for reference in newReferences { try? secretStore.removeSecret(for: reference) }
+            for update in updatedSecrets.reversed() {
+                if let previous = update.previous {
+                    try? secretStore.setSecret(previous, for: update.reference)
+                } else {
+                    try? secretStore.removeSecret(for: update.reference)
+                }
+            }
             throw error
         }
     }

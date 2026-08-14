@@ -20,6 +20,7 @@
 
 /* Settings */
 "设置" = "Impostazioni";
+"通用" = "Generale";
 "工作流" = "Workflow";
 "信息" = "Info";
 "模型" = "Modelli";
@@ -28,6 +29,12 @@
 "下载" = "Download";
 "天气" = "Meteo";
 "更新" = "Aggiornamenti";
+
+/* Settings - General */
+"调整语言、外观、启动与展开方式。" = "Regola lingua, aspetto, avvio e metodo di espansione.";
+
+/* Settings - Privacy */
+"管理剪贴板访问与本机数据。" = "Gestisci accesso agli appunti e dati locali.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Gestisci i moduli workflow in Dynamic Island.";
@@ -163,9 +170,9 @@
 "鼠标进入屏幕顶部感应区时显示" = "Mostra quando il mouse entra nella zona di rilevamento superiore dello schermo";
 "隐私" = "Privacy";
 "记录剪贴板历史" = "Registra Cronologia Appunti";
-"仅本机保存文本和图片，默认关闭" = "Salva solo testo e immagini localmente, disattivato per impostazione predefinita";
+"仅本机保存文本和图片" = "Salva solo testo e immagini localmente";
 "检测剪贴板链接" = "Rileva Link negli Appunti";
-"发现可下载链接时提示，默认关闭" = "Richiedi quando vengono rilevati link scaricabili, disattivato per impostazione predefinita";
+"发现可下载链接时提示" = "Avvisa quando vengono rilevati link scaricabili";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Gestisci directory di download, notifiche di download e componenti richiesti.";

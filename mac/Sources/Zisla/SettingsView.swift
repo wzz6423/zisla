@@ -31,8 +31,8 @@ struct SettingsView: View {
             detail
         }
         .frame(
-            width: input.selection.prefersWideLayout ? 980 : 548,
-            height: input.selection.prefersWideLayout ? 640 : 510
+            width: input.selection.prefersWideLayout ? 980 : 640,
+            height: input.selection.prefersWideLayout ? 640 : 560
         )
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
@@ -80,7 +80,7 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .padding(.top, 1)
 
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 ForEach(SettingsSection.allCases) { section in
                     Button {
                         selectSettingsSection(section)
@@ -95,7 +95,7 @@ struct SettingsView: View {
                             Spacer(minLength: 0)
                         }
                         .padding(.horizontal, 8)
-                        .frame(height: 34)
+                        .frame(height: 32)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
@@ -181,6 +181,8 @@ struct SettingsView: View {
     @ViewBuilder
     private var selectedContent: some View {
         switch input.selection {
+        case .general:
+            generalContent
         case .workflow:
             workflowContent
         case .info:
@@ -193,8 +195,8 @@ struct SettingsView: View {
             modelsContent
         case .pet:
             petContent
-        case .interaction:
-            interactionContent
+        case .privacy:
+            privacyContent
         case .download:
             downloadContent
         case .weather:
@@ -235,7 +237,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 132)
+                    .frame(width: 132, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
                 rowDivider
@@ -276,7 +278,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 132)
+                    .frame(width: 132, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
                 rowDivider
@@ -475,7 +477,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 96)
+                    .frame(maxWidth: 96, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
                 rowDivider
@@ -498,7 +500,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 96)
+                    .frame(maxWidth: 96, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
             }
@@ -619,14 +621,15 @@ struct SettingsView: View {
 
     private var voiceContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Picker("", selection: $input.voicePage) {
-                ForEach(VoiceSettingsPage.allCases) { page in
-                    Text(page.title).tag(page)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(width: 240)
+            IslandOutlinedPicker(
+                selection: $input.voicePage,
+                options: Array(VoiceSettingsPage.allCases),
+                title: { $0.title },
+                selectionID: "voice-settings-page-selection",
+                fontSize: 11,
+                width: 240,
+                height: 28
+            )
             .frame(maxWidth: .infinity)
 
             switch input.voicePage {
@@ -834,7 +837,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(maxWidth: 110)
+                        .frame(maxWidth: 110, alignment: .trailing)
                     }
                     rowDivider
                     settingRow(
@@ -916,7 +919,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 220)
+                    .frame(maxWidth: 220, alignment: .trailing)
                 }
                 if let configuration = model.selectedVoiceModelConfiguration {
                     rowDivider
@@ -1156,7 +1159,7 @@ struct SettingsView: View {
         )
     }
 
-    private var interactionContent: some View {
+    private var generalContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("外观与语言") {
                 settingRow(
@@ -1178,7 +1181,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 180)
+                    .frame(width: 180, alignment: .trailing)
                 }
                 rowDivider
                 settingRow(
@@ -1283,18 +1286,22 @@ struct SettingsView: View {
                     keyPath: \.hoverActivationEnabled
                 )
             }
+        }
+    }
 
-            settingsGroup("隐私") {
+    private var privacyContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            settingsGroup("剪贴板") {
                 featureToggle(
                     "记录剪贴板历史",
-                    detail: "仅本机保存文本和图片，默认关闭",
+                    detail: "仅本机保存文本和图片",
                     symbol: "clipboard",
                     keyPath: \.clipboardHistoryEnabled
                 )
                 rowDivider
                 featureToggle(
                     "检测剪贴板链接",
-                    detail: "发现可下载链接时提示，默认关闭",
+                    detail: "发现可下载链接时提示",
                     symbol: "clipboard.fill",
                     keyPath: \.clipboardDetectionEnabled
                 )
@@ -1415,7 +1422,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("一键管理") {
                 HStack(spacing: 8) {
-                    Text("\(recommendedTools.count) 个精选工具")
+                    Text("\(recommendedTools.count) 个推荐工具")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
@@ -1445,41 +1452,36 @@ struct SettingsView: View {
                 .frame(minHeight: 48)
             }
 
-            recommendedToolGroup("终端效率", tools: terminalRecommendationTools)
-            recommendedToolGroup("网络与数据", tools: networkRecommendationTools)
-            recommendedToolGroup("开发工具链", tools: developmentRecommendationTools)
-            recommendedToolGroup("实用组件", tools: utilityRecommendationTools)
-            recommendedToolGroup("桌面应用", tools: desktopRecommendationTools)
+            recommendedToolGroup(
+                ManagedToolRecommendationGroup.terminalEfficiency.title,
+                tools: recommendedTools(in: .terminalEfficiency)
+            )
+            recommendedToolGroup(
+                ManagedToolRecommendationGroup.networkAndData.title,
+                tools: recommendedTools(in: .networkAndData)
+            )
+            recommendedToolGroup(
+                ManagedToolRecommendationGroup.developmentToolchain.title,
+                tools: recommendedTools(in: .developmentToolchain)
+            )
+            recommendedToolGroup(
+                ManagedToolRecommendationGroup.utility.title,
+                tools: recommendedTools(in: .utility)
+            )
+            recommendedToolGroup(
+                ManagedToolRecommendationGroup.desktopApplication.title,
+                tools: recommendedTools(in: .desktopApplication)
+            )
         }
         .task { await refreshRecommendedTools() }
     }
 
     private var recommendedTools: [ManagedTool] {
-        terminalRecommendationTools
-            + networkRecommendationTools
-            + developmentRecommendationTools
-            + utilityRecommendationTools
-            + desktopRecommendationTools
+        ManagedTool.allCases
     }
 
-    private var terminalRecommendationTools: [ManagedTool] {
-        [.fzf, .ripgrep, .lazygit, .neovim, .yazi, .starship, .tldr, .jq, .tree]
-    }
-
-    private var networkRecommendationTools: [ManagedTool] {
-        []
-    }
-
-    private var developmentRecommendationTools: [ManagedTool] {
-        []
-    }
-
-    private var utilityRecommendationTools: [ManagedTool] {
-        []
-    }
-
-    private var desktopRecommendationTools: [ManagedTool] {
-        [.ytDLP, .libreOffice, .kaku, .kero, .markdownPreview, .keka]
+    private func recommendedTools(in group: ManagedToolRecommendationGroup) -> [ManagedTool] {
+        recommendedTools.filter { $0.recommendationGroup == group }
     }
 
     private var missingRecommendedTools: [ManagedTool] {
@@ -1565,6 +1567,14 @@ struct SettingsView: View {
         case .markdownPreview: "doc.text.magnifyingglass"
         case .keka: "archivebox.fill"
         case .kero: "terminal"
+        default:
+            switch tool.recommendationGroup {
+            case .terminalEfficiency: "terminal"
+            case .networkAndData: "network"
+            case .developmentToolchain: "hammer"
+            case .utility: "wrench.and.screwdriver"
+            case .desktopApplication: "macwindow"
+            }
         }
     }
 
@@ -1904,7 +1914,7 @@ struct SettingsView: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .controlSize(.small)
-            .frame(maxWidth: 108)
+            .frame(maxWidth: 108, alignment: .trailing)
         }
         rowDivider
         mailAppAccountSettings
@@ -2000,7 +2010,7 @@ struct SettingsView: View {
         symbol: String,
         title: String,
         detail: String,
-        detailLineLimit: Int? = 1,
+        detailLineLimit: Int? = nil,
         @ViewBuilder trailing: () -> Trailing
     ) -> some View {
         HStack(spacing: 10) {
@@ -2018,7 +2028,6 @@ struct SettingsView: View {
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .lineLimit(detailLineLimit)
-                        .truncationMode(.middle)
                 }
             }
             .layoutPriority(1)
@@ -2465,18 +2474,19 @@ private final class VoiceInputHotkeyRecorderButton: NSButton {
     }
 }
 
-private enum SettingsSection: String, CaseIterable, Identifiable {
+enum SettingsSection: String, CaseIterable, Identifiable {
+    case general
     case workflow
     case info
     case ai
     case voice
     case models
     case pet
-    case interaction
+    case privacy
     case download
     case weather
-    case updates
     case recommendations
+    case updates
 
     var id: Self { self }
 
@@ -2487,13 +2497,14 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .general: "通用"
         case .workflow: "工作流"
         case .info: "信息"
         case .ai: "AI"
         case .voice: "语音"
         case .models: "模型"
         case .pet: "桌面宠物"
-        case .interaction: "交互"
+        case .privacy: "隐私"
         case .download: "下载"
         case .weather: "天气"
         case .updates: "更新"
@@ -2503,13 +2514,14 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
+        case .general: "gearshape.fill"
         case .workflow: "square.grid.2x2.fill"
         case .info: "info.circle.fill"
         case .ai: "sparkles"
         case .voice: "mic.fill"
         case .models: "cpu"
         case .pet: "pawprint.fill"
-        case .interaction: "cursorarrow.motionlines"
+        case .privacy: "hand.raised.fill"
         case .download: "arrow.down.circle.fill"
         case .weather: "cloud.sun.fill"
         case .updates: "arrow.up.circle"
@@ -2519,13 +2531,14 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
+        case .general: "调整语言、外观、启动与展开方式。"
         case .workflow: "管理灵动岛中的工作流模块。"
         case .info: "配置日历、邮件、锁屏与通知显示。"
         case .ai: "AI 进度，以及连接、自动化、CLI 与 Skills 等 Agent 行为。"
         case .voice: "管理语音输入，并查看保存在本机的原始录音、识别文本与统计。"
         case .models: "配置本地模型、远端模型与凭据，并选择语音整理使用的模型。"
         case .pet: "设置灵动岛内部的宠物形象。"
-        case .interaction: "调整外观、展开方式与隐私行为。"
+        case .privacy: "管理剪贴板访问与本机数据。"
         case .download: "管理下载目录、下载通知与所需组件。"
         case .weather: "管理天气显示、地点和刷新。"
         case .updates: "管理版本检查与自动更新。"
@@ -2536,7 +2549,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
 @MainActor
 private final class SettingsInput: ObservableObject {
-    @Published var selection: SettingsSection = .workflow
+    @Published var selection: SettingsSection = .general
     @Published var voicePage: VoiceSettingsPage = .settings
     @Published var weatherQuery = ""
 }

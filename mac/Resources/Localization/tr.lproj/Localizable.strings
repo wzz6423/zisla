@@ -20,6 +20,7 @@
 
 /* Settings */
 "设置" = "Ayarlar";
+"通用" = "Genel";
 "工作流" = "İş Akışı";
 "信息" = "Bilgi";
 "模型" = "Modeller";
@@ -28,6 +29,12 @@
 "下载" = "İndir";
 "天气" = "Hava Durumu";
 "更新" = "Güncellemeler";
+
+/* Settings - General */
+"调整语言、外观、启动与展开方式。" = "Dil, görünüm, başlangıç ve genişletme yöntemini ayarlayın.";
+
+/* Settings - Privacy */
+"管理剪贴板访问与本机数据。" = "Pano erişimini ve yerel verileri yönetin.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Dynamic Island'daki iş akışı modüllerini yönetin.";
@@ -163,9 +170,9 @@
 "鼠标进入屏幕顶部感应区时显示" = "Fare ekranın üst algılama bölgesine girdiğinde göster";
 "隐私" = "Gizlilik";
 "记录剪贴板历史" = "Pano Geçmişini Kaydet";
-"仅本机保存文本和图片，默认关闭" = "Sadece yerel olarak metin ve resimleri kaydet, varsayılan olarak kapalı";
+"仅本机保存文本和图片" = "Sadece yerel olarak metin ve resimleri kaydet";
 "检测剪贴板链接" = "Pano Bağlantılarını Algıla";
-"发现可下载链接时提示，默认关闭" = "İndirilebilir bağlantılar algılandığında bildir, varsayılan olarak kapalı";
+"发现可下载链接时提示" = "İndirilebilir bağlantılar algılandığında bildir";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "İndirme dizinini, indirme bildirimlerini ve gerekli bileşenleri yönetin.";

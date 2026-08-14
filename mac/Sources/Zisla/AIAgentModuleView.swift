@@ -1114,42 +1114,58 @@ struct AIAgentModuleView: View {
     private func providerCard(_ channel: AgentChannel) -> some View {
         let account = primaryAccount(for: channel)
         let primaryGroup = channel.endpointGroups.first
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 7) {
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
                 Toggle("", isOn: channelEnabledBinding(channel.id))
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.mini)
+                    .accessibilityLabel("启用 Provider")
                 TextField("Provider 名称", text: channelNameBinding(channel.id))
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 160)
+                    .frame(width: 220)
+                Spacer()
+                Button {
+                    Task { await agent.refreshModels(for: channel.id) }
+                } label: {
+                    Image(systemName: "arrow.down.to.line")
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("获取可用模型")
+                .help("获取可用模型")
+                Button {
+                    agent.store.removeChannel(id: channel.id)
+                } label: {
+                    Image(systemName: "trash")
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("删除 Provider")
+                .help("删除 Provider")
+            }
+
+            Divider()
+
+            HStack(spacing: 8) {
+                providerFieldLabel("协议")
                 Picker("", selection: channelProtocolBinding(channel.id)) {
                     ForEach(AgentChannelProtocol.allCases, id: \.self) { proto in
                         Text(proto.displayName).tag(proto)
                     }
                 }
                 .labelsHidden()
-                .frame(width: 150)
+                .frame(width: 180)
+                providerFieldLabel("默认模型", width: 70)
                 channelModelControl(channel)
                 Spacer()
-                Button {
-                    Task { await agent.refreshModels(for: channel.id) }
-                } label: { Image(systemName: "arrow.down.to.line") }
-                    .buttonStyle(.borderless)
-                    .help("获取可用模型")
-                Button {
-                    agent.store.removeChannel(id: channel.id)
-                } label: { Image(systemName: "trash") }
-                    .buttonStyle(.borderless)
-                    .help("删除 Provider")
             }
 
             if let primaryGroup {
-                HStack(spacing: 7) {
-                    Text("端点")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 60, alignment: .leading)
+                HStack(spacing: 8) {
+                    providerFieldLabel("端点")
                     TextField("API Base URL", text: endpointGroupURLsBinding(channel.id, primaryGroup.id))
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 10, design: .monospaced))
@@ -1157,11 +1173,8 @@ struct AIAgentModuleView: View {
             }
 
             if let account {
-                HStack(spacing: 7) {
-                    Text("凭据")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 60, alignment: .leading)
+                HStack(spacing: 8) {
+                    providerFieldLabel("凭据")
                     Picker("", selection: credentialKindBinding(for: channel.id)) {
                         ForEach(AgentAccountCredentialKind.allCases, id: \.self) { kind in
                             Text(kind.displayName).tag(kind)
@@ -1169,22 +1182,22 @@ struct AIAgentModuleView: View {
                     }
                     .labelsHidden()
                     .frame(width: 130)
+                    providerFieldLabel("余额查询")
                     Picker("", selection: accountProbeBinding(account.id)) {
                         ForEach(AgentBalanceProbeKind.allCases, id: \.self) { kind in
                             Text(kind.displayName).tag(kind)
                         }
                     }
                     .labelsHidden()
-                    .frame(width: 140)
+                    .frame(width: 160)
                     balanceText(account)
+                    Spacer()
                 }
                 if account.credentialKind == .apiKey {
-                    HStack(spacing: 7) {
-                        Text("")
-                            .frame(width: 60)
+                    HStack(spacing: 8) {
+                        providerFieldLabel("API Key")
                         SecureField("API Key", text: accountSecretBinding(account.id))
                             .textFieldStyle(.roundedBorder)
-                            .frame(maxWidth: 520)
                     }
                 } else if account.credentialKind == .cliProfile {
                     cliProfileSection(account)
@@ -1213,6 +1226,17 @@ struct AIAgentModuleView: View {
         .padding(9)
         .background(Color.primary.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        }
+    }
+
+    private func providerFieldLabel(_ title: String, width: CGFloat = 64) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: width, alignment: .leading)
     }
 
     private func providerConfigurationAction(_ channel: AgentChannel) -> some View {
@@ -2888,7 +2912,15 @@ struct AIAgentModuleView: View {
     }
 
     private func accountSecretBinding(_ id: UUID) -> Binding<String> {
-        Binding(get: { "" }, set: { value in if !value.isEmpty { try? agent.store.replaceSecret(value, for: id) } })
+        Binding(
+            get: {
+                guard let account = agent.store.account(id: id) else { return "" }
+                return (try? agent.store.secret(for: account)) ?? ""
+            },
+            set: { value in
+                if !value.isEmpty { try? agent.store.replaceSecret(value, for: id) }
+            }
+        )
     }
 
     private func messageConnectionNameBinding(_ id: UUID) -> Binding<String> {
@@ -3134,8 +3166,8 @@ struct AIAgentModuleView: View {
             }
             let count = try agent.store.importProviders(providers)
             providerImportMessage = count == 0
-                ? "没有新增 Provider，可能已存在相同名称和地址。"
-                : "已导入 \(count) 个 Provider。"
+                ? "没有可同步的 Provider。"
+                : "已同步 \(count) 个 Provider（包含 API Key）。"
         } catch {
             providerImportMessage = error.localizedDescription
         }

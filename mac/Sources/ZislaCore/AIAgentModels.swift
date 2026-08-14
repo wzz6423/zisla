@@ -122,7 +122,7 @@ public struct AgentCLIProfile: Codable, Equatable, Sendable {
             ("\(home)/.grok/config.toml", "\(home)/.grok/auth.json")
         case .opencode:
             ("\(home)/.config/opencode/opencode.json", "\(home)/.local/share/opencode/auth.json")
-        case .kimi, .qwen, .qoder, .copilot:
+        case .kimi, .qwen, .qoder, .copilot, .glm:
             ("", "")
         }
     }
@@ -553,6 +553,7 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
     case qwen
     case qoder
     case copilot
+    case glm
 
     public static let detectableCases = allCases
     public static let relayCases: [Self] = [.claude, .codex, .gemini, .grok, .opencode]
@@ -565,6 +566,7 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
         case .qwen: "Qwen Code"
         case .qoder: "Qoder CLI"
         case .copilot: "Copilot"
+        case .glm: "GLM Coding"
         default: rawValue.capitalized
         }
     }
@@ -572,6 +574,7 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
     public var executableName: String {
         switch self {
         case .qoder: "qodercli"
+        case .glm: "chelper"
         default: rawValue
         }
     }
@@ -585,6 +588,7 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
         case .qwen: "@qwen-code/qwen-code"
         case .qoder: "@qoder-ai/qodercli"
         case .copilot: "@github/copilot"
+        case .glm: "@z_ai/coding-helper"
         case .grok, .kimi: nil
         }
     }

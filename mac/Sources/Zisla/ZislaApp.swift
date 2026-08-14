@@ -16,7 +16,17 @@ enum ZislaMain {
 }
 
 @MainActor
-private final class SettingsWindow: NSWindow {
+final class SettingsWindow: NSWindow {
+    override func becomeKey() {
+        level = WindowPlacement.modalWindowLevel
+        super.becomeKey()
+    }
+
+    override func resignKey() {
+        super.resignKey()
+        level = .normal
+    }
+
     override func performClose(_ sender: Any?) {
         // Settings window has no close workflow; keep the instance alive so it can be restored from the menu bar.
     }
@@ -808,7 +818,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if settingsWindowController == nil {
             let rootView = SettingsView(model: AppModel.shared)
             let window = SettingsWindow(
-                contentRect: CGRect(x: 0, y: 0, width: 548, height: 560),
+                contentRect: CGRect(x: 0, y: 0, width: 640, height: 560),
                 styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false

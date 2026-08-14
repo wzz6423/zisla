@@ -50,7 +50,8 @@ struct ManagedToolServiceTests {
 
     @Test
     func kakuUsesTheHomebrewCaskAndExpectedExecutablePaths() {
-        #expect(ManagedTool.kaku.installationSource == .homebrewCask(name: "kakuku"))
+        #expect(ManagedTool.kaku.installationSource == .homebrewCask(name: "tw93/tap/kakuku"))
+        #expect(ManagedTool.kaku.requiredHomebrewTap == "tw93/tap")
         #expect(ManagedTool.kaku.executableName == "kaku")
         #expect(ManagedToolService.externalPaths(for: .kaku).contains(
             "/Applications/Kaku.app/Contents/MacOS/kaku"
@@ -98,7 +99,7 @@ struct ManagedToolServiceTests {
             (.uv, .homebrewFormula(name: "uv"), "uv"),
             (.pnpm, .homebrewFormula(name: "pnpm"), "pnpm"),
             (.tectonic, .homebrewFormula(name: "tectonic"), "tectonic"),
-            (.packer, .homebrewFormula(name: "packer"), "packer"),
+            (.packer, .homebrewFormula(name: "hashicorp/tap/packer"), "packer"),
             (.ytt, .homebrewFormula(name: "ytt"), "ytt"),
             (.kero, .homebrewCask(name: "egoist/tap/kero"), "kero"),
         ]
@@ -109,6 +110,7 @@ struct ManagedToolServiceTests {
             #expect(tool.executableName == executableName)
         }
         #expect(ManagedTool.kero.requiredHomebrewTap == "egoist/tap")
+        #expect(ManagedTool.packer.requiredHomebrewTap == "hashicorp/tap")
     }
 
     @Test

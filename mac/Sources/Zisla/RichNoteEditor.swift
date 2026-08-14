@@ -259,8 +259,12 @@ struct RichNoteEditor: NSViewRepresentable {
             if (!editor.isContentEditable || !selection?.rangeCount || !selection.isCollapsed) return hideCaret();
             const range = selection.getRangeAt(0);
             if (range.startContainer === editor || !editor.contains(range.startContainer)) return hideCaret();
-            const rect = [...range.getClientRects()].find(candidate => candidate.height > 0);
-            if (!rect) return hideCaret();
+            let rect = [...range.getClientRects()].find(candidate => candidate.height > 0);
+            if (!rect) {
+              const boundingRect = range.getBoundingClientRect();
+              if (boundingRect.width === 0 && boundingRect.height === 0) return hideCaret();
+              rect = boundingRect;
+            }
             const height = Math.min(Math.max(rect.height * 0.72, 14), 20);
             caret.style.height = `${height}px`;
             caret.style.transform = `translate3d(${rect.left}px, ${rect.top + (rect.height - height) / 2 - 4}px, 0)`;

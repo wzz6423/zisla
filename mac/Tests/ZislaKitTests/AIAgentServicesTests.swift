@@ -7,6 +7,80 @@ import Testing
 @MainActor
 struct AIAgentServicesTests {
     @Test
+    func skillScanDeduplicatesLinkedRootsUsingManagedPaths() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-skill-scan-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let managed = root.appendingPathComponent("managed", isDirectory: true)
+        let linkedRoot = root.appendingPathComponent("codex/skills", isDirectory: true)
+        let skillFile = managed.appendingPathComponent("review/SKILL.md", isDirectory: false)
+        try FileManager.default.createDirectory(
+            at: skillFile.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("review".utf8).write(to: skillFile)
+        try FileManager.default.createDirectory(
+            at: linkedRoot.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createSymbolicLink(at: linkedRoot, withDestinationURL: managed)
+
+        let skills = AIAgentSkillService().scan(roots: [linkedRoot, managed])
+
+        #expect(skills.count == 1)
+        #expect(skills.first?.path.hasSuffix("/managed/review") == true)
+    }
+
+    @Test
+    func skillScanKeepsOneCaseInsensitiveNameUsingRootPriority() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-skill-name-dedup-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let managed = root.appendingPathComponent("managed", isDirectory: true)
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let claude = root.appendingPathComponent("claude", isDirectory: true)
+        let skillFiles = [
+            managed.appendingPathComponent("review/SKILL.md"),
+            codex.appendingPathComponent("Review/SKILL.md"),
+            claude.appendingPathComponent("review/SKILL.md"),
+            claude.appendingPathComponent("unique/SKILL.md"),
+        ]
+        for skillFile in skillFiles {
+            try FileManager.default.createDirectory(
+                at: skillFile.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try Data(skillFile.path.utf8).write(to: skillFile)
+        }
+
+        let skills = AIAgentSkillService().scan(roots: [managed, codex, claude])
+
+        #expect(skills.count == 2)
+        let review = try #require(skills.first { $0.name.lowercased() == "review" })
+        #expect(review.path.hasSuffix("/managed/review"))
+        #expect(skills.contains { $0.name == "unique" })
+    }
+
+    @Test
+    func managedSkillDestinationsUseEntireSkillsRoots() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-managed-skill-paths-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let workspace = AIAgentWorkspace(
+            store: AIAgentStore(storageURL: directory.appendingPathComponent("state.json"))
+        )
+        let home = FileManager.default.homeDirectoryForCurrentUser
+
+        #expect(workspace.managedSkillDestinationDirectory(for: .codex) == home.appendingPathComponent(".codex/skills", isDirectory: true))
+        #expect(workspace.managedSkillDestinationDirectory(for: .claude) == home.appendingPathComponent(".claude/skills", isDirectory: true))
+        #expect(workspace.managedSkillDestinationDirectory(for: .agents) == home.appendingPathComponent(".agents/skills", isDirectory: true))
+        #expect(workspace.managedSkillBackupRootDirectory == home.appendingPathComponent(".zisla/skill-backups", isDirectory: true))
+        #expect(workspace.managedSkillBackupDirectory(for: .codex) == home.appendingPathComponent(".zisla/skill-backups/codex", isDirectory: true))
+        #expect(workspace.managedSkillBackupDirectory(for: .claude) == home.appendingPathComponent(".zisla/skill-backups/claude", isDirectory: true))
+        #expect(workspace.managedSkillBackupDirectory(for: .agents) == home.appendingPathComponent(".zisla/skill-backups/agents", isDirectory: true))
+    }
+
+    @Test
     func skillPackageInstallationDetectsGlobalManagersAndScopedPackages() throws {
         let npm = try #require(AgentSkillPackageInstallation.detect(
             at: URL(fileURLWithPath: "/Users/test/.nvm/versions/node/v24/lib/node_modules/@scope/tool/skills/review")
@@ -864,6 +938,57 @@ struct AIAgentServicesTests {
                 "@qwen-code/qwen-code", "@qoder-ai/qodercli", "@github/copilot",
             ]
         )])
+    }
+
+    @Test
+    func glmCLIDiscoveryReadsTheOfficialPackageVersion() async throws {
+        let glm = try #require(AgentCLIKind(rawValue: "glm"))
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-glm-cli-discovery-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let packageRoot = root.appendingPathComponent(".npm-global/lib/node_modules/@z_ai/coding-helper")
+        let target = packageRoot.appendingPathComponent("dist/cli.js")
+        let launcher = root.appendingPathComponent(".npm-global/bin/chelper")
+        try writeExecutable(at: target, contents: "#!/bin/sh\nexit 1\n")
+        try Data(#"{"name":"@z_ai/coding-helper","version":"0.0.7"}"#.utf8)
+            .write(to: packageRoot.appendingPathComponent("package.json"))
+        try FileManager.default.createDirectory(at: launcher.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+
+        let status = await AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+            .status(for: glm)
+
+        #expect(status.executablePath == target.path)
+        #expect(status.version == "0.0.7")
+    }
+
+    @Test
+    func glmCLIUsesNPMForInstallUpdateAndUninstall() throws {
+        let glm = try #require(AgentCLIKind(rawValue: "glm"))
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-glm-cli-management-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let npm = root.appendingPathComponent(".npm-global/bin/npm")
+        let target = root.appendingPathComponent(".npm-global/lib/node_modules/@z_ai/coding-helper/dist/cli.js")
+        let launcher = root.appendingPathComponent(".npm-global/bin/chelper")
+        try writeExecutable(at: npm)
+        try writeExecutable(at: target)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(service.installationCommands(for: [glm], update: false) == [
+            AIAgentCLICommand(executableURL: npm, arguments: ["install", "--global", "@z_ai/coding-helper"]),
+        ])
+        #expect(service.installationCommands(for: [glm], update: true) == [
+            AIAgentCLICommand(
+                executableURL: npm,
+                arguments: ["install", "--global", "@z_ai/coding-helper@latest"],
+                timeout: 600
+            ),
+        ])
+        #expect(service.uninstallationCommands(for: [glm]) == [
+            AIAgentCLICommand(executableURL: npm, arguments: ["uninstall", "--global", "@z_ai/coding-helper"]),
+        ])
     }
 
     @Test

@@ -20,6 +20,7 @@
 
 /* Settings */
 "设置" = "Instellingen";
+"通用" = "Algemeen";
 "工作流" = "Workflow";
 "信息" = "Info";
 "模型" = "Modellen";
@@ -28,6 +29,12 @@
 "下载" = "Downloads";
 "天气" = "Weer";
 "更新" = "Updates";
+
+/* Settings - General */
+"调整语言、外观、启动与展开方式。" = "Pas taal, uiterlijk, opstarten en uitbreidingsmethode aan.";
+
+/* Settings - Privacy */
+"管理剪贴板访问与本机数据。" = "Beheer klembordbeheer en lokale gegevens.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Beheer workflowmodules in Dynamic Island.";
@@ -163,9 +170,9 @@
 "鼠标进入屏幕顶部感应区时显示" = "Toon wanneer muis de bovenste detectiezone van het scherm binnenkomt";
 "隐私" = "Privacy";
 "记录剪贴板历史" = "Registreer klembordgeschiedenis";
-"仅本机保存文本和图片，默认关闭" = "Bewaar alleen tekst en afbeeldingen lokaal, standaard uitgeschakeld";
+"仅本机保存文本和图片" = "Bewaar alleen tekst en afbeeldingen lokaal";
 "检测剪贴板链接" = "Detecteer klembordlinks";
-"发现可下载链接时提示，默认关闭" = "Waarschuw wanneer downloadbare links worden gedetecteerd, standaard uitgeschakeld";
+"发现可下载链接时提示" = "Waarschuw wanneer downloadbare links worden gedetecteerd";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Beheer downloadmap, downloadmeldingen en vereiste componenten.";

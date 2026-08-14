@@ -20,6 +20,7 @@
 
 /* Settings */
 "设置" = "Pengaturan";
+"通用" = "Umum";
 "工作流" = "Alur Kerja";
 "信息" = "Info";
 "模型" = "Model";
@@ -28,6 +29,12 @@
 "下载" = "Unduh";
 "天气" = "Cuaca";
 "更新" = "Pembaruan";
+
+/* Settings - General */
+"调整语言、外观、启动与展开方式。" = "Sesuaikan bahasa, tampilan, startup, dan metode ekspansi.";
+
+/* Settings - Privacy */
+"管理剪贴板访问与本机数据。" = "Kelola akses clipboard dan data lokal.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Kelola modul alur kerja di Dynamic Island.";
@@ -163,9 +170,9 @@
 "鼠标进入屏幕顶部感应区时显示" = "Tampilkan saat mouse memasuki zona deteksi atas layar";
 "隐私" = "Privasi";
 "记录剪贴板历史" = "Rekam Riwayat Clipboard";
-"仅本机保存文本和图片，默认关闭" = "Hanya simpan teks dan gambar secara lokal, nonaktif secara default";
+"仅本机保存文本和图片" = "Hanya simpan teks dan gambar secara lokal";
 "检测剪贴板链接" = "Deteksi Tautan Clipboard";
-"发现可下载链接时提示，默认关闭" = "Beri tahu saat tautan yang dapat diunduh terdeteksi, nonaktif secara default";
+"发现可下载链接时提示" = "Beri tahu saat tautan yang dapat diunduh terdeteksi";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Kelola direktori unduhan, notifikasi unduhan, dan komponen yang diperlukan.";

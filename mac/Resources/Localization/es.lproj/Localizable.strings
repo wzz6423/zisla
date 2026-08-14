@@ -20,6 +20,7 @@
 
 /* Settings */
 "设置" = "Ajustes";
+"通用" = "General";
 "工作流" = "Flujo de Trabajo";
 "信息" = "Información";
 "模型" = "Modelos";
@@ -28,6 +29,12 @@
 "下载" = "Descargas";
 "天气" = "Clima";
 "更新" = "Actualizaciones";
+
+/* Settings - General */
+"调整语言、外观、启动与展开方式。" = "Ajustar idioma, apariencia, inicio y método de expansión.";
+
+/* Settings - Privacy */
+"管理剪贴板访问与本机数据。" = "Gestionar acceso al portapapeles y datos locales.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Administrar módulos de flujo de trabajo en Dynamic Island.";
@@ -163,9 +170,9 @@
 "鼠标进入屏幕顶部感应区时显示" = "Mostrar cuando el mouse entra en la zona de detección superior de la pantalla";
 "隐私" = "Privacidad";
 "记录剪贴板历史" = "Registrar Historial del Portapapeles";
-"仅本机保存文本和图片，默认关闭" = "Solo guardar texto e imágenes localmente, desactivado por defecto";
+"仅本机保存文本和图片" = "Solo guardar texto e imágenes localmente";
 "检测剪贴板链接" = "Detectar Enlaces del Portapapeles";
-"发现可下载链接时提示，默认关闭" = "Avisar cuando se detecten enlaces descargables, desactivado por defecto";
+"发现可下载链接时提示" = "Avisar cuando se detecten enlaces descargables";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Administrar directorio de descargas, notificaciones de descarga y componentes requeridos.";

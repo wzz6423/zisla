@@ -20,6 +20,7 @@
 
 /* Settings */
 "设置" = "Settings";
+"通用" = "General";
 "工作流" = "Workflow";
 "信息" = "Info";
 "模型" = "Models";
@@ -28,6 +29,12 @@
 "下载" = "Download";
 "天气" = "Weather";
 "更新" = "Updates";
+
+/* Settings - General */
+"调整语言、外观、启动与展开方式。" = "Adjust language, appearance, startup, and expansion method.";
+
+/* Settings - Privacy */
+"管理剪贴板访问与本机数据。" = "Manage clipboard access and local data.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Manage workflow modules in Dynamic Island.";
@@ -163,9 +170,9 @@
 "鼠标进入屏幕顶部感应区时显示" = "Show when mouse enters top screen detection zone";
 "隐私" = "Privacy";
 "记录剪贴板历史" = "Record Clipboard History";
-"仅本机保存文本和图片，默认关闭" = "Only save text and images locally, off by default";
+"仅本机保存文本和图片" = "Only save text and images locally";
 "检测剪贴板链接" = "Detect Clipboard Links";
-"发现可下载链接时提示，默认关闭" = "Prompt when downloadable links detected, off by default";
+"发现可下载链接时提示" = "Prompt when downloadable links are detected";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Manage download directory, download notifications, and required components.";

@@ -427,4 +427,17 @@ struct AIAgentModelsTests {
         #expect(AgentCLIKind.managedCases.contains(.copilot))
         #expect(AgentCLIKind.allCases.prefix(5) == [.claude, .codex, .gemini, .grok, .opencode])
     }
+
+    @Test
+    func glmCLIKindUsesOfficialPackageMetadata() throws {
+        let glm = try #require(AgentCLIKind(rawValue: "glm"))
+
+        #expect(glm.displayName == "GLM Coding")
+        #expect(glm.executableName == "chelper")
+        #expect(glm.npmPackageName == "@z_ai/coding-helper")
+        #expect(AgentCLIKind.detectableCases.contains(glm))
+        #expect(AgentCLIKind.managedCases.contains(glm))
+        #expect(!AgentCLIKind.relayCases.contains(glm))
+        #expect(!AgentCLIKind.profileCases.contains(glm))
+    }
 }

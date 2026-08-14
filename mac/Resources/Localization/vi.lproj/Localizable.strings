@@ -20,6 +20,7 @@
 
 /* Settings */
 "设置" = "Cài đặt";
+"通用" = "Chung";
 "工作流" = "Quy trình";
 "信息" = "Thông tin";
 "模型" = "Mô hình";
@@ -28,6 +29,12 @@
 "下载" = "Tải xuống";
 "天气" = "Thời tiết";
 "更新" = "Cập nhật";
+
+/* Settings - General */
+"调整语言、外观、启动与展开方式。" = "Điều chỉnh ngôn ngữ, giao diện, khởi động và phương thức mở rộng.";
+
+/* Settings - Privacy */
+"管理剪贴板访问与本机数据。" = "Quản lý quyền truy cập clipboard và dữ liệu cục bộ.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Quản lý các mô-đun quy trình trong Dynamic Island.";
@@ -163,9 +170,9 @@
 "鼠标进入屏幕顶部感应区时显示" = "Hiển thị khi chuột vào vùng phát hiện ở đỉnh màn hình";
 "隐私" = "Quyền riêng tư";
 "记录剪贴板历史" = "Ghi Lịch sử Clipboard";
-"仅本机保存文本和图片，默认关闭" = "Chỉ lưu văn bản và hình ảnh cục bộ, tắt theo mặc định";
+"仅本机保存文本和图片" = "Chỉ lưu văn bản và hình ảnh cục bộ";
 "检测剪贴板链接" = "Phát hiện Liên kết Clipboard";
-"发现可下载链接时提示，默认关闭" = "Nhắc khi phát hiện liên kết có thể tải xuống, tắt theo mặc định";
+"发现可下载链接时提示" = "Nhắc khi phát hiện liên kết có thể tải xuống";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Quản lý thư mục tải xuống, thông báo tải xuống và các thành phần cần thiết.";

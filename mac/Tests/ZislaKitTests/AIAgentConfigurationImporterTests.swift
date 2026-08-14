@@ -75,10 +75,10 @@ struct AIAgentConfigurationImporterTests {
     }
 
     @Test
-    func importedSecretsDoNotEnterAgentStateAndExistingProviderIsSkipped() throws {
+    func importedSecretsStayOutOfAgentStateAndExistingProviderKeyIsUpdated() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        let secrets = MemorySecretStore()
+        let secrets = DatabaseAIAgentSecretStore(storageURL: directory.appendingPathComponent("secrets.sqlite"))
         let stateURL = directory.appendingPathComponent("agent.json")
         let store = AIAgentStore(storageURL: stateURL, secretStore: secrets)
         let provider = AIAgentImportedProvider(
@@ -90,12 +90,17 @@ struct AIAgentConfigurationImporterTests {
         )
 
         #expect(try store.importProviders([provider]) == 1)
-        #expect(try store.importProviders([provider]) == 0)
+        var updatedProvider = provider
+        updatedProvider.apiKey = "updated-secret"
+        #expect(try store.importProviders([updatedProvider]) == 1)
         store.flushPendingChanges()
 
         let account = try #require(store.state.accounts.first)
-        #expect(try secrets.secret(for: account.secretReference) == "super-secret")
+        #expect(store.state.accounts.count == 1)
+        #expect(store.state.channels.count == 1)
+        #expect(try secrets.secret(for: account.secretReference) == "updated-secret")
         #expect(!String(decoding: try Data(contentsOf: stateURL), as: UTF8.self).contains("super-secret"))
+        #expect(!String(decoding: try Data(contentsOf: stateURL), as: UTF8.self).contains("updated-secret"))
     }
 
     private func makeDirectory() throws -> URL {
@@ -129,12 +134,4 @@ struct AIAgentConfigurationImporterTests {
             throw NSError(domain: "AIAgentConfigurationImporterTests", code: 1, userInfo: [NSLocalizedDescriptionKey: detail])
         }
     }
-}
-
-private final class MemorySecretStore: AIAgentSecretStoring, @unchecked Sendable {
-    private var values: [String: String] = [:]
-
-    func secret(for reference: String) throws -> String? { values[reference] }
-    func setSecret(_ secret: String, for reference: String) throws { values[reference] = secret }
-    func removeSecret(for reference: String) throws { values.removeValue(forKey: reference) }
 }

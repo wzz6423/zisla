@@ -461,9 +461,7 @@ private final class LiquidGlassShellView: NSGlassEffectView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard window != nil, !isCollapsed else { return }
-        if refreshGeneration == 0 {
-            refreshGeneration &+= 1
-        }
+        refreshGeneration &+= 1
         scheduleRevealRefreshes()
     }
 

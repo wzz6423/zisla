@@ -399,7 +399,7 @@ public struct AIAgentSkillService: Sendable {
         roots: [URL] = Self.defaultRoots,
         enabledPaths: Set<String> = []
     ) -> [AgentSkill] {
-        roots.flatMap { root -> [AgentSkill] in
+        let scannedSkills = roots.flatMap { root -> [AgentSkill] in
             guard let enumerator = FileManager.default.enumerator(
                 at: root,
                 includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
@@ -419,7 +419,10 @@ public struct AIAgentSkillService: Sendable {
             }
             return skills
         }
-        .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        var seenNames = Set<String>()
+        return scannedSkills
+            .filter { seenNames.insert($0.name.lowercased()).inserted }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     public static var defaultRoots: [URL] {
@@ -1283,7 +1286,7 @@ public struct AIAgentCLIService: Sendable {
             }
             args.append("-")
 
-        case .kimi, .qwen, .qoder, .copilot:
+        case .kimi, .qwen, .qoder, .copilot, .glm:
             return []
         }
 

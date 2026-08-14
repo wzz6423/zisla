@@ -1315,11 +1315,7 @@ final class AppModel: ObservableObject {
   func share(_ items: [TransferDropItem], from view: NSView? = nil) {
     guard !items.isEmpty else { return }
     let values = items.map(\.shareValue)
-    let anchor =
-      view
-      ?? NSApp.windows.first(where: {
-        $0 is IslandPanel && $0.isVisible
-      })?.contentView
+    let anchor = Self.sharingPickerAnchor(from: view)
     guard let anchor else {
       transientMessage = "无法打开系统共享菜单"
       return
@@ -1331,6 +1327,19 @@ final class AppModel: ObservableObject {
     isSharingPickerVisible = true
     previousPicker?.close()
     picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+  }
+
+  static func sharingPickerAnchor(
+    from view: NSView?,
+    at point: CGPoint = NSEvent.mouseLocation,
+    windows: [NSWindow] = NSApp.windows
+  ) -> NSView? {
+    if let view { return view }
+    let interactivePanels = windows.compactMap { $0 as? IslandPanel }.filter {
+      $0.isVisible && !$0.ignoresMouseEvents
+    }
+    return interactivePanels.first(where: { $0.frame.contains(point) })?.contentView
+      ?? interactivePanels.first?.contentView
   }
 
   func shareFromPasteboard(from view: NSView? = nil) {
