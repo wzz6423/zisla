@@ -5,6 +5,9 @@
 /Web/.playwright/
 /Web/screenshots/
 
+# Generated reports
+**/[Rr]eports/
+
 # Future Windows build outputs
 /windows/[Bb]in/
 /windows/[Oo]bj/
