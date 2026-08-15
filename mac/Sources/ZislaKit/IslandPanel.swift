@@ -1,10 +1,17 @@
 import AppKit
 
 private final class ClickBlockingContentView: NSView {
+    var onMouseDown: (() -> Void)?
+
     override func draw(_ dirtyRect: NSRect) {
         // WindowServer routes fully transparent window pixels to the window underneath.
         NSColor(white: 0, alpha: 1.0 / 255.0).setFill()
         NSBezierPath(rect: dirtyRect).fill()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        onMouseDown?()
     }
 }
 
@@ -17,6 +24,7 @@ public final class IslandPanel: NSPanel {
   }
   public var isPinned = false
   private var transitionGeneration: UInt64 = 0
+  private nonisolated(unsafe) var clickMonitor: Any?
 
     /// Window level used when the collapsed island sits above other windows (same layer as the menu bar).
     public static let onTopLevel = NSWindow.Level.statusBar
@@ -24,7 +32,7 @@ public final class IslandPanel: NSPanel {
     public static let onBottomLevel = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
 
     public override var canBecomeKey: Bool {
-        allowsKeyWindow || (allowsNativeGlassActivation && keepsNativeGlassActive)
+        allowsKeyWindow || (allowsNativeGlassActivation && keepsNativeGlassActive) || (isPinned && allowsKeyWindow)
     }
     public override var canBecomeMain: Bool { false }
 
@@ -41,9 +49,16 @@ public final class IslandPanel: NSPanel {
 
     private func restoreNativeGlassActivationIfNeeded() {
         guard allowsNativeGlassActivation, keepsNativeGlassActive, isVisible else { return }
+        // 固定时不自动抢回焦点，只在非固定状态下自动激活
         if !isPinned {
             NSApp.activate(ignoringOtherApps: true)
         }
+        makeKeyAndOrderFront(nil)
+    }
+
+    private func handleContentViewClick() {
+        // 当用户点击灵动岛内容时，主动激活应用和窗口
+        NSApp.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
     }
 
@@ -82,12 +97,28 @@ public final class IslandPanel: NSPanel {
             let blockingView = ClickBlockingContentView(
                 frame: CGRect(origin: .zero, size: frame.size)
             )
+            blockingView.onMouseDown = { [weak self] in
+                self?.handleContentViewClick()
+            }
             contentView.frame = blockingView.bounds
             contentView.autoresizingMask = [.width, .height]
             blockingView.addSubview(contentView)
             self.contentView = blockingView
         } else {
             self.contentView = contentView
+        }
+
+        // 监听窗口内的鼠标点击事件
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            guard let self = self, event.window === self else { return event }
+            self.handleContentViewClick()
+            return event
+        }
+    }
+
+    deinit {
+        if let monitor = clickMonitor {
+            NSEvent.removeMonitor(monitor)
         }
     }
 
