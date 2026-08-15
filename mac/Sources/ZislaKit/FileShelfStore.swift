@@ -2,12 +2,15 @@ import Combine
 import Foundation
 import UniformTypeIdentifiers
 
-public enum FileShelfCategory: String, CaseIterable, Identifiable {
+public enum FileShelfCategory: String, CaseIterable, Hashable, Identifiable, Sendable {
     case all = "全部"
     case folder = "文件夹"
     case image = "图片"
+    case url = "URL"
+    case path = "路径"
     case video = "视频"
     case audio = "音频"
+    case text = "文本"
     case document = "文档"
     case archive = "压缩包"
     case code = "代码"
@@ -20,14 +23,20 @@ public enum FileShelfCategory: String, CaseIterable, Identifiable {
         case .all: return "square.grid.2x2"
         case .folder: return "folder"
         case .image: return "photo"
+        case .url: return "link"
+        case .path: return "arrow.turn.down.right"
         case .video: return "video"
         case .audio: return "music.note"
         case .document: return "doc.text"
         case .archive: return "archivebox"
         case .code: return "chevron.left.forwardslash.chevron.right"
+        case .text: return "text.alignleft"
         case .other: return "doc.questionmark"
         }
     }
+
+    public static let fileShelfCases = allCases.filter { $0 != .url && $0 != .path && $0 != .text }
+    public static let clipboardCases = allCases
 }
 
 public struct FileShelfItem: Identifiable, Equatable {

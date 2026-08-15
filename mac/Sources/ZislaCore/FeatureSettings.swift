@@ -345,6 +345,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether to show the source platform logo and percentage in the collapsed Dynamic Island while the native downloader is active.
     public var videoDownloadIslandEnabled: Bool
     public var systemMonitorEnabled: Bool
+    /// Battery monitor: independent toggle for the battery detail module and status tracking.
+    public var batteryMonitorEnabled: Bool
     /// When empty, no additional monitor status bar items are added.
     public var systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric>
     /// Detailed mode retains the existing icon and horizontal readings; compact mode hides the icon and reduces font size.
@@ -418,6 +420,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         browserDownloadIslandEnabled: Bool = true,
         videoDownloadIslandEnabled: Bool = true,
         systemMonitorEnabled: Bool = true,
+        batteryMonitorEnabled: Bool = true,
         systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric> = Set(SystemMonitorMenuBarMetric.allCases),
         systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle = .detailed,
         menuBarAppIconEnabled: Bool = true,
@@ -469,6 +472,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.browserDownloadIslandEnabled = browserDownloadIslandEnabled
         self.videoDownloadIslandEnabled = videoDownloadIslandEnabled
         self.systemMonitorEnabled = systemMonitorEnabled
+        self.batteryMonitorEnabled = batteryMonitorEnabled
         self.systemMonitorMenuBarMetrics = systemMonitorMenuBarMetrics
         self.systemMonitorMenuBarDisplayStyle = systemMonitorMenuBarDisplayStyle
         self.menuBarAppIconEnabled = menuBarAppIconEnabled
@@ -538,6 +542,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case browserDownloadIslandEnabled
         case videoDownloadIslandEnabled
         case systemMonitorEnabled
+        case batteryMonitorEnabled
         case systemMonitorMenuBarMetrics
         case systemMonitorMenuBarDisplayStyle
         case menuBarAppIconEnabled
@@ -605,11 +610,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .videoDownloadIslandEnabled
         ) ?? defaults.videoDownloadIslandEnabled
-        videoDownloadIslandEnabled = try container.decodeIfPresent(
-            Bool.self,
-            forKey: .videoDownloadIslandEnabled
-        ) ?? defaults.videoDownloadIslandEnabled
         systemMonitorEnabled = try container.decodeIfPresent(Bool.self, forKey: .systemMonitorEnabled) ?? defaults.systemMonitorEnabled
+        batteryMonitorEnabled = try container.decodeIfPresent(Bool.self, forKey: .batteryMonitorEnabled) ?? defaults.batteryMonitorEnabled
         systemMonitorMenuBarMetrics = try container.decodeIfPresent(
             Set<SystemMonitorMenuBarMetric>.self,
             forKey: .systemMonitorMenuBarMetrics

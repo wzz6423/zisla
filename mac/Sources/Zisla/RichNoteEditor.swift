@@ -6,6 +6,7 @@ import ZislaKit
 
 private final class TransparentWKWebView: WKWebView {
     override var isOpaque: Bool { false }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 struct RichNoteEditorCommand: Identifiable, Equatable {
@@ -115,7 +116,11 @@ struct RichNoteEditor: NSViewRepresentable {
             loadedHTML = html
             guard let webView else { return }
             if isReady {
-                webView.evaluateJavaScript("window.zisla.setHTML(\(RichNoteEditor.javaScriptLiteral(html)));")
+                webView.evaluateJavaScript("window.zisla.setHTML(\(RichNoteEditor.javaScriptLiteral(html)));") { _, error in
+                    if let error {
+                        print("Failed to set HTML: \(error)")
+                    }
+                }
             } else {
                 webView.loadHTMLString(
                     RichNoteEditor.document(initialHTML: html, isEditable: isEditable),
@@ -128,7 +133,11 @@ struct RichNoteEditor: NSViewRepresentable {
             guard self.isEditable != isEditable else { return }
             self.isEditable = isEditable
             guard isReady, let webView else { return }
-            webView.evaluateJavaScript("window.zisla.setEditable(\(isEditable));")
+            webView.evaluateJavaScript("window.zisla.setEditable(\(isEditable));") { _, error in
+                if let error {
+                    print("Failed to set editable: \(error)")
+                }
+            }
         }
 
         func perform(_ command: RichNoteEditorCommand) {
@@ -136,13 +145,21 @@ struct RichNoteEditor: NSViewRepresentable {
             guard lastCommandID != command.id else { return }
             lastCommandID = command.id
             guard isReady, let webView else { return }
-            webView.evaluateJavaScript(javaScript(for: command.operation))
+            webView.evaluateJavaScript(javaScript(for: command.operation)) { _, error in
+                if let error {
+                    print("Failed to perform command: \(error)")
+                }
+            }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             isReady = true
             if let loadedHTML {
-                webView.evaluateJavaScript("window.zisla.setHTML(\(RichNoteEditor.javaScriptLiteral(loadedHTML)));")
+                webView.evaluateJavaScript("window.zisla.setHTML(\(RichNoteEditor.javaScriptLiteral(loadedHTML)));") { _, error in
+                    if let error {
+                        print("Failed to set initial HTML: \(error)")
+                    }
+                }
             }
         }
 
@@ -694,13 +711,12 @@ struct ReadOnlyNoteMetadata: View {
     }
 
     private func attachmentSymbol(for attachment: NotesAppBridge.NoteAttachment) -> String {
-        let fileExtension = (attachment.displayName as NSString).pathExtension.lowercased()
-        return switch fileExtension {
-        case "m4a", "mp3", "wav", "aac", "aiff", "caf": "waveform"
-        case "pdf": "doc.viewfinder"
-        case "jpg", "jpeg", "png", "heic", "gif", "webp": "photo"
-        case "mov", "mp4", "m4v": "film"
-        default: "paperclip"
+        switch (attachment.displayName as NSString).pathExtension.lowercased() {
+        case "m4a", "mp3", "wav", "aac", "aiff", "caf": return "waveform"
+        case "pdf": return "doc.viewfinder"
+        case "jpg", "jpeg", "png", "heic", "gif", "webp": return "photo"
+        case "mov", "mp4", "m4v": return "film"
+        default: return "paperclip"
         }
     }
 }

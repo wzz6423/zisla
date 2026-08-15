@@ -396,10 +396,7 @@ public final class ManagedToolService: ObservableObject {
         defer { try? FileManager.default.removeItem(at: downloaded.deletingLastPathComponent()) }
 
         states[tool]?.phase = .installing
-        let installed = try install(downloaded, as: tool)
-        guard let version = await Self.readVersion(of: tool, at: installed) else {
-            throw ManagedToolError.notExecutable(tool.displayName)
-        }
+        let (_, version) = try await install(downloaded, as: tool)
         states[tool]?.installedVersion = version
         states[tool]?.location = .managed
         refreshedInstalledVersions.insert(tool)
@@ -545,11 +542,16 @@ public final class ManagedToolService: ObservableObject {
             .appendingPathComponent("zisla-tool-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: workDirectory, withIntermediateDirectories: true)
         let destination = workDirectory.appendingPathComponent(url.lastPathComponent)
-        try FileManager.default.moveItem(at: temporaryURL, to: destination)
-        return destination
+        do {
+            try FileManager.default.moveItem(at: temporaryURL, to: destination)
+            return destination
+        } catch {
+            try? FileManager.default.removeItem(at: workDirectory)
+            throw error
+        }
     }
 
-    private func install(_ executable: URL, as tool: ManagedTool) throws -> URL {
+    private func install(_ executable: URL, as tool: ManagedTool) async throws -> (URL, String) {
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: toolsDirectory, withIntermediateDirectories: true)
         let destination = toolsDirectory.appendingPathComponent(
@@ -564,9 +566,13 @@ public final class ManagedToolService: ObservableObject {
         if fileManager.fileExists(atPath: staging.path) {
             try fileManager.removeItem(at: staging)
         }
+        defer { try? fileManager.removeItem(at: staging) }
         try fileManager.copyItem(at: executable, to: staging)
         try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: staging.path)
         Self.clearQuarantine(staging)
+        guard let version = await Self.readVersion(of: tool, at: staging) else {
+            throw ManagedToolError.notExecutable(tool.displayName)
+        }
 
         if fileManager.fileExists(atPath: destination.path) {
             _ = try fileManager.replaceItemAt(destination, withItemAt: staging)
@@ -576,7 +582,7 @@ public final class ManagedToolService: ObservableObject {
         guard let trusted = trustedExecutable(destination) else {
             throw ManagedToolError.notExecutable(destination.lastPathComponent)
         }
-        return trusted
+        return (trusted, version)
     }
 
     /// Clear a quarantine flag should the download source add one.

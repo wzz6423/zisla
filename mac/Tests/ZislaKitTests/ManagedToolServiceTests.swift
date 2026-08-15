@@ -388,6 +388,39 @@ struct ManagedToolServiceTests {
     }
 
     @Test
+    func failedDownloadedToolValidationKeepsExistingManagedExecutable() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-managed-tool-update-\(UUID().uuidString)", isDirectory: true)
+        let tools = root.appendingPathComponent("Tools", isDirectory: true)
+        let executable = tools.appendingPathComponent("yt-dlp", isDirectory: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: tools, withIntermediateDirectories: true)
+        let previousContents = Data("#!/bin/sh\necho 2026.06.08\n".utf8)
+        try previousContents.write(to: executable)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: executable.path
+        )
+
+        ManagedToolDownloadURLProtocol.responseData = Data("not an executable".utf8)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ManagedToolDownloadURLProtocol.self]
+        let service = ManagedToolService(
+            toolsDirectory: tools,
+            bundleURL: root,
+            session: URLSession(configuration: configuration),
+            releaseLoader: { [payload = releaseJSON(tag: "2026.06.09", assets: ["yt-dlp_macos"])] _ in
+                payload
+            }
+        )
+
+        await service.install(.ytDLP)
+
+        #expect(try Data(contentsOf: executable) == previousContents)
+        #expect(service.states[.ytDLP]?.errorMessage != nil)
+    }
+
+    @Test
     func restoresCachedInstallAndLatestVersionsBeforeRefreshingAgain() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -471,4 +504,25 @@ struct ManagedToolServiceTests {
         #expect(resolved.location == .managed)
         #expect(resolved.url.path.hasPrefix(tools.resolvingSymlinksInPath().path))
     }
+}
+
+private final class ManagedToolDownloadURLProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var responseData = Data()
+
+    nonisolated override class func canInit(with request: URLRequest) -> Bool { true }
+    nonisolated override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/octet-stream"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Self.responseData)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

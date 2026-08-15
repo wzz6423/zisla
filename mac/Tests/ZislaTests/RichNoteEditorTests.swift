@@ -9,6 +9,32 @@ import WebKit
 @Suite(.serialized)
 struct RichNoteEditorTests {
     @Test
+    func acceptsFirstMouseToRestoreEditingFocus() async throws {
+        let hostingView = NSHostingView(rootView:
+            RichNoteEditor(
+                html: "<div>正文</div>",
+                command: nil,
+                isEditable: true,
+                onChange: { _, _ in }
+            )
+            .frame(width: 320, height: 240)
+        )
+        let window = NSWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = hostingView
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+
+        let webView = try await waitForWebView(in: hostingView)
+
+        #expect(webView.acceptsFirstMouse(for: nil))
+    }
+
+    @Test
     func showsCaretOnEmptyLine() async throws {
         let hostingView = NSHostingView(rootView:
             RichNoteEditor(
@@ -31,7 +57,7 @@ struct RichNoteEditorTests {
 
         let webView = try await waitForWebView(in: hostingView)
         try await waitUntilEditorIsReady(in: webView)
-        // 测试宿主中的 WebView 不会获得前台帧，这里只消除 requestAnimationFrame 节流。
+        // WebView in test host does not receive foreground frames; this only removes requestAnimationFrame throttling.
         _ = try await webView.evaluateJavaScript(
             """
             (() => {

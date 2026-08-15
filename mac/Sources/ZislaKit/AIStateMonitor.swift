@@ -200,6 +200,7 @@ public final class AIStateMonitor: ObservableObject {
                 let timer = Timer(timeInterval: detectorRefreshInterval, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in self?.scheduleDetectorRefresh() }
                 }
+                timer.tolerance = detectorRefreshInterval * 0.1
                 activityTimer = timer
                 RunLoop.main.add(timer, forMode: .common)
             }

@@ -50,6 +50,8 @@
 	<string>zisla 需要读取近期日程并显示在顶部信息面板中。</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>zisla 需要读取当前播放音频的频段能量，以实时显示随音乐变化的音浪。</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>zisla 仅在你打开电池页面时读取已连接或已配对蓝牙设备公开的电量信息。</string>
     <key>NSCameraUsageDescription</key>
 	<string>zisla 仅在你打开镜子时使用摄像头。</string>
   <key>NSRemindersFullAccessUsageDescription</key>

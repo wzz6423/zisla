@@ -63,6 +63,10 @@ if [[ -d "$ROOT/Resources/QuickNotes" ]]; then
   ditto "$ROOT/Resources/QuickNotes" "$CONTENTS/Resources/QuickNotes"
 fi
 
+if [[ -d "$ROOT/Resources/ThirdPartyLicenses" ]]; then
+  ditto "$ROOT/Resources/ThirdPartyLicenses" "$CONTENTS/Resources/ThirdPartyLicenses"
+fi
+
 if [[ -d "$ROOT/Resources/Localization" ]]; then
   ditto "$ROOT/Resources/Localization" "$CONTENTS/Resources"
 fi

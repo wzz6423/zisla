@@ -219,13 +219,7 @@ final class VoiceInputController: ObservableObject {
 
     private func stopAudioInput(for recordingID: UUID) {
         guard self.recordingID == recordingID else { return }
-        if tapInstalled {
-            engine?.inputNode.removeTap(onBus: 0)
-            tapInstalled = false
-        }
-        engine?.stop()
-        request?.endAudio()
-        isRecording = false
+        stopAudioCapture()
         finalizationTask?.cancel()
         finalizationTask = Task { [weak self] in
             // Server-side recognition needs a couple of seconds after endAudio() to return the final
@@ -236,8 +230,20 @@ final class VoiceInputController: ObservableObject {
         }
     }
 
+    private func stopAudioCapture() {
+        guard tapInstalled || isRecording else { return }
+        if tapInstalled {
+            engine?.inputNode.removeTap(onBus: 0)
+            tapInstalled = false
+        }
+        engine?.stop()
+        request?.endAudio()
+        isRecording = false
+    }
+
     private func finishRecording(recordingID: UUID) {
         guard self.recordingID == recordingID else { return }
+        stopAudioCapture()
         let completedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let createdAt = recordingStartedAt ?? Date()
         let fallbackDuration = max(0, Date().timeIntervalSince(createdAt))
@@ -270,12 +276,7 @@ final class VoiceInputController: ObservableObject {
         let fileURL = recordingFileURL
         finalizationTask?.cancel()
         finalizationTask = nil
-        if tapInstalled {
-            engine?.inputNode.removeTap(onBus: 0)
-            tapInstalled = false
-        }
-        engine?.stop()
-        request?.endAudio()
+        stopAudioCapture()
         task?.cancel()
         engine = nil
         request = nil

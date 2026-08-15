@@ -121,6 +121,7 @@ struct AIAgentServicesTests {
         let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"))
         let workspace = AIAgentWorkspace(store: store)
 
+        workspace.start()
         workspace.startAutomation()
         #expect(!workspace.isAutomationLoopRunning)
 
@@ -163,6 +164,7 @@ struct AIAgentServicesTests {
             })
         )
 
+        workspace.start()
         await workspace.refreshCLIs()
 
         #expect(!store.state.cliAutoUpdateEnabled)
@@ -410,6 +412,29 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func newAPIQuotaProbeKeepsUnversionedPathStartingWithV() async throws {
+        AIAgentURLProtocol.responseData = Data(#"{"data":{"quota":100,"used_quota":25}}"#.utf8)
+        AIAgentURLProtocol.statusCode = 200
+        AIAgentURLProtocol.lastRequest = nil
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AIAgentURLProtocol.self]
+        let service = AIAgentBalanceService(session: URLSession(configuration: configuration))
+        let account = AgentAccount(
+            name: "测试账号",
+            provider: "New API",
+            balanceProbe: AgentBalanceProbe(kind: .newAPIQuota)
+        )
+
+        _ = try await service.check(
+            account: account,
+            baseURL: "https://gateway.example/vendor",
+            apiKey: "test-key"
+        )
+
+        #expect(AIAgentURLProtocol.lastRequest?.url?.absoluteString == "https://gateway.example/vendor/api/user/self")
+    }
+
+    @Test
     func providerModelCatalogUsesVersionedModelsEndpoint() async throws {
         AIAgentURLProtocol.responseData = Data(#"{"data":[{"id":"gpt-5"},{"id":"gpt-4.1"}]}"#.utf8)
         AIAgentURLProtocol.statusCode = 200
@@ -430,6 +455,28 @@ struct AIAgentServicesTests {
 
         #expect(catalog.models == ["gpt-4.1", "gpt-5"])
         #expect(AIAgentURLProtocol.lastRequest?.url?.absoluteString == "https://gateway.example/v1/models")
+    }
+
+    @Test
+    func providerModelCatalogAddsVersionAfterPathStartingWithV() async {
+        AIAgentURLProtocol.responseData = Data(#"{"data":[{"id":"gpt-5"}]}"#.utf8)
+        AIAgentURLProtocol.statusCode = 200
+        AIAgentURLProtocol.lastRequest = nil
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AIAgentURLProtocol.self]
+        let service = AIAgentModelCatalogService(session: URLSession(configuration: configuration))
+        let route = AgentRoute(
+            channelID: UUID(),
+            endpointGroupID: UUID(),
+            accountID: UUID(),
+            baseURL: "https://gateway.example/vendor",
+            protocolKind: .openAICompatible,
+            model: "placeholder"
+        )
+
+        _ = await service.fetch(route: route, apiKey: "test-key")
+
+        #expect(AIAgentURLProtocol.lastRequest?.url?.absoluteString == "https://gateway.example/vendor/v1/models")
     }
 
     @Test

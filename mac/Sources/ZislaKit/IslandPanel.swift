@@ -3,7 +3,7 @@ import AppKit
 private final class ClickBlockingContentView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         // WindowServer routes fully transparent window pixels to the window underneath.
-        NSColor.black.withAlphaComponent(1.0 / 255.0).setFill()
+        NSColor(white: 0, alpha: 1.0 / 255.0).setFill()
         NSBezierPath(rect: dirtyRect).fill()
     }
 }
@@ -160,7 +160,7 @@ public final class IslandPanel: NSPanel {
       context.allowsImplicitAnimation = true
       animator().alphaValue = 0
     } completionHandler: { [weak self] in
-      MainActor.assumeIsolated {
+      Task { @MainActor in
         guard let self, self.transitionGeneration == generation else { return }
         self.orderOut(nil)
         self.alphaValue = 1

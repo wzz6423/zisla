@@ -128,13 +128,13 @@ public final class AIAgentStore: ObservableObject {
     }
 
     public func upsertAccount(_ account: AgentAccount, secret: String? = nil) throws {
+        if let secret {
+            try secretStore.setSecret(secret, for: account.secretReference)
+        }
         if let index = state.accounts.firstIndex(where: { $0.id == account.id }) {
             state.accounts[index] = account
         } else {
             state.accounts.append(account)
-        }
-        if let secret {
-            try secretStore.setSecret(secret, for: account.secretReference)
         }
     }
 
@@ -235,25 +235,39 @@ public final class AIAgentStore: ObservableObject {
         authentication: Data,
         for accountID: UUID
     ) throws {
-        try replaceCLIConfiguration(configuration, for: accountID)
-        try replaceCLIAuthentication(authentication, for: accountID)
+        guard let account = account(id: accountID) else {
+            throw AIAgentSecretStoreError.invalidSecret
+        }
+        let configuration = try validatedSecret(from: configuration)
+        let authentication = try validatedSecret(from: authentication)
+        let configurationReference = cliConfigurationReference(for: account)
+        let authenticationReference = cliAuthenticationReference(for: account)
+        let previousConfiguration = try secretStore.secret(for: configurationReference)
+        let previousAuthentication = try secretStore.secret(for: authenticationReference)
+
+        do {
+            try secretStore.setSecret(configuration, for: configurationReference)
+            try secretStore.setSecret(authentication, for: authenticationReference)
+        } catch {
+            restoreSecret(previousConfiguration, for: configurationReference)
+            restoreSecret(previousAuthentication, for: authenticationReference)
+            throw error
+        }
     }
 
     public func replaceCLIConfiguration(_ data: Data, for accountID: UUID) throws {
-        guard let account = account(id: accountID),
-              let configuration = String(data: data, encoding: .utf8),
-              !configuration.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard let account = account(id: accountID) else {
             throw AIAgentSecretStoreError.invalidSecret
         }
+        let configuration = try validatedSecret(from: data)
         try secretStore.setSecret(configuration, for: cliConfigurationReference(for: account))
     }
 
     public func replaceCLIAuthentication(_ data: Data, for accountID: UUID) throws {
-        guard let account = account(id: accountID),
-              let authentication = String(data: data, encoding: .utf8),
-              !authentication.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard let account = account(id: accountID) else {
             throw AIAgentSecretStoreError.invalidSecret
         }
+        let authentication = try validatedSecret(from: data)
         try secretStore.setSecret(authentication, for: cliAuthenticationReference(for: account))
     }
 
@@ -952,6 +966,22 @@ public final class AIAgentStore: ObservableObject {
 
     private func cliAuthenticationReference(for account: AgentAccount) -> String {
         "\(account.secretReference).cli-authentication"
+    }
+
+    private func validatedSecret(from data: Data) throws -> String {
+        guard let value = String(data: data, encoding: .utf8),
+              !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AIAgentSecretStoreError.invalidSecret
+        }
+        return value
+    }
+
+    private func restoreSecret(_ value: String?, for reference: String) {
+        if let value {
+            try? secretStore.setSecret(value, for: reference)
+        } else {
+            try? secretStore.removeSecret(for: reference)
+        }
     }
 
     private func importAttachment(from url: URL) throws -> AgentChatAttachment {

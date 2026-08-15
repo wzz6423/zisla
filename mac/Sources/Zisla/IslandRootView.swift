@@ -180,6 +180,12 @@ struct IslandRootView: View {
                                             ToolboxModuleView(model: model)
                                         case .system:
                                             SystemMonitorView(service: model.systemMonitor)
+                                        case .battery:
+                                            BatteryDetailView(
+                                                batteryMonitor: model.battery,
+                                                networkMonitor: model.networkBattery,
+                                                onContentHeightChange: model.setBatteryModuleDynamicHeight
+                                            )
                                         case .lockScreen:
                                             LockScreenModuleView(model: model)
                                         }
@@ -395,7 +401,8 @@ struct IslandRootView: View {
         guard let activeModule else { return .standard }
         return IslandModuleLayout.resolved(
             for: activeModule,
-            dashboardCardCount: model.dashboardCardCount
+            dashboardCardCount: model.dashboardCardCount,
+            batteryDynamicHeight: model.batteryModuleDynamicHeight
         )
     }
 
@@ -663,7 +670,7 @@ private struct ModuleSelector: View {
                         emphasizesSelection: true
                     )
                 }
-                .frame(width: 30, height: 30)
+                .frame(width: 28, height: 30)
                 .buttonStyle(PressableStyle(hoverScale: 1.08))
                 .background {
                     if isSelected {

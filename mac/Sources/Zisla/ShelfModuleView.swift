@@ -228,7 +228,7 @@ struct ShelfModuleView: View {
     private var categoryFilterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                ForEach(FileShelfCategory.allCases) { category in
+                ForEach(FileShelfCategory.fileShelfCases) { category in
                     let count = categoryCount(for: category)
                     let isSelected = model.selectedShelfCategory == category
                     Button {

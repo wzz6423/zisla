@@ -90,6 +90,7 @@ public final class AIAgentWorkspace: ObservableObject {
     private var automationTask: Task<Void, Never>?
     private var cliAutoUpdateTask: Task<Void, Never>?
     private var cliCommandTask: Task<Void, Never>?
+    private var runtimeEnabled = false
     private var automationMonitoringRequested = false
     private var skillRefreshGeneration = 0
     private var cancellables: Set<AnyCancellable> = []
@@ -138,14 +139,37 @@ public final class AIAgentWorkspace: ObservableObject {
                 self?.updateAutomationLoop(hasEnabledAutomations: hasEnabledAutomations)
             }
             .store(in: &cancellables)
-        refreshMessageConnections()
-        updateCLIAutoUpdateLoop(enabled: store.state.cliAutoUpdateEnabled)
     }
 
     deinit {
         automationTask?.cancel()
         cliAutoUpdateTask?.cancel()
         cliCommandTask?.cancel()
+        let server = messageConnectionServer
+        Task { @MainActor in server?.stop() }
+    }
+
+    /// Starts listeners and background loops owned by the AI Agent feature.
+    public func start() {
+        guard !runtimeEnabled else { return }
+        runtimeEnabled = true
+        refreshMessageConnections()
+        updateCLIAutoUpdateLoop(enabled: store.state.cliAutoUpdateEnabled)
+        startAutomation()
+    }
+
+    /// Stops all AI Agent listeners and background work while preserving user configuration.
+    public func stop() {
+        runtimeEnabled = false
+        automationMonitoringRequested = false
+        automationTask?.cancel()
+        automationTask = nil
+        cliAutoUpdateTask?.cancel()
+        cliAutoUpdateTask = nil
+        cliCommandTask?.cancel()
+        cliCommandTask = nil
+        cliCommandProgress = nil
+        messageConnectionServer?.stop()
     }
 
     public func refreshAll() async {
@@ -273,7 +297,8 @@ public final class AIAgentWorkspace: ObservableObject {
     }
 
     private func startAutomaticCLIUpdateIfNeeded(for updates: [AIAgentCLIUpdate]) {
-        guard store.state.cliAutoUpdateEnabled,
+        guard runtimeEnabled,
+              store.state.cliAutoUpdateEnabled,
               !Task.isCancelled,
               !isRunningCLICommands,
               cliCommandTask == nil else { return }
@@ -685,7 +710,7 @@ public final class AIAgentWorkspace: ObservableObject {
     }
 
     private func updateCLIAutoUpdateLoop(enabled: Bool) {
-        guard enabled else {
+        guard runtimeEnabled, enabled else {
             cliAutoUpdateTask?.cancel()
             cliAutoUpdateTask = nil
             return
@@ -704,6 +729,10 @@ public final class AIAgentWorkspace: ObservableObject {
     }
 
     public func refreshMessageConnections() {
+        guard runtimeEnabled else {
+            messageConnectionServer?.stop()
+            return
+        }
         let ports = Set(store.state.messageConnections.filter(\.isEnabled).map(\.listenerPort))
         let failures = messageConnectionServer?.update(ports: ports) ?? [:]
         for connection in store.state.messageConnections where connection.isEnabled {
@@ -1104,7 +1133,7 @@ public final class AIAgentWorkspace: ObservableObject {
     }
 
     private func updateAutomationLoop(hasEnabledAutomations: Bool) {
-        guard automationMonitoringRequested, hasEnabledAutomations else {
+        guard runtimeEnabled, automationMonitoringRequested, hasEnabledAutomations else {
             automationTask?.cancel()
             automationTask = nil
             return

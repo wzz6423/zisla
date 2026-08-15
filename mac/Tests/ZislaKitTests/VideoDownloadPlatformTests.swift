@@ -80,9 +80,9 @@ struct VideoDownloadPlatformResolverTests {
         for platform in VideoDownloadPlatform.allCases {
             let url = platform.bundledIconURL
             if platform == .douyin {
-                #expect(url == nil, "抖音应无随包 logo，改由运行时 favicon 提供")
+                #expect(url == nil, "Douyin should have no bundled logo, relying on runtime favicon instead")
             } else {
-                #expect(url != nil, "\(platform.rawValue) 缺少随包 logo：\(platform.assetName)")
+                #expect(url != nil, "\(platform.rawValue) missing bundled logo: \(platform.assetName)")
             }
         }
     }

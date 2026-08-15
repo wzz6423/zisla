@@ -283,20 +283,66 @@ public final class CodexSessionActivityDetector {
         let standardizedURLs = Set(urls.map(\.standardizedFileURL))
         guard !standardizedURLs.isEmpty else { return [:] }
 
+        guard let data = runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/usr/sbin/lsof"),
+            arguments: ["-F", "pn", "--"] + standardizedURLs.map(\.path).sorted(),
+            timeout: 2
+        ) else { return [:] }
+        return parseOpenFileProcessIdentifiers(data, matching: standardizedURLs)
+    }
+
+    static func runProcessOutput(
+        executableURL: URL,
+        arguments: [String],
+        timeout: TimeInterval,
+        fileManager: FileManager = .default
+    ) -> Data? {
+        let outputURL = fileManager.temporaryDirectory
+            .appendingPathComponent("zisla-codex-lsof-\(UUID().uuidString)")
+        guard fileManager.createFile(atPath: outputURL.path, contents: nil),
+              let output = try? FileHandle(forWritingTo: outputURL) else {
+            return nil
+        }
+        defer {
+            try? output.close()
+            try? fileManager.removeItem(at: outputURL)
+        }
+
         let process = Process()
-        let output = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-        process.arguments = ["-F", "pn", "--"] + standardizedURLs.map(\.path).sorted()
+        process.executableURL = executableURL
+        process.arguments = arguments
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
         do {
             try process.run()
         } catch {
-            return [:]
+            return nil
         }
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return parseOpenFileProcessIdentifiers(data, matching: standardizedURLs)
+
+        let deadline = DispatchTime.now() + max(0, timeout)
+        while process.isRunning, DispatchTime.now() < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        guard process.isRunning else {
+            process.waitUntilExit()
+            try? output.synchronize()
+            try? output.close()
+            return try? Data(contentsOf: outputURL)
+        }
+
+        process.terminate()
+        let terminationDeadline = DispatchTime.now() + 0.25
+        while process.isRunning, DispatchTime.now() < terminationDeadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        if process.isRunning {
+            Darwin.kill(process.processIdentifier, SIGKILL)
+            let killDeadline = DispatchTime.now() + 0.25
+            while process.isRunning, DispatchTime.now() < killDeadline {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+        }
+        return nil
     }
 
     static func parseOpenFileProcessIdentifiers(

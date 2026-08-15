@@ -106,7 +106,7 @@ struct ReleasePackageDownloadServiceTests {
             try await stub.load(request)
         })
 
-        let invalidNames = ["", ".", ".."]
+        let invalidNames = ["", ".", "..", "/", "//"]
         for name in invalidNames {
             let asset = Self.makeAsset(name: name, url: "https://github.com/test/repo/releases/download/v1.0.0/file")
             await #expect(throws: ReleasePackageDownloadError.invalidAssetName) {
@@ -151,6 +151,27 @@ struct ReleasePackageDownloadServiceTests {
     }
 
     @Test
+    func rejectsDeclaredOversizedAssetBeforeDownloading() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ReleasePackageDownloadServiceTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let stub = DownloadStub(responses: [:])
+        let service = ReleasePackageDownloadService(loadData: { request in
+            try await stub.load(request)
+        })
+        let asset = Self.makeAsset(
+            name: "app.dmg",
+            url: "https://github.com/test/repo/releases/download/v1.0.0/app.dmg",
+            size: ReleasePackageDownloadService.maxDownloadSize + 1
+        )
+
+        await #expect(throws: ReleasePackageDownloadError.responseTooLarge) {
+            try await service.download(asset: asset, to: tempDir)
+        }
+        #expect(await stub.requestCount() == 0)
+    }
+
+    @Test
     func createsTargetDirectoryIfNeeded() async throws {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("ReleasePackageDownloadServiceTests-\(UUID().uuidString)", isDirectory: true)
@@ -172,9 +193,9 @@ struct ReleasePackageDownloadServiceTests {
         #expect(result.lastPathComponent == "app.dmg")
     }
 
-    private static func makeAsset(name: String, url: String) -> GitHubRelease.Asset {
+    private static func makeAsset(name: String, url: String, size: Int = 1_024) -> GitHubRelease.Asset {
         let json = """
-        {"name":"\(name)","browser_download_url":"\(url)","size":1024}
+        {"name":"\(name)","browser_download_url":"\(url)","size":\(size)}
         """
         return try! JSONDecoder().decode(GitHubRelease.Asset.self, from: Data(json.utf8))
     }

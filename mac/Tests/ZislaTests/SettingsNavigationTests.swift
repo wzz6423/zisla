@@ -7,6 +7,7 @@ struct SettingsNavigationTests {
     func keepsPrivacySeparateFromGeneralSettings() {
         #expect(SettingsSection.allCases.map(\.title) == [
             "通用",
+            "功能",
             "工作流",
             "信息",
             "AI",

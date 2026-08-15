@@ -35,7 +35,7 @@ private enum AIAgentURLBuilder {
             throw AIAgentServiceError.invalidBaseURL(raw)
         }
         if dropVersionComponent,
-           url.lastPathComponent.lowercased().hasPrefix("v") {
+           isVersionComponent(url.lastPathComponent) {
             url.deleteLastPathComponent()
         }
         let existing = url.path.split(separator: "/").map(String.init)
@@ -49,7 +49,7 @@ private enum AIAgentURLBuilder {
     static func versionedURL(baseURL: String, pathComponents: [String]) throws -> URL {
         var url = try url(baseURL: baseURL, pathComponents: [])
         let existing = url.path.split(separator: "/").map(String.init)
-        if !existing.contains(where: { $0.lowercased().hasPrefix("v") }) {
+        if !existing.contains(where: isVersionComponent) {
             url.appendPathComponent("v1", isDirectory: true)
         }
         for component in pathComponents {
@@ -77,6 +77,19 @@ private enum AIAgentURLBuilder {
             request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         }
         return request
+    }
+
+    private static func isVersionComponent(_ component: String) -> Bool {
+        let suffix = component.lowercased().dropFirst()
+        guard component.lowercased().first == "v" else { return false }
+        let digits = suffix.prefix(while: \.isNumber)
+        guard !digits.isEmpty else { return false }
+        let qualifier = suffix.dropFirst(digits.count)
+        guard !qualifier.isEmpty else { return true }
+        return ["alpha", "beta"].contains { name in
+            guard qualifier.hasPrefix(name) else { return false }
+            return qualifier.dropFirst(name.count).allSatisfy(\.isNumber)
+        }
     }
 }
 

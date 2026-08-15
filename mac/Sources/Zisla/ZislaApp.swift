@@ -28,7 +28,7 @@ final class SettingsWindow: NSWindow {
     }
 
     override func performClose(_ sender: Any?) {
-        // Settings window has no close workflow; keep the instance alive so it can be restored from the menu bar.
+        close()
     }
 }
 
@@ -68,12 +68,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model.start()
         configureApplicationIconUpdates(model: model)
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
-        lockScreenOverlayController.start()
         self.lockScreenOverlayController = lockScreenOverlayController
+        if model.settingsStore.settings.lockScreenInfoEnabled {
+            lockScreenOverlayController.start()
+        }
 
         let petController = IslandPetController(model: model)
         self.petController = petController
-        petController.start()
+        if model.settingsStore.settings.petEnabled {
+            petController.start()
+        }
 
         let rootView = IslandRootView(
             model: model,
@@ -102,6 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 isMirrorPresented: model.isMirrorPresented,
                 isTeleprompterPresented: model.isTeleprompterPresented,
                 dashboardCardCount: model.dashboardCardCount,
+                batteryDynamicHeight: model.batteryModuleDynamicHeight,
                 includesPet: model.settingsStore.settings.petEnabled
             ).panelSize,
             horizontalMargin: 12
@@ -153,7 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         coordinator.onActiveDisplayHasPhysicalNotchChanged = { hasPhysicalNotch in
             model.isIslandOnPhysicalNotch = hasPhysicalNotch
         }
-        Publishers.CombineLatest(
+        Publishers.CombineLatest3(
             Publishers.CombineLatest4(
                 model.$selectedModule,
                 model.$isMirrorPresented,
@@ -162,15 +167,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             ),
             model.settingsStore.$settings
                 .map(\.petEnabled)
-                .removeDuplicates()
+                .removeDuplicates(),
+            model.$batteryModuleDynamicHeight
         )
-            .map { state, includesPet -> CGSize in
+            .map { state, includesPet, batteryHeight -> CGSize in
                 let (module, isMirrorPresented, isTeleprompterPresented, dashboardCardCount) = state
                 return Self.expandedPanelSize(
                     module: module,
                     isMirrorPresented: isMirrorPresented,
                     isTeleprompterPresented: isTeleprompterPresented,
                     dashboardCardCount: dashboardCardCount,
+                    batteryDynamicHeight: batteryHeight,
                     includesPet: includesPet
                 ).panelSize
             }
@@ -264,16 +271,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .store(in: &cancellables)
 
         model.settingsStore.$settings
+            .map(\.lockScreenInfoEnabled)
+            .removeDuplicates()
+            .sink { [weak self] enabled in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if enabled {
+                        self.lockScreenOverlayController?.start()
+                    } else {
+                        self.lockScreenOverlayController?.stop()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        model.settingsStore.$settings
             .map(\.petEnabled)
             .removeDuplicates()
-            .sink { [weak coordinator, weak model] enabled in
-                Task { @MainActor in
+            .sink { [weak self, weak coordinator, weak model] enabled in
+                Task { @MainActor [weak self] in
                     coordinator?.setPersistentContentVisible(enabled)
                     guard let model else { return }
                     if enabled {
+                        self?.petController?.start()
                         coordinator?.start()
-                    } else if !model.settingsStore.settings.hoverActivationEnabled && !model.isPinned {
-                        coordinator?.stop()
+                    } else {
+                        self?.petController?.stop()
+                        if !model.settingsStore.settings.hoverActivationEnabled && !model.isPinned {
+                            coordinator?.stop()
+                        }
                     }
                 }
             }
@@ -347,6 +373,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             isMirrorPresented: model.isMirrorPresented,
                             isTeleprompterPresented: model.isTeleprompterPresented,
                             dashboardCardCount: model.dashboardCardCount,
+                            batteryDynamicHeight: model.batteryModuleDynamicHeight,
                             includesPet: model.settingsStore.settings.petEnabled
                         ).panelSize
                         // Direct resize (no two-phase): recording swaps layout instantly by design.
@@ -441,13 +468,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         isMirrorPresented: Bool,
         isTeleprompterPresented: Bool,
         dashboardCardCount: Int,
+        batteryDynamicHeight: CGFloat,
         includesPet: Bool
     ) -> IslandModuleLayout {
         if isMirrorPresented { return .mirror }
         if isTeleprompterPresented { return .teleprompter }
         let layout = IslandModuleLayout.resolved(
             for: module,
-            dashboardCardCount: dashboardCardCount
+            dashboardCardCount: dashboardCardCount,
+            batteryDynamicHeight: batteryDynamicHeight
         )
         return IslandModuleLayout(
             islandSize: layout.islandSize,
@@ -849,6 +878,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func windowDidResize(_ notification: Notification) {
         guard let window = notification.object as? SettingsWindow else { return }
         WindowPlacement.center(window, on: settingsWindowScreen)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard notification.object as? SettingsWindow != nil else { return }
+        settingsWindowController = nil
+        settingsWindowScreen = nil
     }
 
     @objc private func checkUpdates() {

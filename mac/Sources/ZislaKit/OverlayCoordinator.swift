@@ -495,9 +495,10 @@ public final class OverlayCoordinator: NSObject {
             return
         }
         let token = glassActivationGeneration.advance()
-        DispatchQueue.main.async { [weak self] in
-            guard let self, !isPinned, glassActivationGeneration.isCurrent(token) else { return }
-            applyNativeGlassActivation()
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self, !self.isPinned, self.glassActivationGeneration.isCurrent(token) else { return }
+            self.applyNativeGlassActivation()
         }
     }
 
@@ -599,8 +600,10 @@ public final class OverlayCoordinator: NSObject {
             visibleDisplayIDs.insert(layout.displayID)
         }
 
-        for (displayID, panel) in persistentPanels where !visibleDisplayIDs.contains(displayID) {
-            panel.orderOut(nil)
+        persistentPanels.forEach { displayID, panel in
+            if !visibleDisplayIDs.contains(displayID) {
+                panel.orderOut(nil)
+            }
         }
         persistentPanelDisplayIDs = visibleDisplayIDs
     }
@@ -613,8 +616,7 @@ public final class OverlayCoordinator: NSObject {
     }
 
     private func contains(_ point: CGPoint, in frame: CGRect) -> Bool {
-        point.x >= frame.minX && point.x <= frame.maxX
-            && point.y >= frame.minY && point.y <= frame.maxY
+        frame.contains(point)
     }
 
     @objc

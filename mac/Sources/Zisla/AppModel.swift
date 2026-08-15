@@ -17,6 +17,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
   case pdf
   case toolbox
   case system
+  case battery
   case lockScreen
 
   var id: Self { self }
@@ -35,6 +36,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
     case .pdf: "PDF"
     case .toolbox: "小工具"
     case .system: "系统"
+    case .battery: "电池"
     case .lockScreen: "锁屏"
     }
   }
@@ -53,6 +55,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
     case .pdf: "doc.viewfinder"
     case .toolbox: "wrench.and.screwdriver.fill"
     case .system: "gauge.with.dots.needle.67percent"
+    case .battery: "battery.100percent"
     case .lockScreen: "lock.display"
     }
   }
@@ -67,6 +70,8 @@ enum IslandModule: String, CaseIterable, Identifiable {
       .agent
     case .system:
       .system
+    case .battery:
+      .battery
     case .clipboard:
       .clipboard
     case .shelf:
@@ -105,6 +110,7 @@ extension IslandModule {
     case .pdf: settings.pdfToolsEnabled
     case .toolbox: settings.toolboxEnabled
     case .system: settings.systemMonitorEnabled
+    case .battery: settings.batteryMonitorEnabled
     case .lockScreen: settings.lockScreenInfoEnabled
     }
   }
@@ -124,6 +130,8 @@ struct IslandModuleLayout: Equatable {
   private static let expandedChromeHeight: CGFloat = 121
   private static let moduleVerticalInsets = IslandSurfaceGeometry.moduleInset * 2
   private static let panelHeightAllowance: CGFloat = 4
+  static let batteryMinimumContentHeight: CGFloat = 0
+  static let batteryMaximumContentHeight: CGFloat = 430
 
   /// Fixed-height modules size the surface to their rendered content instead of inheriting
   /// the standard panel's unused vertical space.
@@ -160,6 +168,7 @@ struct IslandModuleLayout: Equatable {
     panelSize: CGSize(width: 860, height: 544)
   )
   static let system = compactModule(contentHeight: 401)
+  static let battery = compactModule(contentHeight: batteryMaximumContentHeight)
   /// Quick Notes: needs a larger editing/preview area for rich content such as images and tables, so wider and taller than standard.
   static let notes = IslandModuleLayout(
     islandSize: CGSize(width: 720, height: 560),
@@ -191,7 +200,8 @@ struct IslandModuleLayout: Equatable {
   /// Resolves the current layout. Dashboard height follows its rendered activity-card rows.
   nonisolated static func resolved(
     for module: IslandModule,
-    dashboardCardCount: Int
+    dashboardCardCount: Int,
+    batteryDynamicHeight: CGFloat? = nil
   ) -> IslandModuleLayout {
     if module == .dashboard {
       // Empty and single-card dashboards are clamped to the crown floor instead of falling back
@@ -205,6 +215,13 @@ struct IslandModuleLayout: Equatable {
         islandSize: CGSize(width: 660, height: islandHeight),
         panelSize: CGSize(width: 860, height: islandHeight + 4)
       )
+    }
+    if module == .battery, let dynamicHeight = batteryDynamicHeight {
+      let contentHeight = min(
+        batteryMaximumContentHeight,
+        max(batteryMinimumContentHeight, dynamicHeight)
+      )
+      return compactModule(contentHeight: contentHeight)
     }
     return module.layout
   }
@@ -328,6 +345,8 @@ final class AppModel: ObservableObject {
   @Published var collapsedIslandSize = CGSize(width: 240, height: 34)
   /// Number of cards rendered below the dashboard summary.
   @Published private(set) var dashboardCardCount = 0
+  /// Dynamic content height for the battery module.
+  @Published private(set) var batteryModuleDynamicHeight = IslandModuleLayout.batteryMaximumContentHeight
   @Published var isIslandOnPhysicalNotch = false
   @Published private(set) var isMirrorPresented = false
   @Published private(set) var isTeleprompterPresented = false
@@ -367,6 +386,7 @@ final class AppModel: ObservableObject {
   let screenCleaning = ScreenCleaningController()
   let systemMonitor = SystemMonitorService()
   let battery = BatteryMonitor()
+  let networkBattery = NetworkBatteryMonitor()
   let focusMode = FocusModeMonitor()
   let quickNotes = QuickNotesService()
   let browserDownloads = BrowserDownloadMonitor()
@@ -460,7 +480,6 @@ final class AppModel: ObservableObject {
       self?.restorePowerAssertionsAfterCleaning()
     }
     restoreDownloadDirectory()
-    aiAgent.startAutomation()
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
       _ = self?.clipboardHistory.record(content)
     }
@@ -663,10 +682,17 @@ final class AppModel: ObservableObject {
     dashboardCardCount = count
   }
 
+  func setBatteryModuleDynamicHeight(_ height: CGFloat) {
+    let constrained = min(
+      IslandModuleLayout.batteryMaximumContentHeight,
+      max(IslandModuleLayout.batteryMinimumContentHeight, height)
+    )
+    guard abs(batteryModuleDynamicHeight - constrained) > 1 else { return }
+    batteryModuleDynamicHeight = constrained
+  }
+
   func start() {
     apply(settings: settingsStore.settings)
-    focusMode.start()
-    audioOutput.start()
     alarms.rescheduleAll()
   }
 
@@ -709,14 +735,18 @@ final class AppModel: ObservableObject {
     clipboardHistoryMonitor.setEnabled(false)
     Task { [downloadService] in await downloadService.cancelAll() }
     aiMonitor.stop()
+    aiAgent.stop()
     media.stop()
     audioOutput.stop()
+    calendar.stop()
     pomodoro.stop()
+    alarms.suspend()
     screenCleaning.stopAll()
     cleaningPowerState = nil
     powerAssertions.releaseAll()
     systemMonitor.stop()
     battery.stop()
+    networkBattery.stop()
     focusMode.stop()
     browserDownloads.stop()
     mail.stop()
@@ -733,6 +763,7 @@ final class AppModel: ObservableObject {
   }
 
   func startScreenCleaning() {
+    guard settingsStore.settings.toolboxEnabled else { return }
     enablePowerAssertionsForCleaning()
     screenCleaning.startScreenCleaning()
     refreshFocusCountdownNotice()
@@ -740,6 +771,7 @@ final class AppModel: ObservableObject {
   }
 
   func startKeyboardCleaning() {
+    guard settingsStore.settings.toolboxEnabled else { return }
     switch screenCleaning.startKeyboardCleaning() {
     case .started:
       enablePowerAssertionsForCleaning()
@@ -824,7 +856,9 @@ final class AppModel: ObservableObject {
       if settings.aiProgressEnabled { self.aiMonitor.refresh() }
       if settings.weatherEnabled, weatherStale { self.refreshWeather() }
       if settings.systemMonitorEnabled { await self.systemMonitor.sampleOnce() }
-      if settings.lockScreenInfoEnabled { self.battery.refresh() }
+      if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled {
+        self.battery.refresh()
+      }
       if settings.mailEnabled, module == .mail { await self.mail.refresh() }
       if settings.quickNotesEnabled, module == .quickNotes {
         await self.quickNotes.refresh()
@@ -836,6 +870,11 @@ final class AppModel: ObservableObject {
   }
 
   func refreshWeather() {
+    guard settingsStore.settings.weatherEnabled else {
+      weatherTask?.cancel()
+      weatherTask = nil
+      return
+    }
     weatherTask?.cancel()
     let configuredLocations = weatherLocations.locations
     weatherLocationState = .locating
@@ -977,6 +1016,7 @@ final class AppModel: ObservableObject {
   }
 
   func refreshMail() async {
+    guard settingsStore.settings.mailEnabled else { return }
     await mail.refresh()
   }
 
@@ -1009,6 +1049,7 @@ final class AppModel: ObservableObject {
   }
 
   func checkForUpdates(manual: Bool, channel: UpdateChannel? = nil) {
+    guard manual || settingsStore.settings.updateChecksEnabled else { return }
     let selectedChannel = channel ?? (manual ? settingsStore.settings.updateChannel : nil)
     let fallbackChannel = selectedChannel ?? FeatureSettingsStore.bundledDefaultUpdateChannel
     releaseTask?.cancel()
@@ -1091,6 +1132,8 @@ final class AppModel: ObservableObject {
   }
 
   private func downloadUpdateInBackground(release: GitHubRelease) {
+    guard settingsStore.settings.updateChecksEnabled,
+          settingsStore.settings.automaticDownloadEnabled else { return }
     guard let diskImage = release.macDiskImage else { return }
     downloadUpdatePackage(diskImage, to: downloadDirectory, revealInFinder: false)
   }
@@ -1145,6 +1188,7 @@ final class AppModel: ObservableObject {
   }
 
   func selectSystemMonitor() {
+    guard settingsStore.settings.systemMonitorEnabled else { return }
     selectModule(.system)
     Task { await systemMonitor.sampleOnce() }
   }
@@ -1461,6 +1505,11 @@ final class AppModel: ObservableObject {
       clearActiveAINotices()
       powerAssertions.setAIActivityActive(false)
     }
+    if settings.aiAgentEnabled {
+      aiAgent.start()
+    } else {
+      aiAgent.stop()
+    }
     syncAIActivityPowerAssertion(aiMonitor.state)
     if settings.mediaEnabled {
       media.start()
@@ -1479,6 +1528,18 @@ final class AppModel: ObservableObject {
     } else {
       systemMonitor.stop()
     }
+    if settings.sideNoticesEnabled {
+      focusMode.start()
+      audioOutput.start()
+    } else {
+      focusMode.stop()
+      audioOutput.stop()
+    }
+    if settings.calendarEnabled {
+      calendar.start()
+    } else {
+      calendar.stop()
+    }
     if settings.sideNoticesEnabled, settings.browserDownloadIslandEnabled {
       browserDownloads.start()
       consumeBrowserDownloadSnapshot(browserDownloads.snapshot)
@@ -1486,10 +1547,13 @@ final class AppModel: ObservableObject {
       browserDownloads.stop()
       clearBrowserDownloadNotices()
     }
-    if settings.lockScreenInfoEnabled {
+    if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled {
       battery.start()
     } else {
       battery.stop()
+    }
+    if !settings.batteryMonitorEnabled {
+      networkBattery.stop()
     }
     if settings.mailEnabled {
       mail.start(accountNames: settings.mailAccountNames)
@@ -1497,6 +1561,15 @@ final class AppModel: ObservableObject {
       mail.stop()
       hasLoadedMail = false
       knownMailMessageIDs.removeAll()
+    }
+    if settings.toolboxEnabled {
+      alarms.resume()
+    } else {
+      alarms.suspend()
+      pomodoro.stop()
+      screenCleaning.stopAll()
+      cleaningPowerState = nil
+      powerAssertions.releaseAll()
     }
     if selectedModule == .agenda { refreshAgendaIfEnabled() }
     clipboardMonitor.setEnabled(
@@ -1550,6 +1623,7 @@ final class AppModel: ObservableObject {
         transientMessage = "无法注册语音输入快捷键"
       }
     } else {
+      voiceInput.cancel()
       hotkeyManager.unregister()
     }
     refreshToolboxReminderNotice()
@@ -1560,12 +1634,18 @@ final class AppModel: ObservableObject {
     isUpdatePollingEnabled = enabled
     updatePollingTask?.cancel()
     updatePollingTask = nil
-    guard enabled else { return }
+    guard enabled else {
+      releaseTask?.cancel()
+      releaseTask = nil
+      return
+    }
 
     updatePollingTask = Task { [weak self] in
       while !Task.isCancelled {
         guard let self else { return }
-        await self.aiAgent.refreshCLIs()
+        if self.settingsStore.settings.aiAgentEnabled {
+          await self.aiAgent.refreshCLIs()
+        }
         guard !Task.isCancelled else { return }
         self.checkForUpdates(manual: false)
         do {

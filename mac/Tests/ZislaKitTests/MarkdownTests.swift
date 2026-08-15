@@ -65,7 +65,7 @@ struct MarkdownParserTests {
     @Test
     func parsesHorizontalRule() {
         for rule in ["---", "***", "___", "- - -"] {
-            #expect(MarkdownParser.parse(rule) == [.horizontalRule], "应识别分隔线: \(rule)")
+            #expect(MarkdownParser.parse(rule) == [.horizontalRule], "Should recognize horizontal rule: \(rule)")
         }
     }
 
@@ -119,7 +119,7 @@ struct MarkdownParserTests {
         if case .paragraph = blocks[0] {
             // Correct: parsed as a paragraph
         } else {
-            #expect(Bool(false), "应解析为段落，而非独立图片块")
+            #expect(Bool(false), "Should be parsed as paragraph, not standalone image block")
         }
     }
 
@@ -378,9 +378,9 @@ struct NotesAppBridgeTests {
         let html = #"<p><img src="\#(path)" alt="x"></p>"#
         let result = MarkdownImageInliner.inlineLocalImages(in: html)
 
-        #expect(!result.contains(path), "原路径应被替换掉")
-        #expect(result.contains("data:image/jpeg;base64,"), "应内联为 JPEG data URL")
-        #expect(result.contains(#"alt="x""#), "其它属性应保留")
+        #expect(!result.contains(path), "Original path should be replaced")
+        #expect(result.contains("data:image/jpeg;base64,"), "Should inline as JPEG data URL")
+        #expect(result.contains(#"alt="x""#), "Other attributes should be preserved")
     }
 
     @Test
@@ -393,7 +393,7 @@ struct NotesAppBridgeTests {
         let html = #"<p><img src="\#(fileURL)" alt="x"></p>"#
         let result = MarkdownImageInliner.inlineLocalImages(in: html)
 
-        #expect(!result.contains(fileURL), "file:// 形式也应被替换")
+        #expect(!result.contains(fileURL), "file:// format should also be replaced")
         #expect(result.contains("data:image/jpeg;base64,"))
     }
 
@@ -415,7 +415,7 @@ struct NotesAppBridgeTests {
         MarkdownImageInliner.clearCache()
         let html = #"<p><img src="https://example.com/foo.png" alt="x"></p>"#
         let result = MarkdownImageInliner.inlineLocalImages(in: html)
-        #expect(result == html, "网络 URL 不应被改写")
+        #expect(result == html, "Network URLs should not be rewritten")
     }
 
     @Test
@@ -431,7 +431,7 @@ struct NotesAppBridgeTests {
         MarkdownImageInliner.clearCache()
         let html = #"<p><img src="data:image/png;base64,AAAA" alt="x"></p>"#
         let result = MarkdownImageInliner.inlineLocalImages(in: html)
-        #expect(result == html, "已经内联的 data URL 不应再处理")
+        #expect(result == html, "Already inlined data URLs should not be processed again")
     }
 
     @Test
@@ -440,7 +440,7 @@ struct NotesAppBridgeTests {
         let missing = "/tmp/zisla-definitely-not-exist-\(UUID().uuidString).jpg"
         let html = #"<p><img src="\#(missing)" alt="x"></p>"#
         let result = MarkdownImageInliner.inlineLocalImages(in: html)
-        #expect(result == html, "读取失败时保留原 src（与现状一致，无回归）")
+        #expect(result == html, "Preserve original src on read failure (no regression from current behavior)")
     }
 
     @Test
@@ -478,7 +478,7 @@ struct NotesAppBridgeTests {
 
         #expect(!result.contains(p1))
         #expect(!result.contains(p2))
-        #expect(result.contains("https://example.com/x.png"), "网络 URL 应保留")
+        #expect(result.contains("https://example.com/x.png"), "Network URLs should be preserved")
         // At least two data URLs should appear (the first two local images)
         #expect(result.components(separatedBy: "data:image/jpeg;base64,").count - 1 == 2)
     }
@@ -498,7 +498,7 @@ struct NotesAppBridgeTests {
         let html = #"<p><img src="\#(path)" alt="x"></p>"#
         let result = MarkdownImageInliner.inlineLocalImages(in: html)
 
-        #expect(!result.contains(path), "含 & 的路径也应被替换")
+        #expect(!result.contains(path), "Paths with & should also be replaced")
         #expect(result.contains("data:image/jpeg;base64,"))
     }
 
@@ -511,7 +511,7 @@ struct NotesAppBridgeTests {
         let markdown = "![测试图片](\(path))"
         let html = MarkdownHTMLRenderer.html(from: markdown)
 
-        #expect(html.contains("data:image/jpeg;base64,"), "完整管线应把独立图片行内联为 data URL")
-        #expect(!html.contains(path), "原始路径不应残留在 HTML 中")
+        #expect(html.contains("data:image/jpeg;base64,"), "Full pipeline should inline standalone image as data URL")
+        #expect(!html.contains(path), "Original path should not remain in HTML")
     }
 }

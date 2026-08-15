@@ -214,6 +214,63 @@ struct AIAgentStoreTests {
     }
 
     @Test
+    func failedSecretWriteDoesNotPublishAccount() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-ai-agent-account-failure-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let secretStore = FailureInjectingSecretStore()
+        let store = AIAgentStore(
+            storageURL: directory.appendingPathComponent("state.json"),
+            secretStore: secretStore
+        )
+        let account = AgentAccount(name: "OpenAI", provider: "OpenAI")
+        secretStore.failWrites(endingWith: account.secretReference)
+
+        #expect(throws: AIAgentSecretStoreError.storageFailed("injected")) {
+            try store.upsertAccount(account, secret: "sk-test")
+        }
+
+        #expect(store.account(id: account.id) == nil)
+    }
+
+    @Test
+    func failedCLIAuthenticationWriteRestoresPreviousProfile() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-ai-agent-profile-failure-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let secretStore = FailureInjectingSecretStore()
+        let store = AIAgentStore(
+            storageURL: directory.appendingPathComponent("state.json"),
+            secretStore: secretStore
+        )
+        let account = AgentAccount(
+            name: "Codex",
+            provider: "Codex",
+            credentialKind: .cliProfile,
+            cliProfile: AgentCLIProfile(cliKind: .codex)
+        )
+        try store.upsertAccount(account)
+        try store.replaceCLIProfile(
+            configuration: Data("old-config".utf8),
+            authentication: Data("old-auth".utf8),
+            for: account.id
+        )
+        secretStore.failWrites(endingWith: ".cli-authentication")
+
+        #expect(throws: AIAgentSecretStoreError.storageFailed("injected")) {
+            try store.replaceCLIProfile(
+                configuration: Data("new-config".utf8),
+                authentication: Data("new-auth".utf8),
+                for: account.id
+            )
+        }
+
+        let contents = try #require(try store.cliProfileContents(for: account))
+        #expect(contents.configuration == Data("old-config".utf8))
+        #expect(contents.authentication == Data("old-auth".utf8))
+    }
+
+    @Test
     func creatingRemoteProviderCreatesAnAccountAndDefaultEndpointTogether() throws {
         let (store, directory) = makeStore()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -654,6 +711,39 @@ private struct StubSecretStore: AIAgentSecretStoring {
     func secret(for reference: String) throws -> String? { nil }
     func setSecret(_ secret: String, for reference: String) throws {}
     func removeSecret(for reference: String) throws {}
+}
+
+private final class FailureInjectingSecretStore: AIAgentSecretStoring, @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [String: String] = [:]
+    private var failingWriteSuffix: String?
+
+    func failWrites(endingWith suffix: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        failingWriteSuffix = suffix
+    }
+
+    func secret(for reference: String) throws -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return values[reference]
+    }
+
+    func setSecret(_ secret: String, for reference: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        if let failingWriteSuffix, reference.hasSuffix(failingWriteSuffix) {
+            throw AIAgentSecretStoreError.storageFailed("injected")
+        }
+        values[reference] = secret
+    }
+
+    func removeSecret(for reference: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        values.removeValue(forKey: reference)
+    }
 }
 
 private final class PersistenceWriteCounter: @unchecked Sendable {

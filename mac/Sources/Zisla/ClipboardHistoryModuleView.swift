@@ -85,17 +85,11 @@ struct ClipboardHistoryModuleView: View {
     }
 
     private var visibleItems: [ClipboardHistoryItem] {
-        let baseItems: [ClipboardHistoryItem]
         switch filter {
-        case .all: baseItems = visiblePinnedItems + visibleHistoryItems
-        case .pinned: baseItems = visiblePinnedItems
-        case .history: baseItems = visibleHistoryItems
+        case .all: visiblePinnedItems + visibleHistoryItems
+        case .pinned: visiblePinnedItems
+        case .history: visibleHistoryItems
         }
-
-        if categoryFilter == .all {
-            return baseItems
-        }
-        return baseItems.filter { $0.category == categoryFilter }
     }
 
     private var visiblePinnedItems: [ClipboardHistoryItem] {
@@ -271,7 +265,7 @@ struct ClipboardHistoryModuleView: View {
                 try? await Task.sleep(for: .milliseconds(200))
             }
             guard !Task.isCancelled else { return }
-            store.updateQuery(scope: filter.scope, searchText: searchText)
+            store.updateQuery(scope: filter.scope, searchText: searchText, category: categoryFilter)
         }
     }
 
@@ -464,7 +458,7 @@ struct ClipboardHistoryModuleView: View {
     private var categoryFilterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                ForEach(FileShelfCategory.allCases) { category in
+                ForEach(FileShelfCategory.clipboardCases) { category in
                     let count = categoryCount(for: category)
                     let isSelected = categoryFilter == category
                     let hasItems = category == .all || count > 0
@@ -504,13 +498,7 @@ struct ClipboardHistoryModuleView: View {
 
     private func categoryCount(for category: FileShelfCategory) -> Int {
         guard category != .all else { return 0 }
-        let baseItems: [ClipboardHistoryItem]
-        switch filter {
-        case .all: baseItems = store.pinnedItems + store.historyItems
-        case .pinned: baseItems = store.pinnedItems
-        case .history: baseItems = store.historyItems
-        }
-        return baseItems.filter { $0.category == category }.count
+        return store.categoryCounts[category, default: 0]
     }
 }
 

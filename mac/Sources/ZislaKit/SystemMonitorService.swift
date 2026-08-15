@@ -1180,6 +1180,23 @@ enum AppleSMCSensorReader {
         return valid.reduce(0, +) / Double(valid.count)
     }
 
+    static func signedFixedPointCelsius(from bytes: [UInt8]) -> Double? {
+        guard bytes.count == 2 else { return nil }
+        let raw = Int16(bitPattern: UInt16(bytes[0]) << 8 | UInt16(bytes[1]))
+        return Double(raw) / 256
+    }
+
+    static func batteryTemperatureCelsius() -> Double? {
+        guard let connection = openConnection() else { return nil }
+        defer { IOServiceClose(connection) }
+        let values = ["TB0T", "TB1T", "TB2T"].compactMap { key in
+            read(key, connection: connection).flatMap(floatingPointValue)
+        }
+        let valid = values.filter { (-20...80).contains($0) }
+        guard !valid.isEmpty else { return nil }
+        return valid.reduce(0, +) / Double(valid.count)
+    }
+
     static func isValidFanRPM(_ value: Double) -> Bool {
         value.isFinite && (0...20_000).contains(value)
     }
@@ -1297,6 +1314,9 @@ enum AppleSMCSensorReader {
     private static func floatingPointValue(_ value: (type: UInt32, bytes: [UInt8])) -> Double? {
         if value.type == fourCharacterCode("flt ") {
             return float32(from: value.bytes)
+        }
+        if value.type == fourCharacterCode("sp78") {
+            return signedFixedPointCelsius(from: value.bytes)
         }
         guard value.type == fourCharacterCode("fpe2"), value.bytes.count == 2 else { return nil }
         return Double(UInt16(value.bytes[0]) << 8 | UInt16(value.bytes[1])) / 4
@@ -2314,6 +2334,10 @@ public final class SystemMonitorService: ObservableObject {
     private let postCleanupDiskRefreshDelay: Duration
     private let diskCapacityRefreshInterval: TimeInterval
     private var postCleanupDiskRefreshTask: Task<Void, Never>?
+    static let slowMetricsRefreshInterval: TimeInterval = 5
+    private var lastSlowMetricsSample: Date?
+    private var cachedGPUMetrics: GPUMetrics?
+    private var cachedSensorSample: AppleSMCSensorSample?
 
     public init(
         samplingInterval: TimeInterval = 1.5,
@@ -2343,13 +2367,13 @@ public final class SystemMonitorService: ObservableObject {
         isSampling = true
         // Sample immediately, then continue at the configured interval.
         Task { await self.sampleOnce() }
-        timer = Timer.publish(every: samplingInterval, on: .main, in: .common)
+        timer = Timer.publish(every: samplingInterval, tolerance: samplingInterval * 0.1, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self else { return }
                 Task { await self.sampleOnce() }
             }
-        diskCapacityTimer = Timer.publish(every: diskCapacityRefreshInterval, on: .main, in: .common)
+        diskCapacityTimer = Timer.publish(every: diskCapacityRefreshInterval, tolerance: diskCapacityRefreshInterval * 0.1, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self else { return }
@@ -2474,6 +2498,15 @@ public final class SystemMonitorService: ObservableObject {
         return await sampleOnce()
     }
 
+    static func shouldRefreshSlowMetrics(
+        lastSampledAt: Date?,
+        now: Date,
+        interval: TimeInterval
+    ) -> Bool {
+        guard let lastSampledAt else { return true }
+        return now.timeIntervalSince(lastSampledAt) >= interval
+    }
+
     /// CPU and network calculations run on a cooperative worker thread to avoid blocking the main thread.
     private func performSampleOnce() async -> SystemMetricsSnapshot {
         let now = dateProvider()
@@ -2489,6 +2522,12 @@ public final class SystemMonitorService: ObservableObject {
             || now.timeIntervalSince(lastDiskCapacitySample!) >= diskCapacityRefreshInterval
         needsDiskCapacityRefresh = false
 
+        let shouldSampleSlowMetrics = Self.shouldRefreshSlowMetrics(
+            lastSampledAt: lastSlowMetricsSample,
+            now: now,
+            interval: Self.slowMetricsRefreshInterval
+        )
+
         let payload = await Task.detached(priority: .utility) { () -> (
             cpuLoad: host_cpu_load_info?,
             cpu: CPUMetrics,
@@ -2498,8 +2537,8 @@ public final class SystemMonitorService: ObservableObject {
             netCounters: (UInt64, UInt64),
             network: NetworkMetrics,
             privateIP: String?,
-            gpu: GPUMetrics,
-            sensors: AppleSMCSensorSample
+            gpu: GPUMetrics?,
+            sensors: AppleSMCSensorSample?
         ) in
             let load = SystemSampler.sampleCPULoad()
             let cpu: CPUMetrics
@@ -2512,11 +2551,11 @@ public final class SystemMonitorService: ObservableObject {
             let disk = shouldSampleDiskCapacity
                 ? SystemSampler.sampleDisk(fileManager: fm, volumeURL: volume)
                 : nil
-            let diskCounters = SystemSampler.sampleDiskCounters()
+            let diskCounters = shouldSampleSlowMetrics ? SystemSampler.sampleDiskCounters() : nil
             let counters = SystemSampler.sampleNetworkCounters()
             let privateIP = SystemSampler.samplePrivateIPv4Address()
-            let gpu = SystemSampler.sampleGPU()
-            let sensors = AppleSMCSensorReader.sample(chipName: currentHardware.cpuName)
+            let gpu = shouldSampleSlowMetrics ? SystemSampler.sampleGPU() : nil
+            let sensors = shouldSampleSlowMetrics ? AppleSMCSensorReader.sample(chipName: currentHardware.cpuName) : nil
             let network: NetworkMetrics
             if let prev = prevNet {
                 let elapsed = now.timeIntervalSince(prev.at)
@@ -2550,12 +2589,19 @@ public final class SystemMonitorService: ObservableObject {
         previousNetwork = (payload.netCounters.0, payload.netCounters.1, now)
         if let counters = payload.diskCounters {
             previousDisk = (counters.0, counters.1, now)
-        } else {
-            previousDisk = nil
         }
         networkIdentity.privateIPv4Address = payload.privateIP
         if shouldSampleDiskCapacity {
             lastDiskCapacitySample = now
+        }
+        if shouldSampleSlowMetrics {
+            lastSlowMetricsSample = now
+            if let gpu = payload.gpu {
+                cachedGPUMetrics = gpu
+            }
+            if let sensors = payload.sensors {
+                cachedSensorSample = sensors
+            }
         }
         if !didLoadHardware {
             didLoadHardware = true
@@ -2591,13 +2637,20 @@ public final class SystemMonitorService: ObservableObject {
             disk.readBytesPerSecond = rates.read
             disk.writeBytesPerSecond = rates.write
         }
-        var cpu = payload.cpu
-        cpu.temperature = payload.sensors.cpuTemperature
 
-        var gpu = payload.gpu
-        if case .available(var metrics) = gpu {
-            metrics.temperature = payload.sensors.gpuTemperature
-            gpu = .available(metrics)
+        let sensors = payload.sensors ?? cachedSensorSample ?? AppleSMCSensorSample(
+            cpuTemperature: .unavailableByPublicAPI,
+            gpuTemperature: .unavailableByPublicAPI,
+            fan: .unavailable(reason: "AppleSMC 只读传感器不可用")
+        )
+        var cpu = payload.cpu
+        cpu.temperature = sensors.cpuTemperature
+
+        let gpu = payload.gpu ?? cachedGPUMetrics ?? .unavailable(reason: "当前 GPU 未提供可读取的性能统计")
+        var finalGPU = gpu
+        if case .available(var metrics) = finalGPU {
+            metrics.temperature = sensors.gpuTemperature
+            finalGPU = .available(metrics)
         }
 
         let snap = SystemMetricsSnapshot(
@@ -2608,11 +2661,11 @@ public final class SystemMonitorService: ObservableObject {
             disk: disk,
             network: payload.network,
             networkIdentity: networkIdentity,
-            gpu: gpu,
-            fan: payload.sensors.fan
+            gpu: finalGPU,
+            fan: sensors.fan
         )
         snapshot = snap
-        history.append(cpu: cpu, gpu: payload.gpu, network: payload.network)
+        history.append(cpu: cpu, gpu: gpu, network: payload.network)
         Task { [weak self] in
             await self?.refreshPublicIPAddressIfNeeded()
         }

@@ -307,15 +307,6 @@ struct ToolboxModuleView: View {
                 model.powerAssertions.setPreventIdleSystemSleep(!model.powerAssertions.preventIdleSystemSleep)
             }
 
-            ToolToggleButton(
-                title: "常驻提醒",
-                symbol: "pin.fill",
-                isOn: model.settingsStore.settings.toolboxReminderEnabled,
-                help: "无媒体占用时，在折叠状态显示番茄钟、亮屏或清洁状态",
-                isDisabled: !model.settingsStore.settings.sideNoticesEnabled
-            ) {
-                model.settingsStore.settings.toolboxReminderEnabled.toggle()
-            }
         }
     }
 

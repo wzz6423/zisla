@@ -216,6 +216,20 @@ struct CodexSessionActivityDetectorTests {
     }
 
     @Test
+    func openFileLookupStopsAtItsDeadline() {
+        let startedAt = Date()
+
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sleep"),
+            arguments: ["1"],
+            timeout: 0.05
+        )
+
+        #expect(output == nil)
+        #expect(Date().timeIntervalSince(startedAt) < 0.75)
+    }
+
+    @Test
     func blankSessionTitleFallsBackToProviderName() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }

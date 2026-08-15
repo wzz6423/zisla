@@ -62,9 +62,18 @@ public actor ReleasePackageDownloadService {
             throw ReleasePackageDownloadError.invalidAssetName
         }
 
-        let targetURL = directory
+        let targetDirectory = directory.standardizedFileURL
+        let targetURL = targetDirectory
             .appendingPathComponent(fileName, isDirectory: false)
             .standardizedFileURL
+        guard targetURL != targetDirectory,
+              targetURL.deletingLastPathComponent() == targetDirectory else {
+            throw ReleasePackageDownloadError.invalidAssetName
+        }
+
+        guard asset.size <= Self.maxDownloadSize else {
+            throw ReleasePackageDownloadError.responseTooLarge
+        }
 
         if FileManager.default.fileExists(atPath: targetURL.path) {
             return targetURL

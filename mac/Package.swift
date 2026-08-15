@@ -32,6 +32,8 @@ let package = Package(
                 .linkedFramework("ImageIO"),
                 .linkedFramework("CoreText"),
                 .linkedFramework("AVFoundation"),
+                .linkedFramework("IOKit"),
+                .linkedFramework("CoreBluetooth"),
                 .linkedLibrary("sqlite3"),
             ]
         ),
@@ -48,6 +50,7 @@ let package = Package(
                 .copy("../../Resources/Pets"),
                 .copy("../../Resources/QuickNotes"),
                 .copy("../../Resources/BrandIcons"),
+                .copy("../../Resources/ThirdPartyLicenses"),
                 .process("../../Resources/Localization"),
             ],
             linkerSettings: [

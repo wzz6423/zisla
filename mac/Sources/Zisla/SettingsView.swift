@@ -183,6 +183,8 @@ struct SettingsView: View {
         switch input.selection {
         case .general:
             generalContent
+        case .features:
+            featuresContent
         case .workflow:
             workflowContent
         case .info:
@@ -211,13 +213,6 @@ struct SettingsView: View {
     private var workflowContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("工作流模块") {
-                featureToggle(
-                    "媒体播放",
-                    detail: "显示系统正在播放的音乐或视频",
-                    symbol: "play.square.fill",
-                    keyPath: \.mediaEnabled
-                )
-                rowDivider
                 settingRow(
                     symbol: "music.note.list",
                     title: "播放来源",
@@ -281,58 +276,6 @@ struct SettingsView: View {
                     .frame(width: 132, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
-                rowDivider
-                featureToggle(
-                    "文件中转与分享",
-                    detail: "暂存文件并调用 AirDrop 或系统分享",
-                    symbol: "tray.full.fill",
-                    keyPath: \.fileShelfEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "小工具",
-                    detail: "番茄钟、亮屏与屏幕清洁",
-                    symbol: "wrench.and.screwdriver.fill",
-                    keyPath: \.toolboxEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "随记",
-                    detail: "Markdown 随手记，可发送到系统备忘录",
-                    symbol: "note.text",
-                    keyPath: \.quickNotesEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "PDF 工具",
-                    detail: "合并、拆分、加密与转换 PDF",
-                    symbol: "doc.text.fill",
-                    keyPath: \.pdfToolsEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "系统状态与清理",
-                    detail: "监控资源并安全清理缓存和日志",
-                    symbol: "gauge.with.dots.needle.67percent",
-                    keyPath: \.systemMonitorEnabled
-                )
-                rowDivider
-                settingRow(
-                    symbol: "app.badge",
-                    title: "显示 zisla 图标",
-                    detail: "关闭后不影响已启用的菜单栏监控项"
-                ) {
-                    Toggle(
-                        "",
-                        isOn: Binding(
-                            get: { model.settingsStore.settings.menuBarAppIconEnabled },
-                            set: { model.settingsStore.settings.menuBarAppIconEnabled = $0 }
-                        )
-                    )
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                }
                 if model.settingsStore.settings.systemMonitorEnabled {
                     rowDivider
                     settingRow(
@@ -379,33 +322,92 @@ struct SettingsView: View {
         }
     }
 
+    private var featuresContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            settingsGroup("媒体与文件") {
+                featureToggle("媒体播放", detail: "显示系统正在播放的音乐或视频", symbol: "play.square.fill", keyPath: \.mediaEnabled)
+                rowDivider
+                featureToggle("文件中转与分享", detail: "暂存文件并调用 AirDrop 或系统分享", symbol: "tray.full.fill", keyPath: \.fileShelfEnabled)
+                rowDivider
+                featureToggle("链接下载", detail: "下载视频或音频", symbol: "arrow.down.circle.fill", keyPath: \.downloaderEnabled)
+                rowDivider
+                featureToggle("剪贴板历史", detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
+                rowDivider
+                featureToggle("剪贴板链接检测", detail: "发现可下载链接时提示", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
+            }
+
+            settingsGroup("信息与通知") {
+                featureToggle("日历日程", detail: "显示接下来的日程与会议", symbol: "calendar", keyPath: \.calendarEnabled)
+                rowDivider
+                featureToggle("天气", detail: "显示当前或自选地区的天气", symbol: "cloud.sun.fill", keyPath: \.weatherEnabled)
+                rowDivider
+                featureToggle("邮件", detail: "读取已配置的 Mail.app 账户并提醒新邮件", symbol: "envelope.fill", keyPath: \.mailEnabled)
+                rowDivider
+                featureToggle("侧翼通知", detail: "在灵动岛肩部显示任务变化", symbol: "bell.badge.fill", keyPath: \.sideNoticesEnabled)
+                rowDivider
+                featureToggle("锁屏信息", detail: "在系统锁屏页显示状态信息与播放器", symbol: "lock.display", keyPath: \.lockScreenInfoEnabled)
+                rowDivider
+                featureToggle("专注倒计时", detail: "专注时在收起态灵动岛显示剩余时间", symbol: "clock", keyPath: \.focusCountdownIslandEnabled)
+                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                rowDivider
+                featureToggle("工具箱提醒", detail: "在收起态提示番茄钟、亮屏和清洁状态", symbol: "bell.fill", keyPath: \.toolboxReminderEnabled)
+                    .disabled(!model.settingsStore.settings.toolboxEnabled || !model.settingsStore.settings.sideNoticesEnabled)
+            }
+
+            settingsGroup("AI 与语音") {
+                featureToggle("AI 进度与用量", detail: "汇总桌面端与 CLI 工具的运行状态", symbol: "sparkles", keyPath: \.aiProgressEnabled)
+                rowDivider
+                featureToggle("AI Agent", detail: "启用 AI Agent 功能模块与后台服务", symbol: "sparkles.square.filled.on.square", keyPath: \.aiAgentEnabled)
+                rowDivider
+                featureToggle("语音输入", detail: "开启后可通过全局快捷键触发语音输入", symbol: "mic.fill", keyPath: \.voiceInputEnabled)
+            }
+
+            settingsGroup("工具与监控") {
+                featureToggle("小工具", detail: "番茄钟、亮屏与屏幕清洁", symbol: "wrench.and.screwdriver.fill", keyPath: \.toolboxEnabled)
+                rowDivider
+                featureToggle("随记", detail: "Markdown 随手记，可发送到系统备忘录", symbol: "note.text", keyPath: \.quickNotesEnabled)
+                rowDivider
+                featureToggle("PDF 工具", detail: "合并、拆分、加密与转换 PDF", symbol: "doc.text.fill", keyPath: \.pdfToolsEnabled)
+                rowDivider
+                featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
+                rowDivider
+                featureToggle("电池监控", detail: "显示电池详细信息与健康状态", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
+            }
+
+            settingsGroup("灵动岛与下载展示") {
+                featureToggle("鼠标移入展开", detail: "鼠标进入屏幕顶部感应区时显示", symbol: "cursorarrow.motionlines", keyPath: \.hoverActivationEnabled)
+                rowDivider
+                featureToggle("显示 zisla 图标", detail: "关闭后不影响已启用的菜单栏监控项", symbol: "app.badge", keyPath: \.menuBarAppIconEnabled)
+                rowDivider
+                featureToggle("始终置顶", detail: "收起时保持在其他窗口和菜单栏图标上方", symbol: "rectangle.topthird.inset.filled", keyPath: \.islandCollapsedOnTop)
+                rowDivider
+                featureToggle("浏览器下载进度", detail: "在灵动岛显示来源图标与百分比", symbol: "arrow.down.circle.fill", keyPath: \.browserDownloadIslandEnabled)
+                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                rowDivider
+                featureToggle("原生下载进度", detail: "下载器工作时显示来源平台图标与百分比", symbol: "arrow.down.square.fill", keyPath: \.videoDownloadIslandEnabled)
+                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                rowDivider
+                featureToggle("静音 Zisla 通知", detail: "不发送番茄钟等由 Zisla 产生的系统通知", symbol: "bell.slash.fill", keyPath: \.notificationsMuted)
+            }
+
+            settingsGroup("桌面宠物与更新") {
+                featureToggle("桌面宠物", detail: "在灵动岛养一只小宠物", symbol: "pawprint.fill", keyPath: \.petEnabled)
+                rowDivider
+                featureToggle("自动检查更新", detail: "定期检查当前安装包所属的更新通道", symbol: "arrow.triangle.2.circlepath", keyPath: \.updateChecksEnabled)
+                rowDivider
+                featureToggle("自动下载更新", detail: "发现新版本时自动下载安装包", symbol: "arrow.down.circle.fill", keyPath: \.automaticDownloadEnabled)
+                    .disabled(!model.settingsStore.settings.updateChecksEnabled)
+            }
+        }
+    }
+
     private var infoContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("信息与通知") {
-                featureToggle(
-                    "日历日程",
-                    detail: "显示接下来的日程与会议",
-                    symbol: "calendar",
-                    keyPath: \.calendarEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "邮件",
-                    detail: "读取已配置的 Mail.app 账户并提醒新邮件",
-                    symbol: "envelope.fill",
-                    keyPath: \.mailEnabled
-                )
                 if model.settingsStore.settings.mailEnabled {
-                    rowDivider
                     mailAccountSettings
                 }
                 rowDivider
-                featureToggle(
-                    "锁屏信息",
-                    detail: "在系统锁屏页显示状态信息与播放器",
-                    symbol: "lock.display",
-                    keyPath: \.lockScreenInfoEnabled
-                )
                 if model.settingsStore.settings.lockScreenInfoEnabled {
                     rowDivider
                     settingRow(
@@ -442,21 +444,6 @@ struct SettingsView: View {
                         .controlSize(.small)
                     }
                 }
-                rowDivider
-                featureToggle(
-                    "侧翼通知",
-                    detail: "在灵动岛肩部显示任务变化",
-                    symbol: "bell.badge.fill",
-                    keyPath: \.sideNoticesEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "岛上倒计时",
-                    detail: "专注时在收起态灵动岛显示剩余时间",
-                    symbol: "clock",
-                    keyPath: \.focusCountdownIslandEnabled
-                )
-                .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 rowDivider
                 settingRow(
                     symbol: "timer",
@@ -596,25 +583,13 @@ struct SettingsView: View {
     /// AI monitoring and agent behavior; model definitions and remote credentials appear only on the Models page.
     private var aiContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("AI 监控") {
-                featureToggle(
-                    "AI 进度与用量",
-                    detail: "汇总桌面端与 CLI 工具的运行状态",
-                    symbol: "sparkles",
-                    keyPath: \.aiProgressEnabled
-                )
-            }
             settingsGroup("AI Agent 行为") {
-                featureToggle(
-                    "在灵动岛显示",
-                    detail: "关闭后仅从工具栏隐藏，此处的配置与对话不受影响",
-                    symbol: "sparkles.square.filled.on.square",
-                    keyPath: \.aiAgentEnabled
-                )
-                rowDivider
                 AIAgentModuleView(model: model, configurationScope: .agent)
                     .frame(minHeight: 430)
-                    .task { await model.aiAgent.refreshAll() }
+                    .task {
+                        guard model.settingsStore.settings.aiAgentEnabled else { return }
+                        await model.aiAgent.refreshAll()
+                    }
             }
         }
     }
@@ -810,14 +785,7 @@ struct SettingsView: View {
     private var voiceInputGroup: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("语音输入") {
-                featureToggle(
-                    "启用语音输入",
-                    detail: "开启后可通过全局快捷键触发语音输入",
-                    symbol: "mic.fill",
-                    keyPath: \.voiceInputEnabled
-                )
                 if model.settingsStore.settings.voiceInputEnabled {
-                    rowDivider
                     settingRow(
                         symbol: "rectangle.2.group",
                         title: "录音模式",
@@ -890,7 +858,10 @@ struct SettingsView: View {
             settingsGroup("远端模型与凭据") {
                 AIAgentModuleView(model: model, configurationScope: .remoteModels)
                     .frame(minHeight: 300)
-                    .task { await model.aiAgent.refreshAll() }
+                    .task {
+                        guard model.settingsStore.settings.aiAgentEnabled else { return }
+                        await model.aiAgent.refreshAll()
+                    }
             }
 
             settingsGroup("语音整理模型") {
@@ -1041,13 +1012,6 @@ struct SettingsView: View {
     private var petContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("桌面宠物") {
-                featureToggle(
-                    "岛上宠物伙伴",
-                    detail: "在灵动岛养一只小宠物",
-                    symbol: "pawprint.fill",
-                    keyPath: \.petEnabled
-                )
-                rowDivider
                 settingRow(
                     symbol: "shippingbox.fill",
                     title: "当前宠物",
@@ -1278,47 +1242,26 @@ struct SettingsView: View {
                 }
             }
 
-            settingsGroup("展开方式") {
-                featureToggle(
-                    "鼠标移入展开",
-                    detail: "鼠标进入屏幕顶部感应区时显示",
-                    symbol: "cursorarrow.motionlines",
-                    keyPath: \.hoverActivationEnabled
-                )
-            }
         }
     }
 
     private var privacyContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("剪贴板") {
-                featureToggle(
-                    "记录剪贴板历史",
-                    detail: "仅本机保存文本和图片",
-                    symbol: "clipboard",
-                    keyPath: \.clipboardHistoryEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "检测剪贴板链接",
-                    detail: "发现可下载链接时提示",
-                    symbol: "clipboard.fill",
-                    keyPath: \.clipboardDetectionEnabled
-                )
+            settingsGroup("剪贴板数据管理") {
+                settingRow(
+                    symbol: "info.circle",
+                    title: "数据存储",
+                    detail: "剪贴板历史仅保存在本机，不会上传"
+                ) {
+                    EmptyView()
+                }
             }
         }
     }
 
     private var downloadContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("下载器") {
-                featureToggle(
-                    "链接下载",
-                    detail: "下载视频或音频",
-                    symbol: "arrow.down.circle.fill",
-                    keyPath: \.downloaderEnabled
-                )
-                rowDivider
+            settingsGroup("下载目录") {
                 settingRow(
                     symbol: "folder.fill",
                     title: "默认下载目录",
@@ -1328,24 +1271,6 @@ struct SettingsView: View {
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 }
-            }
-
-            settingsGroup("下载通知") {
-                featureToggle(
-                    "浏览器下载进度",
-                    detail: "在灵动岛显示来源图标与百分比",
-                    symbol: "arrow.down.circle.fill",
-                    keyPath: \.browserDownloadIslandEnabled
-                )
-                .disabled(!model.settingsStore.settings.sideNoticesEnabled)
-                rowDivider
-                featureToggle(
-                    "原生下载进度",
-                    detail: "下载器工作时显示来源平台图标与百分比",
-                    symbol: "arrow.down.square.fill",
-                    keyPath: \.videoDownloadIslandEnabled
-                )
-                .disabled(!model.settingsStore.settings.sideNoticesEnabled)
             }
 
             settingsGroup("组件") {
@@ -1606,15 +1531,6 @@ struct SettingsView: View {
 
     private var weatherContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("天气显示") {
-                featureToggle(
-                    "天气",
-                    detail: "显示当前或自选地区的天气",
-                    symbol: "cloud.sun.fill",
-                    keyPath: \.weatherEnabled
-                )
-            }
-
             settingsGroup("地点") {
                 ForEach(Array(model.weatherLocations.locations.enumerated()), id: \.element.id) {
                     index, location in
@@ -1735,21 +1651,6 @@ struct SettingsView: View {
                         height: 28
                     )
                 }
-                rowDivider
-                featureToggle(
-                    "自动检查更新",
-                    detail: "定期检查当前安装包所属的更新通道",
-                    symbol: "arrow.triangle.2.circlepath",
-                    keyPath: \.updateChecksEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "自动下载更新",
-                    detail: "会自动将新的安装包下载到下载目录，需要自行在下载目录双击进行安装更新",
-                    symbol: "arrow.down.circle.fill",
-                    keyPath: \.automaticDownloadEnabled
-                )
-                .disabled(!model.settingsStore.settings.updateChecksEnabled)
             }
 
             settingsGroup("更新下载目录") {
@@ -2476,6 +2377,7 @@ private final class VoiceInputHotkeyRecorderButton: NSButton {
 
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general
+    case features
     case workflow
     case info
     case ai
@@ -2498,6 +2400,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: "通用"
+        case .features: "功能"
         case .workflow: "工作流"
         case .info: "信息"
         case .ai: "AI"
@@ -2515,6 +2418,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .general: "gearshape.fill"
+        case .features: "switch.2"
         case .workflow: "square.grid.2x2.fill"
         case .info: "info.circle.fill"
         case .ai: "sparkles"
@@ -2532,6 +2436,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .general: "调整语言、外观、启动与展开方式。"
+        case .features: "集中开启或关闭所有功能模块。"
         case .workflow: "管理灵动岛中的工作流模块。"
         case .info: "配置日历、邮件、锁屏与通知显示。"
         case .ai: "AI 进度，以及连接、自动化、CLI 与 Skills 等 Agent 行为。"

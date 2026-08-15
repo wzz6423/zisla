@@ -19,6 +19,10 @@ final class IslandPetController: ObservableObject {
 
     init(model: AppModel) {
         self.model = model
+    }
+
+    func start() {
+        guard cancellables.isEmpty else { return }
         model.settingsStore.$settings
             .removeDuplicates()
             .sink { [weak self] _ in Task { @MainActor [weak self] in self?.refresh() } }
@@ -27,14 +31,14 @@ final class IslandPetController: ObservableObject {
             .removeDuplicates()
             .sink { [weak self] _ in Task { @MainActor [weak self] in self?.updateActivityFromAI() } }
             .store(in: &cancellables)
-    }
-
-    func start() {
         refresh()
     }
 
     func stop() {
         cancellables.removeAll()
+        sprite = nil
+        loadedPetID = nil
+        behavior.setActivity(nil)
     }
 
     private func refresh() {

@@ -8,6 +8,7 @@ public struct SideNoticePresentation: Equatable, Sendable {
     public let activeMediaNotice: IslandNotice?
     public let activeFocusCountdownNotice: IslandNotice?
     public let activeFocusModeNotice: IslandNotice?
+    public let activeTransientNotice: IslandNotice?
     public let activeMailNotice: IslandNotice?
     public let activeToolboxNotice: IslandNotice?
     public let activeBrowserDownloadNotice: IslandNotice?
@@ -25,6 +26,7 @@ public struct SideNoticePresentation: Equatable, Sendable {
         activeMediaNotice: IslandNotice? = nil,
         activeFocusCountdownNotice: IslandNotice? = nil,
         activeFocusModeNotice: IslandNotice? = nil,
+        activeTransientNotice: IslandNotice? = nil,
         activeMailNotice: IslandNotice? = nil,
         activeToolboxNotice: IslandNotice? = nil,
         activeBrowserDownloadNotice: IslandNotice? = nil,
@@ -41,6 +43,7 @@ public struct SideNoticePresentation: Equatable, Sendable {
         self.activeMediaNotice = activeMediaNotice
         self.activeFocusCountdownNotice = activeFocusCountdownNotice
         self.activeFocusModeNotice = activeFocusModeNotice
+        self.activeTransientNotice = activeTransientNotice
         self.activeMailNotice = activeMailNotice
         self.activeToolboxNotice = activeToolboxNotice
         self.activeBrowserDownloadNotice = activeBrowserDownloadNotice
@@ -55,7 +58,8 @@ public struct SideNoticePresentation: Equatable, Sendable {
     public var hasCompactContent: Bool {
         activeAICount > 0 || activeMediaNotice != nil || activeFocusCountdownNotice != nil
             || activeUpdateNotice != nil
-            || activeFocusModeNotice != nil || activeToolboxNotice != nil
+            || activeFocusModeNotice != nil || activeTransientNotice != nil
+            || activeToolboxNotice != nil
             || activeMailNotice != nil
             || activeBrowserDownloadNotice != nil || activeVideoDownloadNotice != nil
             || compactPlaceholder
@@ -156,6 +160,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let activeFocusModeNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("focus-mode-") })
             : nil
+        let activeTransientNotice = compactWingsEnabled
+            ? notices.first(where: { $0.id.hasPrefix("focus-transition") })
+            : nil
         let activeMailNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("mail-notification-") })
             : nil
@@ -194,6 +201,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             hasMedia: activeMediaNotice != nil,
             hasFocusCountdown: activeFocusCountdownNotice != nil,
             hasFocusMode: activeFocusModeNotice != nil,
+            hasTransient: activeTransientNotice != nil,
             hasMail: activeMailNotice != nil,
             hasToolbox: activeToolboxNotice != nil,
             hasBrowserDownload: activeBrowserDownloadNotice != nil,
@@ -209,6 +217,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             && activeMediaNotice == nil
             && activeFocusCountdownNotice == nil
             && activeFocusModeNotice == nil
+            && activeTransientNotice == nil
             && activeMailNotice == nil
             && activeToolboxNotice == nil
             && activeBrowserDownloadNotice == nil
@@ -220,6 +229,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             activeMediaNotice: activeMediaNotice,
             activeFocusCountdownNotice: activeFocusCountdownNotice,
             activeFocusModeNotice: activeFocusModeNotice,
+            activeTransientNotice: activeTransientNotice,
             activeMailNotice: activeMailNotice,
             activeToolboxNotice: activeToolboxNotice,
             activeBrowserDownloadNotice: activeBrowserDownloadNotice,
@@ -414,6 +424,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         hasMedia: Bool,
         hasFocusCountdown: Bool,
         hasFocusMode: Bool,
+        hasTransient: Bool,
         hasMail: Bool,
         hasToolbox: Bool,
         hasBrowserDownload: Bool,
@@ -422,8 +433,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         compactWingHeight: CGFloat,
         reserveCompactWing: Bool
     ) -> CGSize {
-        let hasCompact = activeAICount > 0 || hasUpdate || hasMedia || hasFocusCountdown || hasFocusMode || hasMail
-            || hasToolbox || hasBrowserDownload || hasVideoDownload || reserveCompactWing
+        let hasCompact = activeAICount > 0 || hasUpdate || hasMedia || hasFocusCountdown || hasFocusMode || hasTransient
+            || hasMail || hasToolbox || hasBrowserDownload || hasVideoDownload || reserveCompactWing
         guard ordinaryCount > 0 else {
             return hasCompact
                 ? CGSize(width: Layout.compactWingWidth, height: compactWingHeight)

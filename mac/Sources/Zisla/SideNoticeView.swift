@@ -72,6 +72,13 @@ struct SideNoticeRootView: View {
                     height: presentation.compactWingHeight
                 )
                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
+            } else if let transientNotice = presentation.activeTransientNotice {
+                CompactTransientWing(
+                    notice: transientNotice,
+                    side: side,
+                    height: presentation.compactWingHeight
+                )
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
             } else if let toolboxNotice = presentation.activeToolboxNotice {
                 CompactToolboxWing(
                     notice: toolboxNotice,
@@ -1491,6 +1498,39 @@ private struct CompactFocusModeWing: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("专注模式：\(notice.title)"))
         .help("专注模式：\(notice.title)")
+    }
+}
+
+private struct CompactTransientWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    var body: some View {
+        Group {
+            if side == .left {
+                Image(systemName: notice.symbolName ?? "moon.fill")
+                    .font(.system(size: min(15, height * 0.56), weight: .semibold))
+            } else {
+                Text(notice.kind == .success ? "ON" : "OFF")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .monospaced()
+                    .foregroundStyle(notice.kind == .success ? .green : .secondary)
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
+        .frame(
+            width: CompactStatusMetrics.wingWidth,
+            height: height,
+            alignment: side == .left ? .leading : .trailing
+        )
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+        .contentShape(CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("\(notice.title)\(notice.detail ?? "")"))
+        .help("\(notice.title)\(notice.detail ?? "")")
     }
 }
 

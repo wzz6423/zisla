@@ -1327,6 +1327,15 @@ struct DownloadCoreTests {
     }
 
     @Test
+    func httpURLParserRecognizesOnlyCompleteHTTPLinks() {
+        #expect(HTTPURLParser.url(from: "  HTTPS://Example.com/中文路径  ") != nil)
+        #expect(HTTPURLParser.url(from: "https://example.com/path with spaces") == nil)
+        #expect(HTTPURLParser.url(from: "www.example.com") == nil)
+        #expect(HTTPURLParser.url(from: "ftp://example.com") == nil)
+        #expect(HTTPURLParser.url(from: "链接：https://example.com") == nil)
+    }
+
+    @Test
     func clipboardClassifierRecognizesSupportedAndDirectMediaLinks() {
         #expect(DownloadURLClassifier.isLikelyDownloadable("https://www.youtube.com/watch?v=abc"))
         #expect(DownloadURLClassifier.isLikelyDownloadable("https://v.qq.com/x/cover/abc.html"))
