@@ -642,7 +642,7 @@ struct BatteryDetailView: View {
                 symbol: "ruler"
             )
             metricTile(
-                title: "当前容量",
+                title: "当前电量",
                 value: battery.currentCapacityMAh.map { "\($0) mAh" } ?? "--",
                 symbol: "battery.50percent"
             )
