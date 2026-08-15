@@ -10,24 +10,12 @@ struct ShelfModuleView: View {
         GridItem(.adaptive(minimum: 66, maximum: 66), spacing: 8),
     ]
 
-    private static let shelfShape = UnevenRoundedRectangle(
-        cornerRadii: .init(
-            topLeading: IslandSurfaceGeometry.moduleInnerCornerRadius,
-            bottomLeading: IslandSurfaceGeometry.moduleInnerCornerRadius,
-            bottomTrailing: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
-            topTrailing: IslandSurfaceGeometry.moduleInnerCornerRadius
-        ),
-        style: .continuous
+    private static let shelfShape = IslandSurfaceGeometry.moduleContentShape(
+        bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
     )
 
-    private static let shareShoulderShape = UnevenRoundedRectangle(
-        cornerRadii: .init(
-            topLeading: IslandSurfaceGeometry.moduleInnerCornerRadius,
-            bottomLeading: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
-            bottomTrailing: IslandSurfaceGeometry.moduleInnerCornerRadius,
-            topTrailing: IslandSurfaceGeometry.moduleInnerCornerRadius
-        ),
-        style: .continuous
+    private static let shareShoulderShape = IslandSurfaceGeometry.moduleContentShape(
+        bottomLeadingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
     )
 
     var body: some View {

@@ -516,6 +516,16 @@ struct BatteryDetailView: View {
     @ObservedObject var networkMonitor: NetworkBatteryMonitor
     var onContentHeightChange: (CGFloat) -> Void = { _ in }
 
+    @State private var contentHeight = IslandModuleLayout.batteryMaximumContentHeight
+
+    private var deviceCardShape: UnevenRoundedRectangle {
+        IslandSurfaceGeometry.moduleContentShape(
+            cornerRadius: IslandSurfaceGeometry.nestedBottomCornerRadius(
+                inset: IslandSurfaceGeometry.moduleInset
+            )
+        )
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
@@ -539,9 +549,10 @@ struct BatteryDetailView: View {
             .coordinateSpace(name: "batteryContent")
         }
         .scrollIndicators(.hidden)
-        .frame(maxHeight: 430)
+        .frame(maxHeight: min(contentHeight, IslandModuleLayout.batteryMaximumContentHeight))
         .onPreferenceChange(ContentHeightPreferenceKey.self) { height in
             guard height > 0 else { return }
+            contentHeight = height
             onContentHeightChange(height)
         }
         .onAppear {
@@ -727,9 +738,9 @@ struct BatteryDetailView: View {
                     }
                 }
                 .background(Color.fillCard)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(deviceCardShape)
                 .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    deviceCardShape
                         .strokeBorder(Color.strokeCard, lineWidth: 0.5)
                 }
             } else {
@@ -750,9 +761,9 @@ struct BatteryDetailView: View {
                         deviceRow(unpairedDevice)
                             .frame(minHeight: 64)
                             .background(Color.fillCard)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .clipShape(deviceCardShape)
                             .overlay {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                deviceCardShape
                                     .strokeBorder(Color.strokeCard, lineWidth: 0.5)
                             }
                     }
@@ -869,9 +880,9 @@ struct BatteryDetailView: View {
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
         .background(Color.fillCard)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .clipShape(deviceCardShape)
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            deviceCardShape
                 .strokeBorder(Color.strokeCard, lineWidth: 0.5)
         }
         .accessibilityElement(children: .combine)

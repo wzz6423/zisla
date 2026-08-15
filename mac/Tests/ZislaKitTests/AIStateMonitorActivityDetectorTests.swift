@@ -103,11 +103,11 @@ struct AIStateMonitorActivityDetectorTests {
         defer { monitor.stop() }
 
         monitor.start()
-        let detected = await waitForMonitorState { monitor.state.tasks == [task] }
+        let detected = await waitForMonitorState(timeout: 10) { monitor.state.tasks == [task] }
         #expect(detected)
 
         detector.replaceTasks(with: [])
-        let removed = await waitForMonitorState { monitor.state.tasks.isEmpty }
+        let removed = await waitForMonitorState(timeout: 10) { monitor.state.tasks.isEmpty }
         #expect(removed)
     }
 

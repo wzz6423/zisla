@@ -28,6 +28,18 @@ struct ToolboxModuleView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
+    private var focusPanelShape: UnevenRoundedRectangle {
+        IslandSurfaceGeometry.moduleContentShape(
+            bottomLeadingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
+        )
+    }
+
+    private var startPauseButtonShape: UnevenRoundedRectangle {
+        IslandSurfaceGeometry.moduleContentShape(
+            bottomLeadingRadius: IslandSurfaceGeometry.nestedBottomCornerRadius(inset: 10)
+        )
+    }
+
     private var focusPanel: some View {
         VStack(spacing: 0) {
             HStack {
@@ -50,11 +62,11 @@ struct ToolboxModuleView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .frame(height: Metrics.controlHeight)
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .contentShape(startPauseButtonShape)
                 }
                 .buttonStyle(.plain)
                 .background(Color.fillCard)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(startPauseButtonShape)
                 .help(startPauseTitle)
 
                 Button {
@@ -76,9 +88,9 @@ struct ToolboxModuleView: View {
         .padding(10)
         .frame(width: 236, height: Metrics.toolContentHeight)
         .background(Color.fillCard)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(focusPanelShape)
         .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            focusPanelShape
                 .strokeBorder(Color.strokeCard, lineWidth: 1)
         }
     }
@@ -170,16 +182,6 @@ struct ToolboxModuleView: View {
                 )
 
                 ToolShortcutButton(
-                    title: "提词器",
-                    symbol: "text.viewfinder",
-                    help: "打开提词器"
-                ) {
-                    model.presentTeleprompter()
-                }
-            }
-
-            HStack(spacing: 8) {
-                ToolShortcutButton(
                     title: "闹钟",
                     symbol: "alarm",
                     help: "管理闹钟"
@@ -188,6 +190,16 @@ struct ToolboxModuleView: View {
                 }
                 .popover(isPresented: $isAlarmEditorPresented, arrowEdge: .bottom) {
                     AlarmEditorView(service: model.alarms)
+                }
+            }
+
+            HStack(spacing: 8) {
+                ToolShortcutButton(
+                    title: "提词器",
+                    symbol: "text.viewfinder",
+                    help: "打开提词器"
+                ) {
+                    model.presentTeleprompter()
                 }
 
                 ToolShortcutButton(
@@ -201,7 +213,8 @@ struct ToolboxModuleView: View {
                 ToolShortcutButton(
                     title: "废纸篓",
                     symbol: "trash",
-                    help: "清空废纸篓（不可撤销，会先确认）"
+                    help: "清空废纸篓（不可撤销，会先确认）",
+                    bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
                 ) {
                     model.emptyTrash()
                 }
@@ -360,7 +373,26 @@ struct ToolboxModuleView: View {
         let title: String
         let symbol: String
         let help: String
+        let bottomTrailingRadius: CGFloat
         let action: () -> Void
+
+        init(
+            title: String,
+            symbol: String,
+            help: String,
+            bottomTrailingRadius: CGFloat = IslandSurfaceGeometry.moduleInnerCornerRadius,
+            action: @escaping () -> Void
+        ) {
+            self.title = title
+            self.symbol = symbol
+            self.help = help
+            self.bottomTrailingRadius = bottomTrailingRadius
+            self.action = action
+        }
+
+        private var shape: UnevenRoundedRectangle {
+            IslandSurfaceGeometry.moduleContentShape(bottomTrailingRadius: bottomTrailingRadius)
+        }
 
         var body: some View {
             Button(action: action) {
@@ -368,11 +400,11 @@ struct ToolboxModuleView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .frame(maxWidth: .infinity)
                     .frame(height: Metrics.controlHeight)
-                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .contentShape(shape)
             }
             .buttonStyle(.plain)
             .background(Color.fillCard)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(shape)
             .accessibilityLabel(title)
             .help(help)
         }

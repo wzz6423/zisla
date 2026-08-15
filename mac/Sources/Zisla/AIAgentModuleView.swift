@@ -968,7 +968,10 @@ struct AIAgentModuleView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .islandGlassSurface(.input, cornerRadius: 14)
+                .islandGlassSurface(
+                    .input,
+                    cornerRadius: IslandSurfaceGeometry.nestedBottomCornerRadius(inset: 8)
+                )
                 .environment(\.islandVisualStyle, .frosted)
             }
         }

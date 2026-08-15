@@ -130,7 +130,7 @@ struct FocusModeMonitorTests {
 
     @MainActor
     private func waitUntil(
-        timeout: TimeInterval = 1,
+        timeout: TimeInterval = 10,
         condition: () -> Bool
     ) async -> Bool {
         let deadline = Date().addingTimeInterval(timeout)

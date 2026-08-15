@@ -155,6 +155,12 @@ struct QuickNoteModuleView: View {
 
     // MARK: - Editing
 
+    private var editorPaneShape: UnevenRoundedRectangle {
+        IslandSurfaceGeometry.moduleContentShape(
+            bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
+        )
+    }
+
     private var editorColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
             editorToolbar
@@ -174,7 +180,11 @@ struct QuickNoteModuleView: View {
 
             editorPane
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .islandGlassSurface(.input, cornerRadius: 8)
+            .islandGlassSurface(
+                .input,
+                cornerRadius: IslandSurfaceGeometry.moduleInnerCornerRadius,
+                bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
+            )
         }
         .padding(.leading, 10)
     }
@@ -235,7 +245,7 @@ struct QuickNoteModuleView: View {
         }
         .overlay {
             if isTransferTarget {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                editorPaneShape
                     .strokeBorder(Color.accentColor, lineWidth: 2)
                     .allowsHitTesting(false)
             }

@@ -67,14 +67,9 @@ struct ClipboardHistoryModuleView: View {
     private let copyItem: (ClipboardHistoryItem) -> Void
     private let sendToQuickNote: (ClipboardHistoryItem) -> Void
     private let sendToAIAgent: (ClipboardHistoryItem) -> Void
-    private static let surfaceShape = UnevenRoundedRectangle(
-        cornerRadii: .init(
-            topLeading: IslandSurfaceGeometry.moduleInnerCornerRadius,
-            bottomLeading: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
-            bottomTrailing: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
-            topTrailing: IslandSurfaceGeometry.moduleInnerCornerRadius
-        ),
-        style: .continuous
+    private static let surfaceShape = IslandSurfaceGeometry.moduleContentShape(
+        bottomLeadingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
+        bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
     )
 
     init(model: AppModel) {

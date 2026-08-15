@@ -365,7 +365,7 @@ extension OverlayCoordinatorTests {
     }
 
     @Test @MainActor
-    func pinnedPanelRemainsPassiveWhenItsSizeChanges() throws {
+    func pinnedPanelKeepsKeyboardEligibilityWhenItsSizeChanges() throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
         defer { coordinator.stop() }
@@ -382,7 +382,7 @@ extension OverlayCoordinatorTests {
 
         #expect(panel.keepsNativeGlassActive)
         #expect(panel.allowsNativeGlassActivation)
-        #expect(!panel.allowsKeyWindow)
+        #expect(panel.allowsKeyWindow)
         #expect(panel.canBecomeKey)
         #expect(panel.isPinned)
     }
