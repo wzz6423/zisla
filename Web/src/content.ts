@@ -27,7 +27,7 @@ export const productTagline = '原生 macOS 动态工作空间';
 export const productDescription =
   '把 AI 进度、媒体、文件和日程放到屏幕顶部，需要时展开，移开后收起。';
 
-export const heroTitle = '把正在发生的事，放到你<em>看得见</em>的地方。';
+export const heroTitle = 'zisla<br><em>屏幕顶部的动态工作空间。</em>';
 export const heroHints = [
   '鼠标移到屏幕顶部中央即可展开',
   '移开后自动收起，不抢当前应用焦点',
@@ -67,6 +67,8 @@ export const islandModules: IslandModuleMeta[] = [
 ];
 
 export const heroCycleModules = [
+  'dashboard',
+  'aiAgent',
   'download',
   'aiMonitor',
   'clipboard',
@@ -74,30 +76,33 @@ export const heroCycleModules = [
   'quickNotes',
   'pdf',
   'system',
+  'battery',
+  'toolbox',
+  'lockScreen',
   'mail',
   'shelf',
 ];
 
-/* ===== 正在播放（真实界面数据） ===== */
+/* ===== 正在播放（虚构演示数据） ===== */
 
 export const nowPlaying = {
-  title: '刻在我心底的名字',
-  artist: '卢广仲',
-  subtitle: '歌词即将开始',
-  currentSeconds: 12,
-  durationSeconds: 326,
+  title: '微光时刻',
+  artist: '演示音频',
+  subtitle: '示例歌词 · 静静流动',
+  currentSeconds: 54,
+  durationSeconds: 228,
 };
 
-export const islandUptime = '开机时间：2天22小时41分钟';
+export const islandUptime = '开机时间：1天4小时12分钟';
 
 export const islandMetrics = [
-  { label: 'CPU', value: 50, tone: 'normal' as const },
-  { label: 'GPU', value: 59, tone: 'normal' as const },
-  { label: 'RAM', value: 63, tone: 'normal' as const },
-  { label: 'Disk', value: 22, tone: 'good' as const },
+  { label: 'CPU', value: 18, tone: 'good' as const },
+  { label: 'GPU', value: 32, tone: 'normal' as const },
+  { label: 'RAM', value: 45, tone: 'normal' as const },
+  { label: 'Disk', value: 28, tone: 'good' as const },
 ];
 
-/* ===== AI 监控模块（真实界面数据） ===== */
+/* ===== AI 监控模块（虚构演示数据） ===== */
 
 export interface AITaskRow {
   name: string;
@@ -121,47 +126,47 @@ export const providerColors: Record<AITaskRow['provider'], string> = {
 
 export const aiTasks: AITaskRow[] = [
   {
-    name: '重构灵动岛布局引擎',
+    name: '整理组件使用文档',
     provider: 'CLAUDE',
-    detail: 'zisla/mac · IslandRootView',
+    detail: '演示项目 · UI Library',
     effort: 'high',
-    meta: '2026-08-15 08:31 · PID 20416',
+    meta: '开始 09:30 · 演示会话 A1',
     elapsedSeconds: 60,
     status: 'spinner',
   },
   {
-    name: '修复剪贴板过滤失效',
+    name: '检查搜索结果排序',
     provider: 'GPT',
-    detail: 'zisla/mac · ClipboardHistoryModuleView',
+    detail: '演示项目 · Search',
     effort: 'max',
-    meta: '2026-08-15 08:24 · PID 19872',
+    meta: '开始 09:15 · 演示会话 B2',
     elapsedSeconds: 459,
     status: 'dot',
   },
   {
-    name: '官网模块展示页重排',
+    name: '调整产品展示文案',
     provider: 'CODEX',
-    detail: 'zisla/Web · showcase gallery',
+    detail: '官网演示 · Showcase',
     effort: 'high',
-    meta: '2026-08-15 08:28 · PID 21749',
+    meta: '开始 09:25 · 演示会话 C3',
     elapsedSeconds: 226,
     status: 'spinner',
   },
   {
-    name: '下载器队列稳定性回归',
+    name: '验证下载队列状态',
     provider: 'GEMINI',
-    detail: 'zisla/mac · DownloadModuleView',
+    detail: '演示项目 · Queue',
     effort: 'medium',
-    meta: '2026-08-15 08:27 · PID 20115',
+    meta: '开始 09:20 · 演示会话 D4',
     elapsedSeconds: 235,
     status: 'dot',
   },
   {
-    name: '生成 v0.1.2 发布说明',
+    name: '生成示例发布说明',
     provider: 'QWEN',
-    detail: 'zisla · release notes',
+    detail: '演示项目 · Docs',
     effort: 'low',
-    meta: '2026-08-15 08:17 · PID 19230',
+    meta: '开始 09:00 · 演示会话 E5',
     elapsedSeconds: 873,
     status: 'spinner',
   },
@@ -169,62 +174,63 @@ export const aiTasks: AITaskRow[] = [
 
 export const tokenTrend = {
   yLabels: ['1M', '10M', '100M', '1B'],
-  xLabels: ['08/09', '08/10', '08/11', '08/12', '08/13', '08/14', '08/15'],
+  xLabels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
   // 对数刻度下的归一化值（1M=0.05, 1B=1.0），呈上升趋势
   points: [0.08, 0.14, 0.12, 0.28, 0.42, 0.66, 0.94],
   lastValue: '947M',
 };
 
-/* ===== 剪贴板模块（真实界面数据） ===== */
+/* ===== 剪贴板模块（虚构演示数据） ===== */
 
 export const clipboardMeta = {
-  total: 641,
+  total: 12,
   tabs: ['全部', '常用', '非常用'],
   filters: [
-    { label: '全部', count: 641 },
-    { label: '文件夹', count: 0 },
-    { label: '图片', count: 138 },
-    { label: 'URL', count: 16 },
+    { label: '全部', count: 12 },
+    { label: '文件夹', count: 1 },
+    { label: '图片', count: 3 },
+    { label: 'URL', count: 2 },
     { label: '视频', count: 0 },
-    { label: '文档', count: 487 },
+    { label: '文档', count: 4 },
     { label: '压缩包', count: 0 },
-    { label: '代码', count: 0 },
-    { label: '其他', count: 0 },
+    { label: '代码', count: 1 },
+    { label: '其他', count: 1 },
   ],
   actions: ['随记', 'AI', '常用', '删除'],
 };
 
 export const clipboardItems = [
-  { kind: 'image' as const, title: '图片', meta: 'PNG · 484.0 KB' },
+  { kind: 'image' as const, title: '示例设计稿.png', meta: 'PNG · 324.5 KB' },
   {
     kind: 'code' as const,
-    title: 'swift build -c release --package-path mac',
+    title: 'npm run test',
     meta: '代码',
   },
   {
     kind: 'url' as const,
-    title: 'https://github.com/wzz6423/zisla/releases',
+    title: 'https://example.com/documentation',
     meta: 'URL',
   },
   {
     kind: 'text' as const,
-    title: '灵动岛展开时不能激活或抢走当前应用焦点',
+    title: '下周三下午同步演示方案',
     meta: '文本',
   },
 ];
 
-/* ===== 中转站模块（真实界面数据） ===== */
+/* ===== 中转站模块（虚构演示数据） ===== */
 
 export const shelfMeta = {
-  count: 0,
+  count: 3,
   filters: ['全部', '文件夹', '图片', '视频', '音频', '文档', '压缩包', '代码', '其他'],
   previews: [
-    { name: 'image.png', meta: 'PNG · 484.0 KB' },
-    { name: 'image.png', meta: 'PNG · 462.5 KB' },
+    { name: '演示封面.png', meta: 'PNG · 484.0 KB', kind: 'image' },
+    { name: '示例资料.pdf', meta: 'PDF · 1.2 MB', kind: 'document' },
+    { name: '原型素材.zip', meta: 'ZIP · 8.6 MB', kind: 'archive' },
   ],
 };
 
-/* ===== 下载模块（真实界面数据） ===== */
+/* ===== 下载模块（产品界面演示数据） ===== */
 
 export const downloadMeta = {
   placeholder: '视频或音频链接',
@@ -233,59 +239,86 @@ export const downloadMeta = {
   clipboardToggle: '剪贴板检测已开启',
 };
 
-/* ===== 日程模块（真实界面数据） ===== */
+/* ===== 日程模块（虚构演示数据） ===== */
 
 export const weatherCities = [
   {
-    region: '陕西省西安市',
+    region: '示例市 · 中心区',
     icon: 'sun',
-    condition: '晴 · 体感 28°',
-    temp: '23°',
-    sun: '06:05 / 19:32',
+    condition: '晴 · 体感 26°',
+    temp: '24°',
+    sun: '06:12 / 19:28',
     rain: '0.0mm',
-    humidity: '2% / 0.0mm',
+    humidity: '5% / 0.0mm',
   },
   {
-    region: '甘肃省兰州市',
+    region: '示例市 · 湖畔区',
     icon: 'cloud',
-    condition: '阴 · 体感 21°',
-    temp: '23°',
-    sun: '06:33 / 20:00',
+    condition: '多云 · 体感 22°',
+    temp: '21°',
+    sun: '06:25 / 19:45',
     rain: '0.0mm',
-    humidity: '94% / 1.7mm',
+    humidity: '78% / 1.2mm',
   },
 ];
 
-export const agendaEmptyText = '当天暂无事项';
+export const agendaEmptyText = '今天没有待办事项';
 
-/* ===== 随记模块（真实界面数据） ===== */
+/* ===== 随记模块（虚构演示数据） ===== */
 
 export const notesMeta = {
-  count: 5,
-  wordCount: '316字',
+  count: 4,
+  wordCount: '86 字',
   list: [
-    { title: '朋友，看这里。', meta: '内置说明', selected: true },
-    { title: '随记', meta: '14小时前' },
-    { title: 'To Do', meta: '5月18日' },
-    { title: '随笔', meta: '3月31日' },
-    { title: '随记', meta: '11月16日' },
-    { title: '随记', meta: '11月2日' },
+    { title: '产品演示提纲', meta: '刚刚', selected: true },
+    { title: '下周待办', meta: '2 小时前' },
+    { title: '读书摘要', meta: '昨天' },
+    { title: '灵感记录', meta: '上周' },
   ],
   body:
-    '从现在开始，你可以在记事本中写记事了。随时随地在记事本写上一笔，并设置日历提醒，事情不再错过。读书感悟、生活体验、团队计划等等，你都可以放进记事本里。',
+    '用随记收集灵感、整理待办，或把手边的文字和文件继续发给 AI Agent。内容保存在系统「备忘录」中。',
 };
 
-/* ===== 邮件模块（真实界面数据） ===== */
+/* ===== 邮件模块（虚构演示数据） ===== */
 
 export const mailMeta = {
-  errorTitle: '无法读取邮件',
-  errorBody:
-    '无法访问 Mail 的本地邮件索引。请在「系统设置 → 隐私与安全性 → 完全磁盘访问」中允许 zisla，然后重新读取。',
-  actions: ['重新读取', '授权磁盘访问'],
-  emptyText: '选择一封邮件',
+  account: '演示账户',
+  unread: 2,
+  messages: [
+    {
+      sender: '产品协作',
+      title: '本周体验清单',
+      preview: '演示版已准备好，请查看附件。',
+      time: '09:42',
+      unread: true,
+      selected: true,
+    },
+    {
+      sender: '设计协作',
+      title: '新版交互说明',
+      preview: '切换动效与间距已同步。',
+      time: '08:18',
+      unread: true,
+      selected: false,
+    },
+    {
+      sender: '示例通知',
+      title: '下次演示时间',
+      preview: '下周三下午进行产品演示。',
+      time: '昨天',
+      unread: false,
+      selected: false,
+    },
+  ],
+  detail: {
+    sender: '产品协作 <demo@example.com>',
+    title: '本周体验清单',
+    date: '今天 09:42',
+    body: '演示版已准备好。本次重点查看顶部展开、模块切换和多屏显示。',
+  },
 };
 
-/* ===== PDF 工具模块（真实界面数据） ===== */
+/* ===== PDF 工具模块（产品界面演示数据） ===== */
 
 export const pdfTools = [
   { label: '合并 PDF', active: true },
@@ -301,55 +334,103 @@ export const pdfTools = [
   { label: '裁剪页面' },
   { label: '加密 PDF' },
   { label: '解除密码' },
+  { label: '编辑元数据' },
 ];
 
 export const pdfActiveTitle = '合并 PDF';
 export const pdfActiveDesc = '按选择顺序合并多个 PDF';
 
-/* ===== 系统状态模块（真实界面数据） ===== */
+/* ===== 系统状态模块（虚构演示数据） ===== */
 
 export const systemCards = {
   cpu: {
-    chip: 'Apple M5 Pro',
-    temp: '76.2°C',
-    cores: '15核 · 5性能 · 10能效',
+    chip: 'Apple M3 Pro',
+    temp: '52.8°C',
+    cores: '12核 · 6性能 · 6能效',
     legend: [
-      { label: '用户', value: '0%', color: '#0a84ff' },
-      { label: '系统', value: '0%', color: '#ff453a' },
-      { label: '闲置', value: '100%', color: '#e8e8ed' },
+      { label: '用户', value: '18%', color: '#0a84ff' },
+      { label: '系统', value: '12%', color: '#ff453a' },
+      { label: '闲置', value: '70%', color: '#e8e8ed' },
     ],
   },
   gpu: {
-    chip: 'Apple M5 Pro',
-    temp: '68.1°C',
-    cores: '16核',
+    chip: 'Apple M3 Pro',
+    temp: '48.5°C',
+    cores: '18核',
     legend: [
-      { label: '利用率', value: '45%', color: '#0a84ff' },
-      { label: '温度', value: '45%', color: '#ff453a' },
-      { label: '功耗', value: '39%', color: '#5ac8fa' },
+      { label: '利用率', value: '32%', color: '#0a84ff' },
+      { label: '渲染', value: '28%', color: '#ff453a' },
+      { label: 'Tiler', value: '24%', color: '#5ac8fa' },
     ],
   },
   memory: {
-    pressure: '64%',
-    available: '16.8 GB',
-    total: '48.0 GB',
+    pressure: '45%',
+    available: '20.2 GB',
+    total: '36.0 GB',
     action: '释放',
   },
   disk: {
-    name: 'Macintosh HD',
-    available: '774.59 GB',
-    total: '994.61 GB',
-    read: '0 KB/s',
-    write: '0 KB/s',
+    name: '系统磁盘',
+    available: '512.8 GB',
+    total: '1.0 TB',
+    read: '2.4 MB/s',
+    write: '1.8 MB/s',
     action: '清理',
   },
-  fans: ['4,641 RPM', '5,016 RPM'],
+  fans: ['3,200 RPM', '3,450 RPM'],
   network: {
-    down: '40 KB/s',
-    up: '10 KB/s',
-    lan: '192.168.31.214',
-    wan: '1.88.167.67',
+    down: '125 KB/s',
+    up: '48 KB/s',
+    lan: '192.0.2.10',
+    wan: '203.0.113.42',
   },
+};
+
+export const dashboardMeta = {
+  focus: { clock: '24:18', phase: '进行中' },
+  ai: { title: '整理演示文档', provider: 'CODEX', progress: 68 },
+  download: { title: '演示素材.zip', progress: 42, speed: '3.2 MB/s', eta: '剩余 18 秒' },
+};
+
+export const agentMeta = {
+  project: '演示项目',
+  thread: '新建产品演示',
+  model: '演示模型',
+  messages: [
+    { role: '你', body: '把这份演示提纲整理成三个重点。' },
+    { role: 'AI', body: '已整理：顶部工作流、本地优先、按需出现。' },
+  ],
+};
+
+export const toolboxMeta = {
+  clock: '25:00',
+  mode: '专注',
+  toggles: ['保持亮屏', '显示秒数'],
+  actions: ['清理屏幕', '清理键盘', '闹钟', '提词器', '镜子', '废纸篓'],
+};
+
+export const batteryMeta = {
+  status: '使用电池',
+  level: 78,
+  remaining: '约 6 小时 20 分',
+  metrics: [
+    { label: '健康度', value: '96%' },
+    { label: '循环次数', value: '128' },
+    { label: '温度', value: '34.2°C' },
+    { label: '最大容量', value: '6,820 mAh' },
+    { label: '设计容量', value: '7,100 mAh' },
+    { label: '当前电量', value: '5,320 mAh' },
+  ],
+  devices: [
+    { name: '演示耳机', level: 64, symbol: 'airplay' },
+    { name: '演示配件', level: 82, symbol: 'battery-charging' },
+  ],
+};
+
+export const lockScreenMeta = {
+  weather: '24° · 晴',
+  lunar: '农历七月初三',
+  message: '“专注当下，给重要的事留出空间。”',
 };
 
 /* ===== 功能展示区（每个模块对应真实功能说明） ===== */
@@ -366,6 +447,14 @@ export const showcaseGroups = ['顶部工作流', 'AI 工作流', '日常信息'
 
 export const showcaseModules: ShowcaseModule[] = [
   {
+    id: 'dashboard',
+    name: '首页',
+    group: '顶部工作流',
+    caption:
+      '只在有进行中的专注、AI 任务或下载时显示动态卡片，没有活动时不占用额外空间。',
+    points: ['按需出现', '实时进度', '自动调整布局'],
+  },
+  {
     id: 'shelf',
     name: '中转站',
     group: '顶部工作流',
@@ -378,8 +467,8 @@ export const showcaseModules: ShowcaseModule[] = [
     name: '剪贴板',
     group: '顶部工作流',
     caption:
-      '可选记录剪贴板历史，并按图片、URL 与文件类型筛选；链接检测默认关闭，开启后仅在本机识别新链接并提示。',
-    points: ['按类型筛选', '常用标记', '链接检测默认关闭'],
+      '可选记录剪贴板历史，并按图片、URL 与文件类型筛选；链接检测可独立开关，开启后仅在本机识别新链接并提示。',
+    points: ['按类型筛选', '常用标记', '链接检测可独立开关'],
   },
   {
     id: 'aiMonitor',
@@ -388,6 +477,14 @@ export const showcaseModules: ShowcaseModule[] = [
     caption:
       '自动识别受支持的 AI CLI 与桌面工具，展示任务列表、状态、实时 Token 趋势和贡献热力图；只解析结构化事件，不读取对话正文。',
     points: ['多工具任务聚合', 'Token 消耗趋势', '不读取提示词与回答'],
+  },
+  {
+    id: 'aiAgent',
+    name: 'AI Agent',
+    group: 'AI 工作流',
+    caption:
+      '在岛内管理本地项目和统一对话历史，添加文件、Skills 与应用上下文，并切换本地或远端模型。',
+    points: ['项目化对话', '文件与应用上下文', '本地 / 远端模型'],
   },
   {
     id: 'download',
@@ -426,8 +523,16 @@ export const showcaseModules: ShowcaseModule[] = [
     name: 'PDF 工具',
     group: '实用工具',
     caption:
-      '在本机完成 PDF 合并、拆分、旋转、裁剪、图片/Office 转换、渲染为图片、加水印、页码、加密和元数据编辑。',
-    points: ['13 种本机工具', '按顺序合并', '全程不出本机'],
+      '在本机完成 PDF 合并、拆分、旋转、裁剪、图片/Office 转换、渲染为图片、导出文字、文字/图片水印、页码、加密、解除密码和元数据编辑等 14 项操作。',
+    points: ['14 种本机工具', '按顺序合并', '全程不出本机'],
+  },
+  {
+    id: 'toolbox',
+    name: '小工具',
+    group: '实用工具',
+    caption:
+      '将专注倒计时、保持亮屏、屏幕/键盘清理、闹钟、提词器、镜子和废纸篓集中在同一页。',
+    points: ['专注倒计时', '屏幕与键盘清理', '提词器与镜子'],
   },
   {
     id: 'system',
@@ -436,6 +541,22 @@ export const showcaseModules: ShowcaseModule[] = [
     caption:
       '查看 CPU、GPU、内存、磁盘、网络和风扇等状态，并清理可安全删除的缓存与日志。',
     points: ['芯片级监控', '一键清理缓存', '风扇与网络详情'],
+  },
+  {
+    id: 'battery',
+    name: '电池',
+    group: '日常信息',
+    caption:
+      '查看本机电量、健康度、循环、温度和容量等详细指标，并聚合系统可读取的附近设备电量。',
+    points: ['本机健康指标', '剩余时间', '附近设备电量'],
+  },
+  {
+    id: 'lockScreen',
+    name: '锁屏',
+    group: '日常信息',
+    caption:
+      '在锁屏信息模块中集中显示公历、农历、天气、电量和自定义短句，保持信息简短易读。',
+    points: ['公历与农历', '天气与电量', '自定义锁屏文字'],
   },
 ];
 
@@ -504,12 +625,12 @@ export const downloadLinks: DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.2',
+  version: 'v0.1.3',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/release/v0.1.2',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.2/zisla-v0.1.2-macOS-universal.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.2/zisla-v0.1.2-macOS-universal.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.2/zisla-v0.1.2-macOS-universal.zip.sha256',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/release/v0.1.3',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-v0.1.3-macOS-universal.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-v0.1.3-macOS-universal.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-v0.1.3-macOS-universal.zip.sha256',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/preview',
 };
 

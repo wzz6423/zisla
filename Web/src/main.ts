@@ -4,6 +4,7 @@ import {
   ArrowDownToLine,
   ArrowUpRight,
   BatteryCharging,
+  Bot,
   Bold,
   CalendarCheck,
   CalendarDays,
@@ -72,9 +73,12 @@ import {
 } from 'lucide';
 import {
   agendaEmptyText,
+  agentMeta,
   aiTasks,
+  batteryMeta,
   clipboardItems,
   clipboardMeta,
+  dashboardMeta,
   developmentSetup,
   documentationLinks,
   downloadLinks,
@@ -89,6 +93,7 @@ import {
   islandUptime,
   latestRelease,
   license,
+  lockScreenMeta,
   mailMeta,
   navItems,
   notesMeta,
@@ -110,6 +115,7 @@ import {
   systemCards,
   systemRequirements,
   tokenTrend,
+  toolboxMeta,
   weatherCities,
 } from './content';
 import './styles.css';
@@ -129,6 +135,7 @@ const siteIcons = {
   ArrowDownToLine,
   ArrowUpRight,
   BatteryCharging,
+  Bot,
   Bold,
   CalendarCheck,
   CalendarDays,
@@ -208,10 +215,9 @@ const renderCrown = (activeModule: string) => `
           <div class="np-subtitle">${nowPlaying.subtitle}</div>
           <div class="np-progress">
             <span class="np-time" data-np-time>${formatClock(nowPlaying.currentSeconds)}</span>
-            <span class="np-bar"><span class="np-fill" data-np-fill style="width: ${(
-              (nowPlaying.currentSeconds / nowPlaying.durationSeconds) *
-              100
-            ).toFixed(1)}%"></span></span>
+            <span class="np-bar"><span class="np-fill" data-np-fill style="transform: scaleX(${(
+              nowPlaying.currentSeconds / nowPlaying.durationSeconds
+            ).toFixed(3)})"></span></span>
             <span class="np-duration">${formatClock(nowPlaying.durationSeconds)}</span>
           </div>
         </div>
@@ -366,6 +372,40 @@ const formatElapsed = (seconds: number) =>
     Math.floor((seconds % 3600) / 60),
   ).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 
+const renderDashboardPanel = () => `
+  <div class="panel panel-dashboard">
+    <div class="dashboard-grid">
+      <article class="dashboard-card dashboard-focus">
+        <div class="dashboard-label">${icon('clock', 12)}<span>专注倒计时</span></div>
+        <div class="dashboard-focus-row">
+          <b>${dashboardMeta.focus.clock}</b>
+          <span>${dashboardMeta.focus.phase}</span>
+        </div>
+      </article>
+      <article class="dashboard-card dashboard-ai">
+        <div class="dashboard-label">${icon('sparkles', 12)}<span>AI 工作</span></div>
+        <div class="dashboard-task-row">
+          <span class="dashboard-mascot">${icon('sparkles', 13)}</span>
+          <span class="dashboard-task-copy">
+            <b>${dashboardMeta.ai.title}</b>
+            <i><span style="width: ${dashboardMeta.ai.progress}%"></span></i>
+          </span>
+          <strong>${dashboardMeta.ai.progress}%</strong>
+        </div>
+      </article>
+      <article class="dashboard-card dashboard-transfer">
+        <div class="dashboard-label">${icon('download', 12)}<span>下载进度</span></div>
+        <div class="dashboard-transfer-head">
+          <b>${dashboardMeta.download.progress}%</b>
+          <span>${dashboardMeta.download.speed} · ${dashboardMeta.download.eta}</span>
+        </div>
+        <div class="dashboard-progress"><span style="width: ${dashboardMeta.download.progress}%"></span></div>
+        <div class="dashboard-file">${dashboardMeta.download.title}</div>
+      </article>
+    </div>
+  </div>
+`;
+
 const renderAIMonitorPanel = () => `
   <div class="panel panel-ai">
     <div class="ai-tasks">
@@ -397,6 +437,51 @@ const renderAIMonitorPanel = () => `
       <div class="ai-heatmap">
         ${renderHeatmap()}
       </div>
+    </div>
+  </div>
+`;
+
+const renderAIAgentPanel = () => `
+  <div class="panel panel-agent">
+    <div class="panel-head agent-head">
+      ${icon('sparkles', 13)}<span>AI Agent</span>
+      <span class="head-action">${icon('refresh-cw', 12)}</span>
+    </div>
+    <div class="agent-layout">
+      <aside class="agent-history">
+        <div class="agent-history-head"><b>统一历史</b><span>${icon('plus', 11)}</span></div>
+        <button type="button" class="agent-project-add">${icon('folder', 11)}<span>添加项目</span>${icon('chevron-down', 9)}</button>
+        <span class="agent-group-label">未归类</span>
+        <button type="button" class="agent-thread is-active">
+          ${icon('sparkles', 11)}<span>${agentMeta.thread}</span>
+        </button>
+        <span class="agent-group-label">项目</span>
+        <button type="button" class="agent-thread">
+          ${icon('folder', 11)}<span>${agentMeta.project}</span>
+        </button>
+      </aside>
+      <section class="agent-chat">
+        <div class="agent-messages">
+          ${agentMeta.messages
+            .map(
+              (message) => `
+            <div class="agent-message${message.role === '你' ? ' is-user' : ''}">
+              <span>${message.role}</span>
+              <p>${message.body}</p>
+            </div>`,
+            )
+            .join('')}
+          <div class="agent-thinking"><i></i><span>正在思考</span></div>
+        </div>
+        <div class="agent-composer">
+          <div class="agent-composer-input">
+            <span class="agent-add">${icon('plus', 12)}</span>
+            <span class="agent-placeholder">发送消息</span>
+            <span class="agent-model">${agentMeta.model} ${icon('chevron-down', 9)}</span>
+            <span class="agent-send">${icon('arrow-up-right', 12)}</span>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 `;
@@ -476,18 +561,17 @@ const renderShelfPanel = () => `
           .join('')}
       </div>
       <div class="cl-search">${icon('search', 12)}<span>搜索文件名</span></div>
-      <div class="shelf-empty">
-        ${icon('inbox', 26)}
-        <span>中转站为空</span>
-      </div>
-      <div class="shelf-dock">
+      <div class="shelf-items">
         ${shelfMeta.previews
           .map(
             (file) => `
-          <div class="dock-file">
-            <span class="dock-thumb">${icon('image', 14)}</span>
-            <span class="dock-name">${file.name}</span>
-            <span class="dock-meta">${file.meta}</span>
+          <div class="shelf-file">
+            <span class="shelf-file-thumb">${icon(
+              file.kind === 'image' ? 'image' : file.kind === 'archive' ? 'files' : 'file-text',
+              18,
+            )}</span>
+            <span class="shelf-file-name">${file.name}</span>
+            <span class="shelf-file-meta">${file.meta}</span>
           </div>`,
           )
           .join('')}
@@ -509,6 +593,7 @@ const renderDownloadPanel = () => `
         <button type="button" class="dl-mode">${icon('volume-2', 12)}<span>音频</span></button>
       </div>
       <button type="button" class="dl-folder">${icon('folder', 12)}<span>${downloadMeta.folder}</span>${icon('chevron-down', 10)}</button>
+      <button type="button" class="dl-start">${icon('download', 12)}<span>下载</span></button>
     </div>
     <div class="dl-status">
       <span class="dl-state">${icon('info', 12)}${downloadMeta.status}</span>
@@ -610,25 +695,39 @@ const renderNotesPanel = () => `
 
 const renderMailPanel = () => `
   <div class="panel panel-mail">
-    <div class="panel-head">
-      ${icon('mail', 13)}<span>邮件</span>
-      <span class="head-action">${icon('info', 12)}</span>
-      <span class="head-action">${icon('pencil', 12)}</span>
-      <span class="head-action">${icon('refresh-cw', 12)}</span>
+    <div class="mail-list">
+      <div class="mail-list-head">
+        <b>邮件</b><span>${mailMeta.unread}</span>
+        <button type="button" title="筛选">${icon('list', 11)}</button>
+        <i></i>
+        <button type="button" title="发邮件">${icon('pencil', 11)}</button>
+        <button type="button" title="刷新">${icon('refresh-cw', 11)}</button>
+      </div>
+      <div class="mail-account">${mailMeta.account}${icon('chevron-down', 9)}</div>
+      <div class="mail-messages">
+        ${mailMeta.messages
+          .map(
+            (message) => `
+          <button type="button" class="mail-row${message.selected ? ' is-active' : ''}">
+            <span class="mail-row-top">${message.unread ? '<i></i>' : ''}<b>${message.sender}</b><time>${message.time}</time></span>
+            <span class="mail-row-title">${message.title}</span>
+            <span class="mail-row-preview">${message.preview}</span>
+          </button>`,
+          )
+          .join('')}
+      </div>
     </div>
-    <div class="mail-body">
-      <div class="mail-error">
-        <div class="mail-error-title">${icon('triangle-alert', 15)}${mailMeta.errorTitle}</div>
-        <p>${mailMeta.errorBody}</p>
-        <div class="mail-actions">
-          <button type="button" class="mail-button">${mailMeta.actions[0]}</button>
-          <button type="button" class="mail-button is-primary">${mailMeta.actions[1]}</button>
-        </div>
+    <div class="mail-detail">
+      <div class="mail-detail-head">
+        <span>
+          <b>${mailMeta.detail.title}</b>
+          <small>${mailMeta.detail.sender}</small>
+          <small>${mailMeta.account} · ${mailMeta.detail.date}</small>
+        </span>
+        <button type="button">${icon('arrow-up-right', 11)}回复</button>
+        <button type="button" title="其他操作">${icon('menu', 11)}</button>
       </div>
-      <div class="mail-empty">
-        ${icon('mail', 24)}
-        <span>${mailMeta.emptyText}</span>
-      </div>
+      <div class="mail-detail-body">${mailMeta.detail.body}</div>
     </div>
   </div>
 `;
@@ -742,7 +841,7 @@ const renderSystemPanel = () => {
         <button type="button" class="sys-action">${systemCards.memory.action}</button>
       </div>
       <div class="sys-card">
-        <div class="sys-card-head"><b>Macintosh HD</b>${icon('hard-drive', 12)}</div>
+        <div class="sys-card-head"><b>${systemCards.disk.name}</b>${icon('hard-drive', 12)}</div>
         <div class="sys-sub">可用 ${systemCards.disk.available} / 共 ${systemCards.disk.total}</div>
         <div class="sys-bar"><span style="width: 22%; background: #30d158"></span></div>
         <div class="sys-io">R ${systemCards.disk.read} · W ${systemCards.disk.write}</div>
@@ -768,8 +867,111 @@ const renderSystemPanel = () => {
 `;
 };
 
+const renderToolboxPanel = () => `
+  <div class="panel panel-toolbox">
+    <section class="toolbox-focus">
+      <div class="toolbox-mode">${toolboxMeta.mode}</div>
+      <div class="toolbox-clock" data-toolbox-clock>${toolboxMeta.clock}</div>
+      <div class="toolbox-controls">
+        <button type="button" class="is-primary">开始</button>
+        <button type="button">重置</button>
+      </div>
+    </section>
+    <section class="toolbox-actions">
+      <div class="toolbox-toggles">
+        ${toolboxMeta.toggles
+          .map(
+            (label, index) => `
+          <span>${label}<i class="toolbox-switch${index === 0 ? ' is-on' : ''}"><b></b></i></span>`,
+          )
+          .join('')}
+      </div>
+      <div class="toolbox-grid">
+        ${toolboxMeta.actions
+          .map((label, index) => {
+            const symbols = ['scan-text', 'settings', 'clock', 'file-text', 'image', 'trash-2'];
+            return `<button type="button">${icon(symbols[index], 14)}<span>${label}</span></button>`;
+          })
+          .join('')}
+      </div>
+    </section>
+  </div>
+`;
+
+const renderBatteryPanel = () => `
+  <div class="panel panel-battery">
+    <section class="battery-local">
+      <div class="battery-head">
+        <span>${icon('battery-charging', 14)}<b>本机电池</b></span>
+        <small>${batteryMeta.status}</small>
+        <strong>${batteryMeta.level}%</strong>
+      </div>
+      <div class="battery-flow">
+        <span class="battery-device">${icon('battery-charging', 18)}<b>Mac</b></span>
+        <i><b style="width: ${batteryMeta.level}%"></b></i>
+        <span class="battery-level"><b>${batteryMeta.level}%</b><small>${batteryMeta.remaining}</small></span>
+      </div>
+      <div class="battery-metrics">
+        ${batteryMeta.metrics
+          .map(
+            (metric) => `
+          <span><small>${metric.label}</small><b>${metric.value}</b></span>`,
+          )
+          .join('')}
+      </div>
+    </section>
+    <section class="battery-devices">
+      <div class="battery-device-head">
+        <span>${icon('airplay', 13)}<b>设备电量</b></span>
+        <button type="button" title="刷新">${icon('refresh-cw', 11)}</button>
+      </div>
+      <div class="battery-device-list">
+        ${batteryMeta.devices
+          .map(
+            (device) => `
+          <div class="battery-device-row">
+            <span class="battery-device-icon">${icon(device.symbol, 17)}</span>
+            <span><b>${device.name}</b><small>已连接</small></span>
+            <i><b style="width: ${device.level}%"></b></i>
+            <strong>${device.level}%</strong>
+          </div>`,
+          )
+          .join('')}
+      </div>
+    </section>
+  </div>
+`;
+
+const renderLockScreenPanel = () => {
+  const date = new Date();
+  const dateText = new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  }).format(date);
+  return `
+  <div class="panel panel-lock-screen">
+    <div class="lock-date">
+      <b>${dateText}</b>
+      <span>${lockScreenMeta.lunar}</span>
+    </div>
+    <div class="lock-battery">
+      ${icon('battery-charging', 14)}
+      <span><small>电量</small><b>${batteryMeta.level}% · ${batteryMeta.status}</b></span>
+    </div>
+    <div class="lock-status">
+      <span class="lock-weather">${icon('sun', 15)}<i><small>示例位置</small><b>${lockScreenMeta.weather}</b></i></span>
+      <span class="lock-divider"></span>
+      <p>${lockScreenMeta.message}</p>
+    </div>
+  </div>`;
+};
+
 const panelRenderers: Record<string, () => string> = {
+  dashboard: renderDashboardPanel,
   aiMonitor: renderAIMonitorPanel,
+  aiAgent: renderAIAgentPanel,
   clipboard: renderClipboardPanel,
   shelf: renderShelfPanel,
   download: renderDownloadPanel,
@@ -777,7 +979,10 @@ const panelRenderers: Record<string, () => string> = {
   quickNotes: renderNotesPanel,
   mail: renderMailPanel,
   pdf: renderPDFPanel,
+  toolbox: renderToolboxPanel,
   system: renderSystemPanel,
+  battery: renderBatteryPanel,
+  lockScreen: renderLockScreenPanel,
 };
 
 const renderPanels = (ids: string[]) =>
@@ -914,7 +1119,7 @@ app.innerHTML = `
           </div>
           <div class="hero-stage-actions">
             <button type="button" class="demo-replay" id="replayDemo">${icon('refresh-cw', 12)}重播展开演示</button>
-            <span class="stage-note">界面为 zisla 真实模块还原</span>
+            <span class="stage-note">产品界面 · 演示数据</span>
           </div>
         </div>
       </div>
@@ -935,24 +1140,30 @@ app.innerHTML = `
       <div class="section-wrap">
         <div class="section-heading reveal">
           <div>
-            <p class="eyebrow">REAL SCREENS, REAL FEATURES</p>
+            <p class="eyebrow">PRODUCT UI / DEMO DATA</p>
             <h2 class="section-title">每个界面，<span>都来自真实功能。</span></h2>
           </div>
-          <p class="section-lede">下方界面按 zisla 真实模块还原，点击左侧模块切换查看。</p>
+          <p class="section-lede">界面结构与真实产品一致，内容均为虚构演示数据。点击模块即可切换查看。</p>
         </div>
         <div class="showcase reveal">
           <div class="showcase-rail" role="tablist" aria-label="功能模块">${showcaseRailMarkup}</div>
           <div class="showcase-main">
-            <div class="zi-frame" id="showcaseFrame">
-              ${renderCrown(showcaseModules[0]?.id ?? 'shelf')}
-              <div class="zi-panels" data-panels>
-                ${renderPanels(showcaseModules.map((module) => module.id))}
+            <div class="showcase-desktop">
+              <div class="showcase-menubar" aria-hidden="true">
+                <span>zisla</span>
+                <span>${icon('battery-charging', 11)}${icon('gauge', 11)}<b>09:41</b></span>
+              </div>
+              <div class="zi-frame" id="showcaseFrame">
+                ${renderCrown(showcaseModules[0]?.id ?? 'shelf')}
+                <div class="zi-panels" data-panels>
+                  ${renderPanels(showcaseModules.map((module) => module.id))}
+                </div>
               </div>
             </div>
             <div class="showcase-caption" id="showcaseCaption">
               <div class="caption-head">
                 <span class="mono-label" data-caption-module>MODULE / ${showcaseModules[0]?.name ?? ''}</span>
-                <span class="real-badge">${icon('circle-check', 12)}真实界面</span>
+                <span class="real-badge">${icon('circle-check', 12)}产品界面 · 演示数据</span>
               </div>
               <p data-caption-text>${showcaseModules[0]?.caption ?? ''}</p>
               <div class="caption-points" data-caption-points>
@@ -1132,19 +1343,21 @@ window.setInterval(updateMenuClocks, 30_000);
 /* 正在播放进度 */
 let mediaSeconds = nowPlaying.currentSeconds;
 const tickMedia = () => {
+  if (document.hidden) return;
   mediaSeconds = (mediaSeconds + 1) % nowPlaying.durationSeconds;
-  const ratio = ((mediaSeconds / nowPlaying.durationSeconds) * 100).toFixed(1);
+  const ratio = (mediaSeconds / nowPlaying.durationSeconds).toFixed(3);
   document.querySelectorAll<HTMLElement>('[data-np-time]').forEach((el) => {
     el.textContent = formatClock(mediaSeconds);
   });
   document.querySelectorAll<HTMLElement>('[data-np-fill]').forEach((el) => {
-    el.style.width = `${ratio}%`;
+    el.style.transform = `scaleX(${ratio})`;
   });
 };
 window.setInterval(tickMedia, 1000);
 
 /* AI 任务运行时长 */
 const tickElapsed = () => {
+  if (document.hidden) return;
   document.querySelectorAll<HTMLElement>('[data-elapsed]').forEach((el) => {
     const next = Number(el.getAttribute('data-elapsed')) + 1;
     el.setAttribute('data-elapsed', String(next));
@@ -1178,6 +1391,7 @@ const heroCaption = document.querySelector<HTMLElement>('[data-island-caption]')
 const heroTools = document.querySelectorAll('#heroIsland [data-tool]');
 let heroIndex = 0;
 let heroTimer: number | undefined;
+let heroInView = true;
 
 const moduleName = (id: string) => islandModules.find((m) => m.id === id)?.name ?? id;
 
@@ -1193,10 +1407,25 @@ const setHeroModule = (id: string) => {
 
 const startHeroCycle = () => {
   if (heroTimer) window.clearInterval(heroTimer);
+  heroTimer = undefined;
+  if (prefersReducedMotion || document.hidden || !heroInView) return;
   heroTimer = window.setInterval(() => {
     heroIndex = (heroIndex + 1) % heroCycleModules.length;
     setHeroModule(heroCycleModules[heroIndex]);
   }, 4200);
+};
+
+const stopHeroCycle = () => {
+  if (heroTimer) window.clearInterval(heroTimer);
+  heroTimer = undefined;
+};
+
+const syncHeroCycle = () => {
+  if (prefersReducedMotion || document.hidden || !heroInView) {
+    stopHeroCycle();
+    return;
+  }
+  startHeroCycle();
 };
 
 heroTools.forEach((tool) => {
@@ -1205,12 +1434,44 @@ heroTools.forEach((tool) => {
     if (!id || !heroCycleModules.includes(id)) return;
     heroIndex = heroCycleModules.indexOf(id);
     setHeroModule(id);
-    startHeroCycle();
+    syncHeroCycle();
   });
 });
 
 setHeroModule(heroCycleModules[0]);
-startHeroCycle();
+
+const heroSection = document.querySelector<HTMLElement>('.hero');
+if (heroSection) {
+  new IntersectionObserver(
+    ([entry]) => {
+      heroInView = entry?.isIntersecting ?? false;
+      syncHeroCycle();
+    },
+    { threshold: 0.08 },
+  ).observe(heroSection);
+} else {
+  syncHeroCycle();
+}
+
+const motionSurfaces = document.querySelectorAll<HTMLElement>(
+  '.desktop-window, .zi-frame, .signal-panel',
+);
+const motionObserver = new IntersectionObserver(
+  (entries) => {
+    entries.forEach((entry) => {
+      entry.target.classList.toggle('motion-paused', !entry.isIntersecting);
+    });
+  },
+  { rootMargin: '120px 0px', threshold: 0.01 },
+);
+motionSurfaces.forEach((surface) => motionObserver.observe(surface));
+
+const syncPageMotion = () => {
+  document.documentElement.classList.toggle('page-hidden', document.hidden);
+  syncHeroCycle();
+};
+document.addEventListener('visibilitychange', syncPageMotion);
+syncPageMotion();
 
 /* 展示区：模块切换 */
 const showcasePanels = document.querySelectorAll('#showcaseFrame [data-panel]');
@@ -1322,28 +1583,24 @@ document
 const progressBar = document.createElement('div');
 progressBar.className = 'scroll-progress';
 document.body.append(progressBar);
-window.addEventListener(
-  'scroll',
-  () => {
-    const scrollable = document.documentElement.scrollHeight - window.innerHeight;
-    progressBar.style.width = `${scrollable > 0 ? (window.pageYOffset / scrollable) * 100 : 0}%`;
-  },
-  { passive: true },
-);
 
 /* 滚动浮现 */
-const revealObserver = new IntersectionObserver(
-  (entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-        revealObserver.unobserve(entry.target);
-      }
-    });
-  },
-  { threshold: 0.08, rootMargin: '0px 0px -60px 0px' },
-);
-document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
+const revealItems = document.querySelectorAll('.reveal');
+if (!prefersReducedMotion) {
+  const revealObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.08, rootMargin: '0px 0px -60px 0px' },
+  );
+  document.documentElement.classList.add('reveal-ready');
+  revealItems.forEach((el) => revealObserver.observe(el));
+}
 
 /* 平滑滚动 */
 document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
