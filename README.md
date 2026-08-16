@@ -124,7 +124,6 @@ zisla 仅在启用并首次使用相关功能时请求系统权限。你可以�
 
 ```text
 mac/      当前 macOS 实现，使用 Swift、AppKit 和 SwiftUI
-Web/      使用 Vite 与 TypeScript 构建的产品官网
 skills/   发布与仓库维护相关技能
 ```
 
