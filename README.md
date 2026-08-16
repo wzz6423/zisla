@@ -13,6 +13,7 @@ zisla 是一个使用 SwiftUI 和 AppKit 构建的原生 macOS 工作空间。�
 ## 仓库结构
 
 - `mac/`：当前的 macOS 实现，使用 Swift、AppKit 和 SwiftUI 构建。
+- `Web/`：产品官网，使用 TypeScript 和 Vite 构建，展示 zisla 的功能与使用场景。
 
 ## 系统兼容性
 
