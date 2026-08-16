@@ -17,8 +17,14 @@
 | `gemini` | `google-gemini`、`gemini-cli`、`gemini-code-assist` |
 | `grok` | `grok-cli`、`xai` |
 | `gpt` | `openai`、`chatgpt`、`openai-gpt` |
+| `copilot` | `github-copilot`、`copilot-cli`、`copilot-chat` |
+| `kimi` | `kimi-code`、`kimi-code-cli`、`kimi-vscode` |
 | `qwen` | `tongyi`、`qwen-code`、`qwen-code-cli`、`qwen-vscode` |
 | `coder` | `qoder`、`qoder-cli`、`qoderwork`、`qoderwork-cn`、`qoderwake`、`qwen-coder` |
+| `trae` | `trae-work`、`traework`、`trae-solo`、`trae-cn` |
+| `opencode` | `open-code`、`open_code` |
+| `harness` | `harnext`、`harnext-cli`、`harness-cli` |
+| `doubao` | `豆包` |
 
 ## `update`
 

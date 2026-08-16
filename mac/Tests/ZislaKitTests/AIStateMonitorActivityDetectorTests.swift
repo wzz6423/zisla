@@ -139,7 +139,7 @@ struct AIStateMonitorActivityDetectorTests {
         detector.replaceTasks(with: [task])
         monitor.refresh()
 
-        #expect(await waitForMonitorState { monitor.state.tasks == [task] })
+        #expect(await waitForMonitorState(timeout: 10) { monitor.state.tasks == [task] })
     }
 
     @Test @MainActor

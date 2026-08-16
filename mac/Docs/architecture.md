@@ -21,8 +21,8 @@
 
 - AppKit、SwiftUI 状态和窗口控制限制在 `MainActor`。
 - 下载、天气和 GitHub 请求使用 actor。
-- hook 写入的 AI 状态使用目录文件系统事件监听；各 AI 会话源每 1.5 秒检查最近文件的 mtime/size，未变化时复用解析缓存，不重复读取日志正文。
-- 自动检测只解析结构化事件字段或 Qoder 固定日志 marker，不读取 prompt/preview；任一 Provider 解析失败不会阻断其他 Provider。
+- hook 写入的 AI 状态使用目录文件系统事件监听；各 AI 会话源定期比较最近本地会话或活动文件的 mtime/size，未变化时复用解析缓存。
+- 自动检测只读取判断任务状态所需的结构化事件、固定状态 marker 或活动元数据，不读取 prompt/answer 正文；任一 Provider 解析失败不会阻断其他 Provider。
 - 折叠延迟使用可取消 `Task` 和 generation token，旧任务不能隐藏重新展开的岛。
 - 隐藏态没有 `TimelineView`、60 Hz Timer 或持续动画提交。
 

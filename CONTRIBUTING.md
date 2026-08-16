@@ -35,7 +35,6 @@ swift test
 
 - 使用 PR 模板，说明变更、验证方式和关联 Issue。
 - macOS 代码变更必须运行 `cd mac && swift test`；涉及界面时请补充实际验证说明或截图。
-- 修改 `windows/` 时，CI 会在 Windows 上执行 CMake Core 测试，并编译 WinUI 应用。完整的 Windows 应用构建不会在 CI 中启动界面或访问用户数据。
 - 更新用户可见行为、构建方式或发布流程时，同步更新相应文档。
 - 不要提交 `.build`、`dist`、下载文件、日志、令牌、签名材料或其他个人数据。
 - `main` 和 `publish-v*` 受保护，只能通过通过检查并完成评审的 PR 合并。
