@@ -19,11 +19,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  windows:
-    name: Windows Core Tests
+  core:
+    name: Windows Core (${{ matrix.configuration }})
     runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
       - name: Configure, build, and test
@@ -35,45 +40,128 @@ jobs:
             Write-Host "Windows Core is not present in this revision."
             exit 0
           }
-          cmake -S windows -B "$buildDirectory" -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DZISLA_ENABLE_QPDF_ADAPTER=OFF -DZISLA_ENABLE_PDFIUM_ADAPTER=OFF
+          cmake -S windows -B "$buildDirectory" -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} -DBUILD_TESTING=ON -DZISLA_ENABLE_QPDF_ADAPTER=OFF -DZISLA_ENABLE_PDFIUM_ADAPTER=OFF
           cmake --build "$buildDirectory" --parallel
-          ctest --test-dir "$buildDirectory" --output-on-failure
+          ctest --test-dir "$buildDirectory" --output-on-failure --no-tests=error
       - name: Remove test artifacts
         if: always()
         shell: pwsh
         run: Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP "zisla-windows-core") -Recurse -Force -ErrorAction SilentlyContinue
 
+  core-result:
+    name: Windows Core Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: core
+    if: always()
+    steps:
+      - name: Verify matrix result
+        env:
+          CORE_RESULT: ${{ needs.core.result }}
+        run: test "$CORE_RESULT" = "success"
+
   application:
     name: Windows App Build
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - name: Check if Windows application exists
+        id: check-app
+        shell: pwsh
+        run: |
+          if (Test-Path -LiteralPath "windows/Zisla.Windows.sln") {
+            "exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "exists=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Windows application is not present in this revision."
+          }
       - name: Restore cached QPDF build
-        if: hashFiles('windows/Zisla.Windows.sln') != ''
-        uses: actions/cache@v4
+        if: steps.check-app.outputs.exists == 'true'
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: ${{ runner.temp }}\zisla-qpdf
           key: windows-qpdf-v1-${{ hashFiles('windows/Scripts/build-qpdf.ps1', 'windows/Vendor/qpdf/12.3.2/**', 'windows/Vendor/zlib/1.3.2/**', 'windows/Vendor/libjpeg-turbo/3.2.0/**') }}
       - name: Build the Windows application
+        if: steps.check-app.outputs.exists == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $qpdfBuildRoot = Join-Path $env:RUNNER_TEMP "zisla-qpdf"
-          if (-not (Test-Path -LiteralPath "windows/Zisla.Windows.sln")) {
-            Write-Host "Windows application is not present in this revision."
-            exit 0
-          }
           $qpdfLibrary = Join-Path $qpdfBuildRoot "prefix\lib\qpdf.lib"
           if (-not (Test-Path -LiteralPath $qpdfLibrary)) {
             .\windows\Scripts\build-qpdf.ps1 -Architecture x64 -Configuration Release -BuildRoot $qpdfBuildRoot
           }
           msbuild .\windows\Zisla.Windows.sln /restore /m /p:Configuration=Release /p:Platform=x64 /p:QPDFPrefix="$qpdfBuildRoot\prefix" /p:AppxPackage=false /p:GenerateAppxPackageOnBuild=false
+      - name: Verify Zisla.exe
+        if: steps.check-app.outputs.exists == 'true'
+        shell: pwsh
+        run: |
+          $exePath = "windows\bin\x64\Release\Zisla.exe"
+          if (-not (Test-Path -LiteralPath $exePath)) {
+            Write-Error "Zisla.exe not found at expected path: $exePath"
+            exit 1
+          }
+          Write-Host "Zisla.exe found and verified"
+      - name: Upload Windows application artifact
+        if: steps.check-app.outputs.exists == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Zisla-Windows-x64
+          path: windows/bin/x64/Release/
+          retention-days: 7
+          if-no-files-found: error
       - name: Remove workspace artifacts
-        if: always()
+        if: always() && steps.check-app.outputs.exists == 'true'
         shell: pwsh
         run: |
           Remove-Item -LiteralPath "windows\bin" -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item -LiteralPath "windows\obj" -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item -LiteralPath "windows\App\packages.lock.json" -Force -ErrorAction SilentlyContinue
+
+  codeql:
+    name: CodeQL (C/C++)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check if Windows Core exists
+        id: check-core
+        shell: pwsh
+        run: |
+          if (Test-Path -LiteralPath "windows/CMakeLists.txt") {
+            "exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "exists=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Windows Core is not present in this revision."
+          }
+      - uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4
+        if: steps.check-core.outputs.exists == 'true'
+        with:
+          languages: c-cpp
+          build-mode: manual
+          queries: security-and-quality
+      - name: Build Core for CodeQL
+        if: steps.check-core.outputs.exists == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $buildDirectory = Join-Path $env:RUNNER_TEMP "zisla-codeql"
+          cmake -S windows -B "$buildDirectory" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DZISLA_ENABLE_QPDF_ADAPTER=OFF -DZISLA_ENABLE_PDFIUM_ADAPTER=OFF
+          cmake --build "$buildDirectory" --parallel
+      - uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4
+        if: steps.check-core.outputs.exists == 'true'
+        with:
+          category: /language:c-cpp
+      - name: Remove build artifacts
+        if: always() && steps.check-core.outputs.exists == 'true'
+        shell: pwsh
+        run: Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP "zisla-codeql") -Recurse -Force -ErrorAction SilentlyContinue

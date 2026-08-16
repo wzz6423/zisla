@@ -1,0 +1,140 @@
+name: Web CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "publish-v*"
+  push:
+    branches:
+      - main
+      - "publish-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Web Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Check if Web directory exists
+        id: check-web
+        run: |
+          if [ ! -d "Web" ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Web directory not present in this revision."
+          elif [ -f "Web/package.json" ] && [ -f "Web/package-lock.json" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Web/package.json and Web/package-lock.json are both required." >&2
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        if: steps.check-web.outputs.exists == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Web/package-lock.json
+
+      - name: Install dependencies
+        if: steps.check-web.outputs.exists == 'true'
+        working-directory: Web
+        run: npm ci
+
+      - name: Type check
+        if: steps.check-web.outputs.exists == 'true'
+        working-directory: Web
+        run: npm run typecheck
+
+      - name: Lint
+        if: steps.check-web.outputs.exists == 'true'
+        working-directory: Web
+        run: npm run lint --if-present
+
+      - name: Test
+        if: steps.check-web.outputs.exists == 'true'
+        working-directory: Web
+        run: npm run test --if-present
+
+      - name: Build
+        if: steps.check-web.outputs.exists == 'true'
+        working-directory: Web
+        run: npm run build
+
+      - name: Audit production dependencies
+        if: steps.check-web.outputs.exists == 'true'
+        working-directory: Web
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Verify build artifacts
+        if: steps.check-web.outputs.exists == 'true'
+        working-directory: Web
+        run: |
+          test -f dist/index.html || { echo "dist/index.html not found"; exit 1; }
+          test -s dist/index.html || { echo "dist/index.html is empty"; exit 1; }
+          test -d dist/assets || { echo "dist/assets directory not found"; exit 1; }
+          ASSET_COUNT=$(find dist/assets -type f | wc -l | tr -d ' ')
+          test "$ASSET_COUNT" -gt 0 || { echo "No assets found in dist/assets"; exit 1; }
+          echo "Build artifacts verified: index.html exists and non-empty, $ASSET_COUNT asset(s) found"
+
+      - name: Upload build artifacts
+        if: steps.check-web.outputs.exists == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Web-Build
+          path: Web/dist/
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Clean up build artifacts
+        if: always() && steps.check-web.outputs.exists == 'true'
+        working-directory: Web
+        run: rm -rf dist node_modules
+
+  codeql:
+    name: CodeQL (JavaScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Check if Web directory exists
+        id: check-web
+        run: |
+          if [ -d "Web" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Web directory not present in this revision."
+          fi
+
+      - uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4
+        if: steps.check-web.outputs.exists == 'true'
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-and-quality
+
+      - uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4
+        if: steps.check-web.outputs.exists == 'true'
+        with:
+          category: /language:javascript-typescript
