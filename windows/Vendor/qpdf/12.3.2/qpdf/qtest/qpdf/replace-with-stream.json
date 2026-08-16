@@ -1,0 +1,19 @@
+{
+  "qpdf": [
+    {
+      "jsonversion": 2,
+      "pdfversion": "2.0",
+      "maxobjectid": 9
+    },
+    {
+      "obj:8 0 R": {
+        "stream": {
+          "data": "bmV3LXN0cmVhbS1oZXJlCg==",
+          "dict": {
+            "/K": "/V"
+          }
+        }
+      }
+    }
+  ]
+}

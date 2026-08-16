@@ -1,0 +1,6 @@
+{
+  "id": "panda",
+  "displayName": "熊猫",
+  "description": "像素熊猫，来自 Kenney Animal Pack Redux (CC0)",
+  "spritePath": "sprite.png"
+}

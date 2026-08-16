@@ -1,0 +1,78 @@
+<UserControl
+    x:Class="Zisla.CleaningContent"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    IsTabStop="True"
+    KeyDown="Root_KeyDown"
+    KeyUp="Root_KeyUp"
+    mc:Ignorable="d">
+
+    <Grid
+        x:Name="Root"
+        Background="Black"
+        Tapped="Root_Tapped">
+        <Grid
+            x:Name="ScreenLayout"
+            AutomationProperties.Name="屏幕清洁中">
+            <Button
+                Width="184"
+                Height="52"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="退出屏幕清洁"
+                Background="#FF333333"
+                Click="ExitButton_Click"
+                Foreground="White">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon FontSize="15" Glyph="&#xE8BB;" />
+                    <TextBlock
+                        FontSize="15"
+                        FontWeight="SemiBold"
+                        Text="退出屏幕清洁" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <Grid
+            x:Name="KeyboardLayout"
+            Background="#FF16191D"
+            Visibility="Collapsed">
+            <StackPanel
+                MaxWidth="420"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="14">
+                <FontIcon
+                    HorizontalAlignment="Center"
+                    Foreground="White"
+                    FontSize="42"
+                    Glyph="&#xE765;" />
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    Foreground="White"
+                    FontSize="22"
+                    FontWeight="SemiBold"
+                    Text="键盘清洁中" />
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    Foreground="#BFFFFFFF"
+                    FontSize="13"
+                    Text="点击任意位置结束"
+                    TextAlignment="Center" />
+                <Button
+                    MinWidth="168"
+                    Height="44"
+                    HorizontalAlignment="Center"
+                    AutomationProperties.Name="结束键盘清洁"
+                    Click="ExitButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="14" Glyph="&#xE8BB;" />
+                        <TextBlock Text="结束清洁" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>
