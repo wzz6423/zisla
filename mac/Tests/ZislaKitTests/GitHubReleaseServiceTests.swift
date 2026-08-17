@@ -25,7 +25,7 @@ struct GitHubReleaseServiceTests {
     func githubUpdateIsUsedWhenGiteeIsCurrent() async throws {
         let stub = ReleaseRequestStub(responses: [
             GitHubReleaseService.latestGiteeReleaseURL: .success(Self.release(tag: "v1.0.0")),
-            GitHubReleaseService.latestReleaseURL: .success(Self.release(tag: "v1.1.0")),
+            GitHubReleaseService.latestReleaseURL: .success(Self.release(tag: "release/v1.1.0")),
         ])
         let service = GitHubReleaseService(loadData: { request in
             try await stub.load(request)
@@ -33,7 +33,7 @@ struct GitHubReleaseServiceTests {
 
         let result = try await service.check(currentVersion: "1.0.0")
 
-        #expect(result == .updateAvailable(Self.decodedRelease(tag: "v1.1.0"), source: .github))
+        #expect(result == .updateAvailable(Self.decodedRelease(tag: "release/v1.1.0"), source: .github))
         #expect(await stub.requestedURLs() == [
             GitHubReleaseService.latestGiteeReleaseURL,
             GitHubReleaseService.latestReleaseURL,

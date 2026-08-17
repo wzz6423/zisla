@@ -98,6 +98,26 @@ struct TraeSessionActivityDetectorTests {
         #expect(tasks[0].id == TraeSessionActivityDetector.taskID(forTaskID: "new-task"))
         #expect(tasks[1].id == TraeSessionActivityDetector.taskID(forTaskID: "old-task"))
     }
+
+    @Test
+    func recoversFromTransientError() throws {
+        let root = makeTraeTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeTraeLog(
+            under: root,
+            dirName: "20260723T174155",
+            fileName: "ai-agent_0_1784799715608_stdout.log",
+            lines: [
+                #"2026-07-23T20:08:01.000000+08:00  INFO process_ipc_request:route:chat:do_chat: ai_agent: started trace_id="t1" session_id=sess1 task_id=task1"#,
+                #"2026-07-23T20:08:02.000000+08:00  ERROR ai_agent::linter: syntax error trace_id="t1" session_id=sess1 task_id=task1"#,
+                #"2026-07-23T20:08:05.000000+08:00  INFO process_ipc_request:route:chat:do_chat:tool_call: ai_agent: tool succeeded trace_id="t1" session_id=sess1 task_id=task1"#,
+            ]
+        )
+
+        let task = try #require(TraeSessionActivityDetector(logsRoot: root).activeTasks().first)
+        #expect(task.status == .running)
+    }
 }
 
 private func makeTraeTempRoot() -> URL {

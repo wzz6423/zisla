@@ -40,7 +40,7 @@ public actor AIAgentCLIUpdateService {
         var updates: [AIAgentCLIUpdate] = []
 
         await withTaskGroup(of: AIAgentCLIUpdate?.self) { group in
-            for kind in AgentCLIKind.allCases {
+            for kind in AgentCLIKind.managedCases {
                 guard kind.npmPackageName != nil,
                       let status = statusesByKind[kind],
                       status.executablePath != nil,

@@ -13,6 +13,7 @@ private struct ClipboardHistoryDatabaseError: LocalizedError {
 struct ClipboardHistoryPage: Sendable {
     var items: [ClipboardHistoryItem]
     var totalCount: Int
+    var categoryCounts: [FileShelfCategory: Int]
 }
 
 enum ClipboardHistoryMutation: Sendable {
@@ -22,6 +23,8 @@ enum ClipboardHistoryMutation: Sendable {
 }
 
 final class ClipboardHistoryDatabase: @unchecked Sendable {
+    private static let currentSchemaVersion = 4
+
     private let storageURL: URL
     private let queue = DispatchQueue(
         label: "com.zisla.clipboard-history.database",
@@ -46,6 +49,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
     func loadPage(
         scope: ClipboardHistoryScope,
         searchText: String,
+        category: FileShelfCategory,
         offset: Int,
         limit: Int
     ) async throws -> ClipboardHistoryPage {
@@ -53,13 +57,18 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             queue.async { [self] in
                 do {
                     guard FileManager.default.fileExists(atPath: storageURL.path) else {
-                        continuation.resume(returning: ClipboardHistoryPage(items: [], totalCount: 0))
+                        continuation.resume(returning: ClipboardHistoryPage(
+                            items: [],
+                            totalCount: 0,
+                            categoryCounts: [:]
+                        ))
                         return
                     }
                     continuation.resume(returning: try readPage(
                         from: database(),
                         scope: scope,
                         searchText: searchText,
+                        category: category,
                         offset: max(0, offset),
                         limit: max(1, limit)
                     ))
@@ -155,6 +164,13 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 """,
                 on: opened
             )
+            try execute(
+                """
+                CREATE INDEX IF NOT EXISTS clipboard_history_category_order
+                ON clipboard_history(content_category, is_pinned DESC, last_copied_at DESC)
+                """,
+                on: opened
+            )
             connection = opened
             return opened
         } catch {
@@ -163,17 +179,194 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         }
     }
 
-    /// Adds the columns required for file entries to an existing clipboard_history table (idempotent).
-    /// Old databases have only 6 columns; this migrates them incrementally so existing text/image data remains readable.
+    /// Old databases have only the original six columns, so query metadata must be added and backfilled in place.
     private func migrateFileColumns(on database: OpaquePointer) throws {
         let existing = try columnNames(of: "clipboard_history", on: database)
         let additions = [
             ("file_url", "TEXT"),
             ("file_display_name", "TEXT"),
             ("file_bookmark", "BLOB"),
+            ("content_category", "TEXT"),
         ]
         for (name, type) in additions where !existing.contains(name) {
             try execute("ALTER TABLE clipboard_history ADD COLUMN \(name) \(type)", on: database)
+        }
+        try backfillMissingCategories(on: database)
+        try migrateURLCategoriesIfNeeded(on: database)
+        try migrateTextCategoriesIfNeeded(on: database)
+        try migratePathCategoriesIfNeeded(on: database)
+    }
+
+    private func backfillMissingCategories(on database: OpaquePointer) throws {
+        try execute(
+            """
+            UPDATE clipboard_history
+            SET content_category = '\(FileShelfCategory.text.rawValue)'
+            WHERE content_category IS NULL AND content_type = 0
+            """,
+            on: database
+        )
+        try execute(
+            """
+            UPDATE clipboard_history
+            SET content_category = '\(FileShelfCategory.image.rawValue)'
+            WHERE content_category IS NULL AND content_type = 1
+            """,
+            on: database
+        )
+
+        let files = try uncategorizedFileCategories(on: database)
+        guard !files.isEmpty else { return }
+        let statement = try prepare(
+            "UPDATE clipboard_history SET content_category = ? WHERE id = ?",
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+        for file in files {
+            sqlite3_reset(statement)
+            sqlite3_clear_bindings(statement)
+            try bind(file.category.rawValue, to: statement, index: 1, database: database)
+            try bind(file.id, to: statement, index: 2, database: database)
+            try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
+        }
+    }
+
+    private func migrateURLCategoriesIfNeeded(on database: OpaquePointer) throws {
+        guard try schemaVersion(on: database) < Self.currentSchemaVersion else { return }
+        let urlIDs = try legacyCategoryIDs(matching: .url, on: database)
+        if !urlIDs.isEmpty {
+            let statement = try prepare(
+                "UPDATE clipboard_history SET content_category = ? WHERE id = ?",
+                on: database
+            )
+            defer { sqlite3_finalize(statement) }
+            for id in urlIDs {
+                sqlite3_reset(statement)
+                sqlite3_clear_bindings(statement)
+                try bind(FileShelfCategory.url.rawValue, to: statement, index: 1, database: database)
+                try bind(id, to: statement, index: 2, database: database)
+                try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
+            }
+        }
+    }
+
+    private func migrateTextCategoriesIfNeeded(on database: OpaquePointer) throws {
+        let version = try schemaVersion(on: database)
+        guard version < Self.currentSchemaVersion else { return }
+        try execute(
+            """
+            UPDATE clipboard_history
+            SET content_category = '\(FileShelfCategory.text.rawValue)'
+            WHERE content_type = 0
+              AND content_category = '\(FileShelfCategory.document.rawValue)'
+            """,
+            on: database
+        )
+        if version < 2 {
+            try execute("PRAGMA user_version = 2", on: database)
+        }
+    }
+
+    private func migratePathCategoriesIfNeeded(on database: OpaquePointer) throws {
+        guard try schemaVersion(on: database) < Self.currentSchemaVersion else { return }
+        let pathIDs = try legacyCategoryIDs(matching: .path, on: database)
+        if !pathIDs.isEmpty {
+            let statement = try prepare(
+                "UPDATE clipboard_history SET content_category = ? WHERE id = ?",
+                on: database
+            )
+            defer { sqlite3_finalize(statement) }
+            for id in pathIDs {
+                sqlite3_reset(statement)
+                sqlite3_clear_bindings(statement)
+                try bind(FileShelfCategory.path.rawValue, to: statement, index: 1, database: database)
+                try bind(id, to: statement, index: 2, database: database)
+                try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
+            }
+        }
+        try execute("PRAGMA user_version = \(Self.currentSchemaVersion)", on: database)
+    }
+
+    private func legacyCategoryIDs(
+        matching category: FileShelfCategory,
+        on database: OpaquePointer
+    ) throws -> [String] {
+        let statement = try prepare(
+            """
+            SELECT id, text_value
+            FROM clipboard_history
+            WHERE content_type = 0
+              AND content_category IN (
+                  '\(FileShelfCategory.document.rawValue)',
+                  '\(FileShelfCategory.text.rawValue)'
+              )
+            """,
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+
+        var result: [String] = []
+        while true {
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                guard let id = textColumn(statement, index: 0),
+                      let text = textColumn(statement, index: 1) else { continue }
+                if ClipboardHistoryItem(content: .text(text)).category == category {
+                    result.append(id)
+                }
+            case SQLITE_DONE:
+                return result
+            default:
+                throw ClipboardHistoryDatabaseError(
+                    message: sqliteMessage(database, fallback: "无法重新分类文本")
+                )
+            }
+        }
+    }
+
+    private func schemaVersion(on database: OpaquePointer) throws -> Int {
+        let statement = try prepare("PRAGMA user_version", on: database)
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            throw ClipboardHistoryDatabaseError(message: "无法读取剪贴板数据库版本")
+        }
+        return Int(sqlite3_column_int64(statement, 0))
+    }
+
+    private func uncategorizedFileCategories(
+        on database: OpaquePointer
+    ) throws -> [(id: String, category: FileShelfCategory)] {
+        let statement = try prepare(
+            """
+            SELECT id, file_url, file_display_name
+            FROM clipboard_history
+            WHERE content_category IS NULL AND content_type = 2
+            """,
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+        var result: [(String, FileShelfCategory)] = []
+        while true {
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                guard let id = textColumn(statement, index: 0),
+                      let urlText = textColumn(statement, index: 1),
+                      let url = URL(string: urlText) else {
+                    throw ClipboardHistoryDatabaseError(message: "剪贴板数据库包含无效文件路径")
+                }
+                let reference = ClipboardFileReference(
+                    url: url,
+                    displayName: textColumn(statement, index: 2) ?? url.lastPathComponent,
+                    bookmark: Data()
+                )
+                result.append((id, ClipboardHistoryItem(content: .file(reference)).category))
+            case SQLITE_DONE:
+                return result
+            default:
+                throw ClipboardHistoryDatabaseError(
+                    message: sqliteMessage(database, fallback: "无法迁移剪贴板分类")
+                )
+            }
         }
     }
 
@@ -199,10 +392,11 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         from database: OpaquePointer,
         scope: ClipboardHistoryScope,
         searchText: String,
+        category: FileShelfCategory,
         offset: Int,
         limit: Int
     ) throws -> ClipboardHistoryPage {
-        let query = queryClause(scope: scope, searchText: searchText)
+        let query = queryClause(scope: scope, searchText: searchText, category: category)
         let countStatement = try prepare(
             "SELECT COUNT(*) FROM clipboard_history\(query.sql)",
             on: database
@@ -215,6 +409,11 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             )
         }
         let totalCount = Int(sqlite3_column_int64(countStatement, 0))
+        let categoryCounts = try readCategoryCounts(
+            from: database,
+            scope: scope,
+            searchText: searchText
+        )
 
         let statement = try prepare(
             """
@@ -243,10 +442,50 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             case SQLITE_ROW:
                 items.append(try readItem(from: statement))
             case SQLITE_DONE:
-                return ClipboardHistoryPage(items: items, totalCount: totalCount)
+                return ClipboardHistoryPage(
+                    items: items,
+                    totalCount: totalCount,
+                    categoryCounts: categoryCounts
+                )
             default:
                 throw ClipboardHistoryDatabaseError(
                     message: sqliteMessage(database, fallback: "无法读取剪贴板数据库")
+                )
+            }
+        }
+    }
+
+    private func readCategoryCounts(
+        from database: OpaquePointer,
+        scope: ClipboardHistoryScope,
+        searchText: String
+    ) throws -> [FileShelfCategory: Int] {
+        let query = queryClause(scope: scope, searchText: searchText, category: .all)
+        let statement = try prepare(
+            """
+            SELECT content_category, COUNT(*)
+            FROM clipboard_history
+            \(query.sql)
+            GROUP BY content_category
+            """,
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+        try bind(query.values, to: statement, database: database)
+
+        var counts: [FileShelfCategory: Int] = [:]
+        while true {
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                if let rawValue = textColumn(statement, index: 0),
+                   let category = FileShelfCategory(rawValue: rawValue) {
+                    counts[category] = Int(sqlite3_column_int64(statement, 1))
+                }
+            case SQLITE_DONE:
+                return counts
+            default:
+                throw ClipboardHistoryDatabaseError(
+                    message: sqliteMessage(database, fallback: "无法统计剪贴板分类")
                 )
             }
         }
@@ -315,9 +554,11 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
 
     private func queryClause(
         scope: ClipboardHistoryScope,
-        searchText: String
+        searchText: String,
+        category: FileShelfCategory
     ) -> (sql: String, values: [String]) {
         var clauses: [String] = []
+        var values: [String] = []
         switch scope {
         case .all:
             break
@@ -327,8 +568,12 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             clauses.append("is_pinned = 0")
         }
 
+        if category != .all {
+            clauses.append("content_category = ?")
+            values.append(category.rawValue)
+        }
+
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        var values: [String] = []
         if !trimmed.isEmpty {
             clauses.append(
                 """
@@ -344,7 +589,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "%", with: "\\%")
                 .replacingOccurrences(of: "_", with: "\\_")
-            values = ["%\(escaped)%"]
+            values.append("%\(escaped)%")
         }
         return (clauses.isEmpty ? "" : " WHERE " + clauses.joined(separator: " AND "), values)
     }
@@ -442,8 +687,8 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             """
             INSERT INTO clipboard_history (
                 id, content_type, text_value, image_data, last_copied_at, is_pinned,
-                file_url, file_display_name, file_bookmark
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                file_url, file_display_name, file_bookmark, content_category
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 content_type = excluded.content_type,
                 text_value = excluded.text_value,
@@ -452,7 +697,8 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 is_pinned = excluded.is_pinned,
                 file_url = excluded.file_url,
                 file_display_name = excluded.file_display_name,
-                file_bookmark = excluded.file_bookmark
+                file_bookmark = excluded.file_bookmark,
+                content_category = excluded.content_category
             """,
             on: database
         )
@@ -486,6 +732,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 database: database
             )
             try check(sqlite3_bind_int(statement, 6, item.isPinned ? 1 : 0), database: database)
+            try bind(item.category.rawValue, to: statement, index: 10, database: database)
             try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
         }
     }

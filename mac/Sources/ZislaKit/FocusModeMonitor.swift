@@ -109,14 +109,15 @@ enum FocusModeStatusStore {
     }
 }
 
-/// Monitors macOS Focus Mode via the private DoNotDisturb framework.
-/// Stays unavailable when private APIs are missing or have changed signatures, to avoid affecting other features.
+/// Monitors macOS Focus Mode through its local assertion store, with the private framework as a fallback.
 @MainActor
 public final class FocusModeMonitor: ObservableObject {
     @Published public private(set) var status = FocusModeStatus.inactive
     @Published public private(set) var isAvailable = false
 
     private let clientIdentifier: String
+    private let statusStoreURL: URL
+    private let storePollingInterval: Duration
     private var isRunning = false
     private var frameworkHandle: UnsafeMutableRawPointer?
     private var stateService: AnyObject?
@@ -126,17 +127,34 @@ public final class FocusModeMonitor: ObservableObject {
 
     public init(clientIdentifier: String? = Bundle.main.bundleIdentifier) {
         self.clientIdentifier = clientIdentifier ?? "dev.wzz.zisla"
+        statusStoreURL = FocusModeStatusStore.defaultURL
+        storePollingInterval = .seconds(1)
+    }
+
+    init(
+        clientIdentifier: String,
+        statusStoreURL: URL,
+        storePollingInterval: Duration
+    ) {
+        self.clientIdentifier = clientIdentifier
+        self.statusStoreURL = statusStoreURL
+        self.storePollingInterval = storePollingInterval
     }
 
     public func start() {
         guard !isRunning else { return }
         isRunning = true
 
+        if FileManager.default.isReadableFile(atPath: statusStoreURL.path) {
+            startStoreMonitoring()
+            return
+        }
+
         guard let frameworkHandle = dlopen(
             "/System/Library/PrivateFrameworks/DoNotDisturb.framework/DoNotDisturb",
             RTLD_NOW | RTLD_LOCAL
         ) else {
-            startStoreFallback()
+            startStoreMonitoring()
             return
         }
         self.frameworkHandle = frameworkHandle
@@ -144,7 +162,7 @@ public final class FocusModeMonitor: ObservableObject {
         guard let serviceClass = NSClassFromString("DNDStateService"),
               let service = makeStateService(serviceClass: serviceClass) else {
             releaseFramework()
-            startStoreFallback()
+            startStoreMonitoring()
             return
         }
 
@@ -155,7 +173,7 @@ public final class FocusModeMonitor: ObservableObject {
         }
         guard add(listener, to: service, serviceClass: serviceClass) else {
             releaseFramework()
-            startStoreFallback()
+            startStoreMonitoring()
             return
         }
 
@@ -186,13 +204,14 @@ public final class FocusModeMonitor: ObservableObject {
         status = resolved
     }
 
-    private func startStoreFallback() {
-        isAvailable = FileManager.default.isReadableFile(atPath: FocusModeStatusStore.defaultURL.path)
+    private func startStoreMonitoring() {
+        isAvailable = FileManager.default.isReadableFile(atPath: statusStoreURL.path)
         startStorePolling()
     }
 
     private func startStorePolling() {
-        let url = FocusModeStatusStore.defaultURL
+        let url = statusStoreURL
+        let interval = storePollingInterval
         storePollingTask = Task { [weak self] in
             while !Task.isCancelled {
                 if let next = await FocusModeStatusStore.load(from: url) {
@@ -201,7 +220,7 @@ public final class FocusModeMonitor: ObservableObject {
                     self?.isAvailable = true
                 }
                 do {
-                    try await Task.sleep(for: .seconds(1))
+                    try await Task.sleep(for: interval)
                 } catch {
                     return
                 }

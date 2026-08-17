@@ -58,7 +58,7 @@ public enum CLIParser {
         switch subcommand {
         case "update":
             return try parseUpdate(
-                parseOptions(tokens, allowed: ["--id", "--provider", "--title", "--progress", "--detail", "--status", "--queued"]),
+                parseOptions(tokens, allowed: ["--id", "--provider", "--title", "--progress", "--detail", "--status", "--queued", "--pid"]),
                 now: now
             )
         case "finish":
@@ -140,7 +140,9 @@ public enum CLIParser {
         return .update(AIProgressTask(
             id: id, provider: provider, title: title,
             detail: options["--detail"], progress: progress,
-            status: status, updatedAt: now
+            status: status,
+            updatedAt: now,
+            processIdentifier: try optionalProcessIdentifier(options["--pid"])
         ))
     }
 
@@ -219,6 +221,14 @@ public enum CLIParser {
         let raw = try require(options, key)
         guard let value = Int(raw) else {
             throw CLIParseError.invalidValue(option: key, value: raw)
+        }
+        return value
+    }
+
+    private static func optionalProcessIdentifier(_ raw: String?) throws -> Int32? {
+        guard let raw else { return nil }
+        guard let value = Int32(raw), value > 0 else {
+            throw CLIParseError.invalidValue(option: "--pid", value: raw)
         }
         return value
     }

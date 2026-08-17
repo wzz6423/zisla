@@ -523,7 +523,7 @@ struct NowPlayingServiceTests {
         #expect(MediaAppSpecialist.favoriteState(for: ["添加到我喜欢"]) == false)
         #expect(MediaAppSpecialist.favoriteState(for: ["取消收藏此歌曲"]) == true)
         #expect(MediaAppSpecialist.favoriteState(for: ["添加到收藏"]) == false)
-        // QQ 音乐 11.7 菜单栏“播放控制”里的收藏菜单项实测文案。
+        // Observed favorite-menu label in the QQ Music 11.7 menu bar playback controls.
         #expect(MediaAppSpecialist.favoriteState(for: ["取消喜欢"]) == true)
         #expect(MediaAppSpecialist.favoriteState(for: ["喜欢歌曲"]) == false)
         #expect(MediaAppSpecialist.favoriteState(for: ["播放", "下一首"]) == nil)
@@ -785,6 +785,42 @@ struct NowPlayingServiceTests {
     }
 
     @Test
+    func soleCoreAudioSourceCorrectsConflictingMediaRemoteAttribution() throws {
+        let bilibili = source(id: "bilibili", pid: 42, isFrontmost: true)
+
+        let selected = try #require(
+            NowPlayingService.audioSourceCorrectingRemoteAttribution(
+                from: [bilibili],
+                remotePID: 1339,
+                remoteBundleIdentifier: "com.tencent.QQMusicMac"
+            )
+        )
+
+        #expect(selected.id == "bilibili")
+        #expect(
+            NowPlayingService.audioSourceCorrectingRemoteAttribution(
+                from: [bilibili],
+                remotePID: 42,
+                remoteBundleIdentifier: "test.bilibili"
+            ) == nil
+        )
+    }
+
+    @Test
+    func multipleCoreAudioSourcesDoNotGuessRemoteAttribution() {
+        let bilibili = source(id: "bilibili", pid: 42, isFrontmost: true)
+        let qqMusic = source(id: "qqmusic", pid: 1339, isFrontmost: false)
+
+        #expect(
+            NowPlayingService.audioSourceCorrectingRemoteAttribution(
+                from: [bilibili, qqMusic],
+                remotePID: 1339,
+                remoteBundleIdentifier: "com.tencent.QQMusicMac"
+            ) == nil
+        )
+    }
+
+    @Test
     func pausedRemoteSnapshotIsNotTreatedAsPlayingByAudioFallback() {
         let paused = NowPlayingSnapshot(
             title: "暂停的曲目",
@@ -979,6 +1015,44 @@ struct NowPlayingServiceTests {
         #expect(selected.id == "video")
     }
 
+    @Test
+    func repeatOnePlaybackClockWrapsAtTrackBoundary() {
+        let timestamp = Date(timeIntervalSince1970: 1_000)
+        let snapshot = NowPlayingSnapshot(
+            title: "Track",
+            artist: "Artist",
+            album: nil,
+            artworkData: nil,
+            duration: 180,
+            elapsedTime: 178,
+            timestamp: timestamp,
+            isPlaying: true,
+            playbackMode: .repeatOne
+        )
+
+        #expect(snapshot.elapsedTime(at: timestamp.addingTimeInterval(2)) == 0)
+        #expect(snapshot.elapsedTime(at: timestamp.addingTimeInterval(5)) == 3)
+        #expect(snapshot.elapsedTime(at: timestamp.addingTimeInterval(185)) == 3)
+    }
+
+    @Test
+    func sequentialPlaybackClockStillStopsAtTrackEnd() {
+        let timestamp = Date(timeIntervalSince1970: 1_000)
+        let snapshot = NowPlayingSnapshot(
+            title: "Track",
+            artist: "Artist",
+            album: nil,
+            artworkData: nil,
+            duration: 180,
+            elapsedTime: 178,
+            timestamp: timestamp,
+            isPlaying: true,
+            playbackMode: .sequential
+        )
+
+        #expect(snapshot.elapsedTime(at: timestamp.addingTimeInterval(5)) == 180)
+    }
+
     private func source(id: String, pid: pid_t, isFrontmost: Bool) -> AudioPlaybackSource {
         AudioPlaybackSource(
             id: id,
@@ -988,5 +1062,72 @@ struct NowPlayingServiceTests {
             iconData: nil,
             isFrontmost: isFrontmost
         )
+    }
+
+    @Test
+    func confirmedAudioStopRequestsPlaybackStateRefresh() {
+        let playing = NowPlayingSnapshot(
+            title: "Track",
+            artist: "Artist",
+            album: nil,
+            artworkData: nil,
+            duration: 180,
+            elapsedTime: 30,
+            isPlaying: true
+        )
+        var paused = playing
+        paused.isPlaying = false
+
+        #expect(
+            NowPlayingService.shouldRefreshPlaybackAfterAudioChange(
+                wasAudible: true,
+                isAudible: false,
+                snapshot: playing
+            )
+        )
+        #expect(
+            !NowPlayingService.shouldRefreshPlaybackAfterAudioChange(
+                wasAudible: false,
+                isAudible: false,
+                snapshot: playing
+            )
+        )
+        #expect(
+            !NowPlayingService.shouldRefreshPlaybackAfterAudioChange(
+                wasAudible: true,
+                isAudible: true,
+                snapshot: playing
+            )
+        )
+        #expect(
+            !NowPlayingService.shouldRefreshPlaybackAfterAudioChange(
+                wasAudible: true,
+                isAudible: false,
+                snapshot: paused
+            )
+        )
+    }
+
+    @Test
+    func refreshedAdapterSnapshotFreezesPlaybackClockWhenStopped() throws {
+        let data = try #require(
+            """
+            {
+              "title": "Track",
+              "artist": "Artist",
+              "duration": 180,
+              "elapsedTime": 30,
+              "timestamp": "2026-08-13T05:04:59Z",
+              "playing": false,
+              "playbackRate": 1
+            }
+            """.data(using: .utf8)
+        )
+        let payload = try #require(MediaRemoteAdapterClient.decodeNowPlayingInfo(data))
+        let snapshot = try #require(NowPlayingService.parseAdapter(payload))
+        let later = try #require(snapshot.timestamp).addingTimeInterval(20)
+
+        #expect(!snapshot.isPlaying)
+        #expect(snapshot.elapsedTime(at: later) == 30)
     }
 }

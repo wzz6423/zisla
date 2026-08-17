@@ -155,6 +155,12 @@ struct QuickNoteModuleView: View {
 
     // MARK: - Editing
 
+    private var editorPaneShape: UnevenRoundedRectangle {
+        IslandSurfaceGeometry.moduleContentShape(
+            bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
+        )
+    }
+
     private var editorColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
             editorToolbar
@@ -174,7 +180,11 @@ struct QuickNoteModuleView: View {
 
             editorPane
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .islandGlassSurface(.input, cornerRadius: 8)
+            .islandGlassSurface(
+                .input,
+                cornerRadius: IslandSurfaceGeometry.moduleInnerCornerRadius,
+                bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
+            )
         }
         .padding(.leading, 10)
     }
@@ -199,10 +209,6 @@ struct QuickNoteModuleView: View {
                 .disabled(service.isBuiltInWelcomeNoteSelected)
             IconButton(symbol: "text.viewfinder", help: "发送到提词器", size: .compact) {
                 model.sendQuickNoteToTeleprompter(draftPlainText)
-            }
-            .disabled(draftPlainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            IconButton(symbol: "sparkles", help: "发送到 AI Agent", size: .compact) {
-                model.sendQuickNoteToAIAgent(draftPlainText)
             }
             .disabled(draftPlainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             IconButton(symbol: "arrow.up.left.and.arrow.down.right", help: "展开大窗口编辑", size: .compact) {
@@ -235,7 +241,7 @@ struct QuickNoteModuleView: View {
         }
         .overlay {
             if isTransferTarget {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                editorPaneShape
                     .strokeBorder(Color.accentColor, lineWidth: 2)
                     .allowsHitTesting(false)
             }

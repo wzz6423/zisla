@@ -13,6 +13,9 @@ final class SideNoticeDisplayState: ObservableObject {
     var compactStatusIDs: Set<String> = []
     /// Physical notch width; the detailed music layout must leave a gap here in the center. 0 on simulated-island devices.
     @Published var compactBarCenterInset: CGFloat = 0
+    /// Voice-processing status is scoped to the display where the recording happened; every
+    /// other display hides it so the collapsed pill (and the pet slot) stays in its normal place.
+    @Published var hidesVoiceProcessingIndicator = false
 }
 
 private enum CompactStatusMetrics {
@@ -51,7 +54,14 @@ struct SideNoticeRootView: View {
         let activeAINotices = displayState.compactWingsEnabled ? compactAINotices : []
 
         VStack(alignment: side == .left ? .trailing : .leading, spacing: 6) {
-            if let mediaNotice = presentation.activeMediaNotice {
+            if let voiceProcessingNotice = presentation.activeVoiceProcessingNotice {
+                CompactVoiceProcessingWing(
+                    notice: voiceProcessingNotice,
+                    side: side,
+                    height: presentation.compactWingHeight
+                )
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
+            } else if let mediaNotice = presentation.activeMediaNotice {
                 CompactMediaWing(
                     notice: mediaNotice,
                     side: side,
@@ -68,6 +78,13 @@ struct SideNoticeRootView: View {
             } else if let focusModeNotice = presentation.activeFocusModeNotice {
                 CompactFocusModeWing(
                     notice: focusModeNotice,
+                    side: side,
+                    height: presentation.compactWingHeight
+                )
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
+            } else if let transientNotice = presentation.activeTransientNotice {
+                CompactTransientWing(
+                    notice: transientNotice,
                     side: side,
                     height: presentation.compactWingHeight
                 )
@@ -119,7 +136,10 @@ struct SideNoticeRootView: View {
     }
 
     private var notices: [IslandNotice] {
-        side == .left ? queue.left : queue.right
+        let own = side == .left ? queue.left : queue.right
+        return displayState.hidesVoiceProcessingIndicator
+            ? own.filter { !$0.id.hasPrefix("voice-processing-") }
+            : own
     }
 
     private var compactMediaNotice: IslandNotice? {
@@ -139,6 +159,7 @@ struct CompactStatusBarView: View {
     @ObservedObject var queue: SideNoticeQueue
     @ObservedObject var displayState: SideNoticeDisplayState
     @ObservedObject var media: NowPlayingService
+    @ObservedObject var browserDownloads: BrowserDownloadMonitor
     @ObservedObject var settingsStore: FeatureSettingsStore
     var onStatusHidden: () -> Void
 
@@ -246,6 +267,11 @@ struct CompactStatusBarView: View {
             .sorted { $0.createdAt > $1.createdAt }
     }
 
+    private var voiceProcessingNotice: IslandNotice? {
+        guard !displayState.hidesVoiceProcessingIndicator else { return nil }
+        return (queue.left + queue.right).first { $0.id.hasPrefix("voice-processing-") }
+    }
+
     private var updateNotice: IslandNotice? {
         (queue.left + queue.right).first { $0.id.hasPrefix("update-available-") }
     }
@@ -271,6 +297,30 @@ struct CompactStatusBarView: View {
 
     @ViewBuilder
     private var compactStatusContent: some View {
+        // Voice processing is a short, user-initiated status; it takes precedence over the configured priority list.
+        if let voiceProcessingNotice {
+            HStack(spacing: 0) {
+                CompactVoiceProcessingWing(
+                    notice: voiceProcessingNotice,
+                    side: .left,
+                    height: height,
+                    usesTransparentBackground: compactWingsUseTransparentBackground
+                )
+                Spacer(minLength: 0)
+                CompactVoiceProcessingWing(
+                    notice: voiceProcessingNotice,
+                    side: .right,
+                    height: height,
+                    usesTransparentBackground: compactWingsUseTransparentBackground
+                )
+            }
+        } else {
+            configuredCompactStatusContent
+        }
+    }
+
+    @ViewBuilder
+    private var configuredCompactStatusContent: some View {
         switch selectedCompactStatusPriority {
         case .transient:
             if let transientNotice {
@@ -349,6 +399,8 @@ struct CompactStatusBarView: View {
                 HStack(spacing: 0) {
                     CompactBrowserDownloadWing(
                         notice: browserDownloadNotice,
+                        snapshots: browserDownloads.snapshots,
+                        uniqueAgents: browserDownloads.uniqueAgents,
                         side: .left,
                         height: height,
                         usesTransparentBackground: compactWingsUseTransparentBackground
@@ -356,6 +408,8 @@ struct CompactStatusBarView: View {
                     Spacer(minLength: 0)
                     CompactBrowserDownloadWing(
                         notice: browserDownloadNotice,
+                        snapshots: browserDownloads.snapshots,
+                        uniqueAgents: browserDownloads.uniqueAgents,
                         side: .right,
                         height: height,
                         usesTransparentBackground: compactWingsUseTransparentBackground
@@ -951,6 +1005,54 @@ private enum CompactAIWingRole {
     case status
 }
 
+/// Collapsed-island wings shown while an AI model cleans up a recorded transcript:
+/// the left wing carries a microphone glyph, the right wing one of the nine thinking-orb
+/// animations (picked at random when processing starts).
+private struct CompactVoiceProcessingWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    private var orbState: ThinkingOrbState {
+        ThinkingOrbState(rawValue: notice.metadata?["orbState"] ?? "") ?? .working
+    }
+
+    var body: some View {
+        Group {
+            if side == .left {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: min(13, height * 0.44), weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.leading, CompactStatusMetrics.horizontalContentInset + 2)
+                    .frame(
+                        width: CompactStatusMetrics.wingWidth,
+                        height: height,
+                        alignment: .leading
+                    )
+            } else {
+                ThinkingOrbView(
+                    state: orbState,
+                    size: min(22, height * 0.72),
+                    tint: .white,
+                    accessibilityLabel: "正在整理语音"
+                )
+                .padding(.trailing, CompactStatusMetrics.horizontalContentInset + 2)
+                .frame(
+                    width: CompactStatusMetrics.wingWidth,
+                    height: height,
+                    alignment: .trailing
+                )
+            }
+        }
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+        .contentShape(CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("正在整理语音"))
+        .help("正在整理语音…")
+    }
+}
+
 private struct CompactUpdateWing: View {
     var notice: IslandNotice
     var side: NoticeSide
@@ -972,7 +1074,7 @@ private struct CompactUpdateWing: View {
                         .frame(width: min(19, height * 0.58), height: min(19, height * 0.58))
                 }
             } else {
-                Image(systemName: "arrow.up.circle")
+                    Image(systemName: "arrow.down.circle")
                     .font(.system(size: min(14, height * 0.46), weight: .semibold))
                     .foregroundStyle(.cyan)
             }
@@ -984,7 +1086,7 @@ private struct CompactUpdateWing: View {
         )
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(side == .left ? "\(notice.title)有可用更新" : "立即升级"))
+        .accessibilityLabel(Text(side == .left ? "\(notice.title)有可用更新" : "查看更新"))
     }
 }
 
@@ -1489,6 +1591,39 @@ private struct CompactFocusModeWing: View {
     }
 }
 
+private struct CompactTransientWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    var body: some View {
+        Group {
+            if side == .left {
+                Image(systemName: notice.symbolName ?? "moon.fill")
+                    .font(.system(size: min(15, height * 0.56), weight: .semibold))
+            } else {
+                Text(notice.kind == .success ? "ON" : "OFF")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .monospaced()
+                    .foregroundStyle(notice.kind == .success ? .green : .secondary)
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
+        .frame(
+            width: CompactStatusMetrics.wingWidth,
+            height: height,
+            alignment: side == .left ? .leading : .trailing
+        )
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+        .contentShape(CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("\(notice.title)\(notice.detail ?? "")"))
+        .help("\(notice.title)\(notice.detail ?? "")")
+    }
+}
+
 private struct CompactMailWing: View {
     var notice: IslandNotice
     var side: NoticeSide
@@ -1577,27 +1712,23 @@ private struct DetailedMailBar: View {
 
 private struct CompactBrowserDownloadWing: View {
     var notice: IslandNotice
+    var snapshots: [BrowserDownloadSnapshot]
+    var uniqueAgents: [BrowserDownloadAgent]
     var side: NoticeSide
     var height: CGFloat
     var usesTransparentBackground = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private var isFinished: Bool { notice.kind == .success }
+    private var downloadCount: Int { max(1, snapshots.count) }
 
     var body: some View {
         Group {
             if side == .left {
-                icon
-            } else if isFinished {
-                Image(systemName: "checkmark")
-                    .font(.system(size: min(15, height * 0.56), weight: .bold))
-                    .foregroundStyle(.green)
+                leftContent
             } else {
-                Text(notice.detail ?? "…")
-                    .font(.system(size: min(13, height * 0.5), weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.65)
-                    .foregroundStyle(.white)
+                rightContent
             }
         }
         .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
@@ -1613,26 +1744,122 @@ private struct CompactBrowserDownloadWing: View {
         .help(accessibilityLabel)
     }
 
-    private var iconSize: CGFloat { max(16, min(22, height - 12)) }
-
     @ViewBuilder
-    private var icon: some View {
-        if let image = resolvedIcon {
-            Image(nsImage: image)
-                .resizable()
-                .interpolation(.high)
-                .aspectRatio(contentMode: .fit)
-                .frame(width: iconSize, height: iconSize)
+    private var leftContent: some View {
+        if downloadCount == 1, let agent = snapshots.first?.agent {
+            singleBrowserIcon(agent)
+        } else if !uniqueAgents.isEmpty {
+            browserIconStack
         } else {
-            Image(systemName: notice.symbolName ?? "arrow.down.circle.fill")
-                .font(.system(size: min(15, height * 0.56), weight: .semibold))
-                .foregroundStyle(.white)
+            fallbackIcon
         }
     }
 
-    private var resolvedIcon: NSImage? {
-        guard let bundleIdentifier = notice.appBundleIdentifier, !bundleIdentifier.isEmpty,
-            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+    @ViewBuilder
+    private var rightContent: some View {
+        if isFinished {
+            Image(systemName: "checkmark")
+                .font(.system(size: min(15, height * 0.56), weight: .bold))
+                .foregroundStyle(.green)
+        } else if downloadCount == 1 {
+            Text(notice.detail ?? "…")
+                .font(.system(size: min(13, height * 0.5), weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+                .foregroundStyle(.white)
+        } else if downloadCount == 2 {
+            twoFileProgressStack
+        } else {
+            multiFileStatusDot
+        }
+    }
+
+    private func singleBrowserIcon(_ agent: BrowserDownloadAgent) -> some View {
+        Group {
+            if let image = browserIcon(for: agent) {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: iconSize, height: iconSize)
+            } else {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: min(15, height * 0.56), weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+        }
+    }
+
+    private var browserIconStack: some View {
+        let agents = Array(uniqueAgents.prefix(3))
+        return Group {
+            if agents.count == 1, let agent = agents.first {
+                singleBrowserIcon(agent)
+            } else {
+                HStack(spacing: -10) {
+                    ForEach(agents, id: \.self) { agent in
+                        Group {
+                            if let image = browserIcon(for: agent) {
+                                Image(nsImage: image)
+                                    .resizable()
+                                    .interpolation(.high)
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: stackIconSize, height: stackIconSize)
+                            } else {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .font(.system(size: stackIconSize * 0.7, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: stackIconSize, height: stackIconSize)
+                            }
+                        }
+                        .padding(1)
+                        .background(Color.black, in: Circle())
+                    }
+                }
+            }
+        }
+    }
+
+    private var fallbackIcon: some View {
+        Image(systemName: notice.symbolName ?? "arrow.down.circle.fill")
+            .font(.system(size: min(15, height * 0.56), weight: .semibold))
+            .foregroundStyle(.white)
+    }
+
+    private var twoFileProgressStack: some View {
+        VStack(spacing: 1) {
+            ForEach(Array(snapshots.prefix(2))) { snapshot in
+                Text(snapshot.progressText)
+                    .font(.system(size: min(9, height * 0.35), weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(maxHeight: min(22, height * 0.72))
+    }
+
+    private var multiFileStatusDot: some View {
+        HStack(spacing: 5) {
+            CompactStatusPulseView(
+                color: .systemGreen,
+                isAnimated: !reduceMotion
+            )
+            .frame(width: 4, height: 4)
+            Text("\(downloadCount)")
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .monospacedDigit()
+        }
+        .foregroundStyle(.white)
+    }
+
+    private var iconSize: CGFloat { max(16, min(22, height - 12)) }
+    private var stackIconSize: CGFloat { max(14, min(16, height * 0.54)) }
+
+    private func browserIcon(for agent: BrowserDownloadAgent) -> NSImage? {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: agent.bundleIdentifier)
         else { return nil }
         return NSWorkspace.shared.icon(forFile: url.path)
     }
@@ -1640,7 +1867,11 @@ private struct CompactBrowserDownloadWing: View {
     private var accessibilityLabel: String {
         let source = notice.appName ?? "浏览器"
         guard isFinished else {
-            return "\(source) 下载中 \(notice.detail ?? "")：\(notice.title)"
+            if downloadCount == 1 {
+                return "\(source) 下载中 \(notice.detail ?? "")：\(notice.title)"
+            } else {
+                return "\(source) 正在下载 \(downloadCount) 个文件"
+            }
         }
         return "\(source) 下载完成：\(notice.title)"
     }

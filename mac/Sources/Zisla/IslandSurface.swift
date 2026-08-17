@@ -3,6 +3,87 @@ import ZislaCore
 import ZislaKit
 import SwiftUI
 
+struct IslandSurfaceRenderingPolicy: Equatable {
+    let usesExpandedMaterial: Bool
+    let showsCrown: Bool
+    let nativeGlassIsCollapsed: Bool
+
+    init(isCollapsed: Bool, usesCompactGlassSurface: Bool) {
+        usesExpandedMaterial = !isCollapsed || usesCompactGlassSurface
+        showsCrown = !isCollapsed && !usesCompactGlassSurface
+        nativeGlassIsCollapsed = isCollapsed && !usesCompactGlassSurface
+    }
+}
+
+struct VoiceRecordingIslandGeometry: Equatable {
+    static let transcriptRowHeight: CGFloat = 20
+
+    let collapsedSize: CGSize
+    let surfaceSize: CGSize
+
+    init(collapsedSize: CGSize, surfaceSize: CGSize) {
+        self.collapsedSize = collapsedSize
+        self.surfaceSize = surfaceSize
+    }
+
+    init(collapsedSize: CGSize, availableSize: CGSize) {
+        self.collapsedSize = collapsedSize
+        surfaceSize = CGSize(
+            // The available size is already the collapsed pill's overflow width (notch +
+            // wings); recording only adds one transcript row below, never a wider bottom.
+            width: max(0, availableSize.width),
+            height: min(
+                max(0, availableSize.height),
+                max(0, collapsedSize.height) + Self.transcriptRowHeight
+            )
+        )
+    }
+
+    /// The top row spans the full overflow width: on notched screens the physical notch
+    /// covers the center, so the mic and waveform must land in the left/right wings.
+    var topRowFrame: CGRect {
+        CGRect(
+            x: 0,
+            y: 0,
+            width: surfaceSize.width,
+            height: min(max(0, collapsedSize.height), max(0, surfaceSize.height))
+        )
+    }
+
+    var transcriptRowFrame: CGRect {
+        CGRect(
+            x: 0,
+            y: topRowFrame.maxY,
+            width: surfaceSize.width,
+            height: max(0, surfaceSize.height - topRowFrame.maxY)
+        )
+    }
+}
+
+/// The recording island mirrors the collapsed overflow bar (AI-status state) extended by
+/// one transcript row: the root (top edge) sits flush with the screen frame — the sides run
+/// straight down from the very top with no inward curve — while the bottom keeps the
+/// collapsed pill's rounded corners.
+struct VoiceRecordingIslandSilhouette: Shape {
+    static let bottomCornerRadius: CGFloat = 14
+
+    let surfaceSize: CGSize
+
+    func path(in rect: CGRect) -> Path {
+        let frame = CGRect(
+            x: rect.midX - surfaceSize.width / 2,
+            y: rect.minY,
+            width: surfaceSize.width,
+            height: surfaceSize.height
+        )
+        return IslandSilhouette(
+            topCornerRadius: 0,
+            bottomCornerRadius: Self.bottomCornerRadius
+        )
+        .path(in: frame)
+    }
+}
+
 /// The island's visual surface: a solid-black top that smoothly fades through a
 /// smoked transition into a transmissive frosted-glass bottom. The frosted glass
 /// is rendered in dark appearance so it reads as a smoked, non-white translucent
@@ -16,6 +97,7 @@ struct IslandSurface<Content: View>: View {
     private let expandedSize: CGSize
     private let visualStyle: IslandVisualStyle
     private let notchBackground: IslandNotchBackground
+    private let usesCompactGlassSurface: Bool
 
     init(
         isCollapsed: Bool = false,
@@ -23,6 +105,7 @@ struct IslandSurface<Content: View>: View {
         expandedSize: CGSize = CGSize(width: 748, height: 324),
         visualStyle: IslandVisualStyle = .frosted,
         notchBackground: IslandNotchBackground = .black,
+        usesCompactGlassSurface: Bool = false,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.isCollapsed = isCollapsed
@@ -30,7 +113,23 @@ struct IslandSurface<Content: View>: View {
         self.expandedSize = expandedSize
         self.visualStyle = visualStyle
         self.notchBackground = notchBackground
+        self.usesCompactGlassSurface = usesCompactGlassSurface
         self.content = content
+    }
+
+    private var renderingPolicy: IslandSurfaceRenderingPolicy {
+        IslandSurfaceRenderingPolicy(
+            isCollapsed: isCollapsed,
+            usesCompactGlassSurface: usesCompactGlassSurface
+        )
+    }
+
+    /// Rim-light corner radius: the recording surface keeps the pill's bottom radius,
+    /// everything else keeps the expanded bottom radius.
+    private var rimBottomCornerRadius: CGFloat {
+        usesCompactGlassSurface
+            ? VoiceRecordingIslandSilhouette.bottomCornerRadius
+            : IslandSurfaceGeometry.expandedBottomCornerRadius
     }
 
     var body: some View {
@@ -43,21 +142,25 @@ struct IslandSurface<Content: View>: View {
         // Keeps the mask's layout size fixed, redrawing only the outline within its canvas — if the
         // mask view's frame changes during animation, SwiftUI/AppKit layout interpolation briefly shifts the outline leftward.
         .mask {
-            IslandRevealMask(
-                collapsedSize: collapsedSize,
-                expandedSize: expandedSize,
-                isCollapsed: isCollapsed
-            )
-            .animation(
-                reduceMotion
-                    ? nil
-                    // Collapse stays quick and crisp; expand gets a spring with a hint of
-                    // bounce, matching the iOS Dynamic Island reveal feel.
-                    : isCollapsed
-                        ? .smooth(duration: 0.18)
-                        : .snappy(duration: 0.28, extraBounce: 0.05),
-                value: isCollapsed
-            )
+            if usesCompactGlassSurface {
+                VoiceRecordingIslandSilhouette(surfaceSize: expandedSize)
+            } else {
+                IslandRevealMask(
+                    collapsedSize: collapsedSize,
+                    expandedSize: expandedSize,
+                    isCollapsed: isCollapsed
+                )
+                .animation(
+                    reduceMotion
+                        ? nil
+                        // Collapse stays quick and crisp; expand gets a spring with a hint of
+                        // bounce, matching the iOS Dynamic Island reveal feel.
+                        : isCollapsed
+                            ? .smooth(duration: 0.18)
+                            : .snappy(duration: 0.28, extraBounce: 0.05),
+                    value: isCollapsed
+                )
+            }
         }
     }
 
@@ -65,15 +168,15 @@ struct IslandSurface<Content: View>: View {
 
     @ViewBuilder
     private var unifiedSurface: some View {
-        if isCollapsed {
-            collapsedSurface
-        } else {
+        if renderingPolicy.usesExpandedMaterial {
             switch visualStyle {
             case .frosted:
                 frostedSurface
             case .transparent:
                 transparentSurface
             }
+        } else {
+            collapsedSurface
         }
     }
 
@@ -87,10 +190,17 @@ struct IslandSurface<Content: View>: View {
                 // crown keeps covering it where text legibility matters.
                 IslandLightField(visualStyle: .frosted)
                 // Solid-black crown on top + smoked transition.
-                crown
+                if renderingPolicy.showsCrown {
+                    crown
+                } else if usesCompactGlassSurface {
+                    compactCrown
+                }
                 IslandSheenSweep(visualStyle: .frosted)
                     .id(visualStyle)
-                IslandRimLight(visualStyle: .frosted)
+                IslandRimLight(
+                    visualStyle: .frosted,
+                    bottomCornerRadius: rimBottomCornerRadius
+                )
             } else {
                 // Accessibility: opaque black → smoked gradient.
                 surfaceGradient
@@ -109,10 +219,17 @@ struct IslandSurface<Content: View>: View {
             ZStack(alignment: .top) {
                 transparentLiquidGlassShell
                 IslandLightField(visualStyle: .transparent)
-                transparentCrown
+                if renderingPolicy.showsCrown {
+                    transparentCrown
+                } else if usesCompactGlassSurface {
+                    compactCrown
+                }
                 IslandSheenSweep(visualStyle: .transparent)
                     .id(visualStyle)
-                IslandRimLight(visualStyle: .transparent)
+                IslandRimLight(
+                    visualStyle: .transparent,
+                    bottomCornerRadius: rimBottomCornerRadius
+                )
             }
         }
     }
@@ -169,6 +286,50 @@ struct IslandSurface<Content: View>: View {
     /// Crown-to-frosted-glass blend height. Extended to 60pt for a smoother black → smoked merge.
     private let crownBlend: CGFloat = 60
 
+    /// Compact recording crown: the collapsed pill row stays solid black while the single added
+    /// transcript row fades the black into the glass below — a one-row miniature of the expanded
+    /// crown → glass transition, in either visual style. Scales with the (dynamic) collapsed
+    /// height instead of the fixed chrome metrics, which would fill the whole 54pt surface
+    /// with solid black.
+    private var compactCrown: some View {
+        let solidHeight = min(max(0, collapsedSize.height), max(0, expandedSize.height))
+        let blendHeight = max(0, expandedSize.height - solidHeight)
+        return VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.black.opacity(compactCrownOpacity))
+                .frame(height: solidHeight)
+            LinearGradient(stops: compactCrownStops, startPoint: .top, endPoint: .bottom)
+                .frame(height: blendHeight)
+            Spacer(minLength: 0)
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// Liquid Glass keeps the recording crown fully opaque, matching the expanded transparent
+    /// crown; frosted retains its faint translucency.
+    private var compactCrownOpacity: CGFloat {
+        visualStyle == .transparent ? 1 : crownOpacity
+    }
+
+    private var compactCrownStops: [Gradient.Stop] {
+        if visualStyle == .transparent {
+            // Liquid Glass uses the same gradient parameters as the expanded `transparentCrown`.
+            [
+                .init(color: .black, location: 0),
+                .init(color: .black.opacity(0.78), location: 0.35),
+                .init(color: .black.opacity(0.34), location: 0.72),
+                .init(color: .black.opacity(0.0), location: 1),
+            ]
+        } else {
+            [
+                .init(color: .black.opacity(crownOpacity), location: 0),
+                .init(color: .black.opacity(crownOpacity * 0.62), location: 0.4),
+                .init(color: .black.opacity(crownOpacity * 0.28), location: 0.72),
+                .init(color: .black.opacity(0.0), location: 1),
+            ]
+        }
+    }
+
     /// Island surface base: transmissive smoked frosted glass.
     ///
     /// `.glassEffect(.regular)` is dropped for large-area backgrounds — it collapses to
@@ -184,31 +345,74 @@ struct IslandSurface<Content: View>: View {
 
     // MARK: - Transparent glass (macOS 27 / Liquid Glass approximation)
 
-    /// The clear layer keeps the lower edge refractive; the regular layer above it restores
-    /// enough frosted contrast for module content to remain readable.
+    /// The clear layer keeps the lower edge refractive; the regular overlay (masked to fade
+    /// out toward the bottom) gives the body its smoked contrast — on the full expanded
+    /// surface and the compact recording surface alike.
     private var transparentLiquidGlassShell: some View {
-        ZStack {
-            NativeLiquidGlassShell(isCollapsed: isCollapsed, material: .clear)
-            NativeLiquidGlassShell(isCollapsed: isCollapsed, material: .regular)
+        // The recording surface keeps the collapsed pill's rounded bottom corners.
+        let shellCornerRadius = usesCompactGlassSurface
+            ? VoiceRecordingIslandSilhouette.bottomCornerRadius
+            : IslandSurfaceGeometry.expandedBottomCornerRadius
+
+        return ZStack {
+            NativeLiquidGlassShell(
+                isCollapsed: renderingPolicy.nativeGlassIsCollapsed,
+                material: .clear,
+                cornerRadius: shellCornerRadius
+            )
+
+            if usesCompactGlassSurface {
+                // The recording surface uses only `.clear` with a subtle black gradient to avoid `.regular`'s gray cast.
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0.15), location: 0),
+                        .init(color: .black.opacity(0.08), location: 0.6),
+                        .init(color: .clear, location: 1),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            } else {
+                // The expanded surface uses `.regular` material with a mask.
+                NativeLiquidGlassShell(
+                    isCollapsed: renderingPolicy.nativeGlassIsCollapsed,
+                    material: .regular,
+                    cornerRadius: shellCornerRadius
+                )
                 .mask(alignment: .bottom) {
-                    // A single gradient avoids an AppKit compositor seam at the boundary
-                    // between separately laid-out opaque and fading mask views.
                     LinearGradient(
-                        stops: [
-                            .init(color: .black, location: 0),
-                            .init(color: .black, location: 0.72),
-                            .init(color: .black.opacity(0.92), location: 0.78),
-                            .init(color: .black.opacity(0.70), location: 0.84),
-                            .init(color: .black.opacity(0.38), location: 0.90),
-                            .init(color: .black.opacity(0.12), location: 0.96),
-                            .init(color: .clear, location: 1),
-                        ],
+                        stops: expandedLiquidGlassMaskStops,
                         startPoint: .top,
                         endPoint: .bottom
                     )
                 }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// The expanded Liquid Glass mask fades at the bottom to reveal edge refraction.
+    private var expandedLiquidGlassMaskStops: [Gradient.Stop] {
+        [
+            .init(color: .black, location: 0),
+            .init(color: .black, location: 0.72),
+            .init(color: .black.opacity(0.92), location: 0.78),
+            .init(color: .black.opacity(0.70), location: 0.84),
+            .init(color: .black.opacity(0.38), location: 0.90),
+            .init(color: .black.opacity(0.12), location: 0.96),
+            .init(color: .clear, location: 1),
+        ]
+    }
+
+    /// The compact recording mask preserves contrast at the top, then fades sharply to reveal the `.clear` layer's refraction.
+    private var compactLiquidGlassMaskStops: [Gradient.Stop] {
+        [
+            .init(color: .black, location: 0),
+            .init(color: .black.opacity(0.85), location: 0.5),
+            .init(color: .black.opacity(0.35), location: 0.75),
+            .init(color: .black.opacity(0.08), location: 0.92),
+            .init(color: .clear, location: 1),
+        ]
     }
 
     /// The top remains completely opaque: Liquid Glass starts below the crown, where the module content lives.
@@ -405,10 +609,16 @@ private enum NativeLiquidGlassMaterial {
 private struct NativeLiquidGlassShell: NSViewRepresentable {
     let isCollapsed: Bool
     let material: NativeLiquidGlassMaterial
+    let cornerRadius: CGFloat
 
-    init(isCollapsed: Bool, material: NativeLiquidGlassMaterial = .regular) {
+    init(
+        isCollapsed: Bool,
+        material: NativeLiquidGlassMaterial = .regular,
+        cornerRadius: CGFloat = IslandSurfaceGeometry.expandedBottomCornerRadius
+    ) {
         self.isCollapsed = isCollapsed
         self.material = material
+        self.cornerRadius = cornerRadius
     }
 
     func makeNSView(context: Context) -> NSView {
@@ -439,7 +649,7 @@ private struct NativeLiquidGlassShell: NSViewRepresentable {
             view.tintColor = nil
         }
         view.alphaValue = 1
-        view.cornerRadius = IslandSurfaceGeometry.expandedBottomCornerRadius
+        view.cornerRadius = cornerRadius
         view.installTransparentContentHostIfNeeded()
     }
 }
@@ -455,16 +665,14 @@ private final class LiquidGlassShellView: NSGlassEffectView {
         guard didExpand else { return }
 
         refreshGeneration &+= 1
-        let generation = refreshGeneration
-        refreshAfterReveal(generation: generation, delay: 0)
-        refreshAfterReveal(generation: generation, delay: 0.24)
+        scheduleRevealRefreshes()
     }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard window != nil, !isCollapsed else { return }
         refreshGeneration &+= 1
-        refreshAfterReveal(generation: refreshGeneration, delay: 0)
+        scheduleRevealRefreshes()
     }
 
     /// NSGlassEffectView guarantees its full compositing path for `contentView`; an empty shell
@@ -477,6 +685,12 @@ private final class LiquidGlassShellView: NSGlassEffectView {
         host.wantsLayer = true
         host.layer?.backgroundColor = NSColor.clear.cgColor
         contentView = host
+    }
+
+    private func scheduleRevealRefreshes() {
+        let generation = refreshGeneration
+        refreshAfterReveal(generation: generation, delay: 0)
+        refreshAfterReveal(generation: generation, delay: 0.24)
     }
 
     private func refreshAfterReveal(generation: Int, delay: TimeInterval) {

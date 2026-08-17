@@ -65,7 +65,7 @@ public enum AppearanceMode: String, Codable, CaseIterable, Sendable, Equatable {
     }
 }
 
-/// Sparkle update channel selectable when checking for updates manually.
+/// Update channel selectable when checking for updates manually.
 public enum UpdateChannel: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case release
     case preview
@@ -279,6 +279,31 @@ public enum SystemMonitorMenuBarDisplayStyle: String, Codable, CaseIterable, Sen
     }
 }
 
+public enum VoiceRecordingCleanupPolicy: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
+    case sevenDays
+    case fifteenDays
+    case thirtyDays
+    case never
+
+    public var menuTitle: String {
+        switch self {
+        case .sevenDays: "7 天"
+        case .fifteenDays: "15 天"
+        case .thirtyDays: "30 天"
+        case .never: "永不清理"
+        }
+    }
+
+    public var daysThreshold: Int? {
+        switch self {
+        case .sevenDays: 7
+        case .fifteenDays: 15
+        case .thirtyDays: 30
+        case .never: nil
+        }
+    }
+}
+
 public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case transient
     case updateAvailable
@@ -293,12 +318,12 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
 
     public static let defaultOrder: [Self] = [
         .transient,
-        .updateAvailable,
-        .mail,
         .videoDownload,
         .browserDownload,
-        .focusCountdown,
         .toolboxReminder,
+        .mail,
+        .updateAvailable,
+        .focusCountdown,
         .aiActivity,
         .media,
         .focusMode,
@@ -326,13 +351,12 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
     }
 }
 
-/// Feature module toggles. Privacy-sensitive items (clipboard detection) default to off; core modules default to on.
+/// Feature module toggles default to on.
 public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mediaEnabled: Bool
     public var mediaSource: MediaSourcePreference
     public var fileShelfEnabled: Bool
     public var aiProgressEnabled: Bool
-    public var aiAgentEnabled: Bool
     public var downloaderEnabled: Bool
     public var calendarEnabled: Bool
     public var toolboxEnabled: Bool
@@ -345,6 +369,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether to show the source platform logo and percentage in the collapsed Dynamic Island while the native downloader is active.
     public var videoDownloadIslandEnabled: Bool
     public var systemMonitorEnabled: Bool
+    /// Battery monitor: independent toggle for the battery detail module and status tracking.
+    public var batteryMonitorEnabled: Bool
     /// When empty, no additional monitor status bar items are added.
     public var systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric>
     /// Detailed mode retains the existing icon and horizontal readings; compact mode hides the icon and reduces font size.
@@ -358,17 +384,18 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether to show the lunar calendar above the native lock-screen clock; can be shown alongside the custom message.
     public var lockScreenShowsLunar: Bool
     public var quickNotesEnabled: Bool
-    /// Mail integration defaults to off to avoid reading inbox metadata before the user has confirmed authorization.
+    /// Mail integration; users can disable it in Settings if they don't want inbox metadata to be read.
     public var mailEnabled: Bool
     /// An empty set means all configured system Mail.app accounts are synced.
     public var mailAccountNames: Set<String>
     public var mailCompactStyle: MailCompactStyle
     public var updateChecksEnabled: Bool
-    public var automaticUpdatesEnabled: Bool
-    /// Target channel for manual update checks; automatic updates always follow the channel of the installed build.
+    public var automaticDownloadEnabled: Bool
+    /// Target channel for manual update checks.
     public var updateChannel: UpdateChannel
-    /// Whether to save clipboard text and images locally; defaults to off to avoid inadvertently recording sensitive content.
+    /// Whether to save clipboard text and images locally; users can disable it in Settings if concerned about sensitive content.
     public var clipboardHistoryEnabled: Bool
+    /// Whether to detect downloadable links in clipboard; users can disable it in Settings.
     public var clipboardDetectionEnabled: Bool
     public var sideNoticesEnabled: Bool
     public var compactStatusPriority: [CompactStatusPriority]
@@ -399,7 +426,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var voiceInputEnabled: Bool
     public var voiceInputMode: VoiceInputMode
     public var voiceInputHotkeyPreset: VoiceInputHotkeyPreset
-    /// Current model configuration for voice processing. The endpoint and credentials remain in AI Agent settings.
+    public var voiceRecordingRetentionEnabled: Bool
+    public var voiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy
+    /// Current model configuration for voice processing. Endpoint and credentials remain in voice settings.
     public var voiceModelConfiguration: AIModelConfigurationReference?
 
     public init(
@@ -407,32 +436,32 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mediaSource: MediaSourcePreference = .automatic,
         fileShelfEnabled: Bool = true,
         aiProgressEnabled: Bool = true,
-        aiAgentEnabled: Bool = true,
         downloaderEnabled: Bool = true,
         calendarEnabled: Bool = true,
         toolboxEnabled: Bool = true,
         pdfToolsEnabled: Bool = true,
-        toolboxReminderEnabled: Bool = false,
+        toolboxReminderEnabled: Bool = true,
         focusCountdownIslandEnabled: Bool = true,
         browserDownloadIslandEnabled: Bool = true,
         videoDownloadIslandEnabled: Bool = true,
         systemMonitorEnabled: Bool = true,
+        batteryMonitorEnabled: Bool = true,
         systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric> = [.cpu],
-        systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle = .detailed,
+        systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle = .compact,
         menuBarAppIconEnabled: Bool = false,
         weatherEnabled: Bool = true,
         lockScreenInfoEnabled: Bool = true,
         lockScreenMessage: String = "",
         lockScreenShowsLunar: Bool = true,
         quickNotesEnabled: Bool = true,
-        mailEnabled: Bool = false,
+        mailEnabled: Bool = true,
         mailAccountNames: Set<String> = [],
         mailCompactStyle: MailCompactStyle = .compact,
         updateChecksEnabled: Bool = true,
-        automaticUpdatesEnabled: Bool = true,
+        automaticDownloadEnabled: Bool = true,
         updateChannel: UpdateChannel = .release,
-        clipboardHistoryEnabled: Bool = false,
-        clipboardDetectionEnabled: Bool = false,
+        clipboardHistoryEnabled: Bool = true,
+        clipboardDetectionEnabled: Bool = true,
         sideNoticesEnabled: Bool = true,
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
         notificationsMuted: Bool = false,
@@ -442,23 +471,24 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         activityNoticeDisplayIDs: Set<UInt32> = [],
         appearanceMode: AppearanceMode = .system,
         petEnabled: Bool = true,
-        petID: String = "dog",
-        petSide: PetSide = .right,
+        petID: String = "panda",
+        petSide: PetSide = .left,
         mediaShowLyricsAndInfo: Bool = true,
         mediaCompactStyle: MediaCompactStyle = .compact,
         islandVisualStyle: IslandVisualStyle = .transparent,
         islandNotchBackground: IslandNotchBackground = .black,
         islandCollapsedOnTop: Bool = true,
-        voiceInputEnabled: Bool = false,
+        voiceInputEnabled: Bool = true,
         voiceInputMode: VoiceInputMode = .toggle,
         voiceInputHotkeyPreset: VoiceInputHotkeyPreset = .optionSpace,
+        voiceRecordingRetentionEnabled: Bool = true,
+        voiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy = .never,
         voiceModelConfiguration: AIModelConfigurationReference? = nil
     ) {
         self.mediaEnabled = mediaEnabled
         self.mediaSource = mediaSource
         self.fileShelfEnabled = fileShelfEnabled
         self.aiProgressEnabled = aiProgressEnabled
-        self.aiAgentEnabled = aiAgentEnabled
         self.downloaderEnabled = downloaderEnabled
         self.calendarEnabled = calendarEnabled
         self.toolboxEnabled = toolboxEnabled
@@ -468,6 +498,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.browserDownloadIslandEnabled = browserDownloadIslandEnabled
         self.videoDownloadIslandEnabled = videoDownloadIslandEnabled
         self.systemMonitorEnabled = systemMonitorEnabled
+        self.batteryMonitorEnabled = batteryMonitorEnabled
         self.systemMonitorMenuBarMetrics = systemMonitorMenuBarMetrics
         self.systemMonitorMenuBarDisplayStyle = systemMonitorMenuBarDisplayStyle
         self.menuBarAppIconEnabled = menuBarAppIconEnabled
@@ -480,7 +511,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.mailAccountNames = mailAccountNames
         self.mailCompactStyle = mailCompactStyle
         self.updateChecksEnabled = updateChecksEnabled
-        self.automaticUpdatesEnabled = automaticUpdatesEnabled
+        self.automaticDownloadEnabled = automaticDownloadEnabled
         self.updateChannel = updateChannel
         self.clipboardHistoryEnabled = clipboardHistoryEnabled
         self.clipboardDetectionEnabled = clipboardDetectionEnabled
@@ -503,6 +534,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.voiceInputEnabled = voiceInputEnabled
         self.voiceInputMode = voiceInputMode
         self.voiceInputHotkeyPreset = voiceInputHotkeyPreset
+        self.voiceRecordingRetentionEnabled = voiceRecordingRetentionEnabled
+        self.voiceRecordingCleanupPolicy = voiceRecordingCleanupPolicy
         self.voiceModelConfiguration = voiceModelConfiguration
     }
 
@@ -527,7 +560,6 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case mediaSource
         case fileShelfEnabled
         case aiProgressEnabled
-        case aiAgentEnabled
         case downloaderEnabled
         case calendarEnabled
         case toolboxEnabled
@@ -537,6 +569,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case browserDownloadIslandEnabled
         case videoDownloadIslandEnabled
         case systemMonitorEnabled
+        case batteryMonitorEnabled
         case systemMonitorMenuBarMetrics
         case systemMonitorMenuBarDisplayStyle
         case menuBarAppIconEnabled
@@ -549,7 +582,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case mailAccountNames
         case mailCompactStyle
         case updateChecksEnabled
-        case automaticUpdatesEnabled
+        case automaticDownloadEnabled
         case updateChannel
         case clipboardHistoryEnabled
         case clipboardDetectionEnabled
@@ -572,7 +605,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case voiceInputEnabled
         case voiceInputMode
         case voiceInputHotkeyPreset
+        case voiceRecordingRetentionEnabled
+        case voiceRecordingCleanupPolicy
         case voiceModelConfiguration
+    }
+
+    private enum LegacyCodingKeys: String, CodingKey {
+        case automaticUpdatesEnabled
     }
 
     public init(from decoder: Decoder) throws {
@@ -582,7 +621,6 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mediaSource = try container.decodeIfPresent(MediaSourcePreference.self, forKey: .mediaSource) ?? defaults.mediaSource
         fileShelfEnabled = try container.decodeIfPresent(Bool.self, forKey: .fileShelfEnabled) ?? defaults.fileShelfEnabled
         aiProgressEnabled = try container.decodeIfPresent(Bool.self, forKey: .aiProgressEnabled) ?? defaults.aiProgressEnabled
-        aiAgentEnabled = try container.decodeIfPresent(Bool.self, forKey: .aiAgentEnabled) ?? defaults.aiAgentEnabled
         downloaderEnabled = try container.decodeIfPresent(Bool.self, forKey: .downloaderEnabled) ?? defaults.downloaderEnabled
         calendarEnabled = try container.decodeIfPresent(Bool.self, forKey: .calendarEnabled) ?? defaults.calendarEnabled
         toolboxEnabled = try container.decodeIfPresent(Bool.self, forKey: .toolboxEnabled) ?? defaults.toolboxEnabled
@@ -600,11 +638,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .videoDownloadIslandEnabled
         ) ?? defaults.videoDownloadIslandEnabled
-        videoDownloadIslandEnabled = try container.decodeIfPresent(
-            Bool.self,
-            forKey: .videoDownloadIslandEnabled
-        ) ?? defaults.videoDownloadIslandEnabled
         systemMonitorEnabled = try container.decodeIfPresent(Bool.self, forKey: .systemMonitorEnabled) ?? defaults.systemMonitorEnabled
+        batteryMonitorEnabled = try container.decodeIfPresent(Bool.self, forKey: .batteryMonitorEnabled) ?? defaults.batteryMonitorEnabled
         systemMonitorMenuBarMetrics = try container.decodeIfPresent(
             Set<SystemMonitorMenuBarMetric>.self,
             forKey: .systemMonitorMenuBarMetrics
@@ -626,7 +661,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mailAccountNames = try container.decodeIfPresent(Set<String>.self, forKey: .mailAccountNames) ?? defaults.mailAccountNames
         mailCompactStyle = try container.decodeIfPresent(MailCompactStyle.self, forKey: .mailCompactStyle) ?? defaults.mailCompactStyle
         updateChecksEnabled = try container.decodeIfPresent(Bool.self, forKey: .updateChecksEnabled) ?? defaults.updateChecksEnabled
-        automaticUpdatesEnabled = try container.decodeIfPresent(Bool.self, forKey: .automaticUpdatesEnabled) ?? defaults.automaticUpdatesEnabled
+        if let automaticDownload = try container.decodeIfPresent(Bool.self, forKey: .automaticDownloadEnabled) {
+            automaticDownloadEnabled = automaticDownload
+        } else {
+            let legacyContainer = try decoder.container(keyedBy: LegacyCodingKeys.self)
+            automaticDownloadEnabled = try legacyContainer.decodeIfPresent(Bool.self, forKey: .automaticUpdatesEnabled) ?? defaults.automaticDownloadEnabled
+        }
         updateChannel = try container.decodeIfPresent(UpdateChannel.self, forKey: .updateChannel) ?? defaults.updateChannel
         clipboardHistoryEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardHistoryEnabled) ?? defaults.clipboardHistoryEnabled
         clipboardDetectionEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardDetectionEnabled) ?? defaults.clipboardDetectionEnabled
@@ -676,6 +716,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         voiceInputEnabled = try container.decodeIfPresent(Bool.self, forKey: .voiceInputEnabled) ?? defaults.voiceInputEnabled
         voiceInputMode = try container.decodeIfPresent(VoiceInputMode.self, forKey: .voiceInputMode) ?? defaults.voiceInputMode
         voiceInputHotkeyPreset = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .voiceInputHotkeyPreset) ?? defaults.voiceInputHotkeyPreset
+        voiceRecordingRetentionEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .voiceRecordingRetentionEnabled
+        ) ?? defaults.voiceRecordingRetentionEnabled
+        voiceRecordingCleanupPolicy = try container.decodeIfPresent(
+            VoiceRecordingCleanupPolicy.self,
+            forKey: .voiceRecordingCleanupPolicy
+        ) ?? defaults.voiceRecordingCleanupPolicy
         voiceModelConfiguration = try container.decodeIfPresent(
             AIModelConfigurationReference.self,
             forKey: .voiceModelConfiguration

@@ -249,6 +249,12 @@ struct MailModuleView: View {
 
     // MARK: - Message Detail
 
+    private var messageBodyShape: UnevenRoundedRectangle {
+        IslandSurfaceGeometry.moduleContentShape(
+            bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
+        )
+    }
+
     @ViewBuilder
     private var messageDetail: some View {
         if let message = selectedMessage {
@@ -284,9 +290,9 @@ struct MailModuleView: View {
                 .scrollIndicators(.visible)
                 .thinScrollChrome()
                 .background(Color.fillCard)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(messageBodyShape)
                 .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    messageBodyShape
                         .strokeBorder(Color.strokeCard, lineWidth: 1)
                 }
             }

@@ -1,4 +1,6 @@
 import Foundation
+import UniformTypeIdentifiers
+import ZislaCore
 
 /// Clipboard file item: stores the file URL, display name, and a security-scoped bookmark,
 /// following FileShelfStore's bookmark approach to allow reading and writing sandbox-external
@@ -132,5 +134,58 @@ public struct ClipboardHistoryItem: Identifiable, Codable, Equatable, Sendable {
         self.content = content
         self.lastCopiedAt = lastCopiedAt
         self.isPinned = isPinned
+    }
+
+    public var category: FileShelfCategory {
+        switch content {
+        case .text(let value):
+            if HTTPURLParser.url(from: value) != nil {
+                return .url
+            }
+            return isLocalFilePath(value) ? .path : .text
+        case .image:
+            return .image
+        case .file(let reference):
+            return categoryForFile(url: reference.url)
+        }
+    }
+
+    private func isLocalFilePath(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains(where: { $0.isNewline }) else { return false }
+        if trimmed == "~" || trimmed.hasPrefix("~/") || trimmed.hasPrefix("/") {
+            return true
+        }
+        guard let url = URL(string: trimmed), url.isFileURL else { return false }
+        return !url.path.isEmpty
+    }
+
+    private func categoryForFile(url: URL) -> FileShelfCategory {
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+           isDirectory.boolValue {
+            return .folder
+        }
+
+        guard let contentType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType else {
+            return .other
+        }
+
+        if contentType.conforms(to: .image) {
+            return .image
+        } else if contentType.conforms(to: .movie) || contentType.conforms(to: .video) {
+            return .video
+        } else if contentType.conforms(to: .audio) {
+            return .audio
+        } else if contentType.conforms(to: .archive) || contentType.conforms(to: .zip) {
+            return .archive
+        } else if contentType.conforms(to: .sourceCode) || contentType.conforms(to: .script) {
+            return .code
+        } else if contentType.conforms(to: .text) || contentType.conforms(to: .pdf) ||
+                  contentType.conforms(to: .spreadsheet) || contentType.conforms(to: .presentation) {
+            return .document
+        }
+
+        return .other
     }
 }

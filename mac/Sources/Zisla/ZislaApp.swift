@@ -16,9 +16,117 @@ enum ZislaMain {
 }
 
 @MainActor
-private final class SettingsWindow: NSWindow {
+final class SettingsWindow: NSWindow {
+    override func becomeKey() {
+        level = WindowPlacement.modalWindowLevel
+        super.becomeKey()
+    }
+
+    override func resignKey() {
+        super.resignKey()
+        level = .normal
+    }
+
     override func performClose(_ sender: Any?) {
-        // Settings window has no close workflow; keep the instance alive so it can be restored from the menu bar.
+        close()
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard let action = Self.editingAction(for: event),
+              let firstResponder,
+              NSApp.sendAction(action, to: firstResponder, from: self)
+        else {
+            return super.performKeyEquivalent(with: event)
+        }
+        return true
+    }
+
+    private static func editingAction(for event: NSEvent) -> Selector? {
+        let modifiers = event.modifierFlags
+            .intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        let key = event.charactersIgnoringModifiers?.lowercased()
+
+        return switch (key, modifiers) {
+        case ("a", .command): #selector(NSResponder.selectAll(_:))
+        case ("c", .command): #selector(NSText.copy(_:))
+        case ("v", .command): #selector(NSText.paste(_:))
+        case ("x", .command): #selector(NSText.cut(_:))
+        case ("z", .command): Selector(("undo:"))
+        case ("z", [.command, .shift]): Selector(("redo:"))
+        default: nil
+        }
+    }
+}
+
+enum SystemMonitorMemoryPresentation {
+    static func usageRatio(usedBytes: UInt64, totalBytes: UInt64) -> Double? {
+        guard totalBytes > 0 else { return nil }
+        return SystemMonitorMath.memoryPressureRatio(
+            usedBytes: usedBytes,
+            totalBytes: totalBytes
+        )
+    }
+
+    static func usageText(usedBytes: UInt64, totalBytes: UInt64) -> String {
+        guard let ratio = usageRatio(usedBytes: usedBytes, totalBytes: totalBytes) else {
+            return "--"
+        }
+        return "\(Int((ratio * 100).rounded()))%"
+    }
+}
+
+enum SystemMonitorMenuBarPresentation {
+    static func label(for metric: SystemMonitorMenuBarMetric) -> String {
+        switch metric {
+        case .cpu: "CPU"
+        case .gpu: "GPU"
+        case .memory: "Memory"
+        case .disk: "Disk"
+        case .network: "Network"
+        case .fan: "Fans"
+        }
+    }
+
+    static func detailedFanValue(_ rpm: [Double]) -> String? {
+        let readings = fanReadings(rpm)
+        return readings.isEmpty ? nil : readings.joined(separator: "  ")
+    }
+
+    static func compactFanRows(_ rpm: [Double]) -> [String] {
+        let readings = fanReadings(rpm)
+        guard !readings.isEmpty else { return [] }
+
+        var rows = ["", ""]
+        for (index, reading) in readings.enumerated() {
+            let rowIndex = index % 2
+            rows[rowIndex] += rows[rowIndex].isEmpty ? reading : "   \(reading)"
+        }
+        return rows.filter { !$0.isEmpty }
+    }
+
+    private static func fanReadings(_ rpm: [Double]) -> [String] {
+        rpm.enumerated().map { index, speed in
+            let label = switch index {
+            case 0: "L"
+            case 1: "R"
+            default: "F\(index + 1)"
+            }
+            return "\(label) \(Int(speed.rounded()))"
+        }
+    }
+}
+
+enum PersistentPetNoticePolicy {
+    static func notices(
+        _ notices: [IslandNotice],
+        isVoiceRecording: Bool,
+        voiceDisplayID: UInt32?,
+        displayID: UInt32
+    ) -> [IslandNotice] {
+        if isVoiceRecording { return [] }
+        guard let voiceDisplayID, voiceDisplayID != displayID else { return notices }
+        return notices.filter { !$0.id.hasPrefix("voice-processing-") }
     }
 }
 
@@ -39,13 +147,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var cancellables: Set<AnyCancellable> = []
     private var effectiveAppearanceObservation: NSKeyValueObservation?
     private var currentApplicationIconImage: NSImage?
-    private let updateController = UpdateController.shared
     private var expandedSizeUpdateTask: Task<Void, Never>?
     /// Last panel size actually applied to the coordinator; basis for the two-phase
     /// (union → target) resize that keeps the SwiftUI surface spring unclipped.
     private var lastAppliedPanelSize: CGSize?
     /// Panel size saved before voice recording starts; restored when recording ends.
     private var voiceRecordingSavedPanelSize: CGSize?
+    /// Display where the last voice recording happened; scopes the processing indicator and
+    /// keeps every other display's pet slot at its ordinary collapsed position.
+    private var voiceRecordingDisplayID: UInt32?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         LegacyAppDataMigration.migrateUserDefaults()
@@ -56,20 +166,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.setActivationPolicy(.accessory)
         WindowPlacement.installTransientWindowPromotion()
         let model = AppModel.shared
-        updateController.start(
-            automaticallyChecks: model.settingsStore.settings.updateChecksEnabled,
-            automaticallyDownloads: model.settingsStore.settings.automaticUpdatesEnabled,
-            automaticChannel: FeatureSettingsStore.bundledDefaultUpdateChannel
-        )
         model.start()
         configureApplicationIconUpdates(model: model)
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
-        lockScreenOverlayController.start()
         self.lockScreenOverlayController = lockScreenOverlayController
+        if model.settingsStore.settings.lockScreenInfoEnabled {
+            lockScreenOverlayController.start()
+        }
 
         let petController = IslandPetController(model: model)
         self.petController = petController
-        petController.start()
+        if model.settingsStore.settings.petEnabled {
+            petController.start()
+        }
 
         let rootView = IslandRootView(
             model: model,
@@ -98,6 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 isMirrorPresented: model.isMirrorPresented,
                 isTeleprompterPresented: model.isTeleprompterPresented,
                 dashboardCardCount: model.dashboardCardCount,
+                batteryDynamicHeight: model.batteryModuleDynamicHeight,
                 includesPet: model.settingsStore.settings.petEnabled
             ).panelSize,
             horizontalMargin: 12
@@ -121,12 +231,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 persistentPetHostingView.sizingOptions = []
                 return persistentPetHostingView
             },
-            persistentPanelFrameProvider: { layout in
-                CollapsedPetLayout.frame(
+            persistentPanelFrameProvider: { [weak self] layout in
+                let notices = PersistentPetNoticePolicy.notices(
+                    model.notices.left + model.notices.right,
+                    isVoiceRecording: model.voiceInput.isRecording,
+                    voiceDisplayID: self?.voiceRecordingDisplayID,
+                    displayID: layout.displayID
+                )
+                return CollapsedPetLayout.frame(
                     for: layout,
-                    compactBarFrame: Self.collapsedPetCompactBarFrame(
+                    compactBarFrame: SideNoticeLayoutEngine().compactBarFrame(
                         for: layout,
-                        notices: model.notices.left + model.notices.right,
+                        notices: notices,
                         settings: model.settingsStore.settings
                     )
                 )
@@ -139,6 +255,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         coordinator.onDraggingChanged = { dragging in
             model.isExternalDragging = dragging
+            if dragging, model.settingsStore.settings.fileShelfEnabled {
+                model.selectModule(.shelf)
+            }
         }
         coordinator.onCollapsedSizeChanged = { size in
             model.collapsedIslandSize = size
@@ -146,7 +265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         coordinator.onActiveDisplayHasPhysicalNotchChanged = { hasPhysicalNotch in
             model.isIslandOnPhysicalNotch = hasPhysicalNotch
         }
-        Publishers.CombineLatest(
+        Publishers.CombineLatest3(
             Publishers.CombineLatest4(
                 model.$selectedModule,
                 model.$isMirrorPresented,
@@ -155,15 +274,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             ),
             model.settingsStore.$settings
                 .map(\.petEnabled)
-                .removeDuplicates()
+                .removeDuplicates(),
+            model.$batteryModuleDynamicHeight
         )
-            .map { state, includesPet -> CGSize in
+            .map { state, includesPet, batteryHeight -> CGSize in
                 let (module, isMirrorPresented, isTeleprompterPresented, dashboardCardCount) = state
                 return Self.expandedPanelSize(
                     module: module,
                     isMirrorPresented: isMirrorPresented,
                     isTeleprompterPresented: isTeleprompterPresented,
                     dashboardCardCount: dashboardCardCount,
+                    batteryDynamicHeight: batteryHeight,
                     includesPet: includesPet
                 ).panelSize
             }
@@ -194,10 +315,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             model.isPinned = true
             coordinator.setPinned(true)
         }
-
         noticePresenter = SideNoticePresenter(
             queue: model.notices,
             media: model.media,
+            browserDownloads: model.browserDownloads,
             settingsStore: model.settingsStore,
             languageStore: model.languageStore,
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs
@@ -256,16 +377,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .store(in: &cancellables)
 
         model.settingsStore.$settings
+            .map(\.lockScreenInfoEnabled)
+            .removeDuplicates()
+            .sink { [weak self] enabled in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if enabled {
+                        self.lockScreenOverlayController?.start()
+                    } else {
+                        self.lockScreenOverlayController?.stop()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        model.settingsStore.$settings
             .map(\.petEnabled)
             .removeDuplicates()
-            .sink { [weak coordinator, weak model] enabled in
-                Task { @MainActor in
+            .sink { [weak self, weak coordinator, weak model] enabled in
+                Task { @MainActor [weak self] in
                     coordinator?.setPersistentContentVisible(enabled)
                     guard let model else { return }
                     if enabled {
+                        self?.petController?.start()
                         coordinator?.start()
-                    } else if !model.settingsStore.settings.hoverActivationEnabled && !model.isPinned {
-                        coordinator?.stop()
+                    } else {
+                        self?.petController?.stop()
+                        if !model.settingsStore.settings.hoverActivationEnabled && !model.isPinned {
+                            coordinator?.stop()
+                        }
                     }
                 }
             }
@@ -302,11 +442,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .sink { [weak self] settings in
                 Task { @MainActor [weak self] in
                     self?.noticePresenter?.setDisplayIDs(settings.activityNoticeDisplayIDs)
-                    self?.updateController.configure(
-                        automaticallyChecks: settings.updateChecksEnabled,
-                        automaticallyDownloads: settings.automaticUpdatesEnabled,
-                        automaticChannel: FeatureSettingsStore.bundledDefaultUpdateChannel
-                    )
                     self?.syncAppStatusItem()
                     self?.syncMonitorStatusItems(force: true)
                 }
@@ -344,21 +479,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             isMirrorPresented: model.isMirrorPresented,
                             isTeleprompterPresented: model.isTeleprompterPresented,
                             dashboardCardCount: model.dashboardCardCount,
+                            batteryDynamicHeight: model.batteryModuleDynamicHeight,
                             includesPet: model.settingsStore.settings.petEnabled
                         ).panelSize
                         // Direct resize (no two-phase): recording swaps layout instantly by design.
                         self.expandedSizeUpdateTask?.cancel()
-                        let recordingSize = CGSize(width: 660, height: 76)
+                        let recordingSize = IslandModuleLayout.voiceRecording
+                            .matchingWidth(model.collapsedOverflowWidth)
+                            .panelSize
+                        self.overlayCoordinator?.setVoiceRecording(true)
                         self.overlayCoordinator?.updateExpandedSize(recordingSize)
                         self.lastAppliedPanelSize = recordingSize
-                        self.overlayCoordinator?.setTransientInteractionVisible(true)
+                        // Scope the post-recording processing indicator to the display where
+                        // dictation happened.
+                        let voiceDisplayID = self.overlayCoordinator?.activeDisplayID
+                        self.voiceRecordingDisplayID = voiceDisplayID
+                        self.noticePresenter?.setVoiceProcessingDisplayID(voiceDisplayID)
                     } else {
-                        self.overlayCoordinator?.setTransientInteractionVisible(false)
+                        self.overlayCoordinator?.setVoiceRecording(false)
                         if let saved = self.voiceRecordingSavedPanelSize {
                             self.overlayCoordinator?.updateExpandedSize(saved)
                             self.lastAppliedPanelSize = saved
                             self.voiceRecordingSavedPanelSize = nil
                         }
+                        // Fallback: recording no longer activates the app, so focus should remain in the target app;
+                        // this call switches back only in edge cases so the subsequent paste can reach its target.
+                        AppModel.shared.restoreVoiceInputTargetFocus()
                     }
                 }
             }
@@ -438,13 +584,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         isMirrorPresented: Bool,
         isTeleprompterPresented: Bool,
         dashboardCardCount: Int,
+        batteryDynamicHeight: CGFloat,
         includesPet: Bool
     ) -> IslandModuleLayout {
         if isMirrorPresented { return .mirror }
         if isTeleprompterPresented { return .teleprompter }
         let layout = IslandModuleLayout.resolved(
             for: module,
-            dashboardCardCount: dashboardCardCount
+            dashboardCardCount: dashboardCardCount,
+            batteryDynamicHeight: batteryDynamicHeight
         )
         return IslandModuleLayout(
             islandSize: layout.islandSize,
@@ -452,27 +600,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 for: layout.panelSize,
                 includesPet: includesPet
             )
-        )
-    }
-
-    private static func collapsedPetCompactBarFrame(
-        for layout: ScreenOverlayLayout,
-        notices: [IslandNotice],
-        settings: FeatureSettings
-    ) -> CGRect? {
-        let presentation = SideNoticeLayoutEngine().presentation(for: notices)
-        let extendsForFocusCountdown = notices.contains {
-            $0.id.hasPrefix("focus-countdown-") || $0.id.hasPrefix("focus-transition")
-        }
-        guard presentation.hasCompactContent || extendsForFocusCountdown else { return nil }
-        let expandsForDetailedMedia = settings.mediaCompactStyle == .detailed
-            && notices.contains { $0.id.hasPrefix("media-active-") }
-        let expandsForDetailedMail = settings.mailCompactStyle == .detailed
-            && notices.contains { $0.id.hasPrefix("mail-notification-") }
-        return SideNoticeLayoutEngine().compactBarFrame(
-            for: layout,
-            extendsForFocusCountdown: extendsForFocusCountdown,
-            expandsForDetailedMedia: expandsForDetailedMedia || expandsForDetailedMail
         )
     }
 
@@ -604,10 +731,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 configureMonitorStatusItem(item, metric: metric, style: style)
                 monitorStatusItemStyles[metric] = style
                 monitorStatusTitles.removeValue(forKey: metric)
-                item.button?.toolTip = "\(localized(metric.menuTitle)): \(localized("点击打开系统监控"))"
-                if style == .compact {
-                    item.length = compactMonitorStatusItemWidth(for: metric)
-                }
+                item.button?.toolTip = "\(SystemMonitorMenuBarPresentation.label(for: metric)): \(localized("点击打开系统监控"))"
             }
             let title = monitorStatusTitle(
                 for: metric,
@@ -615,8 +739,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 style: style
             )
             if style == .compact {
+                let itemWidth = compactMonitorStatusItemWidth(for: metric, value: title)
+                item.length = itemWidth
                 if monitorStatusTitles[metric] != title {
-                    item.button?.image = compactMonitorStatusImage(value: title, metric: metric)
+                    item.button?.image = compactMonitorStatusImage(
+                        value: title,
+                        metric: metric,
+                        itemWidth: itemWidth
+                    )
                 }
             } else {
                 item.length = NSStatusItem.variableLength
@@ -638,7 +768,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .detailed:
             button.image = NSImage(
                 systemSymbolName: metric.symbolName,
-                accessibilityDescription: localized(metric.menuTitle)
+                accessibilityDescription: SystemMonitorMenuBarPresentation.label(for: metric)
             )
             button.imagePosition = .imageLeading
             button.alignment = .natural
@@ -661,26 +791,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if style == .compact {
             return compactMonitorStatusValue(for: metric, snapshot: snapshot)
         }
-        guard let snapshot else { return "\(localized(metric.menuTitle)) --" }
+        let label = SystemMonitorMenuBarPresentation.label(for: metric)
+        guard let snapshot else { return "\(label) --" }
         switch metric {
         case .cpu:
-            return "CPU \(percent(snapshot.cpu.usage))"
+            return "\(label) \(percent(snapshot.cpu.usage))"
         case .gpu:
-            guard case let .available(gpu) = snapshot.gpu else { return "GPU --" }
-            return "GPU \(percent(gpu.usage))"
+            guard case let .available(gpu) = snapshot.gpu else { return "\(label) --" }
+            return "\(label) \(percent(gpu.usage))"
         case .memory:
-            return "RAM \(byteText(snapshot.memory.usedBytes))"
+            let usage = SystemMonitorMemoryPresentation.usageText(
+                usedBytes: snapshot.memory.usedBytes,
+                totalBytes: snapshot.memory.totalBytes
+            )
+            return "\(label) \(usage)"
         case .disk:
-            guard snapshot.disk.totalBytes > 0 else { return "\(localized("磁盘")) --" }
+            guard snapshot.disk.totalBytes > 0 else { return "\(label) --" }
             let usage = Double(snapshot.disk.usedBytes) / Double(snapshot.disk.totalBytes)
-            return "\(localized("磁盘")) \(percent(usage))"
+            return "\(label) \(percent(usage))"
         case .network:
-            return "\(localized("网络")) ↓\(rateText(snapshot.network.receiveBytesPerSecond)) ↑\(rateText(snapshot.network.sendBytesPerSecond))"
+            return "\(label) ↓\(rateText(snapshot.network.receiveBytesPerSecond)) ↑\(rateText(snapshot.network.sendBytesPerSecond))"
         case .fan:
-            guard case let .available(rpm, _) = snapshot.fan, let first = rpm.first else {
-                return "\(localized("风扇")) --"
-            }
-            return "\(localized("风扇")) \(Int(first.rounded()))"
+            guard case let .available(rpm, _) = snapshot.fan,
+                  let value = SystemMonitorMenuBarPresentation.detailedFanValue(rpm)
+            else { return "\(label) --" }
+            return "\(label) \(value)"
         }
     }
 
@@ -696,30 +831,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             guard case let .available(gpu) = snapshot.gpu else { return "--" }
             return percent(gpu.usage)
         case .memory:
-            guard snapshot.memory.totalBytes > 0 else { return "--" }
-            return percent(Double(snapshot.memory.usedBytes) / Double(snapshot.memory.totalBytes))
+            return SystemMonitorMemoryPresentation.usageText(
+                usedBytes: snapshot.memory.usedBytes,
+                totalBytes: snapshot.memory.totalBytes
+            )
         case .disk:
             guard snapshot.disk.totalBytes > 0 else { return "--" }
             return percent(Double(snapshot.disk.usedBytes) / Double(snapshot.disk.totalBytes))
         case .network:
             return "↓\(rateText(snapshot.network.receiveBytesPerSecond))"
         case .fan:
-            guard case let .available(rpm, _) = snapshot.fan, let first = rpm.first else {
-                return "--"
-            }
-            return "\(Int(first.rounded()))"
+            guard case let .available(rpm, _) = snapshot.fan else { return "--" }
+            let rows = SystemMonitorMenuBarPresentation.compactFanRows(rpm)
+            return rows.isEmpty ? "--" : rows.joined(separator: "\n")
         }
     }
 
     private func compactMonitorStatusLabel(for metric: SystemMonitorMenuBarMetric) -> String {
-        switch metric {
-        case .cpu: "CPU"
-        case .gpu: "GPU"
-        case .memory: localized("内存")
-        case .disk: localized("磁盘")
-        case .network: localized("网络")
-        case .fan: localized("风扇")
-        }
+        SystemMonitorMenuBarPresentation.label(for: metric)
     }
 
     private func localized(_ key: String) -> String {
@@ -740,22 +869,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         quickNotesEditorController?.window?.title = localized("随记 · 编辑")
     }
 
-    private func compactMonitorStatusItemWidth(for metric: SystemMonitorMenuBarMetric) -> CGFloat {
+    private func compactMonitorStatusItemWidth(
+        for metric: SystemMonitorMenuBarMetric,
+        value: String
+    ) -> CGFloat {
+        let valueFont = metric == .fan
+            ? NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+            : NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium)
+        let valueWidth = value
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { ($0 as NSString).size(withAttributes: [.font: valueFont]).width }
+            .max() ?? 0
+
+        if metric == .fan {
+            return max(40, ceil(valueWidth) + 8)
+        }
+
+        let labelWidth = (compactMonitorStatusLabel(for: metric) as NSString).size(
+            withAttributes: [.font: NSFont.systemFont(ofSize: 8, weight: .semibold)]
+        ).width
+        let minimumWidth: CGFloat
         switch metric {
         case .cpu, .gpu, .memory, .disk:
-            32
+            minimumWidth = 32
         case .network:
-            60
+            minimumWidth = 60
         case .fan:
-            40
+            minimumWidth = 40
         }
+        return max(minimumWidth, ceil(max(valueWidth, labelWidth)) + 8)
     }
 
     private func compactMonitorStatusImage(
         value: String,
-        metric: SystemMonitorMenuBarMetric
+        metric: SystemMonitorMenuBarMetric,
+        itemWidth: CGFloat
     ) -> NSImage? {
-        let size = NSSize(width: compactMonitorStatusItemWidth(for: metric) - 4, height: 22)
+        let size = NSSize(width: itemWidth - 4, height: 22)
         guard let representation = NSBitmapImageRep(
             bitmapDataPlanes: nil,
             pixelsWide: Int(size.width * 2),
@@ -780,38 +930,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context
         context.cgContext.scaleBy(x: 2, y: 2)
-        (value as NSString).draw(
-            in: NSRect(x: 0, y: 10, width: size.width, height: 12),
-            withAttributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium),
-                .foregroundColor: NSColor.black,
-                .paragraphStyle: paragraph,
-            ]
-        )
-        (compactMonitorStatusLabel(for: metric) as NSString).draw(
-            in: NSRect(x: 0, y: 1, width: size.width, height: 10),
-            withAttributes: [
-                .font: NSFont.systemFont(ofSize: 8, weight: .semibold),
-                .foregroundColor: NSColor.black,
-                .paragraphStyle: paragraph,
-            ]
-        )
+
+        if metric == .fan {
+            let rows = value.split(separator: "\n", omittingEmptySubsequences: false)
+            let font = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+            for (index, row) in rows.prefix(2).enumerated() {
+                let y: CGFloat = rows.count == 1 && value == "--" ? 6 : (index == 0 ? 11 : 1)
+                (row as NSString).draw(
+                    in: NSRect(x: 0, y: y, width: size.width, height: 10),
+                    withAttributes: [
+                        .font: font,
+                        .foregroundColor: NSColor.black,
+                        .paragraphStyle: paragraph,
+                    ]
+                )
+            }
+        } else {
+            (value as NSString).draw(
+                in: NSRect(x: 0, y: 10, width: size.width, height: 12),
+                withAttributes: [
+                    .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium),
+                    .foregroundColor: NSColor.black,
+                    .paragraphStyle: paragraph,
+                ]
+            )
+            (compactMonitorStatusLabel(for: metric) as NSString).draw(
+                in: NSRect(x: 0, y: 1, width: size.width, height: 10),
+                withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 8, weight: .semibold),
+                    .foregroundColor: NSColor.black,
+                    .paragraphStyle: paragraph,
+                ]
+            )
+        }
+
         context.flushGraphics()
         NSGraphicsContext.restoreGraphicsState()
 
         let image = NSImage(size: size)
         image.addRepresentation(representation)
         image.isTemplate = true
-        image.accessibilityDescription = metric.menuTitle
+        image.accessibilityDescription = SystemMonitorMenuBarPresentation.label(for: metric)
         return image
     }
 
     private func percent(_ value: Double) -> String {
         "\(Int((min(1, max(0, value)) * 100).rounded()))%"
-    }
-
-    private func byteText(_ bytes: UInt64) -> String {
-        ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
     }
 
     private func rateText(_ bytesPerSecond: Double) -> String {
@@ -836,7 +1000,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if settingsWindowController == nil {
             let rootView = SettingsView(model: AppModel.shared)
             let window = SettingsWindow(
-                contentRect: CGRect(x: 0, y: 0, width: 548, height: 560),
+                contentRect: CGRect(x: 0, y: 0, width: 640, height: 560),
                 styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
@@ -867,6 +1031,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func windowDidResize(_ notification: Notification) {
         guard let window = notification.object as? SettingsWindow else { return }
         WindowPlacement.center(window, on: settingsWindowScreen)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard notification.object as? SettingsWindow != nil else { return }
+        settingsWindowController = nil
+        settingsWindowScreen = nil
     }
 
     @objc private func checkUpdates() {

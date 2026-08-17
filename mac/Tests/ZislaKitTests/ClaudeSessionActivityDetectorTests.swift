@@ -105,7 +105,8 @@ struct ClaudeSessionActivityDetectorTests {
         let detector = ClaudeSessionActivityDetector(projectsDirectory: root)
         let failed = try #require(detector.activeTasks().first)
         #expect(failed.status == .error)
-        #expect(failed.failureReason == "Permission denied")
+        #expect(failed.failureReason == "工具执行失败")
+        #expect(failed.failureReason?.contains("Permission denied") == false)
 
         try appendJSONLLine(
             claudeUserToolResult(
@@ -260,7 +261,8 @@ struct ClaudeSessionActivityDetectorTests {
             projectsDirectory: root
         ).activeTasks().first)
         #expect(task.status == .error)
-        #expect(task.failureReason == "upstream failed")
+        #expect(task.failureReason == "API 请求失败（HTTP 502）")
+        #expect(task.failureReason?.contains("upstream failed") == false)
     }
 
     @Test
@@ -289,6 +291,100 @@ struct ClaudeSessionActivityDetectorTests {
         ).activeTasks()
 
         #expect(tasks.isEmpty)
+    }
+
+    @Test
+    func testExtractsAITitleFromTranscript() throws {
+        let root = makeTempRoot("claude-ai-title")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeJSONL(
+            under: root,
+            relativePath: "proj/session-title.jsonl",
+            lines: [
+                #"{"type":"ai-title","sessionId":"sess-title","aiTitle":"Fix navigation bug"}"#,
+                claudeUser(timestamp: "2026-07-19T01:00:00.000Z", sessionId: "sess-title", text: "fix nav"),
+                claudeAssistant(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    sessionId: "sess-title",
+                    stopReason: "tool_use",
+                    model: "claude-sonnet-4",
+                    toolUses: [("t1", "Read")]
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_900_000_170)
+        )
+
+        let task = try #require(ClaudeSessionActivityDetector(projectsDirectory: root).activeTasks().first)
+        #expect(task.title == "Fix navigation bug")
+    }
+
+    @Test
+    func testReadsPIDFromSessionFile() throws {
+        let root = makeTempRoot("claude-pid")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let sessionsDir = root.appendingPathComponent(".claude/sessions", isDirectory: true)
+        try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
+        let sessionFile = sessionsDir.appendingPathComponent("12345.json")
+        try Data(#"{"pid":12345,"sessionId":"sess-pid"}"#.utf8).write(to: sessionFile)
+
+        try writeJSONL(
+            under: root.appendingPathComponent(".claude/projects", isDirectory: true),
+            relativePath: "proj/session-pid.jsonl",
+            lines: [
+                claudeUser(timestamp: "2026-07-19T01:00:00.000Z", sessionId: "sess-pid", text: "hi"),
+                claudeAssistant(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    sessionId: "sess-pid",
+                    stopReason: "tool_use",
+                    model: "claude-opus",
+                    toolUses: [("t1", "Bash")]
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_900_000_180)
+        )
+
+        let detector = ClaudeSessionActivityDetector(
+            projectsDirectory: root.appendingPathComponent(".claude/projects"),
+            isProcessAlive: { $0 == 12345 }
+        )
+        let task = try #require(detector.activeTasks().first)
+        #expect(task.processIdentifier == 12345)
+    }
+
+    @Test
+    func testIgnoresDeadOrMismatchedSessionSidecars() throws {
+        let root = makeTempRoot("claude-stale-pid")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let projectsDir = root.appendingPathComponent(".claude/projects", isDirectory: true)
+        let sessionsDir = root.appendingPathComponent(".claude/sessions", isDirectory: true)
+        try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
+        try Data(#"{"pid":111,"sessionId":"another-session"}"#.utf8)
+            .write(to: sessionsDir.appendingPathComponent("111.json"))
+        try Data(#"{"pid":222,"sessionId":"sess-stale"}"#.utf8)
+            .write(to: sessionsDir.appendingPathComponent("222.json"))
+        try writeJSONL(
+            under: projectsDir,
+            relativePath: "proj/session-stale.jsonl",
+            lines: [
+                claudeUser(timestamp: "2026-07-19T01:00:00.000Z", sessionId: "sess-stale", text: "hi"),
+                claudeAssistant(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    sessionId: "sess-stale",
+                    stopReason: "tool_use",
+                    model: "claude-opus",
+                    toolUses: [("t1", "Bash")]
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_900_000_181)
+        )
+
+        let task = try #require(ClaudeSessionActivityDetector(
+            projectsDirectory: projectsDir,
+            isProcessAlive: { $0 == 111 }
+        ).activeTasks().first)
+        #expect(task.processIdentifier == nil)
     }
 }
 

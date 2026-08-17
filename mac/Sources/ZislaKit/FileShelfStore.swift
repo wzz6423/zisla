@@ -1,5 +1,43 @@
 import Combine
 import Foundation
+import UniformTypeIdentifiers
+
+public enum FileShelfCategory: String, CaseIterable, Hashable, Identifiable, Sendable {
+    case all = "全部"
+    case folder = "文件夹"
+    case image = "图片"
+    case url = "URL"
+    case path = "路径"
+    case video = "视频"
+    case audio = "音频"
+    case text = "文本"
+    case document = "文档"
+    case archive = "压缩包"
+    case code = "代码"
+    case other = "其他"
+
+    public var id: String { rawValue }
+
+    public var symbol: String {
+        switch self {
+        case .all: return "square.grid.2x2"
+        case .folder: return "folder"
+        case .image: return "photo"
+        case .url: return "link"
+        case .path: return "arrow.turn.down.right"
+        case .video: return "video"
+        case .audio: return "music.note"
+        case .document: return "doc.text"
+        case .archive: return "archivebox"
+        case .code: return "chevron.left.forwardslash.chevron.right"
+        case .text: return "text.alignleft"
+        case .other: return "doc.questionmark"
+        }
+    }
+
+    public static let fileShelfCases = allCases.filter { $0 != .url && $0 != .path && $0 != .text }
+    public static let clipboardCases = allCases
+}
 
 public struct FileShelfItem: Identifiable, Equatable {
     public var id: UUID
@@ -13,14 +51,41 @@ public struct FileShelfItem: Identifiable, Equatable {
         self.addedAt = addedAt
         self.bookmarkData = bookmarkData
     }
+
+    public var category: FileShelfCategory {
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+           isDirectory.boolValue {
+            return .folder
+        }
+
+        guard let contentType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType else {
+            return .other
+        }
+
+        if contentType.conforms(to: .image) {
+            return .image
+        } else if contentType.conforms(to: .movie) || contentType.conforms(to: .video) {
+            return .video
+        } else if contentType.conforms(to: .audio) {
+            return .audio
+        } else if contentType.conforms(to: .archive) || contentType.conforms(to: .zip) {
+            return .archive
+        } else if contentType.conforms(to: .sourceCode) || contentType.conforms(to: .script) {
+            return .code
+        } else if contentType.conforms(to: .text) || contentType.conforms(to: .pdf) ||
+                  contentType.conforms(to: .spreadsheet) || contentType.conforms(to: .presentation) {
+            return .document
+        }
+
+        return .other
+    }
 }
 
 @MainActor
 public final class FileShelfStore: ObservableObject {
     @Published public private(set) var items: [FileShelfItem] = []
     @Published public private(set) var errorDescription: String?
-
-    public let capacity: Int
 
     private struct StoredItem: Codable {
         var id: UUID
@@ -30,9 +95,8 @@ public final class FileShelfStore: ObservableObject {
 
     private let storageURL: URL
 
-    public init(storageURL: URL = AppPaths.fileShelf, capacity: Int = 99) {
+    public init(storageURL: URL = AppPaths.fileShelf) {
         self.storageURL = storageURL
-        self.capacity = max(1, capacity)
         load()
     }
 
@@ -55,9 +119,6 @@ public final class FileShelfStore: ObservableObject {
             } catch {
                 errorDescription = error.localizedDescription
             }
-        }
-        if items.count > capacity {
-            items.removeFirst(items.count - capacity)
         }
         if added > 0 { persist() }
         return added
@@ -104,7 +165,7 @@ public final class FileShelfStore: ObservableObject {
                     bookmarkData: bookmark
                 ))
             }
-            items = Array(loaded.suffix(capacity))
+            items = loaded
             errorDescription = nil
             if loaded.count != stored.count || stored.contains(where: { record in
                 !items.contains(where: { $0.id == record.id && $0.bookmarkData == record.bookmarkData })

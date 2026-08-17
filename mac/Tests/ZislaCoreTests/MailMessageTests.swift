@@ -75,13 +75,13 @@ struct MailMessageTests {
     }
 
     @Test
-    func mailIntegrationDefaultsOffAndLegacySettingsRemainDecodable() throws {
-        #expect(FeatureSettings.default.mailEnabled == false)
+    func mailIntegrationDefaultsOnAndLegacySettingsRemainDecodable() throws {
+        #expect(FeatureSettings.default.mailEnabled == true)
 
         let data = Data(#"{"mediaEnabled":true,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"calendarEnabled":true,"toolboxEnabled":true,"systemMonitorEnabled":true,"weatherEnabled":true,"lockScreenInfoEnabled":true,"quickNotesEnabled":true,"updateChecksEnabled":true,"automaticUpdatesEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true,"hoverActivationEnabled":true,"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: data)
 
-        #expect(decoded.mailEnabled == false)
+        #expect(decoded.mailEnabled == true)
         #expect(decoded.mailAccountNames.isEmpty)
     }
 

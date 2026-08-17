@@ -4,8 +4,18 @@ import Testing
 
 struct CompactStatusPriorityTests {
     @Test
-    func updateAvailabilityIsPrioritizedImmediatelyAfterTransientStatus() {
-        #expect(Array(CompactStatusPriority.defaultOrder.prefix(2)) == [.transient, .updateAvailable])
-        #expect(CompactStatusPriority.normalized([.media]).contains(.updateAvailable))
+    func defaultOrderMatchesSettingsPriority() {
+        #expect(CompactStatusPriority.defaultOrder == [
+            .transient,
+            .videoDownload,
+            .browserDownload,
+            .toolboxReminder,
+            .mail,
+            .updateAvailable,
+            .focusCountdown,
+            .aiActivity,
+            .media,
+            .focusMode,
+        ])
     }
 }

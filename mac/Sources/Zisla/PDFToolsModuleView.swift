@@ -64,7 +64,7 @@ struct PDFToolsModuleView: View {
                         inputSummary = ""
                         watermarkImageURL = nil
                         statusMessage = nil
-                        // A password typed for 加密 must not silently pre-fill 解除密码's field.
+                        // A password entered for encryption must not silently pre-fill the password-removal field.
                         password = ""
                         ownerPassword = ""
                     } label: {

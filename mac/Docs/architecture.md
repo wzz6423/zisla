@@ -21,8 +21,8 @@
 
 - AppKit、SwiftUI 状态和窗口控制限制在 `MainActor`。
 - 下载、天气和 GitHub 请求使用 actor。
-- hook 写入的 AI 状态使用目录文件系统事件监听；各 AI 会话源每 1.5 秒检查最近文件的 mtime/size，未变化时复用解析缓存，不重复读取日志正文。
-- 自动检测只解析结构化事件字段或 Qoder 固定日志 marker，不读取 prompt/preview；任一 Provider 解析失败不会阻断其他 Provider。
+- hook 写入的 AI 状态使用目录文件系统事件监听；各 AI 会话源定期比较最近本地会话或活动文件的 mtime/size，未变化时复用解析缓存。
+- 自动检测只读取判断任务状态所需的结构化事件、固定状态 marker 或活动元数据，不读取 prompt/answer 正文；任一 Provider 解析失败不会阻断其他 Provider。
 - 折叠延迟使用可取消 `Task` 和 generation token，旧任务不能隐藏重新展开的岛。
 - 隐藏态没有 `TimelineView`、60 Hz Timer 或持续动画提交。
 
@@ -40,6 +40,6 @@ Swift 使用 `Process.executableURL` 和参数数组启动 `yt-dlp`，URL 永远
 
 只有退出码为 0、完成路径存在、解析符号链接后仍位于授权目录内时任务才成功。每个任务只清理自己的 UUID 临时目录。
 
-## 自动更新
+## 检查和下载更新
 
-GitHub API 负责检测最新 Release；Sparkle 2 负责签名校验、下载、原子替换和重启。手动检查发现新版本后，用户可选择立即更新；没有 32 字节 EdDSA 公钥的开发构建只展示版本信息。
+GitHub API 与 Gitee API 负责检测最新 Release。应用不执行替换、重启或挂载 DMG；发现新版本后，用户可将 DMG 下载到默认下载目录或本次选择的目录。下载完成前会保留原文件，已有同名包直接复用且绝不覆盖。用户必须先退出 zisla，再打开 DMG 并将应用拖入 `Applications`。带路径前缀的发布 tag（例如 `release/v0.1.2`）按最后一个路径分量解析版本。
