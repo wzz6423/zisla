@@ -40,6 +40,11 @@ jobs:
               *) echo "Unsupported shell in $script" >&2; exit 1 ;;
             esac
           done
+      - name: Run shell script tests
+        run: |
+          for test_script in Tests/ScriptTests/*.zsh; do
+            zsh "$test_script"
+          done
       - run: swift test
       - name: Remove test artifacts
         if: always()
