@@ -353,6 +353,33 @@ struct QwenSessionActivityDetectorTests {
             isProcessAlive: { _ in true }
         ).activeTasks().isEmpty)
     }
+
+    @Test
+    func testPIDIsPassedToTask() throws {
+        let root = makeTempRoot("qwen-pid")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeRuntimeAndTranscript(
+            under: root,
+            baseName: "chat-pid",
+            pid: 54321,
+            sessionID: "qw-pid",
+            transcriptLines: [
+                qwenUser(timestamp: "2026-07-19T01:00:00.000Z"),
+                qwenAssistantFunctionCall(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    name: "run_shell",
+                    model: "qwen3-coder"
+                ),
+            ]
+        )
+
+        let task = try #require(QwenSessionActivityDetector(
+            projectsDirectory: root,
+            isProcessAlive: { _ in true }
+        ).activeTasks().first)
+        #expect(task.processIdentifier == 54321)
+    }
 }
 
 // MARK: - Fixtures

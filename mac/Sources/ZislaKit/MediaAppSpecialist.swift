@@ -621,8 +621,8 @@ final class MediaAppSpecialist {
 
     private static let qqMusicControlBarLabel = "播放控制栏"
 
-    /// The window content area exposes links sharing the player controls' copy ("收藏", "封面播放", …)
-    /// which depth-first search hits earlier; only the "播放控制栏" container is a safe search root.
+    /// The window content area exposes links sharing the player controls' labels, which depth-first search reaches earlier;
+    /// only the playback-controls container is a safe search root.
     private static func qqMusicControlRoots(pid: pid_t) -> [AXUIElement] {
         let application = AXUIElementCreateApplication(pid)
         var windows: [AXUIElement] = []

@@ -335,6 +335,8 @@ struct ClipboardHistoryStoreTests {
             INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned)
             VALUES ('\(UUID().uuidString)', 0, '旧文字', NULL, 1000.0, 1);
             INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned)
+            VALUES ('\(UUID().uuidString)', 0, 'https://legacy.example/path', NULL, 950.0, 0);
+            INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned)
             VALUES ('\(UUID().uuidString)', 1, NULL, x'00010203', 900.0, 0);
             """,
             at: storageURL
@@ -344,7 +346,10 @@ struct ClipboardHistoryStoreTests {
         await store.waitUntilLoaded()
         #expect(store.errorDescription == nil)
         #expect(store.pinnedItems.map(\.content) == [.text("旧文字")])
-        #expect(store.historyItems.map(\.content) == [.image(Data([0, 1, 2, 3]))])
+        #expect(store.historyItems.map(\.content) == [
+            .text("https://legacy.example/path"),
+            .image(Data([0, 1, 2, 3])),
+        ])
 
         // After migration, file items can still be written and read back.
         let fileURL = directory.appendingPathComponent("新文件.dat")
@@ -356,6 +361,21 @@ struct ClipboardHistoryStoreTests {
         await restored.waitUntilLoaded()
         #expect(restored.items.contains { $0.content == .text("旧文字") })
         #expect(restored.items.contains { if case .file = $0.content { return true }; return false })
+
+        restored.updateQuery(scope: .all, searchText: "", category: .image)
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 1)
+        #expect(restored.items.map(\.content) == [.image(Data([0, 1, 2, 3]))])
+
+        restored.updateQuery(scope: .all, searchText: "", category: .url)
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 1)
+        #expect(restored.items.map(\.content) == [.text("https://legacy.example/path")])
+
+        restored.updateQuery(scope: .all, searchText: "", category: .text)
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 1)
+        #expect(restored.items.map(\.content) == [.text("旧文字")])
     }
 
     @Test
@@ -390,6 +410,370 @@ struct ClipboardHistoryStoreTests {
         restored.loadNextPage()
         await restored.waitUntilLoaded()
         #expect(restored.items.map(\.content) == [.text("old searchable value")])
+    }
+
+    @Test
+    func categoryFilterAppliesToPaginationAndTotalCount() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2)
+        await store.waitUntilLoaded()
+
+        #expect(store.record(.image(Data([1, 2, 3]))))
+        #expect(store.record(.text("文本一")))
+        #expect(store.record(.image(Data([4, 5, 6]))))
+        #expect(store.record(.text("文本二")))
+        #expect(store.record(.image(Data([7, 8, 9]))))
+        store.flushPendingChanges()
+
+        let allItems = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2)
+        await allItems.waitUntilLoaded()
+        #expect(allItems.totalItemCount == 5)
+        #expect(allItems.items.count == 2)
+        #expect(allItems.categoryCounts[.image] == 3)
+        #expect(allItems.categoryCounts[.text] == 2)
+
+        allItems.updateQuery(scope: .all, searchText: "", category: .image)
+        await allItems.waitUntilLoaded()
+        #expect(allItems.totalItemCount == 3)
+        #expect(allItems.items.count == 2)
+        #expect(allItems.items.allSatisfy { $0.category == .image })
+        #expect(allItems.categoryCounts[.text] == 2)
+
+        allItems.loadNextPage()
+        await allItems.waitUntilLoaded()
+        #expect(allItems.items.count == 1)
+        #expect(allItems.items.first?.category == .image)
+
+        allItems.updateQuery(scope: .all, searchText: "", category: .text)
+        await allItems.waitUntilLoaded()
+        #expect(allItems.totalItemCount == 2)
+        #expect(allItems.items.allSatisfy { $0.category == .text })
+
+        allItems.updateQuery(scope: .all, searchText: "图片", category: .image)
+        await allItems.waitUntilLoaded()
+        #expect(allItems.totalItemCount == 3)
+        #expect(allItems.items.allSatisfy { $0.category == .image })
+    }
+
+    @Test
+    func categoryFilterDistinguishesFileTypes() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let imageURL = directory.appendingPathComponent("image.png")
+        let videoURL = directory.appendingPathComponent("video.mp4")
+        let documentURL = directory.appendingPathComponent("document.txt")
+        try Data([0]).write(to: imageURL)
+        try Data([1]).write(to: videoURL)
+        try Data([2]).write(to: documentURL)
+        let imageContent = try ClipboardHistoryContent.file(at: imageURL)
+        let videoContent = try ClipboardHistoryContent.file(at: videoURL)
+        let documentContent = try ClipboardHistoryContent.file(at: documentURL)
+
+        let store = ClipboardHistoryStore(storageURL: storageURL, pageSize: 1)
+        await store.waitUntilLoaded()
+        #expect(store.record(imageContent))
+        #expect(store.record(videoContent))
+        #expect(store.record(documentContent))
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL, pageSize: 1)
+        await restored.waitUntilLoaded()
+        #expect(restored.categoryCounts[.image] == 1)
+        #expect(restored.categoryCounts[.video] == 1)
+        #expect(restored.categoryCounts[.document] == 1)
+
+        restored.updateQuery(scope: .all, searchText: "", category: .video)
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 1)
+        #expect(restored.items.first?.content == videoContent)
+
+        restored.updateQuery(scope: .all, searchText: "", category: .image)
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 1)
+        #expect(restored.items.first?.content == imageContent)
+
+        restored.updateQuery(scope: .all, searchText: "", category: .document)
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 1)
+        #expect(restored.items.first?.content == documentContent)
+    }
+
+    @Test
+    func recordingRespectsActiveCategoryFilter() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ClipboardHistoryStore(
+            storageURL: directory.appendingPathComponent("clipboard-history.sqlite")
+        )
+        await store.waitUntilLoaded()
+
+        store.updateQuery(scope: .all, searchText: "", category: .image)
+        await store.waitUntilLoaded()
+        #expect(store.record(.text("不应显示")))
+        #expect(store.items.isEmpty)
+        #expect(store.record(.image(Data([1]))))
+        #expect(store.items.map(\.content) == [.image(Data([1]))])
+    }
+
+    @Test
+    func urlCategoryRecognizesCompleteHTTPAndHTTPSLinks() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ClipboardHistoryStore(
+            storageURL: directory.appendingPathComponent("clipboard-history.sqlite")
+        )
+        await store.waitUntilLoaded()
+
+        #expect(store.record(.text("https://example.com")))
+        #expect(store.record(.text("http://github.com/user/repo")))
+        #expect(store.record(.text("普通文本")))
+        #expect(store.record(.text("包含链接 https://example.com 的文本")))
+        #expect(store.record(.text("https://example.com/path?query=value#fragment")))
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(
+            storageURL: directory.appendingPathComponent("clipboard-history.sqlite")
+        )
+        await restored.waitUntilLoaded()
+
+        let urlItems = restored.items.filter { $0.category == .url }
+        let textItems = restored.items.filter { $0.category == .text }
+
+        #expect(urlItems.count == 3)
+        #expect(urlItems.contains { $0.content == .text("https://example.com") })
+        #expect(urlItems.contains { $0.content == .text("http://github.com/user/repo") })
+        #expect(urlItems.contains { $0.content == .text("https://example.com/path?query=value#fragment") })
+
+        #expect(textItems.count == 2)
+        #expect(textItems.contains { $0.content == .text("普通文本") })
+        #expect(textItems.contains { $0.content == .text("包含链接 https://example.com 的文本") })
+    }
+
+    @Test
+    func urlCategoryAcceptsNormalizedHTTPLinks() {
+        #expect(FileShelfCategory.url.rawValue == "URL")
+        #expect(FileShelfCategory.clipboardCases.contains(.url))
+        #expect(!FileShelfCategory.fileShelfCases.contains(.url))
+        #expect(FileShelfCategory.fileShelfCases.contains(.document))
+        #expect(!FileShelfCategory.fileShelfCases.contains(.text))
+        #expect(
+            ClipboardHistoryItem(content: .text("  HTTPS://Example.com/中文路径  ")).category == .url
+        )
+        #expect(
+            ClipboardHistoryItem(content: .text("https://example.com/path with spaces")).category == .text
+        )
+        #expect(ClipboardHistoryItem(content: .text("www.example.com")).category == .text)
+        #expect(ClipboardHistoryItem(content: .text("ftp://example.com")).category == .text)
+    }
+
+    @Test
+    func urlCategoryFilterWorksWithPaginationAndCounts() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2)
+        await store.waitUntilLoaded()
+
+        #expect(store.record(.text("https://example.com")))
+        #expect(store.record(.text("普通文档")))
+        #expect(store.record(.text("http://github.com")))
+        #expect(store.record(.image(Data([1, 2, 3]))))
+        #expect(store.record(.text("https://apple.com")))
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2)
+        await restored.waitUntilLoaded()
+        #expect(restored.categoryCounts[.url] == 3)
+        #expect(restored.categoryCounts[.text] == 1)
+        #expect(restored.categoryCounts[.image] == 1)
+
+        restored.updateQuery(scope: .all, searchText: "", category: .url)
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 3)
+        #expect(restored.items.count == 2)
+        #expect(restored.items.allSatisfy { $0.category == .url })
+
+        restored.loadNextPage()
+        await restored.waitUntilLoaded()
+        #expect(restored.items.count == 1)
+        #expect(restored.items.first?.category == .url)
+
+        restored.updateQuery(scope: .all, searchText: "github", category: .url)
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 1)
+        #expect(restored.items.map(\.content) == [.text("http://github.com")])
+    }
+
+    @Test
+    func pathCategoryFiltersPlainFilePaths() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let pathRawValue = "路径"
+        #expect(FileShelfCategory.allCases.contains { $0.rawValue == pathRawValue })
+        guard let pathCategory = FileShelfCategory(rawValue: pathRawValue) else { return }
+
+        let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
+        #expect(store.record(.text("/Users/example/Documents/report.pdf")))
+        #expect(store.record(.text("file:///Users/example/Documents/archive.zip")))
+        #expect(store.record(.text("普通文本")))
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        #expect(restored.categoryCounts[pathCategory] == 2)
+        #expect(
+            ClipboardHistoryItem(content: .text("/Users/example/Documents/report.pdf")).category
+                == pathCategory
+        )
+        #expect(
+            ClipboardHistoryItem(content: .text("file:///Users/example/Documents/archive.zip")).category
+                == pathCategory
+        )
+
+        restored.updateQuery(scope: .all, searchText: "", category: pathCategory)
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 2)
+        #expect(restored.items.allSatisfy { $0.category == pathCategory })
+    }
+
+    @Test
+    func legacyDocumentTextIsReclassifiedAsURLOnMigration() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+
+        try executeSQL(
+            """
+            CREATE TABLE clipboard_history (
+                id TEXT PRIMARY KEY NOT NULL,
+                content_type INTEGER NOT NULL,
+                text_value TEXT,
+                image_data BLOB,
+                last_copied_at REAL NOT NULL,
+                is_pinned INTEGER NOT NULL,
+                file_url TEXT,
+                file_display_name TEXT,
+                file_bookmark BLOB,
+                content_category TEXT
+            );
+            INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned, content_category)
+            VALUES ('\(UUID().uuidString)', 0, '  HTTPS://Example.com/中文路径  ', NULL, 1000.0, 0, '文档');
+            INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned, content_category)
+            VALUES ('\(UUID().uuidString)', 0, '普通文本', NULL, 900.0, 0, '文档');
+            """,
+            at: storageURL
+        )
+
+        let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
+        #expect(store.errorDescription == nil)
+        #expect(store.categoryCounts[.url] == 1)
+        #expect(store.categoryCounts[.text] == 1)
+
+        store.updateQuery(scope: .all, searchText: "", category: .url)
+        await store.waitUntilLoaded()
+        #expect(store.totalItemCount == 1)
+        #expect(store.items.map(\.content) == [.text("  HTTPS://Example.com/中文路径  ")])
+
+        store.updateQuery(scope: .all, searchText: "", category: .text)
+        await store.waitUntilLoaded()
+        #expect(store.totalItemCount == 1)
+        #expect(store.items.map(\.content) == [.text("普通文本")])
+    }
+
+    @Test
+    func legacyTextPathsAreReclassifiedOnMigration() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let pathRawValue = "路径"
+        #expect(FileShelfCategory.allCases.contains { $0.rawValue == pathRawValue })
+        guard let pathCategory = FileShelfCategory(rawValue: pathRawValue) else { return }
+
+        try executeSQL(
+            """
+            CREATE TABLE clipboard_history (
+                id TEXT PRIMARY KEY NOT NULL,
+                content_type INTEGER NOT NULL,
+                text_value TEXT,
+                image_data BLOB,
+                last_copied_at REAL NOT NULL,
+                is_pinned INTEGER NOT NULL,
+                file_url TEXT,
+                file_display_name TEXT,
+                file_bookmark BLOB,
+                content_category TEXT
+            );
+            PRAGMA user_version = 2;
+            INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned, content_category)
+            VALUES ('\(UUID().uuidString)', 0, '/Users/example/Documents/report.pdf', NULL, 1000.0, 0, '文本');
+            INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned, content_category)
+            VALUES ('\(UUID().uuidString)', 0, 'https://legacy.example/file', NULL, 950.0, 0, '文本');
+            INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned, content_category)
+            VALUES ('\(UUID().uuidString)', 0, '普通文本', NULL, 900.0, 0, '文本');
+            """,
+            at: storageURL
+        )
+
+        let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
+        #expect(store.errorDescription == nil)
+        #expect(store.categoryCounts[pathCategory] == 1)
+        #expect(store.categoryCounts[.url] == 1)
+        #expect(store.categoryCounts[.text] == 1)
+
+        store.updateQuery(scope: .all, searchText: "", category: pathCategory)
+        await store.waitUntilLoaded()
+        #expect(store.totalItemCount == 1)
+        #expect(store.items.map(\.content) == [.text("/Users/example/Documents/report.pdf")])
+    }
+
+    @Test
+    func staleDocumentTextRowsAreReclassifiedAfterCategorySchemaUpgrade() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+
+        try executeSQL(
+            """
+            CREATE TABLE clipboard_history (
+                id TEXT PRIMARY KEY NOT NULL,
+                content_type INTEGER NOT NULL,
+                text_value TEXT,
+                image_data BLOB,
+                last_copied_at REAL NOT NULL,
+                is_pinned INTEGER NOT NULL,
+                file_url TEXT,
+                file_display_name TEXT,
+                file_bookmark BLOB,
+                content_category TEXT
+            );
+            PRAGMA user_version = 3;
+            INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned, content_category)
+            VALUES ('\(UUID().uuidString)', 0, '旧文档文本一', NULL, 1000.0, 0, '文档');
+            INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned, content_category)
+            VALUES ('\(UUID().uuidString)', 0, '旧文档文本二', NULL, 900.0, 0, '文档');
+            INSERT INTO clipboard_history (id, content_type, text_value, image_data, last_copied_at, is_pinned, content_category)
+            VALUES ('\(UUID().uuidString)', 0, 'https://legacy.example', NULL, 800.0, 0, '文档');
+            """,
+            at: storageURL
+        )
+
+        let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
+        #expect(store.categoryCounts[.document, default: 0] == 0)
+        #expect(store.categoryCounts[.text] == 2)
+        #expect(store.categoryCounts[.url] == 1)
+
+        store.updateQuery(scope: .all, searchText: "", category: .document)
+        await store.waitUntilLoaded()
+        #expect(store.totalItemCount == 0)
+        #expect(store.items.isEmpty)
     }
 
     private func makeDirectory() throws -> URL {

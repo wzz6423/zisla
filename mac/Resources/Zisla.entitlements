@@ -4,7 +4,7 @@
 <!--
   Zisla — Developer ID notarization entitlements.
 
-  This file is intended for the Developer ID + notarization + Sparkle signed-update
+  This file is intended for the Developer ID + notarization
   path, NOT for Mac App Store submission. The app loads the private MediaRemote
   framework for Now Playing metadata; private frameworks are incompatible with the
   strict App Sandbox, so MAS submission is not supported. See README "系统限制".
@@ -17,25 +17,25 @@
 -->
 <dict>
   <!-- Hardened runtime requires library validation disabled because the app
-       dlopens MediaRemote.framework (private, not signed by Apple) and loads
-       Sparkle.framework. Without this, dyld rejects the private framework. -->
+       dlopens MediaRemote.framework (private, not signed by Apple). Without this,
+       dyld rejects the private framework. -->
   <key>com.apple.security.cs.disable-library-validation</key>
   <true/>
 
-  <!-- Apple Music 与 Spotify 的公开脚本字典控制。 -->
+  <!-- Automation through the public Apple Music and Spotify scripting dictionaries. -->
   <key>com.apple.security.automation.apple-events</key>
   <true/>
 
-  <!-- Outbound network: Open-Meteo weather, GitHub Releases API, Bilibili
-       fallback download, Sparkle appcast + update download. -->
+  <!-- Outbound network: Open-Meteo weather, GitHub/Gitee Releases API, Bilibili
+       fallback download, and update package download. -->
   <key>com.apple.security.network.client</key>
   <true/>
 
-  <!-- VoiceInputController 仅在用户主动点击语音输入后访问麦克风。 -->
+  <!-- VoiceInputController accesses the microphone only after the user explicitly starts voice input. -->
   <key>com.apple.security.device.audio-input</key>
   <true/>
 
-  <!-- WeatherKit 返回所选地点的气象机构官方预警。 -->
+  <!-- WeatherKit returns official weather-agency alerts for the selected location. -->
   <key>com.apple.developer.weatherkit</key>
   <true/>
 

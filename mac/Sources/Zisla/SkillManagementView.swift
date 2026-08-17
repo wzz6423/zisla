@@ -93,7 +93,7 @@ struct SkillManagementView: View {
             Spacer(minLength: 8)
             Button {
                 guard let directory = agent.ensureManagedSkillsDirectory() else { return }
-                NSWorkspace.shared.activateFileViewerSelecting([directory])
+                NSWorkspace.shared.open(directory)
             } label: {
                 Image(systemName: "folder")
             }

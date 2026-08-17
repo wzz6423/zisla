@@ -58,28 +58,23 @@ private enum ClipboardAdditionPresentation: Equatable {
 struct ClipboardHistoryModuleView: View {
     @ObservedObject private var store: ClipboardHistoryStore
     @State private var filter: ClipboardFilter = .all
+    @State private var categoryFilter: FileShelfCategory = .all
     @State private var additionPresentation: ClipboardAdditionPresentation?
     @State private var draftText = ""
     @State private var searchText = ""
     @FocusState private var isDraftTextFocused: Bool
+    @FocusState private var isSearchFocused: Bool
     private let copyItem: (ClipboardHistoryItem) -> Void
     private let sendToQuickNote: (ClipboardHistoryItem) -> Void
-    private let sendToAIAgent: (ClipboardHistoryItem) -> Void
-    private static let surfaceShape = UnevenRoundedRectangle(
-        cornerRadii: .init(
-            topLeading: IslandSurfaceGeometry.moduleInnerCornerRadius,
-            bottomLeading: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
-            bottomTrailing: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
-            topTrailing: IslandSurfaceGeometry.moduleInnerCornerRadius
-        ),
-        style: .continuous
+    private static let surfaceShape = IslandSurfaceGeometry.moduleContentShape(
+        bottomLeadingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
+        bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
     )
 
     init(model: AppModel) {
         _store = ObservedObject(wrappedValue: model.clipboardHistory)
         copyItem = { model.copyClipboardHistoryItem($0) }
         sendToQuickNote = { model.sendClipboardHistoryItemToQuickNote($0) }
-        sendToAIAgent = { model.sendClipboardHistoryItemToAIAgent($0) }
     }
 
     private var visibleItems: [ClipboardHistoryItem] {
@@ -99,7 +94,7 @@ struct ClipboardHistoryModuleView: View {
     }
 
     private var queryID: String {
-        filter.rawValue + "\u{0}" + searchText
+        filter.rawValue + "\u{0}" + categoryFilter.rawValue + "\u{0}" + searchText
     }
 
     var body: some View {
@@ -138,6 +133,10 @@ struct ClipboardHistoryModuleView: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 8)
 
+            categoryFilterBar
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
@@ -145,6 +144,7 @@ struct ClipboardHistoryModuleView: View {
                 TextField("搜索", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11))
+                    .focused($isSearchFocused)
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
@@ -158,10 +158,10 @@ struct ClipboardHistoryModuleView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color.fillControl)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .padding(.horizontal, 10)
             .padding(.top, 6)
+
+            Hairline()
 
             if store.isLoading && visibleItems.isEmpty {
                 ProgressView()
@@ -258,7 +258,7 @@ struct ClipboardHistoryModuleView: View {
                 try? await Task.sleep(for: .milliseconds(200))
             }
             guard !Task.isCancelled else { return }
-            store.updateQuery(scope: filter.scope, searchText: searchText)
+            store.updateQuery(scope: filter.scope, searchText: searchText, category: categoryFilter)
         }
     }
 
@@ -408,7 +408,6 @@ struct ClipboardHistoryModuleView: View {
             item: item,
             onCopy: copyItem,
             onSendToQuickNote: sendToQuickNote,
-            onSendToAIAgent: sendToAIAgent,
             onSetPinned: { store.setPinned(id: item.id, isPinned: $0) },
             onRemove: { store.remove(id: item.id) }
         )
@@ -447,6 +446,52 @@ struct ClipboardHistoryModuleView: View {
     private func addPinned(_ content: ClipboardHistoryContent) {
         _ = store.recordPinned(content)
     }
+
+    private var categoryFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(FileShelfCategory.clipboardCases) { category in
+                    let count = categoryCount(for: category)
+                    let isSelected = categoryFilter == category
+                    let hasItems = category == .all || count > 0
+
+                    Button {
+                        categoryFilter = category
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: category.symbol)
+                                .font(.system(size: 10, weight: .medium))
+                            Text(category.rawValue)
+                                .font(.system(size: 10, weight: .medium))
+                            if category != .all {
+                                Text("\(count)")
+                                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background {
+                            if isSelected {
+                                RoundedRectangle(cornerRadius: 999, style: .continuous)
+                                    .fill(Color.fillCard)
+                                    .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(hasItems ? .primary : .tertiary)
+                    .disabled(!hasItems)
+                }
+            }
+        }
+        .frame(height: 28)
+    }
+
+    private func categoryCount(for category: FileShelfCategory) -> Int {
+        guard category != .all else { return 0 }
+        return store.categoryCounts[category, default: 0]
+    }
 }
 
 /// Top All / Favorites / Non-favorites segmented control.
@@ -480,10 +525,13 @@ private struct ClipboardFilterSegmentedControl: View {
                     .foregroundStyle(isActive ? .primary : .secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
+                    .contentShape(Rectangle())
                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                     .background {
                         if isActive {
-                            SelectionGlassBackground(cornerRadius: 5)
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color.fillCard)
+                                .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
                                 .matchedGeometryEffect(
                                     id: "clipboard-filter-selection",
                                     in: selectionNamespace
@@ -496,7 +544,6 @@ private struct ClipboardFilterSegmentedControl: View {
             }
         }
         .padding(2)
-        .background(Color.fillControl)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .animation(reduceMotion ? nil : ZislaMotion.selection, value: selection)
     }
@@ -506,7 +553,6 @@ private struct ClipboardHistoryItemRow: View, Equatable {
     let item: ClipboardHistoryItem
     let onCopy: (ClipboardHistoryItem) -> Void
     let onSendToQuickNote: (ClipboardHistoryItem) -> Void
-    let onSendToAIAgent: (ClipboardHistoryItem) -> Void
     let onSetPinned: (Bool) -> Void
     let onRemove: () -> Void
 
@@ -543,29 +589,31 @@ private struct ClipboardHistoryItemRow: View, Equatable {
             Button {
                 onSendToQuickNote(item)
             } label: {
-                Image(systemName: "note.text")
-                    .frame(width: 24, height: 24)
+                HStack(spacing: 3) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 10))
+                    Text("随记")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .help("发送到随记")
 
-            Button {
-                onSendToAIAgent(item)
-            } label: {
-                Image(systemName: "sparkles")
-                    .frame(width: 24, height: 24)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .help("发送到 AI Agent")
-
             // Favorites toggle: filled star = already in favorites; tap to add/remove from favorites.
             Button {
                 onSetPinned(!item.isPinned)
             } label: {
-                Image(systemName: item.isPinned ? "star.fill" : "star")
-                    .frame(width: 24, height: 24)
+                HStack(spacing: 3) {
+                    Image(systemName: item.isPinned ? "star.fill" : "star")
+                        .font(.system(size: 10))
+                    Text("常用")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
             }
             .buttonStyle(.plain)
             .foregroundStyle(item.isPinned ? Color.accentColor : .secondary)
@@ -574,8 +622,14 @@ private struct ClipboardHistoryItemRow: View, Equatable {
             Button {
                 onRemove()
             } label: {
-                Image(systemName: "xmark")
-                    .frame(width: 24, height: 24)
+                HStack(spacing: 3) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10))
+                    Text("删除")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
@@ -589,7 +643,6 @@ private struct ClipboardHistoryItemRow: View, Equatable {
         .contextMenu {
             Button("复制") { onCopy(item) }
             Button("发送到随记") { onSendToQuickNote(item) }
-            Button("发送到 AI Agent") { onSendToAIAgent(item) }
             Button(item.isPinned ? "移出常用" : "设为常用") {
                 onSetPinned(!item.isPinned)
             }

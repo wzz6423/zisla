@@ -14,7 +14,11 @@ struct SettingsView: View {
     @FocusState private var searchFieldFocused: Bool
     @State private var draggedWeatherLocationID: String?
     @State private var sectionSwitchDirection: CGFloat = 1
-    @State private var copiedCommand: String?
+    @State private var pendingRecommendedToolAction: RecommendedToolAction?
+    @State private var isVoiceHistoryClearConfirmationPresented = false
+    @State private var isVoiceHistoryBatchDeleteConfirmationPresented = false
+    @State private var voiceHistorySelectionMode = false
+    @State private var selectedVoiceHistoryIDs: Set<UUID> = []
     @Namespace private var sectionSelectionNamespace
 
     init(model: AppModel) {
@@ -29,17 +33,55 @@ struct SettingsView: View {
             detail
         }
         .frame(
-            width: input.selection.prefersWideLayout ? 980 : 548,
-            height: input.selection.prefersWideLayout ? 640 : 510
+            width: input.selection.prefersWideLayout ? 980 : 640,
+            height: input.selection.prefersWideLayout ? 640 : 560
         )
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             launchAtLogin.refresh()
             model.refreshVoiceInputInputMonitoringAccess()
+            ensureSelectionIsVisible()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             launchAtLogin.refresh()
             model.refreshVoiceInputInputMonitoringAccess()
+        }
+        .onChange(of: settingsStore.settings) { _, _ in
+            ensureSelectionIsVisible()
+        }
+        .alert(
+            pendingRecommendedToolAction?.title ?? "",
+            isPresented: Binding(
+                get: { pendingRecommendedToolAction != nil },
+                set: { if !$0 { pendingRecommendedToolAction = nil } }
+            )
+        ) {
+            Button("取消", role: .cancel) {
+                pendingRecommendedToolAction = nil
+            }
+            Button("继续") {
+                guard let action = pendingRecommendedToolAction else { return }
+                pendingRecommendedToolAction = nil
+                Task { await performRecommendedToolAction(action) }
+            }
+        } message: {
+            Text(recommendedToolActionMessage)
+        }
+        .alert("清空所有语音记录？", isPresented: $isVoiceHistoryClearConfirmationPresented) {
+            Button("取消", role: .cancel) {}
+            Button("清空", role: .destructive) {
+                model.removeAllVoiceRecordings()
+            }
+        } message: {
+            Text("本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。")
+        }
+        .alert("删除选中的语音记录？", isPresented: $isVoiceHistoryBatchDeleteConfirmationPresented) {
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) {
+                deleteSelectedVoiceHistoryEntries()
+            }
+        } message: {
+            Text("选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。")
         }
     }
 
@@ -52,8 +94,8 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .padding(.top, 1)
 
-            VStack(spacing: 4) {
-                ForEach(SettingsSection.allCases) { section in
+            VStack(spacing: 2) {
+                ForEach(visibleSections) { section in
                     Button {
                         selectSettingsSection(section)
                     } label: {
@@ -67,7 +109,7 @@ struct SettingsView: View {
                             Spacer(minLength: 0)
                         }
                         .padding(.horizontal, 8)
-                        .frame(height: 34)
+                        .frame(height: 32)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
@@ -150,40 +192,46 @@ struct SettingsView: View {
         }
     }
 
+    private var visibleSections: [SettingsSection] {
+        SettingsSection.allCases.filter { $0.isVisible(settings: settingsStore.settings) }
+    }
+
+    private func ensureSelectionIsVisible() {
+        guard !input.selection.isVisible(settings: settingsStore.settings) else { return }
+        selectSettingsSection(.features)
+    }
+
     @ViewBuilder
     private var selectedContent: some View {
         switch input.selection {
+        case .general:
+            generalContent
+        case .features:
+            featuresContent
         case .workflow:
             workflowContent
         case .info:
             infoContent
         case .ai:
             aiContent
-        case .models:
-            modelsContent
+        case .voice:
+            voiceContent
         case .pet:
             petContent
-        case .interaction:
-            interactionContent
         case .download:
             downloadContent
         case .weather:
             weatherContent
         case .updates:
             updatesContent
+        case .recommendations:
+            recommendationsContent
         }
     }
 
     private var workflowContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("工作流模块") {
-                featureToggle(
-                    "媒体播放",
-                    detail: "显示系统正在播放的音乐或视频",
-                    symbol: "play.square.fill",
-                    keyPath: \.mediaEnabled
-                )
-                rowDivider
                 settingRow(
                     symbol: "music.note.list",
                     title: "播放来源",
@@ -203,7 +251,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 132)
+                    .frame(width: 132, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
                 rowDivider
@@ -244,60 +292,8 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 132)
+                    .frame(width: 132, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.mediaEnabled)
-                }
-                rowDivider
-                featureToggle(
-                    "文件中转与分享",
-                    detail: "暂存文件并调用 AirDrop 或系统分享",
-                    symbol: "tray.full.fill",
-                    keyPath: \.fileShelfEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "小工具",
-                    detail: "番茄钟、亮屏与屏幕清洁",
-                    symbol: "wrench.and.screwdriver.fill",
-                    keyPath: \.toolboxEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "随记",
-                    detail: "Markdown 随手记，可发送到系统备忘录",
-                    symbol: "note.text",
-                    keyPath: \.quickNotesEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "PDF 工具",
-                    detail: "合并、拆分、加密与转换 PDF",
-                    symbol: "doc.text.fill",
-                    keyPath: \.pdfToolsEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "系统状态与清理",
-                    detail: "监控资源并安全清理缓存和日志",
-                    symbol: "gauge.with.dots.needle.67percent",
-                    keyPath: \.systemMonitorEnabled
-                )
-                rowDivider
-                settingRow(
-                    symbol: "app.badge",
-                    title: "显示 zisla 图标",
-                    detail: "关闭后不影响已启用的菜单栏监控项"
-                ) {
-                    Toggle(
-                        "",
-                        isOn: Binding(
-                            get: { model.settingsStore.settings.menuBarAppIconEnabled },
-                            set: { model.settingsStore.settings.menuBarAppIconEnabled = $0 }
-                        )
-                    )
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
                 }
                 if model.settingsStore.settings.systemMonitorEnabled {
                     rowDivider
@@ -345,33 +341,90 @@ struct SettingsView: View {
         }
     }
 
+    private var featuresContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            settingsGroup("媒体与文件") {
+                featureToggle("媒体播放", detail: "显示系统正在播放的音乐或视频", symbol: "play.square.fill", keyPath: \.mediaEnabled)
+                rowDivider
+                featureToggle("文件中转与分享", detail: "暂存文件并调用 AirDrop 或系统分享", symbol: "tray.full.fill", keyPath: \.fileShelfEnabled)
+                rowDivider
+                featureToggle("链接下载", detail: "下载视频或音频", symbol: "arrow.down.circle.fill", keyPath: \.downloaderEnabled)
+                rowDivider
+                featureToggle("剪贴板历史", detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
+                rowDivider
+                featureToggle("剪贴板链接检测", detail: "发现可下载链接时提示", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
+            }
+
+            settingsGroup("信息与通知") {
+                featureToggle("日历日程", detail: "显示接下来的日程与会议", symbol: "calendar", keyPath: \.calendarEnabled)
+                rowDivider
+                featureToggle("天气", detail: "显示当前或自选地区的天气", symbol: "cloud.sun.fill", keyPath: \.weatherEnabled)
+                rowDivider
+                featureToggle("邮件", detail: "读取已配置的 Mail.app 账户并提醒新邮件", symbol: "envelope.fill", keyPath: \.mailEnabled)
+                rowDivider
+                featureToggle("侧翼通知", detail: "在灵动岛肩部显示任务变化", symbol: "bell.badge.fill", keyPath: \.sideNoticesEnabled)
+                rowDivider
+                featureToggle("锁屏信息", detail: "在系统锁屏页显示状态信息与播放器", symbol: "lock.display", keyPath: \.lockScreenInfoEnabled)
+                rowDivider
+                featureToggle("专注倒计时", detail: "专注时在收起态灵动岛显示剩余时间", symbol: "clock", keyPath: \.focusCountdownIslandEnabled)
+                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                rowDivider
+                featureToggle("工具箱提醒", detail: "在收起态提示番茄钟、亮屏和清洁状态", symbol: "bell.fill", keyPath: \.toolboxReminderEnabled)
+                    .disabled(!model.settingsStore.settings.toolboxEnabled || !model.settingsStore.settings.sideNoticesEnabled)
+            }
+
+            settingsGroup("AI 与语音") {
+                featureToggle("AI 进度与用量", detail: "汇总桌面端与 CLI 工具的运行状态", symbol: "sparkles", keyPath: \.aiProgressEnabled)
+                rowDivider
+                featureToggle("语音输入", detail: "开启后可通过全局快捷键触发语音输入", symbol: "mic.fill", keyPath: \.voiceInputEnabled)
+            }
+
+            settingsGroup("工具与监控") {
+                featureToggle("小工具", detail: "番茄钟、亮屏与屏幕清洁", symbol: "wrench.and.screwdriver.fill", keyPath: \.toolboxEnabled)
+                rowDivider
+                featureToggle("随记", detail: "Markdown 随手记，可发送到系统备忘录", symbol: "note.text", keyPath: \.quickNotesEnabled)
+                rowDivider
+                featureToggle("PDF 工具", detail: "合并、拆分、加密与转换 PDF", symbol: "doc.text.fill", keyPath: \.pdfToolsEnabled)
+                rowDivider
+                featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
+                rowDivider
+                featureToggle("电池监控", detail: "显示电池详细信息与健康状态", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
+            }
+
+            settingsGroup("灵动岛与下载展示") {
+                featureToggle("鼠标移入展开", detail: "鼠标进入屏幕顶部感应区时显示", symbol: "cursorarrow.motionlines", keyPath: \.hoverActivationEnabled)
+                rowDivider
+                featureToggle("显示 zisla 图标", detail: "关闭后不影响已启用的菜单栏监控项", symbol: "app.badge", keyPath: \.menuBarAppIconEnabled)
+                rowDivider
+                featureToggle("始终置顶", detail: "收起时保持在其他窗口和菜单栏图标上方", symbol: "rectangle.topthird.inset.filled", keyPath: \.islandCollapsedOnTop)
+                rowDivider
+                featureToggle("浏览器下载进度", detail: "在灵动岛显示来源图标与百分比", symbol: "arrow.down.circle.fill", keyPath: \.browserDownloadIslandEnabled)
+                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                rowDivider
+                featureToggle("原生下载进度", detail: "下载器工作时显示来源平台图标与百分比", symbol: "arrow.down.square.fill", keyPath: \.videoDownloadIslandEnabled)
+                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                rowDivider
+                featureToggle("静音 Zisla 通知", detail: "不发送番茄钟等由 Zisla 产生的系统通知", symbol: "bell.slash.fill", keyPath: \.notificationsMuted)
+            }
+
+            settingsGroup("宠物与更新") {
+                featureToggle("宠物", detail: "在灵动岛养一只小宠物", symbol: "pawprint.fill", keyPath: \.petEnabled)
+                rowDivider
+                featureToggle("自动检查更新", detail: "定期检查当前安装包所属的更新通道", symbol: "arrow.triangle.2.circlepath", keyPath: \.updateChecksEnabled)
+                rowDivider
+                featureToggle("自动下载更新", detail: "发现新版本时自动下载安装包", symbol: "arrow.down.circle.fill", keyPath: \.automaticDownloadEnabled)
+                    .disabled(!model.settingsStore.settings.updateChecksEnabled)
+            }
+        }
+    }
+
     private var infoContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("信息与通知") {
-                featureToggle(
-                    "日历日程",
-                    detail: "显示接下来的日程与会议",
-                    symbol: "calendar",
-                    keyPath: \.calendarEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "邮件",
-                    detail: "读取已配置的 Mail.app 账户并提醒新邮件",
-                    symbol: "envelope.fill",
-                    keyPath: \.mailEnabled
-                )
                 if model.settingsStore.settings.mailEnabled {
-                    rowDivider
                     mailAccountSettings
                 }
                 rowDivider
-                featureToggle(
-                    "锁屏信息",
-                    detail: "在系统锁屏页显示状态信息与播放器",
-                    symbol: "lock.display",
-                    keyPath: \.lockScreenInfoEnabled
-                )
                 if model.settingsStore.settings.lockScreenInfoEnabled {
                     rowDivider
                     settingRow(
@@ -409,21 +462,6 @@ struct SettingsView: View {
                     }
                 }
                 rowDivider
-                featureToggle(
-                    "侧翼通知",
-                    detail: "在灵动岛肩部显示任务变化",
-                    symbol: "bell.badge.fill",
-                    keyPath: \.sideNoticesEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "岛上倒计时",
-                    detail: "专注时在收起态灵动岛显示剩余时间",
-                    symbol: "clock",
-                    keyPath: \.focusCountdownIslandEnabled
-                )
-                .disabled(!model.settingsStore.settings.sideNoticesEnabled)
-                rowDivider
                 settingRow(
                     symbol: "timer",
                     title: "活动展示",
@@ -443,7 +481,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 96)
+                    .frame(maxWidth: 96, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
                 rowDivider
@@ -466,7 +504,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 96)
+                    .frame(maxWidth: 96, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
             }
@@ -559,119 +597,51 @@ struct SettingsView: View {
         }
     }
 
-    /// AI 监控、语音输入与 AI Agent 行为；模型定义与远端凭据只出现在 模型 页。
+    /// CLI and Skills management stays separate from the voice model configuration.
     private var aiContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("AI 监控") {
-                featureToggle(
-                    "AI 进度与用量",
-                    detail: "汇总桌面端与 CLI 工具的运行状态",
-                    symbol: "sparkles",
-                    keyPath: \.aiProgressEnabled
-                )
+            settingsGroup("CLI 与 Skills") {
+                AIAgentModuleView(model: model, configurationScope: .tools)
+                    .task {
+                        await model.aiAgent.refreshSkills()
+                        await model.aiAgent.refreshCLIs()
+                    }
             }
+        }
+    }
 
+    private var voiceContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            IslandOutlinedPicker(
+                selection: $input.voicePage,
+                options: Array(VoiceSettingsPage.allCases),
+                title: { $0.title },
+                selectionID: "voice-settings-page-selection",
+                fontSize: 11,
+                width: 240,
+                height: 28
+            )
+            .frame(maxWidth: .infinity)
+
+            switch input.voicePage {
+            case .settings:
+                voiceSettingsContent
+            case .history:
+                voiceHistoryContent
+            }
+        }
+    }
+
+    private var voiceSettingsContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
             voiceInputGroup
 
-            settingsGroup("AI Agent 行为") {
-                featureToggle(
-                    "在灵动岛显示",
-                    detail: "关闭后仅从工具栏隐藏，此处的配置与对话不受影响",
-                    symbol: "sparkles.square.filled.on.square",
-                    keyPath: \.aiAgentEnabled
-                )
-                rowDivider
-                AIAgentModuleView(model: model, configurationScope: .agent)
-                    .frame(minHeight: 430)
-                    .task { await model.aiAgent.refreshAll() }
-            }
-        }
-    }
-
-    private var voiceInputGroup: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("语音输入") {
-                featureToggle(
-                    "启用语音输入",
-                    detail: "开启后可通过全局快捷键触发语音输入",
-                    symbol: "mic.fill",
-                    keyPath: \.voiceInputEnabled
-                )
-                if model.settingsStore.settings.voiceInputEnabled {
-                    rowDivider
-                    settingRow(
-                        symbol: "rectangle.2.group",
-                        title: "录音模式",
-                        detail: model.settingsStore.settings.voiceInputMode.detail
-                    ) {
-                        Picker(
-                            "",
-                            selection: Binding(
-                                get: { model.settingsStore.settings.voiceInputMode },
-                                set: { model.settingsStore.settings.voiceInputMode = $0 }
-                            )
-                        ) {
-                            ForEach(VoiceInputMode.allCases, id: \.self) { mode in
-                                AppLocalizedText(mode.displayName).tag(mode)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                        .controlSize(.small)
-                        .frame(maxWidth: 110)
-                    }
-                    rowDivider
-                    settingRow(
-                        symbol: "keyboard",
-                        title: "快捷键",
-                        detail: model.settingsStore.settings.voiceInputMode == .pushToTalk
-                            ? "按住说话、松开结束"
-                            : "按一下开始、再按一下结束"
-                    ) {
-                        VoiceInputHotkeyRecorder(
-                            hotkey: Binding(
-                                get: { model.settingsStore.settings.voiceInputHotkeyPreset },
-                                set: { model.settingsStore.settings.voiceInputHotkeyPreset = $0 }
-                            )
-                        )
-                        .frame(width: 142, height: 26)
-                    }
-                    if model.settingsStore.settings.voiceInputHotkeyPreset.requiresInputMonitoring {
-                        rowDivider
-                        settingRow(
-                            symbol: "lock.shield",
-                            title: "输入监控",
-                            detail: "左右侧修饰键需要监听全局键盘事件"
-                        ) {
-                            if model.voiceInputInputMonitoringAccessGranted {
-                                Label("已授权", systemImage: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                    .font(.caption)
-                            } else {
-                                Button("打开设置") {
-                                    model.openVoiceInputInputMonitoringSettings()
-                                }
-                                .controlSize(.small)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var modelsContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // 模型定义与远端凭据唯一归属这里：先定义模型，再在下方选择。
             settingsGroup("本地模型") {
                 AIAgentModuleView(model: model, configurationScope: .localModels)
-                    .frame(minHeight: 170)
             }
 
             settingsGroup("远端模型与凭据") {
                 AIAgentModuleView(model: model, configurationScope: .remoteModels)
-                    .frame(minHeight: 300)
-                    .task { await model.aiAgent.refreshAll() }
             }
 
             settingsGroup("语音整理模型") {
@@ -689,18 +659,20 @@ struct SettingsView: View {
                     ) {
                         Text("不使用模型整理").tag(Optional<AIModelConfigurationReference>.none)
                         ForEach(model.aiAgent.store.state.localModels.filter(\.isEnabled)) { localModel in
-                            Text("本地 · \(localModel.name)")
-                                .tag(Optional(AIModelConfigurationReference.local(localModel.id)))
+                            let reference = AIModelConfigurationReference.local(localModel.id)
+                            Text("本地 · \(model.voiceModelConfigurationTitle(reference))")
+                                .tag(Optional(reference))
                         }
                         ForEach(model.aiAgent.store.state.channels.filter(\.isEnabled)) { channel in
-                            Text("远端 · \(channel.name)")
-                                .tag(Optional(AIModelConfigurationReference.channel(channel.id)))
+                            let reference = AIModelConfigurationReference.channel(channel.id)
+                            Text("远端 · \(model.voiceModelConfigurationTitle(reference))")
+                                .tag(Optional(reference))
                         }
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 220)
+                    .frame(maxWidth: 220, alignment: .trailing)
                 }
                 if let configuration = model.selectedVoiceModelConfiguration {
                     rowDivider
@@ -742,72 +714,277 @@ struct SettingsView: View {
                 }
             }
 
-            settingsGroup("设备档案与推荐模型") {
-                if let profile = model.hardwareProfile {
-                    settingRow(
-                        symbol: "desktopcomputer",
-                        title: "设备",
-                        detail: profile.compactHardwareDescription,
-                        detailLineLimit: 3
+            settingsGroup("本地记录") {
+                settingRow(
+                    symbol: "externaldrive.fill",
+                    title: "保留原始录音",
+                    detail: "关闭后，新录音只保留识别文本和 AI 整理文本"
+                ) {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { model.settingsStore.settings.voiceRecordingRetentionEnabled },
+                            set: { model.settingsStore.settings.voiceRecordingRetentionEnabled = $0 }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                }
+                rowDivider
+                settingRow(
+                    symbol: "calendar.badge.clock",
+                    title: "自动清理录音",
+                    detail: "按所选周期删除过期音频，文字记录继续保留"
+                ) {
+                    Picker(
+                        "",
+                        selection: Binding(
+                            get: { model.settingsStore.settings.voiceRecordingCleanupPolicy },
+                            set: { model.settingsStore.settings.voiceRecordingCleanupPolicy = $0 }
+                        )
                     ) {
-                        EmptyView()
-                    }
-                    rowDivider
-                    settingRow(
-                        symbol: "gauge.with.dots.needle.67percent",
-                        title: "综合推荐",
-                        detail: profile.recommendationDescription,
-                        detailLineLimit: 2
-                    ) {
-                        EmptyView()
-                    }
-                    ForEach(Array(AIModelRecommendations.recommended(for: profile).enumerated()), id: \.element.id) { index, rec in
-                        rowDivider
-                        VStack(alignment: .leading, spacing: 8) {
-                            settingRow(
-                                symbol: "lightbulb.fill",
-                                title: "\(rec.name) · \(rec.parameterScale)",
-                                detail: rec.reason
-                            ) {
-                                EmptyView()
-                            }
-                            VStack(alignment: .leading, spacing: 6) {
-                                commandRow(
-                                    label: "Ollama 下载",
-                                    command: rec.ollamaPullCommand
-                                )
-                                commandRow(
-                                    label: "Ollama 启动",
-                                    command: rec.ollamaRunCommand
-                                )
-                                commandRow(
-                                    label: "LM Studio 搜索",
-                                    command: rec.lmStudioSearchQuery
-                                )
-                            }
-                            .padding(.leading, 38)
-                            .padding(.bottom, 4)
+                        ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
+                            Text(policy.menuTitle).tag(policy)
                         }
                     }
-                } else {
-                    settingRow(
-                        symbol: "desktopcomputer",
-                        title: "设备档案",
-                        detail: "点击下方按钮检测硬件信息"
-                    ) {
-                        Button("检测") {
-                            model.refreshHardwareProfile()
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .frame(width: 120, alignment: .trailing)
+                }
+                rowDivider
+                settingRow(
+                    symbol: "folder",
+                    title: "记录目录",
+                    detail: "原始音频和文字记录只保存在本机"
+                ) {
+                    IconButton(symbol: "folder", help: "打开语音记录目录", size: .compact) {
+                        model.openVoiceRecordingsDirectory()
                     }
                 }
             }
+        }
+    }
 
+    private var voiceHistoryContent: some View {
+        let statistics = model.voiceHistory.statistics
+        return VStack(alignment: .leading, spacing: 20) {
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())],
+                spacing: 10
+            ) {
+                voiceStatistic(
+                    symbol: "textformat",
+                    title: "总识别字词",
+                    value: "\(statistics.totalWordCount) 字词"
+                )
+                voiceStatistic(
+                    symbol: "waveform",
+                    title: "累计口述时间",
+                    value: voiceDurationText(statistics.totalDuration)
+                )
+                voiceStatistic(
+                    symbol: "bolt.fill",
+                    title: "输入速度",
+                    value: "\(Int(statistics.wordsPerMinute.rounded())) 字词/分"
+                )
+                voiceStatistic(
+                    symbol: "clock",
+                    title: "节省时间",
+                    value: voiceDurationText(statistics.savedTime)
+                )
+            }
+
+            settingsGroup("语音记录") {
+                HStack(spacing: 8) {
+                    Text("全部记录仅保存在本机")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    if voiceHistorySelectionMode {
+                        IconButton(symbol: "xmark", help: "退出选择模式", size: .compact) {
+                            voiceHistorySelectionMode = false
+                            selectedVoiceHistoryIDs.removeAll()
+                        }
+                    } else {
+                        IconButton(symbol: "checkmark.circle", help: "选择多条记录", size: .compact) {
+                            voiceHistorySelectionMode = true
+                            selectedVoiceHistoryIDs.removeAll()
+                        }
+                        .disabled(model.voiceHistory.entries.isEmpty)
+                        IconButton(symbol: "folder", help: "打开语音记录目录", size: .compact) {
+                            model.openVoiceRecordingsDirectory()
+                        }
+                        IconButton(symbol: "trash", help: "清空语音记录", size: .compact) {
+                            isVoiceHistoryClearConfirmationPresented = true
+                        }
+                        .disabled(model.voiceHistory.entries.isEmpty)
+                    }
+                }
+                .padding(.horizontal, 4)
+                .frame(minHeight: 42)
+
+                if voiceHistorySelectionMode && !model.voiceHistory.entries.isEmpty {
+                    rowDivider
+                    HStack(spacing: 8) {
+                        Button(selectedVoiceHistoryIDs.count == model.voiceHistory.entries.count ? "取消全选" : "全选") {
+                            if selectedVoiceHistoryIDs.count == model.voiceHistory.entries.count {
+                                selectedVoiceHistoryIDs.removeAll()
+                            } else {
+                                selectedVoiceHistoryIDs = Set(model.voiceHistory.entries.map(\.id))
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+
+                        Spacer(minLength: 8)
+
+                        if !selectedVoiceHistoryIDs.isEmpty {
+                            Text("已选 \(selectedVoiceHistoryIDs.count) 条")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+
+                            Button("删除选中") {
+                                isVoiceHistoryBatchDeleteConfirmationPresented = true
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .foregroundStyle(.red)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                    .frame(minHeight: 42)
+                }
+
+                if model.voiceHistory.entries.isEmpty {
+                    rowDivider
+                    HStack(spacing: 8) {
+                        Image(systemName: "waveform.slash")
+                            .foregroundStyle(.secondary)
+                        Text("暂无语音记录")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 72)
+                } else {
+                    ForEach(model.voiceHistory.entries) { entry in
+                        rowDivider
+                        voiceHistoryRow(entry)
+                    }
+                }
+            }
         }
-        .onAppear {
-            model.refreshHardwareProfile()
+    }
+
+    private func voiceStatistic(symbol: String, title: String, value: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 26, height: 26)
+                .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
         }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 68)
+        .background(Color.primary.opacity(colorScheme == .dark ? 0.06 : 0.035))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    private func voiceHistoryRow(_ entry: VoiceHistoryEntry) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            if voiceHistorySelectionMode {
+                Button {
+                    if selectedVoiceHistoryIDs.contains(entry.id) {
+                        selectedVoiceHistoryIDs.remove(entry.id)
+                    } else {
+                        selectedVoiceHistoryIDs.insert(entry.id)
+                    }
+                } label: {
+                    Image(systemName: selectedVoiceHistoryIDs.contains(entry.id) ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(selectedVoiceHistoryIDs.contains(entry.id) ? Color.accentColor : Color.secondary)
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Text("\(voiceDurationText(entry.duration)) · \(entry.wordCount) 字词")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                }
+                if let processed = entry.processedTranscript {
+                    Text("AI 整理：\(processed)")
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(2)
+                    Text("原始识别：\(entry.rawTranscript.isEmpty ? "未识别到文字" : entry.rawTranscript)")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                } else {
+                    Text(entry.rawTranscript.isEmpty ? "未识别到文字" : entry.rawTranscript)
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(3)
+                }
+            }
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !voiceHistorySelectionMode {
+                HStack(spacing: 4) {
+                    if model.voiceHistory.audioURL(for: entry) != nil {
+                        IconButton(symbol: "play.fill", help: "播放原始录音", size: .compact) {
+                            model.playVoiceRecording(id: entry.id)
+                        }
+                        IconButton(symbol: "magnifyingglass", help: "在 Finder 中显示", size: .compact) {
+                            model.revealVoiceRecording(id: entry.id)
+                        }
+                    }
+                    IconButton(symbol: "trash", help: "删除这条语音记录", size: .compact) {
+                        model.removeVoiceRecording(id: entry.id)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 64)
+    }
+
+    private func voiceDurationText(_ duration: TimeInterval) -> String {
+        let duration = max(0, duration)
+        if duration < 60 {
+            return "\(Int(duration.rounded())) 秒"
+        }
+        if duration < 3_600 {
+            return String(format: "%.1f 分钟", duration / 60)
+        }
+        return String(format: "%.1f 小时", duration / 3_600)
+    }
+
+    private func deleteSelectedVoiceHistoryEntries() {
+        guard !selectedVoiceHistoryIDs.isEmpty else { return }
+        model.removeVoiceRecordings(ids: selectedVoiceHistoryIDs)
+        selectedVoiceHistoryIDs.removeAll()
+        voiceHistorySelectionMode = false
     }
 
     private var discoveryStatusText: String {
@@ -819,16 +996,74 @@ struct SettingsView: View {
         }
     }
 
+    private var voiceInputGroup: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            settingsGroup("语音输入") {
+                if model.settingsStore.settings.voiceInputEnabled {
+                    settingRow(
+                        symbol: "record.circle",
+                        title: "录音模式",
+                        detail: model.settingsStore.settings.voiceInputMode.detail
+                    ) {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { model.settingsStore.settings.voiceInputMode },
+                                set: { model.settingsStore.settings.voiceInputMode = $0 }
+                            )
+                        ) {
+                            ForEach(VoiceInputMode.allCases, id: \.self) { mode in
+                                AppLocalizedText(mode.displayName).tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .controlSize(.small)
+                        .frame(maxWidth: 110, alignment: .trailing)
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "keyboard",
+                        title: "快捷键",
+                        detail: model.settingsStore.settings.voiceInputMode == .pushToTalk
+                            ? "按住说话、松开结束"
+                            : "按一下开始、再按一下结束"
+                    ) {
+                        VoiceInputHotkeyRecorder(
+                            hotkey: Binding(
+                                get: { model.settingsStore.settings.voiceInputHotkeyPreset },
+                                set: { model.settingsStore.settings.voiceInputHotkeyPreset = $0 }
+                            )
+                        )
+                        .frame(width: 142, height: 26)
+                    }
+                    if model.settingsStore.settings.voiceInputHotkeyPreset.requiresInputMonitoring {
+                        rowDivider
+                        settingRow(
+                            symbol: "lock.shield",
+                            title: "输入监控",
+                            detail: "左右侧修饰键需要监听全局键盘事件"
+                        ) {
+                            if model.voiceInputInputMonitoringAccessGranted {
+                                Label("已授权", systemImage: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                    .font(.caption)
+                            } else {
+                                Button("打开设置") {
+                                    model.openVoiceInputInputMonitoringSettings()
+                                }
+                                .controlSize(.small)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var petContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("桌面宠物") {
-                featureToggle(
-                    "岛上宠物伙伴",
-                    detail: "在灵动岛养一只小宠物",
-                    symbol: "pawprint.fill",
-                    keyPath: \.petEnabled
-                )
-                rowDivider
+            settingsGroup("宠物") {
                 settingRow(
                     symbol: "shippingbox.fill",
                     title: "当前宠物",
@@ -940,7 +1175,7 @@ struct SettingsView: View {
         )
     }
 
-    private var interactionContent: some View {
+    private var generalContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("外观与语言") {
                 settingRow(
@@ -962,7 +1197,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 180)
+                    .frame(width: 180, alignment: .trailing)
                 }
                 rowDivider
                 settingRow(
@@ -1059,43 +1294,12 @@ struct SettingsView: View {
                 }
             }
 
-            settingsGroup("展开方式") {
-                featureToggle(
-                    "鼠标移入展开",
-                    detail: "鼠标进入屏幕顶部感应区时显示",
-                    symbol: "cursorarrow.motionlines",
-                    keyPath: \.hoverActivationEnabled
-                )
-            }
-
-            settingsGroup("隐私") {
-                featureToggle(
-                    "记录剪贴板历史",
-                    detail: "仅本机保存文本和图片，默认关闭",
-                    symbol: "clipboard",
-                    keyPath: \.clipboardHistoryEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "检测剪贴板链接",
-                    detail: "发现可下载链接时提示，默认关闭",
-                    symbol: "clipboard.fill",
-                    keyPath: \.clipboardDetectionEnabled
-                )
-            }
         }
     }
 
     private var downloadContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("下载器") {
-                featureToggle(
-                    "链接下载",
-                    detail: "下载视频或音频",
-                    symbol: "arrow.down.circle.fill",
-                    keyPath: \.downloaderEnabled
-                )
-                rowDivider
+            settingsGroup("下载目录") {
                 settingRow(
                     symbol: "folder.fill",
                     title: "默认下载目录",
@@ -1107,35 +1311,15 @@ struct SettingsView: View {
                 }
             }
 
-            settingsGroup("下载通知") {
-                featureToggle(
-                    "浏览器下载进度",
-                    detail: "在灵动岛显示来源图标与百分比",
-                    symbol: "arrow.down.circle.fill",
-                    keyPath: \.browserDownloadIslandEnabled
-                )
-                .disabled(!model.settingsStore.settings.sideNoticesEnabled)
-                rowDivider
-                featureToggle(
-                    "原生下载进度",
-                    detail: "下载器工作时显示来源平台图标与百分比",
-                    symbol: "arrow.down.square.fill",
-                    keyPath: \.videoDownloadIslandEnabled
-                )
-                .disabled(!model.settingsStore.settings.sideNoticesEnabled)
-            }
-
             settingsGroup("组件") {
                 managedToolRow(.ytDLP, symbol: "terminal.fill")
-                rowDivider
-                managedToolRow(.mas, symbol: "bag.fill")
                 rowDivider
                 managedToolRow(.libreOffice, symbol: "doc.richtext")
             }
         }
         .task {
             await model.managedTools.refreshInstalledVersions()
-            // 行内的"可更新到 X"依赖最新版本号；静默查询，离线时不打扰。
+            // The inline "Update to X" label depends on the latest version; query silently to avoid offline interruptions.
             for tool in ManagedTool.allCases {
                 await model.managedTools.checkLatest(tool, quietly: true)
             }
@@ -1197,17 +1381,194 @@ struct SettingsView: View {
         return "\(version) · \(location.label) · \(tool.purpose)"
     }
 
-    private var weatherContent: some View {
+    private var recommendationsContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("天气显示") {
-                featureToggle(
-                    "天气",
-                    detail: "显示当前或自选地区的天气",
-                    symbol: "cloud.sun.fill",
-                    keyPath: \.weatherEnabled
-                )
+            settingsGroup("一键管理") {
+                HStack(spacing: 8) {
+                    Text("\(recommendedTools.count) 个推荐工具")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    recommendationActionButton(
+                        symbol: "arrow.clockwise",
+                        help: "重新检测推荐工具",
+                        disabled: recommendedToolsAreBusy
+                    ) {
+                        Task { await refreshRecommendedTools() }
+                    }
+                    recommendationActionButton(
+                        symbol: "arrow.down.circle",
+                        help: "一键下载所有未安装的推荐工具",
+                        disabled: recommendedToolsAreBusy || missingRecommendedTools.isEmpty
+                    ) {
+                        pendingRecommendedToolAction = .install
+                    }
+                    recommendationActionButton(
+                        symbol: "arrow.up.circle",
+                        help: "一键更新所有已安装的推荐工具",
+                        disabled: recommendedToolsAreBusy || installedRecommendedTools.isEmpty
+                    ) {
+                        pendingRecommendedToolAction = .update
+                    }
+                }
+                .padding(.horizontal, 4)
+                .frame(minHeight: 48)
             }
 
+            recommendedToolGroup(
+                ManagedToolRecommendationGroup.terminalEfficiency.title,
+                tools: recommendedTools(in: .terminalEfficiency)
+            )
+            recommendedToolGroup(
+                ManagedToolRecommendationGroup.networkAndData.title,
+                tools: recommendedTools(in: .networkAndData)
+            )
+            recommendedToolGroup(
+                ManagedToolRecommendationGroup.developmentToolchain.title,
+                tools: recommendedTools(in: .developmentToolchain)
+            )
+            recommendedToolGroup(
+                ManagedToolRecommendationGroup.utility.title,
+                tools: recommendedTools(in: .utility)
+            )
+            recommendedToolGroup(
+                ManagedToolRecommendationGroup.desktopApplication.title,
+                tools: recommendedTools(in: .desktopApplication)
+            )
+        }
+        .task { await refreshRecommendedTools() }
+    }
+
+    private var recommendedTools: [ManagedTool] {
+        ManagedTool.allCases
+    }
+
+    private func recommendedTools(in group: ManagedToolRecommendationGroup) -> [ManagedTool] {
+        recommendedTools.filter { $0.recommendationGroup == group }
+    }
+
+    private var missingRecommendedTools: [ManagedTool] {
+        recommendedTools.filter { !(model.managedTools.states[$0]?.isInstalled ?? false) }
+    }
+
+    private var installedRecommendedTools: [ManagedTool] {
+        recommendedTools.filter { model.managedTools.states[$0]?.isInstalled == true }
+    }
+
+    private var recommendedToolsAreBusy: Bool {
+        recommendedTools.contains { model.managedTools.states[$0]?.isBusy == true }
+    }
+
+    private func recommendedToolGroup(_ title: String, tools: [ManagedTool]) -> some View {
+        settingsGroup(title) {
+            ForEach(Array(tools.enumerated()), id: \.element.id) { index, tool in
+                if index > 0 { rowDivider }
+                recommendedToolRow(tool)
+            }
+        }
+    }
+
+    private func recommendedToolRow(_ tool: ManagedTool) -> some View {
+        let state = model.managedTools.states[tool] ?? ManagedToolState()
+        return settingRow(
+            symbol: recommendedToolSymbol(for: tool),
+            title: tool.displayName,
+            detail: managedToolDetail(tool, state: state)
+        ) {
+            HStack(spacing: 8) {
+                if case .downloading(let fraction) = state.phase, fraction > 0 {
+                    ProgressView(value: fraction)
+                        .frame(width: 52)
+                        .controlSize(.small)
+                } else if state.isBusy {
+                    ProgressView().controlSize(.small)
+                } else if state.isInstalled {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.zislaSuccess)
+                }
+
+                recommendationActionButton(
+                    symbol: state.isInstalled ? "arrow.up.circle" : "arrow.down.circle",
+                    help: state.isInstalled ? "更新 \(tool.displayName)" : "下载并安装 \(tool.displayName)",
+                    disabled: state.isBusy
+                ) {
+                    Task { await model.managedTools.install(tool) }
+                }
+            }
+        }
+    }
+
+    private func recommendationActionButton(
+        symbol: String,
+        help: String,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+        }
+        .buttonStyle(.borderless)
+        .disabled(disabled)
+        .help(help)
+        .accessibilityLabel(help)
+    }
+
+    private func recommendedToolSymbol(for tool: ManagedTool) -> String {
+        switch tool {
+        case .fzf: "line.3.horizontal.decrease.circle"
+        case .ripgrep: "magnifyingglass"
+        case .lazygit: "arrow.triangle.branch"
+        case .neovim: "doc.text"
+        case .yazi: "folder.fill"
+        case .starship: "text.cursor"
+        case .tldr: "book.closed"
+        case .jq: "curlybraces.square"
+        case .tree: "point.3.connected.trianglepath.dotted"
+        case .ytDLP: "arrow.down.circle.fill"
+        case .libreOffice: "doc.richtext"
+        case .kaku: "terminal.fill"
+        case .markdownPreview: "doc.text.magnifyingglass"
+        case .keka: "archivebox.fill"
+        case .kero: "terminal"
+        default:
+            switch tool.recommendationGroup {
+            case .terminalEfficiency: "terminal"
+            case .networkAndData: "network"
+            case .developmentToolchain: "hammer"
+            case .utility: "wrench.and.screwdriver"
+            case .desktopApplication: "macwindow"
+            }
+        }
+    }
+
+    private func refreshRecommendedTools() async {
+        await model.managedTools.refreshInstalledVersions()
+        for tool in recommendedTools {
+            await model.managedTools.checkLatest(tool, quietly: true)
+        }
+    }
+
+    private func performRecommendedToolAction(_ action: RecommendedToolAction) async {
+        let tools = switch action {
+        case .install: missingRecommendedTools
+        case .update: installedRecommendedTools
+        }
+        for tool in tools {
+            await model.managedTools.install(tool)
+        }
+    }
+
+    private var recommendedToolActionMessage: String {
+        guard let action = pendingRecommendedToolAction else { return "" }
+        let itemCount = switch action {
+        case .install: missingRecommendedTools.count
+        case .update: installedRecommendedTools.count
+        }
+        return action.message(itemCount: itemCount)
+    }
+
+    private var weatherContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
             settingsGroup("地点") {
                 ForEach(Array(model.weatherLocations.locations.enumerated()), id: \.element.id) {
                     index, location in
@@ -1313,7 +1674,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "arrow.triangle.branch",
                     title: "手动检查通道",
-                    detail: "\(model.settingsStore.settings.updateChannel.detail)；不影响自动更新"
+                    detail: "\(model.settingsStore.settings.updateChannel.detail)；仅用于手动检查"
                 ) {
                     IslandOutlinedPicker(
                         selection: Binding(
@@ -1328,20 +1689,18 @@ struct SettingsView: View {
                         height: 28
                     )
                 }
-                rowDivider
-                featureToggle(
-                    "检查更新",
-                    detail: "仅检查当前安装包所属的更新通道",
-                    symbol: "arrow.triangle.2.circlepath",
-                    keyPath: \.updateChecksEnabled
-                )
-                rowDivider
-                featureToggle(
-                    "自动安装更新",
-                    detail: "仅自动安装当前安装包所属通道的新构建",
-                    symbol: "shippingbox.and.arrow.backward.fill",
-                    keyPath: \.automaticUpdatesEnabled
-                )
+            }
+
+            settingsGroup("更新下载目录") {
+                settingRow(
+                    symbol: "folder.fill",
+                    title: "默认下载目录",
+                    detail: model.downloadDirectory.path(percentEncoded: false)
+                ) {
+                    Button("选择…") { chooseDownloadDirectory() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
             }
 
             settingsGroup("版本") {
@@ -1494,7 +1853,7 @@ struct SettingsView: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .controlSize(.small)
-            .frame(maxWidth: 108)
+            .frame(maxWidth: 108, alignment: .trailing)
         }
         rowDivider
         mailAppAccountSettings
@@ -1590,7 +1949,7 @@ struct SettingsView: View {
         symbol: String,
         title: String,
         detail: String,
-        detailLineLimit: Int? = 1,
+        detailLineLimit: Int? = nil,
         @ViewBuilder trailing: () -> Trailing
     ) -> some View {
         HStack(spacing: 10) {
@@ -1608,7 +1967,6 @@ struct SettingsView: View {
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .lineLimit(detailLineLimit)
-                        .truncationMode(.middle)
                 }
             }
             .layoutPriority(1)
@@ -1693,7 +2051,7 @@ struct SettingsView: View {
         if model.productUpdateAvailable {
             IconButton(
                 symbol: "arrow.triangle.2.circlepath",
-                help: "选择升级",
+                help: "查看更新",
                 isActive: true,
                 size: .compact
             ) {
@@ -1733,7 +2091,7 @@ struct SettingsView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.1"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.3"
     }
 
     private func searchWeatherLocation() {
@@ -1773,41 +2131,6 @@ struct SettingsView: View {
             .lazy
             .compactMap(NSImage.init(contentsOf:))
             .first
-    }
-
-    private func commandRow(label: String, command: String) -> some View {
-        HStack(spacing: 8) {
-            AppLocalizedText(label)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 88, alignment: .leading)
-            Text(command)
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            IconButton(
-                symbol: copiedCommand == command ? "checkmark" : "doc.on.doc",
-                help: copiedCommand == command ? "已复制" : "复制\(label)",
-                size: .compact
-            ) {
-                copyToClipboard(command)
-            }
-        }
-        .frame(height: 20)
-    }
-
-    private func copyToClipboard(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        copiedCommand = text
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            if copiedCommand == text {
-                copiedCommand = nil
-            }
-        }
     }
 
     private func languageDisplayName(_ language: AppLanguage) -> String {
@@ -2055,71 +2378,138 @@ private final class VoiceInputHotkeyRecorderButton: NSButton {
     }
 }
 
-private enum SettingsSection: String, CaseIterable, Identifiable {
+enum SettingsSection: String, CaseIterable, Identifiable {
+    case general
+    case features
     case workflow
     case info
     case ai
-    case models
+    case voice
     case pet
-    case interaction
     case download
     case weather
+    case recommendations
     case updates
 
     var id: Self { self }
 
-    /// The two AI pages need the wide layout because they embed the agent's configuration surface.
+    /// AI and voice settings need room for their dense content.
     var prefersWideLayout: Bool {
-        self == .ai || self == .models
+        self == .ai || self == .voice
     }
 
     var title: String {
         switch self {
+        case .general: "通用"
+        case .features: "功能"
         case .workflow: "工作流"
         case .info: "信息"
         case .ai: "AI"
-        case .models: "模型"
-        case .pet: "桌面宠物"
-        case .interaction: "交互"
+        case .voice: "语音"
+        case .pet: "宠物"
         case .download: "下载"
         case .weather: "天气"
         case .updates: "更新"
+        case .recommendations: "推荐"
         }
     }
 
     var symbol: String {
         switch self {
+        case .general: "gearshape.fill"
+        case .features: "switch.2"
         case .workflow: "square.grid.2x2.fill"
         case .info: "info.circle.fill"
         case .ai: "sparkles"
-        case .models: "cpu"
+        case .voice: "mic.fill"
         case .pet: "pawprint.fill"
-        case .interaction: "cursorarrow.motionlines"
         case .download: "arrow.down.circle.fill"
         case .weather: "cloud.sun.fill"
         case .updates: "arrow.up.circle"
+        case .recommendations: "sparkles"
         }
     }
 
     var subtitle: String {
         switch self {
+        case .general: "调整语言、外观、启动与展开方式。"
+        case .features: "集中开启或关闭所有功能模块。"
         case .workflow: "管理灵动岛中的工作流模块。"
         case .info: "配置日历、邮件、锁屏与通知显示。"
-        case .ai: "AI 进度、语音输入，以及连接、自动化、CLI 与 Skills 等 Agent 行为。"
-        case .models: "配置本地模型、远端模型与凭据，并选择语音整理使用的模型。"
+        case .ai: "管理 AI CLI 与 Skills。"
+        case .voice: "配置语音输入、整理模型与本机记录。"
         case .pet: "设置灵动岛内部的宠物形象。"
-        case .interaction: "调整外观、展开方式与隐私行为。"
         case .download: "管理下载目录、下载通知与所需组件。"
         case .weather: "管理天气显示、地点和刷新。"
         case .updates: "管理版本检查与自动更新。"
+        case .recommendations: "一键下载和更新精选效率、网络、开发与桌面工具。"
+        }
+    }
+
+    func isVisible(settings: FeatureSettings) -> Bool {
+        switch self {
+        case .general, .features, .recommendations:
+            return true
+        case .workflow:
+            return settings.mediaEnabled || settings.systemMonitorEnabled
+        case .info:
+            return settings.mailEnabled || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled
+        case .ai:
+            return settings.aiProgressEnabled
+        case .voice:
+            return settings.voiceInputEnabled
+        case .pet:
+            return settings.petEnabled
+        case .download:
+            return settings.downloaderEnabled
+        case .weather:
+            return settings.weatherEnabled
+        case .updates:
+            return settings.updateChecksEnabled
         }
     }
 }
 
 @MainActor
 private final class SettingsInput: ObservableObject {
-    @Published var selection: SettingsSection = .workflow
+    @Published var selection: SettingsSection = .general
+    @Published var voicePage: VoiceSettingsPage = .settings
     @Published var weatherQuery = ""
+}
+
+private enum VoiceSettingsPage: String, CaseIterable, Identifiable {
+    case settings
+    case history
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .settings: "语音设置"
+        case .history: "语音记录"
+        }
+    }
+}
+
+private enum RecommendedToolAction {
+    case install
+    case update
+
+    var title: String {
+        switch self {
+        case .install: "下载缺失推荐工具？"
+        case .update: "更新已安装推荐工具？"
+        }
+    }
+
+    func message(itemCount: Int) -> String {
+        switch self {
+        case .install:
+            "将通过官方安装来源下载并安装 \(itemCount) 项缺失工具。工具较多时可能需要一些时间。"
+        case .update:
+            "将通过官方安装来源更新 \(itemCount) 项已安装工具。工具较多时可能需要一些时间。"
+        }
+    }
 }
 
 private struct WeatherLocationReorderDropDelegate: DropDelegate {

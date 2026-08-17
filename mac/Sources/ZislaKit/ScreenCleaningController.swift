@@ -222,6 +222,7 @@ public final class ScreenCleaningController: ObservableObject {
         keyboardEventTap = eventTap
         keyboardEventTapRunLoopSource = runLoopSource
         CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        CGEvent.tapEnable(tap: eventTap, enable: true)
         return true
     }
 

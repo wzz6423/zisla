@@ -154,7 +154,7 @@ public actor GitHubReleaseService {
         if channel == .preview {
             let releases = try JSONDecoder().decode([GitHubRelease].self, from: data)
             guard let release = latestPreviewRelease(in: releases) else { return .upToDate }
-            guard let version = try? SemanticVersion(release.tagName) else {
+            guard let version = release.parsedVersion else {
                 return .upToDate
             }
             return version > currentVersion ? .updateAvailable(release) : .upToDate
@@ -162,7 +162,7 @@ public actor GitHubReleaseService {
 
         let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
         guard !release.draft, !release.prerelease else { return .upToDate }
-        guard let version = try? SemanticVersion(release.tagName) else {
+        guard let version = release.parsedVersion else {
             throw GitHubReleaseServiceError.invalidReleaseVersion
         }
         return version > currentVersion ? .updateAvailable(release) : .upToDate
@@ -172,7 +172,7 @@ public actor GitHubReleaseService {
         releases
             .filter { !$0.draft && $0.prerelease }
             .compactMap { release -> (release: GitHubRelease, version: SemanticVersion)? in
-                guard let version = try? SemanticVersion(release.tagName) else { return nil }
+                guard let version = release.parsedVersion else { return nil }
                 return (release, version)
             }
             .max { $0.version < $1.version }?

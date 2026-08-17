@@ -7,6 +7,80 @@ import Testing
 @MainActor
 struct AIAgentServicesTests {
     @Test
+    func skillScanDeduplicatesLinkedRootsUsingManagedPaths() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-skill-scan-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let managed = root.appendingPathComponent("managed", isDirectory: true)
+        let linkedRoot = root.appendingPathComponent("codex/skills", isDirectory: true)
+        let skillFile = managed.appendingPathComponent("review/SKILL.md", isDirectory: false)
+        try FileManager.default.createDirectory(
+            at: skillFile.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("review".utf8).write(to: skillFile)
+        try FileManager.default.createDirectory(
+            at: linkedRoot.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createSymbolicLink(at: linkedRoot, withDestinationURL: managed)
+
+        let skills = AIAgentSkillService().scan(roots: [linkedRoot, managed])
+
+        #expect(skills.count == 1)
+        #expect(skills.first?.path.hasSuffix("/managed/review") == true)
+    }
+
+    @Test
+    func skillScanKeepsOneCaseInsensitiveNameUsingRootPriority() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-skill-name-dedup-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let managed = root.appendingPathComponent("managed", isDirectory: true)
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let claude = root.appendingPathComponent("claude", isDirectory: true)
+        let skillFiles = [
+            managed.appendingPathComponent("review/SKILL.md"),
+            codex.appendingPathComponent("Review/SKILL.md"),
+            claude.appendingPathComponent("review/SKILL.md"),
+            claude.appendingPathComponent("unique/SKILL.md"),
+        ]
+        for skillFile in skillFiles {
+            try FileManager.default.createDirectory(
+                at: skillFile.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try Data(skillFile.path.utf8).write(to: skillFile)
+        }
+
+        let skills = AIAgentSkillService().scan(roots: [managed, codex, claude])
+
+        #expect(skills.count == 2)
+        let review = try #require(skills.first { $0.name.lowercased() == "review" })
+        #expect(review.path.hasSuffix("/managed/review"))
+        #expect(skills.contains { $0.name == "unique" })
+    }
+
+    @Test
+    func managedSkillDestinationsUseEntireSkillsRoots() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-managed-skill-paths-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let workspace = AIAgentWorkspace(
+            store: AIAgentStore(storageURL: directory.appendingPathComponent("state.json"))
+        )
+        let home = FileManager.default.homeDirectoryForCurrentUser
+
+        #expect(workspace.managedSkillDestinationDirectory(for: .codex) == home.appendingPathComponent(".codex/skills", isDirectory: true))
+        #expect(workspace.managedSkillDestinationDirectory(for: .claude) == home.appendingPathComponent(".claude/skills", isDirectory: true))
+        #expect(workspace.managedSkillDestinationDirectory(for: .agents) == home.appendingPathComponent(".agents/skills", isDirectory: true))
+        #expect(workspace.managedSkillBackupRootDirectory == home.appendingPathComponent(".zisla/skill-backups", isDirectory: true))
+        #expect(workspace.managedSkillBackupDirectory(for: .codex) == home.appendingPathComponent(".zisla/skill-backups/codex", isDirectory: true))
+        #expect(workspace.managedSkillBackupDirectory(for: .claude) == home.appendingPathComponent(".zisla/skill-backups/claude", isDirectory: true))
+        #expect(workspace.managedSkillBackupDirectory(for: .agents) == home.appendingPathComponent(".zisla/skill-backups/agents", isDirectory: true))
+    }
+
+    @Test
     func skillPackageInstallationDetectsGlobalManagersAndScopedPackages() throws {
         let npm = try #require(AgentSkillPackageInstallation.detect(
             at: URL(fileURLWithPath: "/Users/test/.nvm/versions/node/v24/lib/node_modules/@scope/tool/skills/review")
@@ -28,36 +102,90 @@ struct AIAgentServicesTests {
         #expect(brew.packageName == "tool")
         #expect(brew.uninstallArguments == ["uninstall", "tool"])
 
+        let cask = try #require(AgentSkillPackageInstallation.detect(
+            at: URL(fileURLWithPath: "/opt/homebrew/Caskroom/copilot-cli/1.0.34/copilot")
+        ))
+        #expect(cask.manager == .brew)
+        #expect(cask.packageName == "copilot-cli")
+
         #expect(AgentSkillPackageInstallation.detect(
             at: URL(fileURLWithPath: "/Users/test/.codex/skills/local-skill")
         ) == nil)
     }
 
     @Test
-    func automationLoopOnlyRunsWhileAnEnabledAutomationExists() async {
+    func cliAutoUpdateRequiresExplicitOptIn() async throws {
         let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("zisla-ai-agent-automation-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("zisla-cli-auto-update-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: directory) }
+        let toolDirectory = directory.appendingPathComponent("toolchain/bin", isDirectory: true)
+        let updateMarker = directory.appendingPathComponent("updated")
+        let codex = toolDirectory.appendingPathComponent("codex")
+        let npm = toolDirectory.appendingPathComponent("npm")
+        try writeExecutable(at: codex, contents: "#!/bin/sh\nprintf '1.0.0\\n'\n")
+        try writeExecutable(at: npm, contents: "#!/bin/sh\ntouch '\(updateMarker.path)'\n")
         let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"))
-        let workspace = AIAgentWorkspace(store: store)
-
-        workspace.startAutomation()
-        #expect(!workspace.isAutomationLoopRunning)
-
-        var automation = AgentAutomation(
-            name: "定时检测",
-            task: .cliCheck,
-            isEnabled: true,
-            nextRunAt: .distantFuture
+        let workspace = AIAgentWorkspace(
+            store: store,
+            cliService: AIAgentCLIService(
+                environment: ["PATH": "\(toolDirectory.path):/usr/bin:/bin"],
+                homeDirectory: directory
+            ),
+            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { kind in
+                kind == .codex ? "1.1.0" : nil
+            })
         )
-        store.updateAutomation(automation)
-        await Task.yield()
-        #expect(workspace.isAutomationLoopRunning)
 
-        automation.isEnabled = false
-        store.updateAutomation(automation)
-        await Task.yield()
-        #expect(!workspace.isAutomationLoopRunning)
+        workspace.start()
+        #expect(await waitForCLIUpdate(workspace, kind: .codex))
+
+        #expect(!store.state.cliAutoUpdateEnabled)
+        #expect(!FileManager.default.fileExists(atPath: updateMarker.path))
+        #expect(workspace.cliUpdates == [
+            AIAgentCLIUpdate(kind: .codex, installedVersion: "1.0.0", latestVersion: "1.1.0"),
+        ])
+
+        workspace.setCLIAutoUpdateEnabled(true)
+        await waitForFile(at: updateMarker)
+        await waitForCLICommandRunToFinish(workspace)
+
+        #expect(store.state.cliAutoUpdateEnabled)
+        #expect(FileManager.default.fileExists(atPath: updateMarker.path))
+
+        workspace.setCLIAutoUpdateEnabled(false)
+        #expect(!store.state.cliAutoUpdateEnabled)
+    }
+
+    @Test
+    func cliAutoUpdateRunsWhenEnabledBeforeWorkspaceStart() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-auto-update-on-start-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let toolDirectory = directory.appendingPathComponent("toolchain/bin", isDirectory: true)
+        let updateMarker = directory.appendingPathComponent("updated")
+        let codex = toolDirectory.appendingPathComponent("codex")
+        let npm = toolDirectory.appendingPathComponent("npm")
+        try writeExecutable(at: codex, contents: "#!/bin/sh\nprintf '1.0.0\\n'\n")
+        try writeExecutable(at: npm, contents: "#!/bin/sh\ntouch '\(updateMarker.path)'\n")
+        let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"))
+        let workspace = AIAgentWorkspace(
+            store: store,
+            cliService: AIAgentCLIService(
+                environment: ["PATH": "\(toolDirectory.path):/usr/bin:/bin"],
+                homeDirectory: directory
+            ),
+            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { kind in
+                kind == .codex ? "1.1.0" : nil
+            })
+        )
+
+        workspace.setCLIAutoUpdateEnabled(true)
+        workspace.start()
+        await waitForFile(at: updateMarker)
+        await waitForCLICommandRunToFinish(workspace)
+
+        #expect(store.state.cliAutoUpdateEnabled)
+        #expect(FileManager.default.fileExists(atPath: updateMarker.path))
     }
 
     @Test
@@ -204,6 +332,62 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func processRunnerHandlesChildClosingStandardInputEarly() async throws {
+        let output = try await AIAgentProcessRunner.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/false"),
+            standardInput: Data(repeating: 0x61, count: 1_048_576)
+        )
+
+        #expect(output.status == 1)
+    }
+
+    @Test
+    func processRunnerPropagatesTaskCancellation() async throws {
+        let task = Task {
+            try await AIAgentProcessRunner.run(
+                executableURL: URL(fileURLWithPath: "/bin/sleep"),
+                arguments: ["5"],
+                timeout: 10
+            )
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        let cancellationStartedAt = Date()
+
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            Issue.record("Cancelled process should throw")
+        } catch {
+            #expect(error is CancellationError)
+        }
+        #expect(Date().timeIntervalSince(cancellationStartedAt) < 1)
+    }
+
+    @Test
+    func processRunnerCancellationDoesNotWaitForDescendantHoldingPipes() async throws {
+        let task = Task {
+            try await AIAgentProcessRunner.run(
+                executableURL: URL(fileURLWithPath: "/bin/sh"),
+                arguments: ["-c", "sleep 2 & wait"],
+                timeout: 10
+            )
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        let cancellationStartedAt = Date()
+
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            Issue.record("Cancelled process should throw")
+        } catch {
+            #expect(error is CancellationError)
+        }
+        #expect(Date().timeIntervalSince(cancellationStartedAt) < 1)
+    }
+
+    @Test
     func newAPIQuotaProbeUsesRootUserEndpointAndParsesAvailableQuota() async throws {
         AIAgentURLProtocol.responseData = Data(#"{"data":{"quota":100,"used_quota":25}}"#.utf8)
         AIAgentURLProtocol.statusCode = 200
@@ -232,6 +416,29 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func newAPIQuotaProbeKeepsUnversionedPathStartingWithV() async throws {
+        AIAgentURLProtocol.responseData = Data(#"{"data":{"quota":100,"used_quota":25}}"#.utf8)
+        AIAgentURLProtocol.statusCode = 200
+        AIAgentURLProtocol.lastRequest = nil
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AIAgentURLProtocol.self]
+        let service = AIAgentBalanceService(session: URLSession(configuration: configuration))
+        let account = AgentAccount(
+            name: "测试账号",
+            provider: "New API",
+            balanceProbe: AgentBalanceProbe(kind: .newAPIQuota)
+        )
+
+        _ = try await service.check(
+            account: account,
+            baseURL: "https://gateway.example/vendor",
+            apiKey: "test-key"
+        )
+
+        #expect(AIAgentURLProtocol.lastRequest?.url?.absoluteString == "https://gateway.example/vendor/api/user/self")
+    }
+
+    @Test
     func providerModelCatalogUsesVersionedModelsEndpoint() async throws {
         AIAgentURLProtocol.responseData = Data(#"{"data":[{"id":"gpt-5"},{"id":"gpt-4.1"}]}"#.utf8)
         AIAgentURLProtocol.statusCode = 200
@@ -252,6 +459,58 @@ struct AIAgentServicesTests {
 
         #expect(catalog.models == ["gpt-4.1", "gpt-5"])
         #expect(AIAgentURLProtocol.lastRequest?.url?.absoluteString == "https://gateway.example/v1/models")
+    }
+
+    @Test
+    func providerModelCatalogAddsVersionAfterPathStartingWithV() async {
+        AIAgentURLProtocol.responseData = Data(#"{"data":[{"id":"gpt-5"}]}"#.utf8)
+        AIAgentURLProtocol.statusCode = 200
+        AIAgentURLProtocol.lastRequest = nil
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AIAgentURLProtocol.self]
+        let service = AIAgentModelCatalogService(session: URLSession(configuration: configuration))
+        let route = AgentRoute(
+            channelID: UUID(),
+            endpointGroupID: UUID(),
+            accountID: UUID(),
+            baseURL: "https://gateway.example/vendor",
+            protocolKind: .openAICompatible,
+            model: "placeholder"
+        )
+
+        _ = await service.fetch(route: route, apiKey: "test-key")
+
+        #expect(AIAgentURLProtocol.lastRequest?.url?.absoluteString == "https://gateway.example/vendor/v1/models")
+    }
+
+    @Test
+    func apiFailuresDoNotExposeProviderResponseBody() async throws {
+        AIAgentURLProtocol.responseData = Data(#"{"error":"secret-provider-body"}"#.utf8)
+        AIAgentURLProtocol.statusCode = 500
+        defer {
+            AIAgentURLProtocol.responseData = Data()
+            AIAgentURLProtocol.statusCode = 200
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AIAgentURLProtocol.self]
+        let account = AgentAccount(
+            name: "测试账号",
+            provider: "New API",
+            balanceProbe: AgentBalanceProbe(kind: .newAPIQuota)
+        )
+
+        do {
+            _ = try await AIAgentBalanceService(session: URLSession(configuration: configuration)).check(
+                account: account,
+                baseURL: "https://gateway.example/v1",
+                apiKey: "secret-api-key"
+            )
+            Issue.record("HTTP 错误应抛出异常")
+        } catch {
+            #expect(error.localizedDescription == "渠道请求失败（HTTP 500）")
+            #expect(!error.localizedDescription.contains("secret-provider-body"))
+            #expect(!error.localizedDescription.contains("secret-api-key"))
+        }
     }
 
     @Test
@@ -349,87 +608,71 @@ struct AIAgentServicesTests {
     }
 
     @Test
-    func relayPromptIncludesMultipleExplicitSkillAndAppReferences() {
-        let message = AgentChatMessage(
-            role: .user,
-            content: "检查发布风险",
-            appReferences: [
-                AgentChatAppReference(name: "Codex", bundleIdentifier: "com.openai.codex", processIdentifier: 42),
-                AgentChatAppReference(name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode", processIdentifier: 84),
-            ],
-            skillReferences: [
-                AgentChatSkillReference(name: "release-plan", path: "/skills/release-plan"),
-                AgentChatSkillReference(name: "code-review", path: "/skills/code-review"),
-            ]
-        )
+    func relayPromptBoundsAndSerializesVoiceMessages() {
+        var messages = (0..<40).map { index in
+            AIOutboundMessage(role: .user, content: String(format: "message-%02d-END", index))
+        }
+        messages.append(AIOutboundMessage(role: .tool, content: "tool-result"))
 
-        let project = AgentChatProject(name: "发布", instructions: "保持兼容性")
-        let prompt = AIAgentCLIService().relayPrompt(
-            [AgentChatMessage(role: .user, content: "先前消息", skillReferences: message.skillReferences), message],
-            project: project,
-            accessMode: .fullAccess,
-            model: "gpt-5.6",
-            thinkingDepth: .extraHigh
-        )
+        let prompt = AIAgentCLIService().relayPrompt(messages)
 
-        #expect(prompt.contains("[调用 Skills]"))
-        #expect(prompt.contains("release-plan：/skills/release-plan"))
-        #expect(prompt.contains("code-review：/skills/code-review"))
-        #expect(prompt.contains("不要假设本应用执行了该 Skill"))
-        #expect(prompt.contains("[项目：发布]"))
-        #expect(prompt.contains("项目说明：保持兼容性"))
-        #expect(prompt.contains("[@本机 App]"))
-        #expect(prompt.contains("Codex（com.openai.codex，PID 42）"))
-        #expect(prompt.contains("Xcode（com.apple.dt.Xcode，PID 84）"))
-        #expect(prompt.contains("访问模式：完全访问"))
-        #expect(prompt.contains("模型：gpt-5.6"))
-        #expect(prompt.contains("思考深度：极高"))
-        #expect(prompt.components(separatedBy: "[调用 Skills]").count == 2)
+        #expect(!prompt.contains("message-08-END"))
+        #expect(prompt.contains("message-09-END"))
+        #expect(prompt.contains("[用户]"))
+        #expect(prompt.contains("[工具]\ntool-result"))
     }
 
     @Test
-    func relayUsesTheExistingProjectDirectoryAsItsWorkingDirectory() throws {
+    func relayArgumentsUseFixedReadOnlyMediumConfiguration() {
+        let service = AIAgentCLIService()
+        let claude = service.relayArguments(for: .claude, model: "claude-opus-5")
+        let codex = service.relayArguments(for: .codex, model: "gpt-5.6")
+        let gemini = service.relayArguments(for: .gemini, model: "gemini-2.5-pro")
+        let grok = service.relayArguments(for: .grok, model: "grok-4")
+        let opencode = service.relayArguments(for: .opencode, model: "anthropic/claude-opus-5")
+
+        for arguments in [claude, codex, gemini, grok, opencode] {
+            #expect(arguments.contains("--model"))
+            #expect(!arguments.contains("--dangerously-skip-permissions"))
+            #expect(!arguments.contains("--dangerously-bypass-approvals-and-sandbox"))
+            #expect(!arguments.contains("--auto"))
+        }
+        #expect(claude.contains("medium"))
+        #expect(claude.contains("plan"))
+        #expect(codex.contains(#"model_reasoning_effort="medium""#))
+        #expect(codex.contains("read-only"))
+        #expect(gemini.contains("plan"))
+        #expect(grok.contains("medium"))
+        #expect(grok.contains("plan"))
+        #expect(!service.relayArguments(for: .claude, model: "  ").contains("--model"))
+    }
+
+    @Test
+    func relayRunsFromConfiguredHomeDirectory() async throws {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("zisla-ai-agent-project-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("zisla-voice-cli-working-directory-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let service = AIAgentCLIService()
-
-        let project = AgentChatProject(name: "项目", directoryPath: root.path)
-        let missingProject = AgentChatProject(
-            name: "失效项目",
-            directoryPath: root.appendingPathComponent("missing", isDirectory: true).path
+        let codex = root.appendingPathComponent("bin/codex")
+        try writeExecutable(
+            at: codex,
+            contents: "#!/bin/sh\n/usr/bin/touch relay-working-directory-marker\nprintf 'ok\\n'\n"
+        )
+        let service = AIAgentCLIService(
+            environment: ["PATH": codex.deletingLastPathComponent().path],
+            homeDirectory: root
         )
 
-        #expect(service.relayWorkingDirectory(for: project) == root)
-        #expect(service.relayWorkingDirectory(for: missingProject) == FileManager.default.homeDirectoryForCurrentUser)
+        let response = try await service.relay(
+            messages: [AIOutboundMessage(role: .user, content: "整理这段语音")],
+            to: .codex
+        )
+
+        #expect(response == "ok")
+        #expect(FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("relay-working-directory-marker").path
+        ))
     }
 
-    @Test
-    func relayPromptEmitsGoalSectionWithoutPlanMode() {
-        let service = AIAgentCLIService()
-        let goalOnly = service.relayPrompt([
-            AgentChatMessage(role: .user, content: "继续推进", mode: .standard, goalTitle: "完成 v0.1.1 发布"),
-        ])
-
-        #expect(goalOnly.contains("[目标模式]"))
-        #expect(goalOnly.contains("当前会话目标：完成 v0.1.1 发布"))
-        #expect(!goalOnly.contains("[计划模式]"))
-
-        let planOnly = service.relayPrompt([
-            AgentChatMessage(role: .user, content: "拆分里程碑", mode: .plan),
-        ])
-
-        #expect(planOnly.contains("[计划模式]"))
-        #expect(!planOnly.contains("[目标模式]"))
-
-        let both = service.relayPrompt([
-            AgentChatMessage(role: .user, content: "拆分里程碑", mode: .plan, goalTitle: "完成 v0.1.1 发布"),
-        ])
-
-        #expect(both.contains("[计划模式]"))
-        #expect(both.contains("[目标模式]"))
-    }
 
     @Test
     func cliDiscoveryUsesNPMGlobalPathAndResolvesSymlinks() throws {
@@ -543,6 +786,25 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func grokUpdateCheckFallsBackToInstallerVersionCache() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-grok-update-cache-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let grok = root.appendingPathComponent(".grok/bin/grok")
+        try writeExecutable(at: grok, contents: "#!/bin/sh\nprintf 'grok 1.0.0 (build)'\n")
+        let cache = root.appendingPathComponent(".grok/version.json")
+        try FileManager.default.createDirectory(at: cache.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{\"version\":\"1.0.3\"}".utf8).write(to: cache)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(await service.grokUpdateState() == .updateAvailable(AIAgentCLIUpdate(
+            kind: .grok,
+            installedVersion: "grok 1.0.0 (build)",
+            latestVersion: "1.0.3"
+        )))
+    }
+
+    @Test
     func homebrewUpdateCheckUsesHomebrewReportedVersion() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-homebrew-update-check-\(UUID().uuidString)", isDirectory: true)
@@ -550,10 +812,12 @@ struct AIAgentServicesTests {
         let brew = root.appendingPathComponent("toolchain/bin/brew")
         try writeExecutable(
             at: brew,
-            contents: "#!/bin/sh\nprintf '%s' '{\"formulae\":[{\"name\":\"opencode\",\"current_version\":\"1.18.15\"}],\"casks\":[]}'\n"
+            contents: "#!/bin/sh\nprintf '%s' '{\"formulae\":[{\"name\":\"anomalyco/tap/opencode\",\"current_version\":\"1.18.15\"},{\"name\":\"kimi-code\",\"current_version\":\"0.35.0\"}],\"casks\":[]}'\n"
         )
         let executable = root.appendingPathComponent("Cellar/opencode/1.18.14/bin/opencode")
+        let detectedOnlyExecutable = root.appendingPathComponent("Cellar/kimi-code/0.34.0/bin/kimi")
         try writeExecutable(at: executable)
+        try writeExecutable(at: detectedOnlyExecutable)
         let service = AIAgentCLIService(
             environment: ["PATH": "/usr/bin", "NPM_CONFIG_PREFIX": root.appendingPathComponent("toolchain").path],
             homeDirectory: root
@@ -561,6 +825,7 @@ struct AIAgentServicesTests {
 
         let updates = await service.homebrewUpdates(for: [
             AgentCLIStatus(kind: .opencode, executablePath: executable.path, version: "1.18.14"),
+            AgentCLIStatus(kind: .kimi, executablePath: detectedOnlyExecutable.path, version: "0.34.0"),
         ])
 
         #expect(updates == [
@@ -628,6 +893,227 @@ struct AIAgentServicesTests {
         #expect(uninstallGrok.arguments == [grok.path])
     }
 
+    @Test
+    func additionalManagedCLIsBuildNPMManagementCommands() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-additional-cli-commands-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let npm = root.appendingPathComponent(".npm-global/bin/npm")
+        try writeExecutable(at: npm)
+        let packages: [(AgentCLIKind, String, String)] = [
+            (.qwen, "@qwen-code/qwen-code", "qwen"),
+            (.qoder, "@qoder-ai/qodercli", "qodercli"),
+            (.copilot, "@github/copilot", "copilot"),
+        ]
+        for (_, package, executable) in packages {
+            let target = root.appendingPathComponent(".npm-global/lib/node_modules/\(package)/\(executable).js")
+            try writeExecutable(at: target)
+            let launcher = root.appendingPathComponent(".npm-global/bin/\(executable)")
+            try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+        }
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: root)
+        let kinds = packages.map { $0.0 }
+
+        let installs = service.installationCommands(for: kinds, update: false)
+        #expect(installs == [AIAgentCLICommand(
+            executableURL: npm,
+            arguments: [
+                "install", "--global",
+                "@qwen-code/qwen-code", "@qoder-ai/qodercli", "@github/copilot",
+            ]
+        )])
+
+        let updates = service.installationCommands(for: kinds, update: true)
+        #expect(updates == [AIAgentCLICommand(
+            executableURL: npm,
+            arguments: [
+                "install", "--global",
+                "@qwen-code/qwen-code@latest", "@qoder-ai/qodercli@latest", "@github/copilot@latest",
+            ],
+            timeout: 600
+        )])
+
+        let uninstalls = service.uninstallationCommands(for: kinds)
+        #expect(uninstalls == [AIAgentCLICommand(
+            executableURL: npm,
+            arguments: [
+                "uninstall", "--global",
+                "@qwen-code/qwen-code", "@qoder-ai/qodercli", "@github/copilot",
+            ]
+        )])
+    }
+
+    @Test
+    func glmCLIDiscoveryReadsTheOfficialPackageVersion() async throws {
+        let glm = try #require(AgentCLIKind(rawValue: "glm"))
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-glm-cli-discovery-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let packageRoot = root.appendingPathComponent(".npm-global/lib/node_modules/@z_ai/coding-helper")
+        let target = packageRoot.appendingPathComponent("dist/cli.js")
+        let launcher = root.appendingPathComponent(".npm-global/bin/chelper")
+        try writeExecutable(at: target, contents: "#!/bin/sh\nexit 1\n")
+        try Data(#"{"name":"@z_ai/coding-helper","version":"0.0.7"}"#.utf8)
+            .write(to: packageRoot.appendingPathComponent("package.json"))
+        try FileManager.default.createDirectory(at: launcher.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+
+        let status = await AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+            .status(for: glm)
+
+        #expect(status.executablePath == target.path)
+        #expect(status.version == "0.0.7")
+    }
+
+    @Test
+    func glmCLIUsesNPMForInstallUpdateAndUninstall() throws {
+        let glm = try #require(AgentCLIKind(rawValue: "glm"))
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-glm-cli-management-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let npm = root.appendingPathComponent(".npm-global/bin/npm")
+        let target = root.appendingPathComponent(".npm-global/lib/node_modules/@z_ai/coding-helper/dist/cli.js")
+        let launcher = root.appendingPathComponent(".npm-global/bin/chelper")
+        try writeExecutable(at: npm)
+        try writeExecutable(at: target)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(service.installationCommands(for: [glm], update: false) == [
+            AIAgentCLICommand(executableURL: npm, arguments: ["install", "--global", "@z_ai/coding-helper"]),
+        ])
+        #expect(service.installationCommands(for: [glm], update: true) == [
+            AIAgentCLICommand(
+                executableURL: npm,
+                arguments: ["install", "--global", "@z_ai/coding-helper@latest"],
+                timeout: 600
+            ),
+        ])
+        #expect(service.uninstallationCommands(for: [glm]) == [
+            AIAgentCLICommand(executableURL: npm, arguments: ["uninstall", "--global", "@z_ai/coding-helper"]),
+        ])
+    }
+
+    @Test
+    func additionalManagedCLIsHaveInstallScriptsWithoutNPM() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-additional-cli-install-scripts-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: root)
+
+        let commands = service.installationCommands(for: [.qwen, .qoder, .copilot], update: false)
+        let scripts = commands.filter { $0.executableURL.path == "/bin/bash" }
+        if scripts.isEmpty {
+            #expect(commands.count == 1)
+            #expect(commands[0].arguments == [
+                "install", "--global",
+                "@qwen-code/qwen-code", "@qoder-ai/qodercli", "@github/copilot",
+            ])
+        } else {
+            #expect(scripts.map(\.arguments) == [
+                ["-c", "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh | bash"],
+                ["-c", "curl -fsSL https://qoder.com/install | bash"],
+                ["-c", "curl -fsSL https://gh.io/copilot-install | bash"],
+            ])
+        }
+    }
+
+    @Test
+    func copilotHomebrewInstallationUsesHomebrewForManagement() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-copilot-cask-management-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let brew = root.appendingPathComponent("toolchain/bin/brew")
+        let target = root.appendingPathComponent("Caskroom/copilot-cli/1.0.34/copilot")
+        let launcher = root.appendingPathComponent("bin/copilot")
+        try writeExecutable(at: brew)
+        try writeExecutable(at: target)
+        try FileManager.default.createDirectory(at: launcher.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "\(root.appendingPathComponent("bin").path):/usr/bin", "NPM_CONFIG_PREFIX": root.appendingPathComponent("toolchain").path],
+            homeDirectory: root
+        )
+
+        #expect(service.installationCommands(for: [.copilot], update: true) == [
+            AIAgentCLICommand(executableURL: brew, arguments: ["upgrade", "copilot-cli"], timeout: 600),
+        ])
+        #expect(service.uninstallationCommands(for: [.copilot]) == [
+            AIAgentCLICommand(executableURL: brew, arguments: ["uninstall", "copilot-cli"]),
+        ])
+    }
+
+    @Test
+    func homebrewUpdateCheckUsesCaskReportedVersion() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-copilot-cask-update-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let brew = root.appendingPathComponent("toolchain/bin/brew")
+        try writeExecutable(
+            at: brew,
+            contents: "#!/bin/sh\nprintf '%s' '{\"formulae\":[],\"casks\":[{\"name\":\"copilot-cli\",\"current_version\":\"1.0.35\"}]}'\n"
+        )
+        let copilot = root.appendingPathComponent("Caskroom/copilot-cli/1.0.34/copilot")
+        try writeExecutable(at: copilot)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin", "NPM_CONFIG_PREFIX": root.appendingPathComponent("toolchain").path],
+            homeDirectory: root
+        )
+
+        let updates = await service.homebrewUpdates(for: [
+            AgentCLIStatus(kind: .copilot, executablePath: copilot.path, version: "1.0.34"),
+        ])
+
+        #expect(updates == [
+            AIAgentCLIUpdate(kind: .copilot, installedVersion: "1.0.34", latestVersion: "1.0.35"),
+        ])
+    }
+
+    @Test
+    func standaloneCopilotUninstallRemovesOnlyTheOfficialUserBinary() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-copilot-standalone-uninstall-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let copilot = root.appendingPathComponent(".local/bin/copilot")
+        try writeExecutable(at: copilot)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(service.uninstallationCommands(for: [.copilot]) == [
+            AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/rm"), arguments: [copilot.path]),
+        ])
+    }
+
+    @Test
+    func standaloneQwenUsesOfficialUninstaller() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-qwen-standalone-uninstall-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let qwen = root.appendingPathComponent(".local/bin/qwen")
+        try writeExecutable(at: qwen)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(service.uninstallationCommands(for: [.qwen]) == [
+            AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/bash"),
+                arguments: ["-c", "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/uninstall-qwen-standalone.sh | bash"]
+            ),
+        ])
+    }
+
+    @Test
+    func standaloneQoderUninstallRemovesOnlyTheOfficialUserBinary() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-qoder-standalone-uninstall-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let qoder = root.appendingPathComponent(".local/bin/qodercli")
+        try writeExecutable(at: qoder)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(service.uninstallationCommands(for: [.qoder]) == [
+            AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/rm"), arguments: [qoder.path]),
+        ])
+    }
+
     private func writeExecutable(at url: URL, contents: String = "#!/bin/sh\nexit 0\n") throws {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
@@ -643,8 +1129,221 @@ struct AIAgentServicesTests {
         }
     }
 
+    private func waitForFile(at url: URL) async {
+        for _ in 0..<100 where !FileManager.default.fileExists(atPath: url.path) {
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+    }
+
+    private func waitForCLIUpdate(_ workspace: AIAgentWorkspace, kind: AgentCLIKind) async -> Bool {
+        for _ in 0..<100 {
+            if workspace.cliUpdates.contains(where: { $0.kind == kind }) {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+        return false
+    }
+
     private func parallelCommand(startedAt: URL, waitingFor peer: URL) -> String {
         "touch '\(startedAt.path)'; for _ in $(seq 1 50); do [ -f '\(peer.path)' ] && exit 0; sleep 0.01; done; exit 1"
+    }
+
+
+    @Test
+    func additionalCLIDiscoveryAndVersionDetection() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-additional-cli-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let kimi = root.appendingPathComponent(".kimi-code/bin/kimi")
+        let qwen = root.appendingPathComponent(".local/bin/qwen")
+        let qoder = root.appendingPathComponent(".local/bin/qodercli")
+        let copilot = root.appendingPathComponent(".npm-global/bin/copilot")
+        try writeExecutable(at: kimi, contents: "#!/bin/sh\nprintf '0.34.0\\n'\n")
+        try writeExecutable(at: qwen, contents: "#!/bin/sh\nprintf '0.21.10\\n'\n")
+        try writeExecutable(at: qoder, contents: "#!/bin/sh\nprintf '0.5.0\\n'\n")
+        try writeExecutable(at: copilot, contents: "#!/bin/sh\nprintf 'GitHub Copilot CLI 1.0.34.\\n'\n")
+
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: root)
+
+        let statuses = await service.statuses()
+        let searchPaths = AIAgentCLIService.executableSearchDirectories(
+            environment: ["PATH": "/usr/bin:/bin"],
+            homeDirectory: root
+        ).map(\.path)
+
+        #expect(statuses.first { $0.kind == .kimi }?.executablePath == kimi.path)
+        #expect(statuses.first { $0.kind == .kimi }?.version == "0.34.0")
+        #expect(statuses.first { $0.kind == .qwen }?.executablePath == qwen.path)
+        #expect(statuses.first { $0.kind == .qwen }?.version == "0.21.10")
+        #expect(statuses.first { $0.kind == .qoder }?.executablePath == qoder.path)
+        #expect(statuses.first { $0.kind == .qoder }?.version == "0.5.0")
+        #expect(statuses.first { $0.kind == .copilot }?.executablePath == copilot.path)
+        #expect(statuses.first { $0.kind == .copilot }?.version == "GitHub Copilot CLI 1.0.34.")
+        #expect(searchPaths.contains(root.appendingPathComponent(".kimi-code/bin").path))
+        #expect(!searchPaths.contains(root.appendingPathComponent(".kimi/bin").path))
+    }
+
+    @Test
+    func kimiDiscoveryUsesConfiguredInstallationDirectory() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-kimi-configured-installation-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let configuredInstall = root.appendingPathComponent("configured-install", isDirectory: true)
+        let installedKimi = configuredInstall.appendingPathComponent("bin/kimi")
+        try writeExecutable(at: installedKimi)
+
+        let installedService = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin:/bin", "KIMI_INSTALL_DIR": configuredInstall.path],
+            homeDirectory: root
+        )
+
+        #expect(try #require(installedService.executableURL(for: .kimi)).path == installedKimi.path)
+    }
+
+    @Test
+    func kimiManagementBuildsOfficialCommands() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-kimi-management-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let installRoot = root.appendingPathComponent("kimi-install", isDirectory: true)
+        let kimi = installRoot.appendingPathComponent("bin/kimi")
+        try writeExecutable(at: kimi)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin:/bin", "KIMI_INSTALL_DIR": installRoot.path],
+            homeDirectory: root
+        )
+
+        #expect(service.installationCommands(for: [.kimi], update: false) == [
+            AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/bash"),
+                arguments: ["-c", "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"]
+            ),
+        ])
+        #expect(service.installationCommands(for: [.kimi], update: true) == [
+            AIAgentCLICommand(executableURL: kimi, arguments: ["upgrade"], timeout: 600),
+        ])
+        #expect(service.uninstallationCommands(for: [.kimi]) == [
+            AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/rm"), arguments: [kimi.path]),
+        ])
+    }
+
+    @Test
+    func kimiUninstallRefusesExecutablesOutsideTrustedInstallationRoots() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-kimi-untrusted-uninstall-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let untrustedDirectory = root.appendingPathComponent("untrusted/bin", isDirectory: true)
+        let kimi = untrustedDirectory.appendingPathComponent("kimi")
+        try writeExecutable(at: kimi)
+        let service = AIAgentCLIService(
+            environment: [
+                "PATH": "\(untrustedDirectory.path):/usr/bin:/bin",
+                "KIMI_INSTALL_DIR": root.appendingPathComponent("trusted-install").path,
+            ],
+            homeDirectory: root
+        )
+
+        #expect(service.installationCommands(for: [.kimi], update: true) == [
+            AIAgentCLICommand(executableURL: kimi, arguments: ["upgrade"], timeout: 600),
+        ])
+        #expect(service.uninstallationCommands(for: [.kimi]).isEmpty)
+    }
+
+    @Test
+    func kimiUninstallRemovesTrustedLauncherInsteadOfSymlinkTarget() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-kimi-symlink-uninstall-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let installRoot = root.appendingPathComponent("kimi-install", isDirectory: true)
+        let launcher = installRoot.appendingPathComponent("bin/kimi")
+        let target = root.appendingPathComponent("external/kimi")
+        try writeExecutable(at: target)
+        try FileManager.default.createDirectory(at: launcher.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin:/bin", "KIMI_INSTALL_DIR": installRoot.path],
+            homeDirectory: root
+        )
+
+        #expect(service.uninstallationCommands(for: [.kimi]) == [
+            AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/rm"), arguments: [launcher.path]),
+        ])
+    }
+
+    @Test
+    func relayRejectsDetectionOnlyCLIBeforeLaunchingIt() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-detection-only-relay-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let marker = root.appendingPathComponent("launched")
+        let kimi = root.appendingPathComponent(".kimi-code/bin/kimi")
+        try writeExecutable(at: kimi, contents: "#!/bin/sh\ntouch '\(marker.path)'\nprintf 'unexpected\\n'\n")
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: root)
+
+        do {
+            _ = try await service.relay(
+                messages: [AIOutboundMessage(role: .user, content: "测试")],
+                to: .kimi
+            )
+            Issue.record("仅检测的 CLI 不应进入语音整理")
+        } catch {
+            #expect(error.localizedDescription.contains("暂不支持语音整理"))
+        }
+        #expect(!FileManager.default.fileExists(atPath: marker.path))
+    }
+
+    @Test
+    func relayFailureDoesNotExposeCommandOutput() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-relay-redaction-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("bin/codex")
+        try writeExecutable(
+            at: codex,
+            contents: "#!/bin/sh\nprintf 'secret-command-output\\n' >&2\nexit 9\n"
+        )
+        let service = AIAgentCLIService(
+            environment: ["PATH": codex.deletingLastPathComponent().path],
+            homeDirectory: root
+        )
+
+        do {
+            _ = try await service.relay(
+                messages: [AIOutboundMessage(role: .user, content: "测试")],
+                to: .codex
+            )
+            Issue.record("CLI 失败应抛出异常")
+        } catch {
+            #expect(error.localizedDescription == "CLI 执行失败：退出状态 9")
+            #expect(!error.localizedDescription.contains("secret-command-output"))
+        }
+    }
+
+    @Test
+    func homebrewUpdateCheckSupportsManagedAdditionalCLIs() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-detection-only-homebrew-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let brew = root.appendingPathComponent("toolchain/bin/brew")
+        try writeExecutable(
+            at: brew,
+            contents: "#!/bin/sh\nprintf '%s' '{\"formulae\":[{\"name\":\"qwen-code\",\"current_version\":\"0.22.0\"}],\"casks\":[]}'\n"
+        )
+        let qwen = root.appendingPathComponent("Cellar/qwen-code/0.21.10/bin/qwen")
+        try writeExecutable(at: qwen)
+        let service = AIAgentCLIService(
+            environment: ["PATH": "/usr/bin", "NPM_CONFIG_PREFIX": root.appendingPathComponent("toolchain").path],
+            homeDirectory: root
+        )
+
+        let updates = await service.homebrewUpdates(for: [
+            AgentCLIStatus(kind: .qwen, executablePath: qwen.path, version: "0.21.10"),
+        ])
+
+        #expect(updates == [
+            AIAgentCLIUpdate(kind: .qwen, installedVersion: "0.21.10", latestVersion: "0.22.0"),
+        ])
     }
 }
 

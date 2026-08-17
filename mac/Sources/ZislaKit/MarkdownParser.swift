@@ -125,8 +125,8 @@ public enum MarkdownParser {
             if trimmed.isEmpty { break }
             // Stop when the start of the next block is encountered.
             if isBlockStart(line) { break }
-            // isBlockStart 只认得出分隔行；表头要结合下一行判断，否则紧跟段落（无空行）的表格
-            // 会被吞掉表头、表体退化成裸管道文本。首行交给主循环的表格分支处理。
+            // isBlockStart only recognizes separator rows; headers require the next line to distinguish tables immediately after paragraphs (without a blank line).
+            // Otherwise the header is consumed and the body degrades into bare pipe-delimited text. Leave the first row for the main loop's table branch.
             if index > start, line.contains("|"),
                index + 1 < lines.count, isTableDelimiter(lines[index + 1]) {
                 break
@@ -217,7 +217,7 @@ public enum MarkdownParser {
               let close = trimmed.firstIndex(of: "]"),
               open < close
         else { return nil }
-        // `]` 位于行尾时 index(after:) 即 endIndex，直接下标访问会越界崩溃（如 `![截图]`）。
+        // When `]` ends the line, index(after:) is endIndex; direct subscripting would crash (for example, `![screenshot]`).
         let afterClose = trimmed.index(after: close)
         guard afterClose < trimmed.endIndex, trimmed[afterClose] == "(" else { return nil }
         // The entire line must contain only this one image marker (whitespace allowed around it), to avoid swallowing inline images in body text.

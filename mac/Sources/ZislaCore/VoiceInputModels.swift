@@ -131,22 +131,15 @@ public struct VoiceInputHotkeyPreset: Codable, Equatable, Sendable {
 
     /// Displays modifier keys + primary key name using standard macOS menu symbols.
     public var displayName: String {
-        if let modifierSides, !modifierSides.isEmpty {
-            if isModifierOnly, let modifier = modifierSides.first {
-                return modifier.displayName
-            }
-            let names = VoiceInputModifier.allCases
-                .filter(modifierSides.contains)
-                .map(\.displayName)
-            return (names + [keyDisplayName]).joined(separator: " + ")
+        if isModifierOnly, let modifier = modifierSides?.first {
+            return modifier.displayName
         }
         let symbols = Self.modifierSymbols(carbonModifiers: carbonModifiers)
         return symbols.isEmpty ? keyDisplayName : "\(symbols) \(keyDisplayName)"
     }
 
     public var requiresInputMonitoring: Bool {
-        guard let modifierSides else { return false }
-        return !modifierSides.isEmpty
+        isModifierOnly
     }
 
     /// A standalone modifier key has no ordinary keyDown event; it must be triggered by flagsChanged.

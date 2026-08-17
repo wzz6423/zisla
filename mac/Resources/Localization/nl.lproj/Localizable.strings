@@ -20,14 +20,21 @@
 
 /* Settings */
 "设置" = "Instellingen";
+"通用" = "Algemeen";
 "工作流" = "Workflow";
 "信息" = "Info";
 "模型" = "Modellen";
-"桌面宠物" = "Bureaubladhuisdier";
+"宠物" = "Huisdier";
 "交互" = "Interactie";
 "下载" = "Downloads";
 "天气" = "Weer";
 "更新" = "Updates";
+
+/* Settings - General */
+"调整语言、外观、启动与展开方式。" = "Pas taal, uiterlijk, opstarten en uitbreidingsmethode aan.";
+
+/* Settings - Privacy */
+"管理剪贴板访问与本机数据。" = "Beheer klembordbeheer en lokale gegevens.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Beheer workflowmodules in Dynamic Island.";
@@ -88,7 +95,6 @@
 "播放与 AI 活动通知显示在此屏幕" = "Afspeel- en AI-activiteitsmeldingen worden op dit scherm getoond";
 
 /* Settings - AI */
-"AI 进度、语音输入，以及连接、自动化、CLI 与 Skills 等 Agent 行为。" = "AI-voortgang, spraakinvoer en Agent-gedrag inclusief verbindingen, automatisering, CLI en Skills.";
 "AI 监控" = "AI-monitoring";
 "AI 进度与用量" = "AI-voortgang en gebruik";
 "汇总桌面端与 CLI 工具的运行状态" = "Samenvatting van uitvoeringsstatus van desktop en CLI-hulpmiddelen";
@@ -103,12 +109,7 @@
 "左右侧修饰键需要监听全局键盘事件" = "Linker/rechter wijzigingstoetsen vereisen luisteren naar globale toetsenbordgebeurtenissen";
 "已授权" = "Geautoriseerd";
 
-/* Settings - AI Agent */
-"AI Agent 行为" = "AI Agent-gedrag";
-"在灵动岛显示" = "Toon in Dynamic Island";
-"关闭后仅从工具栏隐藏，此处的配置与对话不受影响" = "Verbergt alleen van werkbalk wanneer uitgeschakeld; configuratie en gesprekken hier worden niet beïnvloed";
-
-/* Settings - Models */
+/* Settings - Voice Models */
 "配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Configureer lokale modellen, externe modellen en inloggegevens, en selecteer het model voor spraakorganisatie.";
 "本地模型" = "Lokale modellen";
 "远端模型与凭据" = "Externe modellen en inloggegevens";
@@ -163,9 +164,9 @@
 "鼠标进入屏幕顶部感应区时显示" = "Toon wanneer muis de bovenste detectiezone van het scherm binnenkomt";
 "隐私" = "Privacy";
 "记录剪贴板历史" = "Registreer klembordgeschiedenis";
-"仅本机保存文本和图片，默认关闭" = "Bewaar alleen tekst en afbeeldingen lokaal, standaard uitgeschakeld";
+"仅本机保存文本和图片" = "Bewaar alleen tekst en afbeeldingen lokaal";
 "检测剪贴板链接" = "Detecteer klembordlinks";
-"发现可下载链接时提示，默认关闭" = "Waarschuw wanneer downloadbare links worden gedetecteerd, standaard uitgeschakeld";
+"发现可下载链接时提示" = "Waarschuw wanneer downloadbare links worden gedetecteerd";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Beheer downloadmap, downloadmeldingen en vereiste componenten.";
@@ -240,7 +241,6 @@
 "输入文字或 Emoji" = "Voer tekst of Emoji in";
 "复制到剪贴板" = "Kopieer naar klembord";
 "发送到随记" = "Verstuur naar snelle notities";
-"发送到 AI Agent" = "Verstuur naar AI Agent";
 "移出常用" = "Verwijder uit favorieten";
 "设为常用" = "Voeg toe aan favorieten";
 "文本" = "Tekst";
@@ -257,47 +257,16 @@
 "展开大窗口编辑" = "Open in groot venster";
 "系统共享" = "Systeemdeelfunctie";
 
-/* AI Agent Module */
-"对话" = "Chat";
-"消息连接" = "Berichtverbindingen";
-"应用增强" = "Toepassingsverbeteringen";
-"自动化" = "Automatisering";
+
+/* Settings - AI CLI and Skills */
 "CLI 与 Skills" = "CLI en Skills";
-"会话存储" = "Sessieopslag";
-"刷新余额、渠道、CLI 和 Skills" = "Ververs saldo, kanalen, CLI en Skills";
-"统一历史" = "Uniforme geschiedenis";
-"新建对话" = "Nieuw gesprek";
-"添加项目" = "Voeg project toe";
-"添加现有文件夹…" = "Voeg bestaande map toe…";
-"新建文件夹并添加…" = "Maak nieuwe map…";
-"将本地文件夹添加为项目" = "Voeg lokale map toe als project";
-"未归类" = "Ongecategoriseerd";
-"展开项目会话" = "Vouw projectsessies uit";
-"收起项目会话" = "Vouw projectsessies in";
-"选择项目；新建对话会归入此项目" = "Selecteer project; nieuwe gesprekken worden aan dit project toegevoegd";
-"取消置顶项目" = "Maak project los";
-"置顶项目" = "Maak project vast";
-"删除项目" = "Verwijder project";
-"选择或新建对话" = "Selecteer of maak gesprek";
-"你" = "Jij";
+
+/* Shared Actions */
 "助手" = "Assistent";
-"执行细节" = "Uitvoeringsdetails";
-"计划模式" = "Planmodus";
-"复制回复" = "Kopieer antwoord";
-"从此回复分叉会话" = "Splits sessie vanaf antwoord";
-"批注" = "Annotatie";
-"添加批注" = "Voeg annotatie toe";
-"将引用和评论发送为新消息" = "Verstuur citaat en commentaar als nieuw bericht";
-"删除批注" = "Verwijder annotatie";
-"发送消息" = "Verstuur bericht";
 "添加文件" = "Voeg bestand toe";
-"添加文件、切换计划模式或目标模式" = "Voeg bestand toe, schakel planmodus of doelmodus in/uit";
-"目标模式" = "Doelmodus";
-"设置外部 CLI 的访问偏好" = "Stel toegangsvoorkeuren voor externe CLI in";
-"选择思考深度偏好" = "Selecteer denkdieptevoorkeur";
 "发送" = "Verstuur";
 
-/* AI Agent - Remote Providers */
+/* Voice Models - Remote Providers */
 "远端 Provider" = "Externe provider";
 "添加 Provider" = "Voeg provider toe";
 "尚未配置远端 Provider" = "Geen externe providers geconfigureerd";
@@ -428,7 +397,6 @@
 "整理桌面" = "Organiseer bureaublad";
 "按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Lijn bureaublad-iconen uit op raster; verplaatst geen bestanden wanneer 'Stapels' is ingeschakeld";
 "App Store 应用" = "App Store-apps";
-"批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页" = "Update App Store-apps in bulk; open App Store-updatepagina wanneer mas niet is geïnstalleerd";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Nog geen wekkers, voeg hieronder toe";

@@ -312,4 +312,62 @@ struct BrowserDownloadTrackerTests {
         #expect(tracker.snapshot == nil)
         #expect(tracker.entries.isEmpty)
     }
+
+    @Test
+    func uniqueAgentsDeduplicatesAndSortsNewestFirst() {
+        var tracker = BrowserDownloadTracker()
+        tracker.insert(
+            token: UUID(),
+            entry: entry(
+                agent: .chrome,
+                fileName: "file1.zip",
+                startedAt: Date(timeIntervalSince1970: 100)
+            )
+        )
+        tracker.insert(
+            token: UUID(),
+            entry: entry(
+                agent: .safari,
+                fileName: "file2.zip",
+                startedAt: Date(timeIntervalSince1970: 200)
+            )
+        )
+        tracker.insert(
+            token: UUID(),
+            entry: entry(
+                agent: .chrome,
+                fileName: "file3.zip",
+                startedAt: Date(timeIntervalSince1970: 300)
+            )
+        )
+
+        #expect(tracker.uniqueAgents == [.chrome, .safari])
+    }
+
+    @Test
+    func uniqueAgentsIgnoresNilAgents() {
+        var tracker = BrowserDownloadTracker()
+        tracker.insert(token: UUID(), entry: entry(agent: nil, fileName: "file1.zip"))
+        tracker.insert(token: UUID(), entry: entry(agent: .firefox, fileName: "file2.zip"))
+        tracker.insert(token: UUID(), entry: entry(agent: nil, fileName: "file3.zip"))
+
+        #expect(tracker.uniqueAgents == [.firefox])
+    }
+
+    @Test
+    func uniqueAgentsEmptyWhenNoEntries() {
+        let tracker = BrowserDownloadTracker()
+        #expect(tracker.uniqueAgents.isEmpty)
+    }
+
+    @Test
+    func uniqueAgentsKeepsFinishedAgentDuringHold() {
+        var tracker = BrowserDownloadTracker()
+        let token = UUID()
+        tracker.insert(token: token, entry: entry(agent: .safari))
+
+        _ = tracker.finish(token: token, succeeded: true)
+
+        #expect(tracker.uniqueAgents == [.safari])
+    }
 }

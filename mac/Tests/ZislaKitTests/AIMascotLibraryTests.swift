@@ -123,6 +123,22 @@ struct AIMascotLibraryTests {
     }
 
     @Test
+    func resolvesOfficialBrandAssetFromSwiftPackageResourceRoot() {
+        let appResources = URL(fileURLWithPath: "/App/Contents/Resources", isDirectory: true)
+        let packageResources = URL(fileURLWithPath: "/Build/zisla_Zisla.bundle", isDirectory: true)
+        let expected = packageResources
+            .appendingPathComponent("BrandIcons/claude-color.svg", isDirectory: false)
+
+        let resolved = AIMascotLibrary.providerAssetURL(
+            for: .claude,
+            resourceRoots: [appResources, packageResources],
+            fileExists: { $0 == expected }
+        )
+
+        #expect(resolved == expected)
+    }
+
+    @Test
     func keepsCodexAndChatGPTIdentityDistinct() {
         #expect(AIMascotLibrary.providerDisplayName(for: .codex) == "Codex")
         #expect(AIMascotLibrary.providerDisplayName(for: .gpt) == "ChatGPT")

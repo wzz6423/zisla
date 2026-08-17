@@ -91,6 +91,7 @@ public struct AIProgressTask: Codable, Equatable, Sendable, Identifiable {
     public var effort: String?
     public var startedAt: Date?
     public var failureReason: String?
+    public var processIdentifier: Int32?
 
     public init(
         id: String,
@@ -103,7 +104,8 @@ public struct AIProgressTask: Codable, Equatable, Sendable, Identifiable {
         sessionURL: URL? = nil,
         effort: String? = nil,
         startedAt: Date? = nil,
-        failureReason: String? = nil
+        failureReason: String? = nil,
+        processIdentifier: Int32? = nil
     ) {
         self.id = id
         self.provider = provider
@@ -116,6 +118,7 @@ public struct AIProgressTask: Codable, Equatable, Sendable, Identifiable {
         self.effort = effort
         self.startedAt = startedAt
         self.failureReason = failureReason
+        self.processIdentifier = processIdentifier
     }
 }
 

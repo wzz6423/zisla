@@ -32,4 +32,41 @@ struct VoiceTranscriptPostProcessorTests {
             ) == "明天十点开会"
         )
     }
+
+    @Test(arguments: [
+        "```\n明天十点开会\n```",
+        "~~~\n明天十点开会\n~~~",
+        "<transcript>\n明天十点开会\n</transcript>",
+        "当然，整理如下：明天十点开会。",
+    ])
+    func fallsBackWhenModelReturnsClearlyWrappedOrPrefixedText(_ response: String) {
+        #expect(
+            VoiceTranscriptPostProcessor.deliveredText(
+                response,
+                fallback: "明天十点开会"
+            ) == "明天十点开会"
+        )
+    }
+
+    @Test
+    func preservesShapesThatWereAlreadyPresentInTheRawTranscript() {
+        #expect(
+            VoiceTranscriptPostProcessor.deliveredText(
+                "```swift\nlet value = 1\n```",
+                fallback: "```swift\nlet value=1\n```"
+            ) == "```swift\nlet value = 1\n```"
+        )
+        #expect(
+            VoiceTranscriptPostProcessor.deliveredText(
+                "<transcript>整理后的原文</transcript>",
+                fallback: "<transcript>原文</transcript>"
+            ) == "<transcript>整理后的原文</transcript>"
+        )
+        #expect(
+            VoiceTranscriptPostProcessor.deliveredText(
+                "当然，整理如下：新的原文",
+                fallback: "当然，整理如下：原文"
+            ) == "当然，整理如下：新的原文"
+        )
+    }
 }

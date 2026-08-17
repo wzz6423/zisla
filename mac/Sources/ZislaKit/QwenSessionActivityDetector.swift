@@ -315,7 +315,8 @@ public final class QwenSessionActivityDetector: AIActivityDetecting {
             updatedAt: max(state.updatedAt, candidate.activityModificationDate),
             sessionURL: nil,
             effort: nil,
-            startedAt: state.startedAt
+            startedAt: state.startedAt,
+            processIdentifier: sidecar.pid
         )
     }
 

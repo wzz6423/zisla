@@ -271,19 +271,18 @@ private struct TaskProgressRow: View {
         if let startedAt = task.startedAt {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 HStack(spacing: 4) {
-                    Text(
-                        "开始 \(startTimeText(startedAt)) · "
-                            + "运行 \(elapsedText(from: startedAt, to: context.date))"
-                    )
-                    .font(.islandMicro(design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .layoutPriority(1)
+                    Text(statusTimeText(startedAt, context.date))
+                        .font(.islandMicro(design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .layoutPriority(1)
 
                     Spacer(minLength: 2)
                     if task.status == .error {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 9, weight: .semibold))
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 16, height: 16)
                             .foregroundStyle(.red)
                             .help(failureReason ?? "任务失败")
                     } else if let progress = task.progress {
@@ -291,24 +290,46 @@ private struct TaskProgressRow: View {
                             .tint(providerColor)
                             .frame(width: 32)
                     } else {
-                        ProgressView()
-                            .controlSize(.mini)
+                        ThinkingOrbView(
+                            state: ThinkingOrbState.forTask(task),
+                            size: 20,
+                            speed: task.status == .blocked ? 0.65 : 1,
+                            tint: .white,
+                            accessibilityLabel: "AI 正在工作"
+                        )
                     }
                 }
-                .frame(height: 12)
+                .frame(height: 20)
             }
         } else if task.status == .error {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 10, weight: .semibold))
+                .resizable()
+                .scaledToFit()
+                .frame(width: 16, height: 16)
                 .foregroundStyle(.red)
                 .help(failureReason ?? "任务失败")
         } else if let progress = task.progress {
             ProgressView(value: progress)
                 .tint(providerColor)
         } else {
-            ProgressView()
-                .controlSize(.mini)
+            ThinkingOrbView(
+                state: ThinkingOrbState.forTask(task),
+                size: 20,
+                speed: task.status == .blocked ? 0.65 : 1,
+                tint: .white,
+                accessibilityLabel: "AI 正在工作"
+            )
         }
+    }
+
+    private func statusTimeText(_ startedAt: Date, _ now: Date) -> String {
+        var parts: [String] = []
+        parts.append("开始 \(startTimeText(startedAt))")
+        if let processIdentifier = task.processIdentifier {
+            parts.append("PID \(processIdentifier)")
+        }
+        parts.append("运行 \(elapsedText(from: startedAt, to: now))")
+        return parts.joined(separator: " · ")
     }
 
     private func startTimeText(_ date: Date) -> String {

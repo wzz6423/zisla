@@ -75,8 +75,29 @@ extension Font {
 enum IslandSurfaceGeometry {
     static let expandedBottomCornerRadius: CGFloat = 34
     static let moduleInset: CGFloat = 12
-    static let moduleOuterBottomCornerRadius = expandedBottomCornerRadius - moduleInset
     static let moduleInnerCornerRadius: CGFloat = 8
+
+    static let moduleOuterBottomCornerRadius = expandedBottomCornerRadius - moduleInset
+
+    static func nestedBottomCornerRadius(inset: CGFloat) -> CGFloat {
+        max(0, moduleOuterBottomCornerRadius - inset)
+    }
+
+    static func moduleContentShape(
+        cornerRadius: CGFloat = moduleInnerCornerRadius,
+        bottomLeadingRadius: CGFloat? = nil,
+        bottomTrailingRadius: CGFloat? = nil
+    ) -> UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            cornerRadii: .init(
+                topLeading: cornerRadius,
+                bottomLeading: bottomLeadingRadius ?? cornerRadius,
+                bottomTrailing: bottomTrailingRadius ?? cornerRadius,
+                topTrailing: cornerRadius
+            ),
+            style: .continuous
+        )
+    }
 }
 
 private struct IslandVisualStyleKey: EnvironmentKey {
@@ -100,6 +121,8 @@ private struct IslandGlassSurface: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let kind: IslandGlassSurfaceKind
     let cornerRadius: CGFloat
+    let bottomLeadingRadius: CGFloat?
+    let bottomTrailingRadius: CGFloat?
 
     func body(content: Content) -> some View {
         content
@@ -159,8 +182,12 @@ private struct IslandGlassSurface: ViewModifier {
         return true
     }
 
-    private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    private var shape: UnevenRoundedRectangle {
+        IslandSurfaceGeometry.moduleContentShape(
+            cornerRadius: cornerRadius,
+            bottomLeadingRadius: bottomLeadingRadius,
+            bottomTrailingRadius: bottomTrailingRadius
+        )
     }
 
     /// Frosted-material translucency: lower lets more desktop through. Input stays densest for
@@ -211,9 +238,18 @@ private struct IslandGlassSurface: ViewModifier {
 extension View {
     func islandGlassSurface(
         _ kind: IslandGlassSurfaceKind,
-        cornerRadius: CGFloat
+        cornerRadius: CGFloat,
+        bottomLeadingRadius: CGFloat? = nil,
+        bottomTrailingRadius: CGFloat? = nil
     ) -> some View {
-        modifier(IslandGlassSurface(kind: kind, cornerRadius: cornerRadius))
+        modifier(
+            IslandGlassSurface(
+                kind: kind,
+                cornerRadius: cornerRadius,
+                bottomLeadingRadius: bottomLeadingRadius,
+                bottomTrailingRadius: bottomTrailingRadius
+            )
+        )
     }
 }
 

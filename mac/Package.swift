@@ -27,12 +27,13 @@ let package = Package(
             dependencies: ["ZislaCore"],
             linkerSettings: [
                 .linkedFramework("WeatherKit"),
-                .linkedFramework("Security"),
                 .linkedFramework("Network"),
                 .linkedFramework("PDFKit"),
                 .linkedFramework("ImageIO"),
                 .linkedFramework("CoreText"),
                 .linkedFramework("AVFoundation"),
+                .linkedFramework("IOKit"),
+                .linkedFramework("CoreBluetooth"),
                 .linkedLibrary("sqlite3"),
             ]
         ),
@@ -41,7 +42,6 @@ let package = Package(
             dependencies: [
                 "ZislaCore",
                 "ZislaKit",
-                "Sparkle",
                 .product(name: "SkyLightWindow", package: "SkyLightWindow"),
             ],
             resources: [
@@ -50,6 +50,7 @@ let package = Package(
                 .copy("../../Resources/Pets"),
                 .copy("../../Resources/QuickNotes"),
                 .copy("../../Resources/BrandIcons"),
+                .copy("../../Resources/ThirdPartyLicenses"),
                 .process("../../Resources/Localization"),
             ],
             linkerSettings: [
@@ -70,9 +71,9 @@ let package = Package(
             name: "ZislaKitTests",
             dependencies: ["ZislaCore", "ZislaKit"]
         ),
-        .binaryTarget(
-            name: "Sparkle",
-            path: "Vendor/Sparkle.xcframework"
+        .testTarget(
+            name: "ZislaTests",
+            dependencies: ["Zisla"]
         ),
     ]
 )

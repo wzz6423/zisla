@@ -1,44 +1,71 @@
 import AppKit
 
 private final class ClickBlockingContentView: NSView {
+    var onMouseDown: (() -> Void)?
+
     override func draw(_ dirtyRect: NSRect) {
         // WindowServer routes fully transparent window pixels to the window underneath.
-        NSColor.black.withAlphaComponent(1.0 / 255.0).setFill()
+        NSColor(white: 0, alpha: 1.0 / 255.0).setFill()
         NSBezierPath(rect: dirtyRect).fill()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        onMouseDown?()
     }
 }
 
 @MainActor
 public final class IslandPanel: NSPanel {
   public var allowsKeyWindow = false
+  public var allowsNativeGlassActivation = true
   public var keepsNativeGlassActive = false {
     didSet { restoreNativeGlassActivationIfNeeded() }
   }
+  /// Prevents app activation or key-window reacquisition during recording, preserving focus in the target input.
+  public var avoidsAppActivation = false
+  public var isPinned = false
   private var transitionGeneration: UInt64 = 0
+  private nonisolated(unsafe) var clickMonitor: Any?
 
     /// Window level used when the collapsed island sits above other windows (same layer as the menu bar).
     public static let onTopLevel = NSWindow.Level.statusBar
     /// Window level used when the collapsed island sinks below the menu bar: lower than both the menu bar (24) and normal windows, so they cover it.
     public static let onBottomLevel = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
 
-    public override var canBecomeKey: Bool { allowsKeyWindow || keepsNativeGlassActive }
+    public override var canBecomeKey: Bool {
+        allowsKeyWindow || (allowsNativeGlassActivation && keepsNativeGlassActive) || (isPinned && allowsKeyWindow)
+    }
     public override var canBecomeMain: Bool { false }
 
-    public override func resignKey() {
-        guard keepsNativeGlassActive, isVisible else {
+  public override func resignKey() {
+        guard !avoidsAppActivation,
+              allowsNativeGlassActivation,
+              keepsNativeGlassActive,
+              isVisible else {
             super.resignKey()
             return
         }
 
-        // WindowServer downgrades NSGlassEffectView before AppKit can redraw it on resign.
-        // Reclaiming key on the next run loop keeps the native glass compositor in its active mode.
         DispatchQueue.main.async { [weak self] in
             self?.restoreNativeGlassActivationIfNeeded()
         }
     }
 
     private func restoreNativeGlassActivationIfNeeded() {
-        guard keepsNativeGlassActive, isVisible else { return }
+        guard !avoidsAppActivation,
+              allowsNativeGlassActivation,
+              keepsNativeGlassActive,
+              isVisible else { return }
+        // Do not automatically reclaim focus while pinned; activate only when unpinned.
+        if !isPinned {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        makeKeyAndOrderFront(nil)
+    }
+
+    private func handleContentViewClick() {
+        // Explicitly activate the app and window when the user clicks the island.
         NSApp.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
     }
@@ -78,12 +105,28 @@ public final class IslandPanel: NSPanel {
             let blockingView = ClickBlockingContentView(
                 frame: CGRect(origin: .zero, size: frame.size)
             )
+            blockingView.onMouseDown = { [weak self] in
+                self?.handleContentViewClick()
+            }
             contentView.frame = blockingView.bounds
             contentView.autoresizingMask = [.width, .height]
             blockingView.addSubview(contentView)
             self.contentView = blockingView
         } else {
             self.contentView = contentView
+        }
+
+        // Monitor mouse clicks within the window.
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            guard let self = self, event.window === self else { return event }
+            self.handleContentViewClick()
+            return event
+        }
+    }
+
+    deinit {
+        if let monitor = clickMonitor {
+            NSEvent.removeMonitor(monitor)
         }
     }
 
@@ -156,7 +199,7 @@ public final class IslandPanel: NSPanel {
       context.allowsImplicitAnimation = true
       animator().alphaValue = 0
     } completionHandler: { [weak self] in
-      MainActor.assumeIsolated {
+      Task { @MainActor in
         guard let self, self.transitionGeneration == generation else { return }
         self.orderOut(nil)
         self.alphaValue = 1

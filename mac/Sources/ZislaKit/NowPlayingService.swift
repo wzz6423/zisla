@@ -96,7 +96,12 @@ public struct NowPlayingSnapshot: Equatable, Sendable {
     guard let elapsedTime else { return nil }
     guard isPlaying, let timestamp else { return elapsedTime }
     let advanced = elapsedTime + max(0, date.timeIntervalSince(timestamp))
-    if let duration, duration > 0 { return min(advanced, duration) }
+    if let duration, duration > 0 {
+      if playbackMode == .repeatOne, advanced >= duration {
+        return advanced.truncatingRemainder(dividingBy: duration)
+      }
+      return min(advanced, duration)
+    }
     return advanced
   }
 }
@@ -240,6 +245,7 @@ public final class NowPlayingService: ObservableObject {
   private var spectrumVisualizationEnabled = false
   private var spectrumCancellable: AnyCancellable?
   private var systemAudioIsAudible = false
+  private var playbackRefreshGeneration: UInt64 = 0
   private var adapterPlaybackMode: NowPlayingPlaybackMode?
   private var playbackModeCommandGeneration: UInt64 = 0
   private var preferredSource: MediaSourcePreference = .automatic
@@ -339,8 +345,17 @@ public final class NowPlayingService: ObservableObject {
       .sink { [weak self] audible in
         Task { @MainActor [weak self] in
           guard let self else { return }
+          let wasAudible = self.systemAudioIsAudible
           self.systemAudioIsAudible = audible
+          if audible { self.playbackRefreshGeneration &+= 1 }
           self.audioMonitor.refresh()
+          if Self.shouldRefreshPlaybackAfterAudioChange(
+            wasAudible: wasAudible,
+            isAudible: audible,
+            snapshot: self.snapshot
+          ) {
+            self.refreshPlaybackAfterAudioStops()
+          }
           self.resolveSnapshot()
         }
       }
@@ -379,6 +394,7 @@ public final class NowPlayingService: ObservableObject {
     spectrumCancellable?.cancel()
     spectrumCancellable = nil
     systemAudioIsAudible = false
+    playbackRefreshGeneration &+= 1
     AudioSpectrumService.shared.stop()
     usesAdapter = false
     adapterClient.stop()
@@ -477,6 +493,7 @@ public final class NowPlayingService: ObservableObject {
     guard sent else { return false }
 
     if let value = Self.optimisticPlaybackValue(after: command, current: current.isPlaying) {
+      playbackRefreshGeneration &+= 1
       playbackStateOverride = TimedControlOverride(
         identity: ControlIdentity(current),
         value: value,
@@ -899,6 +916,23 @@ public final class NowPlayingService: ObservableObject {
     return sources.first(where: \.isFrontmost) ?? sources.first
   }
 
+  /// Core Audio is authoritative for the app that is currently emitting sound when it reports one unambiguous source.
+  nonisolated static func audioSourceCorrectingRemoteAttribution(
+    from sources: [AudioPlaybackSource],
+    remotePID: pid_t?,
+    remoteBundleIdentifier: String?
+  ) -> AudioPlaybackSource? {
+    guard sources.count == 1, let source = sources.first else { return nil }
+
+    if let remoteBundleIdentifier, let sourceBundleIdentifier = source.bundleIdentifier {
+      return remoteBundleIdentifier == sourceBundleIdentifier ? nil : source
+    }
+    if let remotePID {
+      return source.processIdentifiers.contains(remotePID) ? nil : source
+    }
+    return nil
+  }
+
   /// When MediaRemote is stuck on a paused session, select the active source from other audible Core Audio sources.
   nonisolated static func preferredAudioFallbackSource(
     from sources: [AudioPlaybackSource],
@@ -938,6 +972,14 @@ public final class NowPlayingService: ObservableObject {
     case .unavailable: snapshot.isPlaying
     case .pending, .paused: false
     }
+  }
+
+  nonisolated static func shouldRefreshPlaybackAfterAudioChange(
+    wasAudible: Bool,
+    isAudible: Bool,
+    snapshot: NowPlayingSnapshot?
+  ) -> Bool {
+    wasAudible && !isAudible && snapshot?.isPlaying == true
   }
 
   nonisolated static func audioFallbackIsAllowed(
@@ -1055,8 +1097,9 @@ public final class NowPlayingService: ObservableObject {
   }
 
   private func consumeAdapterEvent(_ event: MediaRemoteAdapterEvent) {
+    playbackRefreshGeneration &+= 1
     remotePIDPending = false
-    guard var value = Self.parseAdapter(event.payload) else {
+    guard let value = Self.parseAdapter(event.payload) else {
       remoteInfoState = .empty
       remotePlaybackState = .paused
       remotePID = nil
@@ -1064,6 +1107,12 @@ public final class NowPlayingService: ObservableObject {
       resolveSnapshot()
       return
     }
+
+    consumeAdapterSnapshot(value)
+  }
+
+  private func consumeAdapterSnapshot(_ snapshot: NowPlayingSnapshot) {
+    var value = snapshot
 
     if let playbackMode = value.playbackMode {
       adapterPlaybackMode = playbackMode
@@ -1078,8 +1127,30 @@ public final class NowPlayingService: ObservableObject {
     resolveSnapshot()
   }
 
+  private func refreshPlaybackAfterAudioStops() {
+    guard usesAdapter else {
+      refreshRemoteInfo()
+      return
+    }
+
+    playbackRefreshGeneration &+= 1
+    let generation = playbackRefreshGeneration
+    _ = adapterClient.fetchNowPlayingInfo { [weak self] payload in
+      guard let self,
+        self.playbackRefreshGeneration == generation,
+        self.usesAdapter,
+        !self.systemAudioIsAudible,
+        self.snapshot?.isPlaying == true,
+        let payload,
+        let value = Self.parseAdapter(payload)
+      else { return }
+      self.consumeAdapterSnapshot(value)
+    }
+  }
+
   private func adapterDidTerminate() {
     guard usesAdapter else { return }
+    playbackRefreshGeneration &+= 1
     artworkRefreshTask?.cancel()
     artworkRefreshTask = nil
     artworkRefreshIdentity = nil
@@ -1181,18 +1252,33 @@ public final class NowPlayingService: ObservableObject {
         snapshot: remote,
         playbackState: remotePlaybackState
       )
-      remote.sourceApplication = remote.sourceApplication ?? remoteSource?.applicationName
-      remote.sourceBundleIdentifier =
-        remote.sourceBundleIdentifier
-        ?? remoteSource?.bundleIdentifier
-      remote.sourcePID = remote.sourcePID ?? remotePID ?? remoteSource?.processIdentifiers.first
-      remote.sourceIconData =
-        remote.sourceIconData
-        ?? Self.applicationIconData(
-          source: remoteSource,
-          bundleIdentifier: remote.sourceBundleIdentifier,
-          processIdentifier: remote.sourcePID
+      if let source = Self.audioSourceCorrectingRemoteAttribution(
+        from: sources,
+        remotePID: remotePID,
+        remoteBundleIdentifier: remote.sourceBundleIdentifier
+      ) {
+        remote.sourceApplication = source.applicationName
+        remote.sourceBundleIdentifier = source.bundleIdentifier
+        remote.sourcePID = source.processIdentifiers.first
+        remote.sourceIconData = Self.applicationIconData(
+          source: source,
+          bundleIdentifier: source.bundleIdentifier,
+          processIdentifier: source.processIdentifiers.first
         )
+      } else {
+        remote.sourceApplication = remote.sourceApplication ?? remoteSource?.applicationName
+        remote.sourceBundleIdentifier =
+          remote.sourceBundleIdentifier
+          ?? remoteSource?.bundleIdentifier
+        remote.sourcePID = remote.sourcePID ?? remotePID ?? remoteSource?.processIdentifiers.first
+        remote.sourceIconData =
+          remote.sourceIconData
+          ?? Self.applicationIconData(
+            source: remoteSource,
+            bundleIdentifier: remote.sourceBundleIdentifier,
+            processIdentifier: remote.sourcePID
+          )
+      }
       guard Self.matchesPreferredSource(
         remote.sourceBundleIdentifier,
         preference: preferredSource

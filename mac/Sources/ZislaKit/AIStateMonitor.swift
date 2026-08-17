@@ -33,9 +33,13 @@ public final class AIStateMonitor: ObservableObject {
         case corruptedState
         case failure(String)
 
-        var hasPersistedState: Bool {
-            if case .success = self { return true }
-            return false
+        var allowsDetectorRefresh: Bool {
+            switch self {
+            case .success, .unchanged:
+                true
+            case .corruptedState, .failure:
+                false
+            }
         }
     }
 
@@ -48,7 +52,7 @@ public final class AIStateMonitor: ObservableObject {
 
     public static let defaultActiveTaskTTL: TimeInterval = 30 * 60
     public static let defaultDetectorRefreshInterval: TimeInterval = 30
-    public static let defaultUsageRefreshInterval: TimeInterval = 5 * 60
+    public static let defaultUsageRefreshInterval: TimeInterval = 3 * 60
 
     @Published public private(set) var state: AIState = .empty
     @Published public private(set) var errorDescription: String?
@@ -196,6 +200,7 @@ public final class AIStateMonitor: ObservableObject {
                 let timer = Timer(timeInterval: detectorRefreshInterval, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in self?.scheduleDetectorRefresh() }
                 }
+                timer.tolerance = detectorRefreshInterval * 0.1
                 activityTimer = timer
                 RunLoop.main.add(timer, forMode: .common)
             }
@@ -289,7 +294,7 @@ public final class AIStateMonitor: ObservableObject {
             guard let self, self.refreshGeneration == generation else { return }
             self.persistedReloadInFlight = false
             self.applyPersisted(result, includesUsageSamples: includesUsageSamples)
-            if refreshDetectorsAfterLoad, result.hasPersistedState {
+            if refreshDetectorsAfterLoad, result.allowsDetectorRefresh {
                 self.scheduleDetectorRefresh()
             }
             if self.persistedReloadPending {
@@ -401,7 +406,6 @@ public final class AIStateMonitor: ObservableObject {
                     }
                     automaticUsage.append(contentsOf: samples)
                 }
-                automaticUsage = AIUsageAnalytics.dailyAutomaticUsageSamples(samples: automaticUsage)
             }
             let tasks = mergedTasks(
                 persistedTasks,
@@ -444,15 +448,15 @@ public final class AIStateMonitor: ObservableObject {
             }
         }
 
-        // 移除不再被检测器返回的活动任务（任务已完成/中止）
+        // Remove active tasks no longer returned by detectors (completed or aborted).
         tasks.removeAll { task in
             guard task.status.isActive else { return false }
-            // 如果任务不在持久化列表中且检测器不再返回它，说明任务已结束
+            // A task absent from both persistence and detector results has ended.
             let isPersistedTask = persistedTasks.contains(where: { $0.id == task.id })
             if !isPersistedTask && !detectedTaskIDs.contains(task.id) {
                 return true
             }
-            // TTL 超时检查
+            // Check TTL expiry.
             return dependencies.now().timeIntervalSince(task.updatedAt) > dependencies.activeTaskTTL
         }
         return tasks

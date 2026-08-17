@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="${0:A:h:h}"
 CONFIGURATION="${CONFIGURATION:-release}"
-VERSION="${VERSION:-0.1.2}"
+VERSION="${VERSION:-0.1.3}"
 BUILD_NUMBER="${BUILD_NUMBER:-5}"
 UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
 OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:-$ROOT/dist}"
@@ -21,19 +21,6 @@ case "$UPDATE_CHANNEL" in
     exit 1
     ;;
 esac
-
-if [[ -z "${SPARKLE_PUBLIC_KEY:-}" ]]; then
-  echo "error: SPARKLE_PUBLIC_KEY is required for every packaged build" >&2
-  exit 1
-fi
-if ! print -rn -- "$SPARKLE_PUBLIC_KEY" | base64 -D >/dev/null 2>&1; then
-  echo "error: SPARKLE_PUBLIC_KEY must be valid base64" >&2
-  exit 1
-fi
-if [[ "$(print -rn -- "$SPARKLE_PUBLIC_KEY" | base64 -D | wc -c | tr -d ' ')" != "32" ]]; then
-  echo "error: SPARKLE_PUBLIC_KEY must decode to 32 bytes" >&2
-  exit 1
-fi
 
 for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
   TARGET_TRIPLE="${ARCHITECTURE}-apple-macosx"
@@ -57,8 +44,6 @@ sed \
   -e "s/@UPDATE_CHANNEL@/$UPDATE_CHANNEL/g" \
   "$ROOT/Resources/Info.plist" > "$CONTENTS/Info.plist"
 
-/usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$CONTENTS/Info.plist"
-
 if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
   install -m 0644 "$ROOT/Resources/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 fi
@@ -76,6 +61,10 @@ fi
 
 if [[ -d "$ROOT/Resources/QuickNotes" ]]; then
   ditto "$ROOT/Resources/QuickNotes" "$CONTENTS/Resources/QuickNotes"
+fi
+
+if [[ -d "$ROOT/Resources/ThirdPartyLicenses" ]]; then
+  ditto "$ROOT/Resources/ThirdPartyLicenses" "$CONTENTS/Resources/ThirdPartyLicenses"
 fi
 
 if [[ -d "$ROOT/Resources/Localization" ]]; then
@@ -96,14 +85,6 @@ if [[ -f "$ROOT/Resources/MediaRemoteAdapter/mediaremote-adapter.pl" ]]; then
     "$CONTENTS/Resources/MediaRemoteAdapter/LICENSE"
 fi
 
-sparkle_framework="$(find "$ROOT/.build" -type d -name Sparkle.framework -print -quit)"
-if [[ -n "$sparkle_framework" ]]; then
-  ditto "$sparkle_framework" "$CONTENTS/Frameworks/Sparkle.framework"
-  if ! otool -l "$CONTENTS/MacOS/zisla" | grep -Fq "path @executable_path/../Frameworks"; then
-    install_name_tool -add_rpath @executable_path/../Frameworks "$CONTENTS/MacOS/zisla"
-  fi
-fi
-
 helper="${YTDLP_BINARY:-$ROOT/Tools/yt-dlp}"
 if [[ -x "$helper" ]]; then
   install -m 0755 "$helper" "$CONTENTS/Helpers/yt-dlp"
@@ -112,14 +93,14 @@ fi
 ENTITLEMENTS="$ROOT/Resources/Zisla.entitlements"
 if [[ "$IDENTITY" == "-" ]]; then
   # Ad-hoc signs cannot carry WeatherKit (or other restricted) entitlements.
-  # 注意：adhoc 的 designated requirement 是单次构建的 cdhash，
-  # 每次重新构建都会使 TCC（辅助功能等）授权静默失效。
+  # Note: an ad hoc designated requirement is the build-specific cdhash,
+  # so every rebuild silently invalidates TCC permissions (such as Accessibility).
   echo "warning: ad-hoc code signature (TeamIdentifier empty); WeatherKit unavailable, mainland China uses China Weather alerts" >&2
   codesign --force --deep --sign - "$APP"
 elif [[ "${SIGNING_MODE:-release}" == "dev" ]]; then
-  # 开发签名：稳定证书身份让 TCC 授权跨构建保持有效。
-  # 不带 entitlements（WeatherKit 等受限 entitlement 没有描述文件会被 AMFI 拒载），
-  # 也不启用强化运行时（本地调试不需要）。
+  # Development signing: a stable certificate identity keeps TCC permissions valid across builds.
+  # Do not include entitlements because restricted entitlements such as WeatherKit are rejected by AMFI without a provisioning profile,
+  # and do not enable the hardened runtime because local debugging does not require it.
   codesign --force --deep --sign "$IDENTITY" "$APP"
 else
   if [[ ! -f "$ENTITLEMENTS" ]]; then

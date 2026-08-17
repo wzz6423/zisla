@@ -86,12 +86,10 @@ public struct AIStateRepository {
         )
     }
 
-    /// Stores detected daily totals as deltas so re-scans cannot duplicate usage or overwrite manual reports.
+    /// Deduplicates detected events by source and keeps the visible history aggregated by day.
     @discardableResult
     public func recordDetectedUsage(_ samples: [AIUsageSample]) throws -> Int {
-        try openDatabase().recordDetectedUsage(
-            AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
-        )
+        try openDatabase().recordDetectedUsage(samples)
     }
 
     public func stateRecordingUsage(_ samples: [AIUsageSample]) throws -> AIState {

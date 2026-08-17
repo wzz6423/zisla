@@ -6,7 +6,7 @@ enum MarqueeScrollDirection: Hashable {
 }
 
 /// Scrolls text horizontally (marquee) when it overflows the container; otherwise keeps it static and left-aligned.
-/// Degrades to static text when the system "Reduce Motion" setting is on.
+/// Automatic marquees degrade to static text when the system "Reduce Motion" setting is on.
 ///
 /// Usage:
 /// ```swift
@@ -138,7 +138,9 @@ struct MarqueeText: View {
     }
 
     private var needsScroll: Bool {
-        !reduceMotion && containerWidth > 0 && textWidth > containerWidth + 1
+        (scrollProgress != nil || !reduceMotion)
+            && containerWidth > 0
+            && textWidth > containerWidth + 1
     }
 
     private var marqueeLabel: some View {

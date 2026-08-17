@@ -118,6 +118,7 @@ public final class SideNoticeQueue: ObservableObject {
             || notice.id.hasPrefix("toolbox-reminder-")
             || notice.id.hasPrefix("browser-download-")
             || notice.id.hasPrefix("video-download-")
+            || notice.id.hasPrefix("voice-processing-")
             || notice.style == .headphone
     }
 

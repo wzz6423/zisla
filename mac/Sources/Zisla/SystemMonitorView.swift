@@ -139,14 +139,14 @@ struct SystemMonitorView: View {
         MonitorCard {
             VStack(alignment: .leading, spacing: 7) {
                 CardHeader(symbol: "memorychip", title: "内存") {
-                    Text("压力 \(percent(service.snapshot?.memory.pressureRatio))")
+                    Text("使用率 \(memoryUsageText)")
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(pressureTint(service.snapshot?.memory.pressureRatio ?? 0))
+                        .foregroundStyle(capacityTint(memoryUsage))
                         .monospacedDigit()
                 }
                 usedTotalRow(
-                    leadLabel: "可用",
-                    lead: service.snapshot?.memory.freeBytes,
+                    leadLabel: "已用",
+                    lead: service.snapshot?.memory.usedBytes,
                     total: service.snapshot?.memory.totalBytes,
                     format: memoryByteText
                 )
@@ -312,8 +312,19 @@ struct SystemMonitorView: View {
     }
 
     private var memoryUsage: Double {
-        guard let memory = service.snapshot?.memory, memory.totalBytes > 0 else { return 0 }
-        return min(1, Double(memory.usedBytes) / Double(memory.totalBytes))
+        guard let memory = service.snapshot?.memory else { return 0 }
+        return SystemMonitorMemoryPresentation.usageRatio(
+            usedBytes: memory.usedBytes,
+            totalBytes: memory.totalBytes
+        ) ?? 0
+    }
+
+    private var memoryUsageText: String {
+        guard let memory = service.snapshot?.memory else { return "--" }
+        return SystemMonitorMemoryPresentation.usageText(
+            usedBytes: memory.usedBytes,
+            totalBytes: memory.totalBytes
+        )
     }
 
     private var memoryDetail: String {
@@ -470,12 +481,6 @@ struct SystemMonitorView: View {
         if ratio > 0.95 { return .zislaError }
         if ratio > 0.85 { return .zislaWarning }
         return Color.primary.opacity(0.7)
-    }
-
-    private func pressureTint(_ ratio: Double) -> Color {
-        if ratio > 0.85 { return .zislaError }
-        if ratio > 0.6 { return .zislaWarning }
-        return .zislaSuccess
     }
 
     private func temperatureTint(_ celsius: Double?) -> Color {

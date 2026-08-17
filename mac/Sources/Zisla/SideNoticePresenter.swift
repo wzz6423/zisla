@@ -8,6 +8,7 @@ import SwiftUI
 final class SideNoticePresenter {
     private let queue: SideNoticeQueue
     private let media: NowPlayingService
+    private let browserDownloads: BrowserDownloadMonitor
     private let settingsStore: FeatureSettingsStore
     private let languageStore: AppLanguageStore
     private let layoutEngine = SideNoticeLayoutEngine()
@@ -15,16 +16,21 @@ final class SideNoticePresenter {
     private var cancellables: Set<AnyCancellable> = []
     private var configuredDisplayIDs: Set<UInt32>
     private var isIslandExpanded = false
+    /// Display where the last voice recording happened; the processing indicator stays scoped
+    /// to it so other screens keep their ordinary collapsed pill and pet slot.
+    private var voiceProcessingDisplayID: UInt32?
 
     init(
         queue: SideNoticeQueue,
         media: NowPlayingService,
+        browserDownloads: BrowserDownloadMonitor,
         settingsStore: FeatureSettingsStore,
         languageStore: AppLanguageStore,
         displayIDs: Set<UInt32> = []
     ) {
         self.queue = queue
         self.media = media
+        self.browserDownloads = browserDownloads
         self.settingsStore = settingsStore
         self.languageStore = languageStore
         configuredDisplayIDs = displayIDs
@@ -58,6 +64,14 @@ final class SideNoticePresenter {
     func setDisplayIDs(_ displayIDs: Set<UInt32>) {
         guard configuredDisplayIDs != displayIDs else { return }
         configuredDisplayIDs = displayIDs
+        updatePanels()
+    }
+
+    /// Records which display the voice session belongs to. `nil` keeps the legacy behavior of
+    /// showing the processing indicator on every display.
+    func setVoiceProcessingDisplayID(_ displayID: UInt32?) {
+        guard voiceProcessingDisplayID != displayID else { return }
+        voiceProcessingDisplayID = displayID
         updatePanels()
     }
 
@@ -106,7 +120,18 @@ final class SideNoticePresenter {
         for snapshot in snapshots where displayIDs.contains(UInt32(snapshot.displayID)) {
             let panels = panels(for: snapshot.displayID)
             let displayState = panels.displayState
-            let compactBarFrame = layoutEngine.compactBarFrame(for: snapshot)
+            displayState.hidesVoiceProcessingIndicator = hidesVoiceProcessingIndicator(
+                on: snapshot.displayID
+            )
+            var compactNotices = queue.left + queue.right
+            if displayState.hidesVoiceProcessingIndicator {
+                compactNotices = Self.noticesWithoutVoiceProcessing(compactNotices)
+            }
+            let compactBarFrame = layoutEngine.compactBarFrame(
+                for: snapshot,
+                notices: compactNotices,
+                settings: settingsStore.settings
+            ) ?? layoutEngine.compactBarFrame(for: snapshot)
             displayState.compactWingsEnabled = false
             displayState.compactWingHeight = compactBarFrame.height
             displayState.reserveCompactWing = false
@@ -126,9 +151,21 @@ final class SideNoticePresenter {
         }
     }
 
+    private func hidesVoiceProcessingIndicator(on displayID: CGDirectDisplayID) -> Bool {
+        guard let voiceProcessingDisplayID else { return false }
+        return UInt32(displayID) != voiceProcessingDisplayID
+    }
+
+    private static func noticesWithoutVoiceProcessing(_ notices: [IslandNotice]) -> [IslandNotice] {
+        notices.filter { !$0.id.hasPrefix("voice-processing-") }
+    }
+
     private func updateCompactBar(screen snapshot: ScreenSnapshot, panels: DisplayPanels) {
         let displayState = panels.displayState
-        let compactNotices = queue.left + queue.right
+        var compactNotices = queue.left + queue.right
+        if displayState.hidesVoiceProcessingIndicator {
+            compactNotices = Self.noticesWithoutVoiceProcessing(compactNotices)
+        }
         let compactStatusIDs = Set(compactNotices.filter(Self.isCompactNotice).map(\.id))
         if compactStatusIDs != displayState.compactStatusIDs {
             displayState.compactStatusIDs = compactStatusIDs
@@ -150,19 +187,11 @@ final class SideNoticePresenter {
             panels.compactBar?.orderOut(nil)
             return
         }
-        let selectedPriority = selectedCompactStatusPriority(for: compactNotices)
-        let extendsForCompactStatus = selectedPriority == .transient
-            || selectedPriority == .focusCountdown
-        let usesDetailedMedia = selectedPriority == .media
-            && settingsStore.settings.mediaCompactStyle == .detailed
-        let usesDetailedMail = selectedPriority == .mail
-            && settingsStore.settings.mailCompactStyle == .detailed
-        let frame = layoutEngine.compactBarFrame(
+        guard let frame = layoutEngine.compactBarFrame(
             for: snapshot,
-            extendsForFocusCountdown: extendsForCompactStatus,
-            expandsForDetailedMedia: usesDetailedMedia || usesDetailedMail
-        )
-        guard frame != .zero else {
+            notices: compactNotices,
+            settings: settingsStore.settings
+        ) else {
             panels.compactBar?.orderOut(nil)
             return
         }
@@ -183,6 +212,9 @@ final class SideNoticePresenter {
         panels: DisplayPanels
     ) {
         let displayState = panels.displayState
+        let notices = displayState.hidesVoiceProcessingIndicator
+            ? Self.noticesWithoutVoiceProcessing(notices)
+            : notices
         guard !notices.isEmpty || displayState.reserveCompactWing else {
             panel(for: side, in: panels)?.orderOut(nil)
             return
@@ -228,6 +260,7 @@ final class SideNoticePresenter {
             queue: queue,
             displayState: panels.displayState,
             media: media,
+            browserDownloads: browserDownloads,
             settingsStore: settingsStore,
             onStatusHidden: { [weak self] in self?.updatePanels() }
         )
@@ -254,37 +287,11 @@ final class SideNoticePresenter {
             || notice.id.hasPrefix("toolbox-reminder-")
             || notice.id.hasPrefix("browser-download-")
             || notice.id.hasPrefix("video-download-")
+            || notice.id.hasPrefix("voice-processing-")
     }
 
     private static func isTransientCompactNotice(_ notice: IslandNotice) -> Bool {
         notice.id.hasPrefix("focus-transition") || notice.style == .headphone
-    }
-
-    private func selectedCompactStatusPriority(for notices: [IslandNotice]) -> CompactStatusPriority? {
-        settingsStore.settings.compactStatusPriority.first { priority in
-            switch priority {
-            case .transient:
-                notices.contains(where: Self.isTransientCompactNotice)
-            case .updateAvailable:
-                notices.contains { $0.id.hasPrefix("update-available-") }
-            case .mail:
-                notices.contains { $0.id.hasPrefix("mail-notification-") }
-            case .videoDownload:
-                notices.contains { $0.id.hasPrefix("video-download-") }
-            case .browserDownload:
-                notices.contains { $0.id.hasPrefix("browser-download-") }
-            case .focusCountdown:
-                notices.contains { $0.id.hasPrefix("focus-countdown-") }
-            case .toolboxReminder:
-                notices.contains { $0.id.hasPrefix("toolbox-reminder-") }
-            case .aiActivity:
-                notices.contains { $0.id.hasPrefix("ai-active-") }
-            case .media:
-                notices.contains { $0.id.hasPrefix("media-active-") }
-            case .focusMode:
-                notices.contains { $0.id.hasPrefix("focus-mode-") }
-            }
-        }
     }
 
     private func panel(for side: NoticeSide, in panels: DisplayPanels) -> IslandPanel? {

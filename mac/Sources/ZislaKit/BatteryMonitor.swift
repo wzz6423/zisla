@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import IOKit
 import IOKit.ps
 
 /// Battery status snapshot. `BatteryMonitor.snapshot` is nil on desktop Macs with no built-in battery.
@@ -7,33 +8,78 @@ public struct BatterySnapshot: Equatable, Sendable {
     /// Remaining charge as a fraction, 0...1.
     public var level: Double
     public var isCharging: Bool
-    /// Whether external power is connected (including when fully charged but still plugged in).
+    /// Whether external power is connected, including charge-hold states.
     public var isPluggedIn: Bool
     public var isCharged: Bool
-    /// Minutes remaining when discharging, or minutes to full when charging; nil while the system is still estimating.
+    /// Minutes remaining when discharging, or minutes to full when charging.
     public var timeRemainingMinutes: Int?
+    public var temperatureCelsius: Double?
+    /// Signed milliamps: positive while charging and negative while discharging.
+    public var currentMilliamps: Double?
+    public var voltageVolts: Double?
+    /// Absolute battery power in watts.
+    public var powerWatts: Double?
+    public var designCapacityMAh: Int?
+    public var maxCapacityMAh: Int?
+    public var currentCapacityMAh: Int?
+    public var healthPercent: Int?
+    public var cycleCount: Int?
+    public var isLowPowerMode: Bool
+    /// Instantaneous power entering from the adapter, not its rated ceiling.
+    public var adapterWatts: Double?
+    public var adapterRatedWatts: Double?
+    public var systemLoadWatts: Double?
+    /// Positive when charging the battery and negative when the battery supplies the system.
+    public var batteryFlowWatts: Double?
 
     public init(
         level: Double,
         isCharging: Bool,
         isPluggedIn: Bool,
         isCharged: Bool,
-        timeRemainingMinutes: Int?
+        timeRemainingMinutes: Int?,
+        temperatureCelsius: Double? = nil,
+        currentMilliamps: Double? = nil,
+        voltageVolts: Double? = nil,
+        powerWatts: Double? = nil,
+        designCapacityMAh: Int? = nil,
+        maxCapacityMAh: Int? = nil,
+        currentCapacityMAh: Int? = nil,
+        healthPercent: Int? = nil,
+        cycleCount: Int? = nil,
+        isLowPowerMode: Bool = false,
+        adapterWatts: Double? = nil,
+        adapterRatedWatts: Double? = nil,
+        systemLoadWatts: Double? = nil,
+        batteryFlowWatts: Double? = nil
     ) {
-        self.level = level
+        self.level = min(max(level, 0), 1)
         self.isCharging = isCharging
         self.isPluggedIn = isPluggedIn
         self.isCharged = isCharged
         self.timeRemainingMinutes = timeRemainingMinutes
+        self.temperatureCelsius = temperatureCelsius
+        self.currentMilliamps = currentMilliamps
+        self.voltageVolts = voltageVolts
+        self.powerWatts = powerWatts
+        self.designCapacityMAh = designCapacityMAh
+        self.maxCapacityMAh = maxCapacityMAh
+        self.currentCapacityMAh = currentCapacityMAh
+        self.healthPercent = healthPercent
+        self.cycleCount = cycleCount
+        self.isLowPowerMode = isLowPowerMode
+        self.adapterWatts = adapterWatts
+        self.adapterRatedWatts = adapterRatedWatts
+        self.systemLoadWatts = systemLoadWatts
+        self.batteryFlowWatts = batteryFlowWatts
     }
 
     public var percentInt: Int {
         Int((level * 100).rounded())
     }
 
-    /// Lock-screen-style battery symbol: bolt when charging, otherwise a filled icon at the appropriate level.
     public var symbolName: String {
-        if isCharging || (isPluggedIn && !isCharged) {
+        if isCharging {
             return "battery.100percent.bolt"
         }
         switch percentInt {
@@ -46,7 +92,7 @@ public struct BatterySnapshot: Equatable, Sendable {
     }
 }
 
-/// Reads battery level using the public IOKit Power Source API and refreshes via run-loop notifications.
+/// Combines IOPowerSources status with AppleSmartBattery registry metrics.
 @MainActor
 public final class BatteryMonitor: ObservableObject {
     @Published public private(set) var snapshot: BatterySnapshot?
@@ -83,46 +129,204 @@ public final class BatteryMonitor: ObservableObject {
 
     nonisolated static func currentSnapshot() -> BatterySnapshot? {
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue()
-              as? [CFTypeRef] else { return nil }
+              let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef]
+        else {
+            return nil
+        }
+        let registry = smartBatteryProperties() ?? [:]
         for source in list {
             guard let description = IOPSGetPowerSourceDescription(info, source)?
-                .takeUnretainedValue() as? [String: Any] else { continue }
-            if let snapshot = snapshot(from: description) { return snapshot }
+                .takeUnretainedValue() as? [String: Any]
+            else {
+                continue
+            }
+            if var snapshot = snapshot(
+                from: description,
+                registry: registry,
+                isLowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled
+            ) {
+                snapshot.temperatureCelsius = snapshot.temperatureCelsius
+                    ?? AppleSMCSensorReader.batteryTemperatureCelsius()
+                return snapshot
+            }
         }
         return nil
     }
 
-    /// Pure logic: parses a Power Source description dictionary into a snapshot, for unit testing.
-    nonisolated static func snapshot(from description: [String: Any]) -> BatterySnapshot? {
-        if let type = description[kIOPSTypeKey as String] as? String,
+    /// Pure parser kept separate from IOKit reads so cross-generation fixtures are testable.
+    nonisolated static func snapshot(
+        from powerSource: [String: Any],
+        registry: [String: Any] = [:],
+        isLowPowerMode: Bool = false
+    ) -> BatterySnapshot? {
+        if let type = stringValue(powerSource[kIOPSTypeKey as String]),
            type != kIOPSInternalBatteryType as String {
             return nil
         }
-        guard let current = (description[kIOPSCurrentCapacityKey as String] as? NSNumber)?
-            .doubleValue,
-            let maximum = (description[kIOPSMaxCapacityKey as String] as? NSNumber)?
-            .doubleValue,
-            maximum > 0 else { return nil }
+        guard let current = doubleValue(powerSource[kIOPSCurrentCapacityKey as String]),
+              let maximum = doubleValue(powerSource[kIOPSMaxCapacityKey as String]),
+              maximum > 0
+        else {
+            return nil
+        }
 
         let level = min(max(current / maximum, 0), 1)
-        let isCharging = (description[kIOPSIsChargingKey as String] as? Bool) ?? false
-        let isCharged = (description[kIOPSIsChargedKey as String] as? Bool) ?? false
-        let state = description[kIOPSPowerSourceStateKey as String] as? String
-        let isPluggedIn = state == (kIOPSACPowerValue as String)
+        let isCharging = boolValue(powerSource[kIOPSIsChargingKey as String])
+            ?? boolValue(registry["IsCharging"])
+            ?? false
+        let isCharged = boolValue(powerSource[kIOPSIsChargedKey as String])
+            ?? boolValue(registry["FullyCharged"])
+            ?? false
+        let state = stringValue(powerSource[kIOPSPowerSourceStateKey as String])
+        let isPluggedIn = state.map { $0 == kIOPSACPowerValue as String }
+            ?? boolValue(registry["ExternalConnected"])
+            ?? false
 
         let rawTime = isCharging
-            ? (description[kIOPSTimeToFullChargeKey as String] as? NSNumber)?.intValue
-            : (description[kIOPSTimeToEmptyKey as String] as? NSNumber)?.intValue
-        // IOKit uses -1 to indicate the estimate is still being calculated.
-        let timeRemaining = (rawTime ?? -1) > 0 ? rawTime : nil
+            ? intValue(powerSource[kIOPSTimeToFullChargeKey as String])
+            : intValue(powerSource[kIOPSTimeToEmptyKey as String])
+        let timeRemaining = rawTime.flatMap { (1..<65_535).contains($0) ? $0 : nil }
+
+        let batteryData = dictionaryValue(registry["BatteryData"])
+        let currentCapacity = firstPositive([
+            intValue(registry["AppleRawCurrentCapacity"]),
+            intValue(registry["AbsoluteCapacity"]),
+            intValue(batteryData?["RemainingCapacity"]),
+            legacyCapacity(registry["CurrentCapacity"]),
+        ])
+        let maxCapacity = firstPositive([
+            intValue(registry["AppleRawMaxCapacity"]),
+            intValue(registry["FullChargeCapacity"]),
+            intValue(batteryData?["FullChargeCapacity"]),
+            intValue(registry["NominalChargeCapacity"]),
+            intValue(batteryData?["NominalChargeCapacity"]),
+            legacyCapacity(registry["MaxCapacity"]),
+        ])
+        let designCapacity = firstPositive([
+            intValue(registry["DesignCapacity"]),
+            intValue(batteryData?["DesignCapacity"]),
+        ])
+        let healthPercent: Int? = if let maxCapacity, let designCapacity, designCapacity > 0 {
+            min(100, max(0, Int((Double(maxCapacity) / Double(designCapacity) * 100).rounded())))
+        } else {
+            nil
+        }
+
+        let temperature = normalizedTemperature(doubleValue(registry["Temperature"]))
+        let currentMilliamps = doubleValue(registry["InstantAmperage"])
+            ?? doubleValue(registry["Amperage"])
+        let voltageMillivolts = doubleValue(registry["Voltage"])
+            ?? doubleValue(registry["AppleRawBatteryVoltage"])
+        let voltage = voltageMillivolts.flatMap { $0 > 0 ? $0 / 1_000 : nil }
+        let electricalFlow: Double? = if let currentMilliamps, let voltage {
+            currentMilliamps * voltage / 1_000
+        } else {
+            nil
+        }
+
+        let telemetry = dictionaryValue(registry["PowerTelemetryData"])
+        let adapterInput = milliwattsValue(telemetry?["SystemPowerIn"])
+        let systemLoad = milliwattsValue(telemetry?["SystemLoad"])
+        let telemetryFlow: Double? = if let adapterInput, let systemLoad {
+            adapterInput - systemLoad
+        } else {
+            nil
+        }
+        let batteryFlow = telemetryFlow ?? electricalFlow
+        let adapterDetails = dictionaryValue(registry["AdapterDetails"])
+        let adapterRated = positiveDouble(adapterDetails?["Watts"])
 
         return BatterySnapshot(
             level: level,
             isCharging: isCharging,
             isPluggedIn: isPluggedIn,
             isCharged: isCharged,
-            timeRemainingMinutes: timeRemaining
+            timeRemainingMinutes: timeRemaining,
+            temperatureCelsius: temperature,
+            currentMilliamps: currentMilliamps,
+            voltageVolts: voltage,
+            powerWatts: batteryFlow.map(abs),
+            designCapacityMAh: designCapacity,
+            maxCapacityMAh: maxCapacity,
+            currentCapacityMAh: currentCapacity,
+            healthPercent: healthPercent,
+            cycleCount: firstNonNegative([intValue(registry["CycleCount"])]),
+            isLowPowerMode: isLowPowerMode,
+            adapterWatts: adapterInput,
+            adapterRatedWatts: adapterRated,
+            systemLoadWatts: systemLoad,
+            batteryFlowWatts: batteryFlow
         )
+    }
+
+    nonisolated private static func smartBatteryProperties() -> [String: Any]? {
+        let service = IOServiceGetMatchingService(
+            kIOMainPortDefault,
+            IOServiceMatching("AppleSmartBattery")
+        )
+        guard service != IO_OBJECT_NULL else { return nil }
+        defer { IOObjectRelease(service) }
+
+        var unmanaged: Unmanaged<CFMutableDictionary>?
+        guard IORegistryEntryCreateCFProperties(
+            service,
+            &unmanaged,
+            kCFAllocatorDefault,
+            0
+        ) == kIOReturnSuccess,
+            let properties = unmanaged?.takeRetainedValue() as? [String: Any]
+        else {
+            return nil
+        }
+        return properties
+    }
+
+    nonisolated private static func dictionaryValue(_ value: Any?) -> [String: Any]? {
+        value as? [String: Any]
+    }
+
+    nonisolated private static func stringValue(_ value: Any?) -> String? {
+        value as? String
+    }
+
+    nonisolated private static func boolValue(_ value: Any?) -> Bool? {
+        if let value = value as? Bool { return value }
+        return (value as? NSNumber)?.boolValue
+    }
+
+    nonisolated private static func doubleValue(_ value: Any?) -> Double? {
+        if let value = value as? NSNumber { return value.doubleValue }
+        return value as? Double
+    }
+
+    nonisolated private static func intValue(_ value: Any?) -> Int? {
+        if let value = value as? NSNumber { return value.intValue }
+        return value as? Int
+    }
+
+    nonisolated private static func positiveDouble(_ value: Any?) -> Double? {
+        doubleValue(value).flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    nonisolated private static func legacyCapacity(_ value: Any?) -> Int? {
+        intValue(value).flatMap { $0 > 100 ? $0 : nil }
+    }
+
+    nonisolated private static func firstPositive(_ values: [Int?]) -> Int? {
+        values.compactMap { $0 }.first { $0 > 0 }
+    }
+
+    nonisolated private static func firstNonNegative(_ values: [Int?]) -> Int? {
+        values.compactMap { $0 }.first { $0 >= 0 }
+    }
+
+    nonisolated private static func normalizedTemperature(_ rawValue: Double?) -> Double? {
+        guard let rawValue else { return nil }
+        let celsius = rawValue > 200 ? rawValue / 100 : rawValue
+        return (-20...100).contains(celsius) ? celsius : nil
+    }
+
+    nonisolated private static func milliwattsValue(_ value: Any?) -> Double? {
+        doubleValue(value).flatMap { $0 >= 0 ? $0 / 1_000 : nil }
     }
 }

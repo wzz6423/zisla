@@ -8,10 +8,12 @@ public struct SideNoticePresentation: Equatable, Sendable {
     public let activeMediaNotice: IslandNotice?
     public let activeFocusCountdownNotice: IslandNotice?
     public let activeFocusModeNotice: IslandNotice?
+    public let activeTransientNotice: IslandNotice?
     public let activeMailNotice: IslandNotice?
     public let activeToolboxNotice: IslandNotice?
     public let activeBrowserDownloadNotice: IslandNotice?
     public let activeVideoDownloadNotice: IslandNotice?
+    public let activeVoiceProcessingNotice: IslandNotice?
     public let ordinaryNotices: [IslandNotice]
     public let panelSize: CGSize
     public let compactWingsEnabled: Bool
@@ -25,10 +27,12 @@ public struct SideNoticePresentation: Equatable, Sendable {
         activeMediaNotice: IslandNotice? = nil,
         activeFocusCountdownNotice: IslandNotice? = nil,
         activeFocusModeNotice: IslandNotice? = nil,
+        activeTransientNotice: IslandNotice? = nil,
         activeMailNotice: IslandNotice? = nil,
         activeToolboxNotice: IslandNotice? = nil,
         activeBrowserDownloadNotice: IslandNotice? = nil,
         activeVideoDownloadNotice: IslandNotice? = nil,
+        activeVoiceProcessingNotice: IslandNotice? = nil,
         ordinaryNotices: [IslandNotice],
         panelSize: CGSize,
         compactWingsEnabled: Bool = true,
@@ -41,10 +45,12 @@ public struct SideNoticePresentation: Equatable, Sendable {
         self.activeMediaNotice = activeMediaNotice
         self.activeFocusCountdownNotice = activeFocusCountdownNotice
         self.activeFocusModeNotice = activeFocusModeNotice
+        self.activeTransientNotice = activeTransientNotice
         self.activeMailNotice = activeMailNotice
         self.activeToolboxNotice = activeToolboxNotice
         self.activeBrowserDownloadNotice = activeBrowserDownloadNotice
         self.activeVideoDownloadNotice = activeVideoDownloadNotice
+        self.activeVoiceProcessingNotice = activeVoiceProcessingNotice
         self.ordinaryNotices = ordinaryNotices
         self.panelSize = panelSize
         self.compactWingsEnabled = compactWingsEnabled
@@ -55,9 +61,11 @@ public struct SideNoticePresentation: Equatable, Sendable {
     public var hasCompactContent: Bool {
         activeAICount > 0 || activeMediaNotice != nil || activeFocusCountdownNotice != nil
             || activeUpdateNotice != nil
-            || activeFocusModeNotice != nil || activeToolboxNotice != nil
+            || activeFocusModeNotice != nil || activeTransientNotice != nil
+            || activeToolboxNotice != nil
             || activeMailNotice != nil
             || activeBrowserDownloadNotice != nil || activeVideoDownloadNotice != nil
+            || activeVoiceProcessingNotice != nil
             || compactPlaceholder
     }
 
@@ -86,7 +94,9 @@ public enum CompactStatusVisibilityPolicy {
             $0.id.hasPrefix("ai-active-") || $0.id.hasPrefix("media-active-")
         }
         let hasFocusMode = notices.contains { $0.id.hasPrefix("focus-mode-") }
-        return (hasActivity && activityDuration == .always)
+        let hasVoiceProcessing = notices.contains { $0.id.hasPrefix("voice-processing-") }
+        return hasVoiceProcessing
+            || (hasActivity && activityDuration == .always)
             || (hasFocusMode && focusDuration == .always)
     }
 }
@@ -156,6 +166,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let activeFocusModeNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("focus-mode-") })
             : nil
+        let activeTransientNotice = compactWingsEnabled
+            ? notices.first(where: { $0.id.hasPrefix("focus-transition") })
+            : nil
         let activeMailNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("mail-notification-") })
             : nil
@@ -174,6 +187,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let activeVideoDownloadNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("video-download-") })
             : nil
+        let activeVoiceProcessingNotice = compactWingsEnabled
+            ? notices.first(where: { $0.id.hasPrefix("voice-processing-") })
+            : nil
         let activeAICount = activeAINotices.count
         let ordinaryNotices = notices.filter {
             !$0.id.hasPrefix("ai-active-")
@@ -186,6 +202,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 && !$0.id.hasPrefix("toolbox-reminder-")
                 && !$0.id.hasPrefix("browser-download-")
                 && !$0.id.hasPrefix("video-download-")
+                && !$0.id.hasPrefix("voice-processing-")
                 && $0.style != .headphone
         }
         let panelSize = panelSize(
@@ -194,10 +211,12 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             hasMedia: activeMediaNotice != nil,
             hasFocusCountdown: activeFocusCountdownNotice != nil,
             hasFocusMode: activeFocusModeNotice != nil,
+            hasTransient: activeTransientNotice != nil,
             hasMail: activeMailNotice != nil,
             hasToolbox: activeToolboxNotice != nil,
             hasBrowserDownload: activeBrowserDownloadNotice != nil,
             hasVideoDownload: activeVideoDownloadNotice != nil,
+            hasVoiceProcessing: activeVoiceProcessingNotice != nil,
             ordinaryCount: ordinaryNotices.count,
             compactWingHeight: normalizedHeight,
             reserveCompactWing: compactWingsEnabled && reserveCompactWing
@@ -209,10 +228,12 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             && activeMediaNotice == nil
             && activeFocusCountdownNotice == nil
             && activeFocusModeNotice == nil
+            && activeTransientNotice == nil
             && activeMailNotice == nil
             && activeToolboxNotice == nil
             && activeBrowserDownloadNotice == nil
             && activeVideoDownloadNotice == nil
+            && activeVoiceProcessingNotice == nil
         return SideNoticePresentation(
             activeAICount: activeAICount,
             activeAINotice: activeAINotices.first,
@@ -220,10 +241,12 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             activeMediaNotice: activeMediaNotice,
             activeFocusCountdownNotice: activeFocusCountdownNotice,
             activeFocusModeNotice: activeFocusModeNotice,
+            activeTransientNotice: activeTransientNotice,
             activeMailNotice: activeMailNotice,
             activeToolboxNotice: activeToolboxNotice,
             activeBrowserDownloadNotice: activeBrowserDownloadNotice,
             activeVideoDownloadNotice: activeVideoDownloadNotice,
+            activeVoiceProcessingNotice: activeVoiceProcessingNotice,
             ordinaryNotices: ordinaryNotices,
             panelSize: panelSize,
             compactWingsEnabled: compactWingsEnabled,
@@ -280,6 +303,19 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         )
     }
 
+    public func compactBarFrame(
+        for screen: ScreenSnapshot,
+        notices: [IslandNotice],
+        settings: FeatureSettings
+    ) -> CGRect? {
+        guard let sizing = compactBarSizing(for: notices, settings: settings) else { return nil }
+        return compactBarFrame(
+            for: screen,
+            extendsForFocusCountdown: sizing.extendsForCompactStatus,
+            expandsForDetailedMedia: sizing.expandsForDetailedStatus
+        )
+    }
+
     /// Mirrors `compactBarFrame(for: ScreenSnapshot, ...)` for overlays that already own a screen layout.
     public func compactBarFrame(
         for layout: ScreenOverlayLayout,
@@ -312,6 +348,72 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             width: width,
             height: anchor.height
         )
+    }
+
+    public func compactBarFrame(
+        for layout: ScreenOverlayLayout,
+        notices: [IslandNotice],
+        settings: FeatureSettings
+    ) -> CGRect? {
+        guard let sizing = compactBarSizing(for: notices, settings: settings) else { return nil }
+        return compactBarFrame(
+            for: layout,
+            extendsForFocusCountdown: sizing.extendsForCompactStatus,
+            expandsForDetailedMedia: sizing.expandsForDetailedStatus
+        )
+    }
+
+    private func compactBarSizing(
+        for notices: [IslandNotice],
+        settings: FeatureSettings
+    ) -> (extendsForCompactStatus: Bool, expandsForDetailedStatus: Bool)? {
+        if notices.contains(where: { $0.id.hasPrefix("voice-processing-") }) {
+            return (false, false)
+        }
+        let selectedPriority = settings.compactStatusPriority.first {
+            Self.compactStatusIsAvailable($0, notices: notices)
+        }
+        guard let selectedPriority else { return nil }
+        let expandsForDetailedStatus = switch selectedPriority {
+        case .media:
+            settings.mediaCompactStyle == .detailed
+        case .mail:
+            settings.mailCompactStyle == .detailed
+        default:
+            false
+        }
+        return (
+            selectedPriority == .transient || selectedPriority == .focusCountdown,
+            expandsForDetailedStatus
+        )
+    }
+
+    private static func compactStatusIsAvailable(
+        _ priority: CompactStatusPriority,
+        notices: [IslandNotice]
+    ) -> Bool {
+        return switch priority {
+        case .transient:
+            notices.contains { $0.id.hasPrefix("focus-transition") || $0.style == .headphone }
+        case .updateAvailable:
+            notices.contains { $0.id.hasPrefix("update-available-") }
+        case .mail:
+            notices.contains { $0.id.hasPrefix("mail-notification-") }
+        case .videoDownload:
+            notices.contains { $0.id.hasPrefix("video-download-") }
+        case .browserDownload:
+            notices.contains { $0.id.hasPrefix("browser-download-") }
+        case .focusCountdown:
+            notices.contains { $0.id.hasPrefix("focus-countdown-") }
+        case .toolboxReminder:
+            notices.contains { $0.id.hasPrefix("toolbox-reminder-") }
+        case .aiActivity:
+            notices.contains { $0.id.hasPrefix("ai-active-") }
+        case .media:
+            notices.contains { $0.id.hasPrefix("media-active-") }
+        case .focusMode:
+            notices.contains { $0.id.hasPrefix("focus-mode-") }
+        }
     }
 
     private func compactBarHeight(for screen: ScreenSnapshot, anchor: CGRect) -> CGFloat {
@@ -360,16 +462,18 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         hasMedia: Bool,
         hasFocusCountdown: Bool,
         hasFocusMode: Bool,
+        hasTransient: Bool,
         hasMail: Bool,
         hasToolbox: Bool,
         hasBrowserDownload: Bool,
         hasVideoDownload: Bool,
+        hasVoiceProcessing: Bool,
         ordinaryCount: Int,
         compactWingHeight: CGFloat,
         reserveCompactWing: Bool
     ) -> CGSize {
-        let hasCompact = activeAICount > 0 || hasUpdate || hasMedia || hasFocusCountdown || hasFocusMode || hasMail
-            || hasToolbox || hasBrowserDownload || hasVideoDownload || reserveCompactWing
+        let hasCompact = activeAICount > 0 || hasUpdate || hasMedia || hasFocusCountdown || hasFocusMode || hasTransient
+            || hasMail || hasToolbox || hasBrowserDownload || hasVideoDownload || hasVoiceProcessing || reserveCompactWing
         guard ordinaryCount > 0 else {
             return hasCompact
                 ? CGSize(width: Layout.compactWingWidth, height: compactWingHeight)

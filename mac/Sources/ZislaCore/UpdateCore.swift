@@ -133,7 +133,13 @@ public struct GitHubRelease: Decodable, Equatable, Sendable {
 
     /// Version parsed from the tag; falls back to 0.0.0 on invalid tags so callers don't need to try.
     public var version: SemanticVersion {
-        (try? SemanticVersion(tagName)) ?? SemanticVersion(major: 0, minor: 0, patch: 0)
+        parsedVersion ?? SemanticVersion(major: 0, minor: 0, patch: 0)
+    }
+
+    /// Release tags may be grouped under a path such as `release/v1.2.3`.
+    public var parsedVersion: SemanticVersion? {
+        let versionTag = tagName.split(separator: "/").last.map(String.init) ?? tagName
+        return try? SemanticVersion(versionTag)
     }
 
     /// Picks the macOS .zip archive and its accompanying .sha256 checksum file from the assets.
@@ -146,5 +152,13 @@ public struct GitHubRelease: Decodable, Equatable, Sendable {
         }
         let checksum = assets.first { $0.name == archive.name + ".sha256" }
         return MacUpdateAssets(archive: archive, checksum: checksum)
+    }
+
+    /// Disk image used by the manual installation path for ad-hoc signed builds.
+    public var macDiskImage: Asset? {
+        assets.first { asset in
+            let name = asset.name.lowercased()
+            return name.contains("macos") && name.hasSuffix(".dmg")
+        }
     }
 }

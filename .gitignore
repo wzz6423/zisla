@@ -4,6 +4,11 @@
 # Web test artifacts
 /Web/.playwright/
 /Web/screenshots/
+.playwright-cli/
+.impeccable/
+
+# Generated reports
+**/[Rr]eports/
 
 # Future Windows build outputs
 /windows/[Bb]in/

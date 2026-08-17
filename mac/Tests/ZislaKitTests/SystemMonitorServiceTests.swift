@@ -314,6 +314,13 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
+    func appleSMCReaderDecodesIntelBatteryTemperature() {
+        #expect(AppleSMCSensorReader.signedFixedPointCelsius(from: [0x1E, 0x80]) == 30.5)
+        #expect(AppleSMCSensorReader.signedFixedPointCelsius(from: [0xFF, 0x00]) == -1)
+        #expect(AppleSMCSensorReader.signedFixedPointCelsius(from: [0x1E]) == nil)
+    }
+
+    @Test
     func appleSMCTemperatureAverageRejectsInvalidSensors() {
         let average = AppleSMCSensorReader.averageCelsius([68, 66, 0, 125])
 
@@ -1439,6 +1446,29 @@ struct SystemMonitorServiceTests {
         clock.advance(by: 1)
         _ = await service.sampleOnce()
         #expect(service.snapshot?.disk.freeBytes == 700)
+    }
+
+    @Test
+    func slowMetricsRefreshOnlyAfterConfiguredInterval() {
+        let initial = Date(timeIntervalSince1970: 1_700_000_000)
+        let interval = SystemMonitorService.slowMetricsRefreshInterval
+
+        #expect(interval == 5)
+        #expect(SystemMonitorService.shouldRefreshSlowMetrics(
+            lastSampledAt: nil,
+            now: initial,
+            interval: interval
+        ))
+        #expect(!SystemMonitorService.shouldRefreshSlowMetrics(
+            lastSampledAt: initial,
+            now: initial.addingTimeInterval(4.9),
+            interval: interval
+        ))
+        #expect(SystemMonitorService.shouldRefreshSlowMetrics(
+            lastSampledAt: initial,
+            now: initial.addingTimeInterval(5),
+            interval: interval
+        ))
     }
 
     @Test

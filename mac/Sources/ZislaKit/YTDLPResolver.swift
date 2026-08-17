@@ -13,7 +13,7 @@ public struct YTDLPTools: Equatable, Sendable {
 public enum YTDLPResolverError: Error, Equatable, Sendable, LocalizedError {
     case executableNotFound(searched: [URL])
 
-    /// 安装入口已从下载模块迁到设置页，报错必须替用户指路，否则只剩一条裸的 NSError 文案。
+    /// Installation moved from the Downloads module to Settings, so errors must direct the user there instead of exposing a bare NSError message.
     public var errorDescription: String? {
         "未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。"
     }

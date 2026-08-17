@@ -130,6 +130,7 @@ public final class CodexSessionActivityDetector {
     private let fileManager: FileManager
     private let jsonlReader: IncrementalJSONLReader
     private let now: () -> Date
+    private let processIdentifiersForOpenFiles: ([URL]) -> [URL: Int32]
     private var cache: [URL: CachedRollout] = [:]
     private var sessionIndexCache: CachedSessionIndex?
 
@@ -141,6 +142,8 @@ public final class CodexSessionActivityDetector {
         initialTailBytes: Int = .max,
         maximumRolloutAge: TimeInterval = CodexSessionActivityDetector.defaultMaximumRolloutAge,
         fileManager: FileManager = .default,
+        processIdentifiersForOpenFiles: @escaping ([URL]) -> [URL: Int32]
+            = CodexSessionActivityDetector.defaultProcessIdentifiersForOpenFiles,
         now: @escaping () -> Date = Date.init
     ) {
         self.sessionsDirectory = sessionsDirectory
@@ -151,6 +154,7 @@ public final class CodexSessionActivityDetector {
         self.maximumRolloutAge = max(0, maximumRolloutAge)
         jsonlReader = IncrementalJSONLReader(initialTailBytes: initialTailBytes)
         self.fileManager = fileManager
+        self.processIdentifiersForOpenFiles = processIdentifiersForOpenFiles
         self.now = now
     }
 
@@ -160,19 +164,25 @@ public final class CodexSessionActivityDetector {
         cache = cache.filter { selectedURLs.contains($0.key) }
 
         let titlesBySessionID = sessionTitlesByID()
+        // Codex may append to rollout files while scanning; one unreadable file must not discard other sessions.
+        let activities: [(candidate: Candidate, activity: RolloutActivity)] = candidates.compactMap { candidate in
+            guard let activity = try? activity(in: candidate) else { return nil }
+            return (candidate, activity)
+        }
         var allEvents: [(
             event: Event,
             activityDate: Date,
             model: String?,
             effort: String?,
-            sessionID: String?
+            sessionID: String?,
+            rolloutURL: URL
         )] = []
         var statusSignalsByTurnID: [String: [StatusSignal]] = [:]
         var mergedModelsByTurnID: [String: String] = [:]
         var mergedEffortsByTurnID: [String: String] = [:]
 
-        for candidate in candidates {
-            let activity = try activity(in: candidate)
+        for item in activities {
+            let activity = item.activity
             mergedModelsByTurnID.merge(activity.modelsByTurnID) { _, new in new }
             mergedEffortsByTurnID.merge(activity.effortsByTurnID) { _, new in new }
             for signal in activity.statusSignals {
@@ -180,8 +190,9 @@ public final class CodexSessionActivityDetector {
             }
         }
 
-        for candidate in candidates {
-            let activity = try activity(in: candidate)
+        for item in activities {
+            let candidate = item.candidate
+            let activity = item.activity
             let candidateEvents = activity.events
             let latestStartedTurnID = candidateEvents
                 .filter { $0.kind == .started }
@@ -196,7 +207,8 @@ public final class CodexSessionActivityDetector {
                     activityDate,
                     mergedModelsByTurnID[event.turnID],
                     mergedEffortsByTurnID[event.turnID],
-                    activity.sessionID
+                    activity.sessionID,
+                    candidate.url.standardizedFileURL
                 )
             })
         }
@@ -212,7 +224,8 @@ public final class CodexSessionActivityDetector {
             activityDate: Date,
             model: String?,
             effort: String?,
-            sessionID: String?
+            sessionID: String?,
+            rolloutURL: URL
         )] = [:]
         for record in allEvents {
             let event = record.event
@@ -225,11 +238,16 @@ public final class CodexSessionActivityDetector {
         }
 
         let activeTurnIDs = Set(active.keys)
+        let processIdentifiersByURL = processIdentifiersForOpenFiles(
+            Array(Set(active.values.map(\.rolloutURL)))
+        )
         let tasks = active.values
             .map { record in
                 let event = record.event
                 let provider = Self.provider(forModel: record.model)
                 let fallbackTitle = provider == .gpt ? "ChatGPT" : "Codex"
+                let threadTitle = record.sessionID.flatMap { titlesBySessionID[$0] }
+                let displayTitle = threadTitle ?? fallbackTitle
                 let (status, reason) = Self.statusAndReason(
                     from: statusSignalsByTurnID[event.turnID] ?? [],
                     startedAt: event.timestamp
@@ -237,7 +255,7 @@ public final class CodexSessionActivityDetector {
                 return AIProgressTask(
                     id: Self.taskID(forTurnID: event.turnID),
                     provider: provider,
-                    title: record.sessionID.flatMap { titlesBySessionID[$0] } ?? fallbackTitle,
+                    title: displayTitle,
                     detail: record.model,
                     progress: nil,
                     status: status,
@@ -245,7 +263,8 @@ public final class CodexSessionActivityDetector {
                     sessionURL: record.sessionID.flatMap(Self.sessionURL(for:)),
                     effort: record.effort,
                     startedAt: event.timestamp,
-                    failureReason: reason
+                    failureReason: reason,
+                    processIdentifier: processIdentifiersByURL[record.rolloutURL]
                 )
             }
             .sorted {
@@ -258,6 +277,97 @@ public final class CodexSessionActivityDetector {
 
     public static func taskID(forTurnID turnID: String) -> String {
         "codex-turn-\(turnID)"
+    }
+
+    public static func defaultProcessIdentifiersForOpenFiles(_ urls: [URL]) -> [URL: Int32] {
+        let standardizedURLs = Set(urls.map(\.standardizedFileURL))
+        guard !standardizedURLs.isEmpty else { return [:] }
+
+        guard let data = runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/usr/sbin/lsof"),
+            arguments: ["-F", "pn", "--"] + standardizedURLs.map(\.path).sorted(),
+            timeout: 2
+        ) else { return [:] }
+        return parseOpenFileProcessIdentifiers(data, matching: standardizedURLs)
+    }
+
+    static func runProcessOutput(
+        executableURL: URL,
+        arguments: [String],
+        timeout: TimeInterval,
+        fileManager: FileManager = .default
+    ) -> Data? {
+        let outputURL = fileManager.temporaryDirectory
+            .appendingPathComponent("zisla-codex-lsof-\(UUID().uuidString)")
+        guard fileManager.createFile(atPath: outputURL.path, contents: nil),
+              let output = try? FileHandle(forWritingTo: outputURL) else {
+            return nil
+        }
+        defer {
+            try? output.close()
+            try? fileManager.removeItem(at: outputURL)
+        }
+
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = arguments
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+
+        let deadline = DispatchTime.now() + max(0, timeout)
+        while process.isRunning, DispatchTime.now() < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        guard process.isRunning else {
+            process.waitUntilExit()
+            try? output.synchronize()
+            try? output.close()
+            return try? Data(contentsOf: outputURL)
+        }
+
+        process.terminate()
+        let terminationDeadline = DispatchTime.now() + 0.25
+        while process.isRunning, DispatchTime.now() < terminationDeadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        if process.isRunning {
+            Darwin.kill(process.processIdentifier, SIGKILL)
+            let killDeadline = DispatchTime.now() + 0.25
+            while process.isRunning, DispatchTime.now() < killDeadline {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+        }
+        return nil
+    }
+
+    static func parseOpenFileProcessIdentifiers(
+        _ data: Data,
+        matching urls: Set<URL>
+    ) -> [URL: Int32] {
+        guard let output = String(data: data, encoding: .utf8) else { return [:] }
+        var currentProcessIdentifier: Int32?
+        var result: [URL: Int32] = [:]
+        for line in output.split(whereSeparator: \.isNewline) {
+            guard let field = line.first else { continue }
+            let value = line.dropFirst()
+            switch field {
+            case "p":
+                currentProcessIdentifier = Int32(value)
+            case "n":
+                guard let currentProcessIdentifier, currentProcessIdentifier > 0 else { continue }
+                let url = URL(fileURLWithPath: String(value)).standardizedFileURL
+                guard urls.contains(url), result[url] == nil else { continue }
+                result[url] = currentProcessIdentifier
+            default:
+                continue
+            }
+        }
+        return result
     }
 
     private static func provider(forModel model: String?) -> AIProvider {
@@ -523,7 +633,7 @@ public final class CodexSessionActivityDetector {
         case "function_call_output", "custom_tool_call_output":
             let output = payload["output"]
             failed = Self.outputIndicatesError(output)
-            failureReason = failed == true ? Self.extractFailureReason(from: output) : nil
+            failureReason = failed == true ? "工具执行失败" : nil
         default:
             failed = nil
             failureReason = nil
@@ -564,67 +674,6 @@ public final class CodexSessionActivityDetector {
             return outputIndicatesError(nested)
         }
         return false
-    }
-
-    private static func extractFailureReason(from value: Any?) -> String? {
-        guard let value, !(value is NSNull) else { return nil }
-        if let values = value as? [Any] {
-            for item in values {
-                if let reason = extractFailureReason(from: item) {
-                    return reason
-                }
-            }
-            return nil
-        }
-        if let object = value as? [String: Any] {
-            if let output = object["output"] as? String, !output.isEmpty {
-                if let nestedData = output.data(using: .utf8),
-                   let nested = try? JSONSerialization.jsonObject(with: nestedData),
-                   let nestedReason = extractFailureReason(from: nested) {
-                    return nestedReason
-                }
-                return normalizeFailureReason(output)
-            }
-            if let text = object["text"] as? String, !text.isEmpty {
-                if let nestedData = text.data(using: .utf8),
-                   let nested = try? JSONSerialization.jsonObject(with: nestedData),
-                   let nestedReason = extractFailureReason(from: nested) {
-                    return nestedReason
-                }
-                return normalizeFailureReason(text)
-            }
-            if let message = object["message"] as? String, !message.isEmpty {
-                return normalizeFailureReason(message)
-            }
-            for key in ["structuredContent", "result"] {
-                if let reason = extractFailureReason(from: object[key]) {
-                    return reason
-                }
-            }
-            return nil
-        }
-        if let text = value as? String {
-            if let nestedData = text.data(using: .utf8),
-               let nested = try? JSONSerialization.jsonObject(with: nestedData),
-               let reason = extractFailureReason(from: nested) {
-                return reason
-            }
-            return text.isEmpty ? nil : normalizeFailureReason(text)
-        }
-        return nil
-    }
-
-    private static func normalizeFailureReason(_ raw: String) -> String? {
-        let parts = raw.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
-            .filter { !$0.isEmpty }
-        let collapsed = parts.joined(separator: " ")
-        guard !collapsed.isEmpty else { return nil }
-        let maxLength = 200
-        guard collapsed.count > maxLength else {
-            return collapsed
-        }
-        let end = collapsed.index(collapsed.startIndex, offsetBy: maxLength)
-        return String(collapsed[..<end]) + "…"
     }
 
     private static func integerValue(_ value: Any?) -> Int? {

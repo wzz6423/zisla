@@ -95,24 +95,6 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         provider.map(AIMascotLibrary.providerDisplayName(for:)) ?? rawValue
     }
 
-    fileprivate var symbolName: String {
-        switch self {
-        case .claude: "sparkle"
-        case .codex: "chevron.left.forwardslash.chevron.right"
-        case .gemini: "sparkles"
-        case .grok: "bolt.fill"
-        case .gpt: "brain.head.profile"
-        case .copilot: "sparkles.rectangle.stack"
-        case .kimi: "sparkles"
-        case .qwen: "cloud.fill"
-        case .coder: "terminal.fill"
-        case .trae: "wand.and.stars"
-        case .opencode: "curlybraces"
-        case .harness: "h.square.fill"
-        case .doubao: "bubble.left.and.bubble.right.fill"
-        }
-    }
-
     fileprivate var provider: AIProvider? {
         switch self {
         case .claude: .claude
@@ -129,11 +111,6 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .harness: .harness
         case .doubao: .doubao
         }
-    }
-
-    fileprivate var tint: Color {
-        guard let provider else { return .primary }
-        return ProviderBrand.color(for: provider)
     }
 
     fileprivate var usesMonochromeProviderAsset: Bool {
@@ -169,9 +146,7 @@ struct AIMascotView: View {
                     .scaledToFit()
                     .foregroundStyle(.primary)
             } else {
-                Image(systemName: identity.symbolName)
-                    .font(.system(size: size * 0.66, weight: .semibold))
-                    .foregroundStyle(identity.tint)
+                Color.clear
             }
         }
         .frame(width: size, height: size)
@@ -182,7 +157,10 @@ struct AIMascotView: View {
     private var providerImage: NSImage? {
         guard let provider = identity.provider,
               let assetName = AIMascotLibrary.providerAssetName(for: provider),
-              let url = resourceAssetURL(relativePath: "BrandIcons/\(assetName)")
+              let url = AIMascotLibrary.providerAssetURL(
+                  for: provider,
+                  resourceRoots: providerResourceRoots
+              )
         else { return nil }
         return AIMascotImageCache.shared.image(
             for: "provider|\(assetName)",
@@ -216,17 +194,20 @@ struct AIMascotView: View {
         }
     }
 
-    private func resourceAssetURL(relativePath: String) -> URL? {
+    private var providerResourceRoots: [URL] {
         let sourceRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let candidates = [
-            Bundle.main.resourceURL,
-            sourceRoot.appendingPathComponent("Resources", isDirectory: true),
-        ].compactMap { $0 }
-        return candidates
-            .map { $0.appendingPathComponent(relativePath, isDirectory: false) }
-            .first { FileManager.default.fileExists(atPath: $0.path) }
+        var roots = [URL]()
+        if let appResources = Bundle.main.resourceURL {
+            roots.append(appResources)
+        }
+        // Bundle.module traps in the hand-built app because that layout copies resources into Bundle.main.
+        roots.append(
+            Bundle.main.bundleURL.appendingPathComponent("zisla_Zisla.bundle", isDirectory: true)
+        )
+        roots.append(sourceRoot.appendingPathComponent("Resources", isDirectory: true))
+        return roots
     }
 }

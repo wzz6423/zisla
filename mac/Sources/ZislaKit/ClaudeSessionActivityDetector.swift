@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import ZislaCore
 
@@ -19,6 +20,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         var hasError = false
         var failureReason: String?
         var isVSCode = false
+        var aiTitle: String?
     }
 
     private struct CachedTranscript {
@@ -30,7 +32,9 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
     }
 
     public let projectsDirectory: URL
+    public let sessionsDirectory: URL
     public let maxTranscriptFiles: Int
+    public let isProcessAlive: (Int32) -> Bool
 
     private let fileManager: FileManager
     private let jsonlReader: IncrementalJSONLReader
@@ -39,13 +43,19 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
     public init(
         projectsDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude/projects", isDirectory: true),
+        sessionsDirectory: URL? = nil,
         maxTranscriptFiles: Int = 12,
         initialTailBytes: Int = 1_024 * 1_024,
+        isProcessAlive: @escaping (Int32) -> Bool = ClaudeSessionActivityDetector.defaultIsProcessAlive,
         fileManager: FileManager = .default
     ) {
         self.projectsDirectory = projectsDirectory
+        self.sessionsDirectory = sessionsDirectory ?? projectsDirectory
+            .deletingLastPathComponent()
+            .appendingPathComponent("sessions", isDirectory: true)
         self.maxTranscriptFiles = max(1, maxTranscriptFiles)
         jsonlReader = IncrementalJSONLReader(initialTailBytes: initialTailBytes)
+        self.isProcessAlive = isProcessAlive
         self.fileManager = fileManager
     }
 
@@ -54,6 +64,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         let selectedURLs = Set(candidates.map(\.url))
         cache = cache.filter { selectedURLs.contains($0.key) }
         var tasksBySession: [String: AIProgressTask] = [:]
+        let processIdentifiersBySessionID = sessionProcessIdentifiers()
 
         for candidate in candidates {
             let parsed: AIProgressTask?
@@ -67,7 +78,10 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
             } else {
                 parsed = nil
             }
-            guard let parsed else { continue }
+            guard var parsed else { continue }
+            if let sessionID = Self.sessionID(forTaskID: parsed.id) {
+                parsed.processIdentifier = processIdentifiersBySessionID[sessionID]
+            }
             let existing = tasksBySession[parsed.id]
             if let existing, existing.updatedAt > parsed.updatedAt {
                 continue
@@ -83,6 +97,12 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
 
     public static func taskID(forSessionID sessionID: String) -> String {
         "claude-session-\(sessionID)"
+    }
+
+    public static func defaultIsProcessAlive(_ pid: Int32) -> Bool {
+        guard pid > 0 else { return false }
+        if kill(pid, 0) == 0 { return true }
+        return errno == EPERM
     }
 
     private func recentTranscripts() -> [Candidate] {
@@ -177,6 +197,9 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
                 if let model = Self.extractModel(root) {
                     state.model = model
                 }
+                if let aiTitle = Self.extractAITitle(root) {
+                    state.aiTitle = aiTitle
+                }
 
                 switch type {
                 case "user":
@@ -223,10 +246,12 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         }
 
         let updatedAt = max(active.value.updatedAt, candidate.modificationDate)
+        let displayTitle = active.value.aiTitle
+            ?? (active.value.isVSCode ? "Claude Code (VS Code)" : "Claude")
         next.task = AIProgressTask(
             id: Self.taskID(forSessionID: active.key),
             provider: .claude,
-            title: active.value.isVSCode ? "Claude Code (VS Code)" : "Claude",
+            title: displayTitle,
             detail: active.value.model,
             progress: nil,
             status: status,
@@ -266,7 +291,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
                 }
                 if result["is_error"] as? Bool == true || result["isError"] as? Bool == true {
                     state.hasError = true
-                    state.failureReason = Self.failureReason(from: result["content"] ?? result["error"])
+                    state.failureReason = "工具执行失败"
                 } else {
                     // Successful tool_result can clear error.
                     state.hasError = false
@@ -300,8 +325,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
             || root["error"] != nil {
             state.isActive = true
             state.hasError = true
-            state.failureReason = Self.failureReason(from: root["error"])
-                ?? Self.apiFailureReason(from: root["apiErrorStatus"])
+            state.failureReason = Self.apiFailureReason(from: root["apiErrorStatus"])
             state.updatedAt = max(state.updatedAt, timestamp)
             if state.startedAt == nil {
                 state.startedAt = timestamp
@@ -383,38 +407,64 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         return nil
     }
 
-    private static func failureReason(from value: Any?) -> String? {
-        guard let value, !(value is NSNull) else { return nil }
-        if let text = value as? String {
-            return normalizedFailureReason(text)
-        }
-        if let values = value as? [Any] {
-            return values.lazy.compactMap(failureReason(from:)).first
-        }
-        if let object = value as? [String: Any] {
-            for key in ["error", "message", "text", "content"] {
-                if let reason = failureReason(from: object[key]) {
-                    return reason
-                }
-            }
+    private static func extractAITitle(_ root: [String: Any]) -> String? {
+        if let title = root["aiTitle"] as? String {
+            let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
         }
         return nil
+    }
+
+    private static func sessionID(forTaskID taskID: String) -> String? {
+        let prefix = "claude-session-"
+        guard taskID.hasPrefix(prefix) else { return nil }
+        let sessionID = String(taskID.dropFirst(prefix.count))
+        return sessionID.isEmpty ? nil : sessionID
+    }
+
+    private func sessionProcessIdentifiers() -> [String: Int32] {
+        guard let urls = try? fileManager.contentsOfDirectory(
+            at: sessionsDirectory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return [:]
+        }
+
+        var result: [String: Int32] = [:]
+        for url in urls where url.pathExtension == "json" {
+            guard let data = try? Data(contentsOf: url),
+                  let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let sessionID = ((root["sessionId"] as? String) ?? (root["session_id"] as? String))?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                  !sessionID.isEmpty,
+                  let processIdentifier = Self.processIdentifier(root["pid"]),
+                  url.deletingPathExtension().lastPathComponent == String(processIdentifier),
+                  isProcessAlive(processIdentifier) else {
+                continue
+            }
+            result[sessionID] = processIdentifier
+        }
+        return result
+    }
+
+    private static func processIdentifier(_ value: Any?) -> Int32? {
+        let processIdentifier: Int32?
+        if let number = value as? NSNumber {
+            processIdentifier = number.int32Value
+        } else if let string = value as? String {
+            processIdentifier = Int32(string)
+        } else {
+            processIdentifier = nil
+        }
+        guard let processIdentifier, processIdentifier > 0 else { return nil }
+        return processIdentifier
     }
 
     private static func apiFailureReason(from value: Any?) -> String {
         if let status = value as? NSNumber { return "API 请求失败（HTTP \(status.intValue)）" }
         if let status = value as? String, !status.isEmpty { return "API 请求失败（HTTP \(status)）" }
         return "API 请求失败，未提供详细原因"
-    }
-
-    private static func normalizedFailureReason(_ raw: String) -> String? {
-        let collapsed = raw.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
-            .joined(separator: " ")
-        guard !collapsed.isEmpty else { return nil }
-        let maximumLength = 200
-        guard collapsed.count > maximumLength else { return collapsed }
-        let end = collapsed.index(collapsed.startIndex, offsetBy: maximumLength)
-        return String(collapsed[..<end]) + "…"
     }
 
     private static func parseTimestamp(_ value: Any?) -> Date? {

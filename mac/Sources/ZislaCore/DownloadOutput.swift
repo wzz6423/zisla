@@ -173,6 +173,20 @@ public enum DownloadOutputPathValidator {
     }
 }
 
+public enum HTTPURLParser {
+    public static func url(from string: String) -> URL? {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains(where: \Character.isWhitespace),
+              let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
+              url.host?.isEmpty == false else {
+            return nil
+        }
+        return url
+    }
+}
+
 public enum DownloadURLClassifier {
     private static let supportedHosts: Set<String> = [
         "youtube.com", "youtu.be", "bilibili.com", "b23.tv",
@@ -194,16 +208,8 @@ public enum DownloadURLClassifier {
     ]
 
     public static func isLikelyDownloadable(_ string: String) -> Bool {
-        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !trimmed.contains(where: \Character.isWhitespace) else {
-            return false
-        }
-        guard
-            let url = URL(string: trimmed),
-            let scheme = url.scheme?.lowercased(),
-            scheme == "http" || scheme == "https",
-            let host = url.host?.lowercased()
-        else {
+        guard let url = HTTPURLParser.url(from: string),
+              let host = url.host?.lowercased() else {
             return false
         }
 

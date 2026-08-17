@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  MoveToSky
 //
-//  Created by 秋星桥 on 5/23/25.
+//  Created by Lakr Aream on 5/23/25.
 //
 
 import SwiftUI

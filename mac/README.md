@@ -8,17 +8,34 @@ Swift target、Bundle ID、本地数据目录和 `zislactl` 均使用 zisla 标�
 
 ## 功能
 
-- 系统正在播放：MediaRemote 展示封面、标题、进度和播放控制；Core Audio 兜底识别所有当前实际输出音频的应用，暂停、停止和静音来源不显示。
-- 文件中转与共享：拖动文件、音视频或链接到菜单栏下方的专用触发带时自动展开左右肩部提示，无需进入 macOS 顶边窗口切换热区；可放入中转站或调用 macOS 共享菜单，并支持 Finder 定位。
-- AI 状态：兼容 Claude、Codex、ChatGPT、Gemini、Grok、Qoder、千问等 CLI/桌面工具，展示完整运行任务列表、实时 token 趋势、按日的贡献日历热力图和侧边通知；折叠态会叠放不同 AI 的官方 Logo。
-- 下载器：粘贴视频或音频链接，通过 `yt-dlp` 下载到默认“下载”目录或自选目录；无 ffmpeg 时使用 AVFoundation 原生封装分离的视频轨和音频轨，B 站风控或格式不可用时使用只读接口备用路径。
-- 剪贴板检测：默认关闭；开启后只在本地识别新链接并提示，不会自动联网、下载、清空或写回剪贴板。
-- 信息聚合：同时展示当前位置和最多 6 个自选地区的天气，可搜索添加或删除地点；日历事件与提醒事项支持新增、删除及标记提醒完成。
-- 随记：以系统「备忘录」为数据源——左侧列出备忘录中已有的笔记，可查看、编辑、删除、新建；右侧编辑/预览切换，标题、列表、引用、代码块等 Markdown 实时渲染。草稿停止输入后自动写回备忘录。首次使用需授权自动化。
-- 自动更新：签名发布包使用 Sparkle 2；检查到新版本后可确认立即更新，未配置更新签名的开发构建只展示版本信息。
-- 独立开关：媒体、中转、AI、下载、日历、天气、随记、侧边通知、hover、剪贴板和更新均可配置。
-- 外观：固定使用当前深色视觉；顶部保持纯黑，下半部使用高透明度的系统模糊材质。
-- 折叠状态：使用贴住屏幕顶边的单个连续中央状态条，高度与物理刘海严格一致；轮廓顶部较窄、左右底侧向外展开并由连续弧线过渡，无刘海外接屏使用相同轮廓的模拟条。
+### 13 个功能模块
+
+| 模块 | 已实现能力 |
+| --- | --- |
+| 首页 | 按需汇总当前番茄钟、首个活动 AI 任务、原生下载与多个浏览器下载进度。 |
+| 中转 | 将文件、音视频或链接拖到顶部触发带，暂存到中转站、在 Finder 中定位或调用系统共享菜单。 |
+| 剪贴板 | 在本机保存可搜索历史，按图片、URL 与文件筛选并标记常用项；历史记录与链接检测可独立开关。 |
+| AI 监控 | 聚合受支持 CLI、桌面端与 IDE 的活动任务、状态、token 趋势、贡献热力图和侧翼通知。 |
+| 下载 | 通过 `yt-dlp` 下载视频或音频；无 `ffmpeg` 时用 AVFoundation 封装兼容轨道，并为 B 站提供只读接口备用路径。 |
+| 日程 | 同时展示当前位置与最多 6 个自选地点的天气；查看、新增和删除日历事件及提醒事项，并标记提醒完成。 |
+| 邮件 | 读取选定 Mail.app 账户，在岛内查看收件箱、标记已读、回复、撰写邮件和移入废纸篓。 |
+| 随记 | 以系统「备忘录」为唯一数据源，查看、编辑、新建和删除 Markdown 笔记，并提供实时预览和自动写回。 |
+| PDF | 在本机完成合并、拆分、旋转、图片/Office 转换、转图片、导出文字、两类水印、页码、裁剪、加密、解锁和元数据编辑等 14 项操作。 |
+| 小工具 | 提供番茄钟、闹钟、保持亮屏、防止空闲休眠、屏幕与键盘清洁、提词器、摄像头镜子和经确认后清空废纸篓。 |
+| 系统 | 查看 CPU、GPU、内存、磁盘、网络、温度和风扇状态，释放内存并扫描可安全清理的缓存、日志与临时数据。 |
+| 电池 | 展示本机充放电功率流、健康度、循环次数、温度、容量、电流、电压、充电器，以及蓝牙配件和已信任 Apple 移动设备电量。 |
+| 锁屏 | 在系统锁屏页展示自定义文字、农历日期、媒体与相关状态信息。 |
+
+### 跨模块能力
+
+- 系统正在播放：MediaRemote 展示封面、标题、进度、滚动歌词和播放控制；Core Audio 兜底识别实际输出音频的应用，暂停、停止和静音来源不显示。
+- 浏览器下载：在首页、收起态和侧翼通知中显示 Safari、Chrome、Edge、Firefox、Brave、Vivaldi、Opera 与 Arc 的下载来源和进度。
+- 语音输入：支持按键切换或按住说话、自定义全局快捷键、系统语音识别、本地或远端模型整理，以及本机录音历史。
+- CLI 与 Skills 管理：在设置中检测、安装、更新和卸载常用 AI CLI，并管理本机 Skills。
+- 桌面宠物：可选择内置或导入宠物，并配置显示在灵动岛左侧或右侧。
+- 更新：检查 GitHub/Gitee Release，可手动或自动下载当前通道的 DMG；应用不会自动挂载或替换自身。
+- 外观与交互：设置窗口可跟随系统、浅色或深色；灵动岛支持透明或磨砂表面、固定展开、多显示器、Spaces 和无刘海外接屏。
+- 新安装默认启用功能模块；每项功能、收起态状态、侧翼通知、菜单栏指标和更新行为都可在设置中单独调整，已有安装保留用户当前配置。
 
 ## 快速开始
 
@@ -26,12 +43,13 @@ Swift target、Bundle ID、本地数据目录和 `zislactl` 均使用 zisla 标�
 
 - macOS 14+
 - Swift 6 / Xcode 16+（仅 Command Line Tools 也可构建）
-- 可选：`yt-dlp`、`ffmpeg`
+- 可选：`yt-dlp`、`ffmpeg`；Office 转 PDF 另需 LibreOffice 或 OpenOffice
 
 本机已安装 Homebrew 时：
 
 ```bash
 brew install yt-dlp ffmpeg
+brew install --cask libreoffice
 ```
 
 ### 运行源码
@@ -61,20 +79,21 @@ Scripts/build-app.sh
 
 ## AI 工具接入
 
-zisla 会自动读取各工具公开或稳定的本地会话状态，只解析事件类型、状态、时间、模型和会话 ID，不读取提示词或回答正文：
+### 自动检测
 
-| 工具 | CLI | Desktop / IDE | VS Code 插件 | 自动检测源 |
-| --- | --- | --- | --- | --- |
-| Codex / GPT | Codex CLI | Codex Desktop | OpenAI Codex | `~/.codex/sessions/**/*.jsonl` |
-| Claude | Claude Code | 使用 Claude Code 会话的宿主 | Claude Code | `~/.claude/projects/**/*.jsonl` |
-| Gemini | Gemini CLI | - | - | `~/.gemini/tmp/**/chats/session-*` |
-| Grok | Grok CLI | - | - | `~/.grok/sessions/**/events.jsonl` |
-| 千问 | Qwen Code | - | Qwen Code Companion | `${QWEN_RUNTIME_DIR:-${QWEN_HOME:-~/.qwen}}/projects/**` |
-| Qoder | Qoder CLI | Qoder、QoderWork、QoderWake、JetBrains 等名称含 Qoder 的宿主 | Code、Cursor、VSCodium、Windsurf | `~/.qoder*/logs/sessions/**` 与宿主的 `qoder-agent-sdk.log` |
+zisla 会读取各工具公开或稳定的本地会话状态，只提取判断任务状态所需的结构化事件和本地活动元数据，不读取提示词或回答正文：
+
+| 环境 | 自动检测范围 |
+| --- | --- |
+| OpenAI / Anthropic | Codex CLI 与 Desktop、Claude Code 及其宿主环境 |
+| GitHub / Google / xAI | GitHub Copilot CLI 与 VS Code、Gemini CLI、Grok CLI |
+| 国内与独立工具 | Kimi Code、Qwen Code、Qoder、TRAE、OpenCode、Harnext/Harness、WorkBuddy、豆包 |
 
 检测到等待审批或等待用户回答时显示黄色，工具或命令报错时显示红色，正常运行时显示绿色；同一时刻按红色、黄色、绿色的顺序聚合。Qwen runtime sidecar 只有在 PID 仍存活时才生效，避免退出后长期误报。
 
-普通聊天型 Desktop 应用如果不落盘结构化活动事件，系统无法可靠区分“应用已打开但空闲”和“模型正在生成”。这类工具应使用下面的 `zislactl` hook 接入；zisla 不会用常驻进程冒充运行状态。
+普通聊天型 Desktop 应用如果不落盘结构化活动事件，系统无法可靠区分“应用已打开但空闲”和“模型正在生成”。这类工具（包括 ChatGPT 等）应使用下面的 `zislactl` hook 接入；zisla 不会用常驻进程冒充运行状态。
+
+### `zislactl` 本地协议
 
 `zislactl` 将任务状态和历史用量写入 SQLite：
 
@@ -103,11 +122,15 @@ swift run zislactl usage \
 swift run zislactl finish --id build-42 --detail "完成"
 ```
 
-Codex、ChatGPT、Gemini、Grok、Qoder、Qwen 只需替换 `--provider`。ChatGPT 继续使用兼容参数 `--provider gpt`，Qoder 使用 `--provider coder` 或 `--provider qoder`。可在任意工具的 hook、shell wrapper 或任务脚本中调用。
+Provider 规范值包括 `claude`、`codex`、`gemini`、`grok`、`gpt`、`copilot`、`kimi`、`qwen`、`coder`、`trae`、`opencode`、`harness` 和 `doubao`；常见别名会自动归一化。可在任意工具的 hook、shell wrapper 或任务脚本中调用。
 
 AI 运行列表和折叠状态使用各工具的官方 Logo 标识任务来源。
 
 接入协议见 [CLI 接入设计](Docs/cli-reference.md)。
+
+## 浏览器下载进度
+
+zisla 使用 macOS 公共文件进度机制监听“下载”目录，并结合临时文件扩展名、下载来源扩展属性和正在运行的浏览器解析来源。它不会读取浏览器历史数据库，也不会为识别进度发起网络请求；下载成功后完成状态保留约 3 秒。
 
 ## 下载器
 
@@ -143,9 +166,14 @@ URL 作为独立 argv 传给 `Process`，不经过 shell。运行时强制忽略
 - 日程：首次打开日程模块时分别请求日历和提醒事项权限；新增事件/提醒、删除或标记提醒完成后自动刷新。
 - 定位：天气默认使用一次性当前位置请求，不持续跟踪；也可在设置中搜索、保存和删除其他地区，同时查看多个地点。
 - 文件和下载目录：使用用户选择目录的安全书签；文件中转不复制原文件。
-- 剪贴板：默认关闭；开启时只在 `changeCount` 变化后读取一次文本，最多处理一个链接，不保存 query 参数日志，也不调用清空、声明类型或写入 API，因此不会替换 Mac、iPhone、iPad 之间的通用剪贴板内容。
+- 剪贴板：新安装默认开启历史与链接检测；两项可独立关闭。开启后只在 `changeCount` 变化时读取一次，最多处理一个链接，不保存 query 参数日志，也不调用清空、声明类型或写入 API，因此不会替换 Mac、iPhone、iPad 之间的通用剪贴板内容。
+- AI 状态：自动检测只读取判断任务状态所需的结构化事件和本地活动元数据。
+- 语音：仅在用户主动触发时访问麦克风和系统语音识别；录音、原始转写和 AI 整理文本由用户在本机管理。启用模型整理后，转写文本只发送给用户选定的本地模型、远端 Provider 或 CLI 档案；远端 Provider 与 CLI 凭据存入私有数据库，不写入普通设置。
+- 蓝牙与设备：仅在打开电池模块时读取 macOS 可提供的配件电量和已与本机建立信任关系的 Apple 移动设备电量。
+- 摄像头与输入监控：摄像头仅在打开镜子时使用；自定义物理修饰键快捷键和键盘清洁可能需要输入监控授权。
+- 浏览器下载：只订阅系统公开的文件进度并检查下载临时文件，不读取浏览历史或页面内容。
 - 媒体：通过 MediaRemote 获取系统元数据，并用 Core Audio 的进程输出状态确认是否正在播放。MediaRemote 是非公开框架，因此当前构建不适合直接提交 Mac App Store；无元数据时降级显示实际出声的来源应用。
-- 网络：天气访问 Open-Meteo；中国大陆地点的官方预警访问中国天气网公开数据，其他地点优先使用 WeatherKit；更新检查先访问 Gitee API，未发现新版本或 Gitee 不可用时再访问 GitHub API，签名安装包还会访问 GitHub Sparkle appcast；B 站备用下载访问其只读视频信息、播放地址和媒体 CDN；识别剪贴板链接本身不联网。
+- 网络：天气访问 Open-Meteo；中国大陆地点的官方预警访问中国天气网公开数据，其他地点优先使用 WeatherKit；更新检查先访问 Gitee API，未发现新版本或 Gitee 不可用时再访问 GitHub API，确认下载时访问对应 Release 的 DMG；B 站备用下载访问其只读视频信息、播放地址和媒体 CDN；识别剪贴板链接本身不联网。
 - 自动化：随记通过 AppleScript/JXA 读写系统「备忘录」App 中的笔记（列出、查看、编辑、新建、删除），首次使用需在弹窗中授权 zisla 控制「备忘录」；随记不联网，笔记数据存在备忘录中。
 
 ## 测试
@@ -169,10 +197,11 @@ swift test \
 
 ```bash
 cd ../Web
-python3 -m http.server 4173
+npm ci
+npm run dev
 ```
 
-打开 `http://localhost:4173`。
+打开 Vite 在终端输出的本地地址。生产构建使用 `npm run build`。
 
 ## 文档
 
@@ -185,7 +214,10 @@ python3 -m http.server 4173
 - macOS 没有公开的“灵动岛”API；物理刘海通过 `safeAreaInsets` 和顶部辅助区域推断，无刘海屏幕使用同样的自有覆盖层模拟。
 - DRM 视频、登录窗口、锁屏和部分独占全屏应用不保证提供 Now Playing 数据或允许覆盖层显示。
 - 未接入系统媒体中心的应用仍可识别正在输出音频的来源，但无法保证提供曲名、封面或进度；暂停、停止和静音视频按设计不显示。
-- 自动替换应用需要 Developer ID 签名、公证和 Sparkle EdDSA 更新签名；开发构建不会绕过这些条件。
+- 浏览器必须向 macOS 发布文件进度，或在“下载”目录使用可识别的临时文件，zisla 才能显示下载百分比。
+- 电池健康、温度、实时功率和配件电量取决于硬件、连接方式及 macOS 实际暴露的数据；缺失字段会显示为不可用。
+- Office 转 PDF 依赖本机 LibreOffice 或 OpenOffice，其余 PDF 操作在本机直接完成。
+- 免费 ad-hoc 签名包未经公证，首次打开可能需要在系统设置中选择“仍要打开”。无论签名方式，应用内都只检查和下载更新包，不会自动替换当前应用。
 
 ## License
 

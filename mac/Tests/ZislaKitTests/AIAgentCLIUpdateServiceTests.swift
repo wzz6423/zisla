@@ -13,7 +13,7 @@ struct AIAgentCLIUpdateServiceTests {
             case .codex: "1.2.0"
             case .claude: "2.1.181"
             case .gemini: "0.9.0"
-            case .grok, .opencode: nil
+            case .grok, .kimi, .opencode, .qwen, .qoder, .copilot, .glm: nil
             }
         }
 
@@ -58,5 +58,21 @@ struct AIAgentCLIUpdateServiceTests {
         ])
 
         #expect(updates.isEmpty)
+    }
+
+    @Test
+    func reportsNewerGLMCodingHelperVersions() async throws {
+        let glm = try #require(AgentCLIKind(rawValue: "glm"))
+        let service = AIAgentCLIUpdateService { kind in
+            kind == glm ? "0.0.8" : nil
+        }
+
+        let updates = await service.availableUpdates(for: [
+            AgentCLIStatus(kind: glm, executablePath: "/usr/local/bin/chelper", version: "0.0.7"),
+        ])
+
+        #expect(updates == [
+            AIAgentCLIUpdate(kind: glm, installedVersion: "0.0.7", latestVersion: "0.0.8"),
+        ])
     }
 }
