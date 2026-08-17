@@ -25,13 +25,13 @@ export const navItems: NavItem[] = [
 export const productTitle = 'zisla';
 export const productTagline = '原生 macOS 动态工作空间';
 export const productDescription =
-  '把 AI 进度、媒体、文件和日程放到屏幕顶部，需要时展开，移开后收起。';
+  '把 AI 任务、媒体控制、文件中转和日程信息集中到屏幕顶部。需要时展开查看，移开后自动收起。';
 
-export const heroTitle = 'zisla<br><em>屏幕顶部的动态工作空间。</em>';
+export const heroTitle = 'zisla<br><em>把正在发生的事<br>放到你看得见的地方。</em>';
 export const heroHints = [
-  '鼠标移到屏幕顶部中央即可展开',
-  '移开后自动收起，不抢当前应用焦点',
-  '无刘海显示器同样可用',
+  '移到屏幕顶部即可展开，无需点击',
+  '自动收起，不干扰当前工作',
+  '刘海屏与外接显示器都支持',
 ];
 
 export const proofItems = [

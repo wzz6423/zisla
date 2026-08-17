@@ -11,7 +11,6 @@ import {
   ChartLine,
   Check,
   ChevronDown,
-  CircleCheck,
   Clipboard,
   ClipboardPaste,
   Clock,
@@ -142,7 +141,6 @@ const siteIcons = {
   ChartLine,
   Check,
   ChevronDown,
-  CircleCheck,
   Clipboard,
   ClipboardPaste,
   Clock,
@@ -1060,10 +1058,10 @@ app.innerHTML = `
           <img class="brand-mark" src="./assets/zisla-icon.png" alt="" />
           <span>zisla <span class="brand-subtitle">/ ${productTagline}</span></span>
         </a>
-        <button class="menu-toggle" type="button" aria-label="打开导航" aria-expanded="false" title="打开导航">${icon('menu', 18)}</button>
+        <button class="menu-toggle" type="button" aria-label="打开导航菜单" aria-expanded="false" title="打开导航">${icon('menu', 18)}</button>
         <nav class="nav" aria-label="主导航">
           ${navItems.map((item) => `<a class="nav-link" href="${item.href}">${item.label}</a>`).join('')}
-          <a class="header-cta" href="#download">下载 ${latestRelease.version}${icon('arrow-down-to-line', 14)}</a>
+          <a class="header-cta" href="#download" aria-label="跳转到下载区域">下载 ${latestRelease.version}${icon('arrow-down-to-line', 14)}</a>
         </nav>
       </header>
 
@@ -1073,8 +1071,8 @@ app.innerHTML = `
           <h1 class="hero-title">${heroTitle}</h1>
           <p class="hero-lede">${productDescription}</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="${latestRelease.dmg}" download>${icon('download', 16)}下载 macOS DMG</a>
-            <a class="button button-ghost" href="${repositoryLinks.github}" target="_blank" rel="noreferrer">${icon('code-2', 15)}GitHub</a>
+            <a class="button button-primary" href="${latestRelease.dmg}" download aria-label="下载 zisla ${latestRelease.version} DMG 安装包">${icon('download', 16)}下载 macOS 版</a>
+            <a class="button button-ghost" href="${repositoryLinks.github}" target="_blank" rel="noreferrer" aria-label="在 GitHub 上查看 zisla 源代码">${icon('code-2', 15)}查看源码</a>
           </div>
           <ul class="hero-hints">
             ${heroHints.map((hint) => `<li>${icon('check', 13)}<span>${hint}</span></li>`).join('')}
@@ -1119,7 +1117,6 @@ app.innerHTML = `
           </div>
           <div class="hero-stage-actions">
             <button type="button" class="demo-replay" id="replayDemo">${icon('refresh-cw', 12)}重播展开演示</button>
-            <span class="stage-note">产品界面 · 演示数据</span>
           </div>
         </div>
       </div>
@@ -1140,10 +1137,10 @@ app.innerHTML = `
       <div class="section-wrap">
         <div class="section-heading reveal">
           <div>
-            <p class="eyebrow">PRODUCT UI / DEMO DATA</p>
-            <h2 class="section-title">每个界面，<span>都来自真实功能。</span></h2>
+            <p class="eyebrow">ONE PLACE / EVERYDAY FLOW</p>
+            <h2 class="section-title">常用工作流，<span>都在屏幕顶部。</span></h2>
           </div>
-          <p class="section-lede">界面结构与真实产品一致，内容均为虚构演示数据。点击模块即可切换查看。</p>
+          <p class="section-lede">从 AI 任务到剪贴板、日程与系统状态，zisla 把分散的桌面工作流收进同一个入口。</p>
         </div>
         <div class="showcase reveal">
           <div class="showcase-rail" role="tablist" aria-label="功能模块">${showcaseRailMarkup}</div>
@@ -1163,7 +1160,6 @@ app.innerHTML = `
             <div class="showcase-caption" id="showcaseCaption">
               <div class="caption-head">
                 <span class="mono-label" data-caption-module>MODULE / ${showcaseModules[0]?.name ?? ''}</span>
-                <span class="real-badge">${icon('circle-check', 12)}产品界面 · 演示数据</span>
               </div>
               <p data-caption-text>${showcaseModules[0]?.caption ?? ''}</p>
               <div class="caption-points" data-caption-points>
@@ -1244,12 +1240,12 @@ app.innerHTML = `
       <div class="section-wrap download-layout">
         <div>
           <p class="eyebrow">READY WHEN YOU ARE</p>
-          <h2 class="download-title">下载 zisla。</h2>
+          <h2 class="download-title">立即下载 zisla</h2>
           <p class="download-copy">${latestRelease.version} · macOS Universal · DMG / ZIP</p>
           <div class="download-actions">
-            <a class="button button-light" href="${latestRelease.dmg}" download>${icon('download', 16)}下载 DMG</a>
-            <a class="button button-ghost-dark" href="${latestRelease.zip}" download>下载 ZIP</a>
-            <a class="button button-ghost-dark" href="${latestRelease.releasePage}" target="_blank" rel="noreferrer">${icon('external-link', 16)}查看 Release</a>
+            <a class="button button-light" href="${latestRelease.dmg}" download aria-label="下载 zisla ${latestRelease.version} DMG 安装包">${icon('download', 16)}下载 DMG</a>
+            <a class="button button-ghost-dark" href="${latestRelease.zip}" download aria-label="下载 zisla ${latestRelease.version} ZIP 压缩包">下载 ZIP</a>
+            <a class="button button-ghost-dark" href="${latestRelease.releasePage}" target="_blank" rel="noreferrer" aria-label="在 GitHub 上查看 ${latestRelease.version} 发布详情">${icon('external-link', 16)}查看 Release</a>
           </div>
         </div>
         <dl class="download-notes">
