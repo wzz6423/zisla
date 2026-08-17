@@ -13,6 +13,9 @@ final class SideNoticeDisplayState: ObservableObject {
     var compactStatusIDs: Set<String> = []
     /// Physical notch width; the detailed music layout must leave a gap here in the center. 0 on simulated-island devices.
     @Published var compactBarCenterInset: CGFloat = 0
+    /// Voice-processing status is scoped to the display where the recording happened; every
+    /// other display hides it so the collapsed pill (and the pet slot) stays in its normal place.
+    @Published var hidesVoiceProcessingIndicator = false
 }
 
 private enum CompactStatusMetrics {
@@ -51,7 +54,14 @@ struct SideNoticeRootView: View {
         let activeAINotices = displayState.compactWingsEnabled ? compactAINotices : []
 
         VStack(alignment: side == .left ? .trailing : .leading, spacing: 6) {
-            if let mediaNotice = presentation.activeMediaNotice {
+            if let voiceProcessingNotice = presentation.activeVoiceProcessingNotice {
+                CompactVoiceProcessingWing(
+                    notice: voiceProcessingNotice,
+                    side: side,
+                    height: presentation.compactWingHeight
+                )
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
+            } else if let mediaNotice = presentation.activeMediaNotice {
                 CompactMediaWing(
                     notice: mediaNotice,
                     side: side,
@@ -126,7 +136,10 @@ struct SideNoticeRootView: View {
     }
 
     private var notices: [IslandNotice] {
-        side == .left ? queue.left : queue.right
+        let own = side == .left ? queue.left : queue.right
+        return displayState.hidesVoiceProcessingIndicator
+            ? own.filter { !$0.id.hasPrefix("voice-processing-") }
+            : own
     }
 
     private var compactMediaNotice: IslandNotice? {
@@ -254,6 +267,11 @@ struct CompactStatusBarView: View {
             .sorted { $0.createdAt > $1.createdAt }
     }
 
+    private var voiceProcessingNotice: IslandNotice? {
+        guard !displayState.hidesVoiceProcessingIndicator else { return nil }
+        return (queue.left + queue.right).first { $0.id.hasPrefix("voice-processing-") }
+    }
+
     private var updateNotice: IslandNotice? {
         (queue.left + queue.right).first { $0.id.hasPrefix("update-available-") }
     }
@@ -279,6 +297,30 @@ struct CompactStatusBarView: View {
 
     @ViewBuilder
     private var compactStatusContent: some View {
+        // Voice processing is a short, user-initiated status; it takes precedence over the configured priority list.
+        if let voiceProcessingNotice {
+            HStack(spacing: 0) {
+                CompactVoiceProcessingWing(
+                    notice: voiceProcessingNotice,
+                    side: .left,
+                    height: height,
+                    usesTransparentBackground: compactWingsUseTransparentBackground
+                )
+                Spacer(minLength: 0)
+                CompactVoiceProcessingWing(
+                    notice: voiceProcessingNotice,
+                    side: .right,
+                    height: height,
+                    usesTransparentBackground: compactWingsUseTransparentBackground
+                )
+            }
+        } else {
+            configuredCompactStatusContent
+        }
+    }
+
+    @ViewBuilder
+    private var configuredCompactStatusContent: some View {
         switch selectedCompactStatusPriority {
         case .transient:
             if let transientNotice {
@@ -961,6 +1003,54 @@ private struct MessageTextWidthKey: PreferenceKey {
 private enum CompactAIWingRole {
     case identity
     case status
+}
+
+/// Collapsed-island wings shown while an AI model cleans up a recorded transcript:
+/// the left wing carries a microphone glyph, the right wing one of the nine thinking-orb
+/// animations (picked at random when processing starts).
+private struct CompactVoiceProcessingWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    private var orbState: ThinkingOrbState {
+        ThinkingOrbState(rawValue: notice.metadata?["orbState"] ?? "") ?? .working
+    }
+
+    var body: some View {
+        Group {
+            if side == .left {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: min(13, height * 0.44), weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.leading, CompactStatusMetrics.horizontalContentInset + 2)
+                    .frame(
+                        width: CompactStatusMetrics.wingWidth,
+                        height: height,
+                        alignment: .leading
+                    )
+            } else {
+                ThinkingOrbView(
+                    state: orbState,
+                    size: min(22, height * 0.72),
+                    tint: .white,
+                    accessibilityLabel: "正在整理语音"
+                )
+                .padding(.trailing, CompactStatusMetrics.horizontalContentInset + 2)
+                .frame(
+                    width: CompactStatusMetrics.wingWidth,
+                    height: height,
+                    alignment: .trailing
+                )
+            }
+        }
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+        .contentShape(CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("正在整理语音"))
+        .help("正在整理语音…")
+    }
 }
 
 private struct CompactUpdateWing: View {

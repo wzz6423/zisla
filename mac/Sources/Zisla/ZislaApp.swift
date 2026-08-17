@@ -30,6 +30,104 @@ final class SettingsWindow: NSWindow {
     override func performClose(_ sender: Any?) {
         close()
     }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard let action = Self.editingAction(for: event),
+              let firstResponder,
+              NSApp.sendAction(action, to: firstResponder, from: self)
+        else {
+            return super.performKeyEquivalent(with: event)
+        }
+        return true
+    }
+
+    private static func editingAction(for event: NSEvent) -> Selector? {
+        let modifiers = event.modifierFlags
+            .intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        let key = event.charactersIgnoringModifiers?.lowercased()
+
+        return switch (key, modifiers) {
+        case ("a", .command): #selector(NSResponder.selectAll(_:))
+        case ("c", .command): #selector(NSText.copy(_:))
+        case ("v", .command): #selector(NSText.paste(_:))
+        case ("x", .command): #selector(NSText.cut(_:))
+        case ("z", .command): Selector(("undo:"))
+        case ("z", [.command, .shift]): Selector(("redo:"))
+        default: nil
+        }
+    }
+}
+
+enum SystemMonitorMemoryPresentation {
+    static func usageRatio(usedBytes: UInt64, totalBytes: UInt64) -> Double? {
+        guard totalBytes > 0 else { return nil }
+        return SystemMonitorMath.memoryPressureRatio(
+            usedBytes: usedBytes,
+            totalBytes: totalBytes
+        )
+    }
+
+    static func usageText(usedBytes: UInt64, totalBytes: UInt64) -> String {
+        guard let ratio = usageRatio(usedBytes: usedBytes, totalBytes: totalBytes) else {
+            return "--"
+        }
+        return "\(Int((ratio * 100).rounded()))%"
+    }
+}
+
+enum SystemMonitorMenuBarPresentation {
+    static func label(for metric: SystemMonitorMenuBarMetric) -> String {
+        switch metric {
+        case .cpu: "CPU"
+        case .gpu: "GPU"
+        case .memory: "Memory"
+        case .disk: "Disk"
+        case .network: "Network"
+        case .fan: "Fans"
+        }
+    }
+
+    static func detailedFanValue(_ rpm: [Double]) -> String? {
+        let readings = fanReadings(rpm)
+        return readings.isEmpty ? nil : readings.joined(separator: "  ")
+    }
+
+    static func compactFanRows(_ rpm: [Double]) -> [String] {
+        let readings = fanReadings(rpm)
+        guard !readings.isEmpty else { return [] }
+
+        var rows = ["", ""]
+        for (index, reading) in readings.enumerated() {
+            let rowIndex = index % 2
+            rows[rowIndex] += rows[rowIndex].isEmpty ? reading : "   \(reading)"
+        }
+        return rows.filter { !$0.isEmpty }
+    }
+
+    private static func fanReadings(_ rpm: [Double]) -> [String] {
+        rpm.enumerated().map { index, speed in
+            let label = switch index {
+            case 0: "L"
+            case 1: "R"
+            default: "F\(index + 1)"
+            }
+            return "\(label) \(Int(speed.rounded()))"
+        }
+    }
+}
+
+enum PersistentPetNoticePolicy {
+    static func notices(
+        _ notices: [IslandNotice],
+        isVoiceRecording: Bool,
+        voiceDisplayID: UInt32?,
+        displayID: UInt32
+    ) -> [IslandNotice] {
+        if isVoiceRecording { return [] }
+        guard let voiceDisplayID, voiceDisplayID != displayID else { return notices }
+        return notices.filter { !$0.id.hasPrefix("voice-processing-") }
+    }
 }
 
 @MainActor
@@ -55,6 +153,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var lastAppliedPanelSize: CGSize?
     /// Panel size saved before voice recording starts; restored when recording ends.
     private var voiceRecordingSavedPanelSize: CGSize?
+    /// Display where the last voice recording happened; scopes the processing indicator and
+    /// keeps every other display's pet slot at its ordinary collapsed position.
+    private var voiceRecordingDisplayID: UInt32?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         LegacyAppDataMigration.migrateUserDefaults()
@@ -130,12 +231,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 persistentPetHostingView.sizingOptions = []
                 return persistentPetHostingView
             },
-            persistentPanelFrameProvider: { layout in
-                CollapsedPetLayout.frame(
+            persistentPanelFrameProvider: { [weak self] layout in
+                let notices = PersistentPetNoticePolicy.notices(
+                    model.notices.left + model.notices.right,
+                    isVoiceRecording: model.voiceInput.isRecording,
+                    voiceDisplayID: self?.voiceRecordingDisplayID,
+                    displayID: layout.displayID
+                )
+                return CollapsedPetLayout.frame(
                     for: layout,
                     compactBarFrame: SideNoticeLayoutEngine().compactBarFrame(
                         for: layout,
-                        notices: model.notices.left + model.notices.right,
+                        notices: notices,
                         settings: model.settingsStore.settings
                     )
                 )
@@ -208,7 +315,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             model.isPinned = true
             coordinator.setPinned(true)
         }
-
         noticePresenter = SideNoticePresenter(
             queue: model.notices,
             media: model.media,
@@ -378,17 +484,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         ).panelSize
                         // Direct resize (no two-phase): recording swaps layout instantly by design.
                         self.expandedSizeUpdateTask?.cancel()
-                        let recordingSize = CGSize(width: 660, height: 76)
+                        let recordingSize = IslandModuleLayout.voiceRecording
+                            .matchingWidth(model.collapsedOverflowWidth)
+                            .panelSize
+                        self.overlayCoordinator?.setVoiceRecording(true)
                         self.overlayCoordinator?.updateExpandedSize(recordingSize)
                         self.lastAppliedPanelSize = recordingSize
-                        self.overlayCoordinator?.setTransientInteractionVisible(true)
+                        // Scope the post-recording processing indicator to the display where
+                        // dictation happened.
+                        let voiceDisplayID = self.overlayCoordinator?.activeDisplayID
+                        self.voiceRecordingDisplayID = voiceDisplayID
+                        self.noticePresenter?.setVoiceProcessingDisplayID(voiceDisplayID)
                     } else {
-                        self.overlayCoordinator?.setTransientInteractionVisible(false)
+                        self.overlayCoordinator?.setVoiceRecording(false)
                         if let saved = self.voiceRecordingSavedPanelSize {
                             self.overlayCoordinator?.updateExpandedSize(saved)
                             self.lastAppliedPanelSize = saved
                             self.voiceRecordingSavedPanelSize = nil
                         }
+                        // 兜底:录音期间不再激活应用,焦点本就留在目标应用;
+                        // 此调用仅在极端情况下把它切回,保证后续粘贴可达。
+                        AppModel.shared.restoreVoiceInputTargetFocus()
                     }
                 }
             }
@@ -615,10 +731,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 configureMonitorStatusItem(item, metric: metric, style: style)
                 monitorStatusItemStyles[metric] = style
                 monitorStatusTitles.removeValue(forKey: metric)
-                item.button?.toolTip = "\(localized(metric.menuTitle)): \(localized("点击打开系统监控"))"
-                if style == .compact {
-                    item.length = compactMonitorStatusItemWidth(for: metric)
-                }
+                item.button?.toolTip = "\(SystemMonitorMenuBarPresentation.label(for: metric)): \(localized("点击打开系统监控"))"
             }
             let title = monitorStatusTitle(
                 for: metric,
@@ -626,8 +739,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 style: style
             )
             if style == .compact {
+                let itemWidth = compactMonitorStatusItemWidth(for: metric, value: title)
+                item.length = itemWidth
                 if monitorStatusTitles[metric] != title {
-                    item.button?.image = compactMonitorStatusImage(value: title, metric: metric)
+                    item.button?.image = compactMonitorStatusImage(
+                        value: title,
+                        metric: metric,
+                        itemWidth: itemWidth
+                    )
                 }
             } else {
                 item.length = NSStatusItem.variableLength
@@ -649,7 +768,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .detailed:
             button.image = NSImage(
                 systemSymbolName: metric.symbolName,
-                accessibilityDescription: localized(metric.menuTitle)
+                accessibilityDescription: SystemMonitorMenuBarPresentation.label(for: metric)
             )
             button.imagePosition = .imageLeading
             button.alignment = .natural
@@ -672,26 +791,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if style == .compact {
             return compactMonitorStatusValue(for: metric, snapshot: snapshot)
         }
-        guard let snapshot else { return "\(localized(metric.menuTitle)) --" }
+        let label = SystemMonitorMenuBarPresentation.label(for: metric)
+        guard let snapshot else { return "\(label) --" }
         switch metric {
         case .cpu:
-            return "CPU \(percent(snapshot.cpu.usage))"
+            return "\(label) \(percent(snapshot.cpu.usage))"
         case .gpu:
-            guard case let .available(gpu) = snapshot.gpu else { return "GPU --" }
-            return "GPU \(percent(gpu.usage))"
+            guard case let .available(gpu) = snapshot.gpu else { return "\(label) --" }
+            return "\(label) \(percent(gpu.usage))"
         case .memory:
-            return "RAM \(byteText(snapshot.memory.usedBytes))"
+            let usage = SystemMonitorMemoryPresentation.usageText(
+                usedBytes: snapshot.memory.usedBytes,
+                totalBytes: snapshot.memory.totalBytes
+            )
+            return "\(label) \(usage)"
         case .disk:
-            guard snapshot.disk.totalBytes > 0 else { return "\(localized("磁盘")) --" }
+            guard snapshot.disk.totalBytes > 0 else { return "\(label) --" }
             let usage = Double(snapshot.disk.usedBytes) / Double(snapshot.disk.totalBytes)
-            return "\(localized("磁盘")) \(percent(usage))"
+            return "\(label) \(percent(usage))"
         case .network:
-            return "\(localized("网络")) ↓\(rateText(snapshot.network.receiveBytesPerSecond)) ↑\(rateText(snapshot.network.sendBytesPerSecond))"
+            return "\(label) ↓\(rateText(snapshot.network.receiveBytesPerSecond)) ↑\(rateText(snapshot.network.sendBytesPerSecond))"
         case .fan:
-            guard case let .available(rpm, _) = snapshot.fan, let first = rpm.first else {
-                return "\(localized("风扇")) --"
-            }
-            return "\(localized("风扇")) \(Int(first.rounded()))"
+            guard case let .available(rpm, _) = snapshot.fan,
+                  let value = SystemMonitorMenuBarPresentation.detailedFanValue(rpm)
+            else { return "\(label) --" }
+            return "\(label) \(value)"
         }
     }
 
@@ -707,30 +831,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             guard case let .available(gpu) = snapshot.gpu else { return "--" }
             return percent(gpu.usage)
         case .memory:
-            guard snapshot.memory.totalBytes > 0 else { return "--" }
-            return percent(Double(snapshot.memory.usedBytes) / Double(snapshot.memory.totalBytes))
+            return SystemMonitorMemoryPresentation.usageText(
+                usedBytes: snapshot.memory.usedBytes,
+                totalBytes: snapshot.memory.totalBytes
+            )
         case .disk:
             guard snapshot.disk.totalBytes > 0 else { return "--" }
             return percent(Double(snapshot.disk.usedBytes) / Double(snapshot.disk.totalBytes))
         case .network:
             return "↓\(rateText(snapshot.network.receiveBytesPerSecond))"
         case .fan:
-            guard case let .available(rpm, _) = snapshot.fan, let first = rpm.first else {
-                return "--"
-            }
-            return "\(Int(first.rounded()))"
+            guard case let .available(rpm, _) = snapshot.fan else { return "--" }
+            let rows = SystemMonitorMenuBarPresentation.compactFanRows(rpm)
+            return rows.isEmpty ? "--" : rows.joined(separator: "\n")
         }
     }
 
     private func compactMonitorStatusLabel(for metric: SystemMonitorMenuBarMetric) -> String {
-        switch metric {
-        case .cpu: "CPU"
-        case .gpu: "GPU"
-        case .memory: localized("内存")
-        case .disk: localized("磁盘")
-        case .network: localized("网络")
-        case .fan: localized("风扇")
-        }
+        SystemMonitorMenuBarPresentation.label(for: metric)
     }
 
     private func localized(_ key: String) -> String {
@@ -751,22 +869,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         quickNotesEditorController?.window?.title = localized("随记 · 编辑")
     }
 
-    private func compactMonitorStatusItemWidth(for metric: SystemMonitorMenuBarMetric) -> CGFloat {
+    private func compactMonitorStatusItemWidth(
+        for metric: SystemMonitorMenuBarMetric,
+        value: String
+    ) -> CGFloat {
+        let valueFont = metric == .fan
+            ? NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+            : NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium)
+        let valueWidth = value
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { ($0 as NSString).size(withAttributes: [.font: valueFont]).width }
+            .max() ?? 0
+
+        if metric == .fan {
+            return max(40, ceil(valueWidth) + 8)
+        }
+
+        let labelWidth = (compactMonitorStatusLabel(for: metric) as NSString).size(
+            withAttributes: [.font: NSFont.systemFont(ofSize: 8, weight: .semibold)]
+        ).width
+        let minimumWidth: CGFloat
         switch metric {
         case .cpu, .gpu, .memory, .disk:
-            32
+            minimumWidth = 32
         case .network:
-            60
+            minimumWidth = 60
         case .fan:
-            40
+            minimumWidth = 40
         }
+        return max(minimumWidth, ceil(max(valueWidth, labelWidth)) + 8)
     }
 
     private func compactMonitorStatusImage(
         value: String,
-        metric: SystemMonitorMenuBarMetric
+        metric: SystemMonitorMenuBarMetric,
+        itemWidth: CGFloat
     ) -> NSImage? {
-        let size = NSSize(width: compactMonitorStatusItemWidth(for: metric) - 4, height: 22)
+        let size = NSSize(width: itemWidth - 4, height: 22)
         guard let representation = NSBitmapImageRep(
             bitmapDataPlanes: nil,
             pixelsWide: Int(size.width * 2),
@@ -791,38 +930,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context
         context.cgContext.scaleBy(x: 2, y: 2)
-        (value as NSString).draw(
-            in: NSRect(x: 0, y: 10, width: size.width, height: 12),
-            withAttributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium),
-                .foregroundColor: NSColor.black,
-                .paragraphStyle: paragraph,
-            ]
-        )
-        (compactMonitorStatusLabel(for: metric) as NSString).draw(
-            in: NSRect(x: 0, y: 1, width: size.width, height: 10),
-            withAttributes: [
-                .font: NSFont.systemFont(ofSize: 8, weight: .semibold),
-                .foregroundColor: NSColor.black,
-                .paragraphStyle: paragraph,
-            ]
-        )
+
+        if metric == .fan {
+            let rows = value.split(separator: "\n", omittingEmptySubsequences: false)
+            let font = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+            for (index, row) in rows.prefix(2).enumerated() {
+                let y: CGFloat = rows.count == 1 && value == "--" ? 6 : (index == 0 ? 11 : 1)
+                (row as NSString).draw(
+                    in: NSRect(x: 0, y: y, width: size.width, height: 10),
+                    withAttributes: [
+                        .font: font,
+                        .foregroundColor: NSColor.black,
+                        .paragraphStyle: paragraph,
+                    ]
+                )
+            }
+        } else {
+            (value as NSString).draw(
+                in: NSRect(x: 0, y: 10, width: size.width, height: 12),
+                withAttributes: [
+                    .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium),
+                    .foregroundColor: NSColor.black,
+                    .paragraphStyle: paragraph,
+                ]
+            )
+            (compactMonitorStatusLabel(for: metric) as NSString).draw(
+                in: NSRect(x: 0, y: 1, width: size.width, height: 10),
+                withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 8, weight: .semibold),
+                    .foregroundColor: NSColor.black,
+                    .paragraphStyle: paragraph,
+                ]
+            )
+        }
+
         context.flushGraphics()
         NSGraphicsContext.restoreGraphicsState()
 
         let image = NSImage(size: size)
         image.addRepresentation(representation)
         image.isTemplate = true
-        image.accessibilityDescription = metric.menuTitle
+        image.accessibilityDescription = SystemMonitorMenuBarPresentation.label(for: metric)
         return image
     }
 
     private func percent(_ value: Double) -> String {
         "\(Int((min(1, max(0, value)) * 100).rounded()))%"
-    }
-
-    private func byteText(_ bytes: UInt64) -> String {
-        ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
     }
 
     private func rateText(_ bytesPerSecond: Double) -> String {

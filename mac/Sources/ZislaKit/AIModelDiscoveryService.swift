@@ -1,4 +1,3 @@
-import Darwin
 import Foundation
 import ZislaCore
 
@@ -91,30 +90,6 @@ public struct AIModelDiscoveryService: Sendable {
         components.query = nil
         components.fragment = nil
         return components.url ?? url
-    }
-}
-
-public enum AIHardwareProfileDetector {
-    public static func current() -> AIHardwareProfile {
-        let hardware = SystemHardwareInfoReader.read()
-        return AIHardwareProfile(
-            machineName: Host.current().localizedName ?? "此 Mac",
-            memoryBytes: ProcessInfo.processInfo.physicalMemory,
-            cpuName: hardware.cpuName ?? sysctlString(named: "machdep.cpu.brand_string"),
-            cpuCoreCount: hardware.cpuCoreCount,
-            cpuPerformanceCoreCount: hardware.cpuPerformanceCoreCount,
-            cpuEfficiencyCoreCount: hardware.cpuEfficiencyCoreCount,
-            gpuName: hardware.gpuName,
-            gpuCoreCount: hardware.gpuCoreCount
-        )
-    }
-
-    private static func sysctlString(named name: String) -> String? {
-        var size: size_t = 0
-        guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
-        var buffer = [UInt8](repeating: 0, count: Int(size))
-        guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else { return nil }
-        return String(decoding: buffer.dropLast(), as: UTF8.self)
     }
 }
 

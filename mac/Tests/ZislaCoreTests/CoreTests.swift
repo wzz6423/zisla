@@ -1773,13 +1773,12 @@ struct UpdateCoreTests {
 
 struct FeatureSettingsTests {
     @Test
-    func featuresDefaultOn() {
+    func featureDefaults() {
         let settings = FeatureSettings.default
 
         #expect(settings.mediaEnabled)
         #expect(settings.fileShelfEnabled)
         #expect(settings.aiProgressEnabled)
-        #expect(settings.aiAgentEnabled)
         #expect(settings.downloaderEnabled)
         #expect(settings.calendarEnabled)
         #expect(settings.toolboxEnabled)
@@ -1789,8 +1788,8 @@ struct FeatureSettingsTests {
         #expect(settings.browserDownloadIslandEnabled)
         #expect(settings.videoDownloadIslandEnabled)
         #expect(settings.systemMonitorEnabled)
-        #expect(settings.systemMonitorMenuBarMetrics == Set(SystemMonitorMenuBarMetric.allCases))
-        #expect(settings.menuBarAppIconEnabled)
+        #expect(settings.systemMonitorMenuBarMetrics == [.cpu])
+        #expect(!settings.menuBarAppIconEnabled)
         #expect(settings.weatherEnabled)
         #expect(settings.lockScreenInfoEnabled)
         #expect(settings.lockScreenShowsLunar)

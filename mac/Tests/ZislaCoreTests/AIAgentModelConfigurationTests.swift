@@ -16,17 +16,4 @@ struct AIAgentModelConfigurationTests {
 
         #expect(decoded.voiceModelConfiguration == reference)
     }
-
-    @Test
-    func chatThreadLocalModelSelectionRoundTrips() throws {
-        let localModelID = UUID()
-        let thread = AgentChatThread(localModelID: localModelID)
-
-        let decoded = try JSONDecoder().decode(
-            AgentChatThread.self,
-            from: JSONEncoder().encode(thread)
-        )
-
-        #expect(decoded.localModelID == localModelID)
-    }
 }

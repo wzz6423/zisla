@@ -24,7 +24,7 @@
 "工作流" = "İş Akışı";
 "信息" = "Bilgi";
 "模型" = "Modeller";
-"桌面宠物" = "Masaüstü Evcil Hayvanı";
+"宠物" = "Evcil Hayvan";
 "交互" = "Etkileşim";
 "下载" = "İndir";
 "天气" = "Hava Durumu";
@@ -95,7 +95,6 @@
 "播放与 AI 活动通知显示在此屏幕" = "Oynatma ve AI etkinliği bildirimleri bu ekranda gösterilir";
 
 /* Settings - AI */
-"AI 进度、语音输入，以及连接、自动化、CLI 与 Skills 等 Agent 行为。" = "AI ilerlemesi, sesli giriş ve bağlantılar, otomasyon, CLI ve Skills dahil Agent davranışları.";
 "AI 监控" = "AI İzleme";
 "AI 进度与用量" = "AI İlerlemesi ve Kullanımı";
 "汇总桌面端与 CLI 工具的运行状态" = "Masaüstü ve CLI araç çalışma durumunu özetle";
@@ -110,12 +109,7 @@
 "左右侧修饰键需要监听全局键盘事件" = "Sol/sağ değiştirici tuşlar global klavye olaylarını dinlemeyi gerektirir";
 "已授权" = "Yetkilendirildi";
 
-/* Settings - AI Agent */
-"AI Agent 行为" = "AI Agent Davranışı";
-"在灵动岛显示" = "Dynamic Island'da Göster";
-"关闭后仅从工具栏隐藏，此处的配置与对话不受影响" = "Kapatıldığında sadece araç çubuğundan gizlenir; buradaki yapılandırma ve sohbetler etkilenmez";
-
-/* Settings - Models */
+/* Settings - Voice Models */
 "配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Yerel modelleri, uzak modelleri ve kimlik bilgilerini yapılandırın ve ses organizasyonu için model seçin.";
 "本地模型" = "Yerel Modeller";
 "远端模型与凭据" = "Uzak Modeller ve Kimlik Bilgileri";
@@ -247,7 +241,6 @@
 "输入文字或 Emoji" = "Metin veya Emoji girin";
 "复制到剪贴板" = "Panoya Kopyala";
 "发送到随记" = "Hızlı Notlara Gönder";
-"发送到 AI Agent" = "AI Agent'a Gönder";
 "移出常用" = "Favorilerden Kaldır";
 "设为常用" = "Favorilere Ekle";
 "文本" = "Metin";
@@ -264,47 +257,16 @@
 "展开大窗口编辑" = "Büyük Pencerede Aç";
 "系统共享" = "Sistem Paylaşımı";
 
-/* AI Agent Module */
-"对话" = "Sohbet";
-"消息连接" = "Mesaj Bağlantıları";
-"应用增强" = "Uygulama İyileştirmeleri";
-"自动化" = "Otomasyon";
+
+/* Settings - AI CLI and Skills */
 "CLI 与 Skills" = "CLI ve Skills";
-"会话存储" = "Oturum Depolama";
-"刷新余额、渠道、CLI 和 Skills" = "Bakiye, kanallar, CLI ve Skills'i yenile";
-"统一历史" = "Birleşik Geçmiş";
-"新建对话" = "Yeni Sohbet";
-"添加项目" = "Proje Ekle";
-"添加现有文件夹…" = "Mevcut Klasörü Ekle…";
-"新建文件夹并添加…" = "Yeni Klasör Oluştur…";
-"将本地文件夹添加为项目" = "Yerel klasörü proje olarak ekle";
-"未归类" = "Kategorilenmemiş";
-"展开项目会话" = "Proje oturumlarını genişlet";
-"收起项目会话" = "Proje oturumlarını daralt";
-"选择项目；新建对话会归入此项目" = "Proje seç; yeni sohbetler bu projeye eklenecek";
-"取消置顶项目" = "Projeyi Sabitlemeyi Kaldır";
-"置顶项目" = "Projeyi Sabitle";
-"删除项目" = "Projeyi Sil";
-"选择或新建对话" = "Sohbet seç veya oluştur";
-"你" = "Sen";
+
+/* Shared Actions */
 "助手" = "Asistan";
-"执行细节" = "Yürütme Detayları";
-"计划模式" = "Plan Modu";
-"复制回复" = "Yanıtı Kopyala";
-"从此回复分叉会话" = "Yanıttan Oturumu Çatalla";
-"批注" = "Açıklama";
-"添加批注" = "Açıklama Ekle";
-"将引用和评论发送为新消息" = "Alıntı ve yorumu yeni mesaj olarak gönder";
-"删除批注" = "Açıklamayı Sil";
-"发送消息" = "Mesaj Gönder";
 "添加文件" = "Dosya Ekle";
-"添加文件、切换计划模式或目标模式" = "Dosya ekle, plan moduna veya hedef moduna geç";
-"目标模式" = "Hedef Modu";
-"设置外部 CLI 的访问偏好" = "Harici CLI erişim tercihlerini ayarla";
-"选择思考深度偏好" = "Düşünme derinliği tercihini seç";
 "发送" = "Gönder";
 
-/* AI Agent - Remote Providers */
+/* Voice Models - Remote Providers */
 "远端 Provider" = "Uzak Sağlayıcı";
 "添加 Provider" = "Sağlayıcı Ekle";
 "尚未配置远端 Provider" = "Henüz uzak sağlayıcı yapılandırılmadı";

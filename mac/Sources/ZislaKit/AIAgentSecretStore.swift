@@ -16,7 +16,7 @@ public enum AIAgentSecretStoreError: LocalizedError, Sendable, Equatable {
         switch self {
         case .invalidReference: "密钥引用无效"
         case .invalidSecret: "API Key 不能为空"
-        case let .storageFailed(detail): "无法保存 AI Agent 私有数据：\(detail)"
+        case let .storageFailed(detail): "无法保存模型凭据：\(detail)"
         }
     }
 }
@@ -29,7 +29,7 @@ enum AIAgentSecretStoreFactory {
     }
 }
 
-/// API keys and other private AI Agent data are stored in the app's SQLite database.
+/// Provider API keys and CLI profile data are stored in the app's SQLite database.
 public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked Sendable {
     private let storageURL: URL
     private let queue = DispatchQueue(label: "com.zisla.ai-agent.secrets", qos: .utility)
@@ -53,7 +53,7 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
             case SQLITE_DONE:
                 return nil
             default:
-                throw databaseError(database, fallback: "无法读取 AI Agent 私有数据")
+                throw databaseError(database, fallback: "无法读取模型凭据")
             }
         }
     }
@@ -75,7 +75,7 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
             try bind(reference, to: statement, index: 1, database: database)
             try bind(secret, to: statement, index: 2, database: database)
             guard sqlite3_step(statement) == SQLITE_DONE else {
-                throw databaseError(database, fallback: "无法保存 AI Agent 私有数据")
+                throw databaseError(database, fallback: "无法保存模型凭据")
             }
         }
     }
@@ -90,7 +90,7 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
             defer { sqlite3_finalize(statement) }
             try bind(reference, to: statement, index: 1, database: database)
             guard sqlite3_step(statement) == SQLITE_DONE else {
-                throw databaseError(database, fallback: "无法删除 AI Agent 私有数据")
+                throw databaseError(database, fallback: "无法删除模型凭据")
             }
         }
     }

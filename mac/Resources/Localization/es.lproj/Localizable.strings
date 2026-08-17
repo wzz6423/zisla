@@ -24,7 +24,7 @@
 "工作流" = "Flujo de Trabajo";
 "信息" = "Información";
 "模型" = "Modelos";
-"桌面宠物" = "Mascota de Escritorio";
+"宠物" = "Mascota";
 "交互" = "Interacción";
 "下载" = "Descargas";
 "天气" = "Clima";
@@ -95,7 +95,6 @@
 "播放与 AI 活动通知显示在此屏幕" = "Las notificaciones de reproducción y actividad de IA se muestran en esta pantalla";
 
 /* Settings - AI */
-"AI 进度、语音输入，以及连接、自动化、CLI 与 Skills 等 Agent 行为。" = "Progreso de IA, entrada de voz y comportamientos del agente, incluidos conexiones, automatización, CLI y Skills.";
 "AI 监控" = "Monitoreo de IA";
 "AI 进度与用量" = "Progreso y Uso de IA";
 "汇总桌面端与 CLI 工具的运行状态" = "Resumir el estado de ejecución de herramientas de escritorio y CLI";
@@ -110,12 +109,7 @@
 "左右侧修饰键需要监听全局键盘事件" = "Las teclas modificadoras izquierda/derecha requieren escuchar eventos globales de teclado";
 "已授权" = "Autorizado";
 
-/* Settings - AI Agent */
-"AI Agent 行为" = "Comportamiento del Agente de IA";
-"在灵动岛显示" = "Mostrar en Dynamic Island";
-"关闭后仅从工具栏隐藏，此处的配置与对话不受影响" = "Solo oculta de la barra de herramientas cuando está desactivado; la configuración y las conversaciones aquí no se ven afectadas";
-
-/* Settings - Models */
+/* Settings - Voice Models */
 "配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Configurar modelos locales, modelos remotos y credenciales, y seleccionar el modelo para organización de voz.";
 "本地模型" = "Modelos Locales";
 "远端模型与凭据" = "Modelos Remotos y Credenciales";
@@ -247,7 +241,6 @@
 "输入文字或 Emoji" = "Ingresar texto o Emoji";
 "复制到剪贴板" = "Copiar al Portapapeles";
 "发送到随记" = "Enviar a Notas Rápidas";
-"发送到 AI Agent" = "Enviar al Agente de IA";
 "移出常用" = "Eliminar de Favoritos";
 "设为常用" = "Añadir a Favoritos";
 "文本" = "Texto";
@@ -264,47 +257,16 @@
 "展开大窗口编辑" = "Abrir en Ventana Grande";
 "系统共享" = "Compartir del Sistema";
 
-/* AI Agent Module */
-"对话" = "Chat";
-"消息连接" = "Conexiones de Mensajes";
-"应用增强" = "Mejoras de Aplicación";
-"自动化" = "Automatización";
+
+/* Settings - AI CLI and Skills */
 "CLI 与 Skills" = "CLI y Skills";
-"会话存储" = "Almacenamiento de Sesión";
-"刷新余额、渠道、CLI 和 Skills" = "Actualizar saldo, canales, CLI y Skills";
-"统一历史" = "Historial Unificado";
-"新建对话" = "Nueva Conversación";
-"添加项目" = "Añadir Proyecto";
-"添加现有文件夹…" = "Añadir Carpeta Existente…";
-"新建文件夹并添加…" = "Crear Nueva Carpeta…";
-"将本地文件夹添加为项目" = "Añadir carpeta local como proyecto";
-"未归类" = "Sin Categorizar";
-"展开项目会话" = "Expandir sesiones de proyecto";
-"收起项目会话" = "Colapsar sesiones de proyecto";
-"选择项目；新建对话会归入此项目" = "Seleccionar proyecto; las nuevas conversaciones se añadirán a este proyecto";
-"取消置顶项目" = "Desanclar Proyecto";
-"置顶项目" = "Anclar Proyecto";
-"删除项目" = "Eliminar Proyecto";
-"选择或新建对话" = "Seleccionar o crear conversación";
-"你" = "Tú";
+
+/* Shared Actions */
 "助手" = "Asistente";
-"执行细节" = "Detalles de Ejecución";
-"计划模式" = "Modo de Planificación";
-"复制回复" = "Copiar Respuesta";
-"从此回复分叉会话" = "Bifurcar Sesión desde Respuesta";
-"批注" = "Anotación";
-"添加批注" = "Añadir Anotación";
-"将引用和评论发送为新消息" = "Enviar cita y comentario como nuevo mensaje";
-"删除批注" = "Eliminar Anotación";
-"发送消息" = "Enviar Mensaje";
 "添加文件" = "Añadir Archivo";
-"添加文件、切换计划模式或目标模式" = "Añadir archivo, cambiar a modo de planificación o modo de objetivo";
-"目标模式" = "Modo de Objetivo";
-"设置外部 CLI 的访问偏好" = "Establecer preferencias de acceso para CLI externo";
-"选择思考深度偏好" = "Seleccionar preferencia de profundidad de pensamiento";
 "发送" = "Enviar";
 
-/* AI Agent - Remote Providers */
+/* Voice Models - Remote Providers */
 "远端 Provider" = "Proveedor Remoto";
 "添加 Provider" = "Añadir Proveedor";
 "尚未配置远端 Provider" = "No hay proveedores remotos configurados";

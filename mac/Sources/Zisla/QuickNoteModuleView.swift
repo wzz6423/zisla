@@ -211,10 +211,6 @@ struct QuickNoteModuleView: View {
                 model.sendQuickNoteToTeleprompter(draftPlainText)
             }
             .disabled(draftPlainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            IconButton(symbol: "sparkles", help: "发送到 AI Agent", size: .compact) {
-                model.sendQuickNoteToAIAgent(draftPlainText)
-            }
-            .disabled(draftPlainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             IconButton(symbol: "arrow.up.left.and.arrow.down.right", help: "展开大窗口编辑", size: .compact) {
                 (NSApp.delegate as? AppDelegate)?.openQuickNotesEditor()
             }

@@ -39,6 +39,27 @@ struct AIChatClientTests {
     }
 
     @Test
+    func sendsOpenAIReasoningEffortWhenConfigured() async throws {
+        StubURLProtocol.reset()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let client = AIChatClient(session: URLSession(configuration: configuration))
+
+        _ = try await client.complete(
+            endpoint: AIEndpoint(name: "OpenAI", baseURL: "https://voice.example/v1"),
+            model: "gpt-test",
+            systemPrompt: "system",
+            messages: [AIOutboundMessage(role: .user, content: "hello")],
+            effort: .medium
+        )
+
+        let request = try #require(StubURLProtocol.lastRequest)
+        let body = try #require(requestBody(request))
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["reasoning_effort"] as? String == "medium")
+    }
+
+    @Test
     func throwsInvalidResponseWhenContentIsMissing() async throws {
         StubURLProtocol.reset()
         StubURLProtocol.nextResponseBody = #"{"choices":[{"message":{}}]}"#
@@ -92,7 +113,8 @@ struct AIChatClientTests {
             model: "claude-sonnet",
             systemPrompt: "system",
             messages: [AIOutboundMessage(role: .user, content: "hello")],
-            apiKey: "anthropic-key"
+            apiKey: "anthropic-key",
+            effort: .high
         )
 
         #expect(response.content == "Anthropic reply")
@@ -104,6 +126,8 @@ struct AIChatClientTests {
         let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         #expect(json["system"] as? String == "system")
         #expect((json["messages"] as? [[String: Any]])?.count == 1)
+        let outputConfig = try #require(json["output_config"] as? [String: Any])
+        #expect(outputConfig["effort"] as? String == "high")
     }
 
     @Test

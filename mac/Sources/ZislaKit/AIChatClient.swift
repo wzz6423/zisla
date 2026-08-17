@@ -75,7 +75,8 @@ public struct AIChatClient: Sendable {
         model: String,
         systemPrompt: String,
         messages: [AIOutboundMessage],
-        apiKey: String? = nil
+        apiKey: String? = nil,
+        effort: AgentModelEffort? = nil
     ) async throws -> AIChatResponse {
         let url = try completionURL(for: endpoint, protocolKind: protocolKind, model: model)
         var request = URLRequest(url: url)
@@ -101,7 +102,8 @@ public struct AIChatClient: Sendable {
             protocolKind: protocolKind,
             model: model,
             systemPrompt: systemPrompt,
-            messages: messages
+            messages: messages,
+            effort: effort
         )
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await session.data(for: request)
@@ -150,15 +152,18 @@ public struct AIChatClient: Sendable {
         protocolKind: AgentChannelProtocol,
         model: String,
         systemPrompt: String,
-        messages: [AIOutboundMessage]
+        messages: [AIOutboundMessage],
+        effort: AgentModelEffort?
     ) -> [String: Any] {
         switch protocolKind {
         case .openAICompatible:
-            return [
+            var body: [String: Any] = [
                 "model": model,
                 "stream": false,
                 "messages": makeMessages(systemPrompt: systemPrompt, messages: messages),
             ]
+            if let effort { body["reasoning_effort"] = effort.rawValue }
+            return body
         case .anthropicMessages:
             var body: [String: Any] = [
                 "model": model,
@@ -170,6 +175,7 @@ public struct AIChatClient: Sendable {
                 },
             ]
             if !systemPrompt.isEmpty { body["system"] = systemPrompt }
+            if let effort { body["output_config"] = ["effort": effort.rawValue] }
             return body
         case .geminiGenerateContent:
             var body: [String: Any] = [

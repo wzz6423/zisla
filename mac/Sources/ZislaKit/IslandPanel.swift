@@ -22,6 +22,8 @@ public final class IslandPanel: NSPanel {
   public var keepsNativeGlassActive = false {
     didSet { restoreNativeGlassActivationIfNeeded() }
   }
+  /// 语音录音期间不激活或重新获得 key window，保持目标输入焦点。
+  public var avoidsAppActivation = false
   public var isPinned = false
   private var transitionGeneration: UInt64 = 0
   private nonisolated(unsafe) var clickMonitor: Any?
@@ -36,8 +38,11 @@ public final class IslandPanel: NSPanel {
     }
     public override var canBecomeMain: Bool { false }
 
-    public override func resignKey() {
-        guard allowsNativeGlassActivation, keepsNativeGlassActive, isVisible else {
+  public override func resignKey() {
+        guard !avoidsAppActivation,
+              allowsNativeGlassActivation,
+              keepsNativeGlassActive,
+              isVisible else {
             super.resignKey()
             return
         }
@@ -48,8 +53,11 @@ public final class IslandPanel: NSPanel {
     }
 
     private func restoreNativeGlassActivationIfNeeded() {
-        guard allowsNativeGlassActivation, keepsNativeGlassActive, isVisible else { return }
-        // 固定时不自动抢回焦点，只在非固定状态下自动激活
+        guard !avoidsAppActivation,
+              allowsNativeGlassActivation,
+              keepsNativeGlassActive,
+              isVisible else { return }
+        // 固定时不自动抢回焦点，只在非固定状态下自动激活。
         if !isPinned {
             NSApp.activate(ignoringOtherApps: true)
         }

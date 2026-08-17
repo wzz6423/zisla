@@ -49,10 +49,6 @@ public enum AppPaths {
         applicationSupport.appendingPathComponent("ai-agent.json", isDirectory: false)
     }
 
-    public static var aiAgentAttachments: URL {
-        applicationSupport.appendingPathComponent("ai-agent-attachments", isDirectory: true)
-    }
-
     public static var aiAgentSecrets: URL {
         applicationSupport.appendingPathComponent("ai-agent-secrets.sqlite", isDirectory: false)
     }

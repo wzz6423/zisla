@@ -556,26 +556,14 @@ public enum AIAgentGrokUpdateState: Equatable, Sendable {
 public enum AIAgentCLIProfileError: LocalizedError, Sendable {
     case incompleteProfile
     case emptyProfile
-    case emptyConfiguration
     case unableToRestore(String)
 
     public var errorDescription: String? {
         switch self {
         case .incompleteProfile: "CLI 档案必须同时配置两个不同的绝对路径"
         case .emptyProfile: "配置文件和认证文件都不能为空"
-        case .emptyConfiguration: "配置文件不能为空"
         case let .unableToRestore(path): "切换失败且无法恢复原文件：\(path)"
         }
-    }
-}
-
-enum CodexOfficialLoginPolicy {
-    static func preservesAuthentication(
-        for cliKind: AgentCLIKind,
-        userPreference: Bool,
-        isRouteTakeover: Bool
-    ) -> Bool {
-        cliKind == .codex && (userPreference || isRouteTakeover)
     }
 }
 
@@ -625,36 +613,6 @@ public struct AIAgentCLIProfileService: Sendable {
             throw AIAgentCLIProfileError.emptyProfile
         }
         return (configuration, authentication)
-    }
-
-    /// Replaces only the route configuration, leaving an official CLI authentication file untouched.
-    public func activateConfiguration(
-        profile: AgentCLIProfile,
-        configuration: Data
-    ) throws {
-        guard profile.isComplete else { throw AIAgentCLIProfileError.incompleteProfile }
-        guard !configuration.isEmpty else { throw AIAgentCLIProfileError.emptyConfiguration }
-        let (configurationURL, _) = try targetURLs(for: profile)
-        let previous = try existingData(at: configurationURL)
-        do {
-            try writeSecurely(configuration, to: configurationURL)
-        } catch {
-            do {
-                try restore(previous, at: configurationURL)
-            } catch {
-                throw AIAgentCLIProfileError.unableToRestore(configurationURL.path)
-            }
-            throw error
-        }
-    }
-
-    /// Reads only the route configuration after a profile that preserves external authentication was active.
-    public func syncBackConfiguration(profile: AgentCLIProfile) throws -> Data {
-        let (configurationURL, _) = try targetURLs(for: profile)
-        guard let configuration = try existingData(at: configurationURL), !configuration.isEmpty else {
-            throw AIAgentCLIProfileError.emptyConfiguration
-        }
-        return configuration
     }
 
     private func existingData(at url: URL) throws -> Data? {
@@ -709,10 +667,10 @@ public enum AIAgentCLIRelayError: LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case let .unsupportedRelay(kind): "\(kind.displayName) 暂不支持消息中继"
+        case let .unsupportedRelay(kind): "\(kind.displayName) 暂不支持语音整理"
         case let .unavailable(kind): "未找到 \(kind.displayName) CLI"
-        case let .failed(detail): "Agent CLI 执行失败：\(detail)"
-        case .emptyResponse: "Agent CLI 没有返回消息"
+        case let .failed(detail): "CLI 执行失败：\(detail)"
+        case .emptyResponse: "CLI 没有返回内容"
         }
     }
 }
@@ -1167,13 +1125,10 @@ public struct AIAgentCLIService: Sendable {
         )
     }
 
-    /// Passes unified history as plain text to a local CLI without calling model HTTP APIs from this app.
+    /// Runs one bounded, read-only completion for voice transcript cleanup.
     public func relay(
-        messages: [AgentChatMessage],
-        project: AgentChatProject? = nil,
-        accessMode: AgentChatAccessMode = .autoReview,
+        messages: [AIOutboundMessage],
         model: String? = nil,
-        thinkingDepth: AgentChatThinkingDepth = .high,
         to kind: AgentCLIKind
     ) async throws -> String {
         guard AgentCLIKind.relayCases.contains(kind) else {
@@ -1182,25 +1137,13 @@ public struct AIAgentCLIService: Sendable {
         guard let executableURL = executableURL(for: kind) else {
             throw AIAgentCLIRelayError.unavailable(kind)
         }
-        let prompt = relayPrompt(
-            messages,
-            project: project,
-            accessMode: accessMode,
-            model: model,
-            thinkingDepth: thinkingDepth
-        )
+        let prompt = relayPrompt(messages)
         let output = try await AIAgentProcessRunner.run(
             executableURL: executableURL,
-            arguments: relayArguments(
-                for: kind,
-                prompt: prompt,
-                model: model,
-                thinkingDepth: thinkingDepth,
-                accessMode: accessMode
-            ),
+            arguments: relayArguments(for: kind, model: model),
             standardInput: Data(prompt.utf8),
             environment: commandEnvironment,
-            workingDirectoryURL: relayWorkingDirectory(for: project),
+            workingDirectoryURL: homeDirectory,
             timeout: 300
         )
         guard output.status == 0 else {
@@ -1212,143 +1155,73 @@ public struct AIAgentCLIService: Sendable {
         return response
     }
 
-    func relayWorkingDirectory(for project: AgentChatProject?) -> URL {
-        guard let path = project?.directoryPath.trimmingCharacters(in: .whitespacesAndNewlines),
-              !path.isEmpty
-        else {
-            return FileManager.default.homeDirectoryForCurrentUser
-        }
-
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue else {
-            return FileManager.default.homeDirectoryForCurrentUser
-        }
-        return URL(fileURLWithPath: path, isDirectory: true)
-    }
-
-    public func relayArguments(
-        for kind: AgentCLIKind,
-        prompt: String,
-        model: String? = nil,
-        thinkingDepth: AgentChatThinkingDepth = .high,
-        accessMode: AgentChatAccessMode = .autoReview
-    ) -> [String] {
-        var args: [String] = []
+    public func relayArguments(for kind: AgentCLIKind, model: String? = nil) -> [String] {
+        var arguments: [String] = []
+        let model = model?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         switch kind {
         case .claude:
-            args.append("-p")
-            if let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedModel.isEmpty {
-                args.append(contentsOf: ["--model", trimmedModel])
-            }
-            args.append(contentsOf: ["--effort", effortLevel(for: thinkingDepth)])
-            if accessMode == .fullAccess {
-                args.append("--dangerously-skip-permissions")
-            } else {
-                args.append(contentsOf: ["--permission-mode", claudePermissionMode(for: accessMode)])
-            }
-
+            arguments.append("-p")
+            appendModel(model, to: &arguments)
+            arguments.append(contentsOf: ["--effort", "medium", "--permission-mode", "plan"])
         case .codex:
-            args.append(contentsOf: ["exec", "--skip-git-repo-check"])
-            if let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedModel.isEmpty {
-                args.append(contentsOf: ["--model", trimmedModel])
-            }
-            args.append(contentsOf: [
+            arguments.append(contentsOf: ["exec", "--skip-git-repo-check"])
+            appendModel(model, to: &arguments)
+            arguments.append(contentsOf: [
                 "--config",
-                "model_reasoning_effort=\"\(effortLevel(for: thinkingDepth))\"",
+                "model_reasoning_effort=\"medium\"",
+                "--sandbox",
+                "read-only",
+                "-",
             ])
-            switch accessMode {
-            case .autoReview:
-                args.append("--approve-for-me")
-            case .readOnly:
-                args.append(contentsOf: ["--sandbox", "read-only"])
-            case .workspaceWrite:
-                args.append(contentsOf: ["--sandbox", "workspace-write"])
-            case .fullAccess:
-                args.append("--dangerously-bypass-approvals-and-sandbox")
-            }
-            args.append("-")
-
         case .gemini:
-            args.append("-p")
-            if let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedModel.isEmpty {
-                args.append(contentsOf: ["--model", trimmedModel])
-            }
-            args.append(contentsOf: ["--approval-mode", geminiApprovalMode(for: accessMode)])
-            args.append("-")
-
+            arguments.append("-p")
+            appendModel(model, to: &arguments)
+            arguments.append(contentsOf: ["--approval-mode", "plan", "-"])
         case .grok:
-            if let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedModel.isEmpty {
-                args.append(contentsOf: ["--model", trimmedModel])
-            }
-            args.append(contentsOf: ["--reasoning-effort", effortLevel(for: thinkingDepth)])
-            args.append(contentsOf: ["--permission-mode", grokPermissionMode(for: accessMode)])
-            args.append(contentsOf: ["--prompt-file", "-"])
-
+            appendModel(model, to: &arguments)
+            arguments.append(contentsOf: [
+                "--reasoning-effort",
+                "medium",
+                "--permission-mode",
+                "plan",
+                "--prompt-file",
+                "-",
+            ])
         case .opencode:
-            args.append("run")
-            if let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedModel.isEmpty {
-                args.append(contentsOf: ["--model", trimmedModel])
-            }
-            let variant = opencodeVariant(for: thinkingDepth)
-            if !variant.isEmpty {
-                args.append(contentsOf: ["--variant", variant])
-            }
-            if accessMode == .fullAccess {
-                args.append("--auto")
-            }
-            args.append("-")
-
+            arguments.append("run")
+            appendModel(model, to: &arguments)
+            arguments.append("-")
         case .kimi, .qwen, .qoder, .copilot, .glm:
             return []
         }
 
-        return args
+        return arguments
     }
 
-    private func effortLevel(for depth: AgentChatThinkingDepth) -> String {
-        switch depth {
-        case .low: "low"
-        case .medium: "medium"
-        case .high: "high"
-        case .extraHigh: "xhigh"
+    func relayPrompt(_ messages: [AIOutboundMessage]) -> String {
+        let serialized = messages.suffix(32).map { message in
+            let role = switch message.role {
+            case .system: "系统"
+            case .user: "用户"
+            case .assistant: "助手"
+            case .tool: "工具"
+            }
+            return "[\(role)]\n\(message.content)"
         }
+        var remainingCharacters = 96_000
+        var bounded: [String] = []
+        for message in serialized.reversed() where remainingCharacters > 0 {
+            let content = String(message.prefix(remainingCharacters))
+            bounded.append(content)
+            remainingCharacters -= content.count
+        }
+        return bounded.reversed().joined(separator: "\n\n")
     }
 
-    private func claudePermissionMode(for accessMode: AgentChatAccessMode) -> String {
-        switch accessMode {
-        case .fullAccess: "bypassPermissions"
-        case .autoReview: "auto"
-        case .readOnly: "plan"
-        case .workspaceWrite: "acceptEdits"
-        }
-    }
-
-    private func grokPermissionMode(for accessMode: AgentChatAccessMode) -> String {
-        switch accessMode {
-        case .fullAccess: "bypassPermissions"
-        case .autoReview: "auto"
-        case .readOnly: "plan"
-        case .workspaceWrite: "acceptEdits"
-        }
-    }
-
-    private func geminiApprovalMode(for accessMode: AgentChatAccessMode) -> String {
-        switch accessMode {
-        case .fullAccess: "yolo"
-        case .autoReview: "auto_edit"
-        case .readOnly: "plan"
-        case .workspaceWrite: "auto_edit"
-        }
-    }
-
-    private func opencodeVariant(for depth: AgentChatThinkingDepth) -> String {
-        switch depth {
-        case .low: "minimal"
-        case .medium: ""
-        case .high: "high"
-        case .extraHigh: "max"
-        }
+    private func appendModel(_ model: String?, to arguments: inout [String]) {
+        guard let model, !model.isEmpty else { return }
+        arguments.append(contentsOf: ["--model", model])
     }
 
     func executableURL(for kind: AgentCLIKind) -> URL? {
@@ -1471,107 +1344,6 @@ public struct AIAgentCLIService: Sendable {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedDescending }
     }
 
-    func outboundMessages(_ messages: [AgentChatMessage]) -> [AIOutboundMessage] {
-        boundedSerializedMessages(messages).map { item in
-            let role: AIChatRole = switch item.message.role {
-            case .system: .system
-            case .user: .user
-            case .assistant: .assistant
-            }
-            return AIOutboundMessage(role: role, content: item.content)
-        }
-    }
-
-    func relayPrompt(
-        _ messages: [AgentChatMessage],
-        project: AgentChatProject? = nil,
-        accessMode: AgentChatAccessMode = .autoReview,
-        model: String? = nil,
-        thinkingDepth: AgentChatThinkingDepth = .high
-    ) -> String {
-        let history = boundedSerializedMessages(messages)
-            .map(\.content)
-            .joined(separator: "\n\n")
-        let projectContext: String
-        if let project {
-            let instructions = project.instructions.isEmpty ? "" : "\n项目说明：\(project.instructions)"
-            projectContext = "[项目：\(project.name)]\(instructions)\n请将项目说明作为本项目所有会话的共享上下文。"
-        } else {
-            projectContext = ""
-        }
-        let selectedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let modelPreference = selectedModel?.isEmpty == false ? "\n模型：\(selectedModel!)" : ""
-        let relayPreferences = "[转发偏好]\n访问模式：\(accessMode.displayName)\(modelPreference)\n思考深度：\(thinkingDepth.displayName)\n请在外部 CLI 自身允许的权限范围内遵守这些偏好。"
-        let sections = [relayPreferences, projectContext, history].filter { !$0.isEmpty }.joined(separator: "\n\n")
-        return "以下是从统一聊天历史转发的消息。请直接回复最后一条用户消息；不要声称此应用本身是 Agent。\n\n\(sections)"
-    }
-
-    private func boundedSerializedMessages(
-        _ messages: [AgentChatMessage]
-    ) -> [(message: AgentChatMessage, content: String)] {
-        let retained = Array(messages.suffix(32))
-        let serialized = retained.enumerated().map { index, message in
-            (message, serializedMessage(message, includesSkills: index == retained.count - 1))
-        }
-        var remainingCharacters = 96_000
-        var bounded: [(message: AgentChatMessage, content: String)] = []
-        for item in serialized.reversed() where remainingCharacters > 0 {
-            let content = String(item.1.prefix(remainingCharacters))
-            bounded.append((item.0, content))
-            remainingCharacters -= content.count
-        }
-        return Array(bounded.reversed())
-    }
-
-    private func serializedMessage(_ message: AgentChatMessage, includesSkills: Bool) -> String {
-        let role: String = switch message.role {
-        case .system: "系统"
-        case .user: "用户"
-        case .assistant: "Agent"
-        }
-        var sections = ["[\(role)]\n\(message.content)"]
-        if message.mode == .plan {
-            sections.append("[计划模式]\n请给出可执行计划、当前进展和下一步。")
-        }
-        if let goal = message.goalTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !goal.isEmpty {
-            sections.append("[目标模式]\n当前会话目标：\(goal)\n请围绕该目标推进，不要偏离。")
-        }
-        let attachments = message.attachments.compactMap { attachment -> String? in
-            guard attachment.state != .deleted, !attachment.storagePath.isEmpty else { return nil }
-            let path = AppPaths.aiAgentAttachments
-                .appendingPathComponent(attachment.storagePath, isDirectory: false).path
-            return "- \(attachment.kind.displayName)：\(attachment.fileName)（\(attachment.mimeType)，\(path)）"
-        }
-        if !attachments.isEmpty {
-            sections.append("[附件]\n\(attachments.joined(separator: "\n"))\n可在本机路径读取附件；不要假设附件内容已写入本条文本。")
-        }
-        let apps = message.appReferences.map {
-            "- \($0.name)（\($0.bundleIdentifier)，PID \($0.processIdentifier)）"
-        }
-        if !apps.isEmpty {
-            sections.append("[@本机 App]\n\(apps.joined(separator: "\n"))\n这些应用正在用户本机运行；仅在本机环境允许时读取它们的公开上下文。")
-        }
-        let skills = includesSkills ? message.skillReferences.compactMap { skill -> String? in
-            let name = skill.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            let path = skill.path.trimmingCharacters(in: .whitespacesAndNewlines)
-            return name.isEmpty || path.isEmpty ? nil : "- \(name)：\(path)"
-        } : []
-        if !skills.isEmpty {
-            sections.append("[调用 Skills]\n\(skills.joined(separator: "\n"))\n这是用户显式选择的 Skill。仅当本机可读取对应路径时加载其 SKILL.md；不要假设本应用执行了该 Skill。")
-        }
-        for reference in message.contextReferences {
-            let context = reference.messages.map { contextMessage in
-                let contextRole: String = switch contextMessage.role {
-                case .system: "系统"
-                case .user: "用户"
-                case .assistant: "Agent"
-                }
-                return "[\(contextRole)] \(contextMessage.content)"
-            }.joined(separator: "\n")
-            sections.append("[@会话：\(reference.title)]\n\(context)")
-        }
-        return sections.joined(separator: "\n\n")
-    }
 }
 
 public struct AIAgentProcessOutput: Sendable {

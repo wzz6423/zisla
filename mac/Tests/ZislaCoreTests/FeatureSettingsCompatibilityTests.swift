@@ -37,19 +37,22 @@ struct FeatureSettingsCompatibilityTests {
 
     @Test
     func systemMonitorMenuBarSelectionAndDisplayStyleDefaultForLegacySettingsAndRoundTrip() throws {
+        #expect(FeatureSettings.default.systemMonitorMenuBarMetrics == [.cpu])
+        #expect(FeatureSettings.default.systemMonitorMenuBarDisplayStyle == .compact)
+
         let legacy = Data(#"{"mediaEnabled":true,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"calendarEnabled":true,"weatherEnabled":true,"updateChecksEnabled":true,"automaticUpdatesEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true,"hoverActivationEnabled":true,"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
         let decodedLegacy = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
-        #expect(decodedLegacy.systemMonitorMenuBarMetrics == Set(SystemMonitorMenuBarMetric.allCases))
-        #expect(decodedLegacy.systemMonitorMenuBarDisplayStyle == .detailed)
-        #expect(decodedLegacy.menuBarAppIconEnabled)
+        #expect(decodedLegacy.systemMonitorMenuBarMetrics == [.cpu])
+        #expect(decodedLegacy.systemMonitorMenuBarDisplayStyle == .compact)
+        #expect(!decodedLegacy.menuBarAppIconEnabled)
 
         var settings = FeatureSettings.default
         settings.systemMonitorMenuBarMetrics = [.gpu, .memory, .fan]
-        settings.systemMonitorMenuBarDisplayStyle = .compact
+        settings.systemMonitorMenuBarDisplayStyle = .detailed
         settings.menuBarAppIconEnabled = true
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
         #expect(decoded.systemMonitorMenuBarMetrics == [.gpu, .memory, .fan])
-        #expect(decoded.systemMonitorMenuBarDisplayStyle == .compact)
+        #expect(decoded.systemMonitorMenuBarDisplayStyle == .detailed)
         #expect(decoded.menuBarAppIconEnabled)
     }
 
@@ -262,6 +265,34 @@ struct FeatureSettingsCompatibilityTests {
     }
 
 
+    @Test
+    func voiceRecordingRetentionDefaultsAndRoundTrips() throws {
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let legacySettings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(legacySettings.voiceRecordingRetentionEnabled)
+        #expect(legacySettings.voiceRecordingCleanupPolicy == .never)
+        #expect(VoiceRecordingCleanupPolicy.allCases == [
+            .sevenDays,
+            .fifteenDays,
+            .thirtyDays,
+            .never,
+        ])
+
+        for policy in VoiceRecordingCleanupPolicy.allCases {
+            var settings = FeatureSettings.default
+            settings.voiceRecordingRetentionEnabled = false
+            settings.voiceRecordingCleanupPolicy = policy
+
+            let decoded = try JSONDecoder().decode(
+                FeatureSettings.self,
+                from: JSONEncoder().encode(settings)
+            )
+
+            #expect(!decoded.voiceRecordingRetentionEnabled)
+            #expect(decoded.voiceRecordingCleanupPolicy == policy)
+        }
+    }
+
     // MARK: - VoiceInputHotkeyPreset
 
     @Test
@@ -305,7 +336,7 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
-    func voiceInputHotkeyPresetPreservesModifierSidesAndMatchesExactly() throws {
+    func voiceInputHotkeyPresetUsesCarbonForModifierKeyCombinations() throws {
         let custom = VoiceInputHotkeyPreset(
             keyCode: 40,
             carbonModifiers: 0,
@@ -313,9 +344,9 @@ struct FeatureSettingsCompatibilityTests {
             modifierSides: [.leftCommand, .rightShift]
         )
 
-        #expect(custom.requiresInputMonitoring)
+        #expect(!custom.requiresInputMonitoring)
         #expect(custom.carbonModifiers == 0x0100 | 0x0200)
-        #expect(custom.displayName == "左⌘ + 右⇧ + K")
+        #expect(custom.displayName == "⌘⇧ K")
         #expect(custom.matches(keyCode: 40, modifierSides: [.leftCommand, .rightShift]))
         #expect(!custom.matches(keyCode: 40, modifierSides: [.rightCommand, .rightShift]))
         #expect(!custom.matches(keyCode: 40, modifierSides: [.leftCommand]))

@@ -116,18 +116,44 @@ function stop_service() {
   print -r -- "zisla 调试服务已停止，运行时资源已清理。"
 }
 
+function resolve_dev_code_sign_identity() {
+  local requested_identity="${CODE_SIGN_IDENTITY:-}"
+  local discovered_identity
+
+  if [[ -n "$requested_identity" ]]; then
+    [[ "$requested_identity" != "-" ]] || fail \
+      "调试服务不能使用 ad-hoc 签名；请设置 CODE_SIGN_IDENTITY 为稳定的开发证书"
+    print -r -- "$requested_identity"
+    return
+  fi
+
+  discovered_identity="$(
+    security find-identity -v -p codesigning \
+      | awk '/"Apple Development:/ && !identity { identity = $2 } END { print identity }'
+  )"
+  [[ -n "$discovered_identity" ]] || fail \
+    "未找到 Apple Development 证书；请安装证书或显式设置 CODE_SIGN_IDENTITY"
+  print -r -- "$discovered_identity"
+}
+
 function start_service() {
   local pid
+  local dev_identity
 
+  dev_identity="$(resolve_dev_code_sign_identity)"
   stop_service
-  "$ROOT/Scripts/build-app.sh"
+  CODE_SIGN_IDENTITY="$dev_identity" SIGNING_MODE=dev "$ROOT/Scripts/build-app.sh"
   [[ -x "$APP_BINARY" ]] || fail "构建未生成 zisla.app 可执行文件"
 
   mkdir -p "${LAUNCH_AGENT:h}" "${OUT_LOG:h}"
   rm -f "$LAUNCH_AGENT"
   plutil -create xml1 "$LAUNCH_AGENT"
   plutil -insert Label -string "$SERVICE_LABEL" "$LAUNCH_AGENT"
-  plutil -insert Program -string "$APP_BINARY" "$LAUNCH_AGENT"
+  plutil -insert ProgramArguments -array "$LAUNCH_AGENT"
+  plutil -insert ProgramArguments.0 -string /usr/bin/open "$LAUNCH_AGENT"
+  plutil -insert ProgramArguments.1 -string -n "$LAUNCH_AGENT"
+  plutil -insert ProgramArguments.2 -string -W "$LAUNCH_AGENT"
+  plutil -insert ProgramArguments.3 -string "$APP" "$LAUNCH_AGENT"
   plutil -insert ProcessType -string Interactive "$LAUNCH_AGENT"
   plutil -insert RunAtLoad -bool true "$LAUNCH_AGENT"
   plutil -insert KeepAlive -bool true "$LAUNCH_AGENT"
@@ -141,15 +167,17 @@ function start_service() {
   print -r -- "zisla 调试服务已启动（PID $pid）。停止请执行：make stop"
 }
 
-case "${1:-}" in
-  run)
-    start_service
-    ;;
-  stop)
-    stop_service
-    ;;
-  *)
-    print -u2 -r -- "用法：$0 {run|stop}"
-    exit 64
-    ;;
-esac
+if [[ "${ZSH_EVAL_CONTEXT:-}" != *:file ]]; then
+  case "${1:-}" in
+    run)
+      start_service
+      ;;
+    stop)
+      stop_service
+      ;;
+    *)
+      print -u2 -r -- "用法：$0 {run|stop}"
+      exit 64
+      ;;
+  esac
+fi

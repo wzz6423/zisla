@@ -11,6 +11,8 @@ final class VoiceInputController: ObservableObject {
     @Published private(set) var isPreparing = false
     @Published private(set) var transcript = ""
     @Published private(set) var errorDescription: String?
+    /// 正在等待识别服务返回最终结果（录音已停止，但还在处理中）
+    private var isFinalizingTranscript = false
 
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
     private var engine: AVAudioEngine?
@@ -25,10 +27,11 @@ final class VoiceInputController: ObservableObject {
     private var finalizationTask: Task<Void, Never>?
     private var authorizationPromptHost: NSWindow?
 
+    var onRecordingWillStart: (() -> Void)?
     var onTranscriptCompleted: ((VoiceRecordingResult) -> Void)?
 
     func toggle() {
-        if isRecording || isPreparing {
+        if isRecording || isPreparing || isFinalizingTranscript {
             stop()
         } else {
             start()
@@ -41,6 +44,7 @@ final class VoiceInputController: ObservableObject {
         // The previous take may still be waiting for its final result; deliver it now instead of
         // swallowing this keypress for the whole finalization window.
         if let recordingID { finishRecording(recordingID: recordingID) }
+        onRecordingWillStart?()
         requestPermissionsAndStart()
     }
 
@@ -134,6 +138,44 @@ final class VoiceInputController: ObservableObject {
         AVCaptureDevice.requestAccess(for: .audio, completionHandler: completion)
     }
 
+    nonisolated static func makeAudioTapHandler(
+        request: SFSpeechAudioBufferRecognitionRequest,
+        recordingFile: AVAudioFile,
+        recordingID: UUID,
+        onWriteFailure: @escaping @Sendable (UUID, Error) -> Void
+    ) -> AVAudioNodeTapBlock {
+        // AVAudioEngine invokes tap blocks on a realtime queue, outside MainActor isolation.
+        return { buffer, _ in
+            request.append(buffer)
+            do {
+                try recordingFile.write(from: buffer)
+            } catch {
+                onWriteFailure(recordingID, error)
+            }
+        }
+    }
+
+    nonisolated private static func installAudioTap(
+        on input: AVAudioInputNode,
+        format: AVAudioFormat,
+        request: SFSpeechAudioBufferRecognitionRequest,
+        recordingFile: AVAudioFile,
+        recordingID: UUID,
+        onWriteFailure: @escaping @Sendable (UUID, Error) -> Void
+    ) {
+        input.installTap(
+            onBus: 0,
+            bufferSize: 1_024,
+            format: format,
+            block: makeAudioTapHandler(
+                request: request,
+                recordingFile: recordingFile,
+                recordingID: recordingID,
+                onWriteFailure: onWriteFailure
+            )
+        )
+    }
+
     private func startRecording(startID: UUID) {
         guard pendingStartID == startID else { return }
         guard recognizer?.isAvailable == true else {
@@ -187,14 +229,15 @@ final class VoiceInputController: ObservableObject {
                 }
             }
         }
-        input.installTap(onBus: 0, bufferSize: 1_024, format: format) { [weak self] buffer, _ in
-            request.append(buffer)
-            do {
-                try recordingFile.write(from: buffer)
-            } catch {
-                Task { @MainActor [weak self] in
-                    self?.failRecordingWrite(recordingID: recordingID, error: error)
-                }
+        Self.installAudioTap(
+            on: input,
+            format: format,
+            request: request,
+            recordingFile: recordingFile,
+            recordingID: recordingID
+        ) { [weak self] recordingID, error in
+            Task { @MainActor [weak self] in
+                self?.failRecordingWrite(recordingID: recordingID, error: error)
             }
         }
         tapInstalled = true
@@ -220,6 +263,7 @@ final class VoiceInputController: ObservableObject {
     private func stopAudioInput(for recordingID: UUID) {
         guard self.recordingID == recordingID else { return }
         stopAudioCapture()
+        isFinalizingTranscript = true
         finalizationTask?.cancel()
         finalizationTask = Task { [weak self] in
             // Server-side recognition needs a couple of seconds after endAudio() to return the final
@@ -244,6 +288,7 @@ final class VoiceInputController: ObservableObject {
     private func finishRecording(recordingID: UUID) {
         guard self.recordingID == recordingID else { return }
         stopAudioCapture()
+        isFinalizingTranscript = false
         let completedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let createdAt = recordingStartedAt ?? Date()
         let fallbackDuration = max(0, Date().timeIntervalSince(createdAt))
@@ -286,6 +331,7 @@ final class VoiceInputController: ObservableObject {
         recordingStartedAt = nil
         recordingID = nil
         isRecording = false
+        isFinalizingTranscript = false
         if deleteAudioFile, let fileURL {
             try? FileManager.default.removeItem(at: fileURL)
         }

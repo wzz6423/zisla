@@ -9,7 +9,6 @@ enum IslandModule: String, CaseIterable, Identifiable {
   case shelf
   case clipboard
   case aiMonitor
-  case aiAgent
   case download
   case agenda
   case mail
@@ -28,7 +27,6 @@ enum IslandModule: String, CaseIterable, Identifiable {
     case .shelf: "中转"
     case .clipboard: "剪贴板"
     case .aiMonitor: "AI 监控"
-    case .aiAgent: "AI Agent"
     case .download: "下载"
     case .agenda: "日程"
     case .mail: "邮件"
@@ -47,7 +45,6 @@ enum IslandModule: String, CaseIterable, Identifiable {
     case .shelf: "tray.full.fill"
     case .clipboard: "clipboard"
     case .aiMonitor: "chart.xyaxis.line"
-    case .aiAgent: "sparkles"
     case .download: "arrow.down.circle.fill"
     case .agenda: "calendar"
     case .mail: "envelope.fill"
@@ -66,8 +63,6 @@ enum IslandModule: String, CaseIterable, Identifiable {
       .standard
     case .aiMonitor:
       .ai
-    case .aiAgent:
-      .agent
     case .system:
       .system
     case .battery:
@@ -102,7 +97,6 @@ extension IslandModule {
     case .shelf: settings.fileShelfEnabled
     case .clipboard: settings.clipboardHistoryEnabled
     case .aiMonitor: settings.aiProgressEnabled
-    case .aiAgent: settings.aiAgentEnabled
     case .download: settings.downloaderEnabled
     case .agenda: settings.calendarEnabled || settings.weatherEnabled
     case .mail: settings.mailEnabled
@@ -119,6 +113,15 @@ extension IslandModule {
 struct IslandModuleLayout: Equatable {
   let islandSize: CGSize
   let panelSize: CGSize
+
+  /// Returns the same layout with both widths replaced. Voice recording follows the collapsed
+  /// pill's overflow width (notch + wings on notched screens) instead of a fixed constant.
+  func matchingWidth(_ width: CGFloat) -> IslandModuleLayout {
+    IslandModuleLayout(
+      islandSize: CGSize(width: width, height: islandSize.height),
+      panelSize: CGSize(width: width, height: panelSize.height)
+    )
+  }
 
   /// Standard island width must accommodate the full toolbar row (module icons + system monitor strip + action buttons).
   /// Too narrow causes the HStack to overflow at center and clips the first icon behind the island surface, so widened to 660.
@@ -163,10 +166,6 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: 820, height: 470),
     panelSize: CGSize(width: 820, height: 474)
   )
-  static let agent = IslandModuleLayout(
-    islandSize: CGSize(width: 860, height: 540),
-    panelSize: CGSize(width: 860, height: 544)
-  )
   static let system = compactModule(contentHeight: 401)
   static let battery = compactModule(contentHeight: batteryMaximumContentHeight)
   /// Quick Notes: needs a larger editing/preview area for rich content such as images and tables, so wider and taller than standard.
@@ -182,10 +181,10 @@ struct IslandModuleLayout: Equatable {
   /// Dashboard height follows the fixed crown chrome and rendered activity-card grid.
   /// The arithmetic lives in `IslandDashboardLayout` (ZislaKit) so it is unit-testable and
   /// stays clamped above the crown's black → glass transition.
-  /// Voice recording: expands to a single row showing the recording indicator and live transcription.
+  /// Voice recording keeps the collapsed pill's width and only adds one transcript line below.
   static let voiceRecording = IslandModuleLayout(
-    islandSize: CGSize(width: 660, height: 72),
-    panelSize: CGSize(width: 660, height: 76)
+    islandSize: CGSize(width: 240, height: 54),
+    panelSize: CGSize(width: 240, height: 58)
   )
   /// Mirror uses a square panel so the camera preview maintains its natural aspect ratio without cropping.
   static let mirror = IslandModuleLayout(
@@ -279,7 +278,13 @@ private final class SharingPickerDelegateProxy: NSObject,
 @MainActor
 final class AppModel: ObservableObject {
   private enum AIProcessingTarget {
-    case http(endpoint: AIEndpoint, protocolKind: AgentChannelProtocol, model: String, apiKey: String?)
+    case http(
+      endpoint: AIEndpoint,
+      protocolKind: AgentChannelProtocol,
+      model: String,
+      apiKey: String?,
+      effort: AgentModelEffort?
+    )
     case cliProfile(accountID: UUID, model: String)
   }
 
@@ -300,8 +305,6 @@ final class AppModel: ObservableObject {
         Task { await quickNotes.refresh() }
       case .aiMonitor:
         aiMonitor.loadUsageHistory()
-      case .aiAgent:
-        Task { await aiAgent.refreshAll() }
       default:
         break
       }
@@ -343,11 +346,18 @@ final class AppModel: ObservableObject {
   @Published var downloadState: DownloadUIState = .idle
   @Published var transientMessage: String?
   @Published var collapsedIslandSize = CGSize(width: 240, height: 34)
+  @Published var isIslandOnPhysicalNotch = false
+
+  /// 收起态胶囊的"溢出"宽度:刘海屏上紧凑条会向刘海两侧各延伸一个翼宽,
+  /// 无刘海屏即模拟胶囊本身宽度。录音态等紧凑表面用它对齐收起态的可见边缘。
+  var collapsedOverflowWidth: CGFloat {
+    collapsedIslandSize.width
+      + (isIslandOnPhysicalNotch ? SideNoticeLayoutEngine.compactStatusWingWidth * 2 : 0)
+  }
   /// Number of cards rendered below the dashboard summary.
   @Published private(set) var dashboardCardCount = 0
   /// Dynamic content height for the battery module.
   @Published private(set) var batteryModuleDynamicHeight = IslandModuleLayout.batteryMaximumContentHeight
-  @Published var isIslandOnPhysicalNotch = false
   @Published private(set) var isMirrorPresented = false
   @Published private(set) var isTeleprompterPresented = false
   @Published var isIslandVisible = false {
@@ -403,12 +413,10 @@ final class AppModel: ObservableObject {
   /// Model discovery state: used by the settings page to show connection test results and the available model list.
   @Published var voiceModelDiscoveryState: VoiceModelDiscoveryState = .idle
   @Published var discoveredModels: [AIDiscoveredModel] = []
+  /// True while an AI model is cleaning up a recorded transcript; drives the collapsed-island processing indicator.
+  @Published private(set) var isProcessingVoiceTranscript = false
   @Published private(set) var voiceInputInputMonitoringAccessGranted =
     GlobalHotkeyManager.hasInputMonitoringAccess
-  /// Current device hardware profile, used to recommend suitable local small models.
-  @Published var hardwareProfile: AIHardwareProfile?
-  private var isRefreshingHardwareProfile = false
-
   private let weatherService = WeatherService()
   private let weatherLocationService = WeatherLocationService()
   private let releaseService = GitHubReleaseService()
@@ -416,12 +424,17 @@ final class AppModel: ObservableObject {
   private let downloadService = DownloadService()
   private let hotkeyManager = GlobalHotkeyManager()
   private let voicePostProcessingQueue = VoicePostProcessingQueue()
-  private var voiceModelChannelRouter = AgentRouteRouter()
+  /// Serial voice-processing runs share one pair of wing notices; removed when the last run finishes.
+  private var voiceProcessingOperationCount = 0
+  private let voiceTranscriptDelivery = VoiceTranscriptDelivery()
+  private let voiceRecordingPlayer = VoiceRecordingPlayer()
   private var cancellables: Set<AnyCancellable> = []
   private var weatherTask: Task<Void, Never>?
   private var releaseTask: Task<Void, Never>?
   private var releasePackageDownloadTask: Task<Void, Never>?
   private var updatePollingTask: Task<Void, Never>?
+  private var voiceRecordingCleanupTask: Task<Void, Never>?
+  private var appliedVoiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy?
   private var downloadTask: Task<Void, Never>?
   private var detectedLinkTask: Task<Void, Never>?
   private var activeDownloadID: UUID?
@@ -470,7 +483,10 @@ final class AppModel: ObservableObject {
   private let launchDate = Date()
   private let sharingPickerDelegate = SharingPickerDelegateProxy()
   private var sharingPicker: NSSharingServicePicker?
-  private var voicePreviewSound: NSSound?
+  private var voiceInputTarget: VoiceTranscriptDeliveryTarget?
+  private var voiceInputTargetProcessIdentifier: pid_t?
+  private var voiceInputTargetMouseLocation: CGPoint?
+  private var hasRequestedVoiceInputPostEventAccess = false
 
   private init() {
     sharingPickerDelegate.onCompletion = { [weak self] picker in
@@ -507,6 +523,14 @@ final class AppModel: ObservableObject {
             side: .left
           ))
       }
+    }
+    voiceInput.onRecordingWillStart = { [weak self] in
+      guard let self else { return }
+      let processIdentifier = Self.frontmostVoiceInputTargetProcessIdentifier()
+      voiceInputTargetProcessIdentifier = processIdentifier
+      voiceInputTarget = processIdentifier.flatMap(VoiceTranscriptDelivery.captureTarget(for:))
+      voiceInputTargetMouseLocation = CGEvent(source: nil)?.location
+      requestVoiceInputPostEventAccessIfNeeded()
     }
     voiceInput.onTranscriptCompleted = { [weak self] recording in
       self?.deliverVoiceRecording(recording)
@@ -712,9 +736,40 @@ final class AppModel: ObservableObject {
   func refreshVoiceInputInputMonitoringAccess() {
     let granted = GlobalHotkeyManager.hasInputMonitoringAccess
     guard voiceInputInputMonitoringAccessGranted != granted else { return }
+    let wasGranted = voiceInputInputMonitoringAccessGranted
     voiceInputInputMonitoringAccessGranted = granted
-    if granted, settingsStore.settings.voiceInputEnabled {
-      apply(settings: settingsStore.settings)
+
+    // 权限从无到有：自动重新注册快捷键
+    if granted, !wasGranted, settingsStore.settings.voiceInputEnabled {
+      let preset = settingsStore.settings.voiceInputHotkeyPreset
+      let mode = settingsStore.settings.voiceInputMode
+      let registration = hotkeyManager.register(
+        hotkey: preset,
+        onKeyDown: { [weak self] in
+          guard let self else { return }
+          switch mode {
+          case .toggle:
+            self.voiceInput.toggle()
+          case .pushToTalk:
+            self.voiceInput.start()
+          }
+        },
+        onKeyUp: { [weak self] in
+          guard let self else { return }
+          if mode == .pushToTalk {
+            self.voiceInput.stop()
+          }
+        }
+      )
+
+      switch registration {
+      case .registered:
+        transientMessage = "语音输入快捷键已启用"
+      case .inputMonitoringPermissionRequired:
+        transientMessage = "快捷键需要输入监控权限，请在系统设置中授权后重启 App"
+      case .registrationFailed:
+        transientMessage = "无法注册语音输入快捷键"
+      }
     }
   }
 
@@ -726,9 +781,19 @@ final class AppModel: ObservableObject {
     releaseTask?.cancel()
     releasePackageDownloadTask?.cancel()
     updatePollingTask?.cancel()
+    voiceRecordingCleanupTask?.cancel()
+    voiceRecordingCleanupTask = nil
+    appliedVoiceRecordingCleanupPolicy = nil
     downloadTask?.cancel()
     voicePostProcessingQueue.cancelAll()
+    voiceProcessingOperationCount = 0
+    isProcessingVoiceTranscript = false
+    notices.remove(id: "voice-processing-left")
+    notices.remove(id: "voice-processing-right")
     detectedLinkTask?.cancel()
+    voiceInputTarget = nil
+    voiceInputTargetProcessIdentifier = nil
+    voiceInputTargetMouseLocation = nil
     voiceInput.cancel()
     hotkeyManager.unregister()
     clipboardMonitor.setEnabled(false)
@@ -1276,39 +1341,8 @@ final class AppModel: ObservableObject {
     }
   }
 
-  func sendQuickNoteToAIAgent(_ content: String) {
-    sendTransferItemsToAIAgent([.text(content)])
-  }
-
-  func sendTransferItemsToAIAgent(_ items: [TransferDropItem]) {
-    let content = transferableText(from: items)
-    guard !content.isEmpty else {
-      transientMessage = "没有可发送给 AI Agent 的内容"
-      return
-    }
-    let profileAccount = aiAgent.store.state.accounts.first { aiAgent.store.hasCLIProfile(for: $0) }
-    let thread = aiAgent.store.createThread(
-      useMostRecentModel: true,
-      channelID: aiAgent.store.state.channels.first(where: \.isEnabled)?.id,
-      cliKind: profileAccount?.cliProfile?.cliKind,
-      accountID: profileAccount?.id
-    )
-    // The toggle only hides the module and does not affect conversations, so send normally; do not navigate to a hidden
-    // module because that misaligns the panel size, and show a destination hint instead.
-    if settingsStore.settings.aiAgentEnabled {
-      selectModule(.aiAgent)
-    } else {
-      transientMessage = "已发送给 AI Agent，可在设置中重新开启该模块查看"
-    }
-    Task { await aiAgent.send(content, to: thread.id) }
-  }
-
   func sendClipboardHistoryItemToQuickNote(_ item: ClipboardHistoryItem) {
     receiveQuickNoteTransferItems(transferItems(from: item.content))
-  }
-
-  func sendClipboardHistoryItemToAIAgent(_ item: ClipboardHistoryItem) {
-    sendTransferItemsToAIAgent(transferItems(from: item.content))
   }
 
   private func transferItems(from content: ClipboardHistoryContent) -> [TransferDropItem] {
@@ -1495,6 +1529,7 @@ final class AppModel: ObservableObject {
     media.setPreferredSource(settings.mediaSource)
     pomodoro.notificationsMuted = settings.notificationsMuted
     configureUpdatePolling(enabled: settings.updateChecksEnabled)
+    configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
     if settings.aiProgressEnabled {
       aiMonitor.start()
       if selectedModule == .aiMonitor {
@@ -1505,11 +1540,7 @@ final class AppModel: ObservableObject {
       clearActiveAINotices()
       powerAssertions.setAIActivityActive(false)
     }
-    if settings.aiAgentEnabled {
-      aiAgent.start()
-    } else {
-      aiAgent.stop()
-    }
+    aiAgent.start()
     syncAIActivityPowerAssertion(aiMonitor.state)
     if settings.mediaEnabled {
       media.start()
@@ -1643,9 +1674,7 @@ final class AppModel: ObservableObject {
     updatePollingTask = Task { [weak self] in
       while !Task.isCancelled {
         guard let self else { return }
-        if self.settingsStore.settings.aiAgentEnabled {
-          await self.aiAgent.refreshCLIs()
-        }
+        await self.aiAgent.refreshCLIs()
         guard !Task.isCancelled else { return }
         self.checkForUpdates(manual: false)
         do {
@@ -1653,6 +1682,27 @@ final class AppModel: ObservableObject {
         } catch {
           return
         }
+      }
+    }
+  }
+
+  private func configureVoiceRecordingCleanup(policy: VoiceRecordingCleanupPolicy) {
+    guard appliedVoiceRecordingCleanupPolicy != policy else { return }
+    appliedVoiceRecordingCleanupPolicy = policy
+    voiceRecordingCleanupTask?.cancel()
+    voiceRecordingCleanupTask = nil
+    voiceHistory.cleanupOldRecordings(policy: policy)
+    guard let days = policy.daysThreshold else { return }
+
+    voiceRecordingCleanupTask = Task { [weak self] in
+      while !Task.isCancelled {
+        do {
+          try await Task.sleep(for: .seconds(days * 24 * 60 * 60))
+        } catch {
+          return
+        }
+        guard let self, !Task.isCancelled else { return }
+        self.voiceHistory.cleanupOldRecordings(policy: policy)
       }
     }
   }
@@ -1703,26 +1753,38 @@ final class AppModel: ObservableObject {
   // MARK: - Voice model discovery
 
   private func deliverVoiceRecording(_ recording: VoiceRecordingResult) {
+    let inputTarget = voiceInputTarget
+    let targetProcessIdentifier = voiceInputTargetProcessIdentifier
+    let targetMouseLocation = voiceInputTargetMouseLocation
+    voiceInputTarget = nil
+    voiceInputTargetProcessIdentifier = nil
+    voiceInputTargetMouseLocation = nil
     let rawTranscript = recording.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-    let historySaved = voiceHistory.record(recording)
+    let retainsAudio = settingsStore.settings.voiceRecordingRetentionEnabled
+    let historySaved = voiceHistory.record(recording, retainAudio: retainsAudio)
     guard !rawTranscript.isEmpty else {
       transientMessage = historySaved
-        ? "录音已保存，但未识别到文字"
-        : "录音文件已保留，但记录索引保存失败"
+        ? (retainsAudio ? "录音已保存，但未识别到文字" : "未识别到文字")
+        : (retainsAudio ? "录音文件已保留，但记录索引保存失败" : "语音记录保存失败")
       return
     }
     guard let target = voicePostProcessingTarget() else {
-      copyVoiceTranscript(
+      deliverVoiceTranscript(
         rawTranscript,
-        message: historySaved ? "语音转写已复制并保存" : "语音转写已复制；记录保存失败"
+        to: targetProcessIdentifier,
+        at: targetMouseLocation,
+        target: inputTarget,
+        message: historySaved ? "语音转写已保存" : "语音转写完成；记录保存失败"
       )
       return
     }
     // Recording already ended and the island HUD is gone, so without this the cleanup round-trip
     // looks like the shortcut simply swallowed the dictation.
     transientMessage = "正在整理语音…"
+    beginVoiceProcessingIndicator()
     voicePostProcessingQueue.enqueue { [weak self] in
       guard let self else { return }
+      defer { self.endVoiceProcessingIndicator() }
       do {
         let response = try await self.complete(
           using: target,
@@ -1738,52 +1800,109 @@ final class AppModel: ObservableObject {
           id: recording.id,
           transcript: delivered
         )
-        self.copyVoiceTranscript(
+        self.deliverVoiceTranscript(
           delivered,
+          to: targetProcessIdentifier,
+          at: targetMouseLocation,
+          target: inputTarget,
           message: historySaved && processedTranscriptSaved
-            ? "语音整理后已复制并保存"
-            : "语音整理后已复制；记录保存失败"
+            ? "语音整理结果已保存"
+            : "语音整理完成；记录保存失败"
         )
       } catch is CancellationError {
         return
       } catch {
         guard !Task.isCancelled else { return }
-        self.copyVoiceTranscript(rawTranscript, message: "语音转写已复制；整理失败")
+        self.deliverVoiceTranscript(
+          rawTranscript,
+          to: targetProcessIdentifier,
+          at: targetMouseLocation,
+          target: inputTarget,
+          message: "语音转写完成；整理失败"
+        )
       }
     }
+  }
+
+  /// Shows the collapsed-island "voice processing" wings (left: mic, right: a random thinking orb)
+  /// for the duration of AI transcript cleanup. Each run picks a fresh random orb animation.
+  private func beginVoiceProcessingIndicator() {
+    voiceProcessingOperationCount += 1
+    guard !isProcessingVoiceTranscript else { return }
+    isProcessingVoiceTranscript = true
+    let orbState = ThinkingOrbState.taskStates.randomElement() ?? .working
+    let left = IslandNotice(
+      id: "voice-processing-left",
+      title: "正在整理语音",
+      kind: .info,
+      side: .left,
+      style: .status,
+      symbolName: "mic.fill",
+      metadata: ["orbState": orbState.rawValue]
+    )
+    let right = IslandNotice(
+      id: "voice-processing-right",
+      title: "正在整理语音",
+      kind: .info,
+      side: .right,
+      style: .status,
+      metadata: ["orbState": orbState.rawValue]
+    )
+    for notice in [left, right] {
+      if !notices.updateIfPresent(notice) {
+        notices.enqueue(notice, expiresAfter: nil)
+      }
+    }
+  }
+
+  private func endVoiceProcessingIndicator() {
+    voiceProcessingOperationCount = max(0, voiceProcessingOperationCount - 1)
+    guard voiceProcessingOperationCount == 0, isProcessingVoiceTranscript else { return }
+    isProcessingVoiceTranscript = false
+    notices.remove(id: "voice-processing-left")
+    notices.remove(id: "voice-processing-right")
   }
 
   private func voicePostProcessingTarget() -> AIProcessingTarget? {
     guard let reference = selectedVoiceModelConfiguration else { return nil }
     switch reference.source {
     case .local:
-      guard let configuration = aiAgent.store.localModel(id: reference.id), configuration.isEnabled else {
+      guard let configuration = aiAgent.store.localModel(id: reference.id),
+            configuration.isEnabled else {
         return nil
       }
       let model = configuration.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !model.isEmpty else { return nil }
-      return .http(endpoint: configuration.endpoint, protocolKind: .openAICompatible, model: model, apiKey: nil)
+      return .http(
+        endpoint: configuration.endpoint,
+        protocolKind: .openAICompatible,
+        model: model,
+        apiKey: nil,
+        effort: nil
+      )
     case .channel:
-      guard let channel = aiAgent.store.channel(id: reference.id), channel.isEnabled,
-            let route = voiceModelChannelRouter.nextRoute(
-              for: channel,
-              accounts: aiAgent.store.state.accounts
-            ),
-            let account = aiAgent.store.account(id: route.accountID) else {
+      guard let channel = aiAgent.store.channel(id: reference.id),
+            channel.isEnabled,
+            channel.protocolKind == .openAICompatible || channel.protocolKind == .anthropicMessages,
+            let endpointGroup = channel.endpointGroups.first,
+            let baseURL = endpointGroup.baseURLs.first?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !baseURL.isEmpty,
+            let accountID = endpointGroup.accountIDs.first,
+            let account = aiAgent.store.account(id: accountID),
+            account.credentialKind == .apiKey,
+            let apiKey = try? aiAgent.store.secret(for: account),
+            !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
         return nil
       }
-      switch account.credentialKind {
-      case .apiKey:
-        return .http(
-          endpoint: AIEndpoint(name: channel.name, baseURL: route.baseURL, kind: .openAICompatible),
-          protocolKind: channel.protocolKind,
-          model: route.model,
-          apiKey: try? aiAgent.store.secret(for: account)
-        )
-      case .cliProfile:
-        guard aiAgent.store.hasCLIProfile(for: account) else { return nil }
-        return .cliProfile(accountID: account.id, model: route.model)
-      }
+      let model = channel.defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !model.isEmpty else { return nil }
+      return .http(
+        endpoint: AIEndpoint(name: channel.name, baseURL: baseURL, kind: .openAICompatible),
+        protocolKind: channel.protocolKind,
+        model: model,
+        apiKey: apiKey.trimmingCharacters(in: .whitespacesAndNewlines),
+        effort: channel.effort
+      )
     }
   }
 
@@ -1793,14 +1912,15 @@ final class AppModel: ObservableObject {
     messages: [AIOutboundMessage]
   ) async throws -> String {
     switch target {
-    case let .http(endpoint, protocolKind, model, apiKey):
+    case let .http(endpoint, protocolKind, model, apiKey, effort):
       return try await AIChatClient().complete(
         endpoint: endpoint,
         protocolKind: protocolKind,
         model: model,
         systemPrompt: systemPrompt,
         messages: messages,
-        apiKey: apiKey
+        apiKey: apiKey,
+        effort: effort
       ).content
     case let .cliProfile(accountID, model):
       return try await aiAgent.completeWithCLIProfile(
@@ -1812,24 +1932,56 @@ final class AppModel: ObservableObject {
     }
   }
 
-  private func copyVoiceTranscript(_ transcript: String, message: String) {
-    guard ClipboardHistoryPasteboard.write(.text(transcript)) else {
+  private func deliverVoiceTranscript(
+    _ transcript: String,
+    to targetProcessIdentifier: pid_t?,
+    at targetMouseLocation: CGPoint?,
+    target: VoiceTranscriptDeliveryTarget?,
+    message: String
+  ) {
+    switch voiceTranscriptDelivery.deliver(
+      transcript,
+      to: targetProcessIdentifier,
+      at: targetMouseLocation,
+      target: target
+    ) {
+    case .copiedAndPasted:
+      transientMessage = "\(message)；已输入当前文本框并复制"
+    case .copiedOnly:
+      if targetProcessIdentifier != nil, !CGPreflightPostEventAccess() {
+        transientMessage = "\(message)；已复制。请在系统弹出的授权界面允许 zisla 后重试"
+      } else {
+        transientMessage = "\(message)；已复制，未能输入原文本框"
+      }
+    case .copyFailed:
       transientMessage = "无法复制语音转写结果"
-      return
     }
-    transientMessage = message
+  }
+
+  private func requestVoiceInputPostEventAccessIfNeeded() {
+    guard VoiceTranscriptDelivery.shouldRequestEventSynthesisAccess(
+      hasAccess: CGPreflightPostEventAccess(),
+      hasRequestedInCurrentLaunch: hasRequestedVoiceInputPostEventAccess
+    ) else { return }
+
+    hasRequestedVoiceInputPostEventAccess = true
+    let authorizationHost = WindowPlacement.authorizationPromptHost()
+    defer {
+      authorizationHost?.orderOut(nil)
+      authorizationHost?.close()
+    }
+    VoiceTranscriptDelivery.requestEventSynthesisAccess()
   }
 
   func playVoiceRecording(id: UUID) {
     guard let entry = voiceHistory.entries.first(where: { $0.id == id }),
-          let url = voiceHistory.audioURL(for: entry),
-          let sound = NSSound(contentsOf: url, byReference: true) else {
+          let url = voiceHistory.audioURL(for: entry) else {
       transientMessage = "无法播放该语音原文件"
       return
     }
-    voicePreviewSound?.stop()
-    voicePreviewSound = sound
-    if !sound.play() {
+    if voiceRecordingPlayer.play(id: id, url: url) {
+      transientMessage = "正在播放原始录音"
+    } else {
       transientMessage = "无法播放该语音原文件"
     }
   }
@@ -1856,15 +2008,37 @@ final class AppModel: ObservableObject {
   }
 
   func removeVoiceRecording(id: UUID) {
-    voicePreviewSound?.stop()
-    voicePreviewSound = nil
+    voiceRecordingPlayer.stop()
     voiceHistory.remove(id: id)
   }
 
+  func removeVoiceRecordings(ids: Set<UUID>) {
+    guard !ids.isEmpty else { return }
+    voiceRecordingPlayer.stop()
+    voiceHistory.removeBatch(ids: ids)
+  }
+
   func removeAllVoiceRecordings() {
-    voicePreviewSound?.stop()
-    voicePreviewSound = nil
+    voiceRecordingPlayer.stop()
     voiceHistory.removeAll()
+  }
+
+  private static func frontmostVoiceInputTargetProcessIdentifier() -> pid_t? {
+    guard let application = NSWorkspace.shared.frontmostApplication,
+          application.processIdentifier != NSRunningApplication.current.processIdentifier else {
+      return nil
+    }
+    return application.processIdentifier
+  }
+
+  /// 录音一结束就把焦点交还目标应用(识别结果可能还要等 AI 整理才投递)。
+  /// 不清除已保存的目标 PID:投递时会再次确保 frontmost 再粘贴。
+  func restoreVoiceInputTargetFocus() {
+    guard let pid = voiceInputTargetProcessIdentifier else { return }
+    VoiceTranscriptDelivery.reactivateTargetApplication(pid)
+    if let voiceInputTarget {
+      _ = VoiceTranscriptDelivery.focusTarget(voiceInputTarget)
+    }
   }
 
   /// Tests the current model endpoint and discovers available models.
@@ -1874,7 +2048,7 @@ final class AppModel: ObservableObject {
       discoveredModels = []
       return
     }
-    guard case let .http(endpoint, _, _, apiKey) = target else {
+    guard case let .http(endpoint, _, _, apiKey, _) = target else {
       voiceModelDiscoveryState = .failed("官方 CLI 档案不支持 API 模型发现")
       discoveredModels = []
       return
@@ -1895,13 +2069,8 @@ final class AppModel: ObservableObject {
 
   var selectedVoiceModelConfiguration: AIModelConfigurationReference? {
     let reference = settingsStore.settings.voiceModelConfiguration
-    guard let reference else { return nil }
-    switch reference.source {
-    case .local:
-      return aiAgent.store.localModel(id: reference.id)?.isEnabled == true ? reference : nil
-    case .channel:
-      return aiAgent.store.channel(id: reference.id)?.isEnabled == true ? reference : nil
-    }
+    guard let reference, isSelectableVoiceModelConfiguration(reference) else { return nil }
+    return reference
   }
 
   func selectVoiceModelConfiguration(_ reference: AIModelConfigurationReference?) {
@@ -1910,13 +2079,7 @@ final class AppModel: ObservableObject {
       resetVoiceModelDiscovery()
       return
     }
-    let isEnabled = switch reference.source {
-    case .local:
-      aiAgent.store.localModel(id: reference.id)?.isEnabled == true
-    case .channel:
-      aiAgent.store.channel(id: reference.id)?.isEnabled == true
-    }
-    guard isEnabled else {
+    guard isSelectableVoiceModelConfiguration(reference) else {
       settingsStore.settings.voiceModelConfiguration = nil
       resetVoiceModelDiscovery()
       return
@@ -1925,12 +2088,25 @@ final class AppModel: ObservableObject {
     resetVoiceModelDiscovery()
   }
 
+  private func isSelectableVoiceModelConfiguration(_ reference: AIModelConfigurationReference) -> Bool {
+    switch reference.source {
+    case .local:
+      aiAgent.store.localModel(id: reference.id)?.isEnabled == true
+    case .channel:
+      aiAgent.store.channel(id: reference.id)?.isEnabled == true
+    }
+  }
+
   func voiceModelConfigurationTitle(_ reference: AIModelConfigurationReference) -> String {
     switch reference.source {
     case .local:
-      return aiAgent.store.localModel(id: reference.id)?.name ?? "本地模型"
+      guard let configuration = aiAgent.store.localModel(id: reference.id) else { return "本地模型" }
+      let modelName = configuration.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
+      return modelName.isEmpty ? configuration.name : modelName
     case .channel:
-      return aiAgent.store.channel(id: reference.id)?.name ?? "远端模型"
+      guard let channel = aiAgent.store.channel(id: reference.id) else { return "远端模型" }
+      let modelName = channel.defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
+      return modelName.isEmpty ? channel.name : modelName
     }
   }
 
@@ -1952,21 +2128,6 @@ final class AppModel: ObservableObject {
   private func resetVoiceModelDiscovery() {
     discoveredModels = []
     voiceModelDiscoveryState = .idle
-  }
-
-  /// Fetches the current device's hardware profile to recommend local models.
-  func refreshHardwareProfile() {
-    guard hardwareProfile == nil, !isRefreshingHardwareProfile else { return }
-    isRefreshingHardwareProfile = true
-
-    Task { [weak self] in
-      let profile = await Task.detached(priority: .utility) {
-        AIHardwareProfileDetector.current()
-      }.value
-      guard let self else { return }
-      hardwareProfile = profile
-      isRefreshingHardwareProfile = false
-    }
   }
 
   private func restartActivityNoticesForDurationChange() {

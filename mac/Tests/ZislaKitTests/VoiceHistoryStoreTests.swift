@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import ZislaKit
+@testable import ZislaCore
 
 @MainActor
 struct VoiceHistoryStoreTests {
@@ -364,6 +365,253 @@ struct VoiceHistoryStoreTests {
             #expect(count >= 0)
             #expect(count <= sample.unicodeScalars.count)
         }
+    }
+
+    @Test
+    func recordWithoutAudioRetentionKeepsTranscriptAfterReload() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let store = fixture.makeStore()
+        let id = UUID()
+        let audioURL = store.recordingURL(for: id)
+        try fixture.writeAudio(at: audioURL)
+
+        #expect(store.record(VoiceRecordingResult(
+            id: id,
+            audioFileURL: audioURL,
+            transcript: "仅保留文字",
+            duration: 2
+        ), retainAudio: false))
+
+        let entry = try #require(store.entries.first)
+        #expect(entry.audioFileName == nil)
+        #expect(!FileManager.default.fileExists(atPath: audioURL.path))
+        #expect(fixture.makeStore().entries == [entry])
+    }
+
+    @Test
+    func finiteCleanupPoliciesRemoveOnlyExpiredAudioAndPersistTextHistory() throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let day: TimeInterval = 24 * 60 * 60
+        let policies: [(VoiceRecordingCleanupPolicy, Int)] = [
+            (.sevenDays, 7),
+            (.fifteenDays, 15),
+            (.thirtyDays, 30),
+        ]
+
+        for (policy, days) in policies {
+            let fixture = try makeFixture()
+            defer { fixture.cleanup() }
+            let store = fixture.makeStore()
+            let expiredID = UUID()
+            let currentID = UUID()
+            let expiredURL = store.recordingURL(for: expiredID)
+            let currentURL = store.recordingURL(for: currentID)
+            try fixture.writeAudio(at: expiredURL)
+            try fixture.writeAudio(at: currentURL)
+
+            #expect(store.record(VoiceRecordingResult(
+                id: expiredID,
+                audioFileURL: expiredURL,
+                transcript: "过期录音文字",
+                duration: 1,
+                createdAt: now.addingTimeInterval(-Double(days + 1) * day)
+            )))
+            #expect(store.record(VoiceRecordingResult(
+                id: currentID,
+                audioFileURL: currentURL,
+                transcript: "保留录音文字",
+                duration: 1,
+                createdAt: now.addingTimeInterval(-Double(days - 1) * day)
+            )))
+
+            store.cleanupOldRecordings(policy: policy, now: now)
+
+            #expect(!FileManager.default.fileExists(atPath: expiredURL.path))
+            #expect(FileManager.default.fileExists(atPath: currentURL.path))
+            #expect(store.entries.first(where: { $0.id == expiredID })?.audioFileName == nil)
+            #expect(fixture.makeStore().entries.count == 2)
+        }
+    }
+
+    @Test
+    func neverCleanupPolicyKeepsOldAudio() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let store = fixture.makeStore()
+        let id = UUID()
+        let audioURL = store.recordingURL(for: id)
+        try fixture.writeAudio(at: audioURL)
+        #expect(store.record(VoiceRecordingResult(
+            id: id,
+            audioFileURL: audioURL,
+            transcript: "长期保留",
+            duration: 1,
+            createdAt: Date(timeIntervalSince1970: 1)
+        )))
+
+        store.cleanupOldRecordings(policy: .never, now: Date(timeIntervalSince1970: 2_000_000_000))
+
+        #expect(FileManager.default.fileExists(atPath: audioURL.path))
+    }
+
+    @Test
+    func removingEntriesRetainsCumulativeStatistics() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let store = fixture.makeStore()
+        let firstID = UUID()
+        let secondID = UUID()
+        let firstURL = store.recordingURL(for: firstID)
+        let secondURL = store.recordingURL(for: secondID)
+        try fixture.writeAudio(at: firstURL)
+        try fixture.writeAudio(at: secondURL)
+        #expect(store.record(VoiceRecordingResult(
+            id: firstID,
+            audioFileURL: firstURL,
+            transcript: String(repeating: "你", count: 100),
+            duration: 60
+        )))
+        #expect(store.record(VoiceRecordingResult(
+            id: secondID,
+            audioFileURL: secondURL,
+            transcript: String(repeating: "好", count: 50),
+            duration: 30
+        )))
+
+        #expect(store.statistics.totalWordCount == 150)
+        #expect(store.statistics.totalDuration == 90)
+
+        store.remove(id: firstID)
+
+        #expect(store.entries.count == 1)
+        #expect(store.statistics.totalWordCount == 150)
+        #expect(store.statistics.totalDuration == 90)
+
+        let reloaded = fixture.makeStore()
+        #expect(reloaded.statistics.totalWordCount == 150)
+        #expect(reloaded.statistics.totalDuration == 90)
+        #expect(reloaded.entries.count == 1)
+    }
+
+    @Test
+    func removeAllRetainsCumulativeStatistics() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let store = fixture.makeStore()
+        let id = UUID()
+        let audioURL = store.recordingURL(for: id)
+        try fixture.writeAudio(at: audioURL)
+        #expect(store.record(VoiceRecordingResult(
+            id: id,
+            audioFileURL: audioURL,
+            transcript: String(repeating: "测", count: 200),
+            duration: 120
+        )))
+
+        #expect(store.statistics.totalWordCount == 200)
+
+        store.removeAll()
+
+        #expect(store.entries.isEmpty)
+        #expect(store.statistics.totalWordCount == 200)
+        #expect(store.statistics.totalDuration == 120)
+        #expect(!FileManager.default.fileExists(atPath: audioURL.path))
+
+        let reloaded = fixture.makeStore()
+        #expect(reloaded.entries.isEmpty)
+        #expect(reloaded.statistics.totalWordCount == 200)
+        #expect(reloaded.statistics.totalDuration == 120)
+    }
+
+    @Test
+    func batchRemovalRetainsCumulativeStatistics() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let store = fixture.makeStore()
+        let ids = (0..<3).map { _ in UUID() }
+        for id in ids {
+            let audioURL = store.recordingURL(for: id)
+            try fixture.writeAudio(at: audioURL)
+            #expect(store.record(VoiceRecordingResult(
+                id: id,
+                audioFileURL: audioURL,
+                transcript: String(repeating: "词", count: 10),
+                duration: 10
+            )))
+        }
+
+        #expect(store.statistics.totalWordCount == 30)
+        #expect(store.statistics.totalDuration == 30)
+
+        store.removeBatch(ids: Set([ids[0], ids[1]]))
+
+        #expect(store.entries.count == 1)
+        #expect(store.statistics.totalWordCount == 30)
+        #expect(store.statistics.totalDuration == 30)
+        #expect(!FileManager.default.fileExists(atPath: store.recordingURL(for: ids[0]).path))
+        #expect(!FileManager.default.fileExists(atPath: store.recordingURL(for: ids[1]).path))
+        #expect(FileManager.default.fileExists(atPath: store.recordingURL(for: ids[2]).path))
+    }
+
+    @Test
+    func migrationFromLegacyArrayFormatPreservesCumulativeData() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let id = UUID()
+        let audioURL = fixture.recordingsDirectory.appendingPathComponent("\(id.uuidString).caf")
+        try fixture.writeAudio(at: audioURL)
+        let legacyEntry = VoiceHistoryEntry(
+            id: id,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            duration: 15,
+            rawTranscript: String(repeating: "旧", count: 80),
+            processedTranscript: nil,
+            wordCount: 80,
+            audioFileName: audioURL.lastPathComponent
+        )
+        try JSONEncoder().encode([legacyEntry]).write(to: fixture.metadataURL)
+
+        let store = fixture.makeStore()
+
+        #expect(store.entries.count == 1)
+        #expect(store.statistics.totalWordCount == 80)
+        #expect(store.statistics.totalDuration == 15)
+
+        store.remove(id: id)
+
+        #expect(store.entries.isEmpty)
+        #expect(store.statistics.totalWordCount == 80)
+        #expect(store.statistics.totalDuration == 15)
+    }
+
+    @Test
+    func reloadRepairsCumulativeStatisticsBelowVisibleHistory() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let store = fixture.makeStore()
+        let id = UUID()
+        let audioURL = store.recordingURL(for: id)
+        try fixture.writeAudio(at: audioURL)
+        #expect(store.record(VoiceRecordingResult(
+            id: id,
+            audioFileURL: audioURL,
+            transcript: String(repeating: "累", count: 12),
+            duration: 6
+        )))
+        var root = try #require(
+            JSONSerialization.jsonObject(with: Data(contentsOf: fixture.metadataURL)) as? [String: Any]
+        )
+        root["cumulativeStatistics"] = [
+            "totalWordCount": -1,
+            "totalDuration": -10,
+        ]
+        try JSONSerialization.data(withJSONObject: root).write(to: fixture.metadataURL)
+
+        let reloaded = fixture.makeStore()
+
+        #expect(reloaded.statistics.totalWordCount == 12)
+        #expect(reloaded.statistics.totalDuration == 6)
     }
 }
 

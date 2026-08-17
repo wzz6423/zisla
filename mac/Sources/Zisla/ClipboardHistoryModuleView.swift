@@ -66,7 +66,6 @@ struct ClipboardHistoryModuleView: View {
     @FocusState private var isSearchFocused: Bool
     private let copyItem: (ClipboardHistoryItem) -> Void
     private let sendToQuickNote: (ClipboardHistoryItem) -> Void
-    private let sendToAIAgent: (ClipboardHistoryItem) -> Void
     private static let surfaceShape = IslandSurfaceGeometry.moduleContentShape(
         bottomLeadingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
         bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
@@ -76,7 +75,6 @@ struct ClipboardHistoryModuleView: View {
         _store = ObservedObject(wrappedValue: model.clipboardHistory)
         copyItem = { model.copyClipboardHistoryItem($0) }
         sendToQuickNote = { model.sendClipboardHistoryItemToQuickNote($0) }
-        sendToAIAgent = { model.sendClipboardHistoryItemToAIAgent($0) }
     }
 
     private var visibleItems: [ClipboardHistoryItem] {
@@ -410,7 +408,6 @@ struct ClipboardHistoryModuleView: View {
             item: item,
             onCopy: copyItem,
             onSendToQuickNote: sendToQuickNote,
-            onSendToAIAgent: sendToAIAgent,
             onSetPinned: { store.setPinned(id: item.id, isPinned: $0) },
             onRemove: { store.remove(id: item.id) }
         )
@@ -556,7 +553,6 @@ private struct ClipboardHistoryItemRow: View, Equatable {
     let item: ClipboardHistoryItem
     let onCopy: (ClipboardHistoryItem) -> Void
     let onSendToQuickNote: (ClipboardHistoryItem) -> Void
-    let onSendToAIAgent: (ClipboardHistoryItem) -> Void
     let onSetPinned: (Bool) -> Void
     let onRemove: () -> Void
 
@@ -606,22 +602,6 @@ private struct ClipboardHistoryItemRow: View, Equatable {
             .foregroundStyle(.secondary)
             .help("发送到随记")
 
-            Button {
-                onSendToAIAgent(item)
-            } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 10))
-                    Text("AI")
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .help("发送到 AI Agent")
-
             // Favorites toggle: filled star = already in favorites; tap to add/remove from favorites.
             Button {
                 onSetPinned(!item.isPinned)
@@ -663,7 +643,6 @@ private struct ClipboardHistoryItemRow: View, Equatable {
         .contextMenu {
             Button("复制") { onCopy(item) }
             Button("发送到随记") { onSendToQuickNote(item) }
-            Button("发送到 AI Agent") { onSendToAIAgent(item) }
             Button(item.isPinned ? "移出常用" : "设为常用") {
                 onSetPinned(!item.isPinned)
             }

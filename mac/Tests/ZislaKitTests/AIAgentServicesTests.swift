@@ -114,34 +114,6 @@ struct AIAgentServicesTests {
     }
 
     @Test
-    func automationLoopOnlyRunsWhileAnEnabledAutomationExists() async {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("zisla-ai-agent-automation-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"))
-        let workspace = AIAgentWorkspace(store: store)
-
-        workspace.start()
-        workspace.startAutomation()
-        #expect(!workspace.isAutomationLoopRunning)
-
-        var automation = AgentAutomation(
-            name: "定时检测",
-            task: .cliCheck,
-            isEnabled: true,
-            nextRunAt: .distantFuture
-        )
-        store.updateAutomation(automation)
-        await Task.yield()
-        #expect(workspace.isAutomationLoopRunning)
-
-        automation.isEnabled = false
-        store.updateAutomation(automation)
-        await Task.yield()
-        #expect(!workspace.isAutomationLoopRunning)
-    }
-
-    @Test
     func cliAutoUpdateRequiresExplicitOptIn() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-cli-auto-update-\(UUID().uuidString)", isDirectory: true)
@@ -165,7 +137,7 @@ struct AIAgentServicesTests {
         )
 
         workspace.start()
-        await workspace.refreshCLIs()
+        #expect(await waitForCLIUpdate(workspace, kind: .codex))
 
         #expect(!store.state.cliAutoUpdateEnabled)
         #expect(!FileManager.default.fileExists(atPath: updateMarker.path))
@@ -182,6 +154,38 @@ struct AIAgentServicesTests {
 
         workspace.setCLIAutoUpdateEnabled(false)
         #expect(!store.state.cliAutoUpdateEnabled)
+    }
+
+    @Test
+    func cliAutoUpdateRunsWhenEnabledBeforeWorkspaceStart() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-auto-update-on-start-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let toolDirectory = directory.appendingPathComponent("toolchain/bin", isDirectory: true)
+        let updateMarker = directory.appendingPathComponent("updated")
+        let codex = toolDirectory.appendingPathComponent("codex")
+        let npm = toolDirectory.appendingPathComponent("npm")
+        try writeExecutable(at: codex, contents: "#!/bin/sh\nprintf '1.0.0\\n'\n")
+        try writeExecutable(at: npm, contents: "#!/bin/sh\ntouch '\(updateMarker.path)'\n")
+        let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"))
+        let workspace = AIAgentWorkspace(
+            store: store,
+            cliService: AIAgentCLIService(
+                environment: ["PATH": "\(toolDirectory.path):/usr/bin:/bin"],
+                homeDirectory: directory
+            ),
+            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { kind in
+                kind == .codex ? "1.1.0" : nil
+            })
+        )
+
+        workspace.setCLIAutoUpdateEnabled(true)
+        workspace.start()
+        await waitForFile(at: updateMarker)
+        await waitForCLICommandRunToFinish(workspace)
+
+        #expect(store.state.cliAutoUpdateEnabled)
+        #expect(FileManager.default.fileExists(atPath: updateMarker.path))
     }
 
     @Test
@@ -604,129 +608,71 @@ struct AIAgentServicesTests {
     }
 
     @Test
-    func relayPromptIncludesMultipleExplicitSkillAndAppReferences() {
-        let message = AgentChatMessage(
-            role: .user,
-            content: "检查发布风险",
-            appReferences: [
-                AgentChatAppReference(name: "Codex", bundleIdentifier: "com.openai.codex", processIdentifier: 42),
-                AgentChatAppReference(name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode", processIdentifier: 84),
-            ],
-            skillReferences: [
-                AgentChatSkillReference(name: "release-plan", path: "/skills/release-plan"),
-                AgentChatSkillReference(name: "code-review", path: "/skills/code-review"),
-            ]
-        )
-
-        let project = AgentChatProject(name: "发布", instructions: "保持兼容性")
-        let prompt = AIAgentCLIService().relayPrompt(
-            [AgentChatMessage(role: .user, content: "先前消息", skillReferences: message.skillReferences), message],
-            project: project,
-            accessMode: .fullAccess,
-            model: "gpt-5.6",
-            thinkingDepth: .extraHigh
-        )
-
-        #expect(prompt.contains("[调用 Skills]"))
-        #expect(prompt.contains("release-plan：/skills/release-plan"))
-        #expect(prompt.contains("code-review：/skills/code-review"))
-        #expect(prompt.contains("不要假设本应用执行了该 Skill"))
-        #expect(prompt.contains("[项目：发布]"))
-        #expect(prompt.contains("项目说明：保持兼容性"))
-        #expect(prompt.contains("[@本机 App]"))
-        #expect(prompt.contains("Codex（com.openai.codex，PID 42）"))
-        #expect(prompt.contains("Xcode（com.apple.dt.Xcode，PID 84）"))
-        #expect(prompt.contains("访问模式：完全访问"))
-        #expect(prompt.contains("模型：gpt-5.6"))
-        #expect(prompt.contains("思考深度：极高"))
-        #expect(prompt.components(separatedBy: "[调用 Skills]").count == 2)
-    }
-
-    @Test
-    func outboundMessagesRetainRichReferencesAndBoundHistory() throws {
-        let attachment = AgentChatAttachment(
-            fileName: "report.txt",
-            mimeType: "text/plain",
-            byteCount: 12,
-            storagePath: "report.txt",
-            kind: .file
-        )
-        let reference = AgentChatContextReference(
-            threadID: UUID(),
-            title: "关联会话",
-            messages: [AgentChatContextMessage(role: .assistant, content: "上下文结论")]
-        )
-        var messages = (0..<39).map { index in
-            AgentChatMessage(role: .user, content: "历史消息 \(index)")
+    func relayPromptBoundsAndSerializesVoiceMessages() {
+        var messages = (0..<40).map { index in
+            AIOutboundMessage(role: .user, content: String(format: "message-%02d-END", index))
         }
-        messages.append(AgentChatMessage(
-            role: .user,
-            content: "检查发布风险",
-            attachments: [attachment],
-            contextReferences: [reference],
-            appReferences: [AgentChatAppReference(
-                name: "Xcode",
-                bundleIdentifier: "com.apple.dt.Xcode",
-                processIdentifier: 84
-            )],
-            skillReferences: [AgentChatSkillReference(name: "code-review", path: "/skills/code-review")]
-        ))
+        messages.append(AIOutboundMessage(role: .tool, content: "tool-result"))
 
-        let outbound = AIAgentCLIService().outboundMessages(messages)
+        let prompt = AIAgentCLIService().relayPrompt(messages)
 
-        #expect(outbound.count == 32)
-        #expect(outbound.first?.content.contains("历史消息 8") == true)
-        let latest = try #require(outbound.last?.content)
-        #expect(latest.contains("report.txt"))
-        #expect(latest.contains("关联会话"))
-        #expect(latest.contains("上下文结论"))
-        #expect(latest.contains("com.apple.dt.Xcode"))
-        #expect(latest.contains("code-review：/skills/code-review"))
+        #expect(!prompt.contains("message-08-END"))
+        #expect(prompt.contains("message-09-END"))
+        #expect(prompt.contains("[用户]"))
+        #expect(prompt.contains("[工具]\ntool-result"))
     }
 
     @Test
-    func relayUsesTheExistingProjectDirectoryAsItsWorkingDirectory() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("zisla-ai-agent-project-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    func relayArgumentsUseFixedReadOnlyMediumConfiguration() {
         let service = AIAgentCLIService()
+        let claude = service.relayArguments(for: .claude, model: "claude-opus-5")
+        let codex = service.relayArguments(for: .codex, model: "gpt-5.6")
+        let gemini = service.relayArguments(for: .gemini, model: "gemini-2.5-pro")
+        let grok = service.relayArguments(for: .grok, model: "grok-4")
+        let opencode = service.relayArguments(for: .opencode, model: "anthropic/claude-opus-5")
 
-        let project = AgentChatProject(name: "项目", directoryPath: root.path)
-        let missingProject = AgentChatProject(
-            name: "失效项目",
-            directoryPath: root.appendingPathComponent("missing", isDirectory: true).path
+        for arguments in [claude, codex, gemini, grok, opencode] {
+            #expect(arguments.contains("--model"))
+            #expect(!arguments.contains("--dangerously-skip-permissions"))
+            #expect(!arguments.contains("--dangerously-bypass-approvals-and-sandbox"))
+            #expect(!arguments.contains("--auto"))
+        }
+        #expect(claude.contains("medium"))
+        #expect(claude.contains("plan"))
+        #expect(codex.contains(#"model_reasoning_effort="medium""#))
+        #expect(codex.contains("read-only"))
+        #expect(gemini.contains("plan"))
+        #expect(grok.contains("medium"))
+        #expect(grok.contains("plan"))
+        #expect(!service.relayArguments(for: .claude, model: "  ").contains("--model"))
+    }
+
+    @Test
+    func relayRunsFromConfiguredHomeDirectory() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-voice-cli-working-directory-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("bin/codex")
+        try writeExecutable(
+            at: codex,
+            contents: "#!/bin/sh\n/usr/bin/touch relay-working-directory-marker\nprintf 'ok\\n'\n"
+        )
+        let service = AIAgentCLIService(
+            environment: ["PATH": codex.deletingLastPathComponent().path],
+            homeDirectory: root
         )
 
-        #expect(service.relayWorkingDirectory(for: project) == root)
-        #expect(service.relayWorkingDirectory(for: missingProject) == FileManager.default.homeDirectoryForCurrentUser)
+        let response = try await service.relay(
+            messages: [AIOutboundMessage(role: .user, content: "整理这段语音")],
+            to: .codex
+        )
+
+        #expect(response == "ok")
+        #expect(FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("relay-working-directory-marker").path
+        ))
     }
 
-    @Test
-    func relayPromptEmitsGoalSectionWithoutPlanMode() {
-        let service = AIAgentCLIService()
-        let goalOnly = service.relayPrompt([
-            AgentChatMessage(role: .user, content: "继续推进", mode: .standard, goalTitle: "完成 v0.1.1 发布"),
-        ])
-
-        #expect(goalOnly.contains("[目标模式]"))
-        #expect(goalOnly.contains("当前会话目标：完成 v0.1.1 发布"))
-        #expect(!goalOnly.contains("[计划模式]"))
-
-        let planOnly = service.relayPrompt([
-            AgentChatMessage(role: .user, content: "拆分里程碑", mode: .plan),
-        ])
-
-        #expect(planOnly.contains("[计划模式]"))
-        #expect(!planOnly.contains("[目标模式]"))
-
-        let both = service.relayPrompt([
-            AgentChatMessage(role: .user, content: "拆分里程碑", mode: .plan, goalTitle: "完成 v0.1.1 发布"),
-        ])
-
-        #expect(both.contains("[计划模式]"))
-        #expect(both.contains("[目标模式]"))
-    }
 
     @Test
     func cliDiscoveryUsesNPMGlobalPathAndResolvesSymlinks() throws {
@@ -1189,171 +1135,20 @@ struct AIAgentServicesTests {
         }
     }
 
+    private func waitForCLIUpdate(_ workspace: AIAgentWorkspace, kind: AgentCLIKind) async -> Bool {
+        for _ in 0..<100 {
+            if workspace.cliUpdates.contains(where: { $0.kind == kind }) {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+        return false
+    }
+
     private func parallelCommand(startedAt: URL, waitingFor peer: URL) -> String {
         "touch '\(startedAt.path)'; for _ in $(seq 1 50); do [ -f '\(peer.path)' ] && exit 0; sleep 0.01; done; exit 1"
     }
 
-    @Test
-    func relayArgumentsMapsModelForAllCLIs() {
-        let service = AIAgentCLIService()
-
-        let claudeArgs = service.relayArguments(
-            for: .claude,
-            prompt: "test",
-            model: "claude-opus-5",
-            thinkingDepth: .high,
-            accessMode: .autoReview
-        )
-        #expect(claudeArgs.contains("--model"))
-        #expect(claudeArgs.contains("claude-opus-5"))
-
-        let codexArgs = service.relayArguments(
-            for: .codex,
-            prompt: "test",
-            model: "o3",
-            thinkingDepth: .high,
-            accessMode: .autoReview
-        )
-        #expect(codexArgs.contains("--model"))
-        #expect(codexArgs.contains("o3"))
-
-        let grokArgs = service.relayArguments(
-            for: .grok,
-            prompt: "test",
-            model: "grok-3",
-            thinkingDepth: .high,
-            accessMode: .autoReview
-        )
-        #expect(grokArgs.contains("--model"))
-        #expect(grokArgs.contains("grok-3"))
-
-        let geminiArgs = service.relayArguments(
-            for: .gemini,
-            prompt: "test",
-            model: "gemini-2.0-flash-thinking-exp",
-            thinkingDepth: .high,
-            accessMode: .autoReview
-        )
-        #expect(geminiArgs.contains("--model"))
-        #expect(geminiArgs.contains("gemini-2.0-flash-thinking-exp"))
-
-        let opencodeArgs = service.relayArguments(
-            for: .opencode,
-            prompt: "test",
-            model: "anthropic/claude-opus-5",
-            thinkingDepth: .high,
-            accessMode: .autoReview
-        )
-        #expect(opencodeArgs.contains("--model"))
-        #expect(opencodeArgs.contains("anthropic/claude-opus-5"))
-    }
-
-    @Test
-    func relayArgumentsMapsThinkingDepthToSupportedCLIParameters() {
-        let service = AIAgentCLIService()
-
-        let claudeLow = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .low, accessMode: .autoReview)
-        #expect(claudeLow.contains("--effort"))
-        #expect(claudeLow.contains("low"))
-
-        let claudeHigh = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
-        #expect(claudeHigh.contains("--effort"))
-        #expect(claudeHigh.contains("high"))
-
-        let claudeExtraHigh = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .extraHigh, accessMode: .autoReview)
-        #expect(claudeExtraHigh.contains("--effort"))
-        #expect(claudeExtraHigh.contains("xhigh"))
-
-        let opencodeLow = service.relayArguments(for: .opencode, prompt: "test", model: nil, thinkingDepth: .low, accessMode: .autoReview)
-        #expect(opencodeLow.contains("--variant"))
-        #expect(opencodeLow.contains("minimal"))
-
-        let opencodeHigh = service.relayArguments(for: .opencode, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
-        #expect(opencodeHigh.contains("--variant"))
-        #expect(opencodeHigh.contains("high"))
-
-        let opencodeExtraHigh = service.relayArguments(for: .opencode, prompt: "test", model: nil, thinkingDepth: .extraHigh, accessMode: .autoReview)
-        #expect(opencodeExtraHigh.contains("--variant"))
-        #expect(opencodeExtraHigh.contains("max"))
-
-        let codexArgs = service.relayArguments(for: .codex, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
-        #expect(codexArgs.contains("--config"))
-        #expect(codexArgs.contains(#"model_reasoning_effort="high""#))
-
-        let geminiArgs = service.relayArguments(for: .gemini, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
-        #expect(!geminiArgs.contains("--effort"))
-        #expect(!geminiArgs.contains("--reasoning-effort"))
-
-        let grokArgs = service.relayArguments(for: .grok, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
-        #expect(grokArgs.contains("--reasoning-effort"))
-        #expect(grokArgs.contains("high"))
-    }
-
-    @Test
-    func relayArgumentsMapsAccessModeToPermissionParameters() {
-        let service = AIAgentCLIService()
-
-        let claudeFullAccess = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .fullAccess)
-        #expect(claudeFullAccess.contains("--dangerously-skip-permissions"))
-
-        let claudeAutoReview = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
-        #expect(claudeAutoReview.contains("--permission-mode"))
-        #expect(claudeAutoReview.contains("auto"))
-
-        let claudeReadOnly = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .readOnly)
-        #expect(claudeReadOnly.contains("--permission-mode"))
-        #expect(claudeReadOnly.contains("plan"))
-
-        let claudeWorkspaceWrite = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .workspaceWrite)
-        #expect(claudeWorkspaceWrite.contains("acceptEdits"))
-
-        let geminiFullAccess = service.relayArguments(for: .gemini, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .fullAccess)
-        #expect(geminiFullAccess.contains("--approval-mode"))
-        #expect(geminiFullAccess.contains("yolo"))
-
-        let geminiAutoReview = service.relayArguments(for: .gemini, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
-        #expect(geminiAutoReview.contains("--approval-mode"))
-        #expect(geminiAutoReview.contains("auto_edit"))
-
-        let geminiReadOnly = service.relayArguments(for: .gemini, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .readOnly)
-        #expect(geminiReadOnly.contains("--approval-mode"))
-        #expect(geminiReadOnly.contains("plan"))
-
-        let grokFullAccess = service.relayArguments(for: .grok, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .fullAccess)
-        #expect(grokFullAccess.contains("--permission-mode"))
-        #expect(grokFullAccess.contains("bypassPermissions"))
-
-        let grokReadOnly = service.relayArguments(for: .grok, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .readOnly)
-        #expect(grokReadOnly.contains("plan"))
-
-        let opencodeFullAccess = service.relayArguments(for: .opencode, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .fullAccess)
-        #expect(opencodeFullAccess.contains("--auto"))
-
-        let codexAutoReview = service.relayArguments(for: .codex, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
-        #expect(codexAutoReview.contains("--approve-for-me"))
-
-        let codexReadOnly = service.relayArguments(for: .codex, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .readOnly)
-        #expect(codexReadOnly.contains("--sandbox"))
-        #expect(codexReadOnly.contains("read-only"))
-
-        let codexWorkspaceWrite = service.relayArguments(for: .codex, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .workspaceWrite)
-        #expect(codexWorkspaceWrite.contains("--sandbox"))
-        #expect(codexWorkspaceWrite.contains("workspace-write"))
-
-        let codexFullAccess = service.relayArguments(for: .codex, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .fullAccess)
-        #expect(codexFullAccess.contains("--dangerously-bypass-approvals-and-sandbox"))
-    }
-
-    @Test
-    func relayArgumentsSkipsNilModel() {
-        let service = AIAgentCLIService()
-
-        let claudeArgs = service.relayArguments(for: .claude, prompt: "test", model: nil, thinkingDepth: .high, accessMode: .autoReview)
-        #expect(!claudeArgs.contains("--model"))
-
-        let emptyModelArgs = service.relayArguments(for: .claude, prompt: "test", model: "  ", thinkingDepth: .high, accessMode: .autoReview)
-        #expect(!emptyModelArgs.contains("--model"))
-    }
 
     @Test
     func additionalCLIDiscoveryAndVersionDetection() async throws {
@@ -1488,12 +1283,12 @@ struct AIAgentServicesTests {
 
         do {
             _ = try await service.relay(
-                messages: [AgentChatMessage(role: .user, content: "测试")],
+                messages: [AIOutboundMessage(role: .user, content: "测试")],
                 to: .kimi
             )
-            Issue.record("仅检测的 CLI 不应进入消息中继")
+            Issue.record("仅检测的 CLI 不应进入语音整理")
         } catch {
-            #expect(error.localizedDescription.contains("暂不支持消息中继"))
+            #expect(error.localizedDescription.contains("暂不支持语音整理"))
         }
         #expect(!FileManager.default.fileExists(atPath: marker.path))
     }
@@ -1515,45 +1310,14 @@ struct AIAgentServicesTests {
 
         do {
             _ = try await service.relay(
-                messages: [AgentChatMessage(role: .user, content: "测试")],
+                messages: [AIOutboundMessage(role: .user, content: "测试")],
                 to: .codex
             )
             Issue.record("CLI 失败应抛出异常")
         } catch {
-            #expect(error.localizedDescription == "Agent CLI 执行失败：退出状态 9")
+            #expect(error.localizedDescription == "CLI 执行失败：退出状态 9")
             #expect(!error.localizedDescription.contains("secret-command-output"))
         }
-    }
-
-    @Test
-    func sendPublishesActiveThreadTaskUntilRelayFinishes() async throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("zisla-active-thread-task-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let store = AIAgentStore(
-            storageURL: root.appendingPathComponent("state.json"),
-            secretStore: ActiveThreadSecretStore()
-        )
-        let account = AgentAccount(
-            name: "Codex",
-            provider: "Codex",
-            credentialKind: .cliProfile,
-            cliProfile: AgentCLIProfile(cliKind: .codex)
-        )
-        try store.upsertAccount(account)
-        try store.replaceCLIProfile(configuration: Data("{}".utf8), authentication: Data("{}".utf8), for: account.id)
-        let thread = store.createThread(cliKind: .codex, accountID: account.id)
-        let workspace = AIAgentWorkspace(store: store)
-
-        workspace.beginThreadActivity(thread.id)
-        #expect(workspace.activeThreadIDs == [thread.id])
-        #expect(workspace.activeTasks().map(\.id) == [
-            "zisla-agent-thread-\(thread.id.uuidString.lowercased())",
-        ])
-
-        workspace.endThreadActivity(thread.id)
-        #expect(workspace.activeThreadIDs.isEmpty)
-        #expect(workspace.activeTasks().isEmpty)
     }
 
     @Test
@@ -1581,14 +1345,6 @@ struct AIAgentServicesTests {
             AIAgentCLIUpdate(kind: .qwen, installedVersion: "0.21.10", latestVersion: "0.22.0"),
         ])
     }
-}
-
-private final class ActiveThreadSecretStore: AIAgentSecretStoring, @unchecked Sendable {
-    private var values: [String: String] = [:]
-
-    func secret(for reference: String) throws -> String? { values[reference] }
-    func setSecret(_ secret: String, for reference: String) throws { values[reference] = secret }
-    func removeSecret(for reference: String) throws { values.removeValue(forKey: reference) }
 }
 
 private final class AIAgentURLProtocol: URLProtocol, @unchecked Sendable {

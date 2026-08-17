@@ -14,9 +14,11 @@ struct SettingsView: View {
     @FocusState private var searchFieldFocused: Bool
     @State private var draggedWeatherLocationID: String?
     @State private var sectionSwitchDirection: CGFloat = 1
-    @State private var copiedCommand: String?
     @State private var pendingRecommendedToolAction: RecommendedToolAction?
     @State private var isVoiceHistoryClearConfirmationPresented = false
+    @State private var isVoiceHistoryBatchDeleteConfirmationPresented = false
+    @State private var voiceHistorySelectionMode = false
+    @State private var selectedVoiceHistoryIDs: Set<UUID> = []
     @Namespace private var sectionSelectionNamespace
 
     init(model: AppModel) {
@@ -38,10 +40,14 @@ struct SettingsView: View {
         .onAppear {
             launchAtLogin.refresh()
             model.refreshVoiceInputInputMonitoringAccess()
+            ensureSelectionIsVisible()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             launchAtLogin.refresh()
             model.refreshVoiceInputInputMonitoringAccess()
+        }
+        .onChange(of: settingsStore.settings) { _, _ in
+            ensureSelectionIsVisible()
         }
         .alert(
             pendingRecommendedToolAction?.title ?? "",
@@ -67,7 +73,15 @@ struct SettingsView: View {
                 model.removeAllVoiceRecordings()
             }
         } message: {
-            Text("本机保存的识别文本和原始录音文件都会被删除，此操作无法撤销。")
+            Text("本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。")
+        }
+        .alert("删除选中的语音记录？", isPresented: $isVoiceHistoryBatchDeleteConfirmationPresented) {
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) {
+                deleteSelectedVoiceHistoryEntries()
+            }
+        } message: {
+            Text("选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。")
         }
     }
 
@@ -81,7 +95,7 @@ struct SettingsView: View {
                 .padding(.top, 1)
 
             VStack(spacing: 2) {
-                ForEach(SettingsSection.allCases) { section in
+                ForEach(visibleSections) { section in
                     Button {
                         selectSettingsSection(section)
                     } label: {
@@ -178,6 +192,15 @@ struct SettingsView: View {
         }
     }
 
+    private var visibleSections: [SettingsSection] {
+        SettingsSection.allCases.filter { $0.isVisible(settings: settingsStore.settings) }
+    }
+
+    private func ensureSelectionIsVisible() {
+        guard !input.selection.isVisible(settings: settingsStore.settings) else { return }
+        selectSettingsSection(.features)
+    }
+
     @ViewBuilder
     private var selectedContent: some View {
         switch input.selection {
@@ -193,12 +216,8 @@ struct SettingsView: View {
             aiContent
         case .voice:
             voiceContent
-        case .models:
-            modelsContent
         case .pet:
             petContent
-        case .privacy:
-            privacyContent
         case .download:
             downloadContent
         case .weather:
@@ -357,8 +376,6 @@ struct SettingsView: View {
             settingsGroup("AI 与语音") {
                 featureToggle("AI 进度与用量", detail: "汇总桌面端与 CLI 工具的运行状态", symbol: "sparkles", keyPath: \.aiProgressEnabled)
                 rowDivider
-                featureToggle("AI Agent", detail: "启用 AI Agent 功能模块与后台服务", symbol: "sparkles.square.filled.on.square", keyPath: \.aiAgentEnabled)
-                rowDivider
                 featureToggle("语音输入", detail: "开启后可通过全局快捷键触发语音输入", symbol: "mic.fill", keyPath: \.voiceInputEnabled)
             }
 
@@ -390,8 +407,8 @@ struct SettingsView: View {
                 featureToggle("静音 Zisla 通知", detail: "不发送番茄钟等由 Zisla 产生的系统通知", symbol: "bell.slash.fill", keyPath: \.notificationsMuted)
             }
 
-            settingsGroup("桌面宠物与更新") {
-                featureToggle("桌面宠物", detail: "在灵动岛养一只小宠物", symbol: "pawprint.fill", keyPath: \.petEnabled)
+            settingsGroup("宠物与更新") {
+                featureToggle("宠物", detail: "在灵动岛养一只小宠物", symbol: "pawprint.fill", keyPath: \.petEnabled)
                 rowDivider
                 featureToggle("自动检查更新", detail: "定期检查当前安装包所属的更新通道", symbol: "arrow.triangle.2.circlepath", keyPath: \.updateChecksEnabled)
                 rowDivider
@@ -580,15 +597,14 @@ struct SettingsView: View {
         }
     }
 
-    /// AI monitoring and agent behavior; model definitions and remote credentials appear only on the Models page.
+    /// CLI and Skills management stays separate from the voice model configuration.
     private var aiContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("AI Agent 行为") {
-                AIAgentModuleView(model: model, configurationScope: .agent)
-                    .frame(minHeight: 430)
+            settingsGroup("CLI 与 Skills") {
+                AIAgentModuleView(model: model, configurationScope: .tools)
                     .task {
-                        guard model.settingsStore.settings.aiAgentEnabled else { return }
-                        await model.aiAgent.refreshAll()
+                        await model.aiAgent.refreshSkills()
+                        await model.aiAgent.refreshCLIs()
                     }
             }
         }
@@ -619,11 +635,129 @@ struct SettingsView: View {
     private var voiceSettingsContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             voiceInputGroup
+
+            settingsGroup("本地模型") {
+                AIAgentModuleView(model: model, configurationScope: .localModels)
+            }
+
+            settingsGroup("远端模型与凭据") {
+                AIAgentModuleView(model: model, configurationScope: .remoteModels)
+            }
+
+            settingsGroup("语音整理模型") {
+                settingRow(
+                    symbol: "cpu",
+                    title: "使用模型",
+                    detail: "从上方已启用的本地或远端模型中选择"
+                ) {
+                    Picker(
+                        "",
+                        selection: Binding(
+                            get: { model.selectedVoiceModelConfiguration },
+                            set: { model.selectVoiceModelConfiguration($0) }
+                        )
+                    ) {
+                        Text("不使用模型整理").tag(Optional<AIModelConfigurationReference>.none)
+                        ForEach(model.aiAgent.store.state.localModels.filter(\.isEnabled)) { localModel in
+                            let reference = AIModelConfigurationReference.local(localModel.id)
+                            Text("本地 · \(model.voiceModelConfigurationTitle(reference))")
+                                .tag(Optional(reference))
+                        }
+                        ForEach(model.aiAgent.store.state.channels.filter(\.isEnabled)) { channel in
+                            let reference = AIModelConfigurationReference.channel(channel.id)
+                            Text("远端 · \(model.voiceModelConfigurationTitle(reference))")
+                                .tag(Optional(reference))
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .frame(maxWidth: 220, alignment: .trailing)
+                }
+                if let configuration = model.selectedVoiceModelConfiguration {
+                    rowDivider
+                    settingRow(
+                        symbol: configuration.source == .channel ? "server.rack" : "desktopcomputer",
+                        title: model.voiceModelConfigurationTitle(configuration),
+                        detail: model.voiceModelConfigurationDetail(configuration)
+                    ) {
+                        HStack(spacing: 8) {
+                            Text(discoveryStatusText)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                            Button {
+                                model.discoverModels()
+                            } label: {
+                                if model.voiceModelDiscoveryState.isTesting {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Text("测试连接")
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(model.voiceModelDiscoveryState.isTesting)
+                        }
+                    }
+                } else {
+                    rowDivider
+                    settingRow(
+                        symbol: "sparkles",
+                        title: "尚未选择模型",
+                        detail: model.aiAgent.store.state.localModels.filter(\.isEnabled).isEmpty
+                            && model.aiAgent.store.state.channels.filter(\.isEnabled).isEmpty
+                            ? "在上方添加并启用本地或远端模型后即可选择"
+                            : "选择后会对语音转写进行整理"
+                    ) {
+                        EmptyView()
+                    }
+                }
+            }
+
             settingsGroup("本地记录") {
                 settingRow(
                     symbol: "externaldrive.fill",
                     title: "保留原始录音",
-                    detail: "每条原始音频、系统识别文本和 AI 整理文本只保存在本机"
+                    detail: "关闭后，新录音只保留识别文本和 AI 整理文本"
+                ) {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { model.settingsStore.settings.voiceRecordingRetentionEnabled },
+                            set: { model.settingsStore.settings.voiceRecordingRetentionEnabled = $0 }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                }
+                rowDivider
+                settingRow(
+                    symbol: "calendar.badge.clock",
+                    title: "自动清理录音",
+                    detail: "按所选周期删除过期音频，文字记录继续保留"
+                ) {
+                    Picker(
+                        "",
+                        selection: Binding(
+                            get: { model.settingsStore.settings.voiceRecordingCleanupPolicy },
+                            set: { model.settingsStore.settings.voiceRecordingCleanupPolicy = $0 }
+                        )
+                    ) {
+                        ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
+                            Text(policy.menuTitle).tag(policy)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .frame(width: 120, alignment: .trailing)
+                }
+                rowDivider
+                settingRow(
+                    symbol: "folder",
+                    title: "记录目录",
+                    detail: "原始音频和文字记录只保存在本机"
                 ) {
                     IconButton(symbol: "folder", help: "打开语音记录目录", size: .compact) {
                         model.openVoiceRecordingsDirectory()
@@ -668,16 +802,60 @@ struct SettingsView: View {
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
-                    IconButton(symbol: "folder", help: "打开语音记录目录", size: .compact) {
-                        model.openVoiceRecordingsDirectory()
+                    if voiceHistorySelectionMode {
+                        IconButton(symbol: "xmark", help: "退出选择模式", size: .compact) {
+                            voiceHistorySelectionMode = false
+                            selectedVoiceHistoryIDs.removeAll()
+                        }
+                    } else {
+                        IconButton(symbol: "checkmark.circle", help: "选择多条记录", size: .compact) {
+                            voiceHistorySelectionMode = true
+                            selectedVoiceHistoryIDs.removeAll()
+                        }
+                        .disabled(model.voiceHistory.entries.isEmpty)
+                        IconButton(symbol: "folder", help: "打开语音记录目录", size: .compact) {
+                            model.openVoiceRecordingsDirectory()
+                        }
+                        IconButton(symbol: "trash", help: "清空语音记录", size: .compact) {
+                            isVoiceHistoryClearConfirmationPresented = true
+                        }
+                        .disabled(model.voiceHistory.entries.isEmpty)
                     }
-                    IconButton(symbol: "trash", help: "清空语音记录", size: .compact) {
-                        isVoiceHistoryClearConfirmationPresented = true
-                    }
-                    .disabled(model.voiceHistory.entries.isEmpty)
                 }
                 .padding(.horizontal, 4)
                 .frame(minHeight: 42)
+
+                if voiceHistorySelectionMode && !model.voiceHistory.entries.isEmpty {
+                    rowDivider
+                    HStack(spacing: 8) {
+                        Button(selectedVoiceHistoryIDs.count == model.voiceHistory.entries.count ? "取消全选" : "全选") {
+                            if selectedVoiceHistoryIDs.count == model.voiceHistory.entries.count {
+                                selectedVoiceHistoryIDs.removeAll()
+                            } else {
+                                selectedVoiceHistoryIDs = Set(model.voiceHistory.entries.map(\.id))
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+
+                        Spacer(minLength: 8)
+
+                        if !selectedVoiceHistoryIDs.isEmpty {
+                            Text("已选 \(selectedVoiceHistoryIDs.count) 条")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+
+                            Button("删除选中") {
+                                isVoiceHistoryBatchDeleteConfirmationPresented = true
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .foregroundStyle(.red)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                    .frame(minHeight: 42)
+                }
 
                 if model.voiceHistory.entries.isEmpty {
                     rowDivider
@@ -728,6 +906,22 @@ struct SettingsView: View {
 
     private func voiceHistoryRow(_ entry: VoiceHistoryEntry) -> some View {
         HStack(alignment: .top, spacing: 10) {
+            if voiceHistorySelectionMode {
+                Button {
+                    if selectedVoiceHistoryIDs.contains(entry.id) {
+                        selectedVoiceHistoryIDs.remove(entry.id)
+                    } else {
+                        selectedVoiceHistoryIDs.insert(entry.id)
+                    }
+                } label: {
+                    Image(systemName: selectedVoiceHistoryIDs.contains(entry.id) ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(selectedVoiceHistoryIDs.contains(entry.id) ? Color.accentColor : Color.secondary)
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+            }
+
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
@@ -754,15 +948,19 @@ struct SettingsView: View {
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 4) {
-                IconButton(symbol: "play.fill", help: "播放原始录音", size: .compact) {
-                    model.playVoiceRecording(id: entry.id)
-                }
-                IconButton(symbol: "magnifyingglass", help: "在 Finder 中显示", size: .compact) {
-                    model.revealVoiceRecording(id: entry.id)
-                }
-                IconButton(symbol: "trash", help: "删除这条语音记录", size: .compact) {
-                    model.removeVoiceRecording(id: entry.id)
+            if !voiceHistorySelectionMode {
+                HStack(spacing: 4) {
+                    if model.voiceHistory.audioURL(for: entry) != nil {
+                        IconButton(symbol: "play.fill", help: "播放原始录音", size: .compact) {
+                            model.playVoiceRecording(id: entry.id)
+                        }
+                        IconButton(symbol: "magnifyingglass", help: "在 Finder 中显示", size: .compact) {
+                            model.revealVoiceRecording(id: entry.id)
+                        }
+                    }
+                    IconButton(symbol: "trash", help: "删除这条语音记录", size: .compact) {
+                        model.removeVoiceRecording(id: entry.id)
+                    }
                 }
             }
         }
@@ -782,12 +980,28 @@ struct SettingsView: View {
         return String(format: "%.1f 小时", duration / 3_600)
     }
 
+    private func deleteSelectedVoiceHistoryEntries() {
+        guard !selectedVoiceHistoryIDs.isEmpty else { return }
+        model.removeVoiceRecordings(ids: selectedVoiceHistoryIDs)
+        selectedVoiceHistoryIDs.removeAll()
+        voiceHistorySelectionMode = false
+    }
+
+    private var discoveryStatusText: String {
+        switch model.voiceModelDiscoveryState {
+        case .idle: "尚未测试连接"
+        case .testing: "正在连接…"
+        case .success(let count): "已发现 \(count) 个模型"
+        case .failed(let message): message
+        }
+    }
+
     private var voiceInputGroup: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("语音输入") {
                 if model.settingsStore.settings.voiceInputEnabled {
                     settingRow(
-                        symbol: "rectangle.2.group",
+                        symbol: "record.circle",
                         title: "录音模式",
                         detail: model.settingsStore.settings.voiceInputMode.detail
                     ) {
@@ -847,171 +1061,9 @@ struct SettingsView: View {
         }
     }
 
-    private var modelsContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // Model definitions and remote credentials belong only here: define models first, then select them below.
-            settingsGroup("本地模型") {
-                AIAgentModuleView(model: model, configurationScope: .localModels)
-                    .frame(minHeight: 170)
-            }
-
-            settingsGroup("远端模型与凭据") {
-                AIAgentModuleView(model: model, configurationScope: .remoteModels)
-                    .frame(minHeight: 300)
-                    .task {
-                        guard model.settingsStore.settings.aiAgentEnabled else { return }
-                        await model.aiAgent.refreshAll()
-                    }
-            }
-
-            settingsGroup("语音整理模型") {
-                settingRow(
-                    symbol: "cpu",
-                    title: "使用模型",
-                    detail: "从上方已启用的本地或远端模型中选择"
-                ) {
-                    Picker(
-                        "",
-                        selection: Binding(
-                            get: { model.selectedVoiceModelConfiguration },
-                            set: { model.selectVoiceModelConfiguration($0) }
-                        )
-                    ) {
-                        Text("不使用模型整理").tag(Optional<AIModelConfigurationReference>.none)
-                        ForEach(model.aiAgent.store.state.localModels.filter(\.isEnabled)) { localModel in
-                            Text("本地 · \(localModel.name)")
-                                .tag(Optional(AIModelConfigurationReference.local(localModel.id)))
-                        }
-                        ForEach(model.aiAgent.store.state.channels.filter(\.isEnabled)) { channel in
-                            Text("远端 · \(channel.name)")
-                                .tag(Optional(AIModelConfigurationReference.channel(channel.id)))
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .controlSize(.small)
-                    .frame(maxWidth: 220, alignment: .trailing)
-                }
-                if let configuration = model.selectedVoiceModelConfiguration {
-                    rowDivider
-                    settingRow(
-                        symbol: configuration.source == .channel ? "server.rack" : "desktopcomputer",
-                        title: model.voiceModelConfigurationTitle(configuration),
-                        detail: model.voiceModelConfigurationDetail(configuration)
-                    ) {
-                        HStack(spacing: 8) {
-                            Text(discoveryStatusText)
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                            Button {
-                                model.discoverModels()
-                            } label: {
-                                if model.voiceModelDiscoveryState.isTesting {
-                                    ProgressView().controlSize(.small)
-                                } else {
-                                    Text("测试连接")
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .disabled(model.voiceModelDiscoveryState.isTesting)
-                        }
-                    }
-                } else {
-                    rowDivider
-                    settingRow(
-                        symbol: "sparkles",
-                        title: "尚未选择模型",
-                        detail: model.aiAgent.store.state.localModels.filter(\.isEnabled).isEmpty
-                            && model.aiAgent.store.state.channels.filter(\.isEnabled).isEmpty
-                            ? "在上方添加并启用本地或远端模型后即可选择"
-                            : "选择后会对语音转写进行整理"
-                    ) {
-                        EmptyView()
-                    }
-                }
-            }
-
-            settingsGroup("设备档案与推荐模型") {
-                if let profile = model.hardwareProfile {
-                    settingRow(
-                        symbol: "desktopcomputer",
-                        title: "设备",
-                        detail: profile.compactHardwareDescription,
-                        detailLineLimit: 3
-                    ) {
-                        EmptyView()
-                    }
-                    rowDivider
-                    settingRow(
-                        symbol: "gauge.with.dots.needle.67percent",
-                        title: "综合推荐",
-                        detail: profile.recommendationDescription,
-                        detailLineLimit: 2
-                    ) {
-                        EmptyView()
-                    }
-                    ForEach(Array(AIModelRecommendations.recommended(for: profile).enumerated()), id: \.element.id) { index, rec in
-                        rowDivider
-                        VStack(alignment: .leading, spacing: 8) {
-                            settingRow(
-                                symbol: "lightbulb.fill",
-                                title: "\(rec.name) · \(rec.parameterScale)",
-                                detail: rec.reason
-                            ) {
-                                EmptyView()
-                            }
-                            VStack(alignment: .leading, spacing: 6) {
-                                commandRow(
-                                    label: "Ollama 下载",
-                                    command: rec.ollamaPullCommand
-                                )
-                                commandRow(
-                                    label: "Ollama 启动",
-                                    command: rec.ollamaRunCommand
-                                )
-                                commandRow(
-                                    label: "LM Studio 搜索",
-                                    command: rec.lmStudioSearchQuery
-                                )
-                            }
-                            .padding(.leading, 38)
-                            .padding(.bottom, 4)
-                        }
-                    }
-                } else {
-                    settingRow(
-                        symbol: "desktopcomputer",
-                        title: "设备档案",
-                        detail: "点击下方按钮检测硬件信息"
-                    ) {
-                        Button("检测") {
-                            model.refreshHardwareProfile()
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                }
-            }
-
-        }
-        .onAppear {
-            model.refreshHardwareProfile()
-        }
-    }
-
-    private var discoveryStatusText: String {
-        switch model.voiceModelDiscoveryState {
-        case .idle: "尚未测试连接"
-        case .testing: "正在连接…"
-        case .success(let count): "已发现 \(count) 个模型"
-        case .failed(let message): message
-        }
-    }
-
     private var petContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("桌面宠物") {
+            settingsGroup("宠物") {
                 settingRow(
                     symbol: "shippingbox.fill",
                     title: "当前宠物",
@@ -1242,20 +1294,6 @@ struct SettingsView: View {
                 }
             }
 
-        }
-    }
-
-    private var privacyContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("剪贴板数据管理") {
-                settingRow(
-                    symbol: "info.circle",
-                    title: "数据存储",
-                    detail: "剪贴板历史仅保存在本机，不会上传"
-                ) {
-                    EmptyView()
-                }
-            }
         }
     }
 
@@ -2095,41 +2133,6 @@ struct SettingsView: View {
             .first
     }
 
-    private func commandRow(label: String, command: String) -> some View {
-        HStack(spacing: 8) {
-            AppLocalizedText(label)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 88, alignment: .leading)
-            Text(command)
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            IconButton(
-                symbol: copiedCommand == command ? "checkmark" : "doc.on.doc",
-                help: copiedCommand == command ? "已复制" : "复制\(label)",
-                size: .compact
-            ) {
-                copyToClipboard(command)
-            }
-        }
-        .frame(height: 20)
-    }
-
-    private func copyToClipboard(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        copiedCommand = text
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            if copiedCommand == text {
-                copiedCommand = nil
-            }
-        }
-    }
-
     private func languageDisplayName(_ language: AppLanguage) -> String {
         switch language {
         case .simplifiedChinese: return "简体中文"
@@ -2382,9 +2385,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case info
     case ai
     case voice
-    case models
     case pet
-    case privacy
     case download
     case weather
     case recommendations
@@ -2392,9 +2393,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
-    /// AI, voice history, and model configuration need room for their dense content.
+    /// AI and voice settings need room for their dense content.
     var prefersWideLayout: Bool {
-        self == .ai || self == .voice || self == .models
+        self == .ai || self == .voice
     }
 
     var title: String {
@@ -2405,9 +2406,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .info: "信息"
         case .ai: "AI"
         case .voice: "语音"
-        case .models: "模型"
-        case .pet: "桌面宠物"
-        case .privacy: "隐私"
+        case .pet: "宠物"
         case .download: "下载"
         case .weather: "天气"
         case .updates: "更新"
@@ -2423,9 +2422,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .info: "info.circle.fill"
         case .ai: "sparkles"
         case .voice: "mic.fill"
-        case .models: "cpu"
         case .pet: "pawprint.fill"
-        case .privacy: "hand.raised.fill"
         case .download: "arrow.down.circle.fill"
         case .weather: "cloud.sun.fill"
         case .updates: "arrow.up.circle"
@@ -2439,15 +2436,36 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .features: "集中开启或关闭所有功能模块。"
         case .workflow: "管理灵动岛中的工作流模块。"
         case .info: "配置日历、邮件、锁屏与通知显示。"
-        case .ai: "AI 进度，以及连接、自动化、CLI 与 Skills 等 Agent 行为。"
-        case .voice: "管理语音输入，并查看保存在本机的原始录音、识别文本与统计。"
-        case .models: "配置本地模型、远端模型与凭据，并选择语音整理使用的模型。"
+        case .ai: "管理 AI CLI 与 Skills。"
+        case .voice: "配置语音输入、整理模型与本机记录。"
         case .pet: "设置灵动岛内部的宠物形象。"
-        case .privacy: "管理剪贴板访问与本机数据。"
         case .download: "管理下载目录、下载通知与所需组件。"
         case .weather: "管理天气显示、地点和刷新。"
         case .updates: "管理版本检查与自动更新。"
         case .recommendations: "一键下载和更新精选效率、网络、开发与桌面工具。"
+        }
+    }
+
+    func isVisible(settings: FeatureSettings) -> Bool {
+        switch self {
+        case .general, .features, .recommendations:
+            return true
+        case .workflow:
+            return settings.mediaEnabled || settings.systemMonitorEnabled
+        case .info:
+            return settings.mailEnabled || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled
+        case .ai:
+            return settings.aiProgressEnabled
+        case .voice:
+            return settings.voiceInputEnabled
+        case .pet:
+            return settings.petEnabled
+        case .download:
+            return settings.downloaderEnabled
+        case .weather:
+            return settings.weatherEnabled
+        case .updates:
+            return settings.updateChecksEnabled
         }
     }
 }

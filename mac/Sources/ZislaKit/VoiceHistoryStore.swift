@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import ZislaCore
 
 public struct VoiceRecordingResult: Equatable, Sendable {
     public var id: UUID
@@ -30,7 +31,7 @@ public struct VoiceHistoryEntry: Codable, Equatable, Identifiable, Sendable {
     public var rawTranscript: String
     public var processedTranscript: String?
     public var wordCount: Int
-    public var audioFileName: String
+    public var audioFileName: String?
 
     public var displayTranscript: String {
         processedTranscript ?? rawTranscript
@@ -42,6 +43,16 @@ public struct VoiceHistoryStatistics: Equatable, Sendable {
     public var totalDuration: TimeInterval
     public var wordsPerMinute: Double
     public var savedTime: TimeInterval
+}
+
+private struct VoiceHistoryPersistentState: Codable {
+    var entries: [VoiceHistoryEntry]
+    var cumulativeStatistics: CumulativeStatistics
+
+    struct CumulativeStatistics: Codable {
+        var totalWordCount: Int
+        var totalDuration: TimeInterval
+    }
 }
 
 public enum VoiceTranscriptMetrics {
@@ -90,6 +101,8 @@ public final class VoiceHistoryStore: ObservableObject {
     private let storageURL: URL
     private let recordingsDirectory: URL
     private let fileManager: FileManager
+    private var cumulativeWordCount: Int = 0
+    private var cumulativeDuration: TimeInterval = 0
 
     public init(
         storageURL: URL = AppPaths.voiceHistory,
@@ -103,18 +116,16 @@ public final class VoiceHistoryStore: ObservableObject {
     }
 
     public var statistics: VoiceHistoryStatistics {
-        let totalWordCount = entries.reduce(0) { $0 + $1.wordCount }
-        let totalDuration = entries.reduce(0) { $0 + $1.duration }
-        let wordsPerMinute = totalDuration > 0
-            ? Double(totalWordCount) / (totalDuration / 60)
+        let wordsPerMinute = cumulativeDuration > 0
+            ? Double(cumulativeWordCount) / (cumulativeDuration / 60)
             : 0
-        let estimatedTypingDuration = Double(totalWordCount)
+        let estimatedTypingDuration = Double(cumulativeWordCount)
             / VoiceTranscriptMetrics.assumedTypingWordsPerMinute * 60
         return VoiceHistoryStatistics(
-            totalWordCount: totalWordCount,
-            totalDuration: totalDuration,
+            totalWordCount: cumulativeWordCount,
+            totalDuration: cumulativeDuration,
             wordsPerMinute: wordsPerMinute,
-            savedTime: max(0, estimatedTypingDuration - totalDuration)
+            savedTime: max(0, estimatedTypingDuration - cumulativeDuration)
         )
     }
 
@@ -123,14 +134,15 @@ public final class VoiceHistoryStore: ObservableObject {
     }
 
     public func audioURL(for entry: VoiceHistoryEntry) -> URL? {
-        guard entry.audioFileName == recordingURL(for: entry.id).lastPathComponent else { return nil }
-        let url = recordingsDirectory.appendingPathComponent(entry.audioFileName, isDirectory: false)
+        guard let audioFileName = entry.audioFileName,
+              audioFileName == recordingURL(for: entry.id).lastPathComponent else { return nil }
+        let url = recordingsDirectory.appendingPathComponent(audioFileName, isDirectory: false)
         guard isSafeRecordingURL(url, id: entry.id), isRegularFile(at: url) else { return nil }
         return url.standardizedFileURL
     }
 
     @discardableResult
-    public func record(_ result: VoiceRecordingResult) -> Bool {
+    public func record(_ result: VoiceRecordingResult, retainAudio: Bool = true) -> Bool {
         guard isSafeRecordingURL(result.audioFileURL, id: result.id) else {
             errorDescription = "录音文件不在语音记录目录中"
             return false
@@ -139,26 +151,51 @@ public final class VoiceHistoryStore: ObservableObject {
             errorDescription = "录音文件不存在或不可读取"
             return false
         }
+        if !retainAudio {
+            do {
+                try fileManager.removeItem(at: result.audioFileURL)
+            } catch {
+                errorDescription = error.localizedDescription
+                return false
+            }
+        }
 
         let transcript = result.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let wordCount = VoiceTranscriptMetrics.wordCount(in: transcript)
+        let duration = normalizedDuration(result.duration)
+
         let entry = VoiceHistoryEntry(
             id: result.id,
             createdAt: result.createdAt,
-            duration: normalizedDuration(result.duration),
+            duration: duration,
             rawTranscript: transcript,
             processedTranscript: nil,
-            wordCount: VoiceTranscriptMetrics.wordCount(in: transcript),
-            audioFileName: recordingURL(for: result.id).lastPathComponent
+            wordCount: wordCount,
+            audioFileName: retainAudio ? recordingURL(for: result.id).lastPathComponent : nil
         )
         var candidate = entries
+        let isReplacement = candidate.contains { $0.id == result.id }
         candidate.removeAll { $0.id == result.id }
         candidate.append(entry)
         candidate.sort {
             if $0.createdAt != $1.createdAt { return $0.createdAt > $1.createdAt }
             return $0.id.uuidString < $1.id.uuidString
         }
-        guard persistCandidate(candidate) else { return false }
+
+        let newCumulativeWordCount: Int
+        let newCumulativeDuration: TimeInterval
+        if isReplacement {
+            newCumulativeWordCount = cumulativeWordCount
+            newCumulativeDuration = cumulativeDuration
+        } else {
+            newCumulativeWordCount = cumulativeWordCount + wordCount
+            newCumulativeDuration = cumulativeDuration + duration
+        }
+
+        guard persistCandidate(candidate, cumulativeWordCount: newCumulativeWordCount, cumulativeDuration: newCumulativeDuration) else { return false }
         entries = candidate
+        cumulativeWordCount = newCumulativeWordCount
+        cumulativeDuration = newCumulativeDuration
         return true
     }
 
@@ -168,7 +205,7 @@ public final class VoiceHistoryStore: ObservableObject {
         let normalized = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         var candidate = entries
         candidate[index].processedTranscript = normalized.isEmpty ? nil : normalized
-        guard persistCandidate(candidate) else { return false }
+        guard persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else { return false }
         entries = candidate
         return true
     }
@@ -179,13 +216,34 @@ public final class VoiceHistoryStore: ObservableObject {
         let audioURL = audioURL(for: entry)
         var candidate = entries
         candidate.remove(at: index)
-        guard persistCandidate(candidate) else { return }
+        guard persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else { return }
         if let audioURL {
             do {
                 try fileManager.removeItem(at: audioURL)
             } catch {
-                // Roll back the index when the file system rejects deletion, so an existing audio file does not restore the entry at next launch.
-                _ = persistCandidate(entries)
+                _ = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+                errorDescription = error.localizedDescription
+                return
+            }
+        }
+        entries = candidate
+    }
+
+    public func removeBatch(ids: Set<UUID>) {
+        let toRemove = entries.filter { ids.contains($0.id) }
+        guard !toRemove.isEmpty else { return }
+
+        let audioURLs = toRemove.compactMap { audioURL(for: $0) }
+        var candidate = entries
+        candidate.removeAll { ids.contains($0.id) }
+
+        guard persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else { return }
+
+        for audioURL in audioURLs {
+            do {
+                try fileManager.removeItem(at: audioURL)
+            } catch {
+                _ = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
                 errorDescription = error.localizedDescription
                 return
             }
@@ -194,7 +252,7 @@ public final class VoiceHistoryStore: ObservableObject {
     }
 
     public func removeAll() {
-        guard persistCandidate([]) else { return }
+        guard persistCandidate([], cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else { return }
         entries.removeAll()
         let audioURLs: [URL]
         do {
@@ -222,21 +280,88 @@ public final class VoiceHistoryStore: ObservableObject {
         guard fileManager.fileExists(atPath: storageURL.path) else { return }
         do {
             let data = try Data(contentsOf: storageURL)
-            let decoded = try JSONDecoder().decode([VoiceHistoryEntry].self, from: data)
-            entries = decoded.compactMap(normalizedEntry(_:))
-            sortEntries()
-            errorDescription = nil
-            if entries != decoded {
-                _ = persistCandidate(entries)
+
+            // 尝试新格式
+            if let state = try? JSONDecoder().decode(VoiceHistoryPersistentState.self, from: data) {
+                entries = state.entries.compactMap(normalizedEntry(_:))
+                sortEntries()
+                let visibleWordCount = entries.reduce(0) { $0 + $1.wordCount }
+                let visibleDuration = entries.reduce(0) { $0 + $1.duration }
+                cumulativeWordCount = max(
+                    0,
+                    visibleWordCount,
+                    state.cumulativeStatistics.totalWordCount
+                )
+                cumulativeDuration = max(
+                    0,
+                    visibleDuration,
+                    state.cumulativeStatistics.totalDuration.isFinite
+                        ? state.cumulativeStatistics.totalDuration
+                        : 0
+                )
+                errorDescription = nil
+                if entries != state.entries
+                    || cumulativeWordCount != state.cumulativeStatistics.totalWordCount
+                    || cumulativeDuration != state.cumulativeStatistics.totalDuration
+                {
+                    _ = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+                }
+                return
             }
+
+            // 回退到旧格式（迁移）
+            let legacyEntries = try JSONDecoder().decode([VoiceHistoryEntry].self, from: data)
+            entries = legacyEntries.compactMap(normalizedEntry(_:))
+            sortEntries()
+
+            // 从现有记录计算累计值作为迁移基线
+            cumulativeWordCount = entries.reduce(0) { $0 + $1.wordCount }
+            cumulativeDuration = entries.reduce(0) { $0 + $1.duration }
+
+            errorDescription = nil
+
+            // 迁移到新格式
+            _ = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
         } catch {
             entries = []
+            cumulativeWordCount = 0
+            cumulativeDuration = 0
             errorDescription = error.localizedDescription
         }
     }
 
+    public func cleanupOldRecordings(
+        policy: VoiceRecordingCleanupPolicy,
+        now: Date = Date()
+    ) {
+        guard let daysThreshold = policy.daysThreshold else { return }
+        let cutoffDate = now.addingTimeInterval(-Double(daysThreshold) * 24 * 60 * 60)
+        var candidate = entries
+        var deletionError: Error?
+
+        for index in candidate.indices
+        where candidate[index].createdAt < cutoffDate && candidate[index].audioFileName != nil {
+            guard let audioURL = audioURL(for: candidate[index]) else {
+                candidate[index].audioFileName = nil
+                continue
+            }
+            do {
+                try fileManager.removeItem(at: audioURL)
+                candidate[index].audioFileName = nil
+            } catch {
+                deletionError = error
+            }
+        }
+        if candidate != entries, persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) {
+            entries = candidate
+        }
+        if let deletionError {
+            errorDescription = deletionError.localizedDescription
+        }
+    }
+
     @discardableResult
-    private func persistCandidate(_ candidate: [VoiceHistoryEntry]) -> Bool {
+    private func persistCandidate(_ candidate: [VoiceHistoryEntry], cumulativeWordCount: Int, cumulativeDuration: TimeInterval) -> Bool {
         do {
             try fileManager.createDirectory(
                 at: storageURL.deletingLastPathComponent(),
@@ -246,7 +371,14 @@ public final class VoiceHistoryStore: ObservableObject {
                 at: recordingsDirectory,
                 withIntermediateDirectories: true
             )
-            let data = try JSONEncoder().encode(candidate)
+            let state = VoiceHistoryPersistentState(
+                entries: candidate,
+                cumulativeStatistics: VoiceHistoryPersistentState.CumulativeStatistics(
+                    totalWordCount: cumulativeWordCount,
+                    totalDuration: cumulativeDuration
+                )
+            )
+            let data = try JSONEncoder().encode(state)
             try data.write(to: storageURL, options: .atomic)
             errorDescription = nil
             return true
@@ -264,8 +396,10 @@ public final class VoiceHistoryStore: ObservableObject {
     }
 
     private func normalizedEntry(_ entry: VoiceHistoryEntry) -> VoiceHistoryEntry? {
-        guard audioURL(for: entry) != nil else { return nil }
         var normalized = entry
+        if entry.audioFileName != nil, audioURL(for: entry) == nil {
+            normalized.audioFileName = nil
+        }
         normalized.duration = normalizedDuration(entry.duration)
         normalized.rawTranscript = entry.rawTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
         normalized.wordCount = VoiceTranscriptMetrics.wordCount(in: normalized.rawTranscript)

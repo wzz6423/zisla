@@ -428,6 +428,41 @@ struct SideNoticeLayoutTests {
     }
 
     @Test
+    func voiceProcessingKeepsTheCompactBarShortAndMovesThePetBesideIt() throws {
+        let screen = ScreenSnapshot(
+            displayID: 42,
+            frame: CGRect(x: 0, y: 0, width: 1_512, height: 982),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1_512, height: 950),
+            safeAreaInsets: ScreenInsets(top: 32),
+            auxiliaryTopLeftArea: CGRect(x: 0, y: 950, width: 716, height: 32),
+            auxiliaryTopRightArea: CGRect(x: 796, y: 950, width: 716, height: 32)
+        )
+        let layout = ScreenLayoutEngine().layout(for: screen)
+        let notices = [
+            IslandNotice(
+                id: "voice-processing-left",
+                title: "正在整理语音",
+                side: .left,
+                style: .status
+            )
+        ]
+        let settings = FeatureSettings()
+
+        let barFrame = try #require(
+            engine.compactBarFrame(for: screen, notices: notices, settings: settings)
+        )
+        let petAnchorFrame = try #require(
+            engine.compactBarFrame(for: layout, notices: notices, settings: settings)
+        )
+        let petFrame = CollapsedPetLayout.frame(for: layout, compactBarFrame: petAnchorFrame)
+
+        #expect(barFrame == petAnchorFrame)
+        #expect(barFrame == engine.compactBarFrame(for: screen))
+        #expect(barFrame.width == 160)
+        #expect(petFrame.minX == barFrame.minX - CollapsedPetLayout.sideSlotWidth)
+    }
+
+    @Test
     func detailedMediaStyleWidensTheCompactBarOnBothTopologies() {
         let notched = ScreenSnapshot(
             displayID: 42,

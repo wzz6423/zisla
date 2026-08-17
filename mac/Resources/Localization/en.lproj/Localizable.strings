@@ -24,7 +24,7 @@
 "工作流" = "Workflow";
 "信息" = "Info";
 "模型" = "Models";
-"桌面宠物" = "Desktop Pet";
+"宠物" = "Pet";
 "交互" = "Interaction";
 "下载" = "Download";
 "天气" = "Weather";
@@ -95,7 +95,6 @@
 "播放与 AI 活动通知显示在此屏幕" = "Playback and AI activity notifications shown on this screen";
 
 /* Settings - AI */
-"AI 进度、语音输入，以及连接、自动化、CLI 与 Skills 等 Agent 行为。" = "AI progress, voice input, and Agent behaviors including connections, automation, CLI, and Skills.";
 "AI 监控" = "AI Monitoring";
 "AI 进度与用量" = "AI Progress and Usage";
 "汇总桌面端与 CLI 工具的运行状态" = "Summarize desktop and CLI tool running status";
@@ -110,12 +109,7 @@
 "左右侧修饰键需要监听全局键盘事件" = "Left/right modifier keys require listening to global keyboard events";
 "已授权" = "Authorized";
 
-/* Settings - AI Agent */
-"AI Agent 行为" = "AI Agent Behavior";
-"在灵动岛显示" = "Show in Dynamic Island";
-"关闭后仅从工具栏隐藏，此处的配置与对话不受影响" = "Only hides from toolbar when off; configuration and conversations here are unaffected";
-
-/* Settings - Models */
+/* Settings - Voice Models */
 "配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Configure local models, remote models and credentials, and select the model for voice organization.";
 "本地模型" = "Local Models";
 "远端模型与凭据" = "Remote Models and Credentials";
@@ -247,7 +241,6 @@
 "输入文字或 Emoji" = "Enter text or Emoji";
 "复制到剪贴板" = "Copy to Clipboard";
 "发送到随记" = "Send to Quick Notes";
-"发送到 AI Agent" = "Send to AI Agent";
 "移出常用" = "Remove from Favorites";
 "设为常用" = "Add to Favorites";
 "文本" = "Text";
@@ -264,47 +257,15 @@
 "展开大窗口编辑" = "Open in Large Window";
 "系统共享" = "System Share";
 
-/* AI Agent Module */
-"对话" = "Chat";
-"消息连接" = "Message Connections";
-"应用增强" = "Application Enhancements";
-"自动化" = "Automation";
+/* Settings - AI CLI and Skills */
 "CLI 与 Skills" = "CLI and Skills";
-"会话存储" = "Session Storage";
-"刷新余额、渠道、CLI 和 Skills" = "Refresh balance, channels, CLI, and Skills";
-"统一历史" = "Unified History";
-"新建对话" = "New Conversation";
-"添加项目" = "Add Project";
-"添加现有文件夹…" = "Add Existing Folder…";
-"新建文件夹并添加…" = "Create New Folder…";
-"将本地文件夹添加为项目" = "Add local folder as project";
-"未归类" = "Uncategorized";
-"展开项目会话" = "Expand project sessions";
-"收起项目会话" = "Collapse project sessions";
-"选择项目；新建对话会归入此项目" = "Select project; new conversations will be added to this project";
-"取消置顶项目" = "Unpin Project";
-"置顶项目" = "Pin Project";
-"删除项目" = "Delete Project";
-"选择或新建对话" = "Select or create conversation";
-"你" = "You";
+
+/* Shared Actions */
 "助手" = "Assistant";
-"执行细节" = "Execution Details";
-"计划模式" = "Plan Mode";
-"复制回复" = "Copy Reply";
-"从此回复分叉会话" = "Fork Session from Reply";
-"批注" = "Annotation";
-"添加批注" = "Add Annotation";
-"将引用和评论发送为新消息" = "Send quote and comment as new message";
-"删除批注" = "Delete Annotation";
-"发送消息" = "Send Message";
 "添加文件" = "Add File";
-"添加文件、切换计划模式或目标模式" = "Add file, toggle plan or goal mode";
-"目标模式" = "Goal Mode";
-"设置外部 CLI 的访问偏好" = "Set external CLI access preferences";
-"选择思考深度偏好" = "Select thinking depth preference";
 "发送" = "Send";
 
-/* AI Agent - Remote Providers */
+/* Voice Models - Remote Providers */
 "远端 Provider" = "Remote Provider";
 "添加 Provider" = "Add Provider";
 "尚未配置远端 Provider" = "No remote providers configured";

@@ -279,6 +279,31 @@ public enum SystemMonitorMenuBarDisplayStyle: String, Codable, CaseIterable, Sen
     }
 }
 
+public enum VoiceRecordingCleanupPolicy: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
+    case sevenDays
+    case fifteenDays
+    case thirtyDays
+    case never
+
+    public var menuTitle: String {
+        switch self {
+        case .sevenDays: "7 天"
+        case .fifteenDays: "15 天"
+        case .thirtyDays: "30 天"
+        case .never: "永不清理"
+        }
+    }
+
+    public var daysThreshold: Int? {
+        switch self {
+        case .sevenDays: 7
+        case .fifteenDays: 15
+        case .thirtyDays: 30
+        case .never: nil
+        }
+    }
+}
+
 public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case transient
     case updateAvailable
@@ -332,7 +357,6 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mediaSource: MediaSourcePreference
     public var fileShelfEnabled: Bool
     public var aiProgressEnabled: Bool
-    public var aiAgentEnabled: Bool
     public var downloaderEnabled: Bool
     public var calendarEnabled: Bool
     public var toolboxEnabled: Bool
@@ -402,7 +426,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var voiceInputEnabled: Bool
     public var voiceInputMode: VoiceInputMode
     public var voiceInputHotkeyPreset: VoiceInputHotkeyPreset
-    /// Current model configuration for voice processing. The endpoint and credentials remain in AI Agent settings.
+    public var voiceRecordingRetentionEnabled: Bool
+    public var voiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy
+    /// Current model configuration for voice processing. Endpoint and credentials remain in voice settings.
     public var voiceModelConfiguration: AIModelConfigurationReference?
 
     public init(
@@ -410,7 +436,6 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mediaSource: MediaSourcePreference = .automatic,
         fileShelfEnabled: Bool = true,
         aiProgressEnabled: Bool = true,
-        aiAgentEnabled: Bool = true,
         downloaderEnabled: Bool = true,
         calendarEnabled: Bool = true,
         toolboxEnabled: Bool = true,
@@ -421,9 +446,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         videoDownloadIslandEnabled: Bool = true,
         systemMonitorEnabled: Bool = true,
         batteryMonitorEnabled: Bool = true,
-        systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric> = Set(SystemMonitorMenuBarMetric.allCases),
-        systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle = .detailed,
-        menuBarAppIconEnabled: Bool = true,
+        systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric> = [.cpu],
+        systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle = .compact,
+        menuBarAppIconEnabled: Bool = false,
         weatherEnabled: Bool = true,
         lockScreenInfoEnabled: Bool = true,
         lockScreenMessage: String = "",
@@ -456,13 +481,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         voiceInputEnabled: Bool = true,
         voiceInputMode: VoiceInputMode = .toggle,
         voiceInputHotkeyPreset: VoiceInputHotkeyPreset = .optionSpace,
+        voiceRecordingRetentionEnabled: Bool = true,
+        voiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy = .never,
         voiceModelConfiguration: AIModelConfigurationReference? = nil
     ) {
         self.mediaEnabled = mediaEnabled
         self.mediaSource = mediaSource
         self.fileShelfEnabled = fileShelfEnabled
         self.aiProgressEnabled = aiProgressEnabled
-        self.aiAgentEnabled = aiAgentEnabled
         self.downloaderEnabled = downloaderEnabled
         self.calendarEnabled = calendarEnabled
         self.toolboxEnabled = toolboxEnabled
@@ -508,6 +534,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.voiceInputEnabled = voiceInputEnabled
         self.voiceInputMode = voiceInputMode
         self.voiceInputHotkeyPreset = voiceInputHotkeyPreset
+        self.voiceRecordingRetentionEnabled = voiceRecordingRetentionEnabled
+        self.voiceRecordingCleanupPolicy = voiceRecordingCleanupPolicy
         self.voiceModelConfiguration = voiceModelConfiguration
     }
 
@@ -532,7 +560,6 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case mediaSource
         case fileShelfEnabled
         case aiProgressEnabled
-        case aiAgentEnabled
         case downloaderEnabled
         case calendarEnabled
         case toolboxEnabled
@@ -578,6 +605,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case voiceInputEnabled
         case voiceInputMode
         case voiceInputHotkeyPreset
+        case voiceRecordingRetentionEnabled
+        case voiceRecordingCleanupPolicy
         case voiceModelConfiguration
     }
 
@@ -592,7 +621,6 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mediaSource = try container.decodeIfPresent(MediaSourcePreference.self, forKey: .mediaSource) ?? defaults.mediaSource
         fileShelfEnabled = try container.decodeIfPresent(Bool.self, forKey: .fileShelfEnabled) ?? defaults.fileShelfEnabled
         aiProgressEnabled = try container.decodeIfPresent(Bool.self, forKey: .aiProgressEnabled) ?? defaults.aiProgressEnabled
-        aiAgentEnabled = try container.decodeIfPresent(Bool.self, forKey: .aiAgentEnabled) ?? defaults.aiAgentEnabled
         downloaderEnabled = try container.decodeIfPresent(Bool.self, forKey: .downloaderEnabled) ?? defaults.downloaderEnabled
         calendarEnabled = try container.decodeIfPresent(Bool.self, forKey: .calendarEnabled) ?? defaults.calendarEnabled
         toolboxEnabled = try container.decodeIfPresent(Bool.self, forKey: .toolboxEnabled) ?? defaults.toolboxEnabled
@@ -688,6 +716,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         voiceInputEnabled = try container.decodeIfPresent(Bool.self, forKey: .voiceInputEnabled) ?? defaults.voiceInputEnabled
         voiceInputMode = try container.decodeIfPresent(VoiceInputMode.self, forKey: .voiceInputMode) ?? defaults.voiceInputMode
         voiceInputHotkeyPreset = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .voiceInputHotkeyPreset) ?? defaults.voiceInputHotkeyPreset
+        voiceRecordingRetentionEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .voiceRecordingRetentionEnabled
+        ) ?? defaults.voiceRecordingRetentionEnabled
+        voiceRecordingCleanupPolicy = try container.decodeIfPresent(
+            VoiceRecordingCleanupPolicy.self,
+            forKey: .voiceRecordingCleanupPolicy
+        ) ?? defaults.voiceRecordingCleanupPolicy
         voiceModelConfiguration = try container.decodeIfPresent(
             AIModelConfigurationReference.self,
             forKey: .voiceModelConfiguration

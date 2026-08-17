@@ -67,19 +67,6 @@ struct ShelfModuleView: View {
                         .help("全部发送到随记")
 
                         Button {
-                            model.sendTransferItemsToAIAgent(model.shelf.items.map { .file($0.url) })
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 11, weight: .medium))
-                                Text("AI")
-                                    .font(.system(size: 10, weight: .medium))
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .help("全部发送到 AI Agent")
-
-                        Button {
                             model.copyShelfFiles(model.shelf.items.map(\.url))
                         } label: {
                             HStack(spacing: 4) {
@@ -152,9 +139,6 @@ struct ShelfModuleView: View {
                                         onCopy: { model.copyShelfFiles([item.url]) },
                                         onSendToQuickNote: {
                                             model.receiveQuickNoteTransferItems([.file(item.url)])
-                                        },
-                                        onSendToAIAgent: {
-                                            model.sendTransferItemsToAIAgent([.file(item.url)])
                                         },
                                         onRemove: { model.shelf.remove(id: item.id) }
                                     )
@@ -342,7 +326,6 @@ private struct ShelfItemView: View {
     var item: FileShelfItem
     var onCopy: () -> Void
     var onSendToQuickNote: () -> Void
-    var onSendToAIAgent: () -> Void
     var onRemove: () -> Void
 
     var body: some View {
@@ -385,7 +368,6 @@ private struct ShelfItemView: View {
             }
             Button("复制", action: onCopy)
             Button("发送到随记", action: onSendToQuickNote)
-            Button("发送到 AI Agent", action: onSendToAIAgent)
             Divider()
             Button("移除", role: .destructive, action: onRemove)
         }

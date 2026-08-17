@@ -51,6 +51,7 @@ public final class OverlayCoordinator: NSObject {
     private var keepsNativeGlassActive = false
     private var isExternalDragging = false
     private var isTransientInteractionVisible = false
+    private var isVoiceRecording = false
     private var collapsedOnTop = true
     private var isPersistentContentVisible = true
 
@@ -129,6 +130,7 @@ public final class OverlayCoordinator: NSObject {
         if isExternalDragging { onDraggingChanged?(false) }
         isExternalDragging = false
         isTransientInteractionVisible = false
+        isVoiceRecording = false
     }
 
     public func refreshScreens() {
@@ -137,7 +139,8 @@ public final class OverlayCoordinator: NSObject {
 
     public func updateScreens(
         _ snapshots: [ScreenSnapshot],
-        repositionVisiblePanel: Bool = true
+        repositionVisiblePanel: Bool = true,
+        refreshPersistentPanels: Bool = true
     ) {
         layouts = layoutEngine.layouts(for: snapshots)
         guard !layouts.isEmpty else {
@@ -167,7 +170,9 @@ public final class OverlayCoordinator: NSObject {
             }
             presentCurrentLayout()
         }
-        updatePersistentPanels()
+        if refreshPersistentPanels {
+            updatePersistentPanels()
+        }
     }
 
     public func updateExpandedSize(_ size: CGSize) {
@@ -175,7 +180,8 @@ public final class OverlayCoordinator: NSObject {
         layoutEngine.configuration.expandedSize = size
         updateScreens(
             NSScreen.screens.compactMap(ScreenSnapshot.init(screen:)),
-            repositionVisiblePanel: false
+            repositionVisiblePanel: false,
+            refreshPersistentPanels: false
         )
         guard isVisible else { return }
         if activeDisplayID == nil { ensureActiveDisplay() }
@@ -187,7 +193,7 @@ public final class OverlayCoordinator: NSObject {
             onCollapsedSizeChanged?(layout.collapsedFrame.size)
             onActiveDisplayHasPhysicalNotchChanged?(layout.topology.hasPhysicalNotch)
             panel.resize(to: layout.expandedFrame)
-            panel.ignoresMouseEvents = !isExpanded
+            applyPanelInteractionPolicy()
             applyPanelFocusPolicy(activateGlass: false)
             applyPanelLevel()
             if isExpanded { schedulePointerRevalidation() }
@@ -268,6 +274,31 @@ public final class OverlayCoordinator: NSObject {
         updateInteractionHold()
     }
 
+    public func setVoiceRecording(_ recording: Bool) {
+        setVoiceRecording(recording, at: NSEvent.mouseLocation)
+    }
+
+    public func setVoiceRecording(_ recording: Bool, at point: CGPoint) {
+        guard recording != isVoiceRecording else { return }
+        let wasRecording = isVoiceRecording
+        isVoiceRecording = recording
+
+        if recording, !wasRecording {
+            selectActiveDisplay(at: point)
+            if isVisible {
+                presentCurrentLayout()
+            }
+        }
+
+        updateInteractionHold()
+        if !recording {
+            cancelScheduledCollapse()
+            process(reducer.send(.collapseDelayElapsed))
+        }
+        applyPanelFocusPolicy(activateGlass: false)
+        applyPanelInteractionPolicy()
+    }
+
     public func setAllowsKeyWindow(_ allows: Bool) {
         allowsKeyWindow = allows
         applyPanelFocusPolicy(activateGlass: false)
@@ -331,18 +362,33 @@ public final class OverlayCoordinator: NSObject {
         guard let panel else { return }
         let isExpanded = reducer.state.visibility == .expanded
             || reducer.state.visibility == .pinned
-        let shouldKeepGlassActive = keepsNativeGlassActive && isExpanded
+        let allowsInteraction = isExpanded && !isVoiceRecording
+        // 录音态保留玻璃渲染资格，但不让面板重新夺取目标应用的焦点。
+        let showsGlassSurface = isExpanded || isVoiceRecording
+        let shouldKeepGlassActive = keepsNativeGlassActive && showsGlassSurface
         // 固定时也允许成为 key window，确保输入焦点能正常工作
-        let shouldAllowKeyWindow = allowsKeyWindow && isExpanded
+        let shouldAllowKeyWindow = allowsKeyWindow && allowsInteraction
         let shouldAllowNativeGlassActivation = shouldKeepGlassActive
 
         panel.isPinned = isPinned
+        // 必须先于 keepsNativeGlassActive 赋值：didSet 会立即触发焦点策略。
+        panel.avoidsAppActivation = isVoiceRecording
         panel.allowsKeyWindow = shouldAllowKeyWindow
         panel.allowsNativeGlassActivation = shouldAllowNativeGlassActivation
         panel.keepsNativeGlassActive = shouldKeepGlassActive
 
-        guard !panel.canBecomeKey, panel.isKeyWindow else { return }
-        panel.resignKey()
+        if isVoiceRecording, panel.isKeyWindow {
+            panel.resignKey()
+        } else if !panel.canBecomeKey, panel.isKeyWindow {
+            panel.resignKey()
+        }
+    }
+
+    private func applyPanelInteractionPolicy() {
+        guard let panel else { return }
+        let isExpanded = reducer.state.visibility == .expanded
+            || reducer.state.visibility == .pinned
+        panel.ignoresMouseEvents = !isExpanded || isVoiceRecording
     }
 
     private func setPointerInside(_ inside: Bool) {
@@ -383,7 +429,7 @@ public final class OverlayCoordinator: NSObject {
     }
 
     private func updateInteractionHold() {
-        let held = isExternalDragging || isTransientInteractionVisible
+        let held = isExternalDragging || isTransientInteractionVisible || isVoiceRecording
         if held { ensureActiveDisplay() }
         process(reducer.send(.setDragging(held)))
     }
@@ -536,8 +582,6 @@ public final class OverlayCoordinator: NSObject {
         cancelPendingPanelCollapse()
         onCollapsedSizeChanged?(layout.collapsedFrame.size)
         onActiveDisplayHasPhysicalNotchChanged?(layout.topology.hasPhysicalNotch)
-        let isExpanded = reducer.state.visibility == .expanded
-            || reducer.state.visibility == .pinned
         let targetFrame = layout.expandedFrame
         let panel: IslandPanel
         if let existingPanel = self.panel {
@@ -556,12 +600,12 @@ public final class OverlayCoordinator: NSObject {
             from: layout.collapsedFrame,
             animated: !panel.isVisible
         )
-        panel.ignoresMouseEvents = !isExpanded
+        applyPanelInteractionPolicy()
         applyPanelLevel()
         updatePersistentPanels()
     }
 
-    private func updatePersistentPanels() {
+    private func updatePersistentPanels(forcePresent: Bool = false) {
         guard isPersistentContentVisible,
             let persistentContentViewProvider,
             let persistentPanelFrameProvider
@@ -584,8 +628,10 @@ public final class OverlayCoordinator: NSObject {
                 continue
             }
             let panel: IslandPanel
+            let isNewPanel: Bool
             if let existingPanel = persistentPanels[layout.displayID] {
                 panel = existingPanel
+                isNewPanel = false
             } else {
                 guard let contentView = persistentContentViewProvider(layout) else { continue }
                 panel = IslandPanel(
@@ -593,11 +639,18 @@ public final class OverlayCoordinator: NSObject {
                     frame: persistentPanelFrameProvider(layout)
                 )
                 persistentPanels[layout.displayID] = panel
+                isNewPanel = true
             }
             panel.allowsKeyWindow = false
             panel.ignoresMouseEvents = true
             panel.level = IslandPanel.onTopLevel
-            panel.present(at: persistentPanelFrameProvider(layout), animated: false)
+
+            let targetFrame = persistentPanelFrameProvider(layout)
+            // 只在必要时调用 present：新建、隐藏后重新显示、frame 变化或强制 refront
+            let needsPresent = isNewPanel || !panel.isVisible || panel.frame != targetFrame || forcePresent
+            if needsPresent {
+                panel.present(at: targetFrame, animated: false)
+            }
             visibleDisplayIDs.insert(layout.displayID)
         }
 
@@ -630,7 +683,7 @@ public final class OverlayCoordinator: NSObject {
         if isVisible {
             presentCurrentLayout()
         } else {
-            updatePersistentPanels()
+            updatePersistentPanels(forcePresent: true)
         }
     }
 }

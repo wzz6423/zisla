@@ -24,7 +24,7 @@
 "工作流" = "Quy trình";
 "信息" = "Thông tin";
 "模型" = "Mô hình";
-"桌面宠物" = "Thú cưng Desktop";
+"宠物" = "Thú cưng";
 "交互" = "Tương tác";
 "下载" = "Tải xuống";
 "天气" = "Thời tiết";
@@ -95,7 +95,6 @@
 "播放与 AI 活动通知显示在此屏幕" = "Thông báo hoạt động phát và AI hiển thị trên màn hình này";
 
 /* Settings - AI */
-"AI 进度、语音输入，以及连接、自动化、CLI 与 Skills 等 Agent 行为。" = "Tiến độ AI, nhập giọng nói và hành vi Agent bao gồm kết nối, tự động hóa, CLI và Skills.";
 "AI 监控" = "Giám sát AI";
 "AI 进度与用量" = "Tiến độ và Sử dụng AI";
 "汇总桌面端与 CLI 工具的运行状态" = "Tóm tắt trạng thái desktop và công cụ CLI đang chạy";
@@ -110,12 +109,7 @@
 "左右侧修饰键需要监听全局键盘事件" = "Phím bổ trợ trái/phải yêu cầu lắng nghe sự kiện bàn phím toàn cục";
 "已授权" = "Đã Ủy quyền";
 
-/* Settings - AI Agent */
-"AI Agent 行为" = "Hành vi AI Agent";
-"在灵动岛显示" = "Hiển thị trong Dynamic Island";
-"关闭后仅从工具栏隐藏，此处的配置与对话不受影响" = "Chỉ ẩn khỏi thanh công cụ khi tắt; cấu hình và cuộc trò chuyện ở đây không bị ảnh hưởng";
-
-/* Settings - Models */
+/* Settings - Voice Models */
 "配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Cấu hình mô hình cục bộ, mô hình từ xa và thông tin xác thực, và chọn mô hình cho tổ chức giọng nói.";
 "本地模型" = "Mô hình Cục bộ";
 "远端模型与凭据" = "Mô hình Từ xa và Thông tin Xác thực";
@@ -247,7 +241,6 @@
 "输入文字或 Emoji" = "Nhập văn bản hoặc Emoji";
 "复制到剪贴板" = "Sao chép vào Clipboard";
 "发送到随记" = "Gửi đến Ghi chú Nhanh";
-"发送到 AI Agent" = "Gửi đến AI Agent";
 "移出常用" = "Xóa khỏi Yêu thích";
 "设为常用" = "Thêm vào Yêu thích";
 "文本" = "Văn bản";
@@ -264,47 +257,16 @@
 "展开大窗口编辑" = "Mở trong Cửa sổ Lớn";
 "系统共享" = "Chia sẻ Hệ thống";
 
-/* AI Agent Module */
-"对话" = "Trò chuyện";
-"消息连接" = "Kết nối Tin nhắn";
-"应用增强" = "Cải tiến Ứng dụng";
-"自动化" = "Tự động hóa";
+
+/* Settings - AI CLI and Skills */
 "CLI 与 Skills" = "CLI và Skills";
-"会话存储" = "Lưu trữ Phiên";
-"刷新余额、渠道、CLI 和 Skills" = "Làm mới số dư, kênh, CLI và Skills";
-"统一历史" = "Lịch sử Thống nhất";
-"新建对话" = "Cuộc trò chuyện Mới";
-"添加项目" = "Thêm Dự án";
-"添加现有文件夹…" = "Thêm Thư mục Hiện có…";
-"新建文件夹并添加…" = "Tạo Thư mục Mới…";
-"将本地文件夹添加为项目" = "Thêm thư mục cục bộ làm dự án";
-"未归类" = "Chưa Phân loại";
-"展开项目会话" = "Mở rộng phiên dự án";
-"收起项目会话" = "Thu gọn phiên dự án";
-"选择项目；新建对话会归入此项目" = "Chọn dự án; cuộc trò chuyện mới sẽ được thêm vào dự án này";
-"取消置顶项目" = "Bỏ Ghim Dự án";
-"置顶项目" = "Ghim Dự án";
-"删除项目" = "Xóa Dự án";
-"选择或新建对话" = "Chọn hoặc tạo cuộc trò chuyện";
-"你" = "Bạn";
+
+/* Shared Actions */
 "助手" = "Trợ lý";
-"执行细节" = "Chi tiết Thực thi";
-"计划模式" = "Chế độ Kế hoạch";
-"复制回复" = "Sao chép Trả lời";
-"从此回复分叉会话" = "Rẽ nhánh Phiên từ Trả lời";
-"批注" = "Chú thích";
-"添加批注" = "Thêm Chú thích";
-"将引用和评论发送为新消息" = "Gửi trích dẫn và nhận xét làm tin nhắn mới";
-"删除批注" = "Xóa Chú thích";
-"发送消息" = "Gửi Tin nhắn";
 "添加文件" = "Thêm Tệp";
-"添加文件、切换计划模式或目标模式" = "Thêm tệp, chuyển chế độ kế hoạch hoặc chế độ mục tiêu";
-"目标模式" = "Chế độ Mục tiêu";
-"设置外部 CLI 的访问偏好" = "Đặt tùy chọn truy cập CLI bên ngoài";
-"选择思考深度偏好" = "Chọn tùy chọn độ sâu suy nghĩ";
 "发送" = "Gửi";
 
-/* AI Agent - Remote Providers */
+/* Voice Models - Remote Providers */
 "远端 Provider" = "Nhà cung cấp Từ xa";
 "添加 Provider" = "Thêm Nhà cung cấp";
 "尚未配置远端 Provider" = "Chưa có nhà cung cấp từ xa được cấu hình";
