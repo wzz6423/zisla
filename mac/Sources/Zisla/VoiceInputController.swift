@@ -4,13 +4,15 @@ import Combine
 import ZislaKit
 import Speech
 
-/// Microphone and speech recognition permissions are requested only after the user explicitly taps; recorded audio is passed only to the system recognizer and is not written to Zisla state files.
+/// Microphone and speech recognition permissions are requested only after the user explicitly taps.
 @MainActor
 final class VoiceInputController: ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var isPreparing = false
     @Published private(set) var transcript = ""
     @Published private(set) var errorDescription: String?
+    /// Whether the recognition service is still processing a final result after recording has stopped.
+    private var isFinalizingTranscript = false
 
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
     private var engine: AVAudioEngine?
@@ -18,14 +20,18 @@ final class VoiceInputController: ObservableObject {
     private var task: SFSpeechRecognitionTask?
     private var pendingStartID: UUID?
     private var recordingID: UUID?
+    private var recordingStartedAt: Date?
+    private var recordingFileURL: URL?
+    private var recordingFile: AVAudioFile?
     private var tapInstalled = false
     private var finalizationTask: Task<Void, Never>?
     private var authorizationPromptHost: NSWindow?
 
-    var onTranscriptCompleted: ((String) -> Void)?
+    var onRecordingWillStart: (() -> Void)?
+    var onTranscriptCompleted: ((VoiceRecordingResult) -> Void)?
 
     func toggle() {
-        if isRecording || isPreparing {
+        if isRecording || isPreparing || isFinalizingTranscript {
             stop()
         } else {
             start()
@@ -38,6 +44,7 @@ final class VoiceInputController: ObservableObject {
         // The previous take may still be waiting for its final result; deliver it now instead of
         // swallowing this keypress for the whole finalization window.
         if let recordingID { finishRecording(recordingID: recordingID) }
+        onRecordingWillStart?()
         requestPermissionsAndStart()
     }
 
@@ -53,7 +60,7 @@ final class VoiceInputController: ObservableObject {
         pendingStartID = nil
         isPreparing = false
         dismissAuthorizationPromptHost()
-        clearRecordingResources()
+        clearRecordingResources(deleteAudioFile: true)
     }
 
     private func requestPermissionsAndStart() {
@@ -131,6 +138,44 @@ final class VoiceInputController: ObservableObject {
         AVCaptureDevice.requestAccess(for: .audio, completionHandler: completion)
     }
 
+    nonisolated static func makeAudioTapHandler(
+        request: SFSpeechAudioBufferRecognitionRequest,
+        recordingFile: AVAudioFile,
+        recordingID: UUID,
+        onWriteFailure: @escaping @Sendable (UUID, Error) -> Void
+    ) -> AVAudioNodeTapBlock {
+        // AVAudioEngine invokes tap blocks on a realtime queue, outside MainActor isolation.
+        return { buffer, _ in
+            request.append(buffer)
+            do {
+                try recordingFile.write(from: buffer)
+            } catch {
+                onWriteFailure(recordingID, error)
+            }
+        }
+    }
+
+    nonisolated private static func installAudioTap(
+        on input: AVAudioInputNode,
+        format: AVAudioFormat,
+        request: SFSpeechAudioBufferRecognitionRequest,
+        recordingFile: AVAudioFile,
+        recordingID: UUID,
+        onWriteFailure: @escaping @Sendable (UUID, Error) -> Void
+    ) {
+        input.installTap(
+            onBus: 0,
+            bufferSize: 1_024,
+            format: format,
+            block: makeAudioTapHandler(
+                request: request,
+                recordingFile: recordingFile,
+                recordingID: recordingID,
+                onWriteFailure: onWriteFailure
+            )
+        )
+    }
+
     private func startRecording(startID: UUID) {
         guard pendingStartID == startID else { return }
         guard recognizer?.isAvailable == true else {
@@ -150,6 +195,20 @@ final class VoiceInputController: ObservableObject {
             return
         }
         let recordingID = UUID()
+        let recordingFileURL = AppPaths.voiceRecordings
+            .appendingPathComponent("\(recordingID.uuidString).caf", isDirectory: false)
+        let recordingFile: AVAudioFile
+        do {
+            try FileManager.default.createDirectory(
+                at: AppPaths.voiceRecordings,
+                withIntermediateDirectories: true
+            )
+            recordingFile = try AVAudioFile(forWriting: recordingFileURL, settings: format.settings)
+        } catch {
+            finishPendingStart(with: "无法保存录音：\(error.localizedDescription)")
+            try? FileManager.default.removeItem(at: recordingFileURL)
+            return
+        }
         let task = recognizer?.recognitionTask(with: request) { [weak self] result, error in
             Task { @MainActor [weak self] in
                 guard let self, self.recordingID == recordingID else { return }
@@ -170,38 +229,41 @@ final class VoiceInputController: ObservableObject {
                 }
             }
         }
-        input.installTap(onBus: 0, bufferSize: 1_024, format: format) { buffer, _ in
-            request.append(buffer)
+        Self.installAudioTap(
+            on: input,
+            format: format,
+            request: request,
+            recordingFile: recordingFile,
+            recordingID: recordingID
+        ) { [weak self] recordingID, error in
+            Task { @MainActor [weak self] in
+                self?.failRecordingWrite(recordingID: recordingID, error: error)
+            }
         }
         tapInstalled = true
+        self.engine = engine
+        self.request = request
+        self.task = task
+        self.recordingID = recordingID
+        self.recordingStartedAt = Date()
+        self.recordingFileURL = recordingFileURL
+        self.recordingFile = recordingFile
         do {
             engine.prepare()
             try engine.start()
-            self.engine = engine
-            self.request = request
-            self.task = task
-            self.recordingID = recordingID
             pendingStartID = nil
             isPreparing = false
             isRecording = true
         } catch {
-            input.removeTap(onBus: 0)
-            tapInstalled = false
-            request.endAudio()
-            task?.cancel()
+            clearRecordingResources(deleteAudioFile: true)
             finishPendingStart(with: error.localizedDescription)
         }
     }
 
     private func stopAudioInput(for recordingID: UUID) {
         guard self.recordingID == recordingID else { return }
-        if tapInstalled {
-            engine?.inputNode.removeTap(onBus: 0)
-            tapInstalled = false
-        }
-        engine?.stop()
-        request?.endAudio()
-        isRecording = false
+        stopAudioCapture()
+        isFinalizingTranscript = true
         finalizationTask?.cancel()
         finalizationTask = Task { [weak self] in
             // Server-side recognition needs a couple of seconds after endAudio() to return the final
@@ -212,29 +274,66 @@ final class VoiceInputController: ObservableObject {
         }
     }
 
-    private func finishRecording(recordingID: UUID) {
-        guard self.recordingID == recordingID else { return }
-        let completedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        clearRecordingResources()
-        if !completedTranscript.isEmpty {
-            onTranscriptCompleted?(completedTranscript)
-        }
-    }
-
-    private func clearRecordingResources() {
-        finalizationTask?.cancel()
-        finalizationTask = nil
+    private func stopAudioCapture() {
+        guard tapInstalled || isRecording else { return }
         if tapInstalled {
             engine?.inputNode.removeTap(onBus: 0)
             tapInstalled = false
         }
         engine?.stop()
         request?.endAudio()
+        isRecording = false
+    }
+
+    private func finishRecording(recordingID: UUID) {
+        guard self.recordingID == recordingID else { return }
+        stopAudioCapture()
+        isFinalizingTranscript = false
+        let completedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let createdAt = recordingStartedAt ?? Date()
+        let fallbackDuration = max(0, Date().timeIntervalSince(createdAt))
+        let recordedDuration = recordingFile.map {
+            guard $0.fileFormat.sampleRate > 0 else { return fallbackDuration }
+            return Double($0.length) / $0.fileFormat.sampleRate
+        } ?? fallbackDuration
+        guard let recordingFileURL else {
+            clearRecordingResources(deleteAudioFile: true)
+            errorDescription = "录音文件未能保存"
+            return
+        }
+        clearRecordingResources(deleteAudioFile: false)
+        onTranscriptCompleted?(VoiceRecordingResult(
+            id: recordingID,
+            audioFileURL: recordingFileURL,
+            transcript: completedTranscript,
+            duration: recordedDuration,
+            createdAt: createdAt
+        ))
+    }
+
+    private func failRecordingWrite(recordingID: UUID, error: Error) {
+        guard self.recordingID == recordingID else { return }
+        errorDescription = "无法保存录音：\(error.localizedDescription)"
+        clearRecordingResources(deleteAudioFile: true)
+    }
+
+    private func clearRecordingResources(deleteAudioFile: Bool) {
+        let fileURL = recordingFileURL
+        finalizationTask?.cancel()
+        finalizationTask = nil
+        stopAudioCapture()
         task?.cancel()
         engine = nil
         request = nil
         task = nil
+        recordingFile = nil
+        recordingFileURL = nil
+        recordingStartedAt = nil
         recordingID = nil
         isRecording = false
+        isFinalizingTranscript = false
+        if deleteAudioFile, let fileURL {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
     }
 }

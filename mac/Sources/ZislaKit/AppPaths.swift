@@ -26,7 +26,15 @@ public enum AppPaths {
         applicationSupport.appendingPathComponent("alarms.json", isDirectory: false)
     }
 
-    /// Command-line tools that Zisla downloads and manages itself (yt-dlp, mas). Kept under
+    public static var voiceHistory: URL {
+        applicationSupport.appendingPathComponent("voice-history.json", isDirectory: false)
+    }
+
+    public static var voiceRecordings: URL {
+        applicationSupport.appendingPathComponent("voice-recordings", isDirectory: true)
+    }
+
+    /// Command-line tools that Zisla downloads and manages itself (yt-dlp). Kept under
     /// Application Support: the user directory is not writable by other users, which satisfies
     /// the trusted directory chain required by `YTDLPResolver`.
     public static var managedTools: URL {
@@ -39,10 +47,6 @@ public enum AppPaths {
 
     public static var aiAgent: URL {
         applicationSupport.appendingPathComponent("ai-agent.json", isDirectory: false)
-    }
-
-    public static var aiAgentAttachments: URL {
-        applicationSupport.appendingPathComponent("ai-agent-attachments", isDirectory: true)
     }
 
     public static var aiAgentSecrets: URL {

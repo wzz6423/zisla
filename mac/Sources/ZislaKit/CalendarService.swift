@@ -163,6 +163,14 @@ public final class CalendarService: ObservableObject {
     init(store: EKEventStore, mutations: CalendarMutationCommands) {
         self.store = store
         self.mutations = mutations
+    }
+
+    isolated deinit {
+        stop()
+    }
+
+    public func start() {
+        guard storeChangedObserver == nil else { return }
         storeChangedObserver = NotificationCenter.default.addObserver(
             forName: .EKEventStoreChanged,
             object: store,
@@ -174,10 +182,13 @@ public final class CalendarService: ObservableObject {
         }
     }
 
-    isolated deinit {
+    public func stop() {
+        refreshGeneration &+= 1
         scheduledRefresh?.cancel()
+        scheduledRefresh = nil
         if let storeChangedObserver {
             NotificationCenter.default.removeObserver(storeChangedObserver)
+            self.storeChangedObserver = nil
         }
     }
 
@@ -582,6 +593,7 @@ public final class CalendarService: ObservableObject {
     }
 
     private func scheduleRefresh() {
+        guard storeChangedObserver != nil else { return }
         scheduledRefresh?.cancel()
         scheduledRefresh = Task { @MainActor [weak self] in
             do {

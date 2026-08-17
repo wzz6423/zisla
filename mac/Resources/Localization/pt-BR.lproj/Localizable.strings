@@ -20,14 +20,21 @@
 
 /* Settings */
 "设置" = "Ajustes";
+"通用" = "Geral";
 "工作流" = "Fluxo de Trabalho";
 "信息" = "Informações";
 "模型" = "Modelos";
-"桌面宠物" = "Pet de Desktop";
+"宠物" = "Pet";
 "交互" = "Interação";
 "下载" = "Downloads";
 "天气" = "Clima";
 "更新" = "Atualizações";
+
+/* Settings - General */
+"调整语言、外观、启动与展开方式。" = "Ajustar idioma, aparência, inicialização e método de expansão.";
+
+/* Settings - Privacy */
+"管理剪贴板访问与本机数据。" = "Gerenciar acesso à área de transferência e dados locais.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Gerenciar módulos de fluxo de trabalho na Dynamic Island.";
@@ -88,7 +95,6 @@
 "播放与 AI 活动通知显示在此屏幕" = "Notificações de reprodução e atividades de IA exibidas nesta tela";
 
 /* Settings - AI */
-"AI 进度、语音输入，以及连接、自动化、CLI 与 Skills 等 Agent 行为。" = "Progresso de IA, entrada de voz e comportamentos de Agent incluindo conexões, automação, CLI e Skills.";
 "AI 监控" = "Monitoramento de IA";
 "AI 进度与用量" = "Progresso e Uso de IA";
 "汇总桌面端与 CLI 工具的运行状态" = "Resumir status de execução do desktop e ferramentas CLI";
@@ -103,12 +109,7 @@
 "左右侧修饰键需要监听全局键盘事件" = "Teclas modificadoras esquerda/direita requerem monitoramento de eventos globais";
 "已授权" = "Autorizado";
 
-/* Settings - AI Agent */
-"AI Agent 行为" = "Comportamento do AI Agent";
-"在灵动岛显示" = "Exibir na Dynamic Island";
-"关闭后仅从工具栏隐藏，此处的配置与对话不受影响" = "Apenas oculta da barra de ferramentas quando desativado; configurações e conversas não são afetadas";
-
-/* Settings - Models */
+/* Settings - Voice Models */
 "配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Configurar modelos locais, modelos remotos e credenciais, e selecionar o modelo para organização de voz.";
 "本地模型" = "Modelos Locais";
 "远端模型与凭据" = "Modelos Remotos e Credenciais";
@@ -163,9 +164,9 @@
 "鼠标进入屏幕顶部感应区时显示" = "Exibir quando o mouse entra na zona de detecção superior da tela";
 "隐私" = "Privacidade";
 "记录剪贴板历史" = "Registrar Histórico da Área de Transferência";
-"仅本机保存文本和图片，默认关闭" = "Salvar apenas texto e imagens localmente, desativado por padrão";
+"仅本机保存文本和图片" = "Salvar apenas texto e imagens localmente";
 "检测剪贴板链接" = "Detectar Links da Área de Transferência";
-"发现可下载链接时提示，默认关闭" = "Avisar quando links baixáveis forem detectados, desativado por padrão";
+"发现可下载链接时提示" = "Avisar quando links baixáveis forem detectados";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Gerenciar diretório de downloads, notificações de download e componentes necessários.";
@@ -240,7 +241,6 @@
 "输入文字或 Emoji" = "Digite texto ou Emoji";
 "复制到剪贴板" = "Copiar para Área de Transferência";
 "发送到随记" = "Enviar para Notas Rápidas";
-"发送到 AI Agent" = "Enviar para AI Agent";
 "移出常用" = "Remover dos Favoritos";
 "设为常用" = "Adicionar aos Favoritos";
 "文本" = "Texto";
@@ -257,47 +257,16 @@
 "展开大窗口编辑" = "Abrir em Janela Grande";
 "系统共享" = "Compartilhamento do Sistema";
 
-/* AI Agent Module */
-"对话" = "Chat";
-"消息连接" = "Conexões de Mensagem";
-"应用增强" = "Aprimoramentos de Aplicativo";
-"自动化" = "Automação";
+
+/* Settings - AI CLI and Skills */
 "CLI 与 Skills" = "CLI e Skills";
-"会话存储" = "Armazenamento de Sessão";
-"刷新余额、渠道、CLI 和 Skills" = "Atualizar saldo, canais, CLI e Skills";
-"统一历史" = "Histórico Unificado";
-"新建对话" = "Nova Conversa";
-"添加项目" = "Adicionar Projeto";
-"添加现有文件夹…" = "Adicionar Pasta Existente…";
-"新建文件夹并添加…" = "Criar Nova Pasta…";
-"将本地文件夹添加为项目" = "Adicionar pasta local como projeto";
-"未归类" = "Não Categorizado";
-"展开项目会话" = "Expandir sessões do projeto";
-"收起项目会话" = "Recolher sessões do projeto";
-"选择项目；新建对话会归入此项目" = "Selecionar projeto; novas conversas serão adicionadas a este projeto";
-"取消置顶项目" = "Desafixar Projeto";
-"置顶项目" = "Fixar Projeto";
-"删除项目" = "Excluir Projeto";
-"选择或新建对话" = "Selecionar ou criar conversa";
-"你" = "Você";
+
+/* Shared Actions */
 "助手" = "Assistente";
-"执行细节" = "Detalhes de Execução";
-"计划模式" = "Modo de Planejamento";
-"复制回复" = "Copiar Resposta";
-"从此回复分叉会话" = "Bifurcar Sessão desta Resposta";
-"批注" = "Anotação";
-"添加批注" = "Adicionar Anotação";
-"将引用和评论发送为新消息" = "Enviar citação e comentário como nova mensagem";
-"删除批注" = "Excluir Anotação";
-"发送消息" = "Enviar Mensagem";
 "添加文件" = "Adicionar Arquivo";
-"添加文件、切换计划模式或目标模式" = "Adicionar arquivo, alternar modo de planejamento ou modo de objetivo";
-"目标模式" = "Modo de Objetivo";
-"设置外部 CLI 的访问偏好" = "Definir preferências de acesso do CLI externo";
-"选择思考深度偏好" = "Selecionar preferência de profundidade de pensamento";
 "发送" = "Enviar";
 
-/* AI Agent - Remote Providers */
+/* Voice Models - Remote Providers */
 "远端 Provider" = "Provider Remoto";
 "添加 Provider" = "Adicionar Provider";
 "尚未配置远端 Provider" = "Nenhum provider remoto configurado";
@@ -428,7 +397,6 @@
 "整理桌面" = "Organizar Desktop";
 "按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Alinhar ícones do desktop à grade; não move arquivos quando 'Pilhas' estiver ativado";
 "App Store 应用" = "Apps da App Store";
-"批量升级 App Store 应用；未安装 mas 时打开 App Store 更新页" = "Atualizar apps da App Store em lote; abrir página de atualizações da App Store quando mas não estiver instalado";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Nenhum alarme ainda, adicione abaixo";

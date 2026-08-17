@@ -511,6 +511,42 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test @MainActor
+    func monitorAppendsNewDetectedUsageWhenOlderSessionIsNoLongerScanned() throws {
+        let directory = temporaryDirectory(named: "usage-monitor-append")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let timestamp = Date(timeIntervalSince1970: 100)
+        let original = AIUsageSample(
+            sourceID: "codex-log-event-a",
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 100,
+            outputTokens: 20
+        )
+        let new = AIUsageSample(
+            sourceID: "codex-log-event-b",
+            provider: .codex,
+            timestamp: timestamp.addingTimeInterval(60),
+            inputTokens: 30,
+            outputTokens: 5
+        )
+        let detector = MutableUsageDetector(samples: [original])
+        let monitor = AIStateMonitor(
+            directoryURL: directory,
+            activityDetectors: [],
+            usageDetectors: [detector]
+        )
+
+        monitor.reload()
+        detector.samples = [new]
+        monitor.reload()
+
+        #expect(monitor.state.usageSamples == AIUsageAnalytics.dailyUsageSamples(
+            samples: [original, new],
+            calendar: .current
+        ))
+    }
+
+    @Test @MainActor
     func monitorKeepsDailyTotalWhenAUsageDetectorFails() throws {
         let directory = temporaryDirectory(named: "usage-incomplete-scan")
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -599,7 +635,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
-    func repositoryRevisesDetectedDailyTotalWhenParserCorrectsIt() throws {
+    func repositoryDoesNotReduceDetectedDailyTotalWhenARescanFindsLessUsage() throws {
         let directory = temporaryDirectory(named: "usage-correction")
         defer { try? FileManager.default.removeItem(at: directory) }
         let repository = AIStateRepository(directoryURL: directory)
@@ -619,10 +655,10 @@ struct AIUsageLogDetectorTests {
         )
 
         #expect(try repository.recordDetectedUsage([original]) == 1)
-        #expect(try repository.recordDetectedUsage([corrected]) == 1)
+        #expect(try repository.recordDetectedUsage([corrected]) == 0)
         #expect(
             try repository.load().usageSamples
-                == AIUsageAnalytics.dailyUsageSamples(samples: [corrected], calendar: .current)
+                == AIUsageAnalytics.dailyUsageSamples(samples: [original], calendar: .current)
         )
     }
 
@@ -649,6 +685,16 @@ struct AIUsageLogDetectorTests {
 
 private struct StaticUsageDetector: AIUsageDetecting {
     var samples: [AIUsageSample]
+
+    func usageSamples() throws -> [AIUsageSample] { samples }
+}
+
+private final class MutableUsageDetector: AIUsageDetecting {
+    var samples: [AIUsageSample]
+
+    init(samples: [AIUsageSample]) {
+        self.samples = samples
+    }
 
     func usageSamples() throws -> [AIUsageSample] { samples }
 }

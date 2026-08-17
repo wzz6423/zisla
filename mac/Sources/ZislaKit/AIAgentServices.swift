@@ -7,19 +7,19 @@ public enum AIAgentServiceError: LocalizedError, Sendable {
     case missingAPIKey
     case unsupportedBalanceProbe
     case invalidScript(String)
-    case scriptFailed(String)
+    case scriptFailed(Int32)
     case invalidResponse
-    case http(statusCode: Int, body: String)
+    case http(statusCode: Int)
 
     public var errorDescription: String? {
         switch self {
-        case let .invalidBaseURL(value): "渠道地址无效：\(value)"
+        case .invalidBaseURL: "渠道地址无效"
         case .missingAPIKey: "账号未配置 API Key"
         case .unsupportedBalanceProbe: "当前余额检测方式不支持该渠道"
         case let .invalidScript(path): "余额脚本不可执行：\(path)"
-        case let .scriptFailed(detail): "余额脚本执行失败：\(detail)"
+        case let .scriptFailed(status): "余额脚本执行失败（退出状态 \(status)）"
         case .invalidResponse: "渠道返回了无法识别的结果"
-        case let .http(statusCode, body): "渠道请求失败（HTTP \(statusCode)）：\(body.prefix(180))"
+        case let .http(statusCode): "渠道请求失败（HTTP \(statusCode)）"
         }
     }
 }
@@ -31,12 +31,11 @@ private enum AIAgentURLBuilder {
         dropVersionComponent: Bool = false
     ) throws -> URL {
         let raw = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard var url = URL(string: raw), let scheme = url.scheme,
-              scheme == "http" || scheme == "https" else {
+        guard var url = URL(string: raw), AIEndpointSecurity.permits(url) else {
             throw AIAgentServiceError.invalidBaseURL(raw)
         }
         if dropVersionComponent,
-           url.lastPathComponent.lowercased().hasPrefix("v") {
+           isVersionComponent(url.lastPathComponent) {
             url.deleteLastPathComponent()
         }
         let existing = url.path.split(separator: "/").map(String.init)
@@ -50,7 +49,7 @@ private enum AIAgentURLBuilder {
     static func versionedURL(baseURL: String, pathComponents: [String]) throws -> URL {
         var url = try url(baseURL: baseURL, pathComponents: [])
         let existing = url.path.split(separator: "/").map(String.init)
-        if !existing.contains(where: { $0.lowercased().hasPrefix("v") }) {
+        if !existing.contains(where: isVersionComponent) {
             url.appendPathComponent("v1", isDirectory: true)
         }
         for component in pathComponents {
@@ -75,9 +74,22 @@ private enum AIAgentURLBuilder {
             request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
             request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         case .geminiGenerateContent:
-            break
+            request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         }
         return request
+    }
+
+    private static func isVersionComponent(_ component: String) -> Bool {
+        let suffix = component.lowercased().dropFirst()
+        guard component.lowercased().first == "v" else { return false }
+        let digits = suffix.prefix(while: \.isNumber)
+        guard !digits.isEmpty else { return false }
+        let qualifier = suffix.dropFirst(digits.count)
+        guard !qualifier.isEmpty else { return true }
+        return ["alpha", "beta"].contains { name in
+            guard qualifier.hasPrefix(name) else { return false }
+            return qualifier.dropFirst(name.count).allSatisfy(\.isNumber)
+        }
     }
 }
 
@@ -225,7 +237,7 @@ public struct AIAgentBalanceService: Sendable {
             timeout: 15
         )
         guard output.status == 0 else {
-            throw AIAgentServiceError.scriptFailed(output.standardError)
+            throw AIAgentServiceError.scriptFailed(output.status)
         }
         guard let object = try JSONSerialization.jsonObject(with: output.standardOutput) as? [String: Any] else {
             throw AIAgentServiceError.invalidResponse
@@ -245,10 +257,7 @@ public struct AIAgentBalanceService: Sendable {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw AIAgentServiceError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
-            throw AIAgentServiceError.http(
-                statusCode: http.statusCode,
-                body: String(decoding: data, as: UTF8.self)
-            )
+            throw AIAgentServiceError.http(statusCode: http.statusCode)
         }
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AIAgentServiceError.invalidResponse
@@ -303,13 +312,10 @@ public struct AIAgentChannelProbeService: Sendable {
                 url = components?.url ?? url
                 request = AIAgentURLBuilder.request(url: url, apiKey: apiKey, protocolKind: route.protocolKind)
             case .geminiGenerateContent:
-                var url = try AIAgentURLBuilder.url(baseURL: route.baseURL, pathComponents: ["v1beta", "models"])
-                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-                components?.queryItems = [URLQueryItem(name: "key", value: apiKey)]
-                url = components?.url ?? url
+                let url = try AIAgentURLBuilder.url(baseURL: route.baseURL, pathComponents: ["v1beta", "models"])
                 request = AIAgentURLBuilder.request(url: url, apiKey: apiKey, protocolKind: route.protocolKind)
             }
-            let (data, response) = try await session.data(for: request)
+            let (_, response) = try await session.data(for: request)
             let latency = Int(Date().timeIntervalSince(startedAt) * 1_000)
             guard let http = response as? HTTPURLResponse else { throw AIAgentServiceError.invalidResponse }
             let health: AgentChannelHealth
@@ -324,7 +330,7 @@ public struct AIAgentChannelProbeService: Sendable {
                 baseURL: route.baseURL,
                 health: health,
                 latencyMilliseconds: latency,
-                detail: health == .healthy ? nil : String(decoding: data, as: UTF8.self).prefixString(180)
+                detail: health == .healthy ? nil : "渠道请求失败（HTTP \(http.statusCode)）"
             )
         } catch {
             return AgentChannelProbe(
@@ -352,7 +358,7 @@ public struct AIAgentModelCatalogService: Sendable {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw AIAgentServiceError.invalidResponse }
             guard (200..<300).contains(http.statusCode) else {
-                throw AIAgentServiceError.http(statusCode: http.statusCode, body: String(decoding: data, as: UTF8.self))
+                throw AIAgentServiceError.http(statusCode: http.statusCode)
             }
             guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 throw AIAgentServiceError.invalidResponse
@@ -385,10 +391,7 @@ public struct AIAgentModelCatalogService: Sendable {
                 protocolKind: route.protocolKind
             )
         case .geminiGenerateContent:
-            var url = try AIAgentURLBuilder.url(baseURL: route.baseURL, pathComponents: ["v1beta", "models"])
-            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            components?.queryItems = [URLQueryItem(name: "key", value: apiKey)]
-            url = components?.url ?? url
+            let url = try AIAgentURLBuilder.url(baseURL: route.baseURL, pathComponents: ["v1beta", "models"])
             return AIAgentURLBuilder.request(url: url, apiKey: apiKey, protocolKind: route.protocolKind)
         }
     }
@@ -409,7 +412,7 @@ public struct AIAgentSkillService: Sendable {
         roots: [URL] = Self.defaultRoots,
         enabledPaths: Set<String> = []
     ) -> [AgentSkill] {
-        roots.flatMap { root -> [AgentSkill] in
+        let scannedSkills = roots.flatMap { root -> [AgentSkill] in
             guard let enumerator = FileManager.default.enumerator(
                 at: root,
                 includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
@@ -429,7 +432,10 @@ public struct AIAgentSkillService: Sendable {
             }
             return skills
         }
-        .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        var seenNames = Set<String>()
+        return scannedSkills
+            .filter { seenNames.insert($0.name.lowercased()).inserted }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     public static var defaultRoots: [URL] {
@@ -477,6 +483,13 @@ struct AgentSkillPackageInstallation: Equatable, Sendable {
             return AgentSkillPackageInstallation(
                 manager: .brew,
                 packageName: components[cellarIndex + 1]
+            )
+        }
+        if let caskroomIndex = components.firstIndex(of: "Caskroom"),
+           caskroomIndex + 1 < components.count {
+            return AgentSkillPackageInstallation(
+                manager: .brew,
+                packageName: components[caskroomIndex + 1]
             )
         }
 
@@ -543,26 +556,14 @@ public enum AIAgentGrokUpdateState: Equatable, Sendable {
 public enum AIAgentCLIProfileError: LocalizedError, Sendable {
     case incompleteProfile
     case emptyProfile
-    case emptyConfiguration
     case unableToRestore(String)
 
     public var errorDescription: String? {
         switch self {
         case .incompleteProfile: "CLI 档案必须同时配置两个不同的绝对路径"
         case .emptyProfile: "配置文件和认证文件都不能为空"
-        case .emptyConfiguration: "配置文件不能为空"
         case let .unableToRestore(path): "切换失败且无法恢复原文件：\(path)"
         }
-    }
-}
-
-enum CodexOfficialLoginPolicy {
-    static func preservesAuthentication(
-        for cliKind: AgentCLIKind,
-        userPreference: Bool,
-        isRouteTakeover: Bool
-    ) -> Bool {
-        cliKind == .codex && (userPreference || isRouteTakeover)
     }
 }
 
@@ -614,36 +615,6 @@ public struct AIAgentCLIProfileService: Sendable {
         return (configuration, authentication)
     }
 
-    /// Replaces only the route configuration, leaving an official CLI authentication file untouched.
-    public func activateConfiguration(
-        profile: AgentCLIProfile,
-        configuration: Data
-    ) throws {
-        guard profile.isComplete else { throw AIAgentCLIProfileError.incompleteProfile }
-        guard !configuration.isEmpty else { throw AIAgentCLIProfileError.emptyConfiguration }
-        let (configurationURL, _) = try targetURLs(for: profile)
-        let previous = try existingData(at: configurationURL)
-        do {
-            try writeSecurely(configuration, to: configurationURL)
-        } catch {
-            do {
-                try restore(previous, at: configurationURL)
-            } catch {
-                throw AIAgentCLIProfileError.unableToRestore(configurationURL.path)
-            }
-            throw error
-        }
-    }
-
-    /// Reads only the route configuration after a profile that preserves external authentication was active.
-    public func syncBackConfiguration(profile: AgentCLIProfile) throws -> Data {
-        let (configurationURL, _) = try targetURLs(for: profile)
-        guard let configuration = try existingData(at: configurationURL), !configuration.isEmpty else {
-            throw AIAgentCLIProfileError.emptyConfiguration
-        }
-        return configuration
-    }
-
     private func existingData(at url: URL) throws -> Data? {
         let manager = FileManager.default
         guard manager.fileExists(atPath: url.path) else { return nil }
@@ -689,15 +660,17 @@ public struct AIAgentCLIProfileService: Sendable {
 }
 
 public enum AIAgentCLIRelayError: LocalizedError, Sendable {
+    case unsupportedRelay(AgentCLIKind)
     case unavailable(AgentCLIKind)
     case failed(String)
     case emptyResponse
 
     public var errorDescription: String? {
         switch self {
+        case let .unsupportedRelay(kind): "\(kind.displayName) 暂不支持语音整理"
         case let .unavailable(kind): "未找到 \(kind.displayName) CLI"
-        case let .failed(detail): "Agent CLI 执行失败：\(detail)"
-        case .emptyResponse: "Agent CLI 没有返回消息"
+        case let .failed(detail): "CLI 执行失败：\(detail)"
+        case .emptyResponse: "CLI 没有返回内容"
         }
     }
 }
@@ -718,7 +691,7 @@ public struct AIAgentCLIService: Sendable {
 
     public func statuses() async -> [AgentCLIStatus] {
         var results: [AgentCLIStatus] = []
-        for kind in AgentCLIKind.allCases {
+        for kind in AgentCLIKind.detectableCases {
             results.append(await status(for: kind))
         }
         return results
@@ -755,25 +728,38 @@ public struct AIAgentCLIService: Sendable {
                 environment: commandEnvironment,
                 timeout: 15
             )
-            guard output.status == 0,
-                  let check = try? JSONDecoder().decode(GrokUpdateCheck.self, from: output.standardOutput),
-                  check.error == nil
-            else { return .unknown }
-            guard check.updateAvailable else { return .upToDate }
-            return .updateAvailable(AIAgentCLIUpdate(
+            if output.status == 0,
+               let check = try? JSONDecoder().decode(GrokUpdateCheck.self, from: output.standardOutput),
+               check.error == nil {
+                guard check.updateAvailable else { return .upToDate }
+                return .updateAvailable(AIAgentCLIUpdate(
+                    kind: .grok,
+                    installedVersion: check.currentVersion,
+                    latestVersion: check.latestVersion
+                ))
+            }
+        } catch {}
+
+        guard let installedVersion = await currentVersion(of: .grok, at: grok),
+              let latestVersion = cachedGrokLatestVersion(),
+              let installed = semanticVersion(in: installedVersion),
+              let latest = semanticVersion(in: latestVersion)
+        else { return .unknown }
+        return latest > installed
+            ? .updateAvailable(AIAgentCLIUpdate(
                 kind: .grok,
-                installedVersion: check.currentVersion,
-                latestVersion: check.latestVersion
+                installedVersion: installedVersion,
+                latestVersion: latestVersion
             ))
-        } catch {
-            return .unknown
-        }
+            : .upToDate
     }
 
     public func homebrewUpdates(for statuses: [AgentCLIStatus]) async -> [AIAgentCLIUpdate] {
         guard let brew = executable(named: AgentSkillPackageManager.brew.executableName) else { return [] }
         let candidates = statuses.compactMap { status -> (AgentCLIStatus, AgentSkillPackageInstallation)? in
-            guard let executablePath = status.executablePath,
+            guard status.kind != .kimi,
+                  AgentCLIKind.managedCases.contains(status.kind),
+                  let executablePath = status.executablePath,
                   let installation = AgentSkillPackageInstallation.detect(at: URL(fileURLWithPath: executablePath)),
                   installation.manager == .brew,
                   status.version != nil
@@ -812,13 +798,13 @@ public struct AIAgentCLIService: Sendable {
             )
             guard output.status == 0,
                   let outdated = try? JSONDecoder().decode(HomebrewOutdatedPackages.self, from: output.standardOutput),
-                  let formula = outdated.formulae.first(where: { $0.name == installation.packageName }),
+                  let package = outdated.packages.first(where: { $0.packageName == installation.packageName }),
                   let installedVersion = status.version
             else { return nil }
             return AIAgentCLIUpdate(
                 kind: status.kind,
                 installedVersion: installedVersion,
-                latestVersion: formula.currentVersion
+                latestVersion: package.currentVersion
             )
         } catch {
             return nil
@@ -849,7 +835,30 @@ public struct AIAgentCLIService: Sendable {
         return stderr.isEmpty ? nil : stderr
     }
 
-    /// Returns an npm command for later confirmation without modifying the system.
+    private func currentVersion(of kind: AgentCLIKind, at executableURL: URL) async -> String? {
+        guard let output = try? await AIAgentProcessRunner.run(
+            executableURL: executableURL,
+            arguments: ["--version"],
+            environment: commandEnvironment,
+            timeout: 8
+        ), output.status == 0 else { return nil }
+        return version(in: output)
+    }
+
+    private func cachedGrokLatestVersion() -> String? {
+        let cache = homeDirectory.appendingPathComponent(".grok/version.json")
+        guard let data = try? Data(contentsOf: cache) else { return nil }
+        return try? JSONDecoder().decode(GrokVersionCache.self, from: data).version
+    }
+
+    private func semanticVersion(in rawValue: String) -> SemanticVersion? {
+        let candidates = rawValue.split { character in
+            !(character.isNumber || character == "." || character == "-" || character == "+" || character == "v")
+        }
+        return candidates.compactMap { try? SemanticVersion(String($0)) }.first
+    }
+
+    /// Returns an installation command for later confirmation without modifying the system.
     public func installationCommand(for kind: AgentCLIKind, update: Bool) -> AIAgentCLICommand? {
         installationCommands(for: [kind], update: update).first
     }
@@ -860,22 +869,47 @@ public struct AIAgentCLIService: Sendable {
         if update {
             return updateCommands(for: requested)
         }
-        let packages = AgentCLIKind.allCases.compactMap { kind -> String? in
+        let packages = AgentCLIKind.managedCases.compactMap { kind -> String? in
             guard requested.contains(kind), let package = npmPackage(for: kind) else { return nil }
             return package
         }
         var commands: [AIAgentCLICommand] = []
-        if !packages.isEmpty, let npm = executable(named: "npm") {
-            commands.append(AIAgentCLICommand(
-                executableURL: npm,
-                arguments: ["install", "--global"] + packages
-            ))
+        if !packages.isEmpty {
+            if let npm = executable(named: "npm") {
+                commands.append(AIAgentCLICommand(
+                    executableURL: npm,
+                    arguments: ["install", "--global"] + packages
+                ))
+            } else {
+                for kind in requested.sorted(by: Self.cliKindOrder) {
+                    guard let script = standaloneInstallScript(for: kind) else { continue }
+                    commands.append(AIAgentCLICommand(
+                        executableURL: URL(fileURLWithPath: "/bin/bash"),
+                        arguments: ["-c", script]
+                    ))
+                }
+            }
         }
         if requested.contains(.grok) {
             commands.append(AIAgentCLICommand(
                 executableURL: URL(fileURLWithPath: "/bin/bash"),
                 arguments: ["-c", "curl -fsSL https://x.ai/cli/install.sh | bash"]
             ))
+        }
+        if requested.contains(.kimi) {
+            commands.append(AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/bash"),
+                arguments: ["-c", "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"]
+            ))
+        }
+        if requested.contains(.qwen), !packages.contains("@qwen-code/qwen-code"), let script = standaloneInstallScript(for: .qwen) {
+            commands.append(AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/bash"), arguments: ["-c", script]))
+        }
+        if requested.contains(.qoder), !packages.contains("@qoder-ai/qodercli"), let script = standaloneInstallScript(for: .qoder) {
+            commands.append(AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/bash"), arguments: ["-c", script]))
+        }
+        if requested.contains(.copilot), !packages.contains("@github/copilot"), let script = standaloneInstallScript(for: .copilot) {
+            commands.append(AIAgentCLICommand(executableURL: URL(fileURLWithPath: "/bin/bash"), arguments: ["-c", script]))
         }
         return commands
     }
@@ -885,8 +919,10 @@ public struct AIAgentCLIService: Sendable {
         var managedKinds = Set<AgentCLIKind>()
 
         for manager in [AgentSkillPackageManager.npm, .pnpm, .yarn, .bun, .brew] {
-            let packages = AgentCLIKind.allCases.compactMap { kind -> String? in
-                guard requested.contains(kind),
+            let packages = AgentCLIKind.managedCases.compactMap { kind -> String? in
+                guard kind != .kimi,
+                      kind != .grok,
+                      requested.contains(kind),
                       let executableURL = executableURL(for: kind),
                       let installation = AgentSkillPackageInstallation.detect(at: executableURL),
                       installation.manager == manager
@@ -904,8 +940,14 @@ public struct AIAgentCLIService: Sendable {
             ))
         }
 
-        let fallbackPackages = AgentCLIKind.allCases.compactMap { kind -> String? in
-            guard requested.contains(kind), !managedKinds.contains(kind), let package = npmPackage(for: kind) else {
+        let fallbackPackages = AgentCLIKind.managedCases.compactMap { kind -> String? in
+            guard kind != .qwen,
+                  kind != .qoder,
+                  kind != .copilot,
+                  requested.contains(kind),
+                  !managedKinds.contains(kind),
+                  let package = npmPackage(for: kind)
+            else {
                 return nil
             }
             return "\(package)@latest"
@@ -923,6 +965,22 @@ public struct AIAgentCLIService: Sendable {
                 arguments: ["update"],
                 timeout: Self.updateCommandTimeout
             ))
+        }
+        if requested.contains(.kimi), let kimi = executableURL(for: .kimi) {
+            commands.append(AIAgentCLICommand(
+                executableURL: kimi,
+                arguments: ["upgrade"],
+                timeout: Self.updateCommandTimeout
+            ))
+        }
+        for kind in [AgentCLIKind.qwen, .qoder, .copilot] where requested.contains(kind) && !managedKinds.contains(kind) {
+            if let executable = executableURL(for: kind) {
+                commands.append(AIAgentCLICommand(
+                    executableURL: executable,
+                    arguments: ["update"],
+                    timeout: Self.updateCommandTimeout
+                ))
+            }
         }
         return commands
     }
@@ -944,19 +1002,43 @@ public struct AIAgentCLIService: Sendable {
         uninstallationCommands(for: [kind]).first
     }
 
-    /// Removes only the CLI executable for Grok, retaining its account and local configuration data.
+    /// Removes only trusted standalone CLI executables, retaining account and local configuration data.
     public func uninstallationCommands(for kinds: [AgentCLIKind]) -> [AIAgentCLICommand] {
         let requested = Set(kinds)
-        let packages = AgentCLIKind.allCases.compactMap { kind -> String? in
-            guard requested.contains(kind) else { return nil }
-            return npmPackage(for: kind)
-        }
         var commands: [AIAgentCLICommand] = []
-        if !packages.isEmpty, let npm = executable(named: "npm") {
-            commands.append(AIAgentCLICommand(
-                executableURL: npm,
-                arguments: ["uninstall", "--global"] + packages
-            ))
+        var managedKinds = Set<AgentCLIKind>()
+        for manager in [AgentSkillPackageManager.npm, .pnpm, .yarn, .bun, .brew] {
+            var packages = AgentCLIKind.managedCases.compactMap { kind -> String? in
+                guard requested.contains(kind),
+                      let executableURL = executableURL(for: kind),
+                      let installation = AgentSkillPackageInstallation.detect(at: executableURL),
+                      installation.manager == manager
+                else { return nil }
+                managedKinds.insert(kind)
+                return installation.packageName
+            }
+            if manager == .npm {
+                let legacyPackages = [AgentCLIKind.claude, .codex, .gemini, .opencode].compactMap { kind -> String? in
+                    guard requested.contains(kind), !managedKinds.contains(kind) else { return nil }
+                    return npmPackage(for: kind)
+                }
+                packages.append(contentsOf: legacyPackages)
+            }
+            guard !packages.isEmpty,
+                  let managerExecutable = executable(named: manager.executableName)
+            else { continue }
+            let arguments: [String]
+            switch manager {
+            case .npm:
+                arguments = ["uninstall", "--global"] + packages
+            case .pnpm, .bun:
+                arguments = ["remove", "--global"] + packages
+            case .yarn:
+                arguments = ["global", "remove"] + packages
+            case .brew:
+                arguments = ["uninstall"] + packages
+            }
+            commands.append(AIAgentCLICommand(executableURL: managerExecutable, arguments: arguments))
         }
         if requested.contains(.grok) {
             let managedGrok = homeDirectory.appendingPathComponent(".grok/bin/grok")
@@ -967,7 +1049,59 @@ public struct AIAgentCLIService: Sendable {
                 ))
             }
         }
+        if requested.contains(.kimi), let managedKimi = managedKimiExecutable() {
+            commands.append(AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/rm"),
+                arguments: [managedKimi.path]
+            ))
+        }
+        if requested.contains(.qwen), !managedKinds.contains(.qwen), executableURL(for: .qwen) != nil {
+            commands.append(AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/bash"),
+                arguments: [
+                    "-c",
+                    "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/uninstall-qwen-standalone.sh | bash",
+                ]
+            ))
+        }
+        for kind in [AgentCLIKind.qoder, .copilot] where requested.contains(kind) && !managedKinds.contains(kind) {
+            guard let executable = executableURL(for: kind), isTrustedStandaloneExecutable(executable, for: kind) else {
+                continue
+            }
+            commands.append(AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/rm"),
+                arguments: [executable.path]
+            ))
+        }
         return commands
+    }
+
+    private func isTrustedStandaloneExecutable(_ executable: URL, for kind: AgentCLIKind) -> Bool {
+        executable.standardizedFileURL.path == homeDirectory
+            .appendingPathComponent(".local/bin", isDirectory: true)
+            .appendingPathComponent(kind.executableName)
+            .standardizedFileURL
+            .path
+    }
+
+    private func standaloneInstallScript(for kind: AgentCLIKind) -> String? {
+        switch kind {
+        case .qwen:
+            "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh | bash"
+        case .qoder:
+            "curl -fsSL https://qoder.com/install | bash"
+        case .copilot:
+            "curl -fsSL https://gh.io/copilot-install | bash"
+        default:
+            nil
+        }
+    }
+
+    private static func cliKindOrder(_ lhs: AgentCLIKind, _ rhs: AgentCLIKind) -> Bool {
+        guard let left = AgentCLIKind.allCases.firstIndex(of: lhs),
+              let right = AgentCLIKind.allCases.firstIndex(of: rhs)
+        else { return lhs.rawValue < rhs.rawValue }
+        return left < right
     }
 
     func uninstallationCommand(
@@ -991,38 +1125,29 @@ public struct AIAgentCLIService: Sendable {
         )
     }
 
-    /// Passes unified history as plain text to a local CLI without calling model HTTP APIs from this app.
+    /// Runs one bounded, read-only completion for voice transcript cleanup.
     public func relay(
-        messages: [AgentChatMessage],
-        project: AgentChatProject? = nil,
-        accessMode: AgentChatAccessMode = .autoReview,
+        messages: [AIOutboundMessage],
         model: String? = nil,
-        thinkingDepth: AgentChatThinkingDepth = .high,
         to kind: AgentCLIKind
     ) async throws -> String {
+        guard AgentCLIKind.relayCases.contains(kind) else {
+            throw AIAgentCLIRelayError.unsupportedRelay(kind)
+        }
         guard let executableURL = executableURL(for: kind) else {
             throw AIAgentCLIRelayError.unavailable(kind)
         }
-        let prompt = relayPrompt(
-            messages,
-            project: project,
-            accessMode: accessMode,
-            model: model,
-            thinkingDepth: thinkingDepth
-        )
+        let prompt = relayPrompt(messages)
         let output = try await AIAgentProcessRunner.run(
             executableURL: executableURL,
-            arguments: relayArguments(for: kind, prompt: prompt),
+            arguments: relayArguments(for: kind, model: model),
             standardInput: Data(prompt.utf8),
             environment: commandEnvironment,
-            workingDirectoryURL: relayWorkingDirectory(for: project),
+            workingDirectoryURL: homeDirectory,
             timeout: 300
         )
         guard output.status == 0 else {
-            let detail = output.standardError.isEmpty
-                ? String(decoding: output.standardOutput, as: UTF8.self)
-                : output.standardError
-            throw AIAgentCLIRelayError.failed(String(detail.prefix(500)))
+            throw AIAgentCLIRelayError.failed("退出状态 \(output.status)")
         }
         let response = String(decoding: output.standardOutput, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1030,37 +1155,96 @@ public struct AIAgentCLIService: Sendable {
         return response
     }
 
-    func relayWorkingDirectory(for project: AgentChatProject?) -> URL {
-        guard let path = project?.directoryPath.trimmingCharacters(in: .whitespacesAndNewlines),
-              !path.isEmpty
-        else {
-            return FileManager.default.homeDirectoryForCurrentUser
-        }
+    public func relayArguments(for kind: AgentCLIKind, model: String? = nil) -> [String] {
+        var arguments: [String] = []
+        let model = model?.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue else {
-            return FileManager.default.homeDirectoryForCurrentUser
-        }
-        return URL(fileURLWithPath: path, isDirectory: true)
-    }
-
-    public func relayArguments(for kind: AgentCLIKind, prompt: String) -> [String] {
         switch kind {
         case .claude:
-            ["-p"]
+            arguments.append("-p")
+            appendModel(model, to: &arguments)
+            arguments.append(contentsOf: ["--effort", "medium", "--permission-mode", "plan"])
         case .codex:
-            ["exec", "--skip-git-repo-check", "-"]
+            arguments.append(contentsOf: ["exec", "--skip-git-repo-check"])
+            appendModel(model, to: &arguments)
+            arguments.append(contentsOf: [
+                "--config",
+                "model_reasoning_effort=\"medium\"",
+                "--sandbox",
+                "read-only",
+                "-",
+            ])
         case .gemini:
-            ["-p", "-"]
+            arguments.append("-p")
+            appendModel(model, to: &arguments)
+            arguments.append(contentsOf: ["--approval-mode", "plan", "-"])
         case .grok:
-            ["--prompt-file", "-"]
+            appendModel(model, to: &arguments)
+            arguments.append(contentsOf: [
+                "--reasoning-effort",
+                "medium",
+                "--permission-mode",
+                "plan",
+                "--prompt-file",
+                "-",
+            ])
         case .opencode:
-            ["run", "-"]
+            arguments.append("run")
+            appendModel(model, to: &arguments)
+            arguments.append("-")
+        case .kimi, .qwen, .qoder, .copilot, .glm:
+            return []
         }
+
+        return arguments
+    }
+
+    func relayPrompt(_ messages: [AIOutboundMessage]) -> String {
+        let serialized = messages.suffix(32).map { message in
+            let role = switch message.role {
+            case .system: "系统"
+            case .user: "用户"
+            case .assistant: "助手"
+            case .tool: "工具"
+            }
+            return "[\(role)]\n\(message.content)"
+        }
+        var remainingCharacters = 96_000
+        var bounded: [String] = []
+        for message in serialized.reversed() where remainingCharacters > 0 {
+            let content = String(message.prefix(remainingCharacters))
+            bounded.append(content)
+            remainingCharacters -= content.count
+        }
+        return bounded.reversed().joined(separator: "\n\n")
+    }
+
+    private func appendModel(_ model: String?, to arguments: inout [String]) {
+        guard let model, !model.isEmpty else { return }
+        arguments.append(contentsOf: ["--model", model])
     }
 
     func executableURL(for kind: AgentCLIKind) -> URL? {
-        executable(named: kind.executableName)
+        if kind == .kimi {
+            if let executable = kimiExecutableURL(resolveSymlinks: true) { return executable }
+        }
+        return executable(named: kind.executableName)
+    }
+
+    private func managedKimiExecutable() -> URL? {
+        kimiExecutableURL(resolveSymlinks: false)
+    }
+
+    private func kimiExecutableURL(resolveSymlinks: Bool) -> URL? {
+        let fileManager = FileManager.default
+        guard let executable = Self.kimiInstallationRoots(
+            environment: environment,
+            homeDirectory: homeDirectory
+        )
+        .map({ $0.appendingPathComponent("bin/kimi").standardizedFileURL })
+        .first(where: { fileManager.isExecutableFile(atPath: $0.path) })
+        else { return nil }
+        return resolveSymlinks ? executable.resolvingSymlinksInPath().standardizedFileURL : executable
     }
 
     private func npmPackage(for kind: AgentCLIKind) -> String? {
@@ -1102,6 +1286,10 @@ public struct AIAgentCLIService: Sendable {
             URL(fileURLWithPath: $0, isDirectory: true)
                 .appendingPathComponent("bin", isDirectory: true)
         }
+        let kimiDirectories = kimiInstallationRoots(
+            environment: environment,
+            homeDirectory: homeDirectory
+        ).map { $0.appendingPathComponent("bin", isDirectory: true) }
         let nvmDirectories = versionDirectories(
             in: homeDirectory.appendingPathComponent(".nvm/versions/node", isDirectory: true)
         ).map { $0.appendingPathComponent("bin", isDirectory: true) }
@@ -1122,9 +1310,27 @@ public struct AIAgentCLIService: Sendable {
             URL(fileURLWithPath: "/usr/local/bin", isDirectory: true),
         ]
         let candidates = pathDirectories + (configuredPrefix.map { [$0] } ?? [])
-            + defaults + fnmDirectories + nvmDirectories
+            + kimiDirectories + defaults + fnmDirectories + nvmDirectories
         var seen = Set<String>()
         return candidates.filter { seen.insert($0.standardizedFileURL.path).inserted }
+    }
+
+    private static func kimiInstallationRoots(
+        environment: [String: String],
+        homeDirectory: URL
+    ) -> [URL] {
+        let configured = [environment["KIMI_INSTALL_DIR"]].compactMap { value -> URL? in
+            guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+                return nil
+            }
+            let path = value == "~"
+                ? homeDirectory.path
+                : value.replacingOccurrences(of: "~/", with: "\(homeDirectory.path)/", options: .anchored)
+            return URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        }
+        let defaults = [homeDirectory.appendingPathComponent(".kimi-code", isDirectory: true)]
+        var seen = Set<String>()
+        return (configured + defaults).filter { seen.insert($0.path).inserted }
     }
 
     private static func versionDirectories(in root: URL) -> [URL] {
@@ -1138,83 +1344,6 @@ public struct AIAgentCLIService: Sendable {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedDescending }
     }
 
-    func relayPrompt(
-        _ messages: [AgentChatMessage],
-        project: AgentChatProject? = nil,
-        accessMode: AgentChatAccessMode = .autoReview,
-        model: String? = nil,
-        thinkingDepth: AgentChatThinkingDepth = .high
-    ) -> String {
-        let retainedMessages = Array(messages.suffix(32))
-        let history = retainedMessages.enumerated().map { index, message in
-            let role: String
-            switch message.role {
-            case .system: role = "系统"
-            case .user: role = "用户"
-            case .assistant: role = "Agent"
-            }
-            var sections = ["[\(role)]\n\(message.content)"]
-            if message.mode == .plan {
-                sections.append("[计划模式]\n请给出可执行计划、当前进展和下一步。")
-            }
-            // 计划模式与目标模式互相独立，目标存在时都要单独声明当前会话的 Prompt。
-            if let goal = message.goalTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !goal.isEmpty {
-                sections.append("[目标模式]\n当前会话目标：\(goal)\n请围绕该目标推进，不要偏离。")
-            }
-            let attachments = message.attachments.compactMap { attachment -> String? in
-                guard attachment.state != .deleted,
-                      !attachment.storagePath.isEmpty else { return nil }
-                let path = AppPaths.aiAgentAttachments
-                    .appendingPathComponent(attachment.storagePath, isDirectory: false)
-                    .path
-                return "- \(attachment.kind.displayName)：\(attachment.fileName)（\(attachment.mimeType)，\(path)）"
-            }
-            if !attachments.isEmpty {
-                sections.append("[附件]\n\(attachments.joined(separator: "\n"))\n可在本机路径读取附件；不要假设附件内容已写入本条文本。")
-            }
-            let apps = message.appReferences.map { app in
-                "- \(app.name)（\(app.bundleIdentifier)，PID \(app.processIdentifier)）"
-            }
-            if !apps.isEmpty {
-                sections.append("[@本机 App]\n\(apps.joined(separator: "\n"))\n这些应用正在用户本机运行；仅在本机环境允许时读取它们的公开上下文。")
-            }
-            let skills = index == retainedMessages.count - 1 ? message.skillReferences.compactMap { skill -> String? in
-                let name = skill.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                let path = skill.path.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !name.isEmpty, !path.isEmpty else { return nil }
-                return "- \(name)：\(path)"
-            } : []
-            if !skills.isEmpty {
-                sections.append("[调用 Skills]\n\(skills.joined(separator: "\n"))\n这是用户显式选择的 Skill。仅当本机可读取对应路径时加载其 SKILL.md；不要假设本应用执行了该 Skill。")
-            }
-            for reference in message.contextReferences {
-                let context = reference.messages.map { contextMessage in
-                    let contextRole: String
-                    switch contextMessage.role {
-                    case .system: contextRole = "系统"
-                    case .user: contextRole = "用户"
-                    case .assistant: contextRole = "Agent"
-                    }
-                    return "[\(contextRole)] \(contextMessage.content)"
-                }.joined(separator: "\n")
-                sections.append("[@会话：\(reference.title)]\n\(context)")
-            }
-            return sections.joined(separator: "\n\n")
-        }.joined(separator: "\n\n")
-        let projectContext: String
-        if let project {
-            let instructions = project.instructions.isEmpty ? "" : "\n项目说明：\(project.instructions)"
-            projectContext = "[项目：\(project.name)]\(instructions)\n请将项目说明作为本项目所有会话的共享上下文。"
-        } else {
-            projectContext = ""
-        }
-        let selectedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let modelPreference = selectedModel?.isEmpty == false ? "\n模型：\(selectedModel!)" : ""
-        let relayPreferences = "[转发偏好]\n访问模式：\(accessMode.displayName)\(modelPreference)\n思考深度：\(thinkingDepth.displayName)\n请在外部 CLI 自身允许的权限范围内遵守这些偏好。"
-        let sections = [relayPreferences, projectContext, history].filter { !$0.isEmpty }.joined(separator: "\n\n")
-        return "以下是从统一聊天历史转发的消息。请直接回复最后一条用户消息；不要声称此应用本身是 Agent。\n\n\(sections)"
-    }
 }
 
 public struct AIAgentProcessOutput: Sendable {
@@ -1236,13 +1365,24 @@ private struct GrokUpdateCheck: Decodable {
     let error: String?
 }
 
+private struct GrokVersionCache: Decodable {
+    let version: String
+}
+
 private struct HomebrewOutdatedPackages: Decodable {
     let formulae: [HomebrewOutdatedFormula]
+    let casks: [HomebrewOutdatedFormula]
+
+    var packages: [HomebrewOutdatedFormula] { formulae + casks }
 }
 
 private struct HomebrewOutdatedFormula: Decodable {
     let name: String
     let currentVersion: String
+
+    var packageName: String {
+        name.split(separator: "/").last.map(String.init) ?? name
+    }
 
     private enum CodingKeys: String, CodingKey {
         case name
@@ -1255,6 +1395,7 @@ private final class AIAgentProcessCapture: @unchecked Sendable {
     private var output = Data()
     private var error = Data()
     private var didTimeout = false
+    private var cancelled = false
 
     func setOutput(_ data: Data) {
         lock.lock()
@@ -1274,10 +1415,35 @@ private final class AIAgentProcessCapture: @unchecked Sendable {
         lock.unlock()
     }
 
+    func markCancelled() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+
+    func wasCancelled() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+
     func values() -> (Data, Data, Bool) {
         lock.lock()
         defer { lock.unlock() }
         return (output, error, didTimeout)
+    }
+}
+
+private final class AIAgentProcessResumeGuard: @unchecked Sendable {
+    private let lock = NSLock()
+    private var resumed = false
+
+    func resume(_ block: () -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !resumed else { return }
+        resumed = true
+        block()
     }
 }
 
@@ -1290,63 +1456,95 @@ public enum AIAgentProcessRunner {
         workingDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser,
         timeout: TimeInterval = 15
     ) async throws -> AIAgentProcessOutput {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                let output = Pipe()
-                let error = Pipe()
-                let input = Pipe()
-                process.executableURL = executableURL
-                process.arguments = arguments
-                process.environment = environment
-                process.currentDirectoryURL = workingDirectoryURL
-                process.standardOutput = output
-                process.standardError = error
-                if standardInput != nil { process.standardInput = input }
-                do {
-                    try process.run()
-                    let capture = AIAgentProcessCapture()
-                    let readers = DispatchGroup()
-                    readers.enter()
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        capture.setOutput(output.fileHandleForReading.readDataToEndOfFile())
-                        readers.leave()
-                    }
-                    readers.enter()
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        capture.setError(error.fileHandleForReading.readDataToEndOfFile())
-                        readers.leave()
-                    }
-                    if let standardInput {
+        let process = Process()
+        let output = Pipe()
+        let error = Pipe()
+        let input = Pipe()
+        let capture = AIAgentProcessCapture()
+        process.executableURL = executableURL
+        process.arguments = arguments
+        process.environment = environment
+        process.currentDirectoryURL = workingDirectoryURL
+        process.standardOutput = output
+        process.standardError = error
+        if standardInput != nil {
+            process.standardInput = input
+            _ = fcntl(input.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
+        }
+
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                let resumed = AIAgentProcessResumeGuard()
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        guard !capture.wasCancelled() else { throw CancellationError() }
+                        try process.run()
+                        if capture.wasCancelled() {
+                            terminate(process, escalationDelay: 0.5)
+                        }
+                        let readers = DispatchGroup()
+                        readers.enter()
                         DispatchQueue.global(qos: .userInitiated).async {
-                            input.fileHandleForWriting.write(standardInput)
-                            try? input.fileHandleForWriting.close()
+                            capture.setOutput(output.fileHandleForReading.readDataToEndOfFile())
+                            readers.leave()
+                        }
+                        readers.enter()
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            capture.setError(error.fileHandleForReading.readDataToEndOfFile())
+                            readers.leave()
+                        }
+                        if let standardInput {
+                            DispatchQueue.global(qos: .userInitiated).async {
+                                try? input.fileHandleForWriting.write(contentsOf: standardInput)
+                                try? input.fileHandleForWriting.close()
+                            }
+                        }
+                        let timeoutWork = DispatchWorkItem {
+                            guard process.isRunning else { return }
+                            capture.markTimedOut()
+                            process.terminate()
+                            DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
+                                if process.isRunning { Darwin.kill(process.processIdentifier, SIGKILL) }
+                            }
+                        }
+                        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
+                        process.waitUntilExit()
+                        timeoutWork.cancel()
+                        readers.wait()
+
+                        resumed.resume {
+                            if capture.wasCancelled() {
+                                continuation.resume(throwing: CancellationError())
+                            } else {
+                                let (standardOutput, standardErrorData, didTimeout) = capture.values()
+                                let standardError = String(decoding: standardErrorData, as: UTF8.self)
+                                continuation.resume(returning: AIAgentProcessOutput(
+                                    status: process.terminationStatus,
+                                    standardOutput: standardOutput,
+                                    standardError: standardError.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    didTimeout: didTimeout
+                                ))
+                            }
+                        }
+                    } catch {
+                        resumed.resume {
+                            continuation.resume(throwing: capture.wasCancelled() ? CancellationError() : error)
                         }
                     }
-                    let timeoutWork = DispatchWorkItem {
-                        guard process.isRunning else { return }
-                        capture.markTimedOut()
-                        process.terminate()
-                        DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
-                            if process.isRunning { Darwin.kill(process.processIdentifier, SIGKILL) }
-                        }
-                    }
-                    DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
-                    process.waitUntilExit()
-                    timeoutWork.cancel()
-                    readers.wait()
-                    let (standardOutput, standardErrorData, didTimeout) = capture.values()
-                    let standardError = String(decoding: standardErrorData, as: UTF8.self)
-                    continuation.resume(returning: AIAgentProcessOutput(
-                        status: process.terminationStatus,
-                        standardOutput: standardOutput,
-                        standardError: standardError.trimmingCharacters(in: .whitespacesAndNewlines),
-                        didTimeout: didTimeout
-                    ))
-                } catch {
-                    continuation.resume(throwing: error)
                 }
             }
+        } onCancel: {
+            capture.markCancelled()
+            terminate(process, escalationDelay: 0.5)
+        }
+    }
+
+    private static func terminate(_ process: Process, escalationDelay: TimeInterval) {
+        guard process.isRunning else { return }
+        process.terminate()
+        DispatchQueue.global().asyncAfter(deadline: .now() + escalationDelay) {
+            if process.isRunning { Darwin.kill(process.processIdentifier, SIGKILL) }
         }
     }
 }

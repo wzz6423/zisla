@@ -90,7 +90,7 @@ struct CodexSessionActivityDetectorTests {
 
         let task = try #require(detector.activeTasks().first)
         #expect(task.status == .error)
-        #expect(task.failureReason == "failed")
+        #expect(task.failureReason == "工具执行失败")
 
         try appendLine(
             try responseItemLine(
@@ -152,6 +152,81 @@ struct CodexSessionActivityDetectorTests {
         #expect(task.sessionURL?.absoluteString == "codex://threads/session-123")
         #expect(task.effort == "xhigh")
         #expect(task.startedAt == iso8601Date("2026-07-19T01:00:01.000Z"))
+    }
+
+    @Test
+    func mapsOpenRolloutProcessIdentifierToTask() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-pid.jsonl"
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                sessionMetadataLine(sessionID: "session-pid"),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-pid"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_000_126)
+        )
+        let rolloutURL = root.appendingPathComponent(relativePath).standardizedFileURL
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { urls in
+                #expect(urls.contains(rolloutURL))
+                return [rolloutURL: 2468]
+            }
+        )
+
+        let task = try #require(detector.activeTasks().first)
+
+        #expect(task.processIdentifier == 2468)
+    }
+
+    @Test
+    func parsesLsofFieldOutputForRequestedRollouts() {
+        let first = URL(fileURLWithPath: "/tmp/codex/first.jsonl").standardizedFileURL
+        let second = URL(fileURLWithPath: "/tmp/codex/second.jsonl").standardizedFileURL
+        let output = Data("p2468\nf12\nn\(first.path)\np9753\nf19\nn/other.jsonl\n".utf8)
+
+        let result = CodexSessionActivityDetector.parseOpenFileProcessIdentifiers(
+            output,
+            matching: [first, second]
+        )
+
+        #expect(result == [first: 2468])
+    }
+
+    @Test
+    func resolvesCurrentProcessForActuallyOpenRollout() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let rolloutURL = root.appendingPathComponent("open-rollout.jsonl").standardizedFileURL
+        try Data().write(to: rolloutURL)
+        let handle = try FileHandle(forWritingTo: rolloutURL)
+        defer { try? handle.close() }
+
+        let result = CodexSessionActivityDetector.defaultProcessIdentifiersForOpenFiles([rolloutURL])
+
+        #expect(result[rolloutURL] == ProcessInfo.processInfo.processIdentifier)
+    }
+
+    @Test
+    func openFileLookupStopsAtItsDeadline() {
+        let startedAt = Date()
+
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sleep"),
+            arguments: ["1"],
+            timeout: 0.05
+        )
+
+        #expect(output == nil)
+        #expect(Date().timeIntervalSince(startedAt) < 0.75)
     }
 
     @Test
@@ -639,7 +714,7 @@ struct CodexSessionActivityDetectorTests {
     }
 
     @Test
-    func extractsAndTruncatesFailureReasonFromToolOutput() throws {
+    func doesNotExposeLongFailureOutput() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let longMessage = String(repeating: "error ", count: 50)
@@ -666,13 +741,12 @@ struct CodexSessionActivityDetectorTests {
 
         let task = try #require(CodexSessionActivityDetector(sessionsDirectory: root).activeTasks().first)
         #expect(task.status == .error)
-        #expect(task.failureReason != nil)
-        #expect((task.failureReason?.count ?? 0) <= 201)
-        #expect(task.failureReason?.hasSuffix("…") == true)
+        #expect(task.failureReason == "工具执行失败")
+        #expect(task.failureReason?.contains(longMessage) == false)
     }
 
     @Test
-    func normalizesWhitespaceInFailureReason() throws {
+    func doesNotExposeWhitespaceNormalizedFailureOutput() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         try writeRollout(
@@ -698,7 +772,8 @@ struct CodexSessionActivityDetectorTests {
 
         let task = try #require(CodexSessionActivityDetector(sessionsDirectory: root).activeTasks().first)
         #expect(task.status == .error)
-        #expect(task.failureReason == "build failed due to syntax error")
+        #expect(task.failureReason == "工具执行失败")
+        #expect(task.failureReason?.contains("syntax error") == false)
     }
 
 

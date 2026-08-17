@@ -11,7 +11,7 @@ zislactl — 向灵动岛推送 AI 进度、用量与通知
 
 用法：
   update  --id <id> --provider <claude|codex|gemini|grok|gpt|copilot|qwen|coder> --title <标题>
-          [--progress <0-100>] [--detail <文本>]
+          [--progress <0-100>] [--detail <文本>] [--pid <进程 PID>]
           [--status <running|queued|blocked|error>] [--queued]
   finish  --id <id> [--failed] [--detail <文本>]
   remove  --id <id>

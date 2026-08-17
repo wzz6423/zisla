@@ -97,6 +97,7 @@ public final class AlarmService: ObservableObject {
     private let notificationCenter: UNUserNotificationCenter
     private let notificationRequestHandler: (UNNotificationRequest) -> Void
     private let cancelHandler: ([String]) -> Void
+    private var schedulingEnabled = true
     /// Alarm notifications are always delivered regardless of Do Not Disturb — a time explicitly set by the user must not be silenced.
     private var authorizationPromptHost: NSWindow?
 
@@ -145,8 +146,10 @@ public final class AlarmService: ObservableObject {
         alarms.append(alarm)
         sortAlarms()
         persist()
-        requestAuthorizationIfNeeded()
-        schedule(alarm)
+        if schedulingEnabled {
+            requestAuthorizationIfNeeded()
+            schedule(alarm)
+        }
         return alarm
     }
 
@@ -177,9 +180,19 @@ public final class AlarmService: ObservableObject {
     /// Re-registers all alarm notifications; called on app launch to keep pending system notifications in sync with local data.
     public func rescheduleAll() {
         cancelNotifications(for: alarms)
-        guard !enabledAlarms.isEmpty else { return }
+        guard schedulingEnabled, !enabledAlarms.isEmpty else { return }
         requestAuthorizationIfNeeded()
         for alarm in enabledAlarms { schedule(alarm) }
+    }
+
+    public func suspend() {
+        schedulingEnabled = false
+        cancelNotifications(for: alarms)
+    }
+
+    public func resume() {
+        schedulingEnabled = true
+        rescheduleAll()
     }
 
     public func openSystemClock() {
@@ -200,7 +213,7 @@ public final class AlarmService: ObservableObject {
     }
 
     private func schedule(_ alarm: AlarmItem) {
-        guard alarm.isEnabled else { return }
+        guard schedulingEnabled, alarm.isEnabled else { return }
         let content = UNMutableNotificationContent()
         content.title = alarm.label.isEmpty ? "闹钟" : alarm.label
         content.body = "\(alarm.timeText) · \(alarm.repeatText)"

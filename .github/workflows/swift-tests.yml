@@ -22,15 +22,113 @@ jobs:
   test:
     name: Swift Tests
     runs-on: macos-26
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: mac
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
       - run: swift --version
+      - name: Check shell script syntax
+        run: |
+          for script in Scripts/*.sh; do
+            case "$(head -n 1 "$script")" in
+              "#!/bin/zsh") zsh -n "$script" ;;
+              "#!/usr/bin/env bash") bash -n "$script" ;;
+              *) echo "Unsupported shell in $script" >&2; exit 1 ;;
+            esac
+          done
+      - name: Run shell script tests
+        run: |
+          for test_script in Tests/ScriptTests/*.zsh; do
+            zsh "$test_script"
+          done
       - run: swift test
       - name: Remove test artifacts
+        if: always()
+        run: rm -rf .build
+
+  zislactl:
+    name: Build zislactl (Release)
+    runs-on: macos-26
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mac
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build zislactl in Release mode
+        run: swift build -c release --product zislactl
+      - name: Verify zislactl binary
+        run: |
+          BIN_PATH="$(swift build -c release --show-bin-path)"
+          test -x "$BIN_PATH/zislactl"
+          HOME="${{ runner.temp }}/zislactl-home" "$BIN_PATH/zislactl" --help
+      - name: Remove build artifacts
+        if: always()
+        run: rm -rf .build "${{ runner.temp }}/zislactl-home"
+
+  app-smoke:
+    name: App Build Smoke Test
+    runs-on: macos-26
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mac
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build ad-hoc signed app (single architecture)
+        env:
+          VERSION: "0.1.0"
+          BUILD_NUMBER: "1"
+          UPDATE_CHANNEL: "preview"
+          OUTPUT_DIRECTORY: ${{ runner.temp }}/zisla-app
+          CODE_SIGN_IDENTITY: "-"
+          SPARKLE_PUBLIC_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        run: BUILD_ARCHITECTURES="$(uname -m)" ./Scripts/build-app.sh
+      - name: Verify app bundle structure
+        run: |
+          APP_PATH="${{ runner.temp }}/zisla-app/zisla.app"
+          test -d "$APP_PATH" || { echo "zisla.app not found"; exit 1; }
+          test -f "$APP_PATH/Contents/MacOS/zisla" || { echo "zisla binary not found"; exit 1; }
+          test -x "$APP_PATH/Contents/MacOS/zisla" || { echo "zisla binary not executable"; exit 1; }
+          test -f "$APP_PATH/Contents/Info.plist" || { echo "Info.plist not found"; exit 1; }
+          /usr/bin/plutil -lint "$APP_PATH/Contents/Info.plist"
+          /usr/bin/codesign --verify --deep --strict --all-architectures --verbose=2 "$APP_PATH"
+      - name: Remove build artifacts
+        if: always()
+        run: rm -rf .build "${{ runner.temp }}/zisla-app"
+
+  codeql:
+    name: CodeQL (swift)
+    runs-on: macos-26
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    defaults:
+      run:
+        working-directory: mac
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4
+        with:
+          languages: swift
+          build-mode: manual
+          queries: security-and-quality
+      - run: swift build
+      - uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4
+        with:
+          category: /language:swift
+      - name: Remove build artifacts
         if: always()
         run: rm -rf .build

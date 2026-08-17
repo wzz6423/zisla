@@ -18,6 +18,7 @@ public final class TraeSessionActivityDetector: AIActivityDetecting {
         var startedAt: Date?
         var updatedAt: Date = .distantPast
         var hasError = false
+        var lastErrorAt: Date?
     }
 
     private struct CachedFile {
@@ -232,7 +233,16 @@ public final class TraeSessionActivityDetector: AIActivityDetecting {
             state.startedAt = timestamp
         }
         state.updatedAt = max(state.updatedAt, timestamp)
-        if isError { state.hasError = true }
+
+        if isError {
+            state.hasError = true
+            state.lastErrorAt = timestamp
+        } else if isChatActivity {
+            if let lastError = state.lastErrorAt, timestamp > lastError {
+                state.hasError = false
+            }
+        }
+
         if state.sessionID.isEmpty { state.sessionID = sessionID }
         tasks[taskID] = state
     }

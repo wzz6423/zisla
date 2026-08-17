@@ -107,23 +107,23 @@ struct IslandSurfaceTransformTests {
             revealProgress: 1
         ).visibleFrame(in: expanded)
 
-        // 水平中心在整个展开过程中保持固定
+        // The horizontal center remains fixed throughout expansion.
         #expect(abs(collapsedFrame.midX - expanded.width / 2) < 0.001)
         #expect(abs(midFrame.midX - expanded.width / 2) < 0.001)
         #expect(abs(expandedFrame.midX - expanded.width / 2) < 0.001)
 
-        // 顶部边缘在整个展开过程中保持在 y=0
+        // The top edge remains at y = 0 throughout expansion.
         #expect(collapsedFrame.minY == 0)
         #expect(midFrame.minY == 0)
         #expect(expandedFrame.minY == 0)
 
-        // 左右边缘从中心向外展开（左边缘向左移动，右边缘向右移动）
+        // The side edges expand outward from the center.
         #expect(midFrame.minX < collapsedFrame.minX)
         #expect(midFrame.maxX > collapsedFrame.maxX)
         #expect(expandedFrame.minX < midFrame.minX)
         #expect(expandedFrame.maxX > midFrame.maxX)
 
-        // 底部边缘向下展开
+        // The bottom edge expands downward.
         #expect(midFrame.maxY > collapsedFrame.maxY)
         #expect(expandedFrame.maxY > midFrame.maxY)
     }

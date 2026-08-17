@@ -50,6 +50,8 @@
 	<string>zisla 需要读取近期日程并显示在顶部信息面板中。</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>zisla 需要读取当前播放音频的频段能量，以实时显示随音乐变化的音浪。</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>zisla 仅在你打开电池页面时读取已连接或已配对蓝牙设备公开的电量信息。</string>
     <key>NSCameraUsageDescription</key>
 	<string>zisla 仅在你打开镜子时使用摄像头。</string>
   <key>NSRemindersFullAccessUsageDescription</key>
@@ -68,12 +70,6 @@
 	<string>zisla 需要将你主动录入的语音转换为 AI 对话文字。</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>zisla 需要通过 Mail.app 读取和管理你的邮件，包括收件箱列表、标记已读、删除和回复。</string>
-	<key>SUEnableAutomaticChecks</key>
-    <true/>
-    <key>SUAutomaticallyUpdate</key>
-    <true/>
-    <key>SUFeedURL</key>
-    <string>https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml</string>
     <key>ZislaDefaultUpdateChannel</key>
     <string>@UPDATE_CHANNEL@</string>
 </dict>

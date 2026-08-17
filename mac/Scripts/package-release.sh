@@ -6,26 +6,40 @@ VERSION="${VERSION:?VERSION is required}"
 BUILD_NUMBER="${BUILD_NUMBER:-${VERSION//./}}"
 UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
 ARCHIVE_DIRECTORY="${ARCHIVE_DIRECTORY:-$ROOT/dist}"
+BUILD_ARCHITECTURES="${BUILD_ARCHITECTURES:-arm64 x86_64}"
+ARCHITECTURES=(${=BUILD_ARCHITECTURES})
+
+for arch in "${ARCHITECTURES[@]}"; do
+  case "$arch" in
+    arm64|x86_64) ;;
+    *)
+      echo "error: unsupported architecture: $arch" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if (( ${#ARCHITECTURES[@]} == 1 )); then
+  ARCHITECTURE_SUFFIX="${ARCHITECTURES[1]}"
+elif (( ${#ARCHITECTURES[@]} == 2 )) && [[ "${ARCHITECTURES[*]}" == "arm64 x86_64" || "${ARCHITECTURES[*]}" == "x86_64 arm64" ]]; then
+  ARCHITECTURE_SUFFIX="universal"
+else
+  echo "error: unsupported architecture combination: $BUILD_ARCHITECTURES" >&2
+  exit 1
+fi
 
 APP="$ARCHIVE_DIRECTORY/zisla.app"
-ARCHIVE="$ARCHIVE_DIRECTORY/zisla-v${VERSION}-macOS-universal.zip"
-DMG="$ARCHIVE_DIRECTORY/zisla-v${VERSION}-macOS-universal.dmg"
+ARCHIVE="$ARCHIVE_DIRECTORY/zisla-v${VERSION}-macOS-${ARCHITECTURE_SUFFIX}.zip"
+DMG="$ARCHIVE_DIRECTORY/zisla-v${VERSION}-macOS-${ARCHITECTURE_SUFFIX}.dmg"
 
 if [[ "${SKIP_BUILD:-false}" == "true" ]]; then
   [[ -d "$APP" ]] || { echo "error: missing app bundle: $APP" >&2; exit 1; }
 else
-  VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" UPDATE_CHANNEL="$UPDATE_CHANNEL" OUTPUT_DIRECTORY="$ARCHIVE_DIRECTORY" BUILD_ARCHITECTURES="arm64 x86_64" "$ROOT/Scripts/build-app.sh"
+  VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" UPDATE_CHANNEL="$UPDATE_CHANNEL" OUTPUT_DIRECTORY="$ARCHIVE_DIRECTORY" BUILD_ARCHITECTURES="$BUILD_ARCHITECTURES" "$ROOT/Scripts/build-app.sh"
 fi
 
 ditto -c -k --keepParent "$APP" "$ARCHIVE"
 shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
-
-if [[ -n "${SPARKLE_GENERATE_APPCAST:-}" ]]; then
-  APPCAST_ARGUMENTS=()
-  [[ -n "${SPARKLE_APPCAST_ACCOUNT:-}" ]] && APPCAST_ARGUMENTS+=(--account "$SPARKLE_APPCAST_ACCOUNT")
-  [[ -n "${SPARKLE_APPCAST_DOWNLOAD_URL_PREFIX:-}" ]] && APPCAST_ARGUMENTS+=(--download-url-prefix "$SPARKLE_APPCAST_DOWNLOAD_URL_PREFIX")
-  "$SPARKLE_GENERATE_APPCAST" "${APPCAST_ARGUMENTS[@]}" "$ARCHIVE_DIRECTORY"
-fi
 
 TEMPORARY_DIRECTORY="$(mktemp -d "${TMPDIR%/}/zisla-dmg.XXXXXX")"
 WRITABLE_DMG="${TEMPORARY_DIRECTORY}.dmg"

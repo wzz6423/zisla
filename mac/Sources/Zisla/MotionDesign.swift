@@ -375,11 +375,12 @@ struct IslandSheenSweep: View {
 /// the bottom corners, reading as desk light caught by the glass edge. Zero animation cost.
 struct IslandRimLight: View {
     let visualStyle: IslandVisualStyle
+    var bottomCornerRadius: CGFloat = IslandSurfaceGeometry.expandedBottomCornerRadius
 
     var body: some View {
         IslandSilhouette(
             topCornerRadius: 0,
-            bottomCornerRadius: IslandSurfaceGeometry.expandedBottomCornerRadius
+            bottomCornerRadius: bottomCornerRadius
         )
         .strokeBorder(
             LinearGradient(

@@ -54,6 +54,13 @@ struct IslandRootView: View {
                 width: surfaceSize.width + petSlotWidth,
                 height: surfaceSize.height
             )
+            let voiceRecordingGeometry = VoiceRecordingIslandGeometry(
+                collapsedSize: model.collapsedIslandSize,
+                availableSize: surfaceSize
+            )
+            let renderedSurfaceSize = voiceInput.isRecording
+                ? voiceRecordingGeometry.surfaceSize
+                : surfaceSize
 
             ZStack(alignment: .top) {
             if showsTransferHints {
@@ -110,9 +117,10 @@ struct IslandRootView: View {
             IslandSurface(
                 isCollapsed: isIslandCollapsed,
                 collapsedSize: model.collapsedIslandSize,
-                expandedSize: surfaceSize,
+                expandedSize: renderedSurfaceSize,
                 visualStyle: settingsStore.settings.islandVisualStyle,
-                notchBackground: settingsStore.settings.islandNotchBackground
+                notchBackground: settingsStore.settings.islandNotchBackground,
+                usesCompactGlassSurface: voiceInput.isRecording
             ) {
                 if model.isMirrorPresented {
                     DeferredMount {
@@ -134,13 +142,13 @@ struct IslandRootView: View {
                     ZStack(alignment: .top) {
                     VStack(spacing: 0) {
                         if voiceInput.isRecording {
-                            // Compact voice-recording mode skips the title bar and toolbar to show one transcript line.
-                            Spacer().frame(height: 34)
-                            VoiceTranscriptionView(voiceInput: voiceInput)
-                                .padding(.horizontal, 14)
-                                .padding(.bottom, 6)
+                            VoiceTranscriptionView(
+                                voiceInput: voiceInput,
+                                geometry: voiceRecordingGeometry
+                            )
+                                .frame(height: layout.islandSize.height, alignment: .top)
                         } else if !isIslandCollapsed {
-                            // 固定顶部壳层，模块切换时只替换下方功能区域。
+                            // Keep the top shell fixed so module changes replace only the functional area below.
                             NowPlayingHeader(model: model)
                                 .padding(.horizontal, 14)
                                 .padding(.top, contentTopInset)
@@ -164,8 +172,6 @@ struct IslandRootView: View {
                                             ClipboardHistoryModuleView(model: model)
                                         case .aiMonitor:
                                             AIProgressModuleView(model: model)
-                                        case .aiAgent:
-                                            AIAgentModuleView(model: model)
                                         case .download:
                                             DownloadModuleView(model: model)
                                         case .agenda:
@@ -180,6 +186,12 @@ struct IslandRootView: View {
                                             ToolboxModuleView(model: model)
                                         case .system:
                                             SystemMonitorView(service: model.systemMonitor)
+                                        case .battery:
+                                            BatteryDetailView(
+                                                batteryMonitor: model.battery,
+                                                networkMonitor: model.networkBattery,
+                                                onContentHeightChange: model.setBatteryModuleDynamicHeight
+                                            )
                                         case .lockScreen:
                                             LockScreenModuleView(model: model)
                                         }
@@ -390,12 +402,15 @@ struct IslandRootView: View {
             return .teleprompter
         }
         if voiceInput.isRecording {
-            return .voiceRecording
+            // The recording surface matches the collapsed capsule's overflow width and extends downward by one row.
+            return IslandModuleLayout.voiceRecording
+                .matchingWidth(model.collapsedOverflowWidth)
         }
         guard let activeModule else { return .standard }
         return IslandModuleLayout.resolved(
             for: activeModule,
-            dashboardCardCount: model.dashboardCardCount
+            dashboardCardCount: model.dashboardCardCount,
+            batteryDynamicHeight: model.batteryModuleDynamicHeight
         )
     }
 
@@ -509,43 +524,54 @@ struct CollapsedPetView: View {
 
 }
 
-/// Live transcription view shown during voice recording, with a pulsing red indicator.
 private struct VoiceTranscriptionView: View {
     @ObservedObject var voiceInput: VoiceInputController
+    let geometry: VoiceRecordingIslandGeometry
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulse = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(Color.zislaError)
-                .frame(width: 7, height: 7)
-                .scaleEffect(pulse ? 1.3 : 1.0)
-                .opacity(pulse ? 0.7 : 1.0)
-                .animation(
-                    reduceMotion ? nil : .easeInOut(duration: 0.8).repeatForever(autoreverses: true),
-                    value: pulse
-                )
-                .onAppear { pulse = !reduceMotion }
-                .onChange(of: reduceMotion) { _, isReduced in
-                    pulse = !isReduced
-                }
+        VStack(spacing: 0) {
+            HStack {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.zislaError)
+                    .accessibilityLabel("正在录音")
 
-            Text(transcriptOrPlaceholder)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Spacer(minLength: 12)
 
-            if voiceInput.errorDescription != nil {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.zislaWarning)
+                Image(systemName: "waveform")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .symbolEffect(
+                        .variableColor.iterative,
+                        options: .repeating,
+                        isActive: !reduceMotion
+                    )
+                    .accessibilityHidden(true)
             }
+            .padding(.horizontal, 12)
+            .frame(
+                width: geometry.topRowFrame.width,
+                height: geometry.topRowFrame.height
+            )
+
+            MarqueeText(
+                transcriptOrPlaceholder,
+                font: .system(size: 10.5),
+                textColor: .white.opacity(0.72),
+                fontWeight: .medium,
+                repeats: false,
+                scrollProgress: 1,
+                clipsOverflowWhenStatic: true
+            )
+                .padding(.horizontal, 12)
+                .frame(
+                    width: geometry.transcriptRowFrame.width,
+                    height: geometry.transcriptRowFrame.height,
+                    alignment: .leading
+                )
         }
-        .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var transcriptOrPlaceholder: String {
@@ -663,7 +689,7 @@ private struct ModuleSelector: View {
                         emphasizesSelection: true
                     )
                 }
-                .frame(width: 30, height: 30)
+                .frame(width: 28, height: 30)
                 .buttonStyle(PressableStyle(hoverScale: 1.08))
                 .background {
                     if isSelected {

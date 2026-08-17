@@ -342,6 +342,103 @@ private final class PersistentPetPanelProbe {
 
 extension OverlayCoordinatorTests {
     @Test @MainActor
+    func pinningBeforePendingGlassActivationKeepsGlassWithoutEnablingKeyboardInput() async throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setDragging(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        coordinator.setPinned(true)
+
+        try await Task.sleep(for: .milliseconds(10))
+
+        #expect(panel.keepsNativeGlassActive)
+        #expect(panel.allowsNativeGlassActivation)
+        #expect(!panel.allowsKeyWindow)
+        #expect(panel.canBecomeKey)
+        #expect(panel.isPinned)
+    }
+
+    @Test @MainActor
+    func pinnedPanelKeepsKeyboardEligibilityWhenItsSizeChanges() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setDragging(true)
+        coordinator.setPinned(true)
+        coordinator.setAllowsKeyWindow(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        coordinator.updateExpandedSize(CGSize(width: 900, height: 360))
+
+        #expect(panel.keepsNativeGlassActive)
+        #expect(panel.allowsNativeGlassActivation)
+        #expect(panel.allowsKeyWindow)
+        #expect(panel.canBecomeKey)
+        #expect(panel.isPinned)
+    }
+
+    @Test @MainActor
+    func pinningExpandedGlassPanelStopsReclaimingFocus() async throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setDragging(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        try await Task.sleep(for: .milliseconds(10))
+        #expect(panel.keepsNativeGlassActive)
+        #expect(panel.canBecomeKey)
+        #expect(!panel.isPinned)
+
+        coordinator.setPinned(true)
+        #expect(panel.keepsNativeGlassActive)
+        #expect(!panel.allowsKeyWindow)
+        #expect(panel.canBecomeKey)
+        #expect(panel.isPinned)
+
+        panel.resignKey()
+        try await Task.sleep(for: .milliseconds(50))
+
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test @MainActor
+    func reexpandingVisiblePanelRestoresGlassBeforeItsFirstFrame() async throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setDragging(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        try await Task.sleep(for: .milliseconds(10))
+        #expect(panel.keepsNativeGlassActive)
+
+        coordinator.setDragging(false)
+        #expect(!panel.keepsNativeGlassActive)
+
+        coordinator.setDragging(true)
+        #expect(panel.keepsNativeGlassActive)
+    }
+
+    @Test @MainActor
     func firstShowDelaysGlassActivationUntilAfterVisibilityChanged() async throws {
         let contentView = NSView()
         var visibilityEvents: [Bool] = []
@@ -352,11 +449,11 @@ extension OverlayCoordinatorTests {
         coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
         coordinator.setKeepsNativeGlassActive(true)
-        coordinator.setPinned(true)
+        coordinator.setDragging(true)
 
         let panel = try #require(contentView.window as? IslandPanel)
         #expect(visibilityEvents == [true])
-        #expect(panel.keepsNativeGlassActive == false)
+        #expect(panel.keepsNativeGlassActive == true)
         panel.orderOut(nil)
 
         try await Task.sleep(for: .milliseconds(10))
@@ -372,10 +469,10 @@ extension OverlayCoordinatorTests {
         coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
         coordinator.setKeepsNativeGlassActive(true)
-        coordinator.setPinned(true)
+        coordinator.setDragging(true)
 
         let panel = try #require(contentView.window as? IslandPanel)
-        coordinator.setPinned(false)
+        coordinator.setDragging(false)
 
         try await Task.sleep(for: .milliseconds(10))
         #expect(panel.keepsNativeGlassActive == false)
@@ -390,7 +487,7 @@ extension OverlayCoordinatorTests {
         coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
         coordinator.setKeepsNativeGlassActive(true)
-        coordinator.setPinned(true)
+        coordinator.setDragging(true)
 
         let panel = try #require(contentView.window as? IslandPanel)
         panel.orderOut(nil)
@@ -402,9 +499,9 @@ extension OverlayCoordinatorTests {
 
         coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
-        coordinator.setPinned(true)
+        coordinator.setDragging(true)
 
-        #expect(panel.keepsNativeGlassActive == false)
+        #expect(panel.keepsNativeGlassActive == true)
         panel.orderOut(nil)
         try await Task.sleep(for: .milliseconds(10))
         #expect(panel.keepsNativeGlassActive == true)

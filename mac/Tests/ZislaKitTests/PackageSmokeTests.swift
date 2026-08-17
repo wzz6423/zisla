@@ -15,8 +15,8 @@ struct PackageSmokeTests {
         var reducer = IslandPresentationReducer()
         let monitor = SystemMonitorService(samplingInterval: 1)
 
-        #expect(!settings.clipboardHistoryEnabled)
-        #expect(!settings.clipboardDetectionEnabled)
+        #expect(settings.clipboardHistoryEnabled)
+        #expect(settings.clipboardDetectionEnabled)
         #expect(reducer.start() == [.collapse])
         #expect(reducer.state.visibility == .collapsed)
         #expect(monitor.snapshot == nil)

@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 public final class ClipboardHistoryStore: ObservableObject {
     @Published public private(set) var items: [ClipboardHistoryItem] = []
+    @Published public private(set) var categoryCounts: [FileShelfCategory: Int] = [:]
     @Published public private(set) var errorDescription: String?
     @Published public private(set) var totalItemCount = 0
     @Published public private(set) var currentPage = 0
@@ -17,6 +18,7 @@ public final class ClipboardHistoryStore: ObservableObject {
     private let persistenceDelay: Duration
     private var scope: ClipboardHistoryScope = .all
     private var searchText = ""
+    private var category: FileShelfCategory = .all
     private var loadTask: Task<Void, Never>?
     private var loadGeneration = 0
     private var persistenceTask: Task<Void, Never>?
@@ -67,11 +69,12 @@ public final class ClipboardHistoryStore: ObservableObject {
         }
     }
 
-    public func updateQuery(scope: ClipboardHistoryScope, searchText: String) {
+    public func updateQuery(scope: ClipboardHistoryScope, searchText: String, category: FileShelfCategory = .all) {
         let normalizedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard self.scope != scope || self.searchText != normalizedSearch else { return }
+        guard self.scope != scope || self.searchText != normalizedSearch || self.category != category else { return }
         self.scope = scope
         self.searchText = normalizedSearch
+        self.category = category
         currentPage = 0
         reload()
     }
@@ -177,6 +180,7 @@ public final class ClipboardHistoryStore: ObservableObject {
         let requestedPage = currentPage
         let requestedScope = scope
         let requestedSearch = searchText
+        let requestedCategory = category
         let pageSize = pageSize
         let database = database
         isLoading = true
@@ -186,6 +190,7 @@ public final class ClipboardHistoryStore: ObservableObject {
                 var page = try await database.loadPage(
                     scope: requestedScope,
                     searchText: requestedSearch,
+                    category: requestedCategory,
                     offset: requestedPage * pageSize,
                     limit: pageSize
                 )
@@ -197,6 +202,7 @@ public final class ClipboardHistoryStore: ObservableObject {
                     page = try await database.loadPage(
                         scope: requestedScope,
                         searchText: requestedSearch,
+                        category: requestedCategory,
                         offset: requestedPage * pageSize,
                         limit: pageSize
                     )
@@ -211,6 +217,7 @@ public final class ClipboardHistoryStore: ObservableObject {
                 }
                 items = cleanedItems(page.items).items
                 totalItemCount = page.totalCount
+                categoryCounts = page.categoryCounts
                 errorDescription = nil
                 isLoading = false
             } catch {
@@ -286,6 +293,7 @@ public final class ClipboardHistoryStore: ObservableObject {
         default:
             break
         }
+        guard category == .all || item.category == category else { return false }
         return searchText.isEmpty
             || item.content.previewText.localizedCaseInsensitiveContains(searchText)
     }
