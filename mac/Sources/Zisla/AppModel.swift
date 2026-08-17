@@ -348,8 +348,8 @@ final class AppModel: ObservableObject {
   @Published var collapsedIslandSize = CGSize(width: 240, height: 34)
   @Published var isIslandOnPhysicalNotch = false
 
-  /// 收起态胶囊的"溢出"宽度:刘海屏上紧凑条会向刘海两侧各延伸一个翼宽,
-  /// 无刘海屏即模拟胶囊本身宽度。录音态等紧凑表面用它对齐收起态的可见边缘。
+  /// Overflow width of the collapsed capsule. On notched displays, the compact bar extends one wing width past each side of the notch.
+  /// On displays without a notch, it is the capsule width. Compact surfaces use it to align with the collapsed surface's visible edge.
   var collapsedOverflowWidth: CGFloat {
     collapsedIslandSize.width
       + (isIslandOnPhysicalNotch ? SideNoticeLayoutEngine.compactStatusWingWidth * 2 : 0)
@@ -739,7 +739,7 @@ final class AppModel: ObservableObject {
     let wasGranted = voiceInputInputMonitoringAccessGranted
     voiceInputInputMonitoringAccessGranted = granted
 
-    // 权限从无到有：自动重新注册快捷键
+    // Re-register the hotkey when permission changes from denied to granted.
     if granted, !wasGranted, settingsStore.settings.voiceInputEnabled {
       let preset = settingsStore.settings.voiceInputHotkeyPreset
       let mode = settingsStore.settings.voiceInputMode
@@ -2031,8 +2031,8 @@ final class AppModel: ObservableObject {
     return application.processIdentifier
   }
 
-  /// 录音一结束就把焦点交还目标应用(识别结果可能还要等 AI 整理才投递)。
-  /// 不清除已保存的目标 PID:投递时会再次确保 frontmost 再粘贴。
+  /// Restores focus to the target app immediately after recording ends, while AI processing may still delay delivery.
+  /// The saved target PID remains available so delivery can verify frontmost status again before pasting.
   func restoreVoiceInputTargetFocus() {
     guard let pid = voiceInputTargetProcessIdentifier else { return }
     VoiceTranscriptDelivery.reactivateTargetApplication(pid)

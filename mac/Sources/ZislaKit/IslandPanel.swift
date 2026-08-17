@@ -22,7 +22,7 @@ public final class IslandPanel: NSPanel {
   public var keepsNativeGlassActive = false {
     didSet { restoreNativeGlassActivationIfNeeded() }
   }
-  /// 语音录音期间不激活或重新获得 key window，保持目标输入焦点。
+  /// Prevents app activation or key-window reacquisition during recording, preserving focus in the target input.
   public var avoidsAppActivation = false
   public var isPinned = false
   private var transitionGeneration: UInt64 = 0
@@ -57,7 +57,7 @@ public final class IslandPanel: NSPanel {
               allowsNativeGlassActivation,
               keepsNativeGlassActive,
               isVisible else { return }
-        // 固定时不自动抢回焦点，只在非固定状态下自动激活。
+        // Do not automatically reclaim focus while pinned; activate only when unpinned.
         if !isPinned {
             NSApp.activate(ignoringOtherApps: true)
         }
@@ -65,7 +65,7 @@ public final class IslandPanel: NSPanel {
     }
 
     private func handleContentViewClick() {
-        // 当用户点击灵动岛内容时，主动激活应用和窗口
+        // Explicitly activate the app and window when the user clicks the island.
         NSApp.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
     }
@@ -116,7 +116,7 @@ public final class IslandPanel: NSPanel {
             self.contentView = contentView
         }
 
-        // 监听窗口内的鼠标点击事件
+        // Monitor mouse clicks within the window.
         clickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
             guard let self = self, event.window === self else { return event }
             self.handleContentViewClick()

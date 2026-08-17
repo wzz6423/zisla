@@ -281,7 +281,7 @@ public final class VoiceHistoryStore: ObservableObject {
         do {
             let data = try Data(contentsOf: storageURL)
 
-            // 尝试新格式
+            // Try the current format.
             if let state = try? JSONDecoder().decode(VoiceHistoryPersistentState.self, from: data) {
                 entries = state.entries.compactMap(normalizedEntry(_:))
                 sortEntries()
@@ -309,18 +309,18 @@ public final class VoiceHistoryStore: ObservableObject {
                 return
             }
 
-            // 回退到旧格式（迁移）
+            // Fall back to the legacy format for migration.
             let legacyEntries = try JSONDecoder().decode([VoiceHistoryEntry].self, from: data)
             entries = legacyEntries.compactMap(normalizedEntry(_:))
             sortEntries()
 
-            // 从现有记录计算累计值作为迁移基线
+            // Use existing records as the migration baseline for cumulative values.
             cumulativeWordCount = entries.reduce(0) { $0 + $1.wordCount }
             cumulativeDuration = entries.reduce(0) { $0 + $1.duration }
 
             errorDescription = nil
 
-            // 迁移到新格式
+            // Persist the migrated state in the current format.
             _ = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
         } catch {
             entries = []

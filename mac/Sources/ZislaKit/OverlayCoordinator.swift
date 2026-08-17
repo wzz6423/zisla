@@ -363,15 +363,15 @@ public final class OverlayCoordinator: NSObject {
         let isExpanded = reducer.state.visibility == .expanded
             || reducer.state.visibility == .pinned
         let allowsInteraction = isExpanded && !isVoiceRecording
-        // 录音态保留玻璃渲染资格，但不让面板重新夺取目标应用的焦点。
+        // Keep the recording surface eligible for glass rendering without reclaiming focus from the target app.
         let showsGlassSurface = isExpanded || isVoiceRecording
         let shouldKeepGlassActive = keepsNativeGlassActive && showsGlassSurface
-        // 固定时也允许成为 key window，确保输入焦点能正常工作
+        // Pinned panels may also become key windows so input focus works correctly.
         let shouldAllowKeyWindow = allowsKeyWindow && allowsInteraction
         let shouldAllowNativeGlassActivation = shouldKeepGlassActive
 
         panel.isPinned = isPinned
-        // 必须先于 keepsNativeGlassActive 赋值：didSet 会立即触发焦点策略。
+        // Assign this before keepsNativeGlassActive because its didSet immediately applies the focus policy.
         panel.avoidsAppActivation = isVoiceRecording
         panel.allowsKeyWindow = shouldAllowKeyWindow
         panel.allowsNativeGlassActivation = shouldAllowNativeGlassActivation
@@ -646,7 +646,7 @@ public final class OverlayCoordinator: NSObject {
             panel.level = IslandPanel.onTopLevel
 
             let targetFrame = persistentPanelFrameProvider(layout)
-            // 只在必要时调用 present：新建、隐藏后重新显示、frame 变化或强制 refront
+            // Present only new, previously hidden, resized, or explicitly refronted panels.
             let needsPresent = isNewPanel || !panel.isVisible || panel.frame != targetFrame || forcePresent
             if needsPresent {
                 panel.present(at: targetFrame, animated: false)

@@ -240,12 +240,12 @@ struct ShelfModuleView: View {
     private var filteredItems: [FileShelfItem] {
         var items = model.shelf.items
 
-        // 分类过滤
+        // Apply the category filter.
         if model.selectedShelfCategory != .all {
             items = items.filter { $0.category == model.selectedShelfCategory }
         }
 
-        // 搜索过滤
+        // Apply the search filter.
         if !searchText.isEmpty {
             items = items.filter { item in
                 item.url.lastPathComponent.localizedCaseInsensitiveContains(searchText)

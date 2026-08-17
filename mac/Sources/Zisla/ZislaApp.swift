@@ -502,8 +502,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             self.lastAppliedPanelSize = saved
                             self.voiceRecordingSavedPanelSize = nil
                         }
-                        // 兜底:录音期间不再激活应用,焦点本就留在目标应用;
-                        // 此调用仅在极端情况下把它切回,保证后续粘贴可达。
+                        // Fallback: recording no longer activates the app, so focus should remain in the target app;
+                        // this call switches back only in edge cases so the subsequent paste can reach its target.
                         AppModel.shared.restoreVoiceInputTargetFocus()
                     }
                 }

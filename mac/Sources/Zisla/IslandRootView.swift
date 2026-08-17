@@ -402,7 +402,7 @@ struct IslandRootView: View {
             return .teleprompter
         }
         if voiceInput.isRecording {
-            // 录音态宽度跟随收起态胶囊的"溢出"宽度(刘海屏 = 刘海 + 两侧翼宽),只向下多出一行。
+            // The recording surface matches the collapsed capsule's overflow width and extends downward by one row.
             return IslandModuleLayout.voiceRecording
                 .matchingWidth(model.collapsedOverflowWidth)
         }

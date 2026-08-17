@@ -11,7 +11,7 @@ final class VoiceInputController: ObservableObject {
     @Published private(set) var isPreparing = false
     @Published private(set) var transcript = ""
     @Published private(set) var errorDescription: String?
-    /// 正在等待识别服务返回最终结果（录音已停止，但还在处理中）
+    /// Whether the recognition service is still processing a final result after recording has stopped.
     private var isFinalizingTranscript = false
 
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))

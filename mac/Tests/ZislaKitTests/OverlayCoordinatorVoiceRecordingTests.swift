@@ -49,10 +49,10 @@ struct OverlayCoordinatorVoiceRecordingTests {
 
         let panel = try #require(contentView.window as? IslandPanel)
         #expect(panel.isVisible)
-        // 录音态不参与鼠标交互、不因内容需要而抢 key window……
+        // Recording remains noninteractive and does not take the key window for its content.
         #expect(panel.ignoresMouseEvents)
         #expect(!panel.allowsKeyWindow)
-        // ……保留玻璃资格，但录音期间不实际成为 key window。
+        // It retains glass eligibility without actually becoming the key window.
         #expect(panel.allowsNativeGlassActivation)
         #expect(panel.keepsNativeGlassActive)
         #expect(panel.canBecomeKey)
@@ -129,14 +129,14 @@ struct OverlayCoordinatorVoiceRecordingTests {
         let firstPetPanel = try #require(firstPetView.window as? IslandPanel)
         let firstPetFrame = firstPetPanel.frame
 
-        // 验证初始状态
+        // Verify the initial state.
         #expect(firstPetPanel.isVisible)
         #expect(coordinator.persistentPanelDisplayIDs == [Self.screen.displayID, Self.rightScreen.displayID])
 
-        // 在第二屏开始录音
+        // Start recording on the second display.
         coordinator.setVoiceRecording(true, at: CGPoint(x: 1_900, y: 450))
 
-        // 第一屏宠物应该保持可见，窗口实例和 frame 都不应改变
+        // The pet on the first display must remain visible without replacing or moving its window.
         #expect(firstPetView.window === firstPetPanel, "面板实例不应被替换")
         #expect(firstPetPanel.isVisible, "面板应保持可见")
         #expect(firstPetPanel.frame == firstPetFrame, "面板 frame 不应改变")

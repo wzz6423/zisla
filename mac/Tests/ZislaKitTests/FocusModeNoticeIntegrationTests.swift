@@ -3,14 +3,14 @@ import Testing
 @testable import ZislaCore
 @testable import ZislaKit
 
-/// 测试专注模式变化后，提示能否正确进入队列并被识别为 compact notice
+/// Verifies that focus mode changes enqueue notices recognized as compact notices.
 @MainActor
 struct FocusModeNoticeIntegrationTests {
     @Test
     func focusModeTransitionNoticeEnqueuesSuccessfully() {
         let queue = SideNoticeQueue(capacityPerSide: 3)
 
-        // 模拟专注模式开启的过渡提示
+        // Simulate the transition notice shown when focus mode turns on.
         let transitionNotice = IslandNotice(
             id: "focus-transition",
             title: "工作",
@@ -31,7 +31,7 @@ struct FocusModeNoticeIntegrationTests {
     func focusModeStatusNoticeEnqueuesSuccessfully() {
         let queue = SideNoticeQueue(capacityPerSide: 3)
 
-        // 模拟专注模式持久状态提示
+        // Simulate the persistent focus mode status notices.
         let leftNotice = IslandNotice(
             id: "focus-mode-left",
             title: "工作",
@@ -72,7 +72,7 @@ struct FocusModeNoticeIntegrationTests {
         let engine = SideNoticeLayoutEngine()
         let presentation = engine.presentation(for: [transitionNotice])
 
-        // focus-transition 应该被识别为 compact notice
+        // A focus-transition notice is recognized as compact.
         #expect(presentation.hasCompactContent)
         #expect(presentation.panelSize == CGSize(width: 40, height: 34))
     }
@@ -91,7 +91,7 @@ struct FocusModeNoticeIntegrationTests {
         let engine = SideNoticeLayoutEngine()
         let presentation = engine.presentation(for: [focusModeNotice])
 
-        // focus-mode- 应该被识别为 compact notice
+        // Notices with the focus-mode- prefix are recognized as compact.
         #expect(presentation.hasCompactContent)
         #expect(presentation.activeFocusModeNotice?.id == "focus-mode-left")
     }

@@ -313,7 +313,7 @@ struct IslandSurface<Content: View>: View {
 
     private var compactCrownStops: [Gradient.Stop] {
         if visualStyle == .transparent {
-            // Liquid Glass 模式：与展开态 transparentCrown 使用完全相同的渐变参数
+            // Liquid Glass uses the same gradient parameters as the expanded `transparentCrown`.
             [
                 .init(color: .black, location: 0),
                 .init(color: .black.opacity(0.78), location: 0.35),
@@ -362,7 +362,7 @@ struct IslandSurface<Content: View>: View {
             )
 
             if usesCompactGlassSurface {
-                // 录音态：只使用 .clear 材质 + 轻度黑色渐变，避免 .regular 的灰色效果
+                // The recording surface uses only `.clear` with a subtle black gradient to avoid `.regular`'s gray cast.
                 LinearGradient(
                     stops: [
                         .init(color: .black.opacity(0.15), location: 0),
@@ -373,7 +373,7 @@ struct IslandSurface<Content: View>: View {
                     endPoint: .bottom
                 )
             } else {
-                // 展开态：使用 .regular 材质 + mask
+                // The expanded surface uses `.regular` material with a mask.
                 NativeLiquidGlassShell(
                     isCollapsed: renderingPolicy.nativeGlassIsCollapsed,
                     material: .regular,
@@ -391,7 +391,7 @@ struct IslandSurface<Content: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// 展开态的 Liquid Glass mask：底部逐渐淡出以露出边缘折射
+    /// The expanded Liquid Glass mask fades at the bottom to reveal edge refraction.
     private var expandedLiquidGlassMaskStops: [Gradient.Stop] {
         [
             .init(color: .black, location: 0),
@@ -404,7 +404,7 @@ struct IslandSurface<Content: View>: View {
         ]
     }
 
-    /// 紧凑录音表面的 Liquid Glass mask：顶部保持材质对比度，底部大幅淡出让 .clear 层的透明折射效果显现
+    /// The compact recording mask preserves contrast at the top, then fades sharply to reveal the `.clear` layer's refraction.
     private var compactLiquidGlassMaskStops: [Gradient.Stop] {
         [
             .init(color: .black, location: 0),

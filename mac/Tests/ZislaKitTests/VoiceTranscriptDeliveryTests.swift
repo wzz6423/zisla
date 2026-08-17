@@ -128,8 +128,8 @@ struct VoiceTranscriptDeliveryTests {
         let outcome = delivery.deliver("直接输入这里", to: 4_242)
 
         #expect(outcome == .copiedAndPasted)
-        #expect(hoveredTranscript == nil)  // 有 targetPID 时不使用 hovered input
-        #expect(postedPID == 4_242)        // 直接发送到目标进程
+        #expect(hoveredTranscript == nil)  // A known target PID bypasses hovered input.
+        #expect(postedPID == 4_242)        // Paste directly into the target process.
         #expect(pasteboard.string(forType: .string) == "直接输入这里")
     }
 
@@ -154,7 +154,7 @@ struct VoiceTranscriptDeliveryTests {
         let outcome = delivery.deliver("回退输入", to: nil)
 
         #expect(outcome == .copiedAndPasted)
-        #expect(hoveredInputAttempts == 1)  // 没有 targetPID 时使用 hovered input
+        #expect(hoveredInputAttempts == 1)  // Without a target PID, use hovered input.
         #expect(postedPID == nil)
         #expect(pasteboard.string(forType: .string) == "回退输入")
     }
@@ -205,7 +205,7 @@ struct VoiceTranscriptDeliveryTests {
 
         let outcome = delivery.deliver("已知目标进程", to: 4_242)
 
-        // 有明确目标进程时，直接发送到该进程，不检查 hovered input
+        // With an explicit target process, post directly without checking hovered input.
         #expect(outcome == .copiedAndPasted)
         #expect(!hoveredInputCalled)
         #expect(postedPID == 4_242)
@@ -400,8 +400,8 @@ struct VoiceTranscriptDeliveryTests {
             }
         )
 
-        // 直投目标进程:录音面板可能短暂持有 key window,tap 路由的按键
-        // 会落到面板;postToPid 事件总是进入目标应用。
+        // The recording panel may briefly own the key window when posting directly to the target;
+        // tap-routed key events could reach the panel, while postToPID always reaches the target app.
         #expect(result)
         #expect(capturedPID == 4_242)
     }

@@ -20,7 +20,7 @@ enum HoveredInputDeliveryResult: Equatable, Sendable {
     case blocked
 }
 
-/// 录音开始时保存的 AX 元素。鼠标位置只能作为找回焦点的降级线索。
+/// The AX element captured at recording start. Mouse position is only a fallback for recovering focus.
 @MainActor
 public final class VoiceTranscriptDeliveryTarget {
     public let processIdentifier: pid_t
@@ -54,7 +54,7 @@ public struct VoiceTranscriptDelivery {
         self.postPaste = postPaste
     }
 
-    // 保留旧测试和内部调用的单参数注入器，避免无关 API 迁移阻断构建。
+    // Preserve the single-parameter injector for legacy tests and internal callers, avoiding an unrelated API migration.
     init(
         pasteboard: NSPasteboard,
         pasteIntoHoveredInput: @escaping (String) -> HoveredInputDeliveryResult,
@@ -78,7 +78,7 @@ public struct VoiceTranscriptDelivery {
             return .copyFailed
         }
 
-        // pasteboard server 的写入不是同步操作，过早发送 Cmd+V 会读到旧内容。
+        // Writes to the pasteboard server are asynchronous; sending Cmd+V too early reads stale content.
         Thread.sleep(forTimeInterval: 0.08)
 
         let targetPID = target?.processIdentifier ?? targetProcessIdentifier
@@ -86,7 +86,7 @@ public struct VoiceTranscriptDelivery {
             Self.reactivateTargetApplication(targetPID, waitUntilFrontmost: true)
         }
 
-        // 优先用录音开始时的元素，避免录音期间鼠标移动或面板改变当前焦点。
+        // Prefer the element captured at recording start so mouse movement or the panel cannot redirect focus.
         if let target,
            target.processIdentifier == targetPID,
            Self.isExternalProcess(target.processIdentifier) {
@@ -97,7 +97,7 @@ public struct VoiceTranscriptDelivery {
             }
         }
 
-        // 如果原元素失效，再读取目标应用此刻的 AX 焦点。
+        // If the captured element is stale, read the target app's current AX focus.
         if let targetPID,
            Self.isExternalProcess(targetPID),
            let focused = Self.focusedEditableTextInput(in: targetPID) {
@@ -108,7 +108,7 @@ public struct VoiceTranscriptDelivery {
             }
         }
 
-        // 直接插入失败（通常是 Web 应用），发送 Cmd+V 到已知的目标进程
+        // Direct insertion usually fails in web apps, so send Cmd+V to the known target process.
         if let targetPID, Self.isExternalProcess(targetPID) {
             if postPaste(targetPID) {
                 deliveryLogger.info("deliver: posted Cmd+V to target process")
@@ -116,7 +116,7 @@ public struct VoiceTranscriptDelivery {
             }
         }
 
-        // 没有明确的目标进程，尝试基于鼠标位置的降级策略
+        // Without an explicit target process, fall back to the input under the saved mouse position.
         switch pasteIntoTargetInput(transcript, savedMouseLocation) {
         case .pasted:
             deliveryLogger.info("deliver: pasted via hovered input")
@@ -130,7 +130,7 @@ public struct VoiceTranscriptDelivery {
         }
     }
 
-    /// 在录音开始时捕获前台应用的真实焦点元素。
+    /// Captures the frontmost app's actual focused element at recording start.
     public static func captureTarget(for processIdentifier: pid_t? = nil) -> VoiceTranscriptDeliveryTarget? {
         guard AXIsProcessTrusted() else { return nil }
 
@@ -148,7 +148,7 @@ public struct VoiceTranscriptDelivery {
         return VoiceTranscriptDeliveryTarget(processIdentifier: pid, element: editable)
     }
 
-    /// 将目标元素设回焦点，用于录音结束时恢复输入上下文。
+    /// Restores focus to the target element when recording ends.
     public static func focusTarget(_ target: VoiceTranscriptDeliveryTarget) -> Bool {
         focus(target.element)
     }
@@ -275,7 +275,7 @@ public struct VoiceTranscriptDelivery {
         return false
     }
 
-    /// 供测试和 AX 路径共用的 UTF-16 选区替换，避免截断 emoji/CJK 字符。
+    /// Replaces a UTF-16 selection for both tests and AX delivery without truncating emoji or CJK characters.
     static func replacingSelection(
         in value: String,
         location: Int,
@@ -390,21 +390,21 @@ public struct VoiceTranscriptDelivery {
     }
 
     private static func tryDirectTextInsertion(_ element: AXUIElement, text: String) -> Bool {
-        // Web 应用输入框（Electron、浏览器等）通常有 DOM 属性，对它们直接改 AXValue 不会触发输入事件
-        // 导致框架无法响应，必须通过 Cmd+V 触发真实的键盘/粘贴事件
+        // Web inputs usually expose DOM attributes, and changing AXValue does not fire input events.
+        // Use Cmd+V so Electron and browser frameworks receive a real paste event.
         let hasDOMIdentifier = getAttribute(element, "AXDOMIdentifier") != nil
         let hasDOMClassList = getAttribute(element, "AXDOMClassList") != nil
         if hasDOMIdentifier || hasDOMClassList {
             return false
         }
 
-        // 原生 macOS 输入框可以直接通过 AX API 插入
+        // Native macOS inputs support direct insertion through the AX API.
         guard let current = stringValue(getAttribute(element, kAXValueAttribute)),
               let range = selectedRange(of: element) else {
             return false
         }
 
-        // 过滤 placeholder：如果当前值等于 placeholder 且选区覆盖全文，视为空输入框
+        // Treat a fully selected placeholder value as an empty input.
         let placeholderValue = stringValue(getAttribute(element, kAXPlaceholderValueAttribute))
         let actualCurrent: String
         if let placeholderValue,
@@ -412,7 +412,7 @@ public struct VoiceTranscriptDelivery {
            current == placeholderValue,
            range.location == 0,
            range.length == (current as NSString).length {
-            // placeholder 被选中，实际内容为空
+            // The selected placeholder is not actual content.
             actualCurrent = ""
         } else {
             actualCurrent = current
