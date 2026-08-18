@@ -1,0 +1,41 @@
+name: 功能建议（简体中文）
+description: 提出可解决明确使用问题的功能建议。
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先搜索已有 Issue 或 Discussions，避免提出相同建议。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      description: 请说明使用场景和当前遇到的具体困难。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议的方案
+      description: 请描述预期交互或行为，而不只是一句功能名称。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 考虑过的替代方案
+      description: 可选。请说明现有方案为何无法满足需求。
+  - type: textarea
+    id: context
+    attributes:
+      label: 补充信息
+      description: 可选。可附截图、原型或其他上下文。
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前检查
+      options:
+        - label: 我已搜索现有 Issue 和 Discussions。
+          required: true

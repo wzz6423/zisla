@@ -1,45 +1,47 @@
-# 架构与性能设计
+# Architecture and performance design
 
-## 顶部触发
+**English** | [简体中文](architecture.zh-CN.md)
 
-隐藏态没有透明窗口。`PointerEdgeMonitor` 安装一组全局和本地 `NSEvent` monitor，只处理 `mouseMoved` 与拖拽事件；`ScreenLayoutEngine` 用纯几何判断指针是否进入每块屏幕顶部中央 6 px 区域。
+## Top-edge triggering
 
-每块屏幕通过 `NSScreenNumber` 对应的 `CGDirectDisplayID` 建立稳定身份。布局始终以 `screen.frame.maxY` 为顶部锚点，支持负坐标、上下排列和无刘海外接屏。
+The hidden state has no transparent window. `PointerEdgeMonitor` installs global and local `NSEvent` monitors for mouse movement and drag events; `ScreenLayoutEngine` uses geometry alone to determine whether the pointer enters the top-center 6 px area of each display.
 
-## 窗口
+Each display has a stable identity by pairing `NSScreenNumber` with its `CGDirectDisplayID`. Layout is anchored to `screen.frame.maxY`, so negative coordinates, vertically stacked displays, and external displays without a notch are supported.
 
-主岛只保留一个 `.borderless + .nonactivatingPanel`：
+## Window
 
-- `.statusBar` 层级，不覆盖系统锁屏和系统菜单。
-- `.canJoinAllSpaces + .fullScreenAuxiliary` 支持 Space 与普通全屏。
-- hover 展开不调用 `NSApp.activate`，不会抢走当前应用焦点。
-- 隐藏使用 `orderOut`，菜单栏区域不被透明窗口吞掉。
+The main island keeps one `.borderless + .nonactivatingPanel`:
 
-左右通知面板按需创建，队列为空立即隐藏。
+- It uses the `.statusBar` level and does not cover the system lock screen or system menu.
+- `.canJoinAllSpaces + .fullScreenAuxiliary` supports Spaces and ordinary full-screen apps.
+- Hover expansion never calls `NSApp.activate`, so it does not take focus from the current app.
+- Hidden state uses `orderOut`, so the menu bar area is not consumed by a transparent window.
 
-## 状态与并发
+Left and right notification panels are created on demand and are hidden as soon as their queues are empty.
 
-- AppKit、SwiftUI 状态和窗口控制限制在 `MainActor`。
-- 下载、天气和 GitHub 请求使用 actor。
-- hook 写入的 AI 状态使用目录文件系统事件监听；各 AI 会话源定期比较最近本地会话或活动文件的 mtime/size，未变化时复用解析缓存。
-- 自动检测只读取判断任务状态所需的结构化事件、固定状态 marker 或活动元数据，不读取 prompt/answer 正文；任一 Provider 解析失败不会阻断其他 Provider。
-- 折叠延迟使用可取消 `Task` 和 generation token，旧任务不能隐藏重新展开的岛。
-- 隐藏态没有 `TimelineView`、60 Hz Timer 或持续动画提交。
+## State and concurrency
 
-## 媒体检测
+- AppKit, SwiftUI state, and window control stay on `MainActor`.
+- Downloads, weather, and GitHub requests use actors.
+- AI state written by hooks is monitored through directory filesystem events. Each AI session source compares the latest local session or activity file by mtime and size and reuses the parse cache when nothing changed.
+- Automatic detection reads only structured events, fixed status markers, and activity metadata needed to determine task state. It does not read prompt or answer bodies, and a provider parser failure does not block other providers.
+- Collapse delays use cancellable `Task`s and a generation token so an old task cannot hide an island that has already reopened.
+- The hidden state has no `TimelineView`, 60 Hz timer, or continuous animation submission.
 
-MediaRemote 提供曲名、封面、进度和控制；Core Audio 14.4+ 的进程对象属性负责确认应用是否存在活动输出流，并在元数据缺失时提供来源应用兜底。进程列表和输出状态都使用属性监听器驱动，不轮询、不采集音频内容，也不请求屏幕录制或辅助功能权限。暂停、停止和静音来源不会保留在媒体区域。
+## Media detection
 
-## 材质
+MediaRemote provides the title, artwork, progress, and controls. Process-object properties from Core Audio 14.4+ confirm whether an app has an active output stream and provide a fallback source app when metadata is missing. Process lists and output state are driven by property listeners rather than polling; audio content is never captured, and Screen Recording or Accessibility permission is not requested. Paused, stopped, and muted sources are not kept in the media area.
 
-macOS 26 使用单层 SwiftUI `glassEffect`；macOS 14/15 使用单层 `NSVisualEffectView`。系统开启“降低透明度”后改用实体背景。岛面不会叠加多层 blur/material。
+## Materials
 
-## 下载安全边界
+macOS 26 uses a single-layer SwiftUI `glassEffect`; macOS 14/15 use a single-layer `NSVisualEffectView`. Reduce Transparency switches to an opaque background. The island does not stack multiple blur or material layers.
 
-Swift 使用 `Process.executableURL` 和参数数组启动 `yt-dlp`，URL 永远位于 `--` 后的独立 argv。运行时禁用配置、插件和 exec，并发排空输出管道，通过 JSON sentinel 解析进度。
+## Download safety boundary
 
-只有退出码为 0、完成路径存在、解析符号链接后仍位于授权目录内时任务才成功。每个任务只清理自己的 UUID 临时目录。
+Swift starts `yt-dlp` with `Process.executableURL` and an argument array; the URL is always a separate argv value after `--`. Runtime configuration, plugins, and exec are disabled, output pipes are drained concurrently, and progress is parsed through a JSON sentinel.
 
-## 检查和下载更新
+A task succeeds only when the exit code is 0, the output path exists, and the resolved path remains inside the authorized directory. Each task cleans only its own UUID-named temporary directory.
 
-GitHub API 与 Gitee API 负责检测最新 Release。应用不执行替换、重启或挂载 DMG；发现新版本后，用户可将 DMG 下载到默认下载目录或本次选择的目录。下载完成前会保留原文件，已有同名包直接复用且绝不覆盖。用户必须先退出 zisla，再打开 DMG 并将应用拖入 `Applications`。带路径前缀的发布 tag（例如 `release/v0.1.2`）按最后一个路径分量解析版本。
+## Update checks and downloads
+
+GitHub and Gitee APIs provide release checks. The app never replaces itself, restarts, or mounts a DMG; after finding a new version, the user can download the DMG to the default or a selected directory. The original file is kept until the download completes, and an existing file with the same name is never overwritten. The user must quit zisla, open the DMG, and drag the app to `Applications`. Tags with path prefixes, such as `release/v0.1.2`, are parsed using their final path component.

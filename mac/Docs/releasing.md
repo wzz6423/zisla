@@ -1,16 +1,18 @@
-# 签名与发布设计
+# Signing and release design
 
-项目的完整发布流程、双更新通道和 GitHub/Gitee 的资产同步由仓库根目录的 [`skills/zisla-release`](../../skills/zisla-release/SKILL.md) 统一维护。本页只说明签名、公证和更新包的设计约束；发布时以该技能为准。
+**English** | [简体中文](releasing.zh-CN.md)
 
-应用内只检查 Release 和下载 DMG，绝不自动替换或重启应用。Developer ID 发布包仍建议公证；免费 ad-hoc Preview 不能公证，首次打开可能需要在系统设置中选择“仍要打开”。
+The complete release process, dual update channels, and GitHub/Gitee asset synchronization are maintained by [`skills/zisla-release`](../../skills/zisla-release/SKILL.md). This page documents only the design constraints for signing, notarization, and update packages; follow the skill when publishing a release.
 
-## 前提
+The app only checks releases and downloads DMGs. It never replaces or restarts itself. Developer ID packages should still be notarized. Free ad-hoc previews cannot be notarized and may require **Open Anyway** in System Settings on first launch.
 
-- Developer ID Application 证书
-- Apple 公证凭据
-- 官方 `yt-dlp` Helper 已通过 `Scripts/fetch-yt-dlp.sh` 获取并校验
+## Prerequisites
 
-## 1. 构建签名应用
+- A Developer ID Application certificate
+- Apple notarization credentials
+- The official `yt-dlp` helper fetched and verified through `Scripts/fetch-yt-dlp.sh`
+
+## 1. Build a signed app
 
 ```bash
 export VERSION=1.0.0
@@ -20,7 +22,7 @@ Scripts/fetch-yt-dlp.sh
 Scripts/package-release.sh
 ```
 
-输出：
+Output:
 
 ```text
 dist/zisla-v1.0.0-macOS-universal.zip
@@ -28,9 +30,9 @@ dist/zisla-v1.0.0-macOS-universal.zip.sha256
 dist/zisla-v1.0.0-macOS-universal.dmg
 ```
 
-### 免费预览分发
+### Free preview distribution
 
-不使用 Apple Developer Program 时，可以用 ad-hoc 签名构建预览包：
+Without the Apple Developer Program, build an ad-hoc signed preview:
 
 ```bash
 export VERSION=0.1.0
@@ -39,11 +41,9 @@ export CODE_SIGN_IDENTITY=-
 Scripts/package-release.sh
 ```
 
-该包不经过公证，且不包含 WeatherKit 权限。应用会定期检查 GitHub/Gitee Release；发现新版本后，用户确认即可下载对应 DMG，再把 DMG 中的应用拖入
-`Applications`。首次打开仍需在 **System Settings > Privacy & Security** 中选择 **Open Anyway**。
-Developer ID 和公证仍是面向普通用户无拦截分发的推荐方式。
+This package is not notarized and does not include the WeatherKit entitlement. The app periodically checks GitHub/Gitee Releases; after a user confirms an available version, it downloads the matching DMG, which the user then opens and drags into `Applications`. The first launch may still require **System Settings > Privacy & Security > Open Anyway**. Developer ID signing and notarization remain the recommended path for distribution without security prompts.
 
-## 2. 公证
+## 2. Notarize
 
 ```bash
 xcrun notarytool submit \
@@ -54,14 +54,14 @@ xcrun notarytool submit \
 xcrun stapler staple 'dist/zisla.app'
 xcrun stapler validate 'dist/zisla.app'
 
-# 重新打包已 stapled 的应用，确保 ZIP 和 DMG 都携带最终产物。
+# Repackage the stapled app so both the ZIP and DMG contain the final artifact.
 export SKIP_BUILD=true
 Scripts/package-release.sh
 ```
 
-## 3. 发布与验证
+## 3. Publish and verify
 
-将 DMG 上传到 GitHub 和 Gitee 的同一 tag Release。正式版不能标记为 prerelease；Preview 必须标记为 prerelease。客户端根据通道调用 Release API，选择带有 `macOS` 名称的 DMG。
+Upload the DMG to releases with the same tag on GitHub and Gitee. A stable release must not be marked as a prerelease; a preview must be marked as a prerelease. The client uses its selected channel's Release API and chooses the DMG whose name contains `macOS`.
 
 ```bash
 codesign --verify --deep --strict --all-architectures --verbose=4 'dist/zisla.app'
@@ -74,4 +74,4 @@ test -L /Volumes/zisla/Applications
 hdiutil detach /Volumes/zisla
 ```
 
-使用旧版本检查新 Release，确认可下载 DMG、DMG 落在所选目录且未覆盖同名文件。安装验收时先退出 zisla，再挂载 DMG 并拖入 `Applications`。
+Use an older app version to check the new release. Confirm that the DMG downloads to the selected directory without overwriting a file with the same name. For installation acceptance, quit zisla before mounting the DMG and dragging the app to `Applications`.
