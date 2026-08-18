@@ -1,5 +1,5 @@
-name: 功能建议
-description: 提出可解决明确使用问题的功能建议。
+name: Feature request
+description: Propose a feature that solves a clear user problem.
 title: "[Feature] "
 labels:
   - enhancement
@@ -7,35 +7,35 @@ body:
   - type: markdown
     attributes:
       value: |
-        请先搜索已有 Issue 或 Discussions，避免提出相同建议。
+        Search existing Issues and Discussions first to avoid duplicate proposals.
   - type: textarea
     id: problem
     attributes:
-      label: 要解决的问题
-      description: 请说明使用场景和当前遇到的具体困难。
+      label: Problem to solve
+      description: Describe the use case and the specific difficulty you have today.
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: 建议的方案
-      description: 请描述预期交互或行为，而不只是一句功能名称。
+      label: Proposed solution
+      description: Describe the expected interaction or behavior, not only a feature name.
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
-      label: 考虑过的替代方案
-      description: 可选。请说明现有方案为何无法满足需求。
+      label: Alternatives considered
+      description: Optional. Explain why the current options do not meet the need.
   - type: textarea
     id: context
     attributes:
-      label: 补充信息
-      description: 可选。可附截图、原型或其他上下文。
+      label: Additional context
+      description: Optional. Attach screenshots, prototypes, or other context.
   - type: checkboxes
     id: checks
     attributes:
-      label: 提交前检查
+      label: Pre-submission checks
       options:
-        - label: 我已搜索现有 Issue 和 Discussions。
+        - label: I searched existing Issues and Discussions.
           required: true

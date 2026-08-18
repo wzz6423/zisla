@@ -50,7 +50,7 @@ contributing_url="$server_url/$repository/blob/$default_branch/CONTRIBUTING.md"
 
 cat <<EOF
 <!-- zisla-contributor-welcome -->
-> 自动回复：以下内容来自 [CONTRIBUTING.md]($contributing_url)。
+> Automated reply: the following guidance comes from [CONTRIBUTING.md]($contributing_url).
 
 $section_content
 EOF
