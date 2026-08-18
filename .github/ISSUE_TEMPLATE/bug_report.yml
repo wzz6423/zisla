@@ -1,5 +1,5 @@
-name: 缺陷报告
-description: 报告可复现的问题，帮助我们定位和修复。
+name: Bug report
+description: Report a reproducible problem to help us investigate and fix it.
 title: "[Bug] "
 labels:
   - bug
@@ -7,38 +7,38 @@ body:
   - type: markdown
     attributes:
       value: |
-        感谢反馈。请先搜索已有 Issue，避免重复提交。
+        Thank you for the report. Search existing Issues first to avoid duplicates.
   - type: input
     id: version
     attributes:
-      label: zisla 版本
-      description: 请填写应用版本或提交 SHA。
-      placeholder: 例如 v0.1.1 或 abc1234
+      label: zisla version
+      description: Enter the app version or commit SHA.
+      placeholder: e.g. v0.1.1 or abc1234
     validations:
       required: true
   - type: input
     id: macos-version
     attributes:
-      label: macOS 版本与设备
-      description: 请填写 macOS 版本和芯片型号。
-      placeholder: 例如 macOS 15.5, Apple M3 Pro
+      label: macOS version and device
+      description: Enter the macOS version and chip model.
+      placeholder: e.g. macOS 15.5, Apple M3 Pro
     validations:
       required: true
   - type: dropdown
     id: installation
     attributes:
-      label: 安装方式
+      label: Installation method
       options:
-        - 发布版应用
-        - 从源码运行
-        - 自行构建的应用
+        - Released app
+        - Run from source
+        - Self-built app
     validations:
       required: true
   - type: textarea
     id: reproduction
     attributes:
-      label: 复现步骤
-      description: 请给出从启动应用开始的最小复现步骤。
+      label: Steps to reproduce
+      description: Give the smallest reproduction starting from app launch.
       placeholder: |
         1. ...
         2. ...
@@ -48,28 +48,28 @@ body:
   - type: textarea
     id: expected
     attributes:
-      label: 预期行为
+      label: Expected behavior
     validations:
       required: true
   - type: textarea
     id: actual
     attributes:
-      label: 实际行为
-      description: 可附截图、录屏或错误信息；请先移除密码、令牌和个人数据。
+      label: Actual behavior
+      description: You may attach screenshots, recordings, or errors; remove passwords, tokens, and personal data first.
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
-      label: 相关日志
-      description: 可选。请勿粘贴包含凭据或隐私数据的内容。
+      label: Relevant logs
+      description: Optional. Do not paste credentials or private data.
       render: shell
   - type: checkboxes
     id: checks
     attributes:
-      label: 提交前检查
+      label: Pre-submission checks
       options:
-        - label: 我已搜索现有 Issue，确认这不是重复报告。
+        - label: I searched existing Issues and confirmed that this is not a duplicate.
           required: true
-        - label: 我已移除日志、截图中的敏感信息。
+        - label: I removed sensitive information from logs and screenshots.
           required: true

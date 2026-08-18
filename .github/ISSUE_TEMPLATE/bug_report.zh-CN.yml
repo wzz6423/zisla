@@ -1,0 +1,75 @@
+name: 缺陷报告（简体中文）
+description: 报告可复现的问题，帮助我们定位和修复。
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请先搜索已有 Issue，避免重复提交。
+  - type: input
+    id: version
+    attributes:
+      label: zisla 版本
+      description: 请填写应用版本或提交 SHA。
+      placeholder: 例如 v0.1.1 或 abc1234
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS 版本与设备
+      description: 请填写 macOS 版本和芯片型号。
+      placeholder: 例如 macOS 15.5, Apple M3 Pro
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: 安装方式
+      options:
+        - 发布版应用
+        - 从源码运行
+        - 自行构建的应用
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 请给出从启动应用开始的最小复现步骤。
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 可附截图、录屏或错误信息；请先移除密码、令牌和个人数据。
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: 可选。请勿粘贴包含凭据或隐私数据的内容。
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前检查
+      options:
+        - label: 我已搜索现有 Issue，确认这不是重复报告。
+          required: true
+        - label: 我已移除日志、截图中的敏感信息。
+          required: true
