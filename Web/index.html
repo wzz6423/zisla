@@ -13,6 +13,17 @@
     <title>zisla · 动态工作空间</title>
   </head>
   <body>
+    <!-- Liquid Glass 位移滤镜：为 Chromium 的 backdrop-filter: url() 提供液态折射，
+         其余浏览器由 CSS 中的 blur/saturate 兜底。参考 liquid-glass-studio 的视觉拆解。 -->
+    <svg class="lg-svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="lg-refract" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="7" result="noise" />
+          <feGaussianBlur in="noise" stdDeviation="1.6" result="soft" />
+          <feDisplacementMap in="SourceGraphic" in2="soft" scale="24" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </defs>
+    </svg>
     <div id="app"></div>
     <script type="module" src="./src/main.ts"></script>
   </body>

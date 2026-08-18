@@ -119,6 +119,12 @@ import {
 } from './content';
 import './styles.css';
 
+// backdrop-filter: url(#svg) 目前只有 Chromium 真正渲染，检测后加类启用液态折射；
+// 其余浏览器走 CSS 里的 blur/saturate 兜底，不影响可用性。
+if (/Chrom(e|ium)/.test(navigator.userAgent) && !/Mobile|Android|iPhone|iPad/.test(navigator.userAgent)) {
+  document.documentElement.classList.add('lg-refract');
+}
+
 const app = document.querySelector<HTMLDivElement>('#app');
 
 if (!app) {

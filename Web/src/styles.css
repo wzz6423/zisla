@@ -4802,3 +4802,262 @@ summary:focus-visible {
     align-items: flex-start;
   }
 }
+
+/* ============ Liquid Glass 层 ============
+   视觉拆解参考 liquid-glass-studio（折射 / 色散 / 菲涅尔高光 / 超椭圆），
+   用 CSS + SVG 位移滤镜实现轻量版：
+   - 基础：半透明渐变层 + backdrop blur/saturate + 内嵌高光描边（全浏览器）
+   - 增强：Chromium 下叠加 url(#lg-refract) 位移折射，边缘呈液态流动
+*/
+
+.lg-svg-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* ---- 头部导航：玻璃胶囊（仅桌面，移动端保持全宽菜单） ---- */
+
+@media (min-width: 901px) {
+  .nav {
+    position: relative;
+    gap: 4px;
+    padding: 7px 8px 7px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.05) 46%, rgba(255, 255, 255, 0.02) 100%);
+    backdrop-filter: blur(18px) saturate(170%);
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
+    box-shadow:
+      0 12px 38px rgba(4, 6, 10, 0.42),
+      inset 0 1px 0 rgba(255, 255, 255, 0.26),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .lg-refract .nav {
+    backdrop-filter: url(#lg-refract) blur(18px) saturate(170%);
+  }
+
+  /* 流光：一道高光缓慢掠过胶囊 */
+  .nav::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.18) 48%, rgba(255, 255, 255, 0.04) 54%, transparent 70%);
+    background-size: 220% 100%;
+    animation: lgSheen 7s ease-in-out infinite;
+  }
+
+  .nav-link {
+    padding: 7px 12px;
+    border-radius: 999px;
+    transition: color 180ms ease, background-color 180ms ease;
+  }
+
+  .nav-link::after {
+    display: none;
+  }
+
+  .nav-link:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: var(--paper);
+  }
+}
+
+@keyframes lgSheen {
+  0%,
+  100% {
+    background-position: 130% 0;
+  }
+
+  50% {
+    background-position: -90% 0;
+  }
+}
+
+/* ---- Hero 氛围光：暗底上两团缓慢漂移的彩色光晕，为玻璃提供折射内容 ---- */
+
+.hero::before,
+.hero::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(90px);
+}
+
+.hero::before {
+  width: 620px;
+  height: 620px;
+  left: -180px;
+  top: -220px;
+  background: radial-gradient(circle, rgba(255, 105, 75, 0.32) 0%, transparent 66%);
+  animation: lgDriftA 18s ease-in-out infinite alternate;
+}
+
+.hero::after {
+  width: 700px;
+  height: 700px;
+  right: -220px;
+  bottom: -300px;
+  background: radial-gradient(circle, rgba(110, 231, 183, 0.2) 0%, transparent 66%);
+  animation: lgDriftB 22s ease-in-out infinite alternate;
+}
+
+@keyframes lgDriftA {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(70px, 50px, 0) scale(1.12);
+  }
+}
+
+@keyframes lgDriftB {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(-80px, -40px, 0) scale(1.08);
+  }
+}
+
+/* ---- 灵动岛：液态玻璃边缘 ---- */
+
+.island-collapsed {
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 100%),
+    linear-gradient(180deg, rgba(16, 18, 22, 0.92) 0%, rgba(12, 14, 17, 0.92) 100%);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow:
+    0 12px 34px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.lg-refract .island-collapsed {
+  backdrop-filter: url(#lg-refract) blur(14px) saturate(160%);
+}
+
+/* ---- 主按钮：薄荷玻璃质感 ---- */
+
+.button-primary {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: linear-gradient(135deg, #82f0c6 0%, var(--mint) 48%, #52c29f 100%);
+}
+
+.button-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.08) 46%, transparent 60%);
+}
+
+.header-cta {
+  box-shadow: 0 4px 14px rgba(110, 231, 183, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+/* ---- Hero 演示重播按钮：玻璃药丸 ---- */
+
+.demo-replay {
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.lg-refract .demo-replay {
+  backdrop-filter: url(#lg-refract) blur(12px) saturate(150%);
+}
+
+/* ---- 下载区：氛围光 + 玻璃注记卡 ---- */
+
+.download-section {
+  position: relative;
+  overflow: hidden;
+}
+
+.download-section::before {
+  content: "";
+  position: absolute;
+  top: -240px;
+  right: -160px;
+  width: 620px;
+  height: 620px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(110, 231, 183, 0.16) 0%, transparent 66%);
+  filter: blur(80px);
+}
+
+.download-section::after {
+  content: "";
+  position: absolute;
+  bottom: -280px;
+  left: -180px;
+  width: 560px;
+  height: 560px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(10, 132, 255, 0.14) 0%, transparent 66%);
+  filter: blur(80px);
+}
+
+.download-layout {
+  position: relative;
+  z-index: 1;
+}
+
+.download-note {
+  padding: 15px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  transition: border-color 200ms ease, background-color 200ms ease;
+}
+
+.download-note:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.download-notes {
+  gap: 10px;
+}
+
+/* ---- 无障碍：减少透明度时回退为实底 ---- */
+
+@media (prefers-reduced-transparency: reduce) {
+    .nav,
+  .island-collapsed,
+  .demo-replay,
+  .download-note {
+    background: #14161b;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .nav::before,
+  .hero::before,
+  .hero::after,
+  .download-section::before,
+  .download-section::after {
+    display: none;
+  }
+}
