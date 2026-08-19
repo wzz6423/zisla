@@ -652,7 +652,7 @@ summary:focus-visible {
   isolation: isolate;
   width: min(700px, calc(100vw - 64px));
   overflow: hidden;
-  border-radius: 0 0 34px 34px;
+  border-radius: 0 0 46px 46px;
   background: rgba(11, 13, 17, 0.42);
   backdrop-filter: blur(34px) saturate(155%);
   -webkit-backdrop-filter: blur(34px) saturate(155%);
@@ -3607,7 +3607,7 @@ summary:focus-visible {
   width: min(700px, 100%);
   margin: 0 auto;
   overflow: hidden;
-  border-radius: 0 0 34px 34px;
+  border-radius: 0 0 46px 46px;
   background: rgba(11, 13, 17, 0.38);
   backdrop-filter: blur(34px) saturate(155%);
   -webkit-backdrop-filter: blur(34px) saturate(155%);
@@ -5059,5 +5059,48 @@ summary:focus-visible {
   .download-section::before,
   .download-section::after {
     display: none;
+  }
+}
+
+/* ---- 灵动岛展开态：液态玻璃外壳（R 角放大以贴近连续曲率） ---- */
+
+.island-expanded,
+.zi-frame {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 26%, rgba(11, 13, 17, 0.38) 100%);
+  box-shadow:
+    0 30px 70px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(122, 224, 255, 0.15),
+    inset 0 -18px 48px rgba(122, 224, 255, 0.025),
+    inset 1px 0 0 rgba(255, 255, 255, 0.05),
+    inset -1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+.lg-refract .island-expanded,
+.lg-refract .zi-frame {
+  backdrop-filter: url(#lg-refract) blur(34px) saturate(155%);
+}
+
+/* 媒体外壳：从纯黑降为玻璃内的深色层，保留封面衬托 */
+.crown {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.78) 100%);
+}
+
+/* 兜底：不支持 backdrop-filter 或用户要求减少透明度时回退实底 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .island-expanded,
+  .zi-frame {
+    background: #171a20;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .island-expanded,
+  .zi-frame {
+    background: #171a20;
+  }
+
+  .crown {
+    background: #000;
   }
 }

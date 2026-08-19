@@ -83,12 +83,12 @@ export const heroCycleModules = [
   'shelf',
 ];
 
-/* ===== 正在播放（虚构演示数据） ===== */
+/* ===== 正在播放（界面示意数据） ===== */
 
 export const nowPlaying = {
   title: '微光时刻',
-  artist: '演示音频',
-  subtitle: '示例歌词 · 静静流动',
+  artist: '晚风电台',
+  subtitle: '吹过晚风的手 · 歌词同步',
   currentSeconds: 54,
   durationSeconds: 228,
 };
@@ -102,7 +102,7 @@ export const islandMetrics = [
   { label: 'Disk', value: 28, tone: 'good' as const },
 ];
 
-/* ===== AI 监控模块（虚构演示数据） ===== */
+/* ===== AI 监控模块（界面示意数据） ===== */
 
 export interface AITaskRow {
   name: string;
@@ -128,45 +128,45 @@ export const aiTasks: AITaskRow[] = [
   {
     name: '整理组件使用文档',
     provider: 'CLAUDE',
-    detail: '演示项目 · UI Library',
+    detail: '设计系统 · UI Library',
     effort: 'high',
-    meta: '开始 09:30 · 演示会话 A1',
+    meta: '开始 09:30 · 会话 A1',
     elapsedSeconds: 60,
     status: 'spinner',
   },
   {
     name: '检查搜索结果排序',
     provider: 'GPT',
-    detail: '演示项目 · Search',
+    detail: '官网重构 · Search',
     effort: 'max',
-    meta: '开始 09:15 · 演示会话 B2',
+    meta: '开始 09:15 · 会话 B2',
     elapsedSeconds: 459,
     status: 'dot',
   },
   {
     name: '调整产品展示文案',
     provider: 'CODEX',
-    detail: '官网演示 · Showcase',
+    detail: '落地页改版 · Showcase',
     effort: 'high',
-    meta: '开始 09:25 · 演示会话 C3',
+    meta: '开始 09:25 · 会话 C3',
     elapsedSeconds: 226,
     status: 'spinner',
   },
   {
     name: '验证下载队列状态',
     provider: 'GEMINI',
-    detail: '演示项目 · Queue',
+    detail: '发布流水线 · Queue',
     effort: 'medium',
-    meta: '开始 09:20 · 演示会话 D4',
+    meta: '开始 09:20 · 会话 D4',
     elapsedSeconds: 235,
     status: 'dot',
   },
   {
-    name: '生成示例发布说明',
+    name: '生成本周发布说明',
     provider: 'QWEN',
-    detail: '演示项目 · Docs',
+    detail: '版本归档 · Docs',
     effort: 'low',
-    meta: '开始 09:00 · 演示会话 E5',
+    meta: '开始 09:00 · 会话 E5',
     elapsedSeconds: 873,
     status: 'spinner',
   },
@@ -180,7 +180,7 @@ export const tokenTrend = {
   lastValue: '947M',
 };
 
-/* ===== 剪贴板模块（虚构演示数据） ===== */
+/* ===== 剪贴板模块（界面示意数据） ===== */
 
 export const clipboardMeta = {
   total: 12,
@@ -200,7 +200,7 @@ export const clipboardMeta = {
 };
 
 export const clipboardItems = [
-  { kind: 'image' as const, title: '示例设计稿.png', meta: 'PNG · 324.5 KB' },
+  { kind: 'image' as const, title: '首页设计稿.png', meta: 'PNG · 324.5 KB' },
   {
     kind: 'code' as const,
     title: 'npm run test',
@@ -213,24 +213,24 @@ export const clipboardItems = [
   },
   {
     kind: 'text' as const,
-    title: '下周三下午同步演示方案',
+    title: '下周三下午同步评审方案',
     meta: '文本',
   },
 ];
 
-/* ===== 中转站模块（虚构演示数据） ===== */
+/* ===== 中转站模块（界面示意数据） ===== */
 
 export const shelfMeta = {
   count: 3,
   filters: ['全部', '文件夹', '图片', '视频', '音频', '文档', '压缩包', '代码', '其他'],
   previews: [
-    { name: '演示封面.png', meta: 'PNG · 484.0 KB', kind: 'image' },
-    { name: '示例资料.pdf', meta: 'PDF · 1.2 MB', kind: 'document' },
+    { name: '播客封面.png', meta: 'PNG · 484.0 KB', kind: 'image' },
+    { name: '需求评审资料.pdf', meta: 'PDF · 1.2 MB', kind: 'document' },
     { name: '原型素材.zip', meta: 'ZIP · 8.6 MB', kind: 'archive' },
   ],
 };
 
-/* ===== 下载模块（产品界面演示数据） ===== */
+/* ===== 下载模块（产品界面示意数据） ===== */
 
 export const downloadMeta = {
   placeholder: '视频或音频链接',
@@ -239,11 +239,11 @@ export const downloadMeta = {
   clipboardToggle: '剪贴板检测已开启',
 };
 
-/* ===== 日程模块（虚构演示数据） ===== */
+/* ===== 日程模块（界面示意数据） ===== */
 
 export const weatherCities = [
   {
-    region: '示例市 · 中心区',
+    region: '杭州市 · 中心区',
     icon: 'sun',
     condition: '晴 · 体感 26°',
     temp: '24°',
@@ -252,7 +252,7 @@ export const weatherCities = [
     humidity: '5% / 0.0mm',
   },
   {
-    region: '示例市 · 湖畔区',
+    region: '杭州市 · 湖畔区',
     icon: 'cloud',
     condition: '多云 · 体感 22°',
     temp: '21°',
@@ -264,13 +264,13 @@ export const weatherCities = [
 
 export const agendaEmptyText = '今天没有待办事项';
 
-/* ===== 随记模块（虚构演示数据） ===== */
+/* ===== 随记模块（界面示意数据） ===== */
 
 export const notesMeta = {
   count: 4,
   wordCount: '86 字',
   list: [
-    { title: '产品演示提纲', meta: '刚刚', selected: true },
+    { title: '周会提纲', meta: '刚刚', selected: true },
     { title: '下周待办', meta: '2 小时前' },
     { title: '读书摘要', meta: '昨天' },
     { title: '灵感记录', meta: '上周' },
@@ -279,16 +279,16 @@ export const notesMeta = {
     '用随记收集灵感、整理待办，或把手边的文字和文件继续发给 AI Agent。内容保存在系统「备忘录」中。',
 };
 
-/* ===== 邮件模块（虚构演示数据） ===== */
+/* ===== 邮件模块（界面示意数据） ===== */
 
 export const mailMeta = {
-  account: '演示账户',
+  account: '个人邮箱',
   unread: 2,
   messages: [
     {
       sender: '产品协作',
       title: '本周体验清单',
-      preview: '演示版已准备好，请查看附件。',
+      preview: '初稿已准备好，请查看附件。',
       time: '09:42',
       unread: true,
       selected: true,
@@ -302,23 +302,23 @@ export const mailMeta = {
       selected: false,
     },
     {
-      sender: '示例通知',
-      title: '下次演示时间',
-      preview: '下周三下午进行产品演示。',
+      sender: '日历通知',
+      title: '下次评审时间',
+      preview: '下周三下午进行产品评审。',
       time: '昨天',
       unread: false,
       selected: false,
     },
   ],
   detail: {
-    sender: '产品协作 <demo@example.com>',
+    sender: '产品协作 <team@zisla.app>',
     title: '本周体验清单',
     date: '今天 09:42',
-    body: '演示版已准备好。本次重点查看顶部展开、模块切换和多屏显示。',
+    body: '初稿已准备好。本次重点查看顶部展开、模块切换和多屏显示。',
   },
 };
 
-/* ===== PDF 工具模块（产品界面演示数据） ===== */
+/* ===== PDF 工具模块（产品界面示意数据） ===== */
 
 export const pdfTools = [
   { label: '合并 PDF', active: true },
@@ -340,7 +340,7 @@ export const pdfTools = [
 export const pdfActiveTitle = '合并 PDF';
 export const pdfActiveDesc = '按选择顺序合并多个 PDF';
 
-/* ===== 系统状态模块（虚构演示数据） ===== */
+/* ===== 系统状态模块（界面示意数据） ===== */
 
 export const systemCards = {
   cpu: {
@@ -388,16 +388,16 @@ export const systemCards = {
 
 export const dashboardMeta = {
   focus: { clock: '24:18', phase: '进行中' },
-  ai: { title: '整理演示文档', provider: 'CODEX', progress: 68 },
-  download: { title: '演示素材.zip', progress: 42, speed: '3.2 MB/s', eta: '剩余 18 秒' },
+  ai: { title: '整理需求文档', provider: 'CODEX', progress: 68 },
+  download: { title: '发布会素材.zip', progress: 42, speed: '3.2 MB/s', eta: '剩余 18 秒' },
 };
 
 export const agentMeta = {
-  project: '演示项目',
-  thread: '新建产品演示',
-  model: '演示模型',
+  project: '官方网站',
+  thread: '新建产品评审',
+  model: 'GLM-4.7',
   messages: [
-    { role: '你', body: '把这份演示提纲整理成三个重点。' },
+    { role: '你', body: '把这份提纲整理成三个重点。' },
     { role: 'AI', body: '已整理：顶部工作流、本地优先、按需出现。' },
   ],
 };
@@ -422,8 +422,8 @@ export const batteryMeta = {
     { label: '当前电量', value: '5,320 mAh' },
   ],
   devices: [
-    { name: '演示耳机', level: 64, symbol: 'airplay' },
-    { name: '演示配件', level: 82, symbol: 'battery-charging' },
+    { name: 'AirPods Pro', level: 64, symbol: 'airplay' },
+    { name: 'Magic Keyboard', level: 82, symbol: 'battery-charging' },
   ],
 };
 
