@@ -142,7 +142,7 @@ public struct AgentCLIProfile: Codable, Equatable, Sendable {
             ("\(home)/.grok/config.toml", "\(home)/.grok/auth.json")
         case .opencode:
             ("\(home)/.config/opencode/opencode.json", "\(home)/.local/share/opencode/auth.json")
-        case .kimi, .qwen, .qoder, .copilot, .glm:
+        case .kimi, .qwen, .qoder, .copilot, .glm, .dsh:
             ("", "")
         }
     }
@@ -598,6 +598,7 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
     case qoder
     case glm
     case copilot
+    case dsh
 
     public static let detectableCases = allCases
     public static let relayCases: [Self] = [.claude, .codex, .gemini, .grok, .opencode]
@@ -611,6 +612,7 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
         case .qoder: "Qoder CLI"
         case .copilot: "GitHub Copilot"
         case .glm: "GLM Coding"
+        case .dsh: "DeepSeek Harness"
         default: rawValue.capitalized
         }
     }
@@ -633,6 +635,7 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
         case .qoder: "@qoder-ai/qodercli"
         case .copilot: "@github/copilot"
         case .glm: "@z_ai/coding-helper"
+        case .dsh: "@deepseek-ai/dsh"
         case .grok, .kimi: nil
         }
     }

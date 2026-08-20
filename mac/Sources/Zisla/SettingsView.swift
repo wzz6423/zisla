@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var isVoiceHistoryBatchDeleteConfirmationPresented = false
     @State private var voiceHistorySelectionMode = false
     @State private var selectedVoiceHistoryIDs: Set<UUID> = []
+    @State private var screenshotHotkeyValidationMessage: String?
     @Namespace private var sectionSelectionNamespace
 
     init(model: AppModel) {
@@ -45,6 +46,7 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             launchAtLogin.refresh()
             model.refreshVoiceInputInputMonitoringAccess()
+            model.backgroundSounds.refresh()
         }
         .onChange(of: settingsStore.settings) { _, _ in
             ensureSelectionIsVisible()
@@ -136,9 +138,27 @@ struct SettingsView: View {
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 0)
-                IconButton(symbol: "power", help: "退出应用", size: .compact) {
+                Button {
                     NSApp.terminate(nil)
+                } label: {
+                    HStack(spacing: 6) {
+                        IconButtonLabel(
+                            symbol: "power",
+                            size: .compact,
+                            showsInactiveBackground: false
+                        )
+                        Text("退出")
+                            .font(.system(size: 10, weight: .medium))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    .padding(.trailing, 7)
+                    .background(Color.fillControl)
+                    .clipShape(Capsule())
+                    .contentShape(Capsule())
                 }
+                .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
+                .help("退出应用")
                 .accessibilityLabel("退出应用")
             }
             .frame(maxWidth: .infinity)
@@ -308,7 +328,8 @@ struct SettingsView: View {
                     settingRow(
                         symbol: "rectangle.compress.vertical",
                         title: "监控样式",
-                        detail: "紧凑模式隐藏图标并减小字号，减少菜单栏占用"
+                        detail: "紧凑模式隐藏图标并减小字号，减少菜单栏占用",
+                        isNested: true
                     ) {
                         IslandOutlinedPicker(
                             selection: Binding(
@@ -328,7 +349,8 @@ struct SettingsView: View {
                         settingRow(
                             symbol: metric.symbolName,
                             title: metric.menuTitle,
-                            detail: "显示实时监控摘要"
+                            detail: "显示实时监控摘要",
+                            isNested: true
                         ) {
                             Toggle("", isOn: systemMonitorMenuBarBinding(for: metric))
                                 .labelsHidden()
@@ -345,6 +367,13 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("媒体与文件") {
                 featureToggle("媒体播放", detail: "显示系统正在播放的音乐或视频", symbol: "play.square.fill", keyPath: \.mediaEnabled)
+                rowDivider
+                featureToggle(
+                    "Mac 未使用时关闭背景音",
+                    detail: "锁屏、屏保启动或显示器休眠时，自动关闭背景音",
+                    symbol: "lock.display",
+                    keyPath: \.systemBackgroundSoundStopsWhenUnused
+                )
                 rowDivider
                 featureToggle("文件中转与分享", detail: "暂存文件并调用 AirDrop 或系统分享", symbol: "tray.full.fill", keyPath: \.fileShelfEnabled)
                 rowDivider
@@ -389,6 +418,100 @@ struct SettingsView: View {
                 featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
                 rowDivider
                 featureToggle("电池监控", detail: "显示电池详细信息与健康状态", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
+            }
+
+            settingsGroup("截图") {
+                featureToggle(
+                    "启用截图",
+                    detail: "启用截图、钉图与全局快捷键",
+                    symbol: "camera.viewfinder",
+                    keyPath: \.screenshotEnabled
+                )
+                rowDivider
+                settingRow(
+                    symbol: "camera.fill",
+                    title: "截图快捷键",
+                    detail: "触发截图功能"
+                ) {
+                    HotkeyRecorder(
+                        hotkey: Binding(
+                            get: { model.settingsStore.settings.screenshotHotkey },
+                            set: { updateScreenshotHotkey($0, action: .capture) }
+                        )
+                    )
+                    .frame(width: 142, height: 26)
+                    .disabled(!model.settingsStore.settings.screenshotEnabled)
+                }
+                rowDivider
+                settingRow(
+                    symbol: "pin.fill",
+                    title: "钉图快捷键",
+                    detail: "钉住已截取的图片"
+                ) {
+                    HotkeyRecorder(
+                        hotkey: Binding(
+                            get: { model.settingsStore.settings.screenshotPinHotkey },
+                            set: { updateScreenshotHotkey($0, action: .pin) }
+                        )
+                    )
+                    .frame(width: 142, height: 26)
+                    .disabled(!model.settingsStore.settings.screenshotEnabled)
+                }
+                rowDivider
+                featureToggle(
+                    "显示钉图控制条",
+                    detail: "隐藏后仍支持快捷键、手势和鼠标操作",
+                    symbol: "rectangle.bottomhalf.inset.filled",
+                    keyPath: \.screenshotPinnedToolbarVisible
+                )
+                rowDivider
+                settingRow(
+                    symbol: "cursorarrow.motionlines",
+                    title: "鼠标操作",
+                    detail: "按住图片拖动位置；拖动四角调整大小",
+                    detailLineLimit: 2,
+                    isNested: true
+                ) {
+                    EmptyView()
+                }
+                rowDivider
+                settingRow(
+                    symbol: "hand.draw.fill",
+                    title: "触控板手势",
+                    detail: "双指捏合缩放；双指上滑增加不透明度，下滑降低不透明度",
+                    detailLineLimit: 2,
+                    isNested: true
+                ) {
+                    EmptyView()
+                }
+                if model.settingsStore.settings.screenshotEnabled,
+                   let message = screenshotHotkeyValidationMessage ?? currentScreenshotHotkeyConflict {
+                    rowDivider
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.zislaWarning)
+                        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+                }
+                if screenshotHotkeysRequireInputMonitoring {
+                    rowDivider
+                    settingRow(
+                        symbol: "lock.shield",
+                        title: "输入监控",
+                        detail: "单独修饰键需要监听全局键盘事件",
+                        isNested: true
+                    ) {
+                        if model.voiceInputInputMonitoringAccessGranted {
+                            Label("已授权", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.caption)
+                        } else {
+                            Button("打开设置") {
+                                model.openVoiceInputInputMonitoringSettings()
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
             }
 
             settingsGroup("灵动岛与下载展示") {
@@ -674,6 +797,23 @@ struct SettingsView: View {
                     .controlSize(.small)
                     .frame(maxWidth: 220, alignment: .trailing)
                 }
+                rowDivider
+                settingRow(
+                    symbol: "list.number",
+                    title: "格式化整理",
+                    detail: "将明确列举的事项整理为编号列表"
+                ) {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { model.settingsStore.settings.voiceStructuredFormattingEnabled },
+                            set: { model.settingsStore.settings.voiceStructuredFormattingEnabled = $0 }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                }
                 if let configuration = model.selectedVoiceModelConfiguration {
                     rowDivider
                     settingRow(
@@ -761,6 +901,22 @@ struct SettingsView: View {
                 ) {
                     IconButton(symbol: "folder", help: "打开语音记录目录", size: .compact) {
                         model.openVoiceRecordingsDirectory()
+                    }
+                }
+            }
+
+            settingsGroup("识别词库") {
+                ForEach(Array(VoiceLexicon.allCases.enumerated()), id: \.element.id) { index, lexicon in
+                    if index > 0 { rowDivider }
+                    settingRow(
+                        symbol: lexicon.symbol,
+                        title: lexicon.title,
+                        detail: lexicon.detail
+                    ) {
+                        Toggle("", isOn: voiceLexiconBinding(for: lexicon))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
                     }
                 }
             }
@@ -1029,7 +1185,7 @@ struct SettingsView: View {
                             ? "按住说话、松开结束"
                             : "按一下开始、再按一下结束"
                     ) {
-                        VoiceInputHotkeyRecorder(
+                        HotkeyRecorder(
                             hotkey: Binding(
                                 get: { model.settingsStore.settings.voiceInputHotkeyPreset },
                                 set: { model.settingsStore.settings.voiceInputHotkeyPreset = $0 }
@@ -1042,7 +1198,8 @@ struct SettingsView: View {
                         settingRow(
                             symbol: "lock.shield",
                             title: "输入监控",
-                            detail: "左右侧修饰键需要监听全局键盘事件"
+                            detail: "左右侧修饰键需要监听全局键盘事件",
+                            isNested: true
                         ) {
                             if model.voiceInputInputMonitoringAccessGranted {
                                 Label("已授权", systemImage: "checkmark.circle.fill")
@@ -1133,6 +1290,21 @@ struct SettingsView: View {
         )
     }
 
+    private func voiceLexiconBinding(for lexicon: VoiceLexicon) -> Binding<Bool> {
+        Binding(
+            get: { model.settingsStore.settings.voiceEnabledLexicons.contains(lexicon) },
+            set: { enabled in
+                var selection = model.settingsStore.settings.voiceEnabledLexicons
+                if enabled {
+                    selection.insert(lexicon)
+                } else {
+                    selection.remove(lexicon)
+                }
+                model.settingsStore.settings.voiceEnabledLexicons = selection
+            }
+        )
+    }
+
     private func petDisplayLabel(_ entry: PetLibrary.Entry) -> String {
         switch entry.origin {
         case .builtin: entry.manifest.displayName
@@ -1173,6 +1345,62 @@ struct SettingsView: View {
                     selected == connectedDisplayIDs ? [] : selected
             }
         )
+    }
+
+    private enum ScreenshotHotkeyAction: Equatable {
+        case capture
+        case pin
+    }
+
+    private var screenshotHotkeysRequireInputMonitoring: Bool {
+        let settings = model.settingsStore.settings
+        return settings.screenshotEnabled
+            && (settings.screenshotHotkey.requiresInputMonitoring
+                || settings.screenshotPinHotkey.requiresInputMonitoring)
+    }
+
+    private var currentScreenshotHotkeyConflict: String? {
+        let settings = model.settingsStore.settings
+        if settings.screenshotHotkey.conflicts(with: settings.screenshotPinHotkey) {
+            return "截图与钉图快捷键冲突，请修改其中一个"
+        }
+        if settings.voiceInputEnabled,
+           settings.screenshotHotkey.conflicts(with: settings.voiceInputHotkeyPreset) {
+            return "截图快捷键与语音输入冲突"
+        }
+        if settings.voiceInputEnabled,
+           settings.screenshotPinHotkey.conflicts(with: settings.voiceInputHotkeyPreset) {
+            return "钉图快捷键与语音输入冲突"
+        }
+        return nil
+    }
+
+    private func updateScreenshotHotkey(
+        _ hotkey: VoiceInputHotkeyPreset,
+        action: ScreenshotHotkeyAction
+    ) {
+        var settings = model.settingsStore.settings
+        let other = action == .capture ? settings.screenshotPinHotkey : settings.screenshotHotkey
+        let actionName = action == .capture ? "截图" : "钉图"
+        let otherName = action == .capture ? "钉图" : "截图"
+        guard !hotkey.conflicts(with: other) else {
+            screenshotHotkeyValidationMessage = "\(actionName)快捷键与\(otherName)冲突，未保存"
+            return
+        }
+        guard !settings.voiceInputEnabled
+            || !hotkey.conflicts(with: settings.voiceInputHotkeyPreset)
+        else {
+            screenshotHotkeyValidationMessage = "\(actionName)快捷键与语音输入冲突，未保存"
+            return
+        }
+        switch action {
+        case .capture:
+            settings.screenshotHotkey = hotkey
+        case .pin:
+            settings.screenshotPinHotkey = hotkey
+        }
+        screenshotHotkeyValidationMessage = nil
+        model.settingsStore.settings = settings
     }
 
     private var generalContent: some View {
@@ -1950,6 +2178,7 @@ struct SettingsView: View {
         title: String,
         detail: String,
         detailLineLimit: Int? = nil,
+        isNested: Bool = false,
         @ViewBuilder trailing: () -> Trailing
     ) -> some View {
         HStack(spacing: 10) {
@@ -1973,7 +2202,8 @@ struct SettingsView: View {
             Spacer(minLength: 8)
             trailing()
         }
-        .padding(.horizontal, 4)
+        .padding(.leading, isNested ? 24 : 4)
+        .padding(.trailing, 4)
         .frame(maxWidth: .infinity, minHeight: 48)
     }
 
@@ -2091,7 +2321,7 @@ struct SettingsView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.3"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.4"
     }
 
     private func searchWeatherLocation() {
@@ -2162,28 +2392,28 @@ private struct ActivityNoticeDisplay: Identifiable {
     let name: String
 }
 
-private struct VoiceInputHotkeyRecorder: NSViewRepresentable {
+private struct HotkeyRecorder: NSViewRepresentable {
     @Binding var hotkey: VoiceInputHotkeyPreset
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
-    func makeNSView(context: Context) -> VoiceInputHotkeyRecorderButton {
-        let button = VoiceInputHotkeyRecorderButton(hotkey: hotkey)
+    func makeNSView(context: Context) -> HotkeyRecorderButton {
+        let button = HotkeyRecorderButton(hotkey: hotkey)
         button.onRecord = context.coordinator.record
         return button
     }
 
-    func updateNSView(_ nsView: VoiceInputHotkeyRecorderButton, context: Context) {
+    func updateNSView(_ nsView: HotkeyRecorderButton, context: Context) {
         nsView.hotkey = hotkey
     }
 
     @MainActor
     final class Coordinator {
-        private var parent: VoiceInputHotkeyRecorder
+        private var parent: HotkeyRecorder
 
-        init(_ parent: VoiceInputHotkeyRecorder) {
+        init(_ parent: HotkeyRecorder) {
             self.parent = parent
         }
 
@@ -2194,7 +2424,7 @@ private struct VoiceInputHotkeyRecorder: NSViewRepresentable {
 }
 
 @MainActor
-private final class VoiceInputHotkeyRecorderButton: NSButton {
+private final class HotkeyRecorderButton: NSButton {
     var hotkey: VoiceInputHotkeyPreset {
         didSet {
             if !isRecording {

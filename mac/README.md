@@ -89,7 +89,7 @@ zisla reads public or stable local session state from supported tools and extrac
 | --- | --- |
 | OpenAI / Anthropic | Codex CLI and Desktop, Claude Code, and their host environments |
 | GitHub / Google / xAI | GitHub Copilot CLI and VS Code, Gemini CLI, and Grok CLI |
-| Independent and regional tools | Kimi Code, Qwen Code, Qoder, TRAE, OpenCode, Harnext/Harness, WorkBuddy, and Doubao |
+| Independent and regional tools | Kimi Code, Qwen Code, Qoder, ZCode Desktop and CLI, TRAE, OpenCode, Harnext/Harness, WorkBuddy, and Doubao |
 
 Waiting for approval or a user answer is yellow, tool or command errors are red, and normal execution is green; simultaneous sources are grouped in red, yellow, green order. The Qwen runtime sidecar is considered active only while its PID is alive, avoiding stale reports after exit.
 
@@ -124,7 +124,7 @@ swift run zislactl usage \
 swift run zislactl finish --id build-42 --detail "Complete"
 ```
 
-Canonical providers include `claude`, `codex`, `gemini`, `grok`, `gpt`, `copilot`, `kimi`, `qwen`, `coder`, `trae`, `opencode`, `harness`, and `doubao`; common aliases are normalized automatically. Call it from any tool hook, shell wrapper, or task script.
+Canonical providers include `claude`, `codex`, `gemini`, `grok`, `gpt`, `copilot`, `kimi`, `qwen`, `coder`, `zcode`, `trae`, `opencode`, `harness`, and `doubao`; common aliases are normalized automatically. Call it from any tool hook, shell wrapper, or task script.
 
 The AI run list and collapsed state use each tool's official logo to identify its source.
 

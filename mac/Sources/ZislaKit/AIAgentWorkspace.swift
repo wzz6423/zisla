@@ -62,6 +62,12 @@ public struct AIAgentCLICommandProgress: Equatable, Sendable {
 
 @MainActor
 public final class AIAgentWorkspace: ObservableObject {
+    private struct CLICommandRun {
+        let commands: [AIAgentCLICommand]
+        let title: String
+        let kinds: [AgentCLIKind]
+    }
+
     public let store: AIAgentStore
 
     @Published public private(set) var lastError: String?
@@ -82,6 +88,7 @@ public final class AIAgentWorkspace: ObservableObject {
     private var cliAutoUpdateTask: Task<Void, Never>?
     private var cliCommandTask: Task<Void, Never>?
     private var cliRefreshTask: Task<Void, Never>?
+    private var pendingCLICommandRuns: [CLICommandRun] = []
     private var runtimeEnabled = false
     private var skillRefreshGeneration = 0
     private var cancellables: Set<AnyCancellable> = []
@@ -134,6 +141,7 @@ public final class AIAgentWorkspace: ObservableObject {
         cliAutoUpdateTask = nil
         cliCommandTask?.cancel()
         cliCommandTask = nil
+        pendingCLICommandRuns.removeAll()
         cliRefreshTask?.cancel()
         cliRefreshTask = nil
         isCheckingCLIs = false
@@ -233,6 +241,14 @@ public final class AIAgentWorkspace: ObservableObject {
     }
 
     public func refreshCLIs() async {
+        if let cliCommandTask {
+            await cliCommandTask.value
+            return
+        }
+        await refreshCLIsNow()
+    }
+
+    private func refreshCLIsNow() async {
         if let cliRefreshTask {
             await cliRefreshTask.value
             return
@@ -247,6 +263,7 @@ public final class AIAgentWorkspace: ObservableObject {
         await refreshTask.value
         cliRefreshTask = nil
         isCheckingCLIs = false
+        startNextCLICommandRunIfNeeded()
     }
 
     private func performCLIRefresh() async {
@@ -281,7 +298,7 @@ public final class AIAgentWorkspace: ObservableObject {
         let commands = commandsForCLIInstallation(kinds, update: true)
         guard !commands.isEmpty else { return }
         let names = kinds.map(\.displayName).joined(separator: "、")
-        startCLICommands(commands, title: "正在自动更新 \(names)", kinds: kinds)
+        startCLICommands(commands, title: "自动更新 \(names)", kinds: kinds)
     }
 
     public func refreshSkills() async {
@@ -465,18 +482,34 @@ public final class AIAgentWorkspace: ObservableObject {
         title: String,
         kinds: [AgentCLIKind]
     ) {
-        guard !commands.isEmpty, !isRunningCLICommands else { return }
+        guard !commands.isEmpty else { return }
+        let run = CLICommandRun(commands: commands, title: title, kinds: kinds)
+        guard cliCommandTask == nil, cliRefreshTask == nil else {
+            pendingCLICommandRuns.append(run)
+            return
+        }
+        startCLICommandRun(run)
+    }
+
+    private func startCLICommandRun(_ run: CLICommandRun) {
         lastError = nil
         cliCommandProgress = AIAgentCLICommandProgress(
-            title: title,
-            kinds: kinds,
+            title: run.title,
+            kinds: run.kinds,
             completedCount: 0,
-            totalCount: commands.count,
+            totalCount: run.commands.count,
             state: .running
         )
         cliCommandTask = Task { [weak self] in
-            await self?.performCLICommands(commands, title: title, kinds: kinds)
+            await self?.performCLICommands(run.commands, title: run.title, kinds: run.kinds)
         }
+    }
+
+    private func startNextCLICommandRunIfNeeded() {
+        guard cliCommandTask == nil,
+              cliRefreshTask == nil,
+              !pendingCLICommandRuns.isEmpty else { return }
+        startCLICommandRun(pendingCLICommandRuns.removeFirst())
     }
 
     public func runCLICommands(_ commands: [AIAgentCLICommand]) async -> [AIAgentProcessOutput] {
@@ -495,7 +528,7 @@ public final class AIAgentWorkspace: ObservableObject {
                 break
             }
         }
-        await refreshCLIs()
+        await refreshCLIsNow()
         return outputs
     }
 
@@ -504,7 +537,10 @@ public final class AIAgentWorkspace: ObservableObject {
         title: String,
         kinds: [AgentCLIKind]
     ) async {
-        defer { cliCommandTask = nil }
+        defer {
+            cliCommandTask = nil
+            startNextCLICommandRunIfNeeded()
+        }
         let cliService = cliService
         var failures: [String] = []
         var completedCount = 0
@@ -554,7 +590,7 @@ public final class AIAgentWorkspace: ObservableObject {
             state: .running,
             detail: "正在重新检测 CLI 版本"
         )
-        await refreshCLIs()
+        await refreshCLIsNow()
         cliCommandProgress = AIAgentCLICommandProgress(
             title: title,
             kinds: kinds,

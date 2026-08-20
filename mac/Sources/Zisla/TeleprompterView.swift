@@ -19,17 +19,17 @@ struct TeleprompterView: View {
             Color.black
 
             TeleprompterScrollView(
-                script: script,
+                script: $script,
                 isAutoScrolling: $isAutoScrolling,
                 speed: scrollSpeed,
                 resetID: scrollResetID
             )
-            .opacity(script.isEmpty ? 0 : 1)
 
             if script.isEmpty {
                 Image(systemName: "text.viewfinder")
                     .font(.system(size: 38, weight: .light))
                     .foregroundStyle(.white.opacity(0.3))
+                    .allowsHitTesting(false)
             }
         }
         .overlay(alignment: .bottom) {
@@ -40,10 +40,6 @@ struct TeleprompterView: View {
         }
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
-        .onChange(of: script) { _, _ in
-            isAutoScrolling = false
-            scrollResetID = UUID()
-        }
     }
 
     private var controls: some View {
@@ -112,20 +108,21 @@ struct TeleprompterView: View {
 
 @MainActor
 private struct TeleprompterScrollView: NSViewRepresentable {
-    let script: String
+    @Binding var script: String
     @Binding var isAutoScrolling: Bool
     let speed: Double
     let resetID: UUID
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(isAutoScrolling: $isAutoScrolling)
+        Coordinator(script: $script, isAutoScrolling: $isAutoScrolling)
     }
 
     func makeNSView(context: Context) -> TeleprompterScrollContainer {
         let scrollView = TeleprompterScrollContainer()
+        scrollView.setTextDelegate(context.coordinator)
         context.coordinator.update(
             scrollView: scrollView,
-            script: script,
+            script: $script,
             isAutoScrolling: $isAutoScrolling,
             speed: speed,
             resetID: resetID
@@ -136,7 +133,7 @@ private struct TeleprompterScrollView: NSViewRepresentable {
     func updateNSView(_ scrollView: TeleprompterScrollContainer, context: Context) {
         context.coordinator.update(
             scrollView: scrollView,
-            script: script,
+            script: $script,
             isAutoScrolling: $isAutoScrolling,
             speed: speed,
             resetID: resetID
@@ -148,29 +145,35 @@ private struct TeleprompterScrollView: NSViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject {
+    final class Coordinator: NSObject, NSTextViewDelegate {
         private weak var scrollView: TeleprompterScrollContainer?
         private var timer: Timer?
         private var scrollSpeed: CGFloat = 0
+        private var script: Binding<String>
         private var isAutoScrolling: Binding<Bool>
         private var resetID: UUID?
 
-        init(isAutoScrolling: Binding<Bool>) {
+        init(script: Binding<String>, isAutoScrolling: Binding<Bool>) {
+            self.script = script
             self.isAutoScrolling = isAutoScrolling
             super.init()
         }
 
         func update(
             scrollView: TeleprompterScrollContainer,
-            script: String,
+            script: Binding<String>,
             isAutoScrolling: Binding<Bool>,
             speed: Double,
             resetID: UUID
         ) {
             self.scrollView = scrollView
+            self.script = script
             self.isAutoScrolling = isAutoScrolling
             scrollSpeed = CGFloat(speed)
-            scrollView.setScript(script)
+            if scrollView.setScript(script.wrappedValue) {
+                isAutoScrolling.wrappedValue = false
+                scrollView.scrollToTop()
+            }
 
             if self.resetID != resetID {
                 self.resetID = resetID
@@ -217,6 +220,16 @@ private struct TeleprompterScrollView: NSViewRepresentable {
 
             scrollView.scroll(toVerticalOffset: min(maximumOffset, currentOffset + scrollSpeed / 60))
         }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView,
+                  let scrollView,
+                  scrollView.recordUserScriptChange(textView.string)
+            else { return }
+            let newText = textView.string
+            isAutoScrolling.wrappedValue = false
+            script.wrappedValue = newText
+        }
     }
 }
 
@@ -244,10 +257,10 @@ private final class TeleprompterScrollContainer: NSScrollView {
         scrollerStyle = .overlay
         ThinScrollChrome.apply(to: self)
         textView.drawsBackground = false
-        textView.isEditable = false
+        textView.isEditable = true
         textView.isSelectable = true
         textView.isRichText = false
-        textView.allowsUndo = false
+        textView.allowsUndo = true
         textView.textContainerInset = NSSize(width: 48, height: 54)
         textView.textContainer?.lineFragmentPadding = 0
         textView.isHorizontallyResizable = false
@@ -265,23 +278,34 @@ private final class TeleprompterScrollContainer: NSScrollView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func setScript(_ value: String) {
-        guard renderedScript != value else { return }
+    func setTextDelegate(_ delegate: NSTextViewDelegate) {
+        textView.delegate = delegate
+    }
+
+    @discardableResult
+    func setScript(_ value: String) -> Bool {
+        guard renderedScript != value else { return false }
         renderedScript = value
 
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = .left
         paragraphStyle.lineSpacing = 12
         paragraphStyle.paragraphSpacing = 22
-        textView.textStorage?.setAttributedString(NSAttributedString(
-            string: value,
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 34, weight: .medium),
-                .foregroundColor: NSColor.white,
-                .paragraphStyle: paragraphStyle,
-            ]
-        ))
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 34, weight: .medium),
+            .foregroundColor: NSColor.white,
+            .paragraphStyle: paragraphStyle,
+        ]
+        textView.textStorage?.setAttributedString(NSAttributedString(string: value, attributes: attributes))
+        textView.typingAttributes = attributes
         textView.invalidateIntrinsicContentSize()
+        return true
+    }
+
+    func recordUserScriptChange(_ value: String) -> Bool {
+        guard renderedScript != value else { return false }
+        renderedScript = value
+        return true
     }
 
     func scrollToTop() {

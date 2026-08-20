@@ -71,6 +71,84 @@ struct FocusModeMonitorTests {
     }
 
     @Test
+    func assertionStoreSelectsLatestValidModeInsteadOfUnrelatedAssertion() throws {
+        let data = Data(#"""
+        {
+          "data": [{
+            "storeAssertionRecords": [
+              {
+                "assertionUUID": "focus",
+                "assertionStartDateTimestamp": 200,
+                "assertionDetails": {
+                  "assertionDetailsModeIdentifier": "com.apple.focus.work"
+                }
+              },
+              {
+                "assertionUUID": "unrelated",
+                "assertionStartDateTimestamp": 300,
+                "assertionDetails": {
+                  "assertionDetailsIdentifier": "com.apple.some-other-assertion"
+                }
+              }
+            ]
+          }],
+          "header": {"timestamp": 400}
+        }
+        """#.utf8)
+
+        let status = try FocusModeStatusStore.decode(data)
+
+        #expect(status.isActive)
+        #expect(status.identifier == "com.apple.focus.work")
+    }
+
+    @Test
+    func assertionStoreIgnoresInvalidatedModeAssertion() throws {
+        let data = Data(#"""
+        {
+          "data": [{
+            "storeAssertionRecords": [{
+              "assertionUUID": "focus",
+              "assertionStartDateTimestamp": 200,
+              "assertionDetails": {
+                "assertionDetailsModeIdentifier": "com.apple.focus.work"
+              }
+            }],
+            "storeInvalidationRecords": [{
+              "invalidationAssertion": {
+                "assertionUUID": "focus"
+              },
+              "invalidationDateTimestamp": 300
+            }]
+          }],
+          "header": {"timestamp": 400}
+        }
+        """#.utf8)
+
+        #expect(try FocusModeStatusStore.decode(data) == .inactive)
+    }
+
+    @Test
+    func assertionStoreIgnoresExpiredModeAssertion() throws {
+        let data = Data(#"""
+        {
+          "data": [{
+            "storeAssertionRecords": [{
+              "assertionStartDateTimestamp": 200,
+              "assertionDetails": {
+                "assertionDetailsModeIdentifier": "com.apple.focus.work",
+                "assertionDetailsUserVisibleEndDate": 300
+              }
+            }]
+          }],
+          "header": {"timestamp": 400}
+        }
+        """#.utf8)
+
+        #expect(try FocusModeStatusStore.decode(data) == .inactive)
+    }
+
+    @Test
     func assertionStoreLoadsStatusFromDiskAsynchronously() async throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
