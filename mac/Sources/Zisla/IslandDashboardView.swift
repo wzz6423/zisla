@@ -79,7 +79,7 @@ struct IslandDashboardView: View {
             if let task = activeAITask {
                 HStack(spacing: 7) {
                     AIMascotView(
-                        identity: AIMascotIdentity(provider: task.provider, taskID: task.id),
+                        identity: AIMascotIdentity(provider: task.provider, taskID: task.id, title: task.title),
                         size: 24
                     )
 

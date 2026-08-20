@@ -211,7 +211,7 @@ private struct TaskProgressRow: View {
     private var content: some View {
         HStack(spacing: 9) {
             AIMascotView(
-                identity: AIMascotIdentity(provider: task.provider, taskID: task.id),
+                identity: AIMascotIdentity(provider: task.provider, taskID: task.id, title: task.title),
                 size: 20
             )
 

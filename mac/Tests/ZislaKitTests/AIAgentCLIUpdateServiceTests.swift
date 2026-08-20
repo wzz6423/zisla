@@ -13,7 +13,7 @@ struct AIAgentCLIUpdateServiceTests {
             case .codex: "1.2.0"
             case .claude: "2.1.181"
             case .gemini: "0.9.0"
-            case .grok, .kimi, .opencode, .qwen, .qoder, .copilot, .glm: nil
+            case .grok, .kimi, .opencode, .qwen, .qoder, .copilot, .glm, .dsh: nil
             }
         }
 

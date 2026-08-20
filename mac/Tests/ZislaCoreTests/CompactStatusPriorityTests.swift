@@ -9,13 +9,13 @@ struct CompactStatusPriorityTests {
             .transient,
             .videoDownload,
             .browserDownload,
-            .toolboxReminder,
             .mail,
             .updateAvailable,
             .focusCountdown,
+            .focusMode,
             .aiActivity,
             .media,
-            .focusMode,
+            .toolboxReminder,
         ])
     }
 }

@@ -31,14 +31,20 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     case kimi
     case qwen
     case coder
+    case zcode
     case trae
     case opencode
     case harness
+    case deepseekHarness
     case doubao
 
     var id: Self { self }
 
-    init(provider: AIProvider, taskID: String) {
+    init(provider: AIProvider, taskID _: String, title: String? = nil) {
+        if provider == .harness, title == "DeepSeek Harness" {
+            self = .deepseekHarness
+            return
+        }
         switch provider {
         case .claude: self = .claude
         case .codex: self = .codex
@@ -49,6 +55,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .kimi: self = .kimi
         case .qwen: self = .qwen
         case .coder: self = .coder
+        case .zcode: self = .zcode
         case .trae: self = .trae
         case .opencode: self = .opencode
         case .harness: self = .harness
@@ -78,6 +85,8 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
             self = .qwen
         } else if id.contains("coder") {
             self = .coder
+        } else if id.contains("zcode") {
+            self = .zcode
         } else if id.contains("trae") {
             self = .trae
         } else if id.contains("opencode") {
@@ -92,7 +101,8 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     }
 
     var displayName: String {
-        provider.map(AIMascotLibrary.providerDisplayName(for:)) ?? rawValue
+        if self == .deepseekHarness { return "DeepSeek Harness" }
+        return provider.map(AIMascotLibrary.providerDisplayName(for:)) ?? rawValue
     }
 
     fileprivate var provider: AIProvider? {
@@ -106,11 +116,18 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .kimi: .kimi
         case .qwen: .qwen
         case .coder: .coder
+        case .zcode: .zcode
         case .trae: .trae
         case .opencode: .opencode
         case .harness: .harness
+        case .deepseekHarness: nil
         case .doubao: .doubao
         }
+    }
+
+    fileprivate var assetName: String? {
+        if self == .deepseekHarness { return "deepseek.svg" }
+        return provider.flatMap { AIMascotLibrary.providerAssetName(for: $0) }
     }
 
     fileprivate var usesMonochromeProviderAsset: Bool {
@@ -155,10 +172,9 @@ struct AIMascotView: View {
     }
 
     private var providerImage: NSImage? {
-        guard let provider = identity.provider,
-              let assetName = AIMascotLibrary.providerAssetName(for: provider),
+        guard let assetName = identity.assetName,
               let url = AIMascotLibrary.providerAssetURL(
-                  for: provider,
+                  named: assetName,
                   resourceRoots: providerResourceRoots
               )
         else { return nil }

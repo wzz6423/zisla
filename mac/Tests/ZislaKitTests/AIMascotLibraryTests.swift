@@ -112,6 +112,7 @@ struct AIMascotLibraryTests {
         #expect(AIMascotLibrary.providerAssetName(for: .opencode) == "opencode.svg")
         #expect(AIMascotLibrary.providerAssetName(for: .harness) == "workbuddy.icns")
         #expect(AIMascotLibrary.providerAssetName(for: .doubao) == "doubao.png")
+        #expect(AIMascotLibrary.providerAssetName(for: .zcode) == "zcode.icns")
     }
 
     @Test

@@ -144,6 +144,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var settingsWindowController: NSWindowController?
     private var settingsWindowScreen: NSScreen?
     private var quickNotesEditorController: NSWindowController?
+    private var screenshotSelectionController: ScreenshotSelectionController?
+    private var screenshotEditorController: ScreenshotEditorWindowController?
+    private var additionalScreenshotEditors: [ScreenshotEditorWindowController] = []
+    private var screenshotHotkeyManager = GlobalHotkeyManager()
+    private var screenshotPinHotkeyManager = GlobalHotkeyManager()
+    private var pendingScreenshotPin = false
     private var cancellables: Set<AnyCancellable> = []
     private var effectiveAppearanceObservation: NSKeyValueObservation?
     private var currentApplicationIconImage: NSImage?
@@ -324,6 +330,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs
         )
         configureMainMenu()
+        registerScreenshotHotkeys()
         syncAppStatusItem()
         syncMonitorStatusItems(force: true)
 
@@ -372,6 +379,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .sink { [weak self] style in
                 Task { @MainActor [weak self] in
                     self?.overlayCoordinator?.setKeepsNativeGlassActive(style == .transparent)
+                }
+            }
+            .store(in: &cancellables)
+
+        model.settingsStore.$settings
+            .map(\.screenshotEnabled)
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.registerScreenshotHotkeys()
+                }
+            }
+            .store(in: &cancellables)
+
+        model.settingsStore.$settings
+            .map { ($0.screenshotHotkey, $0.screenshotPinHotkey) }
+            .removeDuplicates { $0 == $1 }
+            .dropFirst()
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.registerScreenshotHotkeys()
+                }
+            }
+            .store(in: &cancellables)
+
+        model.$voiceInputInputMonitoringAccessGranted
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.registerScreenshotHotkeys()
                 }
             }
             .store(in: &cancellables)
@@ -448,17 +487,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
-        // Quick Notes and Mail require keyboard input: allow the island panel to become key only
-        // while the corresponding module is visible; otherwise keep it non-key to avoid stealing
-        // focus from other apps.
-        Publishers.CombineLatest(
+        // 仅在文本输入界面可见时允许岛屿面板成为键盘焦点，避免其他情况下抢占前台应用焦点。
+        Publishers.CombineLatest3(
             model.$selectedModule,
-            model.$isIslandVisible
+            model.$isIslandVisible,
+            model.$isTeleprompterPresented
         )
-            .sink { [weak coordinator] module, visible in
+            .sink { [weak coordinator] module, visible, isTeleprompterPresented in
                 Task { @MainActor in
                     coordinator?.setAllowsKeyWindow(
-                        visible && (module == .quickNotes || module == .mail)
+                        visible && (
+                            module == .quickNotes
+                                || module == .mail
+                                || isTeleprompterPresented
+                        )
                     )
                 }
             }
@@ -540,6 +582,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         expandedSizeUpdateTask?.cancel()
         lockScreenOverlayController?.stop()
         AppModel.shared.stop()
+        screenshotHotkeyManager.unregister()
+        screenshotPinHotkeyManager.unregister()
+        screenshotSelectionController?.cancel()
+        screenshotEditorController?.close()
+        let editorsToClose = additionalScreenshotEditors
+        editorsToClose.forEach { $0.close() }
+        screenshotEditorController = nil
+        additionalScreenshotEditors.removeAll()
         noticePresenter?.stop()
         petController?.stop()
         overlayCoordinator?.stop()
@@ -615,6 +665,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
         quitItem.target = self
         quitItem.keyEquivalentModifierMask = .command
+        let screenshotItem = applicationMenu.insertItem(
+            withTitle: localized("截图"),
+            action: #selector(startScreenshot),
+            keyEquivalent: "",
+            at: 0
+        )
+        screenshotItem.target = self
+        let pinItem = applicationMenu.insertItem(
+            withTitle: localized("钉图"),
+            action: #selector(startPinnedScreenshot),
+            keyEquivalent: "",
+            at: 1
+        )
+        pinItem.target = self
         applicationMenuItem.submenu = applicationMenu
         mainMenu.addItem(applicationMenuItem)
 
@@ -692,6 +756,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         item.button?.image = NSImage(systemSymbolName: "capsule.inset.filled", accessibilityDescription: "zisla")
         let menu = NSMenu()
         menu.addItem(withTitle: localized("显示灵动岛"), action: #selector(showIsland), keyEquivalent: "")
+        menu.addItem(withTitle: localized("截图"), action: #selector(startScreenshot), keyEquivalent: "")
         menu.addItem(withTitle: localized("系统监控"), action: #selector(showSystemMonitor), keyEquivalent: "")
         menu.addItem(withTitle: localized("设置..."), action: #selector(showSettings), keyEquivalent: ",")
         menu.addItem(withTitle: localized("检查更新"), action: #selector(checkUpdates), keyEquivalent: "")
@@ -987,6 +1052,138 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         AppModel.shared.isPinned = true
         overlayCoordinator?.setPinned(true)
         AppModel.shared.refreshForExpansion()
+    }
+
+    @objc private func startScreenshot() {
+        guard AppModel.shared.settingsStore.settings.screenshotEnabled else { return }
+        beginScreenshot(pinAfterCapture: false)
+    }
+
+    @objc private func startPinnedScreenshot() {
+        let editors = [screenshotEditorController].compactMap { $0 } + additionalScreenshotEditors
+        if let editor = editors.last(where: { !$0.isPinnedPresentation }) ?? editors.last {
+            editor.togglePinned()
+            return
+        }
+        if screenshotSelectionController != nil {
+            pendingScreenshotPin = true
+            return
+        }
+        guard AppModel.shared.settingsStore.settings.screenshotEnabled else { return }
+        beginScreenshot(pinAfterCapture: true)
+    }
+
+    private func beginScreenshot(pinAfterCapture: Bool) {
+        guard AppModel.shared.settingsStore.settings.screenshotEnabled else { return }
+        guard screenshotSelectionController == nil else { return }
+        let editors = [screenshotEditorController].compactMap { $0 } + additionalScreenshotEditors
+        if editors.contains(where: { !$0.isPinnedPresentation }) {
+            return
+        }
+        pendingScreenshotPin = pinAfterCapture
+        let capturedApplication = NSWorkspace.shared.frontmostApplication
+        let screens = NSScreen.screens
+        let preferredScreen = WindowPlacement.screenUnderMouse()
+        let captureScreens: [NSScreen]
+        if let preferredScreen {
+            captureScreens = [preferredScreen] + screens.filter { $0 !== preferredScreen }
+        } else {
+            captureScreens = screens
+        }
+        guard !captureScreens.isEmpty else {
+            pendingScreenshotPin = false
+            return
+        }
+
+        let controller = ScreenshotSelectionController(
+            capturedProcessIdentifier: capturedApplication?.processIdentifier
+        )
+        screenshotSelectionController = controller
+        controller.onCaptured = { [weak self] result in
+            guard let self else { return }
+            self.screenshotSelectionController = nil
+            let shouldPin = self.pendingScreenshotPin
+            self.pendingScreenshotPin = false
+            var editor: ScreenshotEditorWindowController!
+            editor = ScreenshotEditorWindowController(
+                image: result.image,
+                screenImage: result.screenImage,
+                screenCGImage: result.screenCGImage,
+                screen: result.screen,
+                captureRect: result.selectionRect,
+                capturedApplication: capturedApplication,
+                onClose: { [weak self] in
+                    guard let self else { return }
+                    if self.screenshotEditorController === editor {
+                        self.screenshotEditorController = nil
+                    } else {
+                        self.additionalScreenshotEditors.removeAll { $0 === editor }
+                    }
+                },
+                pinnedToolbarVisible: AppModel.shared.settingsStore.settings.screenshotPinnedToolbarVisible
+            )
+            if self.screenshotEditorController == nil {
+                self.screenshotEditorController = editor
+            } else {
+                self.additionalScreenshotEditors.append(editor)
+            }
+            editor.present()
+            if shouldPin {
+                editor.setPinned(true)
+            }
+        }
+        controller.onCancelled = { [weak self] in
+            guard let self else { return }
+            self.screenshotSelectionController = nil
+            self.pendingScreenshotPin = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+            guard let self else { return }
+            guard self.screenshotSelectionController === controller else { return }
+            controller.start(on: captureScreens)
+        }
+    }
+
+    private func registerScreenshotHotkeys() {
+        let settings = AppModel.shared.settingsStore.settings
+        screenshotHotkeyManager.unregister()
+        screenshotPinHotkeyManager.unregister()
+        guard settings.screenshotEnabled else { return }
+        let captureResult = screenshotHotkeyManager.register(
+            hotkey: settings.screenshotHotkey,
+            onKeyDown: { [weak self] in
+                Task { @MainActor [weak self] in self?.startScreenshot() }
+            },
+            onKeyUp: {}
+        )
+        reportScreenshotHotkeyRegistration(captureResult, actionName: "截图")
+
+        guard !settings.screenshotHotkey.conflicts(with: settings.screenshotPinHotkey) else {
+            AppModel.shared.transientMessage = "截图与钉图快捷键冲突，钉图快捷键未启用"
+            return
+        }
+        let pinResult = screenshotPinHotkeyManager.register(
+            hotkey: settings.screenshotPinHotkey,
+            onKeyDown: { [weak self] in
+                Task { @MainActor [weak self] in self?.startPinnedScreenshot() }
+            },
+            onKeyUp: {}
+        )
+        reportScreenshotHotkeyRegistration(pinResult, actionName: "钉图")
+    }
+
+    private func reportScreenshotHotkeyRegistration(
+        _ result: GlobalHotkeyRegistrationResult,
+        actionName: String
+    ) {
+        switch result {
+        case .registered:
+            break
+        case .inputMonitoringPermissionRequired:
+            AppModel.shared.transientMessage = "\(actionName)快捷键需要输入监控权限"
+        case .registrationFailed:
+            AppModel.shared.transientMessage = "\(actionName)快捷键与系统或其他应用冲突，未能启用"
+        }
     }
 
     @objc private func showSystemMonitor() {

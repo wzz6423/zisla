@@ -17,6 +17,7 @@ struct IslandSurfaceRenderingPolicy: Equatable {
 
 struct VoiceRecordingIslandGeometry: Equatable {
     static let transcriptRowHeight: CGFloat = 20
+    static let bottomCornerRadius: CGFloat = 14
 
     let collapsedSize: CGSize
     let surfaceSize: CGSize
@@ -57,30 +58,6 @@ struct VoiceRecordingIslandGeometry: Equatable {
             width: surfaceSize.width,
             height: max(0, surfaceSize.height - topRowFrame.maxY)
         )
-    }
-}
-
-/// The recording island mirrors the collapsed overflow bar (AI-status state) extended by
-/// one transcript row: the root (top edge) sits flush with the screen frame — the sides run
-/// straight down from the very top with no inward curve — while the bottom keeps the
-/// collapsed pill's rounded corners.
-struct VoiceRecordingIslandSilhouette: Shape {
-    static let bottomCornerRadius: CGFloat = 14
-
-    let surfaceSize: CGSize
-
-    func path(in rect: CGRect) -> Path {
-        let frame = CGRect(
-            x: rect.midX - surfaceSize.width / 2,
-            y: rect.minY,
-            width: surfaceSize.width,
-            height: surfaceSize.height
-        )
-        return IslandSilhouette(
-            topCornerRadius: 0,
-            bottomCornerRadius: Self.bottomCornerRadius
-        )
-        .path(in: frame)
     }
 }
 
@@ -128,8 +105,12 @@ struct IslandSurface<Content: View>: View {
     /// everything else keeps the expanded bottom radius.
     private var rimBottomCornerRadius: CGFloat {
         usesCompactGlassSurface
-            ? VoiceRecordingIslandSilhouette.bottomCornerRadius
+            ? VoiceRecordingIslandGeometry.bottomCornerRadius
             : IslandSurfaceGeometry.expandedBottomCornerRadius
+    }
+
+    private var maskIsCollapsed: Bool {
+        isCollapsed && !usesCompactGlassSurface
     }
 
     var body: some View {
@@ -142,25 +123,22 @@ struct IslandSurface<Content: View>: View {
         // Keeps the mask's layout size fixed, redrawing only the outline within its canvas — if the
         // mask view's frame changes during animation, SwiftUI/AppKit layout interpolation briefly shifts the outline leftward.
         .mask {
-            if usesCompactGlassSurface {
-                VoiceRecordingIslandSilhouette(surfaceSize: expandedSize)
-            } else {
-                IslandRevealMask(
-                    collapsedSize: collapsedSize,
-                    expandedSize: expandedSize,
-                    isCollapsed: isCollapsed
-                )
-                .animation(
-                    reduceMotion
-                        ? nil
-                        // Collapse stays quick and crisp; expand gets a spring with a hint of
-                        // bounce, matching the iOS Dynamic Island reveal feel.
-                        : isCollapsed
-                            ? .smooth(duration: 0.18)
-                            : .snappy(duration: 0.28, extraBounce: 0.05),
-                    value: isCollapsed
-                )
-            }
+            IslandRevealMask(
+                collapsedSize: collapsedSize,
+                expandedSize: expandedSize,
+                isCollapsed: maskIsCollapsed,
+                expandedBottomCornerRadius: rimBottomCornerRadius
+            )
+            .animation(
+                reduceMotion
+                    ? nil
+                    // Collapse stays quick and crisp; expand gets a spring with a hint of
+                    // bounce, matching the iOS Dynamic Island reveal feel.
+                    : maskIsCollapsed
+                        ? .smooth(duration: 0.18)
+                        : .snappy(duration: 0.28, extraBounce: 0.05),
+                value: maskIsCollapsed
+            )
         }
     }
 
@@ -351,7 +329,7 @@ struct IslandSurface<Content: View>: View {
     private var transparentLiquidGlassShell: some View {
         // The recording surface keeps the collapsed pill's rounded bottom corners.
         let shellCornerRadius = usesCompactGlassSurface
-            ? VoiceRecordingIslandSilhouette.bottomCornerRadius
+            ? VoiceRecordingIslandGeometry.bottomCornerRadius
             : IslandSurfaceGeometry.expandedBottomCornerRadius
 
         return ZStack {
@@ -464,11 +442,18 @@ struct IslandSurface<Content: View>: View {
 private struct IslandRevealMask: Shape {
     let collapsedSize: CGSize
     let expandedSize: CGSize
+    let expandedBottomCornerRadius: CGFloat
     private var revealProgress: CGFloat
 
-    init(collapsedSize: CGSize, expandedSize: CGSize, isCollapsed: Bool) {
+    init(
+        collapsedSize: CGSize,
+        expandedSize: CGSize,
+        isCollapsed: Bool,
+        expandedBottomCornerRadius: CGFloat = IslandSurfaceGeometry.expandedBottomCornerRadius
+    ) {
         self.collapsedSize = collapsedSize
         self.expandedSize = expandedSize
+        self.expandedBottomCornerRadius = expandedBottomCornerRadius
         revealProgress = isCollapsed ? 0 : 1
     }
 
@@ -494,7 +479,7 @@ private struct IslandRevealMask: Shape {
 
         return IslandSilhouette(
             topCornerRadius: 5 * (1 - progress),
-            bottomCornerRadius: 14 + (IslandSurfaceGeometry.expandedBottomCornerRadius - 14) * progress
+            bottomCornerRadius: 14 + (expandedBottomCornerRadius - 14) * progress
         )
         .path(in: frame)
     }

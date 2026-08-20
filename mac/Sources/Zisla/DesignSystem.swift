@@ -27,6 +27,7 @@ enum ProviderBrand {
         case .kimi: Color(red: 0.29, green: 0.76, blue: 0.74)
         case .qwen: Color(red: 0.48, green: 0.62, blue: 1.00)
         case .coder: Color(red: 0.98, green: 0.78, blue: 0.30)
+        case .zcode: Color(red: 0.22, green: 0.78, blue: 0.46)
         case .trae: Color(red: 0.40, green: 0.56, blue: 1.00)
         case .opencode: Color(red: 0.55, green: 0.85, blue: 0.55)
         case .harness: Color(red: 0.90, green: 0.45, blue: 0.50)

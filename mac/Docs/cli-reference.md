@@ -23,6 +23,7 @@
 | `kimi` | `kimi-code`, `kimi-code-cli`, `kimi-vscode` |
 | `qwen` | `tongyi`, `qwen-code`, `qwen-code-cli`, `qwen-vscode` |
 | `coder` | `qoder`, `qoder-cli`, `qoderwork`, `qoderwork-cn`, `qoderwake`, `qwen-coder` |
+| `zcode` | `z-code`, `zcode-cli`, `zcode-desktop`, `glm`, `glm-coding`, `z-ai`, `z.ai` |
 | `trae` | `trae-work`, `traework`, `trae-solo`, `trae-cn` |
 | `opencode` | `open-code`, `open_code` |
 | `harness` | `harnext`, `harnext-cli`, `harness-cli` |

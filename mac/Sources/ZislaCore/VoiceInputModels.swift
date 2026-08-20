@@ -142,6 +142,12 @@ public struct VoiceInputHotkeyPreset: Codable, Equatable, Sendable {
         isModifierOnly
     }
 
+    /// Carbon registers conventional shortcuts by key code and modifier mask; display text and
+    /// physical modifier-side metadata do not make an otherwise identical registration distinct.
+    public func conflicts(with other: VoiceInputHotkeyPreset) -> Bool {
+        keyCode == other.keyCode && carbonModifiers == other.carbonModifiers
+    }
+
     /// A standalone modifier key has no ordinary keyDown event; it must be triggered by flagsChanged.
     public var isModifierOnly: Bool {
         guard let modifierSides, modifierSides.count == 1, let modifier = modifierSides.first else {

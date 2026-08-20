@@ -293,6 +293,68 @@ struct FeatureSettingsCompatibilityTests {
         }
     }
 
+    @Test
+    func voiceLexiconSelectionDefaultsForLegacySettingsAndRoundTrips() throws {
+        #expect(FeatureSettings.default.voiceEnabledLexicons == VoiceLexicon.defaultEnabled)
+        let terms = VoiceLexicon.terms(for: VoiceLexicon.defaultEnabled)
+        let representativeTerms = [
+            "SwiftUI", "床前明月光", "YYDS", "北京", "Apple", "新冠", "民法典", "股票", "高等数学",
+            "电影", "英雄联盟", "高铁", "外卖"
+        ]
+        for term in representativeTerms {
+            #expect(terms.contains(term))
+        }
+        #expect(Set(terms).count == terms.count)
+
+        let contextualTerms = VoiceLexicon.contextualTerms(for: VoiceLexicon.defaultEnabled)
+        #expect(contextualTerms.count <= VoiceLexicon.maximumContextualTerms)
+        for term in ["人工智能", "唐诗", "YYDS", "北京", "Apple", "新冠", "民法典", "股票", "高等数学", "电影", "英雄联盟", "高铁", "外卖"] {
+            #expect(contextualTerms.contains(term))
+        }
+        #expect(Set(contextualTerms).count == contextualTerms.count)
+
+        for lexicon in VoiceLexicon.allCases {
+            #expect(!lexicon.terms.isEmpty)
+            #expect(Set(lexicon.terms).count == lexicon.terms.count)
+            #expect(!lexicon.title.isEmpty)
+            #expect(!lexicon.detail.isEmpty)
+        }
+
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let legacySettings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(legacySettings.voiceEnabledLexicons == VoiceLexicon.defaultEnabled)
+
+        var settings = FeatureSettings.default
+        settings.voiceEnabledLexicons = [.computerTerms, .internetBuzzwords]
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(decoded.voiceEnabledLexicons == [.computerTerms, .internetBuzzwords])
+    }
+
+    @Test
+    func voiceStructuredFormattingDefaultsToFalseForLegacySettings() throws {
+        #expect(FeatureSettings.default.voiceStructuredFormattingEnabled == false)
+
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let legacySettings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(legacySettings.voiceStructuredFormattingEnabled == false)
+    }
+
+    @Test
+    func voiceStructuredFormattingRoundTrips() throws {
+        var settings = FeatureSettings.default
+        settings.voiceStructuredFormattingEnabled = true
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+
+        #expect(decoded.voiceStructuredFormattingEnabled == true)
+    }
+
     // MARK: - VoiceInputHotkeyPreset
 
     @Test
@@ -402,6 +464,29 @@ struct FeatureSettingsCompatibilityTests {
         // Matches the legacy enum display contract: ⌘⇧ V
         #expect(VoiceInputHotkeyPreset.commandShiftV.displayName == "⌘⇧ V")
         #expect(VoiceInputHotkeyPreset.modifierSymbols(carbonModifiers: 0x0100 | 0x0200) == "⌘⇧")
+    }
+
+    @Test
+    func hotkeyConflictUsesRegistrationIdentity() {
+        let generic = VoiceInputHotkeyPreset(
+            keyCode: 40,
+            carbonModifiers: 0x0100,
+            keyDisplayName: "K"
+        )
+        let sideAware = VoiceInputHotkeyPreset(
+            keyCode: 40,
+            carbonModifiers: 0,
+            keyDisplayName: "K",
+            modifierSides: [.leftCommand]
+        )
+        let differentKey = VoiceInputHotkeyPreset(
+            keyCode: 41,
+            carbonModifiers: 0x0100,
+            keyDisplayName: "L"
+        )
+
+        #expect(generic.conflicts(with: sideAware))
+        #expect(!generic.conflicts(with: differentKey))
     }
 
     @Test
@@ -521,11 +606,134 @@ struct FeatureSettingsCompatibilityTests {
             .aiActivity,
             .videoDownload,
             .browserDownload,
-            .toolboxReminder,
             .mail,
             .updateAvailable,
             .focusCountdown,
             .focusMode,
+            .toolboxReminder,
         ])
+    }
+
+    @Test
+    func screenshotHotkeysDefaultToCtrl1AndCtrl2ForLegacySettings() throws {
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+
+        #expect(decoded.screenshotEnabled)
+        #expect(decoded.screenshotHotkey.keyCode == 18)
+        #expect(decoded.screenshotHotkey.carbonModifiers == 0x1000)
+        #expect(decoded.screenshotHotkey.keyDisplayName == "1")
+
+        #expect(decoded.screenshotPinHotkey.keyCode == 19)
+        #expect(decoded.screenshotPinHotkey.carbonModifiers == 0x1000)
+        #expect(decoded.screenshotPinHotkey.keyDisplayName == "2")
+        #expect(decoded.screenshotHotkey == ScreenshotHotkeyDefaults.capture)
+        #expect(decoded.screenshotPinHotkey == ScreenshotHotkeyDefaults.pin)
+    }
+
+    @Test
+    func screenshotEnabledRoundTripsWithoutChangingCustomizedHotkeys() throws {
+        var settings = FeatureSettings.default
+        settings.screenshotEnabled = false
+        settings.screenshotHotkey = VoiceInputHotkeyPreset(
+            keyCode: 45,
+            carbonModifiers: 0x0800,
+            keyDisplayName: "N"
+        )
+        settings.screenshotPinHotkey = VoiceInputHotkeyPreset(
+            keyCode: 46,
+            carbonModifiers: 0x0800,
+            keyDisplayName: "M"
+        )
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+
+        #expect(!decoded.screenshotEnabled)
+        #expect(decoded.screenshotHotkey == settings.screenshotHotkey)
+        #expect(decoded.screenshotPinHotkey == settings.screenshotPinHotkey)
+    }
+
+    @Test
+    func screenshotHotkeysRoundTrip() throws {
+        var settings = FeatureSettings.default
+        settings.screenshotHotkey = VoiceInputHotkeyPreset(
+            keyCode: 45,
+            carbonModifiers: 0x0800,
+            keyDisplayName: "N"
+        )
+        settings.screenshotPinHotkey = VoiceInputHotkeyPreset(
+            keyCode: 46,
+            carbonModifiers: 0x0800,
+            keyDisplayName: "M"
+        )
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+
+        #expect(decoded.screenshotHotkey.keyCode == 45)
+        #expect(decoded.screenshotHotkey.carbonModifiers == 0x0800)
+        #expect(decoded.screenshotHotkey.keyDisplayName == "N")
+
+        #expect(decoded.screenshotPinHotkey.keyCode == 46)
+        #expect(decoded.screenshotPinHotkey.carbonModifiers == 0x0800)
+        #expect(decoded.screenshotPinHotkey.keyDisplayName == "M")
+    }
+
+    @Test
+    func screenshotPinnedToolbarVisibilityDefaultsOnForLegacySettingsAndRoundTrips() throws {
+        #expect(FeatureSettings.default.screenshotPinnedToolbarVisible)
+
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let legacyDecoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(legacyDecoded.screenshotPinnedToolbarVisible)
+
+        var settings = FeatureSettings.default
+        settings.screenshotPinnedToolbarVisible = false
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(!decoded.screenshotPinnedToolbarVisible)
+    }
+
+    @Test
+    func backgroundSoundSettingsDefaultForLegacyConfigurationAndRoundTrip() throws {
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let legacySettings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(!legacySettings.systemBackgroundSoundEnabled)
+        #expect(legacySettings.systemBackgroundSound == .rain)
+        #expect(legacySettings.systemBackgroundSoundStopsWhenUnused)
+
+        var settings = FeatureSettings.default
+        settings.systemBackgroundSoundEnabled = true
+        settings.systemBackgroundSound = .ocean
+        settings.systemBackgroundSoundStopsWhenUnused = false
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(decoded.systemBackgroundSoundEnabled)
+        #expect(decoded.systemBackgroundSound == .ocean)
+        #expect(!decoded.systemBackgroundSoundStopsWhenUnused)
+    }
+
+    @Test
+    func backgroundSoundNamesRemainCompatibleAcrossMacOSVersions() throws {
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds","systemBackgroundSound":"BalancedNoise"}"#.utf8)
+        let legacySettings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(legacySettings.systemBackgroundSound == .balancedNoise)
+
+        var settings = FeatureSettings.default
+        settings.systemBackgroundSound = .pinkNoise
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(decoded.systemBackgroundSound == .pinkNoise)
     }
 }

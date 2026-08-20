@@ -3,7 +3,7 @@ import ZislaCore
 
 /// Infers active AI tasks from the local data directory of the harnext CLI.
 ///
-/// Data directory: `~/.harnext/`
+/// Data directories: `~/.harnext/` and `~/.dsh/`.
 /// Because the harnext log format may change between versions, a directory + file modification time
 /// inference strategy is used: scan the most recently modified log/session files under `~/.harnext/`
 /// and extract file IDs as task identifiers.
@@ -21,6 +21,7 @@ public final class HarnessSessionActivityDetector: AIActivityDetecting {
     }
 
     public let dataRoot: URL
+    public let sourceName: String
     public let maxFiles: Int
     public let recencyThreshold: TimeInterval
 
@@ -29,8 +30,11 @@ public final class HarnessSessionActivityDetector: AIActivityDetecting {
     private var lastScanAt: Date = .distantPast
     private let scanInterval: TimeInterval
 
+    public static let deepSeekSourceName = "DeepSeek Harness"
+
     public init(
         dataRoot: URL? = nil,
+        sourceName: String = "harnext",
         maxFiles: Int = 8,
         recencyThreshold: TimeInterval = 30 * 60,
         scanInterval: TimeInterval = 5,
@@ -44,6 +48,7 @@ public final class HarnessSessionActivityDetector: AIActivityDetecting {
             )
         }
         self.maxFiles = max(1, maxFiles)
+        self.sourceName = sourceName
         self.recencyThreshold = recencyThreshold
         self.scanInterval = max(0, scanInterval)
         self.fileManager = fileManager
@@ -96,10 +101,23 @@ public final class HarnessSessionActivityDetector: AIActivityDetecting {
         "harness-file-\(url.lastPathComponent)"
     }
 
+    private func taskID(forFileURL url: URL) -> String {
+        guard sourceName == Self.deepSeekSourceName else {
+            return Self.taskID(forFileURL: url)
+        }
+        return "deepseek-harness-\(url.deletingLastPathComponent().lastPathComponent)"
+    }
+
     public static func defaultDataRoot(
         home: URL = FileManager.default.homeDirectoryForCurrentUser
     ) -> URL {
         home.appendingPathComponent(".harnext", isDirectory: true)
+    }
+
+    public static func deepSeekDataRoot(
+        home: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> URL {
+        home.appendingPathComponent(".dsh", isDirectory: true)
     }
 
     // MARK: - File Discovery
@@ -119,8 +137,13 @@ public final class HarnessSessionActivityDetector: AIActivityDetecting {
 
         var candidates: [Candidate] = []
         for case let url as URL in enumerator {
-            let ext = url.pathExtension.lowercased()
-            guard ["log", "json", "jsonl"].contains(ext) else { continue }
+            if sourceName == Self.deepSeekSourceName {
+                // DeepSeek keeps profiles and workspace configuration under ~/.dsh; only session transcripts represent work.
+                guard ["session.jsonl", "session.jsonl.zstd"].contains(url.lastPathComponent) else { continue }
+            } else {
+                let ext = url.pathExtension.lowercased()
+                guard ["log", "json", "jsonl"].contains(ext) else { continue }
+            }
             guard let values = try? url.resourceValues(forKeys: [
                 .isRegularFileKey,
                 .contentModificationDateKey,
@@ -144,9 +167,9 @@ public final class HarnessSessionActivityDetector: AIActivityDetecting {
 
     private func makeTask(from candidate: Candidate) -> AIProgressTask? {
         AIProgressTask(
-            id: Self.taskID(forFileURL: candidate.url),
+            id: taskID(forFileURL: candidate.url),
             provider: .harness,
-            title: "harnext",
+            title: sourceName,
             detail: nil,
             progress: nil,
             status: .running,

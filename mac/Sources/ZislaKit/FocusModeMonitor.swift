@@ -83,7 +83,36 @@ enum FocusModeStatusStore {
         else {
             return .inactive
         }
-        let records = stores.flatMap { $0["storeAssertionRecords"] as? [[String: Any]] ?? [] }
+
+        let invalidatedAssertionIDs = Set(stores.flatMap { store in
+            (store["storeInvalidationRecords"] as? [[String: Any]] ?? []).compactMap { record in
+                (record["invalidationAssertion"] as? [String: Any])?["assertionUUID"] as? String
+            }
+        })
+        let snapshotTimestamp = (root["header"] as? [String: Any]).flatMap {
+            timestamp(in: $0, key: "timestamp")
+        }
+        let records = stores
+            .flatMap { $0["storeAssertionRecords"] as? [[String: Any]] ?? [] }
+            .filter { record in
+                guard
+                    let details = record["assertionDetails"] as? [String: Any],
+                    let identifier = details["assertionDetailsModeIdentifier"] as? String,
+                    !identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                else {
+                    return false
+                }
+                if let assertionID = record["assertionUUID"] as? String,
+                   invalidatedAssertionIDs.contains(assertionID) {
+                    return false
+                }
+                if let endTimestamp = timestamp(in: details, key: "assertionDetailsUserVisibleEndDate"),
+                   let snapshotTimestamp,
+                   endTimestamp <= snapshotTimestamp {
+                    return false
+                }
+                return true
+            }
         let activeRecord = records.max { left, right in
             timestamp(in: left) < timestamp(in: right)
         }
@@ -105,7 +134,11 @@ enum FocusModeStatusStore {
     }
 
     private static func timestamp(in record: [String: Any]) -> Double {
-        (record["assertionStartDateTimestamp"] as? NSNumber)?.doubleValue ?? 0
+        timestamp(in: record, key: "assertionStartDateTimestamp") ?? 0
+    }
+
+    private static func timestamp(in record: [String: Any], key: String) -> Double? {
+        (record[key] as? NSNumber)?.doubleValue
     }
 }
 

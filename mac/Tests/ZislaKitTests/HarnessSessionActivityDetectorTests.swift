@@ -67,6 +67,75 @@ struct HarnessSessionActivityDetectorTests {
             forFileURL: root.appendingPathComponent("session.json")
         ))
     }
+
+    @Test
+    func detectsDeepSeekHarnessSessionLog() throws {
+        let home = try makeHarnessTempRoot()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let root = HarnessSessionActivityDetector.deepSeekDataRoot(home: home)
+        let sessionURL = root
+            .appendingPathComponent("projects/example/session-1", isDirectory: true)
+            .appendingPathComponent("session.jsonl.zstd")
+        try FileManager.default.createDirectory(
+            at: sessionURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("session".utf8).write(to: sessionURL)
+
+        let task = try #require(HarnessSessionActivityDetector(
+            dataRoot: root,
+            sourceName: HarnessSessionActivityDetector.deepSeekSourceName,
+            recencyThreshold: 3600
+        ).activeTasks().first)
+
+        #expect(task.title == HarnessSessionActivityDetector.deepSeekSourceName)
+    }
+
+    @Test
+    func keepsDeepSeekHarnessSessionsDistinct() throws {
+        let home = try makeHarnessTempRoot()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let root = HarnessSessionActivityDetector.deepSeekDataRoot(home: home)
+        for sessionID in ["session-1", "session-2"] {
+            let sessionURL = root
+                .appendingPathComponent("projects/example/\(sessionID)", isDirectory: true)
+                .appendingPathComponent("session.jsonl")
+            try FileManager.default.createDirectory(
+                at: sessionURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try Data("session".utf8).write(to: sessionURL)
+        }
+
+        let tasks = try HarnessSessionActivityDetector(
+            dataRoot: root,
+            sourceName: HarnessSessionActivityDetector.deepSeekSourceName,
+            recencyThreshold: 3600
+        ).activeTasks()
+
+        #expect(Set(tasks.map(\.id)) == ["deepseek-harness-session-1", "deepseek-harness-session-2"])
+    }
+
+    @Test
+    func ignoresDeepSeekHarnessConfigurationFiles() throws {
+        let home = try makeHarnessTempRoot()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let root = HarnessSessionActivityDetector.deepSeekDataRoot(home: home)
+        let workspaceURL = root.appendingPathComponent("storages/workspace.json")
+        try FileManager.default.createDirectory(
+            at: workspaceURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(#"{"workspaces":[]}"#.utf8).write(to: workspaceURL)
+
+        let tasks = try HarnessSessionActivityDetector(
+            dataRoot: root,
+            sourceName: HarnessSessionActivityDetector.deepSeekSourceName,
+            recencyThreshold: 3600
+        ).activeTasks()
+
+        #expect(tasks.isEmpty)
+    }
 }
 
 private func makeHarnessTempRoot() throws -> URL {

@@ -280,6 +280,7 @@ final class SideNoticePresenter {
         notice.id.hasPrefix("ai-active-")
             || notice.id.hasPrefix("update-available-")
             || notice.id.hasPrefix("media-active-")
+            || notice.id.hasPrefix("background-sound-")
             || notice.id.hasPrefix("focus-countdown-")
             || notice.id.hasPrefix("focus-mode-")
             || notice.id.hasPrefix("mail-notification-")

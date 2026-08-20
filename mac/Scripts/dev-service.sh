@@ -20,7 +20,7 @@ function fail() {
   exit 1
 }
 
-function matching_pids() {
+function matching_app_pids() {
   local pid
   local process_command
 
@@ -28,6 +28,13 @@ function matching_pids() {
     process_command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
     [[ "$process_command" == "$APP_BINARY"* ]] && print -r -- "$pid"
   done
+}
+
+function matching_pids() {
+  local pid
+  local process_command
+
+  matching_app_pids
 
   for pid in ${(f)"$(pgrep -x perl 2>/dev/null || true)"}; do
     process_command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
@@ -93,21 +100,29 @@ function wait_for_service_to_run() {
 
 function stop_service() {
   local -a pids
+  local -a app_pids
 
   if service_is_loaded; then
     launchctl bootout "$SERVICE_TARGET" || fail "无法卸载调试服务 $SERVICE_LABEL"
     wait_for_service_to_unload || fail "调试服务 $SERVICE_LABEL 仍在运行"
   fi
 
-  pids=("${(@f)$(collect_matching_pids)}")
-  [[ ${#pids[@]} -eq 1 && -z "${pids[1]}" ]] && pids=()
-  (( ${#pids[@]} > 0 )) && kill -TERM "${pids[@]}"
+  app_pids=("${(@f)$(matching_app_pids)}")
+  [[ ${#app_pids[@]} -eq 1 && -z "${app_pids[1]}" ]] && app_pids=()
+  if (( ${#app_pids[@]} > 0 )); then
+    osascript -e 'tell application id "dev.wzz.zisla" to quit' >/dev/null 2>&1 || true
+  fi
 
   if ! wait_for_processes_to_exit; then
     pids=("${(@f)$(collect_matching_pids)}")
     [[ ${#pids[@]} -eq 1 && -z "${pids[1]}" ]] && pids=()
-    (( ${#pids[@]} > 0 )) && kill -KILL "${pids[@]}"
-    wait_for_processes_to_exit || fail "zisla 调试进程未能退出"
+    (( ${#pids[@]} > 0 )) && kill -TERM "${pids[@]}"
+    if ! wait_for_processes_to_exit; then
+      pids=("${(@f)$(collect_matching_pids)}")
+      [[ ${#pids[@]} -eq 1 && -z "${pids[1]}" ]] && pids=()
+      (( ${#pids[@]} > 0 )) && kill -KILL "${pids[@]}"
+      wait_for_processes_to_exit || fail "zisla 调试进程未能退出"
+    fi
   fi
 
   rm -f "$LAUNCH_AGENT" "$OUT_LOG" "$ERROR_LOG"

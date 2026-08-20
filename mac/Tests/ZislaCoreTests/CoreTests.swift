@@ -829,6 +829,9 @@ struct CLIParserTests {
         #expect(AIProvider(token: "qoderwake") == .coder)
         #expect(AIProvider(token: "copilot") == .copilot)
         #expect(AIProvider(token: "github-copilot") == .copilot)
+        #expect(AIProvider(token: "zcode") == .zcode)
+        #expect(AIProvider(token: "zcode-cli") == .zcode)
+        #expect(AIProvider(token: "glm-coding") == .zcode)
     }
 
     @Test

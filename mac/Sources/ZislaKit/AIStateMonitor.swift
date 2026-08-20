@@ -148,9 +148,15 @@ public final class AIStateMonitor: ObservableObject {
             GrokSessionActivityDetector(maxSessionFiles: 4, initialTailBytes: 256 * 1_024),
             QwenSessionActivityDetector(maxRuntimeFiles: 4, initialTailBytes: 256 * 1_024),
             QoderSessionActivityDetector(maxLogFiles: 4, initialTailBytes: 256 * 1_024),
+            ZCodeSessionActivityDetector(),
             TraeSessionActivityDetector(maxLogFiles: 4, tailBytes: 256 * 1_024),
             OpenCodeSessionActivityDetector(maxSessions: 4),
             HarnessSessionActivityDetector(maxFiles: 4),
+            HarnessSessionActivityDetector(
+                dataRoot: HarnessSessionActivityDetector.deepSeekDataRoot(),
+                sourceName: HarnessSessionActivityDetector.deepSeekSourceName,
+                maxFiles: 4
+            ),
             WorkBuddySessionActivityDetector(),
             DoubaoSessionActivityDetector(maxFiles: 4),
         ]

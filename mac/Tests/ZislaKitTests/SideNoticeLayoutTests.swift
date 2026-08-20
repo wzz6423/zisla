@@ -518,6 +518,52 @@ struct SideNoticeLayoutTests {
     }
 
     @Test
+    func backgroundSoundUsesTheDefaultCompactBarInDetailedMediaMode() throws {
+        let screen = ScreenSnapshot(
+            displayID: 7,
+            frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+            menuBarHeightFallback: 24
+        )
+        let backgroundSound = IslandNotice(
+            id: "background-sound-left",
+            title: "棕色噪声",
+            side: .left
+        )
+        var settings = FeatureSettings()
+        settings.mediaCompactStyle = .detailed
+
+        let frame = try #require(
+            engine.compactBarFrame(
+                for: screen,
+                notices: [backgroundSound],
+                settings: settings
+            )
+        )
+
+        #expect(frame == engine.compactBarFrame(for: screen))
+    }
+
+    @Test
+    func musicStillUsesTheDetailedCompactBarWhenDetailedModeIsSelected() throws {
+        let screen = ScreenSnapshot(
+            displayID: 7,
+            frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+            menuBarHeightFallback: 24
+        )
+        let media = IslandNotice(id: "media-active-left", title: "QQ音乐", side: .left)
+        var settings = FeatureSettings()
+        settings.mediaCompactStyle = .detailed
+
+        let frame = try #require(
+            engine.compactBarFrame(for: screen, notices: [media], settings: settings)
+        )
+
+        #expect(frame.width == 380)
+    }
+
+    @Test
     func oppositeSideReservesAnIdenticalCompactWing() {
         let screen = ScreenSnapshot(
             displayID: 42,
