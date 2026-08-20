@@ -3,16 +3,44 @@ set -euo pipefail
 
 ROOT="${0:A:h:h}"
 CONFIGURATION="${CONFIGURATION:-release}"
-VERSION="${VERSION:-0.1.3}"
-BUILD_NUMBER="${BUILD_NUMBER:-9}"
+VERSION="${VERSION:-0.1.4}"
+BUILD_NUMBER="${BUILD_NUMBER:-10}"
 UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
 OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:-$ROOT/dist}"
 APP="$OUTPUT_DIRECTORY/zisla.app"
 CONTENTS="$APP/Contents"
 IDENTITY="${CODE_SIGN_IDENTITY:--}"
+SIGNING_MODE="${SIGNING_MODE:-}"
 BUILD_ARCHITECTURES="${BUILD_ARCHITECTURES:-$(uname -m)}"
 ARCHITECTURES=(${=BUILD_ARCHITECTURES})
 BINARIES=()
+
+if [[ -z "$SIGNING_MODE" ]]; then
+  if [[ "$IDENTITY" == "-" ]]; then
+    SIGNING_MODE="adhoc"
+  else
+    SIGNING_MODE="release"
+  fi
+fi
+
+case "$SIGNING_MODE" in
+  adhoc)
+    [[ "$IDENTITY" == "-" ]] || {
+      echo "error: SIGNING_MODE=adhoc requires CODE_SIGN_IDENTITY=-" >&2
+      exit 1
+    }
+    ;;
+  dev|release)
+    [[ "$IDENTITY" != "-" ]] || {
+      echo "error: SIGNING_MODE=$SIGNING_MODE requires a certificate identity" >&2
+      exit 1
+    }
+    ;;
+  *)
+    echo "error: SIGNING_MODE must be adhoc, dev, or release" >&2
+    exit 1
+    ;;
+esac
 
 case "$UPDATE_CHANNEL" in
   release|preview) ;;
@@ -91,13 +119,13 @@ if [[ -x "$helper" ]]; then
 fi
 
 ENTITLEMENTS="$ROOT/Resources/Zisla.entitlements"
-if [[ "$IDENTITY" == "-" ]]; then
+if [[ "$SIGNING_MODE" == "adhoc" ]]; then
   # Ad-hoc signs cannot carry WeatherKit (or other restricted) entitlements.
   # Note: an ad hoc designated requirement is the build-specific cdhash,
   # so every rebuild silently invalidates TCC permissions (such as Accessibility).
   echo "warning: ad-hoc code signature (TeamIdentifier empty); WeatherKit unavailable, mainland China uses China Weather alerts" >&2
   codesign --force --deep --sign - "$APP"
-elif [[ "${SIGNING_MODE:-release}" == "dev" ]]; then
+elif [[ "$SIGNING_MODE" == "dev" ]]; then
   # Development signing: a stable certificate identity keeps TCC permissions valid across builds.
   # Do not include entitlements because restricted entitlements such as WeatherKit are rejected by AMFI without a provisioning profile,
   # and do not enable the hardened runtime because local debugging does not require it.
@@ -112,4 +140,15 @@ else
     --sign "$IDENTITY" "$APP"
 fi
 codesign --verify --deep --strict --all-architectures --verbose=2 "$APP"
+if [[ "$SIGNING_MODE" == "adhoc" ]]; then
+  SIGNATURE_DETAILS="$(codesign -dv --verbose=4 "$APP" 2>&1)"
+  [[ "$SIGNATURE_DETAILS" == *"Signature=adhoc"* ]] || {
+    echo "error: expected an ad-hoc signature" >&2
+    exit 1
+  }
+  [[ "$SIGNATURE_DETAILS" != *"Authority="* && "$SIGNATURE_DETAILS" == *"TeamIdentifier=not set"* ]] || {
+    echo "error: ad-hoc build unexpectedly contains a certificate identity" >&2
+    exit 1
+  }
+fi
 echo "$APP"

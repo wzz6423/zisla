@@ -130,6 +130,7 @@ public enum AIMascotLibrary {
         case .kimi: "kimi.png"
         case .qwen: "qwen-color.svg"
         case .coder: "qoder.icns"
+        case .zcode: "zcode.icns"
         case .trae: "trae.icns"
         case .opencode: "opencode.svg"
         case .harness: "workbuddy.icns"
@@ -143,6 +144,14 @@ public enum AIMascotLibrary {
         fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
     ) -> URL? {
         guard let assetName = providerAssetName(for: provider) else { return nil }
+        return providerAssetURL(named: assetName, resourceRoots: resourceRoots, fileExists: fileExists)
+    }
+
+    public static func providerAssetURL(
+        named assetName: String,
+        resourceRoots: [URL],
+        fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL? {
         return resourceRoots
             .lazy
             .map { $0.appendingPathComponent("BrandIcons/\(assetName)", isDirectory: false) }
@@ -160,6 +169,7 @@ public enum AIMascotLibrary {
         case .kimi: "Kimi Code"
         case .qwen: "千问"
         case .coder: "Qoder"
+        case .zcode: "ZCode"
         case .trae: "TRAE"
         case .opencode: "opencode"
         case .harness: "harnext"

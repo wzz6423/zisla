@@ -264,7 +264,7 @@ private func globalHotkeyEventHandlerCallback(
     _ event: EventRef?,
     _ userData: UnsafeMutableRawPointer?
 ) -> OSStatus {
-    guard let event, let userData else { return noErr }
+    guard let event, let userData else { return OSStatus(eventNotHandledErr) }
     let manager = Unmanaged<GlobalHotkeyManager>.fromOpaque(userData).takeUnretainedValue()
     var hotkeyID = EventHotKeyID()
     guard GetEventParameter(
@@ -277,7 +277,7 @@ private func globalHotkeyEventHandlerCallback(
         &hotkeyID
     ) == noErr,
         hotkeyID.id == manager.registeredCarbonHotkeyID
-    else { return noErr }
+    else { return OSStatus(eventNotHandledErr) }
     let kind = GetEventKind(event)
     MainActor.assumeIsolated {
         if kind == UInt32(kEventHotKeyPressed) {

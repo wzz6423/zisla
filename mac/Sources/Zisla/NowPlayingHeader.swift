@@ -52,6 +52,7 @@ struct NowPlayingHeader: View {
     @ObservedObject private var media: NowPlayingService
     @ObservedObject private var aiMonitor: AIStateMonitor
     @ObservedObject private var audioOutput: AudioOutputDeviceService
+    @ObservedObject private var backgroundSounds: SystemBackgroundSoundService
     @StateObject private var scrubState = MediaScrubState()
 
     init(model: AppModel) {
@@ -59,12 +60,17 @@ struct NowPlayingHeader: View {
         _media = ObservedObject(wrappedValue: model.media)
         _aiMonitor = ObservedObject(wrappedValue: model.aiMonitor)
         _audioOutput = ObservedObject(wrappedValue: model.audioOutput)
+        _backgroundSounds = ObservedObject(wrappedValue: model.backgroundSounds)
     }
 
     var body: some View {
         Group {
-            if model.settingsStore.settings.mediaEnabled, let item = media.snapshot {
-                playingContent(item)
+            if model.settingsStore.settings.mediaEnabled {
+                if let item = displayedMusicItem {
+                    playingContent(item)
+                } else {
+                    idleContent
+                }
             } else {
                 idleContent
             }
@@ -73,6 +79,14 @@ struct NowPlayingHeader: View {
         .onAppear {
             audioOutput.refresh()
         }
+    }
+
+    /// A paused music snapshot yields to the idle header while background sound plays,
+    /// because that playback is represented only in the collapsed island.
+    private var displayedMusicItem: NowPlayingSnapshot? {
+        guard let item = media.snapshot else { return nil }
+        if backgroundSounds.isPlaying, !item.isPlaying { return nil }
+        return item
     }
 
     private func playingContent(_ item: NowPlayingSnapshot) -> some View {
@@ -338,7 +352,7 @@ struct NowPlayingHeader: View {
     private func aiStatusContent(_ task: AIProgressTask) -> some View {
         HStack(spacing: 8) {
             AIMascotView(
-                identity: AIMascotIdentity(provider: task.provider, taskID: task.id),
+                identity: AIMascotIdentity(provider: task.provider, taskID: task.id, title: task.title),
                 size: 30
             )
             VStack(alignment: .leading, spacing: 2) {

@@ -16,9 +16,12 @@ layer stack reliably; its source path is unchanged.
 offline fallbacks when their corresponding local clients are unavailable. Product names and
 logos remain trademarks of their respective owners.
 
+`zcode.icns` is the official icon from the locally installed ZCode application.
+
 `copilot.svg` is the GitHub Copilot Codicon distributed with VS Code under the MIT License.
 `github-mark.svg` is GitHub's official mark from `primer/octicons`, distributed under the MIT License.
 `kimi.png` is the official Kimi Code extension icon published by Moonshot AI on Open VSX.
+`deepseek.svg` is from `simple-icons/simple-icons`, distributed under CC0-1.0.
 
 # Video Platform Icons
 

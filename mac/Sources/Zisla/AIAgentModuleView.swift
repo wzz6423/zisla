@@ -246,7 +246,6 @@ struct AIAgentModuleView: View {
                     .frame(width: 16, height: 16)
                 }
                 .buttonStyle(.borderless)
-                .disabled(agent.isRunningCLICommands || agent.isCheckingCLIs)
                 .help("重新检测本机 CLI")
                 Button {
                     queueCLIAction(
@@ -259,7 +258,7 @@ struct AIAgentModuleView: View {
                     Image(systemName: "arrow.down.circle")
                 }
                 .buttonStyle(.borderless)
-                .disabled(agent.isRunningCLICommands || agent.isCheckingCLIs || installCommands.isEmpty)
+                .disabled(installCommands.isEmpty)
                 .help("一键下载所有未安装的 CLI")
                 Button {
                     queueCLIAction(
@@ -272,7 +271,7 @@ struct AIAgentModuleView: View {
                     Image(systemName: "arrow.up.circle")
                 }
                 .buttonStyle(.borderless)
-                .disabled(agent.isRunningCLICommands || agent.isCheckingCLIs || updateCommands.isEmpty)
+                .disabled(updateCommands.isEmpty)
                 .help("一键更新所有已安装的 CLI")
                 Button(role: .destructive) {
                     queueCLIAction(
@@ -285,9 +284,11 @@ struct AIAgentModuleView: View {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
-                .disabled(agent.isRunningCLICommands || agent.isCheckingCLIs || uninstallCommands.isEmpty)
+                .disabled(uninstallCommands.isEmpty)
                 .help("一键卸载所有受支持的 CLI")
             }
+            cliCommandGroup(title: "下载命令", commands: installCommands)
+            cliCommandGroup(title: "更新命令", commands: updateCommands)
 
             HStack(alignment: .center, spacing: 9) {
                 Image(systemName: "arrow.triangle.2.circlepath")
@@ -323,93 +324,113 @@ struct AIAgentModuleView: View {
             ForEach(AgentCLIKind.detectableCases, id: \.self) { kind in
                 let status = agent.store.state.cliStatuses.first { $0.kind == kind }
                 let isInstalled = status?.executablePath != nil
-                HStack(spacing: 8) {
-                    Text(kind.displayName).frame(width: 80, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(isInstalled ? (status?.version ?? "已安装（版本未知）") : "未安装")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(isInstalled ? .primary : .secondary)
-                        if let path = status?.executablePath {
-                            Text(path)
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundStyle(.tertiary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(kind.displayName).frame(width: 80, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 2) {
+                            if isInstalled {
+                                Text(status?.version ?? "已安装（版本未知）")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.primary)
+                                if let path = status?.executablePath {
+                                    Text(path)
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .foregroundStyle(.tertiary)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+                            } else {
+                                HStack(spacing: 5) {
+                                    Text("未安装")
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                    cliCommandRows(
+                                        commands: agent.commandsForCLIInstallation([kind], update: false),
+                                        paddingLeading: 0
+                                    )
+                                }
+                            }
+                        }
+                        Spacer()
+                        if AgentCLIKind.managedCases.contains(kind), isInstalled {
+                            let update = agent.commandsForCLIInstallation([kind], update: true)
+                            let availableUpdate = agent.cliUpdates.first { $0.kind == kind }
+                            if agent.isCheckingCLIs {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .frame(width: 16, height: 16)
+                                    .help("正在检查 \(kind.displayName) 更新")
+                            } else if let availableUpdate {
+                                Button {
+                                    queueCLIAction(
+                                        title: "更新 \(kind.displayName)？",
+                                        message: "将 \(kind.displayName) 从 \(availableUpdate.installedVersion) 更新到 \(availableUpdate.latestVersion)",
+                                        kinds: [kind],
+                                        commands: update
+                                    )
+                                } label: {
+                                    Image(systemName: "arrow.up.circle")
+                                }
+                                .buttonStyle(.borderless)
+                                .foregroundStyle(Color.zislaInfo)
+                                .disabled(agent.isRunningCLICommands || update.isEmpty)
+                                .help("已确认新版本 \(availableUpdate.latestVersion)，更新 \(kind.displayName)")
+                            } else if status?.version != nil, kind != .kimi {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(kind == .grok && agent.grokUpdateState == .upToDate ? .green : .secondary)
+                                    .help(kind == .grok && agent.grokUpdateState == .upToDate ? "Grok 已是最新版本" : "当前未检测到可用更新")
+                            } else {
+                                Button {
+                                    queueCLIAction(
+                                        title: "更新 \(kind.displayName)？",
+                                        message: cliActionMessage("将更新", kinds: [kind]),
+                                        kinds: [kind],
+                                        commands: update
+                                    )
+                                } label: {
+                                    Image(systemName: "arrow.up.circle")
+                                }
+                                .buttonStyle(.borderless)
+                                .foregroundStyle(.secondary)
+                                .disabled(agent.isRunningCLICommands || update.isEmpty)
+                                .help(status?.version == nil ? "版本未知，可尝试更新 \(kind.displayName)" : "检查并升级 \(kind.displayName)")
+                            }
+                            let uninstall = agent.commandsForCLIUninstallation([kind])
+                            Button(role: .destructive) {
+                                queueCLIAction(
+                                    title: "卸载 \(kind.displayName)？",
+                                    message: cliActionMessage("将卸载", kinds: [kind]),
+                                    kinds: [kind],
+                                    commands: uninstall
+                                )
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(agent.isRunningCLICommands || uninstall.isEmpty)
+                            .help("卸载 \(kind.displayName)")
+                        } else if AgentCLIKind.managedCases.contains(kind) {
+                            let install = agent.commandsForCLIInstallation([kind], update: false)
+                            Button {
+                                queueCLIAction(
+                                    title: "下载 \(kind.displayName)？",
+                                    message: cliActionMessage("将下载并安装", kinds: [kind]),
+                                    kinds: [kind],
+                                    commands: install
+                                )
+                            } label: {
+                                Image(systemName: "arrow.down.circle")
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(install.isEmpty)
+                            .help("下载并安装 \(kind.displayName)")
                         }
                     }
-                    Spacer()
                     if AgentCLIKind.managedCases.contains(kind), isInstalled {
-                        let update = agent.commandsForCLIInstallation([kind], update: true)
-                        let availableUpdate = agent.cliUpdates.first { $0.kind == kind }
-                        if agent.isCheckingCLIs {
-                            ProgressView()
-                                .controlSize(.small)
-                                .frame(width: 16, height: 16)
-                                .help("正在检查 \(kind.displayName) 更新")
-                        } else if let availableUpdate {
-                            Button {
-                                queueCLIAction(
-                                    title: "更新 \(kind.displayName)？",
-                                    message: "将 \(kind.displayName) 从 \(availableUpdate.installedVersion) 更新到 \(availableUpdate.latestVersion)",
-                                    kinds: [kind],
-                                    commands: update
-                                )
-                            } label: {
-                                Image(systemName: "arrow.up.circle")
-                            }
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(Color.zislaInfo)
-                            .disabled(agent.isRunningCLICommands || agent.isCheckingCLIs || update.isEmpty)
-                            .help("已确认新版本 \(availableUpdate.latestVersion)，更新 \(kind.displayName)")
-                        } else if status?.version != nil, kind != .kimi {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(kind == .grok && agent.grokUpdateState == .upToDate ? .green : .secondary)
-                                .help(kind == .grok && agent.grokUpdateState == .upToDate ? "Grok 已是最新版本" : "当前未检测到可用更新")
-                        } else {
-                            Button {
-                                queueCLIAction(
-                                    title: "更新 \(kind.displayName)？",
-                                    message: cliActionMessage("将更新", kinds: [kind]),
-                                    kinds: [kind],
-                                    commands: update
-                                )
-                            } label: {
-                                Image(systemName: "arrow.up.circle")
-                            }
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(.secondary)
-                            .disabled(agent.isRunningCLICommands || agent.isCheckingCLIs || update.isEmpty)
-                            .help(status?.version == nil ? "版本未知，可尝试更新 \(kind.displayName)" : "检查并升级 \(kind.displayName)")
-                        }
-                        let uninstall = agent.commandsForCLIUninstallation([kind])
-                        Button(role: .destructive) {
-                            queueCLIAction(
-                                title: "卸载 \(kind.displayName)？",
-                                message: cliActionMessage("将卸载", kinds: [kind]),
-                                kinds: [kind],
-                                commands: uninstall
-                            )
-                        } label: {
-                            Image(systemName: "trash")
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(agent.isRunningCLICommands || agent.isCheckingCLIs || uninstall.isEmpty)
-                        .help("卸载 \(kind.displayName)")
-                    } else if AgentCLIKind.managedCases.contains(kind) {
-                        let install = agent.commandsForCLIInstallation([kind], update: false)
-                        Button {
-                            queueCLIAction(
-                                title: "下载 \(kind.displayName)？",
-                                message: cliActionMessage("将下载并安装", kinds: [kind]),
-                                kinds: [kind],
-                                commands: install
-                            )
-                        } label: {
-                            Image(systemName: "arrow.down.circle")
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(agent.isRunningCLICommands || agent.isCheckingCLIs || install.isEmpty)
-                        .help("下载并安装 \(kind.displayName)")
+                        cliCommandRows(
+                            commands: agent.commandsForCLIInstallation([kind], update: true),
+                            paddingLeading: 88
+                        )
                     }
                 }
                 Divider()
@@ -487,6 +508,58 @@ struct AIAgentModuleView: View {
         case .succeeded: return "\(action) 已完成"
         case .failed: return "\(action) 失败"
         }
+    }
+
+    @ViewBuilder
+    private func cliCommandGroup(title: String, commands: [AIAgentCLICommand]) -> some View {
+        if !commands.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+                cliCommandRows(commands: commands, paddingLeading: 0)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cliCommandRows(
+        commands: [AIAgentCLICommand],
+        paddingLeading: CGFloat
+    ) -> some View {
+        ForEach(Array(commands.enumerated()), id: \.offset) { _, command in
+            let commandText = formatCommandForDisplay(command)
+            HStack(spacing: 4) {
+                Text(commandText)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(commandText, forType: .string)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 9))
+                }
+                .buttonStyle(.borderless)
+                .help("复制命令")
+            }
+            .padding(.leading, paddingLeading)
+        }
+    }
+
+    private func formatCommandForDisplay(_ command: AIAgentCLICommand) -> String {
+        let executable = command.executableURL.lastPathComponent
+        let args = command.arguments.map(shellArgument).joined(separator: " ")
+        return "\(executable) \(args)".trimmingCharacters(in: .whitespaces)
+    }
+
+    private func shellArgument(_ argument: String) -> String {
+        let shellCharacters = CharacterSet(charactersIn: " \\t\\n\\\\'\\\"$`;&|<>*?()[]{}!~")
+        guard argument.rangeOfCharacter(from: shellCharacters) != nil else { return argument }
+        return "'\(argument.replacingOccurrences(of: "'", with: "'\\\\''"))'"
     }
 
     private func updateAccount(_ id: UUID, _ update: (inout AgentAccount) -> Void) {

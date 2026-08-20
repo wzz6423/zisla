@@ -1192,7 +1192,7 @@ public struct AIAgentCLIService: Sendable {
             arguments.append("run")
             appendModel(model, to: &arguments)
             arguments.append("-")
-        case .kimi, .qwen, .qoder, .copilot, .glm:
+        case .kimi, .qwen, .qoder, .copilot, .glm, .dsh:
             return []
         }
 

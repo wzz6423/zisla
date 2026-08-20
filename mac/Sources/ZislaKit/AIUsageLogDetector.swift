@@ -230,7 +230,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return url.path.contains("/logs/sessions/")
         case .copilot:
             return true
-        case .kimi, .trae, .opencode, .harness:
+        case .kimi, .zcode, .trae, .opencode, .harness:
             return false
         case .codex, .claude, .qwen, .gpt, .doubao:
             return true
@@ -275,7 +275,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             if parserState.copilotHasDetailedUsage {
                 samples.removeAll(where: isCopilotShutdownSummary)
             }
-        case .kimi, .trae, .opencode, .harness:
+        case .kimi, .zcode, .trae, .opencode, .harness:
             return []
         }
         return Array(samples.suffix(maxSamplesPerFile))
@@ -362,7 +362,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return parseGeneric(root, candidate: candidate)
         case .copilot:
             return parseCopilot(root, candidate: candidate, parserState: &parserState)
-        case .kimi, .trae, .opencode, .harness:
+        case .kimi, .zcode, .trae, .opencode, .harness:
             return []
         }
     }
