@@ -34,6 +34,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     case zcode
     case trae
     case opencode
+    case pi
     case harness
     case deepseekHarness
     case doubao
@@ -58,6 +59,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .zcode: self = .zcode
         case .trae: self = .trae
         case .opencode: self = .opencode
+        case .pi: self = .pi
         case .harness: self = .harness
         case .doubao: self = .doubao
         }
@@ -91,6 +93,10 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
             self = .trae
         } else if id.contains("opencode") {
             self = .opencode
+        } else if id == "pi" || id.contains("pi-coding") {
+            self = .pi
+        } else if id.contains("dsh") || id.contains("deepseek-harness") {
+            self = .deepseekHarness
         } else if id.contains("harness") || id.contains("harnext") {
             self = .harness
         } else if id.contains("doubao") {
@@ -119,6 +125,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .zcode: .zcode
         case .trae: .trae
         case .opencode: .opencode
+        case .pi: .pi
         case .harness: .harness
         case .deepseekHarness: nil
         case .doubao: .doubao
@@ -131,7 +138,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     }
 
     fileprivate var usesMonochromeProviderAsset: Bool {
-        self == .grok || self == .gpt || self == .copilot || self == .opencode
+        self == .grok || self == .gpt || self == .copilot || self == .opencode || self == .pi
     }
 
 }

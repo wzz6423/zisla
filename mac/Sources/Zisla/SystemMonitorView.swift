@@ -14,6 +14,7 @@ struct SystemMonitorView: View {
     @State private var isCleanupPresented = false
     @State private var releasedMemoryBytes: UInt64?
     @State private var systemColumnHeight: CGFloat = 0
+    @Environment(\.locale) private var locale
 
     var body: some View {
         ScrollView {
@@ -22,10 +23,10 @@ struct SystemMonitorView: View {
                     .frame(
                         height: systemColumnHeight > 0 ? systemColumnHeight : nil,
                         alignment: .top
-                    )
+                )
                 Hairline()
                 systemColumn
-                    .frame(width: 214)
+                    .frame(width: 250)
             }
             .padding(12)
         }
@@ -144,9 +145,9 @@ struct SystemMonitorView: View {
                         .foregroundStyle(capacityTint(memoryUsage))
                         .monospacedDigit()
                 }
-                usedTotalRow(
-                    leadLabel: "已用",
-                    lead: service.snapshot?.memory.usedBytes,
+                usedAvailableRow(
+                    used: service.snapshot?.memory.usedBytes,
+                    available: service.snapshot?.memory.freeBytes,
                     total: service.snapshot?.memory.totalBytes,
                     format: memoryByteText
                 )
@@ -168,17 +169,25 @@ struct SystemMonitorView: View {
     private var diskCard: some View {
         MonitorCard {
             VStack(alignment: .leading, spacing: 7) {
-                CardHeader(symbol: "internaldrive", title: service.snapshot?.disk.volumeName ?? "磁盘") {
-                    if let temp = temperatureText(service.snapshot?.disk.temperature) {
-                        Text(temp)
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(temperatureTint(diskCelsius))
-                            .monospacedDigit()
+                CardHeader(symbol: "internaldrive", title: "硬盘") {
+                    HStack(spacing: 6) {
+                        if let temp = temperatureText(service.snapshot?.disk.temperature) {
+                            Text(temp)
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(temperatureTint(diskCelsius))
+                                .monospacedDigit()
+                        }
+                        if let usage = diskUsageText {
+                            Text("使用率 \(usage)")
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(capacityTint(diskUsage))
+                                .monospacedDigit()
+                        }
                     }
                 }
-                usedTotalRow(
-                    leadLabel: "可用",
-                    lead: service.snapshot?.disk.freeBytes,
+                usedAvailableRow(
+                    used: service.snapshot?.disk.usedBytes,
+                    available: service.snapshot?.disk.freeBytes,
                     total: service.snapshot?.disk.totalBytes,
                     format: byteText
                 )
@@ -285,9 +294,9 @@ struct SystemMonitorView: View {
 
     private var cpuWaveSeries: [WaveSeries] {
         [
+            WaveSeries(samples: service.history.cpuIdle, color: WaveformPalette.idle),
             WaveSeries(samples: service.history.cpuUser, color: WaveformPalette.blue),
             WaveSeries(samples: service.history.cpuSystem, color: WaveformPalette.red),
-            WaveSeries(samples: service.history.cpuIdle, color: WaveformPalette.idle),
         ]
     }
 
@@ -309,6 +318,11 @@ struct SystemMonitorView: View {
     private var diskUsage: Double {
         guard let disk = service.snapshot?.disk, disk.totalBytes > 0 else { return 0 }
         return min(1, Double(disk.usedBytes) / Double(disk.totalBytes))
+    }
+
+    private var diskUsageText: String? {
+        guard let disk = service.snapshot?.disk, disk.totalBytes > 0 else { return nil }
+        return percent(diskUsage)
     }
 
     private var memoryUsage: Double {
@@ -341,11 +355,16 @@ struct SystemMonitorView: View {
             noFanLabel
         case let .available(rpm, _):
             HStack(spacing: 16) {
-                ForEach(Array(rpm.enumerated()), id: \.offset) { _, value in
+                ForEach(Array(rpm.enumerated()), id: \.offset) { index, value in
                     HStack(spacing: 5) {
                         Image(systemName: "fan.fill")
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
+                        if let label = Self.fanPositionLabel(for: index, locale: locale) {
+                            Text(label)
+                                .font(.islandMicro())
+                                .foregroundStyle(.secondary)
+                        }
                         Text("\(Int(value.rounded()))")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .monospacedDigit()
@@ -361,6 +380,14 @@ struct SystemMonitorView: View {
             Text("正在读取风扇状态")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    static func fanPositionLabel(for index: Int, locale: Locale) -> String? {
+        switch index {
+        case 0: locale.identifier.lowercased().hasPrefix("en") ? "L" : "左"
+        case 1: locale.identifier.lowercased().hasPrefix("en") ? "R" : "右"
+        default: nil
         }
     }
 
@@ -394,16 +421,16 @@ struct SystemMonitorView: View {
         }
     }
 
-    private func usedTotalRow(
-        leadLabel: String,
-        lead: UInt64?,
+    private func usedAvailableRow(
+        used: UInt64?,
+        available: UInt64?,
         total: UInt64?,
         format: (UInt64) -> String = { _ in "--" }
     ) -> some View {
         HStack {
-            Text("\(leadLabel) \(lead.map { format($0) } ?? "--")")
+            Text("已用 \(used.map { format($0) } ?? "--") / 可用 \(available.map { format($0) } ?? "--")")
             Spacer(minLength: 0)
-            Text("共 \(total.map { format($0) } ?? "--")")
+            Text("总量 \(total.map { format($0) } ?? "--")")
         }
         .font(.islandMicro())
         .foregroundStyle(.secondary)
@@ -514,7 +541,7 @@ struct SystemMonitorView: View {
     }
 
     private func rateText(_ bytesPerSecond: Double?) -> String {
-        guard let bytesPerSecond else { return "建立基线" }
+        guard let bytesPerSecond else { return "---" }
         return ByteCountFormatter.string(
             fromByteCount: Int64(max(0, bytesPerSecond)),
             countStyle: .file
@@ -885,8 +912,10 @@ private struct SystemCleanupSheet: View {
                             .listRowSeparator(.hidden)
                         }
                         ForEach(groupedSections) { section in
-                            Section {
-                                if !isSectionCollapsed(section) {
+                            if isSectionCollapsed(section) {
+                                cleanupSectionHeader(section)
+                            } else {
+                                Section {
                                     ForEach(section.items) { candidate in
                                         Toggle(isOn: selectionBinding(for: candidate.url)) {
                                             HStack(spacing: 9) {
@@ -927,53 +956,9 @@ private struct SystemCleanupSheet: View {
                                         .toggleStyle(.checkbox)
                                         .disabled(isCleaning)
                                     }
+                                } header: {
+                                    cleanupSectionHeader(section)
                                 }
-                            } header: {
-                                HStack(spacing: 6) {
-                                    Button {
-                                        toggleSectionCollapsed(section)
-                                    } label: {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: isSectionCollapsed(section) ? "chevron.right" : "chevron.down")
-                                                .font(.system(size: 8, weight: .bold))
-                                                .frame(width: 10)
-                                            Image(systemName: section.kind.symbol)
-                                                .foregroundStyle(section.kind.tint)
-                                            Text(section.kind.title)
-                                                .font(.system(size: 10, weight: .semibold))
-                                            Text("· \(section.selectedCount(in: selectedURLs))/\(section.items.count) 项")
-                                                .font(.system(size: 9))
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .help(isSectionCollapsed(section) ? "展开\(section.kind.title)" : "折叠\(section.kind.title)")
-                                    .accessibilityLabel(isSectionCollapsed(section) ? "展开\(section.kind.title)" : "折叠\(section.kind.title)")
-                                    Spacer(minLength: 4)
-                                    Text(byteText(section.totalBytes))
-                                        .font(.system(size: 9, design: .monospaced))
-                                        .foregroundStyle(.secondary)
-                                    IconButton(
-                                        symbol: section.allSelected(in: selectedURLs) ? "checkmark.square.fill" : "checkmark.square",
-                                        help: section.allSelected(in: selectedURLs) ? "取消选择\(section.kind.title)" : "全选\(section.kind.title)",
-                                        isActive: section.allSelected(in: selectedURLs),
-                                        size: .compact
-                                    ) {
-                                        toggleSectionSelection(section)
-                                    }
-                                    .disabled(isCleaning)
-                                    IconButton(
-                                        symbol: "arrow.left.arrow.right.square",
-                                        help: "反选\(section.kind.title)",
-                                        size: .compact
-                                    ) {
-                                        invertSelection(in: section)
-                                    }
-                                    .disabled(isCleaning)
-                                }
-                                .textCase(nil)
-                                .padding(.vertical, 1)
                             }
                         }
                     }
@@ -1047,6 +1032,54 @@ private struct SystemCleanupSheet: View {
             let total = items.reduce(UInt64(0)) { $0 + $1.byteSize }
             return CleanupKindSection(kind: kind, items: items, totalBytes: total)
         }
+    }
+
+    private func cleanupSectionHeader(_ section: CleanupKindSection) -> some View {
+        HStack(spacing: 6) {
+            Button {
+                toggleSectionCollapsed(section)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isSectionCollapsed(section) ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 8, weight: .bold))
+                        .frame(width: 10)
+                    Image(systemName: section.kind.symbol)
+                        .foregroundStyle(section.kind.tint)
+                    Text(section.kind.title)
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("· \(section.selectedCount(in: selectedURLs))/\(section.items.count) 项")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(isSectionCollapsed(section) ? "展开\(section.kind.title)" : "折叠\(section.kind.title)")
+            .accessibilityLabel(isSectionCollapsed(section) ? "展开\(section.kind.title)" : "折叠\(section.kind.title)")
+            Spacer(minLength: 4)
+            Text(byteText(section.totalBytes))
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.secondary)
+            IconButton(
+                symbol: section.allSelected(in: selectedURLs) ? "checkmark.square.fill" : "checkmark.square",
+                help: section.allSelected(in: selectedURLs) ? "取消选择\(section.kind.title)" : "全选\(section.kind.title)",
+                isActive: section.allSelected(in: selectedURLs),
+                size: .compact
+            ) {
+                toggleSectionSelection(section)
+            }
+            .disabled(isCleaning)
+            IconButton(
+                symbol: "arrow.left.arrow.right.square",
+                help: "反选\(section.kind.title)",
+                size: .compact
+            ) {
+                invertSelection(in: section)
+            }
+            .disabled(isCleaning)
+        }
+        .textCase(nil)
+        .padding(.vertical, 1)
     }
 
     private func toggleSelectAll() {

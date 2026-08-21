@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="${0:A:h:h}"
 CONFIGURATION="${CONFIGURATION:-release}"
-VERSION="${VERSION:-0.1.4}"
+VERSION="${VERSION:-0.1.5}"
 BUILD_NUMBER="${BUILD_NUMBER:-10}"
 UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
 OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:-$ROOT/dist}"
@@ -14,6 +14,45 @@ SIGNING_MODE="${SIGNING_MODE:-}"
 BUILD_ARCHITECTURES="${BUILD_ARCHITECTURES:-$(uname -m)}"
 ARCHITECTURES=(${=BUILD_ARCHITECTURES})
 BINARIES=()
+
+function supports_swiftui_macros() {
+  local developer_directory="$1"
+
+  [[ -x "$developer_directory/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift" && \
+    -f "$developer_directory/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libSwiftUIMacros.dylib" ]]
+}
+
+function resolve_developer_directory() {
+  local selected_directory
+  local xcode_app
+  local candidate
+  local -a candidates
+
+  candidates=()
+  [[ -n "${DEVELOPER_DIR:-}" ]] && candidates+=("$DEVELOPER_DIR")
+
+  selected_directory="$(xcode-select -p 2>/dev/null || true)"
+  [[ -n "$selected_directory" ]] && candidates+=("$selected_directory")
+
+  for xcode_app in ${(f)"$(mdfind 'kMDItemCFBundleIdentifier == "com.apple.dt.Xcode"' 2>/dev/null || true)"}; do
+    candidates+=("$xcode_app/Contents/Developer")
+  done
+  for xcode_app in /Applications/Xcode*.app(N); do
+    candidates+=("$xcode_app/Contents/Developer")
+  done
+
+  for candidate in "${candidates[@]}"; do
+    if supports_swiftui_macros "$candidate"; then
+      print -r -- "$candidate"
+      return
+    fi
+  done
+
+  echo "error: a full Xcode installation with SwiftUI macro support is required; install Xcode or set DEVELOPER_DIR" >&2
+  exit 1
+}
+
+export DEVELOPER_DIR="$(resolve_developer_directory)"
 
 if [[ -z "$SIGNING_MODE" ]]; then
   if [[ "$IDENTITY" == "-" ]]; then

@@ -4,6 +4,7 @@ import Darwin
 import Foundation
 import IOKit
 import SystemConfiguration
+import ZislaNVMe
 
 // MARK: - Snapshots
 
@@ -809,6 +810,11 @@ enum SystemSampler {
 
     /// Reads internal NVMe/SSD temperature; returns unavailable when the reading cannot be verified.
     static func sampleDiskTemperature() -> TemperatureMetric {
+        let smartCelsius = ZislaReadNVMeTemperatureCelsius()
+        if smartCelsius.isFinite, (0...120).contains(smartCelsius) {
+            return .celsius(smartCelsius)
+        }
+
         let classNames = ["AppleANS3NVMeController", "IONVMeController", "AppleNVMeController"]
         for className in classNames {
             var iterator: io_iterator_t = 0

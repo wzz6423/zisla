@@ -9,24 +9,24 @@ struct AIAgentModelsTests {
 
         #expect(state.skillSyncConfiguration == AgentSkillSyncConfiguration())
         #expect(state.skillSyncConfiguration.mode == .symbolicLink)
-        #expect(state.skillSyncConfiguration.enabledDestinations.isEmpty)
-        #expect(!state.cliAutoUpdateEnabled)
+        #expect(state.skillSyncConfiguration.enabledDestinations == Set(AgentSkillSyncDestination.allCases))
+        #expect(state.cliAutoUpdateEnabled)
     }
 
     @Test
-    func cliAutoUpdateSettingDefaultsOffForLegacyStateAndRoundTrips() throws {
+    func cliAutoUpdateSettingDefaultsOnForLegacyStateAndRoundTrips() throws {
         let legacy = try JSONDecoder().decode(
             AIAgentState.self,
             from: Data(#"{"accounts":[],"channels":[],"cliStatuses":[]}"#.utf8)
         )
-        let enabled = AIAgentState(cliAutoUpdateEnabled: true)
+        let disabled = AIAgentState(cliAutoUpdateEnabled: false)
         let roundTripped = try JSONDecoder().decode(
             AIAgentState.self,
-            from: JSONEncoder().encode(enabled)
+            from: JSONEncoder().encode(disabled)
         )
 
-        #expect(!legacy.cliAutoUpdateEnabled)
-        #expect(roundTripped.cliAutoUpdateEnabled)
+        #expect(legacy.cliAutoUpdateEnabled)
+        #expect(!roundTripped.cliAutoUpdateEnabled)
     }
 
     @Test
@@ -195,7 +195,10 @@ struct AIAgentModelsTests {
         #expect(AgentCLIKind.dsh.displayName == "DeepSeek Harness")
         #expect(AgentCLIKind.dsh.executableName == "dsh")
         #expect(AgentCLIKind.dsh.npmPackageName == "@deepseek-ai/dsh")
-        #expect(AgentCLIKind.allCases.last == .dsh)
+        #expect(AgentCLIKind.allCases.last == .pi)
+        #expect(AgentCLIKind.pi.displayName == "Pi")
+        #expect(AgentCLIKind.pi.executableName == "pi")
+        #expect(AgentCLIKind.pi.npmPackageName == "@earendil-works/pi-coding-agent")
 
         #expect(AgentCLIKind.detectableCases.contains(.kimi))
         #expect(AgentCLIKind.detectableCases.contains(.qwen))

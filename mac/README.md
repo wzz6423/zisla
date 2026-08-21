@@ -124,7 +124,7 @@ swift run zislactl usage \
 swift run zislactl finish --id build-42 --detail "Complete"
 ```
 
-Canonical providers include `claude`, `codex`, `gemini`, `grok`, `gpt`, `copilot`, `kimi`, `qwen`, `coder`, `zcode`, `trae`, `opencode`, `harness`, and `doubao`; common aliases are normalized automatically. Call it from any tool hook, shell wrapper, or task script.
+Canonical providers include `claude`, `codex`, `gemini`, `grok`, `gpt`, `copilot`, `kimi`, `qwen`, `coder`, `zcode`, `trae`, `opencode`, `pi`, `harness`, and `doubao`; common aliases are normalized automatically. Call it from any tool hook, shell wrapper, or task script.
 
 The AI run list and collapsed state use each tool's official logo to identify its source.
 

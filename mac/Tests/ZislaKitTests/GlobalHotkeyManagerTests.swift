@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import Testing
 
+@testable import ZislaCore
 @testable import ZislaKit
 
 @Suite(.serialized)
@@ -44,6 +45,62 @@ struct GlobalHotkeyManagerTests {
         try sendHotkeyPressed(keyCode: secondKeyCode, modifiers: modifiers)
         #expect(firstPressCount == 1)
         #expect(secondPressCount == 1)
+    }
+
+    @Test
+    func flagsChangedTracksRightOptionWithoutGlobalKeyState() {
+        let rightOption = VoiceInputModifier.rightOption
+        var modifierSides = GlobalHotkeyManager.modifierSides(
+            afterFlagsChangedFor: rightOption.keyCode,
+            flags: .maskAlternate,
+            from: []
+        )
+        #expect(modifierSides == [rightOption])
+
+        modifierSides = GlobalHotkeyManager.modifierSides(
+            afterFlagsChangedFor: rightOption.keyCode,
+            flags: [],
+            from: modifierSides
+        )
+        #expect(modifierSides.isEmpty)
+
+        modifierSides = GlobalHotkeyManager.modifierSides(
+            afterFlagsChangedFor: rightOption.keyCode,
+            flags: .maskAlternate,
+            from: [.leftOption]
+        )
+        #expect(modifierSides == [.leftOption, rightOption])
+
+        modifierSides = GlobalHotkeyManager.modifierSides(
+            afterFlagsChangedFor: rightOption.keyCode,
+            flags: .maskAlternate,
+            from: modifierSides
+        )
+        #expect(modifierSides == [.leftOption])
+    }
+
+    @Test
+    func flagsChangedUsesPhysicalModifierBitsWhenAvailable() {
+        let rightOption = VoiceInputModifier.rightOption
+        let rightOptionFlags = CGEventFlags(rawValue: 0x40 | 0x0008_0000)
+
+        #expect(
+            GlobalHotkeyManager.modifierSides(from: rightOptionFlags) == [rightOption]
+        )
+        #expect(
+            GlobalHotkeyManager.modifierSides(
+                afterFlagsChangedFor: rightOption.keyCode,
+                flags: rightOptionFlags,
+                from: [.leftOption]
+            ) == [rightOption]
+        )
+        #expect(
+            GlobalHotkeyManager.modifierSides(
+                afterFlagsChangedFor: rightOption.keyCode,
+                flags: [],
+                from: [rightOption]
+            ).isEmpty
+        )
     }
 
     private func sendHotkeyPressed(keyCode: UInt32, modifiers: UInt32) throws {

@@ -467,6 +467,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var automaticDownloadEnabled: Bool
     /// Target channel for manual update checks.
     public var updateChannel: UpdateChannel
+    /// Optional proxy URL used by local update, install, and network download tasks.
+    public var networkProxyURL: String
+    /// Whether local update, install, and network download tasks should use the configured proxy.
+    public var networkProxyEnabled: Bool
     /// Whether to save clipboard text and images locally; users can disable it in Settings if concerned about sensitive content.
     public var clipboardHistoryEnabled: Bool
     /// Whether to detect downloadable links in clipboard; users can disable it in Settings.
@@ -549,6 +553,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         updateChecksEnabled: Bool = true,
         automaticDownloadEnabled: Bool = true,
         updateChannel: UpdateChannel = .release,
+        networkProxyURL: String = "",
+        networkProxyEnabled: Bool = false,
         clipboardHistoryEnabled: Bool = true,
         clipboardDetectionEnabled: Bool = true,
         sideNoticesEnabled: Bool = true,
@@ -611,6 +617,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.updateChecksEnabled = updateChecksEnabled
         self.automaticDownloadEnabled = automaticDownloadEnabled
         self.updateChannel = updateChannel
+        self.networkProxyURL = networkProxyURL
+        self.networkProxyEnabled = networkProxyEnabled
         self.clipboardHistoryEnabled = clipboardHistoryEnabled
         self.clipboardDetectionEnabled = clipboardDetectionEnabled
         self.sideNoticesEnabled = sideNoticesEnabled
@@ -691,6 +699,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case updateChecksEnabled
         case automaticDownloadEnabled
         case updateChannel
+        case networkProxyURL
+        case networkProxyEnabled
         case clipboardHistoryEnabled
         case clipboardDetectionEnabled
         case sideNoticesEnabled
@@ -793,6 +803,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             automaticDownloadEnabled = try legacyContainer.decodeIfPresent(Bool.self, forKey: .automaticUpdatesEnabled) ?? defaults.automaticDownloadEnabled
         }
         updateChannel = try container.decodeIfPresent(UpdateChannel.self, forKey: .updateChannel) ?? defaults.updateChannel
+        networkProxyURL = try container.decodeIfPresent(String.self, forKey: .networkProxyURL) ?? defaults.networkProxyURL
+        networkProxyEnabled = try container.decodeIfPresent(Bool.self, forKey: .networkProxyEnabled)
+            ?? (!networkProxyURL.isEmpty)
         clipboardHistoryEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardHistoryEnabled) ?? defaults.clipboardHistoryEnabled
         clipboardDetectionEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardDetectionEnabled) ?? defaults.clipboardDetectionEnabled
         sideNoticesEnabled = try container.decodeIfPresent(Bool.self, forKey: .sideNoticesEnabled) ?? defaults.sideNoticesEnabled

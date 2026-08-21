@@ -292,22 +292,10 @@ struct CompactStatusBarView: View {
     }
 
     private var selectedCompactStatusPriority: CompactStatusPriority? {
-        settingsStore.settings.compactStatusPriority.first(where: compactStatusIsAvailable)
-    }
-
-    private func compactStatusIsAvailable(_ priority: CompactStatusPriority) -> Bool {
-        switch priority {
-        case .transient: transientNotice != nil
-        case .updateAvailable: updateNotice != nil
-        case .mail: !mailNotices.isEmpty
-        case .videoDownload: videoDownloadNotice != nil
-        case .browserDownload: browserDownloadNotice != nil
-        case .focusCountdown: focusCountdownNotice != nil
-        case .toolboxReminder: toolboxNotice != nil
-        case .aiActivity: !activeAINotices.isEmpty
-        case .media: mediaNotice != nil || backgroundSoundNotice != nil
-        case .focusMode: focusModeNotice != nil
-        }
+        SideNoticeLayoutEngine.selectedCompactStatusPriority(
+            for: queue.left + queue.right,
+            settings: settingsStore.settings
+        )
     }
 
     @ViewBuilder
@@ -1105,7 +1093,7 @@ private struct CompactUpdateWing: View {
                         .frame(width: min(19, height * 0.58), height: min(19, height * 0.58))
                 }
             } else {
-                    Image(systemName: "arrow.down.circle")
+                    Image(systemName: "arrow.up.circle")
                     .font(.system(size: min(14, height * 0.46), weight: .semibold))
                     .foregroundStyle(.cyan)
             }

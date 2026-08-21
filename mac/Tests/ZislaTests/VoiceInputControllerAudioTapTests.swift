@@ -23,6 +23,19 @@ struct VoiceInputControllerAudioTapTests {
         #expect(source.contains("SFSpeechAudioBufferRecognitionRequest"))
     }
 
+    @Test
+    func systemDictationUsesShortLivePresetAndNaturalInputFormat() throws {
+        let source = try String(contentsOf: Self.controllerSourceURL, encoding: .utf8)
+
+        #expect(source.contains("preset: .progressiveShortDictation"))
+        #expect(source.contains("considering: sourceFormat"))
+        #expect(source.contains("contextualStrings = strings.filter"))
+        #expect(source.contains("request.contextualStrings = contextualStrings"))
+        #expect(source.contains("context.contextualStrings[.general] = contextualStrings"))
+        #expect(!source.contains("strings != VoiceLexicon.terms(for: VoiceLexicon.defaultEnabled)"))
+        #expect(!source.contains(".prefix("))
+    }
+
     @MainActor
     @Test
     func productionAudioTapHandlerRunsOutsideMainActor() async throws {

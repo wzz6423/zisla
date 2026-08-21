@@ -155,6 +155,20 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
 
     public init() {}
 
+    /// Focus transitions are explicit user-visible events, so they take precedence over the
+    /// user's normal collapsed-status ordering until the transient notice expires.
+    public static func selectedCompactStatusPriority(
+        for notices: [IslandNotice],
+        settings: FeatureSettings
+    ) -> CompactStatusPriority? {
+        if notices.contains(where: { $0.id.hasPrefix("focus-transition") }) {
+            return .transient
+        }
+        return settings.compactStatusPriority.first {
+            compactStatusIsAvailable($0, notices: notices)
+        }
+    }
+
     public func presentation(
         for notices: [IslandNotice],
         compactWingsEnabled: Bool = true,
@@ -382,9 +396,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         if notices.contains(where: { $0.id.hasPrefix("voice-processing-") }) {
             return (false, false)
         }
-        let selectedPriority = settings.compactStatusPriority.first {
-            Self.compactStatusIsAvailable($0, notices: notices)
-        }
+        let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }
         let expandsForDetailedStatus = switch selectedPriority {
         case .media:

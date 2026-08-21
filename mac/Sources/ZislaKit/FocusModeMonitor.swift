@@ -17,15 +17,18 @@ public struct FocusModeStatus: Equatable, Sendable {
     public var isActive: Bool
     public var identifier: String?
     public var displayName: String?
+    public var symbolName: String?
 
     public init(
         isActive: Bool,
         identifier: String? = nil,
-        displayName: String? = nil
+        displayName: String? = nil,
+        symbolName: String? = nil
     ) {
         self.isActive = isActive
         self.identifier = Self.nonEmpty(identifier)
         self.displayName = Self.nonEmpty(displayName)
+        self.symbolName = Self.nonEmpty(symbolName)
     }
 
     public static let inactive = FocusModeStatus(isActive: false)
@@ -34,7 +37,7 @@ public struct FocusModeStatus: Equatable, Sendable {
         let knownMode = Self.knownMode(for: identifier)
         return FocusModePresentation(
             title: displayName ?? knownMode?.title ?? "专注模式",
-            symbolName: knownMode?.symbolName ?? "moon.fill"
+            symbolName: symbolName ?? knownMode?.symbolName ?? "moon.fill"
         )
     }
 
@@ -43,7 +46,18 @@ public struct FocusModeStatus: Equatable, Sendable {
         return FocusModeStatus(
             isActive: false,
             identifier: previous.identifier,
-            displayName: previous.displayName
+            displayName: previous.displayName,
+            symbolName: previous.symbolName
+        )
+    }
+
+    func preservingMissingPresentation(from previous: FocusModeStatus) -> FocusModeStatus {
+        guard identifier != nil, identifier == previous.identifier else { return self }
+        return FocusModeStatus(
+            isActive: isActive,
+            identifier: identifier,
+            displayName: displayName ?? previous.displayName,
+            symbolName: symbolName ?? previous.symbolName
         )
     }
 
@@ -56,6 +70,7 @@ public struct FocusModeStatus: Equatable, Sendable {
     private static func knownMode(for identifier: String?) -> FocusModePresentation? {
         guard let identifier = identifier?.lowercased() else { return nil }
         let modes: [(token: String, title: String, symbolName: String)] = [
+            ("workout", "健身", "figure.run"),
             ("work", "工作", "briefcase.fill"),
             ("personal", "个人", "person.fill"),
             ("sleep", "睡眠", "bed.double.fill"),
@@ -67,21 +82,55 @@ public struct FocusModeStatus: Equatable, Sendable {
             ("do-not-disturb", "勿扰", "moon.fill"),
             ("donotdisturb", "勿扰", "moon.fill"),
         ]
-        guard let mode = modes.first(where: { identifier.contains($0.token) }) else { return nil }
+        let mode = modes.first {
+            identifier == $0.token || identifier.hasSuffix(".\($0.token)")
+        } ?? modes.first { identifier.contains($0.token) }
+        guard let mode else { return nil }
         return FocusModePresentation(title: mode.title, symbolName: mode.symbolName)
     }
+}
+
+public struct FocusModeTransition: Equatable, Sendable {
+    public let id: UUID
+    public let status: FocusModeStatus
+
+    public init(status: FocusModeStatus) {
+        id = UUID()
+        self.status = status
+    }
+}
+
+fileprivate struct FocusModeStoreSnapshot: Equatable, Sendable {
+    let status: FocusModeStatus
+    let transitionToken: String?
+    let transitionTimestamp: TimeInterval?
 }
 
 enum FocusModeStatusStore {
     static let defaultURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/DoNotDisturb/DB/Assertions.json")
+    private static let recentInvalidationMaximumAge: TimeInterval = 5
 
-    static func decode(_ data: Data) throws -> FocusModeStatus {
+    static func decode(
+        _ data: Data,
+        currentTimestamp: TimeInterval = Date().timeIntervalSinceReferenceDate
+    ) throws -> FocusModeStatus {
+        try decodeSnapshot(data, currentTimestamp: currentTimestamp).status
+    }
+
+    fileprivate static func decodeSnapshot(
+        _ data: Data,
+        currentTimestamp: TimeInterval = Date().timeIntervalSinceReferenceDate
+    ) throws -> FocusModeStoreSnapshot {
         guard
             let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
             let stores = root["data"] as? [[String: Any]]
         else {
-            return .inactive
+            return FocusModeStoreSnapshot(
+                status: .inactive,
+                transitionToken: nil,
+                transitionTimestamp: nil
+            )
         }
 
         let invalidatedAssertionIDs = Set(stores.flatMap { store in
@@ -92,9 +141,20 @@ enum FocusModeStatusStore {
         let snapshotTimestamp = (root["header"] as? [String: Any]).flatMap {
             timestamp(in: $0, key: "timestamp")
         }
-        let records = stores
-            .flatMap { $0["storeAssertionRecords"] as? [[String: Any]] ?? [] }
-            .filter { record in
+        let records = stores.flatMap { store -> [[String: Any]] in
+            let globalInvalidationTimestamp = (store["storeInvalidationRequestRecords"] as? [[String: Any]] ?? [])
+                .compactMap { request -> Double? in
+                    guard
+                        let predicate = request["invalidationRequestPredicate"] as? [String: Any],
+                        predicate["invalidationPredicateType"] as? String == "any"
+                    else {
+                        return nil
+                    }
+                    return timestamp(in: request, key: "invalidationRequestDateTimestamp")
+                }
+                .max()
+
+            return (store["storeAssertionRecords"] as? [[String: Any]] ?? []).filter { record in
                 guard
                     let details = record["assertionDetails"] as? [String: Any],
                     let identifier = details["assertionDetailsModeIdentifier"] as? String,
@@ -111,8 +171,14 @@ enum FocusModeStatusStore {
                    endTimestamp <= snapshotTimestamp {
                     return false
                 }
+                if let assertionStart = timestamp(in: record, key: "assertionStartDateTimestamp"),
+                   let globalInvalidationTimestamp,
+                   assertionStart < globalInvalidationTimestamp {
+                    return false
+                }
                 return true
             }
+        }
         let activeRecord = records.max { left, right in
             timestamp(in: left) < timestamp(in: right)
         }
@@ -121,16 +187,74 @@ enum FocusModeStatusStore {
             let identifier = details["assertionDetailsModeIdentifier"] as? String,
             !identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else {
-            return .inactive
+            let invalidatedMode = stores
+                .flatMap { $0["storeInvalidationRecords"] as? [[String: Any]] ?? [] }
+                .compactMap { record -> (identifier: String, timestamp: Double, token: String)? in
+                    guard
+                        let details = (record["invalidationAssertion"] as? [String: Any])?["assertionDetails"] as? [String: Any],
+                        let identifier = details["assertionDetailsModeIdentifier"] as? String,
+                        let timestamp = timestamp(in: record, key: "invalidationDateTimestamp"),
+                        currentTimestamp >= timestamp,
+                        currentTimestamp - timestamp <= recentInvalidationMaximumAge
+                    else {
+                        return nil
+                    }
+                    let assertionID = (record["invalidationAssertion"] as? [String: Any])?["assertionUUID"] as? String
+                    return (
+                        identifier,
+                        timestamp,
+                        transitionToken(
+                            prefix: "invalidation",
+                            identifier: identifier,
+                            timestamp: timestamp,
+                            assertionID: assertionID
+                        )
+                    )
+                }
+                .max { $0.timestamp < $1.timestamp }
+            if let invalidatedMode {
+                return FocusModeStoreSnapshot(
+                    status: FocusModeStatus(isActive: false, identifier: invalidatedMode.identifier),
+                    transitionToken: invalidatedMode.token,
+                    transitionTimestamp: invalidatedMode.timestamp
+                )
+            }
+            return FocusModeStoreSnapshot(
+                status: .inactive,
+                transitionToken: nil,
+                transitionTimestamp: nil
+            )
         }
-        return FocusModeStatus(isActive: true, identifier: identifier)
+        return FocusModeStoreSnapshot(
+            status: FocusModeStatus(isActive: true, identifier: identifier),
+            transitionToken: transitionToken(
+                prefix: "assertion",
+                identifier: identifier,
+                timestamp: timestamp(in: activeRecord ?? [:]),
+                assertionID: activeRecord?["assertionUUID"] as? String
+            ),
+            transitionTimestamp: timestamp(in: activeRecord ?? [:])
+        )
     }
 
     static func load(from url: URL) async -> FocusModeStatus? {
+        await loadSnapshot(from: url)?.status
+    }
+
+    fileprivate static func loadSnapshot(from url: URL) async -> FocusModeStoreSnapshot? {
         await Task.detached(priority: .utility) {
             guard let data = try? Data(contentsOf: url) else { return nil }
-            return try? decode(data)
+            return try? decodeSnapshot(data)
         }.value
+    }
+
+    private static func transitionToken(
+        prefix: String,
+        identifier: String,
+        timestamp: Double,
+        assertionID: String?
+    ) -> String {
+        "\(prefix):\(assertionID ?? identifier):\(timestamp)"
     }
 
     private static func timestamp(in record: [String: Any]) -> Double {
@@ -142,10 +266,11 @@ enum FocusModeStatusStore {
     }
 }
 
-/// Monitors macOS Focus Mode through its local assertion store, with the private framework as a fallback.
+/// Monitors macOS Focus Mode through distributed state notifications and its local assertion store.
 @MainActor
 public final class FocusModeMonitor: ObservableObject {
     @Published public private(set) var status = FocusModeStatus.inactive
+    @Published public private(set) var latestTransition: FocusModeTransition?
     @Published public private(set) var isAvailable = false
 
     private let clientIdentifier: String
@@ -156,12 +281,16 @@ public final class FocusModeMonitor: ObservableObject {
     private var stateService: AnyObject?
     private var stateServiceClass: AnyClass?
     private var listener: FocusStateUpdateListener?
+    private var distributedNotificationRelays: [FocusDistributedNotificationRelay] = []
     private var storePollingTask: Task<Void, Never>?
-
+    private var lastStoreTransitionToken: String?
+    private var storeMonitoringStartedAt: TimeInterval?
+    private var hasLoadedStoreSnapshot = false
+    private var lastDistributedTransition: (status: FocusModeStatus, timestamp: TimeInterval)?
     public init(clientIdentifier: String? = Bundle.main.bundleIdentifier) {
         self.clientIdentifier = clientIdentifier ?? "dev.wzz.zisla"
         statusStoreURL = FocusModeStatusStore.defaultURL
-        storePollingInterval = .seconds(1)
+        storePollingInterval = .milliseconds(250)
     }
 
     init(
@@ -177,17 +306,14 @@ public final class FocusModeMonitor: ObservableObject {
     public func start() {
         guard !isRunning else { return }
         isRunning = true
-
-        if FileManager.default.isReadableFile(atPath: statusStoreURL.path) {
-            startStoreMonitoring()
-            return
-        }
+        storeMonitoringStartedAt = Date().timeIntervalSinceReferenceDate
+        startDistributedNotificationMonitoring()
+        startStoreMonitoring()
 
         guard let frameworkHandle = dlopen(
             "/System/Library/PrivateFrameworks/DoNotDisturb.framework/DoNotDisturb",
             RTLD_NOW | RTLD_LOCAL
         ) else {
-            startStoreMonitoring()
             return
         }
         self.frameworkHandle = frameworkHandle
@@ -195,7 +321,6 @@ public final class FocusModeMonitor: ObservableObject {
         guard let serviceClass = NSClassFromString("DNDStateService"),
               let service = makeStateService(serviceClass: serviceClass) else {
             releaseFramework()
-            startStoreMonitoring()
             return
         }
 
@@ -206,7 +331,6 @@ public final class FocusModeMonitor: ObservableObject {
         }
         guard add(listener, to: service, serviceClass: serviceClass) else {
             releaseFramework()
-            startStoreMonitoring()
             return
         }
 
@@ -220,11 +344,16 @@ public final class FocusModeMonitor: ObservableObject {
         if let stateService, let stateServiceClass, let listener {
             remove(listener, from: stateService, serviceClass: stateServiceClass)
         }
+        stopDistributedNotificationMonitoring()
         stateService = nil
         stateServiceClass = nil
         listener = nil
         storePollingTask?.cancel()
         storePollingTask = nil
+        lastStoreTransitionToken = nil
+        storeMonitoringStartedAt = nil
+        hasLoadedStoreSnapshot = false
+        lastDistributedTransition = nil
         isAvailable = false
         isRunning = false
         releaseFramework()
@@ -232,9 +361,99 @@ public final class FocusModeMonitor: ObservableObject {
 
     private func consume(_ next: FocusModeStatus) {
         guard isRunning else { return }
-        let resolved = next.preservingMode(from: status)
+        let resolved = next
+            .preservingMissingPresentation(from: status)
+            .preservingMode(from: status)
         guard status != resolved else { return }
         status = resolved
+    }
+
+    private func consumeStoreSnapshot(_ snapshot: FocusModeStoreSnapshot) {
+        let isInitialSnapshot = !hasLoadedStoreSnapshot
+        let transitionOccurredAfterStart = snapshot.transitionTimestamp.map {
+            $0 >= (storeMonitoringStartedAt ?? .greatestFiniteMagnitude)
+        } ?? false
+        let isNewTransition = (!isInitialSnapshot || transitionOccurredAfterStart)
+            && snapshot.transitionToken != nil
+            && snapshot.transitionToken != lastStoreTransitionToken
+        consume(snapshot.status)
+        lastStoreTransitionToken = snapshot.transitionToken
+        hasLoadedStoreSnapshot = true
+        if isNewTransition {
+            let duplicateOfDistributedNotification = lastDistributedTransition.map {
+                representsSameTransition($0.status, snapshot.status)
+                    && Date.timeIntervalSinceReferenceDate - $0.timestamp < 1
+            } ?? false
+            if duplicateOfDistributedNotification {
+                lastDistributedTransition = nil
+            } else {
+                publishTransition(snapshot.status)
+            }
+        }
+    }
+
+    private func startDistributedNotificationMonitoring() {
+        let center = DistributedNotificationCenter.default()
+        let notifications: [(String, Bool)] = [
+            ("_NSDoNotDisturbEnabledNotification", true),
+            ("_NSDoNotDisturbDisabledNotification", false),
+        ]
+        distributedNotificationRelays = notifications.map { name, isActive in
+            let relay = FocusDistributedNotificationRelay(isActive: isActive) { [weak self] isActive in
+                Task { @MainActor [weak self] in
+                    self?.consumeDistributedNotification(isActive: isActive)
+                }
+            }
+            center.addObserver(
+                relay,
+                selector: #selector(FocusDistributedNotificationRelay.receive(_:)),
+                name: Notification.Name(name),
+                object: nil,
+                suspensionBehavior: .deliverImmediately
+            )
+            return relay
+        }
+    }
+
+    private func stopDistributedNotificationMonitoring() {
+        let center = DistributedNotificationCenter.default()
+        for relay in distributedNotificationRelays {
+            center.removeObserver(relay)
+        }
+        distributedNotificationRelays.removeAll()
+    }
+
+    private func consumeDistributedNotification(isActive: Bool) {
+        guard isRunning else { return }
+        let next = isActive
+            ? FocusModeStatus(isActive: true)
+            : FocusModeStatus.inactive.preservingMode(from: status)
+        consume(next)
+        isAvailable = true
+        let now = Date.timeIntervalSinceReferenceDate
+        if let lastDistributedTransition,
+           representsSameTransition(lastDistributedTransition.status, next),
+           now - lastDistributedTransition.timestamp < 1 {
+            return
+        }
+        lastDistributedTransition = (next, now)
+        publishTransition(next)
+    }
+
+    private func publishTransition(_ status: FocusModeStatus) {
+        latestTransition = FocusModeTransition(status: status)
+    }
+
+    private func representsSameTransition(
+        _ lhs: FocusModeStatus,
+        _ rhs: FocusModeStatus
+    ) -> Bool {
+        guard lhs.isActive == rhs.isActive else { return false }
+        guard let lhsIdentifier = lhs.identifier,
+              let rhsIdentifier = rhs.identifier else {
+            return true
+        }
+        return lhsIdentifier == rhsIdentifier
     }
 
     private func startStoreMonitoring() {
@@ -247,9 +466,9 @@ public final class FocusModeMonitor: ObservableObject {
         let interval = storePollingInterval
         storePollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                if let next = await FocusModeStatusStore.load(from: url) {
+                if let snapshot = await FocusModeStatusStore.loadSnapshot(from: url) {
                     guard !Task.isCancelled else { return }
-                    self?.consume(next)
+                    self?.consumeStoreSnapshot(snapshot)
                     self?.isAvailable = true
                 }
                 do {
@@ -320,7 +539,23 @@ public final class FocusModeMonitor: ObservableObject {
     }
 }
 
-private final class FocusStateUpdateListener: NSObject {
+private final class FocusDistributedNotificationRelay: NSObject {
+    private let isActive: Bool
+    private let handler: (Bool) -> Void
+
+    init(isActive: Bool, handler: @escaping (Bool) -> Void) {
+        self.isActive = isActive
+        self.handler = handler
+        super.init()
+    }
+
+    @objc(receive:)
+    func receive(_ notification: Notification) {
+        handler(isActive)
+    }
+}
+
+final class FocusStateUpdateListener: NSObject {
     private let identifier: String
     private let onUpdate: (FocusModeStatus) -> Void
 
@@ -352,13 +587,20 @@ private final class FocusStateUpdateListener: NSObject {
         onUpdate(status)
     }
 
-    fileprivate static func status(from update: AnyObject) -> FocusModeStatus? {
+    static func status(from update: AnyObject) -> FocusModeStatus? {
         let state = dynamicObject(update, for: "state") ?? update
         let stateObjects = [state, update]
-        let modeObjects = stateObjects.compactMap {
-            dynamicObject($0, for: "activeMode")
-                ?? dynamicObject($0, for: "currentMode")
-                ?? dynamicObject($0, for: "mode")
+        let modeObjects = stateObjects.flatMap { object -> [AnyObject] in
+            var modes = [
+                dynamicObject(object, for: "activeMode"),
+                dynamicObject(object, for: "currentMode"),
+                dynamicObject(object, for: "mode"),
+            ].compactMap { $0 }
+            if let configuration = dynamicObject(object, for: "activeModeConfiguration"),
+               let mode = dynamicObject(configuration, for: "mode") {
+                modes.append(mode)
+            }
+            return modes
         }
         let allObjects = modeObjects + stateObjects
         let identifier = firstString(
@@ -366,8 +608,15 @@ private final class FocusStateUpdateListener: NSObject {
             in: allObjects
         )
         let displayName = firstString(
-            for: ["displayName", "localizedName", "modeName", "name", "title"],
+            for: ["name", "displayName", "localizedName", "modeName", "title"],
             in: modeObjects
+        )
+        let symbolObjects = modeObjects + modeObjects.compactMap {
+            dynamicObject($0, for: "symbolDescriptor")
+        }
+        let symbolName = firstString(
+            for: ["symbolImageName", "systemImageName", "symbolName", "imageName"],
+            in: symbolObjects
         )
         let isActive = firstBool(for: ["isActive", "active", "enabled", "isEnabled"], in: stateObjects)
             ?? (identifier != nil || displayName != nil ? true : nil)
@@ -375,7 +624,8 @@ private final class FocusStateUpdateListener: NSObject {
         return FocusModeStatus(
             isActive: isActive,
             identifier: identifier,
-            displayName: displayName
+            displayName: displayName,
+            symbolName: symbolName
         )
     }
 

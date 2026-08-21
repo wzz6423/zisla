@@ -16,12 +16,14 @@ struct SettingsNavigationTests {
             "宠物",
             "下载",
             "天气",
+            "网络",
             "推荐",
             "更新",
         ])
         #expect(SettingsSection.general.subtitle == "调整语言、外观、启动与展开方式。")
         #expect(SettingsSection.ai.subtitle == "管理 AI CLI 与 Skills。")
         #expect(SettingsSection.voice.subtitle == "配置语音输入、整理模型与本机记录。")
+        #expect(SettingsSection.networkProxy.subtitle == "配置本地代理，用于更新、安装、下载与 GitHub 访问。")
     }
 
     @Test
@@ -34,6 +36,7 @@ struct SettingsNavigationTests {
         let settings = FeatureSettings()
         #expect(SettingsSection.general.isVisible(settings: settings))
         #expect(SettingsSection.features.isVisible(settings: settings))
+        #expect(SettingsSection.networkProxy.isVisible(settings: settings))
         #expect(SettingsSection.recommendations.isVisible(settings: settings))
     }
 
