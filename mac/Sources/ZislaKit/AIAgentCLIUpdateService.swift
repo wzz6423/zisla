@@ -5,10 +5,16 @@ import ZislaCore
 public actor AIAgentCLIUpdateService {
     public typealias LatestVersionLoader = @Sendable (AgentCLIKind) async -> String?
 
-    private let loadLatestVersion: LatestVersionLoader
+    private var loadLatestVersion: LatestVersionLoader
+    private let usesDefaultSession: Bool
 
     public init(session: URLSession = .shared) {
-        loadLatestVersion = { kind in
+        self.usesDefaultSession = true
+        loadLatestVersion = Self.makeLoader(session: session)
+    }
+
+    private static func makeLoader(session: URLSession) -> LatestVersionLoader {
+        { kind in
             guard let package = kind.npmPackageName else { return nil }
             let encodedPackage = package
                 .replacingOccurrences(of: "@", with: "%40")
@@ -32,7 +38,18 @@ public actor AIAgentCLIUpdateService {
     }
 
     public init(loadLatestVersion: @escaping LatestVersionLoader) {
+        self.usesDefaultSession = false
         self.loadLatestVersion = loadLatestVersion
+    }
+
+    public func setNetworkProxyURL(_ value: String) {
+        setNetworkProxy(url: value, enabled: true)
+    }
+
+    public func setNetworkProxy(url: String, enabled: Bool) {
+        guard usesDefaultSession else { return }
+        let session = URLSession(configuration: NetworkProxy.sessionConfiguration(from: url, enabled: enabled))
+        loadLatestVersion = Self.makeLoader(session: session)
     }
 
     public func availableUpdates(for statuses: [AgentCLIStatus]) async -> [AIAgentCLIUpdate] {

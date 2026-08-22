@@ -7,8 +7,11 @@ public final class ManagedToolService: ObservableObject {
 
     private let toolsDirectory: URL
     private let bundleURL: URL
-    private let session: URLSession
-    private let releaseLoader: (String) async throws -> Data
+    private var session: URLSession
+    private var releaseLoader: (String) async throws -> Data
+    private let usesDefaultReleaseLoader: Bool
+    private var networkProxyURL = ""
+    private var networkProxyEnabled = false
     private let defaults: UserDefaults
     private let homebrewExecutable: URL?
     private var refreshedInstalledVersions = Set<ManagedTool>()
@@ -28,9 +31,36 @@ public final class ManagedToolService: ObservableObject {
         self.toolsDirectory = toolsDirectory
         self.bundleURL = bundleURL
         self.session = session
+        self.usesDefaultReleaseLoader = releaseLoader == nil
         self.defaults = defaults
         self.homebrewExecutable = homebrewExecutable ?? Self.defaultHomebrewExecutable()
-        self.releaseLoader = releaseLoader ?? { [session] repository in
+        self.releaseLoader = releaseLoader ?? Self.makeReleaseLoader(session: session)
+        for tool in ManagedTool.allCases { states[tool] = ManagedToolState() }
+        restoreCachedStates()
+    }
+
+    public func setNetworkProxyURL(_ value: String) {
+        setNetworkProxy(url: value, enabled: true)
+    }
+
+    public func setNetworkProxy(url: String, enabled: Bool) {
+        networkProxyURL = url
+        networkProxyEnabled = enabled
+        guard usesDefaultReleaseLoader else { return }
+        session = URLSession(configuration: NetworkProxy.sessionConfiguration(from: url, enabled: enabled))
+        releaseLoader = Self.makeReleaseLoader(session: session)
+    }
+
+    private var processEnvironment: [String: String] {
+        NetworkProxy.environment(
+            from: networkProxyURL,
+            enabled: networkProxyEnabled,
+            base: ProcessInfo.processInfo.environment
+        )
+    }
+
+    private static func makeReleaseLoader(session: URLSession) -> (String) async throws -> Data {
+        { repository in
             let url = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
             var request = URLRequest(url: url)
             request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -42,8 +72,6 @@ public final class ManagedToolService: ObservableObject {
             }
             return data
         }
-        for tool in ManagedTool.allCases { states[tool] = ManagedToolState() }
-        restoreCachedStates()
     }
 
     // MARK: - Locating
@@ -158,20 +186,24 @@ public final class ManagedToolService: ObservableObject {
 
     private func installedVersion(of tool: ManagedTool, at executableURL: URL) async -> String? {
         guard case .homebrewFormula(let formulaName) = tool.installationSource else {
-            return await Self.readVersion(of: tool, at: executableURL)
+            return await Self.readVersion(of: tool, at: executableURL, environment: processEnvironment)
         }
         if let output = try? await runHomebrew(["list", "--versions", "--formula", formulaName]),
            let version = Self.parseHomebrewInstalledVersion(output, tool: tool) {
             return version
         }
-        return await Self.readVersion(of: tool, at: executableURL)
+        return await Self.readVersion(of: tool, at: executableURL, environment: processEnvironment)
     }
 
-    static func readVersion(of tool: ManagedTool, at url: URL) async -> String? {
+    static func readVersion(
+        of tool: ManagedTool,
+        at url: URL,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) async -> String? {
         if tool.usesNativeApplicationVersion {
             return nativeApplicationVersion(at: url)
         }
-        guard case .success(let output) = await runProcess(url, arguments: tool.versionArguments) else {
+        guard case .success(let output) = await runProcess(url, arguments: tool.versionArguments, environment: environment) else {
             return nil
         }
         return tool.normalizedInstalledVersion(from: output)
@@ -378,7 +410,7 @@ public final class ManagedToolService: ObservableObject {
 
     private func runHomebrew(_ arguments: [String]) async throws -> String {
         guard let homebrewExecutable else { throw ManagedToolError.homebrewUnavailable }
-        switch await Self.runProcess(homebrewExecutable, arguments: arguments) {
+        switch await Self.runProcess(homebrewExecutable, arguments: arguments, environment: processEnvironment) {
         case .success(let output):
             return output
         case .failure(let error):
@@ -570,7 +602,7 @@ public final class ManagedToolService: ObservableObject {
         try fileManager.copyItem(at: executable, to: staging)
         try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: staging.path)
         Self.clearQuarantine(staging)
-        guard let version = await Self.readVersion(of: tool, at: staging) else {
+        guard let version = await Self.readVersion(of: tool, at: staging, environment: processEnvironment) else {
             throw ManagedToolError.notExecutable(tool.displayName)
         }
 
@@ -595,7 +627,8 @@ public final class ManagedToolService: ObservableObject {
 
     static func runProcess(
         _ executable: URL,
-        arguments: [String]
+        arguments: [String],
+        environment: [String: String] = ProcessInfo.processInfo.environment
     ) async -> Result<String, ManagedToolError> {
         await Task.detached(priority: .userInitiated) { () -> Result<String, ManagedToolError> in
             let fileManager = FileManager.default
@@ -618,6 +651,7 @@ public final class ManagedToolService: ObservableObject {
                 let process = Process()
                 process.executableURL = executable
                 process.arguments = arguments
+                process.environment = environment
                 process.standardOutput = stdout
                 process.standardError = stderr
                 do {

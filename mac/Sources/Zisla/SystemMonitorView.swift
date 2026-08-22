@@ -2,6 +2,18 @@ import AppKit
 import ZislaKit
 import SwiftUI
 
+final class SystemCleanupPanelPresentationState: ObservableObject {
+    @Published private(set) var isPresented = false
+
+    func present() {
+        isPresented = true
+    }
+
+    func dismiss() {
+        isPresented = false
+    }
+}
+
 /// System monitor view.
 ///
 /// Visually matches the Dynamic Island: an asymmetric two-column layout — left "Real-time Performance"
@@ -11,9 +23,10 @@ import SwiftUI
 /// a dashboard-like dissonance.
 struct SystemMonitorView: View {
     @ObservedObject var service: SystemMonitorService
-    @State private var isCleanupPresented = false
+    let onCleanupRequested: () -> Void
     @State private var releasedMemoryBytes: UInt64?
     @State private var systemColumnHeight: CGFloat = 0
+    @Environment(\.locale) private var locale
 
     var body: some View {
         ScrollView {
@@ -22,10 +35,10 @@ struct SystemMonitorView: View {
                     .frame(
                         height: systemColumnHeight > 0 ? systemColumnHeight : nil,
                         alignment: .top
-                    )
+                )
                 Hairline()
                 systemColumn
-                    .frame(width: 214)
+                    .frame(width: 250)
             }
             .padding(12)
         }
@@ -34,11 +47,7 @@ struct SystemMonitorView: View {
             guard systemColumnHeight != height else { return }
             systemColumnHeight = height
         }
-        .background(SystemCleanupPanelPresenter(isPresented: $isCleanupPresented, service: service))
         .task { await service.sampleOnce() }
-        .onChange(of: isCleanupPresented) { _, newValue in
-            AppModel.shared.isCleanupPanelVisible = newValue
-        }
     }
 
     // MARK: - Columns
@@ -144,9 +153,9 @@ struct SystemMonitorView: View {
                         .foregroundStyle(capacityTint(memoryUsage))
                         .monospacedDigit()
                 }
-                usedTotalRow(
-                    leadLabel: "已用",
-                    lead: service.snapshot?.memory.usedBytes,
+                usedAvailableRow(
+                    used: service.snapshot?.memory.usedBytes,
+                    available: service.snapshot?.memory.freeBytes,
                     total: service.snapshot?.memory.totalBytes,
                     format: memoryByteText
                 )
@@ -168,17 +177,25 @@ struct SystemMonitorView: View {
     private var diskCard: some View {
         MonitorCard {
             VStack(alignment: .leading, spacing: 7) {
-                CardHeader(symbol: "internaldrive", title: service.snapshot?.disk.volumeName ?? "磁盘") {
-                    if let temp = temperatureText(service.snapshot?.disk.temperature) {
-                        Text(temp)
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(temperatureTint(diskCelsius))
-                            .monospacedDigit()
+                CardHeader(symbol: "internaldrive", title: "硬盘") {
+                    HStack(spacing: 6) {
+                        if let temp = temperatureText(service.snapshot?.disk.temperature) {
+                            Text(temp)
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(temperatureTint(diskCelsius))
+                                .monospacedDigit()
+                        }
+                        if let usage = diskUsageText {
+                            Text("使用率 \(usage)")
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(capacityTint(diskUsage))
+                                .monospacedDigit()
+                        }
                     }
                 }
-                usedTotalRow(
-                    leadLabel: "可用",
-                    lead: service.snapshot?.disk.freeBytes,
+                usedAvailableRow(
+                    used: service.snapshot?.disk.usedBytes,
+                    available: service.snapshot?.disk.freeBytes,
                     total: service.snapshot?.disk.totalBytes,
                     format: byteText
                 )
@@ -190,7 +207,7 @@ struct SystemMonitorView: View {
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     miniActionButton("清理", help: "扫描可清理的缓存、日志与开发产物") {
-                        isCleanupPresented = true
+                        onCleanupRequested()
                     }
                 }
             }
@@ -285,18 +302,31 @@ struct SystemMonitorView: View {
 
     private var cpuWaveSeries: [WaveSeries] {
         [
+            WaveSeries(samples: service.history.cpuIdle, color: WaveformPalette.idle),
             WaveSeries(samples: service.history.cpuUser, color: WaveformPalette.blue),
             WaveSeries(samples: service.history.cpuSystem, color: WaveformPalette.red),
-            WaveSeries(samples: service.history.cpuIdle, color: WaveformPalette.idle),
         ]
     }
 
     private var gpuWaveSeries: [WaveSeries] {
-        [
+        let rendererOverlapsUsage = nearlyEqualSeries(
+            service.history.gpuUsage,
+            service.history.gpuRenderer
+        )
+        return [
             WaveSeries(samples: service.history.gpuUsage, color: WaveformPalette.blue),
-            WaveSeries(samples: service.history.gpuRenderer, color: WaveformPalette.red),
+            WaveSeries(
+                samples: service.history.gpuRenderer,
+                color: WaveformPalette.red,
+                dash: rendererOverlapsUsage ? [3, 2] : []
+            ),
             WaveSeries(samples: service.history.gpuTiler, color: WaveformPalette.teal),
         ]
+    }
+
+    private func nearlyEqualSeries(_ lhs: [Double], _ rhs: [Double]) -> Bool {
+        guard lhs.count > 1, lhs.count == rhs.count else { return false }
+        return zip(lhs, rhs).allSatisfy { abs($0 - $1) < 0.005 }
     }
 
     private var gpuUnavailableReason: String {
@@ -309,6 +339,11 @@ struct SystemMonitorView: View {
     private var diskUsage: Double {
         guard let disk = service.snapshot?.disk, disk.totalBytes > 0 else { return 0 }
         return min(1, Double(disk.usedBytes) / Double(disk.totalBytes))
+    }
+
+    private var diskUsageText: String? {
+        guard let disk = service.snapshot?.disk, disk.totalBytes > 0 else { return nil }
+        return percent(diskUsage)
     }
 
     private var memoryUsage: Double {
@@ -341,11 +376,16 @@ struct SystemMonitorView: View {
             noFanLabel
         case let .available(rpm, _):
             HStack(spacing: 16) {
-                ForEach(Array(rpm.enumerated()), id: \.offset) { _, value in
+                ForEach(Array(rpm.enumerated()), id: \.offset) { index, value in
                     HStack(spacing: 5) {
                         Image(systemName: "fan.fill")
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
+                        if let label = Self.fanPositionLabel(for: index, locale: locale) {
+                            Text(label)
+                                .font(.islandMicro())
+                                .foregroundStyle(.secondary)
+                        }
                         Text("\(Int(value.rounded()))")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .monospacedDigit()
@@ -361,6 +401,14 @@ struct SystemMonitorView: View {
             Text("正在读取风扇状态")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    static func fanPositionLabel(for index: Int, locale: Locale) -> String? {
+        switch index {
+        case 0: locale.identifier.lowercased().hasPrefix("en") ? "L" : "左"
+        case 1: locale.identifier.lowercased().hasPrefix("en") ? "R" : "右"
+        default: nil
         }
     }
 
@@ -394,16 +442,16 @@ struct SystemMonitorView: View {
         }
     }
 
-    private func usedTotalRow(
-        leadLabel: String,
-        lead: UInt64?,
+    private func usedAvailableRow(
+        used: UInt64?,
+        available: UInt64?,
         total: UInt64?,
         format: (UInt64) -> String = { _ in "--" }
     ) -> some View {
         HStack {
-            Text("\(leadLabel) \(lead.map { format($0) } ?? "--")")
+            Text("已用 \(used.map { format($0) } ?? "--") / 可用 \(available.map { format($0) } ?? "--")")
             Spacer(minLength: 0)
-            Text("共 \(total.map { format($0) } ?? "--")")
+            Text("总量 \(total.map { format($0) } ?? "--")")
         }
         .font(.islandMicro())
         .foregroundStyle(.secondary)
@@ -514,7 +562,7 @@ struct SystemMonitorView: View {
     }
 
     private func rateText(_ bytesPerSecond: Double?) -> String {
-        guard let bytesPerSecond else { return "建立基线" }
+        guard let bytesPerSecond else { return "---" }
         return ByteCountFormatter.string(
             fromByteCount: Int64(max(0, bytesPerSecond)),
             countStyle: .file
@@ -524,8 +572,8 @@ struct SystemMonitorView: View {
 
 // MARK: - Cleanup panel presentation
 
-private struct SystemCleanupPanelPresenter: NSViewRepresentable {
-    @Binding var isPresented: Bool
+struct SystemCleanupPanelPresenter: NSViewRepresentable {
+    @ObservedObject var presentationState: SystemCleanupPanelPresentationState
     let service: SystemMonitorService
 
     func makeNSView(context: Context) -> NSView {
@@ -534,7 +582,8 @@ private struct SystemCleanupPanelPresenter: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.update(
-            presenting: isPresented,
+            presenting: presentationState.isPresented,
+            dismissPresentation: presentationState.dismiss,
             service: service,
             hostWindow: nsView.window
         )
@@ -545,29 +594,37 @@ private struct SystemCleanupPanelPresenter: NSViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(isPresented: $isPresented)
+        Coordinator()
     }
 
     @MainActor
     final class Coordinator {
-        private var isPresented: Binding<Bool>
         private var panel: SystemCleanupPanel?
+        private var dismissPresentation: () -> Void = {}
+        private var isAwaitingDismissalState = false
 
-        init(isPresented: Binding<Bool>) {
-            self.isPresented = isPresented
-        }
-
-        func update(presenting: Bool, service: SystemMonitorService, hostWindow: NSWindow?) {
+        func update(
+            presenting: Bool,
+            dismissPresentation: @escaping () -> Void,
+            service: SystemMonitorService,
+            hostWindow: NSWindow?
+        ) {
+            self.dismissPresentation = dismissPresentation
             guard presenting else {
+                isAwaitingDismissalState = false
                 dismiss()
                 return
             }
 
             let panel = panel ?? makePanel(service: service)
-            guard !panel.isVisible else { return }
+            guard SystemCleanupPanel.shouldOrderFront(
+                isVisible: panel.isVisible,
+                isMiniaturized: panel.isMiniaturized,
+                isAwaitingDismissalState: isAwaitingDismissalState
+            ) else { return }
             WindowPlacement.center(panel, on: hostWindow?.screen)
-            NSApp.activate(ignoringOtherApps: true)
-            panel.makeKeyAndOrderFront(nil)
+            panel.orderFront(nil)
+            AppModel.shared.islandCollapseRequested = true
         }
 
         func dismiss() {
@@ -575,45 +632,47 @@ private struct SystemCleanupPanelPresenter: NSViewRepresentable {
             panel = nil
         }
 
+        private func dismissFromPanel() {
+            isAwaitingDismissalState = true
+            dismissPresentation()
+            panel?.orderOut(nil)
+        }
+
         private func makePanel(service: SystemMonitorService) -> SystemCleanupPanel {
             let panel = SystemCleanupPanel(
                 contentRect: CGRect(x: 0, y: 0, width: 560, height: 430),
-                styleMask: .borderless,
+                styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
             )
-            panel.isOpaque = false
-            panel.backgroundColor = .clear
-            panel.hasShadow = true
+            panel.title = "磁盘清理"
             panel.isReleasedWhenClosed = false
-        // System authorization temporarily deactivates the app; keep the panel so scanning can resume immediately after authorization.
+            // System authorization temporarily deactivates the app; keep the panel so scanning can resume immediately after authorization.
             panel.hidesOnDeactivate = false
-            panel.level = WindowPlacement.modalWindowLevel
+            panel.level = .normal
             panel.collectionBehavior = [.moveToActiveSpace, .transient, .ignoresCycle]
-            let hostingView = NSHostingView(
+            let dismissPresentation = self.dismissPresentation
+            let dismissPanel = { [weak self, weak panel] in
+                guard let self else {
+                    dismissPresentation()
+                    panel?.orderOut(nil)
+                    return
+                }
+                self.dismissFromPanel()
+            }
+            panel.contentView = NSHostingView(
                 rootView: AppLanguageEnvironment(
                     languageStore: AppModel.shared.languageStore,
                     content: SystemCleanupSheet(
                         service: service,
-                        onDismiss: { [weak self] in
-                            self?.isPresented.wrappedValue = false
-                            self?.dismiss()
-                        },
+                        onDismiss: dismissPanel,
                         onCleanupCompleted: {
                             AppModel.shared.islandCollapseRequested = true
                         }
                     )
                 )
             )
-            hostingView.wantsLayer = true
-            hostingView.layer?.cornerRadius = 18
-            hostingView.layer?.cornerCurve = .continuous
-            hostingView.layer?.masksToBounds = true
-            panel.contentView = hostingView
-            panel.onCancel = { [weak self] in
-                self?.isPresented.wrappedValue = false
-                self?.dismiss()
-            }
+            panel.onCancel = dismissPanel
             self.panel = panel
             return panel
         }
@@ -621,11 +680,20 @@ private struct SystemCleanupPanelPresenter: NSViewRepresentable {
 }
 
 @MainActor
-private final class SystemCleanupPanel: NSPanel {
+final class SystemCleanupPanel: NSWindow {
     var onCancel: () -> Void = {}
 
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
+    static func shouldOrderFront(
+        isVisible: Bool,
+        isMiniaturized: Bool,
+        isAwaitingDismissalState: Bool = false
+    ) -> Bool {
+        !isVisible && !isMiniaturized && !isAwaitingDismissalState
+    }
+
+    override func performClose(_ sender: Any?) {
+        onCancel()
+    }
 
     override func cancelOperation(_ sender: Any?) {
         onCancel()
@@ -732,6 +800,7 @@ private enum WaveformPalette {
 private struct WaveSeries {
     var samples: [Double]
     var color: Color
+    var dash: [CGFloat] = []
 }
 
 private struct MultiLineWaveform: View {
@@ -744,7 +813,13 @@ private struct MultiLineWaveform: View {
                 let baseline = Array(repeating: 0.0, count: item.samples.count)
                 let area = waveArea(top: item.samples, bottom: baseline, size: size)
                 context.fill(area, with: .color(item.color.opacity(0.32)))
-                context.stroke(waveLine(item.samples, size: size), with: .color(item.color), lineWidth: 1.3)
+            }
+            for item in series where item.samples.count > 1 {
+                context.stroke(
+                    waveLine(item.samples, size: size),
+                    with: .color(item.color),
+                    style: StrokeStyle(lineWidth: 1.3, dash: item.dash)
+                )
             }
         }
         .frame(height: height)
@@ -798,7 +873,7 @@ private func waveLine(_ values: [Double], size: CGSize) -> Path {
     return path
 }
 
-// MARK: - Cleanup sheet (unchanged behavior)
+// MARK: - Cleanup sheet
 
 private struct SystemCleanupSheet: View {
     @ObservedObject var service: SystemMonitorService
@@ -820,12 +895,13 @@ private struct SystemCleanupSheet: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("清理候选项")
                         .font(.system(size: 16, weight: .semibold))
-                    Text("检测可再生缓存与常见临时数据；用户文件、重复文件和安装包仅供人工复核")
+                    Text("按来源分组展示可清理项和需复核项；所有可操作项只会移入废纸篓")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button {
+                    guard !confirmationPresented else { return }
                     toggleSelectAll()
                 } label: {
                     Label(
@@ -839,6 +915,7 @@ private struct SystemCleanupSheet: View {
                 .accessibilityLabel(allCandidatesSelected ? "取消全选" : "全选")
                 .disabled(candidates.isEmpty || isScanning || isCleaning)
                 Button {
+                    guard !confirmationPresented else { return }
                     invertSelection()
                 } label: {
                     Label("反选", systemImage: "arrow.left.arrow.right.square")
@@ -850,6 +927,7 @@ private struct SystemCleanupSheet: View {
                 .accessibilityHint("已选中的项取消选中，未选中的项选中")
                 .disabled(candidates.isEmpty || isScanning || isCleaning)
                 Button {
+                    guard !confirmationPresented else { return }
                     Task { await scan() }
                 } label: {
                     Image(systemName: "arrow.clockwise")
@@ -885,8 +963,10 @@ private struct SystemCleanupSheet: View {
                             .listRowSeparator(.hidden)
                         }
                         ForEach(groupedSections) { section in
-                            Section {
-                                if !isSectionCollapsed(section) {
+                            if isSectionCollapsed(section) {
+                                cleanupSectionHeader(section)
+                            } else {
+                                Section {
                                     ForEach(section.items) { candidate in
                                         Toggle(isOn: selectionBinding(for: candidate.url)) {
                                             HStack(spacing: 9) {
@@ -925,55 +1005,13 @@ private struct SystemCleanupSheet: View {
                                             }
                                         }
                                         .toggleStyle(.checkbox)
-                                        .disabled(isCleaning)
+                                        .disabled(
+                                            isCleaning || isScanning || !candidate.isActionable
+                                        )
                                     }
+                                } header: {
+                                    cleanupSectionHeader(section)
                                 }
-                            } header: {
-                                HStack(spacing: 6) {
-                                    Button {
-                                        toggleSectionCollapsed(section)
-                                    } label: {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: isSectionCollapsed(section) ? "chevron.right" : "chevron.down")
-                                                .font(.system(size: 8, weight: .bold))
-                                                .frame(width: 10)
-                                            Image(systemName: section.kind.symbol)
-                                                .foregroundStyle(section.kind.tint)
-                                            Text(section.kind.title)
-                                                .font(.system(size: 10, weight: .semibold))
-                                            Text("· \(section.selectedCount(in: selectedURLs))/\(section.items.count) 项")
-                                                .font(.system(size: 9))
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .help(isSectionCollapsed(section) ? "展开\(section.kind.title)" : "折叠\(section.kind.title)")
-                                    .accessibilityLabel(isSectionCollapsed(section) ? "展开\(section.kind.title)" : "折叠\(section.kind.title)")
-                                    Spacer(minLength: 4)
-                                    Text(byteText(section.totalBytes))
-                                        .font(.system(size: 9, design: .monospaced))
-                                        .foregroundStyle(.secondary)
-                                    IconButton(
-                                        symbol: section.allSelected(in: selectedURLs) ? "checkmark.square.fill" : "checkmark.square",
-                                        help: section.allSelected(in: selectedURLs) ? "取消选择\(section.kind.title)" : "全选\(section.kind.title)",
-                                        isActive: section.allSelected(in: selectedURLs),
-                                        size: .compact
-                                    ) {
-                                        toggleSectionSelection(section)
-                                    }
-                                    .disabled(isCleaning)
-                                    IconButton(
-                                        symbol: "arrow.left.arrow.right.square",
-                                        help: "反选\(section.kind.title)",
-                                        size: .compact
-                                    ) {
-                                        invertSelection(in: section)
-                                    }
-                                    .disabled(isCleaning)
-                                }
-                                .textCase(nil)
-                                .padding(.vertical, 1)
                             }
                         }
                     }
@@ -998,16 +1036,16 @@ private struct SystemCleanupSheet: View {
                 Button("取消", action: onDismiss)
                     .buttonStyle(.bordered)
                 Button("移入废纸篓", role: .destructive) {
+                    guard !confirmationPresented, !isCleaning, !isScanning, !selectedURLs.isEmpty else { return }
                     confirmationPresented = true
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(selectedURLs.isEmpty || isCleaning)
+                .disabled(selectedURLs.isEmpty || isCleaning || isScanning)
             }
         }
         .padding(18)
         .frame(width: 560, height: 430)
         .background(Color(nsColor: .windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .task { await scan() }
         .confirmationDialog(
             "将 \(selectedURLs.count) 项移入废纸篓？",
@@ -1015,7 +1053,7 @@ private struct SystemCleanupSheet: View {
             titleVisibility: .visible
         ) {
             Button("移入废纸篓", role: .destructive) {
-                Task { await cleanSelected() }
+                beginCleanupAndDismiss()
             }
         } message: {
             Text(
@@ -1034,14 +1072,16 @@ private struct SystemCleanupSheet: View {
 
 
     private var allCandidatesSelected: Bool {
-        !candidates.isEmpty && candidates.allSatisfy { selectedURLs.contains($0.url) }
+        let selectable = candidates.filter(\.isActionable)
+        return !selectable.isEmpty && selectable.allSatisfy { selectedURLs.contains($0.url) }
     }
 
     private func makeGroupedSections(from candidates: [DiskCleanupCandidate]) -> [CleanupKindSection] {
         let order = DiskCleanupKind.allCases
         return order.compactMap { kind in
+            guard kind.safetyLevel != .analysisOnly else { return nil }
             let items = candidates
-                .filter { $0.kind == kind }
+                .filter { $0.kind == kind && $0.safetyLevel != .analysisOnly }
                 .sorted { $0.byteSize > $1.byteSize }
             guard !items.isEmpty else { return nil }
             let total = items.reduce(UInt64(0)) { $0 + $1.byteSize }
@@ -1049,18 +1089,68 @@ private struct SystemCleanupSheet: View {
         }
     }
 
+    private func cleanupSectionHeader(_ section: CleanupKindSection) -> some View {
+        HStack(spacing: 6) {
+            Button {
+                toggleSectionCollapsed(section)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isSectionCollapsed(section) ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 8, weight: .bold))
+                        .frame(width: 10)
+                    Image(systemName: section.kind.symbol)
+                        .foregroundStyle(section.kind.tint)
+                    Text(section.kind.title)
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("· \(section.selectedCount(in: selectedURLs))/\(section.selectableItems.count) 项")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(isSectionCollapsed(section) ? "展开\(section.kind.title)" : "折叠\(section.kind.title)")
+            .accessibilityLabel(isSectionCollapsed(section) ? "展开\(section.kind.title)" : "折叠\(section.kind.title)")
+            Spacer(minLength: 4)
+            Text(byteText(section.totalBytes))
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.secondary)
+            IconButton(
+                symbol: section.allSelected(in: selectedURLs) ? "checkmark.square.fill" : "checkmark.square",
+                help: section.allSelected(in: selectedURLs) ? "取消选择\(section.kind.title)" : "全选\(section.kind.title)",
+                isActive: section.allSelected(in: selectedURLs),
+                size: .compact
+            ) {
+                toggleSectionSelection(section)
+            }
+            .disabled(isCleaning || section.selectableItems.isEmpty)
+            IconButton(
+                symbol: "arrow.left.arrow.right.square",
+                help: "反选\(section.kind.title)",
+                size: .compact
+            ) {
+                invertSelection(in: section)
+            }
+            .disabled(isCleaning || section.selectableItems.isEmpty)
+        }
+        .textCase(nil)
+        .padding(.vertical, 1)
+    }
+
     private func toggleSelectAll() {
         if allCandidatesSelected {
             selectedURLs.removeAll()
             cachedManualReviewCount = 0
         } else {
-            selectedURLs = Set(candidates.map(\.url))
-            cachedManualReviewCount = candidates.count { $0.safetyLevel == .requiresManualReview }
+            selectedURLs = Set(candidates.filter(\.isActionable).map(\.url))
+            cachedManualReviewCount = candidates.count {
+                $0.isActionable && $0.safetyLevel == .requiresManualReview
+            }
         }
     }
 
     private func invertSelection() {
-        let all = Set(candidates.map(\.url))
+        let all = Set(candidates.filter(\.isActionable).map(\.url))
         selectedURLs = all.subtracting(selectedURLs)
         cachedManualReviewCount = computeManualReviewCount()
     }
@@ -1078,7 +1168,7 @@ private struct SystemCleanupSheet: View {
     }
 
     private func toggleSectionSelection(_ section: CleanupKindSection) {
-        let urls = section.urls
+        let urls = section.selectableURLs
         if urls.isSubset(of: selectedURLs) {
             selectedURLs.subtract(urls)
         } else {
@@ -1088,7 +1178,7 @@ private struct SystemCleanupSheet: View {
     }
 
     private func invertSelection(in section: CleanupKindSection) {
-        let urls = section.urls
+        let urls = section.selectableURLs
         let unselected = urls.subtracting(selectedURLs)
         selectedURLs.subtract(urls)
         selectedURLs.formUnion(unselected)
@@ -1099,6 +1189,7 @@ private struct SystemCleanupSheet: View {
         Binding(
             get: { selectedURLs.contains(url) },
             set: { selected in
+                guard candidates.first(where: { $0.url == url })?.isActionable == true else { return }
                 if selected {
                     selectedURLs.insert(url)
                 } else {
@@ -1127,6 +1218,7 @@ private struct SystemCleanupSheet: View {
                     .sorted { $0.byteSize > $1.byteSize }
                 candidates = mergedCandidates
                 groupedSections = makeGroupedSections(from: mergedCandidates)
+                cachedManualReviewCount = computeManualReviewCount()
             }
         }
         candidates = scannedCandidates
@@ -1136,19 +1228,28 @@ private struct SystemCleanupSheet: View {
         isScanning = false
     }
 
-    private func cleanSelected() async {
+    private func beginCleanupAndDismiss() {
+        guard !isCleaning else { return }
+        let selectedCandidates = candidates.filter {
+            selectedURLs.contains($0.url) && $0.isActionable
+        }
+        guard !selectedCandidates.isEmpty else {
+            confirmationPresented = false
+            return
+        }
+
         isCleaning = true
-        let result = await service.trashSelected(Array(selectedURLs))
-        self.result = result
+        confirmationPresented = false
         selectedURLs = []
         cachedManualReviewCount = 0
-        candidates.removeAll { candidate in
-            !result.failures.contains(where: { $0.url == candidate.url })
-        }
-        groupedSections = makeGroupedSections(from: candidates)
-        isCleaning = false
-        onCleanupCompleted?()
         onDismiss()
+
+        let cleanupService = service
+        let cleanupCompleted = onCleanupCompleted
+        Task { @MainActor in
+            _ = await cleanupService.trashSelected(selectedCandidates)
+            cleanupCompleted?()
+        }
     }
 
     private func resultText(_ result: DiskCleanupResult) -> String {
@@ -1173,12 +1274,20 @@ private struct CleanupKindSection: Identifiable {
         Set(items.map(\.url))
     }
 
+    var selectableItems: [DiskCleanupCandidate] {
+        items.filter(\.isActionable)
+    }
+
+    var selectableURLs: Set<URL> {
+        Set(selectableItems.map(\.url))
+    }
+
     func selectedCount(in selection: Set<URL>) -> Int {
-        urls.intersection(selection).count
+        selectableURLs.intersection(selection).count
     }
 
     func allSelected(in selection: Set<URL>) -> Bool {
-        !urls.isEmpty && urls.isSubset(of: selection)
+        !selectableURLs.isEmpty && selectableURLs.isSubset(of: selection)
     }
 }
 
@@ -1196,6 +1305,20 @@ private extension DiskCleanupKind {
         case .diskImage: "磁盘镜像"
         case .largeFile: "大文件"
         case .duplicateFile: "重复文件"
+        case .browserCache: "浏览器缓存"
+        case .mailDownloads: "邮件附件"
+        case .unfinishedDownload: "未完成下载"
+        case .iosBackup: "iPhone/iPad 备份"
+        case .projectBuildArtifact: "项目构建产物"
+        case .xcodeArchive: "Xcode Archives"
+        case .simulatorData: "模拟器数据"
+        case .applicationResidual: "应用残留"
+        case .timeMachineSnapshot: "Time Machine 快照"
+        case .dockerData: "Docker 数据"
+        case .virtualMachineData: "虚拟机数据"
+        case .aiToolCache: "AI 工具缓存"
+        case .languagePack: "应用语言包"
+        case .cloudStorageCache: "云存储数据"
         }
     }
 
@@ -1212,6 +1335,20 @@ private extension DiskCleanupKind {
         case .diskImage: "opticaldisc.fill"
         case .largeFile: "doc.zipper.fill"
         case .duplicateFile: "rectangle.stack.fill"
+        case .browserCache: "globe"
+        case .mailDownloads: "envelope.badge.fill"
+        case .unfinishedDownload: "arrow.down.circle"
+        case .iosBackup: "iphone.gen3"
+        case .projectBuildArtifact: "hammer.circle.fill"
+        case .xcodeArchive: "archivebox.fill"
+        case .simulatorData: "iphone.and.arrow.forward"
+        case .applicationResidual: "app.dashed"
+        case .timeMachineSnapshot: "clock.arrow.circlepath"
+        case .dockerData: "shippingbox"
+        case .virtualMachineData: "desktopcomputer"
+        case .aiToolCache: "sparkles.square.fill"
+        case .languagePack: "character.book.closed"
+        case .cloudStorageCache: "icloud.and.arrow.down"
         }
     }
 
@@ -1228,6 +1365,20 @@ private extension DiskCleanupKind {
         case .diskImage: .blue
         case .largeFile: .indigo
         case .duplicateFile: .pink
+        case .browserCache: .cyan
+        case .mailDownloads: .orange
+        case .unfinishedDownload: .teal
+        case .iosBackup: .blue
+        case .projectBuildArtifact: .purple
+        case .xcodeArchive: .indigo
+        case .simulatorData: .gray
+        case .applicationResidual: .yellow
+        case .timeMachineSnapshot: .gray
+        case .dockerData: .blue
+        case .virtualMachineData: .gray
+        case .aiToolCache: .mint
+        case .languagePack: .pink
+        case .cloudStorageCache: .gray
         }
     }
 }

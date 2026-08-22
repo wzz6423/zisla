@@ -8,7 +8,7 @@ import Testing
 @Suite(.serialized)
 struct AIChatClientTests {
     @Test
-    func sendsConfiguredAuthorizationAndTranscriptMessages() async throws {
+    func sendsConfiguredAuthorizationAndDualTranscriptMessages() async throws {
         StubURLProtocol.reset()
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubURLProtocol.self]
@@ -20,7 +20,10 @@ struct AIChatClientTests {
             endpoint: endpoint,
             model: "voice-model",
             systemPrompt: VoiceTranscriptPostProcessor.systemPrompt,
-            messages: VoiceTranscriptPostProcessor.messages(for: "明天十点开会"),
+            messages: VoiceTranscriptPostProcessor.messages(
+                for: "get up 的 SSH key",
+                lexiconNormalizedTranscript: "GitHub 的 SSH key"
+            ),
             apiKey: " test-key "
         )
 
@@ -35,7 +38,7 @@ struct AIChatClientTests {
         let messages = try #require(json["messages"] as? [[String: String]])
         #expect(messages.count == 2)
         #expect(messages[0]["role"] == "system")
-        #expect(messages[1]["content"] == "<transcript>\n明天十点开会\n</transcript>")
+        #expect(messages[1]["content"] == "<raw_transcript>\nget up 的 SSH key\n</raw_transcript>\n<lexicon_transcript>\nGitHub 的 SSH key\n</lexicon_transcript>")
     }
 
     @Test

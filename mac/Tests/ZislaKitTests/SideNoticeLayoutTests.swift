@@ -222,6 +222,34 @@ struct SideNoticeLayoutTests {
     }
 
     @Test
+    func focusTransitionOverridesPersistentFocusModePriority() {
+        var settings = FeatureSettings.default
+        settings.compactStatusPriority = [
+            .focusMode,
+            .transient,
+            .media,
+            .aiActivity,
+            .updateAvailable,
+            .mail,
+            .videoDownload,
+            .browserDownload,
+            .focusCountdown,
+            .toolboxReminder,
+        ]
+        let notices = [
+            IslandNotice(id: "focus-mode-left", title: "勿扰", side: .left, style: .status),
+            IslandNotice(id: "focus-transition", title: "勿扰", side: .left, style: .status),
+        ]
+
+        #expect(
+            SideNoticeLayoutEngine.selectedCompactStatusPriority(
+                for: notices,
+                settings: settings
+            ) == .transient
+        )
+    }
+
+    @Test
     func focusCountdownUsesCompactContentAlongsideMediaAndAI() {
         let media = IslandNotice(id: "media-active-left", title: "正在播放", side: .left)
         let countdown = IslandNotice(

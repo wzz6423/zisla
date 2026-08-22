@@ -37,10 +37,7 @@ final class VoiceInputController: ObservableObject {
 
     func setContextualStrings(_ strings: [String]) {
         var seen = Set<String>()
-        contextualStrings = Array(
-            strings.filter { !$0.isEmpty && seen.insert($0).inserted }
-                .prefix(VoiceLexicon.maximumContextualTerms)
-        )
+        contextualStrings = strings.filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 
     func toggle() {
@@ -587,11 +584,12 @@ private final class SystemDictationSession: DictationSession, @unchecked Sendabl
 
         let transcriber = DictationTranscriber(
             locale: locale,
-            preset: .progressiveLongDictation
+            preset: .progressiveShortDictation
         )
         let modules: [any SpeechModule] = [transcriber]
         guard let outputFormat = await SpeechAnalyzer.bestAvailableAudioFormat(
-            compatibleWith: modules
+            compatibleWith: modules,
+            considering: sourceFormat
         ) else {
             throw SessionError.incompatibleAudioFormat
         }

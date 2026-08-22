@@ -127,6 +127,7 @@ struct AIAgentModuleViewRefreshTests {
         )
         #expect(source.contains("cliCommandGroup(title: \"下载命令\", commands: installCommands)"))
         #expect(source.contains("cliCommandGroup(title: \"更新命令\", commands: updateCommands)"))
+        #expect(source.contains("let updateKinds = installedKinds"))
         #expect(source.contains("commands: agent.commandsForCLIInstallation([kind], update: false)"))
         #expect(source.contains("NSPasteboard.general.setString(commandText, forType: .string)"))
         #expect(source.contains("argument.replacingOccurrences(of: \"'\", with:"))

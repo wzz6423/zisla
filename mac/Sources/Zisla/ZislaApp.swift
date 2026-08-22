@@ -4,6 +4,11 @@ import ZislaCore
 import ZislaKit
 import SwiftUI
 
+@objc private protocol EditingActionTarget {
+    func undo(_ sender: Any?)
+    func redo(_ sender: Any?)
+}
+
 @main
 enum ZislaMain {
     @MainActor
@@ -41,7 +46,7 @@ final class SettingsWindow: NSWindow {
         return true
     }
 
-    private static func editingAction(for event: NSEvent) -> Selector? {
+    fileprivate static func editingAction(for event: NSEvent) -> Selector? {
         let modifiers = event.modifierFlags
             .intersection(.deviceIndependentFlagsMask)
             .subtracting([.capsLock, .numericPad, .function])
@@ -52,10 +57,23 @@ final class SettingsWindow: NSWindow {
         case ("c", .command): #selector(NSText.copy(_:))
         case ("v", .command): #selector(NSText.paste(_:))
         case ("x", .command): #selector(NSText.cut(_:))
-        case ("z", .command): Selector(("undo:"))
-        case ("z", [.command, .shift]): Selector(("redo:"))
+        case ("z", .command): #selector(EditingActionTarget.undo(_:))
+        case ("z", [.command, .shift]): #selector(EditingActionTarget.redo(_:))
         default: nil
         }
+    }
+}
+
+@MainActor
+final class QuickNotesEditorWindow: NSWindow {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard let action = SettingsWindow.editingAction(for: event),
+              let firstResponder,
+              NSApp.sendAction(action, to: firstResponder, from: self)
+        else {
+            return super.performKeyEquivalent(with: event)
+        }
+        return true
     }
 }
 
@@ -487,7 +505,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
-        // 仅在文本输入界面可见时允许岛屿面板成为键盘焦点，避免其他情况下抢占前台应用焦点。
+        // Allow the island panel to become the keyboard focus only when a text input interface is visible, preventing it from stealing focus from the frontmost app in other cases.
         Publishers.CombineLatest3(
             model.$selectedModule,
             model.$isIslandVisible,
@@ -552,25 +570,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
-        // While the disk-cleanup panel is visible: keep the island expanded to prevent it from
-        // collapsing when the pointer leaves the island area.
-        model.$isCleanupPanelVisible
-            .removeDuplicates()
-            .sink { [weak coordinator] visible in
-                Task { @MainActor in
-                    coordinator?.setTransientInteractionVisible(visible)
-                }
-            }
-            .store(in: &cancellables)
-
-        // After disk cleanup completes: release the pin and transient interaction hold, triggering island collapse.
+        // Disk-cleanup panels should remain above the collapsed island without becoming a global topmost window.
         model.$islandCollapseRequested
             .removeDuplicates()
             .filter { $0 }
             .sink { [weak coordinator] _ in
                 Task { @MainActor in
-                    coordinator?.setPinned(false)
-                    coordinator?.setTransientInteractionVisible(false)
+                    coordinator?.collapseImmediately()
                     AppModel.shared.isPinned = false
                     AppModel.shared.islandCollapseRequested = false
                 }
@@ -1247,14 +1253,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let targetScreen = WindowPlacement.screenUnderMouse()
         if quickNotesEditorController == nil {
             let rootView = QuickNoteExpandedView(model: AppModel.shared)
-            let window = NSWindow(
+            let window = QuickNotesEditorWindow(
                 contentRect: CGRect(x: 0, y: 0, width: 860, height: 580),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable],
                 backing: .buffered,
                 defer: false
             )
             window.title = localized("随记 · 编辑")
-            window.level = WindowPlacement.modalWindowLevel
             window.isOpaque = false
             window.backgroundColor = .clear
             window.titlebarAppearsTransparent = true

@@ -497,6 +497,63 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func startingAnotherAnnotationDeselectsTheCurrentAnnotation() async throws {
+        let size = CGSize(width: 400, height: 300)
+        let selection = CGRect(x: 60, y: 50, width: 220, height: 140)
+        let image = try #require(makeGradientImage(width: 400, height: 300))
+        let model = ScreenshotEditorModel(image: NSImage(size: selection.size))
+        let selectedArrow = ScreenshotAnnotation(
+            kind: .arrow,
+            points: [CGPoint(x: 170, y: 110), CGPoint(x: 200, y: 110)]
+        )
+        model.add(selectedArrow)
+        let selectionState = ScreenshotAnnotationSelectionState()
+        selectionState.selectedAnnotationID = selectedArrow.id
+        model.tool = .rectangle
+
+        let hostingView = NSHostingView(rootView:
+            ScreenshotEditorView(
+                model: model,
+                selectionState: selectionState,
+                overlayConfiguration: ScreenshotEditorOverlayConfiguration(
+                    backgroundImage: image,
+                    initialSelection: selection,
+                    cropImage: { _ in image }
+                ),
+                onClose: {},
+                onCopy: {},
+                onPinToggle: { _ in },
+                onLongCapture: {}
+            )
+            .frame(width: size.width, height: size.height)
+        )
+        let window = NSWindow(
+            contentRect: CGRect(origin: .zero, size: size),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = hostingView
+        for _ in 0..<3 {
+            hostingView.layoutSubtreeIfNeeded()
+            await Task.yield()
+        }
+        let interactionView = try #require(
+            findSubview(ScreenshotPointerInteractionNSView.self, in: hostingView)
+        )
+
+        try sendMouseDrag(
+            from: CGPoint(x: 30, y: 30),
+            to: CGPoint(x: 120, y: 90),
+            through: interactionView,
+            in: window
+        )
+
+        #expect(selectionState.selectedAnnotationID == nil)
+        #expect(model.annotations.last?.kind == .rectangle)
+    }
+
+    @Test
     func selectedShapesAndTextApplyStyleChangesImmediately() {
         let model = ScreenshotEditorModel(image: NSImage(size: CGSize(width: 320, height: 200)))
         let rectangle = ScreenshotAnnotation(kind: .rectangle, rect: CGRect(x: 10, y: 10, width: 40, height: 40))
@@ -1764,7 +1821,7 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func annotationTransformSupportsMoveResizeRotateAndTextScaling() {
+    func annotationTransformSupportsMoveResizeRotateAndTextBoxSizing() {
         let id = UUID()
         let rectangle = ScreenshotAnnotation(
             id: id,
@@ -1804,7 +1861,25 @@ struct ScreenshotEditorTests {
             from: CGPoint(x: 100, y: 54),
             to: CGPoint(x: 140, y: 66)
         )
-        #expect(textResized.fontSize == 30)
+        #expect(textResized.rect == CGRect(x: 20, y: 30, width: 120, height: 36))
+        #expect(textResized.fontSize == 20)
+
+        let movedText = ScreenshotAnnotationGeometry.transform(
+            ScreenshotAnnotation(
+                kind: .text,
+                rect: CGRect(x: 220, y: 30, width: 80, height: 24),
+                text: String(repeating: "输入文字", count: 10),
+                fontSize: 14
+            ),
+            handle: nil,
+            from: CGPoint(x: 260, y: 42),
+            to: CGPoint(x: 120, y: 42),
+            textRightEdge: 320
+        )
+        #expect(movedText.rect.minX == 80)
+        #expect(movedText.rect.width > 80)
+        #expect(movedText.rect.maxX <= 320)
+        #expect(movedText.fontSize == 14)
     }
 
     @Test

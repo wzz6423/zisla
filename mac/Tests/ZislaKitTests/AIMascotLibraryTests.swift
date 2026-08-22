@@ -110,6 +110,7 @@ struct AIMascotLibraryTests {
         #expect(AIMascotLibrary.providerAssetName(for: .coder) == "qoder.icns")
         #expect(AIMascotLibrary.providerAssetName(for: .trae) == "trae.icns")
         #expect(AIMascotLibrary.providerAssetName(for: .opencode) == "opencode.svg")
+        #expect(AIMascotLibrary.providerAssetName(for: .pi) == "pi.svg")
         #expect(AIMascotLibrary.providerAssetName(for: .harness) == "workbuddy.icns")
         #expect(AIMascotLibrary.providerAssetName(for: .doubao) == "doubao.png")
         #expect(AIMascotLibrary.providerAssetName(for: .zcode) == "zcode.icns")
@@ -146,6 +147,10 @@ struct AIMascotLibraryTests {
         #expect(
             AIMascotLibrary.providerAssetName(for: .codex)
                 != AIMascotLibrary.providerAssetName(for: .gpt)
+        )
+        #expect(
+            AIMascotLibrary.providerAssetName(for: .pi)
+                != AIMascotLibrary.providerAssetName(for: .opencode)
         )
     }
 

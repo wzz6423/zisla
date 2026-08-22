@@ -151,6 +151,7 @@ public final class AIStateMonitor: ObservableObject {
             ZCodeSessionActivityDetector(),
             TraeSessionActivityDetector(maxLogFiles: 4, tailBytes: 256 * 1_024),
             OpenCodeSessionActivityDetector(maxSessions: 4),
+            PiSessionActivityDetector(maxSessionFiles: 4),
             HarnessSessionActivityDetector(maxFiles: 4),
             HarnessSessionActivityDetector(
                 dataRoot: HarnessSessionActivityDetector.deepSeekDataRoot(),

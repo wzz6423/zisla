@@ -16,6 +16,7 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
     case opencode
     case harness
     case doubao
+    case pi
 
     /// Normalises case and common aliases; returns nil for unknown tokens, letting the caller report the error.
     public init?(token: String) {
@@ -49,6 +50,8 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
             self = .harness
         case "doubao", "豆包":
             self = .doubao
+        case "pi", "pi-coding", "pi-coding-agent", "pi-cli", "pi-agent":
+            self = .pi
         default: return nil
         }
     }

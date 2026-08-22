@@ -71,6 +71,41 @@ struct NowPlayingMetadataStalenessTests {
         #expect(current.lyrics == nil)
     }
 
+    @Test
+    func audioFallbackDoesNotReusePreviouslyResolvedLyrics() {
+        let service = NowPlayingService()
+        let lyrics = SyncedLyrics(lines: [.init(time: 0, text: "上一首歌词")])
+        var previous = NowPlayingSnapshot(
+            title: "芒果TV",
+            artist: "正在播放音频",
+            album: nil,
+            artworkData: nil,
+            duration: nil,
+            elapsedTime: nil,
+            isPlaying: true,
+            sourceBundleIdentifier: "com.hunantv.imgo",
+            lyrics: lyrics
+        )
+        service.applyLyrics(to: &previous)
+        #expect(service.resolvedLyrics == lyrics)
+
+        var fallback = NowPlayingSnapshot(
+            title: "芒果TV",
+            artist: "正在播放音频",
+            album: nil,
+            artworkData: nil,
+            duration: nil,
+            elapsedTime: nil,
+            isPlaying: true,
+            sourceBundleIdentifier: "com.hunantv.imgo",
+            supportsControls: false
+        )
+        service.applyLyrics(to: &fallback)
+
+        #expect(service.resolvedLyrics == nil)
+        #expect(fallback.lyrics == nil)
+    }
+
     private func snapshot(
         sourceBundleIdentifier: String?,
         sourcePID: pid_t?,

@@ -133,6 +133,7 @@ public enum AIMascotLibrary {
         case .zcode: "zcode.icns"
         case .trae: "trae.icns"
         case .opencode: "opencode.svg"
+        case .pi: "pi.svg"
         case .harness: "workbuddy.icns"
         case .doubao: "doubao.png"
         }
@@ -172,6 +173,7 @@ public enum AIMascotLibrary {
         case .zcode: "ZCode"
         case .trae: "TRAE"
         case .opencode: "opencode"
+        case .pi: "Pi"
         case .harness: "harnext"
         case .doubao: "豆包"
         }

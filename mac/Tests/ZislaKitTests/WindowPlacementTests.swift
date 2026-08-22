@@ -92,6 +92,21 @@ struct WindowPlacementTests {
     }
 
     @Test @MainActor
+    func leavesRegularEditingWindowAtNormalLevelWhenItBecomesKey() {
+        let window = NSWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 180),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        WindowPlacement.installTransientWindowPromotion()
+
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+
+        #expect(window.level == .normal)
+    }
+
+    @Test @MainActor
     func leavesIslandAndHigherPriorityWindowsUntouched() {
         let island = IslandPanel(
             contentView: NSView(),

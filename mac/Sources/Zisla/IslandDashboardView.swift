@@ -6,12 +6,14 @@ struct IslandDashboardView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var pomodoro: PomodoroService
     @ObservedObject private var aiMonitor: AIStateMonitor
+    @ObservedObject private var media: NowPlayingService
     @ObservedObject private var browserDownloads: BrowserDownloadMonitor
 
     init(model: AppModel) {
         _model = ObservedObject(wrappedValue: model)
         _pomodoro = ObservedObject(wrappedValue: model.pomodoro)
         _aiMonitor = ObservedObject(wrappedValue: model.aiMonitor)
+        _media = ObservedObject(wrappedValue: model.media)
         _browserDownloads = ObservedObject(wrappedValue: model.browserDownloads)
     }
 
@@ -36,6 +38,9 @@ struct IslandDashboardView: View {
             }
             if activeAITask != nil {
                 aiCard.transition(cardTransition)
+            }
+            if activeMediaItem != nil {
+                mediaCard.transition(cardTransition)
             }
             if isDownloadActive {
                 transferCard.transition(cardTransition)
@@ -140,6 +145,72 @@ struct IslandDashboardView: View {
         }
     }
 
+    private var mediaCard: some View {
+        dashboardCard(symbol: "music.note", title: "正在播放", tint: Color.zislaInfo) {
+            if let item = activeMediaItem {
+                TimelineView(.animation(minimumInterval: 0.5, paused: !item.isPlaying)) { context in
+                    let duration = item.duration ?? 0
+                    let elapsed = item.elapsedTime(at: context.date) ?? item.elapsedTime ?? 0
+                    let fraction = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 7) {
+                            mediaArtwork(item)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title.isEmpty ? "媒体播放" : item.title)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .lineLimit(1)
+                                Text(mediaSecondaryText(item))
+                                    .font(.islandMicro())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        if duration > 0 {
+                            ProgressView(value: fraction)
+                                .tint(Color.zislaInfo)
+                        }
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { _ = media.openSourceApplication() }
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            activeMediaItem.map { "正在播放：\(MediaTextFormatting.titleArtistText($0))" } ?? "正在播放"
+        )
+    }
+
+    @ViewBuilder
+    private func mediaArtwork(_ item: NowPlayingSnapshot) -> some View {
+        if let image = MediaArtworkImageCache.image(from: item.artworkData) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 32, height: 32)
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        } else {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(Color.white.opacity(0.1))
+                .overlay {
+                    Image(systemName: item.isVideo ? "play.rectangle.fill" : "music.note")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.zislaInfo)
+                }
+                .frame(width: 32, height: 32)
+        }
+    }
+
+    private func mediaSecondaryText(_ item: NowPlayingSnapshot) -> String {
+        let text = item.isVideo
+            ? MediaTextFormatting.videoSecondaryText(item)
+            : item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? "媒体播放" : text
+    }
+
     private func browserDownloadCard(_ snapshot: BrowserDownloadSnapshot) -> some View {
         dashboardCard(symbol: "arrow.down.circle", title: "浏览器下载", tint: Color.zislaInfo) {
             VStack(alignment: .leading, spacing: 4) {
@@ -204,6 +275,14 @@ struct IslandDashboardView: View {
             .first
     }
 
+    private var activeMediaItem: NowPlayingSnapshot? {
+        guard model.settingsStore.settings.mediaEnabled,
+              let snapshot = media.snapshot,
+              snapshot.isPlaying
+        else { return nil }
+        return snapshot
+    }
+
     private var isPomodoroActive: Bool {
         pomodoro.phase != .idle
     }
@@ -219,6 +298,7 @@ struct IslandDashboardView: View {
         [
             isPomodoroActive,
             activeAITask != nil,
+            activeMediaItem != nil,
             isDownloadActive,
         ].filter { $0 }.count + browserDownloads.snapshots.count
     }

@@ -224,7 +224,7 @@ struct AIAgentModuleView: View {
         let installedKinds = cliKinds(installed: true)
         let missingKinds = cliKinds(installed: false)
         let installCommands = agent.commandsForCLIInstallation(missingKinds, update: false)
-        let updateKinds = agent.cliUpdates.map(\.kind)
+        let updateKinds = installedKinds
         let updateCommands = agent.commandsForCLIInstallation(updateKinds, update: true)
         let uninstallCommands = agent.commandsForCLIUninstallation(installedKinds)
         return VStack(alignment: .leading, spacing: 10) {

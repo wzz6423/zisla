@@ -42,7 +42,10 @@ public enum WindowPlacement {
 
     @MainActor
     static func promoteTransientWindowIfNeeded(_ window: NSWindow) {
-        guard !(window is IslandPanel), window.level.rawValue < modalWindowLevel.rawValue else { return }
+        guard window is NSPanel,
+              !(window is IslandPanel),
+              window.level.rawValue < modalWindowLevel.rawValue
+        else { return }
         window.level = modalWindowLevel
     }
 

@@ -680,13 +680,28 @@ public struct AIAgentCLIService: Sendable {
 
     private let environment: [String: String]
     private let homeDirectory: URL
+    private var networkProxyURL = ""
+    private var networkProxyEnabled = false
 
     public init(
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        networkProxyURL: String = ""
     ) {
         self.environment = environment
         self.homeDirectory = homeDirectory
+        self.networkProxyURL = networkProxyURL
+        self.networkProxyEnabled = !networkProxyURL.isEmpty
+    }
+
+    public mutating func setNetworkProxyURL(_ value: String) {
+        networkProxyURL = value
+        networkProxyEnabled = true
+    }
+
+    public mutating func setNetworkProxy(url: String, enabled: Bool) {
+        networkProxyURL = url
+        networkProxyEnabled = enabled
     }
 
     public func statuses() async -> [AgentCLIStatus] {
@@ -875,7 +890,7 @@ public struct AIAgentCLIService: Sendable {
         }
         var commands: [AIAgentCLICommand] = []
         if !packages.isEmpty {
-            if let npm = executable(named: "npm") {
+            if let npm = executable(named: "npm", resolveSymlinks: false) {
                 commands.append(AIAgentCLICommand(
                     executableURL: npm,
                     arguments: ["install", "--global"] + packages
@@ -930,7 +945,9 @@ public struct AIAgentCLIService: Sendable {
                 managedKinds.insert(kind)
                 return installation.packageName
             }
-            guard !packages.isEmpty, let executableURL = executable(named: manager.executableName) else {
+            guard !packages.isEmpty,
+                  let executableURL = executable(named: manager.executableName, resolveSymlinks: false)
+            else {
                 continue
             }
             commands.append(AIAgentCLICommand(
@@ -952,21 +969,21 @@ public struct AIAgentCLIService: Sendable {
             }
             return "\(package)@latest"
         }
-        if !fallbackPackages.isEmpty, let npm = executable(named: "npm") {
+        if !fallbackPackages.isEmpty, let npm = executable(named: "npm", resolveSymlinks: false) {
             commands.append(AIAgentCLICommand(
                 executableURL: npm,
                 arguments: ["install", "--global"] + fallbackPackages,
                 timeout: Self.updateCommandTimeout
             ))
         }
-        if requested.contains(.grok), let grok = executableURL(for: .grok) {
+        if requested.contains(.grok), let grok = executableURL(for: .grok, resolveSymlinks: false) {
             commands.append(AIAgentCLICommand(
                 executableURL: grok,
                 arguments: ["update"],
                 timeout: Self.updateCommandTimeout
             ))
         }
-        if requested.contains(.kimi), let kimi = executableURL(for: .kimi) {
+        if requested.contains(.kimi), let kimi = executableURL(for: .kimi, resolveSymlinks: false) {
             commands.append(AIAgentCLICommand(
                 executableURL: kimi,
                 arguments: ["upgrade"],
@@ -974,7 +991,7 @@ public struct AIAgentCLIService: Sendable {
             ))
         }
         for kind in [AgentCLIKind.qwen, .qoder, .copilot] where requested.contains(kind) && !managedKinds.contains(kind) {
-            if let executable = executableURL(for: kind) {
+            if let executable = executableURL(for: kind, resolveSymlinks: false) {
                 commands.append(AIAgentCLICommand(
                     executableURL: executable,
                     arguments: ["update"],
@@ -1025,7 +1042,10 @@ public struct AIAgentCLIService: Sendable {
                 packages.append(contentsOf: legacyPackages)
             }
             guard !packages.isEmpty,
-                  let managerExecutable = executable(named: manager.executableName)
+                  let managerExecutable = executable(
+                      named: manager.executableName,
+                      resolveSymlinks: false
+                  )
             else { continue }
             let arguments: [String]
             switch manager {
@@ -1107,7 +1127,10 @@ public struct AIAgentCLIService: Sendable {
     func uninstallationCommand(
         for installation: AgentSkillPackageInstallation
     ) -> AIAgentCLICommand? {
-        guard let executableURL = executable(named: installation.manager.executableName) else {
+        guard let executableURL = executable(
+            named: installation.manager.executableName,
+            resolveSymlinks: false
+        ) else {
             return nil
         }
         return AIAgentCLICommand(
@@ -1192,7 +1215,7 @@ public struct AIAgentCLIService: Sendable {
             arguments.append("run")
             appendModel(model, to: &arguments)
             arguments.append("-")
-        case .kimi, .qwen, .qoder, .copilot, .glm, .dsh:
+        case .kimi, .qwen, .qoder, .copilot, .glm, .dsh, .pi:
             return []
         }
 
@@ -1224,11 +1247,11 @@ public struct AIAgentCLIService: Sendable {
         arguments.append(contentsOf: ["--model", model])
     }
 
-    func executableURL(for kind: AgentCLIKind) -> URL? {
+    func executableURL(for kind: AgentCLIKind, resolveSymlinks: Bool = true) -> URL? {
         if kind == .kimi {
-            if let executable = kimiExecutableURL(resolveSymlinks: true) { return executable }
+            if let executable = kimiExecutableURL(resolveSymlinks: resolveSymlinks) { return executable }
         }
-        return executable(named: kind.executableName)
+        return executable(named: kind.executableName, resolveSymlinks: resolveSymlinks)
     }
 
     private func managedKimiExecutable() -> URL? {
@@ -1251,7 +1274,7 @@ public struct AIAgentCLIService: Sendable {
         kind.npmPackageName
     }
 
-    func executable(named name: String) -> URL? {
+    func executable(named name: String, resolveSymlinks: Bool = true) -> URL? {
         let fileManager = FileManager.default
         return Self.executableSearchDirectories(
             environment: environment,
@@ -1259,11 +1282,19 @@ public struct AIAgentCLIService: Sendable {
         )
         .map { $0.appendingPathComponent(name) }
         .first { fileManager.isExecutableFile(atPath: $0.path) }
-        .map { $0.resolvingSymlinksInPath().standardizedFileURL }
+        .map { executable in
+            resolveSymlinks
+                ? executable.resolvingSymlinksInPath().standardizedFileURL
+                : executable
+        }
     }
 
     private var commandEnvironment: [String: String] {
-        var environment = environment
+        var environment = NetworkProxy.environment(
+            from: networkProxyURL,
+            enabled: networkProxyEnabled,
+            base: self.environment
+        )
         let directories = Self.executableSearchDirectories(
             environment: environment,
             homeDirectory: homeDirectory

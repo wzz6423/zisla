@@ -130,6 +130,34 @@ struct OverlayCoordinatorTests {
     }
 
     @Test @MainActor
+    func immediateCollapseOverridesPinnedAndTransientInteractionWithoutWaiting() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(
+            contentView: contentView,
+            collapseDelay: .seconds(10)
+        )
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setPinned(true)
+        coordinator.setTransientInteractionVisible(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        #expect(!panel.ignoresMouseEvents)
+        #expect(panel.keepsNativeGlassActive)
+        #expect(panel.isPinned)
+
+        coordinator.collapseImmediately()
+
+        #expect(panel.ignoresMouseEvents)
+        #expect(!panel.keepsNativeGlassActive)
+        #expect(!panel.canBecomeKey)
+        #expect(!panel.isPinned)
+    }
+
+    @Test @MainActor
     func selectingDisplayReportsWhetherItHasAPhysicalNotch() {
         let coordinator = OverlayCoordinator(contentView: NSView())
         coordinator.updateScreens([

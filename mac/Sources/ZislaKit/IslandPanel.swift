@@ -1,5 +1,10 @@
 import AppKit
 
+@objc private protocol EditingActionTarget {
+    func undo(_ sender: Any?)
+    func redo(_ sender: Any?)
+}
+
 private final class ClickBlockingContentView: NSView {
     var onMouseDown: (() -> Void)?
 
@@ -38,6 +43,16 @@ public final class IslandPanel: NSPanel {
     }
     public override var canBecomeMain: Bool { false }
 
+    public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard let action = Self.editingAction(for: event),
+              let firstResponder,
+              NSApp.sendAction(action, to: firstResponder, from: self)
+        else {
+            return super.performKeyEquivalent(with: event)
+        }
+        return true
+    }
+
   public override func resignKey() {
         guard !avoidsAppActivation,
               allowsNativeGlassActivation,
@@ -68,6 +83,23 @@ public final class IslandPanel: NSPanel {
         // Explicitly activate the app and window when the user clicks the island.
         NSApp.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
+    }
+
+    private static func editingAction(for event: NSEvent) -> Selector? {
+        let modifiers = event.modifierFlags
+            .intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        let key = event.charactersIgnoringModifiers?.lowercased()
+
+        return switch (key, modifiers) {
+        case ("a", .command): #selector(NSResponder.selectAll(_:))
+        case ("c", .command): #selector(NSText.copy(_:))
+        case ("v", .command): #selector(NSText.paste(_:))
+        case ("x", .command): #selector(NSText.cut(_:))
+        case ("z", .command): #selector(EditingActionTarget.undo(_:))
+        case ("z", [.command, .shift]): #selector(EditingActionTarget.redo(_:))
+        default: nil
+        }
     }
 
     public override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {

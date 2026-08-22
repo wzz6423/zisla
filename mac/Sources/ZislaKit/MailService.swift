@@ -303,13 +303,13 @@ public final class MailService: ObservableObject {
                                     if (count of messageBody) > 1200 then set messageBody to text 1 thru 1200 of messageBody
                                     set end of messageRows to {accountName, id of mailMessage as text, sender of mailMessage as text, subject of mailMessage as text, messageBody, date received of mailMessage, read status of mailMessage}
                                 on error
-                                    -- 单封邮件不可读（损坏/超大），跳过
+                                    -- Skip unreadable individual messages (corrupt or excessively large).
                                 end try
                             end repeat
                         end if
                     on error
-                        -- 该账户的 inbox 当前不可访问（未完成加载 / 离线 / 认证中），
-                        -- 跳过这个账户，继续抓取其他账户。
+                        -- This account's inbox is currently unavailable (still loading, offline, or authenticating).
+                        -- Skip this account and continue fetching the others.
                     end try
                 end if
             end repeat

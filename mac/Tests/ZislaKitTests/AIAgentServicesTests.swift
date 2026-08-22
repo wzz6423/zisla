@@ -114,7 +114,7 @@ struct AIAgentServicesTests {
     }
 
     @Test
-    func cliAutoUpdateRequiresExplicitOptIn() async throws {
+    func cliAutoUpdateRunsByDefault() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-cli-auto-update-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -138,14 +138,6 @@ struct AIAgentServicesTests {
 
         workspace.start()
         #expect(await waitForCLIUpdate(workspace, kind: .codex))
-
-        #expect(!store.state.cliAutoUpdateEnabled)
-        #expect(!FileManager.default.fileExists(atPath: updateMarker.path))
-        #expect(workspace.cliUpdates == [
-            AIAgentCLIUpdate(kind: .codex, installedVersion: "1.0.0", latestVersion: "1.1.0"),
-        ])
-
-        workspace.setCLIAutoUpdateEnabled(true)
         await waitForFile(at: updateMarker)
         await waitForCLICommandRunToFinish(workspace)
 
@@ -978,6 +970,46 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func cliCommandsKeepLocalLaunchersForCopyableNames() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-cli-command-launchers-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let npmLauncher = root.appendingPathComponent("bin/npm")
+        let npmTarget = root.appendingPathComponent("lib/node_modules/npm/bin/npm-cli.js")
+        try writeExecutable(at: npmTarget)
+        try FileManager.default.createDirectory(
+            at: npmLauncher.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createSymbolicLink(at: npmLauncher, withDestinationURL: npmTarget)
+
+        let grokLauncher = root.appendingPathComponent(".grok/bin/grok")
+        let grokTarget = root.appendingPathComponent(".grok/downloads/grok-versioned")
+        try writeExecutable(at: grokTarget)
+        try FileManager.default.createDirectory(
+            at: grokLauncher.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createSymbolicLink(at: grokLauncher, withDestinationURL: grokTarget)
+
+        let service = AIAgentCLIService(
+            environment: ["PATH": npmLauncher.deletingLastPathComponent().path],
+            homeDirectory: root
+        )
+
+        let install = try #require(
+            service.installationCommands(for: [.claude], update: false).first
+        )
+        #expect(install.executableURL == npmLauncher)
+
+        let update = try #require(
+            service.installationCommands(for: [.grok], update: true).first
+        )
+        #expect(update.executableURL == grokLauncher)
+    }
+
+    @Test
     func additionalManagedCLIsBuildNPMManagementCommands() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-additional-cli-commands-\(UUID().uuidString)", isDirectory: true)
@@ -1026,6 +1058,42 @@ struct AIAgentServicesTests {
                 "@qwen-code/qwen-code", "@qoder-ai/qodercli", "@github/copilot", "@deepseek-ai/dsh",
             ]
         )])
+    }
+
+    @Test
+    func piCLIUsesNPMForInstallUpdateAndUninstall() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-pi-cli-management-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let npm = root.appendingPathComponent(".npm-global/bin/npm")
+        let target = root.appendingPathComponent(
+            ".npm-global/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
+        )
+        let launcher = root.appendingPathComponent(".npm-global/bin/pi")
+        try writeExecutable(at: npm)
+        try writeExecutable(at: target)
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: target)
+        let service = AIAgentCLIService(environment: ["PATH": "/usr/bin"], homeDirectory: root)
+
+        #expect(service.installationCommands(for: [.pi], update: false) == [
+            AIAgentCLICommand(
+                executableURL: npm,
+                arguments: ["install", "--global", "@earendil-works/pi-coding-agent"]
+            ),
+        ])
+        #expect(service.installationCommands(for: [.pi], update: true) == [
+            AIAgentCLICommand(
+                executableURL: npm,
+                arguments: ["install", "--global", "@earendil-works/pi-coding-agent@latest"],
+                timeout: 600
+            ),
+        ])
+        #expect(service.uninstallationCommands(for: [.pi]) == [
+            AIAgentCLICommand(
+                executableURL: npm,
+                arguments: ["uninstall", "--global", "@earendil-works/pi-coding-agent"]
+            ),
+        ])
     }
 
     @Test

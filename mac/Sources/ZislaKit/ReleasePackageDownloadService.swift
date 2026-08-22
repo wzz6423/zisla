@@ -23,7 +23,8 @@ public actor ReleasePackageDownloadService {
     public static let maxDownloadSize = 2_147_483_648
     public typealias DataLoader = @Sendable (URLRequest) async throws -> (URL, HTTPURLResponse)
 
-    private let loadData: DataLoader
+    private var loadData: DataLoader
+    private let usesDefaultSession: Bool
 
     public init(session: URLSession? = nil) {
         let activeSession: URLSession
@@ -36,6 +37,7 @@ public actor ReleasePackageDownloadService {
             configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
             activeSession = URLSession(configuration: configuration)
         }
+        self.usesDefaultSession = session == nil
         self.loadData = { request in
             let (tempURL, response) = try await activeSession.download(for: request)
             guard let response = response as? HTTPURLResponse else {
@@ -46,7 +48,28 @@ public actor ReleasePackageDownloadService {
     }
 
     public init(loadData: @escaping DataLoader) {
+        self.usesDefaultSession = false
         self.loadData = loadData
+    }
+
+    public func setNetworkProxyURL(_ value: String) {
+        setNetworkProxy(url: value, enabled: true)
+    }
+
+    public func setNetworkProxy(url: String, enabled: Bool) {
+        guard usesDefaultSession else { return }
+        let configuration = NetworkProxy.sessionConfiguration(from: url, enabled: enabled)
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 3600
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        let session = URLSession(configuration: configuration)
+        loadData = { request in
+            let (tempURL, response) = try await session.download(for: request)
+            guard let response = response as? HTTPURLResponse else {
+                throw ReleasePackageDownloadError.downloadFailed("无效的 HTTP 响应")
+            }
+            return (tempURL, response)
+        }
     }
 
     public func download(

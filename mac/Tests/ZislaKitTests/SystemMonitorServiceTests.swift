@@ -616,10 +616,9 @@ struct SystemMonitorServiceTests {
         #expect(roots.contains { $0.kind == .log && $0.url.path == "/Users/test/Library/Logs" })
         #expect(roots.contains { $0.kind == .crashReport && $0.url.path == "/Users/test/Library/Logs/DiagnosticReports" })
         #expect(roots.contains { $0.kind == .trash && $0.url.path == "/Users/test/.Trash" })
-        // System-level and sensitive paths remain excluded
+        // System-level and broad sensitive roots remain excluded; explicitly owned roots are scoped.
         let excludedPaths = [
             "/Users/test/Library/Application Support/CrashReporter",
-            "/Users/test/Library/Developer/Xcode/Archives",
             "/Library/Caches",
             "/Library/Logs",
             "/usr/local/var/cache",
@@ -628,8 +627,21 @@ struct SystemMonitorServiceTests {
         for path in excludedPaths {
             #expect(!roots.contains { $0.url.path == path })
         }
-        // Application Support and user documents are not scan roots
-        #expect(!roots.contains { $0.url.path.contains("Application Support") })
+        // A broad Application Support root is never registered.
+        #expect(!roots.contains { $0.url.path == "/Users/test/Library/Application Support" })
+        // Explicitly owned high-value roots are registered independently.
+        #expect(roots.contains {
+            $0.kind == .iosBackup
+                && $0.url.path == "/Users/test/Library/Application Support/MobileSync/Backup"
+        })
+        #expect(roots.contains {
+            $0.kind == .mailDownloads
+                && $0.url.path == "/Users/test/Library/Mail Downloads"
+        })
+        #expect(roots.contains {
+            $0.kind == .xcodeArchive
+                && $0.url.path == "/Users/test/Library/Developer/Xcode/Archives"
+        })
         #expect(!roots.contains { $0.url.path == "/Users/test/Documents" })
     }
 
@@ -868,6 +880,44 @@ struct SystemMonitorServiceTests {
         #expect(DiskCleanupKind.largeFile.safetyLevel == .requiresManualReview)
         #expect(DiskCleanupKind.diskImage.safetyLevel == .requiresManualReview)
         #expect(DiskCleanupKind.crashReport.safetyLevel == .requiresManualReview)
+        #expect(DiskCleanupKind.iosBackup.safetyLevel == .requiresManualReview)
+        #expect(DiskCleanupKind.browserCache.safetyLevel == .safeToClean)
+        #expect(DiskCleanupKind.projectBuildArtifact.safetyLevel == .safeToClean)
+        #expect(DiskCleanupKind.timeMachineSnapshot.safetyLevel == .analysisOnly)
+        #expect(DiskCleanupKind.dockerData.safetyLevel == .analysisOnly)
+    }
+
+    @Test
+    func analysisOnlyKindsAreExcludedFromCleanupScanAndProgress() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let simulatorDevices = home.appendingPathComponent("Library/Developer/CoreSimulator/Devices")
+        let dockerData = home.appendingPathComponent("Library/Containers/com.docker.docker")
+        mock.homeDirectory = home
+        mock.existingPaths = [simulatorDevices.path, dockerData.path]
+        mock.fileAttributes[simulatorDevices.path] = [.size: NSNumber(value: 4_096)]
+        mock.fileAttributes[dockerData.path] = [.size: NSNumber(value: 8_192)]
+
+        let analysisKinds: Set<DiskCleanupKind> = [
+            .simulatorData, .timeMachineSnapshot, .dockerData, .virtualMachineData, .cloudStorageCache,
+        ]
+        let options = DiskCleanupScanOptions(includeAnalysisOnly: true)
+        let candidates = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: analysisKinds,
+            options: options
+        )
+        let progressCapture = CleanupScanProgressCapture()
+        let progressCandidates = SystemDiskCleanup.scanCandidatesWithProgress(
+            fileManager: mock,
+            kinds: analysisKinds,
+            options: options,
+            onProgress: progressCapture.append
+        )
+
+        #expect(candidates.isEmpty)
+        #expect(progressCandidates.isEmpty)
+        #expect(progressCapture.snapshots().isEmpty)
     }
 
     @Test
@@ -1087,6 +1137,219 @@ struct SystemMonitorServiceTests {
         #expect(candidates.contains { $0.displayName == "Xcode.dmg" })
         #expect(candidates.contains { $0.displayName == "Installer.pkg" })
         #expect(!candidates.contains { $0.displayName == "readme.txt" })
+    }
+
+    @Test
+    func scanFindsBrowserMailBackupAndArchiveOwners() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = home
+        let chrome = home.appendingPathComponent("Library/Application Support/Google/Chrome")
+        let profile = chrome.appendingPathComponent("Default")
+        let browserCache = profile.appendingPathComponent("Cache")
+        let browserFile = browserCache.appendingPathComponent("data_0")
+        let mail = home.appendingPathComponent("Library/Mail Downloads")
+        let attachment = mail.appendingPathComponent("invoice.pdf")
+        let backups = home.appendingPathComponent("Library/Application Support/MobileSync/Backup")
+        let backup = backups.appendingPathComponent("device-001")
+        let archives = home.appendingPathComponent("Library/Developer/Xcode/Archives")
+        let archive = archives.appendingPathComponent("2026-08-21/App.xcarchive")
+
+        mock.existingPaths = [
+            chrome.path, profile.path, browserCache.path, browserFile.path,
+            mail.path, attachment.path, backups.path, backup.path, archives.path, archive.path,
+        ]
+        mock.directoryContents[chrome.path] = [profile]
+        mock.directoryContents[browserCache.path] = [browserFile]
+        mock.directoryContents[mail.path] = [attachment]
+        mock.directoryContents[backups.path] = [backup]
+        mock.directoryContents[archives.path] = [archive]
+        for url in [browserFile, attachment, backup, archive] {
+            mock.fileAttributes[url.path] = [.size: NSNumber(value: 4096)]
+        }
+
+        let candidates = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: [.browserCache, .mailDownloads, .iosBackup, .xcodeArchive],
+            maxConcurrentScans: 1
+        )
+
+        #expect(candidates.contains { $0.kind == .browserCache && $0.url.path == browserCache.path })
+        #expect(candidates.contains { $0.kind == .mailDownloads && $0.url == attachment.standardizedFileURL })
+        #expect(candidates.contains { $0.kind == .iosBackup && $0.url == backup.standardizedFileURL })
+        #expect(candidates.contains { $0.kind == .xcodeArchive && $0.url == archive.standardizedFileURL })
+    }
+
+    @Test
+    func scanDiskImagesTraversesNestedFoldersAndFindsXip() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let downloads = home.appendingPathComponent("Downloads")
+        let nested = downloads.appendingPathComponent("releases")
+        let xip = nested.appendingPathComponent("Xcode.xip")
+        mock.homeDirectory = home
+        mock.searchPathResults = [
+            .downloadsDirectory: [downloads],
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        mock.existingPaths = [downloads.path, nested.path, xip.path]
+        mock.directoryContents[downloads.path] = [nested]
+        mock.directoryContents[nested.path] = [xip]
+        mock.fileAttributes[xip.path] = [.size: NSNumber(value: 4096)]
+
+        let candidates = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: [.diskImage],
+            maxConcurrentScans: 1,
+            options: DiskCleanupScanOptions(userFileMaxDepth: 4)
+        )
+
+        #expect(candidates.count == 1)
+        #expect(candidates.first?.displayName == "Xcode.xip")
+        #expect(candidates.first?.detail?.contains("releases") == true)
+    }
+
+    @Test
+    func scanFindsOldUnfinishedDownloadsAndUsesConfigurableLargeFileThreshold() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let downloads = home.appendingPathComponent("Downloads")
+        let partial = downloads.appendingPathComponent("movie.crdownload")
+        let large = downloads.appendingPathComponent("archive.bin")
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        mock.homeDirectory = home
+        mock.searchPathResults = [
+            .downloadsDirectory: [downloads],
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        mock.existingPaths = [downloads.path, partial.path, large.path]
+        mock.directoryContents[downloads.path] = [partial, large]
+        mock.fileAttributes[partial.path] = [
+            .size: NSNumber(value: 2048),
+            .modificationDate: now.addingTimeInterval(-5 * 24 * 3600),
+        ]
+        mock.fileAttributes[large.path] = [
+            .size: NSNumber(value: 60 * 1024 * 1024),
+            .modificationDate: now.addingTimeInterval(-40 * 24 * 3600),
+        ]
+
+        let candidates = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: [.unfinishedDownload, .largeFile],
+            maxConcurrentScans: 1,
+            options: DiskCleanupScanOptions(referenceDate: now)
+        )
+
+        #expect(candidates.contains { $0.kind == .unfinishedDownload && $0.url == partial.standardizedFileURL })
+        #expect(candidates.contains { $0.kind == .largeFile && $0.url == large.standardizedFileURL })
+    }
+
+    @Test
+    func scanFindsProjectBuildArtifactWithProjectMarker() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let projects = home.appendingPathComponent("Projects")
+        let project = projects.appendingPathComponent("Demo")
+        let marker = project.appendingPathComponent("package.json")
+        let nodeModules = project.appendingPathComponent("node_modules")
+        let moduleFile = nodeModules.appendingPathComponent("package/index.js")
+        mock.homeDirectory = home
+        mock.existingPaths = [projects.path, project.path, marker.path, nodeModules.path, nodeModules.appendingPathComponent("package").path, moduleFile.path]
+        mock.directoryContents[home.path] = [projects]
+        mock.directoryContents[projects.path] = [project]
+        mock.directoryContents[project.path] = [marker, nodeModules]
+        mock.directoryContents[nodeModules.path] = [nodeModules.appendingPathComponent("package")]
+        mock.directoryContents[nodeModules.appendingPathComponent("package").path] = [moduleFile]
+        mock.fileAttributes[marker.path] = [.size: NSNumber(value: 10)]
+        mock.fileAttributes[moduleFile.path] = [.size: NSNumber(value: 8192)]
+
+        let candidates = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: [.projectBuildArtifact],
+            maxConcurrentScans: 1
+        )
+
+        #expect(candidates.contains { $0.kind == .projectBuildArtifact && $0.displayName == "node_modules" })
+    }
+
+    @Test
+    func applicationResidualsUseBundleIdentifierAndAnalysisItemsCannotBeTrashed() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let preferences = home.appendingPathComponent("Library/Preferences")
+        let orphan = preferences.appendingPathComponent("net.example.removed.plist")
+        let containers = home.appendingPathComponent("Library/Containers")
+        let installedContainer = containers.appendingPathComponent("com.example.current")
+        let vendorOwnedContainer = containers.appendingPathComponent("com.example.helper")
+        let systemContainer = containers.appendingPathComponent("com.apple.Safari")
+        let groups = home.appendingPathComponent("Library/Group Containers")
+        let installedGroup = groups.appendingPathComponent("group.com.example.current")
+        let systemGroup = groups.appendingPathComponent("group.com.apple.Siri")
+        let applications = URL(fileURLWithPath: "/Applications")
+        let installedApp = applications.appendingPathComponent("Host.app")
+        let installedContents = installedApp.appendingPathComponent("Contents")
+        let embeddedApps = installedContents.appendingPathComponent("MacOS")
+        let embeddedApp = embeddedApps.appendingPathComponent("Current.app")
+        let installedInfo = embeddedApp.appendingPathComponent("Contents/Info.plist")
+        mock.homeDirectory = home
+        mock.existingPaths = [
+            preferences.path, orphan.path,
+            containers.path, installedContainer.path, vendorOwnedContainer.path, systemContainer.path,
+            groups.path, installedGroup.path, systemGroup.path,
+            applications.path, installedApp.path, installedContents.path, embeddedApps.path,
+            embeddedApp.path, installedInfo.path,
+        ]
+        mock.directoryContents[preferences.path] = [orphan]
+        mock.directoryContents[containers.path] = [installedContainer, vendorOwnedContainer, systemContainer]
+        mock.directoryContents[groups.path] = [installedGroup, systemGroup]
+        mock.directoryContents[applications.path] = [installedApp]
+        mock.directoryContents[installedContents.path] = [embeddedApps]
+        mock.directoryContents[embeddedApps.path] = [embeddedApp]
+        for url in [orphan, installedContainer, vendorOwnedContainer, systemContainer, installedGroup, systemGroup] {
+            mock.fileAttributes[url.path] = [.size: NSNumber(value: 2 * 1024 * 1024)]
+        }
+        mock.fileContentsData[installedInfo.path] = try! PropertyListSerialization.data(
+            fromPropertyList: ["CFBundleIdentifier": "com.example.current"],
+            format: .xml,
+            options: 0
+        )
+
+        let residuals = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: [.applicationResidual],
+            maxConcurrentScans: 1
+        )
+        #expect(residuals.contains { $0.source == "net.example.removed" })
+        #expect(!residuals.contains { $0.url == installedContainer.standardizedFileURL })
+        #expect(!residuals.contains { $0.url == vendorOwnedContainer.standardizedFileURL })
+        #expect(!residuals.contains { $0.url == systemContainer.standardizedFileURL })
+        #expect(!residuals.contains { $0.url == installedGroup.standardizedFileURL })
+        #expect(!residuals.contains { $0.url == systemGroup.standardizedFileURL })
+
+        let analysis = DiskCleanupCandidate(
+            url: URL(string: "tmutil://local/com.apple.TimeMachine.test")!,
+            kind: .timeMachineSnapshot,
+            byteSize: 0,
+            displayName: "快照",
+            safetyLevel: .analysisOnly
+        )
+        let result = SystemDiskCleanup.trashSelected(candidates: [analysis], fileManager: mock)
+        #expect(result.successCount == 0)
+        #expect(result.failures.first?.message.contains("仅用于分析") == true)
+
+        let simulatorCache = home.appendingPathComponent("Library/Developer/CoreSimulator/Caches/device-data")
+        mock.existingPaths.insert(simulatorCache.path)
+        mock.trashResults[simulatorCache.standardizedFileURL] = .success(home.appendingPathComponent(".Trash/device-data"))
+        let forgedAnalysisCandidate = DiskCleanupCandidate(
+            url: simulatorCache,
+            kind: .simulatorData,
+            byteSize: 4096,
+            displayName: "模拟器数据",
+            safetyLevel: .safeToClean
+        )
+        let forgedResult = SystemDiskCleanup.trashSelected(candidates: [forgedAnalysisCandidate], fileManager: mock)
+        #expect(forgedResult.successCount == 0)
+        #expect(forgedResult.failures.first?.message.contains("仅用于分析") == true)
     }
 
     @Test
@@ -1565,4 +1828,184 @@ struct SystemMonitorServiceTests {
         }
         #expect(condition())
     }
+
+    // MARK: - Streaming enumeration and duplicate detection
+
+    @Test
+    func recursiveUserFileScanFindsLargeFiles() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let downloads = home.appendingPathComponent("Downloads")
+        let nested = downloads.appendingPathComponent("projects")
+        let file1 = downloads.appendingPathComponent("a.txt")
+        let file2 = nested.appendingPathComponent("b.txt")
+
+        mock.homeDirectory = home
+        mock.searchPathResults = [
+            .downloadsDirectory: [downloads],
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        mock.existingPaths = [downloads.path, nested.path, file1.path, file2.path]
+        mock.directoryContents[downloads.path] = [file1, nested]
+        mock.directoryContents[nested.path] = [file2]
+        let oldDate = Date().addingTimeInterval(-60 * 24 * 3600)
+        mock.fileAttributes[file1.path] = [.size: NSNumber(value: 1024), .modificationDate: oldDate]
+        mock.fileAttributes[file2.path] = [.size: NSNumber(value: 2048), .modificationDate: oldDate]
+
+        let candidates = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: [.largeFile, .duplicateFile],
+            options: DiskCleanupScanOptions(largeFileThreshold: 512, oldFileAge: 30 * 24 * 3600, userFileMaxDepth: 3)
+        )
+
+        #expect(candidates.contains { $0.kind == .largeFile && $0.url == file1.standardizedFileURL })
+        #expect(candidates.contains { $0.kind == .largeFile && $0.url == file2.standardizedFileURL })
+    }
+
+    @Test
+    func duplicateFileDetectionGroupsBySizeThenHashesOnlyCollisions() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let downloads = home.appendingPathComponent("Downloads")
+        let fileA = downloads.appendingPathComponent("photo.jpg")
+        let fileB = downloads.appendingPathComponent("photo-copy.jpg")
+        let fileC = downloads.appendingPathComponent("unique.txt")
+
+        mock.homeDirectory = home
+        mock.searchPathResults = [
+            .downloadsDirectory: [downloads],
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        mock.existingPaths = [downloads.path, fileA.path, fileB.path, fileC.path]
+        mock.directoryContents[downloads.path] = [fileA, fileB, fileC]
+        mock.fileAttributes[fileA.path] = [.size: NSNumber(value: 2048)]
+        mock.fileAttributes[fileB.path] = [.size: NSNumber(value: 2048)]
+        mock.fileAttributes[fileC.path] = [.size: NSNumber(value: 1024)]
+
+        let contentAB = Data(repeating: 0xAB, count: 2048)
+        let contentC = Data(repeating: 0xCD, count: 1024)
+        mock.fileContentsData[fileA.path] = contentAB
+        mock.fileContentsData[fileB.path] = contentAB
+        mock.fileContentsData[fileC.path] = contentC
+
+        let candidates = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: [.duplicateFile],
+            options: DiskCleanupScanOptions(userFileMaxDepth: 1)
+        )
+
+        #expect(candidates.count == 1)
+        #expect(candidates.first?.kind == .duplicateFile)
+        #expect(candidates.first?.url == fileB.standardizedFileURL)
+        #expect(candidates.first?.detail?.contains("photo.jpg") == true)
+    }
+
+    @Test
+    func recursiveDiskImageScanFindsNestedInstallersButIgnoresOrdinaryArchives() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let downloads = home.appendingPathComponent("Downloads")
+        let nested = downloads.appendingPathComponent("installers")
+        let dmg = nested.appendingPathComponent("App.dmg")
+        let pkg = downloads.appendingPathComponent("Tool.pkg")
+        let archive = downloads.appendingPathComponent("Tool.zip")
+
+        mock.homeDirectory = home
+        mock.searchPathResults = [
+            .downloadsDirectory: [downloads],
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        mock.existingPaths = [downloads.path, nested.path, dmg.path, pkg.path, archive.path]
+        mock.directoryContents[downloads.path] = [nested, pkg, archive]
+        mock.directoryContents[nested.path] = [dmg]
+        mock.fileAttributes[dmg.path] = [.size: NSNumber(value: 10_000_000)]
+        mock.fileAttributes[pkg.path] = [.size: NSNumber(value: 5_000_000)]
+        mock.fileAttributes[archive.path] = [.size: NSNumber(value: 4_000_000)]
+
+        let candidates = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: [.diskImage],
+            options: DiskCleanupScanOptions(userFileMaxDepth: 3)
+        )
+
+        #expect(candidates.count == 2)
+        #expect(candidates.contains { $0.url == dmg.standardizedFileURL && $0.kind == .diskImage })
+        #expect(candidates.contains { $0.url == pkg.standardizedFileURL && $0.kind == .diskImage })
+        #expect(!candidates.contains { $0.url == archive.standardizedFileURL })
+    }
+
+    @Test
+    func streamingUnfinishedDownloadScanFiltersRecentFiles() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let downloads = home.appendingPathComponent("Downloads")
+        let stale = downloads.appendingPathComponent("movie.crdownload")
+        let recent = downloads.appendingPathComponent("document.download")
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+
+        mock.homeDirectory = home
+        mock.searchPathResults = [
+            .downloadsDirectory: [downloads],
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        mock.existingPaths = [downloads.path, stale.path, recent.path]
+        mock.directoryContents[downloads.path] = [stale, recent]
+        mock.fileAttributes[stale.path] = [
+            .size: NSNumber(value: 4096),
+            .modificationDate: now.addingTimeInterval(-5 * 24 * 3600),
+        ]
+        mock.fileAttributes[recent.path] = [
+            .size: NSNumber(value: 2048),
+            .modificationDate: now.addingTimeInterval(-1 * 24 * 3600),
+        ]
+
+        let candidates = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: [.unfinishedDownload],
+            options: DiskCleanupScanOptions(
+                unfinishedDownloadAge: 3 * 24 * 3600,
+                userFileMaxDepth: 2,
+                referenceDate: now
+            )
+        )
+
+        #expect(candidates.count == 1)
+        #expect(candidates.first?.url == stale.standardizedFileURL)
+        #expect(candidates.first?.kind == .unfinishedDownload)
+    }
+
+    @Test
+    func duplicateDetectionRejectsSameSizeDifferentContent() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let downloads = home.appendingPathComponent("Downloads")
+
+        mock.homeDirectory = home
+        mock.searchPathResults = [
+            .downloadsDirectory: [downloads],
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        mock.existingPaths = [downloads.path]
+        mock.directoryContents[downloads.path] = []
+
+        var files: [URL] = []
+        for i in 0..<100 {
+            let file = downloads.appendingPathComponent("file\(i).dat")
+            files.append(file)
+            mock.existingPaths.insert(file.path)
+            let size = UInt64((i % 10 + 1) * 1024)
+            mock.fileAttributes[file.path] = [.size: NSNumber(value: size)]
+            mock.fileContentsData[file.path] = Data(repeating: UInt8(i % 256), count: Int(size))
+        }
+        mock.directoryContents[downloads.path] = files
+
+        let candidates = SystemDiskCleanup.scanCandidates(
+            fileManager: mock,
+            kinds: [.duplicateFile],
+            options: DiskCleanupScanOptions(userFileMaxDepth: 1)
+        )
+
+        #expect(candidates.isEmpty)
+    }
+
 }

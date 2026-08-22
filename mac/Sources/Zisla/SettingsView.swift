@@ -9,6 +9,7 @@ struct SettingsView: View {
     @ObservedObject private var settingsStore: FeatureSettingsStore
     @StateObject private var input = SettingsInput()
     @StateObject private var launchAtLogin = LaunchAtLoginController()
+    @StateObject private var networkProxyMonitor = NetworkProxyAvailabilityMonitor()
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var searchFieldFocused: Bool
@@ -240,6 +241,8 @@ struct SettingsView: View {
             petContent
         case .download:
             downloadContent
+        case .networkProxy:
+            networkProxyContent
         case .weather:
             weatherContent
         case .updates:
@@ -1024,9 +1027,11 @@ struct SettingsView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 72)
                 } else {
-                    ForEach(model.voiceHistory.entries) { entry in
-                        rowDivider
-                        voiceHistoryRow(entry)
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(model.voiceHistory.entries) { entry in
+                            rowDivider
+                            voiceHistoryRow(entry)
+                        }
                     }
                 }
             }
@@ -1262,7 +1267,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 100, alignment: .trailing)
+                    .frame(width: 150, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
             }
@@ -1525,6 +1530,53 @@ struct SettingsView: View {
         }
     }
 
+    private var networkProxyStatusText: String {
+        switch networkProxyMonitor.availability {
+        case .disabled: "已关闭"
+        case .notConfigured: "未配置"
+        case .invalid: "链接无效"
+        case .checking: "检测中…"
+        case .available: "可用"
+        case .unavailable: "不可用"
+        }
+    }
+
+    private var networkProxyStatusDetail: String {
+        switch networkProxyMonitor.availability {
+        case .disabled: "启用后可检测代理端口"
+        case .notConfigured: "填写代理链接后检测端口连通性"
+        case .invalid: "支持 http、https、socks5 或 socks5h 链接"
+        case .checking: "正在连接代理主机和端口"
+        case .available: "代理主机和端口可建立连接"
+        case .unavailable: "无法连接代理主机和端口，请检查代理是否运行"
+        }
+    }
+
+    private var networkProxyStatusSymbol: String {
+        switch networkProxyMonitor.availability {
+        case .disabled, .notConfigured: "network"
+        case .invalid, .unavailable: "exclamationmark.triangle"
+        case .checking: "arrow.triangle.2.circlepath"
+        case .available: "checkmark.circle"
+        }
+    }
+
+    private var networkProxyStatusColor: Color {
+        switch networkProxyMonitor.availability {
+        case .available: Color.zislaSuccess
+        case .invalid, .unavailable: Color.zislaError
+        case .checking: Color.zislaInfo
+        case .disabled, .notConfigured: .secondary
+        }
+    }
+
+    private func checkNetworkProxy() {
+        networkProxyMonitor.check(
+            urlString: model.settingsStore.settings.networkProxyURL,
+            enabled: model.settingsStore.settings.networkProxyEnabled
+        )
+    }
+
     private var downloadContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("下载目录") {
@@ -1533,9 +1585,10 @@ struct SettingsView: View {
                     title: "默认下载目录",
                     detail: model.downloadDirectory.path(percentEncoded: false)
                 ) {
-                    Button("选择…") { chooseDownloadDirectory() }
+                    Button("选择默认下载目录") { chooseDownloadDirectory() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
             }
 
@@ -1925,9 +1978,10 @@ struct SettingsView: View {
                     title: "默认下载目录",
                     detail: model.downloadDirectory.path(percentEncoded: false)
                 ) {
-                    Button("选择…") { chooseDownloadDirectory() }
+                    Button("选择默认下载目录") { chooseDownloadDirectory() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
             }
 
@@ -1978,6 +2032,62 @@ struct SettingsView: View {
                 .padding(.vertical, 6)
             }
         }
+    }
+
+    private var networkProxyContent: some View {
+        settingsGroup("代理设置") {
+            settingRow(
+                symbol: "network",
+                title: "代理链接",
+                detail: "用于 CLI 安装/更新、GitHub 访问和下载"
+            ) {
+                TextField(
+                    "http://127.0.0.1:7897",
+                    text: Binding(
+                        get: { model.settingsStore.settings.networkProxyURL },
+                        set: { model.settingsStore.settings.networkProxyURL = $0 }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 220)
+            }
+            rowDivider
+            settingRow(
+                symbol: "power",
+                title: "启用本地代理",
+                detail: "关闭后所有更新、安装和下载命令都不使用此代理"
+            ) {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { model.settingsStore.settings.networkProxyEnabled },
+                        set: { model.settingsStore.settings.networkProxyEnabled = $0 }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+            rowDivider
+            settingRow(
+                symbol: networkProxyStatusSymbol,
+                title: "代理状态",
+                detail: networkProxyStatusDetail
+            ) {
+                HStack(spacing: 8) {
+                    Text(networkProxyStatusText)
+                        .font(.system(size: 10))
+                        .foregroundStyle(networkProxyStatusColor)
+                    IconButton(symbol: "arrow.clockwise", help: "重新检测代理", size: .compact) {
+                        checkNetworkProxy()
+                    }
+                    .disabled(networkProxyMonitor.availability == .checking)
+                }
+            }
+        }
+        .onAppear { checkNetworkProxy() }
+        .onChange(of: model.settingsStore.settings.networkProxyURL) { _, _ in checkNetworkProxy() }
+        .onChange(of: model.settingsStore.settings.networkProxyEnabled) { _, _ in checkNetworkProxy() }
     }
 
     private var weatherSearchRow: some View {
@@ -2161,7 +2271,7 @@ struct SettingsView: View {
     private func compactStatusPrioritySymbol(for priority: CompactStatusPriority) -> String {
         switch priority {
         case .transient: "bolt.fill"
-        case .updateAvailable: "arrow.triangle.2.circlepath"
+        case .updateAvailable: "arrow.up.circle"
         case .mail: "envelope.fill"
         case .videoDownload: "arrow.down.square.fill"
         case .browserDownload: "arrow.down.circle.fill"
@@ -2280,7 +2390,7 @@ struct SettingsView: View {
     private var updateStatusAccessory: some View {
         if model.productUpdateAvailable {
             IconButton(
-                symbol: "arrow.triangle.2.circlepath",
+                symbol: "arrow.up.circle",
                 help: "查看更新",
                 isActive: true,
                 size: .compact
@@ -2298,7 +2408,7 @@ struct SettingsView: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(Color.zislaSuccess)
         case .available:
-            Image(systemName: "arrow.down.circle.fill")
+            Image(systemName: "arrow.up.circle.fill")
                 .foregroundStyle(Color.zislaInfo)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
@@ -2321,7 +2431,7 @@ struct SettingsView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.4"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.5"
     }
 
     private func searchWeatherLocation() {
@@ -2618,6 +2728,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case pet
     case download
     case weather
+    case networkProxy
     case recommendations
     case updates
 
@@ -2638,6 +2749,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .voice: "语音"
         case .pet: "宠物"
         case .download: "下载"
+        case .networkProxy: "网络"
         case .weather: "天气"
         case .updates: "更新"
         case .recommendations: "推荐"
@@ -2654,6 +2766,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .voice: "mic.fill"
         case .pet: "pawprint.fill"
         case .download: "arrow.down.circle.fill"
+        case .networkProxy: "network"
         case .weather: "cloud.sun.fill"
         case .updates: "arrow.up.circle"
         case .recommendations: "sparkles"
@@ -2670,6 +2783,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .voice: "配置语音输入、整理模型与本机记录。"
         case .pet: "设置灵动岛内部的宠物形象。"
         case .download: "管理下载目录、下载通知与所需组件。"
+        case .networkProxy: "配置本地代理，用于更新、安装、下载与 GitHub 访问。"
         case .weather: "管理天气显示、地点和刷新。"
         case .updates: "管理版本检查与自动更新。"
         case .recommendations: "一键下载和更新精选效率、网络、开发与桌面工具。"
@@ -2678,7 +2792,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     func isVisible(settings: FeatureSettings) -> Bool {
         switch self {
-        case .general, .features, .recommendations:
+        case .general, .features, .networkProxy, .recommendations:
             return true
         case .workflow:
             return settings.mediaEnabled || settings.systemMonitorEnabled

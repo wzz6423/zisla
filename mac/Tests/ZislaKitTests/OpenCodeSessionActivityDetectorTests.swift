@@ -27,6 +27,125 @@ struct OpenCodeSessionActivityDetectorTests {
     }
 
     @Test
+    func attachesRunningOpenCodeProcessIdentifier() throws {
+        let dbURL = makeTempDB()
+        defer { try? FileManager.default.removeItem(at: dbURL) }
+
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        try createTables(at: dbURL)
+        try insertSession(at: dbURL, id: "ses-pid", title: "PID", updatedAt: nowMs)
+        try insertMessage(
+            at: dbURL,
+            id: "msg-pid",
+            sessionID: "ses-pid",
+            updatedAt: nowMs,
+            data: #"{"role":"user","time":{"created":\#(nowMs)}}"#
+        )
+
+        let task = try #require(OpenCodeSessionActivityDetector(
+            databaseURL: dbURL,
+            recencyThreshold: 3600,
+            runningProcessIdentifiers: { [54_321] }
+        ).activeTasks().first)
+        #expect(task.processIdentifier == 54_321)
+    }
+
+    @Test
+    func parsesOnlyOpenCodeProcessIdentifiers() {
+        let output = Data("""
+            123 /usr/local/bin/opencode opencode web
+            456 /usr/local/bin/node node opencode.js
+            789 /usr/local/bin/opencode opencode run task
+            """.utf8)
+        #expect(OpenCodeSessionActivityDetector.parseRunningProcessIdentifiers(output) == [789, 123])
+    }
+
+    @Test
+    func exposesNestedModelVariantAndStartTimeOnUserMessage() throws {
+        let dbURL = makeTempDB()
+        defer { try? FileManager.default.removeItem(at: dbURL) }
+
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        try createTables(at: dbURL)
+        try insertSession(at: dbURL, id: "ses-metadata", title: "Metadata", updatedAt: nowMs)
+        try insertMessage(
+            at: dbURL,
+            id: "msg-1",
+            sessionID: "ses-metadata",
+            updatedAt: nowMs,
+            data: #"{"role":"user","time":{"created":\#(nowMs)},"model":{"providerID":"opencode","modelID":"x-preview-f-free","variant":"max"}}"#
+        )
+
+        let task = try #require(OpenCodeSessionActivityDetector(
+            databaseURL: dbURL,
+            recencyThreshold: 3600
+        ).activeTasks().first)
+        #expect(task.detail == "x-preview-f-free")
+        #expect(task.effort == "max")
+        #expect(task.startedAt == Date(timeIntervalSince1970: Double(nowMs - 60000) / 1000))
+    }
+
+    @Test
+    func fallsBackToMetadataFromEarlierMessage() throws {
+        let dbURL = makeTempDB()
+        defer { try? FileManager.default.removeItem(at: dbURL) }
+
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        try createTables(at: dbURL)
+        try insertSession(at: dbURL, id: "ses-fallback", title: "Fallback", updatedAt: nowMs)
+        try insertMessage(
+            at: dbURL,
+            id: "msg-assistant",
+            sessionID: "ses-fallback",
+            updatedAt: nowMs - 1000,
+            data: #"{"role":"assistant","modelID":"legacy-model","variant":"high"}"#
+        )
+        try insertMessage(
+            at: dbURL,
+            id: "msg-user",
+            sessionID: "ses-fallback",
+            updatedAt: nowMs,
+            data: #"{"role":"user","time":{"created":\#(nowMs)}}"#
+        )
+
+        let task = try #require(OpenCodeSessionActivityDetector(
+            databaseURL: dbURL,
+            recencyThreshold: 3600
+        ).activeTasks().first)
+        #expect(task.detail == "legacy-model")
+        #expect(task.effort == "high")
+    }
+
+    @Test
+    func ignoresCompletedAssistantWhenUserRowWasUpdatedAfterCompletion() throws {
+        let dbURL = makeTempDB()
+        defer { try? FileManager.default.removeItem(at: dbURL) }
+
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        try createTables(at: dbURL)
+        try insertSession(at: dbURL, id: "ses-updated-user", title: "Updated user", updatedAt: nowMs)
+        try insertMessage(
+            at: dbURL,
+            id: "msg-assistant",
+            sessionID: "ses-updated-user",
+            updatedAt: nowMs - 100,
+            data: #"{"role":"assistant","time":{"created":#(nowMs - 2000),"completed":#(nowMs - 1000)},"finish":"stop","modelID":"test-model"}"#
+        )
+        try insertMessage(
+            at: dbURL,
+            id: "msg-user",
+            sessionID: "ses-updated-user",
+            updatedAt: nowMs,
+            data: #"{"role":"user","time":{"created":#(nowMs - 3000)}}"#
+        )
+
+        #expect(try OpenCodeSessionActivityDetector(
+            databaseURL: dbURL,
+            recencyThreshold: 3600
+        ).activeTasks().isEmpty)
+    }
+
+    @Test
     func ignoresCompletedAssistant() throws {
         let dbURL = makeTempDB()
         defer { try? FileManager.default.removeItem(at: dbURL) }
@@ -84,6 +203,31 @@ struct OpenCodeSessionActivityDetectorTests {
         let missing = FileManager.default.temporaryDirectory
             .appendingPathComponent("Zisla-opencode-missing-\(UUID().uuidString).db")
         #expect(try OpenCodeSessionActivityDetector(databaseURL: missing).activeTasks().isEmpty)
+    }
+
+    @Test
+    func detectsTaskAddedAfterInitialRead() throws {
+        let dbURL = makeTempDB()
+        defer {
+            try? FileManager.default.removeItem(at: dbURL)
+        }
+
+        try createTables(at: dbURL)
+        let detector = OpenCodeSessionActivityDetector(databaseURL: dbURL, recencyThreshold: 3600)
+        #expect(try detector.activeTasks().isEmpty)
+
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        try insertSession(at: dbURL, id: "ses-wal", title: "WAL session", updatedAt: nowMs)
+        try insertMessage(
+            at: dbURL,
+            id: "msg-wal",
+            sessionID: "ses-wal",
+            updatedAt: nowMs,
+            data: #"{"role":"user","time":{"created":\#(nowMs)}}"#
+        )
+
+        let task = try #require(detector.activeTasks().first)
+        #expect(task.id == OpenCodeSessionActivityDetector.taskID(forSessionID: "ses-wal"))
     }
 }
 

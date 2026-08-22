@@ -274,6 +274,16 @@ public final class OverlayCoordinator: NSObject {
         updateInteractionHold()
     }
 
+    /// Immediately folds the island for a foreground panel that must not be obscured by it.
+    public func collapseImmediately() {
+        guard !isVoiceRecording, !isExternalDragging else { return }
+        cancelScheduledCollapse()
+        cancelPointerRevalidation()
+        cancelPendingGlassActivation()
+        isPinned = false
+        process(reducer.send(.collapseImmediately))
+    }
+
     public func setVoiceRecording(_ recording: Bool) {
         setVoiceRecording(recording, at: NSEvent.mouseLocation)
     }

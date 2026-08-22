@@ -18,6 +18,7 @@ public struct IslandPresentationReducer {
         case pointerEntered
         case pointerExited
         case collapseDelayElapsed
+        case collapseImmediately
         case setPinned(Bool)
         case setDragging(Bool)
     }
@@ -70,6 +71,11 @@ public struct IslandPresentationReducer {
             guard !isHeldOpen else { return [] }
             state.visibility = .collapsed
             return [.collapse]
+
+        case .collapseImmediately:
+            state.pinned = false
+            state.visibility = .collapsed
+            return [.cancelScheduledCollapse, .collapse]
 
         case let .setPinned(pinned):
             state.pinned = pinned
