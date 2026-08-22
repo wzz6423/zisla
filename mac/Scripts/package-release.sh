@@ -9,6 +9,15 @@ ARCHIVE_DIRECTORY="${ARCHIVE_DIRECTORY:-$ROOT/dist}"
 BUILD_ARCHITECTURES="${BUILD_ARCHITECTURES:-arm64 x86_64}"
 ARCHITECTURES=(${=BUILD_ARCHITECTURES})
 
+[[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}([.-][A-Za-z0-9.-]+)?$ ]] || {
+  echo "error: VERSION must be a semantic version (for example 1.2.3 or 1.2.3-preview.1)" >&2
+  exit 1
+}
+[[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]] || {
+  echo "error: BUILD_NUMBER must contain only digits" >&2
+  exit 1
+}
+
 for arch in "${ARCHITECTURES[@]}"; do
   case "$arch" in
     arm64|x86_64) ;;
@@ -93,6 +102,8 @@ sync
 hdiutil detach -quiet "$MOUNTED_DEVICE"
 MOUNTED_DEVICE=""
 hdiutil convert -quiet "$WRITABLE_DMG" -format UDZO -imagekey zlib-level=9 -ov -o "$DMG"
+hdiutil verify "$DMG"
+shasum -a 256 "$DMG" > "$DMG.sha256"
 
 echo "$ARCHIVE"
 echo "$DMG"

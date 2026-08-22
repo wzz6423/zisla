@@ -28,6 +28,7 @@ Output:
 dist/zisla-v1.0.0-macOS-universal.zip
 dist/zisla-v1.0.0-macOS-universal.zip.sha256
 dist/zisla-v1.0.0-macOS-universal.dmg
+dist/zisla-v1.0.0-macOS-universal.dmg.sha256
 ```
 
 ### Free preview distribution

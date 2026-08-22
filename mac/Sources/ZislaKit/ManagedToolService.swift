@@ -569,6 +569,10 @@ public final class ManagedToolService: ObservableObject {
                 "HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1)"
             )
         }
+        guard let finalURL = http.url else {
+            throw ManagedToolError.downloadFailed("无效的 HTTP 响应")
+        }
+        try Self.validate(finalURL)
         // The temporary file from download(for:) is reclaimed right after this await, so move it into a directory we own first.
         let workDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-tool-\(UUID().uuidString)", isDirectory: true)

@@ -56,6 +56,9 @@ case "$1" in
     output_index=${argv[(i)-o]}
     touch "$argv[$(( output_index + 1 ))]"
     ;;
+  verify)
+    touch "$HDIUTIL_VERIFY_CAPTURE"
+    ;;
 esac
 SCRIPT
 
@@ -130,6 +133,7 @@ function expect_architecture_failure() {
 for architecture in arm64 x86_64 universal; do
   case_directory="$TEMPORARY_ROOT/$architecture"
   capture_file="$case_directory/architectures.txt"
+  verify_capture="$case_directory/dmg-verified"
   mkdir -p "$case_directory"
 
   if [[ "$architecture" == universal ]]; then
@@ -146,6 +150,7 @@ for architecture in arm64 x86_64 universal; do
     BUILD_ARCHITECTURES="$build_architectures" \
     ARCHIVE_DIRECTORY="$case_directory" \
     CAPTURE_FILE="$capture_file" \
+    HDIUTIL_VERIFY_CAPTURE="$verify_capture" \
     "$TEST_ROOT/Scripts/package-release.sh" >/dev/null
 
   expect_equal \
@@ -161,6 +166,12 @@ for architecture in arm64 x86_64 universal; do
   expect_file \
     "$case_directory/zisla-v0.1.3-macOS-${architecture}.dmg" \
     "$architecture DMG uses the architecture suffix"
+  expect_file \
+    "$case_directory/zisla-v0.1.3-macOS-${architecture}.dmg.sha256" \
+    "$architecture DMG checksum uses the architecture suffix"
+  expect_file \
+    "$verify_capture" \
+    "$architecture DMG is verified before release"
 done
 
 expect_architecture_failure \
@@ -169,5 +180,37 @@ expect_architecture_failure \
 expect_architecture_failure \
   "arm64e" \
   "unsupported architecture: arm64e"
+
+function expect_version_failure() {
+  local version="$1"
+  local expected_message="$2"
+  local output
+
+  (( tests_run += 1 ))
+  if output="$(
+    PATH="$FAKE_BIN:$PATH" \
+      VERSION="$version" \
+      BUILD_NUMBER=5 \
+      UPDATE_CHANNEL=release \
+      CODE_SIGN_IDENTITY=- \
+      BUILD_ARCHITECTURES=arm64 \
+      ARCHIVE_DIRECTORY="$TEMPORARY_ROOT/invalid-version" \
+      CAPTURE_FILE="$TEMPORARY_ROOT/invalid-version/architectures.txt" \
+      "$TEST_ROOT/Scripts/package-release.sh" 2>&1
+  )"; then
+    print -u2 -r -- "FAIL: invalid VERSION '$version' was accepted"
+    exit 1
+  fi
+  if [[ "$output" != *"$expected_message"* ]]; then
+    print -u2 -r -- "FAIL: invalid VERSION '$version' reported the wrong error"
+    print -u2 -r -- "expected message: $expected_message"
+    print -u2 -r -- "actual:           $output"
+    exit 1
+  fi
+}
+
+expect_version_failure \
+  "1.2.3/../../escape" \
+  "VERSION must be a semantic version"
 
 print -r -- "PASS: $tests_run package-release tests"
