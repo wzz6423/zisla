@@ -79,7 +79,7 @@ public final class AIAgentWorkspace: ObservableObject {
     private let balanceService: AIAgentBalanceService
     private let channelProbeService: AIAgentChannelProbeService
     private let modelCatalogService: AIAgentModelCatalogService
-    private let cliService: AIAgentCLIService
+    private var cliService: AIAgentCLIService
     private let cliUpdateService: AIAgentCLIUpdateService
     private let cliProfileService: AIAgentCLIProfileService
     private let skillService: AIAgentSkillService
@@ -667,6 +667,16 @@ public final class AIAgentWorkspace: ObservableObject {
     public func setCLIAutoUpdateEnabled(_ enabled: Bool) {
         store.setCLIAutoUpdateEnabled(enabled)
         updateCLIAutoUpdateLoop(enabled: enabled)
+    }
+
+    public func setNetworkProxyURL(_ value: String) {
+        cliService.setNetworkProxyURL(value)
+        Task { await cliUpdateService.setNetworkProxyURL(value) }
+    }
+
+    public func setNetworkProxy(url: String, enabled: Bool) {
+        cliService.setNetworkProxy(url: url, enabled: enabled)
+        Task { await cliUpdateService.setNetworkProxy(url: url, enabled: enabled) }
     }
 
     private func updateCLIAutoUpdateLoop(enabled: Bool) {

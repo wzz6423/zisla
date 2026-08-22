@@ -18,4 +18,9 @@ struct AIMascotIdentityTests {
             title: "harnext"
         ) == .harness)
     }
+
+    @Test
+    func recognizesDeepSeekHarnessUpdateNoticeID() {
+        #expect(AIMascotIdentity(noticeID: "update-available-cli-dsh-left") == .deepseekHarness)
+    }
 }

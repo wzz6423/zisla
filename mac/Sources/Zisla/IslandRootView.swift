@@ -16,6 +16,7 @@ struct IslandRootView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var dropState = IslandDropState()
+    @StateObject private var cleanupPanelPresentation = SystemCleanupPanelPresentationState()
 
     init(
         model: AppModel,
@@ -187,7 +188,10 @@ struct IslandRootView: View {
                                         case .toolbox:
                                             ToolboxModuleView(model: model)
                                         case .system:
-                                            SystemMonitorView(service: model.systemMonitor)
+                                            SystemMonitorView(
+                                                service: model.systemMonitor,
+                                                onCleanupRequested: cleanupPanelPresentation.present
+                                            )
                                         case .battery:
                                             BatteryDetailView(
                                                 batteryMonitor: model.battery,
@@ -285,6 +289,12 @@ struct IslandRootView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+        .background(
+            SystemCleanupPanelPresenter(
+                presentationState: cleanupPanelPresentation,
+                service: model.systemMonitor
+            )
+        )
         .clipped()
         .ignoresSafeArea(edges: .top)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: showsTransferHints)

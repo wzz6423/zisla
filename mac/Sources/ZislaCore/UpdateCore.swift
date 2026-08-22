@@ -156,9 +156,20 @@ public struct GitHubRelease: Decodable, Equatable, Sendable {
 
     /// Disk image used by the manual installation path for ad-hoc signed builds.
     public var macDiskImage: Asset? {
-        assets.first { asset in
+        let diskImages = assets.filter { asset in
             let name = asset.name.lowercased()
             return name.contains("macos") && name.hasSuffix(".dmg")
         }
+#if arch(arm64)
+        if let native = diskImages.first(where: { $0.name.lowercased().hasSuffix("-macos-arm64.dmg") }) {
+            return native
+        }
+#elseif arch(x86_64)
+        if let native = diskImages.first(where: { $0.name.lowercased().hasSuffix("-macos-x86_64.dmg") }) {
+            return native
+        }
+#endif
+        return diskImages.first(where: { $0.name.lowercased().hasSuffix("-macos-universal.dmg") })
+            ?? diskImages.first
     }
 }

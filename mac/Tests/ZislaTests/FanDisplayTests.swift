@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import ZislaCore
 
@@ -35,5 +36,15 @@ struct FanDisplayTests {
             "L 1000   F3 3000   F5 5000",
             "R 2000   F4 4000",
         ])
+    }
+
+    @Test
+    @MainActor
+    func fanPositionLabelsFollowInterfaceLanguage() {
+        #expect(SystemMonitorView.fanPositionLabel(for: 0, locale: Locale(identifier: "zh-Hans")) == "左")
+        #expect(SystemMonitorView.fanPositionLabel(for: 1, locale: Locale(identifier: "zh-Hans")) == "右")
+        #expect(SystemMonitorView.fanPositionLabel(for: 0, locale: Locale(identifier: "en")) == "L")
+        #expect(SystemMonitorView.fanPositionLabel(for: 1, locale: Locale(identifier: "en")) == "R")
+        #expect(SystemMonitorView.fanPositionLabel(for: 2, locale: Locale(identifier: "en")) == nil)
     }
 }

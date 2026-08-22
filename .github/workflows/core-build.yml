@@ -143,7 +143,7 @@ jobs:
             "exists=false" >> $env:GITHUB_OUTPUT
             Write-Host "Windows Core is not present in this revision."
           }
-      - uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4
+      - uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         if: steps.check-core.outputs.exists == 'true'
         with:
           languages: c-cpp
@@ -157,7 +157,7 @@ jobs:
           $buildDirectory = Join-Path $env:RUNNER_TEMP "zisla-codeql"
           cmake -S windows -B "$buildDirectory" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DZISLA_ENABLE_QPDF_ADAPTER=OFF -DZISLA_ENABLE_PDFIUM_ADAPTER=OFF
           cmake --build "$buildDirectory" --parallel
-      - uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4
+      - uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         if: steps.check-core.outputs.exists == 'true'
         with:
           category: /language:c-cpp

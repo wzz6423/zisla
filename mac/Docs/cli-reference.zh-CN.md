@@ -26,6 +26,7 @@
 | `zcode` | `z-code`、`zcode-cli`、`zcode-desktop`、`glm`、`glm-coding`、`z-ai`、`z.ai` |
 | `trae` | `trae-work`、`traework`、`trae-solo`、`trae-cn` |
 | `opencode` | `open-code`、`open_code` |
+| `pi` | `pi-coding`、`pi-coding-agent`、`pi-cli`、`pi-agent` |
 | `harness` | `harnext`、`harnext-cli`、`harness-cli` |
 | `doubao` | `豆包` |
 

@@ -45,6 +45,74 @@ enum ScreenshotTool: String, CaseIterable, Identifiable {
     }
 }
 
+enum ScreenshotArrowStyle: String, CaseIterable, Identifiable, Equatable {
+    case straight
+    case tapered
+
+    var id: Self { self }
+
+    var symbol: String {
+        switch self {
+        case .straight: "arrow.up.right"
+        case .tapered: "arrowshape.up.right.fill"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .straight: "直线"
+        case .tapered: "渐粗"
+        }
+    }
+}
+
+enum ScreenshotArrowGeometry {
+    static func headPoints(
+        from start: CGPoint,
+        to end: CGPoint,
+        lineWidth: CGFloat,
+        minimumLength: CGFloat
+    ) -> (tip: CGPoint, left: CGPoint, right: CGPoint) {
+        let angle = atan2(end.y - start.y, end.x - start.x)
+        let headLength = max(minimumLength, lineWidth * 3)
+        return (
+            tip: end,
+            left: CGPoint(
+                x: end.x - cos(angle - .pi / 6) * headLength,
+                y: end.y - sin(angle - .pi / 6) * headLength
+            ),
+            right: CGPoint(
+                x: end.x - cos(angle + .pi / 6) * headLength,
+                y: end.y - sin(angle + .pi / 6) * headLength
+            )
+        )
+    }
+
+    static func taperedShaftPoints(
+        from start: CGPoint,
+        to end: CGPoint,
+        lineWidth: CGFloat
+    ) -> [CGPoint]? {
+        let delta = CGPoint(x: end.x - start.x, y: end.y - start.y)
+        let length = hypot(delta.x, delta.y)
+        guard length > 0 else { return nil }
+
+        let unit = CGPoint(x: delta.x / length, y: delta.y / length)
+        let normal = CGPoint(x: -unit.y, y: unit.x)
+        let startWidth = max(0.8, lineWidth * 0.3)
+        let endWidth = max(1, lineWidth)
+        let startOffset = CGPoint(x: normal.x * startWidth / 2, y: normal.y * startWidth / 2)
+        let endOffset = CGPoint(x: normal.x * endWidth / 2, y: normal.y * endWidth / 2)
+
+        return [
+            CGPoint(x: start.x + startOffset.x, y: start.y + startOffset.y),
+            CGPoint(x: end.x + endOffset.x, y: end.y + endOffset.y),
+            CGPoint(x: end.x - endOffset.x, y: end.y - endOffset.y),
+            CGPoint(x: start.x - startOffset.x, y: start.y - startOffset.y),
+        ]
+    }
+}
+
 enum ScreenshotLongCaptureDirection: String, CaseIterable, Identifiable {
     case vertical
     case horizontal
@@ -446,6 +514,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
     var text = ""
     var color = ScreenshotRGBA.accent
     var lineWidth: CGFloat = 3
+    var arrowStyle: ScreenshotArrowStyle = .straight
     var fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize
     var number = 1
     var obscureShape: ScreenshotObscureShape = .rectangle
@@ -460,6 +529,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         text: String = "",
         color: ScreenshotRGBA = .accent,
         lineWidth: CGFloat = 3,
+        arrowStyle: ScreenshotArrowStyle = .straight,
         fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize,
         number: Int = 1,
         obscureShape: ScreenshotObscureShape = .rectangle,
@@ -473,6 +543,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         self.text = text
         self.color = color
         self.lineWidth = lineWidth
+        self.arrowStyle = arrowStyle
         self.fontSize = fontSize
         self.number = number
         self.obscureShape = obscureShape
@@ -482,13 +553,45 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
 }
 
 enum ScreenshotAnnotationTransform {
-    static func translated(_ annotation: ScreenshotAnnotation, by translation: CGSize) -> ScreenshotAnnotation {
+    static func translated(
+        _ annotation: ScreenshotAnnotation,
+        by translation: CGSize,
+        textRightEdge: CGFloat? = nil
+    ) -> ScreenshotAnnotation {
         var result = annotation
         result.points = annotation.points.map { point in
             CGPoint(x: point.x + translation.width, y: point.y + translation.height)
         }
         if annotation.rect != .zero {
             result.rect = annotation.rect.offsetBy(dx: translation.width, dy: translation.height)
+        }
+        if annotation.kind == .text,
+           let textRightEdge,
+           !result.text.isEmpty,
+           ScreenshotAnnotationGeometry.bounds(for: result) != .zero {
+            let rect = ScreenshotAnnotationGeometry.bounds(for: result).standardized
+            let availableWidth = ScreenshotInlineTextLayout.width(
+                from: rect.minX,
+                to: textRightEdge
+            )
+            let contentWidth = ScreenshotInlineTextLayout.width(
+                for: result.text,
+                fontSize: result.fontSize,
+                from: rect.minX,
+                to: textRightEdge
+            )
+            let width = min(availableWidth, max(rect.width, contentWidth))
+            result.rect = CGRect(
+                x: rect.minX,
+                y: rect.minY,
+                width: width,
+                height: ScreenshotInlineTextLayout.contentHeight(
+                    for: result.text,
+                    fontSize: result.fontSize,
+                    width: width
+                )
+            )
+            result.points = [result.rect.center]
         }
         return result
     }
@@ -562,6 +665,13 @@ enum ScreenshotAnnotationGeometry {
     static func bounds(for annotation: ScreenshotAnnotation) -> CGRect {
         if annotation.rect != .zero { return annotation.rect.standardized }
         guard let point = annotation.points.first else { return .zero }
+        if usesPathGeometry(annotation) {
+            return pathBounds(
+                for: pathGeometryPoints(for: annotation),
+                inset: max(1, annotation.lineWidth / 2),
+                minimumSize: minimumSize
+            )
+        }
         if annotation.kind == .emoji {
             let diameter = emojiDiameter(for: annotation.fontSize)
             return CGRect(
@@ -597,6 +707,62 @@ enum ScreenshotAnnotationGeometry {
         return CGRect(x: point.x - minimumSize / 2, y: point.y - minimumSize / 2, width: minimumSize, height: minimumSize)
     }
 
+    private static func usesPathGeometry(_ annotation: ScreenshotAnnotation) -> Bool {
+        annotation.kind == .brush
+            || annotation.kind == .arrow
+            || (annotation.kind == .mosaic && annotation.obscureShape == .brush)
+    }
+
+    private static func pathGeometryPoints(for annotation: ScreenshotAnnotation) -> [CGPoint] {
+        guard annotation.kind == .arrow,
+              let start = annotation.points.first,
+              let end = annotation.points.last
+        else { return annotation.points }
+
+        let headPoints = ScreenshotArrowGeometry.headPoints(
+            from: start,
+            to: end,
+            lineWidth: annotation.lineWidth,
+            minimumLength: 10
+        )
+        return [start, end, headPoints.left, headPoints.right]
+    }
+
+    private static func pathHitTestPoints(for annotation: ScreenshotAnnotation) -> [CGPoint] {
+        guard annotation.kind == .arrow,
+              let start = annotation.points.first,
+              let end = annotation.points.last
+        else { return annotation.points }
+
+        let headPoints = ScreenshotArrowGeometry.headPoints(
+            from: start,
+            to: end,
+            lineWidth: annotation.lineWidth,
+            minimumLength: 10
+        )
+        return [start, end, headPoints.left, end, headPoints.right]
+    }
+
+    private static func pathBounds(
+        for points: [CGPoint],
+        inset: CGFloat,
+        minimumSize: CGFloat
+    ) -> CGRect {
+        guard let first = points.first else { return .zero }
+        let minX = (points.map(\.x).min() ?? first.x) - inset
+        let maxX = (points.map(\.x).max() ?? first.x) + inset
+        let minY = (points.map(\.y).min() ?? first.y) - inset
+        let maxY = (points.map(\.y).max() ?? first.y) + inset
+        let width = max(maxX - minX, minimumSize)
+        let height = max(maxY - minY, minimumSize)
+        return CGRect(
+            x: (minX + maxX - width) / 2,
+            y: (minY + maxY - height) / 2,
+            width: width,
+            height: height
+        )
+    }
+
     static func localPoint(_ point: CGPoint, in rect: CGRect, rotation: CGFloat) -> CGPoint {
         let center = rect.center
         let translated = CGPoint(x: point.x - center.x, y: point.y - center.y)
@@ -619,10 +785,13 @@ enum ScreenshotAnnotationGeometry {
     }
 
     static func contains(_ point: CGPoint, in annotation: ScreenshotAnnotation) -> Bool {
-        if annotation.kind == .brush || annotation.kind == .arrow {
+        if usesPathGeometry(annotation) {
+            let hitPoint = annotation.rotation == 0
+                ? point
+                : localPoint(point, in: bounds(for: annotation), rotation: annotation.rotation)
             return pathContains(
-                point,
-                points: annotation.points,
+                hitPoint,
+                points: pathHitTestPoints(for: annotation),
                 hitRadius: max(handleRadius, annotation.lineWidth / 2 + 4)
             )
         }
@@ -674,7 +843,7 @@ enum ScreenshotAnnotationGeometry {
             (.bottomRight, CGPoint(x: rect.maxX, y: rect.maxY)),
             (.bottomLeft, CGPoint(x: rect.minX, y: rect.maxY)),
         ]
-        if annotation.kind == .rectangle || annotation.kind == .text {
+        if annotation.kind == .rectangle || annotation.kind == .text || annotation.kind == .arrow {
             candidates.append((.rotation, CGPoint(x: rect.midX, y: rect.minY - rotationOffset)))
         }
         return candidates.first { local.distance(to: $0.1) <= hitRadius }?.0
@@ -701,13 +870,15 @@ enum ScreenshotAnnotationGeometry {
         _ annotation: ScreenshotAnnotation,
         handle: ScreenshotAnnotationEditHandle?,
         from start: CGPoint,
-        to current: CGPoint
+        to current: CGPoint,
+        textRightEdge: CGFloat? = nil
     ) -> ScreenshotAnnotation {
         let rect = bounds(for: annotation)
         guard let handle else {
             return ScreenshotAnnotationTransform.translated(
                 annotation,
-                by: CGSize(width: current.x - start.x, height: current.y - start.y)
+                by: CGSize(width: current.x - start.x, height: current.y - start.y),
+                textRightEdge: annotation.kind == .text ? textRightEdge : nil
             )
         }
         if handle == .rotation && annotation.kind != .number {
@@ -816,12 +987,50 @@ enum ScreenshotAnnotationGeometry {
                 dy: fixedCorner.y - resizedCorner.y
             )
         }
+        if usesPathGeometry(annotation) {
+            guard annotation.rotation == 0 else {
+                let widthScale = rect.width > 0 ? resizedRect.width / rect.width : 1
+                let heightScale = rect.height > 0 ? resizedRect.height / rect.height : 1
+                var result = annotation
+                result.points = annotation.points.map { point in
+                    let local = localPoint(point, in: rect, rotation: annotation.rotation)
+                    let resizedLocal = CGPoint(
+                        x: resizedRect.minX + (local.x - rect.minX) * widthScale,
+                        y: resizedRect.minY + (local.y - rect.minY) * heightScale
+                    )
+                    return rotatedPoint(resizedLocal, around: resizedRect.center, by: annotation.rotation)
+                }
+                result.rect = .zero
+                return result
+            }
+            let sourceBounds = pathBounds(
+                for: pathGeometryPoints(for: annotation),
+                inset: 0,
+                minimumSize: 0
+            )
+            let leftInset = sourceBounds.minX - rect.minX
+            let rightInset = rect.maxX - sourceBounds.maxX
+            let topInset = sourceBounds.minY - rect.minY
+            let bottomInset = rect.maxY - sourceBounds.maxY
+            let targetMinX = resizedRect.minX + leftInset
+            let targetMinY = resizedRect.minY + topInset
+            let targetWidth = max(0, resizedRect.width - leftInset - rightInset)
+            let targetHeight = max(0, resizedRect.height - topInset - bottomInset)
+            let widthScale = sourceBounds.width > 0 ? targetWidth / sourceBounds.width : 1
+            let heightScale = sourceBounds.height > 0 ? targetHeight / sourceBounds.height : 1
+            var result = annotation
+            result.points = annotation.points.map { point in
+                CGPoint(
+                    x: targetMinX + (point.x - sourceBounds.minX) * widthScale,
+                    y: targetMinY + (point.y - sourceBounds.minY) * heightScale
+                )
+            }
+            result.rect = .zero
+            return result
+        }
         var result = annotation
         result.rect = resizedRect
         if annotation.kind == .text || annotation.kind == .emoji {
-            let widthScale = rect.width > 0 ? result.rect.width / rect.width : 1
-            let heightScale = rect.height > 0 ? result.rect.height / rect.height : 1
-            result.fontSize = max(3, annotation.fontSize * max(widthScale, heightScale))
             result.points = [result.rect.origin]
         }
         return result
@@ -850,6 +1059,7 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var tool: ScreenshotTool = .rectangle
     @Published var color = ScreenshotRGBA.accent
     @Published var lineWidth: CGFloat = 3
+    @Published var arrowStyle: ScreenshotArrowStyle = .straight
     @Published var fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize
     @Published var selectedEmoji = "⭐️"
     @Published var obscureShape: ScreenshotObscureShape = .rectangle
@@ -899,6 +1109,7 @@ final class ScreenshotEditorModel: ObservableObject {
         to annotationID: UUID,
         color: ScreenshotRGBA? = nil,
         lineWidth: CGFloat? = nil,
+        arrowStyle: ScreenshotArrowStyle? = nil,
         fontSize: CGFloat? = nil
     ) {
         guard let annotation = annotations.first(where: { $0.id == annotationID }) else { return }
@@ -912,6 +1123,11 @@ final class ScreenshotEditorModel: ObservableObject {
         case .rectangle, .ellipse:
             if let lineWidth, annotation.lineWidth != lineWidth {
                 updated.lineWidth = lineWidth
+                changed = true
+            }
+        case .arrow:
+            if let arrowStyle, annotation.arrowStyle != arrowStyle {
+                updated.arrowStyle = arrowStyle
                 changed = true
             }
         case .text, .emoji:
@@ -1313,28 +1529,37 @@ final class ScreenshotEditorModel: ObservableObject {
             drawLine(annotation.points, imageHeight: imageSize.height, lineWidth: annotation.lineWidth)
         case .arrow:
             guard let start = annotation.points.first, let end = annotation.points.last else { return }
-            let startPoint = appKitPoint(start, imageHeight: imageSize.height)
-            let endPoint = appKitPoint(end, imageHeight: imageSize.height)
-            let line = NSBezierPath()
-            line.move(to: startPoint)
-            line.line(to: endPoint)
-            line.lineWidth = annotation.lineWidth
-            line.stroke()
-            let angle = atan2(end.y - start.y, end.x - start.x)
-            let headLength = max(10, annotation.lineWidth * 3)
-            let left = CGPoint(
-                x: end.x - cos(angle - .pi / 6) * headLength,
-                y: end.y - sin(angle - .pi / 6) * headLength
-            )
-            let right = CGPoint(
-                x: end.x - cos(angle + .pi / 6) * headLength,
-                y: end.y - sin(angle + .pi / 6) * headLength
+            if annotation.arrowStyle == .tapered,
+               let shaftPoints = ScreenshotArrowGeometry.taperedShaftPoints(
+                   from: start,
+                   to: end,
+                   lineWidth: annotation.lineWidth
+               ) {
+                let shaft = NSBezierPath()
+                shaft.move(to: appKitPoint(shaftPoints[0], imageHeight: imageSize.height))
+                for point in shaftPoints.dropFirst() {
+                    shaft.line(to: appKitPoint(point, imageHeight: imageSize.height))
+                }
+                shaft.close()
+                shaft.fill()
+            } else {
+                let line = NSBezierPath()
+                line.move(to: appKitPoint(start, imageHeight: imageSize.height))
+                line.line(to: appKitPoint(end, imageHeight: imageSize.height))
+                line.lineWidth = annotation.lineWidth
+                line.stroke()
+            }
+            let headPoints = ScreenshotArrowGeometry.headPoints(
+                from: start,
+                to: end,
+                lineWidth: annotation.lineWidth,
+                minimumLength: 10
             )
             let head = NSBezierPath()
-            head.move(to: endPoint)
-            head.line(to: appKitPoint(left, imageHeight: imageSize.height))
-            head.move(to: endPoint)
-            head.line(to: appKitPoint(right, imageHeight: imageSize.height))
+            head.move(to: appKitPoint(headPoints.tip, imageHeight: imageSize.height))
+            head.line(to: appKitPoint(headPoints.left, imageHeight: imageSize.height))
+            head.move(to: appKitPoint(headPoints.tip, imageHeight: imageSize.height))
+            head.line(to: appKitPoint(headPoints.right, imageHeight: imageSize.height))
             head.lineWidth = annotation.lineWidth
             head.stroke()
         case .number:
@@ -1605,14 +1830,18 @@ final class ScreenshotAnnotationSelectionState: ObservableObject {
     @Published var selectedAnnotationID: UUID?
     @Published var isInlineTextEditing = false
 
+    func deselect() {
+        selectedAnnotationID = nil
+    }
+
     func deleteSelectedAnnotation(from model: ScreenshotEditorModel) -> Bool {
         guard !isInlineTextEditing, let selectedAnnotationID else { return false }
         guard model.annotations.contains(where: { $0.id == selectedAnnotationID }) else {
-            self.selectedAnnotationID = nil
+            deselect()
             return false
         }
         model.remove(id: selectedAnnotationID)
-        self.selectedAnnotationID = nil
+        deselect()
         return true
     }
 }
@@ -2886,6 +3115,8 @@ struct ScreenshotEditorView: View {
             switch annotation.kind {
             case .rectangle, .ellipse:
                 model.lineWidth = annotation.lineWidth
+            case .arrow:
+                model.arrowStyle = annotation.arrowStyle
             case .text, .emoji:
                 model.fontSize = annotation.fontSize
             default:
@@ -2899,6 +3130,10 @@ struct ScreenshotEditorView: View {
         .onChange(of: model.lineWidth) { _, newValue in
             guard let annotationID = selectionState.selectedAnnotationID else { return }
             model.applySelectedStyle(to: annotationID, lineWidth: newValue)
+        }
+        .onChange(of: model.arrowStyle) { _, newValue in
+            guard let annotationID = selectionState.selectedAnnotationID else { return }
+            model.applySelectedStyle(to: annotationID, arrowStyle: newValue)
         }
         .onChange(of: model.fontSize) { _, newValue in
             guard let annotationID = selectionState.selectedAnnotationID else { return }
@@ -3268,7 +3503,16 @@ struct ScreenshotEditorView: View {
                 lineWidth: annotation.lineWidth
             )
         case .arrow:
-            arrowView(annotation.points, geometry: geometry, color: color, lineWidth: annotation.lineWidth)
+            let bounds = ScreenshotAnnotationGeometry.bounds(for: annotation)
+            arrowView(
+                annotation.points,
+                geometry: geometry,
+                color: color,
+                lineWidth: annotation.lineWidth,
+                style: annotation.arrowStyle,
+                rotation: annotation.rotation,
+                rotationCenter: bounds.center
+            )
         case .number:
             if let point = annotation.points.first {
                 let diameter = ScreenshotAnnotationGeometry.numberDiameter(for: annotation.lineWidth)
@@ -3327,7 +3571,9 @@ struct ScreenshotEditorView: View {
         let rect = ScreenshotAnnotationGeometry.bounds(for: annotation)
         let canvasRect = geometry.canvasRect(from: rect)
         let handleSize = max(8, 10 * geometry.scale)
-        let showRotationHandle = annotation.kind == .rectangle || annotation.kind == .text
+        let showRotationHandle = annotation.kind == .rectangle
+            || annotation.kind == .text
+            || annotation.kind == .arrow
         let rotationDistance = ScreenshotAnnotationGeometry.rotationOffset * geometry.scale
         return ZStack {
             Rectangle()
@@ -3547,7 +3793,13 @@ struct ScreenshotEditorView: View {
                     lineWidth: model.lineWidth
                 )
             } else if model.tool == .arrow {
-                arrowView(draftPoints, geometry: geometry, color: model.color.swiftUIColor, lineWidth: model.lineWidth)
+                arrowView(
+                    draftPoints,
+                    geometry: geometry,
+                    color: model.color.swiftUIColor,
+                    lineWidth: model.lineWidth,
+                    style: model.arrowStyle
+                )
             }
         }
     }
@@ -3599,39 +3851,75 @@ struct ScreenshotEditorView: View {
         )
     }
 
+    @ViewBuilder
     private func arrowView(
         _ points: [CGPoint],
         geometry: ScreenshotCanvasGeometry,
         color: Color,
-        lineWidth: CGFloat
+        lineWidth: CGFloat,
+        style: ScreenshotArrowStyle,
+        rotation: CGFloat = 0,
+        rotationCenter: CGPoint? = nil
     ) -> some View {
-        Path { path in
-            guard let start = points.first, let end = points.last else { return }
-            let startPoint = geometry.canvasPoint(from: start)
-            let endPoint = geometry.canvasPoint(from: end)
-            path.move(to: startPoint)
-            path.addLine(to: endPoint)
-            let angle = atan2(endPoint.y - startPoint.y, endPoint.x - startPoint.x)
-            let headLength = max(8, lineWidth * geometry.scale * 3)
-            path.move(to: endPoint)
-            path.addLine(to: CGPoint(
-                x: endPoint.x - cos(angle - .pi / 6) * headLength,
-                y: endPoint.y - sin(angle - .pi / 6) * headLength
-            ))
-            path.move(to: endPoint)
-            path.addLine(to: CGPoint(
-                x: endPoint.x - cos(angle + .pi / 6) * headLength,
-                y: endPoint.y - sin(angle + .pi / 6) * headLength
-            ))
-        }
-        .stroke(
-            color,
-            style: StrokeStyle(
-                lineWidth: max(1, lineWidth * geometry.scale),
-                lineCap: .round,
-                lineJoin: .round
+        if let start = points.first, let end = points.last {
+            let rotatedStart = rotationCenter.map {
+                ScreenshotAnnotationGeometry.rotatedPoint(start, around: $0, by: rotation)
+            } ?? start
+            let rotatedEnd = rotationCenter.map {
+                ScreenshotAnnotationGeometry.rotatedPoint(end, around: $0, by: rotation)
+            } ?? end
+            let startPoint = geometry.canvasPoint(from: rotatedStart)
+            let endPoint = geometry.canvasPoint(from: rotatedEnd)
+            let scaledLineWidth = max(1, lineWidth * geometry.scale)
+            let headPoints = ScreenshotArrowGeometry.headPoints(
+                from: startPoint,
+                to: endPoint,
+                lineWidth: scaledLineWidth,
+                minimumLength: 8
             )
-        )
+            if style == .tapered,
+               let shaftPoints = ScreenshotArrowGeometry.taperedShaftPoints(
+                   from: startPoint,
+                   to: endPoint,
+                   lineWidth: scaledLineWidth
+               ) {
+                Path { path in
+                    path.move(to: shaftPoints[0])
+                    for point in shaftPoints.dropFirst() {
+                        path.addLine(to: point)
+                    }
+                    path.closeSubpath()
+                }
+                .fill(color)
+            } else {
+                Path { path in
+                    path.move(to: startPoint)
+                    path.addLine(to: endPoint)
+                }
+                .stroke(
+                    color,
+                    style: StrokeStyle(
+                        lineWidth: scaledLineWidth,
+                        lineCap: .round,
+                        lineJoin: .round
+                    )
+                )
+            }
+            Path { path in
+                path.move(to: headPoints.tip)
+                path.addLine(to: headPoints.left)
+                path.move(to: headPoints.tip)
+                path.addLine(to: headPoints.right)
+            }
+            .stroke(
+                color,
+                style: StrokeStyle(
+                    lineWidth: scaledLineWidth,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
+        }
     }
 
     private func handleCanvasDrag(
@@ -3663,7 +3951,8 @@ struct ScreenshotEditorView: View {
                 activeAnnotationEdit.original,
                 handle: activeAnnotationEdit.handle,
                 from: activeAnnotationEdit.startPoint,
-                to: point
+                to: point,
+                textRightEdge: model.image.size.width
             )
             if activeAnnotationEdit.handle == .rotation, !accessibilityReduceMotion {
                 withAnimation(ScreenshotCanvasStyle.rotationAnimation) {
@@ -3679,6 +3968,10 @@ struct ScreenshotEditorView: View {
             self.activeAnnotationEdit = nil
             self.editPreview = nil
             return
+        }
+
+        if !isComplete {
+            selectionState.deselect()
         }
 
         switch model.tool {
@@ -3762,7 +4055,8 @@ struct ScreenshotEditorView: View {
                 kind: .arrow,
                 points: draftPoints,
                 color: model.color,
-                lineWidth: model.lineWidth
+                lineWidth: model.lineWidth,
+                arrowStyle: model.arrowStyle
             ))
         case .number:
             model.addNumber(at: point)
@@ -3998,8 +4292,22 @@ struct ScreenshotEditorView: View {
     @ViewBuilder
     private func toolAttributesMenu(for tool: ScreenshotTool) -> some View {
         HStack(spacing: 10) {
-            if tool == .rectangle || tool == .ellipse || tool == .brush || tool == .arrow {
+            if tool == .rectangle || tool == .ellipse || tool == .brush {
                 colorPicker
+                Divider().frame(height: 24)
+                lineWidthSlider
+            } else if tool == .arrow {
+                colorPicker
+                Divider().frame(height: 24)
+                Picker("样式", selection: $model.arrowStyle) {
+                    ForEach(ScreenshotArrowStyle.allCases) { style in
+                        Label(style.title, systemImage: style.symbol).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 150)
+                .help("箭头样式：\(model.arrowStyle.title)")
                 Divider().frame(height: 24)
                 lineWidthSlider
             } else if tool == .number {
@@ -4047,10 +4355,12 @@ struct ScreenshotEditorView: View {
                     Task { @MainActor in model.color = ScreenshotRGBA(color) }
                 }
             } label: {
-                Label("取色", systemImage: "eyedropper")
+                Label(model.color.hex, systemImage: "eyedropper")
                     .font(.system(size: 11, weight: .medium))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("取色")
+            .accessibilityValue(model.color.hex)
         }
     }
 
@@ -4077,12 +4387,15 @@ struct ScreenshotEditorView: View {
     }
 
     private func selectTool(_ tool: ScreenshotTool) {
+        if model.tool != tool {
+            selectionState.deselect()
+        }
         model.tool = tool
     }
 
     private var obscureButton: some View {
         Button {
-            model.tool = .mosaic
+            selectTool(.mosaic)
             activeToolMenuID = .mosaic
         } label: {
             HStack(spacing: 4) {
@@ -4143,8 +4456,8 @@ struct ScreenshotEditorView: View {
                     .frame(width: 18, alignment: .trailing)
             }
             .padding(10)
-            .onChange(of: model.obscureShape) { _, _ in model.tool = .mosaic }
-            .onChange(of: model.obscureEffect) { _, _ in model.tool = .mosaic }
+            .onChange(of: model.obscureShape) { _, _ in selectTool(.mosaic) }
+            .onChange(of: model.obscureEffect) { _, _ in selectTool(.mosaic) }
         }
     }
 
@@ -5117,6 +5430,11 @@ final class ScreenshotEditorWindow: NSWindow {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if let action = Self.editingAction(for: event),
+           let firstResponder,
+           NSApp.sendAction(action, to: firstResponder, from: self) {
+            return true
+        }
         return handleEditingKey(event) || super.performKeyEquivalent(with: event)
     }
 
@@ -5127,6 +5445,21 @@ final class ScreenshotEditorWindow: NSWindow {
 
     override func cancelOperation(_ sender: Any?) {
         onCancelEditing?()
+    }
+
+    private static func editingAction(for event: NSEvent) -> Selector? {
+        let modifiers = event.modifierFlags
+            .intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        let key = event.charactersIgnoringModifiers?.lowercased()
+
+        return switch (key, modifiers) {
+        case ("a", .command): #selector(NSResponder.selectAll(_:))
+        case ("c", .command): #selector(NSText.copy(_:))
+        case ("v", .command): #selector(NSText.paste(_:))
+        case ("x", .command): #selector(NSText.cut(_:))
+        default: nil
+        }
     }
 
     private func handleEditingKey(_ event: NSEvent) -> Bool {

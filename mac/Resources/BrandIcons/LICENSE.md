@@ -18,6 +18,10 @@ logos remain trademarks of their respective owners.
 
 `zcode.icns` is the official icon from the locally installed ZCode application.
 
+`pi.svg` is Pi Coding Agent's official logo from https://pi.dev/logo.svg. Its white paths are
+kept unchanged and rendered as a template to adapt to the compact island surface. Product names
+and logos remain trademarks of their respective owners.
+
 `copilot.svg` is the GitHub Copilot Codicon distributed with VS Code under the MIT License.
 `github-mark.svg` is GitHub's official mark from `primer/octicons`, distributed under the MIT License.
 `kimi.png` is the official Kimi Code extension icon published by Moonshot AI on Open VSX.
