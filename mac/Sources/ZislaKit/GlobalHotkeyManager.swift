@@ -14,7 +14,7 @@ public enum GlobalHotkeyRegistrationResult: Equatable, Sendable {
 /// The event tap is added to the main RunLoop, so its callbacks and register/unregister calls
 /// are all serialized on the main thread.
 public final class GlobalHotkeyManager: @unchecked Sendable {
-    // CGEventFlags 保留可区分左右物理修饰键的设备相关 bits。
+    // CGEventFlags preserves device-specific bits that distinguish left and right physical modifier keys.
     private static let deviceModifierMasks: [(modifier: VoiceInputModifier, mask: UInt64)] = [
         (.leftControl, 0x0000_0000_0000_0001),
         (.leftShift, 0x0000_0000_0000_0002),

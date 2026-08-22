@@ -51,6 +51,20 @@ struct IslandPresentationReducerTests {
     }
 
     @Test
+    func immediateCollapseOverridesPointerPinAndTransientInteractionHolds() {
+        var reducer = IslandPresentationReducer()
+        _ = reducer.send(.pointerEntered)
+        _ = reducer.send(.setPinned(true))
+        _ = reducer.send(.setDragging(true))
+
+        #expect(
+            reducer.send(.collapseImmediately)
+                == [.cancelScheduledCollapse, .collapse]
+        )
+        #expect(reducer.state.visibility == .collapsed)
+    }
+
+    @Test
     func deterministicChaosEventsKeepVisibilityAndEffectsConsistent() {
         var reducer = IslandPresentationReducer()
         var seed: UInt64 = 0xD1CE_F00D

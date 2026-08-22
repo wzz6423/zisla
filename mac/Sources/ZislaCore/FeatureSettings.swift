@@ -110,7 +110,7 @@ public enum SystemBackgroundSound: String, Codable, CaseIterable, Sendable, Equa
     case pinkNoise = "PinkNoise"
     case brownNoise = "BrownNoise"
     case whiteNoise = "WhiteNoise"
-    // 兼容 macOS 14 及更早版本保存的名称。
+    // Compatibility with the name saved by macOS 14 and earlier.
     case balancedNoise = "BalancedNoise"
     case brightNoise = "BrightNoise"
     case darkNoise = "DarkNoise"

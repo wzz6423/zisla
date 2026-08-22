@@ -1032,13 +1032,3 @@ struct FeatureSettingsCompatibilityTests {
         #expect(contextualTerms.contains("外卖"))
         #expect(contextualTerms.contains("奶茶"))
     }
-
-    @Test
-    func voiceLexiconDeprecatedMaxCountDoesNotTruncate() {
-        let enabled: Set<VoiceLexicon> = [.classicalPoetry, .internetBuzzwords]
-        let fullTerms = VoiceLexicon.contextualTerms(for: enabled)
-        let limitedTerms = VoiceLexicon.contextualTerms(for: enabled, maxCount: 10)
-
-        #expect(limitedTerms.count == fullTerms.count)
-        #expect(Set(limitedTerms) == Set(fullTerms))
-    }

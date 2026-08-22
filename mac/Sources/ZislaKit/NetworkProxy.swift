@@ -13,7 +13,7 @@ public enum NetworkProxy {
               ["http", "https", "socks5", "socks5h"].contains(scheme),
               url.host != nil
         else { return nil }
-        // 允许端口为 nil（使用默认端口）或显式指定的非零端口
+        // Allow a nil port (uses the default port) or an explicitly specified non-zero port.
         if let port = url.port, port == 0 { return nil }
         return url
     }

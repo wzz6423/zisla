@@ -16,9 +16,6 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
     case travelAndTransport
     case dailyLife
 
-    /// Apple Speech 的旧请求接口建议每次不超过 100 条提示词，但这个平台限制不能改变词库的启用语义。
-    public static let maximumContextualTerms = 100
-
     public var id: String { rawValue }
 
     public static let defaultEnabled: Set<Self> = Set(allCases)
@@ -224,7 +221,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         "OpenAI Compatible", "Anthropic Messages", "Gemini Generate Content", "New API", "One API"
     ]
 
-    /// 新增受支持的 Agent CLI 时，此处的穷尽 switch 会要求同步补齐其识别词条。
+    /// When adding a supported Agent CLI, this exhaustive switch requires its recognition terms to be added here as well.
     private static let supportedAIAgentTerms: [String] = AgentCLIKind.allCases.flatMap { kind in
         switch kind {
         case .claude:
@@ -254,7 +251,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         }
     }
 
-    /// 新增应用支持的 AI 提供方时，此处的穷尽 switch 会要求同步补齐其专有术语。
+    /// When adding an AI provider supported by the app, this exhaustive switch requires its dedicated terms to be added here as well.
     private static let supportedAIProviderTerms: [String] = AIProvider.allCases.flatMap { provider -> [String] in
         switch provider {
         case .claude, .codex, .gemini, .grok, .copilot, .opencode, .pi:
@@ -286,21 +283,14 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
             .filter { seen.insert($0).inserted }
     }
 
-    /// 返回所有启用词库的完整词条；应用层不按词库或词条顺序做配额、排序或加权。
+    /// Return the complete terms from all enabled lexicons; the app layer does not quota, sort, or weight terms by lexicon or term order.
     public static func contextualTerms(for enabled: Set<Self>) -> [String] {
         terms(for: enabled)
     }
 
-    /// 兼容旧调用方。`maxCount` 不再裁剪词库，避免启用开关只生效一部分。
-    @available(*, deprecated, message: "词库提示不再按数量裁剪，请使用 contextualTerms(for:)")
-    public static func contextualTerms(for enabled: Set<Self>, maxCount: Int) -> [String] {
-        _ = maxCount
-        return terms(for: enabled)
-    }
-
-    /// 将 ASR 已经输出的术语变体规范为启用词库中的标准写法。
-    /// 也在同词库上下文明确时纠正可确定的音近变体，不会凭空添加词条。
-    /// `contextualTranscript` 用于 AI 二次整理后保留原始句子的上下文，不会被写入输出。
+    /// Normalize term variants already emitted by ASR to the canonical spelling from enabled lexicons.
+    /// Also correct deterministic phonetic variants when the lexicon context is explicit; never invent terms.
+    /// `contextualTranscript` preserves the original sentence context after AI post-processing and is not written to the output.
     public static func normalizeTranscript(
         _ transcript: String,
         for enabled: Set<Self>,
@@ -437,7 +427,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
     ) -> String {
         guard enabled.contains(.computerTerms) else { return transcript }
 
-        // 普通 "get up" 没有同词库上下文时必须保留，避免术语纠错改变日常口语。
+        // Ordinary "get up" must remain unchanged without lexicon context, so term correction does not alter everyday speech.
         let matches = githubAliasRanges(in: transcript)
         var normalized = transcript
         let contextualMatches = contextualTranscript.map(githubAliasRanges(in:)) ?? []
@@ -595,7 +585,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
             with: String(repeating: " ", count: aliasRange.length)
         )
 
-        // 这些协作缩写可能尚未进入用户自维护词库，但本身足以表明 GitHub 语境。
+        // These collaboration abbreviations may not yet be in the user's custom lexicon, but they are sufficient to establish GitHub context.
         let collaborationAliases = ["PR", "MR", "pull request", "merge request"]
         if collaborationAliases.contains(where: { containsCompactTerm($0, in: maskedSentence) }) {
             return true

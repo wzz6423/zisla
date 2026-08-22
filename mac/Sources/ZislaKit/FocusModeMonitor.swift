@@ -266,7 +266,7 @@ enum FocusModeStatusStore {
     }
 }
 
-/// Monitors macOS Focus Mode through distributed state notifications and its local assertion store.
+/// Monitors macOS Focus Mode through its local assertion store and private state service.
 @MainActor
 public final class FocusModeMonitor: ObservableObject {
     @Published public private(set) var status = FocusModeStatus.inactive
@@ -281,12 +281,10 @@ public final class FocusModeMonitor: ObservableObject {
     private var stateService: AnyObject?
     private var stateServiceClass: AnyClass?
     private var listener: FocusStateUpdateListener?
-    private var distributedNotificationRelays: [FocusDistributedNotificationRelay] = []
     private var storePollingTask: Task<Void, Never>?
     private var lastStoreTransitionToken: String?
     private var storeMonitoringStartedAt: TimeInterval?
     private var hasLoadedStoreSnapshot = false
-    private var lastDistributedTransition: (status: FocusModeStatus, timestamp: TimeInterval)?
     public init(clientIdentifier: String? = Bundle.main.bundleIdentifier) {
         self.clientIdentifier = clientIdentifier ?? "dev.wzz.zisla"
         statusStoreURL = FocusModeStatusStore.defaultURL
@@ -307,7 +305,6 @@ public final class FocusModeMonitor: ObservableObject {
         guard !isRunning else { return }
         isRunning = true
         storeMonitoringStartedAt = Date().timeIntervalSinceReferenceDate
-        startDistributedNotificationMonitoring()
         startStoreMonitoring()
 
         guard let frameworkHandle = dlopen(
@@ -344,7 +341,6 @@ public final class FocusModeMonitor: ObservableObject {
         if let stateService, let stateServiceClass, let listener {
             remove(listener, from: stateService, serviceClass: stateServiceClass)
         }
-        stopDistributedNotificationMonitoring()
         stateService = nil
         stateServiceClass = nil
         listener = nil
@@ -353,7 +349,6 @@ public final class FocusModeMonitor: ObservableObject {
         lastStoreTransitionToken = nil
         storeMonitoringStartedAt = nil
         hasLoadedStoreSnapshot = false
-        lastDistributedTransition = nil
         isAvailable = false
         isRunning = false
         releaseFramework()
@@ -380,80 +375,12 @@ public final class FocusModeMonitor: ObservableObject {
         lastStoreTransitionToken = snapshot.transitionToken
         hasLoadedStoreSnapshot = true
         if isNewTransition {
-            let duplicateOfDistributedNotification = lastDistributedTransition.map {
-                representsSameTransition($0.status, snapshot.status)
-                    && Date.timeIntervalSinceReferenceDate - $0.timestamp < 1
-            } ?? false
-            if duplicateOfDistributedNotification {
-                lastDistributedTransition = nil
-            } else {
-                publishTransition(snapshot.status)
-            }
+            publishTransition(snapshot.status)
         }
-    }
-
-    private func startDistributedNotificationMonitoring() {
-        let center = DistributedNotificationCenter.default()
-        let notifications: [(String, Bool)] = [
-            ("_NSDoNotDisturbEnabledNotification", true),
-            ("_NSDoNotDisturbDisabledNotification", false),
-        ]
-        distributedNotificationRelays = notifications.map { name, isActive in
-            let relay = FocusDistributedNotificationRelay(isActive: isActive) { [weak self] isActive in
-                Task { @MainActor [weak self] in
-                    self?.consumeDistributedNotification(isActive: isActive)
-                }
-            }
-            center.addObserver(
-                relay,
-                selector: #selector(FocusDistributedNotificationRelay.receive(_:)),
-                name: Notification.Name(name),
-                object: nil,
-                suspensionBehavior: .deliverImmediately
-            )
-            return relay
-        }
-    }
-
-    private func stopDistributedNotificationMonitoring() {
-        let center = DistributedNotificationCenter.default()
-        for relay in distributedNotificationRelays {
-            center.removeObserver(relay)
-        }
-        distributedNotificationRelays.removeAll()
-    }
-
-    private func consumeDistributedNotification(isActive: Bool) {
-        guard isRunning else { return }
-        let next = isActive
-            ? FocusModeStatus(isActive: true)
-            : FocusModeStatus.inactive.preservingMode(from: status)
-        consume(next)
-        isAvailable = true
-        let now = Date.timeIntervalSinceReferenceDate
-        if let lastDistributedTransition,
-           representsSameTransition(lastDistributedTransition.status, next),
-           now - lastDistributedTransition.timestamp < 1 {
-            return
-        }
-        lastDistributedTransition = (next, now)
-        publishTransition(next)
     }
 
     private func publishTransition(_ status: FocusModeStatus) {
         latestTransition = FocusModeTransition(status: status)
-    }
-
-    private func representsSameTransition(
-        _ lhs: FocusModeStatus,
-        _ rhs: FocusModeStatus
-    ) -> Bool {
-        guard lhs.isActive == rhs.isActive else { return false }
-        guard let lhsIdentifier = lhs.identifier,
-              let rhsIdentifier = rhs.identifier else {
-            return true
-        }
-        return lhsIdentifier == rhsIdentifier
     }
 
     private func startStoreMonitoring() {
@@ -539,22 +466,6 @@ public final class FocusModeMonitor: ObservableObject {
     }
 }
 
-private final class FocusDistributedNotificationRelay: NSObject {
-    private let isActive: Bool
-    private let handler: (Bool) -> Void
-
-    init(isActive: Bool, handler: @escaping (Bool) -> Void) {
-        self.isActive = isActive
-        self.handler = handler
-        super.init()
-    }
-
-    @objc(receive:)
-    func receive(_ notification: Notification) {
-        handler(isActive)
-    }
-}
-
 final class FocusStateUpdateListener: NSObject {
     private let identifier: String
     private let onUpdate: (FocusModeStatus) -> Void
@@ -618,9 +529,12 @@ final class FocusStateUpdateListener: NSObject {
             for: ["symbolImageName", "systemImageName", "symbolName", "imageName"],
             in: symbolObjects
         )
-        let isActive = firstBool(for: ["isActive", "active", "enabled", "isEnabled"], in: stateObjects)
-            ?? (identifier != nil || displayName != nil ? true : nil)
-        guard let isActive else { return nil }
+        guard let isActive = firstBool(
+            for: ["isActive", "active", "enabled", "isEnabled"],
+            in: stateObjects
+        ) else {
+            return nil
+        }
         return FocusModeStatus(
             isActive: isActive,
             identifier: identifier,

@@ -66,6 +66,17 @@ struct FocusModeMonitorTests {
     }
 
     @Test
+    func stateWithoutExplicitActivityFlagIsIgnored() {
+        let update = FocusTestIdentifierOnlyStateUpdate(
+            state: FocusTestIdentifierOnlyState(
+                activeModeIdentifier: "com.apple.donotdisturb.mode.work"
+            )
+        )
+
+        #expect(FocusStateUpdateListener.status(from: update) == nil)
+    }
+
+    @Test
     func assertionStoreCannotEraseSystemModePresentation() {
         let systemStatus = FocusModeStatus(
             isActive: true,
@@ -351,7 +362,7 @@ struct FocusModeMonitorTests {
     }
 
     @Test @MainActor
-    func distributedEnabledNotificationPublishesTransitionWithoutReadableAssertionStore() async {
+    func distributedEnabledNotificationDoesNotPublishTransitionWithoutAuthoritativeState() async {
         let monitor = FocusModeMonitor(
             clientIdentifier: "dev.wzz.zisla.focus-notification-test",
             statusStoreURL: FileManager.default.temporaryDirectory
@@ -368,8 +379,9 @@ struct FocusModeMonitorTests {
             deliverImmediately: true
         )
 
-        #expect(await waitUntil { monitor.latestTransition?.status.isActive == true })
-        #expect(monitor.status.isActive)
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(monitor.latestTransition == nil)
+        #expect(!monitor.status.isActive)
     }
 
     @Test @MainActor
@@ -504,6 +516,24 @@ private final class FocusTestStateUpdate: NSObject {
     @objc dynamic var state: FocusTestState
 
     init(state: FocusTestState) {
+        self.state = state
+        super.init()
+    }
+}
+
+private final class FocusTestIdentifierOnlyState: NSObject {
+    @objc dynamic var activeModeIdentifier: String
+
+    init(activeModeIdentifier: String) {
+        self.activeModeIdentifier = activeModeIdentifier
+        super.init()
+    }
+}
+
+private final class FocusTestIdentifierOnlyStateUpdate: NSObject {
+    @objc dynamic var state: FocusTestIdentifierOnlyState
+
+    init(state: FocusTestIdentifierOnlyState) {
         self.state = state
         super.init()
     }

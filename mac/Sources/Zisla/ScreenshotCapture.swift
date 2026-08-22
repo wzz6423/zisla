@@ -107,7 +107,7 @@ enum ScreenshotCaptureService {
     }
 }
 
-// 进入截图模式时只建立一次缓冲，避免悬停取色反复重绘整张屏幕。
+// Create the buffer only once when entering screenshot mode to avoid redrawing the entire screen during repeated hover color sampling.
 final class ScreenshotPixelSampler {
     private let pixels: [UInt8]
     private let width: Int

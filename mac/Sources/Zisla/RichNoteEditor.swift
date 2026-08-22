@@ -7,6 +7,14 @@ import ZislaKit
 private final class TransparentWKWebView: WKWebView {
     override var isOpaque: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    @objc func undo(_ sender: Any?) {
+        evaluateJavaScript("window.zisla?.exec('undo');", completionHandler: nil)
+    }
+
+    @objc func redo(_ sender: Any?) {
+        evaluateJavaScript("window.zisla?.exec('redo');", completionHandler: nil)
+    }
 }
 
 struct RichNoteEditorCommand: Identifiable, Equatable {

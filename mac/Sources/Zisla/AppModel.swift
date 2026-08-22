@@ -374,11 +374,8 @@ final class AppModel: ObservableObject {
   @Published var detectedLink: URL?
   @Published private(set) var isSharingPickerVisible = false
 
-  /// Signal to request the island to collapse after disk cleaning completes (toggled once per request).
+  /// Signal to request the island to collapse immediately when disk cleaning opens or completes.
   @Published var islandCollapseRequested = false
-
-  /// Whether the disk-cleaning panel is visible: keeps the island expanded while visible to prevent it collapsing when the pointer leaves.
-  @Published var isCleanupPanelVisible = false
 
   let settingsStore = FeatureSettingsStore()
   let languageStore = AppLanguageStore()

@@ -356,6 +356,11 @@ public struct DiskCleanupCandidate: Equatable, Identifiable, Sendable {
     public var byteSize: UInt64
     public var displayName: String
     public var detail: String?
+    public var source: String?
+
+    public var isActionable: Bool {
+        safetyLevel != .analysisOnly && kind.safetyLevel != .analysisOnly
+    }
 
     public init(
         url: URL,
@@ -363,7 +368,8 @@ public struct DiskCleanupCandidate: Equatable, Identifiable, Sendable {
         byteSize: UInt64,
         displayName: String,
         detail: String? = nil,
-        safetyLevel: DiskCleanupSafetyLevel? = nil
+        safetyLevel: DiskCleanupSafetyLevel? = nil,
+        source: String? = nil
     ) {
         self.url = url
         self.kind = kind
@@ -371,17 +377,20 @@ public struct DiskCleanupCandidate: Equatable, Identifiable, Sendable {
         self.byteSize = byteSize
         self.displayName = displayName
         self.detail = detail
+        self.source = source
     }
 }
 
 public enum DiskCleanupSafetyLevel: String, Equatable, Sendable {
     case safeToClean
     case requiresManualReview
+    case analysisOnly
 
     public var title: String {
         switch self {
         case .safeToClean: "可安全清理"
         case .requiresManualReview: "需人工复核"
+        case .analysisOnly: "仅分析"
         }
     }
 
@@ -389,8 +398,41 @@ public enum DiskCleanupSafetyLevel: String, Equatable, Sendable {
         switch self {
         case .safeToClean: "可再生数据；下次使用时可能重新生成或下载"
         case .requiresManualReview: "可能是用户文件、诊断资料或仍有保留价值的数据"
+        case .analysisOnly: "可能包含持久数据或系统状态；只展示，不会移入废纸篓"
         }
     }
+}
+
+/// Controls breadth and thresholds for a read-only cleanup scan.
+public struct DiskCleanupScanOptions: Equatable, Sendable {
+    public var largeFileThreshold: UInt64
+    public var oldFileAge: TimeInterval
+    public var unfinishedDownloadAge: TimeInterval
+    public var userFileMaxDepth: Int
+    /// Kept for source compatibility; analysis-only categories are no longer scanned.
+    public var includeAnalysisOnly: Bool
+    public var referenceDate: Date?
+    public var additionalUserDirectories: [URL]
+
+    public init(
+        largeFileThreshold: UInt64 = 50 * 1024 * 1024,
+        oldFileAge: TimeInterval = 30 * 24 * 3600,
+        unfinishedDownloadAge: TimeInterval = 3 * 24 * 3600,
+        userFileMaxDepth: Int = 8,
+        includeAnalysisOnly: Bool = true,
+        referenceDate: Date? = nil,
+        additionalUserDirectories: [URL] = []
+    ) {
+        self.largeFileThreshold = max(1, largeFileThreshold)
+        self.oldFileAge = max(0, oldFileAge)
+        self.unfinishedDownloadAge = max(0, unfinishedDownloadAge)
+        self.userFileMaxDepth = min(16, max(1, userFileMaxDepth))
+        self.includeAnalysisOnly = includeAnalysisOnly
+        self.referenceDate = referenceDate
+        self.additionalUserDirectories = additionalUserDirectories
+    }
+
+    public static let `default` = DiskCleanupScanOptions()
 }
 
 public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
@@ -407,13 +449,32 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
     case diskImage
     case largeFile
     case duplicateFile
+    case browserCache
+    case mailDownloads
+    case unfinishedDownload
+    case iosBackup
+    case projectBuildArtifact
+    case xcodeArchive
+    case simulatorData
+    case applicationResidual
+    case timeMachineSnapshot
+    case dockerData
+    case virtualMachineData
+    case aiToolCache
+    case languagePack
+    case cloudStorageCache
 
     public var safetyLevel: DiskCleanupSafetyLevel {
         switch self {
-        case .appCache, .cache, .developerArtifacts, .packageManagerCache:
+        case .appCache, .cache, .developerArtifacts, .packageManagerCache,
+             .browserCache, .projectBuildArtifact, .aiToolCache:
             .safeToClean
-        case .log, .trash, .temporaryFiles, .crashReport, .diskImage, .largeFile, .duplicateFile:
+        case .log, .trash, .temporaryFiles, .crashReport, .diskImage, .largeFile, .duplicateFile,
+             .mailDownloads, .unfinishedDownload, .iosBackup, .xcodeArchive, .applicationResidual,
+             .languagePack:
             .requiresManualReview
+        case .simulatorData, .timeMachineSnapshot, .dockerData, .virtualMachineData, .cloudStorageCache:
+            .analysisOnly
         }
     }
 
@@ -431,6 +492,20 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
         case .cache: 30
         case .log: 20
         case .trash: 10
+        case .iosBackup: 95
+        case .timeMachineSnapshot: 94
+        case .applicationResidual: 93
+        case .mailDownloads: 92
+        case .browserCache: 88
+        case .projectBuildArtifact: 86
+        case .xcodeArchive: 84
+        case .simulatorData: 83
+        case .dockerData: 82
+        case .virtualMachineData: 81
+        case .aiToolCache: 79
+        case .languagePack: 78
+        case .cloudStorageCache: 77
+        case .unfinishedDownload: 76
         }
     }
 }
@@ -460,11 +535,13 @@ public struct DiskCleanupResult: Equatable, Sendable {
 public enum DiskCleanupError: Error, LocalizedError, Equatable, Sendable {
     case pathOutsideAllowedRoots
     case notAFileURL
+    case analysisOnlyCandidate
 
     public var errorDescription: String? {
         switch self {
         case .pathOutsideAllowedRoots: "目标不在允许清理的用户目录内"
         case .notAFileURL: "仅支持本地文件路径"
+        case .analysisOnlyCandidate: "该项目仅用于分析，不能移入废纸篓"
         }
     }
 }
@@ -1484,6 +1561,7 @@ public enum SystemDiskCleanup {
             "Library/Developer/Xcode/DerivedData",
             "Library/Developer/Xcode/iOS DeviceSupport",
             "Library/Developer/Xcode/watchOS DeviceSupport",
+            "Library/Developer/Xcode/ModuleCache.noindex",
             "Library/Developer/CoreSimulator/Caches",
             ".cache",
         ]
@@ -1522,7 +1600,25 @@ public enum SystemDiskCleanup {
             append(.packageManagerCache, home.appendingPathComponent(path, isDirectory: true))
         }
 
-        // Register only rebuilable app caches; sandbox and group containers allow only their respective Library/Caches subdirectory.
+        // Browser and Mail caches are registered separately so the UI can explain their owner.
+        for root in browserCacheRoots(fileManager: fileManager) {
+            append(.browserCache, root)
+        }
+        append(.mailDownloads, home.appendingPathComponent("Library/Mail Downloads", isDirectory: true))
+        append(
+            .mailDownloads,
+            home.appendingPathComponent("Library/Containers/com.apple.mail/Data/Library/Mail Downloads", isDirectory: true)
+        )
+        append(
+            .iosBackup,
+            home.appendingPathComponent("Library/Application Support/MobileSync/Backup", isDirectory: true)
+        )
+        append(.xcodeArchive, home.appendingPathComponent("Library/Developer/Xcode/Archives", isDirectory: true))
+        for path in aiToolCachePaths(home: home) {
+            append(.aiToolCache, path)
+        }
+
+        // Register only rebuildable app caches; sandbox and group containers allow only their respective Library/Caches subdirectory.
         for root in applicationCacheRoots(fileManager: fileManager) {
             append(.appCache, root.url)
         }
@@ -1560,6 +1656,66 @@ public enum SystemDiskCleanup {
             }
         }
         return bestByPath.values.sorted { $0.1.path < $1.1.path }
+    }
+
+    private static func browserCacheRoots(fileManager: SystemMonitorFileManaging) -> [URL] {
+        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
+        var roots = [
+            home.appendingPathComponent("Library/Caches/com.apple.Safari", isDirectory: true),
+            home.appendingPathComponent("Library/Caches/com.google.Chrome", isDirectory: true),
+            home.appendingPathComponent("Library/Caches/com.microsoft.edgemac", isDirectory: true),
+            home.appendingPathComponent("Library/Caches/com.brave.Browser", isDirectory: true),
+            home.appendingPathComponent("Library/Caches/Firefox", isDirectory: true),
+            home.appendingPathComponent("Library/Caches/company.thebrowser.Browser", isDirectory: true),
+        ]
+
+        let browserRoots = [
+            home.appendingPathComponent("Library/Application Support/Google/Chrome", isDirectory: true),
+            home.appendingPathComponent("Library/Application Support/Microsoft Edge", isDirectory: true),
+            home.appendingPathComponent("Library/Application Support/BraveSoftware/Brave-Browser", isDirectory: true),
+            home.appendingPathComponent("Library/Application Support/Firefox/Profiles", isDirectory: true),
+            home.appendingPathComponent("Library/Application Support/Arc/User Data", isDirectory: true),
+        ]
+        for browserRoot in browserRoots {
+            guard fileManager.fileExists(atPath: browserRoot.path),
+                  let profiles = try? fileManager.contentsOfDirectory(
+                      at: browserRoot,
+                      includingPropertiesForKeys: [.isDirectoryKey],
+                      options: [.skipsHiddenFiles]
+                  )
+            else {
+                continue
+            }
+            for profile in profiles {
+                roots.append(contentsOf: browserProfileCacheRoots(profile: profile))
+            }
+        }
+        return uniqueURLs(roots)
+    }
+
+    private static func browserProfileCacheRoots(profile: URL) -> [URL] {
+        [
+            profile.appendingPathComponent("Cache", isDirectory: true),
+            profile.appendingPathComponent("Code Cache", isDirectory: true),
+            profile.appendingPathComponent("GPUCache", isDirectory: true),
+            profile.appendingPathComponent("Service Worker/CacheStorage", isDirectory: true),
+            profile.appendingPathComponent("cache2", isDirectory: true),
+        ]
+    }
+
+    private static func aiToolCachePaths(home: URL) -> [URL] {
+        [
+            home.appendingPathComponent(".cache/huggingface", isDirectory: true),
+            home.appendingPathComponent(".cache/torch", isDirectory: true),
+            home.appendingPathComponent(".cache/ollama", isDirectory: true),
+            home.appendingPathComponent("Library/Caches/com.anthropic.claude", isDirectory: true),
+            home.appendingPathComponent("Library/Caches/com.openai.chat", isDirectory: true),
+        ]
+    }
+
+    private static func uniqueURLs(_ urls: [URL]) -> [URL] {
+        var seen = Set<String>()
+        return urls.filter { seen.insert(SystemMonitorPathSafety.standardizedPath($0)).inserted }
     }
 
     private enum ApplicationCacheSource {
@@ -1668,29 +1824,45 @@ public enum SystemDiskCleanup {
             includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey],
             options: [.skipsPackageDescendants]
         ) else {
-            return 0
+            guard let children = try? fileManager.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .totalFileAllocatedSizeKey],
+                options: [.skipsHiddenFiles]
+            ) else {
+                return 0
+            }
+            return children.reduce(0) { total, child in
+                total + allocatedByteSize(of: child, fileManager: fileManager)
+            }
         }
         var total: UInt64 = 0
         for case let fileURL as URL in enumerator {
-            if let values = try? fileURL.resourceValues(forKeys: [
-                .totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey,
-            ]) {
-                if values.isRegularFile == true {
-                    if let s = values.totalFileAllocatedSize {
-                        total += UInt64(s)
-                    } else if let s = values.fileAllocatedSize {
-                        total += UInt64(s)
+            total += autoreleasepool {
+                if let values = try? fileURL.resourceValues(forKeys: [
+                    .totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey,
+                ]) {
+                    guard values.isRegularFile == true else { return 0 }
+                    if let size = values.totalFileAllocatedSize {
+                        return UInt64(size)
                     }
+                    if let size = values.fileAllocatedSize {
+                        return UInt64(size)
+                    }
+                } else if let attrs = try? fileManager.attributesOfItem(atPath: fileURL.path),
+                          let size = attrs[.size] as? NSNumber {
+                    return size.uint64Value
                 }
-            } else if let attrs = try? fileManager.attributesOfItem(atPath: fileURL.path),
-                      let size = attrs[.size] as? NSNumber {
-                total += size.uint64Value
+                return 0
             }
         }
         return total
     }
 
     private static let maximumConcurrentScanWorkers = 3
+
+    private static let excludedScanKinds: Set<DiskCleanupKind> = [
+        .simulatorData, .timeMachineSnapshot, .dockerData, .virtualMachineData, .cloudStorageCache,
+    ]
 
     private struct CleanupScanTask: @unchecked Sendable {
         let run: () -> [DiskCleanupCandidate]
@@ -1793,35 +1965,73 @@ public enum SystemDiskCleanup {
         fileManager: SystemMonitorFileManaging,
         kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases),
         maxDepthChildrenOnly: Bool = true,
-        maxConcurrentScans: Int? = nil
+        maxConcurrentScans: Int? = nil,
+        options: DiskCleanupScanOptions = .default
     ) -> [DiskCleanupCandidate] {
+        let requestedKinds = kinds.subtracting(excludedScanKinds)
         var tasks: [CleanupScanTask] = []
 
-        if kinds.contains(.appCache) {
+        if requestedKinds.contains(.appCache) {
             tasks.append(CleanupScanTask {
                 scanApplicationCaches(fileManager: fileManager)
             })
         }
 
-        // Directory scan: list direct children of known root directories
+        // Directory scan: list direct children of known root directories.
         let directoryKinds: Set<DiskCleanupKind> = [
             .cache, .log, .trash, .developerArtifacts, .temporaryFiles, .packageManagerCache, .crashReport,
+            .mailDownloads, .iosBackup, .xcodeArchive, .aiToolCache,
         ]
-        let activeDirKinds = kinds.intersection(directoryKinds)
+        let activeDirKinds = requestedKinds.intersection(directoryKinds)
         if !activeDirKinds.isEmpty {
             tasks.append(CleanupScanTask {
-                scanDirectoryChildren(fileManager: fileManager, kinds: activeDirKinds)
+                scanDirectoryChildren(
+                    fileManager: fileManager,
+                    kinds: activeDirKinds,
+                    maxDepthChildrenOnly: maxDepthChildrenOnly,
+                    referenceDate: options.referenceDate
+                )
+            })
+        }
+
+        if requestedKinds.contains(.browserCache) {
+            tasks.append(CleanupScanTask {
+                scanBrowserCaches(fileManager: fileManager)
             })
         }
 
         let userFileKinds: Set<DiskCleanupKind> = [.diskImage, .largeFile, .duplicateFile]
-        let activeUserFileKinds = kinds.intersection(userFileKinds)
+        let activeUserFileKinds = requestedKinds.intersection(userFileKinds)
         if !activeUserFileKinds.isEmpty {
             tasks.append(CleanupScanTask {
-                scanUserFileCandidates(fileManager: fileManager, kinds: activeUserFileKinds)
+                scanUserFileCandidates(
+                    fileManager: fileManager,
+                    kinds: activeUserFileKinds,
+                    options: options
+                )
             })
         }
 
+        if requestedKinds.contains(.unfinishedDownload) {
+            tasks.append(CleanupScanTask {
+                scanUnfinishedDownloads(fileManager: fileManager, options: options)
+            })
+        }
+        if requestedKinds.contains(.projectBuildArtifact) {
+            tasks.append(CleanupScanTask {
+                scanProjectBuildArtifacts(fileManager: fileManager)
+            })
+        }
+        if requestedKinds.contains(.applicationResidual) {
+            tasks.append(CleanupScanTask {
+                scanApplicationResiduals(fileManager: fileManager)
+            })
+        }
+        if requestedKinds.contains(.languagePack) {
+            tasks.append(CleanupScanTask {
+                scanLanguagePacks(fileManager: fileManager)
+            })
+        }
         let result = executeScanTasks(
             tasks,
             workerLimit: scanWorkerLimit(requested: maxConcurrentScans)
@@ -1834,11 +2044,13 @@ public enum SystemDiskCleanup {
         fileManager: SystemMonitorFileManaging,
         kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases),
         maxConcurrentScans: Int? = nil,
+        options: DiskCleanupScanOptions = .default,
         onProgress: @escaping @Sendable ([DiskCleanupCandidate]) -> Void
     ) -> [DiskCleanupCandidate] {
+        let requestedKinds = kinds.subtracting(excludedScanKinds)
         var tasks: [CleanupScanTask] = []
 
-        if kinds.contains(.appCache) {
+        if requestedKinds.contains(.appCache) {
             tasks.append(CleanupScanTask {
                 scanApplicationCaches(fileManager: fileManager)
             })
@@ -1846,22 +2058,58 @@ public enum SystemDiskCleanup {
 
         let directoryKinds: Set<DiskCleanupKind> = [
             .cache, .log, .trash, .developerArtifacts, .temporaryFiles, .packageManagerCache, .crashReport,
+            .mailDownloads, .iosBackup, .xcodeArchive, .aiToolCache,
         ]
-        let activeDirKinds = kinds.intersection(directoryKinds)
+        let activeDirKinds = requestedKinds.intersection(directoryKinds)
         if !activeDirKinds.isEmpty {
             tasks.append(CleanupScanTask {
-                scanDirectoryChildren(fileManager: fileManager, kinds: activeDirKinds)
+                scanDirectoryChildren(
+                    fileManager: fileManager,
+                    kinds: activeDirKinds,
+                    maxDepthChildrenOnly: true,
+                    referenceDate: options.referenceDate
+                )
+            })
+        }
+
+        if requestedKinds.contains(.browserCache) {
+            tasks.append(CleanupScanTask {
+                scanBrowserCaches(fileManager: fileManager)
             })
         }
 
         let userFileKinds: Set<DiskCleanupKind> = [.diskImage, .largeFile, .duplicateFile]
-        let activeUserFileKinds = kinds.intersection(userFileKinds)
+        let activeUserFileKinds = requestedKinds.intersection(userFileKinds)
         if !activeUserFileKinds.isEmpty {
             tasks.append(CleanupScanTask {
-                scanUserFileCandidates(fileManager: fileManager, kinds: activeUserFileKinds)
+                scanUserFileCandidates(
+                    fileManager: fileManager,
+                    kinds: activeUserFileKinds,
+                    options: options
+                )
             })
         }
 
+        if requestedKinds.contains(.unfinishedDownload) {
+            tasks.append(CleanupScanTask {
+                scanUnfinishedDownloads(fileManager: fileManager, options: options)
+            })
+        }
+        if requestedKinds.contains(.projectBuildArtifact) {
+            tasks.append(CleanupScanTask {
+                scanProjectBuildArtifacts(fileManager: fileManager)
+            })
+        }
+        if requestedKinds.contains(.applicationResidual) {
+            tasks.append(CleanupScanTask {
+                scanApplicationResiduals(fileManager: fileManager)
+            })
+        }
+        if requestedKinds.contains(.languagePack) {
+            tasks.append(CleanupScanTask {
+                scanLanguagePacks(fileManager: fileManager)
+            })
+        }
         let result = executeScanTasksWithProgress(
             tasks,
             workerLimit: scanWorkerLimit(requested: maxConcurrentScans),
@@ -1955,51 +2203,126 @@ public enum SystemDiskCleanup {
     /// Directory scan: list direct children of known root directories (safe candidates).
     private static func scanDirectoryChildren(
         fileManager: SystemMonitorFileManaging,
-        kinds: Set<DiskCleanupKind>
+        kinds: Set<DiskCleanupKind>,
+        maxDepthChildrenOnly: Bool,
+        referenceDate: Date?
     ) -> [DiskCleanupCandidate] {
         let allRoots = allowedScanRoots(fileManager: fileManager)
         let roots = allRoots.filter { kinds.contains($0.kind) }
         let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
+        let allowedRootPaths = Array(Set(allowed.map(SystemMonitorPathSafety.standardizedPath)))
         // Paths that are already dedicated scan roots: do not list them as direct children of a coarser parent root to avoid double-counting
         let dedicatedRootPaths = Set(allRoots.map { $0.url.path })
+        let runningProcesses = runningProcessNames(fileManager: fileManager)
         var result: [DiskCleanupCandidate] = []
 
         for (kind, root) in roots {
             guard fileManager.fileExists(atPath: root.path) else { continue }
             guard SystemMonitorPathSafety.isURL(root, withinAllowedRoots: allowed) else { continue }
-            let children: [URL]
-            do {
-                children = try fileManager.contentsOfDirectory(
-                    at: root,
-                    includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .totalFileAllocatedSizeKey],
-                    options: [.skipsHiddenFiles]
-                )
-            } catch {
-                continue
-            }
-            for child in children {
-                let standardized = child.standardizedFileURL
-                guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: allowed) else { continue }
-                if dedicatedRootPaths.contains(standardized.path), standardized.path != root.path {
-                    continue
-                }
-                let temporaryDetail = temporaryCandidateDetail(for: standardized, kind: kind, fileManager: fileManager)
-                if kind == .temporaryFiles, temporaryDetail == nil {
-                    continue
-                }
-                let size = allocatedByteSize(of: standardized, fileManager: fileManager)
-                result.append(
-                    DiskCleanupCandidate(
-                        url: standardized,
-                        kind: kind,
-                        byteSize: size,
-                        displayName: standardized.lastPathComponent,
-                        detail: temporaryDetail
-                    )
-                )
-            }
+            guard !ownedApplicationIsRunning(
+                for: kind,
+                processNames: runningProcesses
+            ) else { continue }
+            result.append(contentsOf: scanDirectoryEntries(
+                at: root,
+                kind: kind,
+                fileManager: fileManager,
+                allowedRootPaths: allowedRootPaths,
+                dedicatedRootPaths: dedicatedRootPaths,
+                remainingDepth: maxDepthChildrenOnly ? 1 : 4,
+                referenceDate: referenceDate
+            ))
         }
         return result
+    }
+
+    private static func scanDirectoryEntries(
+        at root: URL,
+        kind: DiskCleanupKind,
+        fileManager: SystemMonitorFileManaging,
+        allowedRootPaths: [String],
+        dedicatedRootPaths: Set<String>,
+        remainingDepth: Int,
+        referenceDate: Date?
+    ) -> [DiskCleanupCandidate] {
+        guard remainingDepth > 0,
+              let children = try? fileManager.contentsOfDirectory(
+                  at: root,
+                  includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .totalFileAllocatedSizeKey],
+                  options: [.skipsHiddenFiles]
+              )
+        else {
+            return []
+        }
+
+        var result: [DiskCleanupCandidate] = []
+        for child in children {
+            let childCandidates: [DiskCleanupCandidate] = autoreleasepool {
+                guard !isSymbolicLink(child),
+                      isURL(child, withinStandardizedRootPaths: allowedRootPaths)
+                else {
+                    return []
+                }
+                let standardized = child.standardizedFileURL
+                guard !(dedicatedRootPaths.contains(standardized.path) && standardized.path != root.path) else {
+                    return []
+                }
+                let temporaryDetail = temporaryCandidateDetail(
+                    for: standardized,
+                    kind: kind,
+                    fileManager: fileManager,
+                    referenceDate: referenceDate
+                )
+                guard kind != .temporaryFiles || temporaryDetail != nil else { return [] }
+                let candidate = DiskCleanupCandidate(
+                    url: standardized,
+                    kind: kind,
+                    byteSize: allocatedByteSize(of: standardized, fileManager: fileManager),
+                    displayName: standardized.lastPathComponent,
+                    detail: directoryCandidateDetail(
+                        for: standardized,
+                        kind: kind,
+                        fallback: temporaryDetail
+                    )
+                )
+                guard remainingDepth > 1, isDirectory(standardized, fileManager: fileManager) else {
+                    return [candidate]
+                }
+                return [candidate] + scanDirectoryEntries(
+                    at: standardized,
+                    kind: kind,
+                    fileManager: fileManager,
+                    allowedRootPaths: allowedRootPaths,
+                    dedicatedRootPaths: dedicatedRootPaths,
+                    remainingDepth: remainingDepth - 1,
+                    referenceDate: referenceDate
+                )
+            }
+            result.append(contentsOf: childCandidates)
+        }
+        return result
+    }
+
+    private static func isURL(_ url: URL, withinStandardizedRootPaths roots: [String]) -> Bool {
+        guard url.isFileURL else { return false }
+        let candidate = SystemMonitorPathSafety.standardizedPath(url)
+        return roots.contains { root in
+            candidate == root || candidate.hasPrefix(root.hasSuffix("/") ? root : root + "/")
+        }
+    }
+
+    private static func ownedApplicationIsRunning(
+        for kind: DiskCleanupKind,
+        processNames: Set<String>
+    ) -> Bool {
+        switch kind {
+        case .mailDownloads:
+            return processNames.contains { $0.localizedCaseInsensitiveContains("mail") }
+        case .xcodeArchive:
+            return processNames.contains { $0.localizedCaseInsensitiveContains("xcode") }
+        default:
+            return false
+        }
     }
 
     private static let temporaryFileMinAge: TimeInterval = 7 * 24 * 3600
@@ -2012,126 +2335,129 @@ public enum SystemDiskCleanup {
     private static func temporaryCandidateDetail(
         for url: URL,
         kind: DiskCleanupKind,
-        fileManager: SystemMonitorFileManaging
+        fileManager: SystemMonitorFileManaging,
+        referenceDate: Date?
     ) -> String? {
         guard kind == .temporaryFiles else { return nil }
         guard let modificationDate = try? fileManager.attributesOfItem(atPath: url.path)[.modificationDate] as? Date else {
             return nil
         }
-        let age = Date().timeIntervalSince(modificationDate)
+        let age = (referenceDate ?? Date()).timeIntervalSince(modificationDate)
         guard age >= temporaryFileMinAge else { return nil }
         return "\(Int(age / 86400)) 天未修改"
     }
 
-    private static let diskImageExtensions: Set<String> = ["dmg", "iso", "pkg", "ipsw"]
+    private static func directoryCandidateDetail(
+        for url: URL,
+        kind: DiskCleanupKind,
+        fallback: String?
+    ) -> String? {
+        switch kind {
+        case .mailDownloads:
+            return "Mail 附件下载 · \(url.path)"
+        case .iosBackup:
+            return "iPhone/iPad 备份 · \(url.path)"
+        case .xcodeArchive:
+            return "Xcode Archive · \(url.path)"
+        case .aiToolCache:
+            return "AI 工具缓存 · \(url.path)"
+        default:
+            return fallback
+        }
+    }
 
-    /// Scans Downloads directory for disk images and installer packages.
-    private static func scanDiskImages(fileManager: SystemMonitorFileManaging) -> [DiskCleanupCandidate] {
+    private static func scanBrowserCaches(
+        fileManager: SystemMonitorFileManaging
+    ) -> [DiskCleanupCandidate] {
         let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
-        guard let downloadsURL = fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first else {
-            return []
-        }
-        guard SystemMonitorPathSafety.isURL(downloadsURL, withinAllowedRoots: allowed) else { return [] }
-        guard fileManager.fileExists(atPath: downloadsURL.path) else { return [] }
-
-        let children: [URL]
-        do {
-            children = try fileManager.contentsOfDirectory(
-                at: downloadsURL,
-                includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .totalFileAllocatedSizeKey],
-                options: [.skipsHiddenFiles]
-            )
-        } catch {
-            return []
-        }
-
+        let roots = browserCacheRoots(fileManager: fileManager)
+        let runningProcesses = runningProcessNames(fileManager: fileManager)
         var result: [DiskCleanupCandidate] = []
-        for child in children {
-            let standardized = child.standardizedFileURL
-            guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: allowed) else { continue }
-            let ext = standardized.pathExtension.lowercased()
-            guard diskImageExtensions.contains(ext) else { continue }
-            let size = allocatedByteSize(of: standardized, fileManager: fileManager)
+        for root in roots {
+            guard fileManager.fileExists(atPath: root.path),
+                  SystemMonitorPathSafety.isURL(root, withinAllowedRoots: allowed),
+                  !browserOwnerIsRunning(for: root, processNames: runningProcesses)
+            else {
+                continue
+            }
+            let size = allocatedByteSize(of: root, fileManager: fileManager)
+            guard size > 0 else { continue }
             result.append(
                 DiskCleanupCandidate(
-                    url: standardized,
-                    kind: .diskImage,
+                    url: root.standardizedFileURL,
+                    kind: .browserCache,
                     byteSize: size,
-                    displayName: standardized.lastPathComponent
+                    displayName: root.lastPathComponent,
+                    detail: "浏览器可再生缓存 · \(root.path)",
+                    source: browserName(for: root)
                 )
             )
         }
         return result
     }
 
-    /// Large file threshold: 100 MB
-    private static let largeFileThreshold: UInt64 = 100 * 1024 * 1024
-    /// Old file threshold: 90 days
-    private static let oldFileDays: TimeInterval = 90 * 24 * 3600
-
-    private struct ScannedUserFile {
-        let url: URL
-        let byteSize: UInt64
-        let modificationDate: Date?
+    private static func browserName(for url: URL) -> String {
+        let path = url.path.lowercased()
+        if path.contains("safari") { return "Safari" }
+        if path.contains("microsoft edge") || path.contains("edgemac") { return "Microsoft Edge" }
+        if path.contains("brave") { return "Brave" }
+        if path.contains("firefox") { return "Firefox" }
+        if path.contains("arc") || path.contains("thebrowser") { return "Arc" }
+        return "Chrome"
     }
 
-    private static func scanUserFileCandidates(
+    private static func browserOwnerIsRunning(for url: URL, processNames: Set<String>) -> Bool {
+        let names = switch browserName(for: url) {
+        case "Safari": ["safari"]
+        case "Microsoft Edge": ["microsoft edge", "msedge"]
+        case "Brave": ["brave browser", "brave"]
+        case "Firefox": ["firefox"]
+        case "Arc": ["arc"]
+        default: ["chrome", "google chrome"]
+        }
+        return processNames.contains { process in
+            names.contains { process.localizedCaseInsensitiveContains($0) }
+        }
+    }
+
+    private static func runningProcessNames(fileManager: SystemMonitorFileManaging) -> Set<String> {
+        guard fileManager is DefaultSystemMonitorFileManager,
+              let output = readOnlyCommand(executable: "/bin/ps", arguments: ["-axo", "comm="]) else {
+            return []
+        }
+        return Set(output.split(whereSeparator: \.isNewline).map {
+            String($0).trimmingCharacters(in: .whitespaces)
+        })
+    }
+
+    private static let diskImageExtensions: Set<String> = ["dmg", "iso", "pkg", "ipsw", "xip"]
+    private static let unfinishedDownloadExtensions: Set<String> = ["download", "crdownload", "part"]
+
+    /// Scans user-selected folders for installer packages and disk images.
+    private static func scanDiskImages(
         fileManager: SystemMonitorFileManaging,
-        kinds: Set<DiskCleanupKind>
+        directories: [URL],
+        maxDepth: Int
     ) -> [DiskCleanupCandidate] {
+        let allowed = allowedUserFileRoots(fileManager: fileManager, directories: directories)
         var result: [DiskCleanupCandidate] = []
-        if kinds.contains(.diskImage) {
-            result.append(contentsOf: scanDiskImages(fileManager: fileManager))
-        }
-
-        let needsLargeFiles = kinds.contains(.largeFile)
-        let needsDuplicates = kinds.contains(.duplicateFile)
-        guard needsLargeFiles || needsDuplicates else { return result }
-
-        let files = collectScannedUserFiles(
+        enumerateUserFiles(
+            in: directories,
             fileManager: fileManager,
-            includesModificationDate: needsLargeFiles
-        )
-        if needsLargeFiles {
-            result.append(contentsOf: largeOldFileCandidates(from: files))
-        }
-        if needsDuplicates {
-            result.append(contentsOf: duplicateFileCandidates(from: files, fileManager: fileManager))
-        }
-        return result
-    }
-
-    /// Downloads, Desktop, and Documents are traversed only once for both large-file and duplicate-file detection.
-    private static func collectScannedUserFiles(
-        fileManager: SystemMonitorFileManaging,
-        includesModificationDate: Bool
-    ) -> [ScannedUserFile] {
-        let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
-        let searchDirs = userFileDirectories(fileManager: fileManager)
-        var seenPaths = Set<String>()
-        var result: [ScannedUserFile] = []
-
-        for dir in searchDirs {
-            guard SystemMonitorPathSafety.isURL(dir, withinAllowedRoots: allowed) else { continue }
-            let files = collectFilesRecursively(at: dir, fileManager: fileManager, maxDepth: 5, allowed: allowed)
-            for fileURL in files {
-                let size = allocatedByteSize(of: fileURL, fileManager: fileManager)
-                guard size > 0 else { continue }
-                let standardized = fileURL.standardizedFileURL
-                guard seenPaths.insert(SystemMonitorPathSafety.standardizedPath(standardized)).inserted else {
-                    continue
-                }
-                let modificationDate: Date?
-                if includesModificationDate {
-                    modificationDate = (try? fileManager.attributesOfItem(atPath: standardized.path)[.modificationDate]) as? Date
-                } else {
-                    modificationDate = nil
-                }
+            maxDepth: maxDepth,
+            allowed: allowed
+        ) { file in
+            autoreleasepool {
+                let standardized = file.standardizedFileURL
+                guard diskImageExtensions.contains(standardized.pathExtension.lowercased()) else { return }
+                let size = allocatedByteSize(of: standardized, fileManager: fileManager)
                 result.append(
-                    ScannedUserFile(
+                    DiskCleanupCandidate(
                         url: standardized,
+                        kind: .diskImage,
                         byteSize: size,
-                        modificationDate: modificationDate
+                        displayName: standardized.lastPathComponent,
+                        detail: "安装包/磁盘镜像 · \(standardized.deletingLastPathComponent().path)"
                     )
                 )
             }
@@ -2139,56 +2465,370 @@ public enum SystemDiskCleanup {
         return result
     }
 
-    private static func largeOldFileCandidates(
-        from files: [ScannedUserFile]
+    private struct DuplicateFileKey: Hashable, Sendable {
+        let byteSize: UInt64
+        let digest: Data
+    }
+
+    private struct DuplicateFileOriginal: Sendable {
+        let url: URL
+    }
+
+    private static func scanUserFileCandidates(
+        fileManager: SystemMonitorFileManaging,
+        kinds: Set<DiskCleanupKind>,
+        options: DiskCleanupScanOptions
     ) -> [DiskCleanupCandidate] {
-        let cutoff = Date().addingTimeInterval(-oldFileDays)
-        return files.compactMap { file in
-            guard file.byteSize >= largeFileThreshold,
-                  let modificationDate = file.modificationDate,
-                  modificationDate < cutoff
-            else {
-                return nil
+        var result: [DiskCleanupCandidate] = []
+        let directories = userFileScanDirectories(
+            fileManager: fileManager,
+            additional: options.additionalUserDirectories
+        )
+        if kinds.contains(.diskImage) {
+            result.append(
+                contentsOf: scanDiskImages(
+                    fileManager: fileManager,
+                    directories: directories,
+                    maxDepth: options.userFileMaxDepth
+                )
+            )
+        }
+
+        let needsLargeFiles = kinds.contains(.largeFile)
+        let needsDuplicates = kinds.contains(.duplicateFile)
+        guard needsLargeFiles || needsDuplicates else { return result }
+
+        let allowed = allowedUserFileRoots(fileManager: fileManager, directories: directories)
+        let referenceDate = options.referenceDate ?? Date()
+        let largeFileCutoff = referenceDate.addingTimeInterval(-options.oldFileAge)
+        var firstFileSizes = Set<UInt64>()
+        var repeatedFileSizes = Set<UInt64>()
+
+        enumerateUserFiles(
+            in: directories,
+            fileManager: fileManager,
+            maxDepth: options.userFileMaxDepth,
+            allowed: allowed
+        ) { fileURL in
+            autoreleasepool {
+                let standardized = fileURL.standardizedFileURL
+                let size = allocatedByteSize(of: standardized, fileManager: fileManager)
+                guard size > 0 else { return }
+
+                if needsLargeFiles,
+                   size >= options.largeFileThreshold,
+                   let modificationDate = (try? fileManager.attributesOfItem(atPath: standardized.path)[.modificationDate]) as? Date,
+                   modificationDate < largeFileCutoff {
+                    let days = Int(referenceDate.timeIntervalSince(modificationDate) / 86400)
+                    result.append(
+                        DiskCleanupCandidate(
+                            url: standardized,
+                            kind: .largeFile,
+                            byteSize: size,
+                            displayName: standardized.lastPathComponent,
+                            detail: "\(days) 天前修改"
+                        )
+                    )
+                }
+
+                guard needsDuplicates, !repeatedFileSizes.contains(size) else { return }
+                if !firstFileSizes.insert(size).inserted {
+                    firstFileSizes.remove(size)
+                    repeatedFileSizes.insert(size)
+                }
             }
-            let days = Int(Date().timeIntervalSince(modificationDate) / 86400)
-            return DiskCleanupCandidate(
-                url: file.url,
-                kind: .largeFile,
-                byteSize: file.byteSize,
-                displayName: file.url.lastPathComponent,
-                detail: "\(days) 天前修改"
+        }
+        if needsDuplicates {
+            result.append(
+                contentsOf: duplicateFileCandidates(
+                    fileManager: fileManager,
+                    directories: directories,
+                    maxDepth: options.userFileMaxDepth,
+                    allowed: allowed,
+                    repeatedFileSizes: repeatedFileSizes
+                )
+            )
+        }
+        return result
+    }
+
+    /// Finds repeated allocated sizes first, then retains only the first SHA256 match for each duplicate group.
+    private static func duplicateFileCandidates(
+        fileManager: SystemMonitorFileManaging,
+        directories: [URL],
+        maxDepth: Int,
+        allowed: [URL],
+        repeatedFileSizes: Set<UInt64>
+    ) -> [DiskCleanupCandidate] {
+        guard !repeatedFileSizes.isEmpty else { return [] }
+        var originals: [DuplicateFileKey: DuplicateFileOriginal] = [:]
+        var result: [DiskCleanupCandidate] = []
+        enumerateUserFiles(
+            in: directories,
+            fileManager: fileManager,
+            maxDepth: maxDepth,
+            allowed: allowed
+        ) { fileURL in
+            autoreleasepool {
+                let standardized = fileURL.standardizedFileURL
+                let size = allocatedByteSize(of: standardized, fileManager: fileManager)
+                guard repeatedFileSizes.contains(size),
+                      let digest = fileManager.sha256Digest(at: standardized)
+                else {
+                    return
+                }
+                let key = DuplicateFileKey(byteSize: size, digest: digest)
+                if let original = originals[key] {
+                    result.append(
+                        DiskCleanupCandidate(
+                            url: standardized,
+                            kind: .duplicateFile,
+                            byteSize: size,
+                            displayName: standardized.lastPathComponent,
+                            detail: "与 \(original.url.lastPathComponent) 重复 · 保留副本：\(original.url.path)"
+                        )
+                    )
+                } else {
+                    originals[key] = DuplicateFileOriginal(url: standardized)
+                }
+            }
+        }
+        return result
+    }
+
+    private static func scanUnfinishedDownloads(
+        fileManager: SystemMonitorFileManaging,
+        options: DiskCleanupScanOptions
+    ) -> [DiskCleanupCandidate] {
+        let referenceDate = options.referenceDate ?? Date()
+        let directories = userFileScanDirectories(
+            fileManager: fileManager,
+            additional: options.additionalUserDirectories
+        )
+        let allowed = allowedUserFileRoots(fileManager: fileManager, directories: directories)
+        var result: [DiskCleanupCandidate] = []
+        enumerateUserFiles(
+            in: directories,
+            fileManager: fileManager,
+            maxDepth: options.userFileMaxDepth,
+            allowed: allowed
+        ) { fileURL in
+            autoreleasepool {
+                let standardized = fileURL.standardizedFileURL
+                let ext = standardized.pathExtension.lowercased()
+                let name = standardized.lastPathComponent.lowercased()
+                guard unfinishedDownloadExtensions.contains(ext)
+                    || name.hasSuffix(".download")
+                    || name.hasSuffix(".crdownload")
+                    || name.hasSuffix(".part")
+                else {
+                    return
+                }
+                guard let modificationDate = (try? fileManager.attributesOfItem(atPath: standardized.path)[.modificationDate]) as? Date,
+                      referenceDate.timeIntervalSince(modificationDate) >= options.unfinishedDownloadAge
+                else {
+                    return
+                }
+                let size = allocatedByteSize(of: standardized, fileManager: fileManager)
+                guard size > 0 else { return }
+                let days = Int(referenceDate.timeIntervalSince(modificationDate) / 86400)
+                result.append(
+                    DiskCleanupCandidate(
+                        url: standardized,
+                        kind: .unfinishedDownload,
+                        byteSize: size,
+                        displayName: standardized.lastPathComponent,
+                        detail: "未完成下载 · \(days) 天未修改",
+                        source: standardized.deletingLastPathComponent().lastPathComponent
+                    )
+                )
+            }
+        }
+        return result
+    }
+
+    private static let projectMarkers: Set<String> = [
+        ".git", "Package.swift", "package.json", "Cargo.toml", "pyproject.toml", "go.mod",
+        "pom.xml", "build.gradle", "Podfile", "project.pbxproj",
+    ]
+    private static let projectArtifactNames: Set<String> = [
+        ".build", "DerivedData", "node_modules", "target", "dist", ".next", "build",
+        "__pycache__", ".pytest_cache", ".gradle",
+    ]
+    private static let projectTraversalExclusions: Set<String> = [
+        "Library", "Applications", "System", ".Trash", "Movies", "Music", "Pictures",
+        "Public", "Downloads", "Desktop", "Documents", "Caches", "Containers",
+    ]
+
+    private static func scanProjectBuildArtifacts(
+        fileManager: SystemMonitorFileManaging
+    ) -> [DiskCleanupCandidate] {
+        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
+        let roots = projectSearchRoots(fileManager: fileManager)
+        let runningProcesses = runningProcessNames(fileManager: fileManager)
+        var visited = Set<String>()
+        var result: [DiskCleanupCandidate] = []
+        for root in roots {
+            guard !isSymbolicLink(root) else { continue }
+            findProjectArtifacts(
+                at: root,
+                fileManager: fileManager,
+                depth: 0,
+                maxDepth: 5,
+                home: home,
+                runningProcesses: runningProcesses,
+                visited: &visited,
+                result: &result
+            )
+        }
+        return result
+    }
+
+    private static func projectSearchRoots(fileManager: SystemMonitorFileManaging) -> [URL] {
+        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
+        var roots = [
+            home.appendingPathComponent("Developer", isDirectory: true),
+            home.appendingPathComponent("Projects", isDirectory: true),
+        ]
+        roots.append(contentsOf: userFileDirectories(fileManager: fileManager))
+
+        if let children = try? fileManager.contentsOfDirectory(
+            at: home,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            roots.append(contentsOf: children.filter {
+                isDirectory($0, fileManager: fileManager)
+                    && !projectTraversalExclusions.contains($0.lastPathComponent)
+            })
+        }
+        return uniqueURLs(roots)
+    }
+
+    private static func findProjectArtifacts(
+        at url: URL,
+        fileManager: SystemMonitorFileManaging,
+        depth: Int,
+        maxDepth: Int,
+        home: URL,
+        runningProcesses: Set<String>,
+        visited: inout Set<String>,
+        result: inout [DiskCleanupCandidate]
+    ) {
+        guard depth <= maxDepth,
+              result.count < 500,
+              SystemMonitorPathSafety.isURL(url, withinAllowedRoots: [home]),
+              fileManager.fileExists(atPath: url.path)
+        else {
+            return
+        }
+        let path = SystemMonitorPathSafety.standardizedPath(url)
+        guard visited.insert(path).inserted else { return }
+
+        guard let children = try? fileManager.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: []
+        ) else {
+            return
+        }
+        let childNames = Set(children.map(\.lastPathComponent))
+        let isProjectRoot = !childNames.intersection(projectMarkers).isEmpty
+        for child in children {
+            guard !isSymbolicLink(child) else { continue }
+            let name = child.lastPathComponent
+            let childIsDirectory = isDirectory(child, fileManager: fileManager)
+            guard childIsDirectory else { continue }
+            if isProjectRoot, projectArtifactNames.contains(name) {
+                guard !directoryContainsRunningProcess(child, processNames: runningProcesses) else { continue }
+                let size = allocatedByteSize(of: child, fileManager: fileManager)
+                guard size > 0 else { continue }
+                result.append(
+                    DiskCleanupCandidate(
+                        url: child.standardizedFileURL,
+                        kind: .projectBuildArtifact,
+                        byteSize: size,
+                        displayName: name,
+                        detail: "项目构建产物 · 项目根：\(url.path)",
+                        source: url.path
+                    )
+                )
+                continue
+            }
+            guard depth < maxDepth,
+                  !projectTraversalExclusions.contains(name),
+                  !name.hasPrefix(".") || name == ".git"
+            else {
+                continue
+            }
+            findProjectArtifacts(
+                at: child,
+                fileManager: fileManager,
+                depth: depth + 1,
+                    maxDepth: maxDepth,
+                    home: home,
+                    runningProcesses: runningProcesses,
+                    visited: &visited,
+                    result: &result
             )
         }
     }
 
-    /// Group by size first, then compare possible duplicates with streaming SHA256 checksums.
-    private static func duplicateFileCandidates(
-        from files: [ScannedUserFile],
+    private static func directoryContainsRunningProcess(_ directory: URL, processNames: Set<String>) -> Bool {
+        let path = SystemMonitorPathSafety.standardizedPath(directory)
+        return processNames.contains { processPath in
+            processPath == path || processPath.hasPrefix(path + "/")
+        }
+    }
+
+    private static let applicationResidualRoots = [
+        "Library/Preferences",
+        "Library/Application Support",
+        "Library/Containers",
+        "Library/Group Containers",
+        "Library/Saved Application State",
+        "Library/WebKit",
+        "Library/LaunchAgents",
+    ]
+    private static let applicationResidualMinimumSize: UInt64 = 1 * 1024 * 1024
+
+    private static func scanApplicationResiduals(
         fileManager: SystemMonitorFileManaging
     ) -> [DiskCleanupCandidate] {
-        var sizeGroups: [UInt64: [ScannedUserFile]] = [:]
-        for file in files {
-            sizeGroups[file.byteSize, default: []].append(file)
-        }
-
+        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
+        let installed = installedBundleIdentifiers(fileManager: fileManager, home: home)
         var result: [DiskCleanupCandidate] = []
-        for (_, filesWithSameSize) in sizeGroups where filesWithSameSize.count > 1 {
-            var hashGroups: [String: [ScannedUserFile]] = [:]
-            for file in filesWithSameSize {
-                let hash = sha256(of: file.url, fileManager: fileManager)
-                guard !hash.isEmpty else { continue }
-                hashGroups[hash, default: []].append(file)
+        for relativeRoot in applicationResidualRoots {
+            let root = home.appendingPathComponent(relativeRoot, isDirectory: true)
+            guard fileManager.fileExists(atPath: root.path),
+                  let children = try? fileManager.contentsOfDirectory(
+                      at: root,
+                      includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .totalFileAllocatedSizeKey],
+                      options: [.skipsHiddenFiles]
+                  )
+            else {
+                continue
             }
-            for (_, group) in hashGroups where group.count > 1 {
-                let original = group[0]
-                for duplicate in group.dropFirst() {
+            for child in children {
+                autoreleasepool {
+                    guard !isSymbolicLink(child) else { return }
+                    let identifier = residualIdentifier(for: child, root: root)
+                    guard let identifier,
+                          !isAppleSystemIdentifier(identifier),
+                          !isOwnedByInstalledApplication(identifier, installed: installed),
+                          looksLikeBundleIdentifier(identifier),
+                          let size = significantApplicationResidualSize(of: child, fileManager: fileManager)
+                    else {
+                        return
+                    }
                     result.append(
                         DiskCleanupCandidate(
-                            url: duplicate.url,
-                            kind: .duplicateFile,
-                            byteSize: duplicate.byteSize,
-                            displayName: duplicate.url.lastPathComponent,
-                            detail: "与 \(original.url.lastPathComponent) 重复 · 保留副本：\(original.url.path)"
+                            url: child.standardizedFileURL,
+                            kind: .applicationResidual,
+                            byteSize: size,
+                            displayName: child.lastPathComponent,
+                            detail: "可能是已卸载应用残留 · bundle id：\(identifier) · 需确认归属",
+                            source: identifier
                         )
                     )
                 }
@@ -2197,52 +2837,419 @@ public enum SystemDiskCleanup {
         return result
     }
 
+    private static func residualIdentifier(for url: URL, root: URL) -> String? {
+        let name = url.deletingPathExtension().lastPathComponent
+        if root.lastPathComponent == "Preferences" || root.lastPathComponent == "LaunchAgents" {
+            return name
+        }
+        return url.lastPathComponent
+    }
+
+    private static func looksLikeBundleIdentifier(_ value: String) -> Bool {
+        let parts = value.split(separator: ".")
+        guard parts.count >= 2 else { return false }
+        return parts.allSatisfy { part in
+            !part.isEmpty && part.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
+        }
+    }
+
+    private static func isAppleSystemIdentifier(_ identifier: String) -> Bool {
+        identifier == "com.apple"
+            || identifier.hasPrefix("com.apple.")
+            || identifier == "group.com.apple"
+            || identifier.hasPrefix("group.com.apple.")
+    }
+
+    private static func significantApplicationResidualSize(
+        of url: URL,
+        fileManager: SystemMonitorFileManaging
+    ) -> UInt64? {
+        if isDirectory(url, fileManager: fileManager) {
+            let size = allocatedByteSize(of: url, fileManager: fileManager)
+            return size >= applicationResidualMinimumSize ? size : nil
+        }
+        guard let size = (try? fileManager.attributesOfItem(atPath: url.path)[.size]) as? NSNumber,
+              size.uint64Value >= applicationResidualMinimumSize
+        else {
+            return nil
+        }
+        let allocated = allocatedByteSize(of: url, fileManager: fileManager)
+        return allocated >= applicationResidualMinimumSize ? allocated : nil
+    }
+
+    private static func residualOwnerIdentifiers(for identifier: String) -> [String] {
+        var values: Set<String> = [identifier]
+        if identifier.hasPrefix("group.") {
+            values.insert(String(identifier.dropFirst("group.".count)))
+        }
+        let parts = identifier.split(separator: ".")
+        if let first = parts.first,
+           first.unicodeScalars.count == 10,
+           first.unicodeScalars.allSatisfy({ scalar in
+               (48...57).contains(scalar.value) || (65...90).contains(scalar.value)
+           }) {
+            values.insert(parts.dropFirst().joined(separator: "."))
+        }
+        let currentValues = values
+        for value in currentValues where value.hasSuffix(".savedState") {
+            values.insert(String(value.dropLast(".savedState".count)))
+        }
+        return Array(values)
+    }
+
+    private static func isOwnedByInstalledApplication(_ identifier: String, installed: Set<String>) -> Bool {
+        let ownerIdentifiers = residualOwnerIdentifiers(for: identifier)
+        if ownerIdentifiers.contains(where: installed.contains) {
+            return true
+        }
+        let ownerNamespaces = Set(ownerIdentifiers.compactMap { vendorNamespace(for: $0) })
+        return installed.contains { installedIdentifier in
+            guard let namespace = vendorNamespace(for: installedIdentifier) else { return false }
+            return ownerNamespaces.contains(namespace)
+        }
+    }
+
+    private static func vendorNamespace(for identifier: String) -> String? {
+        let parts = identifier.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+        return parts.prefix(2).joined(separator: ".")
+    }
+
+    private static func installedBundleIdentifiers(
+        fileManager: SystemMonitorFileManaging,
+        home: URL
+    ) -> Set<String> {
+        let roots = [
+            home.appendingPathComponent("Applications", isDirectory: true),
+            URL(fileURLWithPath: "/Applications", isDirectory: true),
+            URL(fileURLWithPath: "/System/Applications", isDirectory: true),
+            URL(fileURLWithPath: "/System/Library/CoreServices", isDirectory: true),
+        ]
+        var identifiers = Set<String>()
+        var visited = Set<String>()
+        for root in roots {
+            collectInstalledBundleIdentifiers(
+                at: root,
+                fileManager: fileManager,
+                depth: 0,
+                maxDepth: 3,
+                visited: &visited,
+                identifiers: &identifiers
+            )
+        }
+        return identifiers
+    }
+
+    private static let embeddedBundleTraversalDirectories: Set<String> = [
+        "Contents", "MacOS", "PlugIns", "Frameworks", "Resources", "Library", "LoginItems", "app",
+    ]
+
+    private static func collectBundleIdentifiers(
+        from bundle: URL,
+        fileManager: SystemMonitorFileManaging,
+        identifiers: inout Set<String>
+    ) {
+        let infoURL = bundle.appendingPathComponent("Contents/Info.plist")
+        if let data = fileManager.contents(atPath: infoURL.path),
+           let plist = try? PropertyListSerialization.propertyList(
+               from: data,
+               options: [],
+               format: nil
+           ) as? [String: Any],
+           let identifier = plist["CFBundleIdentifier"] as? String {
+            identifiers.insert(identifier)
+        }
+        collectEmbeddedBundleIdentifiers(
+            at: bundle.appendingPathComponent("Contents", isDirectory: true),
+            fileManager: fileManager,
+            depth: 0,
+            maxDepth: 6,
+            identifiers: &identifiers
+        )
+    }
+
+    private static func collectEmbeddedBundleIdentifiers(
+        at url: URL,
+        fileManager: SystemMonitorFileManaging,
+        depth: Int,
+        maxDepth: Int,
+        identifiers: inout Set<String>
+    ) {
+        guard depth < maxDepth,
+              let children = try? fileManager.contentsOfDirectory(
+                  at: url,
+                  includingPropertiesForKeys: [.isDirectoryKey],
+                  options: [.skipsHiddenFiles]
+              )
+        else {
+            return
+        }
+        for child in children {
+            guard !isSymbolicLink(child) else { continue }
+            let extensionName = child.pathExtension.lowercased()
+            if extensionName == "app" || extensionName == "appex" {
+                collectBundleIdentifiers(from: child, fileManager: fileManager, identifiers: &identifiers)
+            } else if embeddedBundleTraversalDirectories.contains(child.lastPathComponent),
+                      isDirectory(child, fileManager: fileManager) {
+                collectEmbeddedBundleIdentifiers(
+                    at: child,
+                    fileManager: fileManager,
+                    depth: depth + 1,
+                    maxDepth: maxDepth,
+                    identifiers: &identifiers
+                )
+            }
+        }
+    }
+
+    private static func collectInstalledBundleIdentifiers(
+        at url: URL,
+        fileManager: SystemMonitorFileManaging,
+        depth: Int,
+        maxDepth: Int,
+        visited: inout Set<String>,
+        identifiers: inout Set<String>
+    ) {
+        guard depth <= maxDepth,
+              fileManager.fileExists(atPath: url.path),
+              visited.insert(url.standardizedFileURL.path).inserted,
+                  let children = try? fileManager.contentsOfDirectory(
+                      at: url,
+                      includingPropertiesForKeys: [.isDirectoryKey],
+                      options: []
+                  )
+        else {
+            return
+        }
+        for child in children {
+            if child.pathExtension.lowercased() == "app" {
+                collectBundleIdentifiers(from: child, fileManager: fileManager, identifiers: &identifiers)
+                continue
+            }
+            if isDirectory(child, fileManager: fileManager) {
+                collectInstalledBundleIdentifiers(
+                    at: child,
+                    fileManager: fileManager,
+                    depth: depth + 1,
+                    maxDepth: maxDepth,
+                    visited: &visited,
+                    identifiers: &identifiers
+                )
+            }
+        }
+    }
+
+    private static func scanLanguagePacks(
+        fileManager: SystemMonitorFileManaging
+    ) -> [DiskCleanupCandidate] {
+        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
+        let applications = home.appendingPathComponent("Applications", isDirectory: true)
+        guard fileManager.fileExists(atPath: applications.path) else { return [] }
+        let bundles = findApplicationBundles(at: applications, fileManager: fileManager, depth: 0, maxDepth: 3)
+        var result: [DiskCleanupCandidate] = []
+        for app in bundles {
+            let resources = app.appendingPathComponent("Contents/Resources", isDirectory: true)
+            guard let children = try? fileManager.contentsOfDirectory(
+                at: resources,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            ) else {
+                continue
+            }
+            for locale in children where locale.pathExtension.lowercased() == "lproj" {
+                let localeName = locale.deletingPathExtension().lastPathComponent
+                guard localeName != "Base" else { continue }
+                let size = allocatedByteSize(of: locale, fileManager: fileManager)
+                guard size > 0 else { continue }
+                result.append(
+                    DiskCleanupCandidate(
+                        url: locale.standardizedFileURL,
+                        kind: .languagePack,
+                        byteSize: size,
+                        displayName: "\(app.deletingPathExtension().lastPathComponent) · \(localeName)",
+                        detail: "应用语言包 · 仅建议在确认不需要该语言后处理",
+                        source: app.path
+                    )
+                )
+            }
+        }
+        return result
+    }
+
+    private static func findApplicationBundles(
+        at url: URL,
+        fileManager: SystemMonitorFileManaging,
+        depth: Int,
+        maxDepth: Int
+    ) -> [URL] {
+        guard depth <= maxDepth,
+              let children = try? fileManager.contentsOfDirectory(
+                  at: url,
+                  includingPropertiesForKeys: [.isDirectoryKey],
+                  options: [.skipsHiddenFiles]
+              )
+        else {
+            return []
+        }
+        var result: [URL] = []
+        for child in children {
+            if child.pathExtension.lowercased() == "app" {
+                result.append(child)
+            } else if isDirectory(child, fileManager: fileManager) {
+                result.append(contentsOf: findApplicationBundles(
+                    at: child,
+                    fileManager: fileManager,
+                    depth: depth + 1,
+                    maxDepth: maxDepth
+                ))
+            }
+        }
+        return result
+    }
+
+    private static func readOnlyCommand(executable: String, arguments: [String]) -> String? {
+        guard FileManager.default.isExecutableFile(atPath: executable) else { return nil }
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            // Drain while the command is running; `ps` can exceed a pipe buffer on developer machines.
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            return String(data: data, encoding: .utf8)
+        } catch {
+            return nil
+        }
+    }
+
     // MARK: - File helpers
 
     /// Returns user file directories: Downloads / Desktop / Documents
     private static func userFileDirectories(fileManager: SystemMonitorFileManaging) -> [URL] {
-        let dirs: [FileManager.SearchPathDirectory] = [.downloadsDirectory, .desktopDirectory, .documentDirectory]
-        return dirs.compactMap { fileManager.urls(for: $0, in: .userDomainMask).first }
+        userFileDirectories(fileManager: fileManager, additional: [])
     }
 
-    /// Recursively collects files (non-directories) under a directory, up to maxDepth levels deep.
-    private static func collectFilesRecursively(
+    private static func userFileDirectories(
+        fileManager: SystemMonitorFileManaging,
+        additional: [URL]
+    ) -> [URL] {
+        let dirs: [FileManager.SearchPathDirectory] = [.downloadsDirectory, .desktopDirectory, .documentDirectory]
+        var result = dirs.compactMap { fileManager.urls(for: $0, in: .userDomainMask).first }
+        result.append(contentsOf: additional)
+        var seen = Set<String>()
+        return result.filter { seen.insert(SystemMonitorPathSafety.standardizedPath($0)).inserted }
+    }
+
+    /// Removes nested roots so each user file is visited once without retaining every path in a de-duplication set.
+    private static func userFileScanDirectories(
+        fileManager: SystemMonitorFileManaging,
+        additional: [URL]
+    ) -> [URL] {
+        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
+        var roots: [URL] = []
+        for directory in userFileDirectories(fileManager: fileManager, additional: additional) {
+            let standardized = directory.standardizedFileURL
+            guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: [home]) else { continue }
+            if roots.contains(where: { SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: [$0]) }) {
+                continue
+            }
+            roots.removeAll { SystemMonitorPathSafety.isURL($0, withinAllowedRoots: [standardized]) }
+            roots.append(standardized)
+        }
+        return roots
+    }
+
+    private static func allowedUserFileRoots(
+        fileManager: SystemMonitorFileManaging,
+        directories: [URL]
+    ) -> [URL] {
+        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
+        let defaultRoots = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
+        let userRoots = directories.filter {
+            SystemMonitorPathSafety.isURL($0, withinAllowedRoots: [home])
+        }
+        return uniqueURLs(defaultRoots + userRoots)
+    }
+
+    private static func enumerateUserFiles(
+        in directories: [URL],
+        fileManager: SystemMonitorFileManaging,
+        maxDepth: Int,
+        allowed: [URL],
+        handler: (URL) -> Void
+    ) {
+        for directory in directories {
+            guard fileManager.fileExists(atPath: directory.path),
+                  SystemMonitorPathSafety.isURL(directory, withinAllowedRoots: allowed)
+            else {
+                continue
+            }
+            enumerateFilesRecursively(
+                at: directory,
+                fileManager: fileManager,
+                maxDepth: maxDepth,
+                allowed: allowed,
+                handler: handler
+            )
+        }
+    }
+
+    /// Streams files via callback without accumulating all URLs in memory.
+    private static func enumerateFilesRecursively(
         at url: URL,
         fileManager: SystemMonitorFileManaging,
         maxDepth: Int,
-        allowed: [URL]
-    ) -> [URL] {
-        guard maxDepth > 0 else { return [] }
-        guard SystemMonitorPathSafety.isURL(url, withinAllowedRoots: allowed) else { return [] }
+        allowed: [URL],
+        handler: (URL) -> Void
+    ) {
+        guard maxDepth > 0 else { return }
+        guard SystemMonitorPathSafety.isURL(url, withinAllowedRoots: allowed) else { return }
 
         let children: [URL]
         do {
             children = try fileManager.contentsOfDirectory(
                 at: url,
-                includingPropertiesForKeys: nil,
+                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
                 options: [.skipsHiddenFiles]
             )
         } catch {
-            return []
+            return
         }
 
-        var files: [URL] = []
         for child in children {
-            let standardized = child.standardizedFileURL
-            guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: allowed) else { continue }
+            autoreleasepool {
+                guard !isSymbolicLink(child) else { return }
+                let standardized = child.standardizedFileURL
+                guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: allowed) else { return }
 
-            if isDirectory(standardized, fileManager: fileManager) {
-                files.append(contentsOf: collectFilesRecursively(at: standardized, fileManager: fileManager, maxDepth: maxDepth - 1, allowed: allowed))
-            } else {
-                files.append(standardized)
+                if isDirectory(standardized, fileManager: fileManager) {
+                    enumerateFilesRecursively(
+                        at: standardized,
+                        fileManager: fileManager,
+                        maxDepth: maxDepth - 1,
+                        allowed: allowed,
+                        handler: handler
+                    )
+                } else {
+                    handler(standardized)
+                }
             }
         }
-        return files
+    }
+
+    private static func isSymbolicLink(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
     }
 
     /// Returns whether a URL is a directory: prefers resourceValues, falls back to contentsOfDirectory.
     private static func isDirectory(_ url: URL, fileManager: SystemMonitorFileManaging) -> Bool {
-        if let isDir = try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory {
+        if let isDir = try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory,
+           isDir == true {
             return isDir
         }
         // Fallback: try listing children; if non-empty, treat as directory
@@ -2252,12 +3259,6 @@ public enum SystemDiskCleanup {
             options: [.skipsHiddenFiles]
         )) ?? []
         return !children.isEmpty
-    }
-
-    /// The production file manager calculates SHA256 incrementally to avoid loading whole files into memory.
-    private static func sha256(of url: URL, fileManager: SystemMonitorFileManaging) -> String {
-        guard let digest = fileManager.sha256Digest(at: url) else { return "" }
-        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     /// Moves selected URLs to the Trash; never permanently deletes. Out-of-bounds URLs are recorded as failures.
@@ -2301,6 +3302,75 @@ public enum SystemDiskCleanup {
             }
         }
         return DiskCleanupResult(successCount: success, freedBytes: freed, failures: failures)
+    }
+
+    /// Moves verified scan candidates to the Trash. Analysis-only candidates are rejected explicitly.
+    public static func trashSelected(
+        candidates: [DiskCleanupCandidate],
+        fileManager: SystemMonitorFileManaging,
+        sizeProvider: ((URL) -> UInt64)? = nil
+    ) -> DiskCleanupResult {
+        var success = 0
+        var freed: UInt64 = 0
+        var failures: [DiskCleanupFailure] = []
+
+        for candidate in candidates {
+            guard candidate.isActionable else {
+                failures.append(
+                    DiskCleanupFailure(
+                        url: candidate.url,
+                        message: DiskCleanupError.analysisOnlyCandidate.localizedDescription
+                    )
+                )
+                continue
+            }
+            guard candidatePathIsEligibleForTrash(candidate, fileManager: fileManager) else {
+                failures.append(
+                    DiskCleanupFailure(
+                        url: candidate.url,
+                        message: DiskCleanupError.pathOutsideAllowedRoots.localizedDescription
+                    )
+                )
+                continue
+            }
+            let result = trashSelected(
+                urls: [candidate.url],
+                fileManager: fileManager,
+                allowedRoots: [candidate.url],
+                sizeProvider: sizeProvider
+            )
+            success += result.successCount
+            freed += result.freedBytes
+            failures.append(contentsOf: result.failures)
+        }
+        return DiskCleanupResult(successCount: success, freedBytes: freed, failures: failures)
+    }
+
+    private static func candidatePathIsEligibleForTrash(
+        _ candidate: DiskCleanupCandidate,
+        fileManager: SystemMonitorFileManaging
+    ) -> Bool {
+        guard candidate.url.isFileURL, candidate.kind.safetyLevel != .analysisOnly else { return false }
+        let path = SystemMonitorPathSafety.standardizedPath(candidate.url)
+        let home = SystemMonitorPathSafety.standardizedPath(fileManager.homeDirectoryForCurrentUser())
+
+        switch candidate.kind {
+        case .applicationResidual:
+            return applicationResidualRoots.contains { root in
+                let rootURL = URL(fileURLWithPath: home).appendingPathComponent(root, isDirectory: true)
+                return URL(fileURLWithPath: path).deletingLastPathComponent().path == rootURL.path
+            }
+        case .projectBuildArtifact:
+            return path.hasPrefix(home + "/")
+                && projectArtifactNames.contains(URL(fileURLWithPath: path).lastPathComponent)
+        case .languagePack:
+            return path.hasPrefix(home + "/Applications/") && path.hasSuffix(".lproj")
+        default:
+            return SystemMonitorPathSafety.isURL(
+                candidate.url,
+                withinAllowedRoots: SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
+            )
+        }
     }
 }
 
@@ -2679,16 +3749,18 @@ public final class SystemMonitorService: ObservableObject {
     }
 
     public func scanCleanupCandidates(
-        kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases)
+        kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases),
+        options: DiskCleanupScanOptions = .default
     ) async -> [DiskCleanupCandidate] {
         let fm = fileManager
         return await Task.detached(priority: .utility) {
-            SystemDiskCleanup.scanCandidates(fileManager: fm, kinds: kinds)
+            SystemDiskCleanup.scanCandidates(fileManager: fm, kinds: kinds, options: options)
         }.value
     }
 
     public func scanCleanupCandidatesWithProgress(
         kinds: Set<DiskCleanupKind> = Set(DiskCleanupKind.allCases),
+        options: DiskCleanupScanOptions = .default,
         onProgress: @escaping @Sendable ([DiskCleanupCandidate]) -> Void
     ) async -> [DiskCleanupCandidate] {
         let fm = fileManager
@@ -2696,6 +3768,7 @@ public final class SystemMonitorService: ObservableObject {
             SystemDiskCleanup.scanCandidatesWithProgress(
                 fileManager: fm,
                 kinds: kinds,
+                options: options,
                 onProgress: onProgress
             )
         }.value
@@ -2705,6 +3778,18 @@ public final class SystemMonitorService: ObservableObject {
         let fm = fileManager
         let result = await Task.detached(priority: .utility) {
             SystemDiskCleanup.trashSelected(urls: urls, fileManager: fm)
+        }.value
+        await refresh()
+        if result.successCount > 0 {
+            schedulePostCleanupDiskRefresh()
+        }
+        return result
+    }
+
+    public func trashSelected(_ candidates: [DiskCleanupCandidate]) async -> DiskCleanupResult {
+        let fm = fileManager
+        let result = await Task.detached(priority: .utility) {
+            SystemDiskCleanup.trashSelected(candidates: candidates, fileManager: fm)
         }.value
         await refresh()
         if result.successCount > 0 {

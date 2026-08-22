@@ -24,7 +24,7 @@ struct SystemBackgroundSoundIntegrationTests {
             #expect(metadata.sha1.count == 20)
             #expect(metadata.downloadSize > 0)
         } catch SystemBackgroundSoundAssetDownloader.DownloadError.soundNotFoundInManifest {
-            // 系统可能没有安装 Rain，跳过
+            // Rain may not be installed on the system; skip.
         }
     }
 
@@ -55,7 +55,7 @@ struct SystemBackgroundSoundIntegrationTests {
                 let metadata = try await downloader.readManifest(for: firstSound.name)
                 #expect(metadata.soundName == firstSound.name)
             } catch {
-                // 某些已安装的声音可能不在清单中（旧版本），跳过
+                // Some installed sounds may not appear in the manifest (legacy versions); skip.
             }
         }
     }
