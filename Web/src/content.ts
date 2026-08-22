@@ -25,7 +25,7 @@ export const navItems: NavItem[] = [
 export const productTitle = 'zisla';
 export const productTagline = '原生 macOS 动态工作空间';
 export const productDescription =
-  '把 AI 任务、媒体控制、文件中转和日程信息集中到屏幕顶部。需要时展开查看，移开后自动收起。';
+  '把 AI 任务、媒体、文件和日程收进屏幕顶部，再用全局截图、语音输入与桌面工具处理手边工作。需要时出现，完成后收起。';
 
 export const heroTitle = 'zisla<br><em>把正在发生的事<br>放到你看得见的地方。</em>';
 export const heroHints = [
@@ -35,7 +35,7 @@ export const heroHints = [
 ];
 
 export const proofItems = [
-  { title: '14 个功能模块', desc: '媒体、文件、AI、日程与系统工具按需开启' },
+  { title: '13 个功能模块', desc: '顶部工作流与桌面工具按需开启' },
   { title: 'macOS 14+', desc: '原生 Swift / AppKit / SwiftUI 实现' },
   { title: '多显示器', desc: '刘海屏与外接屏都能使用' },
   { title: '本地优先', desc: 'AI 状态不读取对话正文' },
@@ -54,7 +54,6 @@ export const islandModules: IslandModuleMeta[] = [
   { id: 'shelf', name: '中转', icon: 'inbox' },
   { id: 'clipboard', name: '剪贴板', icon: 'clipboard' },
   { id: 'aiMonitor', name: 'AI 监控', icon: 'chart-line' },
-  { id: 'aiAgent', name: 'AI Agent', icon: 'sparkles' },
   { id: 'download', name: '下载', icon: 'download' },
   { id: 'agenda', name: '日程', icon: 'calendar-days' },
   { id: 'mail', name: '邮件', icon: 'mail' },
@@ -68,7 +67,6 @@ export const islandModules: IslandModuleMeta[] = [
 
 export const heroCycleModules = [
   'dashboard',
-  'aiAgent',
   'download',
   'aiMonitor',
   'clipboard',
@@ -276,7 +274,7 @@ export const notesMeta = {
     { title: '灵感记录', meta: '上周' },
   ],
   body:
-    '用随记收集灵感、整理待办，或把手边的文字和文件继续发给 AI Agent。内容保存在系统「备忘录」中。',
+    '用随记收集灵感、整理待办，或把文字和文件留在系统「备忘录」中；编辑内容会自动写回。',
 };
 
 /* ===== 邮件模块（界面示意数据） ===== */
@@ -392,16 +390,6 @@ export const dashboardMeta = {
   download: { title: '发布会素材.zip', progress: 42, speed: '3.2 MB/s', eta: '剩余 18 秒' },
 };
 
-export const agentMeta = {
-  project: '官方网站',
-  thread: '新建产品评审',
-  model: 'GLM-4.7',
-  messages: [
-    { role: '你', body: '把这份提纲整理成三个重点。' },
-    { role: 'AI', body: '已整理：顶部工作流、本地优先、按需出现。' },
-  ],
-};
-
 export const toolboxMeta = {
   clock: '25:00',
   mode: '专注',
@@ -475,16 +463,8 @@ export const showcaseModules: ShowcaseModule[] = [
     name: 'AI 监控',
     group: 'AI 工作流',
     caption:
-      '自动识别受支持的 AI CLI 与桌面工具，展示任务列表、状态、实时 Token 趋势和贡献热力图；只解析结构化事件，不读取对话正文。',
+      '自动识别受支持的 AI CLI、桌面端与 IDE 活动，展示任务、状态、Token 趋势和贡献热力图；只解析结构化事件，不读取对话正文。',
     points: ['多工具任务聚合', 'Token 消耗趋势', '不读取提示词与回答'],
-  },
-  {
-    id: 'aiAgent',
-    name: 'AI Agent',
-    group: 'AI 工作流',
-    caption:
-      '在岛内管理本地项目和统一对话历史，添加文件、Skills 与应用上下文，并切换本地或远端模型。',
-    points: ['项目化对话', '文件与应用上下文', '本地 / 远端模型'],
   },
   {
     id: 'download',
@@ -539,8 +519,8 @@ export const showcaseModules: ShowcaseModule[] = [
     name: '系统状态',
     group: '实用工具',
     caption:
-      '查看 CPU、GPU、内存、磁盘、网络和风扇等状态，并清理可安全删除的缓存与日志。',
-    points: ['芯片级监控', '一键清理缓存', '风扇与网络详情'],
+      '查看 CPU、GPU、内存、磁盘、网络和风扇等状态，在设备支持时读取 NVMe SMART 温度，并清理可安全删除的缓存与日志。',
+    points: ['芯片级监控', 'NVMe 温度（设备支持时）', '一键清理缓存'],
   },
   {
     id: 'battery',
@@ -562,7 +542,7 @@ export const showcaseModules: ShowcaseModule[] = [
 
 /* ===== AI 深入区 ===== */
 
-// 与 mac/Sources/ZislaCore/AIModels.swift 的 AIProvider 枚举一一对应
+// 覆盖主线文档列出的自动检测工具，以及可通过 zislactl 接入的通用 Provider。
 export const supportedAITools = [
   { name: 'Claude Code' },
   { name: 'Codex' },
@@ -573,16 +553,57 @@ export const supportedAITools = [
   { name: 'Kimi Code' },
   { name: 'Qwen Code' },
   { name: 'Qoder' },
+  { name: 'ZCode' },
   { name: 'TRAE' },
   { name: 'OpenCode' },
   { name: 'Harnext' },
+  { name: 'WorkBuddy' },
   { name: '豆包' },
+  { name: 'Pi' },
 ];
 
 export const privacyPoints = [
   '只解析结构化事件中的事件类型、状态、时间、模型和会话 ID',
   '不读取提示词或回答正文',
   '协议与状态均保存在本机',
+];
+
+export interface CrossModuleFeature {
+  icon: string;
+  title: string;
+  description: string;
+  detail: string;
+}
+
+export const crossModuleFeatures: CrossModuleFeature[] = [
+  {
+    icon: 'image',
+    title: '截图、长截图与钉图',
+    description:
+      '用全局快捷键截取或钉住屏幕内容，继续标注、拼接长截图，并识别或导出表格。',
+    detail: '全局快捷键 · 标注与撤销 · 图片 / 表格导出',
+  },
+  {
+    icon: 'mic',
+    title: '语音输入与整理',
+    description:
+      '按键切换或按住说话，使用系统语音识别，再按需启用领域词库、结构化格式或本地 / 远端模型整理。',
+    detail: '两种录音方式 · 领域词库 · 可选模型整理',
+  },
+  {
+    icon: 'waves',
+    title: '媒体与系统背景声',
+    description:
+      '在灵动岛顶部控制正在播放，也可选择 macOS 系统背景声；锁屏、屏保或显示器休眠时可自动关闭。',
+    detail: '播放控制 · 歌词同步 · 自动停止背景声',
+  },
+  {
+    icon: 'globe',
+    title: '统一网络代理',
+    description:
+      '可选 HTTP、HTTPS、SOCKS5 或 SOCKS5H 代理，统一用于更新、下载、CLI 管理与模型请求，默认关闭。',
+    detail: '连通性检查 · 多协议 · 按需启用',
+  },
 ];
 
 export const flowSteps = [
@@ -625,12 +646,12 @@ export const downloadLinks: DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.3',
+  version: 'v0.1.5',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/release/v0.1.3',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-v0.1.3-macOS-universal.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-v0.1.3-macOS-universal.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-v0.1.3-macOS-universal.zip.sha256',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/release/v0.1.5',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.5/zisla-v0.1.5-macOS-arm64.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.5/zisla-v0.1.5-macOS-arm64.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.5/zisla-v0.1.5-macOS-arm64.zip.sha256',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/preview',
 };
 
@@ -665,7 +686,7 @@ export const faqItems: FAQItem[] = [
   },
   {
     question: 'zisla 会联网吗？',
-    answer: '天气、更新和主动下载会联网；剪贴板链接检测默认关闭。',
+    answer: '天气、更新、主动下载和可选远端语音整理会按需联网；剪贴板链接检测只在本机识别，不会自行发起下载。',
   },
   {
     question: 'zisla 支持多显示器吗？',

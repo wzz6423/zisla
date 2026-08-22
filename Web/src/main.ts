@@ -43,6 +43,7 @@ import {
   Mail,
   MapPin,
   Menu,
+  Mic,
   NotebookPen,
   Pause,
   Pencil,
@@ -66,17 +67,18 @@ import {
   TriangleAlert,
   Underline,
   Volume2,
+  Waves,
   Wrench,
   X,
   createIcons,
 } from 'lucide';
 import {
   agendaEmptyText,
-  agentMeta,
   aiTasks,
   batteryMeta,
   clipboardItems,
   clipboardMeta,
+  crossModuleFeatures,
   dashboardMeta,
   developmentSetup,
   documentationLinks,
@@ -179,6 +181,7 @@ const siteIcons = {
   Mail,
   MapPin,
   Menu,
+  Mic,
   NotebookPen,
   Pause,
   Pencil,
@@ -202,6 +205,7 @@ const siteIcons = {
   TriangleAlert,
   Underline,
   Volume2,
+  Waves,
   Wrench,
   X,
 };
@@ -445,50 +449,6 @@ const renderAIMonitorPanel = () => `
   </div>
 `;
 
-const renderAIAgentPanel = () => `
-  <div class="panel panel-agent">
-    <div class="panel-head agent-head">
-      ${icon('sparkles', 13)}<span>AI Agent</span>
-      <span class="head-action">${icon('refresh-cw', 12)}</span>
-    </div>
-    <div class="agent-layout">
-      <aside class="agent-history">
-        <div class="agent-history-head"><b>统一历史</b><span>${icon('plus', 11)}</span></div>
-        <button type="button" class="agent-project-add">${icon('folder', 11)}<span>添加项目</span>${icon('chevron-down', 9)}</button>
-        <span class="agent-group-label">未归类</span>
-        <button type="button" class="agent-thread is-active">
-          ${icon('sparkles', 11)}<span>${agentMeta.thread}</span>
-        </button>
-        <span class="agent-group-label">项目</span>
-        <button type="button" class="agent-thread">
-          ${icon('folder', 11)}<span>${agentMeta.project}</span>
-        </button>
-      </aside>
-      <section class="agent-chat">
-        <div class="agent-messages">
-          ${agentMeta.messages
-            .map(
-              (message) => `
-            <div class="agent-message${message.role === '你' ? ' is-user' : ''}">
-              <span>${message.role}</span>
-              <p>${message.body}</p>
-            </div>`,
-            )
-            .join('')}
-          <div class="agent-thinking"><i></i><span>正在思考</span></div>
-        </div>
-        <div class="agent-composer">
-          <div class="agent-composer-input">
-            <span class="agent-add">${icon('plus', 12)}</span>
-            <span class="agent-placeholder">发送消息</span>
-            <span class="agent-model">${agentMeta.model} ${icon('chevron-down', 9)}</span>
-            <span class="agent-send">${icon('arrow-up-right', 12)}</span>
-          </div>
-        </div>
-      </section>
-    </div>
-  </div>
-`;
 
 const renderClipboardPanel = () => `
   <div class="panel panel-clipboard">
@@ -975,7 +935,6 @@ const renderLockScreenPanel = () => {
 const panelRenderers: Record<string, () => string> = {
   dashboard: renderDashboardPanel,
   aiMonitor: renderAIMonitorPanel,
-  aiAgent: renderAIAgentPanel,
   clipboard: renderClipboardPanel,
   shelf: renderShelfPanel,
   download: renderDownloadPanel,
@@ -1032,6 +991,18 @@ const toolMarkup = supportedAITools
   .map((tool) => `<span class="tool-chip"><span class="tool-chip-dot"></span>${tool.name}</span>`)
   .join('');
 
+const crossModuleMarkup = crossModuleFeatures
+  .map(
+    (feature) => `
+    <article class="cross-feature reveal">
+      <span class="cross-feature-icon">${icon(feature.icon, 20)}</span>
+      <h3>${feature.title}</h3>
+      <p>${feature.description}</p>
+      <span class="mono-label">${feature.detail}</span>
+    </article>`,
+  )
+  .join('');
+
 const docsMarkup = documentationLinks
   .slice(0, 4)
   .map(
@@ -1077,7 +1048,7 @@ app.innerHTML = `
           <h1 class="hero-title">${heroTitle}</h1>
           <p class="hero-lede">${productDescription}</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="${latestRelease.dmg}" download aria-label="下载 zisla ${latestRelease.version} DMG 安装包">${icon('download', 16)}下载 macOS 版</a>
+            <a class="button button-primary" href="${latestRelease.dmg}" download aria-label="下载 zisla ${latestRelease.version} Apple 芯片 DMG 安装包">${icon('download', 16)}下载 Apple 芯片版</a>
             <a class="button button-ghost" href="${repositoryLinks.github}" target="_blank" rel="noreferrer" aria-label="在 GitHub 上查看 zisla 源代码">${icon('code-2', 15)}查看源码</a>
           </div>
           <ul class="hero-hints">
@@ -1179,6 +1150,19 @@ app.innerHTML = `
       </div>
     </section>
 
+    <section class="section capabilities-section" id="capabilities">
+      <div class="section-wrap">
+        <div class="section-heading reveal">
+          <div>
+            <p class="eyebrow">ISLAND AND BEYOND</p>
+            <h2 class="section-title">不只看状态，<span>也处理手边工作。</span></h2>
+          </div>
+          <p class="section-lede">截图、语音、背景声和网络设置不占用模块入口，但随时可用。</p>
+        </div>
+        <div class="cross-feature-grid">${crossModuleMarkup}</div>
+      </div>
+    </section>
+
     <section class="section dark-section" id="ai">
       <div class="section-wrap signal-layout">
         <div class="signal-panel reveal" aria-label="AI 工作侧边通知">
@@ -1247,17 +1231,18 @@ app.innerHTML = `
         <div>
           <p class="eyebrow">READY WHEN YOU ARE</p>
           <h2 class="download-title">立即下载 zisla</h2>
-          <p class="download-copy">${latestRelease.version} · macOS Universal · DMG / ZIP</p>
+          <p class="download-copy">${latestRelease.version} · Apple Silicon · DMG / ZIP</p>
           <div class="download-actions">
-            <a class="button button-light" href="${latestRelease.dmg}" download aria-label="下载 zisla ${latestRelease.version} DMG 安装包">${icon('download', 16)}下载 DMG</a>
-            <a class="button button-ghost-dark" href="${latestRelease.zip}" download aria-label="下载 zisla ${latestRelease.version} ZIP 压缩包">下载 ZIP</a>
-            <a class="button button-ghost-dark" href="${latestRelease.releasePage}" target="_blank" rel="noreferrer" aria-label="在 GitHub 上查看 ${latestRelease.version} 发布详情">${icon('external-link', 16)}查看 Release</a>
+            <a class="button button-light" href="${latestRelease.dmg}" download aria-label="下载 zisla ${latestRelease.version} Apple 芯片 DMG 安装包">${icon('download', 16)}Apple 芯片 DMG</a>
+            <a class="button button-ghost" href="${latestRelease.zip}" download aria-label="下载 zisla ${latestRelease.version} Apple 芯片 ZIP 压缩包">Apple 芯片 ZIP</a>
+            <a class="button button-ghost" href="${latestRelease.releasePage}" target="_blank" rel="noreferrer" aria-label="在 GitHub 上查看 ${latestRelease.version} 发布详情">${icon('external-link', 16)}查看 Release</a>
           </div>
         </div>
         <dl class="download-notes">
           <div class="download-note"><dt>系统</dt><dd>${systemRequirements.os} · ${systemRequirements.platform}</dd></div>
           <div class="download-note"><dt>安装</dt><dd>挂载 DMG 后拖入 Applications</dd></div>
-          <div class="download-note"><dt>包体</dt><dd>Universal · DMG / ZIP</dd></div>
+          <div class="download-note"><dt>包体</dt><dd>Apple Silicon (arm64) · DMG / ZIP</dd></div>
+          <div class="download-note"><dt>其他架构</dt><dd><a href="${latestRelease.releasePage}" target="_blank" rel="noreferrer">Universal / Intel</a></dd></div>
           <div class="download-note"><dt>镜像</dt><dd><a href="${downloadLinks[1]?.url ?? repositoryLinks.gitee + '/releases'}" target="_blank" rel="noreferrer">Gitee Releases</a></dd></div>
         </dl>
       </div>

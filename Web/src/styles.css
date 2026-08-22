@@ -207,15 +207,6 @@ summary:focus-visible {
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
 }
 
-.button-ghost-dark {
-  border-color: rgba(10, 13, 18, 0.25);
-  color: var(--ink);
-}
-
-.button-ghost-dark:hover {
-  background: rgba(10, 13, 18, 0.05);
-}
-
 /* ============ 头部导航 ============ */
 
 .site-header {
@@ -1094,7 +1085,6 @@ summary:focus-visible {
 }
 
 .zi-panel.is-active .dashboard-card,
-.zi-panel.is-active .agent-message,
 .zi-panel.is-active .shelf-file,
 .zi-panel.is-active .mail-row,
 .zi-panel.is-active .toolbox-grid button,
@@ -1106,7 +1096,6 @@ summary:focus-visible {
 
 .zi-panel.is-active :is(
     .dashboard-card,
-    .agent-message,
     .shelf-file,
     .mail-row,
     .toolbox-grid button,
@@ -1118,7 +1107,6 @@ summary:focus-visible {
 
 .zi-panel.is-active :is(
     .dashboard-card,
-    .agent-message,
     .shelf-file,
     .mail-row,
     .toolbox-grid button,
@@ -2623,181 +2611,6 @@ summary:focus-visible {
   }
 }
 
-/* ============ AI Agent ============ */
-
-.panel-agent {
-  padding: 8px 10px 10px;
-}
-
-.agent-head {
-  height: 24px;
-  margin-bottom: 6px;
-}
-
-.agent-layout {
-  display: grid;
-  grid-template-columns: 170px 1fr;
-  gap: 10px;
-  min-height: 244px;
-}
-
-.agent-history {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding-right: 10px;
-  border-right: 1px solid var(--ui-line);
-}
-
-.agent-history-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 22px;
-  font-size: 10px;
-}
-
-.agent-project-add,
-.agent-thread {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  min-height: 25px;
-  padding: 0 7px;
-  border-radius: 6px;
-  color: var(--ui-dim);
-  font-size: 10px;
-  text-align: left;
-}
-
-.agent-project-add svg:last-child {
-  margin-left: auto;
-}
-
-.agent-thread span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-thread.is-active {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--ui-text);
-}
-
-.agent-group-label {
-  margin-top: 3px;
-  padding: 0 7px;
-  color: var(--ui-faint);
-  font-size: 9px;
-}
-
-.agent-chat {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.agent-messages {
-  display: grid;
-  gap: 14px;
-  padding: 5px 4px 12px;
-}
-
-.agent-message {
-  display: grid;
-  gap: 4px;
-  padding-left: 10px;
-  border-left: 2px solid transparent;
-}
-
-.agent-message.is-user {
-  border-left-color: rgba(255, 255, 255, 0.22);
-}
-
-.agent-message span {
-  color: var(--ui-dim);
-  font-size: 9px;
-  font-weight: 600;
-}
-
-.agent-message p {
-  max-width: 52ch;
-  margin: 0;
-  color: rgba(245, 245, 247, 0.88);
-  font-size: 11px;
-  line-height: 1.55;
-}
-
-.agent-thinking {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--ui-faint);
-  font-size: 10px;
-}
-
-.agent-thinking i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ui-green);
-  animation: thinkingPulse 1.8s ease-in-out infinite;
-}
-
-@keyframes thinkingPulse {
-  50% {
-    opacity: 0.35;
-    transform: scale(0.72);
-  }
-}
-
-.agent-composer {
-  margin-top: auto;
-}
-
-.agent-composer-input {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 0 8px;
-  border: 1px solid var(--ui-line-strong);
-  border-radius: 8px 8px 20px 8px;
-  background: rgba(255, 255, 255, 0.055);
-}
-
-.agent-add,
-.agent-send {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--ui-dim);
-}
-
-.agent-send {
-  background: rgba(245, 245, 247, 0.9);
-  color: var(--ui-panel);
-}
-
-.agent-placeholder {
-  flex: 1;
-  color: var(--ui-faint);
-  font-size: 11px;
-}
-
-.agent-model {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--ui-dim);
-  font-size: 9px;
-}
-
 /* ============ 中转站文件 ============ */
 
 .shelf-items {
@@ -3654,6 +3467,58 @@ summary:focus-visible {
   font-size: 11.5px;
 }
 
+/* ============ 跨模块能力 ============ */
+
+.capabilities-section {
+  border-top: 1px solid rgba(17, 18, 20, 0.1);
+  background: #eef1f3;
+}
+
+.cross-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid rgba(17, 18, 20, 0.14);
+  border-bottom: 1px solid rgba(17, 18, 20, 0.14);
+}
+
+.cross-feature {
+  min-width: 0;
+  padding: 30px 24px 32px;
+  border-right: 1px solid rgba(17, 18, 20, 0.14);
+}
+
+.cross-feature:last-child {
+  border-right: 0;
+}
+
+.cross-feature-icon {
+  display: inline-flex;
+  margin-bottom: 24px;
+  color: var(--signal-deep);
+}
+
+.cross-feature h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+
+.cross-feature p {
+  min-height: 88px;
+  margin: 0 0 22px;
+  color: #5f6570;
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+
+.cross-feature .mono-label {
+  display: block;
+  color: #747b85;
+  font-size: 9.5px;
+  line-height: 1.65;
+}
+
 /* ============ AI 深入区 ============ */
 
 .dark-section {
@@ -4343,7 +4208,6 @@ summary:focus-visible {
   }
 
   .dashboard-card,
-  .agent-composer-input,
   .mail-detail-body,
   .toolbox-focus,
   .battery-device-list {
@@ -4557,6 +4421,18 @@ summary:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .cross-feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cross-feature:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .cross-feature:nth-child(-n + 2) {
+    border-bottom: 1px solid rgba(17, 18, 20, 0.14);
+  }
+
   .flow-grid,
   .docs-grid {
     grid-template-columns: 1fr;
@@ -4642,35 +4518,6 @@ summary:focus-visible {
   .showcase-desktop {
     min-height: 360px;
     padding: 0 8px 28px;
-  }
-
-  .agent-layout {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-
-  .agent-history {
-    flex-direction: row;
-    padding: 0 0 8px;
-    overflow-x: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--ui-line);
-  }
-
-  .agent-history-head,
-  .agent-group-label {
-    display: none;
-  }
-
-  .agent-project-add,
-  .agent-thread {
-    width: auto;
-    flex: 0 0 auto;
-    white-space: nowrap;
-  }
-
-  .agent-chat {
-    min-height: 238px;
   }
 
   .panel-mail {
@@ -4795,6 +4642,25 @@ summary:focus-visible {
 
   .weather-temp {
     font-size: 24px;
+  }
+
+  .cross-feature-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cross-feature,
+  .cross-feature:nth-child(-n + 2) {
+    padding: 24px 0;
+    border-right: 0;
+    border-bottom: 1px solid rgba(17, 18, 20, 0.14);
+  }
+
+  .cross-feature:last-child {
+    border-bottom: 0;
+  }
+
+  .cross-feature p {
+    min-height: 0;
   }
 
   .footer-bottom {
