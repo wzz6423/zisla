@@ -14,7 +14,6 @@ FAKE_BIN="$TEMPORARY_ROOT/bin"
 CLT_DEVELOPER="$TEMPORARY_ROOT/CommandLineTools"
 XCODE_APP="$TEMPORARY_ROOT/Xcode.app"
 XCODE_DEVELOPER="$XCODE_APP/Contents/Developer"
-BIN_DIRECTORY="$TEMPORARY_ROOT/swift-bin"
 CAPTURE_FILE="$TEMPORARY_ROOT/developer-directory.txt"
 
 mkdir -p "$TEST_ROOT/Scripts" "$TEST_ROOT/Resources" "$FAKE_BIN" \
@@ -39,13 +38,40 @@ SCRIPT
 cat > "$FAKE_BIN/swift" <<'SCRIPT'
 #!/bin/zsh
 set -euo pipefail
+arguments=("$@")
+scratch_path=""
+for (( index = 1; index <= ${#arguments[@]}; index += 1 )); do
+  if [[ "${arguments[index]}" == "--scratch-path" ]]; then
+    scratch_path="${arguments[index + 1]}"
+    break
+  fi
+done
+[[ -n "$scratch_path" ]] || {
+  print -u2 -r -- "missing --scratch-path"
+  exit 1
+}
+bin_directory="$scratch_path/out/Products/Release"
 if [[ "$*" == *"--show-bin-path"* ]]; then
-  print -r -- "$FAKE_SWIFT_BIN_DIRECTORY"
+  print -r -- "$bin_directory"
 else
   print -r -- "$DEVELOPER_DIR" > "$FAKE_CAPTURE_FILE"
-  mkdir -p "$FAKE_SWIFT_BIN_DIRECTORY"
-  touch "$FAKE_SWIFT_BIN_DIRECTORY/zisla"
+  mkdir -p "$bin_directory"
+  touch "$bin_directory/zisla"
 fi
+SCRIPT
+
+cat > "$FAKE_BIN/lipo" <<'SCRIPT'
+#!/bin/zsh
+set -euo pipefail
+arguments=("$@")
+for (( index = 1; index <= ${#arguments[@]}; index += 1 )); do
+  if [[ "${arguments[index]}" == "-output" ]]; then
+    touch "${arguments[index + 1]}"
+    exit 0
+  fi
+done
+print -u2 -r -- "missing lipo output"
+exit 1
 SCRIPT
 
 cat > "$FAKE_BIN/codesign" <<'SCRIPT'
@@ -64,9 +90,8 @@ chmod +x "$FAKE_BIN"/*
   PATH="$FAKE_BIN:$PATH" \
     FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
     FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
-    FAKE_SWIFT_BIN_DIRECTORY="$BIN_DIRECTORY" \
     FAKE_XCODE_APP="$XCODE_APP" \
-    BUILD_ARCHITECTURES=arm64 \
+    BUILD_ARCHITECTURES='arm64 x86_64' \
     CODE_SIGN_IDENTITY=- \
     OUTPUT_DIRECTORY="$TEMPORARY_ROOT/output" \
     SIGNING_MODE=adhoc \
@@ -81,5 +106,11 @@ chmod +x "$FAKE_BIN"/*
   print -u2 -r -- "FAIL: build-app did not produce the app binary"
   exit 1
 }
+for architecture in arm64 x86_64; do
+  [[ -f "$TEST_ROOT/.build/$architecture/out/Products/Release/zisla" ]] || {
+    print -u2 -r -- "FAIL: build-app did not isolate $architecture build output"
+    exit 1
+  }
+done
 
-print -r -- "PASS: build-app full Xcode selection"
+print -r -- "PASS: build-app full Xcode selection and architecture build isolation"

@@ -91,8 +91,9 @@ esac
 
 for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
   TARGET_TRIPLE="${ARCHITECTURE}-apple-macosx"
-  swift build --package-path "$ROOT" -c "$CONFIGURATION" --disable-sandbox --triple "$TARGET_TRIPLE" --product zisla
-  BIN_DIRECTORY="$(swift build --package-path "$ROOT" -c "$CONFIGURATION" --disable-sandbox --triple "$TARGET_TRIPLE" --show-bin-path)"
+  SCRATCH_DIRECTORY="$ROOT/.build/$ARCHITECTURE"
+  swift build --package-path "$ROOT" -c "$CONFIGURATION" --disable-sandbox --scratch-path "$SCRATCH_DIRECTORY" --triple "$TARGET_TRIPLE" --product zisla
+  BIN_DIRECTORY="$(swift build --package-path "$ROOT" -c "$CONFIGURATION" --disable-sandbox --scratch-path "$SCRATCH_DIRECTORY" --triple "$TARGET_TRIPLE" --show-bin-path)"
   BINARIES+=("$BIN_DIRECTORY/zisla")
 done
 
