@@ -39,6 +39,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     public let geminiSessionsDirectory: URL
     public let grokSessionsDirectory: URL
     public let qwenProjectsDirectory: URL
+    public let piSessionsDirectory: URL
     public let qoderRoots: [URL]
     public let doubaoRoots: [URL]
     public let copilotUsageLogRoots: [URL]
@@ -57,6 +58,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         geminiSessionsDirectory: URL? = nil,
         grokSessionsDirectory: URL? = nil,
         qwenProjectsDirectory: URL? = nil,
+        piSessionsDirectory: URL? = nil,
         qoderRoots: [URL]? = nil,
         doubaoRoots: [URL]? = nil,
         copilotUsageLogRoots: [URL]? = nil,
@@ -77,6 +79,8 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             ?? home.appendingPathComponent(".grok/sessions", isDirectory: true)
         self.qwenProjectsDirectory = qwenProjectsDirectory
             ?? home.appendingPathComponent(".qwen/projects", isDirectory: true)
+        self.piSessionsDirectory = piSessionsDirectory
+            ?? home.appendingPathComponent(".pi/agent/sessions", isDirectory: true)
         self.qoderRoots = qoderRoots
             ?? QoderSessionActivityDetector.defaultConfigRoots(home: home, fileManager: fileManager)
         self.doubaoRoots = doubaoRoots
@@ -166,6 +170,10 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             provider: .qwen,
             root: qwenProjectsDirectory
         ))
+        result.append(contentsOf: candidates(
+            provider: .pi,
+            root: piSessionsDirectory
+        ))
         for root in qoderRoots {
             result.append(contentsOf: candidates(provider: .coder, root: root))
         }
@@ -230,7 +238,9 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return url.path.contains("/logs/sessions/")
         case .copilot:
             return true
-        case .kimi, .trae, .opencode, .harness:
+        case .pi:
+            return url.lastPathComponent.hasSuffix(".jsonl")
+        case .kimi, .zcode, .trae, .opencode, .harness:
             return false
         case .codex, .claude, .qwen, .gpt, .doubao:
             return true
@@ -269,13 +279,13 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         case .grok:
             var parserState = ParserState()
             samples = roots.flatMap { parseRoot(from: $0, candidate: candidate, parserState: &parserState) }
-        case .gemini, .qwen, .coder, .gpt, .doubao, .copilot:
+        case .gemini, .qwen, .coder, .gpt, .doubao, .copilot, .pi:
             var parserState = ParserState()
             samples = roots.flatMap { parseRoot(from: $0, candidate: candidate, parserState: &parserState) }
             if parserState.copilotHasDetailedUsage {
                 samples.removeAll(where: isCopilotShutdownSummary)
             }
-        case .kimi, .trae, .opencode, .harness:
+        case .kimi, .zcode, .trae, .opencode, .harness:
             return []
         }
         return Array(samples.suffix(maxSamplesPerFile))
@@ -362,7 +372,9 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return parseGeneric(root, candidate: candidate)
         case .copilot:
             return parseCopilot(root, candidate: candidate, parserState: &parserState)
-        case .kimi, .trae, .opencode, .harness:
+        case .pi:
+            return parsePi(root, candidate: candidate).map { [$0] } ?? []
+        case .kimi, .zcode, .trae, .opencode, .harness:
             return []
         }
     }
@@ -440,6 +452,30 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             usage: usage,
             model: message["model"] as? String,
             includeCacheInputTokens: true
+        )
+    }
+
+    private func parsePi(_ root: [String: Any], candidate: Candidate) -> AIUsageSample? {
+        guard root["type"] as? String == "message",
+              let message = root["message"] as? [String: Any],
+              (message["role"] as? String)?.lowercased() == "assistant",
+              let usage = message["usage"] as? [String: Any] else {
+            return nil
+        }
+        let input = integer(usage["input"])
+            + integer(usage["cacheRead"])
+            + integer(usage["cacheWrite"])
+        let output = integer(usage["output"])
+        let messageID = (root["id"] as? String) ?? stableDigest(root)
+        let cost = (usage["cost"] as? [String: Any]).flatMap { double($0["total"]) }
+        return usageSample(
+            provider: .pi,
+            sourceID: sourceID(candidate, component: "message-\(messageID)"),
+            timestamp: timestamp(in: root, fallback: candidate.modificationDate),
+            inputTokens: input,
+            outputTokens: output,
+            costUSD: cost,
+            model: message["model"] as? String
         )
     }
 

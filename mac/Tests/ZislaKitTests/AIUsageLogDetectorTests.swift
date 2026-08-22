@@ -23,6 +23,7 @@ struct AIUsageLogDetectorTests {
         let gemini = root.appendingPathComponent("gemini", isDirectory: true)
         let grok = root.appendingPathComponent("grok", isDirectory: true)
         let qwen = root.appendingPathComponent("qwen", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
         let qoder = root.appendingPathComponent("qoder", isDirectory: true)
         let doubao = root.appendingPathComponent("doubao", isDirectory: true)
         let ignoredPayload = String(repeating: "x", count: 6_000)
@@ -73,6 +74,7 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: gemini,
             grokSessionsDirectory: grok,
             qwenProjectsDirectory: qwen,
+            piSessionsDirectory: empty,
             qoderRoots: [qoder],
             doubaoRoots: [doubao],
             maxBytesPerFile: 4_096
@@ -110,6 +112,7 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: empty,
             grokSessionsDirectory: grok,
             qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
             qoderRoots: [],
             doubaoRoots: [],
             scanInterval: 0
@@ -146,6 +149,7 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: empty,
             grokSessionsDirectory: empty,
             qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
             qoderRoots: [],
             doubaoRoots: [],
             copilotUsageLogRoots: [copilot]
@@ -182,6 +186,7 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: empty,
             grokSessionsDirectory: empty,
             qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
             qoderRoots: [],
             doubaoRoots: [],
             copilotUsageLogRoots: [copilot]
@@ -214,6 +219,7 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: empty,
             grokSessionsDirectory: empty,
             qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
             qoderRoots: [],
             doubaoRoots: [],
             copilotUsageLogRoots: [copilot]
@@ -244,6 +250,7 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: empty,
             grokSessionsDirectory: empty,
             qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
             qoderRoots: [],
             doubaoRoots: [],
             copilotUsageLogRoots: [copilot],
@@ -306,6 +313,7 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: empty,
             grokSessionsDirectory: grok,
             qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
             qoderRoots: [],
             maxFilesPerProvider: 12
         )
@@ -343,6 +351,7 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: empty,
             grokSessionsDirectory: empty,
             qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
             qoderRoots: [],
             maxBytesPerFile: 4_096
         )
@@ -379,6 +388,7 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: empty,
             grokSessionsDirectory: empty,
             qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
             qoderRoots: [],
             maxBytesPerFile: 4_096
         )
@@ -409,7 +419,10 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: empty,
             grokSessionsDirectory: empty,
             qwenProjectsDirectory: empty,
-            qoderRoots: []
+            piSessionsDirectory: empty,
+            qoderRoots: [],
+            doubaoRoots: [],
+            copilotUsageLogRoots: []
         )
 
         let samples = try detector.usageSamples()
@@ -437,6 +450,7 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: empty,
             grokSessionsDirectory: empty,
             qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
             qoderRoots: [],
             scanInterval: 0
         )
@@ -475,6 +489,7 @@ struct AIUsageLogDetectorTests {
             geminiSessionsDirectory: empty,
             grokSessionsDirectory: empty,
             qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
             qoderRoots: [],
             maxSamplesPerFile: 1
         )

@@ -9,24 +9,24 @@ struct AIAgentModelsTests {
 
         #expect(state.skillSyncConfiguration == AgentSkillSyncConfiguration())
         #expect(state.skillSyncConfiguration.mode == .symbolicLink)
-        #expect(state.skillSyncConfiguration.enabledDestinations.isEmpty)
-        #expect(!state.cliAutoUpdateEnabled)
+        #expect(state.skillSyncConfiguration.enabledDestinations == Set(AgentSkillSyncDestination.allCases))
+        #expect(state.cliAutoUpdateEnabled)
     }
 
     @Test
-    func cliAutoUpdateSettingDefaultsOffForLegacyStateAndRoundTrips() throws {
+    func cliAutoUpdateSettingDefaultsOnForLegacyStateAndRoundTrips() throws {
         let legacy = try JSONDecoder().decode(
             AIAgentState.self,
             from: Data(#"{"accounts":[],"channels":[],"cliStatuses":[]}"#.utf8)
         )
-        let enabled = AIAgentState(cliAutoUpdateEnabled: true)
+        let disabled = AIAgentState(cliAutoUpdateEnabled: false)
         let roundTripped = try JSONDecoder().decode(
             AIAgentState.self,
-            from: JSONEncoder().encode(enabled)
+            from: JSONEncoder().encode(disabled)
         )
 
-        #expect(!legacy.cliAutoUpdateEnabled)
-        #expect(roundTripped.cliAutoUpdateEnabled)
+        #expect(legacy.cliAutoUpdateEnabled)
+        #expect(!roundTripped.cliAutoUpdateEnabled)
     }
 
     @Test
@@ -192,18 +192,26 @@ struct AIAgentModelsTests {
         #expect(AgentCLIKind.qoder.executableName == "qodercli")
         #expect(AgentCLIKind.copilot.displayName == "GitHub Copilot")
         #expect(AgentCLIKind.copilot.executableName == "copilot")
-        #expect(AgentCLIKind.allCases.last == .copilot)
+        #expect(AgentCLIKind.dsh.displayName == "DeepSeek Harness")
+        #expect(AgentCLIKind.dsh.executableName == "dsh")
+        #expect(AgentCLIKind.dsh.npmPackageName == "@deepseek-ai/dsh")
+        #expect(AgentCLIKind.allCases.last == .pi)
+        #expect(AgentCLIKind.pi.displayName == "Pi")
+        #expect(AgentCLIKind.pi.executableName == "pi")
+        #expect(AgentCLIKind.pi.npmPackageName == "@earendil-works/pi-coding-agent")
 
         #expect(AgentCLIKind.detectableCases.contains(.kimi))
         #expect(AgentCLIKind.detectableCases.contains(.qwen))
         #expect(AgentCLIKind.detectableCases.contains(.qoder))
         #expect(AgentCLIKind.detectableCases.contains(.copilot))
+        #expect(AgentCLIKind.detectableCases.contains(.dsh))
         #expect(!AgentCLIKind.relayCases.contains(.kimi))
         #expect(!AgentCLIKind.profileCases.contains(.kimi))
         #expect(AgentCLIKind.managedCases.contains(.kimi))
         #expect(AgentCLIKind.managedCases.contains(.qwen))
         #expect(AgentCLIKind.managedCases.contains(.qoder))
         #expect(AgentCLIKind.managedCases.contains(.copilot))
+        #expect(AgentCLIKind.managedCases.contains(.dsh))
         #expect(AgentCLIKind.allCases.prefix(5) == [.claude, .codex, .gemini, .grok, .opencode])
     }
 

@@ -142,7 +142,7 @@ public struct AgentCLIProfile: Codable, Equatable, Sendable {
             ("\(home)/.grok/config.toml", "\(home)/.grok/auth.json")
         case .opencode:
             ("\(home)/.config/opencode/opencode.json", "\(home)/.local/share/opencode/auth.json")
-        case .kimi, .qwen, .qoder, .copilot, .glm:
+        case .kimi, .qwen, .qoder, .copilot, .glm, .dsh, .pi:
             ("", "")
         }
     }
@@ -598,6 +598,8 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
     case qoder
     case glm
     case copilot
+    case dsh
+    case pi
 
     public static let detectableCases = allCases
     public static let relayCases: [Self] = [.claude, .codex, .gemini, .grok, .opencode]
@@ -611,6 +613,8 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
         case .qoder: "Qoder CLI"
         case .copilot: "GitHub Copilot"
         case .glm: "GLM Coding"
+        case .dsh: "DeepSeek Harness"
+        case .pi: "Pi"
         default: rawValue.capitalized
         }
     }
@@ -633,7 +637,9 @@ public enum AgentCLIKind: String, Codable, CaseIterable, Sendable {
         case .qoder: "@qoder-ai/qodercli"
         case .copilot: "@github/copilot"
         case .glm: "@z_ai/coding-helper"
+        case .dsh: "@deepseek-ai/dsh"
         case .grok, .kimi: nil
+        case .pi: "@earendil-works/pi-coding-agent"
         }
     }
 }
@@ -677,7 +683,7 @@ public struct AgentSkillSyncConfiguration: Codable, Equatable, Sendable {
 
     public init(
         mode: AgentSkillSyncMode = .symbolicLink,
-        enabledDestinations: Set<AgentSkillSyncDestination> = []
+        enabledDestinations: Set<AgentSkillSyncDestination> = Set(AgentSkillSyncDestination.allCases)
     ) {
         self.mode = mode
         self.enabledDestinations = enabledDestinations
@@ -756,7 +762,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         channelProbes: [AgentChannelProbe] = [],
         channelModelCatalogs: [AgentChannelModelCatalog] = [],
         cliStatuses: [AgentCLIStatus] = [],
-        cliAutoUpdateEnabled: Bool = false,
+        cliAutoUpdateEnabled: Bool = true,
         skills: [AgentSkill] = [],
         skillSyncConfiguration: AgentSkillSyncConfiguration = AgentSkillSyncConfiguration(),
         activeCLIProfileAccountID: UUID? = nil,
@@ -797,7 +803,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         channelProbes = try container.decodeIfPresent([AgentChannelProbe].self, forKey: .channelProbes) ?? []
         channelModelCatalogs = try container.decodeIfPresent([AgentChannelModelCatalog].self, forKey: .channelModelCatalogs) ?? []
         cliStatuses = try container.decodeIfPresent([AgentCLIStatus].self, forKey: .cliStatuses) ?? []
-        cliAutoUpdateEnabled = try container.decodeIfPresent(Bool.self, forKey: .cliAutoUpdateEnabled) ?? false
+        cliAutoUpdateEnabled = try container.decodeIfPresent(Bool.self, forKey: .cliAutoUpdateEnabled) ?? true
         skills = try container.decodeIfPresent([AgentSkill].self, forKey: .skills) ?? []
         skillSyncConfiguration = try container.decodeIfPresent(AgentSkillSyncConfiguration.self, forKey: .skillSyncConfiguration) ?? AgentSkillSyncConfiguration()
         activeCLIProfileAccountID = try container.decodeIfPresent(UUID.self, forKey: .activeCLIProfileAccountID)

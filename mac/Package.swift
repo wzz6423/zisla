@@ -23,8 +23,17 @@ let package = Package(
             ]
         ),
         .target(
+            name: "ZislaNVMe",
+            path: "Sources/ZislaNVMe",
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .linkedFramework("IOKit"),
+                .linkedFramework("CoreFoundation"),
+            ]
+        ),
+        .target(
             name: "ZislaKit",
-            dependencies: ["ZislaCore"],
+            dependencies: ["ZislaCore", "ZislaNVMe"],
             linkerSettings: [
                 .linkedFramework("WeatherKit"),
                 .linkedFramework("Network"),
@@ -57,6 +66,7 @@ let package = Package(
                 .linkedFramework("Speech"),
                 .linkedFramework("WebKit"),
                 .linkedFramework("AVFoundation"),
+                .linkedFramework("ScreenCaptureKit"),
             ]
         ),
         .executableTarget(

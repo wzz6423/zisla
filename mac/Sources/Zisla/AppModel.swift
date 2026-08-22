@@ -133,16 +133,20 @@ struct IslandModuleLayout: Equatable {
   private static let expandedChromeHeight: CGFloat = 121
   private static let moduleVerticalInsets = IslandSurfaceGeometry.moduleInset * 2
   private static let panelHeightAllowance: CGFloat = 4
+  private static let panelSideClearance: CGFloat = 200
   static let batteryMinimumContentHeight: CGFloat = 0
   static let batteryMaximumContentHeight: CGFloat = 430
 
   /// Fixed-height modules size the surface to their rendered content instead of inheriting
   /// the standard panel's unused vertical space.
-  private static func compactModule(contentHeight: CGFloat) -> IslandModuleLayout {
+  private static func compactModule(
+    contentHeight: CGFloat,
+    islandWidth: CGFloat = 660
+  ) -> IslandModuleLayout {
     let islandHeight = expandedChromeHeight + contentHeight + moduleVerticalInsets
     return IslandModuleLayout(
-      islandSize: CGSize(width: 660, height: islandHeight),
-      panelSize: CGSize(width: 860, height: islandHeight + panelHeightAllowance)
+      islandSize: CGSize(width: islandWidth, height: islandHeight),
+      panelSize: CGSize(width: islandWidth + panelSideClearance, height: islandHeight + panelHeightAllowance)
     )
   }
 
@@ -166,7 +170,7 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: 820, height: 470),
     panelSize: CGSize(width: 820, height: 474)
   )
-  static let system = compactModule(contentHeight: 401)
+  static let system = compactModule(contentHeight: 401, islandWidth: 720)
   static let battery = compactModule(contentHeight: batteryMaximumContentHeight)
   /// Quick Notes: needs a larger editing/preview area for rich content such as images and tables, so wider and taller than standard.
   static let notes = IslandModuleLayout(
@@ -370,11 +374,8 @@ final class AppModel: ObservableObject {
   @Published var detectedLink: URL?
   @Published private(set) var isSharingPickerVisible = false
 
-  /// Signal to request the island to collapse after disk cleaning completes (toggled once per request).
+  /// Signal to request the island to collapse immediately when disk cleaning opens or completes.
   @Published var islandCollapseRequested = false
-
-  /// Whether the disk-cleaning panel is visible: keeps the island expanded while visible to prevent it collapsing when the pointer leaves.
-  @Published var isCleanupPanelVisible = false
 
   let settingsStore = FeatureSettingsStore()
   let languageStore = AppLanguageStore()
@@ -395,6 +396,7 @@ final class AppModel: ObservableObject {
   let powerAssertions = PowerAssertionController()
   let screenCleaning = ScreenCleaningController()
   let systemMonitor = SystemMonitorService()
+  let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
   let networkBattery = NetworkBatteryMonitor()
   let focusMode = FocusModeMonitor()
@@ -454,6 +456,10 @@ final class AppModel: ObservableObject {
     "media-active-left",
     "media-active-right",
   ]
+  private let backgroundSoundNoticeIDs: Set<String> = [
+    "background-sound-left",
+    "background-sound-right",
+  ]
   private let toolboxReminderIDs: Set<String> = [
     "toolbox-reminder-left",
     "toolbox-reminder-right",
@@ -489,11 +495,24 @@ final class AppModel: ObservableObject {
   private var hasRequestedVoiceInputPostEventAccess = false
 
   private init() {
+    let networkProxyURL = settingsStore.settings.networkProxyURL
+    let networkProxyEnabled = settingsStore.settings.networkProxyEnabled
+    aiAgent.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
+    managedTools.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
+    Task { await releaseService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
+    Task { await releasePackageDownloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
+    Task { await downloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
     sharingPickerDelegate.onCompletion = { [weak self] picker in
       self?.sharingPickerDidComplete(picker)
     }
     screenCleaning.onCleaningDidEnd = { [weak self] in
       self?.restorePowerAssertionsAfterCleaning()
+    }
+    backgroundSounds.onAutomaticStop = { [weak self] in
+      guard let self, self.settingsStore.settings.systemBackgroundSoundEnabled else { return }
+      var settings = self.settingsStore.settings
+      settings.systemBackgroundSoundEnabled = false
+      self.settingsStore.settings = settings
     }
     restoreDownloadDirectory()
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
@@ -561,6 +580,7 @@ final class AppModel: ObservableObject {
       settingsStore.objectWillChange,
       notices.objectWillChange,
       audioOutput.objectWillChange,
+      backgroundSounds.objectWillChange,
       calendar.objectWillChange,
       shelf.objectWillChange,
       clipboardHistory.objectWillChange,
@@ -602,6 +622,13 @@ final class AppModel: ObservableObject {
       .dropFirst()
       .sink { [weak self] settings in
         Task { @MainActor [weak self] in self?.apply(settings: settings) }
+        let networkProxyURL = settings.networkProxyURL
+        let networkProxyEnabled = settings.networkProxyEnabled
+        self?.aiAgent.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
+        self?.managedTools.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
+        Task { await self?.releaseService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
+        Task { await self?.releasePackageDownloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
+        Task { await self?.downloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
       }
       .store(in: &cancellables)
 
@@ -621,10 +648,26 @@ final class AppModel: ObservableObject {
       }
       .store(in: &cancellables)
 
+    Publishers.CombineLatest(backgroundSounds.$isPlaying, backgroundSounds.$playingSound)
+      .removeDuplicates { lhs, rhs in
+        lhs.0 == rhs.0 && lhs.1 == rhs.1
+      }
+      .sink { [weak self] _ in
+        Task { @MainActor [weak self] in
+          self?.consumeBackgroundSoundPlayback()
+          self?.updateSpectrumMonitoring()
+        }
+      }
+      .store(in: &cancellables)
+
     Publishers.CombineLatest(notices.$left, notices.$right)
-      .map { left, right in
-        left.contains { $0.id.hasPrefix("media-active-") }
-          || right.contains { $0.id.hasPrefix("media-active-") }
+      .map { [weak self] left, right in
+        guard let self else { return false }
+        return left.contains {
+          self.mediaNoticeIDs.contains($0.id) || self.backgroundSoundNoticeIDs.contains($0.id)
+        } || right.contains {
+          self.mediaNoticeIDs.contains($0.id) || self.backgroundSoundNoticeIDs.contains($0.id)
+        }
       }
       .removeDuplicates()
       .sink { [weak self] _ in
@@ -649,7 +692,16 @@ final class AppModel: ObservableObject {
       .dropFirst()
       .sink { [weak self] status in
         Task { @MainActor [weak self] in
-          self?.consumeFocusModeStatus(status, showsTransition: true)
+          self?.consumeFocusModeStatus(status, showsTransition: false)
+        }
+      }
+      .store(in: &cancellables)
+
+    focusMode.$latestTransition
+      .compactMap { $0 }
+      .sink { [weak self] transition in
+        Task { @MainActor [weak self] in
+          self?.consumeFocusModeStatus(transition.status, showsTransition: true)
         }
       }
       .store(in: &cancellables)
@@ -716,8 +768,43 @@ final class AppModel: ObservableObject {
   }
 
   func start() {
+    backgroundSounds.startLifecycleMonitoring()
     apply(settings: settingsStore.settings)
     alarms.rescheduleAll()
+  }
+
+  func toggleBackgroundSound() {
+    var settings = settingsStore.settings
+    let sound = settings.systemBackgroundSound
+    if backgroundSounds.isPlaying || backgroundSounds.isDownloading(sound) {
+      backgroundSounds.cancelDownload(sound: sound)
+      backgroundSounds.stop()
+      settings.systemBackgroundSoundEnabled = false
+      settingsStore.settings = settings
+      return
+    }
+
+    settings.systemBackgroundSoundEnabled = true
+    settingsStore.settings = settings
+    backgroundSounds.playOrDownload(sound: sound)
+  }
+
+  func selectBackgroundSound(_ sound: SystemBackgroundSound) {
+    var settings = settingsStore.settings
+    let previousSound = settings.systemBackgroundSound
+    let wasPlaying = backgroundSounds.isPlaying
+    backgroundSounds.refresh()
+    settings.systemBackgroundSound = sound
+    if !backgroundSounds.isInstalled(sound) {
+      settings.systemBackgroundSoundEnabled = false
+    }
+    settingsStore.settings = settings
+    if !backgroundSounds.isInstalled(sound) {
+      if wasPlaying { backgroundSounds.stop() }
+      backgroundSounds.requestDownload(sound: sound, playWhenReady: wasPlaying)
+    } else if wasPlaying, previousSound != sound {
+      _ = backgroundSounds.play(sound: sound)
+    }
   }
 
   func openVoiceInputInputMonitoringSettings() {
@@ -795,6 +882,9 @@ final class AppModel: ObservableObject {
     voiceInputTargetProcessIdentifier = nil
     voiceInputTargetMouseLocation = nil
     voiceInput.cancel()
+    backgroundSounds.cancelAllDownloads()
+    backgroundSounds.stopLifecycleMonitoring()
+    backgroundSounds.stop()
     hotkeyManager.unregister()
     clipboardMonitor.setEnabled(false)
     clipboardHistoryMonitor.setEnabled(false)
@@ -1527,6 +1617,7 @@ final class AppModel: ObservableObject {
     // Regular UI appearance is controlled by user settings; the island panel is separately pinned to dark at the window level (see IslandPanel).
     NSApp.appearance = settings.appearanceMode.nsAppearance
     media.setPreferredSource(settings.mediaSource)
+    voiceInput.setContextualStrings(VoiceLexicon.contextualTerms(for: settings.voiceEnabledLexicons))
     pomodoro.notificationsMuted = settings.notificationsMuted
     configureUpdatePolling(enabled: settings.updateChecksEnabled)
     configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
@@ -1559,6 +1650,12 @@ final class AppModel: ObservableObject {
     } else {
       systemMonitor.stop()
     }
+    backgroundSounds.apply(
+      sound: settings.systemBackgroundSound,
+      enabled: settings.systemBackgroundSoundEnabled,
+      stopsWhenUnused: settings.systemBackgroundSoundStopsWhenUnused
+    )
+    consumeBackgroundSoundPlayback()
     if settings.sideNoticesEnabled {
       focusMode.start()
       audioOutput.start()
@@ -1740,7 +1837,7 @@ final class AppModel: ObservableObject {
       kind: .info,
       side: .right,
       style: .status,
-      symbolName: "arrow.down.circle"
+      symbolName: "arrow.up.circle"
     )
     let activeIDs = Set([left.id, right.id])
     for notice in notices.left + notices.right where notice.id.hasPrefix(updateNoticePrefix) && !activeIDs.contains(notice.id) {
@@ -1761,6 +1858,8 @@ final class AppModel: ObservableObject {
     voiceInputTargetMouseLocation = nil
     let rawTranscript = recording.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
     let retainsAudio = settingsStore.settings.voiceRecordingRetentionEnabled
+    let enabledVoiceLexicons = settingsStore.settings.voiceEnabledLexicons
+    let structuredFormattingEnabled = settingsStore.settings.voiceStructuredFormattingEnabled
     let historySaved = voiceHistory.record(recording, retainAudio: retainsAudio)
     guard !rawTranscript.isEmpty else {
       transientMessage = historySaved
@@ -1768,13 +1867,22 @@ final class AppModel: ObservableObject {
         : (retainsAudio ? "录音文件已保留，但记录索引保存失败" : "语音记录保存失败")
       return
     }
+    let lexiconNormalizedTranscript = VoiceLexicon.normalizeTranscript(
+      rawTranscript,
+      for: enabledVoiceLexicons
+    )
+    let localTranscriptSaved = lexiconNormalizedTranscript == rawTranscript
+      || voiceHistory.updateProcessedTranscript(
+        id: recording.id,
+        transcript: lexiconNormalizedTranscript
+      )
     guard let target = voicePostProcessingTarget() else {
       deliverVoiceTranscript(
-        rawTranscript,
+        lexiconNormalizedTranscript,
         to: targetProcessIdentifier,
         at: targetMouseLocation,
         target: inputTarget,
-        message: historySaved ? "语音转写已保存" : "语音转写完成；记录保存失败"
+        message: historySaved && localTranscriptSaved ? "语音转写已保存" : "语音转写完成；记录保存失败"
       )
       return
     }
@@ -1788,13 +1896,23 @@ final class AppModel: ObservableObject {
       do {
         let response = try await self.complete(
           using: target,
-          systemPrompt: VoiceTranscriptPostProcessor.systemPrompt,
-          messages: VoiceTranscriptPostProcessor.messages(for: rawTranscript)
+          systemPrompt: VoiceTranscriptPostProcessor.systemPrompt(
+            enabledLexicons: enabledVoiceLexicons,
+            structuredFormattingEnabled: structuredFormattingEnabled
+          ),
+          messages: VoiceTranscriptPostProcessor.messages(
+            for: rawTranscript,
+            lexiconNormalizedTranscript: lexiconNormalizedTranscript
+          )
         )
         guard !Task.isCancelled else { return }
-        let delivered = VoiceTranscriptPostProcessor.deliveredText(
-          response,
-          fallback: rawTranscript
+        let delivered = VoiceLexicon.normalizeTranscript(
+          VoiceTranscriptPostProcessor.deliveredText(
+            response,
+            fallback: lexiconNormalizedTranscript
+          ),
+          for: enabledVoiceLexicons,
+          contextualTranscript: rawTranscript
         )
         let processedTranscriptSaved = self.voiceHistory.updateProcessedTranscript(
           id: recording.id,
@@ -1814,7 +1932,7 @@ final class AppModel: ObservableObject {
       } catch {
         guard !Task.isCancelled else { return }
         self.deliverVoiceTranscript(
-          rawTranscript,
+          lexiconNormalizedTranscript,
           to: targetProcessIdentifier,
           at: targetMouseLocation,
           target: inputTarget,
@@ -2260,8 +2378,11 @@ final class AppModel: ObservableObject {
       snapshot.isPlaying
     else {
       clearMediaNotices()
+      consumeBackgroundSoundPlayback()
       return
     }
+
+    clearBackgroundSoundNotices()
 
     let source =
       snapshot.sourceApplication
@@ -2302,22 +2423,63 @@ final class AppModel: ObservableObject {
   private func updateSpectrumMonitoring() {
     let settings = settingsStore.settings
     let isPlaying = media.snapshot?.isPlaying == true
-    let hasVisibleMediaNotice = notices.left.contains { mediaNoticeIDs.contains($0.id) }
-      || notices.right.contains { mediaNoticeIDs.contains($0.id) }
+    let hasVisiblePlaybackNotice = notices.left.contains {
+      mediaNoticeIDs.contains($0.id) || backgroundSoundNoticeIDs.contains($0.id)
+    } || notices.right.contains {
+      mediaNoticeIDs.contains($0.id) || backgroundSoundNoticeIDs.contains($0.id)
+    }
+    // Background sound counts as media playback: its waveform animates while the island
+    // is expanded even when no music app is playing.
     media.setSpectrumVisualizationEnabled(
       settings.mediaEnabled
-        && isPlaying
-        && (isIslandVisible || hasVisibleMediaNotice)
+        && (isPlaying || backgroundSounds.isPlaying)
+        && (isIslandVisible || hasVisiblePlaybackNotice)
     )
     media.setSpectrumMonitoringEnabled(
       settings.mediaEnabled
-        && (isIslandVisible || isPlaying)
+        && (isIslandVisible || isPlaying || backgroundSounds.isPlaying)
     )
   }
 
   private func clearMediaNotices() {
     for id in mediaNoticeIDs { notices.remove(id: id) }
     mediaActivityPresented = false
+  }
+
+  private func consumeBackgroundSoundPlayback() {
+    let settings = settingsStore.settings
+    guard settings.sideNoticesEnabled,
+          backgroundSounds.isPlaying,
+          media.snapshot?.isPlaying != true
+    else {
+      clearBackgroundSoundNotices()
+      return
+    }
+
+    let soundName = backgroundSounds.playingSound?.title ?? "背景音"
+    let leftNotice = IslandNotice(
+      id: "background-sound-left",
+      title: soundName,
+      kind: .info,
+      side: .left
+    )
+    let rightNotice = IslandNotice(
+      id: "background-sound-right",
+      title: soundName,
+      kind: .info,
+      side: .right
+    )
+
+    if !notices.updateIfPresent(leftNotice) {
+      notices.enqueue(leftNotice, expiresAfter: nil)
+    }
+    if !notices.updateIfPresent(rightNotice) {
+      notices.enqueue(rightNotice, expiresAfter: nil)
+    }
+  }
+
+  private func clearBackgroundSoundNotices() {
+    for id in backgroundSoundNoticeIDs { notices.remove(id: id) }
   }
 
   private func consumeHeadphoneConnection(_ connection: HeadphoneConnection) {
@@ -2643,7 +2805,8 @@ final class AppModel: ObservableObject {
   private func noticeSide(for provider: AIProvider) -> NoticeSide {
     switch provider {
     case .claude, .gemini, .qwen, .trae, .doubao: .left
-    case .codex, .grok, .gpt, .copilot, .kimi, .coder, .opencode, .harness: .right
+    case .pi: .right
+    case .codex, .grok, .gpt, .copilot, .kimi, .coder, .zcode, .opencode, .harness: .right
     }
   }
 

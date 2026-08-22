@@ -105,6 +105,61 @@ public enum MediaCompactStyle: String, Codable, CaseIterable, Sendable, Equatabl
     }
 }
 
+/// macOS Accessibility Background Sounds names used by the system asset catalog.
+public enum SystemBackgroundSound: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
+    case pinkNoise = "PinkNoise"
+    case brownNoise = "BrownNoise"
+    case whiteNoise = "WhiteNoise"
+    // Compatibility with the name saved by macOS 14 and earlier.
+    case balancedNoise = "BalancedNoise"
+    case brightNoise = "BrightNoise"
+    case darkNoise = "DarkNoise"
+    case ocean = "Ocean"
+    case rain = "Rain"
+    case stream = "Stream"
+    case night = "Night"
+    case fire = "Fire"
+    case babble = "Babble"
+    case steam = "Steam"
+    case airplane = "Airplane"
+    case boat = "Boat"
+    case bus = "Bus"
+    case train = "Train"
+    case rainOnRoof = "RainOnRoof"
+    case quietNight = "QuietNight"
+
+    public static let allCases: [Self] = [
+        .pinkNoise, .brownNoise, .whiteNoise,
+        .balancedNoise, .brightNoise, .darkNoise,
+        .ocean, .rain, .stream, .night, .fire, .babble, .steam,
+        .airplane, .boat, .bus, .train, .rainOnRoof, .quietNight,
+    ]
+
+    public var title: String {
+        switch self {
+        case .pinkNoise: "粉红噪声"
+        case .brownNoise: "棕色噪声"
+        case .whiteNoise: "白噪声"
+        case .balancedNoise: "平衡噪声"
+        case .brightNoise: "亮噪声"
+        case .darkNoise: "暗噪声"
+        case .ocean: "海洋"
+        case .rain: "雨声"
+        case .stream: "溪流"
+        case .night: "夜晚"
+        case .fire: "火苗"
+        case .babble: "嘈杂声"
+        case .steam: "蒸汽"
+        case .airplane: "飞机"
+        case .boat: "船"
+        case .bus: "公交车"
+        case .train: "火车"
+        case .rainOnRoof: "屋顶雨声"
+        case .quietNight: "静夜"
+        }
+    }
+}
+
 public enum MailCompactStyle: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case compact
     case detailed
@@ -304,6 +359,19 @@ public enum VoiceRecordingCleanupPolicy: String, Codable, CaseIterable, Sendable
     }
 }
 
+public enum ScreenshotHotkeyDefaults {
+    public static let capture = VoiceInputHotkeyPreset(
+        keyCode: 18,
+        carbonModifiers: 0x1000,
+        keyDisplayName: "1"
+    )
+    public static let pin = VoiceInputHotkeyPreset(
+        keyCode: 19,
+        carbonModifiers: 0x1000,
+        keyDisplayName: "2"
+    )
+}
+
 public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case transient
     case updateAvailable
@@ -320,13 +388,13 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
         .transient,
         .videoDownload,
         .browserDownload,
-        .toolboxReminder,
         .mail,
         .updateAvailable,
         .focusCountdown,
+        .focusMode,
         .aiActivity,
         .media,
-        .focusMode,
+        .toolboxReminder,
     ]
 
     public var title: String {
@@ -369,6 +437,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether to show the source platform logo and percentage in the collapsed Dynamic Island while the native downloader is active.
     public var videoDownloadIslandEnabled: Bool
     public var systemMonitorEnabled: Bool
+    /// Whether zisla should play the selected macOS background sound locally.
+    public var systemBackgroundSoundEnabled: Bool
+    /// The macOS background sound selected for local playback.
+    public var systemBackgroundSound: SystemBackgroundSound
+    /// Whether playback stops when the Mac is locked, enters the screen saver, or sleeps.
+    public var systemBackgroundSoundStopsWhenUnused: Bool
     /// Battery monitor: independent toggle for the battery detail module and status tracking.
     public var batteryMonitorEnabled: Bool
     /// When empty, no additional monitor status bar items are added.
@@ -393,6 +467,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var automaticDownloadEnabled: Bool
     /// Target channel for manual update checks.
     public var updateChannel: UpdateChannel
+    /// Optional proxy URL used by local update, install, and network download tasks.
+    public var networkProxyURL: String
+    /// Whether local update, install, and network download tasks should use the configured proxy.
+    public var networkProxyEnabled: Bool
     /// Whether to save clipboard text and images locally; users can disable it in Settings if concerned about sensitive content.
     public var clipboardHistoryEnabled: Bool
     /// Whether to detect downloadable links in clipboard; users can disable it in Settings.
@@ -430,6 +508,18 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var voiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy
     /// Current model configuration for voice processing. Endpoint and credentials remain in voice settings.
     public var voiceModelConfiguration: AIModelConfigurationReference?
+    /// Built-in vocabulary sets used to bias ASR and guide transcript typo correction.
+    public var voiceEnabledLexicons: Set<VoiceLexicon>
+    /// Whether to format explicitly enumerated items into numbered lists during voice transcript cleanup.
+    public var voiceStructuredFormattingEnabled: Bool
+    /// Whether screenshot capture and its global hotkeys are enabled.
+    public var screenshotEnabled: Bool
+    /// Global hotkey for capturing a screenshot.
+    public var screenshotHotkey: VoiceInputHotkeyPreset
+    /// Global hotkey for toggling screenshot pin state.
+    public var screenshotPinHotkey: VoiceInputHotkeyPreset
+    /// Whether the pinned screenshot shows its bottom control bar.
+    public var screenshotPinnedToolbarVisible: Bool
 
     public init(
         mediaEnabled: Bool = true,
@@ -445,6 +535,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         browserDownloadIslandEnabled: Bool = true,
         videoDownloadIslandEnabled: Bool = true,
         systemMonitorEnabled: Bool = true,
+        systemBackgroundSoundEnabled: Bool = false,
+        systemBackgroundSound: SystemBackgroundSound = .rain,
+        systemBackgroundSoundStopsWhenUnused: Bool = true,
         batteryMonitorEnabled: Bool = true,
         systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric> = [.cpu],
         systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle = .compact,
@@ -460,6 +553,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         updateChecksEnabled: Bool = true,
         automaticDownloadEnabled: Bool = true,
         updateChannel: UpdateChannel = .release,
+        networkProxyURL: String = "",
+        networkProxyEnabled: Bool = false,
         clipboardHistoryEnabled: Bool = true,
         clipboardDetectionEnabled: Bool = true,
         sideNoticesEnabled: Bool = true,
@@ -483,7 +578,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         voiceInputHotkeyPreset: VoiceInputHotkeyPreset = .optionSpace,
         voiceRecordingRetentionEnabled: Bool = true,
         voiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy = .never,
-        voiceModelConfiguration: AIModelConfigurationReference? = nil
+        voiceModelConfiguration: AIModelConfigurationReference? = nil,
+        voiceEnabledLexicons: Set<VoiceLexicon> = VoiceLexicon.defaultEnabled,
+        voiceStructuredFormattingEnabled: Bool = false,
+        screenshotEnabled: Bool = true,
+        screenshotHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.capture,
+        screenshotPinHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.pin,
+        screenshotPinnedToolbarVisible: Bool = true
     ) {
         self.mediaEnabled = mediaEnabled
         self.mediaSource = mediaSource
@@ -498,6 +599,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.browserDownloadIslandEnabled = browserDownloadIslandEnabled
         self.videoDownloadIslandEnabled = videoDownloadIslandEnabled
         self.systemMonitorEnabled = systemMonitorEnabled
+        self.systemBackgroundSoundEnabled = systemBackgroundSoundEnabled
+        self.systemBackgroundSound = systemBackgroundSound
+        self.systemBackgroundSoundStopsWhenUnused = systemBackgroundSoundStopsWhenUnused
         self.batteryMonitorEnabled = batteryMonitorEnabled
         self.systemMonitorMenuBarMetrics = systemMonitorMenuBarMetrics
         self.systemMonitorMenuBarDisplayStyle = systemMonitorMenuBarDisplayStyle
@@ -513,6 +617,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.updateChecksEnabled = updateChecksEnabled
         self.automaticDownloadEnabled = automaticDownloadEnabled
         self.updateChannel = updateChannel
+        self.networkProxyURL = networkProxyURL
+        self.networkProxyEnabled = networkProxyEnabled
         self.clipboardHistoryEnabled = clipboardHistoryEnabled
         self.clipboardDetectionEnabled = clipboardDetectionEnabled
         self.sideNoticesEnabled = sideNoticesEnabled
@@ -537,6 +643,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.voiceRecordingRetentionEnabled = voiceRecordingRetentionEnabled
         self.voiceRecordingCleanupPolicy = voiceRecordingCleanupPolicy
         self.voiceModelConfiguration = voiceModelConfiguration
+        self.voiceEnabledLexicons = voiceEnabledLexicons
+        self.voiceStructuredFormattingEnabled = voiceStructuredFormattingEnabled
+        self.screenshotEnabled = screenshotEnabled
+        self.screenshotHotkey = screenshotHotkey
+        self.screenshotPinHotkey = screenshotPinHotkey
+        self.screenshotPinnedToolbarVisible = screenshotPinnedToolbarVisible
     }
 
     /// Falls back to all current displays when all selected displays are disconnected, so activity notices remain visible.
@@ -569,6 +681,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case browserDownloadIslandEnabled
         case videoDownloadIslandEnabled
         case systemMonitorEnabled
+        case systemBackgroundSoundEnabled
+        case systemBackgroundSound
+        case systemBackgroundSoundStopsWhenUnused
         case batteryMonitorEnabled
         case systemMonitorMenuBarMetrics
         case systemMonitorMenuBarDisplayStyle
@@ -584,6 +699,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case updateChecksEnabled
         case automaticDownloadEnabled
         case updateChannel
+        case networkProxyURL
+        case networkProxyEnabled
         case clipboardHistoryEnabled
         case clipboardDetectionEnabled
         case sideNoticesEnabled
@@ -608,6 +725,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case voiceRecordingRetentionEnabled
         case voiceRecordingCleanupPolicy
         case voiceModelConfiguration
+        case voiceEnabledLexicons
+        case voiceStructuredFormattingEnabled
+        case screenshotEnabled
+        case screenshotHotkey
+        case screenshotPinHotkey
+        case screenshotPinnedToolbarVisible
     }
 
     private enum LegacyCodingKeys: String, CodingKey {
@@ -639,6 +762,18 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             forKey: .videoDownloadIslandEnabled
         ) ?? defaults.videoDownloadIslandEnabled
         systemMonitorEnabled = try container.decodeIfPresent(Bool.self, forKey: .systemMonitorEnabled) ?? defaults.systemMonitorEnabled
+        systemBackgroundSoundEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .systemBackgroundSoundEnabled
+        ) ?? defaults.systemBackgroundSoundEnabled
+        systemBackgroundSound = try container.decodeIfPresent(
+            SystemBackgroundSound.self,
+            forKey: .systemBackgroundSound
+        ) ?? defaults.systemBackgroundSound
+        systemBackgroundSoundStopsWhenUnused = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .systemBackgroundSoundStopsWhenUnused
+        ) ?? defaults.systemBackgroundSoundStopsWhenUnused
         batteryMonitorEnabled = try container.decodeIfPresent(Bool.self, forKey: .batteryMonitorEnabled) ?? defaults.batteryMonitorEnabled
         systemMonitorMenuBarMetrics = try container.decodeIfPresent(
             Set<SystemMonitorMenuBarMetric>.self,
@@ -668,6 +803,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             automaticDownloadEnabled = try legacyContainer.decodeIfPresent(Bool.self, forKey: .automaticUpdatesEnabled) ?? defaults.automaticDownloadEnabled
         }
         updateChannel = try container.decodeIfPresent(UpdateChannel.self, forKey: .updateChannel) ?? defaults.updateChannel
+        networkProxyURL = try container.decodeIfPresent(String.self, forKey: .networkProxyURL) ?? defaults.networkProxyURL
+        networkProxyEnabled = try container.decodeIfPresent(Bool.self, forKey: .networkProxyEnabled)
+            ?? (!networkProxyURL.isEmpty)
         clipboardHistoryEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardHistoryEnabled) ?? defaults.clipboardHistoryEnabled
         clipboardDetectionEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardDetectionEnabled) ?? defaults.clipboardDetectionEnabled
         sideNoticesEnabled = try container.decodeIfPresent(Bool.self, forKey: .sideNoticesEnabled) ?? defaults.sideNoticesEnabled
@@ -728,6 +866,30 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             AIModelConfigurationReference.self,
             forKey: .voiceModelConfiguration
         )
+        voiceEnabledLexicons = try container.decodeIfPresent(
+            Set<VoiceLexicon>.self,
+            forKey: .voiceEnabledLexicons
+        ) ?? defaults.voiceEnabledLexicons
+        voiceStructuredFormattingEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .voiceStructuredFormattingEnabled
+        ) ?? defaults.voiceStructuredFormattingEnabled
+        screenshotEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .screenshotEnabled
+        ) ?? defaults.screenshotEnabled
+        screenshotHotkey = try container.decodeIfPresent(
+            VoiceInputHotkeyPreset.self,
+            forKey: .screenshotHotkey
+        ) ?? defaults.screenshotHotkey
+        screenshotPinHotkey = try container.decodeIfPresent(
+            VoiceInputHotkeyPreset.self,
+            forKey: .screenshotPinHotkey
+        ) ?? defaults.screenshotPinHotkey
+        screenshotPinnedToolbarVisible = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .screenshotPinnedToolbarVisible
+        ) ?? defaults.screenshotPinnedToolbarVisible
     }
 }
 

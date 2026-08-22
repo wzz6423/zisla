@@ -6,6 +6,7 @@ public struct SideNoticePresentation: Equatable, Sendable {
     public let activeAINotice: IslandNotice?
     public let activeUpdateNotice: IslandNotice?
     public let activeMediaNotice: IslandNotice?
+    public let activeBackgroundSoundNotice: IslandNotice?
     public let activeFocusCountdownNotice: IslandNotice?
     public let activeFocusModeNotice: IslandNotice?
     public let activeTransientNotice: IslandNotice?
@@ -25,6 +26,7 @@ public struct SideNoticePresentation: Equatable, Sendable {
         activeAINotice: IslandNotice? = nil,
         activeUpdateNotice: IslandNotice? = nil,
         activeMediaNotice: IslandNotice? = nil,
+        activeBackgroundSoundNotice: IslandNotice? = nil,
         activeFocusCountdownNotice: IslandNotice? = nil,
         activeFocusModeNotice: IslandNotice? = nil,
         activeTransientNotice: IslandNotice? = nil,
@@ -43,6 +45,7 @@ public struct SideNoticePresentation: Equatable, Sendable {
         self.activeAINotice = activeAINotice
         self.activeUpdateNotice = activeUpdateNotice
         self.activeMediaNotice = activeMediaNotice
+        self.activeBackgroundSoundNotice = activeBackgroundSoundNotice
         self.activeFocusCountdownNotice = activeFocusCountdownNotice
         self.activeFocusModeNotice = activeFocusModeNotice
         self.activeTransientNotice = activeTransientNotice
@@ -59,7 +62,8 @@ public struct SideNoticePresentation: Equatable, Sendable {
     }
 
     public var hasCompactContent: Bool {
-        activeAICount > 0 || activeMediaNotice != nil || activeFocusCountdownNotice != nil
+        activeAICount > 0 || activeMediaNotice != nil || activeBackgroundSoundNotice != nil
+            || activeFocusCountdownNotice != nil
             || activeUpdateNotice != nil
             || activeFocusModeNotice != nil || activeTransientNotice != nil
             || activeToolboxNotice != nil
@@ -92,6 +96,7 @@ public enum CompactStatusVisibilityPolicy {
     ) -> Bool {
         let hasActivity = notices.contains {
             $0.id.hasPrefix("ai-active-") || $0.id.hasPrefix("media-active-")
+                || $0.id.hasPrefix("background-sound-")
         }
         let hasFocusMode = notices.contains { $0.id.hasPrefix("focus-mode-") }
         let hasVoiceProcessing = notices.contains { $0.id.hasPrefix("voice-processing-") }
@@ -150,6 +155,20 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
 
     public init() {}
 
+    /// Focus transitions are explicit user-visible events, so they take precedence over the
+    /// user's normal collapsed-status ordering until the transient notice expires.
+    public static func selectedCompactStatusPriority(
+        for notices: [IslandNotice],
+        settings: FeatureSettings
+    ) -> CompactStatusPriority? {
+        if notices.contains(where: { $0.id.hasPrefix("focus-transition") }) {
+            return .transient
+        }
+        return settings.compactStatusPriority.first {
+            compactStatusIsAvailable($0, notices: notices)
+        }
+    }
+
     public func presentation(
         for notices: [IslandNotice],
         compactWingsEnabled: Bool = true,
@@ -159,6 +178,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let normalizedHeight = max(1, compactWingHeight)
         let activeMediaNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("media-active-") })
+            : nil
+        let activeBackgroundSoundNotice = compactWingsEnabled
+            ? notices.first(where: { $0.id.hasPrefix("background-sound-") })
             : nil
         let activeFocusCountdownNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("focus-countdown-") })
@@ -195,6 +217,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             !$0.id.hasPrefix("ai-active-")
                 && !$0.id.hasPrefix("update-available-")
                 && !$0.id.hasPrefix("media-active-")
+                && !$0.id.hasPrefix("background-sound-")
                 && !$0.id.hasPrefix("focus-countdown-")
                 && !$0.id.hasPrefix("focus-mode-")
                 && !$0.id.hasPrefix("focus-transition")
@@ -209,6 +232,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             activeAICount: activeAICount,
             hasUpdate: activeUpdateNotice != nil,
             hasMedia: activeMediaNotice != nil,
+            hasBackgroundSound: activeBackgroundSoundNotice != nil,
             hasFocusCountdown: activeFocusCountdownNotice != nil,
             hasFocusMode: activeFocusModeNotice != nil,
             hasTransient: activeTransientNotice != nil,
@@ -226,6 +250,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             && activeAICount == 0
             && activeUpdateNotice == nil
             && activeMediaNotice == nil
+            && activeBackgroundSoundNotice == nil
             && activeFocusCountdownNotice == nil
             && activeFocusModeNotice == nil
             && activeTransientNotice == nil
@@ -239,6 +264,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             activeAINotice: activeAINotices.first,
             activeUpdateNotice: activeUpdateNotice,
             activeMediaNotice: activeMediaNotice,
+            activeBackgroundSoundNotice: activeBackgroundSoundNotice,
             activeFocusCountdownNotice: activeFocusCountdownNotice,
             activeFocusModeNotice: activeFocusModeNotice,
             activeTransientNotice: activeTransientNotice,
@@ -370,13 +396,12 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         if notices.contains(where: { $0.id.hasPrefix("voice-processing-") }) {
             return (false, false)
         }
-        let selectedPriority = settings.compactStatusPriority.first {
-            Self.compactStatusIsAvailable($0, notices: notices)
-        }
+        let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }
         let expandsForDetailedStatus = switch selectedPriority {
         case .media:
             settings.mediaCompactStyle == .detailed
+                && notices.contains { $0.id.hasPrefix("media-active-") }
         case .mail:
             settings.mailCompactStyle == .detailed
         default:
@@ -410,7 +435,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         case .aiActivity:
             notices.contains { $0.id.hasPrefix("ai-active-") }
         case .media:
-            notices.contains { $0.id.hasPrefix("media-active-") }
+            notices.contains {
+                $0.id.hasPrefix("media-active-") || $0.id.hasPrefix("background-sound-")
+            }
         case .focusMode:
             notices.contains { $0.id.hasPrefix("focus-mode-") }
         }
@@ -460,6 +487,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         activeAICount: Int,
         hasUpdate: Bool,
         hasMedia: Bool,
+        hasBackgroundSound: Bool,
         hasFocusCountdown: Bool,
         hasFocusMode: Bool,
         hasTransient: Bool,
@@ -472,7 +500,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         compactWingHeight: CGFloat,
         reserveCompactWing: Bool
     ) -> CGSize {
-        let hasCompact = activeAICount > 0 || hasUpdate || hasMedia || hasFocusCountdown || hasFocusMode || hasTransient
+        let hasCompact = activeAICount > 0 || hasUpdate || hasMedia || hasBackgroundSound || hasFocusCountdown || hasFocusMode || hasTransient
             || hasMail || hasToolbox || hasBrowserDownload || hasVideoDownload || hasVoiceProcessing || reserveCompactWing
         guard ordinaryCount > 0 else {
             return hasCompact

@@ -14,6 +14,18 @@ public enum GlobalHotkeyRegistrationResult: Equatable, Sendable {
 /// The event tap is added to the main RunLoop, so its callbacks and register/unregister calls
 /// are all serialized on the main thread.
 public final class GlobalHotkeyManager: @unchecked Sendable {
+    // CGEventFlags preserves device-specific bits that distinguish left and right physical modifier keys.
+    private static let deviceModifierMasks: [(modifier: VoiceInputModifier, mask: UInt64)] = [
+        (.leftControl, 0x0000_0000_0000_0001),
+        (.leftShift, 0x0000_0000_0000_0002),
+        (.rightShift, 0x0000_0000_0000_0004),
+        (.leftCommand, 0x0000_0000_0000_0008),
+        (.rightCommand, 0x0000_0000_0000_0010),
+        (.leftOption, 0x0000_0000_0000_0020),
+        (.rightOption, 0x0000_0000_0000_0040),
+        (.rightControl, 0x0000_0000_0000_2000),
+    ]
+
     private var hotKeyRef: EventHotKeyRef?
     fileprivate private(set) var registeredCarbonHotkeyID: UInt32?
     private var eventHandler: EventHandlerRef?
@@ -191,10 +203,15 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
         self.onKeyDown = onKeyDown
         self.onKeyUp = onKeyUp
         CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        CGEvent.tapEnable(tap: eventTap, enable: true)
         return .registered
     }
 
-    fileprivate func handleSideSpecificEvent(type: CGEventType, keyCode: UInt32?) {
+    fileprivate func handleSideSpecificEvent(
+        type: CGEventType,
+        keyCode: UInt32?,
+        flags: CGEventFlags
+    ) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let eventTap {
                 CGEvent.tapEnable(tap: eventTap, enable: true)
@@ -204,8 +221,13 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
 
         switch type {
         case .flagsChanged:
-            pressedModifierSides = currentModifierSides()
-            guard let sideSpecificHotkey, sideSpecificHotkey.isModifierOnly, let keyCode else {
+            guard let keyCode else { return }
+            pressedModifierSides = Self.modifierSides(
+                afterFlagsChangedFor: keyCode,
+                flags: flags,
+                from: pressedModifierSides
+            )
+            guard let sideSpecificHotkey, sideSpecificHotkey.isModifierOnly else {
                 return
             }
             if !sideSpecificHotkeyIsPressed,
@@ -246,8 +268,55 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
         }
     }
 
+    static func modifierSides(
+        afterFlagsChangedFor keyCode: UInt32,
+        flags: CGEventFlags,
+        from pressedModifierSides: Set<VoiceInputModifier>
+    ) -> Set<VoiceInputModifier> {
+        let deviceModifierSides = Self.modifierSides(from: flags)
+        if !deviceModifierSides.isEmpty {
+            return deviceModifierSides
+        }
+
+        guard let modifier = VoiceInputModifier(keyCode: keyCode) else {
+            return pressedModifierSides
+        }
+
+        let isModifierPressed: Bool = switch modifier {
+        case .leftControl, .rightControl: flags.contains(.maskControl)
+        case .leftOption, .rightOption: flags.contains(.maskAlternate)
+        case .leftCommand, .rightCommand: flags.contains(.maskCommand)
+        case .leftShift, .rightShift: flags.contains(.maskShift)
+        }
+
+        var modifierSides = pressedModifierSides
+        if !isModifierPressed {
+            modifierSides.remove(modifier)
+        } else if modifierSides.contains(modifier),
+                  modifierSides.contains(where: {
+                      $0 != modifier && $0.carbonModifier == modifier.carbonModifier
+                  }) {
+            modifierSides.remove(modifier)
+        } else {
+            modifierSides.insert(modifier)
+        }
+        return modifierSides
+    }
+
+    static func modifierSides(from flags: CGEventFlags) -> Set<VoiceInputModifier> {
+        Set(Self.deviceModifierMasks.compactMap { entry in
+            flags.rawValue & entry.mask == 0 ? nil : entry.modifier
+        })
+    }
+
     private func currentModifierSides() -> Set<VoiceInputModifier> {
-        Set(VoiceInputModifier.allCases.filter {
+        let deviceModifierSides = Self.modifierSides(
+            from: CGEventSource.flagsState(.combinedSessionState)
+        )
+        guard deviceModifierSides.isEmpty else {
+            return deviceModifierSides
+        }
+        return Set(VoiceInputModifier.allCases.filter {
             CGEventSource.keyState(.combinedSessionState, key: CGKeyCode($0.keyCode))
         })
     }
@@ -264,7 +333,7 @@ private func globalHotkeyEventHandlerCallback(
     _ event: EventRef?,
     _ userData: UnsafeMutableRawPointer?
 ) -> OSStatus {
-    guard let event, let userData else { return noErr }
+    guard let event, let userData else { return OSStatus(eventNotHandledErr) }
     let manager = Unmanaged<GlobalHotkeyManager>.fromOpaque(userData).takeUnretainedValue()
     var hotkeyID = EventHotKeyID()
     guard GetEventParameter(
@@ -277,7 +346,7 @@ private func globalHotkeyEventHandlerCallback(
         &hotkeyID
     ) == noErr,
         hotkeyID.id == manager.registeredCarbonHotkeyID
-    else { return noErr }
+    else { return OSStatus(eventNotHandledErr) }
     let kind = GetEventKind(event)
     MainActor.assumeIsolated {
         if kind == UInt32(kEventHotKeyPressed) {
@@ -303,8 +372,9 @@ private func globalHotkeyEventTapCallback(
     default:
         nil
     }
+    let flags = event.flags
     MainActor.assumeIsolated {
-        manager.handleSideSpecificEvent(type: type, keyCode: keyCode)
+        manager.handleSideSpecificEvent(type: type, keyCode: keyCode, flags: flags)
     }
     return Unmanaged.passUnretained(event)
 }

@@ -11,10 +11,12 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
     case kimi
     case qwen
     case coder
+    case zcode
     case trae
     case opencode
     case harness
     case doubao
+    case pi
 
     /// Normalises case and common aliases; returns nil for unknown tokens, letting the caller report the error.
     public init?(token: String) {
@@ -38,6 +40,8 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
         case "coder", "qwen-coder", "qoder", "qoder-cli", "qoderwork", "qoder-work",
              "qoderworkcn", "qoderwork-cn", "qoderwork cn", "qoderwake", "qoder-wake":
             self = .coder
+        case "zcode", "z-code", "zcode-cli", "zcode-desktop", "glm", "glm-coding", "z-ai", "z.ai":
+            self = .zcode
         case "trae", "trae-work", "traework", "trae-work-cn", "trae-solo", "trae-solo-cn", "trae-cn":
             self = .trae
         case "opencode", "open-code", "open_code":
@@ -46,6 +50,8 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
             self = .harness
         case "doubao", "豆包":
             self = .doubao
+        case "pi", "pi-coding", "pi-coding-agent", "pi-cli", "pi-agent":
+            self = .pi
         default: return nil
         }
     }

@@ -68,6 +68,13 @@ struct SideNoticeRootView: View {
                     height: presentation.compactWingHeight
                 )
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
+            } else if let backgroundSoundNotice = presentation.activeBackgroundSoundNotice {
+                CompactBackgroundSoundWing(
+                    notice: backgroundSoundNotice,
+                    side: side,
+                    height: presentation.compactWingHeight
+                )
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
             } else if let focusCountdownNotice = presentation.activeFocusCountdownNotice {
                 CompactFocusCountdownWing(
                     notice: focusCountdownNotice,
@@ -216,6 +223,10 @@ struct CompactStatusBarView: View {
         (queue.left + queue.right).first { $0.id.hasPrefix("media-active-") }
     }
 
+    private var backgroundSoundNotice: IslandNotice? {
+        (queue.left + queue.right).first { $0.id.hasPrefix("background-sound-") }
+    }
+
     private var transientNotice: IslandNotice? {
         (queue.left + queue.right)
             .filter { $0.id.hasPrefix("focus-transition") || $0.style == .headphone }
@@ -224,8 +235,12 @@ struct CompactStatusBarView: View {
 
     /// Detailed mode needs a live snapshot (lyrics advance with playback); the notice strip only carries a static cover and title.
     private var detailedMediaItem: NowPlayingSnapshot? {
-        guard settingsStore.settings.mediaCompactStyle == .detailed else { return nil }
-        return media.snapshot
+        guard settingsStore.settings.mediaCompactStyle == .detailed,
+              mediaNotice != nil,
+              let snapshot = media.snapshot,
+              snapshot.isPlaying
+        else { return nil }
+        return snapshot
     }
 
     private var toolboxNotice: IslandNotice? {
@@ -277,22 +292,10 @@ struct CompactStatusBarView: View {
     }
 
     private var selectedCompactStatusPriority: CompactStatusPriority? {
-        settingsStore.settings.compactStatusPriority.first(where: compactStatusIsAvailable)
-    }
-
-    private func compactStatusIsAvailable(_ priority: CompactStatusPriority) -> Bool {
-        switch priority {
-        case .transient: transientNotice != nil
-        case .updateAvailable: updateNotice != nil
-        case .mail: !mailNotices.isEmpty
-        case .videoDownload: videoDownloadNotice != nil
-        case .browserDownload: browserDownloadNotice != nil
-        case .focusCountdown: focusCountdownNotice != nil
-        case .toolboxReminder: toolboxNotice != nil
-        case .aiActivity: !activeAINotices.isEmpty
-        case .media: mediaNotice != nil
-        case .focusMode: focusModeNotice != nil
-        }
+        SideNoticeLayoutEngine.selectedCompactStatusPriority(
+            for: queue.left + queue.right,
+            settings: settingsStore.settings
+        )
     }
 
     @ViewBuilder
@@ -485,6 +488,22 @@ struct CompactStatusBarView: View {
                             usesTransparentBackground: compactWingsUseTransparentBackground
                         )
                     }
+                }
+            } else if let backgroundSoundNotice {
+                HStack(spacing: 0) {
+                    CompactBackgroundSoundWing(
+                        notice: backgroundSoundNotice,
+                        side: .left,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
+                    Spacer(minLength: 0)
+                    CompactBackgroundSoundWing(
+                        notice: backgroundSoundNotice,
+                        side: .right,
+                        height: height,
+                        usesTransparentBackground: compactWingsUseTransparentBackground
+                    )
                 }
             }
         case .focusMode:
@@ -1074,7 +1093,7 @@ private struct CompactUpdateWing: View {
                         .frame(width: min(19, height * 0.58), height: min(19, height * 0.58))
                 }
             } else {
-                    Image(systemName: "arrow.down.circle")
+                    Image(systemName: "arrow.up.circle")
                     .font(.system(size: min(14, height * 0.46), weight: .semibold))
                     .foregroundStyle(.cyan)
             }
@@ -1140,10 +1159,11 @@ private struct CompactAIWing: View {
 
     @ViewBuilder
     private var mascotStack: some View {
-        let identities = AIMascotLibrary
-            .uniqueProviders(fromNoticeIDs: notices.map(\.id))
-            .prefix(3)
-            .map { AIMascotIdentity(provider: $0, taskID: "") }
+        let identities = notices.reduce(into: [AIMascotIdentity]()) { result, notice in
+            guard let provider = AIMascotLibrary.provider(fromNoticeID: notice.id) else { return }
+            let identity = AIMascotIdentity(provider: provider, taskID: notice.id, title: notice.title)
+            if !result.contains(identity) { result.append(identity) }
+        }.prefix(3)
         if identities.count == 1, let identity = identities.first {
             AIMascotView(identity: identity, size: min(22, height * 0.72))
         } else {
@@ -1327,6 +1347,47 @@ private struct CompactMediaWing: View {
             return "play.rectangle.fill"
         }
         return "music.note"
+    }
+}
+
+private struct CompactBackgroundSoundWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    @ViewBuilder
+    var body: some View {
+        if side == .left {
+            Text(notice.title)
+                .font(.system(size: min(11, height * 0.4), weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .allowsTightening(true)
+                .truncationMode(.tail)
+                .padding(.leading, CompactStatusMetrics.horizontalContentInset)
+                .frame(width: CompactStatusMetrics.wingWidth, height: height, alignment: .leading)
+                .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+                .contentShape(CompactAIWingShape(side: side))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("背景音正在播放：\(notice.title)"))
+                .help("背景音正在播放：\(notice.title)")
+        } else {
+            MediaWaveformView(
+                artworkData: nil,
+                width: 20,
+                height: min(18, height * 0.68),
+                isActive: true
+            )
+            .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
+            .frame(width: CompactStatusMetrics.wingWidth, height: height, alignment: .trailing)
+            .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+            .contentShape(CompactAIWingShape(side: side))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("背景音正在播放：\(notice.title)"))
+            .help("背景音正在播放：\(notice.title)")
+        }
     }
 }
 

@@ -51,6 +51,20 @@ struct IslandPresentationReducerTests {
     }
 
     @Test
+    func immediateCollapseOverridesPointerPinAndTransientInteractionHolds() {
+        var reducer = IslandPresentationReducer()
+        _ = reducer.send(.pointerEntered)
+        _ = reducer.send(.setPinned(true))
+        _ = reducer.send(.setDragging(true))
+
+        #expect(
+            reducer.send(.collapseImmediately)
+                == [.cancelScheduledCollapse, .collapse]
+        )
+        #expect(reducer.state.visibility == .collapsed)
+    }
+
+    @Test
     func deterministicChaosEventsKeepVisibilityAndEffectsConsistent() {
         var reducer = IslandPresentationReducer()
         var seed: UInt64 = 0xD1CE_F00D
@@ -829,6 +843,12 @@ struct CLIParserTests {
         #expect(AIProvider(token: "qoderwake") == .coder)
         #expect(AIProvider(token: "copilot") == .copilot)
         #expect(AIProvider(token: "github-copilot") == .copilot)
+        #expect(AIProvider(token: "pi") == .pi)
+        #expect(AIProvider(token: "pi-coding-agent") == .pi)
+        #expect(AIProvider(token: "pi-cli") == .pi)
+        #expect(AIProvider(token: "zcode") == .zcode)
+        #expect(AIProvider(token: "zcode-cli") == .zcode)
+        #expect(AIProvider(token: "glm-coding") == .zcode)
     }
 
     @Test
@@ -1768,6 +1788,32 @@ struct UpdateCoreTests {
         #expect(selection?.archive.name == "zisla-macos.zip")
         #expect(selection?.checksum?.name.hasSuffix(".sha256") == true)
         #expect(release.macDiskImage?.name == "zisla-macos.dmg")
+    }
+
+    @Test
+    func releaseDecoderSelectsNativeDiskImageFromGiteeAssets() throws {
+        let json = """
+        {
+          "tag_name":"release/v0.1.4",
+          "prerelease":false,
+          "assets":[
+            {"name":"zisla-v0.1.4-macOS-arm64.dmg","browser_download_url":"https://gitee.com/wzz6423/zisla/releases/download/release/v0.1.4/zisla-v0.1.4-macOS-arm64.dmg"},
+            {"name":"zisla-v0.1.4-macOS-x86_64.dmg","browser_download_url":"https://gitee.com/wzz6423/zisla/releases/download/release/v0.1.4/zisla-v0.1.4-macOS-x86_64.dmg"},
+            {"name":"zisla-v0.1.4-macOS-universal.dmg","browser_download_url":"https://gitee.com/wzz6423/zisla/releases/download/release/v0.1.4/zisla-v0.1.4-macOS-universal.dmg"}
+          ]
+        }
+        """
+
+        let release = try JSONDecoder().decode(GitHubRelease.self, from: Data(json.utf8))
+
+        #expect(release.prerelease == false)
+#if arch(arm64)
+        #expect(release.macDiskImage?.name == "zisla-v0.1.4-macOS-arm64.dmg")
+#elseif arch(x86_64)
+        #expect(release.macDiskImage?.name == "zisla-v0.1.4-macOS-x86_64.dmg")
+#else
+        #expect(release.macDiskImage?.name == "zisla-v0.1.4-macOS-universal.dmg")
+#endif
     }
 }
 

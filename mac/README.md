@@ -1,66 +1,68 @@
 # zisla for macOS
 
-这是 zisla 的 macOS 实现：鼠标移到屏幕顶部中央时展开，移开后隐藏。它使用 AppKit `NSPanel`、SwiftUI 和事件驱动服务实现，不创建常驻透明热区窗口，隐藏时不运行帧循环。
+**English** | [简体中文](README.zh-CN.md)
 
-Swift target、Bundle ID、本地数据目录和 `zislactl` 均使用 zisla 标识。升级时会自动迁移此前版本的本地数据和偏好设置。
+This directory contains zisla's macOS implementation. Move the pointer to the top center of the screen to expand the island; move it away to hide it. The app uses AppKit `NSPanel`, SwiftUI, and event-driven services without a permanent transparent hit-area window or a frame loop while hidden.
 
-支持 macOS 14 及更高版本。macOS 26 使用 Liquid Glass，macOS 14/15 自动回退到系统原生材质。
+Swift targets, the bundle ID, local data directory, and `zislactl` all use the zisla identifier. Upgrades migrate local data and preferences from earlier versions automatically.
 
-## 功能
+macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall back to the native system material.
 
-### 13 个功能模块
+## Features
 
-| 模块 | 已实现能力 |
+### 13 modules
+
+| Module | Implemented capabilities |
 | --- | --- |
-| 首页 | 按需汇总当前番茄钟、首个活动 AI 任务、原生下载与多个浏览器下载进度。 |
-| 中转 | 将文件、音视频或链接拖到顶部触发带，暂存到中转站、在 Finder 中定位或调用系统共享菜单。 |
-| 剪贴板 | 在本机保存可搜索历史，按图片、URL 与文件筛选并标记常用项；历史记录与链接检测可独立开关。 |
-| AI 监控 | 聚合受支持 CLI、桌面端与 IDE 的活动任务、状态、token 趋势、贡献热力图和侧翼通知。 |
-| 下载 | 通过 `yt-dlp` 下载视频或音频；无 `ffmpeg` 时用 AVFoundation 封装兼容轨道，并为 B 站提供只读接口备用路径。 |
-| 日程 | 同时展示当前位置与最多 6 个自选地点的天气；查看、新增和删除日历事件及提醒事项，并标记提醒完成。 |
-| 邮件 | 读取选定 Mail.app 账户，在岛内查看收件箱、标记已读、回复、撰写邮件和移入废纸篓。 |
-| 随记 | 以系统「备忘录」为唯一数据源，查看、编辑、新建和删除 Markdown 笔记，并提供实时预览和自动写回。 |
-| PDF | 在本机完成合并、拆分、旋转、图片/Office 转换、转图片、导出文字、两类水印、页码、裁剪、加密、解锁和元数据编辑等 14 项操作。 |
-| 小工具 | 提供番茄钟、闹钟、保持亮屏、防止空闲休眠、屏幕与键盘清洁、提词器、摄像头镜子和经确认后清空废纸篓。 |
-| 系统 | 查看 CPU、GPU、内存、磁盘、网络、温度和风扇状态，释放内存并扫描可安全清理的缓存、日志与临时数据。 |
-| 电池 | 展示本机充放电功率流、健康度、循环次数、温度、容量、电流、电压、充电器，以及蓝牙配件和已信任 Apple 移动设备电量。 |
-| 锁屏 | 在系统锁屏页展示自定义文字、农历日期、媒体与相关状态信息。 |
+| Home | Summarizes the current Pomodoro timer, first active AI task, native downloads, and multiple browser download progresses on demand. |
+| Handoff | Drag files, media, or links to the top trigger area to keep them in the handoff tray, reveal them in Finder, or open the system share menu. |
+| Clipboard | Stores a searchable local history, filters by image, URL, and file, and marks favorites; history and link detection are independent switches. |
+| AI monitoring | Aggregates activity tasks, status, token trends, contribution heatmaps, and side notices from supported CLIs, desktop apps, and IDEs. |
+| Downloads | Uses `yt-dlp` for video and audio; without `ffmpeg`, AVFoundation wraps compatible tracks and a read-only Bilibili fallback is available. |
+| Schedule | Shows weather for the current location and up to six saved locations; view, create, and delete calendar events and reminders and mark reminders complete. |
+| Mail | Reads selected Mail.app accounts to view inboxes, mark messages read, reply, compose, and move messages to the trash. |
+| Notes | Uses Apple Notes as the sole data source for viewing, editing, creating, and deleting Markdown notes with live preview and automatic write-back. |
+| PDF | Performs local merge, split, rotate, image/Office conversion, image rendering, text export, two watermark types, page numbering, crop, encryption, unlock, and metadata editing. |
+| Utilities | Provides a Pomodoro timer, alarm, keep-awake mode, idle-sleep prevention, screen and keyboard cleaning, teleprompter, camera mirror, and confirmed trash emptying. |
+| System | Shows CPU, GPU, memory, disk, network, temperature, and fan status; releases memory and scans caches, logs, and temporary data that are safe to remove. |
+| Battery | Shows charge flow, health, cycles, temperature, capacity, current, voltage, charger information, and battery levels for Bluetooth accessories and trusted Apple mobile devices. |
+| Lock screen | Displays custom text, lunar dates, media, and related status information on the system lock screen. |
 
-### 跨模块能力
+### Cross-module capabilities
 
-- 系统正在播放：MediaRemote 展示封面、标题、进度、滚动歌词和播放控制；Core Audio 兜底识别实际输出音频的应用，暂停、停止和静音来源不显示。
-- 浏览器下载：在首页、收起态和侧翼通知中显示 Safari、Chrome、Edge、Firefox、Brave、Vivaldi、Opera 与 Arc 的下载来源和进度。
-- 语音输入：支持按键切换或按住说话、自定义全局快捷键、系统语音识别、本地或远端模型整理，以及本机录音历史。
-- CLI 与 Skills 管理：在设置中检测、安装、更新和卸载常用 AI CLI，并管理本机 Skills。
-- 桌面宠物：可选择内置或导入宠物，并配置显示在灵动岛左侧或右侧。
-- 更新：检查 GitHub/Gitee Release，可手动或自动下载当前通道的 DMG；应用不会自动挂载或替换自身。
-- 外观与交互：设置窗口可跟随系统、浅色或深色；灵动岛支持透明或磨砂表面、固定展开、多显示器、Spaces 和无刘海外接屏。
-- 新安装默认启用功能模块；每项功能、收起态状态、侧翼通知、菜单栏指标和更新行为都可在设置中单独调整，已有安装保留用户当前配置。
+- **Now Playing:** MediaRemote shows artwork, title, progress, scrolling lyrics, and controls; Core Audio identifies the actual audio source as a fallback. Paused, stopped, and muted sources are hidden.
+- **Browser downloads:** Shows download source and progress for Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera, and Arc in the home view, collapsed state, and side notices.
+- **Voice input:** Supports toggle or push-to-talk shortcuts, custom global shortcuts, system speech recognition, local or remote transcript organization, and local recording history.
+- **CLI and Skills management:** Detects, installs, updates, and removes common AI CLIs and manages local Skills from Settings.
+- **Desktop pets:** Select a built-in or imported pet and place it on either side of the island.
+- **Updates:** Checks GitHub/Gitee Releases and can manually or automatically download the current channel's DMG; the app never mounts or replaces itself.
+- **Appearance and interaction:** Settings can follow the system, light, or dark appearance. The island supports transparent or frosted surfaces, pinned expansion, multiple displays, Spaces, and external displays without a notch.
+- **Defaults:** New installations enable feature modules by default. Each feature, collapsed-state indicator, side notice, menu-bar metric, and update behavior can be adjusted independently; existing installations keep their current configuration.
 
-## 快速开始
+## Quick start
 
-### 环境
+### Environment
 
 - macOS 14+
-- Swift 6 / Xcode 16+（仅 Command Line Tools 也可构建）
-- 可选：`yt-dlp`、`ffmpeg`；Office 转 PDF 另需 LibreOffice 或 OpenOffice
+- Swift 6 / Xcode 16+ (Command Line Tools alone can also build)
+- Optional: `yt-dlp` and `ffmpeg`; Office-to-PDF conversion also requires LibreOffice or OpenOffice
 
-本机已安装 Homebrew 时：
+With Homebrew:
 
 ```bash
 brew install yt-dlp ffmpeg
 brew install --cask libreoffice
 ```
 
-### 运行源码
+### Run from source
 
 ```bash
 swift run zisla
 ```
 
-应用以菜单栏附件模式启动。鼠标移到当前屏幕顶部中央 6 px 区域即可展开；也可从菜单栏图标选择“显示灵动岛”。
+The app starts as a menu-bar accessory. Move the pointer into the 6 px area at the top center of the current display to expand it, or choose “Show Island” from the menu bar icon.
 
-### 构建 `.app`
+### Build an `.app`
 
 ```bash
 Scripts/generate-icon.sh
@@ -68,48 +70,48 @@ Scripts/build-app.sh
 open "dist/zisla.app"
 ```
 
-打包自带的官方 `yt-dlp` Helper：
+To package the official `yt-dlp` helper:
 
 ```bash
 Scripts/fetch-yt-dlp.sh
 Scripts/build-app.sh
 ```
 
-`fetch-yt-dlp.sh` 固定版本下载官方 macOS standalone 文件，并用官方 `SHA2-256SUMS` 校验后安装到 `Tools/yt-dlp`。
+`fetch-yt-dlp.sh` downloads a pinned official macOS standalone file and verifies it against the official `SHA2-256SUMS` before installing it at `Tools/yt-dlp`.
 
-## AI 工具接入
+## AI tool integration
 
-### 自动检测
+### Automatic detection
 
-zisla 会读取各工具公开或稳定的本地会话状态，只提取判断任务状态所需的结构化事件和本地活动元数据，不读取提示词或回答正文：
+zisla reads public or stable local session state from supported tools and extracts only structured events and local activity metadata needed to determine task state. It does not read prompts or answer bodies.
 
-| 环境 | 自动检测范围 |
+| Environment | Automatic detection |
 | --- | --- |
-| OpenAI / Anthropic | Codex CLI 与 Desktop、Claude Code 及其宿主环境 |
-| GitHub / Google / xAI | GitHub Copilot CLI 与 VS Code、Gemini CLI、Grok CLI |
-| 国内与独立工具 | Kimi Code、Qwen Code、Qoder、TRAE、OpenCode、Harnext/Harness、WorkBuddy、豆包 |
+| OpenAI / Anthropic | Codex CLI and Desktop, Claude Code, and their host environments |
+| GitHub / Google / xAI | GitHub Copilot CLI and VS Code, Gemini CLI, and Grok CLI |
+| Independent and regional tools | Kimi Code, Qwen Code, Qoder, ZCode Desktop and CLI, TRAE, OpenCode, Harnext/Harness, WorkBuddy, and Doubao |
 
-检测到等待审批或等待用户回答时显示黄色，工具或命令报错时显示红色，正常运行时显示绿色；同一时刻按红色、黄色、绿色的顺序聚合。Qwen runtime sidecar 只有在 PID 仍存活时才生效，避免退出后长期误报。
+Waiting for approval or a user answer is yellow, tool or command errors are red, and normal execution is green; simultaneous sources are grouped in red, yellow, green order. The Qwen runtime sidecar is considered active only while its PID is alive, avoiding stale reports after exit.
 
-普通聊天型 Desktop 应用如果不落盘结构化活动事件，系统无法可靠区分“应用已打开但空闲”和“模型正在生成”。这类工具（包括 ChatGPT 等）应使用下面的 `zislactl` hook 接入；zisla 不会用常驻进程冒充运行状态。
+If a chat-oriented desktop app does not persist structured activity events, the system cannot reliably distinguish an idle open app from an actively generating model. Such tools, including ChatGPT, should use the `zislactl` hook below; zisla does not fake activity with a resident process.
 
-### `zislactl` 本地协议
+### Local `zislactl` protocol
 
-`zislactl` 将任务状态和历史用量写入 SQLite：
+`zislactl` writes task state and usage history to SQLite:
 
 ```text
 ~/Library/Application Support/zisla/ai-state.sqlite
 ```
 
-用量历史不会因应用重启、覆盖更新或清空任务而删除；下次启动会从此数据库回读。只有用户手动删除应用数据时，历史才会丢失。
+Usage history survives app restarts, replacement updates, and task clearing. It is lost only when the user deletes the application data manually.
 
-示例：
+Example:
 
 ```bash
 swift run zislactl update \
   --id build-42 \
   --provider claude \
-  --title "重构索引" \
+  --title "Refactor index" \
   --progress 68 \
   --detail "17/25"
 
@@ -119,72 +121,72 @@ swift run zislactl usage \
   --output-tokens 2100 \
   --model claude-opus-4-8
 
-swift run zislactl finish --id build-42 --detail "完成"
+swift run zislactl finish --id build-42 --detail "Complete"
 ```
 
-Provider 规范值包括 `claude`、`codex`、`gemini`、`grok`、`gpt`、`copilot`、`kimi`、`qwen`、`coder`、`trae`、`opencode`、`harness` 和 `doubao`；常见别名会自动归一化。可在任意工具的 hook、shell wrapper 或任务脚本中调用。
+Canonical providers include `claude`, `codex`, `gemini`, `grok`, `gpt`, `copilot`, `kimi`, `qwen`, `coder`, `zcode`, `trae`, `opencode`, `pi`, `harness`, and `doubao`; common aliases are normalized automatically. Call it from any tool hook, shell wrapper, or task script.
 
-AI 运行列表和折叠状态使用各工具的官方 Logo 标识任务来源。
+The AI run list and collapsed state use each tool's official logo to identify its source.
 
-接入协议见 [CLI 接入设计](Docs/cli-reference.md)。
+See the [CLI integration reference](Docs/cli-reference.md) for the protocol.
 
-## 浏览器下载进度
+## Browser download progress
 
-zisla 使用 macOS 公共文件进度机制监听“下载”目录，并结合临时文件扩展名、下载来源扩展属性和正在运行的浏览器解析来源。它不会读取浏览器历史数据库，也不会为识别进度发起网络请求；下载成功后完成状态保留约 3 秒。
+zisla listens to macOS public file-progress information in the Downloads directory and combines temporary-file extensions, download-source extended attributes, and running browser information to identify the source. It does not read browser history databases or make network requests to identify progress; a completed download remains visible for about three seconds.
 
-## 下载器
+## Downloader
 
-可执行文件按以下顺序解析：
+Executables are resolved in this order:
 
 1. `zisla.app/Contents/Helpers/yt-dlp`
 2. `/opt/homebrew/bin/yt-dlp`
 3. `/usr/local/bin/yt-dlp`
 4. `~/.local/bin/yt-dlp`
 
-URL 作为独立 argv 传给 `Process`，不经过 shell。运行时强制忽略用户配置和插件、禁用 `--exec`、限制单个条目，并验证最终文件仍位于授权目录内。
+The URL is passed to `Process` as a separate argv value rather than through a shell. Runtime configuration and plugins are ignored, `--exec` is disabled, single-item limits are enforced, and the final file is verified to remain inside the authorized directory.
 
-没有 ffmpeg 时：
+Without `ffmpeg`:
 
-- 视频优先下载 AVC/MP4 视频轨和 M4A 音频轨，再通过系统 AVFoundation 原样封装为 MP4；若站点只提供单文件则直接保存。
-- 音频优先已有 M4A，否则保留原始音频格式。
-- B 站视频在 yt-dlp 遇到 HTTP 412、格式不可用或本机没有 yt-dlp 时，改用 B 站只读接口获取 DASH 轨并走同一原生封装流程，不安装额外工具。
+- Video prefers AVC/MP4 video and M4A audio tracks, then wraps them into MP4 with AVFoundation; a single-file format is kept as-is.
+- Audio prefers M4A and otherwise keeps the original audio format.
+- If yt-dlp receives HTTP 412, cannot find a format, or is unavailable locally, Bilibili uses its read-only API to obtain DASH tracks and follows the same native wrapping path without installing another tool.
 
-## 随记
+## Notes
 
-灵动岛内的 Markdown 随记，以系统「备忘录」App 作为唯一数据源——既能新建，也能查看、编辑、删除备忘录里已有的笔记，而不仅限于新增。
+Markdown notes inside the island use Apple Notes as their only data source. You can create, view, edit, and delete existing notes rather than only adding new ones.
 
-- 列表：进入模块时通过 JXA（`osascript -l JavaScript`）读取备忘录中未删除笔记的标题与修改时间，按最近修改排序；从备忘录返回时会同步列表，已移入「最近删除」的笔记不显示。点选切换当前编辑的笔记，可刷新、新建、右键删除。
-- 查看/编辑：选中笔记后用 AppleScript 读取其 `plaintext`（即 Markdown 原文）载入编辑器；编辑态使用原生 `TextEditor`，停止输入约 0.8 秒后自动写回备忘录（防抖，避免每次按键触发 AppleScript）。新建则在备忘录中创建一条新笔记并选中。
-- 预览：内置块级解析器把 Markdown 渲染为 `AttributedString`，支持标题、无序/有序/任务列表、引用、围栏代码块、分隔线，以及粗体、斜体、行内代码、删除线和链接等行内格式。
-- 存储格式：笔记正文按 Markdown 原文存入备忘录 `body` 的普通文本段落（HTML 转义并保留空行），读取 `plaintext` 时还原 Markdown 源文本，由随记模块负责渲染。备忘录 App 内显示的是普通文本（不渲染），这是用备忘录做 Markdown 存储后端的取舍。
-- 权限：首次读取/写入时 macOS 弹出自动化授权弹窗，允许 zisla 控制「备忘录」；被拒绝后列表与编辑会返回失败提示。
+- **List:** On entry, JXA (`osascript -l JavaScript`) reads titles and modification dates for non-deleted notes and sorts by latest modification. Returning from Notes refreshes the list; notes in Recently Deleted are hidden. Select a note to edit it, refresh, create a note, or delete it from the context menu.
+- **View and edit:** AppleScript reads the selected note's `plaintext` (the Markdown source) into the editor. Native `TextEditor` writes changes back after about 0.8 seconds of inactivity to avoid an AppleScript call for every keystroke. New notes are created in Apple Notes and selected.
+- **Preview:** The built-in block parser renders headings, unordered/ordered/task lists, quotes, fenced code, rules, bold, italic, inline code, strikethrough, and links as `AttributedString`.
+- **Storage:** The Markdown source is stored as ordinary text in the note's `body` with HTML escaping and blank lines preserved. Reading `plaintext` restores the source; Apple Notes displays plain text rather than rendering Markdown.
+- **Permissions:** The first read or write triggers macOS automation authorization for Apple Notes; a denial returns a failure notice from the list or editor.
 
-随记不在本地另存一份——备忘录即存储后端，避免双份数据与同步问题。
+The Notes module does not keep a second local copy; Apple Notes is the storage backend.
 
-## 权限和隐私
+## Permissions and privacy
 
-- 日程：首次打开日程模块时分别请求日历和提醒事项权限；新增事件/提醒、删除或标记提醒完成后自动刷新。
-- 定位：天气默认使用一次性当前位置请求，不持续跟踪；也可在设置中搜索、保存和删除其他地区，同时查看多个地点。
-- 文件和下载目录：使用用户选择目录的安全书签；文件中转不复制原文件。
-- 剪贴板：新安装默认开启历史与链接检测；两项可独立关闭。开启后只在 `changeCount` 变化时读取一次，最多处理一个链接，不保存 query 参数日志，也不调用清空、声明类型或写入 API，因此不会替换 Mac、iPhone、iPad 之间的通用剪贴板内容。
-- AI 状态：自动检测只读取判断任务状态所需的结构化事件和本地活动元数据。
-- 语音：仅在用户主动触发时访问麦克风和系统语音识别；录音、原始转写和 AI 整理文本由用户在本机管理。启用模型整理后，转写文本只发送给用户选定的本地模型、远端 Provider 或 CLI 档案；远端 Provider 与 CLI 凭据存入私有数据库，不写入普通设置。
-- 蓝牙与设备：仅在打开电池模块时读取 macOS 可提供的配件电量和已与本机建立信任关系的 Apple 移动设备电量。
-- 摄像头与输入监控：摄像头仅在打开镜子时使用；自定义物理修饰键快捷键和键盘清洁可能需要输入监控授权。
-- 浏览器下载：只订阅系统公开的文件进度并检查下载临时文件，不读取浏览历史或页面内容。
-- 媒体：通过 MediaRemote 获取系统元数据，并用 Core Audio 的进程输出状态确认是否正在播放。MediaRemote 是非公开框架，因此当前构建不适合直接提交 Mac App Store；无元数据时降级显示实际出声的来源应用。
-- 网络：天气访问 Open-Meteo；中国大陆地点的官方预警访问中国天气网公开数据，其他地点优先使用 WeatherKit；更新检查先访问 Gitee API，未发现新版本或 Gitee 不可用时再访问 GitHub API，确认下载时访问对应 Release 的 DMG；B 站备用下载访问其只读视频信息、播放地址和媒体 CDN；识别剪贴板链接本身不联网。
-- 自动化：随记通过 AppleScript/JXA 读写系统「备忘录」App 中的笔记（列出、查看、编辑、新建、删除），首次使用需在弹窗中授权 zisla 控制「备忘录」；随记不联网，笔记数据存在备忘录中。
+- **Calendar:** Calendar and Reminders permissions are requested separately on first entry; events and reminders refresh after creation, deletion, or completion.
+- **Location:** Weather uses a one-time current-location request and does not track continuously; other locations can be searched, saved, and removed in Settings.
+- **Files and Downloads:** User-selected directories use security-scoped bookmarks; file handoff does not copy the original.
+- **Clipboard:** New installations enable history and link detection by default, with independent switches. On each `changeCount`, at most one link is recognized locally; query parameters are not logged and no clear, declare-type, or write API is called, so the universal clipboard is not replaced.
+- **AI state:** Automatic detection reads only structured events and local activity metadata needed to determine task state.
+- **Voice:** Microphone and speech recognition are accessed only after an explicit user action. Recordings, raw transcripts, and organized text are managed locally; organized text is sent only to the selected local model, remote provider, or CLI profile, and remote credentials are kept in a private database.
+- **Bluetooth and devices:** Accessory and trusted Apple mobile-device battery levels are read only when the battery module is open.
+- **Camera and Input Monitoring:** The camera is used only for the mirror; custom modifier-key shortcuts and keyboard cleaning may require Input Monitoring.
+- **Browser downloads:** Only public system file progress and download temporary files are inspected; browser history and page content are not read.
+- **Media:** MediaRemote supplies metadata and Core Audio process output state confirms playback. MediaRemote is a private framework, so the current build is not suitable for direct Mac App Store submission; missing metadata falls back to the active audio source app.
+- **Network:** Weather uses Open-Meteo and public China weather alerts where applicable, with WeatherKit preferred elsewhere. Update checks try Gitee before GitHub, and download confirmation contacts the selected Release DMG. The Bilibili fallback uses read-only video information, playback URLs, and its media CDN; recognizing clipboard links does not connect to the network.
+- **Automation:** Notes uses AppleScript/JXA to list, view, edit, create, and delete Apple Notes. It requires automation authorization, does not use the network, and keeps data in Apple Notes.
 
-## 测试
+## Tests
 
-完整 Xcode 环境：
+With a complete Xcode installation:
 
 ```bash
 swift test
 ```
 
-仅安装 Command Line Tools 时：
+With Command Line Tools only:
 
 ```bash
 swift test \
@@ -193,31 +195,21 @@ swift test \
   -Xlinker -rpath -Xlinker /Library/Developer/CommandLineTools/Library/Developer/usr/lib
 ```
 
-产品介绍页：
+## Documentation
 
-```bash
-cd ../Web
-npm ci
-npm run dev
-```
+- [Architecture and performance design](Docs/architecture.md)
+- [CLI integration reference](Docs/cli-reference.md)
+- [Signing and release design](Docs/releasing.md)
 
-打开 Vite 在终端输出的本地地址。生产构建使用 `npm run build`。
+## System limitations
 
-## 文档
-
-- [架构与性能设计](Docs/architecture.md)
-- [CLI 接入设计](Docs/cli-reference.md)
-- [签名与发布设计](Docs/releasing.md)
-
-## 系统限制
-
-- macOS 没有公开的“灵动岛”API；物理刘海通过 `safeAreaInsets` 和顶部辅助区域推断，无刘海屏幕使用同样的自有覆盖层模拟。
-- DRM 视频、登录窗口、锁屏和部分独占全屏应用不保证提供 Now Playing 数据或允许覆盖层显示。
-- 未接入系统媒体中心的应用仍可识别正在输出音频的来源，但无法保证提供曲名、封面或进度；暂停、停止和静音视频按设计不显示。
-- 浏览器必须向 macOS 发布文件进度，或在“下载”目录使用可识别的临时文件，zisla 才能显示下载百分比。
-- 电池健康、温度、实时功率和配件电量取决于硬件、连接方式及 macOS 实际暴露的数据；缺失字段会显示为不可用。
-- Office 转 PDF 依赖本机 LibreOffice 或 OpenOffice，其余 PDF 操作在本机直接完成。
-- 免费 ad-hoc 签名包未经公证，首次打开可能需要在系统设置中选择“仍要打开”。无论签名方式，应用内都只检查和下载更新包，不会自动替换当前应用。
+- macOS has no public Dynamic Island API; a physical notch is inferred from `safeAreaInsets` and the top auxiliary area, while displays without a notch use the same custom overlay simulation.
+- DRM video, login windows, the lock screen, and some exclusive full-screen apps may not expose Now Playing data or allow an overlay.
+- Apps that do not integrate with the system media center may still expose their audio source but cannot guarantee title, artwork, or progress; paused, stopped, and muted video is intentionally hidden.
+- A browser must publish macOS file progress or use recognizable temporary files in Downloads for zisla to show a percentage.
+- Battery health, temperature, live power, and accessory levels depend on hardware, connection method, and data exposed by macOS; missing fields are shown as unavailable.
+- Office-to-PDF conversion requires LibreOffice or OpenOffice; other PDF operations run locally.
+- Free ad-hoc packages are not notarized and may require **Open Anyway** on first launch. Regardless of signing, the app only checks and downloads updates and never replaces itself automatically.
 
 ## License
 

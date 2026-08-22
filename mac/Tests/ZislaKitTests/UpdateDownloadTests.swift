@@ -81,11 +81,6 @@ struct UpdateDownloadTests {
                             "name": "Zisla-macOS.DMG",
                             "browser_download_url": "https://example.com/zisla-upper.dmg",
                             "size": 10485760
-                        },
-                        {
-                            "name": "zisla-macOS-universal.dmg",
-                            "browser_download_url": "https://example.com/zisla-lower.dmg",
-                            "size": 20971520
                         }
                     ]
                 }

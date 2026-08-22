@@ -1,136 +1,99 @@
 # zisla
 
-zisla 是一个原生 macOS 动态工作空间：把屏幕顶部的有限空间变成按需出现的轻量工作台。它会在需要时展示信息和操作入口，平时保持收起，不打断正在进行的工作。
+**English** | [简体中文](README.zh-CN.md)
 
-它尤其适合希望充分利用刘海区域、同时使用多个 AI 工具，或希望将常用桌面操作集中到一个入口的 Mac 用户。没有刘海的显示器也能使用，zisla 会显示同样轮廓的模拟状态条。
+**zisla is a native macOS workspace that appears when you need it, then gets out of the way.** Move the pointer to the top center of the screen to open one lightweight place for active AI work, media, handoff, downloads, and desktop utilities. Displays without a notch use the same simulated status area.
 
-> 当前实现为 macOS 版本。仓库按平台组织代码，为后续平台实现保留共享的产品方向，同时采用各平台原生交互与技术栈。
+Current implementation: **macOS 14+**. Apple Silicon is the supported configuration; Intel release packages may work, but compatibility is not guaranteed.
 
-## 为什么使用 zisla
+## Why it belongs at the top of your screen
 
-- **信息在需要时出现**：鼠标移到屏幕顶部中央即可展开；移开后自动收起，不抢占当前应用焦点。
-- **把工作流留在桌面顶部**：媒体控制、文件中转、浏览器与原生下载进度、日程、邮件、系统状态、电池和专注倒计时可以在同一位置访问。
-- **看见 AI 的实际工作状态**：聚合常用 AI CLI 与桌面工具的任务、进度和用量趋势，而不读取对话内容。
-- **保留你的控制权**：功能模块可分别开关；剪贴板历史和链接检测可独立关闭；需要权限的能力只在首次使用时请求。
+- **On demand, without stealing focus.** Expand it from the top edge, pin it when needed, and keep working in the current app.
+- **One place for active work.** See now playing, AI tasks, downloads, timers, mail, system status, and battery details without opening a full dashboard.
+- **AI activity without conversation access.** zisla reads only structured events and local activity metadata needed to determine task state. It never reads prompts or answer bodies.
+- **Controls remain local.** Modules, clipboard history, and link detection are independent switches; permissions are requested only when a feature is first used.
 
-## 功能总览
+## What it can do
 
-### 顶部工作流
+### Keep desktop work moving
 
-| 能力 | 说明 |
+| Capability | What it does |
 | --- | --- |
-| 正在播放 | 显示封面、标题、进度并提供播放控制；无媒体元数据时，可识别正在实际输出音频的应用。 |
-| 文件中转与共享 | 将文件、音视频或链接拖到屏幕顶部触发带，放入中转站、在 Finder 中定位，或调用 macOS 系统共享菜单。 |
-| 剪贴板 | 可选记录剪贴板历史，并按图片、URL 与文件类型筛选；链接检测可独立开关，开启后仅在本机识别新链接并提示。 |
-| 状态与通知 | 在收起状态展示正在播放、AI 活动、浏览器与原生下载、专注倒计时、新邮件和更新等状态，并可配置优先级、显示屏与通知时长。 |
-| 桌面宠物 | 可选在灵动岛中显示宠物形象，并可独立开关和配置位置。 |
+| Now Playing | Shows artwork, title, progress, lyrics, and playback controls; Core Audio can identify the app actually outputting audio when metadata is unavailable. |
+| Handoff and sharing | Drop files, media, or links on the top trigger area to keep them in a handoff tray, reveal them in Finder, or open the macOS share menu. |
+| Clipboard and notifications | Optionally records local clipboard history, recognizes new links locally, and surfaces media, AI activity, browser downloads, timers, mail, and updates in the collapsed state. |
+| Everyday workspace | Includes weather, calendar, reminders, Mail.app, Markdown notes backed by Apple Notes, lock-screen information, and optional desktop pets. |
 
-### AI 工作流
+### Make AI work visible
 
-| 能力 | 说明 |
+zisla monitors local activity from Codex, Claude Code, Pi, GitHub Copilot, Gemini, Grok, Kimi Code, Qwen Code, Qoder, ZCode, TRAE, OpenCode, Harnext, WorkBuddy, Doubao, and other supported sources. It shows tasks, status, token trends, contribution heatmaps, and side notices.
+
+For tools without a stable local activity source, `zislactl` lets scripts, CI, and tool hooks report progress, usage, and notifications while keeping protocol state on this Mac. Settings can also detect, install, update, and remove common AI CLIs and manage local Skills. See the [CLI integration reference](mac/Docs/cli-reference.md) for providers and commands.
+
+### Handle the useful small things
+
+| Area | Included tools |
 | --- | --- |
-| AI 状态监控 | 自动识别 Codex、Claude Code、GitHub Copilot、Kimi Code、Gemini、Grok、Qwen Code、Qoder、TRAE、OpenCode、Harnext、WorkBuddy 和豆包等本地活动源，展示任务列表、状态、实时 token 趋势、贡献热力图和侧边通知。 |
-| 本地状态协议 | 附带 `zislactl`，可让脚本、CI 或其他工具上报任务进度、用量和通知。协议与状态均保存在本机。 |
-| CLI 与 Skills 管理 | 在设置中检测、安装、更新和卸载常用 AI CLI，并管理本机 Skills。 |
-| 语音输入 | 通过全局快捷键录音并转写为文本，可选择本地或远端模型整理转写结果，并在设置中管理本机语音记录。 |
+| Downloads and documents | Video and audio downloads through `yt-dlp`; local PDF merge, split, rotate, crop, conversion, rendering, text export, watermarks, page numbers, encryption, unlock, and metadata editing. |
+| Focus and presentation | Pomodoro timer, alarm, keep-awake mode, idle-sleep prevention, screen and keyboard cleaning, teleprompter, and camera mirror. |
+| System and battery | CPU, GPU, memory, disk, network, fan, and battery information, plus cleanup of caches and logs that are safe to remove. |
+| Voice input | Global shortcuts for recording and transcription, optional local or remote transcript organization, and local voice history. |
 
-AI 状态监控只读取判断任务状态所需的结构化事件和本地活动元数据，**不会读取提示词或回答正文**。没有稳定本地活动源的工具（包括普通聊天型桌面应用）可通过 `zislactl` 上报；支持的 Provider、接入方式和命令详见 [CLI 接入设计](mac/Docs/cli-reference.md)。
+## Get started
 
-### 日常信息与沟通
+### Install the app
 
-| 能力 | 说明 |
-| --- | --- |
-| 天气、日历与提醒事项 | 展示当前位置与最多 6 个自选地点的天气；查看、新增和删除日历事件及提醒事项，并可将提醒标记完成。 |
-| 邮件 | 读取已启用的 Mail.app 账户，在岛内查看收件箱、标记已读、回复、撰写新邮件和移入废纸篓。 |
-| Markdown 随记 | 以系统「备忘录」为数据源，支持查看、编辑、新建和删除笔记，以及 Markdown 实时预览；草稿会自动写回备忘录。 |
-| 锁屏信息 | 可配置锁屏文字、农历日期和相关状态信息的展示。 |
+Download the latest DMG from [GitHub Releases](https://github.com/wzz6423/zisla/releases) or [Gitee Releases](https://gitee.com/wzz6423/zisla/releases), mount it, and drag `zisla.app` to `Applications`.
 
-### 实用工具
+After launching, move the pointer to the top center of the current screen, or choose **Show Island** from the menu bar icon. An unsigned preview package may require **Open Anyway** in **System Settings > Privacy & Security** on first launch.
 
-| 能力 | 说明 |
-| --- | --- |
-| 视频与音频下载 | 粘贴链接后使用 `yt-dlp` 下载到默认或自选目录；没有 `ffmpeg` 时可使用 AVFoundation 原生封装兼容的音视频轨。 |
-| PDF 工具 | 在本机完成 PDF 合并、拆分、旋转、裁剪、图片/Office 转换、渲染为图片、导出文字、文字/图片水印、页码、加密、解除密码和元数据编辑等 14 项操作。 |
-| 工具箱 | 提供番茄钟、闹钟、保持亮屏、防止空闲休眠、屏幕与键盘清洁、提词器、摄像头镜子和经确认后清空废纸篓。 |
-| 系统状态与清理 | 查看 CPU、GPU、内存、磁盘、网络和风扇等状态，并清理可安全删除的缓存与日志。 |
-| 电池中心 | 查看本机电量、充放电功率流、健康度、循环次数、温度、容量、电流、电压与充电器信息，并汇总可读取的蓝牙配件和已信任 Apple 移动设备电量。 |
+### Run from source
 
-## 交互与性能
-
-- 支持多显示器、Spaces 和普通全屏应用；展开时不会激活或抢走当前应用焦点。
-- 可将展开面板固定在屏幕顶部；固定后保持被动，点击输入控件时仍可正常获得键盘焦点。
-- 隐藏时不创建常驻透明热区窗口，也不运行帧循环；通过全局事件监听与几何判断触发展开。
-- 使用单层系统材质；系统开启“降低透明度”后会自动使用实体背景。
-- 物理刘海通过系统安全区域推断；无刘海的外接显示器使用自有覆盖层模拟状态条。
-
-具体设计取舍见 [架构与性能设计](mac/Docs/architecture.md)。
-
-## 快速开始
-
-### 系统要求
-
-- macOS 14 或更高版本
-- 当前受支持配置为 Apple 芯片 Mac
-
-Intel 机型可能存在可用的发布包，但不保证兼容性。macOS 14 以下版本不受支持。
-
-### 安装应用
-
-从 [GitHub Releases](https://github.com/wzz6423/zisla/releases) 或 [Gitee Releases](https://gitee.com/wzz6423/zisla/releases) 下载最新 DMG，挂载后将 `zisla.app` 拖入 `Applications`。
-
-首次启动后，将鼠标移到当前屏幕顶部中央即可展开；也可以从菜单栏图标选择“显示灵动岛”。非公证的预览包首次打开时，可能需要在“系统设置 > 隐私与安全性”中选择“仍要打开”。
-
-### 从源码运行
-
-开发环境需要 Swift 6 / Xcode 16+；仅安装 Command Line Tools 也可构建。
+Swift 6 / Xcode 16+ is required; Command Line Tools alone can also build the project.
 
 ```bash
 cd mac
 swift run zisla
 ```
 
-从源码使用下载器需要 `yt-dlp`，`ffmpeg` 为可选依赖；Office 转 PDF 需要本机安装 LibreOffice 或 OpenOffice。安装、构建、测试及打包命令见 [macOS 开发指南](mac/README.md)。
+The downloader requires `yt-dlp`; `ffmpeg` is optional. Office-to-PDF conversion requires LibreOffice or OpenOffice. Build, test, and packaging instructions are in the [macOS development guide](mac/README.md).
 
-## 权限、数据与网络
+## Designed to stay out of the way
 
-zisla 仅在启用并首次使用相关功能时请求系统权限。你可以随时在设置中关闭模块或在 macOS 系统设置中撤销授权。
+- Supports multiple displays, Spaces, and ordinary full-screen apps without activating or taking focus from the current app.
+- The hidden state has no permanent transparent hit-area window and runs no frame loop; global event monitoring and geometry checks trigger expansion.
+- Uses one system material and switches to an opaque background when Reduce Transparency is enabled.
+- Detects a physical notch from the system safe area; external displays without one use an overlay with the same outline.
 
-| 范围 | 使用方式 |
+See the [architecture and performance design](mac/Docs/architecture.md) for the implementation trade-offs.
+
+## Privacy and permissions
+
+zisla requests a permission only when an enabled feature first needs it. You can disable modules in Settings and revoke authorization in macOS System Settings at any time.
+
+| Scope | Boundary |
 | --- | --- |
-| 日历与提醒事项 | 读取并管理用户允许访问的日程与提醒。 |
-| 定位 | 天气默认进行一次性定位，不持续追踪；也可手动保存其他地点。 |
-| 备忘录与邮件 | 通过 AppleScript/JXA 与系统「备忘录」和 Mail.app 交互，首次使用需要自动化授权；读取本地 Mail 索引时可能需要完全磁盘访问。 |
-| 麦克风、语音识别与整理模型 | 仅在主动使用语音输入时录音和转写；启用模型整理后，转写文本只发送给用户选定的本地模型、远端 Provider 或 CLI 档案，凭据保存在私有数据库。 |
-| 蓝牙与 Apple 移动设备 | 仅在打开电池页面时读取 macOS 可提供的配件电量，以及已与本机建立信任关系的设备电量。 |
-| 摄像头与输入监控 | 摄像头仅在打开镜子时使用；自定义语音快捷键和键盘清洁可能需要输入监控授权。 |
-| 文件与下载目录 | 使用用户选择目录的安全书签；文件中转不复制原文件。 |
-| 剪贴板 | 剪贴板历史和链接检测可独立开关；开启后仅在本机识别链接，不会自动联网、下载、清空或写回剪贴板。 |
-| 浏览器下载 | 通过 macOS 公共文件进度机制识别下载来源和百分比，不读取浏览器历史数据库，也不发起网络请求。 |
-| 网络 | 天气访问 Open-Meteo、WeatherKit 及相应公开预警服务；更新检查访问 GitHub/Gitee Release API；下载器仅在你发起下载后访问对应站点；语音整理仅在启用后访问用户配置的远端 Provider。 |
+| AI activity | Reads only structured events and local activity metadata. Prompts and answer bodies are never read. |
+| Clipboard and files | Clipboard history and link detection are separate local switches; handoff uses security-scoped bookmarks and does not copy the original file. |
+| Notes, Mail, and voice | Notes and Mail use AppleScript/JXA with automation authorization. Voice records only while active; transcript organization sends text only to the selected local model, remote provider, or CLI profile. |
+| Browser downloads and media | Uses macOS public file-progress information, MediaRemote metadata, and Core Audio output state. It does not read browser history databases or capture audio content. |
+| Network | Weather, release checks, downloader requests, and optional remote voice organization access the network only for their respective enabled actions. |
 
-媒体模块通过 MediaRemote 获取系统媒体元数据，并用 Core Audio 判断实际音频输出；不会采集音频内容。更多边界与限制见 [macOS 开发指南的“权限和隐私”章节](mac/README.md#权限和隐私)。
+The [macOS guide](mac/README.md#permissions-and-privacy) documents the complete permission and network behavior.
 
-## 文档与开发
+## Documentation
 
-| 文档 | 用途 |
+| Document | Purpose |
 | --- | --- |
-| [macOS 开发指南](mac/README.md) | 13 个模块、AI 接入、依赖、构建、测试、权限边界与系统限制。 |
-| [架构与性能设计](mac/Docs/architecture.md) | 顶部触发、窗口行为、并发、媒体与下载安全设计。 |
-| [CLI 接入设计](mac/Docs/cli-reference.md) | `zislactl` 的 Provider、命令、字段与退出码。 |
-| [签名与发布设计](mac/Docs/releasing.md) | 签名、公证、DMG、更新通道与发布验收。 |
-| [贡献指南](CONTRIBUTING.md) | 开发环境、分支、提交和 Pull Request 要求。 |
+| [macOS development guide](mac/README.md) | Modules, AI integration, dependencies, build, test, permissions, and system limitations. |
+| [Architecture and performance design](mac/Docs/architecture.md) | Top-edge triggering, window behavior, concurrency, media, and download safety. |
+| [CLI integration reference](mac/Docs/cli-reference.md) | `zislactl` providers, commands, fields, and exit codes. |
+| [Signing and release design](mac/Docs/releasing.md) | Signing, notarization, DMGs, update channels, and release acceptance. |
+| [Contributing guide](CONTRIBUTING.md) | Development environment, branches, commits, and pull request requirements. |
 
-仓库当前结构：
+## Contributing
 
-```text
-mac/      当前 macOS 实现，使用 Swift、AppKit 和 SwiftUI
-Web/      产品官网，使用 TypeScript 和 Vite 构建
-skills/   发布与仓库维护相关技能
-```
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request。开始前请阅读 [贡献指南](CONTRIBUTING.md)；安全问题请通过 [GitHub Security Advisories](https://github.com/wzz6423/zisla/security/advisories/new) 私下报告，不要公开提交 Issue。
+Issues and pull requests are welcome. Read the [contributing guide](CONTRIBUTING.md) first. Report security issues privately through [GitHub Security Advisories](https://github.com/wzz6423/zisla/security/advisories/new) rather than opening a public issue.
 
 ## License
 

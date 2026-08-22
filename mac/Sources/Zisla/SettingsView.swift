@@ -9,6 +9,7 @@ struct SettingsView: View {
     @ObservedObject private var settingsStore: FeatureSettingsStore
     @StateObject private var input = SettingsInput()
     @StateObject private var launchAtLogin = LaunchAtLoginController()
+    @StateObject private var networkProxyMonitor = NetworkProxyAvailabilityMonitor()
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var searchFieldFocused: Bool
@@ -19,6 +20,7 @@ struct SettingsView: View {
     @State private var isVoiceHistoryBatchDeleteConfirmationPresented = false
     @State private var voiceHistorySelectionMode = false
     @State private var selectedVoiceHistoryIDs: Set<UUID> = []
+    @State private var screenshotHotkeyValidationMessage: String?
     @Namespace private var sectionSelectionNamespace
 
     init(model: AppModel) {
@@ -45,6 +47,7 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             launchAtLogin.refresh()
             model.refreshVoiceInputInputMonitoringAccess()
+            model.backgroundSounds.refresh()
         }
         .onChange(of: settingsStore.settings) { _, _ in
             ensureSelectionIsVisible()
@@ -136,9 +139,27 @@ struct SettingsView: View {
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 0)
-                IconButton(symbol: "power", help: "退出应用", size: .compact) {
+                Button {
                     NSApp.terminate(nil)
+                } label: {
+                    HStack(spacing: 6) {
+                        IconButtonLabel(
+                            symbol: "power",
+                            size: .compact,
+                            showsInactiveBackground: false
+                        )
+                        Text("退出")
+                            .font(.system(size: 10, weight: .medium))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    .padding(.trailing, 7)
+                    .background(Color.fillControl)
+                    .clipShape(Capsule())
+                    .contentShape(Capsule())
                 }
+                .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
+                .help("退出应用")
                 .accessibilityLabel("退出应用")
             }
             .frame(maxWidth: .infinity)
@@ -220,6 +241,8 @@ struct SettingsView: View {
             petContent
         case .download:
             downloadContent
+        case .networkProxy:
+            networkProxyContent
         case .weather:
             weatherContent
         case .updates:
@@ -308,7 +331,8 @@ struct SettingsView: View {
                     settingRow(
                         symbol: "rectangle.compress.vertical",
                         title: "监控样式",
-                        detail: "紧凑模式隐藏图标并减小字号，减少菜单栏占用"
+                        detail: "紧凑模式隐藏图标并减小字号，减少菜单栏占用",
+                        isNested: true
                     ) {
                         IslandOutlinedPicker(
                             selection: Binding(
@@ -328,7 +352,8 @@ struct SettingsView: View {
                         settingRow(
                             symbol: metric.symbolName,
                             title: metric.menuTitle,
-                            detail: "显示实时监控摘要"
+                            detail: "显示实时监控摘要",
+                            isNested: true
                         ) {
                             Toggle("", isOn: systemMonitorMenuBarBinding(for: metric))
                                 .labelsHidden()
@@ -345,6 +370,13 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("媒体与文件") {
                 featureToggle("媒体播放", detail: "显示系统正在播放的音乐或视频", symbol: "play.square.fill", keyPath: \.mediaEnabled)
+                rowDivider
+                featureToggle(
+                    "Mac 未使用时关闭背景音",
+                    detail: "锁屏、屏保启动或显示器休眠时，自动关闭背景音",
+                    symbol: "lock.display",
+                    keyPath: \.systemBackgroundSoundStopsWhenUnused
+                )
                 rowDivider
                 featureToggle("文件中转与分享", detail: "暂存文件并调用 AirDrop 或系统分享", symbol: "tray.full.fill", keyPath: \.fileShelfEnabled)
                 rowDivider
@@ -389,6 +421,100 @@ struct SettingsView: View {
                 featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
                 rowDivider
                 featureToggle("电池监控", detail: "显示电池详细信息与健康状态", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
+            }
+
+            settingsGroup("截图") {
+                featureToggle(
+                    "启用截图",
+                    detail: "启用截图、钉图与全局快捷键",
+                    symbol: "camera.viewfinder",
+                    keyPath: \.screenshotEnabled
+                )
+                rowDivider
+                settingRow(
+                    symbol: "camera.fill",
+                    title: "截图快捷键",
+                    detail: "触发截图功能"
+                ) {
+                    HotkeyRecorder(
+                        hotkey: Binding(
+                            get: { model.settingsStore.settings.screenshotHotkey },
+                            set: { updateScreenshotHotkey($0, action: .capture) }
+                        )
+                    )
+                    .frame(width: 142, height: 26)
+                    .disabled(!model.settingsStore.settings.screenshotEnabled)
+                }
+                rowDivider
+                settingRow(
+                    symbol: "pin.fill",
+                    title: "钉图快捷键",
+                    detail: "钉住已截取的图片"
+                ) {
+                    HotkeyRecorder(
+                        hotkey: Binding(
+                            get: { model.settingsStore.settings.screenshotPinHotkey },
+                            set: { updateScreenshotHotkey($0, action: .pin) }
+                        )
+                    )
+                    .frame(width: 142, height: 26)
+                    .disabled(!model.settingsStore.settings.screenshotEnabled)
+                }
+                rowDivider
+                featureToggle(
+                    "显示钉图控制条",
+                    detail: "隐藏后仍支持快捷键、手势和鼠标操作",
+                    symbol: "rectangle.bottomhalf.inset.filled",
+                    keyPath: \.screenshotPinnedToolbarVisible
+                )
+                rowDivider
+                settingRow(
+                    symbol: "cursorarrow.motionlines",
+                    title: "鼠标操作",
+                    detail: "按住图片拖动位置；拖动四角调整大小",
+                    detailLineLimit: 2,
+                    isNested: true
+                ) {
+                    EmptyView()
+                }
+                rowDivider
+                settingRow(
+                    symbol: "hand.draw.fill",
+                    title: "触控板手势",
+                    detail: "双指捏合缩放；双指上滑增加不透明度，下滑降低不透明度",
+                    detailLineLimit: 2,
+                    isNested: true
+                ) {
+                    EmptyView()
+                }
+                if model.settingsStore.settings.screenshotEnabled,
+                   let message = screenshotHotkeyValidationMessage ?? currentScreenshotHotkeyConflict {
+                    rowDivider
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.zislaWarning)
+                        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+                }
+                if screenshotHotkeysRequireInputMonitoring {
+                    rowDivider
+                    settingRow(
+                        symbol: "lock.shield",
+                        title: "输入监控",
+                        detail: "单独修饰键需要监听全局键盘事件",
+                        isNested: true
+                    ) {
+                        if model.voiceInputInputMonitoringAccessGranted {
+                            Label("已授权", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.caption)
+                        } else {
+                            Button("打开设置") {
+                                model.openVoiceInputInputMonitoringSettings()
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
             }
 
             settingsGroup("灵动岛与下载展示") {
@@ -674,6 +800,23 @@ struct SettingsView: View {
                     .controlSize(.small)
                     .frame(maxWidth: 220, alignment: .trailing)
                 }
+                rowDivider
+                settingRow(
+                    symbol: "list.number",
+                    title: "格式化整理",
+                    detail: "将明确列举的事项整理为编号列表"
+                ) {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { model.settingsStore.settings.voiceStructuredFormattingEnabled },
+                            set: { model.settingsStore.settings.voiceStructuredFormattingEnabled = $0 }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                }
                 if let configuration = model.selectedVoiceModelConfiguration {
                     rowDivider
                     settingRow(
@@ -761,6 +904,22 @@ struct SettingsView: View {
                 ) {
                     IconButton(symbol: "folder", help: "打开语音记录目录", size: .compact) {
                         model.openVoiceRecordingsDirectory()
+                    }
+                }
+            }
+
+            settingsGroup("识别词库") {
+                ForEach(Array(VoiceLexicon.allCases.enumerated()), id: \.element.id) { index, lexicon in
+                    if index > 0 { rowDivider }
+                    settingRow(
+                        symbol: lexicon.symbol,
+                        title: lexicon.title,
+                        detail: lexicon.detail
+                    ) {
+                        Toggle("", isOn: voiceLexiconBinding(for: lexicon))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
                     }
                 }
             }
@@ -868,9 +1027,11 @@ struct SettingsView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 72)
                 } else {
-                    ForEach(model.voiceHistory.entries) { entry in
-                        rowDivider
-                        voiceHistoryRow(entry)
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(model.voiceHistory.entries) { entry in
+                            rowDivider
+                            voiceHistoryRow(entry)
+                        }
                     }
                 }
             }
@@ -1029,7 +1190,7 @@ struct SettingsView: View {
                             ? "按住说话、松开结束"
                             : "按一下开始、再按一下结束"
                     ) {
-                        VoiceInputHotkeyRecorder(
+                        HotkeyRecorder(
                             hotkey: Binding(
                                 get: { model.settingsStore.settings.voiceInputHotkeyPreset },
                                 set: { model.settingsStore.settings.voiceInputHotkeyPreset = $0 }
@@ -1042,7 +1203,8 @@ struct SettingsView: View {
                         settingRow(
                             symbol: "lock.shield",
                             title: "输入监控",
-                            detail: "左右侧修饰键需要监听全局键盘事件"
+                            detail: "左右侧修饰键需要监听全局键盘事件",
+                            isNested: true
                         ) {
                             if model.voiceInputInputMonitoringAccessGranted {
                                 Label("已授权", systemImage: "checkmark.circle.fill")
@@ -1105,7 +1267,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 100, alignment: .trailing)
+                    .frame(width: 150, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
             }
@@ -1129,6 +1291,21 @@ struct SettingsView: View {
                     selection.remove(metric)
                 }
                 model.settingsStore.settings.systemMonitorMenuBarMetrics = selection
+            }
+        )
+    }
+
+    private func voiceLexiconBinding(for lexicon: VoiceLexicon) -> Binding<Bool> {
+        Binding(
+            get: { model.settingsStore.settings.voiceEnabledLexicons.contains(lexicon) },
+            set: { enabled in
+                var selection = model.settingsStore.settings.voiceEnabledLexicons
+                if enabled {
+                    selection.insert(lexicon)
+                } else {
+                    selection.remove(lexicon)
+                }
+                model.settingsStore.settings.voiceEnabledLexicons = selection
             }
         )
     }
@@ -1173,6 +1350,62 @@ struct SettingsView: View {
                     selected == connectedDisplayIDs ? [] : selected
             }
         )
+    }
+
+    private enum ScreenshotHotkeyAction: Equatable {
+        case capture
+        case pin
+    }
+
+    private var screenshotHotkeysRequireInputMonitoring: Bool {
+        let settings = model.settingsStore.settings
+        return settings.screenshotEnabled
+            && (settings.screenshotHotkey.requiresInputMonitoring
+                || settings.screenshotPinHotkey.requiresInputMonitoring)
+    }
+
+    private var currentScreenshotHotkeyConflict: String? {
+        let settings = model.settingsStore.settings
+        if settings.screenshotHotkey.conflicts(with: settings.screenshotPinHotkey) {
+            return "截图与钉图快捷键冲突，请修改其中一个"
+        }
+        if settings.voiceInputEnabled,
+           settings.screenshotHotkey.conflicts(with: settings.voiceInputHotkeyPreset) {
+            return "截图快捷键与语音输入冲突"
+        }
+        if settings.voiceInputEnabled,
+           settings.screenshotPinHotkey.conflicts(with: settings.voiceInputHotkeyPreset) {
+            return "钉图快捷键与语音输入冲突"
+        }
+        return nil
+    }
+
+    private func updateScreenshotHotkey(
+        _ hotkey: VoiceInputHotkeyPreset,
+        action: ScreenshotHotkeyAction
+    ) {
+        var settings = model.settingsStore.settings
+        let other = action == .capture ? settings.screenshotPinHotkey : settings.screenshotHotkey
+        let actionName = action == .capture ? "截图" : "钉图"
+        let otherName = action == .capture ? "钉图" : "截图"
+        guard !hotkey.conflicts(with: other) else {
+            screenshotHotkeyValidationMessage = "\(actionName)快捷键与\(otherName)冲突，未保存"
+            return
+        }
+        guard !settings.voiceInputEnabled
+            || !hotkey.conflicts(with: settings.voiceInputHotkeyPreset)
+        else {
+            screenshotHotkeyValidationMessage = "\(actionName)快捷键与语音输入冲突，未保存"
+            return
+        }
+        switch action {
+        case .capture:
+            settings.screenshotHotkey = hotkey
+        case .pin:
+            settings.screenshotPinHotkey = hotkey
+        }
+        screenshotHotkeyValidationMessage = nil
+        model.settingsStore.settings = settings
     }
 
     private var generalContent: some View {
@@ -1297,6 +1530,53 @@ struct SettingsView: View {
         }
     }
 
+    private var networkProxyStatusText: String {
+        switch networkProxyMonitor.availability {
+        case .disabled: "已关闭"
+        case .notConfigured: "未配置"
+        case .invalid: "链接无效"
+        case .checking: "检测中…"
+        case .available: "可用"
+        case .unavailable: "不可用"
+        }
+    }
+
+    private var networkProxyStatusDetail: String {
+        switch networkProxyMonitor.availability {
+        case .disabled: "启用后可检测代理端口"
+        case .notConfigured: "填写代理链接后检测端口连通性"
+        case .invalid: "支持 http、https、socks5 或 socks5h 链接"
+        case .checking: "正在连接代理主机和端口"
+        case .available: "代理主机和端口可建立连接"
+        case .unavailable: "无法连接代理主机和端口，请检查代理是否运行"
+        }
+    }
+
+    private var networkProxyStatusSymbol: String {
+        switch networkProxyMonitor.availability {
+        case .disabled, .notConfigured: "network"
+        case .invalid, .unavailable: "exclamationmark.triangle"
+        case .checking: "arrow.triangle.2.circlepath"
+        case .available: "checkmark.circle"
+        }
+    }
+
+    private var networkProxyStatusColor: Color {
+        switch networkProxyMonitor.availability {
+        case .available: Color.zislaSuccess
+        case .invalid, .unavailable: Color.zislaError
+        case .checking: Color.zislaInfo
+        case .disabled, .notConfigured: .secondary
+        }
+    }
+
+    private func checkNetworkProxy() {
+        networkProxyMonitor.check(
+            urlString: model.settingsStore.settings.networkProxyURL,
+            enabled: model.settingsStore.settings.networkProxyEnabled
+        )
+    }
+
     private var downloadContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("下载目录") {
@@ -1305,9 +1585,10 @@ struct SettingsView: View {
                     title: "默认下载目录",
                     detail: model.downloadDirectory.path(percentEncoded: false)
                 ) {
-                    Button("选择…") { chooseDownloadDirectory() }
+                    Button("选择默认下载目录") { chooseDownloadDirectory() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
             }
 
@@ -1697,9 +1978,10 @@ struct SettingsView: View {
                     title: "默认下载目录",
                     detail: model.downloadDirectory.path(percentEncoded: false)
                 ) {
-                    Button("选择…") { chooseDownloadDirectory() }
+                    Button("选择默认下载目录") { chooseDownloadDirectory() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
             }
 
@@ -1750,6 +2032,62 @@ struct SettingsView: View {
                 .padding(.vertical, 6)
             }
         }
+    }
+
+    private var networkProxyContent: some View {
+        settingsGroup("代理设置") {
+            settingRow(
+                symbol: "network",
+                title: "代理链接",
+                detail: "用于 CLI 安装/更新、GitHub 访问和下载"
+            ) {
+                TextField(
+                    "http://127.0.0.1:7897",
+                    text: Binding(
+                        get: { model.settingsStore.settings.networkProxyURL },
+                        set: { model.settingsStore.settings.networkProxyURL = $0 }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 220)
+            }
+            rowDivider
+            settingRow(
+                symbol: "power",
+                title: "启用本地代理",
+                detail: "关闭后所有更新、安装和下载命令都不使用此代理"
+            ) {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { model.settingsStore.settings.networkProxyEnabled },
+                        set: { model.settingsStore.settings.networkProxyEnabled = $0 }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+            rowDivider
+            settingRow(
+                symbol: networkProxyStatusSymbol,
+                title: "代理状态",
+                detail: networkProxyStatusDetail
+            ) {
+                HStack(spacing: 8) {
+                    Text(networkProxyStatusText)
+                        .font(.system(size: 10))
+                        .foregroundStyle(networkProxyStatusColor)
+                    IconButton(symbol: "arrow.clockwise", help: "重新检测代理", size: .compact) {
+                        checkNetworkProxy()
+                    }
+                    .disabled(networkProxyMonitor.availability == .checking)
+                }
+            }
+        }
+        .onAppear { checkNetworkProxy() }
+        .onChange(of: model.settingsStore.settings.networkProxyURL) { _, _ in checkNetworkProxy() }
+        .onChange(of: model.settingsStore.settings.networkProxyEnabled) { _, _ in checkNetworkProxy() }
     }
 
     private var weatherSearchRow: some View {
@@ -1933,7 +2271,7 @@ struct SettingsView: View {
     private func compactStatusPrioritySymbol(for priority: CompactStatusPriority) -> String {
         switch priority {
         case .transient: "bolt.fill"
-        case .updateAvailable: "arrow.triangle.2.circlepath"
+        case .updateAvailable: "arrow.up.circle"
         case .mail: "envelope.fill"
         case .videoDownload: "arrow.down.square.fill"
         case .browserDownload: "arrow.down.circle.fill"
@@ -1950,6 +2288,7 @@ struct SettingsView: View {
         title: String,
         detail: String,
         detailLineLimit: Int? = nil,
+        isNested: Bool = false,
         @ViewBuilder trailing: () -> Trailing
     ) -> some View {
         HStack(spacing: 10) {
@@ -1973,7 +2312,8 @@ struct SettingsView: View {
             Spacer(minLength: 8)
             trailing()
         }
-        .padding(.horizontal, 4)
+        .padding(.leading, isNested ? 24 : 4)
+        .padding(.trailing, 4)
         .frame(maxWidth: .infinity, minHeight: 48)
     }
 
@@ -2050,7 +2390,7 @@ struct SettingsView: View {
     private var updateStatusAccessory: some View {
         if model.productUpdateAvailable {
             IconButton(
-                symbol: "arrow.triangle.2.circlepath",
+                symbol: "arrow.up.circle",
                 help: "查看更新",
                 isActive: true,
                 size: .compact
@@ -2068,7 +2408,7 @@ struct SettingsView: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(Color.zislaSuccess)
         case .available:
-            Image(systemName: "arrow.down.circle.fill")
+            Image(systemName: "arrow.up.circle.fill")
                 .foregroundStyle(Color.zislaInfo)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
@@ -2091,7 +2431,7 @@ struct SettingsView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.3"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.5"
     }
 
     private func searchWeatherLocation() {
@@ -2162,28 +2502,28 @@ private struct ActivityNoticeDisplay: Identifiable {
     let name: String
 }
 
-private struct VoiceInputHotkeyRecorder: NSViewRepresentable {
+private struct HotkeyRecorder: NSViewRepresentable {
     @Binding var hotkey: VoiceInputHotkeyPreset
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
-    func makeNSView(context: Context) -> VoiceInputHotkeyRecorderButton {
-        let button = VoiceInputHotkeyRecorderButton(hotkey: hotkey)
+    func makeNSView(context: Context) -> HotkeyRecorderButton {
+        let button = HotkeyRecorderButton(hotkey: hotkey)
         button.onRecord = context.coordinator.record
         return button
     }
 
-    func updateNSView(_ nsView: VoiceInputHotkeyRecorderButton, context: Context) {
+    func updateNSView(_ nsView: HotkeyRecorderButton, context: Context) {
         nsView.hotkey = hotkey
     }
 
     @MainActor
     final class Coordinator {
-        private var parent: VoiceInputHotkeyRecorder
+        private var parent: HotkeyRecorder
 
-        init(_ parent: VoiceInputHotkeyRecorder) {
+        init(_ parent: HotkeyRecorder) {
             self.parent = parent
         }
 
@@ -2194,7 +2534,7 @@ private struct VoiceInputHotkeyRecorder: NSViewRepresentable {
 }
 
 @MainActor
-private final class VoiceInputHotkeyRecorderButton: NSButton {
+private final class HotkeyRecorderButton: NSButton {
     var hotkey: VoiceInputHotkeyPreset {
         didSet {
             if !isRecording {
@@ -2388,6 +2728,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case pet
     case download
     case weather
+    case networkProxy
     case recommendations
     case updates
 
@@ -2408,6 +2749,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .voice: "语音"
         case .pet: "宠物"
         case .download: "下载"
+        case .networkProxy: "网络"
         case .weather: "天气"
         case .updates: "更新"
         case .recommendations: "推荐"
@@ -2424,6 +2766,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .voice: "mic.fill"
         case .pet: "pawprint.fill"
         case .download: "arrow.down.circle.fill"
+        case .networkProxy: "network"
         case .weather: "cloud.sun.fill"
         case .updates: "arrow.up.circle"
         case .recommendations: "sparkles"
@@ -2440,6 +2783,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .voice: "配置语音输入、整理模型与本机记录。"
         case .pet: "设置灵动岛内部的宠物形象。"
         case .download: "管理下载目录、下载通知与所需组件。"
+        case .networkProxy: "配置本地代理，用于更新、安装、下载与 GitHub 访问。"
         case .weather: "管理天气显示、地点和刷新。"
         case .updates: "管理版本检查与自动更新。"
         case .recommendations: "一键下载和更新精选效率、网络、开发与桌面工具。"
@@ -2448,7 +2792,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     func isVisible(settings: FeatureSettings) -> Bool {
         switch self {
-        case .general, .features, .recommendations:
+        case .general, .features, .networkProxy, .recommendations:
             return true
         case .workflow:
             return settings.mediaEnabled || settings.systemMonitorEnabled

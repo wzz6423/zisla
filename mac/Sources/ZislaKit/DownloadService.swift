@@ -22,10 +22,11 @@ public enum DownloadServiceError: Error, Equatable, Sendable {
 }
 
 enum DownloadProcessEnvironment {
-    static func sanitized(_ environment: [String: String]) -> [String: String] {
-        environment.filter { key, _ in
+    static func sanitized(_ environment: [String: String], proxyURL: String = "", proxyEnabled: Bool = true) -> [String: String] {
+        let sanitized = environment.filter { key, _ in
             !key.hasPrefix("DYLD_") && !key.hasPrefix("PYTHON")
         }
+        return NetworkProxy.environment(from: proxyURL, enabled: proxyEnabled, base: sanitized)
     }
 }
 
@@ -37,6 +38,8 @@ public actor DownloadService {
     private var activeProcesses: [UUID: ProcessBox] = [:]
     private var explicitlyCancelledTasks: Set<UUID> = []
     private var reservedOutputURLs: Set<URL> = []
+    private var networkProxyURL = ""
+    private var networkProxyEnabled = false
 
     public init(
         resolver: YTDLPResolver = YTDLPResolver(),
@@ -49,6 +52,15 @@ public actor DownloadService {
         self.temporaryRootDirectory = temporaryRootDirectory.standardizedFileURL
         self.mediaMuxer = mediaMuxer
         self.bilibiliDownloader = bilibiliDownloader
+    }
+
+    public func setNetworkProxyURL(_ value: String) {
+        setNetworkProxy(url: value, enabled: true)
+    }
+
+    public func setNetworkProxy(url: String, enabled: Bool) {
+        networkProxyURL = url
+        networkProxyEnabled = enabled
     }
 
     public func download(
@@ -124,7 +136,11 @@ public actor DownloadService {
             taskTemporaryDirectory: taskTemporaryDirectory,
             ffmpegExecutableURL: tools.ffmpegURL
         )
-        process.environment = DownloadProcessEnvironment.sanitized(ProcessInfo.processInfo.environment)
+        process.environment = DownloadProcessEnvironment.sanitized(
+            ProcessInfo.processInfo.environment,
+            proxyURL: networkProxyURL,
+            proxyEnabled: networkProxyEnabled
+        )
         process.currentDirectoryURL = taskTemporaryDirectory
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe

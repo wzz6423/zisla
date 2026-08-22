@@ -104,8 +104,8 @@ struct MailServiceTests {
         #expect(script.contains("on error"))
         #expect(script.contains("messages of inbox of mailAccount"))
         #expect(script.contains("set mailAccount to item i of accountList"))
-        #expect(script.contains("-- 单封邮件不可读（损坏/超大），跳过"))
-        #expect(script.contains("-- 该账户的 inbox 当前不可访问"))
+        #expect(script.contains("-- Skip unreadable individual messages (corrupt or excessively large)."))
+        #expect(script.contains("-- This account's inbox is currently unavailable"))
         // When an account name is unreadable, fill a placeholder so later indices stay aligned.
         #expect(script.contains("未知账户"))
     }

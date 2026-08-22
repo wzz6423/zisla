@@ -1334,7 +1334,9 @@ public final class NowPlayingService: ObservableObject {
         remotePIDPending: remotePIDPending
       )
     else { return nil }
-    return Self.audioFallbackSnapshot(for: source)
+    var fallback = Self.audioFallbackSnapshot(for: source)
+    applyLyrics(to: &fallback)
+    return fallback
   }
 
   private static func applicationIconData(
@@ -1512,6 +1514,7 @@ public final class NowPlayingService: ObservableObject {
 
   func applyLyrics(to snapshot: inout NowPlayingSnapshot) {
     guard
+      snapshot.supportsControls,
       let identity = LyricsTrackIdentity(
         title: snapshot.title,
         artist: snapshot.artist,

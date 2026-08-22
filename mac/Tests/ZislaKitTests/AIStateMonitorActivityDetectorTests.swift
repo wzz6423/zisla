@@ -24,6 +24,20 @@ struct AIStateMonitorActivityDetectorTests {
     }
 
     @Test @MainActor
+    func defaultActivityDetectorsIncludeZCodeDesktopAndCLI() {
+        #expect(AIStateMonitor.defaultActivityDetectors().contains {
+            $0 is ZCodeSessionActivityDetector
+        })
+    }
+
+    @Test @MainActor
+    func defaultActivityDetectorsIncludePiSessions() {
+        #expect(AIStateMonitor.defaultActivityDetectors().contains {
+            $0 is PiSessionActivityDetector
+        })
+    }
+
+    @Test @MainActor
     func reloadMergesEveryInjectedProvider() {
         let directory = monitorTempDirectory("providers")
         defer { try? FileManager.default.removeItem(at: directory) }

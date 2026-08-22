@@ -39,6 +39,34 @@ function expect_failure_containing() {
   fi
 }
 
+function expect_contains() {
+  local actual="$1"
+  local expected="$2"
+  local description="$3"
+
+  (( tests_run += 1 ))
+  if [[ "$actual" != *"$expected"* ]]; then
+    print -u2 -r -- "FAIL: $description"
+    print -u2 -r -- "missing: $expected"
+    print -u2 -r -- "actual:  $actual"
+    exit 1
+  fi
+}
+
+function expect_not_contains() {
+  local actual="$1"
+  local unexpected="$2"
+  local description="$3"
+
+  (( tests_run += 1 ))
+  if [[ "$actual" == *"$unexpected"* ]]; then
+    print -u2 -r -- "FAIL: $description"
+    print -u2 -r -- "unexpected: $unexpected"
+    print -u2 -r -- "actual:     $actual"
+    exit 1
+  fi
+}
+
 function security() {
   print -r -- '  1) AUTO_IDENTITY "Apple Development: Developer One (TEAMONE)"'
   print -r -- '  2) OTHER_IDENTITY "Developer ID Application: Developer One (TEAMONE)"'
@@ -69,5 +97,40 @@ function security() {
 expect_failure_containing \
   "未找到 Apple Development 证书" \
   "missing stable identity stops the development launch"
+
+run_command="$(make -n -C "${ROOT:h}" run)"
+expect_contains \
+  "$run_command" \
+  "SIGNING_MODE=dev mac/Scripts/dev-service.sh run" \
+  "make run forces development signing"
+
+update_command="$(make -n -C "${ROOT:h}" update)"
+expect_contains \
+  "$update_command" \
+  "SIGNING_MODE=dev mac/Scripts/dev-service.sh run" \
+  "make update forces development signing"
+
+events_file="${TMPDIR%/}/zisla-dev-service-events-$$"
+trap '[[ -f "$events_file" ]] && find "$events_file" -delete' EXIT
+
+function service_is_loaded() { return 1 }
+function matching_app_pids() { print -r -- "4242" }
+function collect_matching_pids() { print -r -- "4242" }
+function wait_for_processes_to_exit() { return 0 }
+function osascript() { print -r -- "quit" >> "$events_file" }
+function kill() { print -r -- "kill $*" >> "$events_file" }
+function rm() { return 0 }
+function rmdir() { return 0 }
+
+stop_service >/dev/null
+stop_events="$(<"$events_file")"
+expect_contains \
+  "$stop_events" \
+  "quit" \
+  "stopping the debug service requests graceful app termination"
+expect_not_contains \
+  "$stop_events" \
+  "kill -TERM" \
+  "graceful app termination avoids SIGTERM fallback"
 
 print -r -- "PASS: $tests_run dev-service signing tests"

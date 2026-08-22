@@ -54,7 +54,8 @@ public actor GitHubReleaseService {
         case updateAvailable(GitHubRelease)
     }
 
-    private let loadData: ReleaseDataLoader
+    private var loadData: ReleaseDataLoader
+    private let usesDefaultSession: Bool
 
     public init(session: URLSession? = nil) {
         let activeSession: URLSession
@@ -67,6 +68,7 @@ public actor GitHubReleaseService {
             configuration.requestCachePolicy = .reloadRevalidatingCacheData
             activeSession = URLSession(configuration: configuration)
         }
+        self.usesDefaultSession = session == nil
         self.loadData = { request in
             let (data, response) = try await activeSession.data(for: request)
             guard let response = response as? HTTPURLResponse else {
@@ -77,7 +79,28 @@ public actor GitHubReleaseService {
     }
 
     public init(loadData: @escaping ReleaseDataLoader) {
+        self.usesDefaultSession = false
         self.loadData = loadData
+    }
+
+    public func setNetworkProxyURL(_ value: String) {
+        setNetworkProxy(url: value, enabled: true)
+    }
+
+    public func setNetworkProxy(url: String, enabled: Bool) {
+        guard usesDefaultSession else { return }
+        let configuration = NetworkProxy.sessionConfiguration(from: url, enabled: enabled)
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 25
+        configuration.requestCachePolicy = .reloadRevalidatingCacheData
+        let session = URLSession(configuration: configuration)
+        loadData = { request in
+            let (data, response) = try await session.data(for: request)
+            guard let response = response as? HTTPURLResponse else {
+                throw GitHubReleaseServiceError.invalidResponse
+            }
+            return (data, response)
+        }
     }
 
     public func check(

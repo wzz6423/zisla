@@ -8,6 +8,7 @@ struct IslandRootView: View {
     @ObservedObject var petController: IslandPetController
     @ObservedObject private var settingsStore: FeatureSettingsStore
     @ObservedObject private var voiceInput: VoiceInputController
+    @ObservedObject private var backgroundSounds: SystemBackgroundSoundService
     var onPointerEntered: () -> Void
     var onPointerExited: () -> Void
     var onPinChanged: (Bool) -> Void
@@ -15,6 +16,7 @@ struct IslandRootView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var dropState = IslandDropState()
+    @StateObject private var cleanupPanelPresentation = SystemCleanupPanelPresentationState()
 
     init(
         model: AppModel,
@@ -28,6 +30,7 @@ struct IslandRootView: View {
         _petController = ObservedObject(wrappedValue: petController)
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
         _voiceInput = ObservedObject(wrappedValue: model.voiceInput)
+        _backgroundSounds = ObservedObject(wrappedValue: model.backgroundSounds)
         self.onPointerEntered = onPointerEntered
         self.onPointerExited = onPointerExited
         self.onPinChanged = onPinChanged
@@ -185,7 +188,10 @@ struct IslandRootView: View {
                                         case .toolbox:
                                             ToolboxModuleView(model: model)
                                         case .system:
-                                            SystemMonitorView(service: model.systemMonitor)
+                                            SystemMonitorView(
+                                                service: model.systemMonitor,
+                                                onCleanupRequested: cleanupPanelPresentation.present
+                                            )
                                         case .battery:
                                             BatteryDetailView(
                                                 batteryMonitor: model.battery,
@@ -283,6 +289,12 @@ struct IslandRootView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+        .background(
+            SystemCleanupPanelPresenter(
+                presentationState: cleanupPanelPresentation,
+                service: model.systemMonitor
+            )
+        )
         .clipped()
         .ignoresSafeArea(edges: .top)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: showsTransferHints)
@@ -297,6 +309,12 @@ struct IslandRootView: View {
                     model.selectModule(.system)
                 }
             }
+            BackgroundSoundControl(
+                service: backgroundSounds,
+                selectedSound: settingsStore.settings.systemBackgroundSound,
+                onToggle: model.toggleBackgroundSound,
+                onSelect: model.selectBackgroundSound
+            )
             IconButton(
                 symbol: model.isPinned ? "pin.fill" : "pin",
                 help: model.isPinned ? "取消固定" : "固定灵动岛",
@@ -585,6 +603,115 @@ private struct VoiceTranscriptionView: View {
 private final class IslandDropState: ObservableObject {
     @Published var shareTargeted = false
     @Published var shelfTargeted = false
+}
+
+private struct BackgroundSoundControl: View {
+    @ObservedObject var service: SystemBackgroundSoundService
+    let selectedSound: SystemBackgroundSound
+    let onToggle: () -> Void
+    let onSelect: (SystemBackgroundSound) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: onToggle) {
+                HStack(spacing: 0) {
+                    IconButtonLabel(
+                        symbol: service.isDownloading(selectedSound)
+                            ? "arrow.down.circle"
+                            : (service.isPlaying ? "waveform" : "waveform.slash"),
+                        isActive: service.isPlaying,
+                        activeColor: .mint,
+                        size: .compact,
+                        // The shared capsule below provides the control surface.
+                        showsActiveBackground: false,
+                        showsInactiveBackground: false
+                    )
+
+                    Text(controlTitle)
+                        .font(.islandMicro(weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.leading, 2)
+                        .padding(.trailing, 4)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableStyle())
+            .help(toggleHelp)
+            .accessibilityLabel(toggleHelp)
+
+            Menu {
+                ForEach(service.availableSounds, id: \.self) { sound in
+                    if service.downloadState(for: sound) == .queued {
+                        Button {} label: {
+                            Label("等待下载 \(sound.title)…", systemImage: "clock")
+                        }
+                        .disabled(true)
+                    } else if service.isDownloading(sound) {
+                        Button {} label: {
+                            Label("正在下载 \(sound.title)…", systemImage: "arrow.down.circle")
+                        }
+                        .disabled(true)
+                    } else if service.isInstalled(sound) {
+                        Button {
+                            onSelect(sound)
+                        } label: {
+                            Label(
+                                sound.title,
+                                systemImage: sound == selectedSound ? "checkmark" : "waveform"
+                            )
+                        }
+                    } else {
+                        Button {
+                            onSelect(sound)
+                        } label: {
+                            let title = service.downloadState(for: sound) == nil
+                                ? "\(sound.title)（下载）"
+                                : "\(sound.title)（重试下载）"
+                            Label(title, systemImage: "arrow.down.circle")
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "chevron.down.circle")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .frame(width: 19, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("选择背景音：\(selectedSound.title)")
+            .accessibilityLabel("选择背景音：\(selectedSound.title)")
+            .onHover { hovering in
+                if hovering { service.refresh() }
+            }
+        }
+        .padding(.leading, 2)
+        .padding(.trailing, 6)
+        .frame(height: 28)
+        .background(
+            Capsule()
+                .fill(service.isPlaying ? Color.mint.opacity(0.16) : Color.fillControl)
+        )
+        .animation(ZislaMotion.selection, value: service.isPlaying)
+    }
+
+    private var controlTitle: String {
+        service.isPlaying ? (service.playingSound?.title ?? "背景音") : "背景音"
+    }
+
+    private var isSelectedSoundQueued: Bool {
+        service.downloadState(for: selectedSound) == .queued
+    }
+
+    private var toggleHelp: String {
+        if isSelectedSoundQueued { return "背景音等待下载，点击取消" }
+        if service.isDownloading(selectedSound) { return "正在下载背景音，点击取消" }
+        return service.isPlaying ? "关闭背景音" : "开启背景音"
+    }
 }
 
 /// Compact navigation-bar monitor showing percentages above CPU, GPU, RAM, and disk labels.
