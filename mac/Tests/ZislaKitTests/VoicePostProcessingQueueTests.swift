@@ -49,6 +49,7 @@ struct VoicePostProcessingQueueTests {
     @Test
     func cancelAllCancelsCurrentWorkAndDropsPendingWork() async throws {
         let queue = VoicePostProcessingQueue()
+        let cancellationGate = VoicePostProcessingQueueTestGate()
         var cancellationObserved = false
         var pendingOperationRan = false
 
@@ -59,6 +60,7 @@ struct VoicePostProcessingQueueTests {
                     try await Task.sleep(for: .seconds(5))
                 } catch is CancellationError {
                     cancellationObserved = true
+                    await cancellationGate.signal()
                 } catch {}
             }
             queue.enqueue {
@@ -67,9 +69,66 @@ struct VoicePostProcessingQueueTests {
         }
 
         queue.cancelAll()
-        try await Task.sleep(for: .milliseconds(20))
+        await cancellationGate.wait()
 
         #expect(cancellationObserved)
         #expect(!pendingOperationRan)
+    }
+
+    @Test
+    func cancelAllWaitsForCurrentWorkBeforeStartingNewGeneration() async {
+        let queue = VoicePostProcessingQueue()
+        let cancellationGate = VoicePostProcessingQueueTestGate()
+        let releaseGate = VoicePostProcessingQueueTestGate()
+        let secondOperationGate = VoicePostProcessingQueueTestGate()
+        var pendingOperationRan = false
+
+        await withCheckedContinuation { started in
+            queue.enqueue {
+                started.resume()
+                do {
+                    try await Task.sleep(for: .seconds(5))
+                } catch is CancellationError {
+                    await cancellationGate.signal()
+                    await releaseGate.wait()
+                } catch {}
+            }
+        }
+
+        queue.cancelAll()
+        queue.enqueue {
+            pendingOperationRan = true
+            await secondOperationGate.signal()
+        }
+        await cancellationGate.wait()
+        #expect(!pendingOperationRan)
+
+        await releaseGate.signal()
+        await secondOperationGate.wait()
+        #expect(pendingOperationRan)
+    }
+}
+
+private actor VoicePostProcessingQueueTestGate {
+    private var isSignaled = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        if isSignaled {
+            isSignaled = false
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func signal() {
+        if let waiter = waiters.first {
+            waiters.removeFirst()
+            waiter.resume()
+        } else {
+            isSignaled = true
+        }
     }
 }

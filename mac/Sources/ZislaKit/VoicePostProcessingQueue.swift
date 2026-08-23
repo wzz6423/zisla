@@ -19,7 +19,6 @@ public final class VoicePostProcessingQueue {
         generation += 1
         pending.removeAll()
         worker?.cancel()
-        worker = nil
     }
 
     private func startWorkerIfNeeded() {
@@ -35,7 +34,13 @@ public final class VoicePostProcessingQueue {
             let operation = pending.removeFirst()
             await operation()
         }
-        guard generation == workerGeneration else { return }
+        guard generation == workerGeneration else {
+            // Keep the cancelled worker registered until its operation has returned;
+            // otherwise a new enqueue could start a second worker concurrently.
+            worker = nil
+            startWorkerIfNeeded()
+            return
+        }
         worker = nil
         startWorkerIfNeeded()
     }
