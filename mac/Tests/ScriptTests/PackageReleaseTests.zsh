@@ -174,12 +174,20 @@ for architecture in arm64 x86_64 universal; do
   expect_file \
     "$case_directory/zisla-v0.1.3-macOS-${architecture}.zip.sha256" \
     "$architecture checksum uses the architecture suffix"
+  expect_equal \
+    "checksum  zisla-v0.1.3-macOS-${architecture}.zip" \
+    "$(<"$case_directory/zisla-v0.1.3-macOS-${architecture}.zip.sha256")" \
+    "$architecture ZIP checksum uses a portable asset name"
   expect_file \
     "$case_directory/zisla-v0.1.3-macOS-${architecture}.dmg" \
     "$architecture DMG uses the architecture suffix"
   expect_file \
     "$case_directory/zisla-v0.1.3-macOS-${architecture}.dmg.sha256" \
     "$architecture DMG checksum uses the architecture suffix"
+  expect_equal \
+    "checksum  zisla-v0.1.3-macOS-${architecture}.dmg" \
+    "$(<"$case_directory/zisla-v0.1.3-macOS-${architecture}.dmg.sha256")" \
+    "$architecture DMG checksum uses a portable asset name"
   expect_file \
     "$verify_capture" \
     "$architecture DMG is verified before release"

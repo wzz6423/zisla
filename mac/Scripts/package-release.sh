@@ -77,7 +77,10 @@ codesign --verify --deep --strict --all-architectures --verbose=2 "$APP" || {
 }
 
 ditto -c -k --keepParent "$APP" "$ARCHIVE"
-shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
+(
+  cd "$ARCHIVE_DIRECTORY"
+  shasum -a 256 "${ARCHIVE:t}" > "${ARCHIVE:t}.sha256"
+)
 
 TEMPORARY_DIRECTORY="$(mktemp -d "${TMPDIR%/}/zisla-dmg.XXXXXX")"
 WRITABLE_DMG="${TEMPORARY_DIRECTORY}.dmg"
@@ -132,7 +135,10 @@ hdiutil detach -quiet "$MOUNTED_DEVICE"
 MOUNTED_DEVICE=""
 hdiutil convert -quiet "$WRITABLE_DMG" -format UDZO -imagekey zlib-level=9 -ov -o "$DMG"
 hdiutil verify "$DMG"
-shasum -a 256 "$DMG" > "$DMG.sha256"
+(
+  cd "$ARCHIVE_DIRECTORY"
+  shasum -a 256 "${DMG:t}" > "${DMG:t}.sha256"
+)
 
 echo "$ARCHIVE"
 echo "$DMG"

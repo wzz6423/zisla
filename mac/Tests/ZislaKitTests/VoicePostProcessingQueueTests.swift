@@ -54,14 +54,18 @@ struct VoicePostProcessingQueueTests {
         let releaseFirst = VoicePostProcessingQueueTestGate()
         let completed = VoicePostProcessingQueueTestGate()
 
-        queue.enqueue {
-            events.append(0)
-            await firstStarted.signal()
-            await releaseFirst.wait()
+        for index in 0...3 {
+            queue.enqueue {
+                events.append(index)
+                if index == 1 {
+                    await firstStarted.signal()
+                    await releaseFirst.wait()
+                }
+            }
         }
         await firstStarted.wait()
 
-        for index in 1...128 {
+        for index in 4...128 {
             queue.enqueue {
                 events.append(index)
                 if index == 128 {
