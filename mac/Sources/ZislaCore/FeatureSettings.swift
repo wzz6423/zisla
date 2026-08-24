@@ -575,7 +575,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         networkProxyEnabled: Bool = false,
         clipboardHistoryEnabled: Bool = true,
         clipboardDetectionEnabled: Bool = true,
-        clipboardAssistantEnabled: Bool = false,
+        clipboardAssistantEnabled: Bool = true,
         clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration = .default,
         clipboardAssistantMouseButton: Int? = nil,
         clipboardAssistantBlacklist: Set<String> = [],

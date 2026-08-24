@@ -1865,8 +1865,8 @@ struct FeatureSettingsTests {
     @Test
     func clipboardAssistantTriggerRoundTripsAndDefaultsOnLegacyJSON() throws {
         let defaults = FeatureSettings.default
-        // Assistant is off by default; the trigger hotkey defaults to double-tap Left Control.
-        #expect(!defaults.clipboardAssistantEnabled)
+        // Assistant is on by default; the trigger hotkey defaults to double-tap Left Control.
+        #expect(defaults.clipboardAssistantEnabled)
         #expect(defaults.clipboardAssistantTriggerConfiguration.hotkey?.isModifierOnly == true)
         #expect(defaults.clipboardAssistantMouseButton == nil)
 
@@ -1900,7 +1900,7 @@ struct FeatureSettingsTests {
             FeatureSettings.self,
             from: JSONSerialization.data(withJSONObject: legacyDictionary)
         )
-        #expect(!legacy.clipboardAssistantEnabled)
+        #expect(legacy.clipboardAssistantEnabled)
         #expect(legacy.clipboardAssistantTriggerConfiguration == .default)
         #expect(legacy.clipboardAssistantMouseButton == nil)
 
