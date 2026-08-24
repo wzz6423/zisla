@@ -158,6 +158,28 @@ struct OverlayCoordinatorTests {
     }
 
     @Test @MainActor
+    func transientInteractionKeepsIslandExpandedUntilPopoverCloses() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(
+            contentView: contentView,
+            collapseDelay: .zero
+        )
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setDragging(true)
+        let panel = try #require(contentView.window as? IslandPanel)
+
+        coordinator.setTransientInteractionVisible(true)
+        coordinator.setDragging(false)
+        #expect(!panel.ignoresMouseEvents)
+
+        coordinator.setTransientInteractionVisible(false)
+        #expect(panel.ignoresMouseEvents)
+    }
+
+    @Test @MainActor
     func selectingDisplayReportsWhetherItHasAPhysicalNotch() {
         let coordinator = OverlayCoordinator(contentView: NSView())
         coordinator.updateScreens([

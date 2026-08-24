@@ -6,6 +6,7 @@ struct ToolboxModuleView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var pomodoro: PomodoroService
     @ObservedObject private var settingsStore: FeatureSettingsStore
+    private let onTransientInteractionChanged: (Bool) -> Void
     @State private var isDurationPickerPresented = false
     @State private var isAlarmEditorPresented = false
 
@@ -14,10 +15,14 @@ struct ToolboxModuleView: View {
         static let toolContentHeight: CGFloat = 136
     }
 
-    init(model: AppModel) {
+    init(
+        model: AppModel,
+        onTransientInteractionChanged: @escaping (Bool) -> Void = { _ in }
+    ) {
         _model = ObservedObject(wrappedValue: model)
         _pomodoro = ObservedObject(wrappedValue: model.pomodoro)
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
+        self.onTransientInteractionChanged = onTransientInteractionChanged
     }
 
     var body: some View {
@@ -186,6 +191,7 @@ struct ToolboxModuleView: View {
                     symbol: "alarm",
                     help: "管理闹钟"
                 ) {
+                    onTransientInteractionChanged(true)
                     isAlarmEditorPresented = true
                 }
                 .popover(isPresented: $isAlarmEditorPresented, arrowEdge: .bottom) {
@@ -221,6 +227,14 @@ struct ToolboxModuleView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .top)
+        .onChange(of: isAlarmEditorPresented) { _, presented in
+            if !presented {
+                onTransientInteractionChanged(false)
+            }
+        }
+        .onDisappear {
+            onTransientInteractionChanged(false)
+        }
     }
 
     private var currentDuration: TimeInterval {

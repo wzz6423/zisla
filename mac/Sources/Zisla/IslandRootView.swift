@@ -12,6 +12,7 @@ struct IslandRootView: View {
     var onPointerEntered: () -> Void
     var onPointerExited: () -> Void
     var onPinChanged: (Bool) -> Void
+    var onTransientInteractionChanged: (Bool) -> Void
     var onSettingsRequested: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -24,6 +25,7 @@ struct IslandRootView: View {
         onPointerEntered: @escaping () -> Void,
         onPointerExited: @escaping () -> Void,
         onPinChanged: @escaping (Bool) -> Void,
+        onTransientInteractionChanged: @escaping (Bool) -> Void,
         onSettingsRequested: @escaping () -> Void
     ) {
         _model = ObservedObject(wrappedValue: model)
@@ -34,6 +36,7 @@ struct IslandRootView: View {
         self.onPointerEntered = onPointerEntered
         self.onPointerExited = onPointerExited
         self.onPinChanged = onPinChanged
+        self.onTransientInteractionChanged = onTransientInteractionChanged
         self.onSettingsRequested = onSettingsRequested
     }
 
@@ -186,7 +189,10 @@ struct IslandRootView: View {
                                         case .pdf:
                                             PDFToolsModuleView(model: model)
                                         case .toolbox:
-                                            ToolboxModuleView(model: model)
+                                            ToolboxModuleView(
+                                                model: model,
+                                                onTransientInteractionChanged: onTransientInteractionChanged
+                                            )
                                         case .system:
                                             SystemMonitorView(
                                                 service: model.systemMonitor,

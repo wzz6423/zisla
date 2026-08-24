@@ -216,6 +216,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             onPinChanged: { [weak self] pinned in
                 self?.overlayCoordinator?.setPinned(pinned)
             },
+            onTransientInteractionChanged: { [weak self] visible in
+                self?.overlayCoordinator?.setTransientInteractionVisible(visible)
+            },
             onSettingsRequested: { [weak self] in
                 self?.showSettings()
             }
