@@ -47,9 +47,6 @@ public final class VoicePostProcessingQueue {
             pending[index] = nil
             pendingHead = (index + 1) % pending.count
             pendingCount -= 1
-            if pendingCount == 0 {
-                pendingHead = 0
-            }
             guard let operation else { continue }
             await operation()
         }

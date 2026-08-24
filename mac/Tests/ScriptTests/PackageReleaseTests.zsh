@@ -78,6 +78,11 @@ cat > "$FAKE_BIN/sync" <<'SCRIPT'
 exit 0
 SCRIPT
 
+cat > "$FAKE_BIN/codesign" <<'SCRIPT'
+#!/bin/zsh
+exit 0
+SCRIPT
+
 chmod +x "$FAKE_BIN"/*
 
 tests_run=0

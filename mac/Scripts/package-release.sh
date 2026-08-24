@@ -71,6 +71,10 @@ RELEASE_UPDATE_CHANNEL="$(plutil -extract ZislaDefaultUpdateChannel raw -o - "$I
   echo "error: release package metadata does not match VERSION, BUILD_NUMBER, or UPDATE_CHANNEL" >&2
   exit 1
 }
+codesign --verify --deep --strict --all-architectures --verbose=2 "$APP" || {
+  echo "error: release package code signature verification failed" >&2
+  exit 1
+}
 
 ditto -c -k --keepParent "$APP" "$ARCHIVE"
 shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
