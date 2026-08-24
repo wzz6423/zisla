@@ -281,7 +281,6 @@ public final class AIStateMonitor: ObservableObject {
     /// Schedules a background refresh for interactive paths, avoiding a full decode of large state files on the main thread.
     public func refresh() {
         schedulePersistedReload()
-        scheduleDetectorRefresh()
     }
 
     private func schedulePersistedReload(
