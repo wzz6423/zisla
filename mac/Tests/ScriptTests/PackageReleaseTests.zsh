@@ -20,6 +20,12 @@ set -euo pipefail
 print -r -- "$BUILD_ARCHITECTURES" > "$CAPTURE_FILE"
 mkdir -p "$OUTPUT_DIRECTORY/zisla.app/Contents/MacOS"
 touch "$OUTPUT_DIRECTORY/zisla.app/Contents/MacOS/zisla"
+plutil -create xml1 "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
+plutil -insert CFBundleIdentifier -string dev.wzz.zisla "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
+plutil -insert CFBundleDisplayName -string zisla "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
+plutil -insert CFBundleShortVersionString -string "$VERSION" "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
+plutil -insert CFBundleVersion -string "$BUILD_NUMBER" "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
+plutil -insert ZislaDefaultUpdateChannel -string "$UPDATE_CHANNEL" "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
 SCRIPT
 chmod +x "$TEST_ROOT/Scripts/build-app.sh"
 
@@ -173,6 +179,69 @@ for architecture in arm64 x86_64 universal; do
     "$verify_capture" \
     "$architecture DMG is verified before release"
 done
+
+function expect_debug_bundle_failure() {
+  local case_directory="$TEMPORARY_ROOT/debug-bundle"
+  local output
+
+  (( tests_run += 1 ))
+  mkdir -p "$case_directory/zisla.app/Contents"
+  plutil -create xml1 "$case_directory/zisla.app/Contents/Info.plist"
+  plutil -insert CFBundleIdentifier -string dev.wzz.zisla.debug "$case_directory/zisla.app/Contents/Info.plist"
+  plutil -insert CFBundleDisplayName -string zisla-debug "$case_directory/zisla.app/Contents/Info.plist"
+  if output="$(
+    PATH="$FAKE_BIN:$PATH" \
+      VERSION=0.1.3 \
+      BUILD_NUMBER=5 \
+      UPDATE_CHANNEL=release \
+      SKIP_BUILD=true \
+      ARCHIVE_DIRECTORY="$case_directory" \
+      "$TEST_ROOT/Scripts/package-release.sh" 2>&1
+  )"; then
+    print -u2 -r -- "FAIL: debug bundle was accepted for release packaging"
+    exit 1
+  fi
+  if [[ "$output" != *"release package contains a debug or unknown app identity"* ]]; then
+    print -u2 -r -- "FAIL: debug bundle reported the wrong release identity error"
+    print -u2 -r -- "$output"
+    exit 1
+  fi
+}
+
+expect_debug_bundle_failure
+
+function expect_metadata_mismatch_failure() {
+  local case_directory="$TEMPORARY_ROOT/metadata-mismatch"
+  local output
+
+  (( tests_run += 1 ))
+  mkdir -p "$case_directory/zisla.app/Contents"
+  plutil -create xml1 "$case_directory/zisla.app/Contents/Info.plist"
+  plutil -insert CFBundleIdentifier -string dev.wzz.zisla "$case_directory/zisla.app/Contents/Info.plist"
+  plutil -insert CFBundleDisplayName -string zisla "$case_directory/zisla.app/Contents/Info.plist"
+  plutil -insert CFBundleShortVersionString -string 0.1.5 "$case_directory/zisla.app/Contents/Info.plist"
+  plutil -insert CFBundleVersion -string 11 "$case_directory/zisla.app/Contents/Info.plist"
+  plutil -insert ZislaDefaultUpdateChannel -string release "$case_directory/zisla.app/Contents/Info.plist"
+  if output="$(
+    PATH="$FAKE_BIN:$PATH" \
+      VERSION=0.1.6 \
+      BUILD_NUMBER=12 \
+      UPDATE_CHANNEL=release \
+      SKIP_BUILD=true \
+      ARCHIVE_DIRECTORY="$case_directory" \
+      "$TEST_ROOT/Scripts/package-release.sh" 2>&1
+  )"; then
+    print -u2 -r -- "FAIL: mismatched release metadata was accepted"
+    exit 1
+  fi
+  if [[ "$output" != *"release package metadata does not match"* ]]; then
+    print -u2 -r -- "FAIL: metadata mismatch reported the wrong error"
+    print -u2 -r -- "$output"
+    exit 1
+  fi
+}
+
+expect_metadata_mismatch_failure
 
 expect_architecture_failure \
   "arm64 arm64" \

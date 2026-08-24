@@ -47,22 +47,32 @@ struct VoicePostProcessingQueueTests {
     }
 
     @Test
-    func longQueueRemainsFIFOWhileCompacting() async {
+    func longQueueRemainsFIFOWhileGrowingAndWrapping() async {
         let queue = VoicePostProcessingQueue()
         var events: [Int] = []
+        let firstStarted = VoicePostProcessingQueueTestGate()
+        let releaseFirst = VoicePostProcessingQueueTestGate()
+        let completed = VoicePostProcessingQueueTestGate()
 
-        await withCheckedContinuation { completion in
-            for index in 0..<128 {
-                queue.enqueue {
-                    events.append(index)
-                    if index == 127 {
-                        completion.resume()
-                    }
+        queue.enqueue {
+            events.append(0)
+            await firstStarted.signal()
+            await releaseFirst.wait()
+        }
+        await firstStarted.wait()
+
+        for index in 1...128 {
+            queue.enqueue {
+                events.append(index)
+                if index == 128 {
+                    await completed.signal()
                 }
             }
         }
+        await releaseFirst.signal()
+        await completed.wait()
 
-        #expect(events == Array(0..<128))
+        #expect(events == Array(0...128))
     }
 
     @Test

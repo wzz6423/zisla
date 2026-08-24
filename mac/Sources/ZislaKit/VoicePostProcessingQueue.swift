@@ -8,23 +8,30 @@ public final class VoicePostProcessingQueue {
     private var worker: Task<Void, Never>?
     private var generation = 0
     private var pendingHead = 0
+    private var pendingCount = 0
 
     public init() {}
 
     public func enqueue(_ operation: @escaping Operation) {
-        pending.append(operation)
+        ensurePendingCapacity()
+        let tail = (pendingHead + pendingCount) % pending.count
+        pending[tail] = operation
+        pendingCount += 1
         startWorkerIfNeeded()
     }
 
     public func cancelAll() {
         generation += 1
-        pending.removeAll()
+        for index in pending.indices {
+            pending[index] = nil
+        }
         pendingHead = 0
+        pendingCount = 0
         worker?.cancel()
     }
 
     private func startWorkerIfNeeded() {
-        guard worker == nil, !pending.isEmpty else { return }
+        guard worker == nil, pendingCount > 0 else { return }
         let workerGeneration = generation
         worker = Task { @MainActor [weak self] in
             await self?.drain(generation: workerGeneration)
@@ -34,17 +41,18 @@ public final class VoicePostProcessingQueue {
     private func drain(generation workerGeneration: Int) async {
         while !Task.isCancelled,
               generation == workerGeneration,
-              pendingHead < pending.count {
-            guard let operation = pending[pendingHead] else {
-                pendingHead += 1
-                continue
+              pendingCount > 0 {
+            let index = pendingHead
+            let operation = pending[index]
+            pending[index] = nil
+            pendingHead = (index + 1) % pending.count
+            pendingCount -= 1
+            if pendingCount == 0 {
+                pendingHead = 0
             }
-            pending[pendingHead] = nil
-            pendingHead += 1
+            guard let operation else { continue }
             await operation()
-            compactPendingIfNeeded()
         }
-        compactPendingIfNeeded()
         guard generation == workerGeneration else {
             // Keep the cancelled worker registered until its operation has returned;
             // otherwise a new enqueue could start a second worker concurrently.
@@ -56,15 +64,18 @@ public final class VoicePostProcessingQueue {
         startWorkerIfNeeded()
     }
 
-    private func compactPendingIfNeeded() {
-        guard pendingHead > 0 else { return }
-        if pendingHead == pending.count {
-            pending.removeAll()
-            pendingHead = 0
-        } else if pendingHead >= 64, pendingHead * 2 >= pending.count {
-            // Bound cleared prefix storage while keeping compaction amortized O(1).
-            pending.removeFirst(pendingHead)
-            pendingHead = 0
+    private func ensurePendingCapacity() {
+        guard pendingCount == pending.count else { return }
+
+        let oldCapacity = pending.count
+        let newCapacity = oldCapacity == 0 ? 1 : oldCapacity * 2
+        var expanded = Array<Operation?>(repeating: nil, count: newCapacity)
+        if oldCapacity > 0 {
+            for offset in 0..<pendingCount {
+                expanded[offset] = pending[(pendingHead + offset) % oldCapacity]
+            }
         }
+        pending = expanded
+        pendingHead = 0
     }
 }
