@@ -4,9 +4,10 @@ import Foundation
 public final class VoicePostProcessingQueue {
     public typealias Operation = @MainActor @Sendable () async -> Void
 
-    private var pending: [Operation] = []
+    private var pending: [Operation?] = []
     private var worker: Task<Void, Never>?
     private var generation = 0
+    private var pendingHead = 0
 
     public init() {}
 
@@ -18,6 +19,7 @@ public final class VoicePostProcessingQueue {
     public func cancelAll() {
         generation += 1
         pending.removeAll()
+        pendingHead = 0
         worker?.cancel()
     }
 
@@ -30,10 +32,19 @@ public final class VoicePostProcessingQueue {
     }
 
     private func drain(generation workerGeneration: Int) async {
-        while !Task.isCancelled, generation == workerGeneration, !pending.isEmpty {
-            let operation = pending.removeFirst()
+        while !Task.isCancelled,
+              generation == workerGeneration,
+              pendingHead < pending.count {
+            guard let operation = pending[pendingHead] else {
+                pendingHead += 1
+                continue
+            }
+            pending[pendingHead] = nil
+            pendingHead += 1
             await operation()
+            compactPendingIfNeeded()
         }
+        compactPendingIfNeeded()
         guard generation == workerGeneration else {
             // Keep the cancelled worker registered until its operation has returned;
             // otherwise a new enqueue could start a second worker concurrently.
@@ -43,5 +54,17 @@ public final class VoicePostProcessingQueue {
         }
         worker = nil
         startWorkerIfNeeded()
+    }
+
+    private func compactPendingIfNeeded() {
+        guard pendingHead > 0 else { return }
+        if pendingHead == pending.count {
+            pending.removeAll()
+            pendingHead = 0
+        } else if pendingHead >= 64, pendingHead * 2 >= pending.count {
+            // Bound cleared prefix storage while keeping compaction amortized O(1).
+            pending.removeFirst(pendingHead)
+            pendingHead = 0
+        }
     }
 }

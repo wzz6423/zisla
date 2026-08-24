@@ -47,6 +47,25 @@ struct VoicePostProcessingQueueTests {
     }
 
     @Test
+    func longQueueRemainsFIFOWhileCompacting() async {
+        let queue = VoicePostProcessingQueue()
+        var events: [Int] = []
+
+        await withCheckedContinuation { completion in
+            for index in 0..<128 {
+                queue.enqueue {
+                    events.append(index)
+                    if index == 127 {
+                        completion.resume()
+                    }
+                }
+            }
+        }
+
+        #expect(events == Array(0..<128))
+    }
+
+    @Test
     func cancelAllCancelsCurrentWorkAndDropsPendingWork() async throws {
         let queue = VoicePostProcessingQueue()
         let cancellationGate = VoicePostProcessingQueueTestGate()
