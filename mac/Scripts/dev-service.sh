@@ -7,7 +7,7 @@ USER_ID="$(id -u)"
 SERVICE_DOMAIN="gui/$USER_ID"
 SERVICE_TARGET="$SERVICE_DOMAIN/$SERVICE_LABEL"
 APP_DIRECTORY="$ROOT/dist"
-APP="$APP_DIRECTORY/zisla.app"
+APP="$APP_DIRECTORY/zisla-debug.app"
 APP_BINARY="$APP/Contents/MacOS/zisla"
 ADAPTER_SCRIPT="$APP/Contents/Resources/MediaRemoteAdapter/mediaremote-adapter.pl"
 SOURCE_ADAPTER_SCRIPT="$ROOT/Resources/MediaRemoteAdapter/mediaremote-adapter.pl"
@@ -25,6 +25,11 @@ function matching_app_pids() {
   local process_command
 
   for pid in ${(f)"$(pgrep -x zisla 2>/dev/null || true)"}; do
+    process_command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+    [[ "$process_command" == "$APP_BINARY"* ]] && print -r -- "$pid"
+  done
+
+  for pid in ${(f)"$(pgrep -x zisla-debug 2>/dev/null || true)"}; do
     process_command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
     [[ "$process_command" == "$APP_BINARY"* ]] && print -r -- "$pid"
   done
@@ -110,7 +115,7 @@ function stop_service() {
   app_pids=("${(@f)$(matching_app_pids)}")
   [[ ${#app_pids[@]} -eq 1 && -z "${app_pids[1]}" ]] && app_pids=()
   if (( ${#app_pids[@]} > 0 )); then
-    osascript -e 'tell application id "dev.wzz.zisla" to quit' >/dev/null 2>&1 || true
+    osascript -e 'tell application id "dev.wzz.zisla.debug" to quit' >/dev/null 2>&1 || true
   fi
 
   if ! wait_for_processes_to_exit; then
@@ -157,8 +162,9 @@ function start_service() {
 
   dev_identity="$(resolve_dev_code_sign_identity)"
   stop_service
-  CODE_SIGN_IDENTITY="$dev_identity" SIGNING_MODE=dev "$ROOT/Scripts/build-app.sh"
-  [[ -x "$APP_BINARY" ]] || fail "构建未生成 zisla.app 可执行文件"
+  DEBUG_BUILD=true OUTPUT_DIRECTORY="$APP_DIRECTORY" CODE_SIGN_IDENTITY="$dev_identity" SIGNING_MODE=dev \
+    "$ROOT/Scripts/build-app.sh"
+  [[ -x "$APP_BINARY" ]] || fail "构建未生成 zisla-debug.app 可执行文件"
 
   mkdir -p "${LAUNCH_AGENT:h}" "${OUT_LOG:h}"
   rm -f "$LAUNCH_AGENT"

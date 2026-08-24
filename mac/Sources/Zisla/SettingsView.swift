@@ -42,11 +42,13 @@ struct SettingsView: View {
         .onAppear {
             launchAtLogin.refresh()
             model.refreshVoiceInputInputMonitoringAccess()
+            model.refreshAssistantAccessibility()
             ensureSelectionIsVisible()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             launchAtLogin.refresh()
             model.refreshVoiceInputInputMonitoringAccess()
+            model.refreshAssistantAccessibility()
             model.backgroundSounds.refresh()
         }
         .onChange(of: settingsStore.settings) { _, _ in
@@ -387,6 +389,220 @@ struct SettingsView: View {
                 featureToggle("剪贴板链接检测", detail: "发现可下载链接时提示", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
             }
 
+            settingsGroup("复制助手") {
+                featureToggle(
+                    "复制助手",
+                    detail: "复制后弹出识别结果和下一步操作",
+                    symbol: "sparkles.rectangle.stack",
+                    keyPath: \.clipboardAssistantEnabled
+                )
+                if model.settingsStore.settings.clipboardAssistantEnabled {
+                    rowDivider
+                    settingRow(
+                        symbol: "keyboard",
+                        title: "快速触发快捷键",
+                        detail: clipboardAssistantHotkeyDetail
+                    ) {
+                        HStack(spacing: 4) {
+                            HotkeyRecorder(
+                                hotkey: Binding(
+                                    get: { model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey },
+                                    set: { newValue in
+                                        model.settingsStore.settings.clipboardAssistantTriggerConfiguration =
+                                            newValue.map(ClipboardAssistantTriggerConfiguration.hotkey) ?? .none
+                                    }
+                                )
+                            )
+                            .frame(width: 142, height: 26)
+                            if model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey != nil {
+                                Button {
+                                    model.settingsStore.settings.clipboardAssistantTriggerConfiguration = .none
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help(loc("清除快捷键"))
+                            }
+                        }
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "computermouse",
+                        title: "鼠标侧键",
+                        detail: "提示可见时按下侧键触发主动作"
+                    ) {
+                        IslandOutlinedPicker(
+                            selection: Binding(
+                                get: { ClipboardAssistantMouseTriggerOption(
+                                    buttonNumber: model.settingsStore.settings.clipboardAssistantMouseButton
+                                ) },
+                                set: { model.settingsStore.settings.clipboardAssistantMouseButton = $0.buttonNumber }
+                            ),
+                            options: ClipboardAssistantMouseTriggerOption.allCases,
+                            title: { loc($0.label) },
+                            selectionID: "clipboard-assistant-mouse-trigger-selection",
+                            fontSize: 9,
+                            width: 150,
+                            height: 28
+                        )
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "hand.tap",
+                        title: "鼠标手势快速复制",
+                        detail: "按住左键点右键复制选中文本，默认关闭"
+                    ) {
+                        Toggle("", isOn: Binding(
+                            get: { model.settingsStore.settings.clipboardAssistantMouseGestureEnabled },
+                            set: { enabled in
+                                model.settingsStore.settings.clipboardAssistantMouseGestureEnabled = enabled
+                                if enabled, !model.assistantAccessibilityGranted {
+                                    AccessibilityPermission.promptIfNeeded()
+                                }
+                            }
+                        ))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                    }
+                    if model.settingsStore.settings.clipboardAssistantMouseGestureEnabled
+                        && !model.assistantAccessibilityGranted {
+                        rowDivider
+                        settingRow(
+                            symbol: "lock.shield",
+                            title: "辅助功能",
+                            detail: "模拟 Command-C 复制选中内容需要辅助功能权限",
+                            isNested: true
+                        ) {
+                            Button {
+                                model.openAssistantAccessibilitySettings()
+                            } label: {
+                                AppLocalizedText("去授权")
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "magnifyingglass.circle",
+                        title: "搜索引擎",
+                        detail: "文本搜索使用的搜索引擎"
+                    ) {
+                        IslandOutlinedPicker(
+                            selection: Binding(
+                                get: { model.settingsStore.settings.clipboardAssistantSearchEngine },
+                                set: { model.settingsStore.settings.clipboardAssistantSearchEngine = $0 }
+                            ),
+                            options: ClipboardAssistantSearchEngine.allCases,
+                            title: { loc($0.displayName) },
+                            selectionID: "clipboard-assistant-search-engine-selection",
+                            fontSize: 9,
+                            width: 150,
+                            height: 28
+                        )
+                    }
+                    rowDivider
+                    featureToggle(
+                        "轻量提醒模式",
+                        detail: "提示更简洁，点击整条执行主动作",
+                        symbol: "sparkle",
+                        keyPath: \.clipboardAssistantLightweightMode,
+                        isNested: true
+                    )
+                    if clipboardAssistantTriggersRequireInputMonitoring {
+                        rowDivider
+                        settingRow(
+                            symbol: "lock.shield",
+                            title: "输入监控",
+                            detail: "单独修饰键或鼠标侧键需要监听全局事件",
+                            isNested: true
+                        ) {
+                            if model.voiceInputInputMonitoringAccessGranted {
+                                Label {
+                                    AppLocalizedText("已授权")
+                                } icon: {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                }
+                                .font(.caption)
+                            } else {
+                                Button {
+                                    model.openVoiceInputInputMonitoringSettings()
+                                } label: {
+                                    AppLocalizedText("去授权")
+                                }
+                                .controlSize(.small)
+                            }
+                        }
+                    }
+                    if let conflictMessage = clipboardAssistantHotkeyConflictMessage {
+                        rowDivider
+                        Label(conflictMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.zislaWarning)
+                            .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "app.badge.checkmark",
+                        title: "应用黑名单",
+                        detail: "这些应用中的复制不弹提示"
+                    ) {
+                        Button {
+                            addFrontmostAppToAssistantBlacklist()
+                        } label: {
+                            AppLocalizedText("加入当前应用")
+                        }
+                        .controlSize(.small)
+                    }
+                    ForEach(assistantBlacklistEntries, id: \.bundleIdentifier) { entry in
+                        rowDivider
+                        assistantBlacklistRow(entry)
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "slider.horizontal.3",
+                        title: "识别类型",
+                        detail: "控制哪些内容会触发提示"
+                    ) {
+                        EmptyView()
+                    }
+                    ForEach(ClipboardAssistantKind.allCases, id: \.self) { kind in
+                        rowDivider
+                        settingRow(
+                            symbol: kind.symbolName,
+                            title: assistantKindTitle(kind),
+                            detail: "",
+                            isNested: true
+                        ) {
+                            Toggle("", isOn: Binding(
+                                get: {
+                                    model.settingsStore.settings.clipboardAssistantEnabledKinds.isEmpty
+                                        || model.settingsStore.settings.clipboardAssistantEnabledKinds.contains(kind)
+                                },
+                                set: { enabled in
+                                    var kinds = model.settingsStore.settings.clipboardAssistantEnabledKinds
+                                    if kinds.isEmpty {
+                                        if enabled { return }
+                                        kinds = Set(ClipboardAssistantKind.allCases)
+                                    }
+                                    if enabled {
+                                        kinds.insert(kind)
+                                    } else {
+                                        kinds.remove(kind)
+                                    }
+                                    model.settingsStore.settings.clipboardAssistantEnabledKinds = kinds
+                                }
+                            ))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                        }
+                    }
+                }
+            }
+
             settingsGroup("信息与通知") {
                 featureToggle("日历日程", detail: "显示接下来的日程与会议", symbol: "calendar", keyPath: \.calendarEnabled)
                 rowDivider
@@ -439,7 +655,10 @@ struct SettingsView: View {
                     HotkeyRecorder(
                         hotkey: Binding(
                             get: { model.settingsStore.settings.screenshotHotkey },
-                            set: { updateScreenshotHotkey($0, action: .capture) }
+                            set: { newValue in
+                                guard let newValue else { return }
+                                updateScreenshotHotkey(newValue, action: .capture)
+                            }
                         )
                     )
                     .frame(width: 142, height: 26)
@@ -454,7 +673,10 @@ struct SettingsView: View {
                     HotkeyRecorder(
                         hotkey: Binding(
                             get: { model.settingsStore.settings.screenshotPinHotkey },
-                            set: { updateScreenshotHotkey($0, action: .pin) }
+                            set: { newValue in
+                                guard let newValue else { return }
+                                updateScreenshotHotkey(newValue, action: .pin)
+                            }
                         )
                     )
                     .frame(width: 142, height: 26)
@@ -1193,7 +1415,10 @@ struct SettingsView: View {
                         HotkeyRecorder(
                             hotkey: Binding(
                                 get: { model.settingsStore.settings.voiceInputHotkeyPreset },
-                                set: { model.settingsStore.settings.voiceInputHotkeyPreset = $0 }
+                                set: { newValue in
+                                    guard let newValue else { return }
+                                    model.settingsStore.settings.voiceInputHotkeyPreset = newValue
+                                }
                             )
                         )
                         .frame(width: 142, height: 26)
@@ -2157,9 +2382,10 @@ struct SettingsView: View {
         _ title: String,
         detail: String,
         symbol: String,
-        keyPath: WritableKeyPath<FeatureSettings, Bool>
+        keyPath: WritableKeyPath<FeatureSettings, Bool>,
+        isNested: Bool = false
     ) -> some View {
-        settingRow(symbol: symbol, title: title, detail: detail) {
+        settingRow(symbol: symbol, title: title, detail: detail, isNested: isNested) {
             Toggle("", isOn: Binding(
                 get: { model.settingsStore.settings[keyPath: keyPath] },
                 set: { model.settingsStore.settings[keyPath: keyPath] = $0 }
@@ -2168,6 +2394,151 @@ struct SettingsView: View {
             .toggleStyle(.switch)
             .controlSize(.small)
         }
+    }
+
+    // MARK: - Clipboard assistant blacklist
+
+    /// Localized string for dynamic contexts (tooltips, formatted details).
+    private func loc(_ key: String) -> String {
+        AppLocalization.string(key, language: model.languageStore.language)
+    }
+
+    /// Localization key for each recognition kind shown in Settings.
+    private func assistantKindTitle(_ kind: ClipboardAssistantKind) -> String {
+        switch kind {
+        case .url: "链接"
+        case .filePath: "文件路径"
+        case .email: "邮箱"
+        case .phone: "电话号码"
+        case .color: "颜色值"
+        case .math: "算式"
+        case .dateTime: "日期时间"
+        case .chineseText: "中文文本"
+        case .code: "代码"
+        case .text: "文本"
+        case .image: "图片"
+        case .file: "文件"
+        }
+    }
+
+    private struct AssistantBlacklistEntry {
+        let bundleIdentifier: String
+        let name: String
+        let icon: NSImage?
+    }
+
+    private var clipboardAssistantHotkeyDetail: String {
+        if let hotkey = model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey {
+            return hotkey.isModifierOnly
+                ? loc("提示可见时连按 %@ 触发主动作").replacingOccurrences(of: "%@", with: hotkey.settingsDisplayName)
+                : loc("提示可见时按下 %@ 触发主动作").replacingOccurrences(of: "%@", with: hotkey.settingsDisplayName)
+        }
+        return loc("未配置；点击右侧录制")
+    }
+
+    private var clipboardAssistantTriggersRequireInputMonitoring: Bool {
+        model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey?.requiresInputMonitoring == true
+            || model.settingsStore.settings.clipboardAssistantMouseButton != nil
+            || model.settingsStore.settings.clipboardAssistantMouseGestureEnabled
+    }
+
+    /// Warns when the assistant trigger collides with the other global hotkeys.
+    private var clipboardAssistantHotkeyConflictMessage: String? {
+        guard let hotkey = model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey else {
+            return nil
+        }
+        let settings = model.settingsStore.settings
+        let conflicts: [String] = [
+            settings.voiceInputEnabled && hotkey.conflicts(with: settings.voiceInputHotkeyPreset) ? loc("语音输入") : nil,
+            settings.screenshotEnabled && hotkey.conflicts(with: settings.screenshotHotkey) ? loc("截图") : nil,
+            settings.screenshotEnabled && hotkey.conflicts(with: settings.screenshotPinHotkey) ? loc("钉图") : nil,
+        ].compactMap { $0 }
+        guard !conflicts.isEmpty else { return nil }
+        return loc("快速触发快捷键与%@快捷键冲突，请更换其中一个")
+            .replacingOccurrences(of: "%@", with: conflicts.joined(separator: "、"))
+    }
+
+    private var assistantBlacklistEntries: [AssistantBlacklistEntry] {
+        model.settingsStore.settings.clipboardAssistantBlacklist
+            .sorted()
+            .map { bundleIdentifier in
+                AssistantBlacklistEntry(
+                    bundleIdentifier: bundleIdentifier,
+                    name: Self.appDisplayName(forBundleIdentifier: bundleIdentifier),
+                    icon: Self.appIcon(forBundleIdentifier: bundleIdentifier)
+                )
+            }
+    }
+
+    private static func appDisplayName(forBundleIdentifier bundleIdentifier: String) -> String {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier),
+           let bundle = Bundle(url: url),
+           let name = bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+            ?? bundle.object(forInfoDictionaryKey: kCFBundleNameKey as String) as? String,
+           !name.isEmpty {
+            return name
+        }
+        return bundleIdentifier
+    }
+
+    private static func appIcon(forBundleIdentifier bundleIdentifier: String) -> NSImage? {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
+            return nil
+        }
+        return NSWorkspace.shared.icon(forFile: url.path)
+    }
+
+    private func assistantBlacklistRow(_ entry: AssistantBlacklistEntry) -> some View {
+        HStack(spacing: 10) {
+            Group {
+                if let icon = entry.icon {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    Image(systemName: "app")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .frame(width: 24, height: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.name)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(entry.bundleIdentifier)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .layoutPriority(1)
+            Spacer(minLength: 8)
+            Button {
+                var blacklist = model.settingsStore.settings.clipboardAssistantBlacklist
+                blacklist.remove(entry.bundleIdentifier)
+                model.settingsStore.settings.clipboardAssistantBlacklist = blacklist
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundStyle(Color.zislaError.opacity(0.8))
+            }
+            .buttonStyle(.plain)
+            .help(loc("移出黑名单"))
+        }
+        .padding(.leading, 28)
+        .padding(.trailing, 4)
+        .frame(maxWidth: .infinity, minHeight: 40)
+    }
+
+    private func addFrontmostAppToAssistantBlacklist() {
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              let bundleIdentifier = app.bundleIdentifier,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+            return
+        }
+        var blacklist = model.settingsStore.settings.clipboardAssistantBlacklist
+        guard blacklist.insert(bundleIdentifier).inserted else { return }
+        model.settingsStore.settings.clipboardAssistantBlacklist = blacklist
     }
 
     @ViewBuilder
@@ -2502,21 +2873,86 @@ private struct ActivityNoticeDisplay: Identifiable {
     let name: String
 }
 
+/// Search engine options for the clipboard assistant's text search action.
+extension ClipboardAssistantSearchEngine {
+    /// Display name; language-neutral brand names except Baidu, which is localized as a key.
+    var displayName: String {
+        switch self {
+        case .google: "Google"
+        case .bing: "Bing"
+        case .baidu: "百度"
+        case .duckduckgo: "DuckDuckGo"
+        }
+    }
+}
+
+/// Mouse side-button options for the clipboard assistant quick trigger; rawValue is the
+/// CGEvent button number.
+private enum ClipboardAssistantMouseTriggerOption: Int, CaseIterable, Identifiable {
+    case off = 0
+    case sideBack = 3
+    case sideForward = 4
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .off: "关闭"
+        case .sideBack: "侧键（后退）"
+        case .sideForward: "侧键（前进）"
+        }
+    }
+
+    var buttonNumber: Int? {
+        self == .off ? nil : rawValue
+    }
+
+    init(buttonNumber: Int?) {
+        self = buttonNumber.flatMap(Self.init(rawValue:)) ?? .off
+    }
+}
+
+private extension VoiceInputModifier {
+    var settingsDisplayName: String {
+        switch self {
+        case .leftControl: "L⌃"
+        case .rightControl: "R⌃"
+        case .leftOption: "L⌥"
+        case .rightOption: "R⌥"
+        case .leftCommand: "L⌘"
+        case .rightCommand: "R⌘"
+        case .leftShift: "L⇧"
+        case .rightShift: "R⇧"
+        }
+    }
+}
+
+private extension VoiceInputHotkeyPreset {
+    var settingsDisplayName: String {
+        if isModifierOnly, let modifier = modifierSides?.first {
+            return modifier.settingsDisplayName
+        }
+        return displayName
+    }
+}
+
 private struct HotkeyRecorder: NSViewRepresentable {
-    @Binding var hotkey: VoiceInputHotkeyPreset
+    @Binding var hotkey: VoiceInputHotkeyPreset?
+    @Environment(\.locale) private var locale
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
     func makeNSView(context: Context) -> HotkeyRecorderButton {
-        let button = HotkeyRecorderButton(hotkey: hotkey)
+        let button = HotkeyRecorderButton(hotkey: hotkey, locale: locale)
         button.onRecord = context.coordinator.record
         return button
     }
 
     func updateNSView(_ nsView: HotkeyRecorderButton, context: Context) {
         nsView.hotkey = hotkey
+        nsView.locale = locale
     }
 
     @MainActor
@@ -2535,11 +2971,16 @@ private struct HotkeyRecorder: NSViewRepresentable {
 
 @MainActor
 private final class HotkeyRecorderButton: NSButton {
-    var hotkey: VoiceInputHotkeyPreset {
+    var hotkey: VoiceInputHotkeyPreset? {
         didSet {
             if !isRecording {
                 updateTitle()
             }
+        }
+    }
+    var locale: Locale {
+        didSet {
+            updateTitle()
         }
     }
     var onRecord: ((VoiceInputHotkeyPreset) -> Void)?
@@ -2556,13 +2997,13 @@ private final class HotkeyRecorderButton: NSButton {
     private var recordingModifierSides: Set<VoiceInputModifier> = []
     private var sawMultipleModifiers = false
 
-    init(hotkey: VoiceInputHotkeyPreset) {
+    init(hotkey: VoiceInputHotkeyPreset?, locale: Locale) {
         self.hotkey = hotkey
+        self.locale = locale
         super.init(frame: .zero)
         bezelStyle = .rounded
         font = .monospacedSystemFont(ofSize: 10, weight: .medium)
         lineBreakMode = .byTruncatingTail
-        toolTip = "点击后按下快捷键，支持单键和区分左/右⌥、⌘、⇧"
         updateTitle()
     }
 
@@ -2609,7 +3050,7 @@ private final class HotkeyRecorderButton: NSButton {
                 VoiceInputHotkeyPreset(
                     keyCode: modifier.keyCode,
                     carbonModifiers: modifier.carbonModifier,
-                    keyDisplayName: modifier.displayName,
+                    keyDisplayName: modifier.settingsDisplayName,
                     modifierSides: [modifier]
                 )
             )
@@ -2662,15 +3103,19 @@ private final class HotkeyRecorderButton: NSButton {
 
     private func updateTitle() {
         guard isRecording else {
-            title = hotkey.displayName
+            title = hotkey?.settingsDisplayName ?? loc("点击录制")
             return
         }
         let modifierNames = VoiceInputModifier.allCases
             .filter(recordingModifierSides.contains)
-            .map(\.displayName)
+            .map(\.settingsDisplayName)
         title = modifierNames.isEmpty
-            ? "按下组合键..."
+            ? loc("按下组合键...")
             : "\(modifierNames.joined(separator: " + ")) + ..."
+    }
+
+    private func loc(_ key: String) -> String {
+        AppLocalization.string(key, locale: locale)
     }
 
     private func opposite(of modifier: VoiceInputModifier) -> VoiceInputModifier? {
@@ -2698,22 +3143,22 @@ private final class HotkeyRecorderButton: NSButton {
 
     private func keyDisplayName(for event: NSEvent) -> String {
         switch event.keyCode {
-        case 36: "回车"
-        case 48: "Tab"
-        case 49: "空格"
-        case 51: "删除"
-        case 53: "Esc"
-        case 115: "Home"
-        case 116: "Page Up"
-        case 117: "向前删除"
-        case 119: "End"
-        case 121: "Page Down"
+        case 36: "↩"
+        case 48: "⇥"
+        case 49: "␣"
+        case 51: "⌫"
+        case 53: "⎋"
+        case 115: "↖"
+        case 116: "⇞"
+        case 117: "⌦"
+        case 119: "↘"
+        case 121: "⇟"
         case 123: "←"
         case 124: "→"
         case 125: "↓"
         case 126: "↑"
         default:
-            event.charactersIgnoringModifiers?.uppercased() ?? "键码 \(event.keyCode)"
+            event.charactersIgnoringModifiers?.uppercased() ?? "\(event.keyCode)"
         }
     }
 }

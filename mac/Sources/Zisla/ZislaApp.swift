@@ -1301,6 +1301,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let currentBundleID = Bundle.main.bundleIdentifier
         let currentExecutable = current.executableURL?.standardizedFileURL
         let processName = ProcessInfo.processInfo.processName
+        let applicationName = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleDisplayName"
+        ) as? String ?? processName
 
         let peer = NSWorkspace.shared.runningApplications.first { application in
             guard application.processIdentifier != current.processIdentifier else { return false }
@@ -1311,7 +1314,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                application.executableURL?.standardizedFileURL == currentExecutable {
                 return true
             }
-            return application.localizedName == processName || application.localizedName == "zisla"
+            return application.localizedName == applicationName
         }
         guard let peer else { return true }
         peer.activate(options: [.activateAllWindows])

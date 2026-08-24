@@ -390,6 +390,8 @@ final class AppModel: ObservableObject {
   let clipboardMonitor = ClipboardLinkMonitor()
   let clipboardHistory = ClipboardHistoryStore()
   let clipboardHistoryMonitor = ClipboardHistoryMonitor()
+  /// Copy assistant: recognizes copied content and shows a toast with a next-step action.
+  let clipboardAssistant = ClipboardAssistantController()
   let pomodoro = PomodoroService()
   let alarms = AlarmService()
   let managedTools = ManagedToolService()
@@ -419,6 +421,8 @@ final class AppModel: ObservableObject {
   @Published private(set) var isProcessingVoiceTranscript = false
   @Published private(set) var voiceInputInputMonitoringAccessGranted =
     GlobalHotkeyManager.hasInputMonitoringAccess
+  /// Accessibility trust state for the clipboard assistant's quick-copy mouse gesture.
+  @Published private(set) var assistantAccessibilityGranted = AccessibilityPermission.isTrusted
   private let weatherService = WeatherService()
   private let weatherLocationService = WeatherLocationService()
   private let releaseService = GitHubReleaseService()
@@ -516,7 +520,14 @@ final class AppModel: ObservableObject {
     }
     restoreDownloadDirectory()
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
-      _ = self?.clipboardHistory.record(content)
+      guard let self else { return }
+      if self.settingsStore.settings.clipboardHistoryEnabled {
+        _ = self.clipboardHistory.record(content)
+      }
+      self.handleCapturedClipboardContent(content)
+    }
+    clipboardAssistant.onPerformAction = { [weak self] action in
+      self?.performClipboardAssistantAction(action)
     }
     clipboardMonitor.onLinkDetected = { [weak self] url in
       guard let self else { return }
@@ -820,11 +831,40 @@ final class AppModel: ObservableObject {
     }
   }
 
+  func refreshAssistantAccessibility() {
+    guard assistantAccessibilityGranted != AccessibilityPermission.isTrusted else { return }
+    assistantAccessibilityGranted = AccessibilityPermission.isTrusted
+    // Re-apply the gesture when the permission flips to granted.
+    if assistantAccessibilityGranted, settingsStore.settings.clipboardAssistantEnabled {
+      applyAssistantMouseGesture()
+    }
+  }
+
+  /// Opens System Settings at the accessibility pane (and fires the system grant prompt).
+  func openAssistantAccessibilitySettings() {
+    guard !assistantAccessibilityGranted else { return }
+    _ = AccessibilityPermission.promptIfNeeded()
+    guard let url = URL(
+      string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+    ), NSWorkspace.shared.open(url) else {
+      transientMessage = "无法打开系统设置的辅助功能页面"
+      return
+    }
+  }
+
   func refreshVoiceInputInputMonitoringAccess() {
     let granted = GlobalHotkeyManager.hasInputMonitoringAccess
     guard voiceInputInputMonitoringAccessGranted != granted else { return }
     let wasGranted = voiceInputInputMonitoringAccessGranted
     voiceInputInputMonitoringAccessGranted = granted
+
+    if granted, !wasGranted, settingsStore.settings.clipboardAssistantEnabled {
+      clipboardAssistant.setTriggers(
+        hotkey: settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey,
+        mouseButton: settingsStore.settings.clipboardAssistantMouseButton
+      )
+      applyAssistantMouseGesture()
+    }
 
     // Re-register the hotkey when permission changes from denied to granted.
     if granted, !wasGranted, settingsStore.settings.voiceInputEnabled {
@@ -888,6 +928,9 @@ final class AppModel: ObservableObject {
     hotkeyManager.unregister()
     clipboardMonitor.setEnabled(false)
     clipboardHistoryMonitor.setEnabled(false)
+    clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil)
+    clipboardAssistant.setMouseGesture(enabled: false, onQuickCopy: {})
+    clipboardAssistant.dismiss()
     Task { [downloadService] in await downloadService.cancelAll() }
     aiMonitor.stop()
     aiAgent.stop()
@@ -1406,6 +1449,157 @@ final class AppModel: ObservableObject {
     transientMessage = "已复制到剪贴板"
   }
 
+  // MARK: - Clipboard Assistant
+
+  /// Pasteboard changeCount written by an assistant action itself; the toast must not re-trigger
+  /// for its own "copy result" writes.
+  private var suppressedAssistantChangeCount: Int?
+
+  private func clipboardAssistantMessage(_ key: String) -> String {
+    AppLocalization.string(key, language: languageStore.language)
+  }
+
+  private func clipboardAssistantMessage(_ key: String, _ argument: CVarArg) -> String {
+    AppLocalization.format(key, locale: languageStore.language.locale, [argument])
+  }
+
+  private func handleCapturedClipboardContent(_ content: ClipboardHistoryContent) {
+    let settings = settingsStore.settings
+    guard settings.clipboardAssistantEnabled else { return }
+    if let suppressed = suppressedAssistantChangeCount,
+       suppressed == NSPasteboard.general.changeCount {
+      return
+    }
+    // The frontmost app at capture time is the app the user copied from.
+    if let bundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+       settings.clipboardAssistantBlacklist.contains(bundleIdentifier) {
+      return
+    }
+    guard let detection = ClipboardAssistantDetector.detect(
+      content: content,
+      enabledKinds: settings.clipboardAssistantEnabledKinds.isEmpty
+        ? Set(ClipboardAssistantKind.allCases)
+        : settings.clipboardAssistantEnabledKinds,
+      offersDownload: settings.downloaderEnabled
+    ) else { return }
+    clipboardAssistant.present(detection)
+  }
+
+  private func performClipboardAssistantAction(_ action: ClipboardAssistantAction) {
+    switch action {
+    case .openURL(let url):
+      NSWorkspace.shared.open(url)
+    case .openDownload(let url):
+      downloadURL = url.absoluteString
+      selectModule(.download)
+    case .revealInFinder(let url):
+      NSWorkspace.shared.activateFileViewerSelecting([url])
+    case .search(let text):
+      let engine = settingsStore.settings.clipboardAssistantSearchEngine
+      if let url = engine.queryURL(for: text) {
+        NSWorkspace.shared.open(url)
+      } else {
+        transientMessage = clipboardAssistantMessage("无法完成操作")
+      }
+    case .translate(let text):
+      // Translate in the browser using the interface language as the target.
+      let code = languageStore.language.translateTargetCode
+      if let url = ClipboardAssistantTranslate.url(text: text, targetLanguageCode: code) {
+        NSWorkspace.shared.open(url)
+      } else {
+        transientMessage = clipboardAssistantMessage("无法完成操作")
+      }
+    case .composeMail(let address):
+      if let url = URL(string: "mailto:\(address)") {
+        NSWorkspace.shared.open(url)
+      } else {
+        transientMessage = clipboardAssistantMessage("无法完成操作")
+      }
+    case .copyText(let text):
+      guard ClipboardHistoryPasteboard.write(.text(text)) else {
+        transientMessage = clipboardAssistantMessage("无法完成操作")
+        return
+      }
+      suppressedAssistantChangeCount = NSPasteboard.general.changeCount
+      transientMessage = clipboardAssistantMessage("已复制")
+    case .saveImage(let data):
+      saveClipboardImage(data)
+    case .saveText(let text):
+      saveAssistantText(text)
+    case .createCalendarEvent(let title, let date, let isAllDay):
+      createAssistantCalendarEvent(title: title, date: date, isAllDay: isAllDay)
+    }
+  }
+
+  private func saveClipboardImage(_ data: Data) {
+    let directory = downloadDirectory
+    let scopedAccess = directory.startAccessingSecurityScopedResource()
+    defer { if scopedAccess { directory.stopAccessingSecurityScopedResource() } }
+    do {
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      let formatter = DateFormatter()
+      formatter.dateFormat = "yyyyMMdd-HHmmss"
+      let url = directory.appendingPathComponent("clipboard-\(formatter.string(from: Date())).png")
+      try data.write(to: url)
+      transientMessage = clipboardAssistantMessage("已保存到 %@", url.path)
+    } catch {
+      transientMessage = clipboardAssistantMessage("操作失败：%@", error.localizedDescription)
+    }
+  }
+
+  /// Saves long copied text as a standalone file in the download directory and reveals it.
+  private func saveAssistantText(_ text: String) {
+    let directory = downloadDirectory
+    let scopedAccess = directory.startAccessingSecurityScopedResource()
+    defer { if scopedAccess { directory.stopAccessingSecurityScopedResource() } }
+    do {
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      let formatter = DateFormatter()
+      formatter.dateFormat = "yyyyMMdd-HHmmss"
+      let url = directory.appendingPathComponent("clipboard-\(formatter.string(from: Date())).txt")
+      try text.write(to: url, atomically: true, encoding: .utf8)
+      NSWorkspace.shared.activateFileViewerSelecting([url])
+      transientMessage = clipboardAssistantMessage("已保存到 %@", url.path)
+    } catch {
+      transientMessage = clipboardAssistantMessage("操作失败：%@", error.localizedDescription)
+    }
+  }
+
+  /// Creates an all-day (or timed) calendar event from a recognized date; errors surface inline.
+  private func createAssistantCalendarEvent(title: String, date: Date, isAllDay: Bool) {
+    do {
+      if isAllDay {
+        try calendar.createEvent(
+          title: title,
+          startDate: date,
+          endDate: date.addingTimeInterval(86_400),
+          isAllDay: true
+        )
+      } else {
+        try calendar.createEvent(
+          title: title,
+          startDate: date,
+          endDate: date.addingTimeInterval(3_600),
+          isAllDay: false
+        )
+      }
+      transientMessage = clipboardAssistantMessage("已创建日程")
+    } catch {
+      transientMessage = clipboardAssistantMessage("操作失败：%@", error.localizedDescription)
+    }
+  }
+
+  /// Applies the hold-left + right-click quick copy gesture from settings.
+  private func applyAssistantMouseGesture() {
+    let enabled = settingsStore.settings.clipboardAssistantEnabled
+      && settingsStore.settings.clipboardAssistantMouseGestureEnabled
+    // The gesture only simulates ⌘C; the shared pasteboard monitor picks up the new copy.
+    let granted = clipboardAssistant.setMouseGesture(enabled: enabled, onQuickCopy: {})
+    if enabled, !granted {
+      refreshAssistantAccessibility()
+    }
+  }
+
   func sendQuickNoteToTeleprompter(_ content: String) {
     let content = content.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !content.isEmpty else {
@@ -1703,7 +1897,21 @@ final class AppModel: ObservableObject {
     clipboardMonitor.setEnabled(
       settings.downloaderEnabled && settings.clipboardDetectionEnabled
     )
-    clipboardHistoryMonitor.setEnabled(settings.clipboardHistoryEnabled)
+    // The shared pasteboard monitor feeds both history recording and the copy assistant.
+    clipboardHistoryMonitor.setEnabled(
+      settings.clipboardHistoryEnabled || settings.clipboardAssistantEnabled
+    )
+    if settings.clipboardAssistantEnabled {
+      clipboardAssistant.setTriggers(
+        hotkey: settings.clipboardAssistantTriggerConfiguration.hotkey,
+        mouseButton: settings.clipboardAssistantMouseButton
+      )
+      clipboardAssistant.isLightweightMode = settings.clipboardAssistantLightweightMode
+    } else {
+      clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil)
+      clipboardAssistant.dismiss()
+    }
+    applyAssistantMouseGesture()
     if !settings.downloaderEnabled, downloadState.isRunning {
       cancelDownload()
     }

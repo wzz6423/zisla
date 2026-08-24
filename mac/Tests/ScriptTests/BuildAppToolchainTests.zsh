@@ -23,7 +23,9 @@ cp "$ROOT/Scripts/build-app.sh" "$TEST_ROOT/Scripts/build-app.sh"
 touch "$XCODE_DEVELOPER/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift"
 touch "$XCODE_DEVELOPER/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libSwiftUIMacros.dylib"
 chmod +x "$XCODE_DEVELOPER/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift"
-print -r -- '<plist version="1.0"><dict/></plist>' > "$TEST_ROOT/Resources/Info.plist"
+cp "$ROOT/Resources/Info.plist" "$TEST_ROOT/Resources/Info.plist"
+print -r -- day > "$TEST_ROOT/Resources/AppIcon.icns"
+print -r -- night > "$TEST_ROOT/Resources/AppIconNight.icns"
 
 cat > "$FAKE_BIN/xcode-select" <<'SCRIPT'
 #!/bin/zsh
@@ -106,6 +108,19 @@ chmod +x "$FAKE_BIN"/*
   print -u2 -r -- "FAIL: build-app did not produce the app binary"
   exit 1
 }
+RELEASE_PLIST="$TEMPORARY_ROOT/output/zisla.app/Contents/Info.plist"
+[[ "$(plutil -extract CFBundleIdentifier raw -o - "$RELEASE_PLIST")" == "dev.wzz.zisla" ]] || {
+  print -u2 -r -- "FAIL: release Bundle ID was not rendered"
+  exit 1
+}
+[[ "$(plutil -extract CFBundleDisplayName raw -o - "$RELEASE_PLIST")" == "zisla" ]] || {
+  print -u2 -r -- "FAIL: release display name was not rendered"
+  exit 1
+}
+[[ "$(plutil -extract ZislaApplicationSupportDirectory raw -o - "$RELEASE_PLIST")" == "zisla" ]] || {
+  print -u2 -r -- "FAIL: release application support directory was not rendered"
+  exit 1
+}
 for architecture in arm64 x86_64; do
   [[ -f "$TEST_ROOT/.build/$architecture/out/Products/Release/zisla" ]] || {
     print -u2 -r -- "FAIL: build-app did not isolate $architecture build output"
@@ -113,4 +128,47 @@ for architecture in arm64 x86_64; do
   }
 done
 
-print -r -- "PASS: build-app full Xcode selection and architecture build isolation"
+(
+  PATH="$FAKE_BIN:$PATH" \
+    FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
+    FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
+    FAKE_XCODE_APP="$XCODE_APP" \
+    DEBUG_BUILD=true \
+    BUILD_ARCHITECTURES=arm64 \
+    CODE_SIGN_IDENTITY=- \
+    OUTPUT_DIRECTORY="$TEMPORARY_ROOT/output" \
+    "$TEST_ROOT/Scripts/build-app.sh" >/dev/null
+)
+
+DEBUG_APP="$TEMPORARY_ROOT/output/zisla-debug.app"
+DEBUG_PLIST="$DEBUG_APP/Contents/Info.plist"
+[[ -x "$DEBUG_APP/Contents/MacOS/zisla" ]] || {
+  print -u2 -r -- "FAIL: debug build did not produce the app binary"
+  exit 1
+}
+[[ -d "$TEMPORARY_ROOT/output/zisla.app" ]] || {
+  print -u2 -r -- "FAIL: debug build removed the release app"
+  exit 1
+}
+[[ "$(plutil -extract CFBundleIdentifier raw -o - "$DEBUG_PLIST")" == "dev.wzz.zisla.debug" ]] || {
+  print -u2 -r -- "FAIL: debug Bundle ID was not rendered"
+  exit 1
+}
+[[ "$(plutil -extract CFBundleDisplayName raw -o - "$DEBUG_PLIST")" == "zisla-debug" ]] || {
+  print -u2 -r -- "FAIL: debug display name was not rendered"
+  exit 1
+}
+[[ "$(plutil -extract ZislaApplicationSupportDirectory raw -o - "$DEBUG_PLIST")" == "zisla-debug" ]] || {
+  print -u2 -r -- "FAIL: debug application support directory was not rendered"
+  exit 1
+}
+cmp -s "$TEST_ROOT/Resources/AppIconNight.icns" "$DEBUG_APP/Contents/Resources/AppIcon.icns" || {
+  print -u2 -r -- "FAIL: debug build did not use the night icon"
+  exit 1
+}
+cmp -s "$DEBUG_APP/Contents/Resources/AppIcon.icns" "$DEBUG_APP/Contents/Resources/AppIconNight.icns" || {
+  print -u2 -r -- "FAIL: debug icon resources are inconsistent"
+  exit 1
+}
+
+print -r -- "PASS: build-app identity, data, icon, and architecture isolation"

@@ -5,24 +5,40 @@ public enum LegacyAppDataMigration {
     private static let legacyBundleIdentifier = "dev.wzz.orbit"
     private static let userDefaultsMigrationMarker = "zisla.legacy-user-defaults-migrated"
 
-    public static func applicationSupportDirectory(fileManager: FileManager = .default) -> URL {
+    public static func applicationSupportDirectory(
+        isDebugBuild: Bool = false,
+        fileManager: FileManager = .default
+    ) -> URL {
         if let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            return applicationSupportDirectory(baseURL: base, fileManager: fileManager)
+            return applicationSupportDirectory(baseURL: base, isDebugBuild: isDebugBuild, fileManager: fileManager)
         }
         return fallbackApplicationSupportDirectory(
             homeDirectory: fileManager.homeDirectoryForCurrentUser,
+            isDebugBuild: isDebugBuild,
             fileManager: fileManager
         )
     }
 
-    static func applicationSupportDirectory(baseURL: URL, fileManager: FileManager = .default) -> URL {
-        let current = baseURL.appendingPathComponent("zisla", isDirectory: true)
+    static func applicationSupportDirectory(
+        baseURL: URL,
+        isDebugBuild: Bool = false,
+        fileManager: FileManager = .default
+    ) -> URL {
+        let directoryName = isDebugBuild ? "zisla-debug" : "zisla"
+        let current = baseURL.appendingPathComponent(directoryName, isDirectory: true)
+        guard !isDebugBuild else { return current }
         let legacy = baseURL.appendingPathComponent(legacyApplicationSupportDirectoryName, isDirectory: true)
         return migrateDirectory(from: legacy, to: current, fileManager: fileManager)
     }
 
-    static func fallbackApplicationSupportDirectory(homeDirectory: URL, fileManager: FileManager = .default) -> URL {
-        let current = homeDirectory.appendingPathComponent(".local/share/zisla", isDirectory: true)
+    static func fallbackApplicationSupportDirectory(
+        homeDirectory: URL,
+        isDebugBuild: Bool = false,
+        fileManager: FileManager = .default
+    ) -> URL {
+        let directoryName = isDebugBuild ? ".local/share/zisla-debug" : ".local/share/zisla"
+        let current = homeDirectory.appendingPathComponent(directoryName, isDirectory: true)
+        guard !isDebugBuild else { return current }
         let legacy = homeDirectory.appendingPathComponent(".orbit", isDirectory: true)
         return migrateDirectory(from: legacy, to: current, fileManager: fileManager)
     }
@@ -41,6 +57,11 @@ public enum LegacyAppDataMigration {
     }
 
     public static func migrateUserDefaults() {
+        let isDebugBuild = (Bundle.main.object(
+            forInfoDictionaryKey: "ZislaApplicationSupportDirectory"
+        ) as? String) == "zisla-debug"
+            || Bundle.main.bundleIdentifier?.hasSuffix(".debug") == true
+        guard !isDebugBuild else { return }
         guard let legacyDefaults = UserDefaults(suiteName: legacyBundleIdentifier) else { return }
         migrateUserDefaults(
             from: legacyDefaults,

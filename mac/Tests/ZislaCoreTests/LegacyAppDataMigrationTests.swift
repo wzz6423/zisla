@@ -53,6 +53,36 @@ struct LegacyAppDataMigrationTests {
     }
 
     @Test
+    func debugBuildUsesSeparateApplicationSupportDirectoryWithoutMigrating() throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let legacyDirectory = root.appendingPathComponent("Orbit", isDirectory: true)
+        try FileManager.default.createDirectory(at: legacyDirectory, withIntermediateDirectories: true)
+
+        let directory = LegacyAppDataMigration.applicationSupportDirectory(
+            baseURL: root,
+            isDebugBuild: true
+        )
+
+        #expect(directory == root.appendingPathComponent("zisla-debug", isDirectory: true))
+        #expect(FileManager.default.fileExists(atPath: legacyDirectory.path))
+    }
+
+    @Test
+    func debugFallbackUsesSeparateApplicationSupportDirectory() {
+        let home = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: home) }
+
+        let directory = LegacyAppDataMigration.fallbackApplicationSupportDirectory(
+            homeDirectory: home,
+            isDebugBuild: true
+        )
+
+        #expect(directory == home.appendingPathComponent(".local/share/zisla-debug", isDirectory: true))
+    }
+
+    @Test
     func importsMissingUserDefaultsValuesWithoutOverwritingCurrentValues() throws {
         let legacySuite = "zisla.legacy-migration.\(UUID().uuidString)"
         let currentSuite = "zisla.current-migration.\(UUID().uuidString)"

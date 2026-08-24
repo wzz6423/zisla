@@ -1861,6 +1861,101 @@ struct FeatureSettingsTests {
         #expect(settings.petID == "panda")
         #expect(settings.petSide == .left)
     }
+
+    @Test
+    func clipboardAssistantTriggerRoundTripsAndDefaultsOnLegacyJSON() throws {
+        let defaults = FeatureSettings.default
+        // Assistant is off by default; the trigger hotkey defaults to double-tap Left Control.
+        #expect(!defaults.clipboardAssistantEnabled)
+        #expect(defaults.clipboardAssistantTriggerConfiguration.hotkey?.isModifierOnly == true)
+        #expect(defaults.clipboardAssistantMouseButton == nil)
+
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        var settings = defaults
+        settings.clipboardAssistantEnabled = true
+        let customCombo = VoiceInputHotkeyPreset(
+            keyCode: 16,                      // Y
+            carbonModifiers: 0x0800,
+            keyDisplayName: "Y"
+        )
+        settings.clipboardAssistantTriggerConfiguration = .hotkey(customCombo)
+        settings.clipboardAssistantMouseButton = 3
+
+        let decoded = try decoder.decode(
+            FeatureSettings.self,
+            from: encoder.encode(settings)
+        )
+        #expect(decoded.clipboardAssistantEnabled)
+        #expect(decoded.clipboardAssistantTriggerConfiguration == .hotkey(customCombo))
+        #expect(decoded.clipboardAssistantMouseButton == 3)
+
+        // Settings JSON written before the assistant existed falls back to defaults.
+        let legacyObject = try JSONSerialization.jsonObject(with: encoder.encode(defaults))
+        var legacyDictionary = try #require(legacyObject as? [String: Any])
+        for key in ["clipboardAssistantEnabled", "clipboardAssistantTriggerConfiguration", "clipboardAssistantMouseButton"] {
+            legacyDictionary.removeValue(forKey: key)
+        }
+        let legacy = try decoder.decode(
+            FeatureSettings.self,
+            from: JSONSerialization.data(withJSONObject: legacyDictionary)
+        )
+        #expect(!legacy.clipboardAssistantEnabled)
+        #expect(legacy.clipboardAssistantTriggerConfiguration == .default)
+        #expect(legacy.clipboardAssistantMouseButton == nil)
+
+        // A cleared trigger persists as .none instead of resurrecting the default hotkey.
+        settings.clipboardAssistantTriggerConfiguration = .none
+        settings.clipboardAssistantMouseButton = nil
+        let cleared = try decoder.decode(
+            FeatureSettings.self,
+            from: encoder.encode(settings)
+        )
+        #expect(cleared.clipboardAssistantTriggerConfiguration == .none)
+        #expect(cleared.clipboardAssistantTriggerConfiguration.hotkey == nil)
+        #expect(cleared.clipboardAssistantMouseButton == nil)
+    }
+
+    @Test
+    func clipboardAssistantPreferenceFieldsRoundTripAndDefaultOnLegacyJSON() throws {
+        let defaults = FeatureSettings.default
+        #expect(defaults.clipboardAssistantSearchEngine == .google)
+        #expect(!defaults.clipboardAssistantLightweightMode)
+        #expect(!defaults.clipboardAssistantMouseGestureEnabled)
+
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        var settings = defaults
+        settings.clipboardAssistantSearchEngine = .baidu
+        settings.clipboardAssistantLightweightMode = true
+        settings.clipboardAssistantMouseGestureEnabled = true
+
+        let decoded = try decoder.decode(
+            FeatureSettings.self,
+            from: encoder.encode(settings)
+        )
+        #expect(decoded.clipboardAssistantSearchEngine == .baidu)
+        #expect(decoded.clipboardAssistantLightweightMode)
+        #expect(decoded.clipboardAssistantMouseGestureEnabled)
+
+        // Settings JSON written before these fields existed falls back to defaults.
+        let legacyObject = try JSONSerialization.jsonObject(with: encoder.encode(defaults))
+        var legacyDictionary = try #require(legacyObject as? [String: Any])
+        for key in [
+            "clipboardAssistantSearchEngine",
+            "clipboardAssistantLightweightMode",
+            "clipboardAssistantMouseGestureEnabled",
+        ] {
+            legacyDictionary.removeValue(forKey: key)
+        }
+        let legacy = try decoder.decode(
+            FeatureSettings.self,
+            from: JSONSerialization.data(withJSONObject: legacyDictionary)
+        )
+        #expect(legacy.clipboardAssistantSearchEngine == .google)
+        #expect(!legacy.clipboardAssistantLightweightMode)
+        #expect(!legacy.clipboardAssistantMouseGestureEnabled)
+    }
 }
 
 private func temporaryDirectory() -> URL {

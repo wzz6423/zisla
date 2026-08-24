@@ -6,8 +6,22 @@ CONFIGURATION="${CONFIGURATION:-release}"
 VERSION="${VERSION:-0.1.6}"
 BUILD_NUMBER="${BUILD_NUMBER:-12}"
 UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
+DEBUG_BUILD="${DEBUG_BUILD:-false}"
 OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:-$ROOT/dist}"
-APP="$OUTPUT_DIRECTORY/zisla.app"
+
+if [[ "$DEBUG_BUILD" == "true" ]]; then
+  APP_NAME="zisla-debug"
+  BUNDLE_ID="dev.wzz.zisla.debug"
+  APP_SUPPORT_DIRECTORY="zisla-debug"
+  ICON_FILE="AppIconNight"
+else
+  APP_NAME="zisla"
+  BUNDLE_ID="dev.wzz.zisla"
+  APP_SUPPORT_DIRECTORY="zisla"
+  ICON_FILE="AppIcon"
+fi
+
+APP="$OUTPUT_DIRECTORY/$APP_NAME.app"
 CONTENTS="$APP/Contents"
 IDENTITY="${CODE_SIGN_IDENTITY:--}"
 SIGNING_MODE="${SIGNING_MODE:-}"
@@ -119,13 +133,25 @@ sed \
   -e "s/@VERSION@/$VERSION/g" \
   -e "s/@BUILD_NUMBER@/$BUILD_NUMBER/g" \
   -e "s/@UPDATE_CHANNEL@/$UPDATE_CHANNEL/g" \
+  -e "s/@APP_NAME@/$APP_NAME/g" \
+  -e "s/@BUNDLE_ID@/$BUNDLE_ID/g" \
+  -e "s/@APP_SUPPORT_DIRECTORY@/$APP_SUPPORT_DIRECTORY/g" \
   "$ROOT/Resources/Info.plist" > "$CONTENTS/Info.plist"
 
-if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
-  install -m 0644 "$ROOT/Resources/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
-fi
-if [[ -f "$ROOT/Resources/AppIconNight.icns" ]]; then
-  install -m 0644 "$ROOT/Resources/AppIconNight.icns" "$CONTENTS/Resources/AppIconNight.icns"
+if [[ "$DEBUG_BUILD" == "true" ]]; then
+  [[ -f "$ROOT/Resources/$ICON_FILE.icns" ]] || {
+    echo "error: missing debug icon: $ROOT/Resources/$ICON_FILE.icns" >&2
+    exit 1
+  }
+  install -m 0644 "$ROOT/Resources/$ICON_FILE.icns" "$CONTENTS/Resources/AppIcon.icns"
+  install -m 0644 "$ROOT/Resources/$ICON_FILE.icns" "$CONTENTS/Resources/AppIconNight.icns"
+else
+  if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
+    install -m 0644 "$ROOT/Resources/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
+  fi
+  if [[ -f "$ROOT/Resources/AppIconNight.icns" ]]; then
+    install -m 0644 "$ROOT/Resources/AppIconNight.icns" "$CONTENTS/Resources/AppIconNight.icns"
+  fi
 fi
 
 if [[ -d "$ROOT/Resources/BrandIcons" ]]; then

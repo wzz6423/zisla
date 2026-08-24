@@ -3,6 +3,10 @@ import AppKit
 public enum ClipboardHistoryPasteboard {
     public static func readContent(from pasteboard: NSPasteboard = .general) -> ClipboardHistoryContent? {
         guard Set(pasteboard.types ?? []).isDisjoint(with: ignoredTypes) else { return nil }
+        if let fileURL = FileShelfPasteboard.readFileURLs(from: pasteboard).first,
+           let content = try? ClipboardHistoryContent.file(at: fileURL) {
+            return content
+        }
         if let pngData = pasteboard.data(forType: .png), !pngData.isEmpty {
             return .image(pngData)
         }
