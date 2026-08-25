@@ -117,6 +117,6 @@ zisla 仅在启用的功能首次实际需要时请求系统权限。你可以�
 
 欢迎提交 Issue 和 Pull Request。开始前请阅读 [贡献指南](CONTRIBUTING.zh-CN.md)；安全问题请通过 [GitHub Security Advisories](https://github.com/wzz6423/zisla/security/advisories/new) 私下报告，不要公开提交 Issue。
 
-## License
+## 许可证
 
 MIT

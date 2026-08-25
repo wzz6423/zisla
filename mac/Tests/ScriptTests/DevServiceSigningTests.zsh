@@ -109,6 +109,20 @@ expect_contains \
   "$update_command" \
   "SIGNING_MODE=dev mac/Scripts/dev-service.sh run" \
   "make update forces development signing"
+expect_equal \
+  "$run_command" \
+  "$update_command" \
+  "make run and make update use the same launch command"
+
+launch_agent_arguments="$(grep -n 'ProgramArguments' "$ROOT/Scripts/dev-service.sh")"
+expect_contains \
+  "$launch_agent_arguments" \
+  'ProgramArguments.0 -string "$APP_BINARY"' \
+  "debug service launchd target is the main app binary"
+expect_not_contains \
+  "$launch_agent_arguments" \
+  "/usr/bin/open" \
+  "debug service launches the app directly instead of keeping open alive"
 
 events_file="${TMPDIR%/}/zisla-dev-service-events-$$"
 trap '[[ -f "$events_file" ]] && find "$events_file" -delete' EXIT

@@ -36,7 +36,7 @@ struct SettingsView: View {
         }
         .frame(
             width: input.selection.prefersWideLayout ? 980 : 640,
-            height: input.selection.prefersWideLayout ? 640 : 560
+            height: 640
         )
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
@@ -231,6 +231,8 @@ struct SettingsView: View {
             generalContent
         case .features:
             featuresContent
+        case .clipboardAssistant, .screenshot:
+            featuresContent
         case .workflow:
             workflowContent
         case .info:
@@ -370,34 +372,39 @@ struct SettingsView: View {
 
     private var featuresContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("媒体与文件") {
-                featureToggle("媒体播放", detail: "显示系统正在播放的音乐或视频", symbol: "play.square.fill", keyPath: \.mediaEnabled)
-                rowDivider
-                featureToggle(
-                    "Mac 未使用时关闭背景音",
-                    detail: "锁屏、屏保启动或显示器休眠时，自动关闭背景音",
-                    symbol: "lock.display",
-                    keyPath: \.systemBackgroundSoundStopsWhenUnused
-                )
-                rowDivider
-                featureToggle("文件中转与分享", detail: "暂存文件并调用 AirDrop 或系统分享", symbol: "tray.full.fill", keyPath: \.fileShelfEnabled)
-                rowDivider
-                featureToggle("链接下载", detail: "下载视频或音频", symbol: "arrow.down.circle.fill", keyPath: \.downloaderEnabled)
-                rowDivider
-                featureToggle("剪贴板历史", detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
-                rowDivider
-                featureToggle("剪贴板链接检测", detail: "发现可下载链接时提示", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
+            if input.selection == .features {
+                settingsGroup("媒体与文件") {
+                    featureToggle("媒体播放", detail: "显示系统正在播放的音乐或视频", symbol: "play.square.fill", keyPath: \.mediaEnabled)
+                    rowDivider
+                    featureToggle(
+                        "Mac 未使用时关闭背景音",
+                        detail: "锁屏、屏保启动或显示器休眠时，自动关闭背景音",
+                        symbol: "lock.display",
+                        keyPath: \.systemBackgroundSoundStopsWhenUnused
+                    )
+                    rowDivider
+                    featureToggle("文件中转与分享", detail: "暂存文件并调用 AirDrop 或系统分享", symbol: "tray.full.fill", keyPath: \.fileShelfEnabled)
+                    rowDivider
+                    featureToggle("链接下载", detail: "下载视频或音频", symbol: "arrow.down.circle.fill", keyPath: \.downloaderEnabled)
+                    rowDivider
+                    featureToggle("剪贴板历史", detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
+                    rowDivider
+                    featureToggle("剪贴板链接检测", detail: "发现可下载链接时提示", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
+                }
             }
 
-            settingsGroup("复制助手") {
-                featureToggle(
-                    "复制助手",
-                    detail: "复制后弹出识别结果和下一步操作",
-                    symbol: "sparkles.rectangle.stack",
-                    keyPath: \.clipboardAssistantEnabled
-                )
-                if model.settingsStore.settings.clipboardAssistantEnabled {
-                    rowDivider
+            if input.selection == .features {
+                settingsGroup("复制助手") {
+                    featureToggle(
+                        "复制助手",
+                        detail: "复制后弹出识别结果和下一步操作",
+                        symbol: "sparkles.rectangle.stack",
+                        keyPath: \.clipboardAssistantEnabled
+                    )
+                }
+            }
+            if input.selection == .clipboardAssistant {
+                settingsGroup("复制助手") {
                     settingRow(
                         symbol: "keyboard",
                         title: "快速触发快捷键",
@@ -426,26 +433,55 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    if clipboardAssistantTriggersRequireInputMonitoring {
+                        rowDivider
+                        settingRow(
+                            symbol: "lock.shield",
+                            title: "输入监控",
+                            detail: "单独修饰键或鼠标侧键需要监听全局事件",
+                            isNested: true
+                        ) {
+                            if model.voiceInputInputMonitoringAccessGranted {
+                                Label {
+                                    AppLocalizedText("已授权")
+                                } icon: {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                }
+                                .font(.caption)
+                            } else {
+                                Button {
+                                    model.openVoiceInputInputMonitoringSettings()
+                                } label: {
+                                    AppLocalizedText("去授权")
+                                }
+                                .controlSize(.small)
+                            }
+                        }
+                    }
                     rowDivider
                     settingRow(
                         symbol: "computermouse",
                         title: "鼠标侧键",
                         detail: "提示可见时按下侧键触发主动作"
                     ) {
-                        IslandOutlinedPicker(
+                        Picker(
+                            "",
                             selection: Binding(
                                 get: { ClipboardAssistantMouseTriggerOption(
                                     buttonNumber: model.settingsStore.settings.clipboardAssistantMouseButton
                                 ) },
                                 set: { model.settingsStore.settings.clipboardAssistantMouseButton = $0.buttonNumber }
-                            ),
-                            options: ClipboardAssistantMouseTriggerOption.allCases,
-                            title: { loc($0.label) },
-                            selectionID: "clipboard-assistant-mouse-trigger-selection",
-                            fontSize: 9,
-                            width: 150,
-                            height: 28
-                        )
+                            )
+                        ) {
+                            ForEach(ClipboardAssistantMouseTriggerOption.allCases, id: \.self) { option in
+                                AppLocalizedText(option.label).tag(option)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .controlSize(.small)
+                        .frame(width: 150, alignment: .trailing)
                     }
                     rowDivider
                     settingRow(
@@ -484,56 +520,83 @@ struct SettingsView: View {
                         }
                     }
                     rowDivider
+                    featureToggle(
+                        "轻量提醒模式",
+                        detail: "提示更简洁，点击整条执行主动作",
+                        symbol: "sparkle",
+                        keyPath: \.clipboardAssistantLightweightMode
+                    )
+                    rowDivider
+                    settingRow(
+                        symbol: "timer",
+                        title: "存在时长",
+                        detail: "提示自动关闭前的时间；永不则仅手动关闭"
+                    ) {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { model.settingsStore.settings.clipboardAssistantDisplayDuration },
+                                set: { model.settingsStore.settings.clipboardAssistantDisplayDuration = $0 }
+                            )
+                        ) {
+                            ForEach(ClipboardAssistantDisplayDuration.allCases, id: \.self) { duration in
+                                AppLocalizedText(duration.menuTitle).tag(duration)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .controlSize(.small)
+                        .frame(width: 150, alignment: .trailing)
+                    }
+                    rowDivider
+                    featureToggle(
+                        "每次保存图片时选择位置",
+                        detail: "关闭时保存到“下载”中的默认下载目录",
+                        symbol: "folder",
+                        keyPath: \.clipboardAssistantPromptsForImageSaveLocation
+                    )
+                    rowDivider
                     settingRow(
                         symbol: "magnifyingglass.circle",
                         title: "搜索引擎",
                         detail: "文本搜索使用的搜索引擎"
                     ) {
-                        IslandOutlinedPicker(
+                        Picker(
+                            "",
                             selection: Binding(
                                 get: { model.settingsStore.settings.clipboardAssistantSearchEngine },
                                 set: { model.settingsStore.settings.clipboardAssistantSearchEngine = $0 }
-                            ),
-                            options: ClipboardAssistantSearchEngine.allCases,
-                            title: { loc($0.displayName) },
-                            selectionID: "clipboard-assistant-search-engine-selection",
-                            fontSize: 9,
-                            width: 150,
-                            height: 28
-                        )
+                            )
+                        ) {
+                            ForEach(ClipboardAssistantSearchEngine.allCases, id: \.self) { engine in
+                                AppLocalizedText(engine.displayName).tag(engine)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .controlSize(.small)
+                        .frame(width: 150, alignment: .trailing)
                     }
-                    rowDivider
-                    featureToggle(
-                        "轻量提醒模式",
-                        detail: "提示更简洁，点击整条执行主动作",
-                        symbol: "sparkle",
-                        keyPath: \.clipboardAssistantLightweightMode,
-                        isNested: true
-                    )
-                    if clipboardAssistantTriggersRequireInputMonitoring {
+                    if model.settingsStore.settings.clipboardAssistantSearchEngine == .custom {
                         rowDivider
                         settingRow(
-                            symbol: "lock.shield",
-                            title: "输入监控",
-                            detail: "单独修饰键或鼠标侧键需要监听全局事件",
+                            symbol: "link",
+                            title: "自定义搜索网址",
+                            detail: "使用 {query} 填入搜索词；未使用时自动添加 q 参数",
+                            detailLineLimit: 2,
                             isNested: true
                         ) {
-                            if model.voiceInputInputMonitoringAccessGranted {
-                                Label {
-                                    AppLocalizedText("已授权")
-                                } icon: {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
-                                }
-                                .font(.caption)
-                            } else {
-                                Button {
-                                    model.openVoiceInputInputMonitoringSettings()
-                                } label: {
-                                    AppLocalizedText("去授权")
-                                }
-                                .controlSize(.small)
-                            }
+                            TextField(
+                                "https://example.com/search?q={query}",
+                                text: Binding(
+                                    get: { model.settingsStore.settings.clipboardAssistantCustomSearchURL },
+                                    set: { model.settingsStore.settings.clipboardAssistantCustomSearchURL = $0 }
+                                )
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 10, design: .monospaced))
+                            .frame(width: 220)
+                            .accessibilityLabel("自定义搜索网址")
                         }
                     }
                     if let conflictMessage = clipboardAssistantHotkeyConflictMessage {
@@ -550,9 +613,12 @@ struct SettingsView: View {
                         detail: "这些应用中的复制不弹提示"
                     ) {
                         Button {
-                            addFrontmostAppToAssistantBlacklist()
+                            addApplicationToAssistantBlacklist()
                         } label: {
-                            AppLocalizedText("加入当前应用")
+                            HStack(spacing: 4) {
+                                Image(systemName: "plus")
+                                AppLocalizedText("添加")
+                            }
                         }
                         .controlSize(.small)
                     }
@@ -603,165 +669,170 @@ struct SettingsView: View {
                 }
             }
 
-            settingsGroup("信息与通知") {
-                featureToggle("日历日程", detail: "显示接下来的日程与会议", symbol: "calendar", keyPath: \.calendarEnabled)
-                rowDivider
-                featureToggle("天气", detail: "显示当前或自选地区的天气", symbol: "cloud.sun.fill", keyPath: \.weatherEnabled)
-                rowDivider
-                featureToggle("邮件", detail: "读取已配置的 Mail.app 账户并提醒新邮件", symbol: "envelope.fill", keyPath: \.mailEnabled)
-                rowDivider
-                featureToggle("侧翼通知", detail: "在灵动岛肩部显示任务变化", symbol: "bell.badge.fill", keyPath: \.sideNoticesEnabled)
-                rowDivider
-                featureToggle("锁屏信息", detail: "在系统锁屏页显示状态信息与播放器", symbol: "lock.display", keyPath: \.lockScreenInfoEnabled)
-                rowDivider
-                featureToggle("专注倒计时", detail: "专注时在收起态灵动岛显示剩余时间", symbol: "clock", keyPath: \.focusCountdownIslandEnabled)
-                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
-                rowDivider
-                featureToggle("工具箱提醒", detail: "在收起态提示番茄钟、亮屏和清洁状态", symbol: "bell.fill", keyPath: \.toolboxReminderEnabled)
-                    .disabled(!model.settingsStore.settings.toolboxEnabled || !model.settingsStore.settings.sideNoticesEnabled)
-            }
-
-            settingsGroup("AI 与语音") {
-                featureToggle("AI 进度与用量", detail: "汇总桌面端与 CLI 工具的运行状态", symbol: "sparkles", keyPath: \.aiProgressEnabled)
-                rowDivider
-                featureToggle("语音输入", detail: "开启后可通过全局快捷键触发语音输入", symbol: "mic.fill", keyPath: \.voiceInputEnabled)
-            }
-
-            settingsGroup("工具与监控") {
-                featureToggle("小工具", detail: "番茄钟、亮屏与屏幕清洁", symbol: "wrench.and.screwdriver.fill", keyPath: \.toolboxEnabled)
-                rowDivider
-                featureToggle("随记", detail: "Markdown 随手记，可发送到系统备忘录", symbol: "note.text", keyPath: \.quickNotesEnabled)
-                rowDivider
-                featureToggle("PDF 工具", detail: "合并、拆分、加密与转换 PDF", symbol: "doc.text.fill", keyPath: \.pdfToolsEnabled)
-                rowDivider
-                featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
-                rowDivider
-                featureToggle("电池监控", detail: "显示电池详细信息与健康状态", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
-            }
-
-            settingsGroup("截图") {
-                featureToggle(
-                    "启用截图",
-                    detail: "启用截图、钉图与全局快捷键",
-                    symbol: "camera.viewfinder",
-                    keyPath: \.screenshotEnabled
-                )
-                rowDivider
-                settingRow(
-                    symbol: "camera.fill",
-                    title: "截图快捷键",
-                    detail: "触发截图功能"
-                ) {
-                    HotkeyRecorder(
-                        hotkey: Binding(
-                            get: { model.settingsStore.settings.screenshotHotkey },
-                            set: { newValue in
-                                guard let newValue else { return }
-                                updateScreenshotHotkey(newValue, action: .capture)
-                            }
-                        )
-                    )
-                    .frame(width: 142, height: 26)
-                    .disabled(!model.settingsStore.settings.screenshotEnabled)
-                }
-                rowDivider
-                settingRow(
-                    symbol: "pin.fill",
-                    title: "钉图快捷键",
-                    detail: "钉住已截取的图片"
-                ) {
-                    HotkeyRecorder(
-                        hotkey: Binding(
-                            get: { model.settingsStore.settings.screenshotPinHotkey },
-                            set: { newValue in
-                                guard let newValue else { return }
-                                updateScreenshotHotkey(newValue, action: .pin)
-                            }
-                        )
-                    )
-                    .frame(width: 142, height: 26)
-                    .disabled(!model.settingsStore.settings.screenshotEnabled)
-                }
-                rowDivider
-                featureToggle(
-                    "显示钉图控制条",
-                    detail: "隐藏后仍支持快捷键、手势和鼠标操作",
-                    symbol: "rectangle.bottomhalf.inset.filled",
-                    keyPath: \.screenshotPinnedToolbarVisible
-                )
-                rowDivider
-                settingRow(
-                    symbol: "cursorarrow.motionlines",
-                    title: "鼠标操作",
-                    detail: "按住图片拖动位置；拖动四角调整大小",
-                    detailLineLimit: 2,
-                    isNested: true
-                ) {
-                    EmptyView()
-                }
-                rowDivider
-                settingRow(
-                    symbol: "hand.draw.fill",
-                    title: "触控板手势",
-                    detail: "双指捏合缩放；双指上滑增加不透明度，下滑降低不透明度",
-                    detailLineLimit: 2,
-                    isNested: true
-                ) {
-                    EmptyView()
-                }
-                if model.settingsStore.settings.screenshotEnabled,
-                   let message = screenshotHotkeyValidationMessage ?? currentScreenshotHotkeyConflict {
+            if input.selection == .features {
+                settingsGroup("信息与通知") {
+                    featureToggle("日历日程", detail: "显示接下来的日程与会议", symbol: "calendar", keyPath: \.calendarEnabled)
                     rowDivider
-                    Label(message, systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.zislaWarning)
-                        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
-                }
-                if screenshotHotkeysRequireInputMonitoring {
+                    featureToggle("天气", detail: "显示当前或自选地区的天气", symbol: "cloud.sun.fill", keyPath: \.weatherEnabled)
                     rowDivider
-                    settingRow(
-                        symbol: "lock.shield",
-                        title: "输入监控",
-                        detail: "单独修饰键需要监听全局键盘事件",
-                        isNested: true
-                    ) {
-                        if model.voiceInputInputMonitoringAccessGranted {
-                            Label("已授权", systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                                .font(.caption)
-                        } else {
-                            Button("打开设置") {
-                                model.openVoiceInputInputMonitoringSettings()
+                    featureToggle("邮件", detail: "读取已配置的 Mail.app 账户并提醒新邮件", symbol: "envelope.fill", keyPath: \.mailEnabled)
+                    rowDivider
+                    featureToggle("侧翼通知", detail: "在灵动岛肩部显示任务变化", symbol: "bell.badge.fill", keyPath: \.sideNoticesEnabled)
+                    rowDivider
+                    featureToggle("锁屏信息", detail: "在系统锁屏页显示状态信息与播放器", symbol: "lock.display", keyPath: \.lockScreenInfoEnabled)
+                    rowDivider
+                    featureToggle("专注倒计时", detail: "专注时在收起态灵动岛显示剩余时间", symbol: "clock", keyPath: \.focusCountdownIslandEnabled)
+                        .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                    rowDivider
+                    featureToggle("工具箱提醒", detail: "在收起态提示番茄钟、亮屏和清洁状态", symbol: "bell.fill", keyPath: \.toolboxReminderEnabled)
+                        .disabled(!model.settingsStore.settings.toolboxEnabled || !model.settingsStore.settings.sideNoticesEnabled)
+                }
+
+                settingsGroup("AI 与语音") {
+                    featureToggle("AI 进度与用量", detail: "汇总桌面端与 CLI 工具的运行状态", symbol: "sparkles", keyPath: \.aiProgressEnabled)
+                    rowDivider
+                    featureToggle("语音输入", detail: "开启后可通过全局快捷键触发语音输入", symbol: "mic.fill", keyPath: \.voiceInputEnabled)
+                }
+
+                settingsGroup("工具与监控") {
+                    featureToggle("小工具", detail: "番茄钟、亮屏与屏幕清洁", symbol: "wrench.and.screwdriver.fill", keyPath: \.toolboxEnabled)
+                    rowDivider
+                    featureToggle("随记", detail: "Markdown 随手记，可发送到系统备忘录", symbol: "note.text", keyPath: \.quickNotesEnabled)
+                    rowDivider
+                    featureToggle("PDF 工具", detail: "合并、拆分、加密与转换 PDF", symbol: "doc.text.fill", keyPath: \.pdfToolsEnabled)
+                    rowDivider
+                    featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
+                    rowDivider
+                    featureToggle("电池监控", detail: "显示电池详细信息与健康状态", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
+                }
+            }
+
+            if input.selection == .features || input.selection == .screenshot {
+                settingsGroup("截图") {
+                    if input.selection == .features {
+                        featureToggle(
+                            "启用截图",
+                            detail: "启用截图、钉图与全局快捷键",
+                            symbol: "camera.viewfinder",
+                            keyPath: \.screenshotEnabled
+                        )
+                    } else {
+                        settingRow(
+                            symbol: "camera.fill",
+                            title: "截图快捷键",
+                            detail: "触发截图功能"
+                        ) {
+                            HotkeyRecorder(
+                                hotkey: Binding(
+                                    get: { model.settingsStore.settings.screenshotHotkey },
+                                    set: { newValue in
+                                        guard let newValue else { return }
+                                        updateScreenshotHotkey(newValue, action: .capture)
+                                    }
+                                )
+                            )
+                            .frame(width: 142, height: 26)
+                        }
+                        rowDivider
+                        settingRow(
+                            symbol: "pin.fill",
+                            title: "钉图快捷键",
+                            detail: "钉住已截取的图片"
+                        ) {
+                            HotkeyRecorder(
+                                hotkey: Binding(
+                                    get: { model.settingsStore.settings.screenshotPinHotkey },
+                                    set: { newValue in
+                                        guard let newValue else { return }
+                                        updateScreenshotHotkey(newValue, action: .pin)
+                                    }
+                                )
+                            )
+                            .frame(width: 142, height: 26)
+                        }
+                        rowDivider
+                        featureToggle(
+                            "显示钉图控制条",
+                            detail: "隐藏后仍支持快捷键、手势和鼠标操作",
+                            symbol: "rectangle.bottomhalf.inset.filled",
+                            keyPath: \.screenshotPinnedToolbarVisible
+                        )
+                        rowDivider
+                        settingRow(
+                            symbol: "cursorarrow.motionlines",
+                            title: "鼠标操作",
+                            detail: "按住图片拖动位置；拖动四角调整大小",
+                            detailLineLimit: 2,
+                            isNested: true
+                        ) {
+                            EmptyView()
+                        }
+                        rowDivider
+                        settingRow(
+                            symbol: "hand.draw.fill",
+                            title: "触控板手势",
+                            detail: "双指捏合缩放；双指上滑增加不透明度，下滑降低不透明度",
+                            detailLineLimit: 2,
+                            isNested: true
+                        ) {
+                            EmptyView()
+                        }
+                        if let message = screenshotHotkeyValidationMessage ?? currentScreenshotHotkeyConflict {
+                            rowDivider
+                            Label(message, systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color.zislaWarning)
+                                .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+                        }
+                        if screenshotHotkeysRequireInputMonitoring {
+                            rowDivider
+                            settingRow(
+                                symbol: "lock.shield",
+                                title: "输入监控",
+                                detail: "单独修饰键需要监听全局键盘事件",
+                                isNested: true
+                            ) {
+                                if model.voiceInputInputMonitoringAccessGranted {
+                                    Label("已授权", systemImage: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                        .font(.caption)
+                                } else {
+                                    Button("打开设置") {
+                                        model.openVoiceInputInputMonitoringSettings()
+                                    }
+                                    .controlSize(.small)
+                                }
                             }
-                            .controlSize(.small)
                         }
                     }
                 }
             }
 
-            settingsGroup("灵动岛与下载展示") {
-                featureToggle("鼠标移入展开", detail: "鼠标进入屏幕顶部感应区时显示", symbol: "cursorarrow.motionlines", keyPath: \.hoverActivationEnabled)
-                rowDivider
-                featureToggle("显示 zisla 图标", detail: "关闭后不影响已启用的菜单栏监控项", symbol: "app.badge", keyPath: \.menuBarAppIconEnabled)
-                rowDivider
-                featureToggle("始终置顶", detail: "收起时保持在其他窗口和菜单栏图标上方", symbol: "rectangle.topthird.inset.filled", keyPath: \.islandCollapsedOnTop)
-                rowDivider
-                featureToggle("浏览器下载进度", detail: "在灵动岛显示来源图标与百分比", symbol: "arrow.down.circle.fill", keyPath: \.browserDownloadIslandEnabled)
-                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
-                rowDivider
-                featureToggle("原生下载进度", detail: "下载器工作时显示来源平台图标与百分比", symbol: "arrow.down.square.fill", keyPath: \.videoDownloadIslandEnabled)
-                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
-                rowDivider
-                featureToggle("静音 Zisla 通知", detail: "不发送番茄钟等由 Zisla 产生的系统通知", symbol: "bell.slash.fill", keyPath: \.notificationsMuted)
-            }
+            if input.selection == .features {
+                settingsGroup("灵动岛与下载展示") {
+                    featureToggle("鼠标移入展开", detail: "鼠标进入屏幕顶部感应区时显示", symbol: "cursorarrow.motionlines", keyPath: \.hoverActivationEnabled)
+                    rowDivider
+                    featureToggle("显示 zisla 图标", detail: "关闭后不影响已启用的菜单栏监控项", symbol: "app.badge", keyPath: \.menuBarAppIconEnabled)
+                    rowDivider
+                    featureToggle("始终置顶", detail: "收起时保持在其他窗口和菜单栏图标上方", symbol: "rectangle.topthird.inset.filled", keyPath: \.islandCollapsedOnTop)
+                    rowDivider
+                    featureToggle("浏览器下载进度", detail: "在灵动岛显示来源图标与百分比", symbol: "arrow.down.circle.fill", keyPath: \.browserDownloadIslandEnabled)
+                        .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                    rowDivider
+                    featureToggle("原生下载进度", detail: "下载器工作时显示来源平台图标与百分比", symbol: "arrow.down.square.fill", keyPath: \.videoDownloadIslandEnabled)
+                        .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                    rowDivider
+                    featureToggle("静音 Zisla 通知", detail: "不发送番茄钟等由 Zisla 产生的系统通知", symbol: "bell.slash.fill", keyPath: \.notificationsMuted)
+                }
 
-            settingsGroup("宠物与更新") {
-                featureToggle("宠物", detail: "在灵动岛养一只小宠物", symbol: "pawprint.fill", keyPath: \.petEnabled)
-                rowDivider
-                featureToggle("自动检查更新", detail: "定期检查当前安装包所属的更新通道", symbol: "arrow.triangle.2.circlepath", keyPath: \.updateChecksEnabled)
-                rowDivider
-                featureToggle("自动下载更新", detail: "发现新版本时自动下载安装包", symbol: "arrow.down.circle.fill", keyPath: \.automaticDownloadEnabled)
-                    .disabled(!model.settingsStore.settings.updateChecksEnabled)
+                settingsGroup("宠物与更新") {
+                    featureToggle("宠物", detail: "在灵动岛养一只小宠物", symbol: "pawprint.fill", keyPath: \.petEnabled)
+                    rowDivider
+                    featureToggle("自动检查更新", detail: "定期检查当前安装包所属的更新通道", symbol: "arrow.triangle.2.circlepath", keyPath: \.updateChecksEnabled)
+                    rowDivider
+                    featureToggle("自动下载更新", detail: "发现新版本时自动下载安装包", symbol: "arrow.down.circle.fill", keyPath: \.automaticDownloadEnabled)
+                        .disabled(!model.settingsStore.settings.updateChecksEnabled)
+                }
             }
         }
     }
@@ -2197,19 +2268,6 @@ struct SettingsView: View {
                 }
             }
 
-            settingsGroup("更新下载目录") {
-                settingRow(
-                    symbol: "folder.fill",
-                    title: "默认下载目录",
-                    detail: model.downloadDirectory.path(percentEncoded: false)
-                ) {
-                    Button("选择默认下载目录") { chooseDownloadDirectory() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .fixedSize(horizontal: true, vertical: false)
-                }
-            }
-
             settingsGroup("版本") {
                 settingRow(
                     symbol: "checkmark.seal.fill",
@@ -2530,10 +2588,37 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, minHeight: 40)
     }
 
-    private func addFrontmostAppToAssistantBlacklist() {
-        guard let app = NSWorkspace.shared.frontmostApplication,
-              let bundleIdentifier = app.bundleIdentifier,
-              app.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+    private static let applicationsDirectoryURL = URL(
+        fileURLWithPath: "/Applications",
+        isDirectory: true
+    )
+
+    static func isApplicationBundleInApplicationsDirectory(_ url: URL) -> Bool {
+        let applicationURL = url.standardizedFileURL.resolvingSymlinksInPath()
+        let applicationsPath = applicationsDirectoryURL
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+            .path
+        return applicationURL.pathExtension.lowercased() == "app"
+            && applicationURL.path.hasPrefix(applicationsPath + "/")
+    }
+
+    private func addApplicationToAssistantBlacklist() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.treatsFilePackagesAsDirectories = false
+        panel.allowedContentTypes = [.applicationBundle]
+        panel.directoryURL = Self.applicationsDirectoryURL
+        panel.prompt = loc("添加")
+        WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
+
+        guard panel.runModal() == .OK,
+              let url = panel.url,
+              Self.isApplicationBundleInApplicationsDirectory(url),
+              let bundleIdentifier = Bundle(url: url)?.bundleIdentifier,
+              !bundleIdentifier.isEmpty else {
             return
         }
         var blacklist = model.settingsStore.settings.clipboardAssistantBlacklist
@@ -2881,7 +2966,13 @@ extension ClipboardAssistantSearchEngine {
         case .google: "Google"
         case .bing: "Bing"
         case .baidu: "百度"
+        case .sogou: "搜狗"
+        case .quark: "夸克"
+        case .so360: "360搜索"
         case .duckduckgo: "DuckDuckGo"
+        case .brave: "Brave Search"
+        case .yandex: "Yandex"
+        case .custom: "自定义"
         }
     }
 }
@@ -3166,6 +3257,8 @@ private final class HotkeyRecorderButton: NSButton {
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case features
+    case clipboardAssistant
+    case screenshot
     case workflow
     case info
     case ai
@@ -3188,6 +3281,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "通用"
         case .features: "功能"
+        case .clipboardAssistant: "复制助手"
+        case .screenshot: "截图"
         case .workflow: "工作流"
         case .info: "信息"
         case .ai: "AI"
@@ -3205,6 +3300,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "gearshape.fill"
         case .features: "switch.2"
+        case .clipboardAssistant: "sparkles.rectangle.stack"
+        case .screenshot: "camera.viewfinder"
         case .workflow: "square.grid.2x2.fill"
         case .info: "info.circle.fill"
         case .ai: "sparkles"
@@ -3222,6 +3319,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "调整语言、外观、启动与展开方式。"
         case .features: "集中开启或关闭所有功能模块。"
+        case .clipboardAssistant: "复制后弹出识别结果和下一步操作"
+        case .screenshot: "启用截图、钉图与全局快捷键"
         case .workflow: "管理灵动岛中的工作流模块。"
         case .info: "配置日历、邮件、锁屏与通知显示。"
         case .ai: "管理 AI CLI 与 Skills。"
@@ -3239,6 +3338,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .networkProxy, .recommendations:
             return true
+        case .clipboardAssistant:
+            return settings.clipboardAssistantEnabled
+        case .screenshot:
+            return settings.screenshotEnabled
         case .workflow:
             return settings.mediaEnabled || settings.systemMonitorEnabled
         case .info:

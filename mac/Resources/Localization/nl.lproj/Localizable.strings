@@ -469,9 +469,11 @@
 "详细模式" = "Gedetailleerd";
 "3 秒" = "3 seconden";
 "5 秒" = "5 seconden";
+"7 秒" = "7 seconden";
 "10 秒" = "10 seconden";
 "30 秒" = "30 seconden";
 "始终显示" = "Altijd";
+"永不" = "Nooit";
 "跟随系统" = "Systeem";
 "浅色" = "Licht";
 "深色" = "Donker";
@@ -480,6 +482,8 @@
 "紧凑" = "Compact";
 "详细" = "Gedetailleerd";
 /* Clipboard assistant */
+"存在时长" = "Weergaveduur";
+"提示自动关闭前的时间；永不则仅手动关闭" = "Tijd voordat de melding sluit; Nooit betekent alleen handmatig sluiten";
 "复制助手" = "Kopieerassistent";
 "复制后弹出识别结果和下一步操作" = "Toont herkende inhoud en vervolgacties na elke kopie";
 "快速触发快捷键" = "Sneltrigger-sneltoets";
@@ -516,6 +520,9 @@
 "代码" = "Code";
 "翻译" = "Vertaal";
 "写邮件" = "E-mail schrijven";
+"压缩为 ZIP" = "Comprimeren als ZIP";
+"拨打电话" = "Bellen";
+"不再显示来自 %@ 的复制" = "Kopieën van %@ niet meer tonen";
 "复制结果" = "Resultaat kopiëren";
 "保存图片" = "Afbeelding bewaren";
 "保存文本" = "Tekst bewaren";

@@ -24,11 +24,11 @@
 
 ## zisla 已覆盖的范围
 
-`README.zh-CN.md` 描述 zisla 是一个顶部动态工作空间，已经包含媒体、文件中转、下载、剪贴板、语音、AI 活动、系统监控、日程、邮件、笔记和 PDF 等模块（[README.zh-CN.md](/Users/wzz/个人/code/zisla/README.zh-CN.md:5)、[README.zh-CN.md](/Users/wzz/个人/code/zisla/README.zh-CN.md:22)）。
+`README.zh-CN.md` 描述 zisla 是一个顶部动态工作空间，已经包含媒体、文件中转、下载、剪贴板、语音、AI 活动、系统监控、日程、邮件、笔记和 PDF 等模块（[README.zh-CN.md](../../README.zh-CN.md#L5)、[README.zh-CN.md](../../README.zh-CN.md#L22)）。
 
-实现层面，`Package.swift` 已链接 `PDFKit`、`ScreenCaptureKit`、`AVFoundation` 等框架（[Package.swift](/Users/wzz/个人/code/zisla/mac/Package.swift:34)），所以“再做一个 PDF 小工具”或“再做一个系统监视小组件”很容易变成复制已有代码，而不是独立产品。
+实现层面，`Package.swift` 已链接 `PDFKit`、`ScreenCaptureKit`、`AVFoundation` 等框架（[Package.swift](../Package.swift#L34)），所以“再做一个 PDF 小工具”或“再做一个系统监视小组件”很容易变成复制已有代码，而不是独立产品。
 
-目前发布流程还需要手动处理构建、签名、公证、DMG、校验和多架构验收（[releasing.zh-CN.md](/Users/wzz/个人/code/zisla/mac/Docs/releasing.zh-CN.md:48)）。这说明发布证据差分有真实 dogfood 场景，但不等于它天然有足够的外部市场。
+目前发布流程还需要手动处理构建、签名、公证、DMG、校验和多架构验收（[releasing.zh-CN.md](releasing.zh-CN.md#L48)）。这说明发布证据差分有真实 dogfood 场景，但不等于它天然有足够的外部市场。
 
 ## 候选一：Mac UI Regression Lab（首选）
 

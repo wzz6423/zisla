@@ -50,6 +50,39 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func selectionSizeBadgePrefersOutsideRightThenFallsInside() {
+        let bounds = CGSize(width: 800, height: 600)
+        let badge = ScreenshotSelectionGeometry.badgeEstimatedSize
+        let gap: CGFloat = 8
+
+        // 常规选区：右侧空间充足，标签放在外侧右侧，底部对齐选区底部。
+        let normal = CGRect(x: 200, y: 100, width: 300, height: 200)
+        let normalPos = ScreenshotSelectionGeometry.badgePosition(for: normal, in: bounds)
+        #expect(normalPos.x == normal.maxX + gap + badge.width / 2)
+        #expect(normalPos.y == normal.maxY - badge.height / 2)
+
+        // 贴右下角：右侧空间不足，标签退到选区内右侧。
+        let farRight = CGRect(x: 660, y: 400, width: 140, height: 180)
+        let farRightPos = ScreenshotSelectionGeometry.badgePosition(for: farRight, in: bounds)
+        #expect(farRightPos.x < farRight.midX)
+        #expect(farRightPos.x >= badge.width / 2)
+        #expect(farRightPos.y == farRight.maxY - badge.height / 2)
+
+        // 顶部窄选区：标签底部对齐选区底部，垂直 clamp 不超出屏幕。
+        let topBar = CGRect(x: 0, y: 0, width: 400, height: 20)
+        let topBarPos = ScreenshotSelectionGeometry.badgePosition(for: topBar, in: bounds)
+        #expect(topBarPos.y >= badge.height / 2)
+        #expect(topBarPos.x == topBar.maxX + gap + badge.width / 2)
+
+        // 整屏选区：外侧放不下，退到内侧右下角。
+        let fullScreen = ScreenshotSelectionGeometry.badgePosition(
+            for: CGRect(origin: .zero, size: bounds),
+            in: bounds
+        )
+        #expect(fullScreen.x < bounds.width / 2)
+    }
+
+    @Test
     func toolbarUsesCompactControlsAndDragPositionStaysOnScreen() {
         #expect(ScreenshotToolbarLayout.controlCount == 15)
         #expect(ScreenshotToolbarLayout.cornerRadius == 10)
@@ -121,8 +154,8 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func rotationHandleStaysAtTheAnnotationBoundary() {
-        #expect(ScreenshotAnnotationGeometry.rotationOffset == 0)
+    func rotationHandleExtendsAboveTheAnnotationBoundary() {
+        #expect(ScreenshotAnnotationGeometry.rotationOffset > 0)
     }
 
     @Test
@@ -681,7 +714,7 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func selectionControllerCreatesOneOverlayPerScreenAndTearsThemDownTogether() throws {
+    func selectionControllerCreatesOneOverlayPerScreenAndTearsThemDownTogether() async throws {
         let screen = try #require(NSScreen.screens.first)
         let image = try #require(makeGradientImage(width: 32, height: 20))
         let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
@@ -693,7 +726,7 @@ struct ScreenshotEditorTests {
         )
         controller.onCancelled = { cancellationCount += 1 }
 
-        controller.start(on: [screen, screen])
+        await controller.start(on: [screen, screen])
         #expect(controller.selectionWindowCount == 2)
         #expect(presentedPanels.count == 2)
         #expect(presentedPanels.allSatisfy { $0.screen === screen })
@@ -708,7 +741,7 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func completingSelectionOnOneScreenClosesEveryOverlayAndReturnsThatScreen() throws {
+    func completingSelectionOnOneScreenClosesEveryOverlayAndReturnsThatScreen() async throws {
         let availableScreens = NSScreen.screens
         let firstScreen = try #require(availableScreens.first)
         let requestedScreens = availableScreens.count > 1
@@ -724,7 +757,7 @@ struct ScreenshotEditorTests {
         )
         controller.onCaptured = { result = $0 }
 
-        controller.start(on: requestedScreens)
+        await controller.start(on: requestedScreens)
         let selectedIndex = requestedScreens.count - 1
         let hostingView = try #require(
             presentedPanels[selectedIndex].contentView as? NSHostingView<ScreenshotSelectionView>
@@ -738,7 +771,7 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func dragSelectionIgnoresWindowSnapTargetAndUsesActualDragBounds() throws {
+    func dragSelectionIgnoresWindowSnapTargetAndUsesActualDragBounds() async throws {
         let screen = try #require(NSScreen.screens.first)
         let image = try #require(makeGradientImage(width: 800, height: 600))
         let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
@@ -755,7 +788,7 @@ struct ScreenshotEditorTests {
         )
         controller.onCaptured = { result = $0 }
 
-        controller.start(on: screen)
+        await controller.start(on: screen)
         let hostingView = try #require(
             presentedPanels.first?.contentView as? NSHostingView<ScreenshotSelectionView>
         )
@@ -768,7 +801,7 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func completedSelectionReturnsTheClampedScreenRect() throws {
+    func completedSelectionReturnsTheClampedScreenRect() async throws {
         let screen = try #require(NSScreen.screens.first)
         let image = try #require(makeGradientImage(width: 800, height: 600))
         let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
@@ -780,7 +813,7 @@ struct ScreenshotEditorTests {
         )
         controller.onCaptured = { result = $0 }
 
-        controller.start(on: screen)
+        await controller.start(on: screen)
         let hostingView = try #require(
             presentedPanels.first?.contentView as? NSHostingView<ScreenshotSelectionView>
         )
@@ -791,7 +824,7 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func hoverRequeriesWindowCandidatesEachTime() throws {
+    func hoverRequeriesWindowCandidatesEachTime() async throws {
         let screen = try #require(NSScreen.screens.first)
         let image = try #require(makeGradientImage(width: 800, height: 600))
         let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
@@ -809,7 +842,7 @@ struct ScreenshotEditorTests {
             snapTargets: snapTargets
         )
 
-        controller.start(on: screen)
+        await controller.start(on: screen)
         let hostingView = try #require(
             presentedPanels.first?.contentView as? NSHostingView<ScreenshotSelectionView>
         )
@@ -1883,6 +1916,49 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func rectangleAnnotationSupportsEdgeMidpointResizeAndDetachedRotationHandle() {
+        let rectangle = ScreenshotAnnotation(
+            kind: .rectangle,
+            rect: CGRect(x: 20, y: 30, width: 80, height: 40)
+        )
+        let rect = ScreenshotAnnotationGeometry.bounds(for: rectangle)
+
+        #expect(ScreenshotAnnotationGeometry.handle(at: CGPoint(x: rect.midX, y: rect.minY), in: rectangle) == .top)
+        #expect(ScreenshotAnnotationGeometry.handle(at: CGPoint(x: rect.maxX, y: rect.midY), in: rectangle) == .right)
+        #expect(ScreenshotAnnotationGeometry.handle(at: CGPoint(x: rect.midX, y: rect.maxY), in: rectangle) == .bottom)
+        #expect(ScreenshotAnnotationGeometry.handle(at: CGPoint(x: rect.minX, y: rect.midY), in: rectangle) == .left)
+        #expect(ScreenshotAnnotationGeometry.handle(
+            at: CGPoint(x: rect.midX, y: rect.minY - ScreenshotAnnotationGeometry.rotationOffset),
+            in: rectangle
+        ) == .rotation)
+
+        #expect(ScreenshotAnnotationGeometry.transform(
+            rectangle,
+            handle: .top,
+            from: CGPoint(x: rect.midX, y: rect.minY),
+            to: CGPoint(x: rect.midX, y: 10)
+        ).rect == CGRect(x: 20, y: 10, width: 80, height: 60))
+        #expect(ScreenshotAnnotationGeometry.transform(
+            rectangle,
+            handle: .right,
+            from: CGPoint(x: rect.maxX, y: rect.midY),
+            to: CGPoint(x: 130, y: rect.midY)
+        ).rect == CGRect(x: 20, y: 30, width: 110, height: 40))
+        #expect(ScreenshotAnnotationGeometry.transform(
+            rectangle,
+            handle: .bottom,
+            from: CGPoint(x: rect.midX, y: rect.maxY),
+            to: CGPoint(x: rect.midX, y: 90)
+        ).rect == CGRect(x: 20, y: 30, width: 80, height: 60))
+        #expect(ScreenshotAnnotationGeometry.transform(
+            rectangle,
+            handle: .left,
+            from: CGPoint(x: rect.minX, y: rect.midY),
+            to: CGPoint(x: 10, y: rect.midY)
+        ).rect == CGRect(x: 10, y: 30, width: 90, height: 40))
+    }
+
+    @Test
     func rotatedRectangleKeepsItsOppositeCornerWhileResizingAndCanRotateAgain() {
         let rectangle = ScreenshotAnnotation(
             kind: .rectangle,
@@ -1930,7 +2006,7 @@ struct ScreenshotEditorTests {
             in: text
         ) == .topLeft)
         #expect(ScreenshotAnnotationGeometry.handle(
-            at: CGPoint(x: bounds.midX, y: bounds.minY),
+            at: CGPoint(x: bounds.midX, y: bounds.minY - ScreenshotAnnotationGeometry.rotationOffset),
             in: text
         ) == .rotation)
 
@@ -2010,7 +2086,7 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func toolbarDragGestureUsesOnChangedForResponsiveness() async throws {
+    func toolbarUsesNativeDragContainerForResponsiveness() async throws {
         let size = CGSize(width: 800, height: 600)
         let image = try #require(makeGradientImage(width: 400, height: 300))
         let model = ScreenshotEditorModel(image: image)
@@ -2037,6 +2113,79 @@ struct ScreenshotEditorTests {
             await Task.yield()
         }
         #expect(hostingView.frame.size == size)
+        #expect(findSubview(ScreenshotToolbarDragHandleView.self, in: hostingView) != nil)
+    }
+
+    @Test
+    func toolbarDragMovesNativeContainerBeforeCommittingCenter() throws {
+        let bounds = CGRect(x: 0, y: 0, width: 800, height: 600)
+        let toolbarSize = CGSize(width: 220, height: ScreenshotToolbarLayout.height)
+        let initialCenter = CGPoint(x: 300, y: 260)
+        var committedCenters: [CGPoint] = []
+        let container = ScreenshotToolbarDragContainer(
+            rootView: Text("toolbar"),
+            restingCenter: initialCenter,
+            toolbarSize: toolbarSize,
+            bounds: bounds,
+            onDragEnd: { committedCenters.append($0) }
+        )
+        let window = NSWindow(
+            contentRect: bounds,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        let parentView = NSView(frame: bounds)
+        window.contentView = parentView
+        parentView.addSubview(container)
+        container.frame = bounds
+        container.layoutSubtreeIfNeeded()
+
+        let handle = try #require(findSubview(ScreenshotToolbarDragHandleView.self, in: container))
+        let startLocal = CGPoint(x: 10, y: toolbarSize.height / 2)
+        let firstLocal = CGPoint(x: startLocal.x + 18, y: startLocal.y + 12)
+        let secondLocal = CGPoint(x: startLocal.x + 44, y: startLocal.y + 28)
+        let start = handle.convert(startLocal, to: nil)
+        let firstDrag = handle.convert(firstLocal, to: nil)
+        let secondDrag = handle.convert(secondLocal, to: nil)
+        handle.mouseDown(with: try #require(mouseEvent(
+            type: .leftMouseDown,
+            location: start,
+            window: window,
+            eventNumber: 1
+        )))
+        handle.mouseDragged(with: try #require(mouseEvent(
+            type: .leftMouseDragged,
+            location: firstDrag,
+            window: window,
+            eventNumber: 2
+        )))
+
+        #expect(committedCenters.isEmpty)
+        #expect(handle.superview?.frame.origin == CGPoint(
+            x: initialCenter.x - toolbarSize.width / 2 + 18,
+            y: initialCenter.y - toolbarSize.height / 2 + 12
+        ))
+
+        handle.mouseDragged(with: try #require(mouseEvent(
+            type: .leftMouseDragged,
+            location: secondDrag,
+            window: window,
+            eventNumber: 3
+        )))
+        #expect(committedCenters.isEmpty)
+
+        handle.mouseUp(with: try #require(mouseEvent(
+            type: .leftMouseUp,
+            location: secondDrag,
+            window: window,
+            eventNumber: 4
+        )))
+        #expect(committedCenters == [ScreenshotToolbarLayout.clampedCenter(
+            CGPoint(x: initialCenter.x + 44, y: initialCenter.y + 28),
+            toolbarSize: toolbarSize,
+            in: bounds
+        )])
     }
 
     @Test

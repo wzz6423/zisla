@@ -468,9 +468,11 @@
 "详细模式" = "Detailed";
 "3 秒" = "3 seconds";
 "5 秒" = "5 seconds";
+"7 秒" = "7 seconds";
 "10 秒" = "10 seconds";
 "30 秒" = "30 seconds";
 "始终显示" = "Always";
+"永不" = "Never";
 "跟随系统" = "System";
 "浅色" = "Light";
 "深色" = "Dark";
@@ -497,6 +499,8 @@
 "百度" = "Baidu";
 "轻量提醒模式" = "Lightweight Reminder Mode";
 "提示更简洁，点击整条执行主动作" = "Compact toast; tap anywhere on it to run the primary action";
+"存在时长" = "Display Duration";
+"提示自动关闭前的时间；永不则仅手动关闭" = "Time before the prompt closes; Never means manual close only";
 "单独修饰键或鼠标侧键需要监听全局事件" = "Modifier-only keys or mouse side buttons need global event monitoring";
 "应用黑名单" = "App Blacklist";
 "这些应用中的复制不弹提示" = "Copies from these apps never trigger the toast";
@@ -515,6 +519,9 @@
 "代码" = "Code";
 "翻译" = "Translate";
 "写邮件" = "Compose Email";
+"压缩为 ZIP" = "Compress as ZIP";
+"拨打电话" = "Call";
+"不再显示来自 %@ 的复制" = "Don't Show Copies from %@";
 "复制结果" = "Copy Result";
 "保存图片" = "Save Image";
 "保存文本" = "Save Text";

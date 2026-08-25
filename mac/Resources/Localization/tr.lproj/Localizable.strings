@@ -469,9 +469,11 @@
 "详细模式" = "Ayrıntılı";
 "3 秒" = "3 saniye";
 "5 秒" = "5 saniye";
+"7 秒" = "7 saniye";
 "10 秒" = "10 saniye";
 "30 秒" = "30 saniye";
 "始终显示" = "Her Zaman";
+"永不" = "Asla";
 "跟随系统" = "Sistem";
 "浅色" = "Açık";
 "深色" = "Koyu";
@@ -480,6 +482,8 @@
 "紧凑" = "Kompakt";
 "详细" = "Ayrıntılı";
 /* Clipboard assistant */
+"存在时长" = "Görüntüleme Süresi";
+"提示自动关闭前的时间；永不则仅手动关闭" = "Bildirimin kapanmasından önceki süre; Asla yalnızca elle kapatılacağı anlamına gelir";
 "复制助手" = "Kopyalama Asistanı";
 "复制后弹出识别结果和下一步操作" = "Her kopyalamadan sonra tanınan içeriği ve sonraki adımları gösterir";
 "快速触发快捷键" = "Hızlı tetikleyici kısayolu";
@@ -516,6 +520,9 @@
 "代码" = "Kod";
 "翻译" = "Çevir";
 "写邮件" = "E-posta yaz";
+"压缩为 ZIP" = "ZIP olarak sıkıştır";
+"拨打电话" = "Ara";
+"不再显示来自 %@ 的复制" = "%@ kaynaklı kopyaları artık gösterme";
 "复制结果" = "Sonucu kopyala";
 "保存图片" = "Görseli kaydet";
 "保存文本" = "Metni kaydet";

@@ -5,6 +5,7 @@ ROOT="${0:A:h:h}"
 VERSION="${VERSION:?VERSION is required}"
 BUILD_NUMBER="${BUILD_NUMBER:?BUILD_NUMBER is required (for example 12)}"
 UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
+TMP_ROOT="${TMPDIR:-/tmp}"
 ARCHIVE_DIRECTORY="${ARCHIVE_DIRECTORY:-$ROOT/dist}"
 BUILD_ARCHITECTURES="${BUILD_ARCHITECTURES:-arm64 x86_64}"
 ARCHITECTURES=(${=BUILD_ARCHITECTURES})
@@ -17,6 +18,13 @@ ARCHITECTURES=(${=BUILD_ARCHITECTURES})
   echo "error: BUILD_NUMBER must contain only digits" >&2
   exit 1
 }
+case "$UPDATE_CHANNEL" in
+  release|preview) ;;
+  *)
+    echo "error: UPDATE_CHANNEL must be release or preview" >&2
+    exit 1
+    ;;
+esac
 
 for arch in "${ARCHITECTURES[@]}"; do
   case "$arch" in
@@ -82,16 +90,16 @@ ditto -c -k --keepParent "$APP" "$ARCHIVE"
   shasum -a 256 "${ARCHIVE:t}" > "${ARCHIVE:t}.sha256"
 )
 
-TEMPORARY_DIRECTORY="$(mktemp -d "${TMPDIR%/}/zisla-dmg.XXXXXX")"
+TEMPORARY_DIRECTORY="$(mktemp -d "${TMP_ROOT%/}/zisla-dmg.XXXXXX")"
 WRITABLE_DMG="${TEMPORARY_DIRECTORY}.dmg"
 MOUNTED_DEVICE=""
 cleanup() {
   if [[ -n "$MOUNTED_DEVICE" ]]; then
     hdiutil detach -quiet "$MOUNTED_DEVICE" || true
   fi
-  [[ "$WRITABLE_DMG" == "${TMPDIR%/}/zisla-dmg."*.dmg ]] || return
+  [[ "$WRITABLE_DMG" == "${TMP_ROOT%/}/zisla-dmg."*.dmg ]] || return
   rm -f "$WRITABLE_DMG"
-  [[ "$TEMPORARY_DIRECTORY" == "${TMPDIR%/}/zisla-dmg."* ]] || return
+  [[ "$TEMPORARY_DIRECTORY" == "${TMP_ROOT%/}/zisla-dmg."* ]] || return
   rm -rf "$TEMPORARY_DIRECTORY"
 }
 trap cleanup EXIT

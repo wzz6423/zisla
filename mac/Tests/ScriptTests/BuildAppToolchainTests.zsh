@@ -42,6 +42,10 @@ cat > "$FAKE_BIN/swift" <<'SCRIPT'
 set -euo pipefail
 arguments=("$@")
 scratch_path=""
+[[ "$*" == *"-Xswiftc -DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE"* ]] || {
+  print -u2 -r -- "missing hand-built app resource-bundle compile condition"
+  exit 1
+}
 for (( index = 1; index <= ${#arguments[@]}; index += 1 )); do
   if [[ "${arguments[index]}" == "--scratch-path" ]]; then
     scratch_path="${arguments[index + 1]}"

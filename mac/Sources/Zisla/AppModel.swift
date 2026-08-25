@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Foundation
+import UniformTypeIdentifiers
 import ZislaCore
 import ZislaKit
 
@@ -253,6 +254,12 @@ enum DownloadUIState: Equatable {
   }
 }
 
+struct DownloadTaskSnapshot: Identifiable, Equatable {
+  let id: UUID
+  let urlString: String
+  let state: DownloadUIState
+}
+
 enum WeatherLocationUIState: Equatable {
   case idle
   case locating
@@ -277,6 +284,11 @@ private final class SharingPickerDelegateProxy: NSObject,
   ) {
     onCompletion?(sharingServicePicker)
   }
+}
+
+struct MailComposeRequest: Equatable {
+  let id = UUID()
+  let recipient: String
 }
 
 @MainActor
@@ -348,7 +360,10 @@ final class AppModel: ObservableObject {
   @Published var downloadMode: DownloadMode = .video
   @Published var downloadDirectory = AppPaths.downloads
   @Published var downloadState: DownloadUIState = .idle
+  @Published private(set) var activeDownloads: [DownloadTaskSnapshot] = []
   @Published var transientMessage: String?
+  var hasActiveDownloads: Bool { !activeDownloadIDs.isEmpty }
+  @Published private(set) var mailComposeRequest: MailComposeRequest?
   @Published var collapsedIslandSize = CGSize(width: 240, height: 34)
   @Published var isIslandOnPhysicalNotch = false
 
@@ -364,6 +379,7 @@ final class AppModel: ObservableObject {
   @Published private(set) var batteryModuleDynamicHeight = IslandModuleLayout.batteryMaximumContentHeight
   @Published private(set) var isMirrorPresented = false
   @Published private(set) var isTeleprompterPresented = false
+  private(set) var teleprompterPresentationPoint: CGPoint?
   @Published var isIslandVisible = false {
     didSet {
       guard oldValue != isIslandVisible else { return }
@@ -376,6 +392,10 @@ final class AppModel: ObservableObject {
 
   /// Signal to request the island to collapse immediately when disk cleaning opens or completes.
   @Published var islandCollapseRequested = false
+
+  /// Signal to expand the island from an entry point that fires while it is still collapsed, such
+  /// as a clipboard assistant action that has to land the user inside an island module.
+  @Published var islandExpansionRequested = false
 
   let settingsStore = FeatureSettingsStore()
   let languageStore = AppLanguageStore()
@@ -441,8 +461,13 @@ final class AppModel: ObservableObject {
   private var updatePollingTask: Task<Void, Never>?
   private var voiceRecordingCleanupTask: Task<Void, Never>?
   private var appliedVoiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy?
-  private var downloadTask: Task<Void, Never>?
+  private var downloadTasks: [UUID: Task<Void, Never>] = [:]
+  private var activeDownloadIDs: Set<UUID> = []
+  private var downloadTaskStates: [UUID: DownloadUIState] = [:]
+  private var downloadTaskURLs: [UUID: String] = [:]
+  private var downloadTaskOrder: [UUID] = []
   private var detectedLinkTask: Task<Void, Never>?
+  private var translationTask: Task<Void, Never>?
   private var activeDownloadID: UUID?
   private var knownNoticeIDs: Set<String> = []
   private var wasPinnedBeforeMirror = false
@@ -493,6 +518,7 @@ final class AppModel: ObservableObject {
   private let launchDate = Date()
   private let sharingPickerDelegate = SharingPickerDelegateProxy()
   private var sharingPicker: NSSharingServicePicker?
+  private var sharingPickerDismissesClipboardAssistant = false
   private var voiceInputTarget: VoiceTranscriptDeliveryTarget?
   private var voiceInputTargetProcessIdentifier: pid_t?
   private var voiceInputTargetMouseLocation: CGPoint?
@@ -531,31 +557,11 @@ final class AppModel: ObservableObject {
     }
     clipboardMonitor.onLinkDetected = { [weak self] url in
       guard let self else { return }
-      downloadURL = url.absoluteString
-      selectModule(.download)
-      detectedLink = url
-      detectedLinkTask?.cancel()
-      detectedLinkTask = Task { [weak self] in
-        do {
-          try await Task.sleep(for: .seconds(6))
-        } catch {
-          return
-        }
-        self?.detectedLink = nil
-      }
-      if settingsStore.settings.sideNoticesEnabled {
-        notices.enqueue(
-          IslandNotice(
-            id: "clipboard-link-\(url.host ?? "media")",
-            title: "发现可下载链接",
-            detail: url.host ?? "媒体链接",
-            kind: .info,
-            side: .left
-          ))
-      }
+      routeCapturedClipboardContent(.text(url.absoluteString), downloadableURL: url)
     }
     voiceInput.onRecordingWillStart = { [weak self] in
       guard let self else { return }
+      self.clipboardAssistant.dismiss(animated: false)
       let processIdentifier = Self.frontmostVoiceInputTargetProcessIdentifier()
       voiceInputTargetProcessIdentifier = processIdentifier
       voiceInputTarget = processIdentifier.flatMap(VoiceTranscriptDelivery.captureTarget(for:))
@@ -757,7 +763,7 @@ final class AppModel: ObservableObject {
     let hasPomodoro = pomodoro.phase != .idle
     let hasAITask = settings.aiProgressEnabled
       && aiMonitor.state.tasks.contains { $0.status.isActive }
-    let cardCount = [hasPomodoro, hasAITask, downloadState.isRunning].filter { $0 }.count
+    let cardCount = [hasPomodoro, hasAITask, hasActiveDownloads].filter { $0 }.count
       + browserDownloads.snapshots.count
     if dashboardCardCount != cardCount {
       dashboardCardCount = cardCount
@@ -911,13 +917,14 @@ final class AppModel: ObservableObject {
     voiceRecordingCleanupTask?.cancel()
     voiceRecordingCleanupTask = nil
     appliedVoiceRecordingCleanupPolicy = nil
-    downloadTask?.cancel()
+    cancelAllDownloads()
     voicePostProcessingQueue.cancelAll()
     voiceProcessingOperationCount = 0
     isProcessingVoiceTranscript = false
     notices.remove(id: "voice-processing-left")
     notices.remove(id: "voice-processing-right")
     detectedLinkTask?.cancel()
+    translationTask?.cancel()
     voiceInputTarget = nil
     voiceInputTargetProcessIdentifier = nil
     voiceInputTargetMouseLocation = nil
@@ -956,6 +963,7 @@ final class AppModel: ObservableObject {
     detectedLink = nil
     let picker = sharingPicker
     sharingPicker = nil
+    sharingPickerDismissesClipboardAssistant = false
     isSharingPickerVisible = false
     picker?.close()
   }
@@ -1246,6 +1254,11 @@ final class AppModel: ObservableObject {
     reportMailOperation(await mail.reply(to: message, body: body), successMessage: "回复已发送")
   }
 
+  func takeMailComposeRequest() -> MailComposeRequest? {
+    defer { mailComposeRequest = nil }
+    return mailComposeRequest
+  }
+
   func checkForUpdates(manual: Bool, channel: UpdateChannel? = nil) {
     guard manual || settingsStore.settings.updateChecksEnabled else { return }
     let selectedChannel = channel ?? (manual ? settingsStore.settings.updateChannel : nil)
@@ -1406,6 +1419,7 @@ final class AppModel: ObservableObject {
 
   func presentTeleprompter() {
     guard !isTeleprompterPresented else { return }
+    teleprompterPresentationPoint = NSEvent.mouseLocation
     wasPinnedBeforeTeleprompter = isPinned
     isPinned = true
     isTeleprompterPresented = true
@@ -1454,6 +1468,14 @@ final class AppModel: ObservableObject {
   /// Pasteboard changeCount written by an assistant action itself; the toast must not re-trigger
   /// for its own "copy result" writes.
   private var suppressedAssistantChangeCount: Int?
+  private var clipboardAssistantContent: ClipboardHistoryContent?
+  private var lastClipboardAssistantRoutingChangeCount: Int?
+
+  private enum ClipboardAssistantPresentationResult {
+    case presented
+    case unavailable
+    case ignored
+  }
 
   private func clipboardAssistantMessage(_ key: String) -> String {
     AppLocalization.string(key, language: languageStore.language)
@@ -1464,25 +1486,94 @@ final class AppModel: ObservableObject {
   }
 
   private func handleCapturedClipboardContent(_ content: ClipboardHistoryContent) {
+    let downloadableURL: URL?
+    if case .text(let text) = content,
+       DownloadURLClassifier.isLikelyDownloadable(text) {
+      downloadableURL = HTTPURLParser.url(from: text)
+    } else {
+      downloadableURL = nil
+    }
+    routeCapturedClipboardContent(content, downloadableURL: downloadableURL)
+  }
+
+  private func routeCapturedClipboardContent(
+    _ content: ClipboardHistoryContent,
+    downloadableURL: URL?
+  ) {
+    let changeCount = NSPasteboard.general.changeCount
+    guard lastClipboardAssistantRoutingChangeCount != changeCount else { return }
+    lastClipboardAssistantRoutingChangeCount = changeCount
+
+    switch presentClipboardAssistant(for: content) {
+    case .presented, .ignored:
+      guard downloadableURL != nil else { return }
+      detectedLinkTask?.cancel()
+      detectedLink = nil
+    case .unavailable:
+      guard clipboardMonitor.isEnabled, let downloadableURL else { return }
+      presentDetectedLink(downloadableURL)
+    }
+  }
+
+  private func presentClipboardAssistant(
+    for content: ClipboardHistoryContent
+  ) -> ClipboardAssistantPresentationResult {
     let settings = settingsStore.settings
-    guard settings.clipboardAssistantEnabled else { return }
+    guard settings.clipboardAssistantEnabled else { return .unavailable }
+    guard !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else {
+      clipboardAssistant.dismiss(animated: false)
+      return .unavailable
+    }
     if let suppressed = suppressedAssistantChangeCount,
        suppressed == NSPasteboard.general.changeCount {
-      return
+      return .ignored
     }
     // The frontmost app at capture time is the app the user copied from.
-    if let bundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+    let sourceApplication = NSWorkspace.shared.frontmostApplication
+    if let bundleIdentifier = sourceApplication?.bundleIdentifier,
        settings.clipboardAssistantBlacklist.contains(bundleIdentifier) {
-      return
+      return .unavailable
     }
-    guard let detection = ClipboardAssistantDetector.detect(
+    guard var detection = ClipboardAssistantDetector.detect(
       content: content,
       enabledKinds: settings.clipboardAssistantEnabledKinds.isEmpty
         ? Set(ClipboardAssistantKind.allCases)
         : settings.clipboardAssistantEnabledKinds,
       offersDownload: settings.downloaderEnabled
-    ) else { return }
-    clipboardAssistant.present(detection)
+    ) else { return .unavailable }
+    detection.actions.append(.addToQuickNote)
+    detection.actions.append(.share)
+    if case .text = content,
+       [.text, .chineseText, .code, .math].contains(detection.kind) {
+      detection.actions.append(.sendToTeleprompter)
+    }
+    if let bundleIdentifier = sourceApplication?.bundleIdentifier,
+       !bundleIdentifier.isEmpty,
+       bundleIdentifier != Bundle.main.bundleIdentifier {
+      detection.actions.append(.blockSourceApp(
+        bundleIdentifier: bundleIdentifier,
+        appName: sourceApplication?.localizedName ?? bundleIdentifier
+      ))
+    }
+    clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle)
+    guard clipboardAssistant.presentation.detection == detection else { return .unavailable }
+    clipboardAssistantContent = content
+    return .presented
+  }
+
+  private func presentDetectedLink(_ url: URL) {
+    downloadURL = url.absoluteString
+    selectModule(.download)
+    detectedLink = url
+    detectedLinkTask?.cancel()
+    detectedLinkTask = Task { [weak self] in
+      do {
+        try await Task.sleep(for: .seconds(6))
+      } catch {
+        return
+      }
+      self?.detectedLink = nil
+    }
   }
 
   private func performClipboardAssistantAction(_ action: ClipboardAssistantAction) {
@@ -1494,9 +1585,32 @@ final class AppModel: ObservableObject {
       selectModule(.download)
     case .revealInFinder(let url):
       NSWorkspace.shared.activateFileViewerSelecting([url])
+    case .compress(let url):
+      compressAssistantFile(url)
+    case .share:
+      guard let content = clipboardAssistantContent else {
+        transientMessage = clipboardAssistantMessage("无法完成操作")
+        clipboardAssistant.dismiss()
+        return
+      }
+      let items = transferItems(from: content)
+      guard !items.isEmpty else {
+        transientMessage = clipboardAssistantMessage("剪贴板没有可共享内容")
+        clipboardAssistant.dismiss()
+        return
+      }
+      guard let anchor = clipboardAssistant.sharingAnchorView else {
+        transientMessage = clipboardAssistantMessage("无法打开系统共享菜单")
+        clipboardAssistant.dismiss()
+        return
+      }
+      share(items, from: anchor)
     case .search(let text):
-      let engine = settingsStore.settings.clipboardAssistantSearchEngine
-      if let url = engine.queryURL(for: text) {
+      let settings = settingsStore.settings
+      if let url = settings.clipboardAssistantSearchEngine.queryURL(
+        for: text,
+        customURL: settings.clipboardAssistantCustomSearchURL
+      ) {
         NSWorkspace.shared.open(url)
       } else {
         transientMessage = clipboardAssistantMessage("无法完成操作")
@@ -1504,16 +1618,29 @@ final class AppModel: ObservableObject {
     case .translate(let text):
       // Translate in the browser using the interface language as the target.
       let code = languageStore.language.translateTargetCode
-      if let url = ClipboardAssistantTranslate.url(text: text, targetLanguageCode: code) {
-        NSWorkspace.shared.open(url)
-      } else {
-        transientMessage = clipboardAssistantMessage("无法完成操作")
+      translationTask?.cancel()
+      translationTask = Task { @MainActor [weak self] in
+        let provider = await Self.translationProviderForCurrentIP()
+        guard let self, !Task.isCancelled else { return }
+        if let url = ClipboardAssistantTranslate.url(
+          text: text,
+          targetLanguageCode: code,
+          provider: provider
+        ) {
+          NSWorkspace.shared.open(url)
+        } else {
+          transientMessage = clipboardAssistantMessage("无法完成操作")
+        }
       }
     case .composeMail(let address):
-      if let url = URL(string: "mailto:\(address)") {
-        NSWorkspace.shared.open(url)
+      if settingsStore.settings.mailEnabled {
+        mailComposeRequest = MailComposeRequest(recipient: address)
+        selectModule(.mail)
+        // The assistant fires from a collapsed island, so the compose page only becomes reachable
+        // once the island expands on its own.
+        islandExpansionRequested = true
       } else {
-        transientMessage = clipboardAssistantMessage("无法完成操作")
+        openSystemMail(to: address)
       }
     case .copyText(let text):
       guard ClipboardHistoryPasteboard.write(.text(text)) else {
@@ -1522,6 +1649,29 @@ final class AppModel: ObservableObject {
       }
       suppressedAssistantChangeCount = NSPasteboard.general.changeCount
       transientMessage = clipboardAssistantMessage("已复制")
+    case .callPhone(let number):
+      if let url = URL(string: "tel:\(number)") {
+        NSWorkspace.shared.open(url)
+      } else {
+        transientMessage = clipboardAssistantMessage("无法完成操作")
+      }
+    case .blockSourceApp(let bundleIdentifier, _):
+      var settings = settingsStore.settings
+      settings.clipboardAssistantBlacklist.insert(bundleIdentifier)
+      settingsStore.settings = settings
+      clipboardAssistant.dismiss()
+    case .addToQuickNote:
+      guard let content = clipboardAssistantContent else {
+        transientMessage = clipboardAssistantMessage("无法完成操作")
+        return
+      }
+      receiveQuickNoteTransferItems(transferItems(from: content))
+    case .sendToTeleprompter:
+      guard case .text(let text)? = clipboardAssistantContent else {
+        transientMessage = clipboardAssistantMessage("无法完成操作")
+        return
+      }
+      sendQuickNoteToTeleprompter(text)
     case .saveImage(let data):
       saveClipboardImage(data)
     case .saveText(let text):
@@ -1531,17 +1681,122 @@ final class AppModel: ObservableObject {
     }
   }
 
+  private nonisolated static func translationProviderForCurrentIP() async -> ClipboardAssistantTranslate.Provider {
+    guard let url = URL(string: "https://ipinfo.io/country") else { return .google }
+    var request = URLRequest(url: url)
+    request.timeoutInterval = 5
+    do {
+      let (data, response) = try await URLSession.shared.data(for: request)
+      guard (response as? HTTPURLResponse)?.statusCode == 200 else { return .google }
+      return ClipboardAssistantTranslate.provider(
+        forCountryCode: String(data: data, encoding: .utf8)
+      )
+    } catch {
+      return .google
+    }
+  }
+
+  private func openSystemMail(to address: String) {
+    guard let url = URL(string: "mailto:\(address)") else {
+      transientMessage = clipboardAssistantMessage("无法完成操作")
+      return
+    }
+    guard NSWorkspace.shared.open(url) else {
+      transientMessage = clipboardAssistantMessage("无法完成操作")
+      return
+    }
+  }
+
+  private func compressAssistantFile(_ source: URL) {
+    guard FileManager.default.fileExists(atPath: source.path) else {
+      transientMessage = clipboardAssistantMessage("无法完成操作")
+      return
+    }
+    let panel = NSSavePanel()
+    panel.directoryURL = source.deletingLastPathComponent()
+    panel.nameFieldStringValue = source.lastPathComponent + ".zip"
+    panel.allowedContentTypes = [.zip]
+    panel.canCreateDirectories = true
+    panel.prompt = clipboardAssistantMessage("压缩为 ZIP")
+    WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
+    guard panel.runModal() == .OK, let destination = panel.url else { return }
+
+    Task { @MainActor [weak self] in
+      let error = await Task.detached(priority: .userInitiated) {
+        await Self.zipArchiveError(source: source, destination: destination)
+      }.value
+      guard let self else { return }
+      if let error {
+        self.transientMessage = self.clipboardAssistantMessage("操作失败：%@", error)
+      } else {
+        self.transientMessage = self.clipboardAssistantMessage("已保存到 %@", destination.path)
+      }
+    }
+  }
+
+  nonisolated static func zipArchiveError(source: URL, destination: URL) async -> String? {
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory) else {
+      return "源文件不存在"
+    }
+    let sourceAccess = source.startAccessingSecurityScopedResource()
+    let destinationDirectory = destination.deletingLastPathComponent()
+    let destinationAccess = destinationDirectory.startAccessingSecurityScopedResource()
+    defer {
+      if sourceAccess { source.stopAccessingSecurityScopedResource() }
+      if destinationAccess { destinationDirectory.stopAccessingSecurityScopedResource() }
+    }
+
+    var arguments = ["-c", "-k", "--sequesterRsrc"]
+    if isDirectory.boolValue { arguments.append("--keepParent") }
+    arguments += [source.lastPathComponent, destination.path]
+    do {
+      let output = try await AIAgentProcessRunner.run(
+        executableURL: URL(fileURLWithPath: "/usr/bin/ditto"),
+        arguments: arguments,
+        workingDirectoryURL: source.deletingLastPathComponent(),
+        timeout: 5 * 60,
+        maximumOutputBytes: 1,
+        maximumErrorBytes: 256 * 1_024
+      )
+      if output.didTimeout {
+        return "压缩操作超时"
+      }
+      guard output.status == 0 else {
+        return output.standardError.isEmpty ? "无法创建 ZIP 文件" : output.standardError
+      }
+      return nil
+    } catch {
+      return error.localizedDescription
+    }
+  }
+
   private func saveClipboardImage(_ data: Data) {
-    let directory = downloadDirectory
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyyMMdd-HHmmss"
+    let name = "clipboard-\(formatter.string(from: Date())).png"
+    let destination: URL
+    if settingsStore.settings.clipboardAssistantPromptsForImageSaveLocation {
+      let panel = NSSavePanel()
+      panel.directoryURL = downloadDirectory
+      panel.nameFieldStringValue = name
+      panel.allowedContentTypes = [.png]
+      panel.canCreateDirectories = true
+      panel.prompt = clipboardAssistantMessage("保存图片")
+      WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
+      guard panel.runModal() == .OK, let url = panel.url else { return }
+      destination = url
+    } else {
+      destination = downloadDirectory.appendingPathComponent(name)
+    }
+
+    let directory = destination.deletingLastPathComponent()
     let scopedAccess = directory.startAccessingSecurityScopedResource()
     defer { if scopedAccess { directory.stopAccessingSecurityScopedResource() } }
     do {
       try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-      let formatter = DateFormatter()
-      formatter.dateFormat = "yyyyMMdd-HHmmss"
-      let url = directory.appendingPathComponent("clipboard-\(formatter.string(from: Date())).png")
-      try data.write(to: url)
-      transientMessage = clipboardAssistantMessage("已保存到 %@", url.path)
+      try data.write(to: destination, options: .atomic)
+      transientMessage = clipboardAssistantMessage("已保存到 %@", destination.path)
     } catch {
       transientMessage = clipboardAssistantMessage("操作失败：%@", error.localizedDescription)
     }
@@ -1608,7 +1863,7 @@ final class AppModel: ObservableObject {
     }
     UserDefaults.standard.set(content, forKey: "toolbox.teleprompterScript")
     transientMessage = "已发送到提词器"
-    selectModule(.toolbox)
+    presentTeleprompter()
   }
 
   func receiveQuickNoteTransferItems(_ items: [TransferDropItem]) {
@@ -1636,7 +1891,7 @@ final class AppModel: ObservableObject {
     case let .file(reference):
       [.file(reference.url)]
     case let .image(data):
-      [.text("剪贴板图片（PNG 数据，\(data.count) 字节）")]
+      [.image(data)]
     }
   }
 
@@ -1646,6 +1901,7 @@ final class AppModel: ObservableObject {
       case let .text(value): value
       case let .link(url): url.absoluteString
       case let .file(url): "[\(url.lastPathComponent)](\(url.absoluteString))"
+      case .image: "剪贴板图片"
       }
     }
     .joined(separator: "\n\n")
@@ -1686,7 +1942,8 @@ final class AppModel: ObservableObject {
     picker.delegate = sharingPickerDelegate
     let previousPicker = sharingPicker
     sharingPicker = picker
-    isSharingPickerVisible = true
+    sharingPickerDismissesClipboardAssistant = anchor.window is ClipboardAssistantWindow
+    isSharingPickerVisible = anchor.window is IslandPanel
     previousPicker?.close()
     picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
   }
@@ -1721,8 +1978,11 @@ final class AppModel: ObservableObject {
 
   private func sharingPickerDidComplete(_ picker: NSSharingServicePicker) {
     guard sharingPicker === picker else { return }
+    let dismissesClipboardAssistant = sharingPickerDismissesClipboardAssistant
     sharingPicker = nil
+    sharingPickerDismissesClipboardAssistant = false
     isSharingPickerVisible = false
+    if dismissesClipboardAssistant { clipboardAssistant.dismiss() }
   }
 
   private func prepareDownload(_ url: URL) {
@@ -1734,7 +1994,6 @@ final class AppModel: ObservableObject {
   }
 
   func startDownload() {
-    guard !downloadState.isRunning else { return }
     let request: DownloadRequest
     do {
       request = try DownloadRequest(
@@ -1743,16 +2002,25 @@ final class AppModel: ObservableObject {
         outputDirectory: downloadDirectory
       )
     } catch {
-      downloadState = .failed("链接或输出目录无效")
+      if hasActiveDownloads {
+        transientMessage = "链接或输出目录无效"
+      } else {
+        downloadState = .failed("链接或输出目录无效")
+      }
       return
     }
 
     let taskID = UUID()
     activeDownloadID = taskID
+    activeDownloadIDs.insert(taskID)
+    downloadTaskStates[taskID] = .preparing
+    downloadTaskURLs[taskID] = request.urlString
+    downloadTaskOrder.append(taskID)
+    refreshActiveDownloads()
     downloadState = .preparing
     beginVideoDownloadIsland(forURLString: request.urlString)
     let scopedAccess = downloadDirectory.startAccessingSecurityScopedResource()
-    downloadTask = Task { [weak self, downloadService] in
+    let task = Task { [weak self, downloadService] in
       defer {
         if scopedAccess { request.outputDirectory.stopAccessingSecurityScopedResource() }
       }
@@ -1762,49 +2030,116 @@ final class AppModel: ObservableObject {
           taskID: taskID
         ) { [weak self] event in
           await MainActor.run {
-            guard let self, self.activeDownloadID == taskID else { return }
+            guard let self, self.activeDownloadIDs.contains(taskID) else { return }
             if case .progress(let fraction, let speed, let eta) = event {
-              self.downloadState = .downloading(
+              let state = DownloadUIState.downloading(
                 fraction: fraction,
                 speed: speed,
                 eta: eta
               )
+              self.downloadTaskStates[taskID] = state
+              self.refreshActiveDownloads()
+              guard self.activeDownloadID == taskID else { return }
+              self.downloadState = state
               self.updateVideoDownloadIsland(fraction: fraction, isFinished: false)
             }
           }
         }
-        guard !Task.isCancelled, self?.activeDownloadID == taskID else { return }
-        self?.downloadState = .completed(result.fileURL)
-        self?.activeDownloadID = nil
-        self?.updateVideoDownloadIsland(fraction: 1, isFinished: true)
-        self?.addToShelf([result.fileURL])
-        self?.notices.enqueue(
-          IslandNotice(
-            id: "download-\(taskID.uuidString)",
-            title: "下载完成",
-            detail: result.fileURL.lastPathComponent,
-            kind: .success,
-            side: .right
-          ))
+        guard !Task.isCancelled else {
+          await MainActor.run {
+            self?.finishDownloadTask(taskID, state: .idle, showsCompletion: false)
+          }
+          return
+        }
+        await MainActor.run {
+          guard let self else { return }
+          self.addToShelf([result.fileURL])
+          self.notices.enqueue(
+            IslandNotice(
+              id: "download-\(taskID.uuidString)",
+              title: "下载完成",
+              detail: result.fileURL.lastPathComponent,
+              kind: .success,
+              side: .right
+            ))
+          self.finishDownloadTask(
+            taskID,
+            state: .completed(result.fileURL),
+            showsCompletion: true
+          )
+        }
       } catch is CancellationError {
-        if self?.activeDownloadID == taskID {
-          self?.downloadState = .idle
-          self?.activeDownloadID = nil
-          self?.endVideoDownloadIsland()
+        await MainActor.run {
+          self?.finishDownloadTask(taskID, state: .idle, showsCompletion: false)
         }
       } catch {
-        guard self?.activeDownloadID == taskID else { return }
-        self?.downloadState = .failed(Self.downloadErrorText(error))
-        self?.activeDownloadID = nil
-        self?.endVideoDownloadIsland()
+        await MainActor.run {
+          self?.finishDownloadTask(
+            taskID,
+            state: .failed(Self.downloadErrorText(error)),
+            showsCompletion: false
+          )
+        }
       }
     }
+    downloadTasks[taskID] = task
   }
 
-  func cancelDownload() {
-    guard let taskID = activeDownloadID else { return }
-    downloadTask?.cancel()
+  func cancelDownload(taskID: UUID) {
+    guard activeDownloadIDs.contains(taskID) else { return }
+    downloadTasks[taskID]?.cancel()
     Task { [downloadService] in await downloadService.cancel(taskID: taskID) }
+  }
+
+  func cancelAllDownloads() {
+    for task in downloadTasks.values { task.cancel() }
+    Task { [downloadService] in await downloadService.cancelAll() }
+  }
+
+  private func finishDownloadTask(
+    _ taskID: UUID,
+    state: DownloadUIState,
+    showsCompletion: Bool
+  ) {
+    guard activeDownloadIDs.remove(taskID) != nil else { return }
+    downloadTasks[taskID] = nil
+    downloadTaskStates[taskID] = state
+
+    let wasActive = activeDownloadID == taskID
+    if wasActive,
+       let nextID = downloadTaskOrder.reversed().first(where: { activeDownloadIDs.contains($0) }),
+       let nextState = downloadTaskStates[nextID],
+       let nextURL = downloadTaskURLs[nextID] {
+      activeDownloadID = nextID
+      downloadState = nextState
+      beginVideoDownloadIsland(forURLString: nextURL)
+      if case .downloading(let fraction, _, _) = nextState {
+        updateVideoDownloadIsland(fraction: fraction, isFinished: false)
+      }
+    } else if wasActive {
+      activeDownloadID = nil
+      downloadState = state
+      if showsCompletion {
+        updateVideoDownloadIsland(fraction: 1, isFinished: true)
+      } else {
+        endVideoDownloadIsland()
+      }
+    }
+
+    downloadTaskStates[taskID] = nil
+    downloadTaskURLs[taskID] = nil
+    downloadTaskOrder.removeAll { $0 == taskID }
+    refreshActiveDownloads()
+  }
+
+  private func refreshActiveDownloads() {
+    activeDownloads = downloadTaskOrder.compactMap { taskID in
+      guard activeDownloadIDs.contains(taskID),
+            let state = downloadTaskStates[taskID],
+            let urlString = downloadTaskURLs[taskID]
+      else { return nil }
+      return DownloadTaskSnapshot(id: taskID, urlString: urlString, state: state)
+    }
   }
 
   private func apply(settings: FeatureSettings) {
@@ -1907,13 +2242,14 @@ final class AppModel: ObservableObject {
         mouseButton: settings.clipboardAssistantMouseButton
       )
       clipboardAssistant.isLightweightMode = settings.clipboardAssistantLightweightMode
+      clipboardAssistant.displayDuration = settings.clipboardAssistantDisplayDuration
     } else {
       clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil)
       clipboardAssistant.dismiss()
     }
     applyAssistantMouseGesture()
-    if !settings.downloaderEnabled, downloadState.isRunning {
-      cancelDownload()
+    if !settings.downloaderEnabled, hasActiveDownloads {
+      cancelAllDownloads()
     }
     let durationChanged =
       lastActivityNoticeDisplayDuration != settings.activityNoticeDisplayDuration

@@ -19,6 +19,7 @@ public final class ManagedToolService: ObservableObject {
 
     private static let cacheKey = "managed-tool-state-cache-v1"
     private static let latestVersionCacheLifetime: TimeInterval = 5 * 60
+    private static let maximumDownloadBytes = 512 * 1024 * 1024
 
     public init(
         toolsDirectory: URL = AppPaths.managedTools,
@@ -203,7 +204,12 @@ public final class ManagedToolService: ObservableObject {
         if tool.usesNativeApplicationVersion {
             return nativeApplicationVersion(at: url)
         }
-        guard case .success(let output) = await runProcess(url, arguments: tool.versionArguments, environment: environment) else {
+        guard case .success(let output) = await runProcess(
+            url,
+            arguments: tool.versionArguments,
+            environment: environment,
+            timeout: 30
+        ) else {
             return nil
         }
         return tool.normalizedInstalledVersion(from: output)
@@ -573,6 +579,13 @@ public final class ManagedToolService: ObservableObject {
             throw ManagedToolError.downloadFailed("无效的 HTTP 响应")
         }
         try Self.validate(finalURL)
+        if response.expectedContentLength > Int64(Self.maximumDownloadBytes) {
+            throw ManagedToolError.downloadFailed("下载文件超过大小限制")
+        }
+        let downloadedSize = try FileManager.default.attributesOfItem(atPath: temporaryURL.path)[.size] as? NSNumber
+        guard downloadedSize?.int64Value ?? 0 <= Int64(Self.maximumDownloadBytes) else {
+            throw ManagedToolError.downloadFailed("下载文件超过大小限制")
+        }
         // The temporary file from download(for:) is reclaimed right after this await, so move it into a directory we own first.
         let workDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-tool-\(UUID().uuidString)", isDirectory: true)
@@ -605,7 +618,6 @@ public final class ManagedToolService: ObservableObject {
         defer { try? fileManager.removeItem(at: staging) }
         try fileManager.copyItem(at: executable, to: staging)
         try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: staging.path)
-        Self.clearQuarantine(staging)
         guard let version = await Self.readVersion(of: tool, at: staging, environment: processEnvironment) else {
             throw ManagedToolError.notExecutable(tool.displayName)
         }
@@ -621,69 +633,32 @@ public final class ManagedToolService: ObservableObject {
         return (trusted, version)
     }
 
-    /// Clear a quarantine flag should the download source add one.
-    static func clearQuarantine(_ url: URL) {
-        url.withUnsafeFileSystemRepresentation { path in
-            guard let path else { return }
-            removexattr(path, "com.apple.quarantine", 0)
-        }
-    }
-
     static func runProcess(
         _ executable: URL,
         arguments: [String],
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        timeout: TimeInterval? = nil
     ) async -> Result<String, ManagedToolError> {
-        await Task.detached(priority: .userInitiated) { () -> Result<String, ManagedToolError> in
-            let fileManager = FileManager.default
-            let directory = fileManager.temporaryDirectory
-                .appendingPathComponent("zisla-process-\(UUID().uuidString)", isDirectory: true)
-            let stdoutURL = directory.appendingPathComponent("stdout")
-            let stderrURL = directory.appendingPathComponent("stderr")
-            do {
-                try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-                defer { try? fileManager.removeItem(at: directory) }
-                fileManager.createFile(atPath: stdoutURL.path, contents: nil)
-                fileManager.createFile(atPath: stderrURL.path, contents: nil)
-                let stdout = try FileHandle(forWritingTo: stdoutURL)
-                let stderr = try FileHandle(forWritingTo: stderrURL)
-                defer {
-                    try? stdout.close()
-                    try? stderr.close()
-                }
-
-                let process = Process()
-                process.executableURL = executable
-                process.arguments = arguments
-                process.environment = environment
-                process.standardOutput = stdout
-                process.standardError = stderr
-                do {
-                    try process.run()
-                } catch {
-                    return .failure(.notExecutable(
-                        "\(executable.lastPathComponent)：\(error.localizedDescription)"
-                    ))
-                }
-                process.waitUntilExit()
-                try? stdout.close()
-                try? stderr.close()
-
-                let data = try Data(contentsOf: stdoutURL)
-                let errorData = try Data(contentsOf: stderrURL)
-                guard process.terminationStatus == 0 else {
-                    let message = [errorData, data]
-                        .compactMap { String(data: $0, encoding: .utf8)?
-                            .trimmingCharacters(in: .whitespacesAndNewlines) }
-                        .first { !$0.isEmpty }
-                    return .failure(.notExecutable(
-                        message ?? "\(executable.lastPathComponent) 退出码 \(process.terminationStatus)"
-                    ))
-                }
-                return .success(String(data: data, encoding: .utf8) ?? "")
-            } catch {
-                return .failure(.notExecutable(error.localizedDescription))
+        do {
+            let output = try await AIAgentProcessRunner.run(
+                executableURL: executable,
+                arguments: arguments,
+                environment: environment,
+                timeout: timeout,
+                maximumOutputBytes: 256 * 1024,
+                maximumErrorBytes: 64 * 1024
+            )
+            guard output.status == 0 else {
+                let message = [output.standardError, String(decoding: output.standardOutput, as: UTF8.self)]
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .first { !$0.isEmpty }
+                return .failure(.notExecutable(
+                    message ?? "\(executable.lastPathComponent) 退出码 \(output.status)"
+                ))
             }
-        }.value
+            return .success(String(decoding: output.standardOutput, as: UTF8.self))
+        } catch {
+            return .failure(.notExecutable(error.localizedDescription))
+        }
     }
 }

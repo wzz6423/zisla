@@ -31,7 +31,21 @@ struct ClipboardAssistantDetectorTests {
             offersDownload: true
         )
 
-        #expect(detection?.actions.contains(.openDownload(url)) == true)
+        #expect(detection?.action == .openURL(url))
+        #expect(detection?.secondaryActions == [.openDownload(url)])
+    }
+
+    @Test
+    func offersDownloadForBilibiliURLWhenEnabled() throws {
+        let url = try #require(URL(string: "https://www.bilibili.com/video/BV1c7GA6kEqN/"))
+        let detection = ClipboardAssistantDetector.detect(
+            text: url.absoluteString,
+            enabledKinds: allKinds,
+            offersDownload: true
+        )
+
+        #expect(detection?.action == .openURL(url))
+        #expect(detection?.secondaryActions == [.openDownload(url)])
     }
 
     @Test
@@ -58,15 +72,43 @@ struct ClipboardAssistantDetectorTests {
         } else {
             Issue.record("reveal action expected")
         }
+        #expect(detection?.secondaryActions == [.compress(fileURL.standardizedFileURL)])
     }
 
     @Test
-    func ignoresNonexistentPaths() {
-        let detection = ClipboardAssistantDetector.detect(
-            text: "/definitely/not/a/real/file-\(UUID().uuidString).txt",
-            enabledKinds: allKinds
-        )
-        #expect(detection?.kind != .filePath)
+    func unresolvablePathKeepsPathKindWithCopyAction() {
+        // Temp files get cleaned up and other apps' containers are unreachable; the copied value is
+        // still a path, so it must not fall through to the Chinese/plain text branch.
+        let path = "/zisla-missing-root-\(UUID().uuidString)/VKTemp/01E3BE85-1731/图像.png"
+        let detection = ClipboardAssistantDetector.detect(text: path, enabledKinds: allKinds)
+        #expect(detection?.kind == .filePath)
+        #expect(detection?.title == "图像.png")
+        #expect(detection?.detail == .path(path))
+        #expect(detection?.actions == [.copyText(path)])
+    }
+
+    @Test
+    func missingFileInAnExistingFolderRevealsThatFolder() {
+        let directory = FileManager.default.temporaryDirectory
+        let missing = directory.appendingPathComponent("zisla-assistant-gone-\(UUID().uuidString).png")
+        let detection = ClipboardAssistantDetector.detect(text: missing.path, enabledKinds: allKinds)
+        #expect(detection?.kind == .filePath)
+        if case .revealInFinder(let url)? = detection?.action {
+            #expect(url.path == directory.path)
+        } else {
+            Issue.record("reveal action for the surviving parent directory expected")
+        }
+        #expect(detection?.secondaryActions == [.copyText(missing.path)])
+    }
+
+    @Test
+    func rejectsValuesThatOnlyLookVaguelyLikePaths() {
+        for text in ["/help", "hello world", "not/a/path"] {
+            let detection = ClipboardAssistantDetector.detect(text: text, enabledKinds: allKinds)
+            #expect(detection?.kind != .filePath, "expected \(text) not to read as a path")
+        }
+        // Whitespace in an unresolvable value means a command line, not a path.
+        #expect(ClipboardAssistantDetector.filePathCandidate(from: "/usr/bin/env python3 main.py") == nil)
     }
 
     @Test
@@ -95,6 +137,11 @@ struct ClipboardAssistantDetectorTests {
             #expect(value == "+8613800138000")
         } else {
             Issue.record("normalized copy action expected")
+        }
+        if case .callPhone(let value)? = detection?.secondaryActions.first {
+            #expect(value == "+8613800138000")
+        } else {
+            Issue.record("call action expected")
         }
     }
 
@@ -271,6 +318,47 @@ struct ClipboardAssistantDetectorTests {
     }
 
     @Test
+    func detectsSnippetsWithoutStructuralPunctuation() {
+        // Declarations, calls and imports carry no braces or semicolons, yet they are plainly code.
+        for snippet in [
+            "let count = 1\nlet total = count + 2",
+            "print(\"hello\")",
+            "const handler = buildHandler(config)",
+            "x = compute(a, b)\ny = x * 2",
+            "from pathlib import Path\np = Path.home()",
+            ".card {\n  color: red;\n}",
+            "SELECT name FROM users",
+            "@State private var isOn = false",
+            "viewModel.reload(force: true)",
+            "{\"name\": \"zisla\", \"pinned\": true}",
+            "<div class=\"row\">",
+            "    total += price\n    count += 1",
+        ] {
+            let detection = ClipboardAssistantDetector.detect(text: snippet, enabledKinds: allKinds)
+            #expect(detection?.kind == .code, "expected code for: \(snippet)")
+        }
+    }
+
+    @Test
+    func proseSharingKeywordsWithCodeStaysText() {
+        for prose in [
+            "Let me know: are we still meeting tomorrow?",
+            "The report came from the finance team and needs a review",
+            "We should print the invoice and file it away",
+            "Send me the file: report.pdf when you get a chance",
+        ] {
+            let detection = ClipboardAssistantDetector.detect(text: prose, enabledKinds: allKinds)
+            #expect(detection?.kind == .text, "expected text for: \(prose)")
+        }
+
+        let chinese = ClipboardAssistantDetector.detect(
+            text: "从今天开始，我们要更认真地对待这件事情，不能再拖延了。",
+            enabledKinds: allKinds
+        )
+        #expect(chinese?.kind == .chineseText)
+    }
+
+    @Test
     func guessesUsefulFileExtensions() {
         #expect(ClipboardAssistantDetector.guessCodeFileExtension("#include <stdio.h>") == "cpp")
         #expect(ClipboardAssistantDetector.guessCodeFileExtension("def main():\n    pass") == "py")
@@ -353,6 +441,7 @@ struct ClipboardAssistantDetectorTests {
         } else {
             Issue.record("file size detail expected")
         }
+        #expect(detection?.secondaryActions == [.compress(fileURL.standardizedFileURL)])
     }
 
     @Test
@@ -393,6 +482,23 @@ struct ClipboardAssistantSearchEngineTests {
 
         let duck = try #require(ClipboardAssistantSearchEngine.duckduckgo.queryURL(for: "duck"))
         #expect(duck.host == "duckduckgo.com")
+
+        let sogou = try #require(ClipboardAssistantSearchEngine.sogou.queryURL(for: "hello"))
+        #expect(sogou.host == "www.sogou.com")
+        #expect(sogou.query?.contains("query=") == true)
+
+        let quark = try #require(ClipboardAssistantSearchEngine.quark.queryURL(for: "hello"))
+        #expect(quark.host == "quark.sm.cn")
+
+        let so360 = try #require(ClipboardAssistantSearchEngine.so360.queryURL(for: "hello"))
+        #expect(so360.host == "www.so.com")
+
+        let brave = try #require(ClipboardAssistantSearchEngine.brave.queryURL(for: "hello"))
+        #expect(brave.host == "search.brave.com")
+
+        let yandex = try #require(ClipboardAssistantSearchEngine.yandex.queryURL(for: "hello"))
+        #expect(yandex.host == "yandex.com")
+        #expect(yandex.query?.contains("text=") == true)
     }
 
     @Test
@@ -401,6 +507,29 @@ struct ClipboardAssistantSearchEngineTests {
         let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
         let query = try #require(components.queryItems)
         #expect(query.first(where: { $0.name == "q" })?.value == "a b&c=d")
+    }
+
+    @Test
+    func buildsCustomQueryURLsAndRejectsNonWebURLs() throws {
+        let templated = try #require(ClipboardAssistantSearchEngine.custom.queryURL(
+            for: "a b&c=d",
+            customURL: "https://search.example.com/search?term={query}"
+        ))
+        let templatedComponents = try #require(URLComponents(url: templated, resolvingAgainstBaseURL: false))
+        #expect(templatedComponents.queryItems?.first(where: { $0.name == "term" })?.value == "a b&c=d")
+
+        let appended = try #require(ClipboardAssistantSearchEngine.custom.queryURL(
+            for: "zisla",
+            customURL: "https://search.example.com/search?lang=zh"
+        ))
+        let appendedComponents = try #require(URLComponents(url: appended, resolvingAgainstBaseURL: false))
+        #expect(appendedComponents.queryItems?.first(where: { $0.name == "lang" })?.value == "zh")
+        #expect(appendedComponents.queryItems?.first(where: { $0.name == "q" })?.value == "zisla")
+
+        #expect(ClipboardAssistantSearchEngine.custom.queryURL(
+            for: "zisla",
+            customURL: "file:///tmp/search"
+        ) == nil)
     }
 
     @Test
@@ -414,6 +543,40 @@ struct ClipboardAssistantSearchEngineTests {
         // Chinese interface languages map onto Google's zh-CN code.
         let chinese = try #require(ClipboardAssistantTranslate.url(text: "hi", targetLanguageCode: "zh-CN"))
         #expect(chinese.absoluteString.contains("tl=zh-CN"))
+    }
+
+    @Test
+    func choosesTranslationProviderByCountryCode() throws {
+        #expect(ClipboardAssistantTranslate.provider(forCountryCode: "CN") == .baidu)
+        #expect(ClipboardAssistantTranslate.provider(forCountryCode: " cn\n") == .baidu)
+        #expect(ClipboardAssistantTranslate.provider(forCountryCode: "US") == .google)
+        #expect(ClipboardAssistantTranslate.provider(forCountryCode: nil) == .google)
+
+        let baidu = try #require(ClipboardAssistantTranslate.url(
+            text: "hello & 你好",
+            targetLanguageCode: "zh-CN",
+            provider: .baidu
+        ))
+        let baiduComponents = try #require(URLComponents(url: baidu, resolvingAgainstBaseURL: false))
+        let baiduItems = try #require(baiduComponents.queryItems)
+        #expect(baidu.host == "fanyi.baidu.com")
+        #expect(baiduItems.first(where: { $0.name == "query" })?.value == "hello & 你好")
+        #expect(baiduItems.first(where: { $0.name == "lang" })?.value == "auto2zh")
+        #expect(baiduComponents.fragment == "/")
+
+        let traditionalChinese = try #require(ClipboardAssistantTranslate.url(
+            text: "hello",
+            targetLanguageCode: "zh-TW",
+            provider: .baidu
+        ))
+        #expect(traditionalChinese.query?.contains("lang=auto2cht") == true)
+
+        let japanese = try #require(ClipboardAssistantTranslate.url(
+            text: "hello",
+            targetLanguageCode: "ja",
+            provider: .baidu
+        ))
+        #expect(japanese.query?.contains("lang=auto2jp") == true)
     }
 
     @Test

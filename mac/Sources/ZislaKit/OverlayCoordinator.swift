@@ -34,6 +34,7 @@ public final class OverlayCoordinator: NSObject {
     private let persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)?
     private var layoutEngine: ScreenLayoutEngine
     private let collapseDelay: Duration
+    private let pointerEntryGrace: Duration
     private var reducer = IslandPresentationReducer()
     private var pointerMonitor: PointerEdgeMonitor?
     private var panel: IslandPanel?
@@ -41,10 +42,13 @@ public final class OverlayCoordinator: NSObject {
     private var collapseTask: Task<Void, Never>?
     private var panelCollapseTask: Task<Void, Never>?
     private var pointerRevalidationTask: Task<Void, Never>?
+    private var pointerEntryGraceTask: Task<Void, Never>?
     private var collapseGeneration = CollapseGenerationTracker()
     private var panelCollapseGeneration = CollapseGenerationTracker()
     private var glassActivationGeneration = CollapseGenerationTracker()
+    private var pointerEntryGraceGeneration = CollapseGenerationTracker()
     private var isPointerInside = false
+    private var awaitsPointerEntry = false
     private var stopsAfterTransientReveal = false
     private var isPinned = false
     private var allowsKeyWindow = false
@@ -52,19 +56,31 @@ public final class OverlayCoordinator: NSObject {
     private var isExternalDragging = false
     private var isTransientInteractionVisible = false
     private var isVoiceRecording = false
+    private var isHoverActivationSuspended = false
+    private var isScreenshotActive = false
     private var collapsedOnTop = true
     private var isPersistentContentVisible = true
 
+    /// - Parameters:
+    ///   - collapseDelay: Grace period between the pointer leaving the island and the fold. Zero by
+    ///     design: the island belongs to the pointer, so it recycles the moment the pointer is gone
+    ///     — the fold animation is what softens the exit, not a wait. Tests raise it to pin the
+    ///     island open.
+    ///   - pointerEntryGrace: How long an externally triggered reveal (menu bar, hotkey) stays open
+    ///     while the pointer is still somewhere else. Without it the first pointer sample, which
+    ///     lands outside the island, would fold it before the pointer could travel there.
     public init(
         contentView: NSView,
         layoutEngine: ScreenLayoutEngine = ScreenLayoutEngine(),
-        collapseDelay: Duration = .milliseconds(450),
+        collapseDelay: Duration = .zero,
+        pointerEntryGrace: Duration = .seconds(2),
         persistentContentViewProvider: ((ScreenOverlayLayout) -> NSView?)? = nil,
         persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)? = nil
     ) {
         self.contentView = contentView
         self.layoutEngine = layoutEngine
         self.collapseDelay = collapseDelay
+        self.pointerEntryGrace = pointerEntryGrace
         self.persistentContentViewProvider = persistentContentViewProvider
         self.persistentPanelFrameProvider = persistentPanelFrameProvider
         super.init()
@@ -115,6 +131,7 @@ public final class OverlayCoordinator: NSObject {
         cancelPendingPanelCollapse()
         cancelPointerRevalidation()
         cancelPendingGlassActivation()
+        endPointerEntryGrace()
         let wasVisible = panel?.isVisible == true
         panel?.allowsNativeGlassActivation = false
         panel?.keepsNativeGlassActive = false
@@ -131,10 +148,34 @@ public final class OverlayCoordinator: NSObject {
         isExternalDragging = false
         isTransientInteractionVisible = false
         isVoiceRecording = false
+        isHoverActivationSuspended = false
+        isScreenshotActive = false
     }
 
     public func refreshScreens() {
         updateScreens(NSScreen.screens.compactMap(ScreenSnapshot.init(screen:)))
+    }
+
+    /// Builds the island panel and lays out its content ahead of the first presentation.
+    ///
+    /// Creating the panel on first use makes that presentation the hosting view's *initial* render:
+    /// SwiftUI has no previous state to animate from, so the surface snaps in fully revealed at
+    /// whatever size the layout engine happened to hold instead of growing out of the collapsed pill.
+    /// Mounting it collapsed up front gives every later reveal a baseline to animate from.
+    public func prewarmPanel() {
+        guard isRunning, panel == nil else { return }
+        ensureActiveDisplay()
+        guard let layout = layout(for: activeDisplayID) else { return }
+        onCollapsedSizeChanged?(layout.collapsedFrame.size)
+        onActiveDisplayHasPhysicalNotchChanged?(layout.topology.hasPhysicalNotch)
+        let panel = IslandPanel(
+            contentView: contentView,
+            frame: layout.expandedFrame,
+            blocksClicksInTransparentAreas: true
+        )
+        panel.ignoresMouseEvents = true
+        panel.contentView?.layoutSubtreeIfNeeded()
+        self.panel = panel
     }
 
     public func updateScreens(
@@ -203,13 +244,14 @@ public final class OverlayCoordinator: NSObject {
     }
 
     public func handlePointer(at point: CGPoint) {
-        guard isRunning else { return }
+        guard isRunning, !isVoiceRecording, !isHoverActivationSuspended else { return }
         if let triggerLayout = layoutEngine.layout(containing: point, in: layouts) {
             let changedDisplay = activeDisplayID != triggerLayout.displayID
             activeDisplayID = triggerLayout.displayID
             if changedDisplay, isVisible {
                 presentCurrentLayout()
             }
+            endPointerEntryGrace()
             setPointerInside(true)
             return
         }
@@ -224,15 +266,25 @@ public final class OverlayCoordinator: NSObject {
         // only hovering over the notch/island trigger area (triggerFrame) does.
         let isExpanded = reducer.state.visibility == .expanded
             || reducer.state.visibility == .pinned
-        setPointerInside(isExpanded && contains(point, in: activeLayout.expandedFrame))
+        let isInside = isExpanded && contains(point, in: activeLayout.expandedFrame)
+        if isInside {
+            endPointerEntryGrace()
+        } else if awaitsPointerEntry {
+            // An external reveal is still waiting for the pointer to arrive; folding now would
+            // dismiss the island the instant it appeared.
+            return
+        }
+        setPointerInside(isInside)
     }
 
     public func setPinned(_ pinned: Bool) {
+        guard !pinned || !isVoiceRecording else { return }
         isPinned = pinned
         if pinned {
             stopsAfterTransientReveal = false
             ensureActiveDisplay()
             cancelPendingGlassActivation()
+            endPointerEntryGrace()
         }
         process(reducer.send(.setPinned(pinned)))
         applyPanelFocusPolicy(activateGlass: false)
@@ -251,17 +303,28 @@ public final class OverlayCoordinator: NSObject {
     /// Expands the panel on the screen containing the given point; used for cross-screen entry
     /// points such as the menu bar.
     public func showExpanded(at point: CGPoint) {
+        guard !isVoiceRecording else { return }
         if !isRunning {
             start()
             stopsAfterTransientReveal = true
         }
         selectActiveDisplay(at: point)
         ensureActiveDisplay()
+        // Only a reveal that starts away from the island needs the grace; when the pointer already
+        // covers it the normal exit rules apply from the first sample.
+        if let expandedFrame = layout(for: activeDisplayID)?.expandedFrame,
+            contains(point, in: expandedFrame)
+        {
+            endPointerEntryGrace()
+        } else {
+            beginPointerEntryGrace()
+        }
         isPointerInside = true
         process(reducer.send(.pointerEntered))
     }
 
     public func setDragging(_ dragging: Bool) {
+        guard !isVoiceRecording || !dragging else { return }
         guard dragging != isExternalDragging else { return }
         isExternalDragging = dragging
         onDraggingChanged?(dragging)
@@ -269,9 +332,37 @@ public final class OverlayCoordinator: NSObject {
     }
 
     public func setTransientInteractionVisible(_ visible: Bool) {
+        guard !isVoiceRecording || !visible else { return }
         guard visible != isTransientInteractionVisible else { return }
         isTransientInteractionVisible = visible
         updateInteractionHold()
+    }
+
+    /// Pauses hover expansion while another top-level prompt occupies the island trigger area.
+    public func setHoverActivationSuspended(_ suspended: Bool) {
+        guard isHoverActivationSuspended != suspended else { return }
+        isHoverActivationSuspended = suspended
+        if suspended {
+            endPointerEntryGrace()
+            if isPointerInside {
+                isPointerInside = false
+                process(reducer.send(.pointerExited))
+            }
+            panel?.orderOut(nil)
+            hidePersistentPanels()
+        } else if isRunning, reducer.state.visibility != .hidden {
+            presentCurrentLayout()
+        } else {
+            updatePersistentPanels()
+        }
+    }
+
+    /// Keeps every island window below screenshot selection and editor windows.
+    public func setScreenshotActive(_ active: Bool) {
+        guard isScreenshotActive != active else { return }
+        isScreenshotActive = active
+        applyPanelLevel()
+        applyPersistentPanelLevels()
     }
 
     /// Immediately folds the island for a foreground panel that must not be obscured by it.
@@ -280,6 +371,7 @@ public final class OverlayCoordinator: NSObject {
         cancelScheduledCollapse()
         cancelPointerRevalidation()
         cancelPendingGlassActivation()
+        endPointerEntryGrace()
         isPinned = false
         process(reducer.send(.collapseImmediately))
     }
@@ -295,12 +387,19 @@ public final class OverlayCoordinator: NSObject {
 
         if recording, !wasRecording {
             selectActiveDisplay(at: point)
+            updateInteractionHold()
+            endPointerEntryGrace()
+            isPinned = false
+            process(reducer.send(.setPinned(false)))
+            isPointerInside = false
+            process(reducer.send(.pointerExited))
             if isVisible {
                 presentCurrentLayout()
             }
+        } else {
+            updateInteractionHold()
         }
 
-        updateInteractionHold()
         if !recording {
             cancelScheduledCollapse()
             process(reducer.send(.collapseDelayElapsed))
@@ -350,15 +449,19 @@ public final class OverlayCoordinator: NSObject {
         guard let panel else { return }
         let isExpanded = reducer.state.visibility == .expanded
             || reducer.state.visibility == .pinned
-        let target = (isExpanded || collapsedOnTop)
+        let target = isScreenshotActive
+            ? IslandPanel.onBottomLevel
+            : ((isExpanded || collapsedOnTop)
             ? IslandPanel.onTopLevel
-            : IslandPanel.onBottomLevel
+            : IslandPanel.onBottomLevel)
         guard panel.level != target else { return }
         panel.level = target
     }
 
     private func applyPersistentPanelLevels() {
-        let target = IslandPanel.onTopLevel
+        let target = isScreenshotActive
+            ? IslandPanel.onBottomLevel
+            : IslandPanel.onTopLevel
         for panel in persistentPanels.values where panel.level != target {
             panel.level = target
         }
@@ -411,6 +514,7 @@ public final class OverlayCoordinator: NSObject {
         at point: CGPoint,
         interaction: PointerEdgeMonitor.Interaction
     ) {
+        guard !isVoiceRecording else { return }
         switch interaction {
         case .dragging(let hasSupportedPayload):
             guard hasSupportedPayload else {
@@ -546,6 +650,40 @@ public final class OverlayCoordinator: NSObject {
         pointerRevalidationTask = nil
     }
 
+    /// Holds an externally revealed island open until the pointer reaches it. The pointer sits at
+    /// the menu bar when the reveal happens, so the very next pointer sample is an "outside" one
+    /// and, with no collapse delay left to absorb it, would fold the island immediately.
+    private func beginPointerEntryGrace() {
+        awaitsPointerEntry = true
+        pointerEntryGraceTask?.cancel()
+        let token = pointerEntryGraceGeneration.advance()
+        let grace = pointerEntryGrace
+        pointerEntryGraceTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: grace)
+            } catch {
+                return
+            }
+            guard let self,
+                !Task.isCancelled,
+                pointerEntryGraceGeneration.isCurrent(token),
+                awaitsPointerEntry
+            else { return }
+            pointerEntryGraceTask = nil
+            awaitsPointerEntry = false
+            // The pointer never travelled to the island: fold it exactly like a normal exit.
+            setPointerInside(false)
+        }
+    }
+
+    private func endPointerEntryGrace() {
+        guard awaitsPointerEntry || pointerEntryGraceTask != nil else { return }
+        awaitsPointerEntry = false
+        pointerEntryGraceTask?.cancel()
+        pointerEntryGraceTask = nil
+        _ = pointerEntryGraceGeneration.advance()
+    }
+
     private func scheduleGlassActivation() {
         guard !isPinned else {
             cancelPendingGlassActivation()
@@ -570,9 +708,12 @@ public final class OverlayCoordinator: NSObject {
             ?? layouts.first?.displayID
     }
 
-    func selectActiveDisplay(at point: CGPoint) {
+    public func selectActiveDisplay(at point: CGPoint) {
         activeDisplayID = preferredLayout(at: point)?.displayID ?? activeDisplayID
         if let layout = layout(for: activeDisplayID) {
+            // Compact surfaces size themselves from the collapsed pill, so its metrics must land
+            // before the caller reads them — not later, when the panel is finally presented.
+            onCollapsedSizeChanged?(layout.collapsedFrame.size)
             onActiveDisplayHasPhysicalNotchChanged?(layout.topology.hasPhysicalNotch)
         }
     }
@@ -616,7 +757,8 @@ public final class OverlayCoordinator: NSObject {
     }
 
     private func updatePersistentPanels(forcePresent: Bool = false) {
-        guard isPersistentContentVisible,
+        guard !isVoiceRecording,
+            isPersistentContentVisible,
             let persistentContentViewProvider,
             let persistentPanelFrameProvider
         else {
@@ -653,7 +795,9 @@ public final class OverlayCoordinator: NSObject {
             }
             panel.allowsKeyWindow = false
             panel.ignoresMouseEvents = true
-            panel.level = IslandPanel.onTopLevel
+            panel.level = isScreenshotActive
+                ? IslandPanel.onBottomLevel
+                : IslandPanel.onTopLevel
 
             let targetFrame = persistentPanelFrameProvider(layout)
             // Present only new, previously hidden, resized, or explicitly refronted panels.

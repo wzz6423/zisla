@@ -469,9 +469,11 @@
 "详细模式" = "Detalhado";
 "3 秒" = "3 segundos";
 "5 秒" = "5 segundos";
+"7 秒" = "7 segundos";
 "10 秒" = "10 segundos";
 "30 秒" = "30 segundos";
 "始终显示" = "Sempre";
+"永不" = "Nunca";
 "跟随系统" = "Sistema";
 "浅色" = "Claro";
 "深色" = "Escuro";
@@ -480,6 +482,8 @@
 "紧凑" = "Compacto";
 "详细" = "Detalhado";
 /* Clipboard assistant */
+"存在时长" = "Duração de exibição";
+"提示自动关闭前的时间；永不则仅手动关闭" = "Tempo antes de o aviso fechar; Nunca significa fechar apenas manualmente";
 "复制助手" = "Assistente de cópia";
 "复制后弹出识别结果和下一步操作" = "Mostra o conteúdo reconhecido e as próximas ações após cada cópia";
 "快速触发快捷键" = "Atalho de acionamento rápido";
@@ -516,6 +520,9 @@
 "代码" = "Código";
 "翻译" = "Traduzir";
 "写邮件" = "Escrever e-mail";
+"压缩为 ZIP" = "Compactar como ZIP";
+"拨打电话" = "Ligar";
+"不再显示来自 %@ 的复制" = "Não mostrar mais cópias de %@";
 "复制结果" = "Copiar resultado";
 "保存图片" = "Salvar imagem";
 "保存文本" = "Salvar texto";

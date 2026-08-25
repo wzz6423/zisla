@@ -169,6 +169,78 @@ struct DownloadServiceTests {
     }
 
     @Test
+    func serviceRunsSeparateDownloadTasksConcurrently() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        let firstOutputDirectory = directory.appendingPathComponent("Downloads/one", isDirectory: true)
+        let secondOutputDirectory = directory.appendingPathComponent("Downloads/two", isDirectory: true)
+        let firstOutput = firstOutputDirectory.appendingPathComponent("one.m4a")
+        let secondOutput = secondOutputDirectory.appendingPathComponent("two.m4a")
+        let firstMarker = directory.appendingPathComponent("one.started")
+        let secondMarker = directory.appendingPathComponent("two.started")
+        let releaseMarker = directory.appendingPathComponent("release")
+        let firstOutputJSON = jsonEscaped(firstOutput.path)
+        let secondOutputJSON = jsonEscaped(secondOutput.path)
+        let script = """
+        #!/bin/sh
+        url=""
+        for arg in "$@"; do url="$arg"; done
+        case "$url" in
+        *one*) target=\(shellSingleQuoted(firstOutput.path)); marker=\(shellSingleQuoted(firstMarker.path)); json=\(shellSingleQuoted(firstOutputJSON)) ;;
+        *two*) target=\(shellSingleQuoted(secondOutput.path)); marker=\(shellSingleQuoted(secondMarker.path)); json=\(shellSingleQuoted(secondOutputJSON)) ;;
+        *) exit 2 ;;
+        esac
+        /bin/mkdir -p "$(/usr/bin/dirname "$target")"
+        /usr/bin/touch "$marker"
+        while [ ! -f \(shellSingleQuoted(releaseMarker.path)) ]; do /bin/sleep 0.02; done
+        /usr/bin/touch "$target"
+        /usr/bin/printf '%s\\n' '\(YTDLPOutputParser.sentinel){"event":"completed","filepath":"'$json'"}'
+        """
+        try writeExecutable(script, to: executable)
+
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [executable],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+        )
+        let firstRequest = try DownloadRequest(
+            urlString: "https://example.com/one",
+            mode: .audio,
+            outputDirectory: firstOutputDirectory
+        )
+        let secondRequest = try DownloadRequest(
+            urlString: "https://example.com/two",
+            mode: .audio,
+            outputDirectory: secondOutputDirectory
+        )
+        let firstTask = Task { try await service.download(firstRequest, taskID: UUID()) }
+        let secondTask = Task { try await service.download(secondRequest, taskID: UUID()) }
+
+        var bothStarted = false
+        for _ in 0..<100 {
+            if FileManager.default.fileExists(atPath: firstMarker.path),
+               FileManager.default.fileExists(atPath: secondMarker.path) {
+                bothStarted = true
+                break
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(bothStarted)
+        try Data().write(to: releaseMarker)
+
+        let firstResult = try await firstTask.value
+        let secondResult = try await secondTask.value
+        #expect(firstResult.fileURL == firstOutput.standardizedFileURL)
+        #expect(secondResult.fileURL == secondOutput.standardizedFileURL)
+    }
+
+    @Test
     func serviceNativePackagesSeparateDASHComponents() async throws {
         let directory = kitTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

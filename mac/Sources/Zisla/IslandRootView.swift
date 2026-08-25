@@ -46,11 +46,13 @@ struct IslandRootView: View {
                 contentSize: layout.panelSize,
                 availableSize: proxy.size
             )
-            let hasPetSlot = !isIslandCollapsed
-                && !model.isMirrorPresented
+            // The slot stays reserved while the island is collapsed: dropping it would shift the
+            // surface back to the panel center at the exact frame the recycle fold starts, so the
+            // fold would jump sideways before it ever reached the notch.
+            let reservesPetSlot = !model.isMirrorPresented
                 && !model.isTeleprompterPresented
                 && model.settingsStore.settings.petEnabled
-            let petSlotWidth = hasPetSlot
+            let petSlotWidth = reservesPetSlot
                 ? min(
                     ExpandedPetLayout.sideSlotWidth,
                     max(0, proxy.size.width - surfaceSize.width)
@@ -60,11 +62,15 @@ struct IslandRootView: View {
                 width: surfaceSize.width + petSlotWidth,
                 height: surfaceSize.height
             )
+            // The reserved slot pushes the surface off the panel center, but the pill still belongs
+            // on the notch — the mask converges there instead of on the surface's own middle.
+            let collapsedCenterOffsetX = petSlotWidth / 2
+                * (settingsStore.settings.petSide == .right ? 1 : -1)
             let voiceRecordingGeometry = VoiceRecordingIslandGeometry(
                 collapsedSize: model.collapsedIslandSize,
                 availableSize: surfaceSize
             )
-            let renderedSurfaceSize = voiceInput.isRecording
+            let renderedSurfaceSize = voiceInput.isCapturingInput
                 ? voiceRecordingGeometry.surfaceSize
                 : surfaceSize
 
@@ -126,7 +132,8 @@ struct IslandRootView: View {
                 expandedSize: renderedSurfaceSize,
                 visualStyle: settingsStore.settings.islandVisualStyle,
                 notchBackground: settingsStore.settings.islandNotchBackground,
-                usesCompactGlassSurface: voiceInput.isRecording
+                usesCompactGlassSurface: voiceInput.isCapturingInput,
+                collapsedCenterOffsetX: collapsedCenterOffsetX
             ) {
                 if model.isMirrorPresented {
                     DeferredMount {
@@ -147,7 +154,7 @@ struct IslandRootView: View {
                 } else {
                     ZStack(alignment: .top) {
                     VStack(spacing: 0) {
-                        if voiceInput.isRecording {
+                        if voiceInput.isCapturingInput {
                             VoiceTranscriptionView(
                                 voiceInput: voiceInput,
                                 geometry: voiceRecordingGeometry
@@ -183,7 +190,10 @@ struct IslandRootView: View {
                                         case .agenda:
                                             AgendaModuleView(model: model, calendar: model.calendar)
                                         case .mail:
-                                            MailModuleView(model: model)
+                                            MailModuleView(
+                                                model: model,
+                                                onTransientInteractionChanged: onTransientInteractionChanged
+                                            )
                                         case .quickNotes:
                                             QuickNoteModuleView(model: model)
                                         case .pdf:
@@ -277,7 +287,7 @@ struct IslandRootView: View {
             .opacity(hidesIslandSurface ? 0 : 1)
             .zIndex(1)
 
-            if petSlotWidth == ExpandedPetLayout.sideSlotWidth {
+            if petSlotWidth == ExpandedPetLayout.sideSlotWidth, !isIslandCollapsed {
                 expandedPetOverlay
                     .frame(
                         width: panelSize.width,
@@ -288,6 +298,13 @@ struct IslandRootView: View {
             }
 
             }
+            // Only the recycle is animated: the surface and everything mounted inside it dissolve
+            // while the mask folds back into the notch, instead of blinking out the moment the
+            // pointer leaves. Reveals keep snapping to full opacity so the pill never ghosts.
+            .animation(
+                reduceMotion || !hidesIslandSurface ? nil : ZislaMotion.islandRecycleFade,
+                value: hidesIslandSurface
+            )
             .frame(
                 width: panelSize.width,
                 height: surfaceSize.height,
@@ -338,12 +355,12 @@ struct IslandRootView: View {
 
     private var isIslandCollapsed: Bool {
         (!model.isIslandVisible && !model.isMirrorPresented && !model.isTeleprompterPresented)
-            || (voiceInput.isRecording && !model.isMirrorPresented && !model.isTeleprompterPresented)
+            || (voiceInput.isCapturingInput && !model.isMirrorPresented && !model.isTeleprompterPresented)
     }
 
     private var hidesIslandSurface: Bool {
         !model.isIslandVisible
-            && !voiceInput.isRecording
+            && !voiceInput.isCapturingInput
             && !model.isMirrorPresented
             && !model.isTeleprompterPresented
     }
@@ -390,9 +407,10 @@ struct IslandRootView: View {
         model.settingsStore.settings.petSide == .right ? .topTrailing : .topLeading
     }
 
+    /// Matches `reservesPetSlot`: the surface keeps hugging the same panel edge while collapsed, so
+    /// the recycle fold starts exactly where the expanded surface stood.
     private var islandSurfaceAlignment: Alignment {
         guard model.settingsStore.settings.petEnabled,
-              !isIslandCollapsed,
               !model.isMirrorPresented,
               !model.isTeleprompterPresented else {
             return .top
@@ -425,7 +443,7 @@ struct IslandRootView: View {
         if model.isTeleprompterPresented {
             return .teleprompter
         }
-        if voiceInput.isRecording {
+        if voiceInput.isCapturingInput {
             // The recording surface matches the collapsed capsule's overflow width and extends downward by one row.
             return IslandModuleLayout.voiceRecording
                 .matchingWidth(model.collapsedOverflowWidth)
@@ -558,8 +576,8 @@ private struct VoiceTranscriptionView: View {
             HStack {
                 Image(systemName: "mic.fill")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.zislaError)
-                    .accessibilityLabel("正在录音")
+                    .foregroundStyle(voiceInput.isRecording ? Color.zislaError : .white.opacity(0.45))
+                    .accessibilityLabel(voiceInput.isRecording ? "正在录音" : "正在准备录音")
 
                 Spacer(minLength: 12)
 
@@ -600,6 +618,9 @@ private struct VoiceTranscriptionView: View {
 
     private var transcriptOrPlaceholder: String {
         if let error = voiceInput.errorDescription { return error }
+        // Only a live take may put text here. The surface opens on the keypress, so while the engine
+        // spins up the row stays a bare ellipsis rather than claiming to listen.
+        guard voiceInput.isRecording else { return "…" }
         let text = voiceInput.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? "正在聆听…" : text
     }

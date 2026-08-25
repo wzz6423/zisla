@@ -180,6 +180,68 @@ struct OverlayCoordinatorTests {
     }
 
     @Test @MainActor
+    func hoverActivationCanBeSuspendedWhileClipboardAssistantUsesTrigger() throws {
+        let coordinator = OverlayCoordinator(contentView: NSView())
+        defer { coordinator.stop() }
+
+        coordinator.start()
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        let trigger = try #require(coordinator.layouts.first?.triggerFrame)
+
+        coordinator.setHoverActivationSuspended(true)
+        coordinator.handlePointer(at: CGPoint(x: trigger.midX, y: trigger.midY))
+        #expect(!coordinator.isVisible)
+
+        coordinator.setHoverActivationSuspended(false)
+        coordinator.handlePointer(at: CGPoint(x: trigger.midX, y: trigger.midY))
+        #expect(coordinator.isVisible)
+    }
+
+    @Test @MainActor
+    func showExpandedRevealsIslandWhileClipboardAssistantOwnsTrigger() throws {
+        let coordinator = OverlayCoordinator(contentView: NSView(), collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.start()
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+
+        // The assistant toast suspends hover activation while it owns the notch; an action that
+        // routes into an island module still has to bring the island up by itself.
+        coordinator.setHoverActivationSuspended(true)
+        coordinator.showExpanded(at: CGPoint(x: 720, y: 450))
+        #expect(coordinator.isVisible)
+
+        coordinator.setHoverActivationSuspended(false)
+        #expect(coordinator.isVisible)
+    }
+
+    @Test @MainActor
+    func screenshotActiveDropsInteractiveAndPersistentIslandsBelowNormalWindows() throws {
+        let probe = PersistentPetPanelProbe()
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(
+            contentView: contentView,
+            persistentContentViewProvider: { probe.contentView(for: $0) },
+            persistentPanelFrameProvider: { $0.collapsedFrame }
+        )
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setPinned(true)
+        let panel = try #require(contentView.window as? IslandPanel)
+        let petPanel = try #require(probe.panel(for: Self.builtInID))
+
+        coordinator.setScreenshotActive(true)
+        #expect(panel.level == IslandPanel.onBottomLevel)
+        #expect(petPanel.level == IslandPanel.onBottomLevel)
+
+        coordinator.setScreenshotActive(false)
+        #expect(panel.level == IslandPanel.onTopLevel)
+        #expect(petPanel.level == IslandPanel.onTopLevel)
+    }
+
+    @Test @MainActor
     func selectingDisplayReportsWhetherItHasAPhysicalNotch() {
         let coordinator = OverlayCoordinator(contentView: NSView())
         coordinator.updateScreens([
@@ -338,6 +400,96 @@ struct OverlayCoordinatorTests {
         #expect(externalPanel.isVisible)
         #expect(builtInPanel.level == IslandPanel.onTopLevel)
         #expect(externalPanel.level == IslandPanel.onTopLevel)
+    }
+
+    /// The island belongs to the pointer: leaving it folds it on the same turn, with no delay for
+    /// the fold animation to fight against.
+    @Test @MainActor
+    func pointerLeavingTheIslandFoldsItOnTheSameTurn() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView)
+        defer { coordinator.stop() }
+
+        coordinator.start()
+        coordinator.updateScreens([Self.externalWindowedScreen], repositionVisiblePanel: false)
+        let layout = try #require(coordinator.layouts.first)
+        coordinator.handlePointer(
+            at: CGPoint(x: layout.triggerFrame.midX, y: layout.triggerFrame.midY)
+        )
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        #expect(coordinator.isVisible)
+        #expect(!panel.ignoresMouseEvents)
+
+        coordinator.handlePointer(at: Self.pointBesideIsland(layout))
+
+        #expect(panel.ignoresMouseEvents)
+    }
+
+    /// A menu-bar reveal starts with the pointer parked on the status item, so the click's own
+    /// mouse-up samples it outside the island. That sample must not fold what it just opened.
+    @Test @MainActor
+    func externalRevealHoldsUntilThePointerReachesTheIsland() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView)
+        defer { coordinator.stop() }
+
+        coordinator.start()
+        coordinator.updateScreens([Self.externalWindowedScreen], repositionVisiblePanel: false)
+        let layout = try #require(coordinator.layouts.first)
+        let statusItemPoint = Self.pointBesideIsland(layout)
+        coordinator.showExpanded(at: statusItemPoint)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        #expect(!panel.ignoresMouseEvents)
+
+        coordinator.handlePointer(at: statusItemPoint)
+        #expect(!panel.ignoresMouseEvents)
+
+        coordinator.handlePointer(
+            at: CGPoint(x: layout.expandedFrame.midX, y: layout.expandedFrame.midY)
+        )
+        #expect(!panel.ignoresMouseEvents)
+
+        // Once the pointer has been inside, the grace is spent and the next exit folds immediately.
+        coordinator.handlePointer(at: statusItemPoint)
+        #expect(panel.ignoresMouseEvents)
+    }
+
+    @Test @MainActor
+    func externalRevealFoldsWhenThePointerNeverArrives() async throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(
+            contentView: contentView,
+            pointerEntryGrace: .milliseconds(40)
+        )
+        defer { coordinator.stop() }
+
+        coordinator.start()
+        coordinator.updateScreens([Self.externalWindowedScreen], repositionVisiblePanel: false)
+        let layout = try #require(coordinator.layouts.first)
+        let statusItemPoint = Self.pointBesideIsland(layout)
+        coordinator.showExpanded(at: statusItemPoint)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        coordinator.handlePointer(at: statusItemPoint)
+        #expect(!panel.ignoresMouseEvents)
+
+        // Polled rather than slept through: the fold rides a 40ms timer that a parallel suite can
+        // push past any single fixed deadline.
+        var attempts = 0
+        while !panel.ignoresMouseEvents, attempts < 40 {
+            attempts += 1
+            try await Task.sleep(for: .milliseconds(25))
+        }
+
+        #expect(panel.ignoresMouseEvents)
+    }
+
+    /// A menu-bar-height point on the same screen that clears both the trigger and the expanded
+    /// panel, standing in for a status item parked beside the island.
+    private static func pointBesideIsland(_ layout: ScreenOverlayLayout) -> CGPoint {
+        CGPoint(x: layout.expandedFrame.maxX + 60, y: layout.screenFrame.maxY - 8)
     }
 
     private static let builtInID: CGDirectDisplayID = 9_001

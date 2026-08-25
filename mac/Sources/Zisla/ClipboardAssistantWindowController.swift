@@ -5,17 +5,36 @@ import SwiftUI
 import ZislaCore
 import ZislaKit
 
-/// Auto-dismiss delays for the assistant toast; hovering pauses the countdown.
 private extension ClipboardAssistantController {
-    static let autoDismissInterval: Duration = .seconds(6)
-    static let lightweightDismissInterval: Duration = .seconds(3)
-    static let hoverResumeInterval: Duration = .seconds(3)
-    static let collapsedHeight: CGFloat = 58
+    /// 复制助手需要同时容纳内容预览和右侧操作，留出额外横向余量。
+    static let islandRowWidth = ScreenLayoutConfiguration().expandedSize.width + 60
+    static let defaultRowHeight = ScreenLayoutConfiguration().simulatedIslandSize.height
+
+    static func trailingControlsWidth(
+        for detection: ClipboardAssistantDetection,
+        isLightweightMode: Bool
+    ) -> CGFloat {
+        let horizontalPadding: CGFloat = 22
+        guard !isLightweightMode, let action = detection.action else {
+            return horizontalPadding + 20
+        }
+        let title = AppLocalization.string(
+            ClipboardAssistantToastView.actionLabel(action),
+            language: AppModel.shared.languageStore.language
+        )
+        let textWidth = (title as NSString).size(withAttributes: [
+            .font: NSFont.systemFont(ofSize: 11, weight: .medium),
+        ]).width
+        return horizontalPadding + 22 + 8 + textWidth + 24 + 8 + 19 + 8 + 20
+    }
 }
 
-/// Borderless always-on-top panel hosting the assistant toast; mirrors IslandPanel's window setup.
+    /// Borderless always-on-top panel hosting the assistant island row; mirrors IslandPanel's setup.
 @MainActor
 final class ClipboardAssistantWindow: NSPanel {
+    static let defaultWindowLevel = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
+    static let aboveScreenshotSelectionLevel = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
+
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
@@ -26,12 +45,12 @@ final class ClipboardAssistantWindow: NSPanel {
             backing: .buffered,
             defer: false
         )
-        level = NSWindow.Level.statusBar
+        level = Self.defaultWindowLevel
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .canJoinAllApplications, .stationary, .ignoresCycle]
         isOpaque = false
         backgroundColor = .clear
         appearance = NSAppearance(named: .darkAqua)
-        hasShadow = true
+        hasShadow = false
         hidesOnDeactivate = false
         isMovable = false
         isReleasedWhenClosed = false
@@ -45,21 +64,39 @@ final class ClipboardAssistantWindow: NSPanel {
     }
 }
 
-/// Presentation state driving the toast's SwiftUI content.
+/// Presentation state driving the island row's SwiftUI content.
 @MainActor
 final class ClipboardAssistantPresentation: ObservableObject {
     @Published var detection: ClipboardAssistantDetection?
     /// Thumbnail preview shown for copied images.
     @Published var imageThumbnail: NSImage?
+    /// Matches the surface to the Dynamic Island appearance selected in Settings.
+    @Published var visualStyle: IslandVisualStyle = .transparent
+    /// The crown remains the same height as the notch the prompt expands from.
+    @Published var islandTopHeight: CGFloat = ScreenLayoutConfiguration().simulatedIslandSize.height
+    @Published var physicalNotchWidth: CGFloat = 0
     /// Toggled from the view so the countdown pauses while the pointer rests on the toast.
     var isHovered = false
 }
 
-/// Shows a small island-style toast below the Dynamic Island after every copy, offering smart
-/// next-step actions for the copied content.
+/// Shows a one-row island prompt after every copy, offering smart next-step actions for the copied
+/// content.
 @MainActor
 final class ClipboardAssistantController: ObservableObject {
     let presentation = ClipboardAssistantPresentation()
+    /// Lets the main island pause hover activation while this row occupies its trigger area.
+    var onPresentationChanged: ((Bool) -> Void)?
+    /// Auto-dismiss setting for newly presented assistant prompts.
+    var displayDuration: ClipboardAssistantDisplayDuration = .fiveSeconds {
+        didSet {
+            guard displayDuration != oldValue, presentation.detection != nil else { return }
+            if displayDuration.expiresAfter == nil || presentation.isHovered {
+                cancelDismissTask()
+            } else {
+                scheduleDismiss()
+            }
+        }
+    }
     /// Executes a detection action; provided by AppModel.
     var onPerformAction: ((ClipboardAssistantAction) -> Void)?
     /// Compact reminder mode: no buttons, tapping anywhere performs the primary action.
@@ -70,8 +107,28 @@ final class ClipboardAssistantController: ObservableObject {
         }
     }
 
+    /// Where the assistant row stands while a screenshot session runs.
+    private enum ScreenshotPhase {
+        /// No screenshot session.
+        case inactive
+        /// The display is about to be frozen; the row stays visible at its normal level so the
+        /// frozen image includes it.
+        case capturing
+        /// The selection overlay renders the frozen capture (which already contains the row), so
+        /// the row hides to avoid a duplicate on top of the overlay.
+        case selecting
+        /// The overlay is gone (region picked or cancelled) and the row behaves normally again.
+        case restored
+    }
+
+    private var screenshotPhase = ScreenshotPhase.inactive
+    private var isScreenshotActive: Bool { screenshotPhase != .inactive }
+    private var isSharingAnchorHeld = false
+
     private var window: ClipboardAssistantWindow?
     private var dismissTask: Task<Void, Never>?
+    private var presentationGeneration = 0
+    private var dismissalGeneration = 0
     private let triggerMonitor = ClipboardAssistantTriggerMonitor()
     private let gestureMonitor = ClipboardAssistantMouseGestureMonitor()
 
@@ -107,20 +164,81 @@ final class ClipboardAssistantController: ObservableObject {
     /// Window accessor used by the toast view to animate expansion.
     var windowForFrameUpdate: NSWindow? { window }
 
-    func present(_ detection: ClipboardAssistantDetection) {
-        dismissTask?.cancel()
-        presentation.isHovered = false
-        presentation.detection = detection
-        presentation.imageThumbnail = Self.thumbnail(for: detection)
-        showWindow(collapsedHeight: Self.collapsedHeight)
-        scheduleDismiss(after: isLightweightMode ? Self.lightweightDismissInterval : Self.autoDismissInterval)
+    /// Anchor for system sharing launched from the assistant row.
+    var sharingAnchorView: NSView? { window?.contentView }
+
+    /// A screenshot session no longer cancels the prompt: the row only steps out of the frozen
+    /// capture, so it stays available afterwards without ever landing inside the screenshot.
+    func setScreenshotActive(_ active: Bool) {
+        setScreenshotPhase(active ? .capturing : .inactive)
     }
 
-    func dismiss() {
-        dismissTask?.cancel()
-        dismissTask = nil
+    /// The selection overlay renders its own frozen capture, so the row can show again above it.
+    /// It stays click-through there, so it never blocks picking a region.
+    func setScreenshotSelectionActive(_ active: Bool) {
+        guard isScreenshotActive else { return }
+        setScreenshotPhase(active ? .selecting : .restored)
+    }
+
+    private func setScreenshotPhase(_ phase: ScreenshotPhase) {
+        guard screenshotPhase != phase else { return }
+        screenshotPhase = phase
+        // The pointer moves onto the selection overlay, so hover must not outlive the capture.
+        if phase == .capturing { presentation.isHovered = false }
+        applyScreenshotPhase()
+        switch phase {
+        case .capturing, .selecting:
+            cancelDismissTask()
+        case .restored, .inactive:
+            scheduleDismiss()
+        }
+    }
+
+    private func applyScreenshotPhase() {
+        guard let window else { return }
+        let isAboveSelection = screenshotPhase == .selecting
+        window.ignoresMouseEvents = isAboveSelection
+        window.level = isAboveSelection
+            ? ClipboardAssistantWindow.aboveScreenshotSelectionLevel
+            : ClipboardAssistantWindow.defaultWindowLevel
+        guard presentation.detection != nil else { return }
+        if screenshotPhase == .capturing {
+            window.orderOut(nil)
+        } else if !window.isVisible {
+            window.alphaValue = 1
+            window.orderFrontRegardless()
+        }
+    }
+
+    func present(_ detection: ClipboardAssistantDetection, visualStyle: IslandVisualStyle) {
+        guard !isScreenshotActive else { return }
+        isSharingAnchorHeld = false
+        cancelDismissTask()
+        presentationGeneration &+= 1
+        presentation.isHovered = false
+        presentation.visualStyle = visualStyle
+        presentation.detection = detection
+        presentation.imageThumbnail = Self.thumbnail(for: detection)
+        showWindow(detection)
+        onPresentationChanged?(true)
+        scheduleDismiss()
+    }
+
+    func dismiss(animated: Bool = true) {
+        isSharingAnchorHeld = false
+        cancelDismissTask()
+        presentationGeneration &+= 1
+        let generation = presentationGeneration
         guard let window, window.isVisible else {
             presentation.detection = nil
+            onPresentationChanged?(false)
+            return
+        }
+        guard animated else {
+            window.orderOut(nil)
+            window.alphaValue = 1
+            presentation.detection = nil
+            onPresentationChanged?(false)
             return
         }
         NSAnimationContext.runAnimationGroup({ context in
@@ -130,16 +248,25 @@ final class ClipboardAssistantController: ObservableObject {
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
                 guard let self else { return }
+                guard self.presentationGeneration == generation else { return }
                 window.orderOut(nil)
                 window.alphaValue = 1
                 self.presentation.detection = nil
+                self.onPresentationChanged?(false)
             }
         })
     }
 
-    /// Fires the given action (button click or quick trigger) and dismisses the toast.
+    /// Fires the given action and dismisses after completion; sharing keeps the anchor until its picker closes.
     func perform(_ action: ClipboardAssistantAction) {
+        let generation = presentationGeneration
+        if case .share = action {
+            isSharingAnchorHeld = true
+            cancelDismissTask()
+        }
         onPerformAction?(action)
+        guard !isSharingAnchorHeld else { return }
+        guard presentationGeneration == generation else { return }
         dismiss()
     }
 
@@ -152,27 +279,42 @@ final class ClipboardAssistantController: ObservableObject {
     func setHovered(_ hovered: Bool) {
         presentation.isHovered = hovered
         if hovered {
-            dismissTask?.cancel()
-            dismissTask = nil
+            cancelDismissTask()
         } else {
-            scheduleDismiss(after: Self.hoverResumeInterval)
+            scheduleDismiss()
         }
     }
 
-    private func scheduleDismiss(after interval: Duration) {
-        dismissTask?.cancel()
+    private func scheduleDismiss() {
+        cancelDismissTask()
+        guard presentation.detection != nil else { return }
+        guard !isSharingAnchorHeld else { return }
+        guard let seconds = displayDuration.expiresAfter else {
+            dismissTask = nil
+            return
+        }
+        let presentationGeneration = self.presentationGeneration
+        let dismissalGeneration = self.dismissalGeneration
         dismissTask = Task { [weak self] in
             do {
-                try await Task.sleep(for: interval)
+                try await Task.sleep(for: .seconds(seconds))
             } catch {
                 return
             }
             await MainActor.run { [weak self] in
                 guard let self else { return }
+                guard self.presentationGeneration == presentationGeneration,
+                      self.dismissalGeneration == dismissalGeneration else { return }
                 if self.presentation.isHovered { return }
                 self.dismiss()
             }
         }
+    }
+
+    private func cancelDismissTask() {
+        dismissTask?.cancel()
+        dismissTask = nil
+        dismissalGeneration &+= 1
     }
 
     private static func thumbnail(for detection: ClipboardAssistantDetection) -> NSImage? {
@@ -180,16 +322,38 @@ final class ClipboardAssistantController: ObservableObject {
         return NSImage(data: data)
     }
 
-    private func showWindow(collapsedHeight: CGFloat) {
+    private func showWindow(_ detection: ClipboardAssistantDetection) {
         guard let screen = WindowPlacement.screenUnderMouse() ?? NSScreen.main else { return }
-        let width = min(480, max(320, screen.visibleFrame.width - 48))
-        // Place the toast right under the collapsed island strip at the top of the screen.
-        let topInset: CGFloat = 42
+        let screenSnapshot = ScreenSnapshot(screen: screen)
+        let layout = screenSnapshot.map { ScreenLayoutEngine().layout(for: $0) }
+        let collapsedFrame = layout?.collapsedFrame
+            ?? CGRect(
+                x: screen.frame.midX,
+                y: screen.frame.maxY - Self.defaultRowHeight,
+                width: 0,
+                height: Self.defaultRowHeight
+            )
+        if let layout {
+            let topology = layout.topology
+            presentation.physicalNotchWidth = topology.hasPhysicalNotch ? topology.anchorFrame.width : 0
+        } else {
+            presentation.physicalNotchWidth = 0
+        }
+        let width = ClipboardAssistantToastView.requiredRowWidth(
+            baseWidth: Self.islandRowWidth,
+            maximumWidth: max(320, screen.frame.width - 48),
+            notchWidth: presentation.physicalNotchWidth,
+            trailingControlsWidth: Self.trailingControlsWidth(
+                for: detection,
+                isLightweightMode: isLightweightMode
+            )
+        )
+        presentation.islandTopHeight = collapsedFrame.height
         let frame = CGRect(
-            x: screen.frame.midX - width / 2,
-            y: screen.frame.maxY - topInset - collapsedHeight,
+            x: collapsedFrame.midX - width / 2,
+            y: collapsedFrame.minY,
             width: width,
-            height: collapsedHeight
+            height: collapsedFrame.height
         )
         let window: ClipboardAssistantWindow
         if let existing = self.window {
@@ -205,6 +369,8 @@ final class ClipboardAssistantController: ObservableObject {
                 )
             )
             hostingView.sizingOptions = []
+            hostingView.wantsLayer = true
+            hostingView.layer?.backgroundColor = NSColor.clear.cgColor
             window = ClipboardAssistantWindow(contentView: hostingView, frame: frame)
             self.window = window
         }
@@ -217,45 +383,58 @@ final class ClipboardAssistantController: ObservableObject {
             window.animator().alphaValue = 1
         }
     }
+
 }
 
-/// Dark island-styled toast: thumbnail or kind icon (color swatch for colors), preview lines,
+/// Dynamic Island-styled row: thumbnail or kind icon (color swatch for colors), preview lines,
 /// an optional expandable full-content view, and the offered actions. All visible strings are
 /// rendered through the app localization so they follow the user's interface language.
 struct ClipboardAssistantToastView: View {
     @ObservedObject var presentation: ClipboardAssistantPresentation
     @ObservedObject var controller: ClipboardAssistantController
 
-    /// Fixed collapsed height of the toast capsule; also drives the corner radius.
-    private static let collapsedHeight: CGFloat = 58
     private static let maxExpandedContentHeight: CGFloat = 220
-
     @Environment(\.locale) private var locale
     @State private var isExpanded = false
 
+    private var rowHeight: CGFloat {
+        max(1, presentation.islandTopHeight)
+    }
+
+    private var detailIsVisible: Bool {
+        rowHeight >= 30
+    }
+
+    private var controlVerticalPadding: CGFloat {
+        min(6, max(2, (rowHeight - 14) / 2))
+    }
+
     var body: some View {
-        Group {
+        GeometryReader { geometry in
             if let detection = presentation.detection {
-                VStack(spacing: 0) {
-                    toastHeader(detection)
-                    if isExpanded, let content = expandableContent(detection) {
-                        Rectangle()
-                            .fill(Color.white.opacity(0.08))
-                            .frame(height: 0.5)
-                            .padding(.horizontal, 14)
-                        expandedContentView(content)
+                IslandSurface(
+                    isCollapsed: !isExpanded,
+                    collapsedSize: CGSize(
+                        width: geometry.size.width,
+                        height: min(geometry.size.height, presentation.islandTopHeight)
+                    ),
+                    expandedSize: geometry.size,
+                    visualStyle: presentation.visualStyle,
+                    collapsedTopCornerRadius: 0,
+                    bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
+                ) {
+                    VStack(spacing: 0) {
+                        toastHeader(detection)
+                        if isExpanded, let content = expandableContent(detection) {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.08))
+                                .frame(height: 0.5)
+                                .padding(.horizontal, 14)
+                            expandedContentView(content)
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: Self.collapsedHeight / 2, style: .continuous)
-                        .fill(Color.black.opacity(0.86))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Self.collapsedHeight / 2, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                        )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: Self.collapsedHeight / 2, style: .continuous))
-                .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
                 .transition(.opacity.combined(with: .move(edge: .top)))
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: presentation.detection)
                 .onChange(of: presentation.detection) {
@@ -264,12 +443,98 @@ struct ClipboardAssistantToastView: View {
                 }
             }
         }
+        .ignoresSafeArea(edges: .top)
+        .environment(\.colorScheme, .dark)
     }
 
     // MARK: Header row
 
     @ViewBuilder
     private func toastHeader(_ detection: ClipboardAssistantDetection) -> some View {
+        Group {
+            if presentation.physicalNotchWidth > 0 {
+                physicalNotchHeader(detection)
+            } else {
+                continuousHeader(detection)
+                    .padding(.horizontal, 14)
+            }
+        }
+        .frame(height: rowHeight)
+        .contentShape(Rectangle())
+        .contextMenu {
+            actionMenuItems(detection.actions)
+        }
+        .onHover { hovering in
+            controller.setHovered(hovering)
+        }
+    }
+
+    private func continuousHeader(_ detection: ClipboardAssistantDetection) -> some View {
+        HStack(spacing: 10) {
+            headerContent(detection)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            trailingControls(detection)
+        }
+    }
+
+    private func physicalNotchHeader(_ detection: ClipboardAssistantDetection) -> some View {
+        GeometryReader { geometry in
+            let sideWidth = Self.physicalNotchSideWidth(
+                totalWidth: geometry.size.width,
+                notchWidth: presentation.physicalNotchWidth
+            )
+            let centerWidth = max(0, geometry.size.width - sideWidth * 2)
+            HStack(spacing: 0) {
+                headerContent(detection)
+                    .padding(.leading, 14)
+                    .padding(.trailing, 8)
+                    .frame(width: sideWidth, height: rowHeight, alignment: .leading)
+                    .clipped()
+
+                Spacer(minLength: 0)
+                    .frame(width: centerWidth)
+
+                trailingControls(detection)
+                    .padding(.leading, 8)
+                    .padding(.trailing, 14)
+                    .frame(width: sideWidth, height: rowHeight, alignment: .trailing)
+                    .clipped()
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+    }
+
+    nonisolated static func physicalNotchSideWidth(totalWidth: CGFloat, notchWidth: CGFloat) -> CGFloat {
+        let totalWidth = max(0, totalWidth)
+        let reservedCenterWidth = min(max(0, notchWidth), totalWidth)
+        return (totalWidth - reservedCenterWidth) / 2
+    }
+
+    nonisolated static func requiredRowWidth(
+        baseWidth: CGFloat,
+        maximumWidth: CGFloat,
+        notchWidth: CGFloat,
+        trailingControlsWidth: CGFloat
+    ) -> CGFloat {
+        let baseWidth = max(0, baseWidth)
+        let maximumWidth = max(0, maximumWidth)
+        let minimumWidth = notchWidth > 0
+            ? max(0, notchWidth) + max(0, trailingControlsWidth) * 2
+            : baseWidth
+        return min(maximumWidth, max(baseWidth, minimumWidth))
+    }
+
+    @ViewBuilder
+    private func headerContent(_ detection: ClipboardAssistantDetection) -> some View {
+        if let dragText = dragText(for: detection) {
+            headerContentBody(detection)
+                .onDrag { NSItemProvider(object: dragText as NSString) }
+        } else {
+            headerContentBody(detection)
+        }
+    }
+
+    private func headerContentBody(_ detection: ClipboardAssistantDetection) -> some View {
         HStack(spacing: 10) {
             leadingAccessory(detection)
 
@@ -279,7 +544,7 @@ struct ClipboardAssistantToastView: View {
                     .foregroundStyle(.white.opacity(0.92))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                if let detailText = detailText(detection.detail) {
+                if detailIsVisible, let detailText = detailText(detection.detail) {
                     Text(detailText)
                         .font(.system(size: 9.5, weight: .regular))
                         .foregroundStyle(.white.opacity(0.55))
@@ -288,30 +553,21 @@ struct ClipboardAssistantToastView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if controller.isLightweightMode {
-                    controller.performCurrentAction()
-                } else if canExpand(detection) {
-                    toggleExpansion(detection)
-                }
-            }
-
-            trailingControls(detection)
         }
-        .padding(.horizontal, 14)
-        .frame(height: Self.collapsedHeight)
         .contentShape(Rectangle())
-        .contextMenu {
-            ForEach(detection.actions, id: \.identifier) { action in
-                Button(loc(actionLabel(action))) {
-                    controller.perform(action)
-                }
-            }
+        .onTapGesture {
+            guard controller.isLightweightMode else { return }
+            controller.performCurrentAction()
         }
-        .onHover { hovering in
-            controller.setHovered(hovering)
+    }
+
+    private func dragText(for detection: ClipboardAssistantDetection) -> String? {
+        guard [.text, .chineseText, .code, .math].contains(detection.kind),
+              let content = detection.fullContent,
+              !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
         }
+        return content
     }
 
     @ViewBuilder
@@ -320,7 +576,7 @@ struct ClipboardAssistantToastView: View {
             Image(nsImage: thumbnail)
                 .resizable()
                 .scaledToFill()
-                .frame(width: 38, height: 28)
+                .frame(width: 38, height: max(16, min(28, rowHeight - 6)))
                 .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
@@ -329,7 +585,7 @@ struct ClipboardAssistantToastView: View {
         } else if let components = detection.colorComponents {
             RoundedRectangle(cornerRadius: 5, style: .continuous)
                 .fill(Color(red: components.red, green: components.green, blue: components.blue))
-                .frame(width: 26, height: 26)
+                .frame(width: 26, height: max(16, min(26, rowHeight - 6)))
                 .overlay(
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .strokeBorder(Color.white.opacity(0.25), lineWidth: 0.5)
@@ -338,77 +594,107 @@ struct ClipboardAssistantToastView: View {
             Image(systemName: detection.kind.symbolName)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
-                .frame(width: 26, height: 26)
+                .frame(width: 26, height: max(16, min(26, rowHeight - 6)))
         }
     }
 
-    @ViewBuilder
     private func trailingControls(_ detection: ClipboardAssistantDetection) -> some View {
-        if controller.isLightweightMode {
-            // Lightweight mode keeps the toast minimal: no buttons at all.
-            Image(systemName: "sparkle")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.white.opacity(0.4))
-                .frame(width: 20, height: 20)
-        } else {
-            if canExpand(detection) {
+        HStack(spacing: 8) {
+            if controller.isLightweightMode {
+                // Lightweight mode keeps the toast minimal: no buttons at all.
+                Image(systemName: "sparkle")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .frame(width: 20, height: max(16, min(20, rowHeight - 4)))
+            } else {
+                if canExpand(detection) {
+                    Button {
+                        toggleExpansion(detection)
+                    } label: {
+                        Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .frame(width: 22, height: max(16, min(22, rowHeight - 4)))
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(isExpanded ? loc("收起") : loc("展开完整内容"))
+                }
+                if let primary = detection.action {
+                    Button {
+                        controller.perform(primary)
+                    } label: {
+                        Text(loc(Self.actionLabel(primary)))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.95))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, controlVerticalPadding)
+                            .background(Capsule().fill(Color.white.opacity(0.14)))
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    .buttonStyle(.plain)
+                    .help(loc(Self.actionLabel(primary)))
+                }
+                if detection.action != nil {
+                    Menu {
+                        actionMenuItems(menuActions(for: detection))
+                    } label: {
+                        Image(systemName: "chevron.down.circle")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.92))
+                            .frame(width: 19, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help(loc("更多操作"))
+                }
                 Button {
-                    toggleExpansion(detection)
+                    controller.dismiss()
                 } label: {
-                    Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.55))
-                        .frame(width: 22, height: 22)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.45))
+                        .frame(width: 20, height: max(16, min(20, rowHeight - 4)))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(isExpanded ? loc("收起") : loc("展开完整内容"))
+                .help(loc("关闭"))
             }
-            ForEach(detection.secondaryActions, id: \.identifier) { action in
-                Button {
+        }
+    }
+
+    private func menuActions(for detection: ClipboardAssistantDetection) -> [ClipboardAssistantAction] {
+        detection.secondaryActions.isEmpty
+            ? [detection.action].compactMap { $0 }
+            : detection.secondaryActions
+    }
+
+    @ViewBuilder
+    private func actionMenuItems(_ actions: [ClipboardAssistantAction]) -> some View {
+        ForEach(actions, id: \.identifier) { action in
+            if case .blockSourceApp = action {
+                Divider()
+                Button(role: .destructive) {
                     controller.perform(action)
                 } label: {
-                    Text(loc(actionLabel(action)))
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.75))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Color.white.opacity(0.09)))
+                    Text(actionTitle(action))
                 }
-                .buttonStyle(.plain)
-                .help(loc(actionLabel(action)))
-            }
-            if let primary = detection.action {
-                Button {
-                    controller.perform(primary)
-                } label: {
-                    Text(loc(actionLabel(primary)))
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.95))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Color.white.opacity(0.14)))
+            } else {
+                Button(actionTitle(action)) {
+                    controller.perform(action)
                 }
-                .buttonStyle(.plain)
-                .help(loc(actionLabel(primary)))
             }
-            Button {
-                controller.dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .frame(width: 20, height: 20)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(loc("关闭"))
         }
     }
 
     // MARK: Expanded content
 
     private func canExpand(_ detection: ClipboardAssistantDetection) -> Bool {
+        guard ![.url, .text, .chineseText, .code, .math].contains(detection.kind) else {
+            return false
+        }
         guard !controller.isLightweightMode, let content = detection.fullContent else { return false }
         return content.count > 40 || content.contains("\n")
     }
@@ -424,10 +710,10 @@ struct ClipboardAssistantToastView: View {
         guard let screen = WindowPlacement.screenUnderMouse() ?? NSScreen.main else { return }
         var frame = window.frame
         let topY = frame.maxY
-        var newHeight = Self.collapsedHeight
+        var newHeight = rowHeight
         if expanded {
             let textHeight = estimateExpandedHeight(detection.fullContent ?? "", width: frame.width)
-            newHeight = Self.collapsedHeight + min(textHeight, Self.maxExpandedContentHeight)
+            newHeight = rowHeight + min(textHeight, Self.maxExpandedContentHeight)
         }
         newHeight = min(newHeight, screen.visibleFrame.height - 80)
         frame.origin.y = topY - newHeight
@@ -500,7 +786,7 @@ struct ClipboardAssistantToastView: View {
     }
 
     /// Localization key for each executable action.
-    private func actionLabel(_ action: ClipboardAssistantAction) -> String {
+    static func actionLabel(_ action: ClipboardAssistantAction) -> String {
         switch action {
         case .openURL: "打开链接"
         case .openDownload: "下载"
@@ -509,10 +795,23 @@ struct ClipboardAssistantToastView: View {
         case .translate: "翻译"
         case .composeMail: "写邮件"
         case .copyText: "复制结果"
+        case .compress: "压缩为 ZIP"
+        case .share: "系统共享"
+        case .callPhone: "拨打电话"
+        case .blockSourceApp: "不再显示来自 %@ 的复制"
+        case .addToQuickNote: "发送到随记"
+        case .sendToTeleprompter: "发送到提词器"
         case .saveImage: "保存图片"
         case .saveText: "保存文本"
         case .createCalendarEvent: "新建日程"
         }
+    }
+
+    private func actionTitle(_ action: ClipboardAssistantAction) -> String {
+        if case .blockSourceApp(_, let appName) = action {
+            return AppLocalization.format("不再显示来自 %@ 的复制", locale: locale, [appName])
+        }
+        return loc(Self.actionLabel(action))
     }
 }
 
@@ -654,7 +953,7 @@ final class ClipboardAssistantTriggerMonitor {
     }
 }
 
-/// Hold-left-mouse + right-click quick copy gesture (off by default): listens globally for a
+/// Optional hold-left-mouse + right-click quick copy gesture: listens globally for a
 /// right mouse-down while the left button is held, then simulates ⌘C so the selection lands in
 /// the pasteboard and the assistant picks it up. Requires input monitoring (listening) and
 /// accessibility (posting keystrokes) permissions.

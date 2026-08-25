@@ -39,41 +39,139 @@ public enum ClipboardAssistantSearchEngine: String, Codable, CaseIterable, Senda
     case google
     case bing
     case baidu
+    case sogou
+    case quark
+    case so360
     case duckduckgo
+    case brave
+    case yandex
+    case custom
 
     /// Builds the search URL for a query; returns `nil` for queries that cannot be encoded.
-    public func queryURL(for text: String) -> URL? {
+    public func queryURL(for text: String, customURL: String = "") -> URL? {
+        if self == .custom {
+            return Self.customQueryURL(for: text, template: customURL)
+        }
+        guard let endpoint else { return nil }
         var components = URLComponents(string: endpoint)
         components?.queryItems = [URLQueryItem(name: queryParameter, value: text)]
         return components?.url
     }
 
-    private var endpoint: String {
+    private var endpoint: String? {
         switch self {
         case .google: "https://www.google.com/search"
         case .bing: "https://www.bing.com/search"
         case .baidu: "https://www.baidu.com/s"
+        case .sogou: "https://www.sogou.com/web"
+        case .quark: "https://quark.sm.cn/s"
+        case .so360: "https://www.so.com/s"
         case .duckduckgo: "https://duckduckgo.com/"
+        case .brave: "https://search.brave.com/search"
+        case .yandex: "https://yandex.com/search/"
+        case .custom: nil
         }
     }
 
     private var queryParameter: String {
-        self == .baidu ? "wd" : "q"
+        switch self {
+        case .baidu: "wd"
+        case .sogou: "query"
+        case .yandex: "text"
+        default: "q"
+        }
+    }
+
+    private static func customQueryURL(for text: String, template: String) -> URL? {
+        let template = template.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !template.isEmpty else { return nil }
+
+        if template.contains("{query}") {
+            guard let encodedQuery = percentEncodedQuery(text) else { return nil }
+            return webURL(from: template.replacingOccurrences(of: "{query}", with: encodedQuery))
+        }
+
+        guard var components = URLComponents(string: template),
+              isWebURL(components) else {
+            return nil
+        }
+        components.queryItems = (components.queryItems ?? []) + [URLQueryItem(name: "q", value: text)]
+        return components.url
+    }
+
+    private static func percentEncodedQuery(_ text: String) -> String? {
+        var components = URLComponents()
+        components.queryItems = [URLQueryItem(name: "q", value: text)]
+        return components.percentEncodedQuery.map { String($0.dropFirst(2)) }
+    }
+
+    private static func webURL(from value: String) -> URL? {
+        guard let components = URLComponents(string: value), isWebURL(components) else {
+            return nil
+        }
+        return components.url
+    }
+
+    private static func isWebURL(_ components: URLComponents) -> Bool {
+        guard let scheme = components.scheme?.lowercased() else { return false }
+        return (scheme == "http" || scheme == "https") && components.host != nil
     }
 }
 
-/// Builds a Google Translate web URL for the given text and BCP-47-ish target language code.
+/// Builds a translation web URL for the given text and BCP-47-ish target language code.
 public enum ClipboardAssistantTranslate {
-    public static func url(text: String, targetLanguageCode code: String) -> URL? {
-        var components = URLComponents(string: "https://translate.google.com/")
-        let normalized = code.hasPrefix("zh") ? "zh-CN" : code
-        components?.queryItems = [
-            URLQueryItem(name: "sl", value: "auto"),
-            URLQueryItem(name: "tl", value: normalized),
-            URLQueryItem(name: "op", value: "translate"),
-            URLQueryItem(name: "text", value: text),
-        ]
-        return components?.url
+    public enum Provider: Equatable, Sendable {
+        case google
+        case baidu
+    }
+
+    public static func provider(forCountryCode countryCode: String?) -> Provider {
+        countryCode?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() == "CN"
+            ? .baidu
+            : .google
+    }
+
+    public static func url(
+        text: String,
+        targetLanguageCode code: String,
+        provider: Provider = .google
+    ) -> URL? {
+        switch provider {
+        case .baidu:
+            var components = URLComponents(string: "https://fanyi.baidu.com/mtpe-individual/transText")
+            components?.queryItems = [
+                URLQueryItem(name: "ext_channel", value: "Aldtype"),
+                URLQueryItem(name: "query", value: text),
+                URLQueryItem(name: "lang", value: "auto2\(baiduTargetLanguageCode(for: code))"),
+            ]
+            components?.fragment = "/"
+            return components?.url
+        case .google:
+            var components = URLComponents(string: "https://translate.google.com/")
+            let normalized = code.hasPrefix("zh") ? "zh-CN" : code
+            components?.queryItems = [
+                URLQueryItem(name: "sl", value: "auto"),
+                URLQueryItem(name: "tl", value: normalized),
+                URLQueryItem(name: "op", value: "translate"),
+                URLQueryItem(name: "text", value: text),
+            ]
+            return components?.url
+        }
+    }
+
+    private static func baiduTargetLanguageCode(for code: String) -> String {
+        switch code {
+        case "zh-CN": "zh"
+        case "zh-TW": "cht"
+        case "ja": "jp"
+        case "ko": "kor"
+        case "fr": "fra"
+        case "es": "spa"
+        case "pt-BR": "pot"
+        case "ar": "ara"
+        case "vi": "vie"
+        default: code
+        }
     }
 }
 
@@ -117,6 +215,12 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     case translate(String)
     case composeMail(String)
     case copyText(String)
+    case compress(URL)
+    case share
+    case callPhone(String)
+    case blockSourceApp(bundleIdentifier: String, appName: String)
+    case addToQuickNote
+    case sendToTeleprompter
     case saveImage(Data)
     case saveText(String)
     case createCalendarEvent(title: String, date: Date, isAllDay: Bool)
@@ -131,6 +235,12 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .translate: "translate"
         case .composeMail: "composeMail"
         case .copyText: "copyText"
+        case .compress: "compress"
+        case .share: "share"
+        case .callPhone: "callPhone"
+        case .blockSourceApp: "blockSourceApp"
+        case .addToQuickNote: "addToQuickNote"
+        case .sendToTeleprompter: "sendToTeleprompter"
         case .saveImage: "saveImage"
         case .saveText: "saveText"
         case .createCalendarEvent: "createCalendarEvent"

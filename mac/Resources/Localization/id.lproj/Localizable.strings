@@ -469,9 +469,11 @@
 "详细模式" = "Detail";
 "3 秒" = "3 detik";
 "5 秒" = "5 detik";
+"7 秒" = "7 detik";
 "10 秒" = "10 detik";
 "30 秒" = "30 detik";
 "始终显示" = "Selalu";
+"永不" = "Jangan pernah";
 "跟随系统" = "Sistem";
 "浅色" = "Terang";
 "深色" = "Gelap";
@@ -480,6 +482,8 @@
 "紧凑" = "Ringkas";
 "详细" = "Detail";
 /* Clipboard assistant */
+"存在时长" = "Durasi tampilan";
+"提示自动关闭前的时间；永不则仅手动关闭" = "Waktu sebelum pemberitahuan ditutup; Jangan pernah berarti hanya ditutup manual";
 "复制助手" = "Asisten Salin";
 "复制后弹出识别结果和下一步操作" = "Menampilkan konten yang dikenali dan tindakan berikutnya setelah setiap penyalinan";
 "快速触发快捷键" = "Pintasan pemicu cepat";
@@ -516,6 +520,9 @@
 "代码" = "Kode";
 "翻译" = "Terjemahkan";
 "写邮件" = "Tulis email";
+"压缩为 ZIP" = "Kompres sebagai ZIP";
+"拨打电话" = "Hubungi";
+"不再显示来自 %@ 的复制" = "Jangan tampilkan salinan dari %@ lagi";
 "复制结果" = "Salin hasil";
 "保存图片" = "Simpan gambar";
 "保存文本" = "Simpan teks";

@@ -50,6 +50,32 @@ public enum FocusModeNoticeDisplayDuration: String, Codable, CaseIterable, Senda
     }
 }
 
+/// Default time before the clipboard assistant disappears automatically.
+public enum ClipboardAssistantDisplayDuration: String, Codable, CaseIterable, Sendable, Equatable {
+    case threeSeconds
+    case fiveSeconds
+    case sevenSeconds
+    case never
+
+    public var expiresAfter: Double? {
+        switch self {
+        case .threeSeconds: 3
+        case .fiveSeconds: 5
+        case .sevenSeconds: 7
+        case .never: nil
+        }
+    }
+
+    public var menuTitle: String {
+        switch self {
+        case .threeSeconds: "3 秒"
+        case .fiveSeconds: "5 秒"
+        case .sevenSeconds: "7 秒"
+        case .never: "永不"
+        }
+    }
+}
+
 /// Appearance mode for regular UI (Settings window, etc.). The Dynamic Island is always dark and unaffected by this setting.
 public enum AppearanceMode: String, Codable, CaseIterable, Sendable, Equatable {
     case system
@@ -488,8 +514,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind>
     /// Engine used by the assistant's "search" action for copied text.
     public var clipboardAssistantSearchEngine: ClipboardAssistantSearchEngine
+    public var clipboardAssistantCustomSearchURL: String
     /// Lightweight reminder mode: compact toast without buttons; tapping it performs the primary action.
     public var clipboardAssistantLightweightMode: Bool
+    /// Default time before the clipboard assistant closes automatically.
+    public var clipboardAssistantDisplayDuration: ClipboardAssistantDisplayDuration
+    /// Whether image saves should ask for a destination instead of using the shared download directory.
+    public var clipboardAssistantPromptsForImageSaveLocation: Bool
     /// Hold left mouse button + right-click to copy the selection (simulated ⌘C); off by default.
     /// Requires input monitoring and accessibility permissions.
     public var clipboardAssistantMouseGestureEnabled: Bool
@@ -581,7 +612,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardAssistantBlacklist: Set<String> = [],
         clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind> = Set(ClipboardAssistantKind.allCases),
         clipboardAssistantSearchEngine: ClipboardAssistantSearchEngine = .google,
+        clipboardAssistantCustomSearchURL: String = "",
         clipboardAssistantLightweightMode: Bool = false,
+        clipboardAssistantDisplayDuration: ClipboardAssistantDisplayDuration = .fiveSeconds,
+        clipboardAssistantPromptsForImageSaveLocation: Bool = false,
         clipboardAssistantMouseGestureEnabled: Bool = false,
         sideNoticesEnabled: Bool = true,
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
@@ -656,7 +690,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             ? Set(ClipboardAssistantKind.allCases)
             : clipboardAssistantEnabledKinds
         self.clipboardAssistantSearchEngine = clipboardAssistantSearchEngine
+        self.clipboardAssistantCustomSearchURL = clipboardAssistantCustomSearchURL
         self.clipboardAssistantLightweightMode = clipboardAssistantLightweightMode
+        self.clipboardAssistantDisplayDuration = clipboardAssistantDisplayDuration
+        self.clipboardAssistantPromptsForImageSaveLocation = clipboardAssistantPromptsForImageSaveLocation
         self.clipboardAssistantMouseGestureEnabled = clipboardAssistantMouseGestureEnabled
         self.sideNoticesEnabled = sideNoticesEnabled
         self.compactStatusPriority = CompactStatusPriority.normalized(compactStatusPriority)
@@ -746,7 +783,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantBlacklist
         case clipboardAssistantEnabledKinds
         case clipboardAssistantSearchEngine
+        case clipboardAssistantCustomSearchURL
         case clipboardAssistantLightweightMode
+        case clipboardAssistantDisplayDuration
+        case clipboardAssistantPromptsForImageSaveLocation
         case clipboardAssistantMouseGestureEnabled
         case sideNoticesEnabled
         case compactStatusPriority
@@ -881,10 +921,22 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             ClipboardAssistantSearchEngine.self,
             forKey: .clipboardAssistantSearchEngine
         ) ?? defaults.clipboardAssistantSearchEngine
+        clipboardAssistantCustomSearchURL = try container.decodeIfPresent(
+            String.self,
+            forKey: .clipboardAssistantCustomSearchURL
+        ) ?? defaults.clipboardAssistantCustomSearchURL
         clipboardAssistantLightweightMode = try container.decodeIfPresent(
             Bool.self,
             forKey: .clipboardAssistantLightweightMode
         ) ?? defaults.clipboardAssistantLightweightMode
+        clipboardAssistantDisplayDuration = try container.decodeIfPresent(
+            ClipboardAssistantDisplayDuration.self,
+            forKey: .clipboardAssistantDisplayDuration
+        ) ?? defaults.clipboardAssistantDisplayDuration
+        clipboardAssistantPromptsForImageSaveLocation = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .clipboardAssistantPromptsForImageSaveLocation
+        ) ?? defaults.clipboardAssistantPromptsForImageSaveLocation
         clipboardAssistantMouseGestureEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .clipboardAssistantMouseGestureEnabled

@@ -1057,6 +1057,47 @@ struct MessageNotificationTests {
         #expect(state.notices.map(\.id) == ["message-atomic-1-left", "message-atomic-1-right"])
         #expect(state.notices.allSatisfy { $0.style == .message })
     }
+
+    @Test
+    func repositoryRetainsEveryEnqueuedNotice() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let notices = (0..<1_005).map { index in
+            IslandNotice(id: "notice-\(index)", title: "Notice \(index)")
+        }
+
+        try repository.enqueueNotices(notices)
+
+        #expect(try repository.load().notices.map(\.id) == notices.map(\.id))
+    }
+
+    @Test
+    func aiStateDatabaseProtectsMainFileAndSQLiteSidecars() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let databaseURL = directory.appendingPathComponent("ai-state.sqlite")
+        let database = try AIStateDatabase(url: databaseURL, maximumUsageSamples: 10)
+
+        try withExtendedLifetime(database) {
+            let fileManager = FileManager.default
+            let directoryPermissions = try fileManager.attributesOfItem(atPath: directory.path)[.posixPermissions]
+                as? NSNumber
+            #expect(directoryPermissions?.intValue == 0o700)
+
+            let protectedFiles = [
+                databaseURL,
+                URL(fileURLWithPath: databaseURL.path + "-wal"),
+                URL(fileURLWithPath: databaseURL.path + "-shm"),
+            ]
+            #expect(protectedFiles.allSatisfy { fileManager.fileExists(atPath: $0.path) })
+            for file in protectedFiles {
+                let permissions = try fileManager.attributesOfItem(atPath: file.path)[.posixPermissions]
+                    as? NSNumber
+                #expect(permissions?.intValue == 0o600)
+            }
+        }
+    }
 }
 
 struct FileShelfTests {
@@ -1865,9 +1906,14 @@ struct FeatureSettingsTests {
     @Test
     func clipboardAssistantTriggerRoundTripsAndDefaultsOnLegacyJSON() throws {
         let defaults = FeatureSettings.default
-        // Assistant is on by default; the trigger hotkey defaults to double-tap Left Control.
+        // Assistant is on by default; its modifier-only trigger fires on a double tap.
         #expect(defaults.clipboardAssistantEnabled)
-        #expect(defaults.clipboardAssistantTriggerConfiguration.hotkey?.isModifierOnly == true)
+        let defaultHotkey = try #require(defaults.clipboardAssistantTriggerConfiguration.hotkey)
+        #expect(defaultHotkey.isModifierOnly)
+        #expect(defaultHotkey.keyCode == 59)
+        #expect(defaultHotkey.carbonModifiers == 0x1000)
+        #expect(defaultHotkey.keyDisplayName.isEmpty)
+        #expect(defaultHotkey.modifierSides == [.leftControl])
         #expect(defaults.clipboardAssistantMouseButton == nil)
 
         let encoder = JSONEncoder()
@@ -1920,22 +1966,31 @@ struct FeatureSettingsTests {
     func clipboardAssistantPreferenceFieldsRoundTripAndDefaultOnLegacyJSON() throws {
         let defaults = FeatureSettings.default
         #expect(defaults.clipboardAssistantSearchEngine == .google)
+        #expect(defaults.clipboardAssistantCustomSearchURL.isEmpty)
         #expect(!defaults.clipboardAssistantLightweightMode)
+        #expect(defaults.clipboardAssistantDisplayDuration == .fiveSeconds)
+        #expect(!defaults.clipboardAssistantPromptsForImageSaveLocation)
         #expect(!defaults.clipboardAssistantMouseGestureEnabled)
 
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
         var settings = defaults
-        settings.clipboardAssistantSearchEngine = .baidu
+        settings.clipboardAssistantSearchEngine = .custom
+        settings.clipboardAssistantCustomSearchURL = "https://search.example.com/search?q={query}"
         settings.clipboardAssistantLightweightMode = true
+        settings.clipboardAssistantDisplayDuration = .sevenSeconds
+        settings.clipboardAssistantPromptsForImageSaveLocation = true
         settings.clipboardAssistantMouseGestureEnabled = true
 
         let decoded = try decoder.decode(
             FeatureSettings.self,
             from: encoder.encode(settings)
         )
-        #expect(decoded.clipboardAssistantSearchEngine == .baidu)
+        #expect(decoded.clipboardAssistantSearchEngine == .custom)
+        #expect(decoded.clipboardAssistantCustomSearchURL == "https://search.example.com/search?q={query}")
         #expect(decoded.clipboardAssistantLightweightMode)
+        #expect(decoded.clipboardAssistantDisplayDuration == .sevenSeconds)
+        #expect(decoded.clipboardAssistantPromptsForImageSaveLocation)
         #expect(decoded.clipboardAssistantMouseGestureEnabled)
 
         // Settings JSON written before these fields existed falls back to defaults.
@@ -1943,7 +1998,10 @@ struct FeatureSettingsTests {
         var legacyDictionary = try #require(legacyObject as? [String: Any])
         for key in [
             "clipboardAssistantSearchEngine",
+            "clipboardAssistantCustomSearchURL",
             "clipboardAssistantLightweightMode",
+            "clipboardAssistantDisplayDuration",
+            "clipboardAssistantPromptsForImageSaveLocation",
             "clipboardAssistantMouseGestureEnabled",
         ] {
             legacyDictionary.removeValue(forKey: key)
@@ -1953,8 +2011,19 @@ struct FeatureSettingsTests {
             from: JSONSerialization.data(withJSONObject: legacyDictionary)
         )
         #expect(legacy.clipboardAssistantSearchEngine == .google)
+        #expect(legacy.clipboardAssistantCustomSearchURL.isEmpty)
         #expect(!legacy.clipboardAssistantLightweightMode)
+        #expect(legacy.clipboardAssistantDisplayDuration == .fiveSeconds)
+        #expect(!legacy.clipboardAssistantPromptsForImageSaveLocation)
         #expect(!legacy.clipboardAssistantMouseGestureEnabled)
+    }
+
+    @Test
+    func clipboardAssistantDisplayDurationMapsToExpectedTimeouts() {
+        #expect(ClipboardAssistantDisplayDuration.threeSeconds.expiresAfter == 3)
+        #expect(ClipboardAssistantDisplayDuration.fiveSeconds.expiresAfter == 5)
+        #expect(ClipboardAssistantDisplayDuration.sevenSeconds.expiresAfter == 7)
+        #expect(ClipboardAssistantDisplayDuration.never.expiresAfter == nil)
     }
 }
 

@@ -469,9 +469,11 @@
 "详细模式" = "Chi tiết";
 "3 秒" = "3 giây";
 "5 秒" = "5 giây";
+"7 秒" = "7 giây";
 "10 秒" = "10 giây";
 "30 秒" = "30 giây";
 "始终显示" = "Luôn luôn";
+"永不" = "Không bao giờ";
 "跟随系统" = "Hệ thống";
 "浅色" = "Sáng";
 "深色" = "Tối";
@@ -480,6 +482,8 @@
 "紧凑" = "Gọn";
 "详细" = "Chi tiết";
 /* Clipboard assistant */
+"存在时长" = "Thời lượng hiển thị";
+"提示自动关闭前的时间；永不则仅手动关闭" = "Thời gian trước khi thông báo đóng; Không bao giờ nghĩa là chỉ đóng thủ công";
 "复制助手" = "Trợ lý sao chép";
 "复制后弹出识别结果和下一步操作" = "Hiển thị nội dung nhận dạng và hành động tiếp theo sau mỗi lần sao chép";
 "快速触发快捷键" = "Phím tắt kích hoạt nhanh";
@@ -516,6 +520,9 @@
 "代码" = "Mã";
 "翻译" = "Dịch";
 "写邮件" = "Soạn email";
+"压缩为 ZIP" = "Nén thành ZIP";
+"拨打电话" = "Gọi điện";
+"不再显示来自 %@ 的复制" = "Không hiển thị bản sao từ %@ nữa";
 "复制结果" = "Sao chép kết quả";
 "保存图片" = "Lưu ảnh";
 "保存文本" = "Lưu văn bản";

@@ -41,12 +41,12 @@ public enum ClipboardAssistantDetector {
                 actions: actions
             )
         }
-        if enabledKinds.contains(.filePath), let url = localFileURL(from: text) {
+        if enabledKinds.contains(.filePath), let candidate = filePathCandidate(from: text) {
             return ClipboardAssistantDetection(
                 kind: .filePath,
-                title: url.lastPathComponent,
-                detail: .path(url.path),
-                actions: [.revealInFinder(url)]
+                title: candidate.url.lastPathComponent,
+                detail: .path(candidate.url.path),
+                actions: filePathActions(for: candidate)
             )
         }
         if enabledKinds.contains(.email), isEmailAddress(text) {
@@ -91,7 +91,7 @@ public enum ClipboardAssistantDetector {
             return ClipboardAssistantDetection(
                 kind: .phone,
                 title: text,
-                actions: [.copyText(normalized)]
+                actions: [.copyText(normalized), .callPhone(normalized)]
             )
         }
         if enabledKinds.contains(.code), let code = codeDetection(text) {
@@ -185,21 +185,68 @@ public enum ClipboardAssistantDetector {
             kind: .file,
             title: reference.displayName,
             detail: byteCount.map(ClipboardAssistantDetail.fileSize),
-            actions: [.revealInFinder(reference.url)]
+            actions: [.revealInFinder(reference.url), .compress(reference.url)]
         )
     }
 
-    private static func localFileURL(from text: String) -> URL? {
-        guard !text.contains(where: \Character.isWhitespace) || text.hasPrefix("/") || text.hasPrefix("~") else {
-            return nil
-        }
+    /// A copied value that reads as a local path, plus whether it currently resolves on disk.
+    struct FilePathCandidate: Equatable {
+        var url: URL
+        var exists: Bool
+    }
+
+    /// Recognizes local paths by shape. Existence is a strong signal but not a requirement:
+    /// temporary files get cleaned up and other apps' container paths are unreachable, yet such
+    /// values are still paths to the user — treating them as text sent them down the plain/Chinese
+    /// text branch (a path ending in `图像.png` came back as Chinese prose). Unresolvable paths keep
+    /// the path kind and only lose the file-bound actions. Shape rules match the clipboard history
+    /// categorization (`ClipboardHistoryItem.category`), tightened for values that do not resolve.
+    static func filePathCandidate(from text: String) -> FilePathCandidate? {
+        guard text.count <= 1024, !text.contains(where: \Character.isNewline) else { return nil }
+        guard text == "~" || text.hasPrefix("~/") || text.hasPrefix("/") else { return nil }
         var expanded = NSString(string: text).expandingTildeInPath
         while expanded.hasSuffix("/") && expanded.count > 1 {
             expanded.removeLast()
         }
-        let url = URL(fileURLWithPath: expanded)
-        guard url.isFileURL, FileManager.default.fileExists(atPath: url.path) else { return nil }
-        return url.standardizedFileURL
+        let url = URL(fileURLWithPath: expanded).standardizedFileURL
+        if FileManager.default.fileExists(atPath: url.path) {
+            return FilePathCandidate(url: url, exists: true)
+        }
+        // Nothing on disk backs the guess, so require an unambiguous shape: no whitespace and at
+        // least two components, keeping values like "/help" or a stray slashed sentence out.
+        guard !text.contains(where: \Character.isWhitespace),
+              url.pathComponents.filter({ $0 != "/" }).count >= 2 else {
+            return nil
+        }
+        return FilePathCandidate(url: url, exists: false)
+    }
+
+    /// Existing items get the file-bound actions. Unresolvable ones reveal the nearest surviving
+    /// ancestor instead — a cleaned-up temp file still tells you where it lived — and always keep
+    /// copying the raw path, which is the only thing left to do with a vanished file.
+    private static func filePathActions(for candidate: FilePathCandidate) -> [ClipboardAssistantAction] {
+        guard !candidate.exists else {
+            return [.revealInFinder(candidate.url), .compress(candidate.url)]
+        }
+        var actions: [ClipboardAssistantAction] = []
+        if let ancestor = nearestExistingAncestor(of: candidate.url) {
+            actions.append(.revealInFinder(ancestor))
+        }
+        actions.append(.copyText(candidate.url.path))
+        return actions
+    }
+
+    /// Walks up until a directory exists on disk. The volume root is excluded: opening it says
+    /// nothing about the copied value.
+    private static func nearestExistingAncestor(of url: URL) -> URL? {
+        var current = url.deletingLastPathComponent()
+        while current.path != "/" {
+            if FileManager.default.fileExists(atPath: current.path) { return current }
+            let parent = current.deletingLastPathComponent()
+            guard parent.path != current.path else { return nil }
+            current = parent
+        }
+        return nil
     }
 
     static func isEmailAddress(_ text: String) -> Bool {
@@ -340,27 +387,16 @@ public enum ClipboardAssistantDetector {
 
     // MARK: - Code
 
-    /// Heuristic code detection: requires at least two lines plus structural markers, or a single
-    /// line starting with an unambiguous language keyword. Returns `nil` for ordinary prose.
+    /// Heuristic code detection. Three independent signals, matching how snippets actually get
+    /// copied: a language keyword opening the first line, an unmistakable syntax signature anywhere
+    /// in the snippet, or enough structural punctuation across a multi-line block. Returns `nil` for
+    /// ordinary prose.
     static func codeDetection(_ text: String) -> ClipboardAssistantDetection? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 8 else { return nil }
         let lines = trimmed.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-        let strongPrefixes = [
-            "#include", "#import", "#define", "import ", "package ", "using ", "namespace ",
-            "func ", "def ", "class ", "struct ", "enum ", "interface ", "public class", "<?xml", "<!DOCTYPE",
-        ]
-        let startsStrong = lines.first.map { line in strongPrefixes.contains { line.hasPrefix($0) } } == true
-        let structuralMarkers = ["{", "}", ";", "()", "=>", "->", "==", ":="]
-        let markerLines = lines.filter { line in structuralMarkers.contains { line.contains($0) } }.count
-        let looksLikeCode: Bool
-        if startsStrong {
-            looksLikeCode = lines.count >= 1
-        } else {
-            looksLikeCode = lines.count >= 2 && markerLines * 2 >= lines.count
-        }
-        guard looksLikeCode else { return nil }
+        guard looksLikeCode(trimmed, lines: lines) else { return nil }
 
         let preview = previewText(trimmed)
         return ClipboardAssistantDetection(
@@ -371,6 +407,107 @@ public enum ClipboardAssistantDetector {
             fullContent: trimmed.count <= 20_000 ? trimmed : String(trimmed.prefix(20_000))
         )
     }
+
+    private static func looksLikeCode(_ text: String, lines: [String]) -> Bool {
+        let strongPrefixes = [
+            "#include", "#import", "#define", "import ", "package ", "using ", "namespace ",
+            "func ", "def ", "class ", "struct ", "enum ", "interface ", "public class", "<?xml", "<!DOCTYPE",
+        ]
+        if let first = lines.first, strongPrefixes.contains(where: first.hasPrefix) { return true }
+
+        // Regex scanning is capped so a huge paste cannot stall the 1 Hz clipboard poll.
+        let sample = text.count <= 20_000 ? text : String(text.prefix(20_000))
+        if codeSignaturePatterns.contains(where: { sample.range(of: $0, options: .regularExpression) != nil }) {
+            return true
+        }
+        if sample.range(of: #"\bselect\b[\s\S]*\bfrom\b"#, options: [.regularExpression, .caseInsensitive]) != nil {
+            return true
+        }
+
+        // Multi-line assignment-with-call is common in copied snippets (e.g. `x = compute(a, b)` /
+        // `y = x * 2`) but rarely in prose, so a single such line among two or more is enough.
+        if lines.count >= 2,
+           lines.contains(where: {
+               $0.range(of: #"^\s*[A-Za-z_$][\w$]*\s*=\s*[A-Za-z_$][\w$]*\("#,
+                        options: .regularExpression) != nil
+           }) {
+            return true
+        }
+
+        // Compound assignments are equally strong signals in short two-line snippets.
+        if lines.count >= 2,
+           lines.filter({
+               $0.range(of: #"^\s*[A-Za-z_$][\w$]*\s*(\+=|-=|\*=|/=|%=)\s*"#,
+                        options: .regularExpression) != nil
+           }).count >= 2 {
+            return true
+        }
+
+        // Punctuation alone is a weak signal, so it needs at least three lines with markers on half
+        // of them. The threshold and line count are deliberately conservative: code blocks copied to
+        // the clipboard rarely span only two short lines, while step-by-step prose does.
+        guard lines.count >= 3 else { return false }
+        let markerLines = lines.filter(hasStructuralMarker).count
+        return markerLines * 2 >= lines.count
+    }
+
+    private static func hasStructuralMarker(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        // A line ending in a semicolon without any other code punctuation is usually a natural-language
+        // step ("Step 1: install;") rather than code, so it does not count toward the marker threshold.
+        if trimmed.hasSuffix(";"),
+           !trimmed.contains("="),
+           !trimmed.contains("{") {
+            return false
+        }
+        // Parentheses are excluded here: ordinary prose routinely has "(see chapter 3)" or
+        // "(Cmd+F)" per line. Calls and signatures are caught by codeSignaturePatterns or the
+        // multi-line assignment check above; this predicate only flags punctuation-dense blocks.
+        return line.contains("{") || line.contains("}")
+            || line.contains("=>") || line.contains("->")
+            || line.contains("==") || line.contains(":=")
+            || line.contains("!=") || line.contains(">=") || line.contains("<=")
+            || line.contains("+=") || line.contains("-=")
+            || line.contains("*=") || line.contains("/=")
+            || line.contains("&&") || line.contains("||")
+    }
+
+    /// Signatures that appear in source code but not in prose. Case-sensitive on purpose: a
+    /// sentence opening with "Let me…" must not read as a `let` declaration. Patterns anchor to the
+    /// start of a line where the keyword doubles as an English word ("class", "let", "import"), and
+    /// float freely where it does not ("def foo(").
+    private static let codeSignaturePatterns = [
+        // Function definitions: `func greet(`, `def main(`, `function handler(`, `fn run(`
+        #"\b(func|fn|def|function)\s+[A-Za-z_$][\w$]*\s*[(<]"#,
+        // Type declarations with optional access modifiers
+        #"(?m)^\s*((public|private|internal|fileprivate|open|final|abstract|export|data)\s+)*(class|struct|enum|interface|protocol|trait|impl|record)\s+[A-Za-z_]\w*"#,
+        // Declarations carrying an initializer or type annotation, behind any attributes or access
+        // modifiers: `let items = …`, `const x: T`, `@State private var isOn = false`
+        #"(?m)^\s*(@\w+(\([^)]*\))?\s+)*((public|private|internal|fileprivate|open|final|static|lazy|weak|unowned)\s+)*(let|var|const|val)\s+[A-Za-z_$][\w$]*\s*[:=]"#,
+        // Imports and includes, each pinned to its language's shape so "from the start" stays prose
+        #"(?m)^\s*(import|#include|#import)\s+[\w"'<@./{*]"#,
+        #"(?m)^\s*from\s+[\w.]+\s+import\s"#,
+        #"(?m)^\s*using\s+[\w.]+\s*;"#,
+        #"(?m)^\s*package\s+[\w.]+\s*;?\s*$"#,
+        #"(?m)^\s*export\s+(default|const|let|var|function|class|\{|\*)"#,
+        #"\brequire\s*\(\s*['\"]"#,
+        // Control flow opening a block
+        #"(?m)^\s*(if|for|while|switch|foreach|elif|else|guard|match)\b.*[):{]\s*$"#,
+        // Print and logging calls
+        #"\b(print|println|printf|NSLog|echo|puts)\s*\("#,
+        #"\b(console|logger|System\.out)\s*\.\s*\w+\s*\("#,
+        #"\b[A-Za-z_$][\w$]*\s*\.\s*[A-Za-z_$][\w$]*\s*\("#,
+        // Quoted keys of JSON and object literals
+        #""[\w-]+"\s*:"#,
+        // Lines made only of closing punctuation
+        #"(?m)^\s*[}\])]+;?\s*$"#,
+        // Markup, stylesheets and shebangs
+        #"</[A-Za-z][\w:-]*>"#,
+        #"<[A-Za-z][\w:-]*(\s+[\w:-]+\s*=\s*("[^"]*"|'[^']*'))+\s*/?>"#,
+        #"(?m)^\s*[\w-]+\s*:\s*[^\s;{}]+;\s*$"#,
+        #"@(media|import|keyframes|supports)\b"#,
+        #"(?m)^\s*#!\s*\S*/"#,
+    ]
 
     /// Guesses a file extension from code content so saved snippets land with a useful name.
     static func guessCodeFileExtension(_ text: String) -> String {
