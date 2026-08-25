@@ -64,7 +64,7 @@ struct ScreenshotEditorTests {
         // 贴右下角：右侧空间不足，标签退到选区内右侧。
         let farRight = CGRect(x: 660, y: 400, width: 140, height: 180)
         let farRightPos = ScreenshotSelectionGeometry.badgePosition(for: farRight, in: bounds)
-        #expect(farRightPos.x < farRight.midX)
+        #expect(farRightPos.x == farRight.maxX - gap - badge.width / 2)
         #expect(farRightPos.x >= badge.width / 2)
         #expect(farRightPos.y == farRight.maxY - badge.height / 2)
 
@@ -79,7 +79,7 @@ struct ScreenshotEditorTests {
             for: CGRect(origin: .zero, size: bounds),
             in: bounds
         )
-        #expect(fullScreen.x < bounds.width / 2)
+        #expect(fullScreen.x == bounds.width - gap - badge.width / 2)
     }
 
     @Test
