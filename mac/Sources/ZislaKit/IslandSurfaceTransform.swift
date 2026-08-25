@@ -41,4 +41,14 @@ public struct IslandSurfaceTransform: Equatable, Sendable {
             height: min(max(0, contentSize.height), max(0, availableSize.height))
         )
     }
+
+    /// Horizontal shift that keeps the collapsed pill on the notch when the expanded surface sits
+    /// off the panel's center (the pet slot widens the panel on one side only). It unwinds to zero
+    /// at full reveal, where the surface already fills its own frame.
+    public static func collapsedCenterOffset(
+        _ offset: CGFloat,
+        revealProgress: CGFloat
+    ) -> CGFloat {
+        offset * (1 - min(1, max(0, revealProgress)))
+    }
 }

@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import ZislaCore
 
@@ -9,6 +10,8 @@ struct SettingsNavigationTests {
         #expect(SettingsSection.allCases.map(\.title) == [
             "通用",
             "功能",
+            "复制助手",
+            "截图",
             "工作流",
             "信息",
             "AI",
@@ -55,6 +58,18 @@ struct SettingsNavigationTests {
         settings.mediaEnabled = true
         settings.systemMonitorEnabled = true
         #expect(SettingsSection.workflow.isVisible(settings: settings))
+    }
+
+    @Test
+    func clipboardAssistantAndScreenshotVisibilityFollowFeatureToggles() {
+        var settings = FeatureSettings(clipboardAssistantEnabled: false, screenshotEnabled: false)
+        #expect(!SettingsSection.clipboardAssistant.isVisible(settings: settings))
+        #expect(!SettingsSection.screenshot.isVisible(settings: settings))
+
+        settings.clipboardAssistantEnabled = true
+        settings.screenshotEnabled = true
+        #expect(SettingsSection.clipboardAssistant.isVisible(settings: settings))
+        #expect(SettingsSection.screenshot.isVisible(settings: settings))
     }
 
     @Test
@@ -117,5 +132,18 @@ struct SettingsNavigationTests {
     @Test
     func petSectionTitleIsShort() {
         #expect(SettingsSection.pet.title == "宠物")
+    }
+
+    @Test @MainActor
+    func clipboardBlacklistAcceptsOnlyApplicationsDirectoryBundles() {
+        #expect(SettingsView.isApplicationBundleInApplicationsDirectory(
+            URL(fileURLWithPath: "/Applications/Example.app")
+        ))
+        #expect(!SettingsView.isApplicationBundleInApplicationsDirectory(
+            URL(fileURLWithPath: "/System/Applications/Example.app")
+        ))
+        #expect(!SettingsView.isApplicationBundleInApplicationsDirectory(
+            URL(fileURLWithPath: "/Applications/Example.txt")
+        ))
     }
 }

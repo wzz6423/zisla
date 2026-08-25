@@ -40,6 +40,21 @@ struct AIAgentSecretStoreTests {
     }
 
     @Test
+    func databaseStoreRestrictsContainingDirectory() throws {
+        let directory = try makeDirectory(named: "zisla-agent-secret-directory-permissions")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = DatabaseAIAgentSecretStore(
+            storageURL: directory.appendingPathComponent("secrets.sqlite")
+        )
+
+        try store.setSecret("database-secret", for: "account")
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: directory.path)
+        let permissions = (attributes[.posixPermissions] as? NSNumber)?.uint16Value
+        #expect(permissions == 0o700)
+    }
+
+    @Test
     func databaseStoreRejectsBlankReferencesAndSecrets() throws {
         let directory = try makeDirectory(named: "zisla-agent-secret-validation")
         defer { try? FileManager.default.removeItem(at: directory) }

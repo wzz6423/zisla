@@ -31,6 +31,18 @@ enum ZislaMotion {
     static let press: Animation = .snappy(duration: 0.14)
     /// Content swap inside the settings window.
     static let settingsPageSwitch: Animation = .smooth(duration: 0.28)
+    /// Island reveal: the surface grows out of the collapsed pill, with a hint of bounce at the end.
+    static let islandReveal: Animation = .snappy(duration: 0.28, extraBounce: 0.05)
+    /// Island recycle: the pointer left, so the surface folds straight back into the pill it grew
+    /// from. No bounce — a fold that overshoots reads as the island hesitating to leave.
+    static let islandRecycle: Animation = .smooth(duration: 0.22)
+    /// The surface and its content dissolve on the same clock as the fold, weighted to its end, so
+    /// the eye follows the island being drawn back into the notch instead of a blink-out.
+    static let islandRecycleFade: Animation = .easeIn(duration: 0.22)
+    /// Delay before the panel returns to its module size after a voice take — must outlast the fold
+    /// and its fade, because the module panel reserves a pet slot that re-offsets the surface from
+    /// the panel center and would drag the still-visible pill sideways.
+    static let islandRecycleSettleDelay: Duration = .milliseconds(280)
 }
 
 enum ZislaMotionPalette {

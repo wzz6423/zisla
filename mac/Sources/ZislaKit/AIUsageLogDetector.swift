@@ -63,7 +63,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         doubaoRoots: [URL]? = nil,
         copilotUsageLogRoots: [URL]? = nil,
         maxFilesPerProvider: Int = .max,
-        maxBytesPerFile: Int = 256 * 1_024,
+        maxBytesPerFile: Int = .max,
         maxSamplesPerFile: Int = .max,
         scanInterval: TimeInterval = 60,
         fileManager: FileManager = .default
@@ -744,24 +744,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     }
 
     private func trailingData(from candidate: Candidate) -> LogData? {
-        guard candidate.url.pathExtension == "jsonl",
-              candidate.size > UInt64(maxBytesPerFile) else {
-            return (try? Data(contentsOf: candidate.url)).map {
-                LogData(data: $0)
-            }
-        }
-        guard candidate.url.pathExtension == "jsonl",
-              let handle = try? FileHandle(forReadingFrom: candidate.url) else {
-            return nil
-        }
-        defer { try? handle.close() }
-
-        let offset = candidate.size - UInt64(maxBytesPerFile)
-        guard (try? handle.seek(toOffset: offset)) != nil,
-              let tail = try? handle.readToEnd(),
-              let firstNewline = tail.firstIndex(of: 0x0A)
-        else { return nil }
-        return LogData(data: Data(tail[tail.index(after: firstNewline)...]))
+        (try? Data(contentsOf: candidate.url)).map { LogData(data: $0) }
     }
 
     private func cacheKey(for candidate: Candidate) -> String {

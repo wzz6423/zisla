@@ -126,7 +126,7 @@ struct AIStateMonitorActivityDetectorTests {
     }
 
     @Test @MainActor
-    func refreshDetectsNewActivityWhenPersistedStateIsUnchanged() async {
+    func refreshDetectsNewActivityWhenPersistedStateIsUnchanged() async throws {
         let directory = monitorTempDirectory("unchanged-state-refresh")
         defer { try? FileManager.default.removeItem(at: directory) }
         let now = Date(timeIntervalSince1970: 1_910_000_000)
@@ -147,8 +147,9 @@ struct AIStateMonitorActivityDetectorTests {
         )
         defer { monitor.stop() }
 
-        monitor.start()
-        #expect(await waitForDetectorCall(detector))
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        monitor.reload()
+        #expect(detector.hasBeenCalled)
 
         detector.replaceTasks(with: [task])
         monitor.refresh()
@@ -229,19 +230,6 @@ private final class MutableActivityDetector: AIActivityDetecting, @unchecked Sen
         defer { lock.unlock() }
         return callCount > 0
     }
-}
-
-@MainActor
-private func waitForDetectorCall(
-    _ detector: MutableActivityDetector,
-    timeout: TimeInterval = 2
-) async -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    while Date() < deadline {
-        if detector.hasBeenCalled { return true }
-        try? await Task.sleep(for: .milliseconds(25))
-    }
-    return detector.hasBeenCalled
 }
 
 @MainActor

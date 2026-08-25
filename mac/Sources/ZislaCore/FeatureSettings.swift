@@ -50,6 +50,32 @@ public enum FocusModeNoticeDisplayDuration: String, Codable, CaseIterable, Senda
     }
 }
 
+/// Default time before the clipboard assistant disappears automatically.
+public enum ClipboardAssistantDisplayDuration: String, Codable, CaseIterable, Sendable, Equatable {
+    case threeSeconds
+    case fiveSeconds
+    case sevenSeconds
+    case never
+
+    public var expiresAfter: Double? {
+        switch self {
+        case .threeSeconds: 3
+        case .fiveSeconds: 5
+        case .sevenSeconds: 7
+        case .never: nil
+        }
+    }
+
+    public var menuTitle: String {
+        switch self {
+        case .threeSeconds: "3 秒"
+        case .fiveSeconds: "5 秒"
+        case .sevenSeconds: "7 秒"
+        case .never: "永不"
+        }
+    }
+}
+
 /// Appearance mode for regular UI (Settings window, etc.). The Dynamic Island is always dark and unaffected by this setting.
 public enum AppearanceMode: String, Codable, CaseIterable, Sendable, Equatable {
     case system
@@ -475,6 +501,29 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var clipboardHistoryEnabled: Bool
     /// Whether to detect downloadable links in clipboard; users can disable it in Settings.
     public var clipboardDetectionEnabled: Bool
+    /// Whether copying shows the assistant toast with a recognized result and next-step action.
+    public var clipboardAssistantEnabled: Bool
+    /// Quick trigger hotkey firing the assistant's primary action while its toast is visible.
+    /// Modifier-only presets fire on double-tap; ordinary combos fire on key-down.
+    public var clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration
+    /// Mouse side button (CGEvent button number, e.g. 3 = back) firing the primary action; `nil` disables it.
+    public var clipboardAssistantMouseButton: Int?
+    /// Bundle identifiers of apps whose copies never trigger the assistant toast.
+    public var clipboardAssistantBlacklist: Set<String>
+    /// Recognized content kinds; an empty set falls back to all kinds.
+    public var clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind>
+    /// Engine used by the assistant's "search" action for copied text.
+    public var clipboardAssistantSearchEngine: ClipboardAssistantSearchEngine
+    public var clipboardAssistantCustomSearchURL: String
+    /// Lightweight reminder mode: compact toast without buttons; tapping it performs the primary action.
+    public var clipboardAssistantLightweightMode: Bool
+    /// Default time before the clipboard assistant closes automatically.
+    public var clipboardAssistantDisplayDuration: ClipboardAssistantDisplayDuration
+    /// Whether image saves should ask for a destination instead of using the shared download directory.
+    public var clipboardAssistantPromptsForImageSaveLocation: Bool
+    /// Hold left mouse button + right-click to copy the selection (simulated ⌘C); off by default.
+    /// Requires input monitoring and accessibility permissions.
+    public var clipboardAssistantMouseGestureEnabled: Bool
     public var sideNoticesEnabled: Bool
     public var compactStatusPriority: [CompactStatusPriority]
     /// Temporarily suppresses system notifications pushed by Zisla itself (Pomodoro, etc.); alarms are unaffected.
@@ -557,6 +606,17 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         networkProxyEnabled: Bool = false,
         clipboardHistoryEnabled: Bool = true,
         clipboardDetectionEnabled: Bool = true,
+        clipboardAssistantEnabled: Bool = true,
+        clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration = .default,
+        clipboardAssistantMouseButton: Int? = nil,
+        clipboardAssistantBlacklist: Set<String> = [],
+        clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind> = Set(ClipboardAssistantKind.allCases),
+        clipboardAssistantSearchEngine: ClipboardAssistantSearchEngine = .google,
+        clipboardAssistantCustomSearchURL: String = "",
+        clipboardAssistantLightweightMode: Bool = false,
+        clipboardAssistantDisplayDuration: ClipboardAssistantDisplayDuration = .fiveSeconds,
+        clipboardAssistantPromptsForImageSaveLocation: Bool = false,
+        clipboardAssistantMouseGestureEnabled: Bool = false,
         sideNoticesEnabled: Bool = true,
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
         notificationsMuted: Bool = false,
@@ -621,6 +681,20 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.networkProxyEnabled = networkProxyEnabled
         self.clipboardHistoryEnabled = clipboardHistoryEnabled
         self.clipboardDetectionEnabled = clipboardDetectionEnabled
+        self.clipboardAssistantEnabled = clipboardAssistantEnabled
+        self.clipboardAssistantTriggerConfiguration = clipboardAssistantTriggerConfiguration
+        self.clipboardAssistantMouseButton = clipboardAssistantMouseButton
+        self.clipboardAssistantBlacklist = clipboardAssistantBlacklist
+        self.clipboardAssistantEnabledKinds =
+            clipboardAssistantEnabledKinds.isEmpty
+            ? Set(ClipboardAssistantKind.allCases)
+            : clipboardAssistantEnabledKinds
+        self.clipboardAssistantSearchEngine = clipboardAssistantSearchEngine
+        self.clipboardAssistantCustomSearchURL = clipboardAssistantCustomSearchURL
+        self.clipboardAssistantLightweightMode = clipboardAssistantLightweightMode
+        self.clipboardAssistantDisplayDuration = clipboardAssistantDisplayDuration
+        self.clipboardAssistantPromptsForImageSaveLocation = clipboardAssistantPromptsForImageSaveLocation
+        self.clipboardAssistantMouseGestureEnabled = clipboardAssistantMouseGestureEnabled
         self.sideNoticesEnabled = sideNoticesEnabled
         self.compactStatusPriority = CompactStatusPriority.normalized(compactStatusPriority)
         self.notificationsMuted = notificationsMuted
@@ -703,6 +777,17 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case networkProxyEnabled
         case clipboardHistoryEnabled
         case clipboardDetectionEnabled
+        case clipboardAssistantEnabled
+        case clipboardAssistantTriggerConfiguration
+        case clipboardAssistantMouseButton
+        case clipboardAssistantBlacklist
+        case clipboardAssistantEnabledKinds
+        case clipboardAssistantSearchEngine
+        case clipboardAssistantCustomSearchURL
+        case clipboardAssistantLightweightMode
+        case clipboardAssistantDisplayDuration
+        case clipboardAssistantPromptsForImageSaveLocation
+        case clipboardAssistantMouseGestureEnabled
         case sideNoticesEnabled
         case compactStatusPriority
         case notificationsMuted
@@ -808,6 +893,54 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             ?? (!networkProxyURL.isEmpty)
         clipboardHistoryEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardHistoryEnabled) ?? defaults.clipboardHistoryEnabled
         clipboardDetectionEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardDetectionEnabled) ?? defaults.clipboardDetectionEnabled
+        clipboardAssistantEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .clipboardAssistantEnabled
+        ) ?? defaults.clipboardAssistantEnabled
+        clipboardAssistantTriggerConfiguration = try container.decodeIfPresent(
+            ClipboardAssistantTriggerConfiguration.self,
+            forKey: .clipboardAssistantTriggerConfiguration
+        ) ?? .default
+        if container.contains(.clipboardAssistantMouseButton) {
+            clipboardAssistantMouseButton = try container.decodeIfPresent(
+                Int.self,
+                forKey: .clipboardAssistantMouseButton
+            )
+        } else {
+            clipboardAssistantMouseButton = defaults.clipboardAssistantMouseButton
+        }
+        clipboardAssistantBlacklist = try container.decodeIfPresent(
+            Set<String>.self,
+            forKey: .clipboardAssistantBlacklist
+        ) ?? defaults.clipboardAssistantBlacklist
+        clipboardAssistantEnabledKinds = try container.decodeIfPresent(
+            Set<ClipboardAssistantKind>.self,
+            forKey: .clipboardAssistantEnabledKinds
+        ) ?? defaults.clipboardAssistantEnabledKinds
+        clipboardAssistantSearchEngine = try container.decodeIfPresent(
+            ClipboardAssistantSearchEngine.self,
+            forKey: .clipboardAssistantSearchEngine
+        ) ?? defaults.clipboardAssistantSearchEngine
+        clipboardAssistantCustomSearchURL = try container.decodeIfPresent(
+            String.self,
+            forKey: .clipboardAssistantCustomSearchURL
+        ) ?? defaults.clipboardAssistantCustomSearchURL
+        clipboardAssistantLightweightMode = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .clipboardAssistantLightweightMode
+        ) ?? defaults.clipboardAssistantLightweightMode
+        clipboardAssistantDisplayDuration = try container.decodeIfPresent(
+            ClipboardAssistantDisplayDuration.self,
+            forKey: .clipboardAssistantDisplayDuration
+        ) ?? defaults.clipboardAssistantDisplayDuration
+        clipboardAssistantPromptsForImageSaveLocation = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .clipboardAssistantPromptsForImageSaveLocation
+        ) ?? defaults.clipboardAssistantPromptsForImageSaveLocation
+        clipboardAssistantMouseGestureEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .clipboardAssistantMouseGestureEnabled
+        ) ?? defaults.clipboardAssistantMouseGestureEnabled
         sideNoticesEnabled = try container.decodeIfPresent(Bool.self, forKey: .sideNoticesEnabled) ?? defaults.sideNoticesEnabled
         compactStatusPriority = CompactStatusPriority.normalized(
             try container.decodeIfPresent([CompactStatusPriority].self, forKey: .compactStatusPriority)

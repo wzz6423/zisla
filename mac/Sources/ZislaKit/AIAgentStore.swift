@@ -11,6 +11,8 @@ private final class AIAgentStatePersistence: @unchecked Sendable {
     private let queue = DispatchQueue(label: "com.zisla.ai-agent.state", qos: .utility)
     private let lock = NSLock()
     private var generation = 0
+    private var pendingState: AIAgentState?
+    private var scheduledWorkItem: DispatchWorkItem?
 
     init(storageURL: URL, delay: TimeInterval, writer: @escaping Writer) {
         self.storageURL = storageURL
@@ -22,25 +24,47 @@ private final class AIAgentStatePersistence: @unchecked Sendable {
         _ state: AIAgentState,
         completion: @escaping @Sendable (Result<Void, Error>) -> Void
     ) {
-        let scheduledGeneration = advanceGeneration()
-        queue.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self, self.isCurrent(scheduledGeneration) else { return }
+        let scheduledGeneration: Int
+        lock.lock()
+        generation += 1
+        scheduledGeneration = generation
+        pendingState = state
+        scheduledWorkItem?.cancel()
+        scheduledWorkItem = nil
+        lock.unlock()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, let state = self.takePendingState(for: scheduledGeneration) else { return }
             let result = Result { try self.writer(state, self.storageURL) }
             guard self.isCurrent(scheduledGeneration) else { return }
             completion(result)
         }
+        lock.lock()
+        if generation == scheduledGeneration {
+            scheduledWorkItem = workItem
+        }
+        lock.unlock()
+        queue.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
     func flush(_ state: AIAgentState) -> Result<Void, Error> {
-        _ = advanceGeneration()
+        lock.lock()
+        generation += 1
+        pendingState = nil
+        scheduledWorkItem?.cancel()
+        scheduledWorkItem = nil
+        lock.unlock()
         return queue.sync { Result { try writer(state, storageURL) } }
     }
 
-    private func advanceGeneration() -> Int {
+    private func takePendingState(for scheduledGeneration: Int) -> AIAgentState? {
         lock.lock()
         defer { lock.unlock() }
-        generation += 1
-        return generation
+        guard generation == scheduledGeneration else { return nil }
+        scheduledWorkItem = nil
+        let state = pendingState
+        pendingState = nil
+        return state
     }
 
     private func isCurrent(_ value: Int) -> Bool {

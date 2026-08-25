@@ -642,9 +642,13 @@ enum ScreenshotAnnotationTransform {
 
 enum ScreenshotAnnotationEditHandle: Equatable {
     case topLeft
+    case top
     case topRight
+    case right
     case bottomRight
+    case bottom
     case bottomLeft
+    case left
     case rotation
 }
 
@@ -652,7 +656,7 @@ enum ScreenshotAnnotationGeometry {
     static let minimumSize: CGFloat = 12
     static let defaultEmojiDiameter: CGFloat = 28
     static let handleRadius: CGFloat = 14
-    static let rotationOffset: CGFloat = 0
+    static let rotationOffset: CGFloat = 24
 
     static func numberDiameter(for lineWidth: CGFloat) -> CGFloat {
         max(18, lineWidth * 7)
@@ -843,6 +847,14 @@ enum ScreenshotAnnotationGeometry {
             (.bottomRight, CGPoint(x: rect.maxX, y: rect.maxY)),
             (.bottomLeft, CGPoint(x: rect.minX, y: rect.maxY)),
         ]
+        if annotation.kind == .rectangle {
+            candidates += [
+                (.top, CGPoint(x: rect.midX, y: rect.minY)),
+                (.right, CGPoint(x: rect.maxX, y: rect.midY)),
+                (.bottom, CGPoint(x: rect.midX, y: rect.maxY)),
+                (.left, CGPoint(x: rect.minX, y: rect.midY)),
+            ]
+        }
         if annotation.kind == .rectangle || annotation.kind == .text || annotation.kind == .arrow {
             candidates.append((.rotation, CGPoint(x: rect.midX, y: rect.minY - rotationOffset)))
         }
@@ -903,7 +915,7 @@ enum ScreenshotAnnotationGeometry {
                 oppositeCorner = CGPoint(x: rect.minX, y: rect.minY)
             case .bottomLeft:
                 oppositeCorner = CGPoint(x: rect.maxX, y: rect.minY)
-            case .rotation:
+            case .top, .right, .bottom, .left, .rotation:
                 return annotation
             }
             let diameter = max(
@@ -936,7 +948,7 @@ enum ScreenshotAnnotationGeometry {
                     width: diameter,
                     height: diameter
                 )
-            case .rotation:
+            case .top, .right, .bottom, .left, .rotation:
                 return annotation
             }
             var result = annotation
@@ -953,15 +965,23 @@ enum ScreenshotAnnotationGeometry {
         case .topLeft:
             minX = min(localCurrent.x, maxX - minimumSize)
             minY = min(localCurrent.y, maxY - minimumSize)
+        case .top:
+            minY = min(localCurrent.y, maxY - minimumSize)
         case .topRight:
             maxX = max(localCurrent.x, minX + minimumSize)
             minY = min(localCurrent.y, maxY - minimumSize)
+        case .right:
+            maxX = max(localCurrent.x, minX + minimumSize)
         case .bottomRight:
             maxX = max(localCurrent.x, minX + minimumSize)
+            maxY = max(localCurrent.y, minY + minimumSize)
+        case .bottom:
             maxY = max(localCurrent.y, minY + minimumSize)
         case .bottomLeft:
             minX = min(localCurrent.x, maxX - minimumSize)
             maxY = max(localCurrent.y, minY + minimumSize)
+        case .left:
+            minX = min(localCurrent.x, maxX - minimumSize)
         case .rotation:
             break
         }
@@ -969,12 +989,20 @@ enum ScreenshotAnnotationGeometry {
         switch handle {
         case .topLeft:
             oppositeCorner = CGPoint(x: rect.maxX, y: rect.maxY)
+        case .top:
+            oppositeCorner = CGPoint(x: rect.midX, y: rect.maxY)
         case .topRight:
             oppositeCorner = CGPoint(x: rect.minX, y: rect.maxY)
+        case .right:
+            oppositeCorner = CGPoint(x: rect.minX, y: rect.midY)
         case .bottomRight:
             oppositeCorner = CGPoint(x: rect.minX, y: rect.minY)
+        case .bottom:
+            oppositeCorner = CGPoint(x: rect.midX, y: rect.minY)
         case .bottomLeft:
             oppositeCorner = CGPoint(x: rect.maxX, y: rect.minY)
+        case .left:
+            oppositeCorner = CGPoint(x: rect.maxX, y: rect.midY)
         case .rotation:
             return annotation
         }
@@ -1923,14 +1951,13 @@ enum ScreenshotCanvasStyle {
     }
 }
 
+@MainActor
 struct ScreenshotToolbarDragWrapper<Content: View>: View {
     private let content: Content
     let restingCenter: CGPoint
     let toolbarSize: CGSize
     let bounds: CGRect
     let onDragEnd: (CGPoint) -> Void
-
-    @GestureState private var dragTranslation = CGSize.zero
 
     init(
         restingCenter: CGPoint,
@@ -1947,49 +1974,236 @@ struct ScreenshotToolbarDragWrapper<Content: View>: View {
     }
 
     var body: some View {
-        let displayedCenter = ScreenshotToolbarLayout.clampedCenter(
-            CGPoint(
-                x: restingCenter.x + dragTranslation.width,
-                y: restingCenter.y + dragTranslation.height
-            ),
+        ScreenshotToolbarDragRepresentable(
+            rootView: content,
+            restingCenter: restingCenter,
             toolbarSize: toolbarSize,
-            in: bounds
+            bounds: bounds,
+            onDragEnd: onDragEnd
         )
-        content
-            .overlay(alignment: .leading) {
-                Color.clear
-                    .frame(
-                        width: ScreenshotToolbarLayout.horizontalPadding
-                            + ScreenshotToolbarLayout.dragHandleWidth,
-                        height: toolbarSize.height
-                    )
-                    .contentShape(Rectangle())
-                    .gesture(dragGesture)
-                    .help("拖动工具栏")
-            }
-            .position(restingCenter)
-            .offset(
-                x: displayedCenter.x - restingCenter.x,
-                y: displayedCenter.y - restingCenter.y
-            )
+        .frame(width: max(0, bounds.width), height: max(0, bounds.height))
+    }
+}
+
+private struct ScreenshotToolbarDragRepresentable<Content: View>: NSViewRepresentable {
+    typealias NSViewType = ScreenshotToolbarDragContainer<Content>
+
+    let rootView: Content
+    let restingCenter: CGPoint
+    let toolbarSize: CGSize
+    let bounds: CGRect
+    let onDragEnd: (CGPoint) -> Void
+
+    func makeNSView(context: Context) -> ScreenshotToolbarDragContainer<Content> {
+        ScreenshotToolbarDragContainer(
+            rootView: rootView,
+            restingCenter: restingCenter,
+            toolbarSize: toolbarSize,
+            bounds: bounds,
+            onDragEnd: onDragEnd
+        )
     }
 
-    private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 1)
-            .updating($dragTranslation) { value, state, _ in
-                state = value.translation
-            }
-            .onEnded { value in
-                let finalCenter = ScreenshotToolbarLayout.clampedCenter(
-                    CGPoint(
-                        x: restingCenter.x + value.translation.width,
-                        y: restingCenter.y + value.translation.height
-                    ),
-                    toolbarSize: toolbarSize,
-                    in: bounds
-                )
-                onDragEnd(finalCenter)
-            }
+    func updateNSView(
+        _ nsView: ScreenshotToolbarDragContainer<Content>,
+        context: Context
+    ) {
+        nsView.update(
+            rootView: rootView,
+            restingCenter: restingCenter,
+            toolbarSize: toolbarSize,
+            bounds: bounds,
+            onDragEnd: onDragEnd
+        )
+    }
+}
+
+@MainActor
+final class ScreenshotToolbarDragContainer<Content: View>: NSView {
+    private let hostingView: NSHostingView<Content>
+    private let toolbarView = ScreenshotToolbarContentView()
+    private let dragHandleView = ScreenshotToolbarDragHandleView()
+    private var restingCenter: CGPoint
+    private var toolbarSize: CGSize
+    private var layoutBounds: CGRect
+    private var onDragEnd: (CGPoint) -> Void
+    private var dragStartPoint: CGPoint?
+    private var dragStartCenter: CGPoint?
+    private var isDragging = false
+
+    override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    init(
+        rootView: Content,
+        restingCenter: CGPoint,
+        toolbarSize: CGSize,
+        bounds: CGRect,
+        onDragEnd: @escaping (CGPoint) -> Void
+    ) {
+        hostingView = NSHostingView(rootView: rootView)
+        self.restingCenter = restingCenter
+        self.toolbarSize = toolbarSize
+        layoutBounds = bounds
+        self.onDragEnd = onDragEnd
+        super.init(frame: .zero)
+
+        toolbarView.addSubview(hostingView)
+        toolbarView.addSubview(dragHandleView)
+        addSubview(toolbarView)
+        dragHandleView.toolTip = "拖动工具栏"
+
+        dragHandleView.onMouseDown = { [weak self] event in
+            self?.beginDrag(with: event)
+        }
+        dragHandleView.onMouseDragged = { [weak self] event in
+            self?.continueDrag(with: event)
+        }
+        dragHandleView.onMouseUp = { [weak self] event in
+            self?.endDrag(with: event)
+        }
+        updateToolbarFrame(center: restingCenter)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(
+        rootView: Content,
+        restingCenter: CGPoint,
+        toolbarSize: CGSize,
+        bounds: CGRect,
+        onDragEnd: @escaping (CGPoint) -> Void
+    ) {
+        hostingView.rootView = rootView
+        self.restingCenter = restingCenter
+        self.toolbarSize = toolbarSize
+        layoutBounds = bounds
+        self.onDragEnd = onDragEnd
+        guard !isDragging else { return }
+        updateToolbarFrame(center: restingCenter)
+    }
+
+    override func layout() {
+        super.layout()
+        guard !isDragging else { return }
+        updateToolbarFrame(center: restingCenter)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let hit = super.hitTest(point)
+        return hit === self ? nil : hit
+    }
+
+    private func updateToolbarFrame(center: CGPoint) {
+        let clampedCenter = ScreenshotToolbarLayout.clampedCenter(
+            center,
+            toolbarSize: toolbarSize,
+            in: layoutBounds
+        )
+        toolbarView.frame = CGRect(
+            x: clampedCenter.x - toolbarSize.width / 2,
+            y: clampedCenter.y - toolbarSize.height / 2,
+            width: toolbarSize.width,
+            height: toolbarSize.height
+        )
+        updateToolbarSubviews()
+    }
+
+    private func moveToolbar(to center: CGPoint) {
+        let clampedCenter = ScreenshotToolbarLayout.clampedCenter(
+            center,
+            toolbarSize: toolbarSize,
+            in: layoutBounds
+        )
+        toolbarView.setFrameOrigin(CGPoint(
+            x: clampedCenter.x - toolbarSize.width / 2,
+            y: clampedCenter.y - toolbarSize.height / 2
+        ))
+    }
+
+    private func updateToolbarSubviews() {
+        hostingView.frame = toolbarView.bounds
+        dragHandleView.frame = CGRect(
+            x: 0,
+            y: 0,
+            width: ScreenshotToolbarLayout.horizontalPadding
+                + ScreenshotToolbarLayout.dragHandleWidth,
+            height: toolbarSize.height
+        )
+    }
+
+    private func beginDrag(with event: NSEvent) {
+        dragStartPoint = event.locationInWindow
+        dragStartCenter = toolbarView.frame.center
+        isDragging = false
+    }
+
+    private func continueDrag(with event: NSEvent) {
+        guard let dragStartPoint, let dragStartCenter else { return }
+        let currentPoint = event.locationInWindow
+        let translation = CGSize(
+            width: currentPoint.x - dragStartPoint.x,
+            height: dragStartPoint.y - currentPoint.y
+        )
+        isDragging = true
+        moveToolbar(to: CGPoint(
+            x: dragStartCenter.x + translation.width,
+            y: dragStartCenter.y + translation.height
+        ))
+    }
+
+    private func endDrag(with event: NSEvent) {
+        guard let dragStartPoint, let dragStartCenter else { return }
+        defer {
+            self.dragStartPoint = nil
+            self.dragStartCenter = nil
+            isDragging = false
+        }
+        guard isDragging else { return }
+
+        let currentPoint = event.locationInWindow
+        let finalCenter = ScreenshotToolbarLayout.clampedCenter(
+            CGPoint(
+                x: dragStartCenter.x + currentPoint.x - dragStartPoint.x,
+                y: dragStartCenter.y + dragStartPoint.y - currentPoint.y
+            ),
+            toolbarSize: toolbarSize,
+            in: layoutBounds
+        )
+        moveToolbar(to: finalCenter)
+        onDragEnd(finalCenter)
+    }
+}
+
+@MainActor
+private final class ScreenshotToolbarContentView: NSView {
+    override var isFlipped: Bool { true }
+}
+
+@MainActor
+final class ScreenshotToolbarDragHandleView: NSView {
+    var onMouseDown: ((NSEvent) -> Void)?
+    var onMouseDragged: ((NSEvent) -> Void)?
+    var onMouseUp: ((NSEvent) -> Void)?
+
+    override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        onMouseDown?(event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        onMouseDragged?(event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        onMouseUp?(event)
     }
 }
 
@@ -2659,17 +2873,19 @@ enum ScreenshotXLSXExporter {
         try write(stylesXML, to: workbook.appendingPathComponent("styles.xml"))
         try write(worksheetXML(for: table), to: worksheets.appendingPathComponent("sheet1.xml"))
 
-        let task = Process()
-        let errorPipe = Pipe()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
-        task.arguments = ["-q", "-r", archive.path, "[Content_Types].xml", "_rels", "xl"]
-        task.currentDirectoryURL = package
-        task.standardError = errorPipe
-        try task.run()
-        task.waitUntilExit()
-        guard task.terminationStatus == 0 else {
-            let data = errorPipe.fileHandleForReading.readDataToEndOfFile()
-            throw ExportError.archiveFailed(String(decoding: data, as: UTF8.self))
+        let output = try AIAgentProcessRunner.runSynchronously(
+            executableURL: URL(fileURLWithPath: "/usr/bin/zip"),
+            arguments: ["-q", "-r", archive.path, "[Content_Types].xml", "_rels", "xl"],
+            workingDirectoryURL: package,
+            timeout: 5 * 60,
+            maximumOutputBytes: 1,
+            maximumErrorBytes: 256 * 1_024
+        )
+        if output.didTimeout {
+            throw ExportError.archiveFailed("压缩操作超时")
+        }
+        guard output.status == 0 else {
+            throw ExportError.archiveFailed(output.standardError)
         }
         try Data(contentsOf: archive).write(to: destination, options: .atomic)
     }
@@ -3260,11 +3476,10 @@ struct ScreenshotEditorView: View {
                     toolbar(viewportWidth: toolbarSize.width)
                 }
 
-                selectionSizeBadge
-                    .position(
-                        x: min(max(selectionRect.midX, 70), max(70, proxy.size.width - 70)),
-                        y: max(22, selectionRect.minY - 18)
-                    )
+                ScreenshotSelectionSizeBadge(
+                    selection: selectionRect,
+                    bounds: proxy.size
+                )
 
             }
             .background(Color.black)
@@ -3461,15 +3676,6 @@ struct ScreenshotEditorView: View {
         return CGPoint(x: x, y: y)
     }
 
-    private var selectionSizeBadge: some View {
-        Text("\(Int(selectionRect.width.rounded())) × \(Int(selectionRect.height.rounded()))")
-            .font(.system(size: 12, weight: .medium, design: .monospaced))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(Color.black.opacity(0.72), in: Capsule())
-    }
-
     @ViewBuilder
     private func annotationView(
         _ annotation: ScreenshotAnnotation,
@@ -3575,15 +3781,21 @@ struct ScreenshotEditorView: View {
             || annotation.kind == .text
             || annotation.kind == .arrow
         let rotationDistance = ScreenshotAnnotationGeometry.rotationOffset * geometry.scale
+        let handlePoints = [
+            CGPoint(x: 0, y: 0),
+            CGPoint(x: canvasRect.width, y: 0),
+            CGPoint(x: canvasRect.width, y: canvasRect.height),
+            CGPoint(x: 0, y: canvasRect.height),
+        ] + (annotation.kind == .rectangle ? [
+            CGPoint(x: canvasRect.width / 2, y: 0),
+            CGPoint(x: canvasRect.width, y: canvasRect.height / 2),
+            CGPoint(x: canvasRect.width / 2, y: canvasRect.height),
+            CGPoint(x: 0, y: canvasRect.height / 2),
+        ] : [])
         return ZStack {
             Rectangle()
                 .stroke(Color.accentColor, lineWidth: 1)
-            ForEach(Array([
-                CGPoint(x: 0, y: 0),
-                CGPoint(x: canvasRect.width, y: 0),
-                CGPoint(x: canvasRect.width, y: canvasRect.height),
-                CGPoint(x: 0, y: canvasRect.height),
-            ].enumerated()), id: \.offset) { _, point in
+            ForEach(Array(handlePoints.enumerated()), id: \.offset) { _, point in
                 Circle()
                     .fill(Color.accentColor)
                     .overlay(Circle().stroke(.white, lineWidth: 1))
@@ -5498,6 +5710,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private let annotationSelectionState: ScreenshotAnnotationSelectionState
     private var onCloseHandler: (() -> Void)?
     private var currentScreen: NSScreen?
+    private var currentDisplayID: CGDirectDisplayID?
     private let screenImage: NSImage
     private let screenCGImage: CGImage
     private var captureRect: CGRect
@@ -5526,6 +5739,29 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         isPinnedImagePresentation && model.isPinned
     }
 
+    /// 显示器重新配置（睡眠唤醒、插拔外接屏、切换分辨率）之后，之前持有的 NSScreen 会失效，
+    /// 它的 frame 会读成 .zero，于是所有基于它算出来的窗口位置都会塌到屏幕左下角原点。
+    /// 所以每次用到几何信息前都按 displayID 重新解析一次，并且绝不回落到 .zero。
+    private var activeScreen: NSScreen? {
+        let liveScreens = NSScreen.screens
+        if let currentScreen, liveScreens.contains(where: { $0 === currentScreen }) {
+            return currentScreen
+        }
+        if let currentDisplayID,
+           let refreshed = liveScreens.first(where: {
+               ScreenshotCaptureService.displayID(for: $0) == currentDisplayID
+           }) {
+            currentScreen = refreshed
+            return refreshed
+        }
+        let fallback = WindowPlacement.screenUnderMouse() ?? NSScreen.main ?? liveScreens.first
+        if let fallback {
+            currentScreen = fallback
+            currentDisplayID = ScreenshotCaptureService.displayID(for: fallback)
+        }
+        return fallback
+    }
+
     init(
         image: NSImage,
         screenImage: NSImage,
@@ -5544,6 +5780,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         self.screenImage = screenImage
         self.screenCGImage = screenCGImage
         currentScreen = screen
+        currentDisplayID = screen.flatMap(ScreenshotCaptureService.displayID(for:))
         self.captureRect = captureRect
         self.capturedApplication = capturedApplication
         self.writeImageToPasteboard = writeImageToPasteboard
@@ -5551,7 +5788,12 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         onCloseHandler = onClose
         let overlayFrame = screen?.frame ?? CGRect(origin: .zero, size: screenImage.size)
         let window = ScreenshotEditorWindow(
-            contentRect: overlayFrame,
+            // 带 screen: 的构造器把 contentRect 当作该屏幕的局部坐标，另外三处调用都走了
+            // localContentRect，这里保持一致，否则负原点的外接屏会算出偏移。
+            contentRect: ScreenshotWindowGeometry.localContentRect(
+                for: overlayFrame,
+                on: screen?.frame ?? overlayFrame
+            ),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false,
@@ -5580,7 +5822,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     func present() {
         isClosed = false
-        if let screen = currentScreen {
+        if let screen = activeScreen {
             window?.setFrame(screen.frame, display: true)
         }
         showWindow(nil)
@@ -5715,8 +5957,8 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     }
 
     private func initialPinnedScale(for imageSize: CGSize) -> CGFloat {
-        guard let currentScreen else { return 1 }
-        let visibleSize = currentScreen.visibleFrame.size
+        guard let screen = activeScreen else { return 1 }
+        let visibleSize = screen.visibleFrame.size
         return min(max(min(
             1,
             visibleSize.width / max(imageSize.width, 1),
@@ -5733,12 +5975,13 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     }
 
     private func pinnedWindowFrame(size: CGSize) -> CGRect {
-        guard let currentScreen else {
+        guard let screen = activeScreen else {
+            // 没有任何可用屏幕时维持窗口现有位置；回落到 .zero 就正好落在主屏左下角。
             return CGRect(origin: window?.frame.origin ?? .zero, size: size)
         }
         let selectionFrame = CGRect(
-            x: currentScreen.frame.minX + captureRect.minX,
-            y: currentScreen.frame.maxY - captureRect.maxY,
+            x: screen.frame.minX + captureRect.minX,
+            y: screen.frame.maxY - captureRect.maxY,
             width: captureRect.width,
             height: captureRect.height
         )
@@ -5825,7 +6068,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     }
 
     private func updateCaptureRect(_ rect: CGRect) -> NSImage? {
-        let screenSize = currentScreen?.frame.size ?? screenImage.size
+        let screenSize = activeScreen?.frame.size ?? screenImage.size
         let bounds = CGRect(origin: .zero, size: screenSize)
         let normalized = rect.standardized.intersection(bounds)
         guard let image = ScreenshotCaptureService.image(
@@ -5873,7 +6116,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private func finishLongCapture() {
         guard !isClosed else { return }
         guard model.isLongCapturePreviewing || isLongCaptureInProgress else { return }
-        guard let screen = currentScreen ?? WindowPlacement.screenUnderMouse() else {
+        guard let screen = activeScreen else {
             completeLongCapture()
             return
         }
@@ -5893,7 +6136,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     private func captureNextScreen() {
         guard !isClosed else { return }
-        guard let screen = currentScreen ?? WindowPlacement.screenUnderMouse() else {
+        guard let screen = activeScreen else {
             model.statusMessage = "找不到显示器"
             return
         }
@@ -6053,8 +6296,8 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         window.isOpaque = true
         window.backgroundColor = .black
         window.sharingType = .readWrite
-        if let currentScreen {
-            window.setFrame(currentScreen.frame, display: true)
+        if let screen = activeScreen {
+            window.setFrame(screen.frame, display: true)
         }
         configureOverlayView(in: window)
         window.makeKeyAndOrderFront(nil)

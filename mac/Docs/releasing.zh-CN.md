@@ -28,6 +28,7 @@ Scripts/package-release.sh
 dist/zisla-v1.0.0-macOS-universal.zip
 dist/zisla-v1.0.0-macOS-universal.zip.sha256
 dist/zisla-v1.0.0-macOS-universal.dmg
+dist/zisla-v1.0.0-macOS-universal.dmg.sha256
 ```
 
 ### 免费预览分发
@@ -42,7 +43,7 @@ Scripts/package-release.sh
 ```
 
 该包不经过公证，且不包含 WeatherKit 权限。应用会定期检查 GitHub/Gitee Release；发现新版本后，用户确认即可下载对应 DMG，再把 DMG 中的应用拖入
-`Applications`。首次打开仍需在 **System Settings > Privacy & Security** 中选择 **Open Anyway**。
+`Applications`。首次打开仍需在 **系统设置 > 隐私与安全性** 中选择 **仍要打开**。
 Developer ID 和公证仍是面向普通用户无拦截分发的推荐方式。
 
 ## 2. 公证

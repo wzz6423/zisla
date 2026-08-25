@@ -3,6 +3,7 @@ import Foundation
 
 @MainActor
 public final class ClipboardHistoryStore: ObservableObject {
+    private static let maximumPendingMutations = 512
     @Published public private(set) var items: [ClipboardHistoryItem] = []
     @Published public private(set) var categoryCounts: [FileShelfCategory: Int] = [:]
     @Published public private(set) var errorDescription: String?
@@ -342,6 +343,10 @@ public final class ClipboardHistoryStore: ObservableObject {
         persistenceTask?.cancel()
         persistenceGeneration += 1
         let generation = persistenceGeneration
+        if pendingMutations.count >= Self.maximumPendingMutations {
+            commitPendingMutations(generation: generation)
+            return
+        }
         let delay = persistenceDelay
         persistenceTask = Task { [weak self] in
             do {
