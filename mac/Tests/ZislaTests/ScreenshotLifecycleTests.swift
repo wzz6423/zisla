@@ -14,6 +14,29 @@ struct ScreenshotLifecycleTests {
         let captureLifecycle = source[beginScreenshot.lowerBound..<registerHotkeys.lowerBound]
 
         #expect(!captureLifecycle.contains("overlayCoordinator?.stop()"))
+        #expect(captureLifecycle.contains("setScreenshotSessionActive(true)"))
+        #expect(captureLifecycle.contains("endScreenshotSessionIfNeeded()"))
+        #expect(captureLifecycle.contains("noticePresenter?.setScreenshotActive(active)"))
+
+        // The clipboard assistant row returns only after the capture is frozen, so it stays visible
+        // during the selection without ever appearing inside the screenshot.
+        let capture = try #require(captureLifecycle.range(of: "controller.start(on: captureScreens)"))
+        let restoreRow = try #require(captureLifecycle.range(
+            of: "clipboardAssistant.setScreenshotSelectionActive(true)"
+        ))
+        #expect(capture.upperBound < restoreRow.lowerBound)
+        #expect(captureLifecycle.contains("guard controller.selectionWindowCount > 0 else { return }"))
+        #expect(captureLifecycle.contains("clipboardAssistant.setScreenshotSelectionActive(false)"))
+
+        // A pinned screenshot keeps the session open, so the row must leave the display on every
+        // capture instead of only on the first one.
+        let rowLeavesCapture = try #require(captureLifecycle.range(
+            of: "AppModel.shared.clipboardAssistant.setScreenshotActive(active)"
+        ))
+        let sessionGuard = try #require(captureLifecycle.range(
+            of: "guard isScreenshotSessionActive != active else { return }"
+        ))
+        #expect(rowLeavesCapture.upperBound < sessionGuard.lowerBound)
     }
 
     @Test
@@ -54,8 +77,9 @@ struct ScreenshotLifecycleTests {
     func longCaptureUsesTheDisplayBackingPixelResolution() throws {
         let source = try String(contentsOf: Self.captureSourceURL, encoding: .utf8)
 
-        #expect(source.contains("screen.frame.width * screen.backingScaleFactor"))
-        #expect(source.contains("screen.frame.height * screen.backingScaleFactor"))
+        #expect(source.contains("max(screen.backingScaleFactor, 1)"))
+        #expect(source.contains("Int((screen.frame.width * scale).rounded())"))
+        #expect(source.contains("Int((screen.frame.height * scale).rounded())"))
     }
 
     @Test

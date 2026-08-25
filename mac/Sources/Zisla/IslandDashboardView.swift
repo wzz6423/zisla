@@ -288,10 +288,7 @@ struct IslandDashboardView: View {
     }
 
     private var isDownloadActive: Bool {
-        switch model.downloadState {
-        case .preparing, .downloading: true
-        case .idle, .completed, .failed: false
-        }
+        model.hasActiveDownloads
     }
 
     private var activeCardCount: Int {

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
@@ -6,11 +7,13 @@ enum TransferDropItem: Hashable, Sendable {
     case file(URL)
     case link(URL)
     case text(String)
+    case image(Data)
 
     var shareValue: Any {
         switch self {
         case .file(let url), .link(let url): url
         case .text(let value): value
+        case .image(let data): NSImage(data: data) ?? data
         }
     }
 }
@@ -88,7 +91,18 @@ struct TransferDropDelegate: DropDelegate {
             return url.isFileURL ? .file(url) : .link(url)
         }
 
-        guard let string = value as? String else { return nil }
+        if let data = value as? Data,
+           let string = String(data: data, encoding: .utf8) {
+            return textItem(from: string)
+        }
+
+        guard let string = (value as? String) ?? (value as? NSString).map({ String($0) }) else {
+            return nil
+        }
+        return textItem(from: string)
+    }
+
+    nonisolated private static func textItem(from string: String) -> TransferDropItem? {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         if let url = URL(string: trimmed), ["http", "https"].contains(url.scheme?.lowercased()) {
             return .link(url)

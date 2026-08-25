@@ -27,9 +27,15 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         var modificationDate: Date
         var readerState: IncrementalJSONLReader.State
         var stateBySession: [String: SessionState]
+        /// `ai-title` 记录每轮只写一次，会话空闲被裁剪后必须还能取回标题。
+        var titleBySession: [String: String]
         var fallbackSessionID: String
         var task: AIProgressTask?
     }
+
+    /// Claude Code 把子代理转录写进 `<会话>/subagents/`，且沿用父会话 ID。
+    private static let sidechainDirectoryName = "subagents"
+    private static let syntheticModelPlaceholder = "<synthetic>"
 
     public let projectsDirectory: URL
     public let sessionsDirectory: URL
@@ -60,11 +66,11 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
     }
 
     public func activeTasks() throws -> [AIProgressTask] {
-        let candidates = recentTranscripts()
+        let processIdentifiersBySessionID = sessionProcessIdentifiers()
+        let candidates = recentTranscripts(liveSessionIDs: Set(processIdentifiersBySessionID.keys))
         let selectedURLs = Set(candidates.map(\.url))
         cache = cache.filter { selectedURLs.contains($0.key) }
         var tasksBySession: [String: AIProgressTask] = [:]
-        let processIdentifiersBySessionID = sessionProcessIdentifiers()
 
         for candidate in candidates {
             let parsed: AIProgressTask?
@@ -105,7 +111,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         return errno == EPERM
     }
 
-    private func recentTranscripts() -> [Candidate] {
+    private func recentTranscripts(liveSessionIDs: Set<String>) -> [Candidate] {
         guard fileManager.fileExists(atPath: projectsDirectory.path),
               let enumerator = fileManager.enumerator(
                 at: projectsDirectory,
@@ -121,6 +127,10 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
 
         var candidates: [Candidate] = []
         for case let url as URL in enumerator {
+            if url.lastPathComponent == Self.sidechainDirectoryName {
+                enumerator.skipDescendants()
+                continue
+            }
             guard url.pathExtension == "jsonl",
                   let values = try? url.resourceValues(forKeys: [
                     .isRegularFileKey,
@@ -137,12 +147,18 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
             ))
         }
 
-        return Array(candidates.sorted {
+        let sorted = candidates.sorted {
             if $0.modificationDate != $1.modificationDate {
                 return $0.modificationDate > $1.modificationDate
             }
             return $0.url.path < $1.url.path
-        }.prefix(maxTranscriptFiles))
+        }
+        guard sorted.count > maxTranscriptFiles else { return sorted }
+        // 并发跑多个 CLI 时最新文件会被占满，存活会话必须无条件补进来，否则任务漏报。
+        return Array(sorted.prefix(maxTranscriptFiles))
+            + sorted.dropFirst(maxTranscriptFiles).filter {
+                liveSessionIDs.contains($0.url.deletingPathExtension().lastPathComponent)
+            }
     }
 
     private func parseSession(
@@ -160,6 +176,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
                 modificationDate: candidate.modificationDate,
                 readerState: jsonlReader.initialState(fileSize: candidate.size),
                 stateBySession: [:],
+                titleBySession: cached?.titleBySession ?? [:],
                 fallbackSessionID: candidate.url.deletingPathExtension().lastPathComponent,
                 task: nil
             )
@@ -175,6 +192,8 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
                 guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                     return
                 }
+                // 内联的子代理记录沿用父会话 ID，计入会污染父任务的活跃状态。
+                if root["isSidechain"] as? Bool == true { return }
                 let type = (root["type"] as? String)?.lowercased() ?? ""
                 let sessionID = ((root["sessionId"] as? String)
                     ?? (root["session_id"] as? String))?
@@ -199,6 +218,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
                 }
                 if let aiTitle = Self.extractAITitle(root) {
                     state.aiTitle = aiTitle
+                    next.titleBySession[sid] = aiTitle
                 }
 
                 switch type {
@@ -247,6 +267,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
 
         let updatedAt = max(active.value.updatedAt, candidate.modificationDate)
         let displayTitle = active.value.aiTitle
+            ?? next.titleBySession[active.key]
             ?? (active.value.isVSCode ? "Claude Code (VS Code)" : "Claude")
         next.task = AIProgressTask(
             id: Self.taskID(forSessionID: active.key),
@@ -398,13 +419,18 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
     }
 
     private static func extractModel(_ root: [String: Any]) -> String? {
-        if let model = root["model"] as? String, !model.isEmpty { return model }
+        if let model = root["model"] as? String, isRealModel(model) { return model }
         if let message = root["message"] as? [String: Any],
            let model = message["model"] as? String,
-           !model.isEmpty {
+           isRealModel(model) {
             return model
         }
         return nil
+    }
+
+    /// Claude Code 给合成消息填的是占位模型名，覆盖真实模型会让详情显示成 `<synthetic>`。
+    private static func isRealModel(_ model: String) -> Bool {
+        !model.isEmpty && model != syntheticModelPlaceholder
     }
 
     private static func extractAITitle(_ root: [String: Any]) -> String? {

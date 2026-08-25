@@ -8,6 +8,7 @@ struct TeleprompterView: View {
     @AppStorage("toolbox.teleprompterScrollSpeed") private var scrollSpeed = 45.0
     @State private var isAutoScrolling = false
     @State private var isHovering = false
+    @State private var isDropTargeted = false
     @State private var scrollResetID = UUID()
 
     init(onClose: @escaping () -> Void) {
@@ -40,6 +41,36 @@ struct TeleprompterView: View {
         }
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
+        .onDrop(
+            of: TransferDropDelegate.supportedTypes,
+            delegate: TransferDropDelegate(isTargeted: $isDropTargeted) { items in
+                let droppedText = Self.text(from: items)
+                guard !droppedText.isEmpty else { return }
+                isAutoScrolling = false
+                script = droppedText
+            }
+        )
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.accentColor, lineWidth: 2)
+                    .padding(8)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private static func text(from items: [TransferDropItem]) -> String {
+        items.map {
+            switch $0 {
+            case .text(let value): value
+            case .link(let url): url.absoluteString
+            case .file(let url): url.path
+            case .image: "剪贴板图片"
+            }
+        }
+        .joined(separator: "\n\n")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var controls: some View {

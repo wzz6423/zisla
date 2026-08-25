@@ -27,6 +27,23 @@ struct AppLocalizedText: View {
     }
 }
 
+/// Format-text variant of `AppLocalizedText` for parameterized strings.
+struct AppLocalizedFormatText: View {
+    let key: String
+    let arguments: [CVarArg]
+
+    @Environment(\.locale) private var locale
+
+    init(_ key: String, _ arguments: CVarArg...) {
+        self.key = key
+        self.arguments = arguments
+    }
+
+    var body: some View {
+        Text(AppLocalization.format(key, locale: locale, arguments))
+    }
+}
+
 enum AppLocalization {
     static func string(_ key: String, language: AppLanguage) -> String {
         string(key, locale: language.locale)
@@ -41,12 +58,22 @@ enum AppLocalization {
         return key
     }
 
+    /// Localizes `key` and formats it with `arguments` (keys use printf-style placeholders).
+    static func format(_ key: String, locale: Locale, _ arguments: [CVarArg]) -> String {
+        String(format: string(key, locale: locale), locale: locale, arguments: arguments)
+    }
+
     private static let localizationBundles: [String: Bundle] = {
         var result: [String: Bundle] = [:]
+        #if SWIFT_PACKAGE && !SWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE
+        let containers = [Bundle.module, Bundle.main]
+        #else
+        let containers = [Bundle.main]
+        #endif
         for language in AppLanguage.allCases {
             for identifier in localeIdentifiers(for: language.locale)
             where result[identifier] == nil {
-                if let bundle = localizationBundle(in: .main, identifier: identifier) {
+                if let bundle = containers.lazy.compactMap({ localizationBundle(in: $0, identifier: identifier) }).first {
                     result[identifier] = bundle
                 }
             }

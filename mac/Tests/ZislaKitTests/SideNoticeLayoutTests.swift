@@ -29,6 +29,26 @@ struct SideNoticeLayoutTests {
 
     private let engine = SideNoticeLayoutEngine()
 
+    /// Expanding the island also dismisses the clipboard assistant; that dismissal must not
+    /// clear the hidden state and let the collapsed status bar draw over the open panel.
+    @Test
+    func clearingOneSuppressionReasonKeepsNoticesHidden() {
+        var suppression = SideNoticeSuppression()
+        #expect(!suppression.hidesNotices)
+
+        suppression.isClipboardAssistantVisible = true
+        suppression.isIslandExpanded = true
+        suppression.isClipboardAssistantVisible = false
+        #expect(suppression.hidesNotices)
+
+        suppression.isVoiceRecording = true
+        suppression.isIslandExpanded = false
+        #expect(suppression.hidesNotices)
+
+        suppression.isVoiceRecording = false
+        #expect(!suppression.hidesNotices)
+    }
+
     @Test
     func activeAINoticesCollapseIntoOneCompactWing() {
         let notices = [

@@ -241,6 +241,7 @@ public final class NowPlayingService: ObservableObject {
   private var specialistFavoriteRefreshTask: Task<Void, Never>?
   private var usesAdapter = false
   private var isRunning = false
+  private var lifecycleGeneration: UInt64 = 0
   private var spectrumMonitoringEnabled = false
   private var spectrumVisualizationEnabled = false
   private var spectrumCancellable: AnyCancellable?
@@ -276,6 +277,8 @@ public final class NowPlayingService: ObservableObject {
 
   public func start() {
     guard !isRunning else { return }
+    lifecycleGeneration &+= 1
+    let lifecycleGeneration = self.lifecycleGeneration
     isRunning = true
     if ProcessInfo.processInfo.environment["ZISLA_VISUAL_MEDIA_FIXTURE"] == "1" {
       let artwork = ProcessInfo.processInfo.environment["ZISLA_VISUAL_MEDIA_ARTWORK"]
@@ -322,15 +325,27 @@ public final class NowPlayingService: ObservableObject {
     }
 
     audioMonitor.onSourcesChanged = { [weak self] _ in
-      if self?.usesAdapter != true { self?.refreshRemoteInfo() }
-      self?.resolveSnapshot()
+      guard let self,
+        self.isRunning,
+        self.lifecycleGeneration == lifecycleGeneration
+      else { return }
+      if !self.usesAdapter { self.refreshRemoteInfo() }
+      self.resolveSnapshot()
     }
     usesAdapter = adapterClient.start(
       onEvent: { [weak self] event in
-        self?.consumeAdapterEvent(event)
+        guard let self,
+          self.isRunning,
+          self.lifecycleGeneration == lifecycleGeneration
+        else { return }
+        self.consumeAdapterEvent(event)
       },
       onTermination: { [weak self] in
-        self?.adapterDidTerminate()
+        guard let self,
+          self.isRunning,
+          self.lifecycleGeneration == lifecycleGeneration
+        else { return }
+        self.adapterDidTerminate()
       }
     )
     remotePlaybackState =
@@ -344,7 +359,10 @@ public final class NowPlayingService: ObservableObject {
       .removeDuplicates()
       .sink { [weak self] audible in
         Task { @MainActor [weak self] in
-          guard let self else { return }
+          guard let self,
+            self.isRunning,
+            self.lifecycleGeneration == lifecycleGeneration
+          else { return }
           let wasAudible = self.systemAudioIsAudible
           self.systemAudioIsAudible = audible
           if audible { self.playbackRefreshGeneration &+= 1 }
@@ -383,6 +401,7 @@ public final class NowPlayingService: ObservableObject {
 
   public func stop() {
     isRunning = false
+    lifecycleGeneration &+= 1
     spectrumMonitoringEnabled = false
     spectrumVisualizationEnabled = false
     for observer in observers {
@@ -394,6 +413,7 @@ public final class NowPlayingService: ObservableObject {
     spectrumCancellable?.cancel()
     spectrumCancellable = nil
     systemAudioIsAudible = false
+    refreshGeneration &+= 1
     playbackRefreshGeneration &+= 1
     AudioSpectrumService.shared.stop()
     usesAdapter = false
@@ -455,6 +475,7 @@ public final class NowPlayingService: ObservableObject {
   }
 
   public func refresh() {
+    guard isRunning else { return }
     audioMonitor.refresh()
     if !usesAdapter { refreshRemoteInfo() }
     resolveSnapshot()
@@ -1041,7 +1062,7 @@ public final class NowPlayingService: ObservableObject {
   }
 
   private func refreshRemoteInfo() {
-    guard !usesAdapter else { return }
+    guard isRunning, !usesAdapter else { return }
     refreshGeneration &+= 1
     let generation = refreshGeneration
     refreshStartingPID = remotePID
@@ -1053,7 +1074,10 @@ public final class NowPlayingService: ObservableObject {
       let callback: InfoCallback = { [weak self] dictionary in
         let value = Self.parse(dictionary)
         Task { @MainActor [weak self] in
-          guard let self, self.refreshGeneration == generation else { return }
+          guard let self,
+            self.isRunning,
+            self.refreshGeneration == generation
+          else { return }
           self.remoteInfoState = value == nil ? .empty : .available
           if let value {
             self.remoteSnapshot = Self.mergingMetadata(
@@ -1073,7 +1097,10 @@ public final class NowPlayingService: ObservableObject {
     if let getPlaying {
       let callback: BoolCallback = { [weak self] value in
         Task { @MainActor [weak self] in
-          guard let self, self.refreshGeneration == generation else { return }
+          guard let self,
+            self.isRunning,
+            self.refreshGeneration == generation
+          else { return }
           self.remotePlaybackState = value ? .playing : .paused
           self.reconcileEmptyRemoteInfo()
           self.resolveSnapshot()
@@ -1085,7 +1112,10 @@ public final class NowPlayingService: ObservableObject {
     if let getPID {
       let callback: PIDCallback = { [weak self] value in
         Task { @MainActor [weak self] in
-          guard let self, self.refreshGeneration == generation else { return }
+          guard let self,
+            self.isRunning,
+            self.refreshGeneration == generation
+          else { return }
           self.remotePID = value > 0 ? value : nil
           self.remotePIDPending = false
           self.reconcileEmptyRemoteInfo()
@@ -1097,6 +1127,7 @@ public final class NowPlayingService: ObservableObject {
   }
 
   private func consumeAdapterEvent(_ event: MediaRemoteAdapterEvent) {
+    guard isRunning, usesAdapter else { return }
     playbackRefreshGeneration &+= 1
     remotePIDPending = false
     guard let value = Self.parseAdapter(event.payload) else {
@@ -1112,6 +1143,7 @@ public final class NowPlayingService: ObservableObject {
   }
 
   private func consumeAdapterSnapshot(_ snapshot: NowPlayingSnapshot) {
+    guard isRunning, usesAdapter else { return }
     var value = snapshot
 
     if let playbackMode = value.playbackMode {
@@ -1135,9 +1167,12 @@ public final class NowPlayingService: ObservableObject {
 
     playbackRefreshGeneration &+= 1
     let generation = playbackRefreshGeneration
+    let lifecycleGeneration = self.lifecycleGeneration
     _ = adapterClient.fetchNowPlayingInfo { [weak self] payload in
       guard let self,
         self.playbackRefreshGeneration == generation,
+        self.lifecycleGeneration == lifecycleGeneration,
+        self.isRunning,
         self.usesAdapter,
         !self.systemAudioIsAudible,
         self.snapshot?.isPlaying == true,
@@ -1175,12 +1210,15 @@ public final class NowPlayingService: ObservableObject {
 
     let identity = ArtworkRefreshIdentity(remoteSnapshot)
     guard artworkRefreshIdentity != identity else { return }
+    let lifecycleGeneration = self.lifecycleGeneration
     artworkRefreshTask?.cancel()
     artworkRefreshIdentity = identity
     artworkRefreshTask = Task { [weak self] in
       for delay in [Duration.milliseconds(250), .milliseconds(700), .seconds(1)] {
         try? await Task.sleep(for: delay)
         guard !Task.isCancelled, let self,
+          self.isRunning,
+          self.lifecycleGeneration == lifecycleGeneration,
           self.usesAdapter,
           self.artworkRefreshIdentity == identity,
           let current = self.remoteSnapshot,
@@ -1188,19 +1226,34 @@ public final class NowPlayingService: ObservableObject {
           identity.matches(current)
         else { return }
         _ = self.adapterClient.fetchNowPlayingInfo { [weak self] payload in
-          self?.consumeArtworkRefresh(payload, expectedIdentity: identity)
+          guard let self,
+            self.isRunning,
+            self.lifecycleGeneration == lifecycleGeneration
+          else { return }
+          self.consumeArtworkRefresh(
+            payload,
+            expectedIdentity: identity,
+            expectedLifecycleGeneration: lifecycleGeneration
+          )
         }
       }
-      guard let self, self.artworkRefreshIdentity == identity else { return }
+      guard let self,
+        self.isRunning,
+        self.lifecycleGeneration == lifecycleGeneration,
+        self.artworkRefreshIdentity == identity
+      else { return }
       self.artworkRefreshTask = nil
     }
   }
 
   private func consumeArtworkRefresh(
     _ payload: MediaRemoteAdapterPayload?,
-    expectedIdentity: ArtworkRefreshIdentity
+    expectedIdentity: ArtworkRefreshIdentity,
+    expectedLifecycleGeneration: UInt64
   ) {
-    guard usesAdapter,
+    guard isRunning,
+      lifecycleGeneration == expectedLifecycleGeneration,
+      usesAdapter,
       let payload,
       let update = Self.parseAdapter(payload),
       expectedIdentity.matches(update),

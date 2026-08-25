@@ -25,17 +25,17 @@
         <string>tr</string>
     </array>
     <key>CFBundleDisplayName</key>
-    <string>zisla</string>
+    <string>@APP_NAME@</string>
     <key>CFBundleExecutable</key>
     <string>zisla</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>dev.wzz.zisla</string>
+    <string>@BUNDLE_ID@</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>zisla</string>
+    <string>@APP_NAME@</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -72,5 +72,7 @@
 	<string>zisla 需要通过 Mail.app 读取和管理你的邮件，包括收件箱列表、标记已读、删除和回复。</string>
     <key>ZislaDefaultUpdateChannel</key>
     <string>@UPDATE_CHANNEL@</string>
+    <key>ZislaApplicationSupportDirectory</key>
+    <string>@APP_SUPPORT_DIRECTORY@</string>
 </dict>
 </plist>

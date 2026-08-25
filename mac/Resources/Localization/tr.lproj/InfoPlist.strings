@@ -6,3 +6,4 @@
 "NSMicrophoneUsageDescription" = "zisla mikrofonu yalnızca sesli giriş başlattığınızda, konuşmayı mevcut AI sohbet metnine dönüştürmek için kullanır.";
 "NSSpeechRecognitionUsageDescription" = "zisla, aktif olarak kaydettiğiniz konuşmayı AI sohbet metnine dönüştürür.";
 "NSAppleEventsUsageDescription" = "zisla, gelen kutuları, okundu durumu, silme ve yanıtlar dahil olmak üzere e-postaları okumak ve yönetmek için Mail.app'i kullanır.";
+"NSBluetoothAlwaysUsageDescription" = "zisla, Bluetooth sayfasını açtığınızda bağlı veya eşleştirilmiş Bluetooth aygıtlarının herkese açık pil bilgilerini okur.";

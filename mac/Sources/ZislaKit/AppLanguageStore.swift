@@ -24,6 +24,15 @@ public enum AppLanguage: String, CaseIterable, Codable, Equatable, Sendable {
         Locale(identifier: rawValue)
     }
 
+    /// BCP-47-ish code used as the translation target for the clipboard assistant.
+    public var translateTargetCode: String {
+        switch self {
+        case .simplifiedChinese: "zh-CN"
+        case .traditionalChinese: "zh-TW"
+        default: rawValue
+        }
+    }
+
     public var isRightToLeft: Bool {
         self == .arabic
     }

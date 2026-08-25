@@ -6,3 +6,4 @@
 "NSMicrophoneUsageDescription" = "zisla 僅在您啟動語音輸入時使用麥克風，以將語音轉換為目前 AI 對話文字。";
 "NSSpeechRecognitionUsageDescription" = "zisla 將您主動錄製的語音轉錄為 AI 對話文字。";
 "NSAppleEventsUsageDescription" = "zisla 使用 Mail.app 來讀取和管理郵件，包括收件匣、已讀狀態、刪除和回覆。";
+"NSBluetoothAlwaysUsageDescription" = "zisla 僅在您開啟電池頁面時讀取已連線或已配對藍牙裝置公開的電量資訊。";

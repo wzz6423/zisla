@@ -109,6 +109,19 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
                     at: storageURL.deletingLastPathComponent(),
                     withIntermediateDirectories: true
                 )
+                try manager.setAttributes(
+                    [.posixPermissions: NSNumber(value: 0o700)],
+                    ofItemAtPath: storageURL.deletingLastPathComponent().path
+                )
+                if !manager.fileExists(atPath: storageURL.path) {
+                    guard manager.createFile(
+                        atPath: storageURL.path,
+                        contents: nil,
+                        attributes: [.posixPermissions: NSNumber(value: 0o600)]
+                    ) else {
+                        throw AIAgentSecretStoreError.storageFailed("无法创建私有 SQLite 数据库")
+                    }
+                }
                 var database: OpaquePointer?
                 let opened = sqlite3_open_v2(
                     storageURL.path,
@@ -124,6 +137,7 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
                 guard sqlite3_busy_timeout(database, 1_000) == SQLITE_OK else {
                     throw databaseError(database, fallback: "无法配置私有 SQLite 数据库")
                 }
+                defer { try? setPrivateFilePermissions(using: manager) }
                 try execute(
                     """
                     CREATE TABLE IF NOT EXISTS ai_agent_secrets (
@@ -133,13 +147,28 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
                     """,
                     database: database
                 )
-                try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: storageURL.path)
+                try setPrivateFilePermissions(using: manager)
                 return try body(database)
             } catch let error as AIAgentSecretStoreError {
                 throw error
             } catch {
                 throw AIAgentSecretStoreError.storageFailed(error.localizedDescription)
             }
+        }
+    }
+
+    private func setPrivateFilePermissions(using manager: FileManager) throws {
+        let privateFiles = [
+            storageURL,
+            URL(fileURLWithPath: storageURL.path + "-journal"),
+            URL(fileURLWithPath: storageURL.path + "-wal"),
+            URL(fileURLWithPath: storageURL.path + "-shm"),
+        ]
+        for file in privateFiles where manager.fileExists(atPath: file.path) {
+            try manager.setAttributes(
+                [.posixPermissions: NSNumber(value: 0o600)],
+                ofItemAtPath: file.path
+            )
         }
     }
 

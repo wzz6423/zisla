@@ -3,11 +3,28 @@ set -euo pipefail
 
 ROOT="${0:A:h:h}"
 VERSION="${VERSION:?VERSION is required}"
-BUILD_NUMBER="${BUILD_NUMBER:-${VERSION//./}}"
+BUILD_NUMBER="${BUILD_NUMBER:?BUILD_NUMBER is required (for example 12)}"
 UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
+TMP_ROOT="${TMPDIR:-/tmp}"
 ARCHIVE_DIRECTORY="${ARCHIVE_DIRECTORY:-$ROOT/dist}"
 BUILD_ARCHITECTURES="${BUILD_ARCHITECTURES:-arm64 x86_64}"
 ARCHITECTURES=(${=BUILD_ARCHITECTURES})
+
+[[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}([.-][A-Za-z0-9.-]+)?$ ]] || {
+  echo "error: VERSION must be a semantic version (for example 1.2.3 or 1.2.3-preview.1)" >&2
+  exit 1
+}
+[[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]] || {
+  echo "error: BUILD_NUMBER must contain only digits" >&2
+  exit 1
+}
+case "$UPDATE_CHANNEL" in
+  release|preview) ;;
+  *)
+    echo "error: UPDATE_CHANNEL must be release or preview" >&2
+    exit 1
+    ;;
+esac
 
 for arch in "${ARCHITECTURES[@]}"; do
   case "$arch" in
@@ -35,22 +52,54 @@ DMG="$ARCHIVE_DIRECTORY/zisla-v${VERSION}-macOS-${ARCHITECTURE_SUFFIX}.dmg"
 if [[ "${SKIP_BUILD:-false}" == "true" ]]; then
   [[ -d "$APP" ]] || { echo "error: missing app bundle: $APP" >&2; exit 1; }
 else
-  VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" UPDATE_CHANNEL="$UPDATE_CHANNEL" OUTPUT_DIRECTORY="$ARCHIVE_DIRECTORY" BUILD_ARCHITECTURES="$BUILD_ARCHITECTURES" "$ROOT/Scripts/build-app.sh"
+  if [[ "${CODE_SIGN_IDENTITY:--}" == "-" ]]; then
+    RELEASE_SIGNING_MODE=adhoc
+  else
+    RELEASE_SIGNING_MODE=release
+  fi
+  DEBUG_BUILD=false VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" UPDATE_CHANNEL="$UPDATE_CHANNEL" \
+    SIGNING_MODE="$RELEASE_SIGNING_MODE" \
+    OUTPUT_DIRECTORY="$ARCHIVE_DIRECTORY" BUILD_ARCHITECTURES="$BUILD_ARCHITECTURES" \
+    "$ROOT/Scripts/build-app.sh"
 fi
 
-ditto -c -k --keepParent "$APP" "$ARCHIVE"
-shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
+INFO_PLIST="$APP/Contents/Info.plist"
+[[ -f "$INFO_PLIST" ]] || { echo "error: missing release Info.plist: $INFO_PLIST" >&2; exit 1; }
+RELEASE_BUNDLE_ID="$(plutil -extract CFBundleIdentifier raw -o - "$INFO_PLIST" 2>/dev/null || true)"
+RELEASE_DISPLAY_NAME="$(plutil -extract CFBundleDisplayName raw -o - "$INFO_PLIST" 2>/dev/null || true)"
+RELEASE_VERSION="$(plutil -extract CFBundleShortVersionString raw -o - "$INFO_PLIST" 2>/dev/null || true)"
+RELEASE_BUILD_NUMBER="$(plutil -extract CFBundleVersion raw -o - "$INFO_PLIST" 2>/dev/null || true)"
+RELEASE_UPDATE_CHANNEL="$(plutil -extract ZislaDefaultUpdateChannel raw -o - "$INFO_PLIST" 2>/dev/null || true)"
+[[ "$RELEASE_BUNDLE_ID" == "dev.wzz.zisla" && "$RELEASE_DISPLAY_NAME" == "zisla" ]] || {
+  echo "error: release package contains a debug or unknown app identity" >&2
+  exit 1
+}
+[[ "$RELEASE_VERSION" == "$VERSION" && "$RELEASE_BUILD_NUMBER" == "$BUILD_NUMBER" && \
+  "$RELEASE_UPDATE_CHANNEL" == "$UPDATE_CHANNEL" ]] || {
+  echo "error: release package metadata does not match VERSION, BUILD_NUMBER, or UPDATE_CHANNEL" >&2
+  exit 1
+}
+codesign --verify --deep --strict --all-architectures --verbose=2 "$APP" || {
+  echo "error: release package code signature verification failed" >&2
+  exit 1
+}
 
-TEMPORARY_DIRECTORY="$(mktemp -d "${TMPDIR%/}/zisla-dmg.XXXXXX")"
+ditto -c -k --keepParent "$APP" "$ARCHIVE"
+(
+  cd "$ARCHIVE_DIRECTORY"
+  shasum -a 256 "${ARCHIVE:t}" > "${ARCHIVE:t}.sha256"
+)
+
+TEMPORARY_DIRECTORY="$(mktemp -d "${TMP_ROOT%/}/zisla-dmg.XXXXXX")"
 WRITABLE_DMG="${TEMPORARY_DIRECTORY}.dmg"
 MOUNTED_DEVICE=""
 cleanup() {
   if [[ -n "$MOUNTED_DEVICE" ]]; then
     hdiutil detach -quiet "$MOUNTED_DEVICE" || true
   fi
-  [[ "$WRITABLE_DMG" == "${TMPDIR%/}/zisla-dmg."*.dmg ]] || return
+  [[ "$WRITABLE_DMG" == "${TMP_ROOT%/}/zisla-dmg."*.dmg ]] || return
   rm -f "$WRITABLE_DMG"
-  [[ "$TEMPORARY_DIRECTORY" == "${TMPDIR%/}/zisla-dmg."* ]] || return
+  [[ "$TEMPORARY_DIRECTORY" == "${TMP_ROOT%/}/zisla-dmg."* ]] || return
   rm -rf "$TEMPORARY_DIRECTORY"
 }
 trap cleanup EXIT
@@ -93,6 +142,11 @@ sync
 hdiutil detach -quiet "$MOUNTED_DEVICE"
 MOUNTED_DEVICE=""
 hdiutil convert -quiet "$WRITABLE_DMG" -format UDZO -imagekey zlib-level=9 -ov -o "$DMG"
+hdiutil verify "$DMG"
+(
+  cd "$ARCHIVE_DIRECTORY"
+  shasum -a 256 "${DMG:t}" > "${DMG:t}.sha256"
+)
 
 echo "$ARCHIVE"
 echo "$DMG"

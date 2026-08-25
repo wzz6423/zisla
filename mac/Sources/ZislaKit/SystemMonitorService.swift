@@ -1434,21 +1434,20 @@ enum SystemHardwareInfoReader {
     typealias SysctlIntReader = @Sendable (String) -> Int?
 
     static func read(sysctlInt: SysctlIntReader = SystemSysctl.intValue(named:)) -> SystemHardwareInfo {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
-        process.arguments = ["-json", "SPHardwareDataType", "SPDisplaysDataType"]
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = Pipe()
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return .unavailable }
-            return parse(output.fileHandleForReading.readDataToEndOfFile(), sysctlInt: sysctlInt)
-        } catch {
+        guard let output = try? AIAgentProcessRunner.runSynchronously(
+            executableURL: URL(fileURLWithPath: "/usr/sbin/system_profiler"),
+            arguments: ["-json", "SPHardwareDataType", "SPDisplaysDataType"],
+            workingDirectoryURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
+            timeout: 30,
+            maximumOutputBytes: 4 * 1_024 * 1_024,
+            maximumErrorBytes: 64 * 1_024
+        ),
+        !output.didTimeout,
+        output.status == 0
+        else {
             return .unavailable
         }
+        return parse(output.standardOutput, sysctlInt: sysctlInt)
     }
 
     static func parse(

@@ -6,11 +6,16 @@ import UniformTypeIdentifiers
 
 struct MailModuleView: View {
     @ObservedObject var model: AppModel
+    /// Holds the island open while the composer is up so an unfinished draft survives the pointer
+    /// leaving the island.
+    var onTransientInteractionChanged: (Bool) -> Void = { _ in }
 
     @State private var selectedMessageID: String?
     @State private var selectedAccountName: String?
     @State private var isComposing = false
     @State private var replyTarget: MailMessage?
+    @State private var composeRecipient = ""
+    @State private var composeRequestID: UUID?
 
     private var mail: MailService { model.mail }
 
@@ -42,7 +47,11 @@ struct MailModuleView: View {
         }
         .onAppear {
             selectFirstMessageIfNeeded()
+            consumeMailComposeRequest()
             Task { await model.refreshMail() }
+        }
+        .onChange(of: model.mailComposeRequest) { _, _ in
+            consumeMailComposeRequest()
         }
         .onChange(of: mail.messages) { _, _ in
             selectFirstMessageIfNeeded()
@@ -52,6 +61,12 @@ struct MailModuleView: View {
                 self.selectedAccountName = nil
             }
             selectFirstMessageIfNeeded()
+        }
+        .onChange(of: isComposing) { _, composing in
+            onTransientInteractionChanged(composing)
+        }
+        .onDisappear {
+            onTransientInteractionChanged(false)
         }
     }
 
@@ -63,15 +78,15 @@ struct MailModuleView: View {
             MailComposerView(
                 model: model,
                 replyTarget: replyTarget,
+                initialRecipients: composeRecipient,
                 onCancel: {
-                    isComposing = false
-                    replyTarget = nil
+                    finishComposing()
                 },
                 onSent: {
-                    isComposing = false
-                    replyTarget = nil
+                    finishComposing()
                 }
             )
+            .id(composeRequestID)
             .padding(.leading, 10)
             .transition(.opacity.combined(with: .move(edge: .trailing)))
         } else {
@@ -96,8 +111,7 @@ struct MailModuleView: View {
                 accountMenu
                 Spacer(minLength: 2)
                 IconButton(symbol: "square.and.pencil", help: "发邮件", size: .compact) {
-                    replyTarget = nil
-                    withAnimation(.easeInOut(duration: 0.2)) { isComposing = true }
+                    beginNewMessage()
                 }
                 IconButton(symbol: "arrow.clockwise", help: "刷新收件箱", size: .compact) {
                     Task { await model.refreshMail() }
@@ -206,8 +220,7 @@ struct MailModuleView: View {
         return Button {
             if isComposing {
                 withAnimation(.easeInOut(duration: 0.18)) {
-                    isComposing = false
-                    replyTarget = nil
+                    finishComposing()
                 }
             }
             selectedMessageID = message.id
@@ -306,8 +319,7 @@ struct MailModuleView: View {
     private func actionRail(for message: MailMessage) -> some View {
         HStack(spacing: 6) {
             Button {
-                replyTarget = message
-                withAnimation(.easeInOut(duration: 0.2)) { isComposing = true }
+                beginReply(to: message)
             } label: {
                 Label("回复", systemImage: "arrowshape.turn.up.left")
                     .font(.islandMicro(weight: .semibold))
@@ -333,6 +345,8 @@ struct MailModuleView: View {
                     .font(.islandMicro(weight: .semibold))
             }
             .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
             .controlSize(.mini)
             .help("标记为垃圾邮件或移到废纸篓")
             .disabled(mail.isMutating)
@@ -344,6 +358,35 @@ struct MailModuleView: View {
     private func selectAccount(_ accountName: String?) {
         selectedAccountName = accountName
         selectedMessageID = visibleMessages.first?.id
+    }
+
+    private func consumeMailComposeRequest() {
+        guard let request = model.takeMailComposeRequest() else { return }
+        replyTarget = nil
+        composeRecipient = request.recipient
+        composeRequestID = request.id
+        withAnimation(.easeInOut(duration: 0.2)) { isComposing = true }
+    }
+
+    private func beginNewMessage() {
+        replyTarget = nil
+        composeRecipient = ""
+        composeRequestID = UUID()
+        withAnimation(.easeInOut(duration: 0.2)) { isComposing = true }
+    }
+
+    private func beginReply(to message: MailMessage) {
+        replyTarget = message
+        composeRecipient = ""
+        composeRequestID = UUID()
+        withAnimation(.easeInOut(duration: 0.2)) { isComposing = true }
+    }
+
+    private func finishComposing() {
+        isComposing = false
+        replyTarget = nil
+        composeRecipient = ""
+        composeRequestID = nil
     }
 
     private func selectFirstMessageIfNeeded() {
@@ -384,11 +427,25 @@ private struct MailComposerView: View {
     let onSent: () -> Void
 
     @State private var selectedSenderAddress: String?
-    @State private var recipients = ""
+    @State private var recipients: String
     @State private var subject = ""
     @State private var messageBody = ""
     @State private var isSending = false
     @State private var attachmentURLs: [URL] = []
+
+    init(
+        model: AppModel,
+        replyTarget: MailMessage?,
+        initialRecipients: String,
+        onCancel: @escaping () -> Void,
+        onSent: @escaping () -> Void
+    ) {
+        self.model = model
+        self.replyTarget = replyTarget
+        self.onCancel = onCancel
+        self.onSent = onSent
+        _recipients = State(initialValue: initialRecipients)
+    }
 
     private var isReply: Bool { replyTarget != nil }
     private var availableAccounts: [MailAccount] { model.mail.activeAccounts }

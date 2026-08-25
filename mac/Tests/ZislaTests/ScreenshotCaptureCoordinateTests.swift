@@ -361,7 +361,7 @@ struct ScreenshotCaptureCoordinateTests {
     }
 
     @Test
-    func selectionOverlayAcceptsFirstMouseForImmediateDragging() throws {
+    func selectionOverlayAcceptsFirstMouseForImmediateDragging() async throws {
         let screen = try #require(NSScreen.screens.first)
         let cgImage = try #require(makeCoordinateImage(width: 8, height: 8))
         let image = NSImage(cgImage: cgImage, size: screen.frame.size)
@@ -371,7 +371,7 @@ struct ScreenshotCaptureCoordinateTests {
             presentPanels: { panels = $0 },
             snapTargets: { _ in [] }
         )
-        controller.start(on: screen)
+        await controller.start(on: screen)
         let contentView = try #require(panels.first?.contentView)
 
         #expect(contentView.acceptsFirstMouse(for: nil))

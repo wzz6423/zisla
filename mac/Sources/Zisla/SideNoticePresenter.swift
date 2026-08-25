@@ -15,9 +15,9 @@ final class SideNoticePresenter {
     private var panelsByDisplayID: [CGDirectDisplayID: DisplayPanels] = [:]
     private var cancellables: Set<AnyCancellable> = []
     private var configuredDisplayIDs: Set<UInt32>
-    private var isIslandExpanded = false
-    /// Display where the last voice recording happened; the processing indicator stays scoped
-    /// to it so other screens keep their ordinary collapsed pill and pet slot.
+    private var suppression = SideNoticeSuppression()
+    private var isScreenshotActive = false
+    /// Display where the last voice recording happened; the post-recording processing indicator stays scoped to it.
     private var voiceProcessingDisplayID: UInt32?
 
     init(
@@ -92,17 +92,42 @@ final class SideNoticePresenter {
     }
 
     func setIslandExpanded(_ expanded: Bool) {
-        guard expanded != isIslandExpanded else { return }
-        isIslandExpanded = expanded
-        if expanded {
+        updateSuppression { $0.isIslandExpanded = expanded }
+    }
+
+    func setVoiceRecording(_ recording: Bool) {
+        updateSuppression { $0.isVoiceRecording = recording }
+    }
+
+    /// The clipboard assistant takes over the notch row, so notices give way while it is up.
+    func setClipboardAssistantVisible(_ visible: Bool) {
+        updateSuppression { $0.isClipboardAssistantVisible = visible }
+    }
+
+    private func updateSuppression(_ mutate: (inout SideNoticeSuppression) -> Void) {
+        var updated = suppression
+        mutate(&updated)
+        guard updated != suppression else { return }
+        suppression = updated
+        if updated.hidesNotices {
             hideAllPanels()
         } else {
             updatePanels()
         }
     }
 
+    func setScreenshotActive(_ active: Bool) {
+        guard isScreenshotActive != active else { return }
+        isScreenshotActive = active
+        for panels in panelsByDisplayID.values {
+            panels.left?.level = active ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
+            panels.right?.level = active ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
+            panels.compactBar?.level = active ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
+        }
+    }
+
     private func updatePanels() {
-        guard !isIslandExpanded else {
+        guard !suppression.hidesNotices else {
             hideAllPanels()
             return
         }
@@ -201,6 +226,7 @@ final class SideNoticePresenter {
             ? topology.anchorFrame.width
             : 0
         let panel = ensureCompactBarPanel(in: panels)
+        panel.level = isScreenshotActive ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
         panel.setFrame(frame, display: true)
         panel.orderFrontRegardless()
     }
@@ -230,6 +256,7 @@ final class SideNoticePresenter {
             return
         }
         let panel = ensurePanel(for: side, in: panels)
+        panel.level = isScreenshotActive ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
         let frame = layoutEngine.frame(side: side, presentation: presentation, screen: snapshot)
         panel.setFrame(frame, display: true)
         panel.orderFrontRegardless()

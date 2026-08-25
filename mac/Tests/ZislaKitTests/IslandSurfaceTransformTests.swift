@@ -127,4 +127,20 @@ struct IslandSurfaceTransformTests {
         #expect(midFrame.maxY > collapsedFrame.maxY)
         #expect(expandedFrame.maxY > midFrame.maxY)
     }
+
+    @Test
+    func collapsedCenterOffsetUnwindsAsTheSurfaceReachesFullReveal() {
+        // The pet slot pushes the expanded surface 22pt off the panel center, so the pill has to
+        // drift back that far to land on the notch — and drift to nothing once fully revealed.
+        #expect(IslandSurfaceTransform.collapsedCenterOffset(22, revealProgress: 0) == 22)
+        #expect(IslandSurfaceTransform.collapsedCenterOffset(22, revealProgress: 0.5) == 11)
+        #expect(IslandSurfaceTransform.collapsedCenterOffset(22, revealProgress: 1) == 0)
+        // Mirrored pet side.
+        #expect(IslandSurfaceTransform.collapsedCenterOffset(-22, revealProgress: 0) == -22)
+        // Spring overshoot must not push the pill past the notch or past the surface center.
+        #expect(IslandSurfaceTransform.collapsedCenterOffset(22, revealProgress: 1.2) == 0)
+        #expect(IslandSurfaceTransform.collapsedCenterOffset(22, revealProgress: -0.3) == 22)
+        // No slot reserved: the surface is already centered on the notch.
+        #expect(IslandSurfaceTransform.collapsedCenterOffset(0, revealProgress: 0) == 0)
+    }
 }

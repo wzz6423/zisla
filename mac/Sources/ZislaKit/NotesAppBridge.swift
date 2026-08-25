@@ -331,32 +331,28 @@ public enum NotesAppBridge {
 
     /// Runs JXA (`osascript -l JavaScript`) on a background thread and returns stdout as text.
     private static func runJXA(_ script: String) async -> Result<String, NotesAppError> {
-        await Task.detached(priority: .userInitiated) { () -> Result<String, NotesAppError> in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            process.arguments = ["-l", "JavaScript", "-e", script]
-            let stdout = Pipe()
-            let stderr = Pipe()
-            process.standardOutput = stdout
-            process.standardError = stderr
-            do {
-                try process.run()
-            } catch {
-                return .failure(.failed("无法启动 osascript：\(error.localizedDescription)"))
+        do {
+            let output = try await AIAgentProcessRunner.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/osascript"),
+                arguments: ["-l", "JavaScript", "-e", script],
+                timeout: 30,
+                maximumOutputBytes: .max,
+                maximumErrorBytes: 256 * 1024
+            )
+            if output.didTimeout {
+                return .failure(.failed("备忘录操作超时"))
             }
-            process.waitUntilExit()
-            let data = stdout.fileHandleForReading.readDataToEndOfFile()
-            let errData = stderr.fileHandleForReading.readDataToEndOfFile()
-            if process.terminationStatus != 0 {
-                let message = String(data: errData, encoding: .utf8)?
+            if output.status != 0 {
+                let message = output.standardError
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                    ?? "备忘录访问失败"
-                return .failure(.failed(message))
+                return .failure(.failed(message.isEmpty ? "备忘录访问失败" : message))
             }
-            let output = String(data: data, encoding: .utf8)?
+            let text = String(data: output.standardOutput, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return .success(output)
-        }.value
+            return .success(text)
+        } catch {
+            return .failure(.failed("无法启动 osascript：\(error.localizedDescription)"))
+        }
     }
 
     /// Runs AppleScript in-process and returns a list of strings (used to read plaintext and body simultaneously).

@@ -553,6 +553,34 @@ struct CodexSessionActivityDetectorTests {
 
         #expect(tasks.isEmpty)
     }
+
+    @Test
+    func defaultColdStartReadsLifecycleEventsBeforeTheFormerTailLimit() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let padding = String(repeating: "x", count: 64 * 1_024)
+        let filler = (0..<40).map { index in
+            #"{"timestamp":"2026-07-19T01:00:01.000Z","type":"ignored","index":\#(index),"padding":"\#(padding)"}"#
+        }
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-complete.jsonl",
+            lines: [
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-before-former-tail"
+                ),
+            ] + filler,
+            modifiedAt: Date(timeIntervalSince1970: 1_800_001_200)
+        )
+
+        let tasks = try CodexSessionActivityDetector(sessionsDirectory: root).activeTasks()
+
+        #expect(tasks.map(\.id) == [
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-before-former-tail"),
+        ])
+    }
 }
 
     @Test

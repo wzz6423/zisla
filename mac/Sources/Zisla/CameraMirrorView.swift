@@ -170,24 +170,25 @@ private final class CameraMirrorController: ObservableObject {
 
     @Published private(set) var status: Status = .idle
 
-    // Session and input are accessed only on sessionQueue; nonisolated(unsafe) lets background queue closures capture them directly,
-    // with mutual exclusion guaranteed by the serial queue rather than the actor. Reading the session reference from the main thread for the preview layer is permitted by AVFoundation.
+    // The session is serialized on sessionQueue; reading its reference for the preview layer is permitted by AVFoundation.
     nonisolated(unsafe) let session = AVCaptureSession()
-    nonisolated(unsafe) private var deviceInput: AVCaptureDeviceInput?
     private let sessionQueue = DispatchQueue(label: "com.zisla.camera-mirror.session")
+    private let lifecycle = CameraSessionLifecycle()
 
     func start() {
+        let generation = lifecycle.next()
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             status = .preparing
-            configureAndStart()
+            configureAndStart(generation: generation)
         case .notDetermined:
             status = .preparing
             Self.requestVideoAccess { [weak self] granted in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
+                    guard self.lifecycle.isCurrent(generation) else { return }
                     if granted {
-                        self.configureAndStart()
+                        self.configureAndStart(generation: generation)
                     } else {
                         self.status = .failed(.denied)
                     }
@@ -203,6 +204,7 @@ private final class CameraMirrorController: ObservableObject {
     }
 
     func stop() {
+        _ = lifecycle.next()
         sessionQueue.async { [session] in
             if session.isRunning {
                 session.stopRunning()
@@ -211,18 +213,29 @@ private final class CameraMirrorController: ObservableObject {
                 session.removeInput(input)
             }
         }
-        deviceInput = nil
         if status != .idle {
             status = .idle
         }
     }
 
-    private func configureAndStart() {
-        sessionQueue.async { [weak self] in
+    private func configureAndStart(generation: Int) {
+        let lifecycle = lifecycle
+        sessionQueue.async { [weak self, lifecycle] in
             guard let self else { return }
+            guard lifecycle.isCurrent(generation) else { return }
             let result = self.configureSession()
+            guard lifecycle.isCurrent(generation) else {
+                if case .success = result, self.session.isRunning {
+                    self.session.stopRunning()
+                    for input in self.session.inputs {
+                        self.session.removeInput(input)
+                    }
+                }
+                return
+            }
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                guard lifecycle.isCurrent(generation) else { return }
                 switch result {
                 case .success:
                     self.status = .running
@@ -256,7 +269,6 @@ private final class CameraMirrorController: ObservableObject {
             return .failure(.reason(.configuration))
         }
         session.addInput(input)
-        deviceInput = input
         session.commitConfiguration()
 
         if !session.isRunning {
@@ -289,5 +301,23 @@ private final class CameraMirrorController: ObservableObject {
                 }
             }
         }
+    }
+}
+
+private final class CameraSessionLifecycle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var generation = 0
+
+    func next() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        generation += 1
+        return generation
+    }
+
+    func isCurrent(_ value: Int) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return generation == value
     }
 }

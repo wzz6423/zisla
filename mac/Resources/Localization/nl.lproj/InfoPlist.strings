@@ -6,3 +6,4 @@
 "NSMicrophoneUsageDescription" = "zisla gebruikt de microfoon alleen wanneer je spraakinvoer start, om spraak om te zetten naar de huidige AI-gesprekstekst.";
 "NSSpeechRecognitionUsageDescription" = "zisla transcribeert de spraak die je actief opneemt naar AI-gesprekstekst.";
 "NSAppleEventsUsageDescription" = "zisla gebruikt Mail.app om e-mail te lezen en beheren, inclusief postvakken, gelezen status, verwijdering en antwoorden.";
+"NSBluetoothAlwaysUsageDescription" = "zisla leest alleen openbare batterijgegevens van verbonden of gekoppelde Bluetooth-apparaten wanneer je de batterijpagina opent.";

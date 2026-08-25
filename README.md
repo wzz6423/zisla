@@ -21,7 +21,7 @@ Current implementation: **macOS 14+**. Apple Silicon is the supported configurat
 | --- | --- |
 | Now Playing | Shows artwork, title, progress, lyrics, and playback controls; Core Audio can identify the app actually outputting audio when metadata is unavailable. |
 | Handoff and sharing | Drop files, media, or links on the top trigger area to keep them in a handoff tray, reveal them in Finder, or open the macOS share menu. |
-| Clipboard and notifications | Optionally records local clipboard history, recognizes new links locally, and surfaces media, AI activity, browser downloads, timers, mail, and updates in the collapsed state. |
+| Clipboard and notifications | Optionally records local clipboard history, recognizes new links locally, and surfaces media, AI activity, browser downloads, timers, mail, and updates in the collapsed state. An optional copy assistant shows a small island toast after every copy with a rich preview and smart next actions (open, reveal in Finder, search, translate, calculate, save). |
 | Everyday workspace | Includes weather, calendar, reminders, Mail.app, Markdown notes backed by Apple Notes, lock-screen information, and optional desktop pets. |
 
 ### Make AI work visible
@@ -74,7 +74,7 @@ zisla requests a permission only when an enabled feature first needs it. You can
 | Scope | Boundary |
 | --- | --- |
 | AI activity | Reads only structured events and local activity metadata. Prompts and answer bodies are never read. |
-| Clipboard and files | Clipboard history and link detection are separate local switches; handoff uses security-scoped bookmarks and does not copy the original file. |
+| Clipboard and files | Clipboard history, link detection, and the copy assistant are separate local switches; recognition runs entirely on-device, and opening links or running actions happens only after an explicit click or trigger press. Handoff uses security-scoped bookmarks and does not copy the original file. |
 | Notes, Mail, and voice | Notes and Mail use AppleScript/JXA with automation authorization. Voice records only while active; transcript organization sends text only to the selected local model, remote provider, or CLI profile. |
 | Browser downloads and media | Uses macOS public file-progress information, MediaRemote metadata, and Core Audio output state. It does not read browser history databases or capture audio content. |
 | Network | Weather, release checks, downloader requests, and optional remote voice organization access the network only for their respective enabled actions. |

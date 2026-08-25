@@ -127,19 +127,19 @@ final class MediaRemoteAdapterClient {
     ) -> Bool {
         guard let resources = MediaRemoteAdapterResources.locate() else { return false }
         commandQueue.async {
-            let process = Self.configuredProcess(resources: resources, arguments: ["get"])
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            let payload: MediaRemoteAdapterPayload?
-            do {
-                try process.run()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                payload = process.terminationStatus == 0
-                    ? Self.decodeNowPlayingInfo(data)
+            let output = try? AIAgentProcessRunner.runSynchronously(
+                executableURL: URL(fileURLWithPath: "/usr/bin/perl"),
+                arguments: [resources.scriptURL.path, resources.frameworkURL.path, "get"],
+                standardInput: Data(),
+                workingDirectoryURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
+                timeout: 15,
+                maximumOutputBytes: 16 * 1_024 * 1_024,
+                maximumErrorBytes: 64 * 1_024
+            )
+            let payload = output.flatMap {
+                !$0.didTimeout && $0.status == 0
+                    ? Self.decodeNowPlayingInfo($0.standardOutput)
                     : nil
-            } catch {
-                payload = nil
             }
             Task { @MainActor in completion(payload) }
         }
@@ -155,19 +155,18 @@ final class MediaRemoteAdapterClient {
         commandQueue.async {
             var succeeded = true
             for arguments in commands {
-                let process = Self.configuredProcess(
-                    resources: resources,
-                    arguments: arguments
+                let output = try? AIAgentProcessRunner.runSynchronously(
+                    executableURL: URL(fileURLWithPath: "/usr/bin/perl"),
+                    arguments: [resources.scriptURL.path, resources.frameworkURL.path] + arguments,
+                    standardInput: Data(),
+                    workingDirectoryURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
+                    timeout: 15,
+                    maximumOutputBytes: 1,
+                    maximumErrorBytes: 64 * 1_024
                 )
-                process.standardOutput = FileHandle.nullDevice
-                do {
-                    try process.run()
-                    process.waitUntilExit()
-                    guard process.terminationStatus == 0 else {
-                        succeeded = false
-                        break
-                    }
-                } catch {
+                guard let output,
+                      !output.didTimeout,
+                      output.status == 0 else {
                     succeeded = false
                     break
                 }

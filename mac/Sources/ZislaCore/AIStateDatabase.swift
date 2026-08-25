@@ -17,10 +17,29 @@ final class AIStateDatabase {
     init(url: URL, maximumUsageSamples: Int) throws {
         self.url = url
         self.maximumUsageSamples = max(1, maximumUsageSamples)
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
+        let fileManager = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        do {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            try fileManager.setAttributes(
+                [.posixPermissions: NSNumber(value: 0o700)],
+                ofItemAtPath: directory.path
+            )
+            if !fileManager.fileExists(atPath: url.path) {
+                guard fileManager.createFile(
+                    atPath: url.path,
+                    contents: nil,
+                    attributes: [.posixPermissions: NSNumber(value: 0o600)]
+                ) else {
+                    throw AIStateRepositoryError.storageFailure("无法创建私有 AI 状态数据库")
+                }
+            }
+            try setPrivateFilePermissions(using: fileManager)
+        } catch let error as AIStateRepositoryError {
+            throw error
+        } catch {
+            throw AIStateRepositoryError.storageFailure(error.localizedDescription)
+        }
 
         var opened: OpaquePointer?
         let result = sqlite3_open_v2(
@@ -89,6 +108,7 @@ final class AIStateDatabase {
             try migrateUsageToDailyTotalsIfNeeded()
             try migrateDetectedUsageCursorIfNeeded()
             try migrateDetectedUsageEventsIfNeeded()
+            try setPrivateFilePermissions(using: fileManager)
         } catch {
             close()
             throw error
@@ -592,6 +612,21 @@ final class AIStateDatabase {
             result.append(try decode(IslandNotice.self, from: blob(at: 0, in: statement)))
         }
         return result
+    }
+
+    private func setPrivateFilePermissions(using fileManager: FileManager) throws {
+        let privateFiles = [
+            url,
+            URL(fileURLWithPath: url.path + "-journal"),
+            URL(fileURLWithPath: url.path + "-wal"),
+            URL(fileURLWithPath: url.path + "-shm"),
+        ]
+        for file in privateFiles where fileManager.fileExists(atPath: file.path) {
+            try fileManager.setAttributes(
+                [.posixPermissions: NSNumber(value: 0o600)],
+                ofItemAtPath: file.path
+            )
+        }
     }
 
     private func usageSample(

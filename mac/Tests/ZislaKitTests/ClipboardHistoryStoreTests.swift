@@ -152,6 +152,27 @@ struct ClipboardHistoryStoreTests {
     }
 
     @Test
+    func clipboardDatabaseIsRestrictedToTheCurrentUser() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
+
+        #expect(store.record(.text("private clipboard")))
+        store.flushPendingChanges()
+
+        let databaseFileNames = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            .filter { $0.hasPrefix(storageURL.lastPathComponent) }
+        #expect(databaseFileNames.contains(storageURL.lastPathComponent))
+        for fileName in databaseFileNames {
+            let path = directory.appendingPathComponent(fileName).path
+            let attributes = try FileManager.default.attributesOfItem(atPath: path)
+            #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
+        }
+    }
+
+    @Test
     func oldJSONStorageIsIgnored() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

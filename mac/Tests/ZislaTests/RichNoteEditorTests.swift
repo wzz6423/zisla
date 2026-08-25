@@ -9,6 +9,52 @@ import WebKit
 @Suite(.serialized)
 struct RichNoteEditorTests {
     @Test
+    func blocksActiveContentFromSyncedNoteHTML() async throws {
+        let maliciousHTML = """
+        <div>safe content</div>
+        <img src="invalid" onerror="window.zislaCompromised = true">
+        <iframe srcdoc="<script>window.top.zislaCompromised = true</script>"></iframe>
+        <form action="https://example.com"><input name="secret"></form>
+        """
+        let hostingView = NSHostingView(rootView:
+            RichNoteEditor(
+                html: maliciousHTML,
+                command: nil,
+                isEditable: true,
+                onChange: { _, _ in }
+            )
+            .frame(width: 320, height: 240)
+        )
+        let window = NSWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = hostingView
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+
+        let webView = try await waitForWebView(in: hostingView)
+        try await waitUntilEditorIsReady(in: webView)
+        let result = try #require(await webView.evaluateJavaScript(
+            """
+            (() => ({
+              compromised: Boolean(window.zislaCompromised),
+              activeElementCount: document.getElementById('editor').querySelectorAll('script, iframe, frame, object, embed, form, meta, link').length,
+              eventHandlerCount: document.getElementById('editor').querySelectorAll('[onerror], [srcdoc]').length,
+              text: document.getElementById('editor').innerText
+            }))()
+            """
+        ) as? [String: Any])
+
+        #expect(result["compromised"] as? Bool == false)
+        #expect(result["activeElementCount"] as? Int == 0)
+        #expect(result["eventHandlerCount"] as? Int == 0)
+        #expect((result["text"] as? String)?.contains("safe content") == true)
+    }
+
+    @Test
     func acceptsFirstMouseToRestoreEditingFocus() async throws {
         let hostingView = NSHostingView(rootView:
             RichNoteEditor(

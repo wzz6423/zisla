@@ -137,7 +137,7 @@ public final class AIStateMonitor: ObservableObject {
     static func defaultActivityDetectors() -> [any AIActivityDetecting] {
         [
             CodexSessionActivityDetector(),
-            ClaudeSessionActivityDetector(maxTranscriptFiles: 4, initialTailBytes: 256 * 1_024),
+            ClaudeSessionActivityDetector(maxTranscriptFiles: 12, initialTailBytes: 256 * 1_024),
             CopilotSessionActivityDetector(maxTranscriptFiles: 4, maxCLISessions: 4),
             KimiSessionActivityDetector(maxSessionFiles: 4, initialTailBytes: 256 * 1_024),
             GeminiSessionActivityDetector(

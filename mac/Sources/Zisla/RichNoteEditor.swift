@@ -220,12 +220,14 @@ struct RichNoteEditor: NSViewRepresentable {
 
     private static func document(initialHTML: String, isEditable: Bool) -> String {
         let initial = javaScriptLiteral(initialHTML)
+        let scriptNonce = UUID().uuidString
         return """
         <!DOCTYPE html>
         <html>
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-\(scriptNonce)'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
         <style>
           :root { color-scheme: dark; background: transparent !important; }
           html, body { margin: 0; min-height: 100%; background: transparent !important; }
@@ -266,7 +268,7 @@ struct RichNoteEditor: NSViewRepresentable {
         </head>
         <body>
         <div id="editor" contenteditable="\(isEditable)" spellcheck="\(isEditable)" role="textbox" aria-multiline="true"></div>
-        <script>
+        <script nonce="\(scriptNonce)">
         (() => {
           const editor = document.getElementById('editor');
           const caret = document.createElement('div');
@@ -300,13 +302,13 @@ struct RichNoteEditor: NSViewRepresentable {
           const sanitize = value => {
             const template = document.createElement('template');
             template.innerHTML = value || '';
-            // Preserve Notes-specific attachment nodes that WebKit cannot render while editing text.
-            template.content.querySelectorAll('script, base').forEach(node => node.remove());
+            // Preserve passive Notes markup while removing elements that can execute or navigate outside the editor.
+            template.content.querySelectorAll('script, base, iframe, frame, object, embed, form, meta, link').forEach(node => node.remove());
             template.content.querySelectorAll('*').forEach(node => {
               [...node.attributes].forEach(attribute => {
                 const name = attribute.name.toLowerCase();
                 const value = attribute.value.trim().toLowerCase();
-                if (name.startsWith('on') || ((name === 'href' || name === 'src') && value.startsWith('javascript:'))) {
+                if (name.startsWith('on') || name === 'srcdoc' || ((name === 'href' || name === 'src') && value.startsWith('javascript:'))) {
                   node.removeAttribute(attribute.name);
                 }
               });

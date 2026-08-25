@@ -386,6 +386,155 @@ struct ClaudeSessionActivityDetectorTests {
         ).activeTasks().first)
         #expect(task.processIdentifier == nil)
     }
+
+    @Test
+    func testSubagentTranscriptDoesNotReplaceParentTask() throws {
+        let root = makeTempRoot("claude-subagent")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeJSONL(
+            under: root,
+            relativePath: "proj/sess-parent.jsonl",
+            lines: [
+                #"{"type":"ai-title","sessionId":"sess-parent","aiTitle":"父会话标题"}"#,
+                claudeUser(timestamp: "2026-07-19T01:00:00.000Z", sessionId: "sess-parent", text: "go"),
+                claudeAssistant(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    sessionId: "sess-parent",
+                    stopReason: "tool_use",
+                    model: "claude-opus-5",
+                    toolUses: [("t1", "Task")]
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_900_000_190)
+        )
+        // 子代理转录沿用父会话 ID，且更晚落盘，不能顶掉父任务。
+        try writeJSONL(
+            under: root,
+            relativePath: "proj/sess-parent/subagents/agent-a1.jsonl",
+            lines: [
+                claudeUser(timestamp: "2026-07-19T01:00:02.000Z", sessionId: "sess-parent", text: "sub"),
+                claudeAssistant(
+                    timestamp: "2026-07-19T01:00:03.000Z",
+                    sessionId: "sess-parent",
+                    stopReason: "tool_use",
+                    model: "claude-opus-5",
+                    toolUses: [("t2", "Grep")]
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_900_000_191)
+        )
+
+        let tasks = try ClaudeSessionActivityDetector(projectsDirectory: root).activeTasks()
+        #expect(tasks.count == 1)
+        #expect(tasks.first?.title == "父会话标题")
+    }
+
+    @Test
+    func testLiveSessionsSurviveTranscriptLimit() throws {
+        let root = makeTempRoot("claude-live-overflow")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let projectsDir = root.appendingPathComponent(".claude/projects", isDirectory: true)
+        let sessionsDir = root.appendingPathComponent(".claude/sessions", isDirectory: true)
+        try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
+        try Data(#"{"pid":901,"sessionId":"sess-old-live"}"#.utf8)
+            .write(to: sessionsDir.appendingPathComponent("901.json"))
+
+        for (sessionID, offset) in [("sess-old-live", 0), ("sess-newer", 10)] {
+            try writeJSONL(
+                under: projectsDir,
+                relativePath: "proj/\(sessionID).jsonl",
+                lines: [
+                    claudeUser(timestamp: "2026-07-19T01:00:00.000Z", sessionId: sessionID, text: "go"),
+                    claudeAssistant(
+                        timestamp: "2026-07-19T01:00:01.000Z",
+                        sessionId: sessionID,
+                        stopReason: "tool_use",
+                        model: "claude-opus-5",
+                        toolUses: [("t1", "Bash")]
+                    ),
+                ],
+                modifiedAt: Date(timeIntervalSince1970: 1_900_000_200 + Double(offset))
+            )
+        }
+
+        let tasks = try ClaudeSessionActivityDetector(
+            projectsDirectory: projectsDir,
+            maxTranscriptFiles: 1,
+            isProcessAlive: { $0 == 901 }
+        ).activeTasks()
+
+        #expect(Set(tasks.map(\.id)) == [
+            ClaudeSessionActivityDetector.taskID(forSessionID: "sess-old-live"),
+            ClaudeSessionActivityDetector.taskID(forSessionID: "sess-newer"),
+        ])
+    }
+
+    @Test
+    func testKeepsAITitleAcrossIdleTurns() throws {
+        let root = makeTempRoot("claude-title-retained")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relative = "proj/session-retained.jsonl"
+
+        try writeJSONL(
+            under: root,
+            relativePath: relative,
+            lines: [
+                #"{"type":"ai-title","sessionId":"sess-keep","aiTitle":"保留的标题"}"#,
+                claudeUser(timestamp: "2026-07-19T01:00:00.000Z", sessionId: "sess-keep", text: "go"),
+                claudeAssistant(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    sessionId: "sess-keep",
+                    stopReason: "end_turn",
+                    model: "claude-opus-5",
+                    toolUses: []
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_900_000_210)
+        )
+
+        let detector = ClaudeSessionActivityDetector(projectsDirectory: root)
+        #expect(try detector.activeTasks().isEmpty)
+
+        // 新一轮开始时 `ai-title` 还没重写，标题必须来自缓存而不是回落成 "Claude"。
+        try appendJSONLLine(
+            claudeUser(timestamp: "2026-07-19T01:05:00.000Z", sessionId: "sess-keep", text: "again"),
+            to: root.appendingPathComponent(relative)
+        )
+        #expect(try detector.activeTasks().first?.title == "保留的标题")
+    }
+
+    @Test
+    func testIgnoresSyntheticModelPlaceholder() throws {
+        let root = makeTempRoot("claude-synthetic-model")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeJSONL(
+            under: root,
+            relativePath: "proj/session-synthetic.jsonl",
+            lines: [
+                claudeUser(timestamp: "2026-07-19T01:00:00.000Z", sessionId: "sess-syn", text: "hi"),
+                claudeAssistant(
+                    timestamp: "2026-07-19T01:00:01.000Z",
+                    sessionId: "sess-syn",
+                    stopReason: "tool_use",
+                    model: "claude-opus-5",
+                    toolUses: [("tool-1", "Bash")]
+                ),
+                claudeAssistant(
+                    timestamp: "2026-07-19T01:00:02.000Z",
+                    sessionId: "sess-syn",
+                    stopReason: "tool_use",
+                    model: "<synthetic>",
+                    toolUses: []
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_900_000_220)
+        )
+
+        let task = try #require(ClaudeSessionActivityDetector(projectsDirectory: root).activeTasks().first)
+        #expect(task.detail == "claude-opus-5")
+    }
 }
 
 // MARK: - Fixtures

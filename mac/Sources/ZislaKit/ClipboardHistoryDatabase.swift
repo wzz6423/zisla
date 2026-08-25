@@ -121,6 +121,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             at: storageURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
+        try restrictDatabaseFilePermissions()
         var opened: OpaquePointer?
         let result = sqlite3_open_v2(
             storageURL.path,
@@ -135,6 +136,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         }
 
         do {
+            try restrictDatabaseFilePermissions()
             guard sqlite3_busy_timeout(opened, 1_000) == SQLITE_OK else {
                 throw ClipboardHistoryDatabaseError(
                     message: sqliteMessage(opened, fallback: "无法配置剪贴板数据库")
@@ -171,11 +173,25 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 """,
                 on: opened
             )
+            try restrictDatabaseFilePermissions()
             connection = opened
             return opened
         } catch {
             sqlite3_close(opened)
             throw error
+        }
+    }
+
+    private func restrictDatabaseFilePermissions() throws {
+        let fileManager = FileManager.default
+        let paths = [
+            storageURL.path,
+            "\(storageURL.path)-journal",
+            "\(storageURL.path)-wal",
+            "\(storageURL.path)-shm",
+        ]
+        for path in paths where fileManager.fileExists(atPath: path) {
+            try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
         }
     }
 

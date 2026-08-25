@@ -1,0 +1,9 @@
+"NSCalendarsFullAccessUsageDescription" = "zisla 需要读取近期日程并显示在顶部信息面板中。";
+"NSAudioCaptureUsageDescription" = "zisla 仅在你打开音乐相关功能时读取当前播放音频的频段能量，以实时显示音浪。";
+"NSBluetoothAlwaysUsageDescription" = "zisla 仅在你打开电池页面时读取已连接或已配对蓝牙设备公开的电量信息。";
+"NSCameraUsageDescription" = "zisla 仅在你打开镜子时使用摄像头。";
+"NSRemindersFullAccessUsageDescription" = "zisla 需要读取带日期的提醒事项并与日历事件一起展示。";
+"NSLocationWhenInUseUsageDescription" = "zisla 需要使用当前位置显示本地天气和地区名称。";
+"NSMicrophoneUsageDescription" = "zisla 仅在你点击语音输入时使用麦克风，将语音转换为当前 AI 对话的文字。";
+"NSSpeechRecognitionUsageDescription" = "zisla 需要将你主动录入的语音转换为 AI 对话文字。";
+"NSAppleEventsUsageDescription" = "zisla 需要通过 Mail.app 读取和管理你的邮件，包括收件箱列表、标记已读、删除和回复。";

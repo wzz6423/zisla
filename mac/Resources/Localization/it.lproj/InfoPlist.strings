@@ -6,3 +6,4 @@
 "NSMicrophoneUsageDescription" = "zisla utilizza il microfono solo quando avvii l'input vocale, per trasformare il parlato in testo della conversazione AI corrente.";
 "NSSpeechRecognitionUsageDescription" = "zisla trascrive il parlato che registri attivamente in testo della conversazione AI.";
 "NSAppleEventsUsageDescription" = "zisla utilizza Mail.app per leggere e gestire la posta, incluse caselle di posta, stato di lettura, eliminazione e risposte.";
+"NSBluetoothAlwaysUsageDescription" = "zisla legge le informazioni pubbliche sulla batteria dei dispositivi Bluetooth collegati o associati solo quando apri la pagina Batteria.";

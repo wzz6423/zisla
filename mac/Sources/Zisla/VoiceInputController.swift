@@ -16,6 +16,21 @@ final class VoiceInputController: ObservableObject {
     /// Whether the recognition service is still processing a final result after recording has stopped.
     private var isFinalizingTranscript = false
 
+    /// Drives the in-island recording surface. Presentation must not wait for `isRecording`:
+    /// permission round-trips and the dictation engine's first-run setup take up to a second, so the
+    /// surface would appear long after the keypress that asked for it.
+    var isCapturingInput: Bool { isPreparing || isRecording }
+
+    /// `isCapturingInput` as a publisher for the panel-sizing pipeline. Both assignments that hand
+    /// preparation over to recording keep the combined value true, so it never dips mid-take.
+    var isCapturingInputPublisher: AnyPublisher<Bool, Never> {
+        $isPreparing
+            .combineLatest($isRecording)
+            .map { $0 || $1 }
+            .removeDuplicates()
+            .eraseToAnyPublisher()
+    }
+
     private var recognizer: SFSpeechRecognizer?
     private var engine: AVAudioEngine?
     private var request: SFSpeechAudioBufferRecognitionRequest?
@@ -78,6 +93,15 @@ final class VoiceInputController: ObservableObject {
         pendingStartID = startID
         isPreparing = true
         errorDescription = nil
+        // The island surface is already on screen at this point, and the recognizers only reset the
+        // transcript once they are live — leaving the previous take's text on display until then.
+        transcript = ""
+        // Already-granted permissions still cost two async TCC round-trips before capture can begin,
+        // which delays the first words of a take; go straight to the microphone check instead.
+        guard SFSpeechRecognizer.authorizationStatus() != .authorized else {
+            requestMicrophoneAccess(startID: startID)
+            return
+        }
         if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
             presentAuthorizationPromptHost()
         }
@@ -98,6 +122,10 @@ final class VoiceInputController: ObservableObject {
     }
 
     private func requestMicrophoneAccess(startID: UUID) {
+        guard AVCaptureDevice.authorizationStatus(for: .audio) != .authorized else {
+            startRecording(startID: startID)
+            return
+        }
         if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
             presentAuthorizationPromptHost()
         }
@@ -295,9 +323,7 @@ final class VoiceInputController: ObservableObject {
         do {
             engine.prepare()
             try engine.start()
-            pendingStartID = nil
-            isPreparing = false
-            isRecording = true
+            finishPreparingIntoRecording()
         } catch {
             clearRecordingResources(deleteAudioFile: true)
             finishPendingStart(with: error.localizedDescription)
@@ -381,13 +407,20 @@ final class VoiceInputController: ObservableObject {
         do {
             engine.prepare()
             try engine.start()
-            pendingStartID = nil
-            isPreparing = false
-            isRecording = true
+            finishPreparingIntoRecording()
         } catch {
             clearRecordingResources(deleteAudioFile: true)
             finishPendingStart(with: error.localizedDescription)
         }
+    }
+
+    /// Hands preparation over to a live take. `isRecording` rises before `isPreparing` clears so
+    /// `isCapturingInput` never dips to false in between, which would tear the island surface down
+    /// and rebuild it in the middle of a take.
+    private func finishPreparingIntoRecording() {
+        pendingStartID = nil
+        isRecording = true
+        isPreparing = false
     }
 
     private func makeRecordingFile(
