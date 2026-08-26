@@ -485,12 +485,12 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
-    func voiceStructuredFormattingDefaultsToFalseForLegacySettings() throws {
-        #expect(FeatureSettings.default.voiceStructuredFormattingEnabled == false)
+    func voiceStructuredFormattingDefaultsToTrueForNewAndLegacySettings() throws {
+        #expect(FeatureSettings.default.voiceStructuredFormattingEnabled == true)
 
         let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
         let legacySettings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
-        #expect(legacySettings.voiceStructuredFormattingEnabled == false)
+        #expect(legacySettings.voiceStructuredFormattingEnabled == true)
     }
 
     @Test
@@ -504,6 +504,21 @@ struct FeatureSettingsCompatibilityTests {
         )
 
         #expect(decoded.voiceStructuredFormattingEnabled == true)
+    }
+
+    @Test
+    func voiceStructuredFormattingPreservesExplicitFalse() throws {
+        let explicitFalse = Data(#"{"activityNoticeDisplayDuration":"threeSeconds","voiceStructuredFormattingEnabled":false}"#.utf8)
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: explicitFalse)
+        #expect(decoded.voiceStructuredFormattingEnabled == false)
+
+        var settings = FeatureSettings.default
+        settings.voiceStructuredFormattingEnabled = false
+        let roundTripped = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(roundTripped.voiceStructuredFormattingEnabled == false)
     }
 
     // MARK: - VoiceInputHotkeyPreset

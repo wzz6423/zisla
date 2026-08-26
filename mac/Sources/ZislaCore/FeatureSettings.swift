@@ -640,7 +640,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         voiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy = .never,
         voiceModelConfiguration: AIModelConfigurationReference? = nil,
         voiceEnabledLexicons: Set<VoiceLexicon> = VoiceLexicon.defaultEnabled,
-        voiceStructuredFormattingEnabled: Bool = false,
+        voiceStructuredFormattingEnabled: Bool = true,
         screenshotEnabled: Bool = true,
         screenshotHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.capture,
         screenshotPinHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.pin,

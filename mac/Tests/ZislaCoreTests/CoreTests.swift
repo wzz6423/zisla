@@ -1906,14 +1906,15 @@ struct FeatureSettingsTests {
     @Test
     func clipboardAssistantTriggerRoundTripsAndDefaultsOnLegacyJSON() throws {
         let defaults = FeatureSettings.default
-        // Assistant is on by default; its modifier-only trigger fires on a double tap.
+        // Assistant is on by default; its conventional trigger is ⌘N.
         #expect(defaults.clipboardAssistantEnabled)
         let defaultHotkey = try #require(defaults.clipboardAssistantTriggerConfiguration.hotkey)
-        #expect(defaultHotkey.isModifierOnly)
-        #expect(defaultHotkey.keyCode == 59)
-        #expect(defaultHotkey.carbonModifiers == 0x1000)
-        #expect(defaultHotkey.keyDisplayName.isEmpty)
-        #expect(defaultHotkey.modifierSides == [.leftControl])
+        #expect(!defaultHotkey.isModifierOnly)
+        #expect(defaultHotkey.keyCode == 45)
+        #expect(defaultHotkey.carbonModifiers == 0x0100)
+        #expect(defaultHotkey.keyDisplayName == "N")
+        #expect(defaultHotkey.modifierSides == nil)
+        #expect(defaultHotkey.displayName == "⌘ N")
         #expect(defaults.clipboardAssistantMouseButton == nil)
 
         let encoder = JSONEncoder()
