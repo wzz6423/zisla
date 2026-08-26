@@ -73,30 +73,28 @@ public struct LocalOfficeConverter: Sendable {
         }
         defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
 
-        let process = Process()
-        let stdout = Pipe()
-        let stderr = Pipe()
-        process.executableURL = executable
-        process.arguments = Self.conversionArguments(
-            input: input,
-            outputDirectory: temporaryDirectory,
-            profileDirectory: profileDirectory
-        )
-        process.currentDirectoryURL = temporaryDirectory
-        process.standardOutput = stdout
-        process.standardError = stderr
+        let processOutput: AIAgentProcessOutput
         do {
-            try process.run()
+            processOutput = try AIAgentProcessRunner.runSynchronously(
+                executableURL: executable,
+                arguments: Self.conversionArguments(
+                    input: input,
+                    outputDirectory: temporaryDirectory,
+                    profileDirectory: profileDirectory
+                ),
+                workingDirectoryURL: temporaryDirectory,
+                timeout: 5 * 60,
+                maximumOutputBytes: 256 * 1_024,
+                maximumErrorBytes: 256 * 1_024
+            )
         } catch {
             throw LocalOfficeConverterError.launchFailed(error.localizedDescription)
         }
-        process.waitUntilExit()
-        let diagnostics = String(
-            data: stderr.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard process.terminationStatus == 0 else {
-            throw LocalOfficeConverterError.conversionFailed(diagnostics)
+        if processOutput.didTimeout {
+            throw LocalOfficeConverterError.conversionFailed("转换超时")
+        }
+        guard processOutput.status == 0 else {
+            throw LocalOfficeConverterError.conversionFailed(processOutput.standardError)
         }
 
         let converted = temporaryDirectory

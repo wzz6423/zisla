@@ -31,16 +31,29 @@ enum ScreenshotCaptureService {
         return CGDirectDisplayID(number.uint32Value)
     }
 
-    static func capture(screen: NSScreen) throws -> (image: NSImage, cgImage: CGImage) {
+    /// macOS 15 起 `CGDisplayCreateImage` 被标记为 obsoleted：调用仍能链接，但返回的图像尺寸正确、
+    /// 内容却是回收后的显存，在选区遮罩上表现为整屏色块。所以统一走 ScreenCaptureKit，
+    /// 只有 macOS 14 才在 ScreenCaptureKit 失败时回落到旧接口。
+    @MainActor
+    static func capture(screen: NSScreen) async throws -> (image: NSImage, cgImage: CGImage) {
         try requirePermission()
         guard let displayID = displayID(for: screen) else {
             throw ScreenshotCaptureError.screenUnavailable
         }
-        guard let cgImage = CGDisplayCreateImage(displayID) else {
-            throw ScreenshotCaptureError.permissionRequired
+        do {
+            let cgImage = try await captureWithScreenCaptureKit(
+                displayID: displayID,
+                screen: screen,
+                excludingProcessIdentifier: nil
+            )
+            return (NSImage(cgImage: cgImage, size: screen.frame.size), cgImage)
+        } catch {
+            if #unavailable(macOS 15.0) {
+                guard let cgImage = CGDisplayCreateImage(displayID) else { throw error }
+                return (NSImage(cgImage: cgImage, size: screen.frame.size), cgImage)
+            }
+            throw error
         }
-        let image = NSImage(cgImage: cgImage, size: screen.frame.size)
-        return (image, cgImage)
     }
 
     @MainActor
@@ -52,6 +65,20 @@ enum ScreenshotCaptureService {
         guard let displayID = displayID(for: screen) else {
             throw ScreenshotCaptureError.screenUnavailable
         }
+        let cgImage = try await captureWithScreenCaptureKit(
+            displayID: displayID,
+            screen: screen,
+            excludingProcessIdentifier: processIdentifier
+        )
+        return (NSImage(cgImage: cgImage, size: screen.frame.size), cgImage)
+    }
+
+    @MainActor
+    private static func captureWithScreenCaptureKit(
+        displayID: CGDirectDisplayID,
+        screen: NSScreen,
+        excludingProcessIdentifier processIdentifier: pid_t?
+    ) async throws -> CGImage {
         let content = try await SCShareableContent.excludingDesktopWindows(
             false,
             onScreenWindowsOnly: true
@@ -59,25 +86,26 @@ enum ScreenshotCaptureService {
         guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
             throw ScreenshotCaptureError.screenUnavailable
         }
-        let excludedApplications = content.applications.filter {
-            $0.processID == processIdentifier
-        }
+        let excludedApplications = processIdentifier.map { identifier in
+            content.applications.filter { $0.processID == identifier }
+        } ?? []
 
         let filter = SCContentFilter(
             display: display,
             excludingApplications: excludedApplications,
             exceptingWindows: []
         )
+        // 显示器重新配置后 NSScreen 可能已失效，缩放读成 0 会让配置里的像素尺寸退化为 0。
+        let scale = max(screen.backingScaleFactor, 1)
         let configuration = SCStreamConfiguration()
-        configuration.width = Int((screen.frame.width * screen.backingScaleFactor).rounded())
-        configuration.height = Int((screen.frame.height * screen.backingScaleFactor).rounded())
+        configuration.width = max(1, Int((screen.frame.width * scale).rounded()))
+        configuration.height = max(1, Int((screen.frame.height * scale).rounded()))
         configuration.captureResolution = .best
         configuration.showsCursor = false
-        let cgImage = try await SCScreenshotManager.captureImage(
+        return try await SCScreenshotManager.captureImage(
             contentFilter: filter,
             configuration: configuration
         )
-        return (NSImage(cgImage: cgImage, size: screen.frame.size), cgImage)
     }
 
     static func image(from cgImage: CGImage, cropInScreenPoints rect: CGRect, screenSize: CGSize) -> NSImage? {
@@ -262,6 +290,38 @@ enum ScreenshotSelectionGeometry {
         case .bottomLeft: CGPoint(x: rect.minX, y: rect.maxY)
         case .left: CGPoint(x: rect.minX, y: rect.midY)
         }
+    }
+
+    /// 尺寸标签与选区边框、角把手之间的留白。
+    static let badgeInset: CGFloat = 10
+
+    /// 标签的估算尺寸，用于判断外侧是否有足够空间容纳标签。
+    static let badgeEstimatedSize = CGSize(width: 104, height: 27)
+
+    /// 尺寸标签的中心点：优先放在选区外右侧（底部对齐），外侧放不下时退到选区内右下角。
+    static func badgePosition(for selection: CGRect, in bounds: CGSize) -> CGPoint {
+        let badge = badgeEstimatedSize
+        let gap: CGFloat = 8
+        let rect = selection.standardized
+
+        // 水平：优先放外侧右侧，放不下则退到内侧右侧
+        let outsideCenterX = rect.maxX + gap + badge.width / 2
+        let fitsOutside = outsideCenterX + badge.width / 2 <= bounds.width
+        let centerX: CGFloat
+        if fitsOutside {
+            centerX = outsideCenterX
+        } else {
+            centerX = max(badge.width / 2, rect.maxX - gap - badge.width / 2)
+        }
+
+        // 垂直：标签底部对齐选区底部，超出屏幕时 clamp
+        let preferredCenterY = rect.maxY - badge.height / 2
+        let centerY = min(
+            max(badge.height / 2, preferredCenterY),
+            bounds.height - badge.height / 2
+        )
+
+        return CGPoint(x: centerX, y: centerY)
     }
 }
 
@@ -483,13 +543,15 @@ final class ScreenshotColorCopyFeedback: ObservableObject {
 
 @MainActor
 final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
-    typealias CaptureScreen = (NSScreen) throws -> (image: NSImage, cgImage: CGImage)
+    typealias CaptureScreen = @MainActor (NSScreen) async throws -> (image: NSImage, cgImage: CGImage)
     typealias PresentPanels = @MainActor ([ScreenshotSelectionPanel]) -> Void
     typealias SnapTargets = (NSScreen) -> [CGRect]
 
     private var panels: [ScreenshotSelectionPanel] = []
     private var didFinish = false
     private var didRequestPermission = false
+    /// 抓图改成异步之后，两次 start 可能交叠，用会话号丢弃过期的那一次。
+    private var startSessionID = 0
     private var colorCopyMonitor: Any?
     private let captureScreen: CaptureScreen
     private let presentPanels: PresentPanels
@@ -517,33 +579,34 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
         self.snapTargets = snapTargets
     }
 
-    func start(on screen: NSScreen) {
-        start(on: [screen])
+    func start(on screen: NSScreen) async {
+        await start(on: [screen])
     }
 
-    func start(on screens: [NSScreen]) {
+    func start(on screens: [NSScreen]) async {
         didFinish = false
         closePanels()
+        startSessionID += 1
+        let sessionID = startSessionID
         guard !screens.isEmpty else {
             didFinish = true
             onCancelled?()
             return
         }
 
-        let captures: [(screen: NSScreen, image: NSImage, cgImage: CGImage)]
+        var captures: [(screen: NSScreen, image: NSImage, cgImage: CGImage)] = []
         do {
-            captures = try screens.map { screen in
-                let capture = try captureScreen(screen)
-                return (screen, capture.image, capture.cgImage)
+            for screen in screens {
+                let capture = try await captureScreen(screen)
+                captures.append((screen, capture.image, capture.cgImage))
             }
         } catch {
             if case ScreenshotCaptureError.permissionRequired = error,
                !didRequestPermission {
                 didRequestPermission = true
                 if CGRequestScreenCaptureAccess() {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                        self?.start(on: screens)
-                    }
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    await start(on: screens)
                     return
                 }
             }
@@ -553,6 +616,8 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
             return
         }
         didRequestPermission = false
+        // 抓图期间可能又发起了一次截图，过期的这次不能再把遮罩挂上去。
+        guard sessionID == startSessionID else { return }
 
         panels = captures.map { capture in
             let copyFeedback = ScreenshotColorCopyFeedback()
@@ -794,11 +859,10 @@ struct ScreenshotSelectionView: View {
                             .frame(width: displayedSelection.width, height: displayedSelection.height)
                             .position(x: displayedSelection.midX, y: displayedSelection.midY)
 
-                        selectionBadge(for: displayedSelection)
-                            .position(
-                                x: min(max(displayedSelection.midX, 72), max(72, proxy.size.width - 72)),
-                                y: max(26, displayedSelection.minY - 22)
-                            )
+                        ScreenshotSelectionSizeBadge(
+                            selection: displayedSelection,
+                            bounds: proxy.size
+                        )
                     }
                 }
                 .allowsHitTesting(false)
@@ -944,13 +1008,23 @@ struct ScreenshotSelectionView: View {
         }
         .frame(width: size.width, height: size.height)
     }
+}
 
-    private func selectionBadge(for selection: CGRect) -> some View {
+/// 选区尺寸标签：优先贴在选区外右侧，外侧空间不够时退到选区内右下角。
+struct ScreenshotSelectionSizeBadge: View {
+    let selection: CGRect
+    let bounds: CGSize
+
+    var body: some View {
+        let pos = ScreenshotSelectionGeometry.badgePosition(for: selection, in: bounds)
         Text("\(Int(selection.width.rounded())) × \(Int(selection.height.rounded()))")
             .font(.system(size: 12, weight: .medium, design: .monospaced))
             .foregroundStyle(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(Color.black.opacity(0.72), in: Capsule())
+            .fixedSize()
+            .position(x: pos.x, y: pos.y)
+            .allowsHitTesting(false)
     }
 }

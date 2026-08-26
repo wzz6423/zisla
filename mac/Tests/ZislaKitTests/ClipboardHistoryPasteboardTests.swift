@@ -26,6 +26,23 @@ struct ClipboardHistoryPasteboardTests {
     }
 
     @Test
+    func fileRoundTripsThroughPasteboard() throws {
+        let pasteboard = makePasteboard()
+        defer { pasteboard.releaseGlobally() }
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-clipboard-history-\(UUID().uuidString)", isDirectory: true)
+        let fileURL = directory.appendingPathComponent("example.txt")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try Data("clipboard file".utf8).write(to: fileURL)
+
+        let content = try ClipboardHistoryContent.file(at: fileURL)
+        #expect(ClipboardHistoryPasteboard.write(content, to: pasteboard))
+        #expect(ClipboardHistoryPasteboard.readContent(from: pasteboard) == content)
+    }
+
+    @Test
     func monitorCapturesOneChangedValueOnlyOnce() {
         let pasteboard = makePasteboard()
         defer { pasteboard.releaseGlobally() }

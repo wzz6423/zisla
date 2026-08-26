@@ -75,6 +75,9 @@ struct IslandSurface<Content: View>: View {
     private let visualStyle: IslandVisualStyle
     private let notchBackground: IslandNotchBackground
     private let usesCompactGlassSurface: Bool
+    private let collapsedTopCornerRadius: CGFloat
+    private let bottomCornerRadius: CGFloat?
+    private let collapsedCenterOffsetX: CGFloat
 
     init(
         isCollapsed: Bool = false,
@@ -83,6 +86,9 @@ struct IslandSurface<Content: View>: View {
         visualStyle: IslandVisualStyle = .frosted,
         notchBackground: IslandNotchBackground = .black,
         usesCompactGlassSurface: Bool = false,
+        collapsedTopCornerRadius: CGFloat = 5,
+        bottomCornerRadius: CGFloat? = nil,
+        collapsedCenterOffsetX: CGFloat = 0,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.isCollapsed = isCollapsed
@@ -91,6 +97,9 @@ struct IslandSurface<Content: View>: View {
         self.visualStyle = visualStyle
         self.notchBackground = notchBackground
         self.usesCompactGlassSurface = usesCompactGlassSurface
+        self.collapsedTopCornerRadius = collapsedTopCornerRadius
+        self.bottomCornerRadius = bottomCornerRadius
+        self.collapsedCenterOffsetX = collapsedCenterOffsetX
         self.content = content
     }
 
@@ -101,12 +110,12 @@ struct IslandSurface<Content: View>: View {
         )
     }
 
-    /// Rim-light corner radius: the recording surface keeps the pill's bottom radius,
-    /// everything else keeps the expanded bottom radius.
+    /// Compact surfaces may keep their pill radius while reusing the standard reveal path.
     private var rimBottomCornerRadius: CGFloat {
-        usesCompactGlassSurface
-            ? VoiceRecordingIslandGeometry.bottomCornerRadius
-            : IslandSurfaceGeometry.expandedBottomCornerRadius
+        bottomCornerRadius
+            ?? (usesCompactGlassSurface
+                ? VoiceRecordingIslandGeometry.bottomCornerRadius
+                : IslandSurfaceGeometry.expandedBottomCornerRadius)
     }
 
     private var maskIsCollapsed: Bool {
@@ -127,16 +136,18 @@ struct IslandSurface<Content: View>: View {
                 collapsedSize: collapsedSize,
                 expandedSize: expandedSize,
                 isCollapsed: maskIsCollapsed,
-                expandedBottomCornerRadius: rimBottomCornerRadius
+                collapsedTopCornerRadius: collapsedTopCornerRadius,
+                expandedBottomCornerRadius: rimBottomCornerRadius,
+                collapsedCenterOffsetX: collapsedCenterOffsetX
             )
             .animation(
                 reduceMotion
                     ? nil
-                    // Collapse stays quick and crisp; expand gets a spring with a hint of
-                    // bounce, matching the iOS Dynamic Island reveal feel.
+                    // Collapse folds straight back into the pill; expand gets a spring with a hint
+                    // of bounce, matching the iOS Dynamic Island reveal feel.
                     : maskIsCollapsed
-                        ? .smooth(duration: 0.18)
-                        : .snappy(duration: 0.28, extraBounce: 0.05),
+                        ? ZislaMotion.islandRecycle
+                        : ZislaMotion.islandReveal,
                 value: maskIsCollapsed
             )
         }
@@ -442,18 +453,24 @@ struct IslandSurface<Content: View>: View {
 private struct IslandRevealMask: Shape {
     let collapsedSize: CGSize
     let expandedSize: CGSize
+    let collapsedTopCornerRadius: CGFloat
     let expandedBottomCornerRadius: CGFloat
+    let collapsedCenterOffsetX: CGFloat
     private var revealProgress: CGFloat
 
     init(
         collapsedSize: CGSize,
         expandedSize: CGSize,
         isCollapsed: Bool,
-        expandedBottomCornerRadius: CGFloat = IslandSurfaceGeometry.expandedBottomCornerRadius
+        collapsedTopCornerRadius: CGFloat = 5,
+        expandedBottomCornerRadius: CGFloat = IslandSurfaceGeometry.expandedBottomCornerRadius,
+        collapsedCenterOffsetX: CGFloat = 0
     ) {
         self.collapsedSize = collapsedSize
         self.expandedSize = expandedSize
+        self.collapsedTopCornerRadius = collapsedTopCornerRadius
         self.expandedBottomCornerRadius = expandedBottomCornerRadius
+        self.collapsedCenterOffsetX = collapsedCenterOffsetX
         revealProgress = isCollapsed ? 0 : 1
     }
 
@@ -470,7 +487,11 @@ private struct IslandRevealMask: Shape {
         )
         let visibleFrame = transform.visibleFrame(in: rect.size)
         let frame = CGRect(
-            x: rect.midX - visibleFrame.width / 2,
+            x: rect.midX - visibleFrame.width / 2
+                + IslandSurfaceTransform.collapsedCenterOffset(
+                    collapsedCenterOffsetX,
+                    revealProgress: revealProgress
+                ),
             y: rect.minY,
             width: visibleFrame.width,
             height: visibleFrame.height
@@ -478,8 +499,9 @@ private struct IslandRevealMask: Shape {
         let progress = min(1, max(0, revealProgress))
 
         return IslandSilhouette(
-            topCornerRadius: 5 * (1 - progress),
-            bottomCornerRadius: 14 + (expandedBottomCornerRadius - 14) * progress
+            topCornerRadius: collapsedTopCornerRadius * (1 - progress),
+            bottomCornerRadius: 14
+                + (expandedBottomCornerRadius - 14) * progress
         )
         .path(in: frame)
     }

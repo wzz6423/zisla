@@ -421,6 +421,27 @@ struct ManagedToolServiceTests {
     }
 
     @Test
+    func rejectsDownloadRedirectedToAnUntrustedHost() async {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-managed-tool-redirect-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [UntrustedRedirectDownloadURLProtocol.self]
+        let service = ManagedToolService(
+            toolsDirectory: root.appendingPathComponent("Tools", isDirectory: true),
+            bundleURL: root,
+            session: URLSession(configuration: configuration),
+            releaseLoader: { [payload = releaseJSON(tag: "2026.06.09", assets: ["yt-dlp_macos"])] _ in
+                payload
+            }
+        )
+
+        await service.install(.ytDLP)
+
+        #expect(service.states[.ytDLP]?.errorMessage == "下载地址不可信：evil.example.com")
+    }
+
+    @Test
     func restoresCachedInstallAndLatestVersionsBeforeRefreshingAgain() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -521,6 +542,25 @@ private final class ManagedToolDownloadURLProtocol: URLProtocol, @unchecked Send
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Self.responseData)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+private final class UntrustedRedirectDownloadURLProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated override class func canInit(with request: URLRequest) -> Bool { true }
+    nonisolated override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let response = HTTPURLResponse(
+            url: URL(string: "https://evil.example.com/yt-dlp_macos")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/octet-stream"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data("untrusted executable".utf8))
         client?.urlProtocolDidFinishLoading(self)
     }
 

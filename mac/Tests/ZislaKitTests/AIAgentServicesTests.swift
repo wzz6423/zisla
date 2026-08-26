@@ -418,6 +418,61 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func synchronousProcessRunnerUsesSharedOutputLimit() throws {
+        let output = try AIAgentProcessRunner.runSynchronously(
+            executableURL: URL(fileURLWithPath: "/usr/bin/printf"),
+            arguments: ["abcdef"],
+            maximumOutputBytes: 3
+        )
+
+        #expect(output.status == 0)
+        #expect(output.standardOutput == Data("abc".utf8))
+    }
+
+    @Test
+    func processRunnerReturnsCompleteOutputBeyondFormerDefaultLimit() async throws {
+        let byteCount = 4 * 1_024 * 1_024 + 1
+        let output = try await AIAgentProcessRunner.run(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "/usr/bin/yes x | /usr/bin/head -c \(byteCount)"],
+            timeout: 10
+        )
+
+        #expect(AIAgentProcessRunner.defaultMaximumOutputBytes == .max)
+        #expect(AIAgentProcessRunner.defaultMaximumErrorBytes == .max)
+        #expect(output.status == 0)
+        #expect(output.standardOutput.count == byteCount)
+    }
+
+    @Test
+    func processRunnerDoesNotWaitForDescendantHoldingPipesAfterParentExits() async throws {
+        let startedAt = Date()
+        let output = try await AIAgentProcessRunner.run(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "sleep 2 &"],
+            timeout: 0.05
+        )
+
+        #expect(output.status == 0)
+        #expect(!output.didTimeout)
+        #expect(Date().timeIntervalSince(startedAt) < 1)
+    }
+
+    @Test
+    func processRunnerKeepsParentOutputWhenDescendantHoldsPipes() async throws {
+        let output = try await AIAgentProcessRunner.run(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "/usr/bin/printf complete; sleep 2 &"],
+            timeout: 0.05
+        )
+
+        // 解除孙进程占管道的阻塞不能牺牲父进程已经产出的内容。
+        #expect(output.status == 0)
+        #expect(!output.didTimeout)
+        #expect(output.standardOutput == Data("complete".utf8))
+    }
+
+    @Test
     func processRunnerPropagatesTaskCancellation() async throws {
         let task = Task {
             try await AIAgentProcessRunner.run(
@@ -445,7 +500,7 @@ struct AIAgentServicesTests {
         let task = Task {
             try await AIAgentProcessRunner.run(
                 executableURL: URL(fileURLWithPath: "/bin/sh"),
-                arguments: ["-c", "sleep 2 & wait"],
+                arguments: ["-c", "sleep 2 &"],
                 timeout: 10
             )
         }

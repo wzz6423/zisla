@@ -1,0 +1,8 @@
+/* Localizable.strings - Simplified Chinese localization for Zisla macOS */
+
+/* These keys are already written in Simplified Chinese; keeping the bundle
+   explicit prevents SwiftPM from falling back to the raw key for the locale. */
+"7 秒" = "7 秒";
+"永不" = "永不";
+"存在时长" = "存在时长";
+"提示自动关闭前的时间；永不则仅手动关闭" = "提示自动关闭前的时间；永不则仅手动关闭";

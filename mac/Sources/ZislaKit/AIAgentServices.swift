@@ -1479,105 +1479,203 @@ private final class AIAgentProcessResumeGuard: @unchecked Sendable {
 }
 
 public enum AIAgentProcessRunner {
+    public static let defaultMaximumOutputBytes = Int.max
+    public static let defaultMaximumErrorBytes = Int.max
+
+    private static let readerDrainGrace: DispatchTimeInterval = .milliseconds(250)
+
     public static func run(
         executableURL: URL,
         arguments: [String] = [],
         standardInput: Data? = nil,
         environment: [String: String]? = nil,
         workingDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser,
-        timeout: TimeInterval = 15
+        timeout: TimeInterval? = 15,
+        maximumOutputBytes: Int = AIAgentProcessRunner.defaultMaximumOutputBytes,
+        maximumErrorBytes: Int = AIAgentProcessRunner.defaultMaximumErrorBytes
     ) async throws -> AIAgentProcessOutput {
-        let process = Process()
-        let output = Pipe()
-        let error = Pipe()
-        let input = Pipe()
+        let channels = AIAgentProcessChannels()
         let capture = AIAgentProcessCapture()
-        process.executableURL = executableURL
-        process.arguments = arguments
-        process.environment = environment
-        process.currentDirectoryURL = workingDirectoryURL
-        process.standardOutput = output
-        process.standardError = error
-        if standardInput != nil {
-            process.standardInput = input
-            _ = fcntl(input.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
-        }
 
         return try await withTaskCancellationHandler {
             try Task.checkCancellation()
             return try await withCheckedThrowingContinuation { continuation in
                 let resumed = AIAgentProcessResumeGuard()
                 DispatchQueue.global(qos: .userInitiated).async {
-                    do {
-                        guard !capture.wasCancelled() else { throw CancellationError() }
-                        try process.run()
+                    let result = Result {
+                        try execute(
+                            channels: channels,
+                            capture: capture,
+                            executableURL: executableURL,
+                            arguments: arguments,
+                            standardInput: standardInput,
+                            environment: environment,
+                            workingDirectoryURL: workingDirectoryURL,
+                            timeout: timeout,
+                            maximumOutputBytes: maximumOutputBytes,
+                            maximumErrorBytes: maximumErrorBytes
+                        )
+                    }
+                    resumed.resume {
                         if capture.wasCancelled() {
-                            terminate(process, escalationDelay: 0.5)
-                        }
-                        let readers = DispatchGroup()
-                        readers.enter()
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            capture.setOutput(output.fileHandleForReading.readDataToEndOfFile())
-                            readers.leave()
-                        }
-                        readers.enter()
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            capture.setError(error.fileHandleForReading.readDataToEndOfFile())
-                            readers.leave()
-                        }
-                        if let standardInput {
-                            DispatchQueue.global(qos: .userInitiated).async {
-                                try? input.fileHandleForWriting.write(contentsOf: standardInput)
-                                try? input.fileHandleForWriting.close()
-                            }
-                        }
-                        let timeoutWork = DispatchWorkItem {
-                            guard process.isRunning else { return }
-                            capture.markTimedOut()
-                            process.terminate()
-                            DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
-                                if process.isRunning { Darwin.kill(process.processIdentifier, SIGKILL) }
-                            }
-                        }
-                        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
-                        process.waitUntilExit()
-                        timeoutWork.cancel()
-                        readers.wait()
-
-                        resumed.resume {
-                            if capture.wasCancelled() {
-                                continuation.resume(throwing: CancellationError())
-                            } else {
-                                let (standardOutput, standardErrorData, didTimeout) = capture.values()
-                                let standardError = String(decoding: standardErrorData, as: UTF8.self)
-                                continuation.resume(returning: AIAgentProcessOutput(
-                                    status: process.terminationStatus,
-                                    standardOutput: standardOutput,
-                                    standardError: standardError.trimmingCharacters(in: .whitespacesAndNewlines),
-                                    didTimeout: didTimeout
-                                ))
-                            }
-                        }
-                    } catch {
-                        resumed.resume {
-                            continuation.resume(throwing: capture.wasCancelled() ? CancellationError() : error)
+                            continuation.resume(throwing: CancellationError())
+                        } else {
+                            continuation.resume(with: result)
                         }
                     }
                 }
             }
         } onCancel: {
             capture.markCancelled()
-            terminate(process, escalationDelay: 0.5)
+            terminate(channels, escalationDelay: 0.5)
         }
     }
 
-    private static func terminate(_ process: Process, escalationDelay: TimeInterval) {
-        guard process.isRunning else { return }
-        process.terminate()
+    /// 直接在调用线程跑完子进程，不借道 Swift 并发协作线程池，避免调用方在 `Task` 内等待时线程枯竭。
+    public static func runSynchronously(
+        executableURL: URL,
+        arguments: [String] = [],
+        standardInput: Data? = nil,
+        environment: [String: String]? = nil,
+        workingDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser,
+        timeout: TimeInterval? = 15,
+        maximumOutputBytes: Int = AIAgentProcessRunner.defaultMaximumOutputBytes,
+        maximumErrorBytes: Int = AIAgentProcessRunner.defaultMaximumErrorBytes
+    ) throws -> AIAgentProcessOutput {
+        try execute(
+            channels: AIAgentProcessChannels(),
+            capture: AIAgentProcessCapture(),
+            executableURL: executableURL,
+            arguments: arguments,
+            standardInput: standardInput,
+            environment: environment,
+            workingDirectoryURL: workingDirectoryURL,
+            timeout: timeout,
+            maximumOutputBytes: maximumOutputBytes,
+            maximumErrorBytes: maximumErrorBytes
+        )
+    }
+
+    private static func execute(
+        channels: AIAgentProcessChannels,
+        capture: AIAgentProcessCapture,
+        executableURL: URL,
+        arguments: [String],
+        standardInput: Data?,
+        environment: [String: String]?,
+        workingDirectoryURL: URL,
+        timeout: TimeInterval?,
+        maximumOutputBytes: Int,
+        maximumErrorBytes: Int
+    ) throws -> AIAgentProcessOutput {
+        channels.process.executableURL = executableURL
+        channels.process.arguments = arguments
+        channels.process.environment = environment
+        channels.process.currentDirectoryURL = workingDirectoryURL
+        channels.process.standardOutput = channels.output
+        channels.process.standardError = channels.error
+        if standardInput != nil {
+            channels.process.standardInput = channels.input
+            _ = fcntl(channels.input.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
+        }
+
+        guard !capture.wasCancelled() else { throw CancellationError() }
+        try channels.process.run()
+        if capture.wasCancelled() {
+            terminate(channels, escalationDelay: 0.5)
+        }
+
+        let readers = DispatchGroup()
+        readers.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            capture.setOutput(readLimited(
+                channels.output.fileHandleForReading,
+                maximumBytes: maximumOutputBytes
+            ))
+            readers.leave()
+        }
+        readers.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            capture.setError(readLimited(
+                channels.error.fileHandleForReading,
+                maximumBytes: maximumErrorBytes
+            ))
+            readers.leave()
+        }
+        if let standardInput {
+            DispatchQueue.global(qos: .userInitiated).async {
+                try? channels.input.fileHandleForWriting.write(contentsOf: standardInput)
+                try? channels.input.fileHandleForWriting.close()
+            }
+        }
+        let timeoutWork = timeout.map { _ in
+            DispatchWorkItem {
+                // 进程已退出时读取线程可能仍在收尾，此时关管道会截断正常输出。
+                guard channels.process.isRunning else { return }
+                capture.markTimedOut()
+                terminate(channels, escalationDelay: 3)
+            }
+        }
+        if let timeout, let timeoutWork {
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
+        }
+        channels.process.waitUntilExit()
+        timeoutWork?.cancel()
+        // 写端随进程退出而关闭，此后管道里最多只剩缓冲区那点数据；
+        // 还读不完就说明有孙进程占着写端，主动关读端解除阻塞。
+        if readers.wait(timeout: .now() + readerDrainGrace) == .timedOut {
+            closeReadEnds(channels)
+            readers.wait()
+        }
+
+        guard !capture.wasCancelled() else { throw CancellationError() }
+        let (standardOutput, standardErrorData, didTimeout) = capture.values()
+        return AIAgentProcessOutput(
+            status: channels.process.terminationStatus,
+            standardOutput: standardOutput,
+            standardError: String(decoding: standardErrorData, as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            didTimeout: didTimeout
+        )
+    }
+
+    private static func terminate(
+        _ channels: AIAgentProcessChannels,
+        escalationDelay: TimeInterval
+    ) {
+        closeReadEnds(channels)
+        guard channels.process.isRunning else { return }
+        channels.process.terminate()
         DispatchQueue.global().asyncAfter(deadline: .now() + escalationDelay) {
-            if process.isRunning { Darwin.kill(process.processIdentifier, SIGKILL) }
+            if channels.process.isRunning {
+                Darwin.kill(channels.process.processIdentifier, SIGKILL)
+            }
         }
     }
+
+    private static func closeReadEnds(_ channels: AIAgentProcessChannels) {
+        try? channels.output.fileHandleForReading.close()
+        try? channels.error.fileHandleForReading.close()
+    }
+
+    private static func readLimited(_ handle: FileHandle, maximumBytes: Int) -> Data {
+        let limit = max(1, maximumBytes)
+        var result = Data()
+        while let chunk = try? handle.read(upToCount: 64 * 1024),
+              !chunk.isEmpty {
+            if result.count < limit {
+                result.append(chunk.prefix(limit - result.count))
+            }
+        }
+        return result
+    }
+}
+
+private final class AIAgentProcessChannels: @unchecked Sendable {
+    let process = Process()
+    let output = Pipe()
+    let error = Pipe()
+    let input = Pipe()
 }
 
 private extension Double {

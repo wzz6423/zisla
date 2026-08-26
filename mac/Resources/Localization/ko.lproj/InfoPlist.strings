@@ -6,3 +6,4 @@
 "NSMicrophoneUsageDescription" = "zisla는 음성 입력을 시작할 때만 마이크를 사용하여 음성을 현재 AI 대화 텍스트로 변환합니다.";
 "NSSpeechRecognitionUsageDescription" = "zisla는 적극적으로 녹음한 음성을 AI 대화 텍스트로 변환합니다.";
 "NSAppleEventsUsageDescription" = "zisla는 Mail.app을 사용하여 메일을 읽고 관리합니다. 받은 편지함, 읽음 상태, 삭제, 답장이 포함됩니다.";
+"NSBluetoothAlwaysUsageDescription" = "zisla는 배터리 페이지를 열 때만 연결되거나 페어링된 Bluetooth 기기의 공개 배터리 정보를 읽습니다.";

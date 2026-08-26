@@ -210,9 +210,7 @@ public final class AudioOutputDeviceService: ObservableObject {
     private func publishHeadphoneConnection(for device: AudioOutputDevice) {
         batteryTask?.cancel()
         batteryTask = Task { [weak self] in
-            let battery = await Task.detached(priority: .utility) {
-                Self.readBluetoothBattery(for: device.name)
-            }.value
+            let battery = await Self.readBluetoothBattery(for: device.name)
             guard !Task.isCancelled, self?.selectedDevice?.id == device.id else { return }
             self?.headphoneConnection = HeadphoneConnection(device: device, battery: battery)
         }
@@ -220,19 +218,16 @@ public final class AudioOutputDeviceService: ObservableObject {
 
     nonisolated private static func readBluetoothBattery(
         for deviceName: String
-    ) -> HeadphoneBatterySnapshot? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
-        process.arguments = ["SPBluetoothDataType", "-json"]
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = Pipe()
+    ) async -> HeadphoneBatterySnapshot? {
         do {
-            try process.run()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return nil }
+            let output = try await AIAgentProcessRunner.run(
+                executableURL: URL(fileURLWithPath: "/usr/sbin/system_profiler"),
+                arguments: ["SPBluetoothDataType", "-json"],
+                timeout: 15
+            )
+            guard output.status == 0, !output.didTimeout else { return nil }
             return HeadphoneBatterySnapshot.fromBluetoothProfile(
-                output.fileHandleForReading.readDataToEndOfFile(),
+                output.standardOutput,
                 deviceName: deviceName
             )
         } catch {

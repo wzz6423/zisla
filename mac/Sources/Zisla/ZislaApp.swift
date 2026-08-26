@@ -168,6 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var screenshotHotkeyManager = GlobalHotkeyManager()
     private var screenshotPinHotkeyManager = GlobalHotkeyManager()
     private var pendingScreenshotPin = false
+    private var isScreenshotSessionActive = false
     private var cancellables: Set<AnyCancellable> = []
     private var effectiveAppearanceObservation: NSKeyValueObservation?
     private var currentApplicationIconImage: NSImage?
@@ -177,8 +178,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var lastAppliedPanelSize: CGSize?
     /// Panel size saved before voice recording starts; restored when recording ends.
     private var voiceRecordingSavedPanelSize: CGSize?
-    /// Display where the last voice recording happened; scopes the processing indicator and
-    /// keeps every other display's pet slot at its ordinary collapsed position.
+    /// Module panel size waiting for the post-recording fold to finish before it is applied.
+    private var pendingVoiceRecordingPanelRestore: CGSize?
+    /// Display where the last voice recording happened; scopes the post-recording processing indicator.
     private var voiceRecordingDisplayID: UInt32?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -215,6 +217,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             },
             onPinChanged: { [weak self] pinned in
                 self?.overlayCoordinator?.setPinned(pinned)
+            },
+            onTransientInteractionChanged: { [weak self] visible in
+                self?.overlayCoordinator?.setTransientInteractionVisible(visible)
             },
             onSettingsRequested: { [weak self] in
                 self?.showSettings()
@@ -258,7 +263,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             persistentPanelFrameProvider: { [weak self] layout in
                 let notices = PersistentPetNoticePolicy.notices(
                     model.notices.left + model.notices.right,
-                    isVoiceRecording: model.voiceInput.isRecording,
+                    isVoiceRecording: model.voiceInput.isCapturingInput,
                     voiceDisplayID: self?.voiceRecordingDisplayID,
                     displayID: layout.displayID
                 )
@@ -275,7 +280,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         coordinator.onVisibilityChanged = { [weak self] visible in
             model.isIslandVisible = visible
             self?.noticePresenter?.setIslandExpanded(visible)
-            if visible { model.refreshForExpansion() }
+            if visible {
+                self?.flushVoiceRecordingPanelRestore()
+                model.clipboardAssistant.dismiss(animated: false)
+                model.refreshForExpansion()
+            }
         }
         coordinator.onDraggingChanged = { dragging in
             model.isExternalDragging = dragging
@@ -314,7 +323,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .removeDuplicates()
             .sink { [weak self, weak coordinator] size in
-                guard !model.voiceInput.isRecording else { return }
+                guard !model.voiceInput.isCapturingInput else { return }
                 self?.scheduleExpandedSizeUpdate(size, coordinator: coordinator)
             }
             .store(in: &cancellables)
@@ -323,17 +332,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .sink { [weak coordinator, weak model] isMirrorPresented, isTeleprompterPresented in
                 Task { @MainActor in
                     guard let model else { return }
+                    if isTeleprompterPresented {
+                        coordinator?.start()
+                        coordinator?.selectActiveDisplay(
+                            at: model.teleprompterPresentationPoint ?? NSEvent.mouseLocation
+                        )
+                    }
                     coordinator?.setPinned(isMirrorPresented || isTeleprompterPresented || model.isPinned)
                 }
             }
             .store(in: &cancellables)
         overlayCoordinator = coordinator
+        model.clipboardAssistant.onPresentationChanged = { [weak self, weak coordinator] visible in
+            coordinator?.setHoverActivationSuspended(visible)
+            self?.noticePresenter?.setClipboardAssistantVisible(visible)
+        }
         coordinator.setPersistentContentVisible(model.settingsStore.settings.petEnabled)
         coordinator.setCollapsedOnTop(model.settingsStore.settings.islandCollapsedOnTop)
         if model.settingsStore.settings.hoverActivationEnabled
             || model.settingsStore.settings.petEnabled {
             coordinator.start()
         }
+        // Mount the island content now so the first reveal animates instead of snapping in.
+        coordinator.prewarmPanel()
         if ProcessInfo.processInfo.environment["ZISLA_VISUAL_TEST_SHOW"] == "1" {
             coordinator.start()
             model.isPinned = true
@@ -480,13 +501,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
-        Publishers.CombineLatest(
-            model.$detectedLink.map { $0 != nil },
-            model.$isSharingPickerVisible
-        )
-            .map { detectedLinkVisible, sharingPickerVisible in
-                detectedLinkVisible || sharingPickerVisible
-            }
+        model.$isSharingPickerVisible
             .removeDuplicates()
             .sink { [weak coordinator] visible in
                 Task { @MainActor in
@@ -525,14 +540,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .store(in: &cancellables)
 
         // Voice recording: expand the island to one row and show live transcription below.
-        // Recording starts → save current panel size, switch to compact size, expand the island.
-        // Recording ends → restore panel size and collapse the island.
-        model.voiceInput.$isRecording
-            .removeDuplicates()
+        // Capture starts → save current panel size, switch to compact size, expand the island.
+        // Capture ends → restore panel size and collapse the island.
+        // Driven by the combined capture flag rather than `$isRecording`: the surface has to be on
+        // screen from the keypress, and the dictation engine needs up to a second to start recording.
+        model.voiceInput.isCapturingInputPublisher
             .sink { [weak self] recording in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     if recording {
+                        self.noticePresenter?.setVoiceRecording(true)
                         let model = AppModel.shared
                         self.voiceRecordingSavedPanelSize = Self.expandedPanelSize(
                             module: model.selectedModule,
@@ -544,10 +561,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         ).panelSize
                         // Direct resize (no two-phase): recording swaps layout instantly by design.
                         self.expandedSizeUpdateTask?.cancel()
+                        self.pendingVoiceRecordingPanelRestore = nil
+                        self.overlayCoordinator?.setVoiceRecording(true)
+                        // Read the collapsed pill metrics only after `setVoiceRecording` resolved the
+                        // active display: before the island has ever been presented they still hold
+                        // the launch defaults, which sizes the first take's surface wrong.
                         let recordingSize = IslandModuleLayout.voiceRecording
                             .matchingWidth(model.collapsedOverflowWidth)
                             .panelSize
-                        self.overlayCoordinator?.setVoiceRecording(true)
                         self.overlayCoordinator?.updateExpandedSize(recordingSize)
                         self.lastAppliedPanelSize = recordingSize
                         // Scope the post-recording processing indicator to the display where
@@ -556,15 +577,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         self.voiceRecordingDisplayID = voiceDisplayID
                         self.noticePresenter?.setVoiceProcessingDisplayID(voiceDisplayID)
                     } else {
+                        let model = AppModel.shared
                         self.overlayCoordinator?.setVoiceRecording(false)
                         if let saved = self.voiceRecordingSavedPanelSize {
-                            self.overlayCoordinator?.updateExpandedSize(saved)
-                            self.lastAppliedPanelSize = saved
                             self.voiceRecordingSavedPanelSize = nil
+                            self.scheduleVoiceRecordingPanelRestore(saved)
                         }
+                        self.overlayCoordinator?.setPinned(model.isPinned)
                         // Fallback: recording no longer activates the app, so focus should remain in the target app;
                         // this call switches back only in edge cases so the subsequent paste can reach its target.
                         AppModel.shared.restoreVoiceInputTargetFocus()
+                        self.noticePresenter?.setVoiceRecording(false)
                     }
                 }
             }
@@ -582,6 +605,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             }
             .store(in: &cancellables)
+
+        // Clipboard assistant actions that land in an island module run while the island is still
+        // collapsed; expanding here spares the user from hovering the notch themselves.
+        model.$islandExpansionRequested
+            .removeDuplicates()
+            .filter { $0 }
+            .sink { [weak coordinator] _ in
+                Task { @MainActor in
+                    coordinator?.showExpanded(at: NSEvent.mouseLocation)
+                    AppModel.shared.refreshForExpansion()
+                    AppModel.shared.islandExpansionRequested = false
+                }
+            }
+            .store(in: &cancellables)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -590,6 +627,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         AppModel.shared.stop()
         screenshotHotkeyManager.unregister()
         screenshotPinHotkeyManager.unregister()
+        setScreenshotSessionActive(false)
         screenshotSelectionController?.cancel()
         screenshotEditorController?.close()
         let editorsToClose = additionalScreenshotEditors
@@ -601,11 +639,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         overlayCoordinator?.stop()
     }
 
+    /// Holds the island panel at its recording size until the recycle fold has folded the pill back
+    /// into the notch.
+    ///
+    /// The module panel is wider than the recording surface and reserves a pet slot on one side, so
+    /// restoring it re-offsets the surface from the panel center. That offset is compensated by the
+    /// reveal mask's collapsed center offset — but the two run on different clocks (`surfaceResize`
+    /// for the layout, `islandRecycle` for the fold), so applying it while the fold is on screen
+    /// drags the pill sideways before it reaches the notch.
+    private func scheduleVoiceRecordingPanelRestore(_ size: CGSize) {
+        pendingVoiceRecordingPanelRestore = size
+        expandedSizeUpdateTask?.cancel()
+        expandedSizeUpdateTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: ZislaMotion.islandRecycleSettleDelay)
+            guard !Task.isCancelled, let self else { return }
+            self.expandedSizeUpdateTask = nil
+            self.flushVoiceRecordingPanelRestore()
+        }
+    }
+
+    /// Applies the deferred size early: whatever just expanded the island needs the full panel frame
+    /// now, and there is no fold left to protect.
+    private func flushVoiceRecordingPanelRestore() {
+        guard let size = pendingVoiceRecordingPanelRestore else { return }
+        pendingVoiceRecordingPanelRestore = nil
+        overlayCoordinator?.updateExpandedSize(size)
+        lastAppliedPanelSize = size
+    }
+
     private func scheduleExpandedSizeUpdate(
         _ size: CGSize,
         coordinator: OverlayCoordinator?
     ) {
         expandedSizeUpdateTask?.cancel()
+        pendingVoiceRecordingPanelRestore = nil
         expandedSizeUpdateTask = Task { @MainActor [weak self, weak coordinator] in
         // Defer module button event handling to the next run-loop turn before resizing the NSPanel
         // frame, avoiding a spurious "mouse exited" AppKit hit-test triggered mid-click.
@@ -1054,10 +1121,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func showIsland() {
+        let model = AppModel.shared
+        guard !model.voiceInput.isRecording, !model.voiceInput.isPreparing else { return }
         overlayCoordinator?.start()
-        AppModel.shared.isPinned = true
+        model.isPinned = true
         overlayCoordinator?.setPinned(true)
-        AppModel.shared.refreshForExpansion()
+        model.refreshForExpansion()
     }
 
     @objc private func startScreenshot() {
@@ -1101,6 +1170,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
 
+        setScreenshotSessionActive(true)
+
         let controller = ScreenshotSelectionController(
             capturedProcessIdentifier: capturedApplication?.processIdentifier
         )
@@ -1108,6 +1179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         controller.onCaptured = { [weak self] result in
             guard let self else { return }
             self.screenshotSelectionController = nil
+            AppModel.shared.clipboardAssistant.setScreenshotSelectionActive(false)
             let shouldPin = self.pendingScreenshotPin
             self.pendingScreenshotPin = false
             var editor: ScreenshotEditorWindowController!
@@ -1125,6 +1197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     } else {
                         self.additionalScreenshotEditors.removeAll { $0 === editor }
                     }
+                    self.endScreenshotSessionIfNeeded()
                 },
                 pinnedToolbarVisible: AppModel.shared.settingsStore.settings.screenshotPinnedToolbarVisible
             )
@@ -1141,13 +1214,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         controller.onCancelled = { [weak self] in
             guard let self else { return }
             self.screenshotSelectionController = nil
+            AppModel.shared.clipboardAssistant.setScreenshotSelectionActive(false)
             self.pendingScreenshotPin = false
+            self.endScreenshotSessionIfNeeded()
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 120_000_000)
             guard let self else { return }
             guard self.screenshotSelectionController === controller else { return }
-            controller.start(on: captureScreens)
+            await controller.start(on: captureScreens)
+            guard self.screenshotSelectionController === controller else { return }
+            // Selection panels only exist once the capture is frozen, so the clipboard assistant row
+            // can come back above them without landing inside the screenshot.
+            guard controller.selectionWindowCount > 0 else { return }
+            AppModel.shared.clipboardAssistant.setScreenshotSelectionActive(true)
         }
+    }
+
+    private func setScreenshotSessionActive(_ active: Bool) {
+        // A pinned screenshot keeps the session open, so every capture has to move the clipboard
+        // assistant row out of the frozen display again.
+        AppModel.shared.clipboardAssistant.setScreenshotActive(active)
+        guard isScreenshotSessionActive != active else { return }
+        isScreenshotSessionActive = active
+        overlayCoordinator?.setScreenshotActive(active)
+        noticePresenter?.setScreenshotActive(active)
+    }
+
+    private func endScreenshotSessionIfNeeded() {
+        guard screenshotSelectionController == nil,
+              screenshotEditorController == nil,
+              additionalScreenshotEditors.isEmpty
+        else { return }
+        setScreenshotSessionActive(false)
     }
 
     private func registerScreenshotHotkeys() {
@@ -1193,9 +1292,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func showSystemMonitor() {
-        AppModel.shared.selectSystemMonitor()
+        let model = AppModel.shared
+        guard !model.voiceInput.isRecording, !model.voiceInput.isPreparing else { return }
+        model.selectSystemMonitor()
         overlayCoordinator?.showExpanded(at: NSEvent.mouseLocation)
-        AppModel.shared.refreshForExpansion()
+        model.refreshForExpansion()
     }
 
     @objc private func showSettings() {
@@ -1203,7 +1304,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if settingsWindowController == nil {
             let rootView = SettingsView(model: AppModel.shared)
             let window = SettingsWindow(
-                contentRect: CGRect(x: 0, y: 0, width: 640, height: 560),
+                contentRect: CGRect(x: 0, y: 0, width: 640, height: 640),
                 styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
@@ -1298,6 +1399,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let currentBundleID = Bundle.main.bundleIdentifier
         let currentExecutable = current.executableURL?.standardizedFileURL
         let processName = ProcessInfo.processInfo.processName
+        let applicationName = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleDisplayName"
+        ) as? String ?? processName
 
         let peer = NSWorkspace.shared.runningApplications.first { application in
             guard application.processIdentifier != current.processIdentifier else { return false }
@@ -1308,7 +1412,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                application.executableURL?.standardizedFileURL == currentExecutable {
                 return true
             }
-            return application.localizedName == processName || application.localizedName == "zisla"
+            return application.localizedName == applicationName
         }
         guard let peer else { return true }
         peer.activate(options: [.activateAllWindows])

@@ -24,7 +24,7 @@ struct DownloadModuleView: View {
                 if !model.downloadURL.isEmpty {
                     IconButton(symbol: "xmark", help: "清空") {
                         model.downloadURL = ""
-                        if !model.downloadState.isRunning { model.downloadState = .idle }
+                        if !model.hasActiveDownloads { model.downloadState = .idle }
                     }
                 }
             }
@@ -49,8 +49,6 @@ struct DownloadModuleView: View {
                     height: 28,
                     usesGlassSelection: false
                 )
-                .disabled(model.downloadState.isRunning)
-                .opacity(model.downloadState.isRunning ? 0.45 : 1)
 
                 Button {
                     chooseDirectory()
@@ -67,29 +65,23 @@ struct DownloadModuleView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
-                .disabled(model.downloadState.isRunning)
 
-                if model.downloadState.isRunning {
-                    Button(role: .destructive) {
-                        model.cancelDownload()
-                    } label: {
-                        Label("取消", systemImage: "stop.fill")
-                            .frame(width: 76)
+                Button {
+                    model.startDownload()
+                } label: {
+                    Label("下载", systemImage: "arrow.down")
+                        .frame(width: 76)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .frame(height: 28)
+                .disabled(model.downloadURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                if model.hasActiveDownloads {
+                    IconButton(symbol: "stop.fill", help: "取消全部下载", size: .compact) {
+                        model.cancelAllDownloads()
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .frame(height: 28)
-                } else {
-                    Button {
-                        model.startDownload()
-                    } label: {
-                        Label("下载", systemImage: "arrow.down")
-                            .frame(width: 76)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .frame(height: 28)
-                    .disabled(model.downloadURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .foregroundStyle(Color.zislaError)
                 }
             }
 
@@ -101,60 +93,133 @@ struct DownloadModuleView: View {
 
     @ViewBuilder
     private var downloadStatus: some View {
-        switch model.downloadState {
-        case .idle:
-            HStack(spacing: 8) {
-                Label("准备就绪", systemImage: "arrow.down.circle.fill")
-                Spacer()
-                if model.settingsStore.settings.clipboardDetectionEnabled {
-                    Label("剪贴板检测已开启", systemImage: "clipboard.fill")
-                        .foregroundStyle(Color.zislaSuccess)
-                }
-            }
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(.secondary)
-        case .preparing:
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text("正在准备下载")
-                    .font(.system(size: 10, weight: .medium))
-            }
-        case let .downloading(fraction, speed, eta):
-            VStack(spacing: 5) {
-                HStack {
-                    Text("\(fraction * 100, specifier: "%.1f")%")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+        if model.activeDownloads.isEmpty {
+            switch model.downloadState {
+            case .idle:
+                HStack(spacing: 8) {
+                    Label("准备就绪", systemImage: "arrow.down.circle.fill")
                     Spacer()
-                    Text([speed, eta.isEmpty ? "" : "ETA \(eta)"].filter { !$0.isEmpty }.joined(separator: "  "))
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                    if model.settingsStore.settings.clipboardDetectionEnabled {
+                        Label("剪贴板检测已开启", systemImage: "clipboard.fill")
+                            .foregroundStyle(Color.zislaSuccess)
+                    }
                 }
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+            case .preparing:
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("正在准备下载")
+                        .font(.system(size: 10, weight: .medium))
+                }
+            case let .downloading(fraction, speed, eta):
+                VStack(spacing: 5) {
+                    HStack {
+                        Text("\(fraction * 100, specifier: "%.1f")%")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        Spacer()
+                        Text([speed, eta.isEmpty ? "" : "ETA \(eta)"].filter { !$0.isEmpty }.joined(separator: "  "))
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    ProgressView(value: fraction)
+                        .tint(Color(red: 0.36, green: 0.82, blue: 0.98))
+                }
+            case let .completed(url):
+                HStack {
+                    Label(url.lastPathComponent, systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(Color.zislaSuccess)
+                        .lineLimit(1)
+                    Spacer()
+                    Button("在 Finder 中显示") {
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .font(.system(size: 10, weight: .medium))
+            case let .failed(message):
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color.zislaError)
+                    Text(message)
+                        .font(.system(size: 10))
+                        .lineLimit(2)
+                    Spacer()
+                }
+            }
+        } else {
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVStack(alignment: .leading, spacing: 5) {
+                    ForEach(model.activeDownloads) { task in
+                        downloadTaskRow(task)
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+        }
+    }
+
+    private func downloadTaskRow(_ task: DownloadTaskSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.zislaInfo)
+                Text(downloadSourceLabel(task.urlString))
+                    .font(.system(size: 9, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 4)
+                downloadTaskSummary(task.state)
+                IconButton(symbol: "xmark", help: "取消此下载", size: .compact) {
+                    model.cancelDownload(taskID: task.id)
+                }
+                .foregroundStyle(Color.zislaError)
+            }
+
+            if case let .downloading(fraction, _, _) = task.state {
                 ProgressView(value: fraction)
                     .tint(Color(red: 0.36, green: 0.82, blue: 0.98))
             }
-        case let .completed(url):
-            HStack {
-                Label(url.lastPathComponent, systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(Color.zislaSuccess)
-                    .lineLimit(1)
-                Spacer()
-                Button("在 Finder 中显示") {
-                    NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func downloadTaskSummary(_ state: DownloadUIState) -> some View {
+        Group {
+            switch state {
+            case .preparing:
+                HStack(spacing: 4) {
+                    ProgressView().controlSize(.mini)
+                    Text("准备中")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-            .font(.system(size: 10, weight: .medium))
-        case let .failed(message):
-            HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Color.zislaError)
-                Text(message)
-                    .font(.system(size: 10))
-                    .lineLimit(2)
-                Spacer()
+                .foregroundStyle(.secondary)
+            case let .downloading(fraction, speed, eta):
+                HStack(spacing: 5) {
+                    Text("\(fraction * 100, specifier: "%.1f")%")
+                    if !speed.isEmpty { Text(speed) }
+                    if !eta.isEmpty { Text("ETA \(eta)") }
+                }
+                .foregroundStyle(.secondary)
+            case .idle:
+                Text("已停止")
+            case .completed:
+                Text("已完成")
+            case .failed:
+                Text("失败")
             }
         }
+        .font(.system(size: 9, design: .monospaced))
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func downloadSourceLabel(_ urlString: String) -> String {
+        guard let url = URL(string: urlString), let host = url.host else { return urlString }
+        let path = url.path == "/" ? "" : url.path
+        return host + path
     }
 
     private func chooseDirectory() {

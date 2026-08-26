@@ -10,8 +10,71 @@ struct AIUsageLogDetectorTests {
         let detector = AIUsageLogDetector()
 
         #expect(detector.maxFilesPerProvider == .max)
-        #expect(detector.maxBytesPerFile == 256 * 1_024)
+        #expect(detector.maxBytesPerFile == .max)
         #expect(detector.maxSamplesPerFile == .max)
+    }
+
+    @Test
+    func defaultScanReadsStructuredJSONLargerThanFormerLimit() throws {
+        let root = temporaryDirectory(named: "usage-log-large-json")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let gemini = root.appendingPathComponent("gemini", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        let padding = String(repeating: "x", count: 4 * 1_024 * 1_024)
+        try writeJSON(
+            """
+            [{"timestamp":"2026-07-26T00:02:00.000Z","padding":"\(padding)","model":"gemini-2.5-pro","usageMetadata":{"promptTokenCount":90,"candidatesTokenCount":12}}]
+            """,
+            to: gemini.appendingPathComponent("session-2026-07-26.json")
+        )
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: empty,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: gemini,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
+            qoderRoots: [],
+            doubaoRoots: [],
+            copilotUsageLogRoots: []
+        )
+
+        let sample = try #require(detector.usageSamples().first)
+        #expect(sample.provider == .gemini)
+        #expect(sample.inputTokens == 90)
+        #expect(sample.outputTokens == 12)
+    }
+
+    @Test
+    func defaultScanReadsUsageInsideLongJSONLRecord() throws {
+        let root = temporaryDirectory(named: "usage-log-long-jsonl")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        let padding = String(repeating: "x", count: 256 * 1_024)
+        try writeJSONL([
+            """
+            {"timestamp":"2026-07-24T00:00:00.000Z","padding":"\(padding)","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":240,"output_tokens":60},"last_token_usage":{"input_tokens":240,"output_tokens":60}}}}
+            """,
+        ], to: codex.appendingPathComponent("2026/07/24/rollout.jsonl"))
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: codex,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
+            qoderRoots: [],
+            doubaoRoots: [],
+            copilotUsageLogRoots: []
+        )
+
+        let sample = try #require(detector.usageSamples().first)
+        #expect(sample.provider == .codex)
+        #expect(sample.inputTokens == 240)
+        #expect(sample.outputTokens == 60)
     }
 
     @Test
