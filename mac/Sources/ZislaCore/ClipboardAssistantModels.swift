@@ -177,13 +177,11 @@ public enum ClipboardAssistantTranslate {
 
 /// Defaults for the clipboard assistant quick trigger.
 public enum ClipboardAssistantDefaults {
-    /// Double-tap Left ⌃ Control; modifier-only triggers require a double-tap so ordinary
-    /// modifier usage (copy/paste chords) never fires the action accidentally.
+    /// ⌘ N; ordinary combinations are registered through the system global hotkey API.
     public static let triggerHotkey = VoiceInputHotkeyPreset(
-        keyCode: 59,              // kVK_Control
-        carbonModifiers: 0x1000,
-        keyDisplayName: "",
-        modifierSides: [.leftControl]
+        keyCode: 45,              // kVK_ANSI_N
+        carbonModifiers: 0x0100,  // cmdKey
+        keyDisplayName: "N"
     )
     /// Text longer than this many characters offers a dedicated "save as file" action.
     public static let saveableTextLength = 50
