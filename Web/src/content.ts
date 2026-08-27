@@ -25,401 +25,21 @@ export const navItems: NavItem[] = [
 export const productTitle = 'zisla';
 export const productTagline = '原生 macOS 动态工作空间';
 export const productDescription =
-  '把 AI 任务、媒体、文件和日程收进屏幕顶部，再用全局截图、语音输入与桌面工具处理手边工作。需要时出现，完成后收起。';
+  '把 AI 任务、媒体、文件和日程收进屏幕顶部；复制后，独立的助手提示条会在屏幕顶端预览内容并给出下一步。需要时出现，完成后收起。';
 
-export const heroTitle = 'zisla<br><em>把正在发生的事<br>放到你看得见的地方。</em>';
+export const heroTitle = 'zisla<br><em>把正在发生的事<br>放到你看得<br class="hero-mobile-break">见的地方。</em>';
 export const heroHints = [
   '移到屏幕顶部即可展开，无需点击',
+  '复制后可用 Command+N 调出智能下一步',
   '自动收起，不干扰当前工作',
-  '刘海屏与外接显示器都支持',
 ];
 
 export const proofItems = [
-  { title: '13 个功能模块', desc: '顶部工作流与桌面工具按需开启' },
-  { title: 'macOS 14+', desc: '原生 Swift / AppKit / SwiftUI 实现' },
+  { title: '12 个顶部模块', desc: '顶部工作流按需开启' },
+  { title: 'macOS 14+', desc: '原生桌面体验' },
   { title: '多显示器', desc: '刘海屏与外接屏都能使用' },
   { title: '本地优先', desc: 'AI 状态不读取对话正文' },
 ];
-
-/* ===== 真实灵动岛：模块工具栏（与 mac/Sources/Zisla/AppModel.swift 的 IslandModule 一致） ===== */
-
-export interface IslandModuleMeta {
-  id: string;
-  name: string;
-  icon: string;
-}
-
-export const islandModules: IslandModuleMeta[] = [
-  { id: 'dashboard', name: '首页', icon: 'grid-2x2' },
-  { id: 'shelf', name: '中转', icon: 'inbox' },
-  { id: 'clipboard', name: '剪贴板', icon: 'clipboard' },
-  { id: 'aiMonitor', name: 'AI 监控', icon: 'chart-line' },
-  { id: 'download', name: '下载', icon: 'download' },
-  { id: 'agenda', name: '日程', icon: 'calendar-days' },
-  { id: 'mail', name: '邮件', icon: 'mail' },
-  { id: 'quickNotes', name: '随记', icon: 'notebook-pen' },
-  { id: 'pdf', name: 'PDF', icon: 'scan-text' },
-  { id: 'toolbox', name: '小工具', icon: 'wrench' },
-  { id: 'system', name: '系统', icon: 'gauge' },
-  { id: 'battery', name: '电池', icon: 'battery-charging' },
-  { id: 'lockScreen', name: '锁屏', icon: 'lock' },
-];
-
-export const heroCycleModules = [
-  'dashboard',
-  'download',
-  'aiMonitor',
-  'clipboard',
-  'agenda',
-  'quickNotes',
-  'pdf',
-  'system',
-  'battery',
-  'toolbox',
-  'lockScreen',
-  'mail',
-  'shelf',
-];
-
-/* ===== 正在播放（界面示意数据） ===== */
-
-export const nowPlaying = {
-  title: '微光时刻',
-  artist: '晚风电台',
-  subtitle: '吹过晚风的手 · 歌词同步',
-  currentSeconds: 54,
-  durationSeconds: 228,
-};
-
-export const islandUptime = '开机时间：1天4小时12分钟';
-
-export const islandMetrics = [
-  { label: 'CPU', value: 18, tone: 'good' as const },
-  { label: 'GPU', value: 32, tone: 'normal' as const },
-  { label: 'RAM', value: 45, tone: 'normal' as const },
-  { label: 'Disk', value: 28, tone: 'good' as const },
-];
-
-/* ===== AI 监控模块（界面示意数据） ===== */
-
-export interface AITaskRow {
-  name: string;
-  provider: 'GPT' | 'CLAUDE' | 'CODEX' | 'GEMINI' | 'QWEN' | 'KIMI';
-  detail: string;
-  effort: string;
-  meta: string;
-  elapsedSeconds: number;
-  status: 'spinner' | 'dot';
-}
-
-// Provider 色值来自 mac 端 DesignSystem.swift 的 ProviderBrand.color(for:)
-export const providerColors: Record<AITaskRow['provider'], string> = {
-  GPT: '#6bd1b8',
-  CLAUDE: '#f27a57',
-  CODEX: '#5ce6a8',
-  GEMINI: '#80adff',
-  QWEN: '#7a9eff',
-  KIMI: '#4ac2bd',
-};
-
-export const aiTasks: AITaskRow[] = [
-  {
-    name: '整理组件使用文档',
-    provider: 'CLAUDE',
-    detail: '设计系统 · UI Library',
-    effort: 'high',
-    meta: '开始 09:30 · 会话 A1',
-    elapsedSeconds: 60,
-    status: 'spinner',
-  },
-  {
-    name: '检查搜索结果排序',
-    provider: 'GPT',
-    detail: '官网重构 · Search',
-    effort: 'max',
-    meta: '开始 09:15 · 会话 B2',
-    elapsedSeconds: 459,
-    status: 'dot',
-  },
-  {
-    name: '调整产品展示文案',
-    provider: 'CODEX',
-    detail: '落地页改版 · Showcase',
-    effort: 'high',
-    meta: '开始 09:25 · 会话 C3',
-    elapsedSeconds: 226,
-    status: 'spinner',
-  },
-  {
-    name: '验证下载队列状态',
-    provider: 'GEMINI',
-    detail: '发布流水线 · Queue',
-    effort: 'medium',
-    meta: '开始 09:20 · 会话 D4',
-    elapsedSeconds: 235,
-    status: 'dot',
-  },
-  {
-    name: '生成本周发布说明',
-    provider: 'QWEN',
-    detail: '版本归档 · Docs',
-    effort: 'low',
-    meta: '开始 09:00 · 会话 E5',
-    elapsedSeconds: 873,
-    status: 'spinner',
-  },
-];
-
-export const tokenTrend = {
-  yLabels: ['1M', '10M', '100M', '1B'],
-  xLabels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-  // 对数刻度下的归一化值（1M=0.05, 1B=1.0），呈上升趋势
-  points: [0.08, 0.14, 0.12, 0.28, 0.42, 0.66, 0.94],
-  lastValue: '947M',
-};
-
-/* ===== 剪贴板模块（界面示意数据） ===== */
-
-export const clipboardMeta = {
-  total: 12,
-  tabs: ['全部', '常用', '非常用'],
-  filters: [
-    { label: '全部', count: 12 },
-    { label: '文件夹', count: 1 },
-    { label: '图片', count: 3 },
-    { label: 'URL', count: 2 },
-    { label: '视频', count: 0 },
-    { label: '文档', count: 4 },
-    { label: '压缩包', count: 0 },
-    { label: '代码', count: 1 },
-    { label: '其他', count: 1 },
-  ],
-  actions: ['随记', 'AI', '常用', '删除'],
-};
-
-export const clipboardItems = [
-  { kind: 'image' as const, title: '首页设计稿.png', meta: 'PNG · 324.5 KB' },
-  {
-    kind: 'code' as const,
-    title: 'npm run test',
-    meta: '代码',
-  },
-  {
-    kind: 'url' as const,
-    title: 'https://example.com/documentation',
-    meta: 'URL',
-  },
-  {
-    kind: 'text' as const,
-    title: '下周三下午同步评审方案',
-    meta: '文本',
-  },
-];
-
-/* ===== 中转站模块（界面示意数据） ===== */
-
-export const shelfMeta = {
-  count: 3,
-  filters: ['全部', '文件夹', '图片', '视频', '音频', '文档', '压缩包', '代码', '其他'],
-  previews: [
-    { name: '播客封面.png', meta: 'PNG · 484.0 KB', kind: 'image' },
-    { name: '需求评审资料.pdf', meta: 'PDF · 1.2 MB', kind: 'document' },
-    { name: '原型素材.zip', meta: 'ZIP · 8.6 MB', kind: 'archive' },
-  ],
-};
-
-/* ===== 下载模块（产品界面示意数据） ===== */
-
-export const downloadMeta = {
-  placeholder: '视频或音频链接',
-  folder: '下载',
-  status: '准备就绪',
-  clipboardToggle: '剪贴板检测已开启',
-};
-
-/* ===== 日程模块（界面示意数据） ===== */
-
-export const weatherCities = [
-  {
-    region: '杭州市 · 中心区',
-    icon: 'sun',
-    condition: '晴 · 体感 26°',
-    temp: '24°',
-    sun: '06:12 / 19:28',
-    rain: '0.0mm',
-    humidity: '5% / 0.0mm',
-  },
-  {
-    region: '杭州市 · 湖畔区',
-    icon: 'cloud',
-    condition: '多云 · 体感 22°',
-    temp: '21°',
-    sun: '06:25 / 19:45',
-    rain: '0.0mm',
-    humidity: '78% / 1.2mm',
-  },
-];
-
-export const agendaEmptyText = '今天没有待办事项';
-
-/* ===== 随记模块（界面示意数据） ===== */
-
-export const notesMeta = {
-  count: 4,
-  wordCount: '86 字',
-  list: [
-    { title: '周会提纲', meta: '刚刚', selected: true },
-    { title: '下周待办', meta: '2 小时前' },
-    { title: '读书摘要', meta: '昨天' },
-    { title: '灵感记录', meta: '上周' },
-  ],
-  body:
-    '用随记收集灵感、整理待办，或把文字和文件留在系统「备忘录」中；编辑内容会自动写回。',
-};
-
-/* ===== 邮件模块（界面示意数据） ===== */
-
-export const mailMeta = {
-  account: '个人邮箱',
-  unread: 2,
-  messages: [
-    {
-      sender: '产品协作',
-      title: '本周体验清单',
-      preview: '初稿已准备好，请查看附件。',
-      time: '09:42',
-      unread: true,
-      selected: true,
-    },
-    {
-      sender: '设计协作',
-      title: '新版交互说明',
-      preview: '切换动效与间距已同步。',
-      time: '08:18',
-      unread: true,
-      selected: false,
-    },
-    {
-      sender: '日历通知',
-      title: '下次评审时间',
-      preview: '下周三下午进行产品评审。',
-      time: '昨天',
-      unread: false,
-      selected: false,
-    },
-  ],
-  detail: {
-    sender: '产品协作 <team@zisla.app>',
-    title: '本周体验清单',
-    date: '今天 09:42',
-    body: '初稿已准备好。本次重点查看顶部展开、模块切换和多屏显示。',
-  },
-};
-
-/* ===== PDF 工具模块（产品界面示意数据） ===== */
-
-export const pdfTools = [
-  { label: '合并 PDF', active: true },
-  { label: '拆分页面' },
-  { label: '旋转页面' },
-  { label: '图片转 PDF' },
-  { label: 'Office 转 PDF' },
-  { label: 'PDF 转图片' },
-  { label: '导出文字' },
-  { label: '文字水印', group: '格式' },
-  { label: '图片水印' },
-  { label: '添加页码' },
-  { label: '裁剪页面' },
-  { label: '加密 PDF' },
-  { label: '解除密码' },
-  { label: '编辑元数据' },
-];
-
-export const pdfActiveTitle = '合并 PDF';
-export const pdfActiveDesc = '按选择顺序合并多个 PDF';
-
-/* ===== 系统状态模块（界面示意数据） ===== */
-
-export const systemCards = {
-  cpu: {
-    chip: 'Apple M3 Pro',
-    temp: '52.8°C',
-    cores: '12核 · 6性能 · 6能效',
-    legend: [
-      { label: '用户', value: '18%', color: '#0a84ff' },
-      { label: '系统', value: '12%', color: '#ff453a' },
-      { label: '闲置', value: '70%', color: '#e8e8ed' },
-    ],
-  },
-  gpu: {
-    chip: 'Apple M3 Pro',
-    temp: '48.5°C',
-    cores: '18核',
-    legend: [
-      { label: '利用率', value: '32%', color: '#0a84ff' },
-      { label: '渲染', value: '28%', color: '#ff453a' },
-      { label: 'Tiler', value: '24%', color: '#5ac8fa' },
-    ],
-  },
-  memory: {
-    pressure: '45%',
-    available: '20.2 GB',
-    total: '36.0 GB',
-    action: '释放',
-  },
-  disk: {
-    name: '系统磁盘',
-    available: '512.8 GB',
-    total: '1.0 TB',
-    read: '2.4 MB/s',
-    write: '1.8 MB/s',
-    action: '清理',
-  },
-  fans: ['3,200 RPM', '3,450 RPM'],
-  network: {
-    down: '125 KB/s',
-    up: '48 KB/s',
-    lan: '192.0.2.10',
-    wan: '203.0.113.42',
-  },
-};
-
-export const dashboardMeta = {
-  focus: { clock: '24:18', phase: '进行中' },
-  ai: { title: '整理需求文档', provider: 'CODEX', progress: 68 },
-  download: { title: '发布会素材.zip', progress: 42, speed: '3.2 MB/s', eta: '剩余 18 秒' },
-};
-
-export const toolboxMeta = {
-  clock: '25:00',
-  mode: '专注',
-  toggles: ['保持亮屏', '显示秒数'],
-  actions: ['清理屏幕', '清理键盘', '闹钟', '提词器', '镜子', '废纸篓'],
-};
-
-export const batteryMeta = {
-  status: '使用电池',
-  level: 78,
-  remaining: '约 6 小时 20 分',
-  metrics: [
-    { label: '健康度', value: '96%' },
-    { label: '循环次数', value: '128' },
-    { label: '温度', value: '34.2°C' },
-    { label: '最大容量', value: '6,820 mAh' },
-    { label: '设计容量', value: '7,100 mAh' },
-    { label: '当前电量', value: '5,320 mAh' },
-  ],
-  devices: [
-    { name: 'AirPods Pro', level: 64, symbol: 'airplay' },
-    { name: 'Magic Keyboard', level: 82, symbol: 'battery-charging' },
-  ],
-};
-
-export const lockScreenMeta = {
-  weather: '24° · 晴',
-  lunar: '农历七月初三',
-  message: '“专注当下，给重要的事留出空间。”',
-};
 
 /* ===== 功能展示区（每个模块对应真实功能说明） ===== */
 
@@ -455,8 +75,8 @@ export const showcaseModules: ShowcaseModule[] = [
     name: '剪贴板',
     group: '顶部工作流',
     caption:
-      '可选记录剪贴板历史，并按图片、URL 与文件类型筛选；链接检测可独立开关，开启后仅在本机识别新链接并提示。',
-    points: ['按类型筛选', '常用标记', '链接检测可独立开关'],
+      '在灵动岛内查看剪贴板历史，并按图片、URL、路径与文件类型筛选；可将历史项发送到随记、设为常用或删除。',
+    points: ['岛内历史记录', '按类型筛选', '随记与常用'],
   },
   {
     id: 'aiMonitor',
@@ -471,8 +91,8 @@ export const showcaseModules: ShowcaseModule[] = [
     name: '下载器',
     group: '实用工具',
     caption:
-      '粘贴链接后使用 yt-dlp 下载到默认或自选目录；没有 ffmpeg 时可使用 AVFoundation 原生封装兼容的音视频轨。',
-    points: ['视频 / 音频两种模式', '自选下载目录', '剪贴板检测可选'],
+      '粘贴链接，或在开启后从剪贴板识别链接；选择视频或音频下载到默认或自选目录。支持常见视频平台与其他受支持链接，下载时显示来源图标、实时进度和完成状态。',
+    points: ['视频 / 音频模式', '默认或自选目录', '来源图标与实时进度'],
   },
   {
     id: 'agenda',
@@ -530,19 +150,10 @@ export const showcaseModules: ShowcaseModule[] = [
       '查看本机电量、健康度、循环、温度和容量等详细指标，并聚合系统可读取的附近设备电量。',
     points: ['本机健康指标', '剩余时间', '附近设备电量'],
   },
-  {
-    id: 'lockScreen',
-    name: '锁屏',
-    group: '日常信息',
-    caption:
-      '在锁屏信息模块中集中显示公历、农历、天气、电量和自定义短句，保持信息简短易读。',
-    points: ['公历与农历', '天气与电量', '自定义锁屏文字'],
-  },
 ];
 
 /* ===== AI 深入区 ===== */
 
-// 覆盖主线文档列出的自动检测工具，以及可通过 zislactl 接入的通用 Provider。
 export const supportedAITools = [
   { name: 'Claude Code' },
   { name: 'Codex' },
@@ -569,6 +180,7 @@ export const privacyPoints = [
 ];
 
 export interface CrossModuleFeature {
+  id: string;
   icon: string;
   title: string;
   description: string;
@@ -577,6 +189,7 @@ export interface CrossModuleFeature {
 
 export const crossModuleFeatures: CrossModuleFeature[] = [
   {
+    id: 'capture',
     icon: 'image',
     title: '截图、长截图与钉图',
     description:
@@ -584,6 +197,7 @@ export const crossModuleFeatures: CrossModuleFeature[] = [
     detail: '全局快捷键 · 标注与撤销 · 图片 / 表格导出',
   },
   {
+    id: 'voice',
     icon: 'mic',
     title: '语音输入与整理',
     description:
@@ -591,6 +205,7 @@ export const crossModuleFeatures: CrossModuleFeature[] = [
     detail: '两种录音方式 · 领域词库 · 可选模型整理',
   },
   {
+    id: 'media',
     icon: 'waves',
     title: '媒体与系统背景声',
     description:
@@ -598,11 +213,44 @@ export const crossModuleFeatures: CrossModuleFeature[] = [
     detail: '播放控制 · 歌词同步 · 自动停止背景声',
   },
   {
-    icon: 'globe',
-    title: '统一网络代理',
+    id: 'browserDownloads',
+    icon: 'download',
+    title: '浏览器下载进度',
     description:
-      '可选 HTTP、HTTPS、SOCKS5 或 SOCKS5H 代理，统一用于更新、下载、CLI 管理与模型请求，默认关闭。',
-    detail: '连通性检查 · 多协议 · 按需启用',
+      '识别 Safari、Chrome、Edge、Firefox、Brave、Vivaldi、Opera 与 Arc 的下载，在顶部显示来源和实时进度。',
+    detail: '8 种浏览器 · 来源识别 · 完成提示',
+  },
+  {
+    id: 'copyAssistant',
+    icon: 'copy',
+    title: '复制助手与智能下一步',
+    description:
+      '启用后，复制文本、链接、文件或图片会在独立的顶部提示条中预览，并按内容给出打开、Finder 定位、搜索、翻译、计算或保存等下一步，由你确认后执行。',
+    detail: '可选开关 · 本机识别 · 默认 Command+N',
+  },
+  {
+    id: 'aiManagement',
+    icon: 'bot',
+    title: 'AI CLI 与 Skills 管理',
+    description:
+      '在设置中检测、安装、更新和卸载常用 AI CLI，并查看和管理本机 Skills，减少在多个终端和工具之间切换。',
+    detail: '检测与安装 · 更新与卸载 · 本机 Skills',
+  },
+  {
+    id: 'pet',
+    icon: 'sparkles',
+    title: '灵动岛宠物',
+    description:
+      '选择内置的宠物形象，把它放在灵动岛的左侧或右侧；不需要时可随时关闭。',
+    detail: '内置形象 · 左右位置 · 按需开启',
+  },
+  {
+    id: 'lockScreen',
+    icon: 'lock',
+    title: '锁屏信息',
+    description:
+      '按需在 macOS 锁屏界面显示日期、状态与正在播放信息；它是独立锁屏叠层，不会出现在灵动岛的模块列表或轮播中。',
+    detail: '独立锁屏叠层 · 按需开启 · 不抢焦点',
   },
 ];
 
@@ -646,12 +294,16 @@ export const downloadLinks: DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.5',
+  version: 'v0.1.6',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/release/v0.1.5',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.5/zisla-v0.1.5-macOS-arm64.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.5/zisla-v0.1.5-macOS-arm64.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.5/zisla-v0.1.5-macOS-arm64.zip.sha256',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/release/v0.1.6',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.6/zisla-v0.1.6-macOS-arm64.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.6/zisla-v0.1.6-macOS-arm64.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.6/zisla-v0.1.6-macOS-arm64.zip.sha256',
+  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.6/zisla-v0.1.6-macOS-universal.dmg',
+  universalZip: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.6/zisla-v0.1.6-macOS-universal.zip',
+  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.6/zisla-v0.1.6-macOS-x86_64.dmg',
+  intelZip: 'https://github.com/wzz6423/zisla/releases/download/release/v0.1.6/zisla-v0.1.6-macOS-x86_64.zip',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/preview',
 };
 
@@ -667,7 +319,8 @@ export const developmentSetup = {
 export const performanceFeatures = [
   '支持多显示器、Spaces 和普通全屏应用；展开时不会激活或抢走当前应用焦点',
   '隐藏时不创建常驻透明热区窗口，也不运行帧循环；通过全局事件监听与几何判断触发展开',
-  '使用单层系统材质；系统开启“降低透明度”后会自动使用实体背景',
+  '使用单层系统材质；系统开启"降低透明度"后会自动使用实体背景',
+  'macOS 26+ 使用 Liquid Glass；macOS 14/15 自动回退为系统原生材质',
   '物理刘海通过系统安全区域推断；无刘海的外接显示器使用自有覆盖层模拟状态条',
 ];
 
@@ -681,8 +334,29 @@ export const faqItems: FAQItem[] = [
     answer: '不会。AI 状态监控只读取任务状态，不读取提示词或回答正文。',
   },
   {
+    question: '复制助手会自动打开或上传我复制的内容吗？',
+    answer: '不会。启用后，内容识别和预览均在本机完成；只有你点击动作或按下快速触发后，zisla 才会执行对应下一步。',
+  },
+  {
     question: 'zisla 需要哪些系统权限？',
-    answer: '仅在启用相关功能时请求权限，并可随时在设置中撤销。',
+    answer: `
+      <p>zisla 不会在首次启动时一次性索取所有权限。只有你开启并实际使用下列功能时，macOS 才会显示对应授权：</p>
+      <ul>
+        <li><strong>日历与提醒事项：</strong>打开日程模块时分别请求，用于读取、创建和管理日历事件与带日期的提醒事项。</li>
+        <li><strong>定位服务：</strong>选择“使用当前位置”的天气时请求；只获取一次当前位置，不会持续跟踪。手动添加城市不需要定位权限。</li>
+        <li><strong>麦克风与语音识别：</strong>点击开始语音输入时请求；只在主动录音期间采集声音，只处理该次录音的转写。</li>
+        <li><strong>辅助功能：</strong>自动将语音转写填入当前应用、鼠标手势快速复制、键盘清洁及部分受支持播放器控制时需要；用于定位非密码输入控件或发送必要的系统按键。</li>
+        <li><strong>输入监控：</strong>仅在使用单独修饰键、鼠标侧键等全局触发方式，或键盘清洁时需要；普通全局快捷键不需要这项授权。</li>
+        <li><strong>屏幕录制与系统音频录制：</strong>截图、截图编辑和显示系统播放音频波形时需要。截图会读取屏幕图像；音频波形只分析当前系统音频能量，不保存或上传音频内容。</li>
+        <li><strong>摄像头：</strong>只在打开镜子窗口期间使用。</li>
+        <li><strong>蓝牙：</strong>只在打开电池模块时读取已连接或已配对设备公开的电量信息。</li>
+        <li><strong>自动化：</strong>首次使用随记、邮件、桌面整理或直接控制受支持播放器时，macOS 会分别询问是否允许 zisla 控制“备忘录”“邮件”“访达”或相应应用。随记可读写备忘录；邮件可读取、撰写、回复、标记和删除邮件。</li>
+        <li><strong>完全磁盘访问：</strong>仅在 Mail.app 未运行时仍要读取本地邮件索引以显示账户、发件人、主题、摘要、时间和已读状态时需要。</li>
+        <li><strong>通知：</strong>启用番茄钟或闹钟提醒时请求，只用于在计时结束或闹钟触发时显示本机通知。</li>
+      </ul>
+      <p><strong>文件与下载目录不是完全磁盘访问：</strong>你通过系统文件选择器选中的中转、导入导出或下载目录，zisla 只获得该目录的访问权，不会获得整块磁盘的读取权限。</p>
+      <p>你可在应用设置中关闭对应功能，或随时在“系统设置 → 隐私与安全性”中撤销授权。撤销某一项只会停用相关功能，不会影响其他模块；不同 macOS 版本中的项目名称可能略有不同。</p>
+    `.trim(),
   },
   {
     question: 'zisla 会联网吗？',

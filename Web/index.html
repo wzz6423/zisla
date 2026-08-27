@@ -4,26 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#111214" />
-    <meta name="description" content="zisla：面向 macOS 的原生动态工作空间。集中查看 AI、媒体、文件和日程，并提供截图、语音输入与桌面工具。" />
+    <meta name="description" content="zisla：面向 macOS 的原生动态工作空间。集中查看 AI、媒体、文件和日程；复制助手会在屏幕顶部独立提示条中预览内容并给出下一步。" />
     <meta property="og:title" content="zisla · 把正在发生的事放到你看得见的地方" />
-    <meta property="og:description" content="从 AI 任务与媒体，到截图、语音和桌面工具，一个按需出现的原生 macOS 工作空间。" />
+    <meta property="og:description" content="从 AI 任务与媒体，到复制助手、截图、语音和桌面工具，一个按需出现的原生 macOS 工作空间。" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://github.com/wzz6423/zisla" />
     <link rel="icon" href="./assets/zisla-icon.png" />
     <title>zisla · 动态工作空间</title>
   </head>
   <body>
-    <!-- Liquid Glass 位移滤镜：为 Chromium 的 backdrop-filter: url() 提供液态折射，
-         其余浏览器由 CSS 中的 blur/saturate 兜底。参考 liquid-glass-studio 的视觉拆解。 -->
-    <svg class="lg-svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
-      <defs>
-        <filter id="lg-refract" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="7" result="noise" />
-          <feGaussianBlur in="noise" stdDeviation="1.6" result="soft" />
-          <feDisplacementMap in="SourceGraphic" in2="soft" scale="24" xChannelSelector="R" yChannelSelector="G" />
-        </filter>
-      </defs>
-    </svg>
     <div id="app"></div>
     <script type="module" src="./src/main.ts"></script>
   </body>
