@@ -359,6 +359,19 @@ struct ClipboardAssistantDetectorTests {
     }
 
     @Test
+    func chineseProgressTranscriptWithTechnicalFragmentsStaysText() {
+        let prose = """
+        进度 40%：按照项目的协作规则，我会先检查真实差异，再独立运行测试，不会直接照搬工具的结论。
+        已在 8s 内运行 claude --model claude-opus-5 -p，并读取 /Users/example/project 下的文件。
+        进度 42%：命令返回 403，后续由主线程继续；stream disconnected before completion: network error。
+        已查看 1 张图像，也读取了文件并运行了命令。
+        """
+
+        let detection = ClipboardAssistantDetector.detect(text: prose, enabledKinds: allKinds)
+        #expect(detection?.kind == .chineseText)
+    }
+
+    @Test
     func guessesUsefulFileExtensions() {
         #expect(ClipboardAssistantDetector.guessCodeFileExtension("#include <stdio.h>") == "cpp")
         #expect(ClipboardAssistantDetector.guessCodeFileExtension("def main():\n    pass") == "py")

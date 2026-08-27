@@ -4,6 +4,26 @@ import Testing
 
 struct FeatureSettingsCompatibilityTests {
     @Test
+    func clipboardAssistantActionOrdersDefaultAndRoundTrip() throws {
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let legacySettings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(
+            legacySettings.clipboardAssistantActionOrders[.text]
+                == ClipboardAssistantActionOrder.defaults(for: .text)
+        )
+
+        var settings = FeatureSettings.default
+        settings.clipboardAssistantActionOrders[.text] = [
+            .translate, .search, .saveText, .addToQuickNote, .share, .sendToTeleprompter,
+        ]
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(decoded.clipboardAssistantActionOrders[.text]?.first == .translate)
+    }
+
+    @Test
     func aiProgressDefaultsEnabledForNewAndLegacySettings() throws {
         #expect(FeatureSettings.default.aiProgressEnabled)
 

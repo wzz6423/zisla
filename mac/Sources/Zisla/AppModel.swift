@@ -1555,6 +1555,11 @@ final class AppModel: ObservableObject {
         appName: sourceApplication?.localizedName ?? bundleIdentifier
       ))
     }
+    detection.actions = ClipboardAssistantActionOrder.ordered(
+      detection.actions,
+      for: detection.kind,
+      using: settings.clipboardAssistantActionOrders
+    )
     clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle)
     guard clipboardAssistant.presentation.detection == detection else { return .unavailable }
     clipboardAssistantContent = content

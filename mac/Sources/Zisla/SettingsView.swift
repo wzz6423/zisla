@@ -21,6 +21,7 @@ struct SettingsView: View {
     @State private var voiceHistorySelectionMode = false
     @State private var selectedVoiceHistoryIDs: Set<UUID> = []
     @State private var screenshotHotkeyValidationMessage: String?
+    @State private var expandedClipboardAssistantKind: ClipboardAssistantKind?
     @Namespace private var sectionSelectionNamespace
 
     init(model: AppModel) {
@@ -664,6 +665,100 @@ struct SettingsView: View {
                             .labelsHidden()
                             .toggleStyle(.switch)
                             .controlSize(.small)
+                        }
+                    }
+                }
+                settingsGroup("复制助手") {
+                    ForEach(ClipboardAssistantKind.allCases, id: \.self) { kind in
+                        let actions = clipboardAssistantActionOrder(for: kind)
+                        if kind != ClipboardAssistantKind.allCases.first { rowDivider }
+                        settingRow(
+                            symbol: kind.symbolName,
+                            title: assistantKindTitle(kind),
+                            detail: ""
+                        ) {
+                            HStack(spacing: 4) {
+                                Menu {
+                                    ForEach(actions, id: \.self) { action in
+                                        Button {
+                                            setPrimaryClipboardAssistantAction(action, for: kind)
+                                        } label: {
+                                            Label(
+                                                clipboardAssistantActionTitle(action),
+                                                systemImage: action == actions.first ? "checkmark" : action.symbolName
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "star.fill")
+                                        AppLocalizedText(
+                                            actions.first.map(clipboardAssistantActionTitle) ?? "恢复默认顺序"
+                                        )
+                                    }
+                                }
+                                .menuStyle(.borderlessButton)
+                                .fixedSize()
+
+                                IconButton(
+                                    symbol: expandedClipboardAssistantKind == kind
+                                        ? "chevron.up.circle.fill"
+                                        : "chevron.down.circle",
+                                    help: expandedClipboardAssistantKind == kind ? "收起" : "展开",
+                                    isActive: expandedClipboardAssistantKind == kind,
+                                    size: .compact
+                                ) {
+                                    expandedClipboardAssistantKind =
+                                        expandedClipboardAssistantKind == kind ? nil : kind
+                                }
+                            }
+                        }
+                        if expandedClipboardAssistantKind == kind {
+                            ForEach(Array(actions.dropFirst().enumerated()), id: \.element) { offset, action in
+                                rowDivider
+                                settingRow(
+                                    symbol: action.symbolName,
+                                    title: clipboardAssistantActionTitle(action),
+                                    detail: "",
+                                    isNested: true
+                                ) {
+                                    HStack(spacing: 4) {
+                                        IconButton(
+                                            symbol: "arrow.up",
+                                            help: "上移\(clipboardAssistantActionTitle(action))",
+                                            size: .compact
+                                        ) {
+                                            moveClipboardAssistantAction(action, for: kind, by: -1)
+                                        }
+                                        .disabled(offset == 0)
+
+                                        IconButton(
+                                            symbol: "arrow.down",
+                                            help: "下移\(clipboardAssistantActionTitle(action))",
+                                            size: .compact
+                                        ) {
+                                            moveClipboardAssistantAction(action, for: kind, by: 1)
+                                        }
+                                        .disabled(offset == actions.dropFirst().count - 1)
+                                    }
+                                }
+                            }
+                            rowDivider
+                            settingRow(
+                                symbol: "arrow.counterclockwise",
+                                title: "恢复默认顺序",
+                                detail: "",
+                                isNested: true
+                            ) {
+                                IconButton(
+                                    symbol: "arrow.counterclockwise",
+                                    help: "恢复默认顺序",
+                                    size: .compact
+                                ) {
+                                    resetClipboardAssistantActionOrder(for: kind)
+                                }
+                                .disabled(actions == ClipboardAssistantActionOrder.defaults(for: kind))
+                            }
                         }
                     }
                 }
@@ -2724,6 +2819,64 @@ struct SettingsView: View {
         model.settingsStore.settings.compactStatusPriority = priorities
     }
 
+    private func clipboardAssistantActionOrder(
+        for kind: ClipboardAssistantKind
+    ) -> [ClipboardAssistantActionKind] {
+        ClipboardAssistantActionOrder.normalized(
+            model.settingsStore.settings.clipboardAssistantActionOrders[kind]
+                ?? ClipboardAssistantActionOrder.defaults(for: kind),
+            for: kind
+        )
+    }
+
+    private func setPrimaryClipboardAssistantAction(
+        _ action: ClipboardAssistantActionKind,
+        for kind: ClipboardAssistantKind
+    ) {
+        var order = clipboardAssistantActionOrder(for: kind)
+        order.removeAll { $0 == action }
+        order.insert(action, at: 0)
+        model.settingsStore.settings.clipboardAssistantActionOrders[kind] = order
+    }
+
+    private func moveClipboardAssistantAction(
+        _ action: ClipboardAssistantActionKind,
+        for kind: ClipboardAssistantKind,
+        by offset: Int
+    ) {
+        var order = clipboardAssistantActionOrder(for: kind)
+        guard let index = order.firstIndex(of: action), index > 0 else { return }
+        let destination = order.index(index, offsetBy: offset)
+        guard destination > order.startIndex, order.indices.contains(destination) else { return }
+        order.swapAt(index, destination)
+        model.settingsStore.settings.clipboardAssistantActionOrders[kind] = order
+    }
+
+    private func resetClipboardAssistantActionOrder(for kind: ClipboardAssistantKind) {
+        model.settingsStore.settings.clipboardAssistantActionOrders[kind] =
+            ClipboardAssistantActionOrder.defaults(for: kind)
+    }
+
+    private func clipboardAssistantActionTitle(_ action: ClipboardAssistantActionKind) -> String {
+        switch action {
+        case .openURL: "打开链接"
+        case .openDownload: "下载"
+        case .revealInFinder: "在 Finder 中显示"
+        case .search: "搜索"
+        case .translate: "翻译"
+        case .composeMail: "写邮件"
+        case .copyText: "复制结果"
+        case .compress: "压缩为 ZIP"
+        case .share: "系统共享"
+        case .callPhone: "拨打电话"
+        case .addToQuickNote: "发送到随记"
+        case .sendToTeleprompter: "发送到提词器"
+        case .saveImage: "保存图片"
+        case .saveText: "保存文本"
+        case .createCalendarEvent: "新建日程"
+        }
+    }
+
     private func compactStatusPrioritySymbol(for priority: CompactStatusPriority) -> String {
         switch priority {
         case .transient: "bolt.fill"
@@ -2887,7 +3040,7 @@ struct SettingsView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.6"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.7"
     }
 
     private func searchWeatherLocation() {

@@ -1860,6 +1860,36 @@ struct UpdateCoreTests {
 
 struct FeatureSettingsTests {
     @Test
+    func clipboardAssistantActionOrderNormalizesSavedValues() {
+        let normalized = ClipboardAssistantActionOrder.normalized(
+            [.translate, .translate, .share],
+            for: .text
+        )
+        #expect(normalized.first == .translate)
+        #expect(normalized.filter { $0 == .translate }.count == 1)
+        #expect(normalized.contains(.search))
+        #expect(!normalized.contains(.openURL))
+    }
+
+    @Test
+    func clipboardAssistantActionOrderAppliesAvailableActionsAndKeepsBlockingLast() throws {
+        let actions: [ClipboardAssistantAction] = [
+            .search("query"),
+            .translate("query"),
+            .share,
+            .blockSourceApp(bundleIdentifier: "com.example.app", appName: "Example"),
+        ]
+        let ordered = ClipboardAssistantActionOrder.ordered(
+            actions,
+            for: .text,
+            using: [.text: [.translate, .saveText, .search, .share, .addToQuickNote, .sendToTeleprompter]]
+        )
+
+        #expect(try #require(ordered.first?.kind) == .translate)
+        #expect(ordered.map(\.kind) == [.translate, .search, .share, nil])
+    }
+
+    @Test
     func featureDefaults() {
         let settings = FeatureSettings.default
 

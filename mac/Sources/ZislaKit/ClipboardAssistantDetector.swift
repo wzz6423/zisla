@@ -424,6 +424,14 @@ public enum ClipboardAssistantDetector {
             return true
         }
 
+        // Long CJK prose and progress transcripts often include isolated command names, paths,
+        // percentages and operators. Without a declaration/signature above, those fragments must
+        // not let weak structural punctuation reclassify the whole passage as source code.
+        let cjkCharacters = sample.filter(isChineseCharacter).count
+        if cjkCharacters >= 20, cjkCharacters * 4 >= sample.count {
+            return false
+        }
+
         // Multi-line assignment-with-call is common in copied snippets (e.g. `x = compute(a, b)` /
         // `y = x * 2`) but rarely in prose, so a single such line among two or more is enough.
         if lines.count >= 2,

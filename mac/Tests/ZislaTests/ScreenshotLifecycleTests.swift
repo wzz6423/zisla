@@ -40,6 +40,17 @@ struct ScreenshotLifecycleTests {
     }
 
     @Test
+    func screenshotHotkeysStartCaptureSynchronouslyWhileMenusAreTracking() throws {
+        let source = try String(contentsOf: Self.appSourceURL, encoding: .utf8)
+        let registerHotkeys = try #require(source.range(of: "private func registerScreenshotHotkeys"))
+        let registration = source[registerHotkeys.lowerBound..<source.endIndex]
+
+        #expect(registration.contains("onKeyDown: { [weak self] in self?.startScreenshot() }"))
+        #expect(registration.contains("onKeyDown: { [weak self] in self?.startPinnedScreenshot() }"))
+        #expect(!registration.contains("Task { @MainActor [weak self] in self?.startScreenshot() }"))
+    }
+
+    @Test
     func longCaptureKeepsToolbarInteractiveWhileRangePassesThroughScrolling() throws {
         let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)
         let captureNextScreen = try #require(source.range(of: "private func captureNextScreen()"))

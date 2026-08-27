@@ -512,6 +512,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var clipboardAssistantBlacklist: Set<String>
     /// Recognized content kinds; an empty set falls back to all kinds.
     public var clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind>
+    /// Primary action and expanded-menu order for each recognized content kind.
+    public var clipboardAssistantActionOrders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
     /// Engine used by the assistant's "search" action for copied text.
     public var clipboardAssistantSearchEngine: ClipboardAssistantSearchEngine
     public var clipboardAssistantCustomSearchURL: String
@@ -611,6 +613,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardAssistantMouseButton: Int? = nil,
         clipboardAssistantBlacklist: Set<String> = [],
         clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind> = Set(ClipboardAssistantKind.allCases),
+        clipboardAssistantActionOrders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]] = [:],
         clipboardAssistantSearchEngine: ClipboardAssistantSearchEngine = .google,
         clipboardAssistantCustomSearchURL: String = "",
         clipboardAssistantLightweightMode: Bool = false,
@@ -689,6 +692,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             clipboardAssistantEnabledKinds.isEmpty
             ? Set(ClipboardAssistantKind.allCases)
             : clipboardAssistantEnabledKinds
+        self.clipboardAssistantActionOrders = ClipboardAssistantActionOrder.normalized(
+            clipboardAssistantActionOrders
+        )
         self.clipboardAssistantSearchEngine = clipboardAssistantSearchEngine
         self.clipboardAssistantCustomSearchURL = clipboardAssistantCustomSearchURL
         self.clipboardAssistantLightweightMode = clipboardAssistantLightweightMode
@@ -782,6 +788,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantMouseButton
         case clipboardAssistantBlacklist
         case clipboardAssistantEnabledKinds
+        case clipboardAssistantActionOrders
         case clipboardAssistantSearchEngine
         case clipboardAssistantCustomSearchURL
         case clipboardAssistantLightweightMode
@@ -917,6 +924,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Set<ClipboardAssistantKind>.self,
             forKey: .clipboardAssistantEnabledKinds
         ) ?? defaults.clipboardAssistantEnabledKinds
+        clipboardAssistantActionOrders = ClipboardAssistantActionOrder.normalized(
+            try container.decodeIfPresent(
+                [ClipboardAssistantKind: [ClipboardAssistantActionKind]].self,
+                forKey: .clipboardAssistantActionOrders
+            ) ?? defaults.clipboardAssistantActionOrders
+        )
         clipboardAssistantSearchEngine = try container.decodeIfPresent(
             ClipboardAssistantSearchEngine.self,
             forKey: .clipboardAssistantSearchEngine

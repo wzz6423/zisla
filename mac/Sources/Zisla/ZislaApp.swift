@@ -1256,9 +1256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard settings.screenshotEnabled else { return }
         let captureResult = screenshotHotkeyManager.register(
             hotkey: settings.screenshotHotkey,
-            onKeyDown: { [weak self] in
-                Task { @MainActor [weak self] in self?.startScreenshot() }
-            },
+            onKeyDown: { [weak self] in self?.startScreenshot() },
             onKeyUp: {}
         )
         reportScreenshotHotkeyRegistration(captureResult, actionName: "截图")
@@ -1269,9 +1267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         let pinResult = screenshotPinHotkeyManager.register(
             hotkey: settings.screenshotPinHotkey,
-            onKeyDown: { [weak self] in
-                Task { @MainActor [weak self] in self?.startPinnedScreenshot() }
-            },
+            onKeyDown: { [weak self] in self?.startPinnedScreenshot() },
             onKeyUp: {}
         )
         reportScreenshotHotkeyRegistration(pinResult, actionName: "钉图")

@@ -204,6 +204,96 @@ public enum ClipboardAssistantTriggerConfiguration: Codable, Equatable, Sendable
     )
 }
 
+/// Stable action identities stored in Settings. Runtime payloads stay in
+/// `ClipboardAssistantAction`; only the order is persisted.
+public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
+    case openURL
+    case openDownload
+    case revealInFinder
+    case search
+    case translate
+    case composeMail
+    case copyText
+    case compress
+    case share
+    case callPhone
+    case addToQuickNote
+    case sendToTeleprompter
+    case saveImage
+    case saveText
+    case createCalendarEvent
+
+    public var symbolName: String {
+        switch self {
+        case .openURL: "arrow.up.right.square"
+        case .openDownload: "arrow.down.circle"
+        case .revealInFinder: "folder"
+        case .search: "magnifyingglass"
+        case .translate: "character.book.closed"
+        case .composeMail: "envelope"
+        case .copyText: "doc.on.doc"
+        case .compress: "archivebox"
+        case .share: "square.and.arrow.up"
+        case .callPhone: "phone"
+        case .addToQuickNote: "note.text"
+        case .sendToTeleprompter: "text.viewfinder"
+        case .saveImage: "photo.badge.arrow.down"
+        case .saveText: "doc.badge.arrow.down"
+        case .createCalendarEvent: "calendar.badge.plus"
+        }
+    }
+}
+
+public enum ClipboardAssistantActionOrder {
+    public static func defaults(for kind: ClipboardAssistantKind) -> [ClipboardAssistantActionKind] {
+        switch kind {
+        case .url: [.openURL, .openDownload, .addToQuickNote, .share]
+        case .filePath, .file: [.revealInFinder, .compress, .copyText, .addToQuickNote, .share]
+        case .email: [.composeMail, .addToQuickNote, .share]
+        case .phone: [.copyText, .callPhone, .addToQuickNote, .share]
+        case .color: [.copyText, .addToQuickNote, .share]
+        case .math: [.copyText, .addToQuickNote, .share, .sendToTeleprompter]
+        case .dateTime: [.createCalendarEvent, .copyText, .addToQuickNote, .share]
+        case .chineseText: [.translate, .search, .saveText, .addToQuickNote, .share, .sendToTeleprompter]
+        case .code: [.saveText, .addToQuickNote, .share, .sendToTeleprompter]
+        case .text: [.search, .saveText, .translate, .addToQuickNote, .share, .sendToTeleprompter]
+        case .image: [.saveImage, .addToQuickNote, .share]
+        }
+    }
+
+    public static func normalized(
+        _ order: [ClipboardAssistantActionKind],
+        for kind: ClipboardAssistantKind
+    ) -> [ClipboardAssistantActionKind] {
+        let defaults = defaults(for: kind)
+        var seen: Set<ClipboardAssistantActionKind> = []
+        return (order + defaults).filter { defaults.contains($0) && seen.insert($0).inserted }
+    }
+
+    public static func normalized(
+        _ orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
+    ) -> [ClipboardAssistantKind: [ClipboardAssistantActionKind]] {
+        Dictionary(uniqueKeysWithValues: ClipboardAssistantKind.allCases.map { kind in
+            (kind, normalized(orders[kind] ?? defaults(for: kind), for: kind))
+        })
+    }
+
+    public static func ordered(
+        _ actions: [ClipboardAssistantAction],
+        for kind: ClipboardAssistantKind,
+        using orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
+    ) -> [ClipboardAssistantAction] {
+        let order = normalized(orders[kind] ?? defaults(for: kind), for: kind)
+        let ranked = actions.enumerated().compactMap { index, action -> (Int, Int, ClipboardAssistantAction)? in
+            guard let actionKind = action.kind else { return nil }
+            return (order.firstIndex(of: actionKind) ?? order.count, index, action)
+        }
+        .sorted { lhs, rhs in lhs.0 == rhs.0 ? lhs.1 < rhs.1 : lhs.0 < rhs.0 }
+        .map(\.2)
+        return ranked + actions.filter { $0.kind == nil }
+    }
+}
+
 /// An executable next-step action offered by the clipboard assistant.
 public enum ClipboardAssistantAction: Equatable, Sendable {
     case openURL(URL)
@@ -242,6 +332,27 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .saveImage: "saveImage"
         case .saveText: "saveText"
         case .createCalendarEvent: "createCalendarEvent"
+        }
+    }
+
+    public var kind: ClipboardAssistantActionKind? {
+        switch self {
+        case .openURL: .openURL
+        case .openDownload: .openDownload
+        case .revealInFinder: .revealInFinder
+        case .search: .search
+        case .translate: .translate
+        case .composeMail: .composeMail
+        case .copyText: .copyText
+        case .compress: .compress
+        case .share: .share
+        case .callPhone: .callPhone
+        case .blockSourceApp: nil
+        case .addToQuickNote: .addToQuickNote
+        case .sendToTeleprompter: .sendToTeleprompter
+        case .saveImage: .saveImage
+        case .saveText: .saveText
+        case .createCalendarEvent: .createCalendarEvent
         }
     }
 }
