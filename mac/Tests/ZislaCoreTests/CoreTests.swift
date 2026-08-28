@@ -1869,6 +1869,11 @@ struct FeatureSettingsTests {
         #expect(normalized.filter { $0 == .translate }.count == 1)
         #expect(normalized.contains(.search))
         #expect(!normalized.contains(.openURL))
+
+        for kind in [ClipboardAssistantKind.filePath, .phone] {
+            let migrated = ClipboardAssistantActionOrder.normalized([.copyText], for: kind)
+            #expect(!migrated.contains(.copyText))
+        }
     }
 
     @Test

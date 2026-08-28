@@ -76,7 +76,7 @@ struct ClipboardAssistantDetectorTests {
     }
 
     @Test
-    func unresolvablePathKeepsPathKindWithCopyAction() {
+    func unresolvablePathKeepsPathKindWithoutCopyAction() {
         // Temp files get cleaned up and other apps' containers are unreachable; the copied value is
         // still a path, so it must not fall through to the Chinese/plain text branch.
         let path = "/zisla-missing-root-\(UUID().uuidString)/VKTemp/01E3BE85-1731/图像.png"
@@ -84,7 +84,7 @@ struct ClipboardAssistantDetectorTests {
         #expect(detection?.kind == .filePath)
         #expect(detection?.title == "图像.png")
         #expect(detection?.detail == .path(path))
-        #expect(detection?.actions == [.copyText(path)])
+        #expect(detection?.actions.isEmpty == true)
     }
 
     @Test
@@ -98,7 +98,7 @@ struct ClipboardAssistantDetectorTests {
         } else {
             Issue.record("reveal action for the surviving parent directory expected")
         }
-        #expect(detection?.secondaryActions == [.copyText(missing.path)])
+        #expect(detection?.secondaryActions.isEmpty == true)
     }
 
     @Test
@@ -130,19 +130,15 @@ struct ClipboardAssistantDetectorTests {
     }
 
     @Test
-    func detectsPhoneNumbersWithNormalizedCopyAction() {
+    func detectsPhoneNumbersWithDialAction() {
         let detection = ClipboardAssistantDetector.detect(text: "+86 138 0013 8000", enabledKinds: allKinds)
         #expect(detection?.kind == .phone)
-        if case .copyText(let value)? = detection?.action {
-            #expect(value == "+8613800138000")
-        } else {
-            Issue.record("normalized copy action expected")
-        }
-        if case .callPhone(let value)? = detection?.secondaryActions.first {
+        if case .callPhone(let value)? = detection?.action {
             #expect(value == "+8613800138000")
         } else {
             Issue.record("call action expected")
         }
+        #expect(detection?.secondaryActions.isEmpty == true)
     }
 
     @Test

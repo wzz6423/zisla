@@ -86,12 +86,11 @@ public enum ClipboardAssistantDetector {
             )
         }
         if enabledKinds.contains(.phone), isPhoneNumber(text) {
-            // Copy the normalized digit-only form; dialers and forms prefer it over spacing.
             let normalized = "+\(text.filter(\.isNumber))"
             return ClipboardAssistantDetection(
                 kind: .phone,
                 title: text,
-                actions: [.copyText(normalized), .callPhone(normalized)]
+                actions: [.callPhone(normalized)]
             )
         }
         if enabledKinds.contains(.code), let code = codeDetection(text) {
@@ -222,18 +221,13 @@ public enum ClipboardAssistantDetector {
     }
 
     /// Existing items get the file-bound actions. Unresolvable ones reveal the nearest surviving
-    /// ancestor instead — a cleaned-up temp file still tells you where it lived — and always keep
-    /// copying the raw path, which is the only thing left to do with a vanished file.
+    /// ancestor instead, so a cleaned-up temp file still tells users where it lived.
     private static func filePathActions(for candidate: FilePathCandidate) -> [ClipboardAssistantAction] {
         guard !candidate.exists else {
             return [.revealInFinder(candidate.url), .compress(candidate.url)]
         }
-        var actions: [ClipboardAssistantAction] = []
-        if let ancestor = nearestExistingAncestor(of: candidate.url) {
-            actions.append(.revealInFinder(ancestor))
-        }
-        actions.append(.copyText(candidate.url.path))
-        return actions
+        guard let ancestor = nearestExistingAncestor(of: candidate.url) else { return [] }
+        return [.revealInFinder(ancestor)]
     }
 
     /// Walks up until a directory exists on disk. The volume root is excluded: opening it says

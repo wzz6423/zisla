@@ -248,9 +248,10 @@ public enum ClipboardAssistantActionOrder {
     public static func defaults(for kind: ClipboardAssistantKind) -> [ClipboardAssistantActionKind] {
         switch kind {
         case .url: [.openURL, .openDownload, .addToQuickNote, .share]
-        case .filePath, .file: [.revealInFinder, .compress, .copyText, .addToQuickNote, .share]
+        case .filePath: [.revealInFinder, .compress, .addToQuickNote, .share]
+        case .file: [.revealInFinder, .compress, .copyText, .addToQuickNote, .share]
         case .email: [.composeMail, .addToQuickNote, .share]
-        case .phone: [.copyText, .callPhone, .addToQuickNote, .share]
+        case .phone: [.callPhone, .addToQuickNote, .share]
         case .color: [.copyText, .addToQuickNote, .share]
         case .math: [.copyText, .addToQuickNote, .share, .sendToTeleprompter]
         case .dateTime: [.createCalendarEvent, .copyText, .addToQuickNote, .share]
