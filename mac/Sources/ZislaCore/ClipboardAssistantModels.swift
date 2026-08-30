@@ -9,8 +9,8 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
     case color
     case math
     case dateTime
-    case chineseText
     case code
+    case nonSystemLanguageText = "chineseText"
     case text
     case image
     case file
@@ -25,7 +25,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
         case .color: "paintpalette"
         case .math: "equal.square"
         case .dateTime: "calendar"
-        case .chineseText: "character.book.closed"
+        case .nonSystemLanguageText: "character.book.closed"
         case .code: "chevron.left.forwardslash.chevron.right"
         case .text: "text.quote"
         case .image: "photo"
@@ -214,6 +214,7 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
     case translate
     case composeMail
     case copyText
+    case copyFullExpression
     case compress
     case share
     case callPhone
@@ -232,13 +233,14 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
         case .translate: "character.book.closed"
         case .composeMail: "envelope"
         case .copyText: "doc.on.doc"
+        case .copyFullExpression: "doc.on.doc"
         case .compress: "archivebox"
         case .share: "square.and.arrow.up"
         case .callPhone: "phone"
         case .addToQuickNote: "note.text"
         case .sendToTeleprompter: "text.viewfinder"
         case .saveImage: "photo.badge.arrow.down"
-        case .saveText: "doc.badge.arrow.down"
+        case .saveText: "square.and.arrow.down"
         case .createCalendarEvent: "calendar.badge.plus"
         }
     }
@@ -253,11 +255,11 @@ public enum ClipboardAssistantActionOrder {
         case .email: [.composeMail, .addToQuickNote, .share]
         case .phone: [.callPhone, .addToQuickNote, .share]
         case .color: [.copyText, .addToQuickNote, .share]
-        case .math: [.copyText, .addToQuickNote, .share, .sendToTeleprompter]
+        case .math: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
         case .dateTime: [.createCalendarEvent, .copyText, .addToQuickNote, .share]
-        case .chineseText: [.translate, .search, .saveText, .addToQuickNote, .share, .sendToTeleprompter]
-        case .code: [.saveText, .addToQuickNote, .share, .sendToTeleprompter]
-        case .text: [.search, .saveText, .translate, .addToQuickNote, .share, .sendToTeleprompter]
+        case .nonSystemLanguageText: [.translate, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
+        case .code: [.saveText, .addToQuickNote, .sendToTeleprompter, .share]
+        case .text: [.search, .saveText, .translate, .addToQuickNote, .sendToTeleprompter, .share]
         case .image: [.saveImage, .addToQuickNote, .share]
         }
     }
@@ -275,8 +277,25 @@ public enum ClipboardAssistantActionOrder {
         _ orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
     ) -> [ClipboardAssistantKind: [ClipboardAssistantActionKind]] {
         Dictionary(uniqueKeysWithValues: ClipboardAssistantKind.allCases.map { kind in
-            (kind, normalized(orders[kind] ?? defaults(for: kind), for: kind))
+            let savedOrder = orders[kind] ?? defaults(for: kind)
+            let order: [ClipboardAssistantActionKind]
+            if let legacyDefault = legacyDefault(for: kind), savedOrder == legacyDefault {
+                order = defaults(for: kind)
+            } else {
+                order = savedOrder
+            }
+            return (kind, normalized(order, for: kind))
         })
+    }
+
+    private static func legacyDefault(for kind: ClipboardAssistantKind) -> [ClipboardAssistantActionKind]? {
+        switch kind {
+        case .math: [.copyText, .addToQuickNote, .share, .sendToTeleprompter]
+        case .nonSystemLanguageText: [.translate, .search, .saveText, .addToQuickNote, .share, .sendToTeleprompter]
+        case .code: [.saveText, .addToQuickNote, .share, .sendToTeleprompter]
+        case .text: [.search, .saveText, .translate, .addToQuickNote, .share, .sendToTeleprompter]
+        default: nil
+        }
     }
 
     public static func ordered(
@@ -304,6 +323,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     case translate(String)
     case composeMail(String)
     case copyText(String)
+    case copyFullExpression(String)
     case compress(URL)
     case share
     case callPhone(String)
@@ -324,6 +344,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .translate: "translate"
         case .composeMail: "composeMail"
         case .copyText: "copyText"
+        case .copyFullExpression: "copyFullExpression"
         case .compress: "compress"
         case .share: "share"
         case .callPhone: "callPhone"
@@ -345,6 +366,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .translate: .translate
         case .composeMail: .composeMail
         case .copyText: .copyText
+        case .copyFullExpression: .copyFullExpression
         case .compress: .compress
         case .share: .share
         case .callPhone: .callPhone

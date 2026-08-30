@@ -236,7 +236,11 @@ public final class QwenSessionActivityDetector: AIActivityDetecting {
            cached.runtimeSize == candidate.runtimeSize,
            candidate.transcriptSize >= cached.readerState.offset,
            !(candidate.transcriptSize == cached.readerState.offset
-               && candidate.transcriptModificationDate != cached.transcriptModificationDate) {
+               && candidate.transcriptModificationDate != cached.transcriptModificationDate),
+           jsonlReader.hasUnchangedReadPrefix(
+               at: candidate.transcriptURL,
+               state: cached.readerState
+           ) {
             next = cached
         } else {
             var initialState = TurnState()

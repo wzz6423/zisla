@@ -27,13 +27,13 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         var modificationDate: Date
         var readerState: IncrementalJSONLReader.State
         var stateBySession: [String: SessionState]
-        /// `ai-title` 记录每轮只写一次，会话空闲被裁剪后必须还能取回标题。
+        /// `ai-title` is written only once per turn, so the title must remain available after idle sessions are pruned.
         var titleBySession: [String: String]
         var fallbackSessionID: String
         var task: AIProgressTask?
     }
 
-    /// Claude Code 把子代理转录写进 `<会话>/subagents/`，且沿用父会话 ID。
+    /// Claude Code writes subagent transcripts to `<session>/subagents/` and reuses the parent session ID.
     private static let sidechainDirectoryName = "subagents"
     private static let syntheticModelPlaceholder = "<synthetic>"
 
@@ -154,7 +154,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
             return $0.url.path < $1.url.path
         }
         guard sorted.count > maxTranscriptFiles else { return sorted }
-        // 并发跑多个 CLI 时最新文件会被占满，存活会话必须无条件补进来，否则任务漏报。
+        // Concurrent CLI runs can fill the newest-file quota, so live sessions must always be included to avoid missing tasks.
         return Array(sorted.prefix(maxTranscriptFiles))
             + sorted.dropFirst(maxTranscriptFiles).filter {
                 liveSessionIDs.contains($0.url.deletingPathExtension().lastPathComponent)
@@ -169,7 +169,8 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         if let cached,
            candidate.size >= cached.readerState.offset,
            !(candidate.size == cached.readerState.offset
-               && candidate.modificationDate != cached.modificationDate) {
+               && candidate.modificationDate != cached.modificationDate),
+           jsonlReader.hasUnchangedReadPrefix(at: candidate.url, state: cached.readerState) {
             next = cached
         } else {
             next = CachedTranscript(
@@ -192,7 +193,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
                 guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                     return
                 }
-                // 内联的子代理记录沿用父会话 ID，计入会污染父任务的活跃状态。
+                // Inline subagent records reuse the parent session ID and would contaminate the parent task's activity state.
                 if root["isSidechain"] as? Bool == true { return }
                 let type = (root["type"] as? String)?.lowercased() ?? ""
                 let sessionID = ((root["sessionId"] as? String)
@@ -428,7 +429,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         return nil
     }
 
-    /// Claude Code 给合成消息填的是占位模型名，覆盖真实模型会让详情显示成 `<synthetic>`。
+    /// Claude Code assigns a placeholder model name to synthetic messages; overwriting the real model would show `<synthetic>` in the details.
     private static func isRealModel(_ model: String) -> Bool {
         !model.isEmpty && model != syntheticModelPlaceholder
     }

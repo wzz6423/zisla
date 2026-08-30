@@ -121,6 +121,30 @@ struct NetworkBatteryMonitorTests {
     }
 
     @Test
+    func classifiesAirPodsMaxAsHeadphonesWhileKeepingAppleAdvertisementSupport() throws {
+        let data = Data("""
+        {
+          "SPBluetoothDataType": [{
+            "device_connected": [{
+              "AirPods Max": {
+                "device_minorType": "Headphones",
+                "device_batteryLevelMain": "81%"
+              }
+            }]
+          }]
+        }
+        """.utf8)
+
+        let discovery = NetworkBatteryMonitor.bluetoothDiscovery(from: data)
+        let device = try #require(discovery.devices.first)
+        let target = try #require(discovery.targets.first)
+
+        #expect(device.deviceType == .headphones)
+        #expect(device.deviceType.symbolName == "headphones")
+        #expect(target.supportsAppleHeadphoneAdvertisement)
+    }
+
+    @Test
     func mergesBluetoothReadingsAndKeepsTheRicherFreshSnapshot() throws {
         let profile = NetworkBatteryDevice(
             identifier: "bluetooth:aabbcc",

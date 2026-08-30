@@ -9,6 +9,14 @@ import Foundation
 /// Notes remains the storage backend for user content. The dismissible welcome item is local-only.
 @MainActor
 public final class QuickNotesService: ObservableObject {
+    struct Operations {
+        let listNotes: () async -> Result<[NotesAppBridge.NoteSummary], NotesAppError>
+        let isPasswordProtected: (String) async -> Result<Bool, NotesAppError>
+        let readNote: (String) async -> Result<NotesAppBridge.NoteContent, NotesAppError>
+        let writeNote: (String, String) async -> Result<Void, NotesAppError>
+        let deleteNote: (String) async -> Result<Void, NotesAppError>
+    }
+
     public static let welcomeNoteTitle = "朋友，看这里。"
     private static let builtInWelcomeNoteID = "zisla.builtin.quick-notes-welcome"
     private static let welcomeDismissedDefaultsKey = "QuickNotesService.isBuiltInWelcomeNoteDismissed"
@@ -23,17 +31,53 @@ public final class QuickNotesService: ObservableObject {
     愿你能愉快而轻松地使用这个小工具~
     """
     @Published public private(set) var notes: [NotesAppBridge.NoteSummary] = []
-    @Published public var selectedID: String?
+    @Published public var selectedID: String? {
+        didSet {
+            guard oldValue != selectedID else { return }
+            noteLoadID = nil
+            noteLoadGeneration &+= 1
+            isLoadingNote = false
+        }
+    }
     @Published public private(set) var isLoadingList = false
     @Published public private(set) var isLoadingNote = false
     @Published public private(set) var isSaving = false
     @Published public var errorMessage: String?
 
-    private var saveTask: Task<Void, Never>?
+    private var saveTasksByID: [String: Task<Void, Never>] = [:]
     private let welcomeDismissalDefaults: UserDefaults
+    private let operations: Operations
+    private let saveDelay: Duration
+    private var refreshGeneration = 0
+    private var noteLoadGeneration = 0
+    private var noteLoadID: String?
+    private var activeNoteLoadsByGeneration: [Int: Int] = [:]
+    private var saveGenerationByID: [String: Int] = [:]
+    private var activeSaveGenerationByID: [String: Int] = [:]
+    private var activeSaveTasksByID: [String: Task<Void, Never>] = [:]
+    private var pendingSaveByID: [String: (generation: Int, html: String)] = [:]
+    private var deletingNoteIDs: Set<String> = []
 
     public init(welcomeDismissalDefaults: UserDefaults = .standard) {
+        operations = Operations(
+            listNotes: { await NotesAppBridge.listNotes() },
+            isPasswordProtected: { await NotesAppBridge.isPasswordProtected(noteID: $0) },
+            readNote: { await NotesAppBridge.readNote(id: $0) },
+            writeNote: { id, html in await NotesAppBridge.writeNote(id: id, html: html) },
+            deleteNote: { await NotesAppBridge.deleteNote(id: $0) }
+        )
         self.welcomeDismissalDefaults = welcomeDismissalDefaults
+        saveDelay = .milliseconds(800)
+    }
+
+    init(
+        welcomeDismissalDefaults: UserDefaults,
+        operations: Operations,
+        saveDelay: Duration = .milliseconds(800)
+    ) {
+        self.welcomeDismissalDefaults = welcomeDismissalDefaults
+        self.operations = operations
+        self.saveDelay = saveDelay
     }
 
     public var selectedNote: NotesAppBridge.NoteSummary? {
@@ -83,9 +127,12 @@ public final class QuickNotesService: ObservableObject {
 
     /// Re-fetches the Notes note list; falls back to the first note if the currently selected item no longer exists.
     public func refresh() async {
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
         isLoadingList = true
         errorMessage = nil
-        let result = await NotesAppBridge.listNotes()
+        let result = await operations.listNotes()
+        guard refreshGeneration == generation else { return }
         isLoadingList = false
         switch result {
         case .success(let fetched):
@@ -126,24 +173,25 @@ public final class QuickNotesService: ObservableObject {
     /// Reads the currently selected note for the editor and preview to load.
     public func loadNote() async -> NotesAppBridge.NoteContent? {
         guard let id = selectedID else { return nil }
+        let generation = beginNoteLoad(id: id)
+        defer { finishNoteLoad(id: id, generation: generation) }
         if isBuiltInWelcomeNote(id: id) {
             return NotesAppBridge.NoteContent(
                 plainText: Self.welcomeNoteText,
                 bodyHTML: NotesAppBridge.bodyHTML(for: Self.welcomeNoteText)
             )
         }
-        isLoadingNote = true
-        let protectionResult = await NotesAppBridge.isPasswordProtected(noteID: id)
+        let protectionResult = await operations.isPasswordProtected(id)
+        guard isCurrentNoteLoad(generation, id: id) else { return nil }
         if case .success(true) = protectionResult {
-            isLoadingNote = false
             return NotesAppBridge.NoteContent(
                 plainText: "",
                 bodyHTML: "",
                 isPasswordProtected: true
             )
         }
-        let result = await NotesAppBridge.readNote(id: id)
-        isLoadingNote = false
+        let result = await operations.readNote(id)
+        guard isCurrentNoteLoad(generation, id: id) else { return nil }
         switch result {
         case .success(let content):
             return content
@@ -160,37 +208,113 @@ public final class QuickNotesService: ObservableObject {
 
     /// Debounced write-back of rich-text body.
     public func scheduleSave(id: String, html: String) {
-        guard !isBuiltInWelcomeNote(id: id) else { return }
-        saveTask?.cancel()
-        saveTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(800))
+        guard !isBuiltInWelcomeNote(id: id), !deletingNoteIDs.contains(id) else { return }
+        let generation = (saveGenerationByID[id] ?? 0) &+ 1
+        saveGenerationByID[id] = generation
+        if let oldTask = saveTasksByID[id] {
+            oldTask.cancel()
+            saveTasksByID.removeValue(forKey: id)
+        }
+        saveTasksByID[id] = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: self.saveDelay)
             if Task.isCancelled { return }
-            await self?.performSave(id: id, html: html)
+            self.enqueueSave(id: id, html: html, generation: generation)
         }
     }
 
-    /// Cancels a pending write-back (e.g. before switching notes).
+    /// Explicitly discards pending write-backs.
     public func cancelPendingSave() {
-        saveTask?.cancel()
-        saveTask = nil
+        let pendingIDs = Set(saveGenerationByID.keys)
+            .union(saveTasksByID.keys)
+            .union(pendingSaveByID.keys)
+        for id in pendingIDs {
+            invalidatePendingSave(for: id)
+        }
     }
 
-    private func performSave(id: String, html: String) async {
-        guard !isBuiltInWelcomeNote(id: id) else { return }
+    private func invalidatePendingSave(for id: String) {
+        saveGenerationByID[id] = (saveGenerationByID[id] ?? 0) &+ 1
+        if let task = saveTasksByID.removeValue(forKey: id) {
+            task.cancel()
+        }
+        pendingSaveByID.removeValue(forKey: id)
+    }
+
+    private func isCurrentNoteLoad(_ generation: Int, id: String) -> Bool {
+        noteLoadGeneration == generation && noteLoadID == id && selectedID == id
+    }
+
+    private func beginNoteLoad(id: String) -> Int {
+        if noteLoadID != id {
+            noteLoadID = id
+            noteLoadGeneration &+= 1
+        }
+        let generation = noteLoadGeneration
+        activeNoteLoadsByGeneration[generation, default: 0] += 1
+        isLoadingNote = true
+        return generation
+    }
+
+    private func finishNoteLoad(id: String, generation: Int) {
+        let remaining = max(0, (activeNoteLoadsByGeneration[generation] ?? 0) - 1)
+        if remaining == 0 {
+            activeNoteLoadsByGeneration[generation] = nil
+        } else {
+            activeNoteLoadsByGeneration[generation] = remaining
+        }
+        guard isCurrentNoteLoad(generation, id: id) else { return }
+        isLoadingNote = remaining > 0
+    }
+
+    private func enqueueSave(id: String, html: String, generation: Int) {
+        guard saveGenerationByID[id] == generation else { return }
+        saveTasksByID[id] = nil
+        guard !deletingNoteIDs.contains(id), activeSaveGenerationByID[id] == nil else {
+            pendingSaveByID[id] = (generation, html)
+            return
+        }
+        startSave(id: id, html: html, generation: generation)
+    }
+
+    private func startSave(id: String, html: String, generation: Int) {
+        guard !deletingNoteIDs.contains(id) else { return }
+        activeSaveGenerationByID[id] = generation
         isSaving = true
-        let result = await NotesAppBridge.writeNote(id: id, html: html)
-        isSaving = false
-        switch result {
-        case .success:
-            if let index = notes.firstIndex(where: { $0.id == id }) {
-                notes[index] = NotesAppBridge.NoteSummary(
-                    id: id,
-                    title: notes[index].title,
-                    modifiedAt: Date()
-                )
+        let task = Task { [weak self] in
+            guard let self else { return }
+            let result = await self.operations.writeNote(id, html)
+            self.finishSave(id: id, generation: generation, result: result)
+        }
+        activeSaveTasksByID[id] = task
+    }
+
+    private func finishSave(id: String, generation: Int, result: Result<Void, NotesAppError>) {
+        guard activeSaveGenerationByID[id] == generation else { return }
+        activeSaveGenerationByID[id] = nil
+        activeSaveTasksByID[id] = nil
+
+        if saveGenerationByID[id] == generation {
+            switch result {
+            case .success:
+                if let index = notes.firstIndex(where: { $0.id == id }) {
+                    notes[index] = NotesAppBridge.NoteSummary(
+                        id: id,
+                        title: notes[index].title,
+                        modifiedAt: Date()
+                    )
+                }
+            case .failure(let error):
+                errorMessage = error.message
             }
-        case .failure(let error):
-            errorMessage = error.message
+        }
+
+        if let pendingSave = pendingSaveByID.removeValue(forKey: id),
+           saveGenerationByID[id] == pendingSave.generation,
+           !deletingNoteIDs.contains(id) {
+            startSave(id: id, html: pendingSave.html, generation: pendingSave.generation)
+        } else {
+            isSaving = !activeSaveGenerationByID.isEmpty
         }
     }
 
@@ -230,14 +354,19 @@ public final class QuickNotesService: ObservableObject {
     /// Deletes the specified note from Notes and refreshes the list.
     public func delete(id: String) async {
         if isBuiltInWelcomeNote(id: id) {
-            cancelPendingSave()
             welcomeDismissalDefaults.set(true, forKey: Self.welcomeDismissedDefaultsKey)
             if selectedID == id {
                 selectedID = notes.first?.id
             }
             return
         }
-        let result = await NotesAppBridge.deleteNote(id: id)
+        guard deletingNoteIDs.insert(id).inserted else { return }
+        defer { deletingNoteIDs.remove(id) }
+        invalidatePendingSave(for: id)
+        if let activeSave = activeSaveTasksByID[id] {
+            await activeSave.value
+        }
+        let result = await operations.deleteNote(id)
         if case .failure(let error) = result {
             errorMessage = error.message
         }

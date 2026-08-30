@@ -80,6 +80,7 @@ struct YTDLPResolverTests {
     }
 }
 
+@Suite(.serialized)
 struct DownloadServiceTests {
     @Test
     func nativeMuxerRejectsInputWithoutMediaTracks() async throws {
@@ -324,6 +325,52 @@ struct DownloadServiceTests {
     }
 
     @Test
+    func nativeBackendRejectsDuplicateTaskIDWhileDownloadIsRunning() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let backend = RecordingBilibiliDownloader(pausesFirstDownload: true)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true),
+            mediaMuxer: RecordingMediaMuxer(),
+            bilibiliDownloader: backend
+        )
+        let request = try DownloadRequest(
+            urlString: "https://www.bilibili.com/video/BV1d2N16KEh6",
+            mode: .video,
+            outputDirectory: directory.appendingPathComponent("Downloads", isDirectory: true)
+        )
+        let taskID = UUID()
+        let firstTask = Task { try await service.download(request, taskID: taskID) }
+
+        var firstStarted = false
+        for _ in 0..<100 {
+            if await backend.invocationCount == 1 {
+                firstStarted = true
+                break
+            }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        #expect(firstStarted)
+
+        do {
+            _ = try await service.download(request, taskID: taskID)
+            Issue.record("A running native download must reserve its task ID")
+        } catch let error as DownloadServiceError {
+            #expect(error == .duplicateTask(taskID))
+        }
+
+        await backend.releaseFirstDownload()
+        _ = try await firstTask.value
+        #expect(await backend.invocationCount == 1)
+    }
+
+    @Test
     func bilibiliVideoWorksWithoutYTDLPButAudioDoesNotUseVideoFallback() async throws {
         let directory = kitTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -435,6 +482,151 @@ struct DownloadServiceTests {
         }
     }
 
+    @Test
+    func explicitCancellationTerminatesNativeBilibiliDownload() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let backend = RecordingBilibiliDownloader(pausesFirstDownload: true)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true),
+            mediaMuxer: RecordingMediaMuxer(),
+            bilibiliDownloader: backend
+        )
+        let request = try DownloadRequest(
+            urlString: "https://www.bilibili.com/video/BV1d2N16KEh6",
+            mode: .video,
+            outputDirectory: directory.appendingPathComponent("Downloads", isDirectory: true)
+        )
+        let taskID = UUID()
+        let task = Task { try await service.download(request, taskID: taskID) }
+
+        var downloadStarted = false
+        for _ in 0..<100 {
+            if await backend.invocationCount == 1 {
+                downloadStarted = true
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(downloadStarted)
+
+        await service.cancel(taskID: taskID)
+        await backend.releaseFirstDownload()
+
+        do {
+            _ = try await task.value
+            Issue.record("Cancelled Bilibili download should throw CancellationError")
+        } catch {
+            #expect(error is CancellationError)
+        }
+        #expect(await backend.observedCancellation)
+    }
+
+    @Test
+    func explicitCancellationTreatsNativeBilibiliBackendErrorAsCancellation() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let backend = RecordingBilibiliDownloader(
+            pausesFirstDownload: true,
+            throwsGenericErrorAfterCancellation: true
+        )
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true),
+            mediaMuxer: RecordingMediaMuxer(),
+            bilibiliDownloader: backend
+        )
+        let request = try DownloadRequest(
+            urlString: "https://www.bilibili.com/video/BV1d2N16KEh6",
+            mode: .video,
+            outputDirectory: directory.appendingPathComponent("Downloads", isDirectory: true)
+        )
+        let taskID = UUID()
+        let task = Task { try await service.download(request, taskID: taskID) }
+
+        var downloadStarted = false
+        for _ in 0..<100 {
+            if await backend.invocationCount == 1 {
+                downloadStarted = true
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(downloadStarted)
+
+        await service.cancel(taskID: taskID)
+        await backend.releaseFirstDownload()
+
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+        #expect(await backend.observedCancellation)
+    }
+
+    @Test
+    func explicitCancellationBeforeMuxPreventsFileInstallation() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let muxer = PausableMediaMuxer(throwsGenericErrorAfterCancellation: true)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true),
+            mediaMuxer: muxer,
+            bilibiliDownloader: RecordingBilibiliDownloader()
+        )
+        let outputDirectory = directory.appendingPathComponent("Downloads", isDirectory: true)
+        let request = try DownloadRequest(
+            urlString: "https://www.bilibili.com/video/BV1d2N16KEh6",
+            mode: .video,
+            outputDirectory: outputDirectory
+        )
+        let taskID = UUID()
+        let task = Task { try await service.download(request, taskID: taskID) }
+
+        var muxStarted = false
+        for _ in 0..<100 {
+            if await muxer.invocationCount == 1 {
+                muxStarted = true
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(muxStarted)
+
+        await service.cancel(taskID: taskID)
+        await muxer.releaseMux()
+
+        do {
+            _ = try await task.value
+            Issue.record("Cancelled download before mux completion should throw")
+        } catch {
+            #expect(error is CancellationError)
+        }
+        #expect(await muxer.observedCancellation)
+
+        let installedFiles = try FileManager.default.contentsOfDirectory(
+            at: outputDirectory,
+            includingPropertiesForKeys: nil
+        )
+        #expect(installedFiles.isEmpty, "No files should be installed after cancellation")
+    }
+
     @Test @MainActor
     func clipboardMonitoringIsDisabledByDefault() {
         let monitor = ClipboardLinkMonitor()
@@ -497,12 +689,66 @@ private actor RecordingMediaMuxer: MediaMuxing {
     }
 }
 
+private actor PausableMediaMuxer: MediaMuxing {
+    private let throwsGenericErrorAfterCancellation: Bool
+    private(set) var invocationCount = 0
+    private(set) var observedCancellation = false
+    private var muxContinuation: CheckedContinuation<Void, Never>?
+
+    init(throwsGenericErrorAfterCancellation: Bool = false) {
+        self.throwsGenericErrorAfterCancellation = throwsGenericErrorAfterCancellation
+    }
+
+    func mux(videoURL: URL, audioURL: URL, outputURL: URL) async throws {
+        invocationCount += 1
+        await withCheckedContinuation { continuation in
+            muxContinuation = continuation
+        }
+        observedCancellation = Task.isCancelled
+        if throwsGenericErrorAfterCancellation {
+            try Data("partial".utf8).write(to: outputURL)
+            throw DownloadServiceTestError.cancelled
+        }
+        try Task.checkCancellation()
+        try Data("muxed".utf8).write(to: outputURL)
+    }
+
+    func releaseMux() {
+        muxContinuation?.resume()
+        muxContinuation = nil
+    }
+}
+
 private actor RecordingBilibiliDownloader: BilibiliDownloading {
+    private let pausesFirstDownload: Bool
+    private let throwsGenericErrorAfterCancellation: Bool
     private(set) var requestedURL: String?
+    private(set) var invocationCount = 0
+    private(set) var observedCancellation = false
+    private var firstDownloadContinuation: CheckedContinuation<Void, Never>?
+
+    init(
+        pausesFirstDownload: Bool = false,
+        throwsGenericErrorAfterCancellation: Bool = false
+    ) {
+        self.pausesFirstDownload = pausesFirstDownload
+        self.throwsGenericErrorAfterCancellation = throwsGenericErrorAfterCancellation
+    }
 
     func downloadComponents(from urlString: String, to directory: URL) async throws
         -> [DownloadedMediaComponent]
     {
+        invocationCount += 1
+        if pausesFirstDownload, invocationCount == 1 {
+            await withCheckedContinuation { continuation in
+                firstDownloadContinuation = continuation
+            }
+            observedCancellation = Task.isCancelled
+            if throwsGenericErrorAfterCancellation {
+                throw DownloadServiceTestError.cancelled
+            }
+            try Task.checkCancellation()
+        }
         requestedURL = urlString
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let video = directory.appendingPathComponent("fallback [BV1d2N16KEh6].32.mp4")
@@ -514,6 +760,15 @@ private actor RecordingBilibiliDownloader: BilibiliDownloading {
             DownloadedMediaComponent(fileURL: audio, formatID: "30280", kind: .audio),
         ]
     }
+
+    func releaseFirstDownload() {
+        firstDownloadContinuation?.resume()
+        firstDownloadContinuation = nil
+    }
+}
+
+private enum DownloadServiceTestError: Error, Sendable {
+    case cancelled
 }
 
 private actor StubBilibiliHTTPClient: BilibiliHTTPClient {

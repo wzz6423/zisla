@@ -20,7 +20,73 @@ struct FeatureSettingsCompatibilityTests {
             FeatureSettings.self,
             from: JSONEncoder().encode(settings)
         )
-        #expect(decoded.clipboardAssistantActionOrders[.text]?.first == .translate)
+        #expect(decoded.clipboardAssistantActionOrders[.text] == [
+            .translate, .search, .saveText, .addToQuickNote, .share, .sendToTeleprompter,
+        ])
+    }
+
+    @Test
+    func legacyClipboardAssistantKindRawValueDecodesFromCompleteFeatureSettingsPayload() throws {
+        var payload = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(FeatureSettings.default)
+            ) as? [String: Any]
+        )
+        payload["clipboardAssistantEnabledKinds"] = ["text", "chineseText"]
+        payload["clipboardAssistantActionOrders"] = [
+            "chineseText",
+            ["search", "translate", "saveText", "addToQuickNote", "sendToTeleprompter", "share"],
+        ]
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONSerialization.data(withJSONObject: payload)
+        )
+
+        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .nonSystemLanguageText])
+        #expect(decoded.clipboardAssistantActionOrders[.nonSystemLanguageText] == [
+            .search, .translate, .saveText, .addToQuickNote, .sendToTeleprompter, .share,
+        ])
+
+        let reencoded = String(
+            decoding: try JSONEncoder().encode(decoded),
+            as: UTF8.self
+        )
+        #expect(reencoded.contains("\"chineseText\""))
+        #expect(!reencoded.contains("\"nonSystemLanguageText\""))
+    }
+
+    @Test
+    func legacyClipboardAssistantDefaultOrdersMigrateSystemSharingToTheEnd() throws {
+        let legacyOrders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]] = [
+            .math: [.copyText, .addToQuickNote, .share, .sendToTeleprompter],
+            .nonSystemLanguageText: [.translate, .search, .saveText, .addToQuickNote, .share, .sendToTeleprompter],
+            .code: [.saveText, .addToQuickNote, .share, .sendToTeleprompter],
+            .text: [.search, .saveText, .translate, .addToQuickNote, .share, .sendToTeleprompter],
+        ]
+        let legacy = try JSONEncoder().encode(
+            LegacySettings(clipboardAssistantActionOrders: legacyOrders)
+        )
+
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+
+        for kind in [ClipboardAssistantKind.math, .nonSystemLanguageText, .code, .text] {
+            #expect(decoded.clipboardAssistantActionOrders[kind] == ClipboardAssistantActionOrder.defaults(for: kind))
+            #expect(decoded.clipboardAssistantActionOrders[kind]?.last == .share)
+        }
+    }
+
+    @Test
+    func clipboardAssistantSystemSharingIsLastInEveryDefaultOrder() {
+        for kind in ClipboardAssistantKind.allCases {
+            let order = ClipboardAssistantActionOrder.defaults(for: kind)
+            #expect(order.last == .share)
+        }
+    }
+
+    private struct LegacySettings: Encodable {
+        let activityNoticeDisplayDuration: ActivityNoticeDisplayDuration = .threeSeconds
+        let clipboardAssistantActionOrders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
     }
 
     @Test
@@ -33,13 +99,21 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
-    func settingsMissingActivityDurationFailDecoding() {
+    func settingsMissingActivityDurationUsesDefaultAndPreservesExistingValues() throws {
         let data = Data(#"{"appearanceMode":"light","mediaEnabled":false,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"updateChecksEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true}"#.utf8)
 
-        #expect(throws: DecodingError.self) {
-            try JSONDecoder().decode(FeatureSettings.self, from: data)
-        }
-}
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: data)
+
+        #expect(decoded.activityNoticeDisplayDuration == .threeSeconds)
+        #expect(decoded.appearanceMode == .light)
+        #expect(!decoded.mediaEnabled)
+        #expect(decoded.fileShelfEnabled)
+        #expect(decoded.aiProgressEnabled)
+        #expect(decoded.downloaderEnabled)
+        #expect(decoded.updateChecksEnabled)
+        #expect(!decoded.clipboardDetectionEnabled)
+        #expect(decoded.sideNoticesEnabled)
+    }
     @Test
     func activityNoticeDisplayDurationRoundTripsAllCases() throws {
         for duration in ActivityNoticeDisplayDuration.allCases {
@@ -350,6 +424,31 @@ struct FeatureSettingsCompatibilityTests {
             from: JSONEncoder().encode(settings)
         )
         #expect(decoded.voiceEnabledLexicons == [.computerTerms, .internetBuzzwords])
+    }
+
+    @Test
+    func customVoiceHotwordsDefaultForLegacySettingsAndParticipateInRecognition() throws {
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let legacySettings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(legacySettings.voiceCustomHotwords.isEmpty)
+
+        let customHotwords = [" Zisla ", "RSP-VSR", "Zisla", ""]
+        let contextualTerms = VoiceLexicon.contextualTerms(
+            for: [],
+            customTerms: customHotwords
+        )
+        #expect(contextualTerms == ["Zisla", "RSP-VSR"])
+
+        let normalized = VoiceLexicon.normalizeTranscript(
+            "zisla 和 rsp vsr",
+            for: [],
+            customTerms: customHotwords
+        )
+        #expect(normalized == "Zisla 和 RSP-VSR")
+
+        let settings = FeatureSettings(voiceCustomHotwords: customHotwords)
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
+        #expect(decoded.voiceCustomHotwords == ["Zisla", "RSP-VSR"])
     }
 
     @Test

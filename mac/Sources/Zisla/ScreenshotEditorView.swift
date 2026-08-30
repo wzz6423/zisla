@@ -2766,6 +2766,7 @@ enum ScreenshotRecognitionFormatter {
         let fragments = rows.filter { $0.fragments.count > 1 }.flatMap(\.fragments)
         let source = fragments.isEmpty ? rows.flatMap(\.fragments) : fragments
         let widths = source.map(\.boundingBox.width).filter { $0 > 0 }.sorted()
+        guard !widths.isEmpty else { return [] }
         let tolerance = max(widths[widths.count / 2] * 0.6, 0.01)
         var anchors: [[CGFloat]] = []
         for position in source.map(\.boundingBox.minX).sorted() {
@@ -5145,7 +5146,7 @@ final class ScreenshotPointerInteractionNSView: NSView {
     }
 
     private func activateWindowForInteraction() {
-        guard let window, !window.isKeyWindow else { return }
+        guard let window, window.isVisible, !window.isKeyWindow else { return }
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
@@ -5739,9 +5740,9 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         isPinnedImagePresentation && model.isPinned
     }
 
-    /// 显示器重新配置（睡眠唤醒、插拔外接屏、切换分辨率）之后，之前持有的 NSScreen 会失效，
-    /// 它的 frame 会读成 .zero，于是所有基于它算出来的窗口位置都会塌到屏幕左下角原点。
-    /// 所以每次用到几何信息前都按 displayID 重新解析一次，并且绝不回落到 .zero。
+    /// After display reconfiguration (wake from sleep, external display changes, or resolution changes), a retained NSScreen becomes stale,
+    /// its frame reads as .zero, and every window position derived from it collapses to the lower-left screen origin.
+    /// Re-resolve it by displayID before using its geometry and never fall back to .zero.
     private var activeScreen: NSScreen? {
         let liveScreens = NSScreen.screens
         if let currentScreen, liveScreens.contains(where: { $0 === currentScreen }) {
@@ -5788,8 +5789,8 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         onCloseHandler = onClose
         let overlayFrame = screen?.frame ?? CGRect(origin: .zero, size: screenImage.size)
         let window = ScreenshotEditorWindow(
-            // 带 screen: 的构造器把 contentRect 当作该屏幕的局部坐标，另外三处调用都走了
-            // localContentRect，这里保持一致，否则负原点的外接屏会算出偏移。
+            // The initializer with screen: treats contentRect as local to that screen. The other three call sites use
+            // localContentRect, so keep this consistent or external displays with negative origins will be offset.
             contentRect: ScreenshotWindowGeometry.localContentRect(
                 for: overlayFrame,
                 on: screen?.frame ?? overlayFrame
@@ -5976,7 +5977,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     private func pinnedWindowFrame(size: CGSize) -> CGRect {
         guard let screen = activeScreen else {
-            // 没有任何可用屏幕时维持窗口现有位置；回落到 .zero 就正好落在主屏左下角。
+            // Keep the current window position when no screen is available; falling back to .zero would place it at the main screen's lower-left corner.
             return CGRect(origin: window?.frame.origin ?? .zero, size: size)
         }
         let selectionFrame = CGRect(

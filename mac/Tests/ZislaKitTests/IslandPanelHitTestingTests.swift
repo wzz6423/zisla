@@ -45,6 +45,7 @@ struct IslandPanelHitTestingTests {
         )
         panel.allowsKeyWindow = true
         panel.present(at: panel.frame, animated: false)
+        panel.alphaValue = 0
         defer { panel.orderOut(nil) }
         let click = try #require(NSEvent.mouseEvent(
             with: .leftMouseDown,
@@ -110,6 +111,7 @@ struct IslandPanelHitTestingTests {
         panel.allowsNativeGlassActivation = true
         panel.keepsNativeGlassActive = true
         panel.present(at: panel.frame, animated: false)
+        panel.alphaValue = 0
         defer { panel.orderOut(nil) }
 
         #expect(panel.canBecomeKey)
@@ -130,6 +132,7 @@ struct IslandPanelHitTestingTests {
         panel.allowsNativeGlassActivation = true
         panel.keepsNativeGlassActive = true
         panel.present(at: panel.frame, animated: false)
+        panel.alphaValue = 0
         defer { panel.orderOut(nil) }
 
         panel.resignKey()
@@ -147,9 +150,11 @@ struct IslandPanelHitTestingTests {
         let expandedFrame = CGRect(x: 0, y: 400, width: 860, height: 334)
         let panel = IslandPanel(contentView: NSView(), frame: collapsedFrame)
         panel.present(at: collapsedFrame)
+        panel.alphaValue = 0
         defer { panel.orderOut(nil) }
 
         panel.present(at: expandedFrame)
+        panel.alphaValue = 0
 
         #expect(panel.isVisible)
         #expect(panel.frame == expandedFrame)
@@ -201,6 +206,7 @@ struct IslandPanelHitTestingTests {
         let frame = CGRect(x: 40, y: 600, width: 240, height: 34)
         let panel = IslandPanel(contentView: NSView(), frame: frame)
         panel.present(at: frame)
+        panel.alphaValue = 0
         defer { panel.orderOut(nil) }
         // Mimics a dismiss fade still in flight when the Space change re-presents the panel.
         panel.alphaValue = 0
@@ -242,6 +248,7 @@ struct IslandPanelHitTestingTests {
         panel.keepsNativeGlassActive = true
         panel.isPinned = true
         panel.present(at: panel.frame, animated: false)
+        panel.alphaValue = 0
         defer { panel.orderOut(nil) }
 
         #expect(panel.canBecomeKey)

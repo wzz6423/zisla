@@ -282,9 +282,7 @@ public final class AIAgentWorkspace: ObservableObject {
         } else {
             grokUpdateState = checkedState
         }
-        cliUpdates = updates.sorted {
-            AgentCLIKind.allCases.firstIndex(of: $0.kind)! < AgentCLIKind.allCases.firstIndex(of: $1.kind)!
-        }
+        cliUpdates = updates.sorted { AIAgentCLIService.cliKindOrder($0.kind, $1.kind) }
         startAutomaticCLIUpdateIfNeeded(for: cliUpdates)
     }
 

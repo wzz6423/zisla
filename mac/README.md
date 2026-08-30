@@ -33,10 +33,10 @@ macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall b
 - **Now Playing:** MediaRemote shows artwork, title, progress, scrolling lyrics, and controls; Core Audio identifies the actual audio source as a fallback. Paused, stopped, and muted sources are hidden.
 - **Browser downloads:** Shows download source and progress for Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera, and Arc in the home view, collapsed state, and side notices.
 - **Voice input:** Supports toggle or push-to-talk shortcuts, custom global shortcuts, system speech recognition, local or remote transcript organization, and local recording history.
-- **Copy assistant:** After every copy, a small island-style toast shows a rich preview and smart next actions — open links, reveal files in Finder, search (engine selectable), translate, calculate, create calendar events from recognized dates, and save long text or images. Recognizes URLs, file paths, emails, phone numbers, CSS colors with live swatches, arithmetic, dates and times, Chinese text, code snippets, plain text with counts, images with thumbnails, and file references. Triggers: the action buttons, a double-tapped modifier key (default Left ⌃ Control), or a mouse side button; all user-configurable. Also offers a hold-left + right-click quick-copy mouse gesture (off by default), an app blacklist, per-type recognition switches, and a lightweight reminder mode.
+- **Copy assistant:** After every copy, a small island-style toast shows a rich preview and smart next actions — open links, reveal files in Finder, search (engine selectable), translate, calculate, create calendar events from recognized dates, and save long text or images. Recognizes URLs, file paths, emails, phone numbers, CSS colors with live swatches, arithmetic, dates and times, text in a non-system language, code snippets, plain text with counts, images with thumbnails, and file references. Triggers: the action buttons, a double-tapped modifier key (default Left ⌃ Control), or a mouse side button; all user-configurable. Also offers a hold-left + right-click quick-copy mouse gesture (off by default), an app blacklist, per-type recognition switches, and a lightweight reminder mode.
 - **CLI and Skills management:** Detects, installs, updates, and removes common AI CLIs and manages local Skills from Settings.
 - **Desktop pets:** Select a built-in or imported pet and place it on either side of the island.
-- **Updates:** Checks GitHub/Gitee Releases and can manually or automatically download the current channel's DMG; the app never mounts or replaces itself.
+- **Updates:** The selected Release or Preview channel uses Sparkle to check its signed Gitee appcast first, retries the signed GitHub appcast once if the Gitee appcast cannot load or its update package fails to download, then downloads, verifies, installs, and relaunches updates. Changing the channel applies to both automatic and manual checks.
 - **Appearance and interaction:** Settings can follow the system, light, or dark appearance. The island supports transparent or frosted surfaces, pinned expansion, multiple displays, Spaces, and external displays without a notch.
 - **Defaults:** New installations enable feature modules by default. Each feature, collapsed-state indicator, side notice, menu-bar metric, and update behavior can be adjusted independently; existing installations keep their current configuration.
 
@@ -177,7 +177,7 @@ The Notes module does not keep a second local copy; Apple Notes is the storage b
 - **Camera and Input Monitoring:** The camera is used only for the mirror; custom modifier-key shortcuts and keyboard cleaning may require Input Monitoring.
 - **Browser downloads:** Only public system file progress and download temporary files are inspected; browser history and page content are not read.
 - **Media:** MediaRemote supplies metadata and Core Audio process output state confirms playback. MediaRemote is a private framework, so the current build is not suitable for direct Mac App Store submission; missing metadata falls back to the active audio source app.
-- **Network:** Weather uses Open-Meteo and public China weather alerts where applicable, with WeatherKit preferred elsewhere. Update checks try Gitee before GitHub, and download confirmation contacts the selected Release DMG. The Bilibili fallback uses read-only video information, playback URLs, and its media CDN; recognizing clipboard links does not connect to the network.
+- **Network:** Weather uses Open-Meteo and public China weather alerts where applicable, with WeatherKit preferred elsewhere. The selected update channel retrieves its signed Gitee appcast and release ZIP, with one GitHub appcast and package-download retry if Gitee's appcast cannot load or its package download fails. The Bilibili fallback uses read-only video information, playback URLs, and its media CDN; recognizing clipboard links does not connect to the network.
 - **Automation:** Notes uses AppleScript/JXA to list, view, edit, create, and delete Apple Notes. It requires automation authorization, does not use the network, and keeps data in Apple Notes.
 
 ## Tests
@@ -211,7 +211,7 @@ swift test \
 - A browser must publish macOS file progress or use recognizable temporary files in Downloads for zisla to show a percentage.
 - Battery health, temperature, live power, and accessory levels depend on hardware, connection method, and data exposed by macOS; missing fields are shown as unavailable.
 - Office-to-PDF conversion requires LibreOffice or OpenOffice; other PDF operations run locally.
-- Free ad-hoc packages are not notarized and may require **Open Anyway** on first launch. Regardless of signing, the app only checks and downloads updates and never replaces itself automatically.
+- Free ad-hoc packages are not notarized and may require **Open Anyway** on first launch. Afterwards, Sparkle verifies every update with the embedded EdDSA public key before extracting, replacing, and relaunching the app.
 
 ## License
 

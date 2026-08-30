@@ -328,7 +328,11 @@ struct CompactStatusBarView: View {
         case .transient:
             if let transientNotice {
                 if transientNotice.style == .headphone {
-                    CompactHeadphoneConnectionBar(notice: transientNotice, height: height)
+                    CompactHeadphoneConnectionBar(
+                        notice: transientNotice,
+                        height: height,
+                        centerInset: displayState.compactBarCenterInset
+                    )
                 } else {
                     CompactFocusTransitionBar(notice: transientNotice, height: height)
                 }
@@ -835,29 +839,39 @@ private struct HeadphoneBatteryRing: View {
 private struct CompactHeadphoneConnectionBar: View {
     var notice: IslandNotice
     var height: CGFloat
+    var centerInset: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isPresented = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            HeadphonePairGlyph(isPresented: isPresented)
-                .frame(width: 42, height: height)
+        GeometryReader { geometry in
+            let reservedCenterWidth = min(centerInset, geometry.size.width)
+            let sideWidth = max(0, (geometry.size.width - reservedCenterWidth) / 2)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(notice.title)
-                    .font(.system(size: 10, weight: .semibold))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text(notice.detail ?? "已连接")
-                    .font(.system(size: 8, weight: .medium))
-                    .foregroundStyle(.secondary)
+            if reservedCenterWidth > 0 {
+                HStack(spacing: 0) {
+                    headphoneIdentity
+                        .padding(.leading, 10)
+                        .padding(.trailing, 4)
+                        .frame(width: sideWidth, height: height, alignment: .leading)
+
+                    Spacer(minLength: 0)
+                        .frame(width: reservedCenterWidth)
+
+                    HeadphoneBatteryLevels(levels: notice.batteryLevels ?? [])
+                        .padding(.trailing, 10)
+                        .frame(width: sideWidth, height: height, alignment: .trailing)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    headphoneIdentity
+
+                    HeadphoneBatteryLevels(levels: notice.batteryLevels ?? [])
+                }
+                .padding(.horizontal, 10)
             }
-            .frame(minWidth: 42, maxWidth: .infinity, alignment: .leading)
-
-            HeadphoneBatteryLevels(levels: notice.batteryLevels ?? [])
         }
-        .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             guard !reduceMotion else {
@@ -870,6 +884,25 @@ private struct CompactHeadphoneConnectionBar: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("耳机已连接：\(notice.title)"))
+    }
+
+    private var headphoneIdentity: some View {
+        HStack(spacing: 8) {
+            HeadphonePairGlyph(isPresented: isPresented)
+                .frame(width: 42, height: height)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(notice.title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .truncationMode(.tail)
+                Text(notice.detail ?? "已连接")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minWidth: 42, maxWidth: .infinity, alignment: .leading)
+        }
     }
 }
 

@@ -185,6 +185,35 @@ struct ClipboardAssistantDetectorTests {
         #expect(ClipboardAssistantDetector.evaluateArithmetic("10/4") == 2.5)
         #expect(ClipboardAssistantDetector.evaluateArithmetic("3 × 4 ÷ 2") == 6)
         #expect(ClipboardAssistantDetector.evaluateArithmetic("-5+2") == -3)
+        #expect(ClipboardAssistantDetector.evaluateArithmetic("3 ** 2") == 9)
+        #expect(ClipboardAssistantDetector.evaluateArithmetic("3 ^2") == 9)
+        #expect(ClipboardAssistantDetector.evaluateArithmetic("2 ^ 3 ^ 2") == 512)
+        #expect(ClipboardAssistantDetector.evaluateArithmetic("1\t+\n1 =") == 2)
+    }
+
+    @Test
+    func arithmeticDetectionSupportsTrailingEqualsAndBothCopyResults() {
+        let detection = ClipboardAssistantDetector.detect(
+            text: "1 + 2 =",
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en"
+        )
+
+        #expect(detection?.kind == .math)
+        #expect(detection?.detail == .mathExpression("1 + 2"))
+        #expect(detection?.actions == [
+            .copyText("3"),
+            .copyFullExpression("1 + 2 = 3"),
+        ])
+        #expect(detection?.fullContent == "1 + 2 = 3")
+
+        let compact = ClipboardAssistantDetector.detect(
+            text: "1+1=",
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en"
+        )
+        #expect(compact?.kind == .math)
+        #expect(compact?.actions == [.copyText("2"), .copyFullExpression("1+1 = 2")])
     }
 
     @Test
@@ -253,28 +282,58 @@ struct ClipboardAssistantDetectorTests {
         }
     }
 
-    // MARK: - Chinese text
+    // MARK: - Non-current-system-language text
 
     @Test
-    func detectsChineseTextWithTranslateAction() {
-        let detection = ClipboardAssistantDetector.detect(text: "这是一段中文内容", enabledKinds: allKinds)
-        #expect(detection?.kind == .chineseText)
+    func detectsNonCurrentSystemLanguageTextWithTranslateAction() {
+        let detection = ClipboardAssistantDetector.detect(
+            text: "这是一段中文内容，用于验证语言识别。",
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en"
+        )
+        #expect(detection?.kind == .nonSystemLanguageText)
         if case .translate(let text)? = detection?.action {
-            #expect(text == "这是一段中文内容")
+            #expect(text == "这是一段中文内容，用于验证语言识别。")
         } else {
             Issue.record("translate action expected")
         }
-        if case .chineseCharacterCount(let count)? = detection?.detail {
-            #expect(count == 8)
+        if case .characterCount(let count)? = detection?.detail {
+            #expect(count == 18)
         } else {
-            Issue.record("chinese character count detail expected")
+            Issue.record("character count detail expected")
         }
     }
 
     @Test
-    func englishTextDoesNotBecomeChineseDetection() {
-        let detection = ClipboardAssistantDetector.detect(text: "plain english words", enabledKinds: allKinds)
+    func currentSystemLanguageTextRemainsPlainText() {
+        let detection = ClipboardAssistantDetector.detect(
+            text: "plain English words used to verify language recognition",
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en"
+        )
         #expect(detection?.kind == .text)
+    }
+
+    @Test
+    func shortEnglishWordsRemainPlainTextForEnglishInterface() {
+        for text in ["OK", "no", "gift", "copy", "test"] {
+            let detection = ClipboardAssistantDetector.detect(
+                text: text,
+                enabledKinds: allKinds,
+                systemLanguageIdentifier: "en"
+            )
+            #expect(detection?.kind == .text, "\(text) should not be treated as foreign text")
+        }
+    }
+
+    @Test
+    func englishTextIsDetectedWhenTheSystemLanguageIsChinese() {
+        let detection = ClipboardAssistantDetector.detect(
+            text: "plain English words used to verify language recognition",
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "zh-Hans"
+        )
+        #expect(detection?.kind == .nonSystemLanguageText)
     }
 
     // MARK: - Code
@@ -309,7 +368,11 @@ struct ClipboardAssistantDetectorTests {
     @Test
     func ordinaryProseIsNotCode() {
         let prose = "This is just an ordinary sentence without any structure."
-        let detection = ClipboardAssistantDetector.detect(text: prose, enabledKinds: allKinds)
+        let detection = ClipboardAssistantDetector.detect(
+            text: prose,
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en"
+        )
         #expect(detection?.kind == .text)
     }
 
@@ -343,15 +406,20 @@ struct ClipboardAssistantDetectorTests {
             "We should print the invoice and file it away",
             "Send me the file: report.pdf when you get a chance",
         ] {
-            let detection = ClipboardAssistantDetector.detect(text: prose, enabledKinds: allKinds)
+            let detection = ClipboardAssistantDetector.detect(
+                text: prose,
+                enabledKinds: allKinds,
+                systemLanguageIdentifier: "en"
+            )
             #expect(detection?.kind == .text, "expected text for: \(prose)")
         }
 
         let chinese = ClipboardAssistantDetector.detect(
             text: "从今天开始，我们要更认真地对待这件事情，不能再拖延了。",
-            enabledKinds: allKinds
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en"
         )
-        #expect(chinese?.kind == .chineseText)
+        #expect(chinese?.kind == .nonSystemLanguageText)
     }
 
     @Test
@@ -363,8 +431,12 @@ struct ClipboardAssistantDetectorTests {
         已查看 1 张图像，也读取了文件并运行了命令。
         """
 
-        let detection = ClipboardAssistantDetector.detect(text: prose, enabledKinds: allKinds)
-        #expect(detection?.kind == .chineseText)
+        let detection = ClipboardAssistantDetector.detect(
+            text: prose,
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en"
+        )
+        #expect(detection?.kind == .nonSystemLanguageText)
     }
 
     @Test
@@ -378,7 +450,11 @@ struct ClipboardAssistantDetectorTests {
 
     @Test
     func shortPlainTextSearchesAndTranslates() {
-        let detection = ClipboardAssistantDetector.detect(text: "hello world", enabledKinds: allKinds)
+        let detection = ClipboardAssistantDetector.detect(
+            text: "hello world",
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en"
+        )
         #expect(detection?.kind == .text)
         #expect(detection?.actions.count == 2)
         if case .search(let query)? = detection?.action {
@@ -395,8 +471,15 @@ struct ClipboardAssistantDetectorTests {
 
     @Test
     func longPlainTextOffersSaveAction() {
-        let longText = String(repeating: "word ", count: 20)
-        let detection = ClipboardAssistantDetector.detect(text: longText, enabledKinds: allKinds)
+        let longText = String(
+            repeating: "This is an ordinary English paragraph with enough context for language detection. ",
+            count: 2
+        )
+        let detection = ClipboardAssistantDetector.detect(
+            text: longText,
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en"
+        )
         #expect(detection?.kind == .text)
         if case .saveText(let saved)? = detection?.action {
             #expect(saved == longText.trimmingCharacters(in: .whitespaces))
@@ -407,7 +490,11 @@ struct ClipboardAssistantDetectorTests {
 
     @Test
     func textDetailCarriesCharacterAndWordCounts() {
-        let detection = ClipboardAssistantDetector.detect(text: "one two three", enabledKinds: allKinds)
+        let detection = ClipboardAssistantDetector.detect(
+            text: "one two three",
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en"
+        )
         #expect(detection?.detail == .characterAndWordCount(characters: 13, words: 3))
 
         let preview = ClipboardAssistantDetector.previewText(String(repeating: "x", count: 200))
@@ -431,7 +518,7 @@ struct ClipboardAssistantDetectorTests {
             text: "这是中文",
             enabledKinds: [ClipboardAssistantKind.text]
         )
-        #expect(chineseFallback?.kind == .text, "chinese kind disabled → falls through to plain text")
+        #expect(chineseFallback?.kind == .text, "non-system-language kind disabled → falls through to plain text")
     }
 
     @Test

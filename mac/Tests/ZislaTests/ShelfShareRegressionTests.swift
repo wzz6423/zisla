@@ -74,6 +74,7 @@ struct ShelfShareRegressionTests {
     ) -> (panel: IslandPanel, contentView: NSView) {
         let contentView = NSView()
         let panel = IslandPanel(contentView: contentView, frame: frame)
+        panel.alphaValue = 0
         panel.ignoresMouseEvents = ignoresMouseEvents
         panel.orderFrontRegardless()
         return (panel, contentView)

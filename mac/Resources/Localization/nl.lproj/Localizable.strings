@@ -517,6 +517,7 @@
 "算式" = "Berekening";
 "日期时间" = "Datum en tijd";
 "中文文本" = "Chinese tekst";
+"非当前系统语言文本" = "Tekst in een andere systeemtaal";
 "代码" = "Code";
 "翻译" = "Vertaal";
 "写邮件" = "E-mail schrijven";
@@ -524,6 +525,7 @@
 "拨打电话" = "Bellen";
 "不再显示来自 %@ 的复制" = "Kopieën van %@ niet meer tonen";
 "复制结果" = "Resultaat kopiëren";
+"复制完整算式" = "Volledige berekening kopiëren";
 "保存图片" = "Afbeelding bewaren";
 "保存文本" = "Tekst bewaren";
 "新建日程" = "Nieuwe agenda-item";

@@ -169,6 +169,9 @@ struct IslandRootView: View {
                                 .environment(\.colorScheme, .dark)
 
                             toolRail
+                                .transaction { transaction in
+                                    transaction.animation = nil
+                                }
                                 .padding(.horizontal, 12)
                                 .padding(.bottom, 7)
                                 .environment(\.colorScheme, .dark)
@@ -839,8 +842,7 @@ private struct ModuleSelector: View {
                         dimmedWhenInactive: true,
                         // The moving focus lens below provides the active surface.
                         showsActiveBackground: false,
-                        showsInactiveBackground: false,
-                        emphasizesSelection: true
+                        showsInactiveBackground: false
                     )
                 }
                 .frame(width: 28, height: 30)

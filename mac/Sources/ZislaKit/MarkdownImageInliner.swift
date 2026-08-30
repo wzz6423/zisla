@@ -24,10 +24,25 @@ public enum MarkdownImageInliner {
     private static let downscaleThreshold = 2 * 1024 * 1024
     private static let downscaleMaxDimension = 1600
 
-    /// Simple URL → data URL cache to avoid re-reading from disk on every re-render.
+    private struct FileState: Equatable {
+        let fileSize: Int
+        let modificationDate: Date?
+    }
+
+    private final class CacheEntry: NSObject {
+        let state: FileState
+        let dataURL: NSString
+
+        init(state: FileState, dataURL: String) {
+            self.state = state
+            self.dataURL = dataURL as NSString
+        }
+    }
+
+    /// URL → data URL cache, invalidated when the local file changes.
     /// `NSCache` is thread-safe; declared with `nonisolated(unsafe)` to satisfy strict concurrency checking.
-    private nonisolated(unsafe) static let cache: NSCache<NSString, NSString> = {
-        let c = NSCache<NSString, NSString>()
+    private nonisolated(unsafe) static let cache: NSCache<NSString, CacheEntry> = {
+        let c = NSCache<NSString, CacheEntry>()
         c.countLimit = 32
         return c
     }()
@@ -101,20 +116,23 @@ public enum MarkdownImageInliner {
 
     private static func dataURL(for url: URL) -> String? {
         let key = url.standardizedFileURL.path as NSString
-        if let cached = cache.object(forKey: key) {
-            return cached as String
+        let state = fileState(for: url)
+        if let state, let cached = cache.object(forKey: key), cached.state == state {
+            return cached.dataURL as String
         }
-        guard let data = try? Data(contentsOf: url) else { return nil }
 
         let mime = mimeType(for: url.pathExtension.lowercased())
         let processed: Data
         let processedMime: String
 
-        if data.count > downscaleThreshold,
-           let downsized = downscale(data: data, maxDimension: downscaleMaxDimension) {
+        if let state, state.fileSize > downscaleThreshold,
+           let downsized = downscale(url: url, maxDimension: downscaleMaxDimension) {
             processed = downsized
             processedMime = "image/jpeg"
         } else {
+            guard state?.fileSize ?? 0 <= maxInlineBytes,
+                  let data = try? Data(contentsOf: url)
+            else { return nil }
             processed = data
             processedMime = mime
         }
@@ -123,8 +141,17 @@ public enum MarkdownImageInliner {
 
         let encoded = processed.base64EncodedString()
         let result = "data:\(processedMime);base64,\(encoded)"
-        cache.setObject(result as NSString, forKey: key)
+        if let state = fileState(for: url) ?? state {
+            cache.setObject(CacheEntry(state: state, dataURL: result), forKey: key)
+        }
         return result
+    }
+
+    private static func fileState(for url: URL) -> FileState? {
+        guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
+              let fileSize = values.fileSize
+        else { return nil }
+        return FileState(fileSize: fileSize, modificationDate: values.contentModificationDate)
     }
 
     private static func mimeType(for ext: String) -> String {
@@ -142,8 +169,8 @@ public enum MarkdownImageInliner {
     }
 
     /// Decodes with ImageIO → creates a thumbnail with the long edge at 1600 px → re-encodes as JPEG.
-    private static func downscale(data: Data, maxDimension: Int) -> Data? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+    private static func downscale(url: URL, maxDimension: Int) -> Data? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,

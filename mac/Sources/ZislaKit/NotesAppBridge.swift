@@ -101,8 +101,8 @@ public enum NotesAppBridge {
     /// Notes has no public API to identify this system folder directly; name matching is the most reliable cross-language approach.
     public static let recentlyDeletedFolderNames: Set<String> = [
         "Recently Deleted",          // en
-        "最近删除",                    // zh-Hans
-        "最近刪除",                    // zh-Hant
+        "最近删除",                    // Simplified Chinese
+        "最近刪除",                    // Traditional Chinese
         "Kürzlich gelöscht",         // de
         "Supprimés récemment",       // fr
         "Eliminados recientemente",  // es
@@ -110,7 +110,7 @@ public enum NotesAppBridge {
         "Recentelijk verwijderd",    // nl
         "Nyligen raderade",          // sv
         "Недавно удалённые",         // ru
-        "最近削除した項目",              // ja
+        "最近削除した項目",              // Japanese
         "최근 삭제된 항목",              // ko
     ]
 

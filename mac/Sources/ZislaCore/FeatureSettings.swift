@@ -91,7 +91,7 @@ public enum AppearanceMode: String, Codable, CaseIterable, Sendable, Equatable {
     }
 }
 
-/// Update channel selectable when checking for updates manually.
+/// Target update channel for both automatic and manual checks.
 public enum UpdateChannel: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case release
     case preview
@@ -491,7 +491,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mailCompactStyle: MailCompactStyle
     public var updateChecksEnabled: Bool
     public var automaticDownloadEnabled: Bool
-    /// Target channel for manual update checks.
+    /// Target channel for automatic and manual update checks.
     public var updateChannel: UpdateChannel
     /// Optional proxy URL used by local update, install, and network download tasks.
     public var networkProxyURL: String
@@ -561,6 +561,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var voiceModelConfiguration: AIModelConfigurationReference?
     /// Built-in vocabulary sets used to bias ASR and guide transcript typo correction.
     public var voiceEnabledLexicons: Set<VoiceLexicon>
+    /// User-defined hotwords used alongside the enabled built-in vocabulary sets.
+    public var voiceCustomHotwords: [String]
     /// Whether to format explicitly enumerated items into numbered lists during voice transcript cleanup.
     public var voiceStructuredFormattingEnabled: Bool
     /// Whether screenshot capture and its global hotkeys are enabled.
@@ -643,6 +645,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         voiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy = .never,
         voiceModelConfiguration: AIModelConfigurationReference? = nil,
         voiceEnabledLexicons: Set<VoiceLexicon> = VoiceLexicon.defaultEnabled,
+        voiceCustomHotwords: [String] = [],
         voiceStructuredFormattingEnabled: Bool = true,
         screenshotEnabled: Bool = true,
         screenshotHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.capture,
@@ -724,6 +727,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.voiceRecordingCleanupPolicy = voiceRecordingCleanupPolicy
         self.voiceModelConfiguration = voiceModelConfiguration
         self.voiceEnabledLexicons = voiceEnabledLexicons
+        self.voiceCustomHotwords = VoiceLexicon.normalizedCustomTerms(voiceCustomHotwords)
         self.voiceStructuredFormattingEnabled = voiceStructuredFormattingEnabled
         self.screenshotEnabled = screenshotEnabled
         self.screenshotHotkey = screenshotHotkey
@@ -818,6 +822,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case voiceRecordingCleanupPolicy
         case voiceModelConfiguration
         case voiceEnabledLexicons
+        case voiceCustomHotwords
         case voiceStructuredFormattingEnabled
         case screenshotEnabled
         case screenshotHotkey
@@ -961,10 +966,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         )
         notificationsMuted = try container.decodeIfPresent(Bool.self, forKey: .notificationsMuted) ?? defaults.notificationsMuted
         hoverActivationEnabled = try container.decodeIfPresent(Bool.self, forKey: .hoverActivationEnabled) ?? defaults.hoverActivationEnabled
-        activityNoticeDisplayDuration = try container.decode(
+        activityNoticeDisplayDuration = try container.decodeIfPresent(
             ActivityNoticeDisplayDuration.self,
             forKey: .activityNoticeDisplayDuration
-        )
+        ) ?? defaults.activityNoticeDisplayDuration
         focusModeNoticeDisplayDuration = try container.decodeIfPresent(
             FocusModeNoticeDisplayDuration.self,
             forKey: .focusModeNoticeDisplayDuration
@@ -1016,6 +1021,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Set<VoiceLexicon>.self,
             forKey: .voiceEnabledLexicons
         ) ?? defaults.voiceEnabledLexicons
+        voiceCustomHotwords = VoiceLexicon.normalizedCustomTerms(
+            try container.decodeIfPresent([String].self, forKey: .voiceCustomHotwords)
+                ?? defaults.voiceCustomHotwords
+        )
         voiceStructuredFormattingEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .voiceStructuredFormattingEnabled

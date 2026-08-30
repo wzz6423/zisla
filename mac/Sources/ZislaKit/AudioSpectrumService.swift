@@ -161,13 +161,15 @@ public final class AudioSpectrumService: ObservableObject {
     )
     @Published public private(set) var isAudible = false
 
-    private let capture = SystemAudioSpectrumCapture()
+    private let capture: any AudioSpectrumCapturing
     private var isRequested = false
     private var analysisMode = AudioSpectrumAnalysisMode.visualization
     private var generation: UInt64 = 0
     private var lastAudibleTime: TimeInterval?
 
-    private init() {}
+    init(capture: any AudioSpectrumCapturing = SystemAudioSpectrumCapture()) {
+        self.capture = capture
+    }
 
     public func startMonitoring() {
         guard !isRequested else { return }
@@ -189,9 +191,14 @@ public final class AudioSpectrumService: ObservableObject {
             },
             onFailure: { [weak self] in
                 Task { @MainActor [weak self] in
-                    guard let self, self.generation == currentGeneration else { return }
+                    guard let self,
+                          self.isRequested,
+                          self.generation == currentGeneration
+                    else { return }
+                    self.isRequested = false
                     self.levels = Self.silentLevels
                     if self.isAudible { self.isAudible = false }
+                    self.lastAudibleTime = nil
                 }
             }
         )
@@ -244,7 +251,16 @@ public final class AudioSpectrumService: ObservableObject {
     }
 }
 
-private final class SystemAudioSpectrumCapture: @unchecked Sendable {
+protocol AudioSpectrumCapturing: AnyObject {
+    func setAnalysisMode(_ mode: AudioSpectrumAnalysisMode)
+    func start(
+        onFrame: @escaping @Sendable (AudioSpectrumFrame) -> Void,
+        onFailure: @escaping @Sendable () -> Void
+    )
+    func stop()
+}
+
+private final class SystemAudioSpectrumCapture: AudioSpectrumCapturing, @unchecked Sendable {
     private let controlQueue = DispatchQueue(label: "dev.wzz.zisla.audio-spectrum.control")
     private let callbackQueue = DispatchQueue(
         label: "dev.wzz.zisla.audio-spectrum.callback",
@@ -304,6 +320,8 @@ private final class SystemAudioSpectrumCapture: @unchecked Sendable {
 
         var newTapID = AudioObjectID(kAudioObjectUnknown)
         var host: NSWindow?
+        // Keep the host for every tap creation: ordering it also keeps the nonactivating
+        // island panel's glass surface composited across later collapse/expand cycles.
         DispatchQueue.main.sync {
             host = WindowPlacement.authorizationPromptHost()
         }
@@ -434,7 +452,7 @@ private final class SystemAudioSpectrumCapture: @unchecked Sendable {
     }
 }
 
-private struct AudioSpectrumFrame: Sendable {
+struct AudioSpectrumFrame: Sendable {
     var levels: [Float]?
     var rootMeanSquare: Float
 }

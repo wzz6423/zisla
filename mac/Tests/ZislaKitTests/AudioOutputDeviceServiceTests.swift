@@ -7,7 +7,23 @@ struct AudioOutputDeviceServiceTests {
     func recognizesCommonHeadphoneNames() {
         #expect(AudioOutputDevice(id: 1, name: "AirPods Pro").isHeadphones)
         #expect(AudioOutputDevice(id: 2, name: "Beats Studio Buds").isHeadphones)
-        #expect(!AudioOutputDevice(id: 3, name: "MacBook Pro Speakers").isHeadphones)
+        #expect(AudioOutputDevice(id: 3, name: "三年后AirPods Max").isHeadphones)
+        #expect(!AudioOutputDevice(id: 4, name: "MacBook Pro Speakers").isHeadphones)
+    }
+
+    @Test
+    func publishesNewlyConnectedAirPodsMaxWithoutDefaultOutputChange() {
+        let airPodsPro = AudioOutputDevice(id: 1, name: "AirPods Pro")
+        let airPodsMax = AudioOutputDevice(id: 2, name: "三年后AirPods Max")
+
+        let candidate = AudioOutputDeviceService.connectionCandidate(
+            previousDevice: airPodsPro,
+            currentDevice: airPodsPro,
+            previousHeadphoneDeviceIDs: [airPodsPro.id],
+            updatedDevices: [airPodsPro, airPodsMax]
+        )
+
+        #expect(candidate == airPodsMax)
     }
 
     @Test

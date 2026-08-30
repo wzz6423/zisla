@@ -31,6 +31,7 @@ struct RichNoteEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         window.contentView = hostingView
         window.orderFrontRegardless()
         defer { window.orderOut(nil) }
@@ -71,6 +72,7 @@ struct RichNoteEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         window.contentView = hostingView
         window.orderFrontRegardless()
         defer { window.orderOut(nil) }
@@ -97,6 +99,7 @@ struct RichNoteEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         window.contentView = hostingView
         window.orderFrontRegardless()
         defer { window.orderOut(nil) }
@@ -143,6 +146,7 @@ struct RichNoteEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
         defer { window.orderOut(nil) }

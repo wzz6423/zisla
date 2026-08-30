@@ -57,6 +57,12 @@ struct MarkdownParserTests {
     }
 
     @Test
+    func preservesLongFenceUntilItsMatchingCloser() {
+        let source = "````text\n```\nkeep\n````"
+        #expect(MarkdownParser.parse(source) == [.codeBlock(language: "text", content: "```\nkeep")])
+    }
+
+    @Test
     func parsesUnclosedCodeBlockToEOF() {
         let blocks = MarkdownParser.parse("```\n未闭合代码")
         #expect(blocks == [.codeBlock(language: nil, content: "未闭合代码")])
@@ -140,6 +146,18 @@ struct MarkdownParserTests {
             .table(header: ["A", "B"], rows: [["1", "2"]]),
         ])
     }
+
+    @Test
+    func requiresThreeHyphensInEveryTableDelimiterCell() {
+        let source = "| A | B |\n| - | - |\n| 1 | 2 |"
+        #expect(MarkdownParser.parse(source) == [.paragraph(text: "| A | B | | - | - | | 1 | 2 |")])
+    }
+
+    @Test
+    func keepsMultipleImageMarkersInParagraphs() {
+        let source = "![one](/one.png) ![one](/one.png)"
+        #expect(MarkdownParser.parse(source) == [.paragraph(text: source)])
+    }
 }
 
 struct MarkdownRendererTests {
@@ -180,6 +198,19 @@ struct MarkdownRendererTests {
         """
         let attr = MarkdownRenderer.attributedString(from: source)
         #expect(!attr.characters.isEmpty)
+    }
+
+    @Test
+    func escapesInlineCodeExactlyOnce() {
+        let html = MarkdownHTMLRenderer.bodyHTML(from: "`<tag>&`")
+        #expect(html.contains("<code>&lt;tag&gt;&amp;</code>"))
+        #expect(!html.contains("&amp;lt;"))
+    }
+
+    @Test
+    func preservesLiteralTextThatMatchesHistoricalCodePlaceholder() {
+        let html = MarkdownHTMLRenderer.bodyHTML(from: "%%CODE0%% and `value`")
+        #expect(html.contains("%%CODE0%% and <code>value</code>"))
     }
 }
 
@@ -334,7 +365,7 @@ struct NotesAppBridgeTests {
 
 @Suite struct MarkdownImageInlinerTests {
     /// Build a minimal valid JPEG (1x1 red pixel) to simulate a local image file in Notes.
-    private func makeTestJPEG() -> Data {
+    private func makeTestJPEG(red: CGFloat = 1, green: CGFloat = 0, blue: CGFloat = 0) -> Data {
         let space = CGColorSpaceCreateDeviceRGB()
         let ctx = CGContext(
             data: nil,
@@ -345,7 +376,7 @@ struct NotesAppBridgeTests {
             space: space,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         )!
-        ctx.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        ctx.setFillColor(red: red, green: green, blue: blue, alpha: 1)
         ctx.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
         let cgImage = ctx.makeImage()!
         let mutable = NSMutableData()
@@ -513,5 +544,23 @@ struct NotesAppBridgeTests {
 
         #expect(html.contains("data:image/jpeg;base64,"), "Full pipeline should inline standalone image as data URL")
         #expect(!html.contains(path), "Original path should not remain in HTML")
+    }
+
+    @Test
+    func refreshesCachedImageWhenTheLocalFileChanges() throws {
+        MarkdownImageInliner.clearCache()
+        let path = try writeTempImage(extension: "jpg")
+        defer { try? FileManager.default.removeItem(atPath: path) }
+
+        let html = #"<img src="\#(path)" alt="x">"#
+        let first = MarkdownImageInliner.inlineLocalImages(in: html)
+        try makeTestJPEG(red: 0, blue: 1).write(to: URL(fileURLWithPath: path))
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: 1)],
+            ofItemAtPath: path
+        )
+        let second = MarkdownImageInliner.inlineLocalImages(in: html)
+
+        #expect(first != second)
     }
 }

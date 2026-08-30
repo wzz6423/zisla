@@ -82,9 +82,7 @@ public actor AIAgentCLIUpdateService {
             }
         }
 
-        return updates.sorted { lhs, rhs in
-            AgentCLIKind.allCases.firstIndex(of: lhs.kind)! < AgentCLIKind.allCases.firstIndex(of: rhs.kind)!
-        }
+        return updates.sorted { AIAgentCLIService.cliKindOrder($0.kind, $1.kind) }
     }
 
     private static func isHomebrewManaged(_ status: AgentCLIStatus) -> Bool {

@@ -517,12 +517,14 @@ struct MediaScrubTrack: Equatable {
     var title: String
     var artist: String
     var duration: Double?
+    var sourceBundleIdentifier: String?
     var sourcePID: pid_t?
 
     init(_ item: NowPlayingSnapshot) {
         title = item.title
         artist = item.artist
         duration = item.duration
+        sourceBundleIdentifier = item.sourceBundleIdentifier
         sourcePID = item.sourcePID
     }
 }

@@ -31,6 +31,10 @@ let package = Package(
                 .linkedFramework("CoreFoundation"),
             ]
         ),
+        .binaryTarget(
+            name: "Sparkle",
+            path: "Vendor/Sparkle.xcframework"
+        ),
         .target(
             name: "ZislaKit",
             dependencies: ["ZislaCore", "ZislaNVMe"],
@@ -51,6 +55,7 @@ let package = Package(
             dependencies: [
                 "ZislaCore",
                 "ZislaKit",
+                "Sparkle",
                 .product(name: "SkyLightWindow", package: "SkyLightWindow"),
             ],
             resources: [
@@ -83,7 +88,13 @@ let package = Package(
         ),
         .testTarget(
             name: "ZislaTests",
-            dependencies: ["Zisla"]
+            dependencies: ["Zisla", "Sparkle"],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "@loader_path/../../..",
+                ]),
+            ]
         ),
     ]
 )

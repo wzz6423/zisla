@@ -93,7 +93,9 @@ public actor WeatherService {
         guard (-90...90).contains(latitude), (-180...180).contains(longitude) else {
             throw WeatherServiceError.invalidCoordinates
         }
-        var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast")!
+        guard var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast") else {
+            throw WeatherServiceError.invalidResponse
+        }
         components.queryItems = [
             URLQueryItem(name: "latitude", value: String(latitude)),
             URLQueryItem(name: "longitude", value: String(longitude)),

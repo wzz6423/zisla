@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import ZislaCore
 
@@ -13,15 +14,19 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         var provider: AIProvider
         var url: URL
         var modificationDate: Date
+        var changeDate: Date?
         var size: UInt64
     }
 
     private struct CachedSamples {
         var modificationDate: Date
+        var changeDate: Date?
         var size: UInt64
         var samples: [AIUsageSample]
         var readerState: IncrementalJSONLReader.State?
         var parserState: ParserState?
+        var contentHash: UInt64?
+        var edgeHash: UInt64?
     }
 
     private struct ParserState {
@@ -51,6 +56,20 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     private let scanInterval: TimeInterval
     private var cache: [String: CachedSamples] = [:]
     private var lastScanAt: Date = .distantPast
+
+    private static let contentHashOffset: UInt64 = 14_695_981_039_346_656_037
+    private static let contentHashPrime: UInt64 = 1_099_511_628_211
+    static let incrementalVerificationBytes = 4 * 1_024
+
+    static func incrementalVerificationByteCount(for fileSize: UInt64) -> UInt64 {
+        guard fileSize > 0 else { return 0 }
+        let bytesPerEdge = incrementalVerificationBytesPerEdge(for: fileSize)
+        return fileSize > bytesPerEdge ? bytesPerEdge * 2 : bytesPerEdge
+    }
+
+    private static func incrementalVerificationBytesPerEdge(for fileSize: UInt64) -> UInt64 {
+        min(UInt64(incrementalVerificationBytes), max(1, fileSize / 2))
+    }
 
     public init(
         codexSessionsDirectory: URL? = nil,
@@ -118,7 +137,8 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         for candidate in candidates {
             let key = cacheKey(for: candidate)
             if let cached = cache[key],
-               cached.modificationDate == candidate.modificationDate,
+                  cached.modificationDate == candidate.modificationDate,
+               cached.changeDate == candidate.changeDate,
                cached.size == candidate.size {
                 samples.append(contentsOf: cached.samples)
                 continue
@@ -215,6 +235,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
                 provider: provider,
                 url: url,
                 modificationDate: values.contentModificationDate ?? .distantPast,
+                changeDate: Self.fileChangeDate(for: url),
                 size: UInt64(max(0, values.fileSize ?? 0))
             ))
         }
@@ -258,10 +279,13 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         let samples = parse(candidate)
         return CachedSamples(
             modificationDate: candidate.modificationDate,
+            changeDate: candidate.changeDate,
             size: candidate.size,
             samples: samples,
             readerState: nil,
-            parserState: nil
+            parserState: nil,
+            contentHash: nil,
+            edgeHash: nil
         )
     }
 
@@ -295,23 +319,37 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         _ candidate: Candidate,
         cached: CachedSamples?
     ) -> CachedSamples {
-        let canContinue = (cached?.size ?? 0) < candidate.size
+        let cachedEdgeMatches: Bool = {
+            guard let cached,
+                  let cachedEdgeHash = cached.edgeHash,
+                  cached.readerState?.offset == cached.size,
+                  candidate.size > cached.size else {
+                return false
+            }
+            return edgeHash(of: candidate.url, byteCount: cached.size) == cachedEdgeHash
+        }()
+
+        let canContinue = candidate.size > (cached?.size ?? 0) && cachedEdgeMatches
         var readerState: IncrementalJSONLReader.State
         var parserState: ParserState
         var samples: [AIUsageSample]
+        var contentHash: UInt64
 
         if canContinue,
            let cached,
            let cachedReaderState = cached.readerState,
-           let cachedParserState = cached.parserState {
+           let cachedParserState = cached.parserState,
+           let cachedContentHash = cached.contentHash {
             readerState = cachedReaderState
             parserState = cachedParserState
             samples = cached.samples
+            contentHash = cachedContentHash
         } else {
             readerState = IncrementalJSONLReader(initialTailBytes: .max)
                 .initialState(fileSize: candidate.size)
             parserState = ParserState()
             samples = []
+            contentHash = Self.contentHashOffset
         }
 
         let reader = IncrementalJSONLReader(
@@ -319,23 +357,38 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             maximumLineBytes: maxBytesPerFile
         )
         do {
+            let parseLine: (Data) -> Bool = { line in
+                guard let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
+                    return false
+                }
+                samples.append(contentsOf: self.parseRoot(
+                    from: root,
+                    candidate: candidate,
+                    parserState: &parserState
+                ))
+                return true
+            }
             try reader.readLines(
                 from: candidate.url,
                 fileSize: candidate.size,
-                state: &readerState
-            ) { line in
-                guard let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
-                    return
+                state: &readerState,
+                onChunk: { chunk in
+                    contentHash = Self.updateContentHash(contentHash, with: chunk)
                 }
-                samples.append(contentsOf: parseRoot(from: root, candidate: candidate, parserState: &parserState))
+            ) { line in
+                _ = parseLine(line)
             }
+            readerState.consumePendingLineIfAccepted(parseLine)
         } catch {
             return cached ?? CachedSamples(
                 modificationDate: candidate.modificationDate,
+                changeDate: candidate.changeDate,
                 size: candidate.size,
                 samples: [],
                 readerState: nil,
-                parserState: nil
+                parserState: nil,
+                contentHash: nil,
+                edgeHash: nil
             )
         }
 
@@ -345,10 +398,13 @@ public final class AIUsageLogDetector: AIUsageDetecting {
 
         return CachedSamples(
             modificationDate: candidate.modificationDate,
+            changeDate: candidate.changeDate,
             size: candidate.size,
             samples: Array(samples.suffix(maxSamplesPerFile)),
             readerState: readerState,
-            parserState: parserState
+            parserState: parserState,
+            contentHash: contentHash,
+            edgeHash: edgeHash(of: candidate.url, byteCount: readerState.offset)
         )
     }
 
@@ -428,7 +484,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
 
         return usageSample(
             provider: .codex,
-            sourceID: sourceID(candidate, component: "event-\(stableDigest(root))"),
+            sourceID: codexEventSourceID(candidate: candidate, root: root),
             timestamp: timestamp(in: root, fallback: candidate.modificationDate),
             inputTokens: current.input,
             outputTokens: current.output,
@@ -462,9 +518,10 @@ public final class AIUsageLogDetector: AIUsageDetecting {
               let usage = message["usage"] as? [String: Any] else {
             return nil
         }
-        let input = integer(usage["input"])
-            + integer(usage["cacheRead"])
-            + integer(usage["cacheWrite"])
+        let input = AIUsageTokenMath.adding(
+            AIUsageTokenMath.adding(integer(usage["input"]), integer(usage["cacheRead"])),
+            integer(usage["cacheWrite"])
+        )
         let output = integer(usage["output"])
         let messageID = (root["id"] as? String) ?? stableDigest(root)
         let cost = (usage["cost"] as? [String: Any]).flatMap { double($0["total"]) }
@@ -496,7 +553,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             input: integer(usage["inputTokens"]),
             output: integer(usage["outputTokens"])
         )
-        guard current.input + current.output > 0 else { return nil }
+        guard AIUsageTokenMath.adding(current.input, current.output) > 0 else { return nil }
         let prior = priorUsageBySession[sessionID] ?? TokenUsage(input: 0, output: 0)
         priorUsageBySession[sessionID] = TokenUsage(
             input: max(prior.input, current.input),
@@ -509,7 +566,11 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         let model = (usage["modelUsage"] as? [String: Any])?.keys.sorted().first
         return sample(
             provider: .grok,
-            sourceID: sourceID(candidate, component: "prompt-\(promptID)"),
+            sourceID: grokUpdateSourceID(
+                candidate: candidate,
+                promptID: promptID,
+                root: root
+            ),
             timestamp: timestamp(in: root, fallback: candidate.modificationDate),
             usage: delta,
             model: model
@@ -582,13 +643,15 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         model: String?
     ) -> AIUsageSample? {
         let tokens = tokenUsage(usage)
+        let inputTokens = AIUsageTokenMath.adding(
+            AIUsageTokenMath.adding(tokens.input, integer(usage["cacheReadTokens"])),
+            integer(usage["cacheWriteTokens"])
+        )
         return usageSample(
             provider: .copilot,
             sourceID: sourceID,
             timestamp: timestamp,
-            inputTokens: tokens.input
-                + integer(usage["cacheReadTokens"])
-                + integer(usage["cacheWriteTokens"]),
+            inputTokens: inputTokens,
             outputTokens: tokens.output,
             costUSD: double(usage["cost"]),
             model: model
@@ -621,8 +684,14 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     ) -> AIUsageSample? {
         var tokens = tokenUsage(usage)
         if includeCacheInputTokens {
-            tokens.input += integer(usage["cache_creation_input_tokens"])
-            tokens.input += integer(usage["cache_read_input_tokens"])
+            tokens.input = AIUsageTokenMath.adding(
+                tokens.input,
+                integer(usage["cache_creation_input_tokens"])
+            )
+            tokens.input = AIUsageTokenMath.adding(
+                tokens.input,
+                integer(usage["cache_read_input_tokens"])
+            )
         }
 
         return usageSample(
@@ -672,7 +741,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         model: String?,
         permitsZero: Bool = false
     ) -> AIUsageSample? {
-        guard permitsZero || inputTokens + outputTokens > 0 else { return nil }
+        guard permitsZero || AIUsageTokenMath.adding(inputTokens, outputTokens) > 0 else { return nil }
         return AIUsageSample(
             sourceID: sourceID,
             provider: provider,
@@ -755,11 +824,53 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         "\(candidate.provider.rawValue)-\(stableDigest(candidate.url.standardizedFileURL.path))-\(component)"
     }
 
+    private func codexEventSourceID(candidate: Candidate, root: [String: Any]) -> String {
+        var identity = root
+        if var payload = identity["payload"] as? [String: Any],
+           var info = payload["info"] as? [String: Any] {
+            info.removeValue(forKey: "total_token_usage")
+            info.removeValue(forKey: "last_token_usage")
+            payload["info"] = info
+            identity["payload"] = payload
+        }
+        return sourceID(candidate, component: "event-v2-\(stableDigest(identity))")
+    }
+
+    private func grokUpdateSourceID(
+        candidate: Candidate,
+        promptID: String,
+        root: [String: Any]
+    ) -> String {
+        var identity = root
+        if var params = identity["params"] as? [String: Any],
+           var update = params["update"] as? [String: Any] {
+            update.removeValue(forKey: "usage")
+            params["update"] = update
+            identity["params"] = params
+        }
+        return sourceID(
+            candidate,
+            component: "prompt-\(promptID)-update-v2-\(stableDigest(identity))"
+        )
+    }
+
     private func integer(_ value: Any?) -> Int {
         if let value = value as? Int { return max(0, value) }
-        if let value = value as? NSNumber { return max(0, value.intValue) }
-        if let value = value as? String, let parsed = Int(value) { return max(0, parsed) }
+        if let value = value as? NSNumber { return boundedInteger(value.doubleValue) }
+        if let value = value as? String {
+            if let parsed = Int(value) { return max(0, parsed) }
+            if let parsed = UInt64(value) {
+                return parsed > UInt64(Int.max) ? Int.max : Int(parsed)
+            }
+            return boundedInteger(Double(value) ?? .nan)
+        }
         return 0
+    }
+
+    private func boundedInteger(_ value: Double) -> Int {
+        guard value.isFinite, value > 0 else { return 0 }
+        guard value < Double(Int.max) else { return Int.max }
+        return Int(value)
     }
 
     private func double(_ value: Any?) -> Double? {
@@ -767,6 +878,51 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         if let value = value as? NSNumber { return value.doubleValue }
         if let value = value as? String { return Double(value) }
         return nil
+    }
+
+    private static func fileChangeDate(for url: URL) -> Date? {
+        var info = stat()
+        guard lstat(url.path, &info) == 0 else { return nil }
+        return Date(
+            timeIntervalSince1970: TimeInterval(info.st_ctimespec.tv_sec)
+                + TimeInterval(info.st_ctimespec.tv_nsec) / 1_000_000_000
+        )
+    }
+
+    private func edgeHash(of url: URL, byteCount: UInt64) -> UInt64? {
+        guard byteCount > 0 else { return Self.contentHashOffset }
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+
+        let bytesPerEdge = Self.incrementalVerificationBytesPerEdge(for: byteCount)
+        var hash = Self.contentHashOffset
+        do {
+            guard let first = try handle.read(upToCount: Int(bytesPerEdge)),
+                  first.count == Int(bytesPerEdge) else {
+                return nil
+            }
+            hash = Self.updateContentHash(hash, with: first)
+            if byteCount > bytesPerEdge {
+                try handle.seek(toOffset: byteCount - bytesPerEdge)
+                guard let last = try handle.read(upToCount: Int(bytesPerEdge)),
+                      last.count == Int(bytesPerEdge) else {
+                    return nil
+                }
+                hash = Self.updateContentHash(hash, with: last)
+            }
+        } catch {
+            return nil
+        }
+        return hash
+    }
+
+    private static func updateContentHash(_ hash: UInt64, with data: Data) -> UInt64 {
+        data.reduce(hash) { partial, byte in
+            var next = partial
+            next ^= UInt64(byte)
+            next &*= contentHashPrime
+            return next
+        }
     }
 
     private func stableDigest(_ value: String) -> String {

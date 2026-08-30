@@ -517,6 +517,7 @@
 "算式" = "Perhitungan";
 "日期时间" = "Tanggal dan waktu";
 "中文文本" = "Teks bahasa Mandarin";
+"非当前系统语言文本" = "Teks dalam bahasa selain bahasa sistem";
 "代码" = "Kode";
 "翻译" = "Terjemahkan";
 "写邮件" = "Tulis email";
@@ -524,6 +525,7 @@
 "拨打电话" = "Hubungi";
 "不再显示来自 %@ 的复制" = "Jangan tampilkan salinan dari %@ lagi";
 "复制结果" = "Salin hasil";
+"复制完整算式" = "Salin ekspresi lengkap";
 "保存图片" = "Simpan gambar";
 "保存文本" = "Simpan teks";
 "新建日程" = "Acara baru";

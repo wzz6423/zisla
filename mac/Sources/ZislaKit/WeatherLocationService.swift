@@ -212,59 +212,92 @@ final class CLGeocoderPlaceGeocoder: PlaceGeocoding {
 }
 
 /// One-shot location wrapper around `CLLocationManager`. All mutable state is `@MainActor`-isolated; delegate callbacks use `assumeIsolated`.
+struct CurrentLocationRequestState: Sendable {
+    private(set) var token: UUID?
+    private var managerIdentifier: ObjectIdentifier?
+
+    mutating func begin(_ token: UUID, managerIdentifier: ObjectIdentifier) {
+        self.token = token
+        self.managerIdentifier = managerIdentifier
+    }
+
+    func token(for managerIdentifier: ObjectIdentifier) -> UUID? {
+        guard self.managerIdentifier == managerIdentifier else { return nil }
+        return token
+    }
+
+    mutating func claimCompletion(for token: UUID) -> Bool {
+        guard self.token == token else { return false }
+        self.token = nil
+        managerIdentifier = nil
+        return true
+    }
+}
+
 @MainActor
 final class CoreLocationCurrentLocationProvider:
     NSObject, CurrentLocationProviding, CLLocationManagerDelegate
 {
-    private let manager = CLLocationManager()
+    private var manager: CLLocationManager?
     private var continuation: CheckedContinuation<GeoCoordinate, Error>?
     private var timeoutTask: Task<Void, Never>?
-    private var configured = false
+    private var requestState = CurrentLocationRequestState()
     private var authorizationPromptHost: NSWindow?
 
     nonisolated func requestOnce() async throws -> GeoCoordinate {
-        try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                Task { @MainActor in
-                    self.start(continuation)
-                }
-            }
+        let token = UUID()
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            return try await requestOnce(token: token)
         } onCancel: {
             Task { @MainActor in
-                self.finish(.failure(CancellationError()))
+                self.finish(.failure(CancellationError()), matching: token)
             }
         }
     }
 
-    private func start(_ continuation: CheckedContinuation<GeoCoordinate, Error>) {
-        if !configured {
-            manager.delegate = self
-            manager.desiredAccuracy = kCLLocationAccuracyKilometer
-            configured = true
+    private func requestOnce(token: UUID) async throws -> GeoCoordinate {
+        try Task.checkCancellation()
+        return try await withCheckedThrowingContinuation { continuation in
+            start(continuation, token: token)
         }
-        if self.continuation != nil {
+    }
+
+    private func start(
+        _ continuation: CheckedContinuation<GeoCoordinate, Error>,
+        token: UUID
+    ) {
+        guard requestState.token == nil else {
             continuation.resume(throwing: WeatherLocationError.locationUnavailable)
             return
         }
+
+        let manager = CLLocationManager()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyKilometer
+        self.manager = manager
+        self.continuation = continuation
+        requestState.begin(token, managerIdentifier: ObjectIdentifier(manager))
+
         switch manager.authorizationStatus {
         case .denied, .restricted:
-            continuation.resume(throwing: WeatherLocationError.authorizationDenied)
+            finish(.failure(WeatherLocationError.authorizationDenied), matching: token)
         case .notDetermined:
-            self.continuation = continuation
-            scheduleTimeout()
+            scheduleTimeout(for: token)
             authorizationPromptHost = WindowPlacement.authorizationPromptHost()
             manager.requestWhenInUseAuthorization()
         default:
-            self.continuation = continuation
-            scheduleTimeout()
+            scheduleTimeout(for: token)
             manager.requestLocation()
         }
     }
 
-    private func finish(_ result: Result<GeoCoordinate, Error>) {
-        guard let continuation else { return }
+    private func finish(_ result: Result<GeoCoordinate, Error>, matching token: UUID) {
+        guard let continuation, requestState.claimCompletion(for: token) else { return }
         timeoutTask?.cancel()
         timeoutTask = nil
+        manager?.delegate = nil
+        manager = nil
         dismissAuthorizationPromptHost()
         self.continuation = nil
         continuation.resume(with: result)
@@ -276,7 +309,7 @@ final class CoreLocationCurrentLocationProvider:
         authorizationPromptHost = nil
     }
 
-    private func scheduleTimeout() {
+    private func scheduleTimeout(for token: UUID) {
         timeoutTask?.cancel()
         timeoutTask = Task { [weak self] in
             do {
@@ -284,23 +317,37 @@ final class CoreLocationCurrentLocationProvider:
             } catch {
                 return
             }
-            self?.finish(.failure(WeatherLocationError.locationUnavailable))
+            self?.finish(.failure(WeatherLocationError.locationUnavailable), matching: token)
         }
+    }
+
+    private func activeRequest(
+        for managerIdentifier: ObjectIdentifier
+    ) -> (manager: CLLocationManager, token: UUID)? {
+        guard
+            let manager,
+            let token = requestState.token(for: managerIdentifier)
+        else { return nil }
+        return (manager, token)
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         // Extract the Sendable authorization status in a nonisolated context to avoid sending a non-Sendable manager into the closure.
         let status = manager.authorizationStatus
+        let managerIdentifier = ObjectIdentifier(manager)
         MainActor.assumeIsolated {
-            guard continuation != nil else { return }
+            guard let request = activeRequest(for: managerIdentifier) else { return }
             switch status {
             case .denied, .restricted:
-                finish(.failure(WeatherLocationError.authorizationDenied))
+                finish(
+                    .failure(WeatherLocationError.authorizationDenied),
+                    matching: request.token
+                )
             case .notDetermined:
                 break
             default:
                 dismissAuthorizationPromptHost()
-                self.manager.requestLocation()
+                request.manager.requestLocation()
             }
         }
     }
@@ -313,12 +360,17 @@ final class CoreLocationCurrentLocationProvider:
         let coordinate = locations.last.map {
             GeoCoordinate(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude)
         }
+        let managerIdentifier = ObjectIdentifier(manager)
         MainActor.assumeIsolated {
+            guard let request = activeRequest(for: managerIdentifier) else { return }
             guard let coordinate else {
-                finish(.failure(WeatherLocationError.locationUnavailable))
+                finish(
+                    .failure(WeatherLocationError.locationUnavailable),
+                    matching: request.token
+                )
                 return
             }
-            finish(.success(coordinate))
+            finish(.success(coordinate), matching: request.token)
         }
     }
 
@@ -326,8 +378,13 @@ final class CoreLocationCurrentLocationProvider:
         _ manager: CLLocationManager,
         didFailWithError error: Error
     ) {
+        let managerIdentifier = ObjectIdentifier(manager)
         MainActor.assumeIsolated {
-            finish(.failure(WeatherLocationError.locationUnavailable))
+            guard let request = activeRequest(for: managerIdentifier) else { return }
+            finish(
+                .failure(WeatherLocationError.locationUnavailable),
+                matching: request.token
+            )
         }
     }
 }

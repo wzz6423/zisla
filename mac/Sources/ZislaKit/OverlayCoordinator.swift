@@ -57,6 +57,7 @@ public final class OverlayCoordinator: NSObject {
     private var isTransientInteractionVisible = false
     private var isVoiceRecording = false
     private var isHoverActivationSuspended = false
+    private var isScreenshotCaptureInProgress = false
     private var isScreenshotActive = false
     private var collapsedOnTop = true
     private var isPersistentContentVisible = true
@@ -149,6 +150,7 @@ public final class OverlayCoordinator: NSObject {
         isTransientInteractionVisible = false
         isVoiceRecording = false
         isHoverActivationSuspended = false
+        isScreenshotCaptureInProgress = false
         isScreenshotActive = false
     }
 
@@ -244,7 +246,11 @@ public final class OverlayCoordinator: NSObject {
     }
 
     public func handlePointer(at point: CGPoint) {
-        guard isRunning, !isVoiceRecording, !isHoverActivationSuspended else { return }
+        guard isRunning,
+              !isVoiceRecording,
+              !isHoverActivationSuspended,
+              !isScreenshotCaptureInProgress
+        else { return }
         if let triggerLayout = layoutEngine.layout(containing: point, in: layouts) {
             let changedDisplay = activeDisplayID != triggerLayout.displayID
             activeDisplayID = triggerLayout.displayID
@@ -363,6 +369,19 @@ public final class OverlayCoordinator: NSObject {
         isScreenshotActive = active
         applyPanelLevel()
         applyPersistentPanelLevels()
+    }
+
+    /// Holds the current island presentation until the screen capture has produced its frozen frame.
+    public func setScreenshotCaptureInProgress(_ active: Bool) {
+        guard isScreenshotCaptureInProgress != active else { return }
+        isScreenshotCaptureInProgress = active
+        if active {
+            cancelScheduledCollapse()
+            cancelPointerRevalidation()
+            cancelPendingPanelCollapse()
+        } else {
+            handlePointer(at: NSEvent.mouseLocation)
+        }
     }
 
     /// Immediately folds the island for a foreground panel that must not be obscured by it.

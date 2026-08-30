@@ -154,12 +154,275 @@ struct ClipboardAssistantIslandPresentationTests {
         let source = try String(contentsOf: sourceURL, encoding: .utf8)
         let phaseStart = try #require(source.range(of: "private func applyScreenshotPhase()"))
         let phaseSource = source[phaseStart.lowerBound...]
-        // Off screen only while the display is frozen, then click-through above the selection overlay.
-        #expect(phaseSource.contains("window.ignoresMouseEvents = isAboveSelection"))
-        #expect(phaseSource.contains("ClipboardAssistantWindow.aboveScreenshotSelectionLevel"))
-        #expect(phaseSource.contains("if screenshotPhase == .capturing {"))
+        // Keep visible during capturing so it appears in the frozen screenshot.
+        // Hide only when the selection overlay renders the frozen capture.
+        #expect(phaseSource.contains("let hidesLiveWindow = screenshotPhase == .selecting || isSystemScreenshotActive"))
+        #expect(phaseSource.contains("window.ignoresMouseEvents = hidesLiveWindow"))
+        #expect(phaseSource.contains("window.level = ClipboardAssistantWindow.defaultWindowLevel"))
+        #expect(phaseSource.contains("if hidesLiveWindow {"))
         #expect(phaseSource.contains("window.orderOut(nil)"))
-        #expect(source.contains("NSWindow.Level.screenSaver.rawValue + 1"))
+        #expect(phaseSource.contains("screenshotPhase == .restored || screenshotPhase == .inactive"))
+        #expect(!source.contains("aboveScreenshotSelectionLevel"))
+    }
+
+    @MainActor
+    @Test
+    func screenshotSessionDoesNotRestartDismissalAfterTheHiddenWindowReportsHoverExit() async throws {
+        let controller = ClipboardAssistantController()
+        controller.displayDuration = .threeSeconds
+        controller.presentation.detection = ClipboardAssistantDetection(
+            kind: .text,
+            title: "text",
+            actions: [.copyText("text")]
+        )
+
+        controller.setScreenshotActive(true)
+        controller.setHovered(false)
+        try await Task.sleep(for: .milliseconds(3_200))
+
+        #expect(controller.presentation.detection != nil)
+        controller.displayDuration = .never
+        controller.setScreenshotActive(false)
+    }
+
+    @MainActor
+    @Test
+    func imageThumbnailUsesImageActionEvenWhenItIsNotPrimary() throws {
+        let pngData = try #require(Data(base64Encoded:
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        ))
+        let detection = ClipboardAssistantDetection(
+            kind: .image,
+            title: "image",
+            actions: [.copyText("metadata"), .saveImage(pngData)]
+        )
+
+        #expect(ClipboardAssistantController.thumbnail(for: detection) != nil)
+    }
+
+    @MainActor
+    @Test
+    func capturingPhaseKeepsWindowVisibleForFrozenScreenshot() throws {
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let phaseStart = try #require(source.range(of: "private func applyScreenshotPhase()"))
+        let phaseEnd = try #require(source[phaseStart.upperBound...].range(of: "\n    }"))
+        let phaseImpl = source[phaseStart.lowerBound..<phaseEnd.upperBound]
+
+        // Capturing phase should NOT hide the window - it stays visible for the frozen capture
+        #expect(!phaseImpl.contains("screenshotPhase == .capturing"))
+        #expect(phaseImpl.contains("let hidesLiveWindow = screenshotPhase == .selecting || isSystemScreenshotActive"))
+
+        let enumStart = try #require(source.range(of: "private enum ScreenshotPhase"))
+        let enumSource = source[enumStart.lowerBound...]
+        #expect(enumSource.contains("/// The display is about to be frozen; the row stays visible"))
+        #expect(enumSource.contains("case capturing"))
+    }
+
+    @MainActor
+    @Test
+    func screenshotPhasesCloseMoreActionsOnlyWhenTheLiveWindowLeaves() {
+        let controller = ClipboardAssistantController()
+
+        controller.setMoreActionsPresented(true)
+        #expect(controller.isMoreActionsPresented)
+
+        controller.setScreenshotActive(true)
+        #expect(controller.isMoreActionsPresented)
+
+        controller.setScreenshotSelectionActive(true)
+        #expect(!controller.isMoreActionsPresented)
+
+        controller.setScreenshotSelectionActive(false)
+        controller.setScreenshotActive(false)
+        controller.setMoreActionsPresented(true)
+        controller.setSystemScreenshotActive(true)
+        #expect(!controller.isMoreActionsPresented)
+        controller.setSystemScreenshotActive(false)
+    }
+
+    @Test
+    func systemScreenshotSessionTracksTheLauncherAndCaptureUI() {
+        #expect(SystemScreenshotSession.matches(bundleIdentifier: "com.apple.screencaptureui"))
+        #expect(SystemScreenshotSession.matches(bundleIdentifier: "com.apple.screenshot.launcher"))
+        #expect(!SystemScreenshotSession.matches(bundleIdentifier: "com.apple.ScreenCapture"))
+
+        var session = SystemScreenshotSession(missingWindowPollLimit: 2)
+        var result = session.applicationStarted(processIdentifier: 101)
+        #expect(result)
+        #expect(session.isActive)
+
+        result = session.applicationStarted(processIdentifier: 101)
+        #expect(!result)
+        result = session.updateWindowVisibility(false, hasRunningProcess: true)
+        #expect(!result)
+        #expect(session.isActive)
+        result = session.updateWindowVisibility(false, hasRunningProcess: true)
+        #expect(!result)
+        #expect(session.isActive)
+        result = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(!result)
+        #expect(session.isActive)
+        result = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(result)
+        #expect(!session.isActive)
+    }
+
+    @Test @MainActor
+    func systemScreenshotPollingReducesWakeupsWithoutExtendingDismissalGracePeriod() {
+        #expect(SystemScreenshotMonitor.pollInterval == .milliseconds(100))
+        #expect(SystemScreenshotSession.defaultMissingWindowPollLimit == 3)
+    }
+
+    @Test
+    func systemScreenshotSessionDropsStaleProcessIdentifiersAfterTheWindowGracePeriod() {
+        var session = SystemScreenshotSession(missingWindowPollLimit: 2)
+        _ = session.applicationStarted(processIdentifier: 606)
+
+        #expect(session.activeProcessIdentifiers == [606])
+        let firstUpdate = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(!firstUpdate)
+        let secondUpdate = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(secondUpdate)
+
+        #expect(!session.isActive)
+        #expect(session.activeProcessIdentifiers.isEmpty)
+    }
+
+    @Test
+    func systemScreenshotSessionStaysActiveAcrossLauncherToCaptureUIHandoff() {
+        var session = SystemScreenshotSession(missingWindowPollLimit: 2)
+        var result = session.applicationStarted(processIdentifier: 101)
+        #expect(result)
+
+        session.applicationTerminated(processIdentifier: 101)
+        result = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(!result)
+        #expect(session.isActive)
+
+        result = session.applicationStarted(processIdentifier: 202)
+        #expect(!result)
+        #expect(session.isActive)
+
+        session.applicationTerminated(processIdentifier: 202)
+        result = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(!result)
+        result = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(result)
+        #expect(!session.isActive)
+    }
+
+    @Test
+    func systemScreenshotSessionKeepsActiveWhileProcessRunsEvenWithoutVisibleWindow() {
+        var session = SystemScreenshotSession(missingWindowPollLimit: 3)
+        var result = session.applicationStarted(processIdentifier: 303)
+        #expect(result)
+        #expect(session.isActive)
+
+        for _ in 0..<10 {
+            result = session.updateWindowVisibility(false, hasRunningProcess: true)
+            #expect(!result)
+            #expect(session.isActive)
+        }
+
+        result = session.updateWindowVisibility(true, hasRunningProcess: true)
+        #expect(!result)
+        #expect(session.isActive)
+
+        session.applicationTerminated(processIdentifier: 303)
+        result = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(!result)
+        result = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(!result)
+        result = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(result)
+        #expect(!session.isActive)
+    }
+
+    @Test
+    func systemScreenshotSessionWaitsForVisibleUIToDisappear() {
+        var session = SystemScreenshotSession(missingWindowPollLimit: 2)
+        var result = session.applicationStarted(processIdentifier: 202)
+        #expect(result)
+        result = session.updateWindowVisibility(true, hasRunningProcess: true)
+        #expect(!result)
+        #expect(session.isActive)
+
+        session.applicationTerminated(processIdentifier: 202)
+        #expect(session.activeProcessIdentifiers.isEmpty)
+        result = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(!result)
+        #expect(session.isActive)
+        result = session.updateWindowVisibility(false, hasRunningProcess: false)
+        #expect(result)
+        #expect(!session.isActive)
+    }
+
+    @Test
+    func systemScreenshotWindowDetectorAcceptsOverlayWindowsAtAnyLevel() {
+        let candidates = [
+            SystemScreenshotWindowCandidate(
+                ownerProcessIdentifier: 404,
+                alpha: 1,
+                bounds: CGRect(x: 0, y: 0, width: 1_440, height: 900)
+            ),
+            SystemScreenshotWindowCandidate(
+                ownerProcessIdentifier: 505,
+                alpha: 0,
+                bounds: CGRect(x: 20, y: 20, width: 200, height: 100)
+            ),
+        ]
+
+        #expect(SystemScreenshotWindowDetector.hasVisibleSystemScreenshotWindow(
+            candidates,
+            ownedBy: [404]
+        ))
+        #expect(!SystemScreenshotWindowDetector.hasVisibleSystemScreenshotWindow(
+            candidates,
+            ownedBy: [505]
+        ))
+        #expect(!SystemScreenshotWindowDetector.isEligibleOwner(
+            processIdentifier: 404,
+            ownedBy: [404],
+            currentBundleIdentifier: "com.apple.TextEdit",
+            processIsRunning: true
+        ))
+        #expect(SystemScreenshotWindowDetector.isEligibleOwner(
+            processIdentifier: 404,
+            ownedBy: [404],
+            currentBundleIdentifier: "com.apple.screencaptureui",
+            processIsRunning: true
+        ))
+    }
+
+    @Test
+    func systemScreenshotMonitorUsesVisibleWindowsBeforeRestoringTheIsland() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sources/Zisla/SystemScreenshotMonitor.swift"),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("NSWorkspace.didActivateApplicationNotification"))
+        #expect(source.contains("publishIfNeeded(session.applicationStarted"))
+        #expect(source.contains("CGWindowListCopyWindowInfo"))
+        #expect(source.contains("[.optionOnScreenOnly, .excludeDesktopElements]"))
+        #expect(source.contains("kCGWindowOwnerPID"))
+        #expect(source.contains("SystemScreenshotWindowDetector.hasVisibleSystemScreenshotWindow"))
+        #expect(source.contains("let hasVisibleWindow = !hasRunningProcess"))
+        #expect(source.contains("onScreenWindowCandidates(ownedBy: processIdentifiers)"))
+        #expect(source.contains("SystemScreenshotWindowDetector.isEligibleOwner("))
+        #expect(source.contains("currentBundleIdentifier: application?.bundleIdentifier"))
+        #expect(!source.contains("layer == 0"))
+        #expect(source.contains("private var windowPollingTask: Task<Void, Never>?"))
+        #expect(source.contains("windowPollingTask?.cancel()"))
+        #expect(source.contains("Task.detached(priority: .utility)"))
+
+        let refreshStart = try #require(source.range(of: "private func refreshWindowVisibility"))
+        let refreshSource = source[refreshStart.lowerBound...]
+        #expect(!refreshSource.contains("workspace.runningApplications"))
     }
 
     @Test
@@ -175,14 +438,18 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(toastSource.contains("bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius"))
         #expect(!toastSource.contains("usesCompactGlassSurface: true"))
         #expect(!toastSource.contains("Color.black.opacity(0.86)"))
-        #expect(toastSource.contains("Menu {"))
+        #expect(toastSource.contains(".popover(isPresented: Binding("))
+        #expect(toastSource.contains("moreActionsPopover(for: detection)"))
+        #expect(toastSource.contains("controller.setMoreActionsPresented("))
+        #expect(!toastSource.contains("showActionsMenu(for: detection)"))
+        #expect(!toastSource.contains("Menu {\n                        actionMenuItems(menuActions(for: detection))"))
         #expect(toastSource.contains("if detection.action != nil"))
-        #expect(toastSource.contains("actionMenuItems(menuActions(for: detection))"))
         #expect(toastSource.contains("private func menuActions(for detection"))
+        #expect(toastSource.contains("private func moreActionsPopover(for detection"))
         #expect(toastSource.contains("if case .blockSourceApp = action"))
         #expect(toastSource.contains("Image(systemName: \"chevron.down.circle\")"))
         #expect(!toastSource.contains("Image(systemName: \"ellipsis.circle\")"))
-        #expect(toastSource.contains("guard ![.url, .text, .chineseText, .code, .math].contains(detection.kind)"))
+        #expect(toastSource.contains("guard ![.url, .text, .nonSystemLanguageText, .code, .math].contains(detection.kind)"))
         #expect(toastSource.contains(".onDrag { NSItemProvider(object: dragText as NSString) }"))
         #expect(toastSource.contains("private func dragText(for detection"))
         let headerContentStart = try #require(toastSource.range(of: "private func headerContent"))

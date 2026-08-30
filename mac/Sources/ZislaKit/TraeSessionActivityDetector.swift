@@ -74,10 +74,10 @@ public final class TraeSessionActivityDetector: AIActivityDetecting {
                 )
             }
             for (taskID, state) in parsed {
-                let existing = tasksByTaskID[taskID]
-                if existing == nil || existing!.updatedAt < state.updatedAt {
-                    tasksByTaskID[taskID] = state
+                if let existing = tasksByTaskID[taskID], existing.updatedAt >= state.updatedAt {
+                    continue
                 }
+                tasksByTaskID[taskID] = state
             }
         }
 
@@ -229,9 +229,7 @@ public final class TraeSessionActivityDetector: AIActivityDetecting {
         let sessionID = extractKeyValue(trimmed, key: "session_id") ?? ""
 
         var state = tasks[taskID] ?? TaskState(sessionID: sessionID)
-        if state.startedAt == nil || timestamp < state.startedAt! {
-            state.startedAt = timestamp
-        }
+        state.startedAt = state.startedAt.map { min($0, timestamp) } ?? timestamp
         state.updatedAt = max(state.updatedAt, timestamp)
 
         if isError {

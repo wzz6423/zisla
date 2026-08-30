@@ -151,7 +151,8 @@ public final class GeminiSessionActivityDetector: AIActivityDetecting {
            let readerState = cached.readerState,
            candidate.size >= readerState.offset,
            !(candidate.size == readerState.offset
-               && candidate.modificationDate != cached.modificationDate) {
+               && candidate.modificationDate != cached.modificationDate),
+           jsonlReader.hasUnchangedReadPrefix(at: candidate.url, state: readerState) {
             next = cached
         } else {
             next = CachedTask(

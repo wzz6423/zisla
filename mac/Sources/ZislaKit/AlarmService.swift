@@ -94,27 +94,23 @@ public final class AlarmService: ObservableObject {
     @Published public var errorMessage: String?
 
     private let storageURL: URL
-    private let notificationCenter: UNUserNotificationCenter
-    private let notificationRequestHandler: (UNNotificationRequest) -> Void
-    private let cancelHandler: ([String]) -> Void
+    private var notificationCenter: UNUserNotificationCenter?
+    private let notificationRequestHandler: ((UNNotificationRequest) -> Void)?
+    private let cancelHandler: (([String]) -> Void)?
     private var schedulingEnabled = true
     /// Alarm notifications are always delivered regardless of Do Not Disturb — a time explicitly set by the user must not be silenced.
     private var authorizationPromptHost: NSWindow?
 
     public init(
         storageURL: URL = AppPaths.alarms,
-        notificationCenter: UNUserNotificationCenter = .current(),
+        notificationCenter: UNUserNotificationCenter? = nil,
         notificationRequestHandler: ((UNNotificationRequest) -> Void)? = nil,
         cancelHandler: (([String]) -> Void)? = nil
     ) {
         self.storageURL = storageURL
         self.notificationCenter = notificationCenter
-        self.notificationRequestHandler = notificationRequestHandler ?? { [notificationCenter] request in
-            notificationCenter.add(request, withCompletionHandler: nil)
-        }
-        self.cancelHandler = cancelHandler ?? { [notificationCenter] identifiers in
-            notificationCenter.removePendingNotificationRequests(withIdentifiers: identifiers)
-        }
+        self.notificationRequestHandler = notificationRequestHandler
+        self.cancelHandler = cancelHandler
         load()
     }
 
@@ -223,7 +219,7 @@ public final class AlarmService: ObservableObject {
             var components = DateComponents()
             components.hour = alarm.hour
             components.minute = alarm.minute
-            notificationRequestHandler(UNNotificationRequest(
+            addNotification(UNNotificationRequest(
                 identifier: "zisla.alarm.\(alarm.id.uuidString)",
                 content: content,
                 trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
@@ -236,7 +232,7 @@ public final class AlarmService: ObservableObject {
             components.hour = alarm.hour
             components.minute = alarm.minute
             components.weekday = weekday
-            notificationRequestHandler(UNNotificationRequest(
+            addNotification(UNNotificationRequest(
                 identifier: "zisla.alarm.\(alarm.id.uuidString).\(weekday)",
                 content: content,
                 trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
@@ -245,23 +241,47 @@ public final class AlarmService: ObservableObject {
     }
 
     private func cancelNotifications(for alarm: AlarmItem) {
-        cancelHandler(Self.notificationIdentifiers(for: alarm))
+        removePendingNotifications(Self.notificationIdentifiers(for: alarm))
     }
 
     private func cancelNotifications(for alarms: [AlarmItem]) {
         let identifiers = alarms.flatMap { Self.notificationIdentifiers(for: $0) }
         guard !identifiers.isEmpty else { return }
-        cancelHandler(identifiers)
+        removePendingNotifications(identifiers)
+    }
+
+    private func resolvedNotificationCenter() -> UNUserNotificationCenter {
+        if let notificationCenter { return notificationCenter }
+        let center = UNUserNotificationCenter.current()
+        notificationCenter = center
+        return center
+    }
+
+    private func addNotification(_ request: UNNotificationRequest) {
+        if let notificationRequestHandler {
+            notificationRequestHandler(request)
+        } else {
+            resolvedNotificationCenter().add(request, withCompletionHandler: nil)
+        }
+    }
+
+    private func removePendingNotifications(_ identifiers: [String]) {
+        guard !identifiers.isEmpty else { return }
+        if let cancelHandler {
+            cancelHandler(identifiers)
+        } else {
+            resolvedNotificationCenter().removePendingNotificationRequests(withIdentifiers: identifiers)
+        }
     }
 
     private func requestAuthorizationIfNeeded() {
-        notificationCenter.getNotificationSettings { [weak self] settings in
+        resolvedNotificationCenter().getNotificationSettings { [weak self] settings in
             guard settings.authorizationStatus == .notDetermined else { return }
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.dismissAuthorizationPromptHost()
                 self.authorizationPromptHost = WindowPlacement.authorizationPromptHost()
-                _ = try? await self.notificationCenter.requestAuthorization(options: [.alert, .sound])
+                _ = try? await self.resolvedNotificationCenter().requestAuthorization(options: [.alert, .sound])
                 self.dismissAuthorizationPromptHost()
             }
         }

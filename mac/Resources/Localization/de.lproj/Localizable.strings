@@ -518,6 +518,7 @@
 "算式" = "Rechnung";
 "日期时间" = "Datum und Uhrzeit";
 "中文文本" = "Chinesischer Text";
+"非当前系统语言文本" = "Text in einer anderen Systemsprache";
 "代码" = "Code";
 "翻译" = "Übersetzen";
 "写邮件" = "E-Mail schreiben";
@@ -525,6 +526,7 @@
 "拨打电话" = "Anrufen";
 "不再显示来自 %@ 的复制" = "Kopien von %@ nicht mehr anzeigen";
 "复制结果" = "Ergebnis kopieren";
+"复制完整算式" = "Vollständige Rechnung kopieren";
 "保存图片" = "Bild sichern";
 "保存文本" = "Text sichern";
 "新建日程" = "Neuer Termin";

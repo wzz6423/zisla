@@ -242,6 +242,29 @@ struct OverlayCoordinatorTests {
     }
 
     @Test @MainActor
+    func screenshotCaptureKeepsTheCurrentIslandVisibleUntilTheFrozenFrameIsReady() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.start()
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        let trigger = try #require(coordinator.layouts.first?.triggerFrame)
+        coordinator.showExpanded(at: CGPoint(x: trigger.midX, y: trigger.midY))
+        let panel = try #require(contentView.window as? IslandPanel)
+
+        coordinator.setScreenshotCaptureInProgress(true)
+        coordinator.handlePointer(at: CGPoint(
+            x: Self.builtInScreen.frame.midX,
+            y: Self.builtInScreen.frame.minY
+        ))
+
+        #expect(coordinator.isVisible)
+        #expect(panel.level == IslandPanel.onTopLevel)
+        coordinator.setScreenshotCaptureInProgress(false)
+    }
+
+    @Test @MainActor
     func selectingDisplayReportsWhetherItHasAPhysicalNotch() {
         let coordinator = OverlayCoordinator(contentView: NSView())
         coordinator.updateScreens([

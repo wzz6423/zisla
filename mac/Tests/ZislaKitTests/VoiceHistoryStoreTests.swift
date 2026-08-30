@@ -153,6 +153,28 @@ struct VoiceHistoryStoreTests {
     }
 
     @Test
+    func failedPersistenceWithoutAudioRetentionKeepsAudioFile() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let store = fixture.makeStore()
+        let id = UUID()
+        let audioURL = store.recordingURL(for: id)
+        try fixture.writeAudio(at: audioURL)
+        try fixture.blockMetadataWrites()
+
+        let recorded = store.record(VoiceRecordingResult(
+            id: id,
+            audioFileURL: audioURL,
+            transcript: "仅保留文字",
+            duration: 2
+        ), retainAudio: false)
+
+        #expect(!recorded)
+        #expect(store.entries.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: audioURL.path))
+    }
+
+    @Test
     func failedProcessedTranscriptPersistenceKeepsPreviousEntry() throws {
         let fixture = try makeFixture()
         defer { fixture.cleanup() }
@@ -213,6 +235,31 @@ struct VoiceHistoryStoreTests {
     }
 
     @Test
+    func failedBatchRemovalPersistenceKeepsEntriesAndAudioFiles() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let store = fixture.makeStore()
+        let ids = [UUID(), UUID()]
+        for id in ids {
+            let audioURL = store.recordingURL(for: id)
+            try fixture.writeAudio(at: audioURL)
+            #expect(store.record(VoiceRecordingResult(
+                id: id,
+                audioFileURL: audioURL,
+                transcript: "保留记录",
+                duration: 1
+            )))
+        }
+        try fixture.blockMetadataWrites()
+
+        store.removeBatch(ids: Set(ids))
+
+        #expect(store.entries.count == 2)
+        #expect(FileManager.default.fileExists(atPath: store.recordingURL(for: ids[0]).path))
+        #expect(FileManager.default.fileExists(atPath: store.recordingURL(for: ids[1]).path))
+    }
+
+    @Test
     func failedAudioRemovalRestoresEntryAndMetadata() throws {
         let fixture = try makeFixture()
         defer { fixture.cleanup() }
@@ -233,6 +280,139 @@ struct VoiceHistoryStoreTests {
 
         #expect(store.entries.count == 1)
         #expect(FileManager.default.fileExists(atPath: audioURL.path))
+        #expect(fixture.makeStore().entries == store.entries)
+        #expect(store.errorDescription != nil)
+    }
+
+    @Test
+    func batchRemovalRetainsOnlyTheEntryWhoseStagedAudioCannotBeDeleted() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let fileManager = FailingVoiceFileManager()
+        let store = fixture.makeStore(fileManager: fileManager)
+        let firstID = UUID()
+        let secondID = UUID()
+        let firstURL = store.recordingURL(for: firstID)
+        let secondURL = store.recordingURL(for: secondID)
+        try fixture.writeAudio(at: firstURL)
+        try fixture.writeAudio(at: secondURL)
+        #expect(store.record(VoiceRecordingResult(
+            id: firstID,
+            audioFileURL: firstURL,
+            transcript: "第一条",
+            duration: 1,
+            createdAt: Date(timeIntervalSince1970: 2)
+        )))
+        #expect(store.record(VoiceRecordingResult(
+            id: secondID,
+            audioFileURL: secondURL,
+            transcript: "第二条",
+            duration: 1,
+            createdAt: Date(timeIntervalSince1970: 1)
+        )))
+
+        fileManager.blockedStagedRemovalFileName = secondURL.lastPathComponent
+        store.removeBatch(ids: [firstID, secondID])
+
+        #expect(store.entries.map(\.id) == [secondID])
+        #expect(!FileManager.default.fileExists(atPath: firstURL.path))
+        #expect(FileManager.default.fileExists(atPath: secondURL.path))
+        #expect(fixture.makeStore().entries == store.entries)
+        #expect(store.errorDescription != nil)
+    }
+
+    @Test
+    func partialBatchRemovalKeepsSelectedTextOnlyEntries() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let fileManager = FailingVoiceFileManager()
+        let store = fixture.makeStore(fileManager: fileManager)
+        let textID = UUID()
+        let firstID = UUID()
+        let secondID = UUID()
+        let textURL = store.recordingURL(for: textID)
+        let firstURL = store.recordingURL(for: firstID)
+        let secondURL = store.recordingURL(for: secondID)
+        try fixture.writeAudio(at: textURL)
+        try fixture.writeAudio(at: firstURL)
+        try fixture.writeAudio(at: secondURL)
+        #expect(store.record(VoiceRecordingResult(
+            id: textID,
+            audioFileURL: textURL,
+            transcript: "仅文字",
+            duration: 1,
+            createdAt: Date(timeIntervalSince1970: 3)
+        ), retainAudio: false))
+        #expect(store.record(VoiceRecordingResult(
+            id: firstID,
+            audioFileURL: firstURL,
+            transcript: "第一条",
+            duration: 1,
+            createdAt: Date(timeIntervalSince1970: 2)
+        )))
+        #expect(store.record(VoiceRecordingResult(
+            id: secondID,
+            audioFileURL: secondURL,
+            transcript: "第二条",
+            duration: 1,
+            createdAt: Date(timeIntervalSince1970: 1)
+        )))
+
+        fileManager.blockedStagedRemovalFileName = secondURL.lastPathComponent
+        store.removeBatch(ids: [textID, firstID, secondID])
+
+        #expect(store.entries.map(\.id) == [textID, secondID])
+        #expect(!FileManager.default.fileExists(atPath: firstURL.path))
+        #expect(FileManager.default.fileExists(atPath: secondURL.path))
+        #expect(fixture.makeStore().entries == store.entries)
+    }
+
+    @Test
+    func removeAllRetainsOnlyTextAndRestoredAudioWhenSecondStagedRemovalFails() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let fileManager = FailingVoiceFileManager()
+        let store = fixture.makeStore(fileManager: fileManager)
+        let textID = UUID()
+        let firstID = UUID()
+        let secondID = UUID()
+        let textURL = store.recordingURL(for: textID)
+        let firstURL = store.recordingURL(for: firstID)
+        let secondURL = store.recordingURL(for: secondID)
+        try fixture.writeAudio(at: textURL)
+        try fixture.writeAudio(at: firstURL)
+        try fixture.writeAudio(at: secondURL)
+        #expect(store.record(VoiceRecordingResult(
+            id: textID,
+            audioFileURL: textURL,
+            transcript: "仅文字",
+            duration: 1,
+            createdAt: Date(timeIntervalSince1970: 3)
+        ), retainAudio: false))
+        #expect(store.record(VoiceRecordingResult(
+            id: firstID,
+            audioFileURL: firstURL,
+            transcript: "第一条",
+            duration: 1,
+            createdAt: Date(timeIntervalSince1970: 2)
+        )))
+        #expect(store.record(VoiceRecordingResult(
+            id: secondID,
+            audioFileURL: secondURL,
+            transcript: "第二条",
+            duration: 1,
+            createdAt: Date(timeIntervalSince1970: 1)
+        )))
+
+        fileManager.stagedRemovalFailureIndex = 2
+        store.removeAll()
+
+        let restoredAudioIDs = [firstID, secondID].filter {
+            FileManager.default.fileExists(atPath: store.recordingURL(for: $0).path)
+        }
+        let restoredAudioID = try #require(restoredAudioIDs.first)
+        #expect(restoredAudioIDs.count == 1)
+        #expect(store.entries.map(\.id) == [textID, restoredAudioID])
         #expect(fixture.makeStore().entries == store.entries)
         #expect(store.errorDescription != nil)
     }
@@ -315,6 +495,35 @@ struct VoiceHistoryStoreTests {
         #expect(store.record(recording))
 
         #expect(store.entries.count == 1)
+    }
+
+    @Test
+    func cumulativeDurationRemainsFiniteWhenLargeValidDurationsAreRecorded() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let store = fixture.makeStore()
+        let firstID = UUID()
+        let secondID = UUID()
+        let firstURL = store.recordingURL(for: firstID)
+        let secondURL = store.recordingURL(for: secondID)
+        try fixture.writeAudio(at: firstURL)
+        try fixture.writeAudio(at: secondURL)
+
+        #expect(store.record(VoiceRecordingResult(
+            id: firstID,
+            audioFileURL: firstURL,
+            transcript: "第一条",
+            duration: .greatestFiniteMagnitude
+        )))
+        #expect(store.record(VoiceRecordingResult(
+            id: secondID,
+            audioFileURL: secondURL,
+            transcript: "第二条",
+            duration: .greatestFiniteMagnitude
+        )))
+
+        #expect(store.statistics.totalDuration == .greatestFiniteMagnitude)
+        #expect(store.statistics.totalDuration.isFinite)
     }
 
     @Test
@@ -432,6 +641,32 @@ struct VoiceHistoryStoreTests {
             #expect(store.entries.first(where: { $0.id == expiredID })?.audioFileName == nil)
             #expect(fixture.makeStore().entries.count == 2)
         }
+    }
+
+    @Test
+    func failedCleanupPersistenceKeepsAudioReferenceAndFile() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let store = fixture.makeStore()
+        let id = UUID()
+        let audioURL = store.recordingURL(for: id)
+        try fixture.writeAudio(at: audioURL)
+        #expect(store.record(VoiceRecordingResult(
+            id: id,
+            audioFileURL: audioURL,
+            transcript: "保留过期录音",
+            duration: 1,
+            createdAt: Date(timeIntervalSince1970: 1)
+        )))
+        try fixture.blockMetadataWrites()
+
+        store.cleanupOldRecordings(
+            policy: .sevenDays,
+            now: Date(timeIntervalSince1970: 2_000_000_000)
+        )
+
+        #expect(store.entries.first?.audioFileName == audioURL.lastPathComponent)
+        #expect(FileManager.default.fileExists(atPath: audioURL.path))
     }
 
     @Test
@@ -613,6 +848,44 @@ struct VoiceHistoryStoreTests {
         #expect(reloaded.statistics.totalWordCount == 12)
         #expect(reloaded.statistics.totalDuration == 6)
     }
+
+    @Test
+    func recordingSaturatesCumulativeWordCountInsteadOfOverflowing() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let firstID = UUID()
+        let firstAudioURL = fixture.recordingsDirectory.appendingPathComponent("\(firstID.uuidString).caf")
+        try fixture.writeAudio(at: firstAudioURL)
+        let initial = fixture.makeStore()
+        #expect(initial.record(VoiceRecordingResult(
+            id: firstID,
+            audioFileURL: firstAudioURL,
+            transcript: "初",
+            duration: 1
+        )))
+
+        var root = try #require(
+            JSONSerialization.jsonObject(with: Data(contentsOf: fixture.metadataURL)) as? [String: Any]
+        )
+        root["cumulativeStatistics"] = [
+            "totalWordCount": Int.max,
+            "totalDuration": 1,
+        ]
+        try JSONSerialization.data(withJSONObject: root).write(to: fixture.metadataURL)
+
+        let store = fixture.makeStore()
+        let secondID = UUID()
+        let secondAudioURL = store.recordingURL(for: secondID)
+        try fixture.writeAudio(at: secondAudioURL)
+
+        #expect(store.record(VoiceRecordingResult(
+            id: secondID,
+            audioFileURL: secondAudioURL,
+            transcript: "增",
+            duration: 1
+        )))
+        #expect(store.statistics.totalWordCount == .max)
+    }
 }
 
 private struct VoiceHistoryFixture {
@@ -651,8 +924,30 @@ private struct VoiceHistoryFixture {
 
 private final class FailingVoiceFileManager: FileManager {
     var blockedURL: URL?
+    var blockedStagedRemovalFileName: String?
+    var stagedRemovalFailureIndex: Int? {
+        didSet { stagedRemovalAttemptCount = 0 }
+    }
+    private var stagedRemovalAttemptCount = 0
+
+    override func moveItem(at srcURL: URL, to dstURL: URL) throws {
+        if let blockedURL, srcURL.standardizedFileURL == blockedURL.standardizedFileURL {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        try super.moveItem(at: srcURL, to: dstURL)
+    }
 
     override func removeItem(at url: URL) throws {
+        if url.lastPathComponent.hasPrefix(".zisla-deleting-") {
+            stagedRemovalAttemptCount += 1
+            if stagedRemovalFailureIndex == stagedRemovalAttemptCount {
+                throw CocoaError(.fileWriteUnknown)
+            }
+        }
+        if let blockedStagedRemovalFileName,
+           url.lastPathComponent.hasSuffix(blockedStagedRemovalFileName) {
+            throw CocoaError(.fileWriteUnknown)
+        }
         if let blockedURL, url.standardizedFileURL == blockedURL.standardizedFileURL {
             throw CocoaError(.fileWriteUnknown)
         }

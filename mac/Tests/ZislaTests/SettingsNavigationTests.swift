@@ -6,6 +6,63 @@ import ZislaCore
 
 struct SettingsNavigationTests {
     @Test
+    func settingsContentTransitionTargetsMountedContent() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        let detailRange = try #require(source.range(of: "    private var detail: some View {"))
+        let detailEnd = try #require(source.range(of: "\n    private func selectSettingsSection", range: detailRange.lowerBound..<source.endIndex))
+        let detail = String(source[detailRange.lowerBound..<detailEnd.lowerBound])
+        let compactDetail = detail.components(separatedBy: .whitespacesAndNewlines).joined()
+
+        #expect(compactDetail.contains("DeferredMount{selectedContent.id(input.selection).transition("))
+        #expect(compactDetail.contains(".settingsPagePush(direction:sectionSwitchDirection)"))
+    }
+
+    @Test
+    func settingsPageTransitionAvoidsBlur() throws {
+        let source = try String(contentsOf: Self.motionDesignSourceURL, encoding: .utf8)
+        let transitionStart = try #require(source.range(of: "    static func settingsPagePush(direction: CGFloat) -> AnyTransition {"))
+        let transitionEnd = try #require(source.range(of: "\n    }\n}", range: transitionStart.lowerBound..<source.endIndex))
+        let transition = String(source[transitionStart.lowerBound..<transitionEnd.lowerBound])
+
+        #expect(transition.contains("blurRadius: 0"))
+        #expect(!transition.contains("blurRadius: 5"))
+    }
+
+    @Test
+    func moduleSelectionDoesNotAnimateNavigationGlyphGeometry() throws {
+        let source = try String(contentsOf: Self.islandRootViewSourceURL, encoding: .utf8)
+        let selectorStart = try #require(source.range(of: "private struct ModuleSelector: View {"))
+        let selector = String(source[selectorStart.lowerBound...])
+
+        #expect(selector.contains("MotionFocusLens(cornerRadius: 8)"))
+        #expect(selector.contains(".frame(width: 28, height: 30)"))
+        #expect(!selector.contains("emphasizesSelection: true"))
+    }
+
+    @Test
+    func moduleRailDoesNotInheritSurfaceResizeAnimation() throws {
+        let source = try String(contentsOf: Self.islandRootViewSourceURL, encoding: .utf8)
+        let toolRailUse = try #require(source.range(of: "                            toolRail\n"))
+        let moduleContentEnd = try #require(
+            source[toolRailUse.upperBound...].range(of: "                            Group {")
+        )
+        let moduleContent = source[toolRailUse.lowerBound..<moduleContentEnd.lowerBound]
+
+        #expect(moduleContent.contains(".transaction { transaction in"))
+        #expect(moduleContent.contains("transaction.animation = nil"))
+        #expect(source.contains(".animation(reduceMotion ? nil : ZislaMotion.selection, value: model.selectedModule)"))
+    }
+
+    @Test
+    func updateChannelAppliesToAutomaticAndManualChecks() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+
+        #expect(source.contains("title: \"更新通道\""))
+        #expect(source.contains("用于自动与手动更新"))
+        #expect(!source.contains("仅用于手动检查"))
+    }
+
+    @Test
     func showsOnlyCurrentSettingsSections() {
         #expect(SettingsSection.allCases.map(\.title) == [
             "通用",
@@ -145,5 +202,25 @@ struct SettingsNavigationTests {
         #expect(!SettingsView.isApplicationBundleInApplicationsDirectory(
             URL(fileURLWithPath: "/Applications/Example.txt")
         ))
+    }
+
+    private static var settingsViewSourceURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zisla/SettingsView.swift")
+    }
+
+    private static var motionDesignSourceURL: URL {
+        settingsViewSourceURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("MotionDesign.swift")
+    }
+
+    private static var islandRootViewSourceURL: URL {
+        settingsViewSourceURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("IslandRootView.swift")
     }
 }

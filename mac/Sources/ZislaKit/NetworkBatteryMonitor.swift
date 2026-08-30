@@ -482,7 +482,7 @@ public final class NetworkBatteryMonitor: NSObject, ObservableObject {
         )
         let vendorID = normalizedHexIdentifier(details["device_vendorID"])
         let lowercasedName = name.lowercased()
-        let supportsAdvertisement = deviceType == .airPods
+        let supportsAdvertisement = lowercasedName.contains("airpod")
             || (vendorID == "004c" && lowercasedName.contains("beats"))
         let address = (details["device_address"] as? String).flatMap {
             let normalized = $0.lowercased().filter(\.isHexDigit)
@@ -584,6 +584,7 @@ public final class NetworkBatteryMonitor: NSObject, ObservableObject {
         minorType: String?
     ) -> NetworkBatteryDevice.DeviceType {
         let value = "\(name) \(minorType ?? "")".lowercased()
+        if value.contains("airpods max") { return .headphones }
         if value.contains("airpod") { return .airPods }
         if value.contains("iphone") { return .iPhone }
         if value.contains("ipad") { return .iPad }

@@ -404,26 +404,27 @@ const siteHeader = document.querySelector<HTMLElement>('.site-header');
 const menuToggle = document.querySelector<HTMLButtonElement>('.menu-toggle');
 const nav = document.querySelector<HTMLElement>('.nav');
 
-menuToggle?.addEventListener('click', () => {
-  const isOpen = nav?.classList.toggle('is-open') ?? false;
+const setMenuOpen = (isOpen: boolean) => {
+  nav?.classList.toggle('is-open', isOpen);
   document.body.classList.toggle('is-locked', isOpen);
-  menuToggle.setAttribute('aria-expanded', String(isOpen));
+  menuToggle?.setAttribute('aria-expanded', String(isOpen));
+  if (!menuToggle) return;
+
   menuToggle.setAttribute('aria-label', isOpen ? '关闭导航' : '打开导航菜单');
   menuToggle.innerHTML = icon(isOpen ? 'x' : 'menu', 18);
   createIcons({ icons: siteIcons });
+};
+
+menuToggle?.addEventListener('click', () => {
+  setMenuOpen(!(nav?.classList.contains('is-open') ?? false));
 });
 
 nav?.querySelectorAll('a').forEach((link) => {
-  link.addEventListener('click', () => {
-    nav.classList.remove('is-open');
-    document.body.classList.remove('is-locked');
-    menuToggle?.setAttribute('aria-expanded', 'false');
-    if (menuToggle) {
-      menuToggle.setAttribute('aria-label', '打开导航菜单');
-      menuToggle.innerHTML = icon('menu', 18);
-      createIcons({ icons: siteIcons });
-    }
-  });
+  link.addEventListener('click', () => setMenuOpen(false));
+});
+
+window.matchMedia('(min-width: 901px)').addEventListener('change', ({ matches }) => {
+  if (matches) setMenuOpen(false);
 });
 
 const toast = document.querySelector<HTMLElement>('#toast');
@@ -461,8 +462,11 @@ const showCopyFeedback = (button?: HTMLButtonElement | null) => {
 };
 
 const copyText = async (text: string, message: string, button?: HTMLButtonElement | null) => {
+  let copied = false;
+
   try {
     await navigator.clipboard.writeText(text);
+    copied = true;
   } catch {
     const input = document.createElement('textarea');
     input.value = text;
@@ -470,11 +474,18 @@ const copyText = async (text: string, message: string, button?: HTMLButtonElemen
     input.style.position = 'fixed';
     input.style.opacity = '0';
     document.body.append(input);
-    input.select();
-    document.execCommand('copy');
-    input.remove();
+
+    try {
+      input.select();
+      copied = document.execCommand('copy');
+    } catch {
+      copied = false;
+    } finally {
+      input.remove();
+    }
   }
 
+  if (!copied) return;
   showToast(message);
   showCopyFeedback(button);
 };

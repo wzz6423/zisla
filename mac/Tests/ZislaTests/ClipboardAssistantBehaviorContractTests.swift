@@ -58,6 +58,66 @@ struct ClipboardAssistantBehaviorContractTests {
         #expect(!mailFallback.contains("withApplicationAt"))
     }
 
+    @Test
+    func voiceRecordingStartCapturesTheExternalTargetWithoutChangingFocus() throws {
+        let source = try String(contentsOf: appModelSourceURL, encoding: .utf8)
+        let handler = try sourceSlice(
+            in: source,
+            from: "voiceInput.onRecordingWillStart = {",
+            to: "voiceInput.onTranscriptCompleted = {"
+        )
+
+        #expect(handler.contains("let processIdentifier = Self.frontmostVoiceInputTargetProcessIdentifier()"))
+        #expect(handler.contains("voiceInputTargetProcessIdentifier = processIdentifier"))
+        #expect(handler.contains("voiceInputTarget = processIdentifier.flatMap(VoiceTranscriptDelivery.captureTarget(for:))"))
+        #expect(handler.contains("voiceInputTargetMouseLocation = CGEvent(source: nil)?.location"))
+        #expect(!handler.contains("requestVoiceInputPostEventAccessIfNeeded"))
+        #expect(!handler.contains("WindowPlacement.authorizationPromptHost"))
+        #expect(!handler.contains("CGRequestPostEventAccess"))
+    }
+
+    @Test
+    func voiceRecordingArmsOverlayProtectionBeforeDismissingTheAssistant() throws {
+        let appModel = try String(contentsOf: appModelSourceURL, encoding: .utf8)
+        let handler = try sourceSlice(
+            in: appModel,
+            from: "voiceInput.onRecordingWillStart = {",
+            to: "voiceInput.onTranscriptCompleted = {"
+        )
+        let protection = try #require(handler.range(of: "onVoiceInputWillStart?()"))
+        let dismissal = try #require(handler.range(of: "clipboardAssistant.dismiss(animated: false)"))
+
+        #expect(protection.lowerBound < dismissal.lowerBound)
+
+        let controller = try String(contentsOf: voiceInputControllerSourceURL, encoding: .utf8)
+        let start = try #require(controller.range(of: "func start() {"))
+        let stop = try #require(controller[start.upperBound...].range(of: "func stop() {"))
+        let startBody = controller[start.lowerBound..<stop.lowerBound]
+        let preparing = try #require(startBody.range(of: "isPreparing = true"))
+        let callback = try #require(startBody.range(of: "onRecordingWillStart?()"))
+        #expect(preparing.lowerBound < callback.lowerBound)
+    }
+
+    @Test
+    func mouseGestureCancelsDeferredCopyWhenStopped() throws {
+        let source = try String(contentsOf: clipboardAssistantSourceURL, encoding: .utf8)
+        let monitor = try sourceSlice(
+            in: source,
+            from: "final class ClipboardAssistantMouseGestureMonitor",
+            to: "private func postCommandC()"
+        )
+        let postCommandCStart = try #require(source.range(of: "private func postCommandC()"))
+        let postCommandC = source[postCommandCStart.lowerBound...]
+
+        #expect(monitor.contains("private var commandCCopyTask: Task<Void, Never>?"))
+        #expect(monitor.contains("commandCCopyTask?.cancel()"))
+        #expect(monitor.contains("copyGeneration &+= 1"))
+        #expect(postCommandC.contains("Task.sleep(for: .milliseconds(50))"))
+        #expect(postCommandC.contains("self.copyGeneration == generation"))
+        #expect(!postCommandC.contains("DispatchQueue.global().asyncAfter"))
+        #expect(!postCommandC.contains("usleep("))
+    }
+
     private func sourceSlice(in source: String, from start: String, to end: String) throws -> Substring {
         let startRange = try #require(source.range(of: start))
         let endRange = try #require(source[startRange.upperBound...].range(of: end))
@@ -70,5 +130,21 @@ struct ClipboardAssistantBehaviorContractTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Sources/Zisla/AppModel.swift")
+    }
+
+    private var voiceInputControllerSourceURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zisla/VoiceInputController.swift")
+    }
+
+    private var clipboardAssistantSourceURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zisla/ClipboardAssistantWindowController.swift")
     }
 }

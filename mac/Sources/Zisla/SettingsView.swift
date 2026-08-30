@@ -20,6 +20,7 @@ struct SettingsView: View {
     @State private var isVoiceHistoryBatchDeleteConfirmationPresented = false
     @State private var voiceHistorySelectionMode = false
     @State private var selectedVoiceHistoryIDs: Set<UUID> = []
+    @State private var customVoiceHotword = ""
     @State private var screenshotHotkeyValidationMessage: String?
     @State private var expandedClipboardAssistantKind: ClipboardAssistantKind?
     @Namespace private var sectionSelectionNamespace
@@ -185,13 +186,13 @@ struct SettingsView: View {
                 }
                 DeferredMount {
                     selectedContent
+                        .id(input.selection)
+                        .transition(
+                            reduceMotion
+                                ? .opacity
+                                : .settingsPagePush(direction: sectionSwitchDirection)
+                        )
                 }
-                    .id(input.selection)
-                    .transition(
-                        reduceMotion
-                            ? .opacity
-                            : .modulePush(direction: sectionSwitchDirection)
-                    )
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 18)
@@ -925,7 +926,7 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("自动检查更新", detail: "定期检查当前安装包所属的更新通道", symbol: "arrow.triangle.2.circlepath", keyPath: \.updateChecksEnabled)
                     rowDivider
-                    featureToggle("自动下载更新", detail: "发现新版本时自动下载安装包", symbol: "arrow.down.circle.fill", keyPath: \.automaticDownloadEnabled)
+                    featureToggle("自动下载更新", detail: "发现新版本后下载，并在退出或重启时完成安装", symbol: "arrow.down.circle.fill", keyPath: \.automaticDownloadEnabled)
                         .disabled(!model.settingsStore.settings.updateChecksEnabled)
                 }
             }
@@ -1308,6 +1309,36 @@ struct SettingsView: View {
                             .labelsHidden()
                             .toggleStyle(.switch)
                             .controlSize(.small)
+                    }
+                }
+                rowDivider
+                settingRow(
+                    symbol: "text.badge.plus",
+                    title: "自定义热词",
+                    detail: "用于语音识别和语音整理模型"
+                ) {
+                    HStack(spacing: 6) {
+                        TextField("输入热词", text: $customVoiceHotword)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 150)
+                            .onSubmit(addCustomVoiceHotword)
+                        Button("添加", action: addCustomVoiceHotword)
+                            .controlSize(.small)
+                            .disabled(
+                                customVoiceHotword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            )
+                    }
+                }
+                ForEach(model.settingsStore.settings.voiceCustomHotwords, id: \.self) { hotword in
+                    rowDivider
+                    settingRow(
+                        symbol: "text.badge.checkmark",
+                        title: hotword,
+                        detail: ""
+                    ) {
+                        IconButton(symbol: "trash", help: "删除\(hotword)", size: .compact) {
+                            removeCustomVoiceHotword(hotword)
+                        }
                     }
                 }
             }
@@ -1699,6 +1730,21 @@ struct SettingsView: View {
                 model.settingsStore.settings.voiceEnabledLexicons = selection
             }
         )
+    }
+
+    private func addCustomVoiceHotword() {
+        let newHotword = customVoiceHotword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !newHotword.isEmpty else { return }
+        let updated = VoiceLexicon.normalizedCustomTerms(
+            model.settingsStore.settings.voiceCustomHotwords + [newHotword]
+        )
+        customVoiceHotword = ""
+        guard updated != model.settingsStore.settings.voiceCustomHotwords else { return }
+        model.settingsStore.settings.voiceCustomHotwords = updated
+    }
+
+    private func removeCustomVoiceHotword(_ hotword: String) {
+        model.settingsStore.settings.voiceCustomHotwords.removeAll { $0 == hotword }
     }
 
     private func petDisplayLabel(_ entry: PetLibrary.Entry) -> String {
@@ -2345,8 +2391,8 @@ struct SettingsView: View {
             settingsGroup("更新策略") {
                 settingRow(
                     symbol: "arrow.triangle.branch",
-                    title: "手动检查通道",
-                    detail: "\(model.settingsStore.settings.updateChannel.detail)；仅用于手动检查"
+                    title: "更新通道",
+                    detail: "\(model.settingsStore.settings.updateChannel.detail)；用于自动与手动更新"
                 ) {
                     IslandOutlinedPicker(
                         selection: Binding(
@@ -2417,7 +2463,7 @@ struct SettingsView: View {
             settingRow(
                 symbol: "network",
                 title: "代理链接",
-                detail: "用于 CLI 安装/更新、GitHub 访问和下载"
+                detail: "用于 CLI 安装/更新和媒体下载"
             ) {
                 TextField(
                     "http://127.0.0.1:7897",
@@ -2433,7 +2479,7 @@ struct SettingsView: View {
             settingRow(
                 symbol: "power",
                 title: "启用本地代理",
-                detail: "关闭后所有更新、安装和下载命令都不使用此代理"
+                detail: "关闭后 CLI 安装/更新和媒体下载不使用此代理"
             ) {
                 Toggle(
                     "",
@@ -2566,8 +2612,8 @@ struct SettingsView: View {
         case .color: "颜色值"
         case .math: "算式"
         case .dateTime: "日期时间"
-        case .chineseText: "中文文本"
         case .code: "代码"
+        case .nonSystemLanguageText: "非当前系统语言文本"
         case .text: "文本"
         case .image: "图片"
         case .file: "文件"
@@ -2846,7 +2892,7 @@ struct SettingsView: View {
     ) {
         var order = clipboardAssistantActionOrder(for: kind)
         guard let index = order.firstIndex(of: action), index > 0 else { return }
-        let destination = order.index(index, offsetBy: offset)
+        let destination = index + offset
         guard destination > order.startIndex, order.indices.contains(destination) else { return }
         order.swapAt(index, destination)
         model.settingsStore.settings.clipboardAssistantActionOrders[kind] = order
@@ -2866,6 +2912,7 @@ struct SettingsView: View {
         case .translate: "翻译"
         case .composeMail: "写邮件"
         case .copyText: "复制结果"
+        case .copyFullExpression: "复制完整算式"
         case .compress: "压缩为 ZIP"
         case .share: "系统共享"
         case .callPhone: "拨打电话"
@@ -3034,7 +3081,7 @@ struct SettingsView: View {
         case .idle: "尚未检查更新"
         case .checking: "正在检查更新"
         case .current: "已是最新版本"
-        case .available(let release, let source): "发现 \(source.displayName) 新版本 \(release.tagName)"
+        case .available: "发现可用新版本"
         case .failed(let message): message
         }
     }

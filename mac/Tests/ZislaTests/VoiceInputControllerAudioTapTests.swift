@@ -32,8 +32,34 @@ struct VoiceInputControllerAudioTapTests {
         #expect(source.contains("contextualStrings = strings.filter"))
         #expect(source.contains("request.contextualStrings = contextualStrings"))
         #expect(source.contains("context.contextualStrings[.general] = contextualStrings"))
+        #expect(source.contains("format: nil"))
         #expect(!source.contains("strings != VoiceLexicon.terms(for: VoiceLexicon.defaultEnabled)"))
         #expect(!source.contains(".prefix("))
+    }
+
+    @Test
+    func audioTapFormatRefreshDetectsInputDeviceChanges() throws {
+        let preparedFormat = try #require(AVAudioFormat(
+            standardFormatWithSampleRate: 24_000,
+            channels: 1
+        ))
+        let liveFormat = try #require(AVAudioFormat(
+            standardFormatWithSampleRate: 48_000,
+            channels: 1
+        ))
+        let unchangedFormat = try #require(AVAudioFormat(
+            standardFormatWithSampleRate: 24_000,
+            channels: 1
+        ))
+
+        #expect(VoiceInputController.audioTapFormatNeedsRefresh(
+            preparedFormat: preparedFormat,
+            liveFormat: liveFormat
+        ))
+        #expect(!VoiceInputController.audioTapFormatNeedsRefresh(
+            preparedFormat: preparedFormat,
+            liveFormat: unchangedFormat
+        ))
     }
 
     @MainActor

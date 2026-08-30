@@ -44,4 +44,4 @@ Swift 使用 `Process.executableURL` 和参数数组启动 `yt-dlp`，URL 永远
 
 ## 检查和下载更新
 
-GitHub API 与 Gitee API 负责检测最新 Release。应用不执行替换、重启或挂载 DMG；发现新版本后，用户可将 DMG 下载到默认下载目录或本次选择的目录。下载完成前会保留原文件，已有同名包直接复用且绝不覆盖。用户必须先退出 zisla，再打开 DMG 并将应用拖入 `Applications`。带路径前缀的发布 tag（例如 `release/v0.1.2`）按最后一个路径分量解析版本。
+当前选择的更新通道由 Sparkle 读取已签名的 `appcast.xml`，经 HTTPS 下载其中引用的 ZIP，并在解压前验证 EdDSA 归档与 feed 签名，随后替换并重启应用。每次自动或手动检查都先读取 Gitee（Release 为 `update-release`，Preview 为 `preview`）；当 Gitee appcast 无法加载或更新包下载失败时，自动重试一次对应 GitHub feed。两份 appcast 分别只引用本站已签名的 Universal ZIP。切换设置同时影响自动和手动检查，并重置 Sparkle 的下一次检查周期。内置公钥不含账户信息；私钥仅保存在维护者的 macOS 钥匙串或受保护的私钥文件中。

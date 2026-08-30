@@ -32,6 +32,29 @@ struct AIAgentServicesTests {
     }
 
     @Test
+    func skillScanReadsDescriptionFromFrontMatter() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-skill-description-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let skillFile = root.appendingPathComponent("review/SKILL.md", isDirectory: false)
+        try FileManager.default.createDirectory(
+            at: skillFile.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("""
+        ---
+        name: review
+        description: \"A long skill description that should remain available to the UI.\"
+        ---
+        # Review
+        """.utf8).write(to: skillFile)
+
+        let skill = try #require(AIAgentSkillService().scan(roots: [root]).first)
+
+        #expect(skill.description == "A long skill description that should remain available to the UI.")
+    }
+
+    @Test
     func skillScanKeepsOneCaseInsensitiveNameUsingRootPriority() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-skill-name-dedup-\(UUID().uuidString)", isDirectory: true)
@@ -466,7 +489,7 @@ struct AIAgentServicesTests {
             timeout: 0.05
         )
 
-        // 解除孙进程占管道的阻塞不能牺牲父进程已经产出的内容。
+        // Unblocking a pipe held by a grandchild must preserve output already produced by the parent.
         #expect(output.status == 0)
         #expect(!output.didTimeout)
         #expect(output.standardOutput == Data("complete".utf8))
