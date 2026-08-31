@@ -128,7 +128,7 @@ struct NetworkBatteryMonitorTests {
             "device_connected": [{
               "AirPods Max": {
                 "device_minorType": "Headphones",
-                "device_batteryLevelMain": "81%"
+                "device_batteryLevelLeft": "77%"
               }
             }]
           }]
@@ -141,13 +141,15 @@ struct NetworkBatteryMonitorTests {
 
         #expect(device.deviceType == .headphones)
         #expect(device.deviceType.symbolName == "headphones")
+        #expect(device.batteryPercentInt == 77)
+        #expect(device.components.isEmpty)
         #expect(target.supportsAppleHeadphoneAdvertisement)
     }
 
     @Test
     func mergesBluetoothReadingsAndKeepsTheRicherFreshSnapshot() throws {
         let profile = NetworkBatteryDevice(
-            identifier: "bluetooth:aabbcc",
+            identifier: "bluetooth:profile-id",
             name: "AirPods Pro",
             deviceType: .airPods,
             batteryLevel: 0.70,
@@ -156,7 +158,7 @@ struct NetworkBatteryMonitorTests {
             connectionDetail: "已连接"
         )
         let advertisement = NetworkBatteryDevice(
-            identifier: "apple-headphone:aabbcc",
+            identifier: "apple-headphone:ble-id",
             name: "airpods pro",
             deviceType: .airPods,
             batteryLevel: 0.42,

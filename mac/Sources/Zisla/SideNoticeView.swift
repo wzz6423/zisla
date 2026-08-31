@@ -713,7 +713,10 @@ private struct HeadphoneConnectionNotice: View {
 
     var body: some View {
         HStack(spacing: 9) {
-            HeadphonePairGlyph(isPresented: isPresented)
+            HeadphoneGlyph(
+                isPresented: isPresented,
+                isSingleUnit: isSingleUnit
+            )
                 .frame(width: 42, height: 34)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -727,7 +730,10 @@ private struct HeadphoneConnectionNotice: View {
             }
             .frame(minWidth: 54, maxWidth: .infinity, alignment: .leading)
 
-            HeadphoneBatteryLevels(levels: notice.batteryLevels ?? [])
+            HeadphoneBatteryLevels(
+                levels: notice.batteryLevels ?? [],
+                isSingleUnit: isSingleUnit
+            )
 
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
@@ -753,28 +759,45 @@ private struct HeadphoneConnectionNotice: View {
     }
 
     private var accessibilityDescription: String {
+        if isSingleUnit {
+            let level = notice.batteryLevels?.first?.level.map { "\($0)%" } ?? "电量未知"
+            return "\(notice.title)已连接，耳机电量\(level)"
+        }
         let batteries = (notice.batteryLevels ?? []).map { level in
             "\(level.label)耳\(level.level.map { "\($0)%" } ?? "电量未知")"
         }
         return (["\(notice.title)已连接"] + batteries).joined(separator: "，")
     }
+
+    private var isSingleUnit: Bool {
+        notice.symbolName == "headphones"
+    }
 }
 
-private struct HeadphonePairGlyph: View {
+private struct HeadphoneGlyph: View {
     var isPresented: Bool
+    var isSingleUnit: Bool
 
     var body: some View {
-        ZStack {
-            Image(systemName: "airpod.left")
-                .offset(x: -9, y: isPresented ? -1 : 5)
-                .opacity(isPresented ? 1 : 0)
-                .scaleEffect(isPresented ? 1 : 0.64)
-            Image(systemName: "airpod.right")
-                .offset(x: 9, y: isPresented ? 1 : -5)
-                .opacity(isPresented ? 1 : 0)
-                .scaleEffect(isPresented ? 1 : 0.64)
+        Group {
+            if isSingleUnit {
+                Image(systemName: "headphones")
+                    .opacity(isPresented ? 1 : 0)
+                    .scaleEffect(isPresented ? 1 : 0.64)
+            } else {
+                ZStack {
+                    Image(systemName: "airpod.left")
+                        .offset(x: -9, y: isPresented ? -1 : 5)
+                        .opacity(isPresented ? 1 : 0)
+                        .scaleEffect(isPresented ? 1 : 0.64)
+                    Image(systemName: "airpod.right")
+                        .offset(x: 9, y: isPresented ? 1 : -5)
+                        .opacity(isPresented ? 1 : 0)
+                        .scaleEffect(isPresented ? 1 : 0.64)
+                }
+            }
         }
-        .font(.system(size: 25, weight: .medium))
+        .font(.system(size: isSingleUnit ? 27 : 25, weight: .medium))
         .foregroundStyle(.white)
         .shadow(color: .cyan.opacity(0.22), radius: 5, y: 1)
     }
@@ -782,6 +805,7 @@ private struct HeadphonePairGlyph: View {
 
 private struct HeadphoneBatteryLevels: View {
     var levels: [NoticeBatteryLevel]
+    var isSingleUnit = false
 
     var body: some View {
         HStack(spacing: 4) {
@@ -793,6 +817,9 @@ private struct HeadphoneBatteryLevels: View {
     }
 
     private var displayedLevels: [NoticeBatteryLevel] {
+        if isSingleUnit {
+            return [NoticeBatteryLevel(label: "耳机", level: levels.first?.level)]
+        }
         let defaults = [
             NoticeBatteryLevel(label: "左", level: nil),
             NoticeBatteryLevel(label: "右", level: nil),
@@ -859,7 +886,10 @@ private struct CompactHeadphoneConnectionBar: View {
                     Spacer(minLength: 0)
                         .frame(width: reservedCenterWidth)
 
-                    HeadphoneBatteryLevels(levels: notice.batteryLevels ?? [])
+                    HeadphoneBatteryLevels(
+                        levels: notice.batteryLevels ?? [],
+                        isSingleUnit: isSingleUnit
+                    )
                         .padding(.trailing, 10)
                         .frame(width: sideWidth, height: height, alignment: .trailing)
                 }
@@ -867,7 +897,10 @@ private struct CompactHeadphoneConnectionBar: View {
                 HStack(spacing: 8) {
                     headphoneIdentity
 
-                    HeadphoneBatteryLevels(levels: notice.batteryLevels ?? [])
+                    HeadphoneBatteryLevels(
+                        levels: notice.batteryLevels ?? [],
+                        isSingleUnit: isSingleUnit
+                    )
                 }
                 .padding(.horizontal, 10)
             }
@@ -888,7 +921,10 @@ private struct CompactHeadphoneConnectionBar: View {
 
     private var headphoneIdentity: some View {
         HStack(spacing: 8) {
-            HeadphonePairGlyph(isPresented: isPresented)
+            HeadphoneGlyph(
+                isPresented: isPresented,
+                isSingleUnit: isSingleUnit
+            )
                 .frame(width: 42, height: height)
 
             VStack(alignment: .leading, spacing: 1) {
@@ -903,6 +939,10 @@ private struct CompactHeadphoneConnectionBar: View {
             }
             .frame(minWidth: 42, maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private var isSingleUnit: Bool {
+        notice.symbolName == "headphones"
     }
 }
 

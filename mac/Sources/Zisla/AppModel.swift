@@ -2968,6 +2968,7 @@ final class AppModel: ObservableObject {
         kind: .info,
         side: .right,
         style: .headphone,
+        symbolName: connection.device.isAirPodsMax ? "headphones" : nil,
         batteryLevels: connection.battery?.noticeLevels
       ),
       expiresAfter: 3

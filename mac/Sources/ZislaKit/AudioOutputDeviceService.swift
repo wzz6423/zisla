@@ -27,21 +27,33 @@ public struct AudioOutputDevice: Identifiable, Equatable, Sendable {
         return ["headphone", "earphone", "earbud", "airpod", "airpods", "buds", "beats", "耳机"]
             .contains { normalized.contains($0) }
     }
+
+    public var isAirPodsMax: Bool {
+        name.lowercased()
+            .components(separatedBy: .whitespacesAndNewlines)
+            .joined()
+            .contains("airpodsmax")
+    }
 }
 
 public struct HeadphoneBatterySnapshot: Equatable, Sendable {
     public var leftLevel: Int?
     public var rightLevel: Int?
     public var caseLevel: Int?
+    public var mainLevel: Int?
 
-    public init(leftLevel: Int?, rightLevel: Int?, caseLevel: Int?) {
+    public init(leftLevel: Int?, rightLevel: Int?, caseLevel: Int?, mainLevel: Int? = nil) {
         self.leftLevel = Self.normalized(leftLevel)
         self.rightLevel = Self.normalized(rightLevel)
         self.caseLevel = Self.normalized(caseLevel)
+        self.mainLevel = Self.normalized(mainLevel)
     }
 
     public var noticeLevels: [NoticeBatteryLevel] {
-        [
+        if mainLevel != nil {
+            return [NoticeBatteryLevel(label: "耳机", level: mainLevel)]
+        }
+        return [
             NoticeBatteryLevel(label: "左", level: leftLevel),
             NoticeBatteryLevel(label: "右", level: rightLevel),
             NoticeBatteryLevel(label: "盒", level: caseLevel),
@@ -77,9 +89,13 @@ public struct HeadphoneBatterySnapshot: Equatable, Sendable {
         let snapshot = HeadphoneBatterySnapshot(
             leftLevel: Self.percentage(details["device_batteryLevelLeft"]),
             rightLevel: Self.percentage(details["device_batteryLevelRight"]),
-            caseLevel: Self.percentage(details["device_batteryLevelCase"])
+            caseLevel: Self.percentage(details["device_batteryLevelCase"]),
+            mainLevel: Self.percentage(details["device_batteryLevelMain"])
         )
-        return snapshot.leftLevel != nil || snapshot.rightLevel != nil || snapshot.caseLevel != nil
+        return snapshot.leftLevel != nil
+            || snapshot.rightLevel != nil
+            || snapshot.caseLevel != nil
+            || snapshot.mainLevel != nil
             ? snapshot
             : nil
     }

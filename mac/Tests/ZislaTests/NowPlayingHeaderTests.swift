@@ -5,6 +5,15 @@ import Testing
 
 struct NowPlayingHeaderTests {
     @Test
+    func backgroundSoundSnapshotDisplaysSourceAndLocalizedSoundName() {
+        let snapshot = MediaTextFormatting.backgroundSoundSnapshot(for: .rain)
+
+        #expect(snapshot.isPlaying)
+        #expect(!snapshot.supportsControls)
+        #expect(MediaTextFormatting.titleArtistText(snapshot) == "背景音 · 雨声")
+    }
+
+    @Test
     func mediaScrubTrackDistinguishesOtherwiseIdenticalSourceApplications() {
         let first = NowPlayingSnapshot(
             title: "同名曲目",

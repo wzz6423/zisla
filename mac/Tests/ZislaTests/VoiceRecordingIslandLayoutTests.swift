@@ -66,14 +66,14 @@ struct VoiceRecordingIslandLayoutTests {
     }
 
     @Test
-    func independentStatusPanelsDoNotForceThemselvesOverOtherApps() throws {
+    func independentStatusPanelsRejoinFullscreenSpacesWhenPresented() throws {
         let presenterSource = try String(
             contentsOf: Self.sourcesDirectoryURL.appendingPathComponent("Zisla/SideNoticePresenter.swift"),
             encoding: .utf8
         )
 
-        #expect(presenterSource.contains("panel.orderFront(nil)"))
-        #expect(!presenterSource.contains("panel.orderFrontRegardless()"))
+        #expect(presenterSource.contains("panel.orderFrontRegardless()"))
+        #expect(!presenterSource.contains("panel.orderFront(nil)"))
     }
 
     @Test

@@ -136,7 +136,13 @@ public struct NetworkBatteryDevice: Identifiable, Equatable, Sendable {
         self.isCharging = isCharging
         self.lastSeen = lastSeen
         self.source = source
-        self.components = components
+        let normalizedName = name
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .components(separatedBy: .whitespacesAndNewlines)
+            .joined()
+        self.components = deviceType == .headphones && normalizedName.contains("airpodsmax")
+            ? []
+            : components
         self.parentName = parentName
         self.connectionDetail = connectionDetail
     }
@@ -518,6 +524,9 @@ public final class NetworkBatteryMonitor: NSObject, ObservableObject {
         _ device: NetworkBatteryDevice
     ) -> String {
         guard device.source == .bluetooth else { return device.identifier }
+        if device.deviceType == .airPods || device.deviceType == .headphones {
+            return "bluetooth:headphone-name:\(normalizedName(device.name))"
+        }
         for prefix in ["bluetooth:", "ble:", "apple-headphone:"]
         where device.identifier.hasPrefix(prefix) {
             return "bluetooth:\(device.identifier.dropFirst(prefix.count))"
