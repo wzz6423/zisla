@@ -34,12 +34,16 @@ public struct OpenMeteoResponse: Decodable, Equatable, Sendable {
     public struct Daily: Decodable, Equatable, Sendable {
         public var sunrise: [String]
         public var sunset: [String]
+        public var temperatureMin: [Double]?
+        public var temperatureMax: [Double]?
         public var precipitationProbabilityMax: [Int]
         public var precipitationSum: [Double]
 
         private enum CodingKeys: String, CodingKey {
             case sunrise
             case sunset
+            case temperatureMin = "temperature_2m_min"
+            case temperatureMax = "temperature_2m_max"
             case precipitationProbabilityMax = "precipitation_probability_max"
             case precipitationSum = "precipitation_sum"
         }
