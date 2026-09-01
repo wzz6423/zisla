@@ -604,36 +604,12 @@ final class KeyboardAudioEngine {
     }
 
     private func connect(_ source: AVAudioNode, to destination: AVAudioNode) -> Bool {
-        if #available(macOS 27.0, *) {
-            do {
-                try engine.connectNode(source, to: destination, format: playbackFormat)
-            } catch {
-                engineError = L10n.format(
-                    "音频节点连接失败：%@",
-                    error.localizedDescription
-                )
-                return false
-            }
-        } else {
-            engine.connect(source, to: destination, format: playbackFormat)
-        }
+        engine.connect(source, to: destination, format: playbackFormat)
         return true
     }
 
     private func startPlayback(for voice: Voice) -> Bool {
-        if #available(macOS 27.0, *) {
-            do {
-                try voice.player.playAudio()
-            } catch {
-                engineError = L10n.format(
-                    "音频播放启动失败：%@",
-                    error.localizedDescription
-                )
-                return false
-            }
-        } else {
-            voice.player.play()
-        }
+        voice.player.play()
         return true
     }
 
