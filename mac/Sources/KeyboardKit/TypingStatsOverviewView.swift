@@ -257,7 +257,7 @@ private struct TypingRecentTrendCard: View {
                     "时间范围",
                     selection: Binding(
                         get: { selectedRange },
-                        set: onSelectRange
+                        set: { onSelectRange($0) }
                     )
                 ) {
                     ForEach(TypingTimelineRange.allCases) { timelineRange in
