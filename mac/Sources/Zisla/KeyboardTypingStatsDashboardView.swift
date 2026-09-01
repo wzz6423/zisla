@@ -106,7 +106,7 @@ struct KeyboardTypingStatsDashboardView: View {
     }
 
     private var trendPanel: some View {
-        statsPanel(title: "输入趋势", symbol: "waveform.path.ecg", subtitle: "最近 \(summary.timelineRange) · 每个区间聚合") {
+        statsPanel(title: "输入趋势", symbol: "waveform.path.ecg") {
             chartView
                 .frame(height: 110)
         }
@@ -144,7 +144,7 @@ struct KeyboardTypingStatsDashboardView: View {
     }
 
     private var historyPanel: some View {
-        statsPanel(title: "历史", symbol: "calendar", subtitle: "最近 14 天每日输入") {
+        statsPanel(title: "历史", symbol: "calendar") {
             Chart(summary.history) { day in
                 LineMark(
                     x: .value("日期", day.date, unit: .day),
@@ -179,7 +179,7 @@ struct KeyboardTypingStatsDashboardView: View {
     }
 
     private var keyboardPanel: some View {
-        statsPanel(title: "键盘", symbol: "keyboard", subtitle: "按键热力图 · 今日 / 累计按键次数") {
+        statsPanel(title: "键盘", symbol: "keyboard") {
             HStack(spacing: 8) {
                 keyboardCount("今日按键", summary.todayKeyPressCount)
                 keyboardCount("累计按键", summary.allTimeKeyPressCount)
@@ -204,7 +204,7 @@ struct KeyboardTypingStatsDashboardView: View {
     }
 
     private var applicationPanel: some View {
-        statsPanel(title: "应用时间线", symbol: "app.fill", subtitle: "按应用查看输入分布") {
+        statsPanel(title: "应用时间线", symbol: "app.fill") {
             if summary.applicationTimelines.isEmpty {
                 Text("记录输入后会在这里展示应用时间线。")
                     .font(.system(size: 10))
@@ -329,7 +329,6 @@ struct KeyboardTypingStatsDashboardView: View {
     private func statsPanel<Content: View>(
         title: String,
         symbol: String,
-        subtitle: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -340,9 +339,6 @@ struct KeyboardTypingStatsDashboardView: View {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Text(subtitle)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
             }
             content()
         }

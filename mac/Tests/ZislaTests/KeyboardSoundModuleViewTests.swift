@@ -70,6 +70,8 @@ struct KeyboardSoundModuleViewTests {
         )
         #expect(dashboardSource.contains("输入趋势"))
         #expect(dashboardSource.contains("历史"))
+        #expect(!dashboardSource.contains("subtitle:"))
+        #expect(!dashboardSource.contains("Text(subtitle)"))
         let historyStart = try #require(dashboardSource.range(of: "private var historyPanel"))
         let keyboardStart = try #require(dashboardSource.range(of: "private var keyboardPanel"))
         let historySource = String(dashboardSource[historyStart.lowerBound..<keyboardStart.lowerBound])
