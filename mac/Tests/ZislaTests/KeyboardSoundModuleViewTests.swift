@@ -82,6 +82,19 @@ struct KeyboardSoundModuleViewTests {
         #expect(dashboardSource.contains("Key(\"leftArrow\", \"←\", 123)"))
         #expect(dashboardSource.contains("Key(\"rightShift\", \"shift\", 60"))
 
+        // 今日/累计按键需按内容自然排列：keyboardCount 不能再撑满等分宽度，
+        // 靠外层 HStack 的 Spacer 保持左对齐。
+        let keyboardCountBody = try #require(
+            dashboardSource
+                .components(separatedBy: "private func keyboardCount")
+                .dropFirst()
+                .first?
+                .components(separatedBy: "\n    private ")
+                .first
+        )
+        #expect(!keyboardCountBody.contains("maxWidth: .infinity"))
+        #expect(dashboardSource.contains("keyboardCount(\"累计按键\", summary.allTimeKeyPressCount)\n                Spacer()"))
+
         let modules = IslandModule.allCases
         let aiIndex = try #require(modules.firstIndex(of: .aiMonitor))
         let keyboardIndex = try #require(modules.firstIndex(of: .keyboardSound))

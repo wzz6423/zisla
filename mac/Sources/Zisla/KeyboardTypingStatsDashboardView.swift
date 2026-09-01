@@ -180,6 +180,7 @@ struct KeyboardTypingStatsDashboardView: View {
             HStack(spacing: 8) {
                 keyboardCount("今日按键", summary.todayKeyPressCount)
                 keyboardCount("累计按键", summary.allTimeKeyPressCount)
+                Spacer()
             }
             KeyboardHeatmapView(counts: summary.todayKeyCounts)
                 .frame(height: 270)
@@ -195,7 +196,6 @@ struct KeyboardTypingStatsDashboardView: View {
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .monospacedDigit()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var applicationPanel: some View {
