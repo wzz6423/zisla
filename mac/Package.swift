@@ -9,6 +9,7 @@ let package = Package(
     products: [
         .library(name: "ZislaCore", targets: ["ZislaCore"]),
         .library(name: "ZislaKit", targets: ["ZislaKit"]),
+        .library(name: "BattutaKit", targets: ["BattutaKit"]),
         .executable(name: "zisla", targets: ["Zisla"]),
         .executable(name: "zislactl", targets: ["zislactl"]),
     ],
@@ -31,6 +32,21 @@ let package = Package(
                 .linkedFramework("CoreFoundation"),
             ]
         ),
+        .binaryTarget(
+            name: "Sparkle",
+            path: "Vendor/Sparkle.xcframework"
+        ),
+        .target(
+            name: "BattutaKit",
+            dependencies: [],
+            resources: [
+                .copy("../../Resources/Battuta")
+            ],
+            linkerSettings: [
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("CoreGraphics"),
+            ]
+        ),
         .target(
             name: "ZislaKit",
             dependencies: ["ZislaCore", "ZislaNVMe"],
@@ -51,6 +67,8 @@ let package = Package(
             dependencies: [
                 "ZislaCore",
                 "ZislaKit",
+                "BattutaKit",
+                "Sparkle",
                 .product(name: "SkyLightWindow", package: "SkyLightWindow"),
             ],
             resources: [
@@ -82,8 +100,18 @@ let package = Package(
             dependencies: ["ZislaCore", "ZislaKit"]
         ),
         .testTarget(
+            name: "BattutaKitTests",
+            dependencies: ["BattutaKit"]
+        ),
+        .testTarget(
             name: "ZislaTests",
-            dependencies: ["Zisla"]
+            dependencies: ["Zisla", "Sparkle"],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "@loader_path/../../..",
+                ]),
+            ]
         ),
     ]
 )

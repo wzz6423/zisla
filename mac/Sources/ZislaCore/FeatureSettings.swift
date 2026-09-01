@@ -569,6 +569,24 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var screenshotPinHotkey: VoiceInputHotkeyPreset
     /// Whether the pinned screenshot shows its bottom control bar.
     public var screenshotPinnedToolbarVisible: Bool
+    /// Whether keyboard typing sound (Battuta) is enabled.
+    public var battutaEnabled: Bool
+    /// Selected keyboard sound profile ID.
+    public var battutaSelectedProfileID: String
+    /// Keyboard sound volume (0.0 - 1.0).
+    public var battutaVolume: Double
+    /// Whether to play key release sounds.
+    public var battutaPlaysReleaseSound: Bool
+    /// Whether to use pitch variation for natural sound.
+    public var battutaUsesPitchVariation: Bool
+    /// Whether pointer (mouse) click sound is enabled.
+    public var battutaPointerSoundEnabled: Bool
+    /// Selected pointer sound profile ID.
+    public var battutaSelectedPointerProfileID: String
+    /// Pointer sound volume (0.0 - 1.0).
+    public var battutaPointerVolume: Double
+    /// Whether to play pointer release sounds.
+    public var battutaPlaysPointerReleaseSound: Bool
 
     public init(
         mediaEnabled: Bool = true,
@@ -644,7 +662,16 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         screenshotEnabled: Bool = true,
         screenshotHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.capture,
         screenshotPinHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.pin,
-        screenshotPinnedToolbarVisible: Bool = true
+        screenshotPinnedToolbarVisible: Bool = true,
+        battutaEnabled: Bool = false,
+        battutaSelectedProfileID: String = "holypanda",
+        battutaVolume: Double = 0.75,
+        battutaPlaysReleaseSound: Bool = true,
+        battutaUsesPitchVariation: Bool = true,
+        battutaPointerSoundEnabled: Bool = false,
+        battutaSelectedPointerProfileID: String = "classic",
+        battutaPointerVolume: Double = 0.5,
+        battutaPlaysPointerReleaseSound: Bool = true
     ) {
         self.mediaEnabled = mediaEnabled
         self.mediaSource = mediaSource
@@ -723,6 +750,15 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.screenshotHotkey = screenshotHotkey
         self.screenshotPinHotkey = screenshotPinHotkey
         self.screenshotPinnedToolbarVisible = screenshotPinnedToolbarVisible
+        self.battutaEnabled = battutaEnabled
+        self.battutaSelectedProfileID = battutaSelectedProfileID
+        self.battutaVolume = battutaVolume
+        self.battutaPlaysReleaseSound = battutaPlaysReleaseSound
+        self.battutaUsesPitchVariation = battutaUsesPitchVariation
+        self.battutaPointerSoundEnabled = battutaPointerSoundEnabled
+        self.battutaSelectedPointerProfileID = battutaSelectedPointerProfileID
+        self.battutaPointerVolume = battutaPointerVolume
+        self.battutaPlaysPointerReleaseSound = battutaPlaysPointerReleaseSound
     }
 
     /// Falls back to all current displays when all selected displays are disconnected, so activity notices remain visible.
@@ -816,6 +852,15 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case screenshotHotkey
         case screenshotPinHotkey
         case screenshotPinnedToolbarVisible
+        case battutaEnabled
+        case battutaSelectedProfileID
+        case battutaVolume
+        case battutaPlaysReleaseSound
+        case battutaUsesPitchVariation
+        case battutaPointerSoundEnabled
+        case battutaSelectedPointerProfileID
+        case battutaPointerVolume
+        case battutaPlaysPointerReleaseSound
     }
 
     private enum LegacyCodingKeys: String, CodingKey {
@@ -1023,6 +1068,42 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .screenshotPinnedToolbarVisible
         ) ?? defaults.screenshotPinnedToolbarVisible
+        battutaEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .battutaEnabled
+        ) ?? defaults.battutaEnabled
+        battutaSelectedProfileID = try container.decodeIfPresent(
+            String.self,
+            forKey: .battutaSelectedProfileID
+        ) ?? defaults.battutaSelectedProfileID
+        battutaVolume = try container.decodeIfPresent(
+            Double.self,
+            forKey: .battutaVolume
+        ) ?? defaults.battutaVolume
+        battutaPlaysReleaseSound = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .battutaPlaysReleaseSound
+        ) ?? defaults.battutaPlaysReleaseSound
+        battutaUsesPitchVariation = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .battutaUsesPitchVariation
+        ) ?? defaults.battutaUsesPitchVariation
+        battutaPointerSoundEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .battutaPointerSoundEnabled
+        ) ?? defaults.battutaPointerSoundEnabled
+        battutaSelectedPointerProfileID = try container.decodeIfPresent(
+            String.self,
+            forKey: .battutaSelectedPointerProfileID
+        ) ?? defaults.battutaSelectedPointerProfileID
+        battutaPointerVolume = try container.decodeIfPresent(
+            Double.self,
+            forKey: .battutaPointerVolume
+        ) ?? defaults.battutaPointerVolume
+        battutaPlaysPointerReleaseSound = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .battutaPlaysPointerReleaseSound
+        ) ?? defaults.battutaPlaysPointerReleaseSound
     }
 }
 
