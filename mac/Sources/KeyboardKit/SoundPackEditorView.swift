@@ -510,21 +510,21 @@ private struct SoundPackInspector: View {
                 "名称",
                 text: Binding(
                     get: { editor.manifest?.name ?? "" },
-                    set: editor.setName
+                    set: { editor.setName($0) }
                 )
             )
             TextField(
                 "作者（可选）",
                 text: Binding(
                     get: { editor.manifest?.author ?? "" },
-                    set: editor.setAuthor
+                    set: { editor.setAuthor($0) }
                 )
             )
             TextField(
                 "备注（可选）",
                 text: Binding(
                     get: { editor.manifest?.notes ?? "" },
-                    set: editor.setNotes
+                    set: { editor.setNotes($0) }
                 ),
                 axis: .vertical
             )
