@@ -21,14 +21,14 @@ struct ScreenshotEditorWindowVisibilityTests {
         #expect(!window.isVisible)
 
         // 模拟鼠标事件
-        let mouseEvent = try #require(mouseEvent(
+        let event = try #require(mouseEvent(
             type: .leftMouseDown,
             location: CGPoint(x: 80, y: 50),
             window: window,
             eventNumber: 1
         ))
 
-        view.mouseDown(with: mouseEvent)
+        view.mouseDown(with: event)
 
         // 验证隐藏窗口不会被激活
         #expect(!window.isVisible)
@@ -51,14 +51,14 @@ struct ScreenshotEditorWindowVisibilityTests {
         // 窗口现在可见
         #expect(window.isVisible)
 
-        let mouseEvent = try #require(mouseEvent(
+        let event = try #require(mouseEvent(
             type: .leftMouseDown,
             location: CGPoint(x: 80, y: 50),
             window: window,
             eventNumber: 1
         ))
 
-        view.mouseDown(with: mouseEvent)
+        view.mouseDown(with: event)
 
         // 可见窗口可以被激活
         #expect(window.isVisible)

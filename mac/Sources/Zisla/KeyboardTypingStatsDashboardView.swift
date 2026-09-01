@@ -146,21 +146,24 @@ struct KeyboardTypingStatsDashboardView: View {
     private var historyPanel: some View {
         statsPanel(title: "历史", symbol: "calendar", subtitle: "最近 14 天每日输入") {
             Chart(summary.history) { day in
-                BarMark(
-                    x: .value("日期", day.date, unit: .day),
-                    y: .value("字符数", day.characterCount)
-                )
-                .foregroundStyle(accent.opacity(0.64))
-                .cornerRadius(3)
                 LineMark(
                     x: .value("日期", day.date, unit: .day),
-                    y: .value("峰值", day.peakCharactersPerSecond)
+                    y: .value("字符数", day.characterCount),
+                    series: .value("系列", "字符数")
+                )
+                .interpolationMethod(.monotone)
+                .foregroundStyle(accent)
+                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                LineMark(
+                    x: .value("日期", day.date, unit: .day),
+                    y: .value("峰值", day.peakCharactersPerSecond),
+                    series: .value("系列", "峰值")
                 )
                 .foregroundStyle(Color.zislaInfo)
                 .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
             }
             .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: 4)) {
+                AxisMarks(values: .automatic(desiredCount: 7)) {
                     AxisGridLine().foregroundStyle(Color.dividerSubtle)
                     AxisValueLabel(format: .dateTime.month(.twoDigits).day(.twoDigits))
                 }
@@ -181,8 +184,11 @@ struct KeyboardTypingStatsDashboardView: View {
                 keyboardCount("今日按键", summary.todayKeyPressCount)
                 keyboardCount("累计按键", summary.allTimeKeyPressCount)
             }
-            KeyboardHeatmapView(counts: summary.todayKeyCounts)
-                .frame(height: 270)
+            KeyboardHeatmapView(
+                todayCounts: summary.todayKeyCounts,
+                allTimeCounts: summary.allTimeKeyCounts
+            )
+            .frame(height: 270)
         }
     }
 
@@ -195,7 +201,6 @@ struct KeyboardTypingStatsDashboardView: View {
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .monospacedDigit()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var applicationPanel: some View {
@@ -214,7 +219,7 @@ struct KeyboardTypingStatsDashboardView: View {
                                 .lineLimit(1)
                                 .frame(width: 110, alignment: .leading)
                             GeometryReader { proxy in
-                                HStack(alignment: .bottom, spacing: 1) {
+                                HStack(alignment: .bottom, spacing: Self.timelineBucketSpacing) {
                                     ForEach(timeline.buckets) { bucket in
                                         RoundedRectangle(cornerRadius: 1)
                                             .fill(accent.opacity(bucket.characterCount > 0 ? 0.72 : 0.08))
@@ -229,8 +234,95 @@ struct KeyboardTypingStatsDashboardView: View {
                                 .frame(width: 52, alignment: .trailing)
                         }
                     }
+                    timelineAxis
                 }
             }
+        }
+    }
+
+    /// Anchor ticks to the bucket geometry (first edge, middle edge, and last edge)
+    /// instead of evenly spacing labels, which drifts when the bucket count is odd.
+    struct TimelineAxisTick {
+        let date: Date
+        let x: CGFloat
+        let anchor: Alignment
+    }
+
+    /// Shared by the application bars and axis so both use the same bucket spacing.
+    static let timelineBucketSpacing: CGFloat = 1
+
+    static func timelineAxisTicks(
+        buckets: [KeyboardTypingStatsTrendPoint],
+        width: CGFloat,
+        spacing: CGFloat = timelineBucketSpacing
+    ) -> [TimelineAxisTick] {
+        guard buckets.count > 1, width > 0 else { return [] }
+
+        let count = CGFloat(buckets.count)
+        let cellWidth = max(0, (width - spacing * (count - 1)) / count)
+        let pitch = cellWidth + spacing
+        let middleIndex = buckets.count / 2
+        // Derive the final boundary from adjacent starts instead of duplicating bucketSeconds here.
+        let step = buckets[1].start.timeIntervalSince(buckets[0].start)
+
+        // Keep all ticks on time boundaries: bucket starts and the final end boundary.
+        // Using a bucket center while labeling its start would create a semantic offset.
+        return [
+            TimelineAxisTick(date: buckets[0].start, x: 0, anchor: .leading),
+            TimelineAxisTick(
+                date: buckets[middleIndex].start,
+                x: CGFloat(middleIndex) * pitch,
+                anchor: .center
+            ),
+            TimelineAxisTick(
+                date: buckets[buckets.count - 1].start.addingTimeInterval(step),
+                x: CGFloat(buckets.count - 1) * pitch + cellWidth,
+                anchor: .trailing
+            ),
+        ]
+    }
+
+    private var timelineAxis: some View {
+        HStack(spacing: 8) {
+            Color.clear.frame(width: 110, height: 1)
+            GeometryReader { proxy in
+                let ticks = Self.timelineAxisTicks(
+                    buckets: summary.applicationTimelines.first?.buckets ?? [],
+                    width: proxy.size.width
+                )
+                ZStack(alignment: .topLeading) {
+                    ForEach(Array(ticks.enumerated()), id: \.offset) { _, tick in
+                        Rectangle()
+                            .fill(Color.dividerSubtle)
+                            .frame(width: 1, height: 3)
+                            .offset(x: min(max(0, tick.x - 0.5), max(0, proxy.size.width - 1)))
+                    }
+                    ForEach(Array(ticks.enumerated()), id: \.offset) { _, tick in
+                        Text(timelineAxisLabel(tick.date))
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .fixedSize()
+                            .frame(width: 0, alignment: tick.anchor)
+                            .offset(x: tick.x, y: 4)
+                    }
+                }
+                .frame(width: proxy.size.width, alignment: .topLeading)
+            }
+            .frame(height: 14)
+            Color.clear.frame(width: 52, height: 1)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func timelineAxisLabel(_ date: Date) -> String {
+        switch summary.timelineRange {
+        case "7d":
+            // A seven-day window needs the date to distinguish repeated times of day.
+            return date.formatted(.dateTime.month(.twoDigits).day(.twoDigits).hour(.twoDigits(amPM: .omitted)))
+        case "24h", "6h", "1h":
+            return date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+        default:
+            return date.formatted(.dateTime.hour().minute())
         }
     }
 
@@ -270,7 +362,8 @@ struct KeyboardTypingStatsDashboardView: View {
 }
 
 private struct KeyboardHeatmapView: View {
-    let counts: [UInt16: Int64]
+    let todayCounts: [UInt16: Int64]
+    let allTimeCounts: [UInt16: Int64]
     var compact = false
 
     private var accent: Color { Color.accentColor }
@@ -340,7 +433,7 @@ private struct KeyboardHeatmapView: View {
         ],
     ]
 
-    private var maximum: Int64 { max(1, counts.values.max() ?? 0) }
+    private var maximum: Int64 { max(1, todayCounts.values.max() ?? 0) }
 
     var body: some View {
         GeometryReader { proxy in
@@ -366,10 +459,11 @@ private struct KeyboardHeatmapView: View {
     }
 
     private func keycap(_ key: Key, unit: CGFloat) -> some View {
-        let count = key.keyCode.map { counts[$0, default: 0] } ?? 0
+        let todayCount = key.keyCode.map { todayCounts[$0, default: 0] } ?? 0
+        let allTimeCount = key.keyCode.map { allTimeCounts[$0, default: 0] } ?? 0
         let fillOpacity = key.keyCode == nil
             ? 0.08
-            : 0.08 + 0.68 * Double(count) / Double(maximum)
+            : 0.08 + 0.68 * Double(todayCount) / Double(maximum)
 
         return VStack(spacing: 2) {
             if let systemImage = key.systemImage {
@@ -382,7 +476,7 @@ private struct KeyboardHeatmapView: View {
                     .minimumScaleFactor(0.65)
             }
             if !compact, key.keyCode != nil {
-                Text(count.formatted(.number))
+                Text("\(todayCount.formatted(.number)) / \(allTimeCount.formatted(.number))")
                     .font(.system(size: 8, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
@@ -398,7 +492,7 @@ private struct KeyboardHeatmapView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(key.systemImage == nil ? key.label : "锁定")
-        .accessibilityValue(key.keyCode.map { _ in count.formatted(.number) } ?? "")
+        .accessibilityValue(key.keyCode.map { _ in "今日 \(todayCount.formatted(.number))，累计 \(allTimeCount.formatted(.number))" } ?? "")
     }
 }
 

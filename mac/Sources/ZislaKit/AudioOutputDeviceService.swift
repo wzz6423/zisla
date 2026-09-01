@@ -60,6 +60,23 @@ public struct HeadphoneBatterySnapshot: Equatable, Sendable {
         ]
     }
 
+    static func fromNetworkBatteryDevice(_ device: NetworkBatteryDevice) -> HeadphoneBatterySnapshot? {
+        let isAirPodsMax = device.deviceType == .headphones
+            && Self.normalizedName(device.name).contains("airpodsmax")
+        let snapshot = HeadphoneBatterySnapshot(
+            leftLevel: device.components.first { $0.kind == .left }?.percentInt,
+            rightLevel: device.components.first { $0.kind == .right }?.percentInt,
+            caseLevel: device.components.first { $0.kind == .caseBattery }?.percentInt,
+            mainLevel: isAirPodsMax ? device.batteryPercentInt : nil
+        )
+        return snapshot.leftLevel != nil
+            || snapshot.rightLevel != nil
+            || snapshot.caseLevel != nil
+            || snapshot.mainLevel != nil
+            ? snapshot
+            : nil
+    }
+
     static func fromBluetoothProfile(_ data: Data, deviceName: String) -> HeadphoneBatterySnapshot? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let reports = root["SPBluetoothDataType"] as? [[String: Any]]
@@ -300,13 +317,32 @@ public final class AudioOutputDeviceService: ObservableObject {
                 timeout: 15
             )
             guard output.status == 0, !output.didTimeout else { return nil }
-            return HeadphoneBatterySnapshot.fromBluetoothProfile(
+            let profileSnapshot = HeadphoneBatterySnapshot.fromBluetoothProfile(
                 output.standardOutput,
                 deviceName: deviceName
             )
+            if profileSnapshot != nil { return profileSnapshot }
+
+            let discovery = NetworkBatteryMonitor.bluetoothDiscovery(from: output.standardOutput)
+            let normalizedDeviceName = Self.normalizedName(deviceName)
+            let target = discovery.targets.first { target in
+                target.isConnected && Self.normalizedName(target.name) == normalizedDeviceName
+            } ?? discovery.targets.first { target in
+                Self.normalizedName(target.name) == normalizedDeviceName
+            }
+            guard let target else { return nil }
+            let scannedDevices = await BluetoothBatteryScanner.collectBatteryDevices(targets: [target])
+            return scannedDevices.first { Self.normalizedName($0.name) == normalizedDeviceName }
+                .flatMap(HeadphoneBatterySnapshot.fromNetworkBatteryDevice)
         } catch {
             return nil
         }
+    }
+
+    nonisolated private static func normalizedName(_ value: String) -> String {
+        value.lowercased()
+            .components(separatedBy: .whitespacesAndNewlines)
+            .joined()
     }
 
     private static func outputDevices(defaultID: UInt32?) -> [AudioOutputDevice] {

@@ -91,4 +91,29 @@ struct AudioOutputDeviceServiceTests {
         #expect(snapshot?.noticeLevels.map(\.label) == ["耳机"])
         #expect(snapshot?.noticeLevels.map(\.level) == [81])
     }
+
+    @Test
+    func mapsScannedAirPodsMaxBatteryToOneNoticeLevel() {
+        let device = NetworkBatteryDevice(
+            identifier: "apple-headphone:test",
+            name: "AirPods Max",
+            deviceType: .headphones,
+            batteryLevel: 0.58,
+            isCharging: false,
+            components: [
+                BatteryLevelComponent(kind: .left, level: 0.58),
+                BatteryLevelComponent(kind: .right, level: 0.61),
+            ]
+        )
+
+        let snapshot = HeadphoneBatterySnapshot.fromNetworkBatteryDevice(device)
+
+        #expect(snapshot == HeadphoneBatterySnapshot(
+            leftLevel: nil,
+            rightLevel: nil,
+            caseLevel: nil,
+            mainLevel: 58
+        ))
+        #expect(snapshot?.noticeLevels.map(\.level) == [58])
+    }
 }
