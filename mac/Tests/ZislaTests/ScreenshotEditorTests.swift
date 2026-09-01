@@ -1017,6 +1017,31 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func pinPresentationKeepsTheFullToolbarForSmallImages() throws {
+        let image = try #require(makeGradientImage(width: 120, height: 80))
+        let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let controller = ScreenshotEditorWindowController(
+            image: image,
+            screenImage: image,
+            screenCGImage: cgImage,
+            screen: nil,
+            captureRect: CGRect(x: 20, y: 20, width: 80, height: 60),
+            capturedApplication: nil,
+            onClose: {}
+        )
+
+        controller.setPinned(true)
+
+        let window = try #require(controller.window)
+        window.alphaValue = 0
+        #expect(window.frame.width == ScreenshotPinnedLayout.contentWidth)
+        #expect(ScreenshotPinnedLayout.windowWidth(
+            forImageWidth: image.size.width,
+            toolbarVisible: true
+        ) == ScreenshotPinnedLayout.contentWidth)
+    }
+
+    @Test
     func pinnedPresentationCanHideToolbarWithoutLeavingFooterSpace() throws {
         let image = try #require(makeGradientImage(width: 320, height: 200))
         let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))

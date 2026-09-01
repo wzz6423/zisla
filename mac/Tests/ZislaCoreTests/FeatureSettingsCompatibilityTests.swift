@@ -114,6 +114,29 @@ struct FeatureSettingsCompatibilityTests {
         #expect(!decoded.clipboardDetectionEnabled)
         #expect(decoded.sideNoticesEnabled)
     }
+
+    @Test
+    func keyboardSoundSettingsDefaultForLegacyPayloadAndRoundTrip() throws {
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let decodedLegacy = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(!decodedLegacy.keyboardEnabled)
+        #expect(decodedLegacy.keyboardSelectedProfileID == "holypanda")
+
+        var settings = FeatureSettings.default
+        settings.keyboardEnabled = true
+        settings.keyboardVolume = 0.62
+        settings.keyboardTypingStatsEnabled = true
+        let encoded = try JSONEncoder().encode(settings)
+        let encodedText = String(decoding: encoded, as: UTF8.self)
+        #expect(encodedText.contains("\"keyboardEnabled\""))
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: encoded
+        )
+        #expect(decoded.keyboardEnabled)
+        #expect(decoded.keyboardVolume == 0.62)
+        #expect(decoded.keyboardTypingStatsEnabled)
+    }
     @Test
     func activityNoticeDisplayDurationRoundTripsAllCases() throws {
         for duration in ActivityNoticeDisplayDuration.allCases {

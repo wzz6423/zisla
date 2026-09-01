@@ -321,10 +321,12 @@ public final class NetworkBatteryMonitor: NSObject, ObservableObject {
     nonisolated static func mergedDevices(
         _ candidates: [NetworkBatteryDevice]
     ) -> [NetworkBatteryDevice] {
+        let aliases = crossSourceKeyAliases(candidates)
         var mergedByKey: [String: NetworkBatteryDevice] = [:]
         var orderedKeys: [String] = []
         for candidate in candidates {
-            let key = canonicalDeviceKey(candidate)
+            let canonicalKey = canonicalDeviceKey(candidate)
+            let key = aliases[canonicalKey] ?? canonicalKey
             guard let existing = mergedByKey[key] else {
                 mergedByKey[key] = candidate
                 orderedKeys.append(key)
@@ -343,6 +345,9 @@ public final class NetworkBatteryMonitor: NSObject, ObservableObject {
             combined.parentName = preferred.parentName ?? other.parentName
             combined.connectionDetail = preferred.connectionDetail ?? other.connectionDetail
             if combined.components.isEmpty { combined.components = other.components }
+            if isWeaklyTypedDevice(combined.deviceType), !isWeaklyTypedDevice(other.deviceType) {
+                combined.deviceType = other.deviceType
+            }
             mergedByKey[key] = combined
         }
         return orderedKeys.compactMap { mergedByKey[$0] }
@@ -518,6 +523,76 @@ public final class NetworkBatteryMonitor: NSObject, ObservableObject {
             }
         }
         return keys.compactMap { result[$0] }
+    }
+
+    /// Bluetooth and paired-device readings share no identifier, so the same iPhone/iPad shows up
+    /// twice. Pair them by name only when the match is unambiguous (exactly one candidate key per
+    /// source), otherwise two same-named devices the user owns would collapse into one row.
+    nonisolated private static func crossSourceKeyAliases(
+        _ candidates: [NetworkBatteryDevice]
+    ) -> [String: String] {
+        struct NameGroup {
+            var bluetoothKeys: Set<String> = []
+            var iDeviceKeys: Set<String> = []
+            var bluetoothTypes: Set<NetworkBatteryDevice.DeviceType> = []
+            var iDeviceTypes: Set<NetworkBatteryDevice.DeviceType> = []
+        }
+
+        var groups: [String: NameGroup] = [:]
+        for candidate in candidates {
+            let name = normalizedName(candidate.name)
+            guard !name.isEmpty else { continue }
+            let key = canonicalDeviceKey(candidate)
+            var group = groups[name] ?? NameGroup()
+            switch candidate.source {
+            case .bluetooth:
+                group.bluetoothKeys.insert(key)
+                group.bluetoothTypes.insert(candidate.deviceType)
+            case .iDevice:
+                group.iDeviceKeys.insert(key)
+                group.iDeviceTypes.insert(candidate.deviceType)
+            }
+            groups[name] = group
+        }
+
+        var aliases: [String: String] = [:]
+        for group in groups.values {
+            guard let bluetoothKey = group.bluetoothKeys.first,
+                  let iDeviceKey = group.iDeviceKeys.first,
+                  group.bluetoothKeys.count == 1,
+                  group.iDeviceKeys.count == 1,
+                  canMergeAcrossSources(
+                      bluetoothTypes: group.bluetoothTypes,
+                      iDeviceTypes: group.iDeviceTypes
+                  )
+            else {
+                continue
+            }
+            aliases[iDeviceKey] = bluetoothKey
+        }
+        return aliases
+    }
+
+    nonisolated private static func canMergeAcrossSources(
+        bluetoothTypes: Set<NetworkBatteryDevice.DeviceType>,
+        iDeviceTypes: Set<NetworkBatteryDevice.DeviceType>
+    ) -> Bool {
+        guard let bluetoothType = bluetoothTypes.first,
+              let iDeviceType = iDeviceTypes.first,
+              bluetoothTypes.count == 1,
+              iDeviceTypes.count == 1
+        else {
+            return false
+        }
+        // A renamed iPhone reports no usable minorType over Bluetooth, so it lands on the weak
+        // `.accessory`/`.unknown` guess; that carries no signal that contradicts the paired reading.
+        return bluetoothType == iDeviceType || isWeaklyTypedDevice(bluetoothType)
+    }
+
+    nonisolated private static func isWeaklyTypedDevice(
+        _ deviceType: NetworkBatteryDevice.DeviceType
+    ) -> Bool {
+        deviceType == .accessory || deviceType == .unknown
     }
 
     nonisolated private static func canonicalDeviceKey(

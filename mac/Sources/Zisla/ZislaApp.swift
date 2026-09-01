@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import ObjectiveC.runtime
 import ZislaCore
 import ZislaKit
 import SwiftUI
@@ -88,9 +89,26 @@ enum ScreenshotModalSession {
     }
 }
 
+@MainActor
+private final class ScreenshotModalDismissTarget: NSObject {
+    weak var window: NSWindow?
+
+    init(window: NSWindow) {
+        self.window = window
+    }
+
+    @objc func close(_ sender: Any?) {
+        window?.close()
+    }
+}
+
+@MainActor
+private var screenshotModalDismissTargetKey: UInt8 = 0
+
 struct ScreenshotModalWindowSnapshot {
     let image: CGImage
     let screenFrame: CGRect
+    let modalWindow: NSWindow?
 
     @MainActor
     static func capture(from modalWindow: NSWindow? = NSApp.modalWindow) -> Self? {
@@ -101,6 +119,7 @@ struct ScreenshotModalWindowSnapshot {
             return nil
         }
 
+        modalWindow.isReleasedWhenClosed = false
         let snapshotView = contentView.superview ?? contentView
         guard let bitmap = snapshotView.bitmapImageRepForCachingDisplay(in: snapshotView.bounds) else {
             return nil
@@ -110,8 +129,52 @@ struct ScreenshotModalWindowSnapshot {
 
         return Self(
             image: image,
-            screenFrame: modalWindow.frame
+            screenFrame: modalWindow.frame,
+            modalWindow: modalWindow
         )
+    }
+
+    @MainActor
+    func restore() {
+        guard let modalWindow else { return }
+        modalWindow.isReleasedWhenClosed = false
+        modalWindow.windowController?.showWindow(nil)
+        Self.bindDismissAction(toUpdateCancelButtonIn: modalWindow)
+        modalWindow.level = WindowPlacement.modalWindowLevel
+        modalWindow.alphaValue = 1
+        modalWindow.makeKeyAndOrderFront(nil)
+    }
+
+    @MainActor
+    private static func bindDismissAction(toUpdateCancelButtonIn window: NSWindow) {
+        guard let contentView = window.contentView else { return }
+        var pendingViews = ArraySlice(contentView.subviews)
+        while let view = pendingViews.popFirst() {
+            if let button = view as? NSButton {
+                let title = button.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                if title == "取消更新" || title == "Cancel Update" {
+                    let target = ScreenshotModalDismissTarget(window: window)
+                    objc_setAssociatedObject(
+                        button,
+                        &screenshotModalDismissTargetKey,
+                        target,
+                        .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+                    )
+                    button.target = target
+                    button.action = #selector(ScreenshotModalDismissTarget.close(_:))
+                    return
+                }
+            }
+            pendingViews.append(contentsOf: view.subviews)
+        }
+    }
+
+    @MainActor
+    func restoreAfterModalDismissal() {
+        restore()
+        DispatchQueue.main.async { [self] in
+            restore()
+        }
     }
 
     func composited(
@@ -161,7 +224,7 @@ struct ScreenshotModalWindowSnapshot {
         let scaleY = CGFloat(captureImage.height) / screenSize.height
         let drawFrame = CGRect(
             x: modalFrame.minX * scaleX,
-            y: modalFrame.minY * scaleY,
+            y: CGFloat(captureImage.height) - modalFrame.maxY * scaleY,
             width: modalFrame.width * scaleX,
             height: modalFrame.height * scaleY
         )
@@ -1310,6 +1373,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         let modalWindowSnapshot = ScreenshotModalWindowSnapshot.capture()
         ScreenshotModalSession.dismissForSelectionPresentation()
+        modalWindowSnapshot?.restoreAfterModalDismissal()
         setScreenshotSessionActive(true)
         setScreenshotLiveCaptureActive(true)
 
@@ -1348,6 +1412,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     } else {
                         self.additionalScreenshotEditors.removeAll { $0 === editor }
                     }
+                    modalWindowSnapshot?.restoreAfterModalDismissal()
                     self.endScreenshotSessionIfNeeded()
                 },
                 pinnedToolbarVisible: AppModel.shared.settingsStore.settings.screenshotPinnedToolbarVisible
@@ -1357,6 +1422,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             } else {
                 self.additionalScreenshotEditors.append(editor)
             }
+            modalWindowSnapshot?.restore()
             editor.present()
             if shouldPin {
                 editor.setPinned(true)
@@ -1368,6 +1434,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self.setScreenshotLiveCaptureActive(false)
             AppModel.shared.clipboardAssistant.setScreenshotSelectionActive(false)
             self.pendingScreenshotPin = false
+            modalWindowSnapshot?.restore()
             self.endScreenshotSessionIfNeeded()
         }
         Task { @MainActor [weak self] in

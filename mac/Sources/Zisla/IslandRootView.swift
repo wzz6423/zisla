@@ -219,6 +219,8 @@ struct IslandRootView: View {
                                             )
                                         case .lockScreen:
                                             LockScreenModuleView(model: model)
+                                        case .keyboardSound:
+                                            KeyboardSoundModuleView(model: model)
                                         }
                                     }
                                 } else {

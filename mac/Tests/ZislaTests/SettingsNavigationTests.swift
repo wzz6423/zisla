@@ -73,6 +73,7 @@ struct SettingsNavigationTests {
             "信息",
             "AI",
             "语音",
+            "键盘音效",
             "宠物",
             "下载",
             "天气",
@@ -83,6 +84,8 @@ struct SettingsNavigationTests {
         #expect(SettingsSection.general.subtitle == "调整语言、外观、启动与展开方式。")
         #expect(SettingsSection.ai.subtitle == "管理 AI CLI 与 Skills。")
         #expect(SettingsSection.voice.subtitle == "配置语音输入、整理模型与本机记录。")
+        #expect(SettingsSection.keyboardSound.subtitle == "键盘音效与输入统计。")
+        #expect(!SettingsSection.keyboardSound.prefersWideLayout)
         #expect(SettingsSection.networkProxy.subtitle == "配置本地代理，用于更新、安装、下载与 GitHub 访问。")
     }
 
@@ -96,8 +99,31 @@ struct SettingsNavigationTests {
         let settings = FeatureSettings()
         #expect(SettingsSection.general.isVisible(settings: settings))
         #expect(SettingsSection.features.isVisible(settings: settings))
+        #expect(!SettingsSection.keyboardSound.isVisible(settings: settings))
         #expect(SettingsSection.networkProxy.isVisible(settings: settings))
         #expect(SettingsSection.recommendations.isVisible(settings: settings))
+
+        var enabledSettings = settings
+        enabledSettings.keyboardEnabled = true
+        #expect(SettingsSection.keyboardSound.isVisible(settings: enabledSettings))
+    }
+
+    @Test
+    func keyboardSettingsDoNotExposePointerOrLaunchItemControls() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        let contentStart = try #require(source.range(of: "    private var keyboardSoundContent: some View {"))
+        let contentEnd = try #require(source.range(of: "\n    private var infoContent", range: contentStart.upperBound..<source.endIndex))
+        let content = String(source[contentStart.lowerBound..<contentEnd.lowerBound])
+
+        #expect(!content.contains("鼠标与触控板"))
+        #expect(!content.contains("启动项"))
+        #expect(!content.contains("启用键盘与点击音效"))
+        #expect(content.contains("试听键盘音"))
+        #expect(!content.contains("settingsGroup(\"输入统计\")"))
+        #expect(!content.contains("KeyboardTypingStatsDashboardView"))
+        #expect(!content.contains("keyboardTypingStatsContent"))
+        #expect(!content.contains("refreshTypingStats()"))
+        #expect(source.contains("featureToggle(\"键盘音效\", detail: \"全局播放键盘音效并记录输入统计\""))
     }
 
     @Test

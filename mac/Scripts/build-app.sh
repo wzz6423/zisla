@@ -44,6 +44,7 @@ SIGNING_MODE="${SIGNING_MODE:-}"
 BUILD_ARCHITECTURES="${BUILD_ARCHITECTURES:-$(uname -m)}"
 ARCHITECTURES=(${=BUILD_ARCHITECTURES})
 BINARIES=()
+KEYBOARD_RESOURCE_BUNDLE=""
 HAND_BUILT_APP_SWIFT_FLAGS=(-Xswiftc -DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE)
 
 [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]] || {
@@ -155,10 +156,18 @@ for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
   swift build --package-path "$ROOT" -c "$CONFIGURATION" --disable-sandbox --scratch-path "$SCRATCH_DIRECTORY" --triple "$TARGET_TRIPLE" "${HAND_BUILT_APP_SWIFT_FLAGS[@]}" --product zisla
   BIN_DIRECTORY="$(swift build --package-path "$ROOT" -c "$CONFIGURATION" --disable-sandbox --scratch-path "$SCRATCH_DIRECTORY" --triple "$TARGET_TRIPLE" "${HAND_BUILT_APP_SWIFT_FLAGS[@]}" --show-bin-path)"
   BINARIES+=("$BIN_DIRECTORY/zisla")
+  if [[ -z "$KEYBOARD_RESOURCE_BUNDLE" ]]; then
+    KEYBOARD_RESOURCE_BUNDLE="$BIN_DIRECTORY/zisla_KeyboardKit.bundle"
+  fi
 done
 
 rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Frameworks" "$CONTENTS/Helpers"
+[[ -d "$KEYBOARD_RESOURCE_BUNDLE" ]] || {
+  echo "error: missing KeyboardKit resource bundle: $KEYBOARD_RESOURCE_BUNDLE" >&2
+  exit 1
+}
+ditto "$KEYBOARD_RESOURCE_BUNDLE" "$CONTENTS/Resources/zisla_KeyboardKit.bundle"
 if (( ${#BINARIES[@]} == 1 )); then
   install -m 0755 "$BINARIES[1]" "$CONTENTS/MacOS/zisla"
 else

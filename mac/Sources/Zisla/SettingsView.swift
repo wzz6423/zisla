@@ -233,6 +233,8 @@ struct SettingsView: View {
             generalContent
         case .features:
             featuresContent
+        case .keyboardSound:
+            keyboardSoundContent
         case .clipboardAssistant, .screenshot:
             featuresContent
         case .workflow:
@@ -800,6 +802,8 @@ struct SettingsView: View {
                     featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
                     rowDivider
                     featureToggle("电池监控", detail: "显示电池详细信息与健康状态", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
+                    rowDivider
+                    featureToggle("键盘音效", detail: "全局播放键盘音效并记录输入统计", symbol: "keyboard.badge.ellipsis", keyPath: \.keyboardEnabled)
                 }
             }
 
@@ -928,6 +932,64 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("自动下载更新", detail: "发现新版本后下载，并在退出或重启时完成安装", symbol: "arrow.down.circle.fill", keyPath: \.automaticDownloadEnabled)
                         .disabled(!model.settingsStore.settings.updateChecksEnabled)
+                }
+            }
+        }
+    }
+
+    private var keyboardSoundContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            settingsGroup("全局音效") {
+                settingRow(symbol: "waveform", title: "键盘音色", detail: "选择 20 种内置机械键盘音色") {
+                    HStack(spacing: 6) {
+                        Picker("", selection: Binding(
+                            get: { model.settingsStore.settings.keyboardSelectedProfileID },
+                            set: { model.settingsStore.settings.keyboardSelectedProfileID = $0 }
+                        )) {
+                            ForEach(model.keyboardSound.keyboardProfiles) { profile in
+                                Text(profile.name).tag(profile.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .controlSize(.small)
+                        .frame(width: 150, alignment: .trailing)
+
+                        Button("试听键盘音") { model.keyboardSound.preview() }
+                            .controlSize(.small)
+                            .disabled(!model.settingsStore.settings.keyboardEnabled)
+                    }
+                    .disabled(!model.settingsStore.settings.keyboardEnabled)
+                }
+                rowDivider
+                settingRow(symbol: "speaker.wave.2", title: "键盘音量", detail: "调整主音量") {
+                    Slider(value: Binding(
+                        get: { model.settingsStore.settings.keyboardVolume },
+                        set: { model.settingsStore.settings.keyboardVolume = $0 }
+                    ), in: 0...1)
+                    .frame(width: 150)
+                    .disabled(!model.settingsStore.settings.keyboardEnabled)
+                }
+                rowDivider
+                featureToggle("播放键盘回弹音", detail: "为支持的音色播放释放音", symbol: "arrow.uturn.backward", keyPath: \.keyboardPlaysReleaseSound, isNested: true)
+                    .disabled(!model.settingsStore.settings.keyboardEnabled)
+                rowDivider
+                featureToggle("自然音高变化", detail: "在连续击键间使用轻微音量与音高变化", symbol: "waveform.path.ecg", keyPath: \.keyboardUsesPitchVariation, isNested: true)
+                    .disabled(!model.settingsStore.settings.keyboardEnabled)
+            }
+
+            settingsGroup("统计与权限") {
+                featureToggle("记录本地输入统计", detail: "仅保存字符数、按键次数、应用与时间聚合，不保存输入内容", symbol: "chart.bar.xaxis", keyPath: \.keyboardTypingStatsEnabled)
+                rowDivider
+                settingRow(symbol: "lock.shield", title: "输入监控权限", detail: model.keyboardSound.monitoringStateText) {
+                    if model.keyboardSound.isInputMonitoringGranted {
+                        Label("已授权", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                    } else {
+                        Button("打开设置") { model.keyboardSound.openInputMonitoringSettings() }
+                            .controlSize(.small)
+                    }
                 }
             }
         }
@@ -3463,6 +3525,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case info
     case ai
     case voice
+    case keyboardSound
     case pet
     case download
     case weather
@@ -3481,6 +3544,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "通用"
         case .features: "功能"
+        case .keyboardSound: "键盘音效"
         case .clipboardAssistant: "复制助手"
         case .screenshot: "截图"
         case .workflow: "工作流"
@@ -3500,6 +3564,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "gearshape.fill"
         case .features: "switch.2"
+        case .keyboardSound: "keyboard.badge.ellipsis"
         case .clipboardAssistant: "sparkles.rectangle.stack"
         case .screenshot: "camera.viewfinder"
         case .workflow: "square.grid.2x2.fill"
@@ -3519,6 +3584,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "调整语言、外观、启动与展开方式。"
         case .features: "集中开启或关闭所有功能模块。"
+        case .keyboardSound: "键盘音效与输入统计。"
         case .clipboardAssistant: "复制后弹出识别结果和下一步操作"
         case .screenshot: "启用截图、钉图与全局快捷键"
         case .workflow: "管理灵动岛中的工作流模块。"
@@ -3538,6 +3604,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .networkProxy, .recommendations:
             return true
+        case .keyboardSound:
+            return settings.keyboardEnabled
         case .clipboardAssistant:
             return settings.clipboardAssistantEnabled
         case .screenshot:

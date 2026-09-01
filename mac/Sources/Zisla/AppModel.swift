@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import UniformTypeIdentifiers
+import KeyboardKit
 import ZislaCore
 import ZislaKit
 
@@ -10,6 +11,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
   case shelf
   case clipboard
   case aiMonitor
+  case keyboardSound
   case download
   case agenda
   case mail
@@ -37,6 +39,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
     case .system: "系统"
     case .battery: "电池"
     case .lockScreen: "锁屏"
+    case .keyboardSound: "键盘音效"
     }
   }
 
@@ -55,6 +58,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
     case .system: "gauge.with.dots.needle.67percent"
     case .battery: "battery.100percent"
     case .lockScreen: "lock.display"
+    case .keyboardSound: "keyboard.badge.ellipsis"
     }
   }
 
@@ -86,6 +90,8 @@ enum IslandModule: String, CaseIterable, Identifiable {
       .mail
     case .quickNotes:
       .notes
+    case .keyboardSound:
+      .keyboardSound
     }
   }
 }
@@ -107,6 +113,7 @@ extension IslandModule {
     case .system: settings.systemMonitorEnabled
     case .battery: settings.batteryMonitorEnabled
     case .lockScreen: settings.lockScreenInfoEnabled
+    case .keyboardSound: settings.keyboardEnabled
     }
   }
 }
@@ -173,6 +180,10 @@ struct IslandModuleLayout: Equatable {
   )
   static let system = compactModule(contentHeight: 401, islandWidth: 720)
   static let battery = compactModule(contentHeight: batteryMaximumContentHeight)
+  static let keyboardSound = IslandModuleLayout(
+    islandSize: CGSize(width: 820, height: 560),
+    panelSize: CGSize(width: 820, height: 564)
+  )
   /// Quick Notes: needs a larger editing/preview area for rich content such as images and tables, so wider and taller than standard.
   static let notes = IslandModuleLayout(
     islandSize: CGSize(width: 720, height: 560),
@@ -433,6 +444,8 @@ final class AppModel: ObservableObject {
   let voiceInput = VoiceInputController()
   let voiceHistory = VoiceHistoryStore()
   let aiAgent = AIAgentWorkspace()
+  /// Integrated keyboard sound engine and local typing statistics.
+  let keyboardSound = KeyboardSoundController()
   /// Synchronous hook used by the app delegate to arm overlay focus protection before any
   /// recording-start cleanup can reorder windows.
   var onVoiceInputWillStart: (() -> Void)?
@@ -635,6 +648,7 @@ final class AppModel: ObservableObject {
       voiceHistory.objectWillChange,
       aiAgent.objectWillChange,
       managedTools.objectWillChange,
+      keyboardSound.objectWillChange,
     ]
     for publisher in childPublishers {
       publisher
@@ -930,6 +944,7 @@ final class AppModel: ObservableObject {
 
   func stop() {
     settingsStore.flushPendingChanges()
+    keyboardSound.stop()
     clipboardHistory.flushPendingChanges()
     aiAgent.store.flushPendingChanges()
     weatherTask?.cancel()
@@ -2059,6 +2074,14 @@ final class AppModel: ObservableObject {
   private func apply(settings: FeatureSettings) {
     // Regular UI appearance is controlled by user settings; the island panel is separately pinned to dark at the window level (see IslandPanel).
     NSApp.appearance = settings.appearanceMode.nsAppearance
+    keyboardSound.apply(
+      enabled: settings.keyboardEnabled,
+      keyboardProfileID: settings.keyboardSelectedProfileID,
+      keyboardVolume: settings.keyboardVolume,
+      playsReleaseSound: settings.keyboardPlaysReleaseSound,
+      usesPitchVariation: settings.keyboardUsesPitchVariation,
+      typingStatsEnabled: settings.keyboardTypingStatsEnabled
+    )
     media.setPreferredSource(settings.mediaSource)
     voiceInput.setContextualStrings(
       VoiceLexicon.contextualTerms(

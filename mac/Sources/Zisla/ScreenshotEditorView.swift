@@ -5178,6 +5178,10 @@ enum ScreenshotPinnedLayout {
             + opacityControlWidth
             + spacing * 5
     }
+
+    static func windowWidth(forImageWidth imageWidth: CGFloat, toolbarVisible: Bool) -> CGFloat {
+        toolbarVisible ? max(imageWidth, contentWidth) : imageWidth
+    }
 }
 
 enum ScreenshotPinnedInteraction {
@@ -5299,6 +5303,10 @@ struct ScreenshotPinnedImageView: View {
             width: image.size.width * scale,
             height: image.size.height * scale
         )
+        let windowWidth = ScreenshotPinnedLayout.windowWidth(
+            forImageWidth: imageSize.width,
+            toolbarVisible: toolbarVisible
+        )
         VStack(spacing: toolbarVisible ? ScreenshotPinnedLayout.verticalSpacing : 0) {
             ZStack {
                 Image(nsImage: image)
@@ -5370,13 +5378,13 @@ struct ScreenshotPinnedImageView: View {
             if toolbarVisible {
                 pinnedToolbar
                     .frame(
-                        width: min(imageSize.width, ScreenshotPinnedLayout.contentWidth),
+                        width: ScreenshotPinnedLayout.contentWidth,
                         height: ScreenshotPinnedLayout.toolbarHeight
                     )
             }
         }
         .frame(
-            width: imageSize.width,
+            width: windowWidth,
             height: imageSize.height + ScreenshotPinnedLayout.footerHeight(toolbarVisible: toolbarVisible)
         )
     }
@@ -5970,7 +5978,10 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     private func pinnedWindowSize(for imageSize: CGSize, scale: CGFloat) -> CGSize {
         CGSize(
-            width: imageSize.width * scale,
+            width: ScreenshotPinnedLayout.windowWidth(
+                forImageWidth: imageSize.width * scale,
+                toolbarVisible: pinnedToolbarVisible
+            ),
             height: imageSize.height * scale + ScreenshotPinnedLayout.footerHeight(toolbarVisible: pinnedToolbarVisible)
         )
     }

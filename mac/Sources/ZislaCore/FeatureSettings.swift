@@ -573,6 +573,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var screenshotPinHotkey: VoiceInputHotkeyPreset
     /// Whether the pinned screenshot shows its bottom control bar.
     public var screenshotPinnedToolbarVisible: Bool
+    /// Whether the integrated keyboard sounds are enabled.
+    public var keyboardEnabled: Bool
+    public var keyboardSelectedProfileID: String
+    public var keyboardVolume: Double
+    public var keyboardPlaysReleaseSound: Bool
+    public var keyboardUsesPitchVariation: Bool
+    public var keyboardTypingStatsEnabled: Bool
 
     public init(
         mediaEnabled: Bool = true,
@@ -650,7 +657,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         screenshotEnabled: Bool = true,
         screenshotHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.capture,
         screenshotPinHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.pin,
-        screenshotPinnedToolbarVisible: Bool = true
+        screenshotPinnedToolbarVisible: Bool = true,
+        keyboardEnabled: Bool = false,
+        keyboardSelectedProfileID: String = "holypanda",
+        keyboardVolume: Double = 0.75,
+        keyboardPlaysReleaseSound: Bool = true,
+        keyboardUsesPitchVariation: Bool = true,
+        keyboardTypingStatsEnabled: Bool = false
     ) {
         self.mediaEnabled = mediaEnabled
         self.mediaSource = mediaSource
@@ -733,6 +746,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.screenshotHotkey = screenshotHotkey
         self.screenshotPinHotkey = screenshotPinHotkey
         self.screenshotPinnedToolbarVisible = screenshotPinnedToolbarVisible
+        self.keyboardEnabled = keyboardEnabled
+        self.keyboardSelectedProfileID = keyboardSelectedProfileID
+        self.keyboardVolume = keyboardVolume
+        self.keyboardPlaysReleaseSound = keyboardPlaysReleaseSound
+        self.keyboardUsesPitchVariation = keyboardUsesPitchVariation
+        self.keyboardTypingStatsEnabled = keyboardTypingStatsEnabled
     }
 
     /// Falls back to all current displays when all selected displays are disconnected, so activity notices remain visible.
@@ -828,6 +847,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case screenshotHotkey
         case screenshotPinHotkey
         case screenshotPinnedToolbarVisible
+        case keyboardEnabled
+        case keyboardSelectedProfileID
+        case keyboardVolume
+        case keyboardPlaysReleaseSound
+        case keyboardUsesPitchVariation
+        case keyboardTypingStatsEnabled
     }
 
     private enum LegacyCodingKeys: String, CodingKey {
@@ -1045,6 +1070,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .screenshotPinnedToolbarVisible
         ) ?? defaults.screenshotPinnedToolbarVisible
+        keyboardEnabled = try container.decodeIfPresent(Bool.self, forKey: .keyboardEnabled) ?? defaults.keyboardEnabled
+        keyboardSelectedProfileID = try container.decodeIfPresent(String.self, forKey: .keyboardSelectedProfileID) ?? defaults.keyboardSelectedProfileID
+        keyboardVolume = try container.decodeIfPresent(Double.self, forKey: .keyboardVolume) ?? defaults.keyboardVolume
+        keyboardPlaysReleaseSound = try container.decodeIfPresent(Bool.self, forKey: .keyboardPlaysReleaseSound) ?? defaults.keyboardPlaysReleaseSound
+        keyboardUsesPitchVariation = try container.decodeIfPresent(Bool.self, forKey: .keyboardUsesPitchVariation) ?? defaults.keyboardUsesPitchVariation
+        keyboardTypingStatsEnabled = try container.decodeIfPresent(Bool.self, forKey: .keyboardTypingStatsEnabled) ?? defaults.keyboardTypingStatsEnabled
     }
 }
 

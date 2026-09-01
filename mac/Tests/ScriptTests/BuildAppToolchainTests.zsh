@@ -63,6 +63,7 @@ else
   print -r -- "$DEVELOPER_DIR" > "$FAKE_CAPTURE_FILE"
   mkdir -p "$bin_directory"
   touch "$bin_directory/zisla"
+  mkdir -p "$bin_directory/zisla_KeyboardKit.bundle"
 fi
 SCRIPT
 
