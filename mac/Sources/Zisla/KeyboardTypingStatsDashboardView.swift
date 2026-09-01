@@ -183,6 +183,7 @@ struct KeyboardTypingStatsDashboardView: View {
             HStack(spacing: 8) {
                 keyboardCount("今日按键", summary.todayKeyPressCount)
                 keyboardCount("累计按键", summary.allTimeKeyPressCount)
+                Spacer()
             }
             KeyboardHeatmapView(
                 todayCounts: summary.todayKeyCounts,
