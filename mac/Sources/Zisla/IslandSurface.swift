@@ -665,7 +665,6 @@ private struct NativeLiquidGlassShell: NSViewRepresentable {
 private final class LiquidGlassShellView: NSGlassEffectView {
     private var isCollapsed = true
     private var refreshGeneration = 0
-    private var lastLaidOutSize: CGSize = .zero
 
     func setCollapsed(_ isCollapsed: Bool) {
         let didExpand = self.isCollapsed && !isCollapsed
@@ -679,14 +678,6 @@ private final class LiquidGlassShellView: NSGlassEffectView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard window != nil, !isCollapsed else { return }
-        refreshGeneration &+= 1
-        scheduleRevealRefreshes()
-    }
-
-    override func layout() {
-        super.layout()
-        guard window != nil, !isCollapsed, bounds.size != lastLaidOutSize else { return }
-        lastLaidOutSize = bounds.size
         refreshGeneration &+= 1
         scheduleRevealRefreshes()
     }
@@ -716,13 +707,8 @@ private final class LiquidGlassShellView: NSGlassEffectView {
             else { return }
             self.needsLayout = true
             self.layoutSubtreeIfNeeded()
-            // A module switch changes the shell's bounds without moving it to a new window. Flush
-            // both the view and its window backing store so NSGlassEffectView rebuilds the
-            // refraction pass instead of leaving the inactive-size snapshot rendered as a frosted
-            // fallback.
             self.needsDisplay = true
             self.displayIfNeeded()
-            self.window?.displayIfNeeded()
         }
     }
 }

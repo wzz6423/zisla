@@ -5,13 +5,14 @@ import Testing
 /// Guards the native Glass refresh seam used after an expanded surface changes size.
 struct IslandSurfaceLiquidGlassLifecycleTests {
     @Test
-    func resizingAnExpandedShellRenewsItsCompositingState() throws {
+    func resizingAnExpandedShellUsesTheStableCompositingPath() throws {
         let source = try Self.source(of: "IslandSurface.swift")
 
-        #expect(source.contains("private var lastLaidOutSize: CGSize = .zero"))
-        #expect(source.contains("override func layout()"))
-        #expect(source.contains("bounds.size != lastLaidOutSize"))
-        #expect(source.contains("self.window?.displayIfNeeded()"))
+        #expect(!source.contains("private var lastLaidOutSize: CGSize = .zero"))
+        #expect(!source.contains("override func layout()"))
+        #expect(!source.contains("self.window?.displayIfNeeded()"))
+        #expect(source.contains("self.needsDisplay = true"))
+        #expect(source.contains("self.displayIfNeeded()"))
     }
 
     @Test

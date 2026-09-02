@@ -132,7 +132,7 @@ struct IslandPanelFocusRetentionTests {
     }
 
     @Test @MainActor
-    func resizingKeyPanelKeepsNativeGlassCompositingInPlace() async {
+    func resizingKeyPanelKeepsGlassPanelVisible() async {
         let (panel, host) = Self.makeFocusedElsewhereScenario()
         defer {
             panel.orderOut(nil)
@@ -143,9 +143,8 @@ struct IslandPanelFocusRetentionTests {
         panel.resize(to: CGRect(x: 0, y: 0, width: 320, height: 48))
         try? await Task.sleep(for: .milliseconds(10))
 
-        // A visible resize stays in the existing window/compositor context. The panel may remain
-        // key in this same-process harness; the real external app remains frontmost because no
-        // activation call is made.
+        // The stable Glass resize path may cycle window ordering, but it must leave the panel visible
+        // without activating the application.
         #expect(panel.isVisible)
         #expect(panel.frame == CGRect(x: 0, y: 0, width: 320, height: 48))
     }
@@ -163,6 +162,34 @@ struct IslandPanelFocusRetentionTests {
         panel.activateNativeGlassIfNeeded()
 
         #expect(panel.isKeyWindow)
+    }
+
+    /// Losing key status to another app is a normal focus handoff, not a deliberate island reveal.
+    /// The delayed Glass recovery must keep the compositor alive without activating Zisla again.
+    @Test @MainActor
+    func resigningGlassPanelDoesNotReactivateApplication() async {
+        var activationCount = 0
+        let originalActivationHandler = IslandPanel.applicationActivationHandler
+        IslandPanel.applicationActivationHandler = { activationCount += 1 }
+        defer { IslandPanel.applicationActivationHandler = originalActivationHandler }
+
+        let panel = IslandPanel(
+            contentView: NSView(),
+            frame: CGRect(x: 0, y: 0, width: 240, height: 34)
+        )
+        panel.allowsNativeGlassActivation = true
+        panel.keepsNativeGlassActive = true
+        panel.present(at: panel.frame, animated: false)
+        activationCount = 0
+        defer {
+            panel.keepsNativeGlassActive = false
+            panel.orderOut(nil)
+        }
+
+        panel.resignKey()
+        try? await Task.sleep(for: .milliseconds(20))
+
+        #expect(activationCount == 0)
     }
 
     /// A panel arriving on screen is a reveal, not a refresh: it may take focus.

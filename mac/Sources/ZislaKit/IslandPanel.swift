@@ -33,11 +33,6 @@ public final class IslandPanel: NSPanel {
   public var keepsNativeGlassActive = false {
     didSet {
       guard keepsNativeGlassActive != oldValue else { return }
-      if !keepsNativeGlassActive {
-        // A new expanded session may activate Glass once; refreshes in that session must stay
-        // non-activating until the panel is collapsed again.
-        suppressNativeGlassRecovery = false
-      }
       restoreNativeGlassActivationIfNeeded()
     }
   }
@@ -45,7 +40,6 @@ public final class IslandPanel: NSPanel {
   public var avoidsAppActivation = false
   public var isPinned = false
   private var transitionGeneration: UInt64 = 0
-  private var suppressNativeGlassRecovery = false
   private nonisolated(unsafe) var clickMonitor: Any?
 
     /// Window level used when the collapsed island sits above other windows (same layer as the menu bar).
@@ -87,29 +81,22 @@ public final class IslandPanel: NSPanel {
     /// Reclaims activation for the glass surface on a deliberate reveal. Refresh paths must not call
     /// this: it activates the app, which moves keyboard focus off the user's current text field.
     public func activateNativeGlassIfNeeded() {
-        restoreNativeGlassActivationIfNeeded(ignoringRefreshSuppression: true)
+        restoreNativeGlassActivationIfNeeded(allowingApplicationActivation: true)
     }
 
-    private func restoreNativeGlassActivationIfNeeded(ignoringRefreshSuppression: Bool = false) {
+    private func restoreNativeGlassActivationIfNeeded(allowingApplicationActivation: Bool = false) {
         guard !avoidsAppActivation,
               allowsNativeGlassActivation,
               keepsNativeGlassActive,
               isVisible else { return }
-        // Refreshes must suppress only application activation. The panel still has to become key so
+        // Lifecycle recovery must suppress only application activation. The panel still has to become key so
         // NSGlassEffectView keeps its native compositing path instead of falling back to frosted glass.
-        let mayActivateApplication = ignoringRefreshSuppression || !suppressNativeGlassRecovery
         // Do not automatically reclaim focus while pinned; activate only when unpinned.
-        if !isPinned && mayActivateApplication {
+        // Lifecycle recovery stays non-activating; only an explicit reveal opts into application activation.
+        if allowingApplicationActivation && !isPinned {
             Self.applicationActivationHandler()
         }
         makeKeyAndOrderFront(nil)
-    }
-
-    /// Begins suppressing the app-activation half of Glass recovery for an internal refresh.
-    /// Keep the suppression for the whole expanded session: the size pipeline can issue a second
-    /// resize hundreds of milliseconds later, after the first `resignKey` callback has returned.
-    private func suppressNativeGlassRecoveryDuringRefresh() {
-        suppressNativeGlassRecovery = true
     }
 
     private func handleContentViewClick() {
@@ -233,19 +220,12 @@ public final class IslandPanel: NSPanel {
     // NSPanel produces WindowServer intermediate frames when its frame changes while visible, even with
     // animationBehavior set to .none. Move it out of the compositing layer first, then reposition it;
     // expansion is drawn solely by the SwiftUI mask.
-    let isRefresh = plan != .show
-    if isRefresh, keepsNativeGlassActive {
-      suppressNativeGlassRecoveryDuringRefresh()
-    }
-    if plan == .reposition {
-      orderOut(nil)
-    }
+    if plan == .reposition { orderOut(nil) }
     alphaValue = 1
     if plan != .refront { setFrame(frame, display: true) }
     orderFrontRegardless()
-    // Only a panel arriving on screen may reclaim activation. `.refront` and `.reposition` are the
-    // refresh plans — Space recovery, module resize, a media header re-laid out by a new track — and
-    // the panel is already up, so reclaiming there only serves to steal the caret from another app.
+    // Only the first reveal may activate the app. Refreshes keep the original compositor ordering
+    // path, while the non-activating restore above preserves the frontmost app's caret.
     if plan == .show { activateNativeGlassIfNeeded() }
   }
 
@@ -253,15 +233,10 @@ public final class IslandPanel: NSPanel {
     guard self.frame != frame else { return }
     transitionGeneration &+= 1
     _ = animated
-    // A module switch changes only the expanded panel bounds. Keep a visible panel in the
-    // WindowServer ordering while resizing; cycling it through orderOut/orderFront rebuilds the
-    // NSGlassEffectView compositing context and can fall back to frosted glass when the app is
-    // inactive (the same transition that used to steal the external text field's focus).
-    let isRefresh = isVisible
-    if isRefresh, keepsNativeGlassActive {
-      suppressNativeGlassRecoveryDuringRefresh()
-    }
+    let requiresReposition = isVisible
+    if requiresReposition { orderOut(nil) }
     setFrame(frame, display: true)
+    if requiresReposition { orderFrontRegardless() }
   }
 
   public func dismiss(to collapsedFrame: CGRect? = nil, animated: Bool = true) {
