@@ -88,60 +88,39 @@ struct IslandPanelHitTestingTests {
         #expect(!panel.canBecomeKey)
     }
 
+    /// The whole point of the active-appearance override: glass no longer needs key status, so
+    /// showing the glass surface must not widen the panel's focus eligibility by itself.
     @Test @MainActor
-    func keepsNativeGlassActiveAllowsPanelToBecomeKey() {
+    func keepsNativeGlassActiveDoesNotMakePanelKeyEligible() {
         let panel = IslandPanel(
             contentView: NSView(),
             frame: CGRect(x: 0, y: 0, width: 240, height: 34)
         )
         panel.allowsKeyWindow = false
-        panel.allowsNativeGlassActivation = true
         panel.keepsNativeGlassActive = true
 
-        #expect(panel.canBecomeKey)
-    }
-
-    @Test @MainActor
-    func panelWithGlassActiveRetainsActivationEligibilityAfterResigning() async {
-        let panel = IslandPanel(
-            contentView: NSView(),
-            frame: CGRect(x: 0, y: 0, width: 240, height: 34)
-        )
-        panel.allowsKeyWindow = false
-        panel.allowsNativeGlassActivation = true
-        panel.keepsNativeGlassActive = true
-        panel.present(at: panel.frame, animated: false)
-        panel.alphaValue = 0
-        defer { panel.orderOut(nil) }
-
-        #expect(panel.canBecomeKey)
-
-        panel.resignKey()
-        try? await Task.sleep(for: .milliseconds(50))
-
-        #expect(panel.keepsNativeGlassActive)
-        #expect(panel.canBecomeKey)
-    }
-
-    @Test @MainActor
-    func disablingGlassActivationStopsPendingKeyReclaim() async {
-        let panel = IslandPanel(
-            contentView: NSView(),
-            frame: CGRect(x: 0, y: 0, width: 240, height: 34)
-        )
-        panel.allowsNativeGlassActivation = true
-        panel.keepsNativeGlassActive = true
-        panel.present(at: panel.frame, animated: false)
-        panel.alphaValue = 0
-        defer { panel.orderOut(nil) }
-
-        panel.resignKey()
-        panel.allowsNativeGlassActivation = false
-        try? await Task.sleep(for: .milliseconds(50))
-
-        #expect(panel.keepsNativeGlassActive)
         #expect(!panel.canBecomeKey)
+    }
+
+    /// `NSGlassEffectView` renders full Liquid Glass only while its host window paints as active.
+    /// The panel answers AppKit's private appearance query itself, which is what lets it stay
+    /// non-key — and therefore leave the user's caret alone — without degrading to frosted glass.
+    @Test @MainActor
+    func panelClaimsActiveAppearanceWhileStayingNonKey() throws {
+        let panel = IslandPanel(
+            contentView: NSView(),
+            frame: CGRect(x: 0, y: 0, width: 240, height: 34)
+        )
+        panel.present(at: panel.frame, animated: false)
+        panel.alphaValue = 0
+        defer { panel.orderOut(nil) }
+        let selector = activeAppearanceSelector
+        let override = try #require(class_getMethodImplementation(IslandPanel.self, selector))
+
+        #expect(override != class_getMethodImplementation(NSPanel.self, selector))
+        #expect(callsBackTrue(panel, selector))
         #expect(!panel.isKeyWindow)
+        #expect(!panel.canBecomeKey)
     }
 
     @Test @MainActor
@@ -191,7 +170,7 @@ struct IslandPanelHitTestingTests {
     }
 
     @Test @MainActor
-    func visiblePanelMovingToNewFrameLeavesCompositingLayerFirst() {
+    func visiblePanelMovingToNewFrameIsClassifiedAsReposition() {
         #expect(
             IslandPanel.presentationPlan(
                 isVisible: true,
@@ -239,26 +218,40 @@ struct IslandPanelHitTestingTests {
     }
 
     @Test @MainActor
-    func pinnedPanelKeepsGlassActiveWithoutActivatingApp() async {
+    func pinnedPanelKeepsGlassActiveWithoutTakingFocus() async {
         let panel = IslandPanel(
             contentView: NSView(),
             frame: CGRect(x: 0, y: 0, width: 240, height: 34)
         )
-        panel.allowsNativeGlassActivation = true
+        var activationCount = 0
+        panel.applicationActivationHandler = { activationCount += 1 }
         panel.keepsNativeGlassActive = true
         panel.isPinned = true
         panel.present(at: panel.frame, animated: false)
         panel.alphaValue = 0
         defer { panel.orderOut(nil) }
 
-        #expect(panel.canBecomeKey)
-
-        panel.resignKey()
         try? await Task.sleep(for: .milliseconds(50))
 
-        #expect(panel.canBecomeKey)
         #expect(panel.keepsNativeGlassActive)
+        #expect(!panel.isKeyWindow)
+        #expect(activationCount == 0)
     }
+}
+
+/// Built from a runtime string because `#selector` cannot name a private AppKit query.
+private let activeAppearanceSelector: Selector = {
+    let name = "_hasActiveAppearance"
+    return Selector(name)
+}()
+
+/// Invokes a `BOOL`-returning, argument-less selector without going through `perform`, which would
+/// misread the returned scalar as an object.
+@MainActor
+private func callsBackTrue(_ object: AnyObject, _ selector: Selector) -> Bool {
+    typealias BoolQuery = @convention(c) (AnyObject, Selector) -> Bool
+    guard let method = class_getInstanceMethod(type(of: object), selector) else { return false }
+    return unsafeBitCast(method_getImplementation(method), to: BoolQuery.self)(object, selector)
 }
 
 @MainActor

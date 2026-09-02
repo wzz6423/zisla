@@ -83,10 +83,9 @@ struct OverlayCoordinatorVoiceRecordingTests {
         // Recording remains noninteractive and does not take the key window for its content.
         #expect(panel.ignoresMouseEvents)
         #expect(!panel.allowsKeyWindow)
-        // It retains glass eligibility without actually becoming the key window.
-        #expect(panel.allowsNativeGlassActivation)
+        // The recording surface keeps its glass without ever being focusable.
         #expect(panel.keepsNativeGlassActive)
-        #expect(panel.canBecomeKey)
+        #expect(!panel.canBecomeKey)
         #expect(!panel.isKeyWindow)
         #expect(panel.avoidsAppActivation)
     }

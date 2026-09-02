@@ -45,7 +45,6 @@ public final class OverlayCoordinator: NSObject {
     private var pointerEntryGraceTask: Task<Void, Never>?
     private var collapseGeneration = CollapseGenerationTracker()
     private var panelCollapseGeneration = CollapseGenerationTracker()
-    private var glassActivationGeneration = CollapseGenerationTracker()
     private var pointerEntryGraceGeneration = CollapseGenerationTracker()
     private var isPointerInside = false
     private var awaitsPointerEntry = false
@@ -61,6 +60,9 @@ public final class OverlayCoordinator: NSObject {
     private var isScreenshotActive = false
     private var collapsedOnTop = true
     private var isPersistentContentVisible = true
+    internal var applicationActivationHandler: () -> Void = {
+        NSApp.activate(ignoringOtherApps: true)
+    }
 
     /// - Parameters:
     ///   - collapseDelay: Grace period between the pointer leaving the island and the fold. Zero by
@@ -131,10 +133,8 @@ public final class OverlayCoordinator: NSObject {
         cancelScheduledCollapse()
         cancelPendingPanelCollapse()
         cancelPointerRevalidation()
-        cancelPendingGlassActivation()
         endPointerEntryGrace()
         let wasVisible = panel?.isVisible == true
-        panel?.allowsNativeGlassActivation = false
         panel?.keepsNativeGlassActive = false
         panel?.allowsKeyWindow = false
         panel?.orderOut(nil)
@@ -237,7 +237,7 @@ public final class OverlayCoordinator: NSObject {
             onActiveDisplayHasPhysicalNotchChanged?(layout.topology.hasPhysicalNotch)
             panel.resize(to: layout.expandedFrame)
             applyPanelInteractionPolicy()
-            applyPanelFocusPolicy(activateGlass: false)
+            applyPanelFocusPolicy()
             applyPanelLevel()
             if isExpanded { schedulePointerRevalidation() }
         } else {
@@ -289,14 +289,11 @@ public final class OverlayCoordinator: NSObject {
         if pinned {
             stopsAfterTransientReveal = false
             ensureActiveDisplay()
-            cancelPendingGlassActivation()
             endPointerEntryGrace()
         }
         process(reducer.send(.setPinned(pinned)))
-        applyPanelFocusPolicy(activateGlass: false)
-        if !pinned {
-            scheduleGlassActivation()
-        }
+        applyPanelFocusPolicy()
+        if pinned { focusKeyboardInputSurfaceIfNeeded() }
     }
 
     /// Expands the panel without pinning it (does not modify isPinned). Intended for external
@@ -389,7 +386,6 @@ public final class OverlayCoordinator: NSObject {
         guard !isVoiceRecording, !isExternalDragging else { return }
         cancelScheduledCollapse()
         cancelPointerRevalidation()
-        cancelPendingGlassActivation()
         endPointerEntryGrace()
         isPinned = false
         process(reducer.send(.collapseImmediately))
@@ -423,21 +419,22 @@ public final class OverlayCoordinator: NSObject {
             cancelScheduledCollapse()
             process(reducer.send(.collapseDelayElapsed))
         }
-        applyPanelFocusPolicy(activateGlass: false)
+        applyPanelFocusPolicy()
         applyPanelInteractionPolicy()
     }
 
     public func setAllowsKeyWindow(_ allows: Bool) {
         allowsKeyWindow = allows
-        applyPanelFocusPolicy(activateGlass: false)
+        applyPanelFocusPolicy()
+        if allows { focusKeyboardInputSurfaceIfNeeded() }
     }
 
-    /// The window server subdues NSGlassEffectView in inactive non-activating panels.
-    /// This is enabled only while the transparent style's island is expanded.
+    /// Records whether the island shows the transparent style's native glass surface, which the
+    /// panel keeps rendering on its own — no focus is taken for it.
     public func setKeepsNativeGlassActive(_ keepsActive: Bool) {
         guard keepsNativeGlassActive != keepsActive else { return }
         keepsNativeGlassActive = keepsActive
-        applyNativeGlassActivation()
+        applyPanelFocusPolicy()
     }
 
     /// Sets the stacking level of the collapsed Dynamic Island.
@@ -486,34 +483,35 @@ public final class OverlayCoordinator: NSObject {
         }
     }
 
-    private func applyNativeGlassActivation() {
-        applyPanelFocusPolicy(activateGlass: true)
-    }
-
-    private func applyPanelFocusPolicy(activateGlass: Bool) {
+    private func applyPanelFocusPolicy() {
         guard let panel else { return }
         let isExpanded = reducer.state.visibility == .expanded
             || reducer.state.visibility == .pinned
         let allowsInteraction = isExpanded && !isVoiceRecording
-        // Keep the recording surface eligible for glass rendering without reclaiming focus from the target app.
+        // The recording surface is glass too, and it must never pull focus from the target app.
         let showsGlassSurface = isExpanded || isVoiceRecording
-        let shouldKeepGlassActive = keepsNativeGlassActive && showsGlassSurface
         // Pinned panels may also become key windows so input focus works correctly.
         let shouldAllowKeyWindow = allowsKeyWindow && allowsInteraction
-        let shouldAllowNativeGlassActivation = shouldKeepGlassActive
 
         panel.isPinned = isPinned
-        // Assign this before keepsNativeGlassActive because its didSet immediately applies the focus policy.
         panel.avoidsAppActivation = isVoiceRecording
         panel.allowsKeyWindow = shouldAllowKeyWindow
-        panel.allowsNativeGlassActivation = shouldAllowNativeGlassActivation
-        panel.keepsNativeGlassActive = shouldKeepGlassActive
+        panel.keepsNativeGlassActive = keepsNativeGlassActive && showsGlassSurface
 
-        if isVoiceRecording, panel.isKeyWindow {
-            panel.resignKey()
-        } else if !panel.canBecomeKey, panel.isKeyWindow {
+        if panel.isKeyWindow, isVoiceRecording || !panel.canBecomeKey {
             panel.resignKey()
         }
+    }
+
+    /// Hands the caret to the island only when the user has parked it open on purpose *and* the app
+    /// reports a text-input surface (quick notes, mail, teleprompter). Automatic reveals — track
+    /// changes, notices, repositioning — are never pinned, so they cannot reach this and cannot pull
+    /// the caret out of whatever the user is typing in.
+    private func focusKeyboardInputSurfaceIfNeeded() {
+        guard isPinned, allowsKeyWindow, let panel, panel.isVisible, !panel.isKeyWindow else {
+            return
+        }
+        panel.takeKeyboardFocus()
     }
 
     private func applyPanelInteractionPolicy() {
@@ -574,23 +572,20 @@ public final class OverlayCoordinator: NSObject {
                 cancelPendingPanelCollapse()
                 presentCurrentLayout()
                 onVisibilityChanged?(true)
-                scheduleGlassActivation()
             case .collapse:
-                cancelPendingGlassActivation()
                 // The host view completes the center-mask animation within the fixed expanded size; on collapse
                 // only the hit-testing is disabled — avoids touching the visible NSPanel's frame, which would
                 // trigger window-server compositing layer rebuilds.
                 onVisibilityChanged?(false)
                 panel?.ignoresMouseEvents = true
-                applyPanelFocusPolicy(activateGlass: false)
+                applyPanelFocusPolicy()
                 applyPanelLevel()
                 updatePersistentPanels()
                 if stopsAfterTransientReveal { schedulePanelDismiss() }
             case .hide:
                 cancelPendingPanelCollapse()
-                cancelPendingGlassActivation()
                 panel?.ignoresMouseEvents = true
-                applyPanelFocusPolicy(activateGlass: false)
+                applyPanelFocusPolicy()
                 panel?.dismiss(to: layout(for: activeDisplayID)?.collapsedFrame)
                 onVisibilityChanged?(false)
             case .scheduleCollapse:
@@ -703,23 +698,6 @@ public final class OverlayCoordinator: NSObject {
         _ = pointerEntryGraceGeneration.advance()
     }
 
-    private func scheduleGlassActivation() {
-        guard !isPinned else {
-            cancelPendingGlassActivation()
-            return
-        }
-        let token = glassActivationGeneration.advance()
-        Task { @MainActor [weak self] in
-            await Task.yield()
-            guard let self, !self.isPinned, self.glassActivationGeneration.isCurrent(token) else { return }
-            self.applyNativeGlassActivation()
-        }
-    }
-
-    private func cancelPendingGlassActivation() {
-        _ = glassActivationGeneration.advance()
-    }
-
     private func ensureActiveDisplay() {
         guard activeDisplayID == nil else { return }
         activeDisplayID =
@@ -746,7 +724,7 @@ public final class OverlayCoordinator: NSObject {
         return layouts.first { $0.displayID == displayID }
     }
 
-    private func presentCurrentLayout(activatesFocus: Bool = true) {
+    private func presentCurrentLayout() {
         guard let layout = layout(for: activeDisplayID) else { return }
         // After repositioning to a different screen, don't let a pending collapse task on the old screen prematurely hide the shared panel.
         cancelPendingPanelCollapse()
@@ -764,12 +742,12 @@ public final class OverlayCoordinator: NSObject {
             )
             self.panel = panel
         }
-        applyPanelFocusPolicy(activateGlass: false)
+        panel.applicationActivationHandler = applicationActivationHandler
+        applyPanelFocusPolicy()
         panel.present(
             at: targetFrame,
             from: layout.collapsedFrame,
-            animated: !panel.isVisible,
-            activatesFocus: activatesFocus
+            animated: !panel.isVisible
         )
         applyPanelInteractionPolicy()
         applyPanelLevel()
@@ -815,6 +793,7 @@ public final class OverlayCoordinator: NSObject {
             }
             panel.allowsKeyWindow = false
             panel.ignoresMouseEvents = true
+            panel.applicationActivationHandler = applicationActivationHandler
             panel.level = isScreenshotActive
                 ? IslandPanel.onBottomLevel
                 : IslandPanel.onTopLevel

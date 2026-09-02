@@ -260,7 +260,7 @@ protocol AudioSpectrumCapturing: AnyObject {
     func stop()
 }
 
-private final class SystemAudioSpectrumCapture: AudioSpectrumCapturing, @unchecked Sendable {
+final class SystemAudioSpectrumCapture: AudioSpectrumCapturing, @unchecked Sendable {
     private let controlQueue = DispatchQueue(label: "dev.wzz.zisla.audio-spectrum.control")
     private let callbackQueue = DispatchQueue(
         label: "dev.wzz.zisla.audio-spectrum.callback",
@@ -274,6 +274,19 @@ private final class SystemAudioSpectrumCapture: AudioSpectrumCapturing, @uncheck
     private var sampleRate = 48_000.0
     private var lastAnalysisTime: TimeInterval = 0
     private var analysisMode = AudioSpectrumAnalysisMode.visualization
+    private var hasRequestedAuthorizationInCurrentLaunch = false
+
+    /// Anchoring the system recording prompt activates the app, so it may only happen where a prompt
+    /// can still appear: the tap creation just failed and this launch has not asked yet. Once the
+    /// permission is granted the first, unanchored attempt succeeds — which is what keeps automatic
+    /// graph rebuilds (track changes, island reveals, notice updates) from pulling the caret out of
+    /// whatever the user is typing in.
+    static func shouldRequestAuthorizationPrompt(
+        creationFailed: Bool,
+        hasRequestedInCurrentLaunch: Bool
+    ) -> Bool {
+        creationFailed && !hasRequestedInCurrentLaunch
+    }
 
     func setAnalysisMode(_ mode: AudioSpectrumAnalysisMode) {
         callbackQueue.async { [weak self] in
@@ -319,13 +332,18 @@ private final class SystemAudioSpectrumCapture: AudioSpectrumCapturing, @uncheck
         tapDescription = description
 
         var newTapID = AudioObjectID(kAudioObjectUnknown)
-        var host: NSWindow?
-        // Keep the host for every tap creation: ordering it also keeps the nonactivating
-        // island panel's glass surface composited across later collapse/expand cycles.
-        DispatchQueue.main.sync {
-            host = WindowPlacement.authorizationPromptHost()
-        }
-        defer {
+        var status = AudioHardwareCreateProcessTap(description, &newTapID)
+        if Self.shouldRequestAuthorizationPrompt(
+            creationFailed: status != noErr,
+            hasRequestedInCurrentLaunch: hasRequestedAuthorizationInCurrentLaunch
+        ) {
+            hasRequestedAuthorizationInCurrentLaunch = true
+            // A key host on the mouse's screen makes the system panel open there.
+            var host: NSWindow?
+            DispatchQueue.main.sync {
+                host = WindowPlacement.authorizationPromptHost()
+            }
+            status = AudioHardwareCreateProcessTap(description, &newTapID)
             if let host {
                 DispatchQueue.main.async {
                     host.orderOut(nil)
@@ -333,7 +351,7 @@ private final class SystemAudioSpectrumCapture: AudioSpectrumCapturing, @uncheck
                 }
             }
         }
-        try check(AudioHardwareCreateProcessTap(description, &newTapID))
+        try check(status)
         tapID = newTapID
 
         let aggregateDescription: [String: Any] = [

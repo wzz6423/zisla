@@ -22,12 +22,14 @@ private final class ClickBlockingContentView: NSView {
 
 @MainActor
 public final class IslandPanel: NSPanel {
-  public var allowsKeyWindow = false
-  public var allowsNativeGlassActivation = true
-  public var keepsNativeGlassActive = false {
-    didSet { restoreNativeGlassActivationIfNeeded() }
+  internal var applicationActivationHandler: () -> Void = {
+    NSApp.activate(ignoringOtherApps: true)
   }
-  /// Prevents app activation or key-window reacquisition during recording, preserving focus in the target input.
+  public var allowsKeyWindow = false
+  /// Records that the transparent style's native glass surface is on screen. The active-appearance
+  /// override below is what keeps that surface rendering, so this never influences focus.
+  public var keepsNativeGlassActive = false
+  /// Prevents app activation while recording, preserving focus in the target input.
   public var avoidsAppActivation = false
   public var isPinned = false
   private var transitionGeneration: UInt64 = 0
@@ -38,10 +40,22 @@ public final class IslandPanel: NSPanel {
     /// Window level used when the collapsed island sinks below the menu bar: lower than both the menu bar (24) and normal windows, so they cover it.
     public static let onBottomLevel = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
 
-    public override var canBecomeKey: Bool {
-        allowsKeyWindow || (allowsNativeGlassActivation && keepsNativeGlassActive) || (isPinned && allowsKeyWindow)
-    }
+    public override var canBecomeKey: Bool { allowsKeyWindow }
     public override var canBecomeMain: Bool { false }
+
+    /// `NSGlassEffectView` renders its full Liquid Glass treatment only while the host window paints
+    /// as active, and AppKit derives that from key status — which this `.nonactivatingPanel` must
+    /// never take, because `makeKeyAndOrderFront` flips `NSApp.isActive` and pulls the caret out of
+    /// whatever the user is typing in even while another app stays frontmost. Claiming active
+    /// appearance separates the two: measured pixel-identical to a key window's glass with
+    /// `isKeyWindow` still false, which is what lets automatic refreshes (track changes, notice
+    /// updates, repositioning) leave focus completely alone. Unconditional on purpose — there is no
+    /// inactive look to preserve, since the island is always dark and never follows the system
+    /// appearance, and a state-dependent answer would need an invalidation hook AppKit only fires on
+    /// real key changes. If a future AppKit stops asking, the island simply falls back to today's
+    /// frosted rendering.
+    @objc(_hasActiveAppearance)
+    private func islandHasActiveAppearance() -> Bool { true }
 
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard let action = Self.editingAction(for: event),
@@ -53,35 +67,31 @@ public final class IslandPanel: NSPanel {
         return true
     }
 
-  public override func resignKey() {
-        guard !avoidsAppActivation,
-              allowsNativeGlassActivation,
-              keepsNativeGlassActive,
-              isVisible else {
-            super.resignKey()
-            return
+    /// Moves the panel without leaving the window server's ordering. The zero-duration context
+    /// suppresses the ambient implicit-animation transaction that otherwise smears the frame change
+    /// across intermediate positions; ordering the panel out and back in cured the same smear but
+    /// dropped the window from the server's ordering, costing a frame and a Space rejoin.
+    private func setFrameWithoutReordering(_ frame: CGRect) {
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            context.allowsImplicitAnimation = false
+            setFrame(frame, display: true)
         }
-
-        DispatchQueue.main.async { [weak self] in
-            self?.restoreNativeGlassActivationIfNeeded()
-        }
-    }
-
-    private func restoreNativeGlassActivationIfNeeded() {
-        guard !avoidsAppActivation,
-              allowsNativeGlassActivation,
-              keepsNativeGlassActive,
-              isVisible else { return }
-        // Do not automatically reclaim focus while pinned; activate only when unpinned.
-        if !isPinned {
-            NSApp.activate(ignoringOtherApps: true)
-        }
-        makeKeyAndOrderFront(nil)
     }
 
     private func handleContentViewClick() {
-        // Explicitly activate the app and window when the user clicks the island.
-        NSApp.activate(ignoringOtherApps: true)
+        // A deliberate click may take focus — but not while recording, when the caret belongs to the
+        // app being dictated into.
+        guard !avoidsAppActivation else { return }
+        applicationActivationHandler()
+        makeKeyAndOrderFront(nil)
+    }
+
+    /// The other deliberate path to the caret: the user opened a text surface inside the island
+    /// (quick notes, mail, teleprompter) on purpose. Never called for automatic content refreshes.
+    public func takeKeyboardFocus() {
+        guard !avoidsAppActivation, canBecomeKey else { return }
+        applicationActivationHandler()
         makeKeyAndOrderFront(nil)
     }
 
@@ -168,7 +178,7 @@ public final class IslandPanel: NSPanel {
         case refront
         /// Not on screen yet: position it, then order it in.
         case show
-        /// Visible at a different frame: leave the compositing layer before moving.
+        /// Visible at a different frame: move it, then re-assert ordering.
         case reposition
     }
 
@@ -186,8 +196,7 @@ public final class IslandPanel: NSPanel {
   public func present(
     at frame: CGRect,
     from collapsedFrame: CGRect? = nil,
-    animated: Bool = true,
-    activatesFocus: Bool = true
+    animated: Bool = true
   ) {
     _ = collapsedFrame
     _ = animated
@@ -198,26 +207,17 @@ public final class IslandPanel: NSPanel {
     )
     // Supersedes any in-flight dismiss fade so its completion cannot order this panel back out.
     transitionGeneration &+= 1
-    // NSPanel produces WindowServer intermediate frames when its frame changes while visible, even with
-    // animationBehavior set to .none. Move it out of the compositing layer first, then reposition it;
-    // expansion is drawn solely by the SwiftUI mask.
-    if plan == .reposition { orderOut(nil) }
     alphaValue = 1
-    if plan != .refront { setFrame(frame, display: true) }
+    if plan != .refront { setFrameWithoutReordering(frame) }
     orderFrontRegardless()
-    if activatesFocus {
-        restoreNativeGlassActivationIfNeeded()
-    }
   }
 
   public func resize(to frame: CGRect, animated: Bool = true) {
     guard self.frame != frame else { return }
     transitionGeneration &+= 1
     _ = animated
-    let requiresReposition = isVisible
-    if requiresReposition { orderOut(nil) }
-    setFrame(frame, display: true)
-    if requiresReposition { orderFrontRegardless() }
+    setFrameWithoutReordering(frame)
+    if isVisible { orderFrontRegardless() }
   }
 
   public func dismiss(to collapsedFrame: CGRect? = nil, animated: Bool = true) {
