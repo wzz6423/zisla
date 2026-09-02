@@ -312,17 +312,32 @@ public enum NotesAppBridge {
     /// Converts Markdown source to the HTML format used for a Notes body: splits into plain `<div>` paragraphs and escapes `&<>`.
     /// Matches the format of native plain-text notes in Notes, avoiding the monospaced preformatted style of `<pre>`;
     /// when Notes returns `plaintext`, it reconstructs newlines from paragraphs so the Quick Note editor still receives Markdown source.
+    /// Preserves leading whitespace (spaces and tabs) by converting them to non-breaking spaces.
     public static func bodyHTML(for markdown: String) -> String {
         if markdown.isEmpty { return "" }
         return markdown
             .components(separatedBy: "\n")
             .map { line -> String in
                 if line.isEmpty { return "<div><br></div>" }
-                let escaped = line
+
+                // Count and preserve leading whitespace
+                var leadingCount = 0
+                for char in line {
+                    if char == " " || char == "\t" {
+                        leadingCount += 1
+                    } else {
+                        break
+                    }
+                }
+
+                let content = String(line.dropFirst(leadingCount))
+                let escaped = content
                     .replacingOccurrences(of: "&", with: "&amp;")
                     .replacingOccurrences(of: "<", with: "&lt;")
                     .replacingOccurrences(of: ">", with: "&gt;")
-                return "<div>\(escaped)</div>"
+
+                let leadingSpaces = leadingCount > 0 ? String(repeating: "&nbsp;", count: leadingCount) : ""
+                return "<div>\(leadingSpaces)\(escaped)</div>"
             }
             .joined()
     }

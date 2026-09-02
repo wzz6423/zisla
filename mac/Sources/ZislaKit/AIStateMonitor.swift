@@ -586,7 +586,10 @@ public final class AIStateMonitor: ObservableObject {
                 detectsUsage: detectsUsage,
                 loadsUsageHistory: false
             )
-            Self.scheduleAllocatorRelief(on: self.refreshQueue)
+            // Page-entry refreshes inspect active tasks only; forcing allocator pressure relief
+            // there can invalidate the just-composited Liquid Glass surface. Reclaim memory only
+            // when this pass actually scanned usage history.
+            if detectsUsage { Self.scheduleAllocatorRelief(on: self.refreshQueue) }
             Task { @MainActor in completion(result) }
         }
     }

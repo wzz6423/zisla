@@ -508,6 +508,9 @@ public final class OverlayCoordinator: NSObject {
         panel.allowsKeyWindow = shouldAllowKeyWindow
         panel.allowsNativeGlassActivation = shouldAllowNativeGlassActivation
         panel.keepsNativeGlassActive = shouldKeepGlassActive
+        // A refresh caller passes `false`: the island is only re-laying out (new track in the media
+        // header, module resize, Space recovery) and must leave the frontmost app's focus alone.
+        if activateGlass { panel.activateNativeGlassIfNeeded() }
 
         if isVoiceRecording, panel.isKeyWindow {
             panel.resignKey()
@@ -799,10 +802,8 @@ public final class OverlayCoordinator: NSObject {
                 continue
             }
             let panel: IslandPanel
-            let isNewPanel: Bool
             if let existingPanel = persistentPanels[layout.displayID] {
                 panel = existingPanel
-                isNewPanel = false
             } else {
                 guard let contentView = persistentContentViewProvider(layout) else { continue }
                 panel = IslandPanel(
@@ -810,7 +811,6 @@ public final class OverlayCoordinator: NSObject {
                     frame: persistentPanelFrameProvider(layout)
                 )
                 persistentPanels[layout.displayID] = panel
-                isNewPanel = true
             }
             panel.allowsKeyWindow = false
             panel.ignoresMouseEvents = true
@@ -819,10 +819,12 @@ public final class OverlayCoordinator: NSObject {
                 : IslandPanel.onTopLevel
 
             let targetFrame = persistentPanelFrameProvider(layout)
-            // Present only new, previously hidden, resized, or explicitly refronted panels.
-            let needsPresent = isNewPanel || !panel.isVisible || panel.frame != targetFrame || forcePresent
-            if needsPresent {
+            if !panel.isVisible || forcePresent {
                 panel.present(at: targetFrame, animated: false)
+            } else if panel.frame != targetFrame {
+                // Status updates can shift the pet anchor while another app owns keyboard focus.
+                // Update the frame in place instead of cycling the panel through WindowServer ordering.
+                panel.setFrame(targetFrame, display: true)
             }
             visibleDisplayIDs.insert(layout.displayID)
         }

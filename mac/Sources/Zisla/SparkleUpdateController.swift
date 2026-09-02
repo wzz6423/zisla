@@ -2,7 +2,7 @@
 import Sparkle
 import ZislaCore
 
-fileprivate struct SparkleFeedPair: Equatable {
+struct SparkleFeedPair: Equatable {
     let gitee: URL
     let github: URL
 
@@ -73,13 +73,17 @@ struct SparkleUpdateConfiguration: Equatable {
 }
 
 @MainActor
-private final class SparkleFeedDelegate: NSObject, SPUUpdaterDelegate {
+final class SparkleFeedDelegate: NSObject, SPUUpdaterDelegate {
     var onFallbackRequested: ((SPUUpdateCheck) -> Void)?
     var onCheckFailed: ((Error) -> Void)?
 
     private var feeds: SparkleFeedPair
     private var fallbackState = UpdateFeedFallbackState()
     private var fallbackRetryCheck: SPUUpdateCheck?
+
+    var shouldSuppressUpdaterError: Bool {
+        fallbackState.source == .primary
+    }
 
     init(feeds: SparkleFeedPair) {
         self.feeds = feeds
@@ -144,6 +148,34 @@ private final class SparkleFeedDelegate: NSObject, SPUUpdaterDelegate {
 }
 
 @MainActor
+class SparkleStandardUserDriver: SPUStandardUserDriver {
+    private let shouldSuppressUpdaterError: () -> Bool
+    var onUpdaterErrorPresented: ((Error) -> Void)?
+
+    init(
+        hostBundle: Bundle,
+        shouldSuppressUpdaterError: @escaping () -> Bool,
+        onUpdaterErrorPresented: ((Error) -> Void)? = nil
+    ) {
+        self.shouldSuppressUpdaterError = shouldSuppressUpdaterError
+        self.onUpdaterErrorPresented = onUpdaterErrorPresented
+        super.init(hostBundle: hostBundle, delegate: nil)
+    }
+
+    override func showUpdaterError(
+        _ error: Error,
+        acknowledgement: @escaping () -> Void
+    ) {
+        if shouldSuppressUpdaterError() {
+            acknowledgement()
+        } else {
+            onUpdaterErrorPresented?(error)
+            super.showUpdaterError(error, acknowledgement: acknowledgement)
+        }
+    }
+}
+
+@MainActor
 final class SparkleUpdateController {
     var onUpdateFound: (() -> Void)?
     var onNoUpdateFound: (() -> Void)?
@@ -151,7 +183,8 @@ final class SparkleUpdateController {
 
     private let configuration: SparkleUpdateConfiguration
     private let updaterDelegate: SparkleFeedDelegate
-    private let updaterController: SPUStandardUpdaterController
+    private let userDriver: SparkleStandardUserDriver
+    private let updater: SPUUpdater
     private var notificationObservers: [NSObjectProtocol] = []
     private var didStart = false
 
@@ -163,11 +196,20 @@ final class SparkleUpdateController {
             return nil
         }
         self.configuration = configuration
-        updaterDelegate = SparkleFeedDelegate(feeds: releaseFeeds)
-        updaterController = SPUStandardUpdaterController(
-            startingUpdater: false,
-            updaterDelegate: updaterDelegate,
-            userDriverDelegate: nil
+        let delegate = SparkleFeedDelegate(feeds: releaseFeeds)
+        updaterDelegate = delegate
+        let userDriver = SparkleStandardUserDriver(
+            hostBundle: Bundle.main,
+            shouldSuppressUpdaterError: { [weak delegate] in
+                delegate?.shouldSuppressUpdaterError == true
+            }
+        )
+        self.userDriver = userDriver
+        updater = SPUUpdater(
+            hostBundle: Bundle.main,
+            applicationBundle: Bundle.main,
+            userDriver: userDriver,
+            delegate: delegate
         )
 
         updaterDelegate.onFallbackRequested = { [weak self] updateCheck in
@@ -182,7 +224,7 @@ final class SparkleUpdateController {
         notificationObservers = [
             NotificationCenter.default.addObserver(
                 forName: .SUUpdaterDidFindValidUpdate,
-                object: updaterController.updater,
+                object: updater,
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
@@ -191,7 +233,7 @@ final class SparkleUpdateController {
             },
             NotificationCenter.default.addObserver(
                 forName: .SUUpdaterDidNotFindUpdate,
-                object: updaterController.updater,
+                object: updater,
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
@@ -217,10 +259,10 @@ final class SparkleUpdateController {
         let didChangeFeed = updaterDelegate.setFeeds(feeds)
         let wasStarted = didStart
         guard startIfNeeded() else { return false }
-        updaterController.updater.automaticallyChecksForUpdates = checksEnabled
-        updaterController.updater.automaticallyDownloadsUpdates = checksEnabled && automaticDownloadEnabled
+        updater.automaticallyChecksForUpdates = checksEnabled
+        updater.automaticallyDownloadsUpdates = checksEnabled && automaticDownloadEnabled
         if wasStarted && didChangeFeed {
-            updaterController.updater.resetUpdateCycle()
+            updater.resetUpdateCycle()
         }
         return true
     }
@@ -238,7 +280,7 @@ final class SparkleUpdateController {
         ) else {
             return false
         }
-        updaterController.checkForUpdates(nil)
+        updater.checkForUpdates()
         return true
     }
 
@@ -246,20 +288,24 @@ final class SparkleUpdateController {
         guard didStart else { return }
         switch updateCheck {
         case .updates:
-            updaterController.checkForUpdates(nil)
+            updater.checkForUpdates()
         case .updatesInBackground:
-            updaterController.updater.checkForUpdatesInBackground()
+            updater.checkForUpdatesInBackground()
         case .updateInformation:
-            updaterController.updater.checkForUpdateInformation()
+            updater.checkForUpdateInformation()
         @unknown default:
-            updaterController.updater.checkForUpdatesInBackground()
+            updater.checkForUpdatesInBackground()
         }
     }
 
     private func startIfNeeded() -> Bool {
         guard !didStart else { return true }
-        updaterController.startUpdater()
-        didStart = true
-        return true
+        do {
+            try updater.start()
+            didStart = true
+            return true
+        } catch {
+            return false
+        }
     }
 }

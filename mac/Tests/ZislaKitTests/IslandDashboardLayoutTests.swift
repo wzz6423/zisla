@@ -103,9 +103,19 @@ struct IslandDashboardLayoutTests {
         let twoRows = IslandDashboardLayout.cardGridHeight(forCardCount: 3)
         let threeRows = IslandDashboardLayout.cardGridHeight(forCardCount: 5)
 
-        #expect(twoRows == CGFloat(14 + 58 * 2 + 8))
-        #expect(threeRows == CGFloat(14 + 58 * 3 + 8 * 2))
+        #expect(twoRows == CGFloat(14 + 64 * 2 + 8))
+        #expect(threeRows == CGFloat(14 + 64 * 3 + 8 * 2))
         #expect(threeRows - twoRows == IslandDashboardLayout.cardHeight + IslandDashboardLayout.cardRowSpacing)
+    }
+
+    @Test
+    func twoCardsShareOneFullHeightRow() {
+        #expect(IslandDashboardLayout.cardHeight == 64)
+        #expect(
+            IslandDashboardLayout.cardGridHeight(forCardCount: 2)
+                == IslandDashboardLayout.cardGridVerticalPadding * 2
+                    + IslandDashboardLayout.cardHeight
+        )
     }
 
     @Test

@@ -8,6 +8,19 @@ import ZislaKit
 
 struct VoiceRecordingIslandLayoutTests {
     @Test
+    func modulePagesUseTheFormerAIMonitorWidth() {
+        for module in IslandModule.allCases {
+            let layout = IslandModuleLayout.resolved(
+                for: module,
+                dashboardCardCount: 0
+            )
+
+            #expect(layout.islandSize.width == 820)
+            #expect(layout.panelSize.width == 820)
+        }
+    }
+
+    @Test
     func voiceRecordingKeepsCollapsedWidthWithOneTranscriptRow() {
         let layout = IslandModuleLayout.voiceRecording
 

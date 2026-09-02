@@ -126,7 +126,7 @@ final class SideNoticePresenter {
         }
     }
 
-    private func updatePanels() {
+    private func updatePanels(rejoiningActiveSpace: Bool = false) {
         guard !suppression.hidesNotices else {
             hideAllPanels()
             return
@@ -160,18 +160,24 @@ final class SideNoticePresenter {
             displayState.compactWingsEnabled = false
             displayState.compactWingHeight = compactBarFrame.height
             displayState.reserveCompactWing = false
-            updateCompactBar(screen: snapshot, panels: panels)
+            updateCompactBar(
+                screen: snapshot,
+                panels: panels,
+                rejoiningActiveSpace: rejoiningActiveSpace
+            )
             updatePanel(
                 side: .left,
                 notices: queue.left,
                 screen: snapshot,
-                panels: panels
+                panels: panels,
+                rejoiningActiveSpace: rejoiningActiveSpace
             )
             updatePanel(
                 side: .right,
                 notices: queue.right,
                 screen: snapshot,
-                panels: panels
+                panels: panels,
+                rejoiningActiveSpace: rejoiningActiveSpace
             )
         }
     }
@@ -185,7 +191,11 @@ final class SideNoticePresenter {
         notices.filter { !$0.id.hasPrefix("voice-processing-") }
     }
 
-    private func updateCompactBar(screen snapshot: ScreenSnapshot, panels: DisplayPanels) {
+    private func updateCompactBar(
+        screen snapshot: ScreenSnapshot,
+        panels: DisplayPanels,
+        rejoiningActiveSpace: Bool
+    ) {
         let displayState = panels.displayState
         var compactNotices = queue.left + queue.right
         if displayState.hidesVoiceProcessingIndicator {
@@ -227,15 +237,23 @@ final class SideNoticePresenter {
             : 0
         let panel = ensureCompactBarPanel(in: panels)
         panel.level = isScreenshotActive ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
-        panel.setFrame(frame, display: true)
-        panel.orderFrontRegardless()
+        if panel.frame != frame {
+            panel.setFrame(frame, display: true)
+        }
+        if Self.shouldOrderPanelFront(
+            isVisible: panel.isVisible,
+            rejoiningActiveSpace: rejoiningActiveSpace
+        ) {
+            panel.orderFrontRegardless()
+        }
     }
 
     private func updatePanel(
         side: NoticeSide,
         notices: [IslandNotice],
         screen snapshot: ScreenSnapshot,
-        panels: DisplayPanels
+        panels: DisplayPanels,
+        rejoiningActiveSpace: Bool
     ) {
         let displayState = panels.displayState
         let notices = displayState.hidesVoiceProcessingIndicator
@@ -258,8 +276,15 @@ final class SideNoticePresenter {
         let panel = ensurePanel(for: side, in: panels)
         panel.level = isScreenshotActive ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
         let frame = layoutEngine.frame(side: side, presentation: presentation, screen: snapshot)
-        panel.setFrame(frame, display: true)
-        panel.orderFrontRegardless()
+        if panel.frame != frame {
+            panel.setFrame(frame, display: true)
+        }
+        if Self.shouldOrderPanelFront(
+            isVisible: panel.isVisible,
+            rejoiningActiveSpace: rejoiningActiveSpace
+        ) {
+            panel.orderFrontRegardless()
+        }
     }
 
     private func ensurePanel(for side: NoticeSide, in panels: DisplayPanels) -> IslandPanel {
@@ -301,6 +326,13 @@ final class SideNoticePresenter {
         )
         panels.compactBar = panel
         return panel
+    }
+
+    static func shouldOrderPanelFront(
+        isVisible: Bool,
+        rejoiningActiveSpace: Bool
+    ) -> Bool {
+        !isVisible || rejoiningActiveSpace
     }
 
     private static func isCompactNotice(_ notice: IslandNotice) -> Bool {
@@ -356,7 +388,7 @@ final class SideNoticePresenter {
     }
 
     @objc private func activeSpaceDidChange(_ notification: Notification) {
-        updatePanels()
+        updatePanels(rejoiningActiveSpace: true)
     }
 }
 

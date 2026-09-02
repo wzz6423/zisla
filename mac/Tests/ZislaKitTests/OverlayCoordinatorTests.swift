@@ -566,6 +566,40 @@ private final class PersistentPetPanelProbe {
 }
 
 extension OverlayCoordinatorTests {
+    /// A module resize is the path a track change takes to the panel: the media header re-lays out and
+    /// the island asks for a new expanded size. It must not pull focus back off the user's text field.
+    @Test @MainActor
+    func resizingExpandedGlassIslandLeavesFocusWithTheFrontmostApp() async throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setKeepsNativeGlassActive(true)
+        coordinator.setDragging(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        try await Task.sleep(for: .milliseconds(10))
+
+        let host = NSWindow(
+            contentRect: CGRect(x: 20, y: 20, width: 240, height: 120),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        panel.avoidsAppActivation = true
+        host.makeKeyAndOrderFront(nil)
+        panel.avoidsAppActivation = false
+        defer { host.orderOut(nil) }
+
+        coordinator.updateExpandedSize(CGSize(width: 900, height: 360))
+        try await Task.sleep(for: .milliseconds(20))
+
+        #expect(!panel.isKeyWindow)
+        #expect(panel.keepsNativeGlassActive)
+    }
+
     @Test @MainActor
     func pinningBeforePendingGlassActivationKeepsGlassWithoutEnablingKeyboardInput() async throws {
         let contentView = NSView()

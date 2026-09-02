@@ -132,17 +132,17 @@ struct IslandModuleLayout: Equatable {
     )
   }
 
-  /// Standard island width must accommodate the full toolbar row (module icons + system monitor strip + action buttons).
-  /// Too narrow causes the HStack to overflow at center and clips the first icon behind the island surface, so widened to 660.
-  /// panelSize is widened in sync to preserve 200pt shoulder clearance for shelf/share.
+  private static let unifiedIslandWidth: CGFloat = 820
+  private static let unifiedPanelWidth: CGFloat = 820
+
+  /// All module pages use the former AI monitor panel width.
   static let standard = IslandModuleLayout(
-    islandSize: CGSize(width: 660, height: 340),
-    panelSize: CGSize(width: 860, height: 344)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 340),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 344)
   )
   private static let expandedChromeHeight: CGFloat = 121
   private static let moduleVerticalInsets = IslandSurfaceGeometry.moduleInset * 2
   private static let panelHeightAllowance: CGFloat = 4
-  private static let panelSideClearance: CGFloat = 200
   static let batteryMinimumContentHeight: CGFloat = 0
   static let batteryMaximumContentHeight: CGFloat = 430
 
@@ -150,12 +150,12 @@ struct IslandModuleLayout: Equatable {
   /// the standard panel's unused vertical space.
   private static func compactModule(
     contentHeight: CGFloat,
-    islandWidth: CGFloat = 660
+    islandWidth: CGFloat = unifiedIslandWidth
   ) -> IslandModuleLayout {
     let islandHeight = expandedChromeHeight + contentHeight + moduleVerticalInsets
     return IslandModuleLayout(
       islandSize: CGSize(width: islandWidth, height: islandHeight),
-      panelSize: CGSize(width: islandWidth + panelSideClearance, height: islandHeight + panelHeightAllowance)
+      panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + panelHeightAllowance)
     )
   }
 
@@ -164,36 +164,36 @@ struct IslandModuleLayout: Equatable {
   static let agenda = compactModule(contentHeight: 160)
   /// PDF tools need the full-width toolbar plus enough vertical room for the operation list.
   static let pdf = IslandModuleLayout(
-    islandSize: CGSize(width: 660, height: 600),
-    panelSize: CGSize(width: 860, height: 604)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 600),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 604)
   )
   /// Shelf content is fixed at 320pt and scrolls internally when it contains more files.
   static let shelf = compactModule(contentHeight: 320)
   /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
-  /// Width matches standard (panelSize keeps 200pt shoulder clearance); only the island body is taller.
+  /// Width matches standard; only the island body is taller.
   static let clipboard = IslandModuleLayout(
-    islandSize: CGSize(width: 660, height: 500),
-    panelSize: CGSize(width: 860, height: 504)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 500),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 504)
   )
   static let ai = IslandModuleLayout(
-    islandSize: CGSize(width: 820, height: 470),
-    panelSize: CGSize(width: 820, height: 474)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 470),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 474)
   )
-  static let system = compactModule(contentHeight: 401, islandWidth: 720)
+  static let system = compactModule(contentHeight: 401)
   static let battery = compactModule(contentHeight: batteryMaximumContentHeight)
   static let keyboardSound = IslandModuleLayout(
-    islandSize: CGSize(width: 820, height: 560),
-    panelSize: CGSize(width: 820, height: 564)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 560),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 564)
   )
-  /// Quick Notes: needs a larger editing/preview area for rich content such as images and tables, so wider and taller than standard.
+  /// Quick Notes keeps its taller editing/preview area for rich content such as images and tables.
   static let notes = IslandModuleLayout(
-    islandSize: CGSize(width: 720, height: 560),
-    panelSize: CGSize(width: 720, height: 564)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 560),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 564)
   )
-  /// Mail: wider and taller; list column expands to 232pt so sender/subject/preview are not truncated prematurely, and more messages are visible.
+  /// Mail keeps its taller content area; the list column remains 232pt wide for readable previews.
   static let mail = IslandModuleLayout(
-    islandSize: CGSize(width: 860, height: 520),
-    panelSize: CGSize(width: 1060, height: 524)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 520),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 524)
   )
   /// Dashboard height follows the fixed crown chrome and rendered activity-card grid.
   /// The arithmetic lives in `IslandDashboardLayout` (ZislaKit) so it is unit-testable and
@@ -228,8 +228,8 @@ struct IslandModuleLayout: Equatable {
         cardCount: dashboardCardCount
       )
       return IslandModuleLayout(
-        islandSize: CGSize(width: 660, height: islandHeight),
-        panelSize: CGSize(width: 860, height: islandHeight + 4)
+        islandSize: CGSize(width: unifiedIslandWidth, height: islandHeight),
+        panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + 4)
       )
     }
     if module == .battery, let dynamicHeight = batteryDynamicHeight {

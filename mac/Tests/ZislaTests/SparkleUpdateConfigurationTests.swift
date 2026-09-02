@@ -1,8 +1,24 @@
+import Foundation
 import Testing
 
 @testable import Zisla
 
 struct SparkleUpdateConfigurationTests {
+    @Test @MainActor
+    func primaryFeedErrorIsAcknowledgedWithoutShowingWhenFallbackCanRetry() {
+        let driver = SparkleStandardUserDriver(
+            hostBundle: Bundle.main,
+            shouldSuppressUpdaterError: { true }
+        )
+        var acknowledged = false
+
+        driver.showUpdaterError(NSError(domain: "test", code: 1)) {
+            acknowledged = true
+        }
+
+        #expect(acknowledged)
+    }
+
     @Test
     func acceptsHTTPSPrimaryAndFallbackFeedsWithEd25519PublicKey() throws {
         let configuration = try #require(SparkleUpdateConfiguration(infoDictionary: [

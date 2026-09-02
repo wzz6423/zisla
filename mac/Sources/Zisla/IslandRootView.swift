@@ -102,7 +102,7 @@ struct IslandRootView: View {
                         model.shareFromPasteboard()
                     }
 
-                    Spacer(minLength: layout.islandSize.width - 16)
+                    Spacer(minLength: max(0, surfaceSize.width - 216))
 
                     transferShoulder(
                         symbol: "tray.and.arrow.down.fill",

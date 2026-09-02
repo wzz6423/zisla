@@ -4,6 +4,22 @@ import Testing
 @testable import Zisla
 
 struct SideNoticePresenterWindowLifecycleTests {
+    @Test @MainActor
+    func contentRefreshDoesNotRefrontVisibleNoticePanels() {
+        #expect(!SideNoticePresenter.shouldOrderPanelFront(
+            isVisible: true,
+            rejoiningActiveSpace: false
+        ))
+        #expect(SideNoticePresenter.shouldOrderPanelFront(
+            isVisible: false,
+            rejoiningActiveSpace: false
+        ))
+        #expect(SideNoticePresenter.shouldOrderPanelFront(
+            isVisible: true,
+            rejoiningActiveSpace: true
+        ))
+    }
+
     @Test
     func noticeUpdatesDoNotRunAfterTheIslandGlassActivationPass() throws {
         let source = try Self.presenterSource()
