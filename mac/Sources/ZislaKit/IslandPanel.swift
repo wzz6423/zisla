@@ -22,19 +22,10 @@ private final class ClickBlockingContentView: NSView {
 
 @MainActor
 public final class IslandPanel: NSPanel {
-  internal static var applicationActivationHandler: () -> Void = {
-    NSApp.activate(ignoringOtherApps: true)
-  }
   public var allowsKeyWindow = false
   public var allowsNativeGlassActivation = true
-  /// Re-asserting the same value happens on every island refresh — a new track landing in the media
-  /// header, a module resize. Only a real transition may reclaim activation; reclaiming on a refresh
-  /// pulls the caret out of whatever text field the user is typing in.
   public var keepsNativeGlassActive = false {
-    didSet {
-      guard keepsNativeGlassActive != oldValue else { return }
-      restoreNativeGlassActivationIfNeeded()
-    }
+    didSet { restoreNativeGlassActivationIfNeeded() }
   }
   /// Prevents app activation or key-window reacquisition during recording, preserving focus in the target input.
   public var avoidsAppActivation = false
@@ -63,8 +54,6 @@ public final class IslandPanel: NSPanel {
     }
 
   public override func resignKey() {
-        // Keep this recovery branch: Liquid Glass needs the panel to remain key after a normal
-        // resignation. Do not replace it with an unconditional `super.resignKey()`.
         guard !avoidsAppActivation,
               allowsNativeGlassActivation,
               keepsNativeGlassActive,
@@ -78,23 +67,14 @@ public final class IslandPanel: NSPanel {
         }
     }
 
-    /// Reclaims activation for the glass surface on a deliberate reveal. Refresh paths must not call
-    /// this: it activates the app, which moves keyboard focus off the user's current text field.
-    public func activateNativeGlassIfNeeded() {
-        restoreNativeGlassActivationIfNeeded(allowingApplicationActivation: true)
-    }
-
-    private func restoreNativeGlassActivationIfNeeded(allowingApplicationActivation: Bool = false) {
+    private func restoreNativeGlassActivationIfNeeded() {
         guard !avoidsAppActivation,
               allowsNativeGlassActivation,
               keepsNativeGlassActive,
               isVisible else { return }
-        // Lifecycle recovery must suppress only application activation. The panel still has to become key so
-        // NSGlassEffectView keeps its native compositing path instead of falling back to frosted glass.
         // Do not automatically reclaim focus while pinned; activate only when unpinned.
-        // Lifecycle recovery stays non-activating; only an explicit reveal opts into application activation.
-        if allowingApplicationActivation && !isPinned {
-            Self.applicationActivationHandler()
+        if !isPinned {
+            NSApp.activate(ignoringOtherApps: true)
         }
         makeKeyAndOrderFront(nil)
     }
@@ -224,9 +204,7 @@ public final class IslandPanel: NSPanel {
     alphaValue = 1
     if plan != .refront { setFrame(frame, display: true) }
     orderFrontRegardless()
-    // Only the first reveal may activate the app. Refreshes keep the original compositor ordering
-    // path, while the non-activating restore above preserves the frontmost app's caret.
-    if plan == .show { activateNativeGlassIfNeeded() }
+    restoreNativeGlassActivationIfNeeded()
   }
 
   public func resize(to frame: CGRect, animated: Bool = true) {
