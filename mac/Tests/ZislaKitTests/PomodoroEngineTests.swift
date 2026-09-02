@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import IOKit.pwr_mgt
 import Testing
@@ -109,6 +110,60 @@ struct PomodoroEngineTests {
         engine.startWithRemaining(29 * 60 + 28, at: now)
         #expect(PomodoroEngine.formatMMSS(at: now, engine: engine) == "29:28")
         #expect(PomodoroEngine.formatHHMMSS(at: now, engine: engine) == "00:29:28")
+    }
+
+    @Test
+    func invalidAndOversizedDurationsAreNormalizedBeforeFormatting() {
+        let invalid = PomodoroEngine(focusDuration: .nan, restDuration: -Double.infinity)
+        #expect(invalid.focusDuration == PomodoroMode.focus.duration)
+        #expect(invalid.restDuration == PomodoroMode.rest.duration)
+
+        let oversized = PomodoroEngine(focusDuration: .greatestFiniteMagnitude)
+        #expect(oversized.focusDuration == PomodoroEngine.maximumDuration)
+        #expect(!PomodoroEngine.formatMMSS(engine: oversized).isEmpty)
+    }
+}
+
+@MainActor
+struct PomodoroServiceTests {
+    @Test
+    func refreshDisplayPublishesOnlyWhenClockTextChanges() {
+        let suiteName = "PomodoroServiceTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let service = PomodoroService(defaults: defaults)
+        var clocks: [String] = []
+        let observation = service.$displayClock
+            .dropFirst()
+            .sink { clocks.append($0) }
+
+        service.refreshDisplay()
+        #expect(clocks.isEmpty)
+
+        service.setFocusDuration(26 * 60)
+        #expect(clocks == ["26:00"])
+        withExtendedLifetime(observation) {}
+    }
+
+    @Test
+    func corruptedStoredDurationsFallBackToDefaultsAndStaySafe() {
+        let suiteName = "PomodoroServiceTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(-1.0, forKey: "zisla.pomodoro.focusDuration")
+        defaults.set(Double.nan, forKey: "zisla.pomodoro.restDuration")
+
+        let service = PomodoroService(defaults: defaults)
+
+        #expect(service.focusDuration == PomodoroMode.focus.duration)
+        #expect(service.restDuration == PomodoroMode.rest.duration)
+        #expect(service.displayClock == "25:00")
+        #expect(defaults.double(forKey: "zisla.pomodoro.focusDuration") == PomodoroMode.focus.duration)
+        #expect(defaults.double(forKey: "zisla.pomodoro.restDuration") == PomodoroMode.rest.duration)
+
+        service.setFocusDuration(.greatestFiniteMagnitude)
+        #expect(service.focusDuration == PomodoroEngine.maximumDuration)
+        #expect(!service.displayClock.isEmpty)
     }
 }
 

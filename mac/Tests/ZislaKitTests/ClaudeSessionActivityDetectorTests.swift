@@ -408,7 +408,7 @@ struct ClaudeSessionActivityDetectorTests {
             ],
             modifiedAt: Date(timeIntervalSince1970: 1_900_000_190)
         )
-        // 子代理转录沿用父会话 ID，且更晚落盘，不能顶掉父任务。
+        // A later-written subagent transcript reuses the parent session ID and must not replace the parent task.
         try writeJSONL(
             under: root,
             relativePath: "proj/sess-parent/subagents/agent-a1.jsonl",
@@ -496,7 +496,7 @@ struct ClaudeSessionActivityDetectorTests {
         let detector = ClaudeSessionActivityDetector(projectsDirectory: root)
         #expect(try detector.activeTasks().isEmpty)
 
-        // 新一轮开始时 `ai-title` 还没重写，标题必须来自缓存而不是回落成 "Claude"。
+        // Before `ai-title` is rewritten for a new turn, use the cached title instead of falling back to "Claude".
         try appendJSONLLine(
             claudeUser(timestamp: "2026-07-19T01:05:00.000Z", sessionId: "sess-keep", text: "again"),
             to: root.appendingPathComponent(relative)

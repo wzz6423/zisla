@@ -7,7 +7,24 @@ struct AudioOutputDeviceServiceTests {
     func recognizesCommonHeadphoneNames() {
         #expect(AudioOutputDevice(id: 1, name: "AirPods Pro").isHeadphones)
         #expect(AudioOutputDevice(id: 2, name: "Beats Studio Buds").isHeadphones)
-        #expect(!AudioOutputDevice(id: 3, name: "MacBook Pro Speakers").isHeadphones)
+        #expect(AudioOutputDevice(id: 3, name: "三年后AirPods Max").isHeadphones)
+        #expect(AudioOutputDevice(id: 3, name: "三年后AirPods Max").isAirPodsMax)
+        #expect(!AudioOutputDevice(id: 4, name: "MacBook Pro Speakers").isHeadphones)
+    }
+
+    @Test
+    func publishesNewlyConnectedAirPodsMaxWithoutDefaultOutputChange() {
+        let airPodsPro = AudioOutputDevice(id: 1, name: "AirPods Pro")
+        let airPodsMax = AudioOutputDevice(id: 2, name: "三年后AirPods Max")
+
+        let candidate = AudioOutputDeviceService.connectionCandidate(
+            previousDevice: airPodsPro,
+            currentDevice: airPodsPro,
+            previousHeadphoneDeviceIDs: [airPodsPro.id],
+            updatedDevices: [airPodsPro, airPodsMax]
+        )
+
+        #expect(candidate == airPodsMax)
     }
 
     @Test
@@ -37,5 +54,66 @@ struct AudioOutputDeviceServiceTests {
 
         #expect(snapshot == HeadphoneBatterySnapshot(leftLevel: 91, rightLevel: 83, caseLevel: 62))
         #expect(snapshot?.noticeLevels.map(\.level) == [91, 83, 62])
+    }
+
+    @Test
+    func parsesSingleAirPodsMaxBatteryLevel() throws {
+        let data = try #require(
+            """
+            {
+              "SPBluetoothDataType": [
+                {
+                  "device_connected": [
+                    {
+                      "AirPods Max": {
+                        "device_minorType": "Headphones",
+                        "device_batteryLevelMain": "81%"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+            """.data(using: .utf8)
+        )
+
+        let snapshot = HeadphoneBatterySnapshot.fromBluetoothProfile(
+            data,
+            deviceName: "AirPods Max"
+        )
+
+        #expect(snapshot == HeadphoneBatterySnapshot(
+            leftLevel: nil,
+            rightLevel: nil,
+            caseLevel: nil,
+            mainLevel: 81
+        ))
+        #expect(snapshot?.noticeLevels.map(\.label) == ["耳机"])
+        #expect(snapshot?.noticeLevels.map(\.level) == [81])
+    }
+
+    @Test
+    func mapsScannedAirPodsMaxBatteryToOneNoticeLevel() {
+        let device = NetworkBatteryDevice(
+            identifier: "apple-headphone:test",
+            name: "AirPods Max",
+            deviceType: .headphones,
+            batteryLevel: 0.58,
+            isCharging: false,
+            components: [
+                BatteryLevelComponent(kind: .left, level: 0.58),
+                BatteryLevelComponent(kind: .right, level: 0.61),
+            ]
+        )
+
+        let snapshot = HeadphoneBatterySnapshot.fromNetworkBatteryDevice(device)
+
+        #expect(snapshot == HeadphoneBatterySnapshot(
+            leftLevel: nil,
+            rightLevel: nil,
+            caseLevel: nil,
+            mainLevel: 58
+        ))
+        #expect(snapshot?.noticeLevels.map(\.level) == [58])
     }
 }

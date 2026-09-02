@@ -10,6 +10,8 @@ use DynaLoader;
 use File::Spec;
 use File::Basename;
 
+my $parent_lifecycle_environment_key = "MEDIAREMOTEADAPTER_PARENT_LIFECYCLE";
+
 sub print_help() {
   print <<'HELP';
 Usage:
@@ -109,8 +111,6 @@ fail "Provided path is not a framework: $framework_path"
 my $framework = File::Spec->catfile($framework_path, $framework_basename);
 fail "Framework not found at $framework" unless -e $framework;
 
-my $handle = DynaLoader::dl_load_file($framework, 0)
-  or fail "Failed to load framework: $framework";
 my $function_name = shift @ARGV or fail "Missing function name";
 fail "Invalid function name: '$function_name'"
   unless $function_name eq "stream"
@@ -180,6 +180,46 @@ sub set_env_option_value {
   set_env_option_unsafe($key, $value);
 }
 
+# Keep a stream adapter tied to the application that launched it. The pipe is
+# closed by the kernel when that application exits, including SIGKILL.
+sub start_parent_lifecycle_watchdog {
+  return unless ($ENV{$parent_lifecycle_environment_key} // '') eq '1';
+
+  my $adapter_pid = $$;
+  my $watchdog_pid = fork();
+  if (!defined $watchdog_pid) {
+    print STDERR "Unable to start parent lifecycle watchdog\n";
+    exit 1;
+  }
+  return if $watchdog_pid != 0;
+
+  # The watchdog must not keep the app's output pipes alive after the adapter exits.
+  close STDOUT;
+  close STDERR;
+  my $input_fd = fileno(STDIN);
+  exit 0 unless defined $input_fd;
+
+  my $read_set = '';
+  vec($read_set, $input_fd, 1) = 1;
+  my $buffer = '';
+  while (getppid() == $adapter_pid) {
+    my $ready_set = $read_set;
+    my $ready = select($ready_set, undef, undef, 0.25);
+    next unless defined $ready && $ready > 0;
+    my $bytes = sysread(STDIN, $buffer, 4_096);
+    last unless defined $bytes && $bytes > 0;
+  }
+
+  if (getppid() == $adapter_pid) {
+    kill 'TERM', $adapter_pid;
+    select undef, undef, undef, 0.5;
+    kill 'KILL', $adapter_pid
+      if getppid() == $adapter_pid && kill(0, $adapter_pid);
+  }
+  close STDIN;
+  exit 0;
+}
+
 my $symbol_name = "adapter_$function_name";
 if ($function_name eq "send") {
   my $id = shift @ARGV;
@@ -213,6 +253,7 @@ elsif ($function_name eq "stream") {
     }
   }
   $symbol_name = env_func($symbol_name);
+  start_parent_lifecycle_watchdog();
 }
 elsif ($function_name eq "get") {
   my $options = parse_options(0);
@@ -266,6 +307,9 @@ elsif ($function_name eq "test") {
 if (defined shift @ARGV) {
   fail "Too many arguments";
 }
+
+my $handle = DynaLoader::dl_load_file($framework, 0)
+  or fail "Failed to load framework: $framework";
 
 my $symbol = DynaLoader::dl_find_symbol($handle, "$symbol_name")
   or fail "Symbol '$symbol_name' not found in $framework";

@@ -160,7 +160,8 @@ public final class CopilotSessionActivityDetector: AIActivityDetecting {
         if let cached,
            candidate.size >= cached.readerState.offset,
            !(candidate.size == cached.readerState.offset
-               && candidate.modificationDate != cached.modificationDate) {
+               && candidate.modificationDate != cached.modificationDate),
+           jsonlReader.hasUnchangedReadPrefix(at: candidate.url, state: cached.readerState) {
             next = cached
         } else {
             next = CachedTranscript(

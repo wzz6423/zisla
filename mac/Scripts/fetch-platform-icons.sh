@@ -26,12 +26,17 @@ ENTRIES=(
 )
 
 mkdir -p "$DEST"
+STAGING="$(mktemp -d "$ROOT/Resources/.BrandIcons.fetch.XXXXXX")"
+cleanup() {
+  [[ -d "$STAGING" ]] && find "$STAGING" -depth -delete
+}
+trap cleanup EXIT
 failed=0
 
 for entry in "${ENTRIES[@]}"; do
   IFS=':' read -r asset slug color <<<"$entry"
   url="$BASE/$slug.svg"
-  tmp="$(mktemp)"
+  tmp="$STAGING/$asset"
 
   if ! curl -fsSL --max-time 20 "$url" -o "$tmp"; then
     echo "✗ $asset  拉取失败：$url" >&2
@@ -45,10 +50,12 @@ for entry in "${ENTRIES[@]}"; do
   python3 - "$tmp" "$color" <<'PY'
 import re
 import sys
+from xml.etree import ElementTree
 
 path, color = sys.argv[1], sys.argv[2]
 with open(path, encoding="utf-8") as handle:
     svg = handle.read()
+ElementTree.fromstring(svg)
 
 opening, _, rest = svg.partition(">")
 # Child-element fills override root inheritance; clear them before injecting or the brand color silently fails.
@@ -62,12 +69,12 @@ else:
     opening = opening.replace("<svg", f'<svg fill="{color}"', 1)
 
 svg = opening + ">" + rest
+ElementTree.fromstring(svg)
 
 with open(path, "w", encoding="utf-8") as handle:
     handle.write(svg)
 PY
 
-  mv "$tmp" "$DEST/$asset"
   echo "✓ $asset  ($slug, $color)"
 done
 
@@ -79,4 +86,10 @@ if [[ $failed -gt 0 ]]; then
   echo "$failed 个资源拉取失败，产物不完整。" >&2
   exit 1
 fi
+
+for entry in "${ENTRIES[@]}"; do
+  IFS=':' read -r asset _ <<<"$entry"
+  mv "$STAGING/$asset" "$DEST/$asset"
+done
+
 echo "完成。产物在 $DEST"

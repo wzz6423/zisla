@@ -93,6 +93,27 @@ struct IslandPresentationReducerTests {
 
 struct AIStateRepositoryTests {
     @Test
+    func repositoryLoadsUsageSamplesFromRequestedDate() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let calendar = Calendar(identifier: .gregorian)
+        let start = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 1)))
+        let expired = try #require(calendar.date(byAdding: .day, value: -1, to: start))
+        let retained = try #require(calendar.date(byAdding: .day, value: 1, to: start))
+
+        try repository.recordUsage([
+            AIUsageSample(sourceID: "expired", provider: .codex, timestamp: expired, inputTokens: 1, outputTokens: 2),
+            AIUsageSample(sourceID: "retained", provider: .claude, timestamp: retained, inputTokens: 3, outputTokens: 4),
+        ])
+
+        let samples = try repository.loadUsageSamples(startingAt: start)
+        #expect(samples.count == 1)
+        #expect(samples.first?.inputTokens == 3)
+        #expect(samples.first?.outputTokens == 4)
+    }
+
+    @Test
     func progressStatusSeparatesActiveAttentionFromTerminalFailure() {
         #expect(AIProgressStatus.queued.isActive)
         #expect(AIProgressStatus.running.isActive)
@@ -249,6 +270,28 @@ struct AIStateRepositoryTests {
     }
 
     @Test
+    func storageChangeTokenTracksOpenWALAppends() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let database = try AIStateDatabase(url: repository.databaseURL, maximumUsageSamples: 10)
+        let initialToken = repository.storageChangeToken()
+
+        try database.upsertTask(AIProgressTask(
+            id: "wal-task",
+            provider: .codex,
+            title: "WAL task",
+            progress: nil,
+            status: .running,
+            updatedAt: .now
+        ))
+
+        #expect(FileManager.default.fileExists(atPath: repository.databaseWALURL.path))
+        #expect(repository.storageChangeToken() != initialToken)
+        withExtendedLifetime(database) {}
+    }
+
+    @Test
     func repositoryRecordsUsageAndExternalNotice() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -383,6 +426,33 @@ struct AIStateRepositoryTests {
 
         let summaries = AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
         #expect(try repository.load().usageSamples == Array(summaries.suffix(2)))
+    }
+
+    @Test
+    func repositoryUsesTimestampIndexForDetectedUsageEventDailyTotals() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+
+        try repository.recordDetectedUsage([AIUsageSample(
+            sourceID: "detected-event-index",
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 10,
+            outputTokens: 1
+        )])
+
+        let queryPlan = try sqliteQueryPlan(
+            at: repository.databaseURL,
+            sql: """
+            SELECT input_tokens, output_tokens
+            FROM detected_usage_events
+            WHERE timestamp >= \(timestamp.timeIntervalSinceReferenceDate)
+              AND timestamp < \(timestamp.addingTimeInterval(86_400).timeIntervalSinceReferenceDate)
+            """
+        )
+        #expect(queryPlan.contains("detected_usage_events_timestamp"))
     }
 
     @Test
@@ -717,6 +787,71 @@ struct AIStateRepositoryTests {
     }
 
     @Test
+    func repositoryMigratesLegacyDetectedSourceIDsAcrossRestart() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let legacyCodex = AIUsageSample(
+            sourceID: "codex-abc-event-legacy-root",
+            provider: .codex,
+            timestamp: timestamp,
+            inputTokens: 100,
+            outputTokens: 0
+        )
+        let legacyGrok = AIUsageSample(
+            sourceID: "grok-abc-prompt-prompt-one",
+            provider: .grok,
+            timestamp: timestamp.addingTimeInterval(60),
+            inputTokens: 100,
+            outputTokens: 0
+        )
+        let firstRepository = AIStateRepository(directoryURL: directory)
+        #expect(try firstRepository.recordDetectedUsage([legacyCodex, legacyGrok]) == 1)
+
+        let stableCodex = AIUsageSample(
+            sourceID: "codex-abc-event-v2-stable-event",
+            provider: .codex,
+            timestamp: legacyCodex.timestamp,
+            inputTokens: 300,
+            outputTokens: 0
+        )
+        let stableGrokFirst = AIUsageSample(
+            sourceID: "grok-abc-prompt-prompt-one-update-v2-first",
+            provider: .grok,
+            timestamp: legacyGrok.timestamp,
+            inputTokens: 100,
+            outputTokens: 0
+        )
+        let stableGrokUpdate = AIUsageSample(
+            sourceID: "grok-abc-prompt-prompt-one-update-v2-second",
+            provider: .grok,
+            timestamp: legacyGrok.timestamp.addingTimeInterval(60),
+            inputTokens: 60,
+            outputTokens: 0
+        )
+        let recreatedRepository = AIStateRepository(directoryURL: directory)
+        #expect(try recreatedRepository.recordDetectedUsage([
+            stableCodex,
+            stableGrokFirst,
+            stableGrokUpdate,
+        ]) == 1)
+        #expect(try recreatedRepository.load().usageSamples.first?.totalTokens == 460)
+        #expect(Set(try readDetectedUsageEvents(from: recreatedRepository.databaseURL).compactMap(\.sourceID)) == Set([
+            stableCodex.sourceID!,
+            stableGrokFirst.sourceID!,
+            stableGrokUpdate.sourceID!,
+        ]))
+
+        let restartedRepository = AIStateRepository(directoryURL: directory)
+        #expect(try restartedRepository.recordDetectedUsage([
+            stableCodex,
+            stableGrokFirst,
+            stableGrokUpdate,
+        ]) == 0)
+        #expect(try restartedRepository.load().usageSamples.first?.totalTokens == 460)
+    }
+
+    @Test
     func repositoryReconcilesLegacyDailyTotalWithDetectedEvents() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -825,6 +960,114 @@ struct AIStateRepositoryTests {
         let migrated = try AIStateRepository(directoryURL: directory).load().usageSamples
 
         #expect(migrated == AIUsageAnalytics.dailyManualUsageSamples(samples: legacySamples))
+    }
+
+    @Test
+    func repositoryPreservesCostAndModelWhenUpdatingManualUsage() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let day = Calendar.current.startOfDay(for: Date(timeIntervalSinceReferenceDate: 700_000_000))
+        let firstSample = AIUsageSample(
+            sourceID: "zisla-daily-total:\(day.timeIntervalSinceReferenceDate)",
+            provider: .claude,
+            timestamp: day,
+            inputTokens: 100,
+            outputTokens: 50,
+            costUSD: 0.05,
+            model: "claude-opus-5"
+        )
+        let delta = AIUsageSample(
+            sourceID: "zisla-daily-total:\(day.timeIntervalSinceReferenceDate)",
+            provider: .claude,
+            timestamp: day,
+            inputTokens: 20,
+            outputTokens: 10
+        )
+
+        try repository.recordUsage(firstSample)
+        try repository.recordUsage(delta)
+
+        let raw = try readUsageSamples(from: repository.databaseURL)
+        let updated = try #require(raw.first { $0.sourceID == firstSample.sourceID })
+        #expect(updated.inputTokens == 120)
+        #expect(updated.outputTokens == 60)
+        #expect(updated.costUSD == 0.05)
+        #expect(updated.model == "claude-opus-5")
+    }
+
+    @Test
+    func repositoryPreservesCostAndModelWhenUpdatingDetectedUsageEvents() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let firstSample = AIUsageSample(
+            sourceID: "detected-cost-test",
+            provider: .gpt,
+            timestamp: timestamp,
+            inputTokens: 200,
+            outputTokens: 100,
+            costUSD: 0.12,
+            model: "gpt-5"
+        )
+        let updatedSample = AIUsageSample(
+            sourceID: "detected-cost-test",
+            provider: .gpt,
+            timestamp: timestamp,
+            inputTokens: 250,
+            outputTokens: 120,
+            costUSD: 0.15,
+            model: "gpt-5-turbo"
+        )
+
+        #expect(try repository.recordDetectedUsage([firstSample]) == 1)
+        #expect(try repository.recordDetectedUsage([updatedSample]) == 1)
+
+        let events = try readDetectedUsageEvents(from: repository.databaseURL)
+        let updated = try #require(events.first { $0.sourceID == "detected-cost-test" })
+        #expect(updated.inputTokens == 250)
+        #expect(updated.outputTokens == 120)
+        #expect(updated.costUSD == 0.12)
+        #expect(updated.model == "gpt-5")
+    }
+
+    @Test
+    func repositoryAddsMissingDetectedUsageMetadataWithoutAddingTokens() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let timestamp = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        let sourceID = "detected-metadata-backfill"
+        let original = AIUsageSample(
+            sourceID: sourceID,
+            provider: .gpt,
+            timestamp: timestamp,
+            inputTokens: 200,
+            outputTokens: 100
+        )
+        let enriched = AIUsageSample(
+            sourceID: sourceID,
+            provider: .gpt,
+            timestamp: timestamp,
+            inputTokens: 200,
+            outputTokens: 100,
+            costUSD: 0.12,
+            model: "gpt-5"
+        )
+
+        #expect(try repository.recordDetectedUsage([original]) == 1)
+        let tokenDeltaCount = try repository.recordDetectedUsage([enriched])
+        #expect(tokenDeltaCount == 0)
+
+        let event = try #require(readDetectedUsageEvents(from: repository.databaseURL).first {
+            $0.sourceID == sourceID
+        })
+        #expect(event.inputTokens == 200)
+        #expect(event.outputTokens == 100)
+        #expect(event.costUSD == 0.12)
+        #expect(event.model == "gpt-5")
+        #expect(try repository.load().usageSamples.first?.totalTokens == 300)
     }
 }
 
@@ -952,6 +1195,59 @@ struct CLIParserTests {
         }
         #expect(value.kind == .success)
         #expect(value.side == .left)
+    }
+
+    @Test
+    func usageRejectsInvalidNumericValuesAndPreservesDefaultTimestamp() throws {
+        let now = Date(timeIntervalSince1970: 42)
+        let command = try CLIParser.parse(arguments: [
+            "usage", "--provider", "codex", "--input-tokens", "1", "--output-tokens", "2",
+        ], now: now)
+        guard case let .usage(sample) = command else {
+            Issue.record("Expected usage command")
+            return
+        }
+        #expect(sample.timestamp == now)
+
+        for (option, value) in [("--input-tokens", "-1"), ("--output-tokens", "-1")] {
+            #expect(throws: CLIParseError.invalidValue(option: option, value: value)) {
+                try CLIParser.parse(arguments: [
+                    "usage", "--provider", "codex", "--input-tokens", "1", "--output-tokens", "2",
+                    option, value,
+                ])
+            }
+        }
+
+        #expect(throws: CLIParseError.invalidValue(option: "--output-tokens", value: "1")) {
+            try CLIParser.parse(arguments: [
+                "usage", "--provider", "codex",
+                "--input-tokens", "\(Int.max)", "--output-tokens", "1",
+            ])
+        }
+
+        for value in ["-0.01", "nan", "inf"] {
+            #expect(throws: CLIParseError.invalidValue(option: "--cost", value: value)) {
+                try CLIParser.parse(arguments: [
+                    "usage", "--provider", "codex", "--input-tokens", "1", "--output-tokens", "2",
+                    "--cost", value,
+                ])
+            }
+            #expect(throws: CLIParseError.invalidValue(option: "--timestamp", value: value)) {
+                try CLIParser.parse(arguments: [
+                    "usage", "--provider", "codex", "--input-tokens", "1", "--output-tokens", "2",
+                    "--timestamp", value,
+                ])
+            }
+        }
+
+        for value in ["invalid", ""] {
+            #expect(throws: CLIParseError.invalidValue(option: "--timestamp", value: value)) {
+                try CLIParser.parse(arguments: [
+                    "usage", "--provider", "codex", "--input-tokens", "1", "--output-tokens", "2",
+                    "--timestamp", value,
+                ])
+            }
+        }
     }
 
     @Test
@@ -1805,60 +2101,118 @@ struct AIUsageAnalyticsTests {
 
 struct UpdateCoreTests {
     @Test
+    func mockPrimaryAppcastFailureRetriesFallbackExactlyOnce() {
+        var state = UpdateFeedFallbackState()
+
+        state.beginCheck()
+        #expect(state.source == .primary)
+        let didRetryFallback = state.finishCheck(failed: true)
+        #expect(didRetryFallback)
+        #expect(state.source == .fallback)
+        let didRetryAgain = state.finishCheck(failed: true)
+        #expect(!didRetryAgain)
+    }
+
+    @Test
+    func mockLoadedPrimaryAppcastDoesNotRetryFallback() {
+        var state = UpdateFeedFallbackState()
+
+        state.beginCheck()
+        state.didLoadAppcast()
+        let didRetryFallback = state.finishCheck(failed: true)
+        #expect(!didRetryFallback)
+        #expect(state.source == .primary)
+    }
+
+    @Test
+    func mockPrimaryDownloadFailureRetriesFallbackAfterAppcastLoads() {
+        var state = UpdateFeedFallbackState()
+
+        state.beginCheck()
+        state.didLoadAppcast()
+        state.didFailDownloadingUpdate()
+        let didRetryFallback = state.finishCheck(failed: true)
+        #expect(didRetryFallback)
+        #expect(state.source == .fallback)
+    }
+
+    @Test
+    func mockNextCheckRestoresPrimaryFeed() {
+        var state = UpdateFeedFallbackState()
+
+        state.beginCheck()
+        _ = state.finishCheck(failed: true)
+        #expect(state.source == .fallback)
+
+        state.beginCheck()
+        #expect(state.source == .primary)
+    }
+
+    @Test
     func semanticVersionsHandlePrefixAndPrerelease() throws {
         #expect(try SemanticVersion("v1.2.3") > SemanticVersion("1.2.2"))
         #expect(try SemanticVersion("1.2.3") > SemanticVersion("1.2.3-beta.1"))
         #expect(try SemanticVersion("2.0") == SemanticVersion(major: 2, minor: 0, patch: 0))
     }
 
-    @Test
-    func releaseDecoderSelectsMacInstallAssetsAndVersionFromPrefixedTag() throws {
-        let json = """
-        {"tag_name":"release/v1.4.0","html_url":"https://github.com/wzz6423/zisla/releases/tag/release/v1.4.0","draft":false,"prerelease":false,"assets":[
-          {"name":"zisla-macos.dmg","browser_download_url":"https://example.com/app.dmg","size":1234},
-          {"name":"zisla-macos.zip","browser_download_url":"https://example.com/app.zip","size":1234},
-          {"name":"zisla-macos.zip.sha256","browser_download_url":"https://example.com/app.zip.sha256","size":64}
-        ]}
-        """
-
-        let release = try JSONDecoder().decode(GitHubRelease.self, from: Data(json.utf8))
-        let selection = release.macUpdateAssets
-
-        let expectedVersion = try SemanticVersion("1.4.0")
-        #expect(release.version == expectedVersion)
-        #expect(selection?.archive.name == "zisla-macos.zip")
-        #expect(selection?.checksum?.name.hasSuffix(".sha256") == true)
-        #expect(release.macDiskImage?.name == "zisla-macos.dmg")
-    }
-
-    @Test
-    func releaseDecoderSelectsNativeDiskImageFromGiteeAssets() throws {
-        let json = """
-        {
-          "tag_name":"release/v0.1.4",
-          "prerelease":false,
-          "assets":[
-            {"name":"zisla-v0.1.4-macOS-arm64.dmg","browser_download_url":"https://gitee.com/wzz6423/zisla/releases/download/release/v0.1.4/zisla-v0.1.4-macOS-arm64.dmg"},
-            {"name":"zisla-v0.1.4-macOS-x86_64.dmg","browser_download_url":"https://gitee.com/wzz6423/zisla/releases/download/release/v0.1.4/zisla-v0.1.4-macOS-x86_64.dmg"},
-            {"name":"zisla-v0.1.4-macOS-universal.dmg","browser_download_url":"https://gitee.com/wzz6423/zisla/releases/download/release/v0.1.4/zisla-v0.1.4-macOS-universal.dmg"}
-          ]
-        }
-        """
-
-        let release = try JSONDecoder().decode(GitHubRelease.self, from: Data(json.utf8))
-
-        #expect(release.prerelease == false)
-#if arch(arm64)
-        #expect(release.macDiskImage?.name == "zisla-v0.1.4-macOS-arm64.dmg")
-#elseif arch(x86_64)
-        #expect(release.macDiskImage?.name == "zisla-v0.1.4-macOS-x86_64.dmg")
-#else
-        #expect(release.macDiskImage?.name == "zisla-v0.1.4-macOS-universal.dmg")
-#endif
-    }
 }
 
 struct FeatureSettingsTests {
+    @Test
+    func clipboardAssistantDefaultsKeepSharedActionLast() throws {
+        for kind in ClipboardAssistantKind.allCases {
+            #expect(ClipboardAssistantActionOrder.defaults(for: kind).last == .share)
+        }
+        #expect(ClipboardAssistantActionOrder.defaults(for: .math) == [
+            .copyText,
+            .copyFullExpression,
+            .addToQuickNote,
+            .sendToTeleprompter,
+            .share,
+        ])
+        let codeIndex = try #require(ClipboardAssistantKind.allCases.firstIndex(of: .code))
+        let nonCurrentLanguageTextIndex = try #require(
+            ClipboardAssistantKind.allCases.firstIndex(of: .nonSystemLanguageText)
+        )
+        #expect(codeIndex < nonCurrentLanguageTextIndex)
+        #expect(ClipboardAssistantActionKind.saveText.symbolName == "square.and.arrow.down")
+    }
+
+    @Test
+    func clipboardAssistantActionOrderNormalizesSavedValues() {
+        let normalized = ClipboardAssistantActionOrder.normalized(
+            [.translate, .translate, .share],
+            for: .text
+        )
+        #expect(normalized.first == .translate)
+        #expect(normalized.filter { $0 == .translate }.count == 1)
+        #expect(normalized.contains(.search))
+        #expect(!normalized.contains(.openURL))
+
+        for kind in [ClipboardAssistantKind.filePath, .phone] {
+            let migrated = ClipboardAssistantActionOrder.normalized([.copyText], for: kind)
+            #expect(!migrated.contains(.copyText))
+        }
+    }
+
+    @Test
+    func clipboardAssistantActionOrderAppliesAvailableActionsAndKeepsBlockingLast() throws {
+        let actions: [ClipboardAssistantAction] = [
+            .search("query"),
+            .translate("query"),
+            .share,
+            .blockSourceApp(bundleIdentifier: "com.example.app", appName: "Example"),
+        ]
+        let ordered = ClipboardAssistantActionOrder.ordered(
+            actions,
+            for: .text,
+            using: [.text: [.translate, .saveText, .search, .share, .addToQuickNote, .sendToTeleprompter]]
+        )
+
+        #expect(try #require(ordered.first?.kind) == .translate)
+        #expect(ordered.map(\.kind) == [.translate, .search, .share, nil])
+    }
+
     @Test
     func featureDefaults() {
         let settings = FeatureSettings.default
@@ -2118,6 +2472,131 @@ private func executeSQLite(at url: URL, sql: String) throws {
     let result = sqlite3_exec(database, sql, nil, nil, &errorMessage)
     defer { sqlite3_free(errorMessage) }
     guard result == SQLITE_OK else { throw SQLiteTestError.statementFailed }
+}
+
+private func sqliteQueryPlan(at url: URL, sql: String) throws -> String {
+    var database: OpaquePointer?
+    guard sqlite3_open(url.path, &database) == SQLITE_OK, let database else {
+        sqlite3_close(database)
+        throw SQLiteTestError.openFailed
+    }
+    defer { sqlite3_close(database) }
+
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(database, "EXPLAIN QUERY PLAN \(sql)", -1, &statement, nil) == SQLITE_OK else {
+        sqlite3_finalize(statement)
+        throw SQLiteTestError.statementFailed
+    }
+    defer { sqlite3_finalize(statement) }
+
+    var details: [String] = []
+    while sqlite3_step(statement) == SQLITE_ROW {
+        guard let detail = sqlite3_column_text(statement, 3) else { continue }
+        details.append(String(cString: detail))
+    }
+    return details.joined(separator: "\n")
+}
+
+private func readDetectedUsageEvents(from url: URL) throws -> [AIUsageSample] {
+    var database: OpaquePointer?
+    guard sqlite3_open(url.path, &database) == SQLITE_OK, let database else {
+        sqlite3_close(database)
+        throw SQLiteTestError.openFailed
+    }
+    defer { sqlite3_close(database) }
+
+    var statement: OpaquePointer?
+    let sql = """
+        SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+        FROM detected_usage_events ORDER BY timestamp
+        """
+    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else {
+        sqlite3_finalize(statement)
+        throw SQLiteTestError.statementFailed
+    }
+    defer { sqlite3_finalize(statement) }
+
+    var results: [AIUsageSample] = []
+    while sqlite3_step(statement) == SQLITE_ROW {
+        let sourceID = sqlite3_column_type(statement, 0) == SQLITE_NULL
+            ? nil
+            : String(cString: sqlite3_column_text(statement, 0))
+        guard let providerText = sqlite3_column_text(statement, 1),
+              let provider = AIProvider(rawValue: String(cString: providerText)) else {
+            continue
+        }
+        let timestamp = Date(timeIntervalSinceReferenceDate: sqlite3_column_double(statement, 2))
+        let inputTokens = Int(sqlite3_column_int64(statement, 3))
+        let outputTokens = Int(sqlite3_column_int64(statement, 4))
+        let costUSD = sqlite3_column_type(statement, 5) == SQLITE_NULL
+            ? nil
+            : sqlite3_column_double(statement, 5)
+        let model = sqlite3_column_type(statement, 6) == SQLITE_NULL
+            ? nil
+            : String(cString: sqlite3_column_text(statement, 6))
+
+        results.append(AIUsageSample(
+            sourceID: sourceID,
+            provider: provider,
+            timestamp: timestamp,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            costUSD: costUSD,
+            model: model
+        ))
+    }
+    return results
+}
+
+private func readUsageSamples(from url: URL) throws -> [AIUsageSample] {
+    var database: OpaquePointer?
+    guard sqlite3_open(url.path, &database) == SQLITE_OK, let database else {
+        sqlite3_close(database)
+        throw SQLiteTestError.openFailed
+    }
+    defer { sqlite3_close(database) }
+
+    var statement: OpaquePointer?
+    let sql = """
+        SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+        FROM usage_samples ORDER BY position
+        """
+    guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else {
+        sqlite3_finalize(statement)
+        throw SQLiteTestError.statementFailed
+    }
+    defer { sqlite3_finalize(statement) }
+
+    var results: [AIUsageSample] = []
+    while sqlite3_step(statement) == SQLITE_ROW {
+        let sourceID = sqlite3_column_type(statement, 0) == SQLITE_NULL
+            ? nil
+            : String(cString: sqlite3_column_text(statement, 0))
+        guard let providerText = sqlite3_column_text(statement, 1),
+              let provider = AIProvider(rawValue: String(cString: providerText)) else {
+            continue
+        }
+        let timestamp = Date(timeIntervalSinceReferenceDate: sqlite3_column_double(statement, 2))
+        let inputTokens = Int(sqlite3_column_int64(statement, 3))
+        let outputTokens = Int(sqlite3_column_int64(statement, 4))
+        let costUSD = sqlite3_column_type(statement, 5) == SQLITE_NULL
+            ? nil
+            : sqlite3_column_double(statement, 5)
+        let model = sqlite3_column_type(statement, 6) == SQLITE_NULL
+            ? nil
+            : String(cString: sqlite3_column_text(statement, 6))
+
+        results.append(AIUsageSample(
+            sourceID: sourceID,
+            provider: provider,
+            timestamp: timestamp,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            costUSD: costUSD,
+            model: model
+        ))
+    }
+    return results
 }
 
 private enum SQLiteTestError: Error {

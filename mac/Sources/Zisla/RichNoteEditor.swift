@@ -58,11 +58,8 @@ struct RichNoteEditor: NSViewRepresentable {
     static let newNoteHTML = "<h1>新随记</h1><div><br></div>"
 
     static func editableHTML(for content: NotesAppBridge.NoteContent?) -> String {
-        guard let content else { return "<div><br></div>" }
-        if content.usesNativeHTML {
-            return content.bodyHTML
-        }
-        return MarkdownHTMLRenderer.bodyHTML(from: content.plainText)
+        guard let content, !content.bodyHTML.isEmpty else { return "<div><br></div>" }
+        return content.bodyHTML
     }
 
     func makeCoordinator() -> Coordinator {
@@ -237,6 +234,8 @@ struct RichNoteEditor: NSViewRepresentable {
             line-height: 1.55;
           }
           #editor { box-sizing: border-box; min-height: 100vh; outline: none; padding: 4px 14px 20px; background: transparent !important; caret-color: transparent; }
+          #editor > div, #editor > p, #editor li, #editor blockquote, #editor td, #editor th { white-space: pre-wrap; }
+          #editor [style*="font-size: 11px"] { font-size: inherit !important; }
           #caret { background: rgba(255,255,255,0.92); border-radius: 0.5px; display: none; height: 14px; left: 0; pointer-events: none; position: fixed; top: 0; transform: translate3d(-9999px, -9999px, 0); width: 1px; z-index: 1; }
           #caret.is-visible { animation: caret-blink 1s steps(1, end) infinite; display: block; }
           @keyframes caret-blink { 50% { opacity: 0; } }
@@ -275,11 +274,17 @@ struct RichNoteEditor: NSViewRepresentable {
           caret.id = 'caret';
           caret.setAttribute('aria-hidden', 'true');
           document.body.append(caret);
+          const continuationStyle = document.createElement('style');
+          document.head.append(continuationStyle);
           let sendTimer;
 
           const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
           const emit = () => window.webkit?.messageHandlers?.richNoteChanged?.postMessage({ html: editor.innerHTML, plainText: editor.innerText });
-          const scheduleEmit = () => { clearTimeout(sendTimer); sendTimer = setTimeout(emit, 80); };
+          const scheduleEmit = () => {
+            updateListContinuationStyle();
+            clearTimeout(sendTimer);
+            sendTimer = setTimeout(emit, 80);
+          };
           const hideCaret = () => caret.classList.remove('is-visible');
           const updateCaret = () => {
             const selection = window.getSelection();
@@ -299,6 +304,7 @@ struct RichNoteEditor: NSViewRepresentable {
             caret.classList.add('is-visible');
           };
           const scheduleCaretUpdate = () => requestAnimationFrame(updateCaret);
+          const isEmptyBlock = node => node?.matches?.('div, p') && !node.textContent.trim() && [...node.children].every(child => child.tagName === 'BR' || !child.textContent.trim());
           const sanitize = value => {
             const template = document.createElement('template');
             template.innerHTML = value || '';
@@ -313,11 +319,33 @@ struct RichNoteEditor: NSViewRepresentable {
                 }
               });
             });
-            const isEmptyBlock = node => node?.matches?.('div, p') && !node.textContent.trim() && [...node.children].every(child => child.tagName === 'BR');
             while (isEmptyBlock(template.content.firstElementChild)) template.content.firstElementChild.remove();
             const title = template.content.querySelector('h1');
             while (isEmptyBlock(title?.nextElementSibling)) title.nextElementSibling.remove();
             return template.innerHTML;
+          };
+          const updateListContinuationStyle = () => {
+            let followsOrderedList = false;
+            const positions = [];
+            [...editor.children].forEach((node, index) => {
+              if (node.tagName === 'OL') {
+                followsOrderedList = true;
+                return;
+              }
+              if (!followsOrderedList) return;
+              if (isEmptyBlock(node)) {
+                followsOrderedList = false;
+                return;
+              }
+              if (node.matches('div, p')) {
+                positions.push(index + 1);
+                return;
+              }
+              followsOrderedList = false;
+            });
+            continuationStyle.textContent = positions
+              .map(position => `#editor > :nth-child(${position}) { padding-left: 16px; }`)
+              .join('\\n');
           };
           const selectionCell = () => {
             const selection = window.getSelection();
@@ -338,6 +366,7 @@ struct RichNoteEditor: NSViewRepresentable {
             setHTML: value => {
               editor.innerHTML = sanitize(value);
               if (!editor.innerHTML.trim()) editor.innerHTML = '<div><br></div>';
+              updateListContinuationStyle();
               scheduleCaretUpdate();
             },
             setEditable: value => {

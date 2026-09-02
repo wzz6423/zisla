@@ -46,6 +46,59 @@ struct MailIndexReaderTests {
     }
 
     @Test
+    func filtersSelectedAccountBeforeApplyingMessageLimit() throws {
+        let databaseURL = try makeMailIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+
+        try execute("""
+            INSERT INTO mailboxes (ROWID, url) VALUES
+                (1, 'imap://busy%40example.com@mail.example.com/INBOX'),
+                (2, 'imap://quiet%40example.com@mail.example.com/INBOX');
+            INSERT INTO subjects (ROWID, subject) VALUES (1, 'Busy'), (2, 'Quiet');
+            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+            VALUES
+                (101, 1, 2_000, 2_000, 1, 0, 0),
+                (102, 1, 1_999, 1_999, 1, 0, 0),
+                (103, 1, 1_998, 1_998, 1, 0, 0),
+                (104, 1, 1_997, 1_997, 1, 0, 0),
+                (105, 1, 1_996, 1_996, 1, 0, 0),
+                (106, 1, 1_995, 1_995, 1, 0, 0),
+                (107, 1, 1_994, 1_994, 1, 0, 0),
+                (108, 1, 1_993, 1_993, 1, 0, 0),
+                (201, 2, 1_000, 1_000, 2, 0, 0);
+            """, at: databaseURL)
+
+        let snapshot = try MailIndexReader(databaseURL: databaseURL, maxMessages: 2)
+            .snapshot(accountNames: ["quiet@example.com"])
+
+        #expect(snapshot.messages.map(\.messageID) == ["201"])
+    }
+
+    @Test
+    func excludesNonInboxMailboxesWhenOtherURLPartsContainInbox() throws {
+        let databaseURL = try makeMailIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+
+        try execute("""
+            INSERT INTO mailboxes (ROWID, url) VALUES
+                (1, 'imap://inbox-owner%40example.com@mail.example.com/Sent'),
+                (2, 'imap://owner%40example.com@inbox.mail.example.com/Sent'),
+                (3, 'imap://owner%40example.com@mail.example.com/Archive%2FINBOX');
+            INSERT INTO subjects (ROWID, subject) VALUES
+                (1, 'Account match'), (2, 'Host match'), (3, 'Encoded mailbox name');
+            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+            VALUES
+                (301, 1, 1_000, 1_000, 1, 0, 0),
+                (302, 2, 999, 999, 2, 0, 0),
+                (303, 3, 998, 998, 3, 0, 0);
+            """, at: databaseURL)
+
+        let snapshot = try MailIndexReader(databaseURL: databaseURL).snapshot(accountNames: [])
+
+        #expect(snapshot.messages.isEmpty)
+    }
+
+    @Test
     func filtersMessagesForSelectedAccounts() throws {
         let databaseURL = try makeMailIndex()
         defer { try? FileManager.default.removeItem(at: databaseURL) }
@@ -53,12 +106,15 @@ struct MailIndexReaderTests {
         try execute("""
             INSERT INTO mailboxes (ROWID, url) VALUES
                 (1, 'imap://work%40example.com@mail.example.com/INBOX'),
-                (2, 'imap://personal%40example.com@mail.example.com/INBOX');
-            INSERT INTO subjects (ROWID, subject) VALUES (1, '工作邮件'), (2, '个人邮件');
+                (2, 'imap://personal%40example.com@mail.example.com/INBOX'),
+                (3, 'imap://sent-only%40example.com@mail.example.com/Sent');
+            INSERT INTO subjects (ROWID, subject) VALUES
+                (1, '工作邮件'), (2, '个人邮件'), (3, '已发送邮件');
             INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
             VALUES
                 (11, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0),
-                (12, 2, 1_720_000_100, 1_720_000_100, 2, 1, 0);
+                (12, 2, 1_720_000_100, 1_720_000_100, 2, 1, 0),
+                (13, 3, 1_720_000_200, 1_720_000_200, 3, 1, 0);
             """, at: databaseURL)
 
         let snapshot = try MailIndexReader(databaseURL: databaseURL)
@@ -67,9 +123,33 @@ struct MailIndexReaderTests {
         #expect(snapshot.messages.map(\.messageID) == ["11"])
         #expect(snapshot.messages.first?.body == "工作邮件")
 
-        let fallback = try MailIndexReader(databaseURL: databaseURL)
+        let unmatchedSelection = try MailIndexReader(databaseURL: databaseURL)
             .snapshot(accountNames: ["旧账户名称"])
-        #expect(fallback.messages.map(\.messageID) == ["12", "11"])
+        #expect(unmatchedSelection.messages.isEmpty)
+
+        let existingAccountWithoutInbox = try MailIndexReader(databaseURL: databaseURL)
+            .snapshot(accountNames: ["sent-only@example.com"])
+        #expect(existingAccountWithoutInbox.messages.isEmpty)
+    }
+
+    @Test
+    func ordersMessagesWithEqualTimestampsDeterministically() throws {
+        let databaseURL = try makeMailIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+
+        try execute("""
+            INSERT INTO mailboxes (ROWID, url) VALUES
+                (1, 'imap://work%40example.com@mail.example.com/INBOX');
+            INSERT INTO subjects (ROWID, subject) VALUES (1, 'Earlier row'), (2, 'Later row');
+            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+            VALUES
+                (10, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0),
+                (20, 2, 1_720_000_000, 1_720_000_000, 1, 0, 0);
+            """, at: databaseURL)
+
+        let snapshot = try MailIndexReader(databaseURL: databaseURL).snapshot(accountNames: [])
+
+        #expect(snapshot.messages.map(\.messageID) == ["20", "10"])
     }
 }
 

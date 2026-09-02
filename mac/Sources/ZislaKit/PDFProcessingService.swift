@@ -615,6 +615,7 @@ public struct PDFProcessingService: Sendable {
 
     private func copiedPages(from input: PDFDocument, pageIndexes: [Int]) throws -> PDFDocument {
         let output = PDFDocument()
+        output.documentAttributes = input.documentAttributes
         for pageIndex in pageIndexes {
             guard let page = input.page(at: pageIndex) else {
                 throw PDFProcessingError.invalidPageIndex(pageIndex)

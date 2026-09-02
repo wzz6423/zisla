@@ -186,7 +186,8 @@ public final class IslandPanel: NSPanel {
   public func present(
     at frame: CGRect,
     from collapsedFrame: CGRect? = nil,
-    animated: Bool = true
+    animated: Bool = true,
+    activatesFocus: Bool = true
   ) {
     _ = collapsedFrame
     _ = animated
@@ -204,7 +205,9 @@ public final class IslandPanel: NSPanel {
     alphaValue = 1
     if plan != .refront { setFrame(frame, display: true) }
     orderFrontRegardless()
-    restoreNativeGlassActivationIfNeeded()
+    if activatesFocus {
+        restoreNativeGlassActivationIfNeeded()
+    }
   }
 
   public func resize(to frame: CGRect, animated: Bool = true) {

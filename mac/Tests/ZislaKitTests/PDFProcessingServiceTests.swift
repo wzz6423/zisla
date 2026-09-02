@@ -272,6 +272,28 @@ struct PDFProcessingServiceTests {
         #expect(metadata.keywords == ["internal", "2026"])
         #expect(try service.inspect(source).pageCount == 1)
     }
+
+    @Test
+    func pageCopyOperationsPreserveDocumentMetadata() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("source.pdf")
+        let output = directory.appendingPathComponent("exported.pdf")
+        try writePDF(to: source, pageCount: 2)
+        let document = try #require(PDFDocument(url: source))
+        document.documentAttributes = [
+            AnyHashable(PDFDocumentAttribute.titleAttribute): "Preserved title",
+            AnyHashable(PDFDocumentAttribute.authorAttribute): "zisla",
+        ]
+        #expect(document.write(to: source))
+
+        let service = PDFProcessingService()
+        try service.exportPages(from: source, pageIndexes: [1], to: output)
+
+        let metadata = try service.metadata(for: output)
+        #expect(metadata.title == "Preserved title")
+        #expect(metadata.author == "zisla")
+    }
 }
 
 private func makeTemporaryDirectory() throws -> URL {

@@ -55,26 +55,26 @@ struct ScreenshotEditorTests {
         let badge = ScreenshotSelectionGeometry.badgeEstimatedSize
         let gap: CGFloat = 8
 
-        // 常规选区：右侧空间充足，标签放在外侧右侧，底部对齐选区底部。
+        // Regular selection: place the label outside on the right and align it with the bottom edge.
         let normal = CGRect(x: 200, y: 100, width: 300, height: 200)
         let normalPos = ScreenshotSelectionGeometry.badgePosition(for: normal, in: bounds)
         #expect(normalPos.x == normal.maxX + gap + badge.width / 2)
         #expect(normalPos.y == normal.maxY - badge.height / 2)
 
-        // 贴右下角：右侧空间不足，标签退到选区内右侧。
+        // Bottom-right selection: fall back to placing the label inside on the right.
         let farRight = CGRect(x: 660, y: 400, width: 140, height: 180)
         let farRightPos = ScreenshotSelectionGeometry.badgePosition(for: farRight, in: bounds)
         #expect(farRightPos.x == farRight.maxX - gap - badge.width / 2)
         #expect(farRightPos.x >= badge.width / 2)
         #expect(farRightPos.y == farRight.maxY - badge.height / 2)
 
-        // 顶部窄选区：标签底部对齐选区底部，垂直 clamp 不超出屏幕。
+        // Narrow top selection: align the label bottoms and clamp it within the screen vertically.
         let topBar = CGRect(x: 0, y: 0, width: 400, height: 20)
         let topBarPos = ScreenshotSelectionGeometry.badgePosition(for: topBar, in: bounds)
         #expect(topBarPos.y >= badge.height / 2)
         #expect(topBarPos.x == topBar.maxX + gap + badge.width / 2)
 
-        // 整屏选区：外侧放不下，退到内侧右下角。
+        // Full-screen selection: fall back to the inside bottom-right corner.
         let fullScreen = ScreenshotSelectionGeometry.badgePosition(
             for: CGRect(origin: .zero, size: bounds),
             in: bounds
@@ -288,6 +288,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         window.contentView = hostingView
         for _ in 0..<3 {
             hostingView.layoutSubtreeIfNeeded()
@@ -413,6 +414,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         var confirmCount = 0
         var cancelCount = 0
         window.onConfirm = { confirmCount += 1 }
@@ -438,6 +440,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         var undoCount = 0
         var redoCount = 0
         window.onUndo = { undoCount += 1 }
@@ -471,6 +474,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         var deleteCount = 0
         window.onDelete = {
             deleteCount += 1
@@ -495,6 +499,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         let backspace = try #require(keyEvent(keyCode: UInt16(kVK_Delete), characters: "\u{7f}"))
         let forwardDelete = try #require(keyEvent(keyCode: UInt16(kVK_ForwardDelete), characters: "\u{f728}"))
 
@@ -566,6 +571,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         window.contentView = hostingView
         for _ in 0..<3 {
             hostingView.layoutSubtreeIfNeeded()
@@ -705,6 +711,7 @@ struct ScreenshotEditorTests {
             onClose: {}
         )
         let window = try #require(controller.window)
+        window.alphaValue = 0
 
         #expect(window.styleMask.contains(.borderless))
         #expect(!window.styleMask.contains(.titled))
@@ -737,6 +744,46 @@ struct ScreenshotEditorTests {
         #expect(cancellationCount == 1)
 
         controller.cancel()
+        #expect(cancellationCount == 1)
+    }
+
+    @Test
+    func selectionControllerPreparesPresentationBeforeShowingPanels() async throws {
+        let screen = try #require(NSScreen.screens.first)
+        let image = try #require(makeGradientImage(width: 32, height: 20))
+        let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        var events: [String] = []
+        let controller = ScreenshotSelectionController(
+            captureScreen: { _ in (image, cgImage) },
+            presentPanels: { _ in events.append("present") }
+        )
+        controller.onSelectionWillPresent = { events.append("prepare") }
+
+        await controller.start(on: screen)
+
+        #expect(events == ["prepare", "present"])
+        controller.cancel()
+    }
+
+    @Test
+    func selectionControllerCancelsWhilePreparingWithoutPresentingPanels() async throws {
+        let screen = try #require(NSScreen.screens.first)
+        let image = try #require(makeGradientImage(width: 32, height: 20))
+        let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        var cancellationCount = 0
+        var presentedPanels: [ScreenshotSelectionPanel] = []
+        var controller: ScreenshotSelectionController!
+        controller = ScreenshotSelectionController(
+            captureScreen: { _ in (image, cgImage) },
+            presentPanels: { presentedPanels = $0 }
+        )
+        controller.onCancelled = { cancellationCount += 1 }
+        controller.onSelectionWillPresent = { controller.cancel() }
+
+        await controller.start(on: screen)
+
+        #expect(presentedPanels.isEmpty)
+        #expect(controller.selectionWindowCount == 0)
         #expect(cancellationCount == 1)
     }
 
@@ -874,6 +921,7 @@ struct ScreenshotEditorTests {
             onClose: { closeCount += 1 }
         )
         let window = try #require(controller.window as? ScreenshotEditorWindow)
+        window.alphaValue = 0
         let escape = try #require(keyEvent(keyCode: UInt16(kVK_Escape), characters: "\u{1b}"))
 
         #expect(window.performKeyEquivalent(with: escape))
@@ -898,6 +946,7 @@ struct ScreenshotEditorTests {
             onClose: { closeCount += 1 }
         )
         let window = try #require(controller.window)
+        window.alphaValue = 0
 
         window.performClose(nil)
 
@@ -926,6 +975,7 @@ struct ScreenshotEditorTests {
             onClose: { closeCount += 1 }
         )
         let window = try #require(controller.window as? ScreenshotEditorWindow)
+        window.alphaValue = 0
         let enter = try #require(keyEvent(keyCode: UInt16(kVK_Return), characters: "\r"))
 
         #expect(window.performKeyEquivalent(with: enter))
@@ -950,6 +1000,7 @@ struct ScreenshotEditorTests {
         controller.setPinned(true)
 
         let window = try #require(controller.window)
+        window.alphaValue = 0
         #expect(window.styleMask.contains(.borderless))
         #expect(!window.styleMask.contains(.titled))
         #expect(window.contentView?.frame.size == CGSize(
@@ -963,6 +1014,31 @@ struct ScreenshotEditorTests {
         #expect(window.collectionBehavior.contains(.fullScreenAuxiliary))
         #expect(window.isMovableByWindowBackground)
         #expect(!window.hasShadow)
+    }
+
+    @Test
+    func pinPresentationKeepsTheFullToolbarForSmallImages() throws {
+        let image = try #require(makeGradientImage(width: 120, height: 80))
+        let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let controller = ScreenshotEditorWindowController(
+            image: image,
+            screenImage: image,
+            screenCGImage: cgImage,
+            screen: nil,
+            captureRect: CGRect(x: 20, y: 20, width: 80, height: 60),
+            capturedApplication: nil,
+            onClose: {}
+        )
+
+        controller.setPinned(true)
+
+        let window = try #require(controller.window)
+        window.alphaValue = 0
+        #expect(window.frame.width == ScreenshotPinnedLayout.contentWidth)
+        #expect(ScreenshotPinnedLayout.windowWidth(
+            forImageWidth: image.size.width,
+            toolbarVisible: true
+        ) == ScreenshotPinnedLayout.contentWidth)
     }
 
     @Test
@@ -983,6 +1059,7 @@ struct ScreenshotEditorTests {
         controller.setPinned(true)
 
         let window = try #require(controller.window)
+        window.alphaValue = 0
         #expect(ScreenshotPinnedLayout.footerHeight(toolbarVisible: false) == 0)
         #expect(window.contentView?.frame.size == image.size)
     }
@@ -1004,6 +1081,7 @@ struct ScreenshotEditorTests {
         controller.setPinned(true)
 
         let window = try #require(controller.window)
+        window.alphaValue = 0
         #expect(window.isMovableByWindowBackground)
         let pointer = try #require(findSubview(ScreenshotPointerInteractionNSView.self, in: window.contentView!))
         #expect(!pointer.mouseDownCanMoveWindow)
@@ -1049,6 +1127,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         window.contentView = view
 
         try sendMouseDrag(
@@ -1098,6 +1177,7 @@ struct ScreenshotEditorTests {
         )
         controller.setPinned(true)
         let window = try #require(controller.window)
+        window.alphaValue = 0
         let initialImageCenter = pinnedImageCenter(in: window.frame)
 
         controller.setPinnedScale(1.5)
@@ -1138,6 +1218,7 @@ struct ScreenshotEditorTests {
 
         controller.setPinned(true)
         let window = try #require(controller.window)
+        window.alphaValue = 0
         let origin = window.frame.origin
         let translation = CGSize(width: screen.frame.width + 128, height: 0)
 
@@ -1176,6 +1257,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         window.contentView = hostingView
         for _ in 0..<3 {
             hostingView.layoutSubtreeIfNeeded()
@@ -1221,6 +1303,7 @@ struct ScreenshotEditorTests {
         )
         controller.setPinned(true)
         let window = try #require(controller.window as? ScreenshotEditorWindow)
+        window.alphaValue = 0
         let escape = try #require(keyEvent(keyCode: UInt16(kVK_Escape), characters: "\u{1b}"))
 
         #expect(window.performKeyEquivalent(with: escape))
@@ -1275,6 +1358,11 @@ struct ScreenshotEditorTests {
         #expect(lines.count == 2)
         #expect(lines[0].contains("\t"))
         #expect(lines[1].contains("\t"))
+    }
+
+    @Test
+    func tableRecognitionHandlesNoTextFragments() {
+        #expect(ScreenshotRecognitionFormatter.table(from: []).isEmpty)
     }
 
     @Test
@@ -1788,6 +1876,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         window.contentView = view
         view.updateTrackingAreas()
         let event = try #require(mouseEvent(
@@ -1797,10 +1886,12 @@ struct ScreenshotEditorTests {
             eventNumber: 1
         ))
 
+        #expect(!window.isVisible)
         view.mouseEntered(with: event)
         view.mouseDown(with: event)
         view.mouseExited(with: event)
 
+        #expect(!window.isVisible)
         #expect(clickCount == 1)
         #expect(focusChanges == [true, false])
     }
@@ -2107,6 +2198,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         window.contentView = hostingView
         for _ in 0..<3 {
             hostingView.layoutSubtreeIfNeeded()
@@ -2135,6 +2227,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         let parentView = NSView(frame: bounds)
         window.contentView = parentView
         parentView.addSubview(container)
@@ -2249,6 +2342,7 @@ struct ScreenshotEditorTests {
             backing: .buffered,
             defer: false
         )
+        window.alphaValue = 0
         window.contentView = hostingView
         for _ in 0..<3 {
             hostingView.layoutSubtreeIfNeeded()

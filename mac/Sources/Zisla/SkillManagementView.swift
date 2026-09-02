@@ -180,31 +180,41 @@ struct SkillManagementView: View {
         if !agent.store.state.skills.isEmpty {
             Text("已发现 Skills（\(agent.store.state.skills.count)）")
                 .font(.system(size: 10, weight: .medium))
-            ForEach(agent.store.state.skills) { skill in
-                HStack(spacing: 7) {
-                    Toggle("", isOn: skillEnabledBinding(skill.path))
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                    Text(skill.name)
-                        .font(.system(size: 10))
-                    Spacer(minLength: 0)
-                    Text(skill.path)
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Button {
-                        pendingUninstallSkill = skill
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 9))
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(agent.store.state.skills) { skill in
+                    HStack(spacing: 7) {
+                        Toggle("", isOn: skillEnabledBinding(skill.path))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .controlSize(.mini)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(skill.name)
+                                .font(.system(size: 10))
+                            if let description = skill.description, !description.isEmpty {
+                                Text(description)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(skill.path)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Button {
+                            pendingUninstallSkill = skill
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 9))
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .help("卸载 Skill")
                     }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(.secondary)
-                    .help("卸载 Skill")
+                    .padding(.vertical, 2)
                 }
-                .padding(.vertical, 2)
             }
         }
     }

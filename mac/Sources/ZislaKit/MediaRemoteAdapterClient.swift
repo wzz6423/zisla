@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 struct MediaRemoteAdapterEvent: Decodable, Sendable {
@@ -31,9 +32,13 @@ struct MediaRemoteAdapterPayload: Decodable, Sendable {
 
 @MainActor
 final class MediaRemoteAdapterClient {
+    nonisolated static let parentLifecycleEnvironmentKey = "MEDIAREMOTEADAPTER_PARENT_LIFECYCLE"
+    private nonisolated static let terminationEscalationDelay: UInt64 = 1_000_000_000
+
     private let commandQueue = DispatchQueue(label: "dev.wzz.zisla.media-command")
     private var listener: Process?
     private var listenerPipe: Pipe?
+    private var listenerLifecyclePipe: Pipe?
     private var listenerToken: UUID?
     private var commandProcesses: [UUID: Process] = [:]
 
@@ -50,20 +55,25 @@ final class MediaRemoteAdapterClient {
 
         let token = UUID()
         let pipe = Pipe()
+        let lifecyclePipe = Pipe()
         let decoder = MediaRemoteAdapterStreamDecoder { event in
             Task { @MainActor in onEvent(event) }
         }
         let process = Self.configuredProcess(
             resources: resources,
-            arguments: ["stream", "--no-diff", "--debounce=80"]
+            arguments: Self.streamArguments()
         )
         process.standardOutput = pipe
+        process.standardInput = lifecyclePipe
+        process.environment = Self.parentLifecycleEnvironment()
         process.terminationHandler = { [weak self] _ in
             pipe.fileHandleForReading.readabilityHandler = nil
-            Task { @MainActor [weak self] in
+            Self.closePipe(lifecyclePipe)
+            Task { @MainActor [weak self, token] in
                 guard let self, self.listenerToken == token else { return }
                 self.listener = nil
                 self.listenerPipe = nil
+                self.listenerLifecyclePipe = nil
                 self.listenerToken = nil
                 onTermination()
             }
@@ -81,23 +91,31 @@ final class MediaRemoteAdapterClient {
             try process.run()
             listener = process
             listenerPipe = pipe
+            listenerLifecyclePipe = lifecyclePipe
             listenerToken = token
             return true
         } catch {
             pipe.fileHandleForReading.readabilityHandler = nil
+            Self.closePipe(lifecyclePipe)
             return false
         }
     }
 
     func stop() {
+        let listenerProcess = self.listener
+        let lifecyclePipe = self.listenerLifecyclePipe
         listenerToken = nil
         listenerPipe?.fileHandleForReading.readabilityHandler = nil
-        if listener?.isRunning == true { listener?.terminate() }
-        listener = nil
+        Self.closePipe(lifecyclePipe)
+        if let listenerProcess, listenerProcess.isRunning {
+            terminate(listenerProcess)
+        }
+        self.listener = nil
         listenerPipe = nil
+        self.listenerLifecyclePipe = nil
 
         for process in commandProcesses.values where process.isRunning {
-            process.terminate()
+            terminate(process)
         }
         commandProcesses.removeAll()
     }
@@ -186,6 +204,33 @@ final class MediaRemoteAdapterClient {
         process.standardError = FileHandle.nullDevice
         process.standardInput = FileHandle.nullDevice
         return process
+    }
+
+    nonisolated static func parentLifecycleEnvironment() -> [String: String] {
+        var environment = ProcessInfo.processInfo.environment
+        environment[parentLifecycleEnvironmentKey] = "1"
+        return environment
+    }
+
+    private func terminate(_ process: Process) {
+        guard process.isRunning else { return }
+        process.terminate()
+        let processIdentifier = process.processIdentifier
+        Task { @MainActor [process] in
+            try? await Task.sleep(nanoseconds: Self.terminationEscalationDelay)
+            guard process.isRunning else { return }
+            _ = Darwin.kill(processIdentifier, SIGKILL)
+        }
+    }
+
+    private nonisolated static func closePipe(_ pipe: Pipe?) {
+        guard let pipe else { return }
+        try? pipe.fileHandleForWriting.close()
+        try? pipe.fileHandleForReading.close()
+    }
+
+    nonisolated static func streamArguments() -> [String] {
+        ["stream", "--no-diff", "--debounce=80", "--no-artwork"]
     }
 
     nonisolated static func decodeNowPlayingInfo(_ data: Data) -> MediaRemoteAdapterPayload? {

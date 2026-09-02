@@ -1,3 +1,5 @@
+import CryptoKit
+import Darwin
 import Foundation
 import ZislaCore
 
@@ -7,6 +9,7 @@ public final class CodexSessionActivityDetector {
     private struct Candidate {
         var url: URL
         var modificationDate: Date
+        var changeDate: Date?
         var size: UInt64
     }
 
@@ -20,6 +23,7 @@ public final class CodexSessionActivityDetector {
         var kind: Kind
         var turnID: String
         var timestamp: Date
+        var ordinal: UInt64
     }
 
     private struct StatusSignal {
@@ -27,6 +31,7 @@ public final class CodexSessionActivityDetector {
         var failed: Bool
         var timestamp: Date
         var reason: String?
+        var ordinal: UInt64
     }
 
     private struct ParsedResponseItem {
@@ -107,6 +112,8 @@ public final class CodexSessionActivityDetector {
 
     private struct CachedRollout {
         var modificationDate: Date
+        var changeDate: Date?
+        var size: UInt64
         var readerState: IncrementalJSONLReader.State
         var events: [Event]
         var statusSignals: [StatusSignal]
@@ -114,6 +121,8 @@ public final class CodexSessionActivityDetector {
         var effortsByTurnID: [String: String]
         var turnIDsByCallID: [String: String]
         var sessionID: String?
+        var nextRecordOrdinal: UInt64
+        var edgeHash: Data?
     }
 
     private struct CachedSessionIndex {
@@ -131,8 +140,21 @@ public final class CodexSessionActivityDetector {
     private let jsonlReader: IncrementalJSONLReader
     private let now: () -> Date
     private let processIdentifiersForOpenFiles: ([URL]) -> [URL: Int32]
+    private let clientProvidersForProcessIdentifiers: (Set<Int32>) -> [Int32: AIProvider]
     private var cache: [URL: CachedRollout] = [:]
     private var sessionIndexCache: CachedSessionIndex?
+
+    static let incrementalVerificationBytes = 4 * 1_024
+
+    static func incrementalVerificationByteCount(for fileSize: UInt64) -> UInt64 {
+        guard fileSize > 0 else { return 0 }
+        let bytesPerEdge = incrementalVerificationBytesPerEdge(for: fileSize)
+        return fileSize > bytesPerEdge ? bytesPerEdge * 2 : bytesPerEdge
+    }
+
+    private static func incrementalVerificationBytesPerEdge(for fileSize: UInt64) -> UInt64 {
+        min(UInt64(incrementalVerificationBytes), max(1, fileSize / 2))
+    }
 
     public init(
         sessionsDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
@@ -144,6 +166,8 @@ public final class CodexSessionActivityDetector {
         fileManager: FileManager = .default,
         processIdentifiersForOpenFiles: @escaping ([URL]) -> [URL: Int32]
             = CodexSessionActivityDetector.defaultProcessIdentifiersForOpenFiles,
+        clientProvidersForProcessIdentifiers: @escaping (Set<Int32>) -> [Int32: AIProvider]
+            = CodexSessionActivityDetector.defaultClientProvidersForProcessIdentifiers,
         now: @escaping () -> Date = Date.init
     ) {
         self.sessionsDirectory = sessionsDirectory
@@ -155,6 +179,7 @@ public final class CodexSessionActivityDetector {
         jsonlReader = IncrementalJSONLReader(initialTailBytes: initialTailBytes)
         self.fileManager = fileManager
         self.processIdentifiersForOpenFiles = processIdentifiersForOpenFiles
+        self.clientProvidersForProcessIdentifiers = clientProvidersForProcessIdentifiers
         self.now = now
     }
 
@@ -196,7 +221,7 @@ public final class CodexSessionActivityDetector {
             let candidateEvents = activity.events
             let latestStartedTurnID = candidateEvents
                 .filter { $0.kind == .started }
-                .max { $0.timestamp < $1.timestamp }?
+                .max(by: Self.isOrderedBefore)?
                 .turnID
             allEvents.append(contentsOf: candidateEvents.map { event in
                 let activityDate = event.kind == .started && event.turnID == latestStartedTurnID
@@ -216,7 +241,20 @@ public final class CodexSessionActivityDetector {
             if $0.event.timestamp != $1.event.timestamp {
                 return $0.event.timestamp < $1.event.timestamp
             }
-            return Self.sortOrder(for: $0.event.kind) < Self.sortOrder(for: $1.event.kind)
+            let lhsOrder = Self.sortOrder(for: $0.event.kind)
+            let rhsOrder = Self.sortOrder(for: $1.event.kind)
+            if lhsOrder != rhsOrder { return lhsOrder < rhsOrder }
+            if $0.rolloutURL.path != $1.rolloutURL.path {
+                return $0.rolloutURL.path < $1.rolloutURL.path
+            }
+            return $0.event.ordinal < $1.event.ordinal
+        }
+
+        var latestTurnIDsBySessionID: [String: String] = [:]
+        for record in allEvents where record.event.kind == .started {
+            if let sessionID = record.sessionID {
+                latestTurnIDsBySessionID[sessionID] = record.event.turnID
+            }
         }
 
         var active: [String: (
@@ -227,10 +265,16 @@ public final class CodexSessionActivityDetector {
             sessionID: String?,
             rolloutURL: URL
         )] = [:]
+
         for record in allEvents {
             let event = record.event
             switch event.kind {
             case .started:
+                if let sessionID = record.sessionID,
+                   let latestTurnID = latestTurnIDsBySessionID[sessionID],
+                   latestTurnID != event.turnID {
+                    continue
+                }
                 active[event.turnID] = record
             case .completed, .aborted:
                 active.removeValue(forKey: event.turnID)
@@ -241,10 +285,16 @@ public final class CodexSessionActivityDetector {
         let processIdentifiersByURL = processIdentifiersForOpenFiles(
             Array(Set(active.values.map(\.rolloutURL)))
         )
+        let clientProvidersByProcessIdentifier = clientProvidersForProcessIdentifiers(
+            Set(processIdentifiersByURL.values)
+        )
         let tasks = active.values
             .map { record in
                 let event = record.event
-                let provider = Self.provider(forModel: record.model)
+                let processIdentifier = processIdentifiersByURL[record.rolloutURL]
+                let provider = processIdentifier.flatMap {
+                    clientProvidersByProcessIdentifier[$0]
+                } ?? .codex
                 let fallbackTitle = provider == .gpt ? "ChatGPT" : "Codex"
                 let threadTitle = record.sessionID.flatMap { titlesBySessionID[$0] }
                 let displayTitle = threadTitle ?? fallbackTitle
@@ -264,7 +314,7 @@ public final class CodexSessionActivityDetector {
                     effort: record.effort,
                     startedAt: event.timestamp,
                     failureReason: reason,
-                    processIdentifier: processIdentifiersByURL[record.rolloutURL]
+                    processIdentifier: processIdentifier
                 )
             }
             .sorted {
@@ -289,6 +339,23 @@ public final class CodexSessionActivityDetector {
             timeout: 2
         ) else { return [:] }
         return parseOpenFileProcessIdentifiers(data, matching: standardizedURLs)
+    }
+
+    public static func defaultClientProvidersForProcessIdentifiers(
+        _ processIdentifiers: Set<Int32>
+    ) -> [Int32: AIProvider] {
+        guard !processIdentifiers.isEmpty,
+              let data = runProcessOutput(
+                  executableURL: URL(fileURLWithPath: "/bin/ps"),
+                  arguments: ["-axo", "pid=,ppid=,command="],
+                  timeout: 2
+              ) else {
+            return [:]
+        }
+        return parseClientProviders(
+            fromProcessList: data,
+            matching: processIdentifiers
+        )
     }
 
     static func runProcessOutput(
@@ -370,11 +437,52 @@ public final class CodexSessionActivityDetector {
         return result
     }
 
-    private static func provider(forModel model: String?) -> AIProvider {
-        guard let model = model?.lowercased() else { return .codex }
-        if model.contains("codex") { return .codex }
-        if model.contains("gpt") || model.contains("chatgpt") { return .gpt }
-        return .codex
+    static func parseClientProviders(
+        fromProcessList data: Data,
+        matching processIdentifiers: Set<Int32>
+    ) -> [Int32: AIProvider] {
+        struct ProcessEntry {
+            var parentIdentifier: Int32
+            var command: Substring
+        }
+
+        var entries: [Int32: ProcessEntry] = [:]
+        for line in String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline) {
+            let fields = line.split(maxSplits: 2, whereSeparator: \.isWhitespace)
+            guard fields.count == 3,
+                  let processIdentifier = Int32(fields[0]),
+                  let parentIdentifier = Int32(fields[1]) else {
+                continue
+            }
+            entries[processIdentifier] = ProcessEntry(
+                parentIdentifier: parentIdentifier,
+                command: fields[2]
+            )
+        }
+
+        var providers: [Int32: AIProvider] = [:]
+        for processIdentifier in processIdentifiers {
+            var currentIdentifier = processIdentifier
+            var visited = Set<Int32>()
+            while visited.insert(currentIdentifier).inserted,
+                  let entry = entries[currentIdentifier] {
+                let command = entry.command.lowercased()
+                if command.contains("/chatgpt.app/") {
+                    providers[processIdentifier] = .gpt
+                    break
+                }
+                if command.contains("/codex.app/") {
+                    providers[processIdentifier] = .codex
+                    break
+                }
+                guard entry.parentIdentifier > 0,
+                      entry.parentIdentifier != currentIdentifier else {
+                    break
+                }
+                currentIdentifier = entry.parentIdentifier
+            }
+        }
+        return providers
     }
 
     private static func sortOrder(for kind: Event.Kind) -> Int {
@@ -384,10 +492,23 @@ public final class CodexSessionActivityDetector {
         }
     }
 
+    private static func isOrderedBefore(_ lhs: Event, _ rhs: Event) -> Bool {
+        if lhs.timestamp != rhs.timestamp { return lhs.timestamp < rhs.timestamp }
+        let lhsOrder = sortOrder(for: lhs.kind)
+        let rhsOrder = sortOrder(for: rhs.kind)
+        if lhsOrder != rhsOrder { return lhsOrder < rhsOrder }
+        return lhs.ordinal < rhs.ordinal
+    }
+
+    private static func isOrderedBefore(_ lhs: StatusSignal, _ rhs: StatusSignal) -> Bool {
+        if lhs.timestamp != rhs.timestamp { return lhs.timestamp < rhs.timestamp }
+        return lhs.ordinal < rhs.ordinal
+    }
+
     private static func statusAndReason(from signals: [StatusSignal], startedAt: Date) -> (AIProgressStatus, String?) {
         let latestSignal = signals
             .filter({ $0.timestamp >= startedAt })
-            .max(by: { $0.timestamp < $1.timestamp })
+            .max(by: Self.isOrderedBefore)
         guard latestSignal?.failed == true else {
             return (.running, nil)
         }
@@ -429,6 +550,7 @@ public final class CodexSessionActivityDetector {
             candidates.append(Candidate(
                 url: url,
                 modificationDate: modificationDate,
+                changeDate: Self.fileChangeDate(for: url),
                 size: UInt64(max(0, values.fileSize ?? 0))
             ))
         }
@@ -444,6 +566,8 @@ public final class CodexSessionActivityDetector {
     private func activity(in candidate: Candidate) throws -> RolloutActivity {
         if let cached = cache[candidate.url],
            cached.modificationDate == candidate.modificationDate,
+           cached.changeDate == candidate.changeDate,
+           cached.size == candidate.size,
            cached.readerState.offset == candidate.size {
             return RolloutActivity(
                 events: cached.events,
@@ -454,53 +578,58 @@ public final class CodexSessionActivityDetector {
             )
         }
 
-        var cached = cache[candidate.url]
-        if cached == nil
-            || candidate.size < (cached?.readerState.offset ?? 0)
-            || (candidate.size == cached?.readerState.offset
-                && candidate.modificationDate != cached?.modificationDate) {
-            cached = CachedRollout(
+        let cachedEdgeMatches: Bool = {
+            guard let cached = cache[candidate.url],
+                  let cachedEdgeHash = cached.edgeHash,
+                  cached.readerState.offset == cached.size,
+                  candidate.size > cached.size else {
+                return false
+            }
+            return edgeHash(of: candidate.url, byteCount: cached.size) == cachedEdgeHash
+        }()
+
+        let canContinue = cache[candidate.url].map {
+            candidate.size > $0.size && cachedEdgeMatches
+        } ?? false
+        var next: CachedRollout
+        if canContinue, let cached = cache[candidate.url] {
+            next = cached
+        } else {
+            next = CachedRollout(
                 modificationDate: candidate.modificationDate,
+                changeDate: candidate.changeDate,
+                size: candidate.size,
                 readerState: jsonlReader.initialState(fileSize: candidate.size),
                 events: [],
                 statusSignals: [],
                 modelsByTurnID: [:],
                 effortsByTurnID: [:],
                 turnIDsByCallID: [:],
-                sessionID: nil
+                sessionID: nil,
+                nextRecordOrdinal: 0,
+                edgeHash: nil
             )
         }
 
-        guard var next = cached else {
-            return RolloutActivity(
-                events: [],
-                statusSignals: [],
-                modelsByTurnID: [:],
-                effortsByTurnID: [:],
-                sessionID: nil
-            )
-        }
         var readerState = next.readerState
-        try jsonlReader.readLines(
-            from: candidate.url,
-            fileSize: candidate.size,
-            state: &readerState
-        ) { data in
-            guard let type = parseRecordType(data) else { return }
+        let consumeRecord: (Data) -> Bool = { data in
+            guard let type = self.parseRecordType(data) else { return false }
+            let ordinal = next.nextRecordOrdinal
+            next.nextRecordOrdinal &+= 1
             switch type {
             case "session_meta":
-                if let sessionID = parseSessionID(data) {
+                if let sessionID = self.parseSessionID(data) {
                     next.sessionID = sessionID
                 }
             case "turn_context":
-                if let context = parseTurnContext(data) {
-                next.modelsByTurnID[context.turnID] = context.model
-                if let effort = context.effort {
-                    next.effortsByTurnID[context.turnID] = effort
-                }
+                if let context = self.parseTurnContext(data) {
+                    next.modelsByTurnID[context.turnID] = context.model
+                    if let effort = context.effort {
+                        next.effortsByTurnID[context.turnID] = effort
+                    }
                 }
             case "response_item":
-                guard let item = parseResponseItem(data) else { return }
+                guard let item = self.parseResponseItem(data) else { return true }
                 if let callID = item.callID, let turnID = item.turnID {
                     next.turnIDsByCallID[callID] = turnID
                 }
@@ -510,19 +639,32 @@ public final class CodexSessionActivityDetector {
                         turnID: turnID,
                         failed: failed,
                         timestamp: item.timestamp,
-                        reason: item.failureReason
+                        reason: item.failureReason,
+                        ordinal: ordinal
                     ))
                 }
             case "event_msg":
-                if let event = parseEvent(data) {
+                if let event = self.parseEvent(data, ordinal: ordinal) {
                     next.events.append(event)
                 }
             default:
                 break
             }
+            return true
         }
+        try jsonlReader.readLines(
+            from: candidate.url,
+            fileSize: candidate.size,
+            state: &readerState
+        ) { data in
+            _ = consumeRecord(data)
+        }
+        readerState.consumePendingLineIfAccepted(consumeRecord)
         next.readerState = readerState
         next.modificationDate = candidate.modificationDate
+        next.changeDate = candidate.changeDate
+        next.size = candidate.size
+        next.edgeHash = edgeHash(of: candidate.url, byteCount: readerState.offset)
         coalesceCachedActivity(&next)
 
         cache[candidate.url] = next
@@ -536,27 +678,42 @@ public final class CodexSessionActivityDetector {
     }
 
     private func coalesceCachedActivity(_ cached: inout CachedRollout) {
-        var latestEvents: [String: Event] = [:]
-        for event in cached.events {
-            guard let previous = latestEvents[event.turnID] else {
-                latestEvents[event.turnID] = event
-                continue
-            }
-            if event.timestamp > previous.timestamp
-                || (event.timestamp == previous.timestamp
-                    && Self.sortOrder(for: event.kind) >= Self.sortOrder(for: previous.kind)) {
-                latestEvents[event.turnID] = event
-            }
+        var latestEvents: [String: (started: Event?, terminal: Event?)] = [:]
+
+        func replaces(_ candidate: Event, current: Event?) -> Bool {
+            guard let current else { return true }
+            return Self.isOrderedBefore(current, candidate)
         }
-        cached.events = Array(latestEvents.values)
+
+        for event in cached.events {
+            var lifecycle = latestEvents[event.turnID] ?? (started: nil, terminal: nil)
+            switch event.kind {
+            case .started:
+                if replaces(event, current: lifecycle.started) {
+                    lifecycle.started = event
+                }
+            case .completed, .aborted:
+                if replaces(event, current: lifecycle.terminal) {
+                    lifecycle.terminal = event
+                }
+            }
+            latestEvents[event.turnID] = lifecycle
+        }
+        cached.events = latestEvents.values.flatMap { lifecycle in
+            [lifecycle.started, lifecycle.terminal].compactMap { $0 }
+        }.sorted(by: Self.isOrderedBefore)
 
         var latestStatusSignals: [String: StatusSignal] = [:]
         for signal in cached.statusSignals {
-            if latestStatusSignals[signal.turnID]?.timestamp ?? .distantPast <= signal.timestamp {
+            if let current = latestStatusSignals[signal.turnID] {
+                if Self.isOrderedBefore(current, signal) {
+                    latestStatusSignals[signal.turnID] = signal
+                }
+            } else {
                 latestStatusSignals[signal.turnID] = signal
             }
         }
-        cached.statusSignals = Array(latestStatusSignals.values)
+        cached.statusSignals = latestStatusSignals.values.sorted(by: Self.isOrderedBefore)
     }
 
     private func retainOnlyActiveActivity(for activeTurnIDs: Set<String>) {
@@ -693,7 +850,7 @@ public final class CodexSessionActivityDetector {
         try? JSONDecoder().decode(RecordEnvelope.self, from: data).type
     }
 
-    private func parseEvent(_ data: Data) -> Event? {
+    private func parseEvent(_ data: Data, ordinal: UInt64) -> Event? {
         guard let envelope = try? JSONDecoder().decode(EventEnvelope.self, from: data),
               envelope.type == "event_msg",
               let kind = Event.Kind(rawValue: envelope.payload.type),
@@ -702,7 +859,7 @@ public final class CodexSessionActivityDetector {
               let timestamp = Self.parseTimestamp(envelope.timestamp) else {
             return nil
         }
-        return Event(kind: kind, turnID: turnID, timestamp: timestamp)
+        return Event(kind: kind, turnID: turnID, timestamp: timestamp, ordinal: ordinal)
     }
 
     private func parseTurnContext(
@@ -730,6 +887,46 @@ public final class CodexSessionActivityDetector {
         }
         let sessionID = envelope.payload.id.trimmingCharacters(in: .whitespacesAndNewlines)
         return sessionID.isEmpty ? nil : sessionID
+    }
+
+    private static func fileChangeDate(for url: URL) -> Date? {
+        var info = stat()
+        guard lstat(url.path, &info) == 0 else { return nil }
+        return Date(
+            timeIntervalSince1970: TimeInterval(info.st_ctimespec.tv_sec)
+                + TimeInterval(info.st_ctimespec.tv_nsec) / 1_000_000_000
+        )
+    }
+
+    private func edgeHash(of url: URL, byteCount: UInt64) -> Data? {
+        guard byteCount > 0 else { return Self.contentHash(for: SHA256()) }
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+
+        let bytesPerEdge = Self.incrementalVerificationBytesPerEdge(for: byteCount)
+        var hasher = SHA256()
+        do {
+            guard let first = try handle.read(upToCount: Int(bytesPerEdge)),
+                  first.count == Int(bytesPerEdge) else {
+                return nil
+            }
+            hasher.update(data: first)
+            if byteCount > bytesPerEdge {
+                try handle.seek(toOffset: byteCount - bytesPerEdge)
+                guard let last = try handle.read(upToCount: Int(bytesPerEdge)),
+                      last.count == Int(bytesPerEdge) else {
+                    return nil
+                }
+                hasher.update(data: last)
+            }
+        } catch {
+            return nil
+        }
+        return Self.contentHash(for: hasher)
+    }
+
+    private static func contentHash(for hasher: SHA256) -> Data {
+        return Data(hasher.finalize())
     }
 
     private static func sessionURL(for sessionID: String) -> URL? {

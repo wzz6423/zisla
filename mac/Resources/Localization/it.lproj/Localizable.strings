@@ -517,6 +517,7 @@
 "算式" = "Calcolo";
 "日期时间" = "Data e ora";
 "中文文本" = "Testo cinese";
+"非当前系统语言文本" = "Testo in una lingua diversa da quella di sistema";
 "代码" = "Codice";
 "翻译" = "Traduci";
 "写邮件" = "Scrivi email";
@@ -524,6 +525,7 @@
 "拨打电话" = "Chiama";
 "不再显示来自 %@ 的复制" = "Non mostrare più le copie da %@";
 "复制结果" = "Copia risultato";
+"复制完整算式" = "Copia espressione completa";
 "保存图片" = "Salva immagine";
 "保存文本" = "Salva testo";
 "新建日程" = "Nuovo evento";

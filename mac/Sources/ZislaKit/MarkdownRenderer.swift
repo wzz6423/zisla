@@ -115,13 +115,32 @@ public enum MarkdownRenderer {
     /// Inline formatting: parse bold/italic/inline code/links/strikethrough via Foundation;
     /// fall back to plain text on parse failure.
     private static func inline(_ text: String, font: Font) -> AttributedString {
+        let expandedText = expandIndentationMarkers(in: text)
         var attr: AttributedString
-        if let parsed = try? AttributedString(markdown: text) {
+        if let parsed = try? AttributedString(markdown: expandedText) {
             attr = parsed
         } else {
-            attr = AttributedString(text)
+            attr = AttributedString(expandedText)
         }
         attr.font = font
         return attr
+    }
+
+    private static func expandIndentationMarkers(in text: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: "%%ZISLA_INDENT:([0-9]+)%%") else {
+            return text
+        }
+        let nsText = text as NSString
+        var result = text
+        for match in regex.matches(in: text, range: NSRange(location: 0, length: nsText.length)).reversed() {
+            guard let count = Int(nsText.substring(with: match.range(at: 1))), count <= 4096 else {
+                continue
+            }
+            result = (result as NSString).replacingCharacters(
+                in: match.range,
+                with: String(repeating: "\u{00A0}", count: count)
+            )
+        }
+        return result
     }
 }

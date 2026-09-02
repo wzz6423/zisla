@@ -126,6 +126,53 @@ struct AIStateMonitorActivityDetectorTests {
     }
 
     @Test @MainActor
+    func stateFileWatchersReloadWALAppendsAndRemainStoppedUntilRestart() async throws {
+        let directory = monitorTempDirectory("wal-watch")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let database = try AIStateDatabase(url: repository.databaseURL, maximumUsageSamples: 10)
+        let first = AIProgressTask(
+            id: "first", provider: .codex, title: "First", progress: nil,
+            status: .running, updatedAt: .now
+        )
+        try database.upsertTask(first)
+
+        let monitor = AIStateMonitor(
+            directoryURL: directory,
+            activityDetectors: [],
+            activeTaskTTL: .greatestFiniteMagnitude
+        )
+        defer { monitor.stop() }
+        monitor.start()
+        #expect(await waitForMonitorState(timeout: 10) { monitor.state.tasks == [first] })
+
+        let second = AIProgressTask(
+            id: "second", provider: .claude, title: "Second", progress: 0.5,
+            status: .running, updatedAt: .now
+        )
+        try database.upsertTask(second)
+        #expect(await waitForMonitorState(timeout: 10) {
+            Set(monitor.state.tasks.map(\.id)) == Set([first.id, second.id])
+        })
+
+        monitor.stop()
+        let stoppedState = monitor.state
+        let third = AIProgressTask(
+            id: "third", provider: .gemini, title: "Third", progress: 0.75,
+            status: .running, updatedAt: .now
+        )
+        try database.upsertTask(third)
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(monitor.state == stoppedState)
+
+        monitor.start()
+        #expect(await waitForMonitorState(timeout: 10) {
+            Set(monitor.state.tasks.map(\.id)) == Set([first.id, second.id, third.id])
+        })
+        withExtendedLifetime(database) {}
+    }
+
+    @Test @MainActor
     func refreshDetectsNewActivityWhenPersistedStateIsUnchanged() async throws {
         let directory = monitorTempDirectory("unchanged-state-refresh")
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -155,6 +202,70 @@ struct AIStateMonitorActivityDetectorTests {
         monitor.refresh()
 
         #expect(await waitForMonitorState(timeout: 10) { monitor.state.tasks == [task] })
+    }
+
+    @Test @MainActor
+    func interactiveRefreshDoesNotScanUsageLogs() async throws {
+        let directory = monitorTempDirectory("interactive-refresh-no-usage")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let now = Date(timeIntervalSince1970: 1_910_000_000)
+        let activityDetector = MutableActivityDetector(tasks: [])
+        let usageDetector = CountingUsageDetector()
+        let monitor = AIStateMonitor(
+            directoryURL: directory,
+            activityDetectors: [activityDetector],
+            usageDetectors: [usageDetector],
+            detectorRefreshInterval: 60,
+            now: { now }
+        )
+        defer { monitor.stop() }
+
+        monitor.start()
+
+        #expect(await waitForMonitorState(timeout: 10) { activityDetector.hasBeenCalled })
+        let initialActivityCallCount = activityDetector.callCount
+        monitor.refreshActiveTasks()
+
+        #expect(await waitForMonitorState(timeout: 10) {
+            activityDetector.callCount > initialActivityCallCount
+        })
+        #expect(usageDetector.callCount == 0)
+    }
+
+    @Test @MainActor
+    func stateFileWatcherDoesNotRescanActivityDetectors() async throws {
+        let directory = monitorTempDirectory("watcher-no-activity-rescan")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = AIStateRepository(directoryURL: directory)
+        let detector = MutableActivityDetector(tasks: [])
+        let monitor = AIStateMonitor(
+            directoryURL: directory,
+            activityDetectors: [detector],
+            detectorRefreshInterval: 60
+        )
+        defer { monitor.stop() }
+
+        monitor.start()
+        #expect(await waitForMonitorState(timeout: 10) { detector.callCount >= 1 })
+        let initialCallCount = detector.callCount
+
+        let task = AIProgressTask(
+            id: "persisted-after-start",
+            provider: .codex,
+            title: "Codex",
+            progress: nil,
+            status: .running,
+            updatedAt: .now
+        )
+        let database = try AIStateDatabase(url: repository.databaseURL, maximumUsageSamples: 10)
+        try database.upsertTask(task)
+        #expect(await waitForMonitorState(timeout: 10) { monitor.state.tasks == [task] })
+
+        // Give the debounced watcher completion a chance to run; it must only reconcile
+        // persisted state and leave the active-session scan to the timer/page entry path.
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(detector.callCount == initialCallCount)
+        withExtendedLifetime(database) {}
     }
 
     @Test @MainActor
@@ -206,7 +317,7 @@ private struct FailingActivityDetector: AIActivityDetecting {
 private final class MutableActivityDetector: AIActivityDetecting, @unchecked Sendable {
     private let lock = NSLock()
     private var tasks: [AIProgressTask]
-    private var callCount = 0
+    private var calls = 0
 
     init(tasks: [AIProgressTask]) {
         self.tasks = tasks
@@ -215,7 +326,7 @@ private final class MutableActivityDetector: AIActivityDetecting, @unchecked Sen
     func activeTasks() throws -> [AIProgressTask] {
         lock.lock()
         defer { lock.unlock() }
-        callCount += 1
+        calls += 1
         return tasks
     }
 
@@ -228,7 +339,31 @@ private final class MutableActivityDetector: AIActivityDetecting, @unchecked Sen
     var hasBeenCalled: Bool {
         lock.lock()
         defer { lock.unlock() }
-        return callCount > 0
+        return calls > 0
+    }
+
+    var callCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return calls
+    }
+}
+
+final class CountingUsageDetector: AIUsageDetecting {
+    private let lock = NSLock()
+    private var calls = 0
+
+    var callCount: Int {
+        lock.withLock { calls }
+    }
+
+    func reset() {
+        lock.withLock { calls = 0 }
+    }
+
+    func usageSamples() throws -> [AIUsageSample] {
+        lock.withLock { calls += 1 }
+        return []
     }
 }
 

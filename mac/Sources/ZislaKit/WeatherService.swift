@@ -3,6 +3,8 @@ import ZislaCore
 
 public struct WeatherSnapshot: Equatable, Sendable {
     public var temperature: Double
+    public var temperatureMin: Double?
+    public var temperatureMax: Double?
     public var apparentTemperature: Double
     public var condition: WeatherCondition
     public var currentPrecipitation: Double
@@ -21,6 +23,8 @@ public struct WeatherSnapshot: Equatable, Sendable {
 
     public init(
         temperature: Double,
+        temperatureMin: Double? = nil,
+        temperatureMax: Double? = nil,
         apparentTemperature: Double,
         condition: WeatherCondition,
         currentPrecipitation: Double = 0,
@@ -36,6 +40,8 @@ public struct WeatherSnapshot: Equatable, Sendable {
         locationName: String? = nil
     ) {
         self.temperature = temperature
+        self.temperatureMin = temperatureMin
+        self.temperatureMax = temperatureMax
         self.apparentTemperature = apparentTemperature
         self.condition = condition
         self.currentPrecipitation = currentPrecipitation
@@ -93,7 +99,9 @@ public actor WeatherService {
         guard (-90...90).contains(latitude), (-180...180).contains(longitude) else {
             throw WeatherServiceError.invalidCoordinates
         }
-        var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast")!
+        guard var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast") else {
+            throw WeatherServiceError.invalidResponse
+        }
         components.queryItems = [
             URLQueryItem(name: "latitude", value: String(latitude)),
             URLQueryItem(name: "longitude", value: String(longitude)),
@@ -103,7 +111,7 @@ public actor WeatherService {
             ),
             URLQueryItem(
                 name: "daily",
-                value: "sunrise,sunset,precipitation_probability_max,precipitation_sum"
+                value: "temperature_2m_min,temperature_2m_max,sunrise,sunset,precipitation_probability_max,precipitation_sum"
             ),
             URLQueryItem(name: "timezone", value: "auto"),
         ]
@@ -143,6 +151,8 @@ public actor WeatherService {
         }
         return WeatherSnapshot(
             temperature: decoded.current.temperature,
+            temperatureMin: decoded.daily?.temperatureMin?.first,
+            temperatureMax: decoded.daily?.temperatureMax?.first,
             apparentTemperature: decoded.current.apparentTemperature,
             condition: WeatherCondition(
                 code: decoded.current.weatherCode,

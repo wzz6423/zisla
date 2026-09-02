@@ -37,6 +37,15 @@ struct TeleprompterViewTests {
         #expect(defaults.string(forKey: key) == "原文 新增")
     }
 
+    @Test
+    func durationInputSaturatesOverflowingComponents() {
+        #expect(ToolboxModuleView.durationSeconds(hours: 1, minutes: 90, seconds: 2) == 9_002)
+        #expect(
+            ToolboxModuleView.durationSeconds(hours: .max, minutes: .max, seconds: .max)
+                == ToolboxModuleView.maximumDurationSeconds
+        )
+    }
+
     private func waitForTextView(in view: NSView) async throws -> NSTextView {
         for _ in 0..<100 {
             view.layoutSubtreeIfNeeded()

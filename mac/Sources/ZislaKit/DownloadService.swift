@@ -35,7 +35,10 @@ public actor DownloadService {
     private let temporaryRootDirectory: URL
     private let mediaMuxer: any MediaMuxing
     private let bilibiliDownloader: any BilibiliDownloading
+    private var activeTaskIDs: Set<UUID> = []
     private var activeProcesses: [UUID: ProcessBox] = [:]
+    private var activeNativeDownloadTasks: [UUID: Task<[DownloadedMediaComponent], Error>] = [:]
+    private var activeNativeMuxTasks: [UUID: Task<Void, Error>] = [:]
     private var explicitlyCancelledTasks: Set<UUID> = []
     private var reservedOutputURLs: Set<URL> = []
     private var networkProxyURL = ""
@@ -68,8 +71,19 @@ public actor DownloadService {
         taskID: UUID = UUID(),
         onEvent: @escaping @Sendable (YTDLPEvent) async -> Void = { _ in }
     ) async throws -> DownloadResult {
-        guard activeProcesses[taskID] == nil else {
+        guard activeTaskIDs.insert(taskID).inserted else {
             throw DownloadServiceError.duplicateTask(taskID)
+        }
+        defer {
+            if let downloadTask = activeNativeDownloadTasks.removeValue(forKey: taskID) {
+                downloadTask.cancel()
+            }
+            if let muxTask = activeNativeMuxTasks.removeValue(forKey: taskID) {
+                muxTask.cancel()
+            }
+            activeProcesses.removeValue(forKey: taskID)
+            explicitlyCancelledTasks.remove(taskID)
+            activeTaskIDs.remove(taskID)
         }
 
         let fileManager = FileManager.default
@@ -147,10 +161,6 @@ public actor DownloadService {
 
         let processBox = ProcessBox(process)
         activeProcesses[taskID] = processBox
-        defer {
-            activeProcesses[taskID] = nil
-            explicitlyCancelledTasks.remove(taskID)
-        }
 
         do {
             try Task.checkCancellation()
@@ -180,9 +190,7 @@ public actor DownloadService {
         }
         let diagnostics = await (stdoutDiagnostic, stderrDiagnostic)
 
-        if Task.isCancelled || explicitlyCancelledTasks.contains(taskID) {
-            throw CancellationError()
-        }
+        try throwIfCancelled(taskID: taskID)
         guard exitCode == 0 else {
             let diagnostic = Self.combinedDiagnostic(
                 stdout: diagnostics.0,
@@ -246,10 +254,35 @@ public actor DownloadService {
         taskID: UUID,
         taskTemporaryDirectory: URL
     ) async throws -> DownloadResult {
-        let components = try await bilibiliDownloader.downloadComponents(
-            from: request.urlString,
-            to: taskTemporaryDirectory
-        )
+        try throwIfCancelled(taskID: taskID)
+        let downloader = bilibiliDownloader
+        let nativeDownloadTask: Task<[DownloadedMediaComponent], Error> = Task {
+            try await downloader.downloadComponents(
+                from: request.urlString,
+                to: taskTemporaryDirectory
+            )
+        }
+        activeNativeDownloadTasks[taskID] = nativeDownloadTask
+        defer {
+            nativeDownloadTask.cancel()
+            activeNativeDownloadTasks[taskID] = nil
+        }
+
+        let components: [DownloadedMediaComponent]
+        do {
+            components = try await withTaskCancellationHandler {
+                try await nativeDownloadTask.value
+            } onCancel: {
+                nativeDownloadTask.cancel()
+            }
+        } catch {
+            if isCancelled(taskID: taskID) || error is CancellationError {
+                throw CancellationError()
+            }
+            throw error
+        }
+        try throwIfCancelled(taskID: taskID)
+
         return try await finalizeNativePackaging(
             taskID: taskID,
             components: components,
@@ -264,6 +297,8 @@ public actor DownloadService {
         taskTemporaryDirectory: URL,
         outputDirectory: URL
     ) async throws -> DownloadResult {
+        try throwIfCancelled(taskID: taskID)
+
         let validatedComponents = try components.map {
             try validatedComponent($0, within: taskTemporaryDirectory)
         }
@@ -276,6 +311,9 @@ public actor DownloadService {
             let destinationURL = availableOutputURL(for: desiredURL)
             reservedOutputURLs.insert(destinationURL)
             defer { reservedOutputURLs.remove(destinationURL) }
+
+            try throwIfCancelled(taskID: taskID)
+
             do {
                 try FileManager.default.moveItem(at: combined.fileURL, to: destinationURL)
             } catch {
@@ -302,16 +340,33 @@ public actor DownloadService {
         reservedOutputURLs.insert(destinationURL)
         defer { reservedOutputURLs.remove(destinationURL) }
 
-        do {
-            try Task.checkCancellation()
-            try await mediaMuxer.mux(
+        try throwIfCancelled(taskID: taskID)
+        let muxer = mediaMuxer
+        let nativeMuxTask: Task<Void, Error> = Task {
+            try await muxer.mux(
                 videoURL: video.fileURL,
                 audioURL: audio.fileURL,
                 outputURL: destinationURL
             )
-        } catch is CancellationError {
-            throw CancellationError()
+        }
+        activeNativeMuxTasks[taskID] = nativeMuxTask
+        defer {
+            nativeMuxTask.cancel()
+            activeNativeMuxTasks[taskID] = nil
+        }
+
+        do {
+            try await withTaskCancellationHandler {
+                try await nativeMuxTask.value
+            } onCancel: {
+                nativeMuxTask.cancel()
+            }
+            try throwIfCancelled(taskID: taskID)
         } catch {
+            try? FileManager.default.removeItem(at: destinationURL)
+            if isCancelled(taskID: taskID) || error is CancellationError {
+                throw CancellationError()
+            }
             throw DownloadServiceError.processFailed(
                 exitCode: 0,
                 diagnostic: "系统原生媒体封装失败：\(error.localizedDescription)"
@@ -393,15 +448,29 @@ public actor DownloadService {
     }
 
     public func cancel(taskID: UUID) {
-        guard let process = activeProcesses[taskID] else { return }
+        guard activeTaskIDs.contains(taskID) else { return }
         explicitlyCancelledTasks.insert(taskID)
-        process.terminate()
+        activeProcesses[taskID]?.terminate()
+        activeNativeDownloadTasks[taskID]?.cancel()
+        activeNativeMuxTasks[taskID]?.cancel()
     }
 
     public func cancelAll() {
-        for (taskID, process) in activeProcesses {
+        for taskID in activeTaskIDs {
             explicitlyCancelledTasks.insert(taskID)
-            process.terminate()
+            activeProcesses[taskID]?.terminate()
+            activeNativeDownloadTasks[taskID]?.cancel()
+            activeNativeMuxTasks[taskID]?.cancel()
+        }
+    }
+
+    private func isCancelled(taskID: UUID) -> Bool {
+        Task.isCancelled || explicitlyCancelledTasks.contains(taskID)
+    }
+
+    private func throwIfCancelled(taskID: UUID) throws {
+        guard !isCancelled(taskID: taskID) else {
+            throw CancellationError()
         }
     }
 

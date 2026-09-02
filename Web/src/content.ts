@@ -41,7 +41,7 @@ export const proofItems = [
   { title: '本地优先', desc: 'AI 状态不读取对话正文' },
 ];
 
-/* ===== 功能展示区（每个模块对应真实功能说明） ===== */
+/* ===== Feature showcase (each module describes an actual feature) ===== */
 
 export interface ShowcaseModule {
   id: string;
@@ -152,7 +152,7 @@ export const showcaseModules: ShowcaseModule[] = [
   },
 ];
 
-/* ===== AI 深入区 ===== */
+/* ===== AI deep dive ===== */
 
 export const supportedAITools = [
   { name: 'Claude Code' },
@@ -272,7 +272,7 @@ export const flowSteps = [
   },
 ];
 
-/* ===== 下载与系统要求 ===== */
+/* ===== Download and system requirements ===== */
 
 export const systemRequirements = {
   os: 'macOS 14 或更高版本',
@@ -307,7 +307,7 @@ export const latestRelease = {
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/preview',
 };
 
-/* ===== 开发者 ===== */
+/* ===== Developer ===== */
 
 export const developmentSetup = {
   requirements: ['Swift 6 / Xcode 16+', 'macOS 14+', '可选：yt-dlp、ffmpeg'],

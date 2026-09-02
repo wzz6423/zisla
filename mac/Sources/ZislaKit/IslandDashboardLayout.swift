@@ -63,8 +63,8 @@ public enum IslandDashboardLayout: Sendable {
     public static let moduleBottomInset: CGFloat = 12
     /// `NowPlayingHeader` renders at a fixed 72pt, plus its 4pt bottom padding.
     public static let mediaHeaderHeight: CGFloat = 76
-    /// A single activity card's minimum height.
-    public static let cardHeight: CGFloat = 58
+    /// Fixed activity-card height, including padding and the media artwork row.
+    public static let cardHeight: CGFloat = 64
     /// Vertical spacing between card rows in the grid.
     public static let cardRowSpacing: CGFloat = 8
     /// Vertical padding the card grid wrapper adds once, above and below the whole grid.

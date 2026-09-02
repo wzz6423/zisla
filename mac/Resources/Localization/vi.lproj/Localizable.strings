@@ -517,6 +517,7 @@
 "算式" = "Phép tính";
 "日期时间" = "Ngày và giờ";
 "中文文本" = "Văn bản tiếng Trung";
+"非当前系统语言文本" = "Văn bản không phải ngôn ngữ hệ thống";
 "代码" = "Mã";
 "翻译" = "Dịch";
 "写邮件" = "Soạn email";
@@ -524,6 +525,7 @@
 "拨打电话" = "Gọi điện";
 "不再显示来自 %@ 的复制" = "Không hiển thị bản sao từ %@ nữa";
 "复制结果" = "Sao chép kết quả";
+"复制完整算式" = "Sao chép biểu thức đầy đủ";
 "保存图片" = "Lưu ảnh";
 "保存文本" = "Lưu văn bản";
 "新建日程" = "Sự kiện mới";

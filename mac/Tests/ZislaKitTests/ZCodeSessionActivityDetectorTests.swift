@@ -78,6 +78,18 @@ struct ZCodeSessionActivityDetectorTests {
         #expect(databaseURL.path == "/Users/tester/.zcode/cli/db/db.sqlite")
         #expect(try ZCodeSessionActivityDetector(databaseURL: databaseURL).activeTasks().isEmpty)
     }
+
+    @Test
+    func reportsSchemaErrorsInsteadOfTreatingDatabaseAsIdle() throws {
+        let databaseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Zisla-zcode-empty-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        try execute("", at: databaseURL)
+
+        #expect(throws: AIStateRepositoryError.self) {
+            try ZCodeSessionActivityDetector(databaseURL: databaseURL).activeTasks()
+        }
+    }
 }
 
 private func execute(_ sql: String, at url: URL) throws {

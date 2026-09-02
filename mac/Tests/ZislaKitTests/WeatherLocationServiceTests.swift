@@ -178,4 +178,47 @@ struct WeatherLocationServiceTests {
         #expect(snapshot.locationName == "上海市")
         #expect(snapshot.coordinate == GeoCoordinate(latitude: 31.2, longitude: 121.4))
     }
+
+    @Test
+    func staleLocationRequestCannotClaimReplacementCompletion() {
+        var state = CurrentLocationRequestState()
+        let firstToken = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let secondToken = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let firstManager = NSObject()
+        let secondManager = NSObject()
+        defer { withExtendedLifetime((firstManager, secondManager)) {} }
+        let firstManagerIdentifier = ObjectIdentifier(firstManager)
+        let secondManagerIdentifier = ObjectIdentifier(secondManager)
+
+        state.begin(firstToken, managerIdentifier: firstManagerIdentifier)
+        state.begin(secondToken, managerIdentifier: secondManagerIdentifier)
+        #expect(state.token(for: firstManagerIdentifier) == nil)
+        #expect(state.token(for: secondManagerIdentifier) == secondToken)
+        let staleRequestClaimedCompletion = state.claimCompletion(for: firstToken)
+        #expect(!staleRequestClaimedCompletion)
+        #expect(state.token == secondToken)
+        let currentRequestClaimedCompletion = state.claimCompletion(for: secondToken)
+        #expect(currentRequestClaimedCompletion)
+        #expect(state.token == nil)
+    }
+
+    @Test
+    func alreadyCancelledLocationRequestFailsImmediately() async {
+        let provider = await MainActor.run { CoreLocationCurrentLocationProvider() }
+        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        let task = Task {
+            for await _ in stream {}
+            return try await provider.requestOnce()
+        }
+
+        task.cancel()
+        continuation.finish()
+
+        do {
+            _ = try await task.value
+            Issue.record("A cancelled request should fail")
+        } catch {
+            #expect(error is CancellationError)
+        }
+    }
 }

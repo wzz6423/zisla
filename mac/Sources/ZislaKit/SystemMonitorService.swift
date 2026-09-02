@@ -988,23 +988,18 @@ enum SystemSampler {
         var sent: UInt64 = 0
         var cursor: UnsafeMutablePointer<ifaddrs>? = first
         while let current = cursor {
+            defer { cursor = current.pointee.ifa_next }
             let name = String(cString: current.pointee.ifa_name)
             // Skip loopback
             if name.hasPrefix("lo") {
-                cursor = current.pointee.ifa_next
                 continue
             }
-            if current.pointee.ifa_addr?.pointee.sa_family == UInt8(AF_LINK) {
-                current.pointee.ifa_data.withMemoryRebound(to: if_data.self, capacity: 1) { data in
-                    // ifa_data points to if_data for AF_LINK
-                }
-                if let data = current.pointee.ifa_data {
-                    let ifdata = data.assumingMemoryBound(to: if_data.self)
-                    received += UInt64(ifdata.pointee.ifi_ibytes)
-                    sent += UInt64(ifdata.pointee.ifi_obytes)
-                }
+            if current.pointee.ifa_addr?.pointee.sa_family == UInt8(AF_LINK),
+               let data = current.pointee.ifa_data {
+                let ifdata = data.assumingMemoryBound(to: if_data.self)
+                received += UInt64(ifdata.pointee.ifi_ibytes)
+                sent += UInt64(ifdata.pointee.ifi_obytes)
             }
-            cursor = current.pointee.ifa_next
         }
         return (received, sent)
     }
@@ -2429,6 +2424,28 @@ public enum SystemDiskCleanup {
         })
     }
 
+    /// `ps` exposes executable paths but not working directories. Keep the full visible process set so an active build is not offered for cleanup.
+    private static func runningProcessWorkingDirectories(fileManager: SystemMonitorFileManaging) -> Set<String> {
+        guard fileManager is DefaultSystemMonitorFileManager,
+              let output = readOnlyCommand(
+                  executable: "/usr/sbin/lsof",
+                  arguments: ["-Fn", "-n", "-P", "-a", "-d", "cwd"]
+              )
+        else {
+            return []
+        }
+        return workingDirectoryPaths(fromLsofFieldOutput: output)
+    }
+
+    static func workingDirectoryPaths(fromLsofFieldOutput output: String) -> Set<String> {
+        Set(output.split(whereSeparator: \.isNewline).compactMap { field in
+            guard field.first == "n" else { return nil }
+            let path = String(field.dropFirst())
+            guard path.hasPrefix("/") else { return nil }
+            return SystemMonitorPathSafety.standardizedPath(URL(fileURLWithPath: path))
+        })
+    }
+
     private static let diskImageExtensions: Set<String> = ["dmg", "iso", "pkg", "ipsw", "xip"]
     private static let unfinishedDownloadExtensions: Set<String> = ["download", "crdownload", "part"]
 
@@ -2664,7 +2681,8 @@ public enum SystemDiskCleanup {
     ) -> [DiskCleanupCandidate] {
         let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
         let roots = projectSearchRoots(fileManager: fileManager)
-        let runningProcesses = runningProcessNames(fileManager: fileManager)
+        let runningProcessPaths = runningProcessNames(fileManager: fileManager)
+        let runningWorkingDirectories = runningProcessWorkingDirectories(fileManager: fileManager)
         var visited = Set<String>()
         var result: [DiskCleanupCandidate] = []
         for root in roots {
@@ -2675,7 +2693,8 @@ public enum SystemDiskCleanup {
                 depth: 0,
                 maxDepth: 5,
                 home: home,
-                runningProcesses: runningProcesses,
+                runningProcessPaths: runningProcessPaths,
+                runningProcessWorkingDirectories: runningWorkingDirectories,
                 visited: &visited,
                 result: &result
             )
@@ -2710,7 +2729,8 @@ public enum SystemDiskCleanup {
         depth: Int,
         maxDepth: Int,
         home: URL,
-        runningProcesses: Set<String>,
+        runningProcessPaths: Set<String>,
+        runningProcessWorkingDirectories: Set<String>,
         visited: inout Set<String>,
         result: inout [DiskCleanupCandidate]
     ) {
@@ -2739,7 +2759,12 @@ public enum SystemDiskCleanup {
             let childIsDirectory = isDirectory(child, fileManager: fileManager)
             guard childIsDirectory else { continue }
             if isProjectRoot, projectArtifactNames.contains(name) {
-                guard !directoryContainsRunningProcess(child, processNames: runningProcesses) else { continue }
+                guard !projectContainsRunningProcess(
+                    projectRoot: url,
+                    artifactDirectory: child,
+                    executablePaths: runningProcessPaths,
+                    workingDirectoryPaths: runningProcessWorkingDirectories
+                ) else { continue }
                 let size = allocatedByteSize(of: child, fileManager: fileManager)
                 guard size > 0 else { continue }
                 result.append(
@@ -2766,18 +2791,30 @@ public enum SystemDiskCleanup {
                 depth: depth + 1,
                     maxDepth: maxDepth,
                     home: home,
-                    runningProcesses: runningProcesses,
+                    runningProcessPaths: runningProcessPaths,
+                    runningProcessWorkingDirectories: runningProcessWorkingDirectories,
                     visited: &visited,
                     result: &result
             )
         }
     }
 
-    private static func directoryContainsRunningProcess(_ directory: URL, processNames: Set<String>) -> Bool {
-        let path = SystemMonitorPathSafety.standardizedPath(directory)
-        return processNames.contains { processPath in
-            processPath == path || processPath.hasPrefix(path + "/")
-        }
+    static func projectContainsRunningProcess(
+        projectRoot: URL,
+        artifactDirectory: URL,
+        executablePaths: Set<String>,
+        workingDirectoryPaths: Set<String>
+    ) -> Bool {
+        let projectPath = SystemMonitorPathSafety.standardizedPath(projectRoot)
+        let artifactPath = SystemMonitorPathSafety.standardizedPath(artifactDirectory)
+        return executablePaths.contains { path($0, isWithin: artifactPath) }
+            || workingDirectoryPaths.contains { path($0, isWithin: projectPath) }
+    }
+
+    private static func path(_ candidate: String, isWithin root: String) -> Bool {
+        guard candidate.hasPrefix("/") else { return false }
+        let normalized = SystemMonitorPathSafety.standardizedPath(URL(fileURLWithPath: candidate))
+        return normalized == root || normalized.hasPrefix(root + "/")
     }
 
     private static let applicationResidualRoots = [
@@ -3367,9 +3404,24 @@ public enum SystemDiskCleanup {
         default:
             return SystemMonitorPathSafety.isURL(
                 candidate.url,
-                withinAllowedRoots: SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
+                withinAllowedRoots: candidateAllowedRoots(for: candidate.kind, fileManager: fileManager)
             )
         }
+    }
+
+    private static func candidateAllowedRoots(
+        for kind: DiskCleanupKind,
+        fileManager: SystemMonitorFileManaging
+    ) -> [URL] {
+        let roots = allowedScanRoots(fileManager: fileManager)
+        let rootKind: DiskCleanupKind
+        switch kind {
+        case .diskImage, .largeFile, .duplicateFile, .unfinishedDownload:
+            rootKind = .diskImage
+        default:
+            rootKind = kind
+        }
+        return roots.filter { $0.kind == rootKind }.map(\.url)
     }
 }
 
@@ -3404,8 +3456,7 @@ public final class SystemMonitorService: ObservableObject {
     private var needsDiskCapacityRefresh = false
     private var hardware = SystemHardwareInfo.unavailable
     private var didLoadHardware = false
-    private var isSampleInProgress = false
-    private var sampleWaiters: [CheckedContinuation<SystemMetricsSnapshot, Never>] = []
+    private var sampleTask: Task<SystemMetricsSnapshot, Never>?
     private let postCleanupDiskRefreshDelay: Duration
     private let diskCapacityRefreshInterval: TimeInterval
     private var postCleanupDiskRefreshTask: Task<Void, Never>?
@@ -3525,9 +3576,11 @@ public final class SystemMonitorService: ObservableObject {
 
     private func refreshPublicIPAddress(force: Bool) async {
         let now = dateProvider()
-        guard force
-            || lastPublicIPRefresh == nil
-            || now.timeIntervalSince(lastPublicIPRefresh!) >= Self.publicIPRefreshInterval
+        guard force || Self.shouldRefreshSlowMetrics(
+            lastSampledAt: lastPublicIPRefresh,
+            now: now,
+            interval: Self.publicIPRefreshInterval
+        )
         else { return }
 
         lastPublicIPRefresh = now
@@ -3546,28 +3599,24 @@ public final class SystemMonitorService: ObservableObject {
     /// Performs one sample; overlapping requests share it so late stale results cannot overwrite newer data.
     @discardableResult
     public func sampleOnce() async -> SystemMetricsSnapshot {
-        if isSampleInProgress {
-            return await withCheckedContinuation { continuation in
-                sampleWaiters.append(continuation)
-            }
+        if let sampleTask {
+            return await sampleTask.value
         }
 
-        isSampleInProgress = true
-        let snapshot = await performSampleOnce()
-        isSampleInProgress = false
-        let waiters = sampleWaiters
-        sampleWaiters.removeAll()
-        for waiter in waiters {
-            waiter.resume(returning: snapshot)
+        let task = Task { @MainActor in
+            let snapshot = await self.performSampleOnce()
+            self.sampleTask = nil
+            return snapshot
         }
-        return snapshot
+        sampleTask = task
+        return await task.value
     }
 
     /// Resamples after an in-progress sample finishes for operations, such as cleanup, that change disk state.
     @discardableResult
     public func refresh() async -> SystemMetricsSnapshot {
         needsDiskCapacityRefresh = true
-        if isSampleInProgress {
+        if sampleTask != nil {
             _ = await sampleOnce()
         }
         return await sampleOnce()
@@ -3593,8 +3642,11 @@ public final class SystemMonitorService: ObservableObject {
         let readHardwareInfo = hardwareInfoProvider
         let currentHardware = hardware
         let shouldSampleDiskCapacity = needsDiskCapacityRefresh
-            || lastDiskCapacitySample == nil
-            || now.timeIntervalSince(lastDiskCapacitySample!) >= diskCapacityRefreshInterval
+            || Self.shouldRefreshSlowMetrics(
+                lastSampledAt: lastDiskCapacitySample,
+                now: now,
+                interval: diskCapacityRefreshInterval
+            )
         needsDiskCapacityRefresh = false
 
         let shouldSampleSlowMetrics = Self.shouldRefreshSlowMetrics(
@@ -3742,6 +3794,7 @@ public final class SystemMonitorService: ObservableObject {
         snapshot = snap
         history.append(cpu: cpu, gpu: gpu, network: payload.network)
         Task { [weak self] in
+            await Task.yield()
             await self?.refreshPublicIPAddressIfNeeded()
         }
         return snap

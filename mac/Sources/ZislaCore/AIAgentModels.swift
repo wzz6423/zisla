@@ -726,13 +726,22 @@ public struct AIAgentCLIUpdate: Identifiable, Equatable, Sendable {
 public struct AgentSkill: Identifiable, Codable, Equatable, Sendable {
     public var id: String { path }
     public var name: String
+    public var description: String?
     public var path: String
     public var source: String
     public var isEnabled: Bool
     public var modifiedAt: Date?
 
-    public init(name: String, path: String, source: String, isEnabled: Bool = true, modifiedAt: Date? = nil) {
+    public init(
+        name: String,
+        description: String? = nil,
+        path: String,
+        source: String,
+        isEnabled: Bool = true,
+        modifiedAt: Date? = nil
+    ) {
         self.name = name
+        self.description = description
         self.path = path
         self.source = source
         self.isEnabled = isEnabled

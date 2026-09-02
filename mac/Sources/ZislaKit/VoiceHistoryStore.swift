@@ -95,6 +95,11 @@ public enum VoiceTranscriptMetrics {
 
 @MainActor
 public final class VoiceHistoryStore: ObservableObject {
+    private struct StagedAudioFile {
+        let originalURL: URL
+        let stagingURL: URL
+    }
+
     @Published public private(set) var entries: [VoiceHistoryEntry] = []
     @Published public private(set) var errorDescription: String?
 
@@ -151,15 +156,6 @@ public final class VoiceHistoryStore: ObservableObject {
             errorDescription = "录音文件不存在或不可读取"
             return false
         }
-        if !retainAudio {
-            do {
-                try fileManager.removeItem(at: result.audioFileURL)
-            } catch {
-                errorDescription = error.localizedDescription
-                return false
-            }
-        }
-
         let transcript = result.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let wordCount = VoiceTranscriptMetrics.wordCount(in: transcript)
         let duration = normalizedDuration(result.duration)
@@ -188,11 +184,44 @@ public final class VoiceHistoryStore: ObservableObject {
             newCumulativeWordCount = cumulativeWordCount
             newCumulativeDuration = cumulativeDuration
         } else {
-            newCumulativeWordCount = cumulativeWordCount + wordCount
-            newCumulativeDuration = cumulativeDuration + duration
+            let (totalWordCount, overflow) = cumulativeWordCount.addingReportingOverflow(wordCount)
+            newCumulativeWordCount = overflow ? .max : totalWordCount
+            newCumulativeDuration = addingCumulativeDuration(cumulativeDuration, duration)
         }
 
-        guard persistCandidate(candidate, cumulativeWordCount: newCumulativeWordCount, cumulativeDuration: newCumulativeDuration) else { return false }
+        let stagedAudioFiles: [StagedAudioFile]
+        if retainAudio {
+            stagedAudioFiles = []
+        } else {
+            do {
+                stagedAudioFiles = try stageAudioFiles([result.audioFileURL])
+            } catch {
+                errorDescription = error.localizedDescription
+                return false
+            }
+        }
+        guard persistCandidate(candidate, cumulativeWordCount: newCumulativeWordCount, cumulativeDuration: newCumulativeDuration) else {
+            let persistenceError = errorDescription
+            if let restorationError = restoreStagedAudioFiles(stagedAudioFiles) {
+                errorDescription = restorationError.localizedDescription
+            } else {
+                errorDescription = persistenceError
+            }
+            return false
+        }
+        let removal = removeStagedAudioFiles(stagedAudioFiles)
+        if let removalError = removal.error {
+            let restorationError = restoreStagedAudioFiles(removal.remaining)
+            let rollbackSucceeded = restorationError == nil
+                && persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+            if !rollbackSucceeded {
+                entries = candidate
+                cumulativeWordCount = newCumulativeWordCount
+                cumulativeDuration = newCumulativeDuration
+            }
+            errorDescription = (restorationError ?? removalError).localizedDescription
+            return false
+        }
         entries = candidate
         cumulativeWordCount = newCumulativeWordCount
         cumulativeDuration = newCumulativeDuration
@@ -216,15 +245,32 @@ public final class VoiceHistoryStore: ObservableObject {
         let audioURL = audioURL(for: entry)
         var candidate = entries
         candidate.remove(at: index)
-        guard persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else { return }
-        if let audioURL {
-            do {
-                try fileManager.removeItem(at: audioURL)
-            } catch {
-                _ = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
-                errorDescription = error.localizedDescription
-                return
+        let stagedAudioFiles: [StagedAudioFile]
+        do {
+            stagedAudioFiles = try stageAudioFiles(audioURL.map { [$0] } ?? [])
+        } catch {
+            errorDescription = error.localizedDescription
+            return
+        }
+        guard persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else {
+            let persistenceError = errorDescription
+            if let restorationError = restoreStagedAudioFiles(stagedAudioFiles) {
+                errorDescription = restorationError.localizedDescription
+            } else {
+                errorDescription = persistenceError
             }
+            return
+        }
+        let removal = removeStagedAudioFiles(stagedAudioFiles)
+        if let removalError = removal.error {
+            let restorationError = restoreStagedAudioFiles(removal.remaining)
+            let rollbackSucceeded = restorationError == nil
+                && persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+            if !rollbackSucceeded {
+                entries = candidate
+            }
+            errorDescription = (restorationError ?? removalError).localizedDescription
+            return
         }
         entries = candidate
     }
@@ -233,27 +279,56 @@ public final class VoiceHistoryStore: ObservableObject {
         let toRemove = entries.filter { ids.contains($0.id) }
         guard !toRemove.isEmpty else { return }
 
-        let audioURLs = toRemove.compactMap { audioURL(for: $0) }
+        let audioFiles = toRemove.compactMap { entry in
+            audioURL(for: entry).map { (id: entry.id, url: $0) }
+        }
         var candidate = entries
         candidate.removeAll { ids.contains($0.id) }
-
-        guard persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else { return }
-
-        for audioURL in audioURLs {
-            do {
-                try fileManager.removeItem(at: audioURL)
-            } catch {
-                _ = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
-                errorDescription = error.localizedDescription
-                return
+        let stagedAudioFiles: [StagedAudioFile]
+        do {
+            stagedAudioFiles = try stageAudioFiles(audioFiles.map(\.url))
+        } catch {
+            errorDescription = error.localizedDescription
+            return
+        }
+        guard persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else {
+            let persistenceError = errorDescription
+            if let restorationError = restoreStagedAudioFiles(stagedAudioFiles) {
+                errorDescription = restorationError.localizedDescription
+            } else {
+                errorDescription = persistenceError
             }
+            return
+        }
+        let removal = removeStagedAudioFiles(stagedAudioFiles)
+        if let removalError = removal.error {
+            let remainingURLs = Set(removal.remaining.map(\.originalURL))
+            let restoredIDs = Set(audioFiles.compactMap { file in
+                remainingURLs.contains(file.url) ? file.id : nil
+            })
+            let restorationError = restoreStagedAudioFiles(removal.remaining)
+            let audioEntryIDs = Set(audioFiles.map(\.id))
+            let fallback = entries.filter {
+                !ids.contains($0.id)
+                    || !audioEntryIDs.contains($0.id)
+                    || restoredIDs.contains($0.id)
+            }
+            let rollbackSucceeded = restorationError == nil
+                && persistCandidate(fallback, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+            entries = rollbackSucceeded ? fallback : candidate
+            errorDescription = (restorationError ?? removalError).localizedDescription
+            return
         }
         entries = candidate
     }
 
     public func removeAll() {
-        guard persistCandidate([], cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else { return }
-        entries.removeAll()
+        var audioURLsByEntryID: [UUID: URL] = [:]
+        for entry in entries {
+            if let audioURL = audioURL(for: entry) {
+                audioURLsByEntryID[entry.id] = audioURL
+            }
+        }
         let audioURLs: [URL]
         do {
             audioURLs = try fileManager.contentsOfDirectory(
@@ -264,16 +339,45 @@ public final class VoiceHistoryStore: ObservableObject {
                     && (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true
             }
         } catch {
+            guard !fileManager.fileExists(atPath: recordingsDirectory.path) else {
+                errorDescription = error.localizedDescription
+                return
+            }
+            audioURLs = []
+        }
+        let stagedAudioFiles: [StagedAudioFile]
+        do {
+            stagedAudioFiles = try stageAudioFiles(audioURLs)
+        } catch {
             errorDescription = error.localizedDescription
             return
         }
-        for audioURL in audioURLs {
-            do {
-                try fileManager.removeItem(at: audioURL)
-            } catch {
-                errorDescription = error.localizedDescription
+        guard persistCandidate([], cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else {
+            let persistenceError = errorDescription
+            if let restorationError = restoreStagedAudioFiles(stagedAudioFiles) {
+                errorDescription = restorationError.localizedDescription
+            } else {
+                errorDescription = persistenceError
             }
+            return
         }
+        let removal = removeStagedAudioFiles(stagedAudioFiles)
+        if let removalError = removal.error {
+            let remainingURLs = Set(removal.remaining.map(\.originalURL))
+            let restorationError = restoreStagedAudioFiles(removal.remaining)
+            let restoredEntryIDs = Set(audioURLsByEntryID.compactMap { id, url in
+                remainingURLs.contains(url) && isRegularFile(at: url) ? id : nil
+            })
+            let fallback = entries.filter { entry in
+                entry.audioFileName == nil || restoredEntryIDs.contains(entry.id)
+            }
+            let rollbackSucceeded = restorationError == nil
+                && persistCandidate(fallback, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+            entries = rollbackSucceeded ? fallback : []
+            errorDescription = (restorationError ?? removalError).localizedDescription
+            return
+        }
+        entries.removeAll()
     }
 
     private func load() {
@@ -286,7 +390,9 @@ public final class VoiceHistoryStore: ObservableObject {
                 entries = state.entries.compactMap(normalizedEntry(_:))
                 sortEntries()
                 let visibleWordCount = entries.reduce(0) { $0 + $1.wordCount }
-                let visibleDuration = entries.reduce(0) { $0 + $1.duration }
+                let visibleDuration = entries.reduce(0) {
+                    addingCumulativeDuration($0, $1.duration)
+                }
                 cumulativeWordCount = max(
                     0,
                     visibleWordCount,
@@ -316,7 +422,9 @@ public final class VoiceHistoryStore: ObservableObject {
 
             // Use existing records as the migration baseline for cumulative values.
             cumulativeWordCount = entries.reduce(0) { $0 + $1.wordCount }
-            cumulativeDuration = entries.reduce(0) { $0 + $1.duration }
+            cumulativeDuration = entries.reduce(0) {
+                addingCumulativeDuration($0, $1.duration)
+            }
 
             errorDescription = nil
 
@@ -337,7 +445,7 @@ public final class VoiceHistoryStore: ObservableObject {
         guard let daysThreshold = policy.daysThreshold else { return }
         let cutoffDate = now.addingTimeInterval(-Double(daysThreshold) * 24 * 60 * 60)
         var candidate = entries
-        var deletionError: Error?
+        var audioDeletions: [(id: UUID, url: URL)] = []
 
         for index in candidate.indices
         where candidate[index].createdAt < cutoffDate && candidate[index].audioFileName != nil {
@@ -345,19 +453,44 @@ public final class VoiceHistoryStore: ObservableObject {
                 candidate[index].audioFileName = nil
                 continue
             }
-            do {
-                try fileManager.removeItem(at: audioURL)
-                candidate[index].audioFileName = nil
-            } catch {
-                deletionError = error
+            candidate[index].audioFileName = nil
+            audioDeletions.append((candidate[index].id, audioURL))
+        }
+        guard candidate != entries else { return }
+        let stagedAudioFiles: [StagedAudioFile]
+        do {
+            stagedAudioFiles = try stageAudioFiles(audioDeletions.map(\.url))
+        } catch {
+            errorDescription = error.localizedDescription
+            return
+        }
+        guard persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else {
+            let persistenceError = errorDescription
+            if let restorationError = restoreStagedAudioFiles(stagedAudioFiles) {
+                errorDescription = restorationError.localizedDescription
+            } else {
+                errorDescription = persistenceError
             }
+            return
         }
-        if candidate != entries, persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) {
-            entries = candidate
+        let removal = removeStagedAudioFiles(stagedAudioFiles)
+        if let removalError = removal.error {
+            let remainingURLs = Set(removal.remaining.map(\.originalURL))
+            let restoredIDs = Set(audioDeletions.compactMap { deletion in
+                remainingURLs.contains(deletion.url) ? deletion.id : nil
+            })
+            let restorationError = restoreStagedAudioFiles(removal.remaining)
+            var fallback = candidate
+            for index in fallback.indices where restoredIDs.contains(fallback[index].id) {
+                fallback[index].audioFileName = entries[index].audioFileName
+            }
+            let rollbackSucceeded = restorationError == nil
+                && persistCandidate(fallback, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+            entries = rollbackSucceeded ? fallback : candidate
+            errorDescription = (restorationError ?? removalError).localizedDescription
+            return
         }
-        if let deletionError {
-            errorDescription = deletionError.localizedDescription
-        }
+        entries = candidate
     }
 
     @discardableResult
@@ -388,6 +521,54 @@ public final class VoiceHistoryStore: ObservableObject {
         }
     }
 
+    private func stageAudioFiles(_ audioURLs: [URL]) throws -> [StagedAudioFile] {
+        var staged: [StagedAudioFile] = []
+        var seen = Set<URL>()
+        for originalURL in audioURLs.map(\.standardizedFileURL)
+        where seen.insert(originalURL).inserted {
+            let stagingURL = originalURL
+                .deletingLastPathComponent()
+                .appendingPathComponent(
+                    ".zisla-deleting-\(UUID().uuidString).\(originalURL.lastPathComponent)",
+                    isDirectory: false
+                )
+            do {
+                try fileManager.moveItem(at: originalURL, to: stagingURL)
+                staged.append(StagedAudioFile(originalURL: originalURL, stagingURL: stagingURL))
+            } catch {
+                if let restorationError = restoreStagedAudioFiles(staged) {
+                    throw restorationError
+                }
+                throw error
+            }
+        }
+        return staged
+    }
+
+    private func restoreStagedAudioFiles(_ staged: [StagedAudioFile]) -> Error? {
+        for file in staged.reversed() where fileManager.fileExists(atPath: file.stagingURL.path) {
+            do {
+                try fileManager.moveItem(at: file.stagingURL, to: file.originalURL)
+            } catch {
+                return error
+            }
+        }
+        return nil
+    }
+
+    private func removeStagedAudioFiles(
+        _ staged: [StagedAudioFile]
+    ) -> (remaining: [StagedAudioFile], error: Error?) {
+        for index in staged.indices {
+            do {
+                try fileManager.removeItem(at: staged[index].stagingURL)
+            } catch {
+                return (Array(staged[index...]), error)
+            }
+        }
+        return ([], nil)
+    }
+
     private func sortEntries() {
         entries.sort {
             if $0.createdAt != $1.createdAt { return $0.createdAt > $1.createdAt }
@@ -412,6 +593,11 @@ public final class VoiceHistoryStore: ObservableObject {
 
     private func normalizedDuration(_ duration: TimeInterval) -> TimeInterval {
         duration.isFinite ? max(0, duration) : 0
+    }
+
+    private func addingCumulativeDuration(_ lhs: TimeInterval, _ rhs: TimeInterval) -> TimeInterval {
+        let sum = normalizedDuration(lhs) + normalizedDuration(rhs)
+        return sum.isFinite ? sum : .greatestFiniteMagnitude
     }
 
     private func isSafeRecordingURL(_ url: URL, id: UUID) -> Bool {

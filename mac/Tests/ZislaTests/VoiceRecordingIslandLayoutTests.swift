@@ -8,6 +8,19 @@ import ZislaKit
 
 struct VoiceRecordingIslandLayoutTests {
     @Test
+    func modulePagesUseTheFormerAIMonitorWidth() {
+        for module in IslandModule.allCases {
+            let layout = IslandModuleLayout.resolved(
+                for: module,
+                dashboardCardCount: 0
+            )
+
+            #expect(layout.islandSize.width == 820)
+            #expect(layout.panelSize.width == 820)
+        }
+    }
+
+    @Test
     func voiceRecordingKeepsCollapsedWidthWithOneTranscriptRow() {
         let layout = IslandModuleLayout.voiceRecording
 
@@ -66,6 +79,17 @@ struct VoiceRecordingIslandLayoutTests {
     }
 
     @Test
+    func independentStatusPanelsRejoinFullscreenSpacesWhenPresented() throws {
+        let presenterSource = try String(
+            contentsOf: Self.sourcesDirectoryURL.appendingPathComponent("Zisla/SideNoticePresenter.swift"),
+            encoding: .utf8
+        )
+
+        #expect(presenterSource.contains("panel.orderFrontRegardless()"))
+        #expect(!presenterSource.contains("panel.orderFront(nil)"))
+    }
+
+    @Test
     func theRecordingSurfaceIsDrivenByTheCombinedCaptureFlag() throws {
         let controllerSource = try Self.source(of: "Zisla/VoiceInputController.swift")
         let rootViewSource = try Self.source(of: "Zisla/IslandRootView.swift")
@@ -81,6 +105,40 @@ struct VoiceRecordingIslandLayoutTests {
         // The island content is mounted up front, so the first take's reveal animates from the
         // collapsed pill instead of being SwiftUI's initial render.
         #expect(appSource.contains("coordinator.prewarmPanel()"))
+    }
+
+    @Test
+    func recordingStartWiresSynchronousOverlayProtectionAndEndDoesNotRefocusTheTarget() throws {
+        let appModelSource = try Self.source(of: "Zisla/AppModel.swift")
+        #expect(appModelSource.contains("var onVoiceInputWillStart: (() -> Void)?"))
+        let appModelHandler = try #require(appModelSource.range(of: "voiceInput.onRecordingWillStart = {"))
+        let handlerEnd = try #require(
+            appModelSource[appModelHandler.upperBound...].range(of: "voiceInput.onTranscriptCompleted = {")
+        )
+        let handler = appModelSource[appModelHandler.lowerBound..<handlerEnd.lowerBound]
+        #expect(handler.contains("onVoiceInputWillStart?()"))
+
+        let appSource = try Self.source(of: "Zisla/ZislaApp.swift")
+        #expect(appSource.contains("model.onVoiceInputWillStart = {"))
+        #expect(appSource.contains("coordinator.setVoiceRecording(true, at: NSEvent.mouseLocation)"))
+        #expect(!appSource.contains("AppModel.shared.restoreVoiceInputTargetFocus()"))
+    }
+
+    @Test
+    func voiceCaptureSuppressesSystemSpectrumMonitoring() throws {
+        let appModelSource = try Self.source(of: "Zisla/AppModel.swift")
+        let updateStart = try #require(appModelSource.range(of: "private func updateSpectrumMonitoring()"))
+        let updateBody = appModelSource[updateStart.lowerBound...]
+
+        #expect(appModelSource.contains("voiceInput.isCapturingInputPublisher"))
+        #expect(updateBody.contains("let voiceInputIsCapturing = voiceInput.isCapturingInput"))
+        #expect(updateBody.contains("!voiceInputIsCapturing"))
+
+        let startHandler = try #require(appModelSource.range(of: "voiceInput.onRecordingWillStart = {"))
+        let handler = appModelSource[startHandler.lowerBound..<updateStart.lowerBound]
+        let stopSpectrum = try #require(handler.range(of: "self.updateSpectrumMonitoring()"))
+        let overlayHook = try #require(handler.range(of: "self.onVoiceInputWillStart?()"))
+        #expect(stopSpectrum.lowerBound < overlayHook.lowerBound)
     }
 
     @Test

@@ -12,6 +12,7 @@ struct QuickNoteModuleView: View {
     @State private var draftHTML: String = "<div><br></div>"
     @State private var draftPlainText: String = ""
     @State private var noteContent: NotesAppBridge.NoteContent?
+    @State private var draftLoadGeneration = 0
     @State private var editorCommand: RichNoteEditorCommand?
     @State private var isTransferTarget = false
 
@@ -257,9 +258,12 @@ struct QuickNoteModuleView: View {
     // MARK: - Actions
 
     private func cancelAndLoadDraft() {
-        service.cancelPendingSave()
+        draftLoadGeneration &+= 1
+        let generation = draftLoadGeneration
+        let selectedID = service.selectedID
         Task {
             let content = await service.loadNote()
+            guard generation == draftLoadGeneration, selectedID == service.selectedID else { return }
             noteContent = content
             draftHTML = RichNoteEditor.editableHTML(for: content)
             draftPlainText = content?.plainText ?? ""

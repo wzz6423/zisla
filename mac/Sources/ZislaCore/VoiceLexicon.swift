@@ -283,9 +283,25 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
             .filter { seen.insert($0).inserted }
     }
 
+    /// Removes blank and duplicate user-entered hotwords while preserving their display order.
+    public static func normalizedCustomTerms(_ terms: [String]) -> [String] {
+        var seen = Set<String>()
+        return terms.compactMap { term -> String? in
+            let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            return trimmed
+        }
+        .filter { seen.insert($0).inserted }
+    }
+
     /// Return the complete terms from all enabled lexicons; the app layer does not quota, sort, or weight terms by lexicon or term order.
-    public static func contextualTerms(for enabled: Set<Self>) -> [String] {
-        terms(for: enabled)
+    public static func contextualTerms(
+        for enabled: Set<Self>,
+        customTerms: [String] = []
+    ) -> [String] {
+        let builtInTerms = terms(for: enabled)
+        var seen = Set(builtInTerms)
+        return builtInTerms + normalizedCustomTerms(customTerms).filter { seen.insert($0).inserted }
     }
 
     /// Normalize term variants already emitted by ASR to the canonical spelling from enabled lexicons.
@@ -294,9 +310,10 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
     public static func normalizeTranscript(
         _ transcript: String,
         for enabled: Set<Self>,
+        customTerms: [String] = [],
         contextualTranscript: String? = nil
     ) -> String {
-        let enabledTerms = terms(for: enabled)
+        let enabledTerms = contextualTerms(for: enabled, customTerms: customTerms)
         guard !transcript.isEmpty, !enabledTerms.isEmpty else { return transcript }
 
         var normalized = transcript

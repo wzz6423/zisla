@@ -209,6 +209,42 @@ struct ClipboardHistoryStoreTests {
     }
 
     @Test
+    func asynchronousPersistenceFailureRetainsMutationOrderForTheNextBatch() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(
+            storageURL: storageURL,
+            persistenceDelay: .milliseconds(1)
+        )
+        await store.waitUntilLoaded()
+
+        #expect(store.record(.text("existing")))
+        store.flushPendingChanges()
+        try executeSQL(
+            """
+            CREATE TRIGGER reject_history_removal
+            BEFORE DELETE ON clipboard_history
+            BEGIN
+                SELECT RAISE(ABORT, 'simulated asynchronous persistence failure');
+            END
+            """,
+            at: storageURL
+        )
+
+        store.removeAllHistory()
+        try await waitUntil { store.errorDescription != nil }
+        try executeSQL("DROP TRIGGER reject_history_removal", at: storageURL)
+
+        #expect(store.record(.text("later")))
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        #expect(restored.historyItems.map(\.content) == [.text("later")])
+    }
+
+    @Test
     func updatingTextDoesNotRewriteUnchangedImageBlob() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -431,6 +467,59 @@ struct ClipboardHistoryStoreTests {
         restored.loadNextPage()
         await restored.waitUntilLoaded()
         #expect(restored.items.map(\.content) == [.text("old searchable value")])
+    }
+
+    @Test
+    func initialLoadShowsOnlyRecentEightHistoryItemsUntilExpanded() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
+
+        for value in 0..<10 {
+            #expect(store.record(.text("history \(value)")))
+        }
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+
+        #expect(restored.isShowingHistoryPreview)
+        #expect(restored.historyItems.map(\.content) == (2...9).reversed().map { .text("history \($0)") })
+
+        restored.loadFullHistory()
+        await restored.waitUntilLoaded()
+
+        #expect(!restored.isShowingHistoryPreview)
+        #expect(restored.historyItems.map(\.content) == (0...9).reversed().map { .text("history \($0)") })
+    }
+
+    @Test
+    func historyCanJumpToAPageByItsOneBasedNumber() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2)
+        await store.waitUntilLoaded()
+
+        #expect(store.record(.text("oldest value")))
+        #expect(store.record(.text("middle value")))
+        #expect(store.record(.text("latest value")))
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2)
+        await restored.waitUntilLoaded()
+        restored.loadPage(number: 2)
+        await restored.waitUntilLoaded()
+
+        #expect(restored.currentPage == 1)
+        #expect(restored.items.map(\.content) == [.text("oldest value")])
+
+        restored.loadPage(number: 0)
+        restored.loadPage(number: 3)
+
+        #expect(restored.currentPage == 1)
     }
 
     @Test
@@ -804,6 +893,16 @@ struct ClipboardHistoryStoreTests {
         return directory
     }
 
+    private func waitUntil(
+        _ condition: @escaping @MainActor () -> Bool
+    ) async throws {
+        for _ in 0..<100 {
+            if condition() { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        throw PersistenceWaitTimeout()
+    }
+
     private func executeSQL(_ sql: String, at url: URL) throws {
         var database: OpaquePointer?
         guard sqlite3_open(url.path, &database) == SQLITE_OK, let database else {
@@ -826,3 +925,5 @@ struct ClipboardHistoryStoreTests {
 private struct SQLiteTestError: Error {
     let message: String
 }
+
+private struct PersistenceWaitTimeout: Error {}

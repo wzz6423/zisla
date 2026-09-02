@@ -513,6 +513,7 @@
 "算式" = "Calcul";
 "日期时间" = "Date et heure";
 "中文文本" = "Texte chinois";
+"非当前系统语言文本" = "Texte dans une langue différente de celle du système";
 "代码" = "Code";
 "翻译" = "Traduire";
 "写邮件" = "Écrire un e-mail";
@@ -520,6 +521,7 @@
 "拨打电话" = "Appeler";
 "不再显示来自 %@ 的复制" = "Ne plus afficher les copies de %@";
 "复制结果" = "Copier le résultat";
+"复制完整算式" = "Copier l'expression complète";
 "保存图片" = "Enregistrer l'image";
 "保存文本" = "Enregistrer le texte";
 "新建日程" = "Nouvel événement";

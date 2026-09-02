@@ -20,7 +20,7 @@ struct PiSessionActivityDetectorTests {
         let tasks = try PiSessionActivityDetector(
             sessionsDirectory: root,
             maximumSessionAge: .greatestFiniteMagnitude,
-            runningProcessIdentifiers: { [] }
+            processIdentifiersForSessions: { _ in [:] }
         ).activeTasks()
 
         #expect(tasks.count == 1)
@@ -51,7 +51,7 @@ struct PiSessionActivityDetectorTests {
         let tasks = try PiSessionActivityDetector(
             sessionsDirectory: root,
             maximumSessionAge: .greatestFiniteMagnitude,
-            runningProcessIdentifiers: { [] }
+            processIdentifiersForSessions: { _ in [:] }
         ).activeTasks()
 
         #expect(tasks.map(\.id) == ["pi-session-bad"])
@@ -103,21 +103,96 @@ struct PiSessionActivityDetectorTests {
         let task = try #require(PiSessionActivityDetector(
             sessionsDirectory: root,
             maximumSessionAge: .greatestFiniteMagnitude,
-            runningProcessIdentifiers: { [54_321] }
+            processIdentifiersForSessions: { sessions in
+                #expect(sessions[session.standardizedFileURL] == "live")
+                return [session.standardizedFileURL: 54_321]
+            }
         ).activeTasks().first)
 
         #expect(task.processIdentifier == 54_321)
     }
 
     @Test
-    func recognizesPiCLIBinaryAndNodeLaunchersInProcessOutput() {
+    func reparsesAnInPlaceLargerSessionRewrite() throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = root.appendingPathComponent("session.jsonl")
+        try writeJSONL([
+            #"{"type":"session","id":"old","cwd":"/tmp/old"}"#,
+            #"{"type":"message","timestamp":"2026-08-21T00:00:00Z","message":{"role":"user"}}"#,
+        ], to: session)
+
+        let detector = PiSessionActivityDetector(
+            sessionsDirectory: root,
+            maximumSessionAge: .greatestFiniteMagnitude,
+            processIdentifiersForSessions: { _ in [:] }
+        )
+        #expect(try detector.activeTasks().first?.id == "pi-session-old")
+
+        try writeJSONL([
+            #"{"type":"session","id":"rewritten-session-with-a-longer-id","cwd":"/tmp/rewritten"}"#,
+            #"{"type":"message","timestamp":"2026-08-21T00:00:01Z","message":{"role":"user"}}"#,
+        ], to: session)
+        #expect(try detector.activeTasks().first?.id == "pi-session-rewritten-session-with-a-longer-id")
+    }
+
+    @Test
+    func doesNotPairSessionsAndProcessIdentifiersByUnrelatedSortOrder() throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeJSONL([
+            #"{"type":"session","id":"session-a","cwd":"/tmp/a"}"#,
+            #"{"type":"message","id":"user-a","timestamp":"2026-08-21T00:00:00Z","message":{"role":"user"}}"#,
+        ], to: root.appendingPathComponent("a.jsonl"))
+        try writeJSONL([
+            #"{"type":"session","id":"session-b","cwd":"/tmp/b"}"#,
+            #"{"type":"message","id":"user-b","timestamp":"2026-08-21T00:00:01Z","message":{"role":"user"}}"#,
+        ], to: root.appendingPathComponent("b.jsonl"))
+
+        let tasks = try PiSessionActivityDetector(
+            sessionsDirectory: root,
+            maximumSessionAge: .greatestFiniteMagnitude,
+            processIdentifiersForSessions: { _ in [:] }
+        ).activeTasks()
+
+        #expect(tasks.count == 2)
+        #expect(tasks.allSatisfy { $0.processIdentifier == nil })
+    }
+
+    @Test
+    func mapsOnlyExplicitPiSessionArgumentsToProcessIdentifiers() {
+        let first = URL(fileURLWithPath: "/tmp/a.jsonl").standardizedFileURL
+        let second = URL(fileURLWithPath: "/tmp/b.jsonl").standardizedFileURL
+        let pathWithWhitespace = URL(fileURLWithPath: "/tmp/pi session.jsonl").standardizedFileURL
         let output = Data("""
-          4321 /Users/wzz/.npm-global/bin/pi pi
-          5432 /opt/homebrew/bin/node /Users/wzz/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js
-          6543 /usr/local/bin/node /tmp/other.js
+          4321 /Users/wzz/.npm-global/bin/pi pi --session-id session-a
+          5432 /opt/homebrew/bin/node /Users/wzz/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js --session /tmp/b.jsonl
+          6543 /usr/local/bin/node /tmp/other.js --session-id session-a
+          7654 /bin/rg rg --session-id session-b /pi-coding-agent/
+          8765 /Users/wzz/.npm-global/bin/pi pi --no-session --session-id session-b
+          9876 /Users/wzz/.npm-global/bin/pi pi --session /tmp/pi session.jsonl
         """.utf8)
 
-        #expect(PiSessionActivityDetector.parseRunningProcessIdentifiers(output) == [5432, 4321])
+        #expect(PiSessionActivityDetector.parseRunningProcessIdentifiers(
+            output,
+            matching: [first: "session-a", second: "session-b", pathWithWhitespace: "session-c"]
+        ) == [first: 4321, second: 5432, pathWithWhitespace: 9876])
+    }
+
+    @Test
+    func omitsAmbiguousPiSessionReferences() {
+        let first = URL(fileURLWithPath: "/tmp/a.jsonl").standardizedFileURL
+        let second = URL(fileURLWithPath: "/tmp/b.jsonl").standardizedFileURL
+        let output = Data("""
+          4321 /Users/wzz/.npm-global/bin/pi pi --session session
+          5432 /Users/wzz/.npm-global/bin/pi pi --session-id session-a
+          6543 /Users/wzz/.npm-global/bin/pi pi --session-id session-a
+        """.utf8)
+
+        #expect(PiSessionActivityDetector.parseRunningProcessIdentifiers(
+            output,
+            matching: [first: "session-a", second: "session-b"]
+        ).isEmpty)
     }
 }
 

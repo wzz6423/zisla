@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Testing
 
 @testable import ZislaCore
@@ -661,5 +662,80 @@ struct SideNoticeLayoutTests {
         // The overlay sits directly above the island's bottom edge.
         #expect(frame == CGRect(x: 840, y: anchor.minY - 54 - 4, width: 252, height: 54))
         #expect(frame.maxY == anchor.minY - 4)
+    }
+
+    @Test
+    func headphoneNoticeGetsExtraClearanceWithoutWideningOtherTransientNotices() throws {
+        let referenceDate = Date(timeIntervalSinceReferenceDate: 0)
+        let notched = ScreenSnapshot(
+            displayID: 42,
+            frame: CGRect(x: 0, y: 0, width: 1_512, height: 982),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1_512, height: 950),
+            safeAreaInsets: ScreenInsets(top: 32),
+            auxiliaryTopLeftArea: CGRect(x: 0, y: 950, width: 716, height: 32),
+            auxiliaryTopRightArea: CGRect(x: 796, y: 950, width: 716, height: 32)
+        )
+        let headphone = IslandNotice(
+            id: "headphone-connection",
+            title: "AirPods Pro",
+            side: .left,
+            createdAt: referenceDate,
+            style: .headphone
+        )
+        let focusTransition = IslandNotice(
+            id: "focus-transition",
+            title: "工作",
+            side: .left,
+            createdAt: referenceDate.addingTimeInterval(1),
+            style: .status
+        )
+        let simulated = ScreenSnapshot(
+            displayID: 7,
+            frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+            menuBarHeightFallback: 24
+        )
+        let layout = ScreenLayoutEngine().layout(for: notched)
+        let settings = FeatureSettings()
+
+        let selectedPriority = SideNoticeLayoutEngine.selectedCompactStatusPriority(
+            for: [headphone],
+            settings: settings
+        )
+
+        #expect(selectedPriority == .transient)
+
+        let headphoneFrame = try #require(engine.compactBarFrame(
+            for: notched,
+            notices: [headphone],
+            settings: settings
+        ))
+        let focusTransitionFrame = try #require(engine.compactBarFrame(
+            for: notched,
+            notices: [focusTransition],
+            settings: settings
+        ))
+        let simulatedHeadphoneFrame = try #require(engine.compactBarFrame(
+            for: simulated,
+            notices: [headphone],
+            settings: settings
+        ))
+        let petAnchorFrame = try #require(engine.compactBarFrame(
+            for: layout,
+            notices: [headphone],
+            settings: settings
+        ))
+        let latestFocusFrame = try #require(engine.compactBarFrame(
+            for: notched,
+            notices: [headphone, focusTransition],
+            settings: settings
+        ))
+
+        #expect(focusTransitionFrame.width == 240)
+        #expect(headphoneFrame.width == 380)
+        #expect(headphoneFrame.width == focusTransitionFrame.width + 140)
+        #expect(petAnchorFrame == headphoneFrame)
+        #expect(latestFocusFrame == focusTransitionFrame)
+        #expect(simulatedHeadphoneFrame.width == engine.compactBarFrame(for: simulated).width)
     }
 }

@@ -15,6 +15,21 @@ enum MediaTextFormatting {
         return "\(title) · \(artist)"
     }
 
+    nonisolated static func backgroundSoundSnapshot(
+        for sound: SystemBackgroundSound
+    ) -> NowPlayingSnapshot {
+        NowPlayingSnapshot(
+            title: "背景音",
+            artist: sound.title,
+            album: nil,
+            artworkData: nil,
+            duration: nil,
+            elapsedTime: nil,
+            isPlaying: true,
+            supportsControls: false
+        )
+    }
+
     /// Uses the program name and cast returned by system MediaRemote, deduplicated for display.
     nonisolated static func videoSecondaryText(_ item: NowPlayingSnapshot) -> String {
         let album = item.album?
@@ -81,11 +96,12 @@ struct NowPlayingHeader: View {
         }
     }
 
-    /// A paused music snapshot yields to the idle header while background sound plays,
-    /// because that playback is represented only in the collapsed island.
+    /// Background sound takes priority in the header so its source and selected sound stay visible.
     private var displayedMusicItem: NowPlayingSnapshot? {
+        if backgroundSounds.isPlaying, let sound = backgroundSounds.playingSound {
+            return MediaTextFormatting.backgroundSoundSnapshot(for: sound)
+        }
         guard let item = media.snapshot else { return nil }
-        if backgroundSounds.isPlaying, !item.isPlaying { return nil }
         return item
     }
 
@@ -517,12 +533,14 @@ struct MediaScrubTrack: Equatable {
     var title: String
     var artist: String
     var duration: Double?
+    var sourceBundleIdentifier: String?
     var sourcePID: pid_t?
 
     init(_ item: NowPlayingSnapshot) {
         title = item.title
         artist = item.artist
         duration = item.duration
+        sourceBundleIdentifier = item.sourceBundleIdentifier
         sourcePID = item.sourcePID
     }
 }

@@ -68,6 +68,32 @@
     <string>NSApplication</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>zisla 需要将你主动录入的语音转换为 AI 对话文字。</string>
+	<key>SUAllowsAutomaticUpdates</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>https://gitee.com/wzz6423/zisla/releases/download/update-release/appcast.xml</string>
+	<key>ZislaReleaseFallbackAppcastURL</key>
+	<string>https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml</string>
+	<key>ZislaPreviewAppcastURL</key>
+	<string>https://gitee.com/wzz6423/zisla/releases/download/preview/appcast.xml</string>
+	<key>ZislaPreviewFallbackAppcastURL</key>
+	<string>https://github.com/wzz6423/zisla/releases/download/preview/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>RTy+qQHkv0VMQ/6VS/D/oyzOdRmRld7+3nqUywhuqNI=</string>
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>600</integer>
+	<key>SUScheduledImpatientCheckInterval</key>
+	<integer>3600</integer>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>zisla 需要通过 Mail.app 读取和管理你的邮件，包括收件箱列表、标记已读、删除和回复。</string>
     <key>ZislaDefaultUpdateChannel</key>

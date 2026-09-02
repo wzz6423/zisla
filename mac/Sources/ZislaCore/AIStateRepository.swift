@@ -26,12 +26,16 @@ public struct AIStateStorageChangeToken: Equatable, Sendable {
 }
 
 /// SQLite repository for aggregated AI state.
-public struct AIStateRepository {
+public struct AIStateRepository: Sendable {
     public let directoryURL: URL
     private let maximumUsageSamples: Int
 
     public var databaseURL: URL {
         directoryURL.appendingPathComponent("ai-state.sqlite", isDirectory: false)
+    }
+
+    public var databaseWALURL: URL {
+        URL(fileURLWithPath: databaseURL.path + "-wal", isDirectory: false)
     }
 
     public init(
@@ -47,6 +51,12 @@ public struct AIStateRepository {
         let database = try openDatabase()
         try database.trimUsageIfNeeded()
         return try database.load(includeUsageSamples: includeUsageSamples)
+    }
+
+    public func loadUsageSamples(startingAt startDate: Date? = nil) throws -> [AIUsageSample] {
+        let database = try openDatabase()
+        try database.trimUsageIfNeeded()
+        return try database.loadUsageSamples(startingAt: startDate)
     }
 
     public func upsert(_ task: AIProgressTask) throws {
@@ -108,7 +118,7 @@ public struct AIStateRepository {
 
     public func storageChangeToken() -> AIStateStorageChangeToken {
         let database = fileVersion(at: databaseURL)
-        let wal = fileVersion(at: databaseURL.appendingPathExtension("wal"))
+        let wal = fileVersion(at: databaseWALURL)
         return AIStateStorageChangeToken(
             databaseModificationDate: database.modificationDate,
             databaseSize: database.size,

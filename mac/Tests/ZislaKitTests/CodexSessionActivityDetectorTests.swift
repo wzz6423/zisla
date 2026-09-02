@@ -178,12 +178,18 @@ struct CodexSessionActivityDetectorTests {
             processIdentifiersForOpenFiles: { urls in
                 #expect(urls.contains(rolloutURL))
                 return [rolloutURL: 2468]
+            },
+            clientProvidersForProcessIdentifiers: { identifiers in
+                #expect(identifiers == Set([Int32(2468)]))
+                return [2468: .gpt]
             }
         )
 
         let task = try #require(detector.activeTasks().first)
 
         #expect(task.processIdentifier == 2468)
+        #expect(task.provider == .gpt)
+        #expect(task.title == "ChatGPT")
     }
 
     @Test
@@ -260,10 +266,11 @@ struct CodexSessionActivityDetectorTests {
 
         let task = try #require(CodexSessionActivityDetector(
             sessionsDirectory: root,
-            sessionIndexURL: sessionIndexURL
+            sessionIndexURL: sessionIndexURL,
+            processIdentifiersForOpenFiles: { _ in [:] }
         ).activeTasks().first)
 
-        #expect(task.title == "ChatGPT")
+        #expect(task.title == "Codex")
         #expect(task.sessionURL?.absoluteString == "codex://threads/session-blank")
     }
 
@@ -298,7 +305,7 @@ struct CodexSessionActivityDetectorTests {
     }
 
     @Test
-    func mapsTurnModelToChatGPTOrCodexIdentity() throws {
+    func turnContextProvidesDetailsWithoutChangingClientIdentity() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -331,13 +338,16 @@ struct CodexSessionActivityDetectorTests {
             modifiedAt: Date(timeIntervalSince1970: 1_800_000_150)
         )
 
-        let tasks = try CodexSessionActivityDetector(sessionsDirectory: root).activeTasks()
+        let tasks = try CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }
+        ).activeTasks()
         let byID = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
         let gpt = try #require(byID[CodexSessionActivityDetector.taskID(forTurnID: "turn-gpt")])
         let codex = try #require(byID[CodexSessionActivityDetector.taskID(forTurnID: "turn-codex")])
 
-        #expect(gpt.provider == .gpt)
-        #expect(gpt.title == "ChatGPT")
+        #expect(gpt.provider == .codex)
+        #expect(gpt.title == "Codex")
         #expect(gpt.detail == "gpt-5.6-sol")
         #expect(gpt.effort == "medium")
         #expect(gpt.startedAt == iso8601Date("2026-07-19T01:00:01.000Z"))
@@ -370,6 +380,43 @@ struct CodexSessionActivityDetectorTests {
         let tasks = try detector.activeTasks()
 
         #expect(tasks.map(\.id) == [CodexSessionActivityDetector.taskID(forTurnID: "turn-live")])
+    }
+
+    @Test
+    func lateCompletionFromPreviousTurnDoesNotHideTheLatestRunningTurn() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-late-completion.jsonl",
+            lines: [
+                sessionMetadataLine(sessionID: "session-late-completion"),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-previous"
+                ),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:02.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-latest"
+                ),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:03.000Z",
+                    payloadType: "task_complete",
+                    turnID: "turn-previous"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_000_205)
+        )
+
+        let tasks = try CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }
+        ).activeTasks()
+
+        #expect(tasks.map(\.id) == [CodexSessionActivityDetector.taskID(forTurnID: "turn-latest")])
     }
 
     @Test
@@ -699,7 +746,7 @@ struct CodexSessionActivityDetectorTests {
     }
 
     @Test
-    func turnContextInDifferentFileStillMapsProviderCorrectly() throws {
+    func turnContextInDifferentFileStillProvidesDetails() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -729,13 +776,16 @@ struct CodexSessionActivityDetectorTests {
             modifiedAt: Date(timeIntervalSince1970: 1_800_001_250)
         )
 
-        let tasks = try CodexSessionActivityDetector(sessionsDirectory: root).activeTasks()
+        let tasks = try CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }
+        ).activeTasks()
         let task = try #require(tasks.first)
 
         #expect(tasks.count == 1)
         #expect(task.id == CodexSessionActivityDetector.taskID(forTurnID: "turn-gpt-split"))
-        #expect(task.provider == .gpt)
-        #expect(task.title == "ChatGPT")
+        #expect(task.provider == .codex)
+        #expect(task.title == "Codex")
         #expect(task.detail == "gpt-5.6-sol")
         #expect(task.effort == "high")
         #expect(task.status == .running)
@@ -802,6 +852,361 @@ struct CodexSessionActivityDetectorTests {
         #expect(task.status == .error)
         #expect(task.failureReason == "工具执行失败")
         #expect(task.failureReason?.contains("syntax error") == false)
+    }
+
+    @Test
+    func newTaskStartedInSameSessionSupersedesUncompletedOlderTurn() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-supersede.jsonl",
+            lines: [
+                sessionMetadataLine(sessionID: "session-supersede"),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-old-uncompleted"
+                ),
+                eventLine(
+                    timestamp: "2026-07-19T01:05:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-new"
+                ),
+                eventLine(
+                    timestamp: "2026-07-19T01:06:00.000Z",
+                    payloadType: "task_complete",
+                    turnID: "turn-new"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_003_100)
+        )
+
+        let tasks = try CodexSessionActivityDetector(sessionsDirectory: root).activeTasks()
+
+        #expect(tasks.isEmpty)
+    }
+
+    @Test
+    func newTaskStartedInDifferentSessionDoesNotAffectOtherSession() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-session-a.jsonl",
+            lines: [
+                sessionMetadataLine(sessionID: "session-a"),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-session-a"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_003_200)
+        )
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-session-b.jsonl",
+            lines: [
+                sessionMetadataLine(sessionID: "session-b"),
+                eventLine(
+                    timestamp: "2026-07-19T01:05:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-session-b"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_003_300)
+        )
+
+        let tasks = try CodexSessionActivityDetector(sessionsDirectory: root).activeTasks()
+
+        #expect(tasks.count == 2)
+        #expect(Set(tasks.map(\.id)) == Set([
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-session-a"),
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-session-b"),
+        ]))
+    }
+
+    @Test
+    func laterSameTimestampStartInOneRolloutSupersedesTheEarlierTurn() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-same-timestamp.jsonl",
+            lines: [
+                sessionMetadataLine(sessionID: "session-same-timestamp"),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-earlier"
+                ),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-later"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_003_400)
+        )
+
+        let tasks = try CodexSessionActivityDetector(sessionsDirectory: root).activeTasks()
+
+        #expect(tasks.map(\.id) == [CodexSessionActivityDetector.taskID(forTurnID: "turn-later")])
+    }
+
+    @Test
+    func rolloutPathBreaksCrossFileSameTimestampTiesDeterministically() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let modifiedAt = Date(timeIntervalSince1970: 1_800_003_500)
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-alpha.jsonl",
+            lines: [
+                sessionMetadataLine(sessionID: "session-cross-file"),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-alpha"
+                ),
+            ],
+            modifiedAt: modifiedAt
+        )
+        try writeRollout(
+            under: root,
+            relativePath: "2026/07/19/rollout-omega.jsonl",
+            lines: [
+                sessionMetadataLine(sessionID: "session-cross-file"),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-omega"
+                ),
+            ],
+            modifiedAt: modifiedAt
+        )
+
+        let tasks = try CodexSessionActivityDetector(sessionsDirectory: root).activeTasks()
+
+        #expect(tasks.map(\.id) == [CodexSessionActivityDetector.taskID(forTurnID: "turn-omega")])
+    }
+
+    @Test
+    func largerRewriteReparsesRolloutInsteadOfContinuingFromTheOldOffset() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-rewrite.jsonl"
+        let modifiedAt = Date(timeIntervalSince1970: 1_800_003_600)
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                sessionMetadataLine(sessionID: "session-rewrite"),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-before-rewrite"
+                ),
+            ],
+            modifiedAt: modifiedAt
+        )
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root)
+        #expect(try detector.activeTasks().map(\.id) == [
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-before-rewrite"),
+        ])
+
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                sessionMetadataLine(sessionID: "session-rewrite"),
+                "{\"type\":\"ignored\",\"padding\":\"\(String(repeating: "x", count: 512))\"}",
+                eventLine(
+                    timestamp: "2026-07-19T01:01:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-after-rewrite"
+                ),
+            ],
+            modifiedAt: modifiedAt
+        )
+
+        #expect(try detector.activeTasks().map(\.id) == [
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-after-rewrite"),
+        ])
+    }
+
+    @Test
+    func sameSizeRewriteReparsesRolloutInsteadOfUsingCachedPrefix() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-same-size-rewrite.jsonl"
+        let rolloutURL = root.appendingPathComponent(relativePath)
+        let modifiedAt = Date(timeIntervalSince1970: 1_800_003_700)
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                sessionMetadataLine(sessionID: "session-same-size-rewrite"),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-before"
+                ),
+            ],
+            modifiedAt: modifiedAt
+        )
+        let originalSize = try Data(contentsOf: rolloutURL).count
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root)
+        #expect(try detector.activeTasks().map(\.id) == [
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-before"),
+        ])
+
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                sessionMetadataLine(sessionID: "session-same-size-rewrite"),
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-change"
+                ),
+            ],
+            modifiedAt: modifiedAt
+        )
+
+        #expect(try Data(contentsOf: rolloutURL).count == originalSize)
+        #expect(try detector.activeTasks().map(\.id) == [
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-change"),
+        ])
+    }
+
+    @Test
+    func continuesCachedDigestAcrossMultipleAppendsAndChunks() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-cached-digest.jsonl"
+        let rolloutURL = root.appendingPathComponent(relativePath)
+        let padding = String(repeating: "x", count: IncrementalJSONLReader.defaultChunkBytes + 1)
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-first"
+                ),
+                "{\"type\":\"ignored\",\"padding\":\"\(padding)\"}",
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_003_800)
+        )
+        #expect(try Data(contentsOf: rolloutURL).count > IncrementalJSONLReader.defaultChunkBytes)
+
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root)
+        #expect(try detector.activeTasks().map(\.id) == [
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-first"),
+        ])
+
+        try appendLine(
+            eventLine(
+                timestamp: "2026-07-19T01:01:00.000Z",
+                payloadType: "task_complete",
+                turnID: "turn-first"
+            ),
+            to: rolloutURL
+        )
+        #expect(try detector.activeTasks().isEmpty)
+
+        try appendLine(
+            eventLine(
+                timestamp: "2026-07-19T01:02:00.000Z",
+                payloadType: "task_started",
+                turnID: "turn-second"
+            ),
+            to: rolloutURL
+        )
+        #expect(try detector.activeTasks().map(\.id) == [
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-second"),
+        ])
+    }
+
+    @Test
+    func incrementalVerificationStaysBoundedForLargeRollouts() {
+        let largeRolloutBytes = UInt64(80 * 1_024 * 1_024)
+        #expect(CodexSessionActivityDetector.incrementalVerificationByteCount(
+            for: largeRolloutBytes
+        ) == 8 * 1_024)
+    }
+
+    @Test
+    func readsAnUnterminatedCompleteEventAndKeepsTheNextAppendSeparate() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rolloutURL = root.appendingPathComponent("2026/07/19/rollout-unterminated.jsonl")
+        try FileManager.default.createDirectory(
+            at: rolloutURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(eventLine(
+            timestamp: "2026-07-19T01:00:00.000Z",
+            payloadType: "task_started",
+            turnID: "turn-unterminated"
+        ).utf8).write(to: rolloutURL)
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root)
+
+        #expect(try detector.activeTasks().map(\.id) == [
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-unterminated"),
+        ])
+
+        let handle = try FileHandle(forWritingTo: rolloutURL)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(("\n" + eventLine(
+            timestamp: "2026-07-19T01:01:00.000Z",
+            payloadType: "task_complete",
+            turnID: "turn-unterminated"
+        ) + "\n").utf8))
+
+        #expect(try detector.activeTasks().isEmpty)
+    }
+
+    @Test
+    func parsesDesktopClientProviderFromProcessTree() {
+        let data = Data("""
+        100 1 /Applications/ChatGPT.app/Contents/MacOS/ChatGPT
+        101 100 /Applications/ChatGPT.app/Contents/Resources/codex app-server
+        200 1 /Applications/Codex.app/Contents/MacOS/Codex
+        201 200 /Applications/Codex.app/Contents/Resources/codex app-server
+        300 1 /usr/local/bin/codex app-server
+        """.utf8)
+
+        let providers = CodexSessionActivityDetector.parseClientProviders(
+            fromProcessList: data,
+            matching: Set([Int32(101), 201, 300])
+        )
+
+        #expect(providers[101] == .gpt)
+        #expect(providers[201] == .codex)
+        #expect(providers[300] == nil)
+    }
+
+    @Test
+    func processTreeProviderParsingStopsAtParentCycle() {
+        let data = Data("""
+        100 200 /usr/local/bin/worker
+        200 100 /usr/local/bin/worker
+        """.utf8)
+
+        let providers = CodexSessionActivityDetector.parseClientProviders(
+            fromProcessList: data,
+            matching: Set([Int32(100)])
+        )
+
+        #expect(providers.isEmpty)
     }
 
 

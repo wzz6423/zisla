@@ -19,6 +19,8 @@ struct WeatherDetailsTests {
           "daily":{
             "sunrise":["2026-07-23T05:04"],
             "sunset":["2026-07-23T18:56"],
+            "temperature_2m_min":[24.1],
+            "temperature_2m_max":[33.8],
             "precipitation_probability_max":[82],
             "precipitation_sum":[18.5],
             "weather_code":[95]
@@ -30,6 +32,8 @@ struct WeatherDetailsTests {
 
         #expect(response.current.precipitation == 1.5)
         #expect(response.daily?.sunrise.first == "2026-07-23T05:04")
+        #expect(response.daily?.temperatureMin?.first == 24.1)
+        #expect(response.daily?.temperatureMax?.first == 33.8)
         #expect(response.daily?.precipitationProbabilityMax.first == 82)
         #expect(response.daily?.precipitationSum.first == 18.5)
     }

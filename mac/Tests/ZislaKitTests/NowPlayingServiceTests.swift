@@ -6,6 +6,46 @@ import Testing
 
 struct NowPlayingServiceTests {
     @Test
+    func adapterStreamOmitsArtworkUntilTheDedicatedMetadataRefresh() {
+        let arguments = MediaRemoteAdapterClient.streamArguments()
+
+        #expect(arguments == ["stream", "--no-diff", "--debounce=80", "--no-artwork"])
+    }
+
+    @Test
+    func adapterListenerUsesAParentLifecyclePipeAndEscalatesTermination() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appendingPathComponent("Sources/ZislaKit/MediaRemoteAdapterClient.swift"),
+            encoding: .utf8
+        )
+        let script = try String(
+            contentsOf: root.appendingPathComponent(
+                "Resources/MediaRemoteAdapter/mediaremote-adapter.pl"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("let lifecyclePipe = Pipe()"))
+        #expect(source.contains("process.standardInput = lifecyclePipe"))
+        #expect(source.contains("process.environment = Self.parentLifecycleEnvironment()"))
+        #expect(
+            MediaRemoteAdapterClient.parentLifecycleEnvironment()[
+                MediaRemoteAdapterClient.parentLifecycleEnvironmentKey
+            ] == "1"
+        )
+        #expect(source.contains("Self.closePipe(lifecyclePipe)"))
+        #expect(source.contains("Darwin.kill(processIdentifier, SIGKILL)"))
+        #expect(script.contains("MEDIAREMOTEADAPTER_PARENT_LIFECYCLE"))
+        #expect(script.contains("my $watchdog_pid = fork();"))
+        #expect(script.contains("sysread(STDIN"))
+        #expect(script.contains("kill 'TERM', $adapter_pid"))
+    }
+
+    @Test
     func mediaRemoteDictionaryParsesMetadataAndPlaybackClock() throws {
         let timestamp = Date(timeIntervalSince1970: 1_000)
         let artwork = Data([0x01, 0x02, 0x03])

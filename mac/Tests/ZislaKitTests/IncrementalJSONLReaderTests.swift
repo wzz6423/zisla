@@ -58,6 +58,22 @@ struct IncrementalJSONLReaderTests {
         #expect(lines == ["ok"])
         #expect(state.pendingBytes == 0)
     }
+
+    @Test
+    func rejectsARewrittenReadPrefixBeforeContinuing() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Zisla-jsonl-rewrite-\(UUID().uuidString).jsonl")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data("old-record\n".utf8).write(to: url)
+
+        let reader = IncrementalJSONLReader(initialTailBytes: 64)
+        var state = reader.initialState(fileSize: try fileSize(at: url))
+        try reader.readLines(from: url, fileSize: fileSize(at: url), state: &state) { _ in }
+        #expect(reader.hasUnchangedReadPrefix(at: url, state: state))
+
+        try Data("new-record-with-a-larger-payload\n".utf8).write(to: url)
+        #expect(!reader.hasUnchangedReadPrefix(at: url, state: state))
+    }
 }
 
 private func fileSize(at url: URL) throws -> UInt64 {

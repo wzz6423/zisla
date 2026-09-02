@@ -62,6 +62,7 @@ struct ClipboardHistoryModuleView: View {
     @State private var additionPresentation: ClipboardAdditionPresentation?
     @State private var draftText = ""
     @State private var searchText = ""
+    @State private var pageInput = "1"
     @FocusState private var isDraftTextFocused: Bool
     @FocusState private var isSearchFocused: Bool
     private let copyItem: (ClipboardHistoryItem) -> Void
@@ -188,6 +189,12 @@ struct ClipboardHistoryModuleView: View {
                                 ForEach(visibleHistoryItems) { item in
                                     itemRow(item)
                                 }
+                                if store.isShowingHistoryPreview,
+                                   visibleHistoryItems.count == ClipboardHistoryStore.recentHistoryPreviewLimit {
+                                    Color.clear
+                                        .frame(height: 1)
+                                        .onAppear(perform: store.loadFullHistory)
+                                }
                             }
                         } else {
                             ForEach(visibleItems) { item in
@@ -201,7 +208,7 @@ struct ClipboardHistoryModuleView: View {
                 .thinScrollChrome()
             }
 
-            if store.pageCount > 1 {
+            if !store.isShowingHistoryPreview, store.pageCount > 1 {
                 Hairline()
                 HStack(spacing: 8) {
                     Button {
@@ -214,10 +221,17 @@ struct ClipboardHistoryModuleView: View {
                     .disabled(!store.canLoadPreviousPage)
                     .help("上一页")
 
-                    Text("\(store.currentPage + 1)/\(store.pageCount)")
+                    TextField("页码", text: $pageInput)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .multilineTextAlignment(.center)
+                        .frame(width: 36)
+                        .help("输入页码后按回车跳转")
+                        .onSubmit(jumpToEnteredPage)
+
+                    Text("/\(store.pageCount)")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .frame(minWidth: 42)
 
                     Button {
                         store.loadNextPage()
@@ -259,6 +273,10 @@ struct ClipboardHistoryModuleView: View {
             }
             guard !Task.isCancelled else { return }
             store.updateQuery(scope: filter.scope, searchText: searchText, category: categoryFilter)
+        }
+        .onAppear { pageInput = displayedPageNumber }
+        .onChange(of: store.currentPage) { _, _ in
+            pageInput = displayedPageNumber
         }
     }
 
@@ -385,6 +403,19 @@ struct ClipboardHistoryModuleView: View {
         case .pinned: "还没有常用项"
         case .history: "这里空空如也"
         }
+    }
+
+    private var displayedPageNumber: String {
+        String(store.currentPage + 1)
+    }
+
+    private func jumpToEnteredPage() {
+        guard let page = Int(pageInput) else {
+            pageInput = displayedPageNumber
+            return
+        }
+        store.loadPage(number: page)
+        pageInput = displayedPageNumber
     }
 
     private var emptyStateDetail: String? {

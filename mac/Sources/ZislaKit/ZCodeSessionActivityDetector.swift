@@ -29,14 +29,16 @@ public final class ZCodeSessionActivityDetector: AIActivityDetecting {
         guard fileManager.fileExists(atPath: databaseURL.path) else { return [] }
 
         var database: OpaquePointer?
-        guard sqlite3_open_v2(
+        let openResult = sqlite3_open_v2(
             databaseURL.path,
             &database,
             SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX,
             nil
-        ) == SQLITE_OK, let database else {
+        )
+        guard openResult == SQLITE_OK, let database else {
+            let message = sqliteMessage(database, fallback: "无法打开 ZCode 数据库")
             sqlite3_close(database)
-            return []
+            throw AIStateRepositoryError.storageFailure(message)
         }
         defer { sqlite3_close(database) }
         sqlite3_busy_timeout(database, 500)
@@ -73,44 +75,60 @@ public final class ZCodeSessionActivityDetector: AIActivityDetecting {
             """
 
         var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
-              let statement else {
+        let prepareResult = sqlite3_prepare_v2(database, sql, -1, &statement, nil)
+        guard prepareResult == SQLITE_OK, let statement else {
+            let message = sqliteMessage(database, fallback: "无法查询 ZCode 会话")
             sqlite3_finalize(statement)
-            return []
+            throw AIStateRepositoryError.storageFailure(message)
         }
         defer { sqlite3_finalize(statement) }
 
-        let cutoff = Int64((now().timeIntervalSince1970 - recencyThreshold) * 1_000)
-        sqlite3_bind_int64(statement, 1, cutoff)
+        let cutoff = Self.clampedMilliseconds(
+            now().timeIntervalSince1970 - recencyThreshold
+        )
+        guard sqlite3_bind_int64(statement, 1, cutoff) == SQLITE_OK else {
+            throw AIStateRepositoryError.storageFailure(
+                sqliteMessage(database, fallback: "无法设置 ZCode 会话查询范围")
+            )
+        }
 
         var tasks: [AIProgressTask] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
-            guard let sessionID = stringColumn(statement, 0),
-                  let turnID = stringColumn(statement, 1),
-                  let rawStatus = stringColumn(statement, 2),
-                  let status = AIProgressStatus(rawValue: rawStatus),
-                  let startedAtMilliseconds = optionalInt64Column(statement, 3) else {
-                continue
-            }
+        readRows: while true {
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                guard let sessionID = stringColumn(statement, 0),
+                      let turnID = stringColumn(statement, 1),
+                      let rawStatus = stringColumn(statement, 2),
+                      let status = AIProgressStatus(rawValue: rawStatus),
+                      let startedAtMilliseconds = optionalInt64Column(statement, 3) else {
+                    continue
+                }
 
-            let completedAtMilliseconds = optionalInt64Column(statement, 4)
-            let sessionUpdatedAtMilliseconds = optionalInt64Column(statement, 7)
-            let updatedMilliseconds = status == .running
-                ? (sessionUpdatedAtMilliseconds ?? startedAtMilliseconds)
-                : (completedAtMilliseconds ?? startedAtMilliseconds)
-            let updatedAt = Date(timeIntervalSince1970: Double(updatedMilliseconds) / 1_000)
-            let model = stringColumn(statement, 6)
-            tasks.append(AIProgressTask(
-                id: Self.taskID(forSessionID: sessionID, turnID: turnID),
-                provider: .zcode,
-                title: "ZCode",
-                detail: model,
-                progress: nil,
-                status: status,
-                updatedAt: updatedAt,
-                startedAt: Date(timeIntervalSince1970: Double(startedAtMilliseconds) / 1_000),
-                failureReason: status == .error ? stringColumn(statement, 5) : nil
-            ))
+                let completedAtMilliseconds = optionalInt64Column(statement, 4)
+                let sessionUpdatedAtMilliseconds = optionalInt64Column(statement, 7)
+                let updatedMilliseconds = status == .running
+                    ? (sessionUpdatedAtMilliseconds ?? startedAtMilliseconds)
+                    : (completedAtMilliseconds ?? startedAtMilliseconds)
+                let updatedAt = Date(timeIntervalSince1970: Double(updatedMilliseconds) / 1_000)
+                let model = stringColumn(statement, 6)
+                tasks.append(AIProgressTask(
+                    id: Self.taskID(forSessionID: sessionID, turnID: turnID),
+                    provider: .zcode,
+                    title: "ZCode",
+                    detail: model,
+                    progress: nil,
+                    status: status,
+                    updatedAt: updatedAt,
+                    startedAt: Date(timeIntervalSince1970: Double(startedAtMilliseconds) / 1_000),
+                    failureReason: status == .error ? stringColumn(statement, 5) : nil
+                ))
+            case SQLITE_DONE:
+                break readRows
+            default:
+                throw AIStateRepositoryError.storageFailure(
+                    sqliteMessage(database, fallback: "无法读取 ZCode 会话")
+                )
+            }
         }
         return tasks
     }
@@ -136,5 +154,20 @@ public final class ZCodeSessionActivityDetector: AIActivityDetecting {
     private func optionalInt64Column(_ statement: OpaquePointer?, _ index: Int32) -> Int64? {
         guard sqlite3_column_type(statement, index) != SQLITE_NULL else { return nil }
         return sqlite3_column_int64(statement, index)
+    }
+
+    private static func clampedMilliseconds(_ seconds: TimeInterval) -> Int64 {
+        guard seconds.isFinite else {
+            return seconds.sign == .minus ? Int64.min : Int64.max
+        }
+        let milliseconds = seconds * 1_000
+        if milliseconds <= Double(Int64.min) { return Int64.min }
+        if milliseconds >= Double(Int64.max) { return Int64.max }
+        return Int64(milliseconds)
+    }
+
+    private func sqliteMessage(_ database: OpaquePointer?, fallback: String) -> String {
+        guard let database, let message = sqlite3_errmsg(database) else { return fallback }
+        return String(cString: message)
     }
 }

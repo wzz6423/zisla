@@ -137,6 +137,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         /// Countdown expanded bar aligned to the simulated 240 pt island width for notch-less devices,
         /// ensuring `HH:MM:SS` is not squeezed by the notch's corner radii and masks.
         static let compactBarSideExtension: CGFloat = 40
+        /// Headphone connection status keeps its full identity and three battery readings outside the physical notch.
+        static let compactBarHeadphoneAdditionalSideExtension: CGFloat = 70
         /// The music detail view needs to fit cover art + title/artist (left) or waveform + scrolling lyrics (right),
         /// requiring wider wings than the countdown expanded bar.
         static let compactBarMediaDetailSideWidth: CGFloat = 160
@@ -296,6 +298,18 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         extendsForFocusCountdown: Bool = false,
         expandsForDetailedMedia: Bool = false
     ) -> CGRect {
+        compactBarFrame(
+            for: screen,
+            sideExtension: extendsForFocusCountdown ? Layout.compactBarSideExtension : 0,
+            expandsForDetailedMedia: expandsForDetailedMedia
+        )
+    }
+
+    private func compactBarFrame(
+        for screen: ScreenSnapshot,
+        sideExtension: CGFloat,
+        expandsForDetailedMedia: Bool
+    ) -> CGRect {
         let topology = ScreenLayoutEngine().layout(for: screen).topology
         let anchor = topology.anchorFrame
         let baseWidth: CGFloat
@@ -306,7 +320,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 visibleWingWidth = Layout.compactBarMediaDetailSideWidth - Layout.compactOverlap
             } else {
                 visibleWingWidth = Layout.compactWingWidth
-                    + (extendsForFocusCountdown ? Layout.compactBarSideExtension : 0)
+                    + max(0, sideExtension)
                     - Layout.compactOverlap
             }
             baseWidth = anchor.width + visibleWingWidth * 2
@@ -337,7 +351,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         guard let sizing = compactBarSizing(for: notices, settings: settings) else { return nil }
         return compactBarFrame(
             for: screen,
-            extendsForFocusCountdown: sizing.extendsForCompactStatus,
+            sideExtension: sizing.sideExtension,
             expandsForDetailedMedia: sizing.expandsForDetailedStatus
         )
     }
@@ -348,13 +362,25 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         extendsForFocusCountdown: Bool = false,
         expandsForDetailedMedia: Bool = false
     ) -> CGRect {
+        compactBarFrame(
+            for: layout,
+            sideExtension: extendsForFocusCountdown ? Layout.compactBarSideExtension : 0,
+            expandsForDetailedMedia: expandsForDetailedMedia
+        )
+    }
+
+    private func compactBarFrame(
+        for layout: ScreenOverlayLayout,
+        sideExtension: CGFloat,
+        expandsForDetailedMedia: Bool
+    ) -> CGRect {
         let anchor = layout.topology.anchorFrame
         let baseWidth: CGFloat
         if layout.topology.hasPhysicalNotch {
             let visibleWingWidth = expandsForDetailedMedia
                 ? Layout.compactBarMediaDetailSideWidth - Layout.compactOverlap
                 : Layout.compactWingWidth
-                    + (extendsForFocusCountdown ? Layout.compactBarSideExtension : 0)
+                    + max(0, sideExtension)
                     - Layout.compactOverlap
             baseWidth = anchor.width + visibleWingWidth * 2
         } else {
@@ -384,7 +410,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         guard let sizing = compactBarSizing(for: notices, settings: settings) else { return nil }
         return compactBarFrame(
             for: layout,
-            extendsForFocusCountdown: sizing.extendsForCompactStatus,
+            sideExtension: sizing.sideExtension,
             expandsForDetailedMedia: sizing.expandsForDetailedStatus
         )
     }
@@ -392,9 +418,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     private func compactBarSizing(
         for notices: [IslandNotice],
         settings: FeatureSettings
-    ) -> (extendsForCompactStatus: Bool, expandsForDetailedStatus: Bool)? {
+    ) -> (sideExtension: CGFloat, expandsForDetailedStatus: Bool)? {
         if notices.contains(where: { $0.id.hasPrefix("voice-processing-") }) {
-            return (false, false)
+            return (0, false)
         }
         let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }
@@ -407,8 +433,23 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         default:
             false
         }
+        let displayedTransientNotice = notices
+            .filter { $0.id.hasPrefix("focus-transition") || $0.style == .headphone }
+            .max { $0.createdAt < $1.createdAt }
+        let sideExtension: CGFloat
+        if expandsForDetailedStatus {
+            sideExtension = 0
+        } else if selectedPriority == .transient,
+                  displayedTransientNotice?.style == .headphone {
+            sideExtension = Layout.compactBarSideExtension
+                + Layout.compactBarHeadphoneAdditionalSideExtension
+        } else if selectedPriority == .transient || selectedPriority == .focusCountdown {
+            sideExtension = Layout.compactBarSideExtension
+        } else {
+            sideExtension = 0
+        }
         return (
-            selectedPriority == .transient || selectedPriority == .focusCountdown,
+            sideExtension,
             expandsForDetailedStatus
         )
     }

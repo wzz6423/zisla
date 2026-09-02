@@ -1,0 +1,557 @@
+import AppKit
+import Foundation
+import SwiftUI
+
+/// Shared square-cell geometry for the history page's rhythm and annual grids.
+/// Use `.standard` for both grids so their cells and gutters remain visually
+/// consistent. The annual grid scales both values together when space is tight.
+struct TypingHeatmapCellMetrics: Equatable, Sendable {
+    static let axisWidth: CGFloat = 34
+    static let spacing: CGFloat = 3
+    static let standard = TypingHeatmapCellMetrics(cellSize: 14, spacing: spacing)
+
+    let cellSize: CGFloat
+    let spacing: CGFloat
+
+    init(cellSize: CGFloat, spacing: CGFloat) {
+        self.cellSize = max(1, cellSize)
+        self.spacing = max(0, spacing)
+    }
+
+    func scaled(by factor: CGFloat) -> TypingHeatmapCellMetrics {
+        TypingHeatmapCellMetrics(
+            cellSize: cellSize * factor,
+            spacing: spacing * factor
+        )
+    }
+}
+
+/// A compact, GitHub-style contribution grid for a year of typing activity.
+///
+/// The caller owns the surrounding panel so this view can be composed with the
+/// history page's existing instrument-card treatment.
+@MainActor
+struct TypingYearHeatmap: View, Equatable {
+    private let presentation: TypingYearHeatmapPresentation
+    private let preferredMetrics: TypingHeatmapCellMetrics
+
+    private var weekdayLabels: [String] {
+        if statsPrefersChineseUI() {
+            return ["一", "", "三", "", "五", "", ""]
+        }
+        return ["M", "", "W", "", "F", "", ""]
+    }
+
+    init(
+        range: TypingDateRange,
+        days: [TypingDaySummary],
+        calendar: Calendar,
+        cellSize: CGFloat = TypingHeatmapCellMetrics.standard.cellSize,
+        cellSpacing: CGFloat = TypingHeatmapCellMetrics.standard.spacing
+    ) {
+        presentation = TypingYearHeatmapPresentation(
+            range: range,
+            days: days,
+            calendar: calendar
+        )
+        preferredMetrics = TypingHeatmapCellMetrics(
+            cellSize: cellSize,
+            spacing: cellSpacing
+        )
+    }
+
+    init(
+        range: TypingDateRange,
+        days: [TypingDaySummary],
+        calendar: Calendar,
+        metrics: TypingHeatmapCellMetrics
+    ) {
+        presentation = TypingYearHeatmapPresentation(
+            range: range,
+            days: days,
+            calendar: calendar
+        )
+        preferredMetrics = metrics
+    }
+
+    var body: some View {
+        let exposesEmptyCellsToAssistiveTech = NSWorkspace.shared.isVoiceOverEnabled
+            || NSWorkspace.shared.isSwitchControlEnabled
+
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("全年输入热力图")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(KeyboardVisualStyle.instrumentPrimary)
+
+                Text(
+                    L10n.format(
+                        "%@ · 每格一天，颜色按当前可见数据自动连续映射",
+                        presentation.rangeDescription
+                    )
+                )
+                    .font(.caption)
+                    .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
+            }
+
+            heatmapContent(
+                presentation: presentation,
+                metrics: preferredMetrics,
+                exposesEmptyCellsToAssistiveTech: exposesEmptyCellsToAssistiveTech
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func heatmapContent(
+        presentation: TypingYearHeatmapPresentation,
+        metrics: TypingHeatmapCellMetrics,
+        exposesEmptyCellsToAssistiveTech: Bool
+    ) -> some View {
+        let totalWidth = weekdayLabelWidth(metrics)
+            + labelGridSpacing(metrics)
+            + gridWidth(presentation: presentation, metrics: metrics)
+
+        return VStack(alignment: .leading, spacing: 12 * scale(metrics)) {
+            HStack(alignment: .top, spacing: labelGridSpacing(metrics)) {
+                weekdayAxis(metrics: metrics)
+
+                VStack(alignment: .leading, spacing: 5 * scale(metrics)) {
+                    monthAxis(presentation: presentation, metrics: metrics)
+                    contributionGrid(
+                        presentation: presentation,
+                        metrics: metrics,
+                        exposesEmptyCellsToAssistiveTech: exposesEmptyCellsToAssistiveTech
+                    )
+                }
+            }
+
+            legend(presentation: presentation, metrics: metrics)
+                .frame(width: totalWidth, alignment: .trailing)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func weekdayAxis(metrics: TypingHeatmapCellMetrics) -> some View {
+        VStack(spacing: 5 * scale(metrics)) {
+            Color.clear
+                .frame(width: weekdayLabelWidth(metrics), height: 12 * scale(metrics))
+                .accessibilityHidden(true)
+
+            VStack(spacing: metrics.spacing) {
+                ForEach(Array(weekdayLabels.enumerated()), id: \.offset) { _, label in
+                    Text(label)
+                        .font(.system(size: max(6, 8 * scale(metrics)), weight: .medium))
+                        .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
+                        .frame(
+                            width: weekdayLabelWidth(metrics),
+                            height: metrics.cellSize,
+                            alignment: .trailing
+                        )
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+    }
+
+    private func monthAxis(
+        presentation: TypingYearHeatmapPresentation,
+        metrics: TypingHeatmapCellMetrics
+    ) -> some View {
+        ZStack(alignment: .topLeading) {
+            Color.clear
+                .frame(
+                    width: gridWidth(presentation: presentation, metrics: metrics),
+                    height: 12 * scale(metrics)
+                )
+
+            ForEach(presentation.monthMarkers) { marker in
+                Text(marker.title)
+                    .font(.system(size: max(6, 9 * scale(metrics)), weight: .medium))
+                    .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
+                    .fixedSize()
+                    .offset(x: CGFloat(marker.weekIndex) * (metrics.cellSize + metrics.spacing))
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(
+            width: gridWidth(presentation: presentation, metrics: metrics),
+            height: 12 * scale(metrics)
+        )
+    }
+
+    private func contributionGrid(
+        presentation: TypingYearHeatmapPresentation,
+        metrics: TypingHeatmapCellMetrics,
+        exposesEmptyCellsToAssistiveTech: Bool
+    ) -> some View {
+        TypingYearHeatmapInteractiveGrid(
+            presentation: presentation,
+            metrics: metrics,
+            exposesEmptyCellsToAssistiveTech: exposesEmptyCellsToAssistiveTech
+        )
+    }
+
+    private func legend(
+        presentation: TypingYearHeatmapPresentation,
+        metrics: TypingHeatmapCellMetrics
+    ) -> some View {
+        KeyboardHeatmapLegend(
+            leadingLabel: presentation.heatScale.hasValues
+                ? L10n.format("少 %@", statsCount(Int64(presentation.heatScale.low.rounded())))
+                : L10n.tr("少 0"),
+            trailingLabel: presentation.heatScale.hasValues
+                ? L10n.format("多 ≥%@", statsCount(Int64(presentation.heatScale.high.rounded())))
+                : L10n.tr("多 0"),
+            palette: .year,
+            barWidth: max(76, 112 * scale(metrics)),
+            labelColor: KeyboardVisualStyle.instrumentSecondary
+        )
+    }
+
+    private func gridWidth(
+        presentation: TypingYearHeatmapPresentation,
+        metrics: TypingHeatmapCellMetrics
+    ) -> CGFloat {
+        CGFloat(presentation.weekCount) * metrics.cellSize
+            + CGFloat(max(0, presentation.weekCount - 1)) * metrics.spacing
+    }
+
+    private func scale(_ metrics: TypingHeatmapCellMetrics) -> CGFloat {
+        metrics.cellSize / TypingHeatmapCellMetrics.standard.cellSize
+    }
+
+    private func weekdayLabelWidth(_ metrics: TypingHeatmapCellMetrics) -> CGFloat {
+        TypingHeatmapCellMetrics.axisWidth
+    }
+
+    private func labelGridSpacing(_ metrics: TypingHeatmapCellMetrics) -> CGFloat {
+        TypingHeatmapCellMetrics.spacing
+    }
+
+}
+
+@MainActor
+private struct TypingYearHeatmapInteractiveGrid: View {
+    let presentation: TypingYearHeatmapPresentation
+    let metrics: TypingHeatmapCellMetrics
+    let exposesEmptyCellsToAssistiveTech: Bool
+
+    @State private var hoveredCellID: Int?
+    @State private var pinnedCellID: Int?
+
+    private var gridWidth: CGFloat {
+        CGFloat(presentation.weekCount) * metrics.cellSize
+            + CGFloat(max(0, presentation.weekCount - 1)) * metrics.spacing
+    }
+
+    private var gridHeight: CGFloat {
+        CGFloat(7) * metrics.cellSize + CGFloat(6) * metrics.spacing
+    }
+
+    private var activeCell: TypingYearHeatmapPresentation.DayCell? {
+        guard let activeID = pinnedCellID ?? hoveredCellID else { return nil }
+        return presentation.visibleCellsByID[activeID]
+    }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Canvas(opaque: false, colorMode: .nonLinear, rendersAsynchronously: true) {
+                context,
+                _ in
+                for week in presentation.weeks {
+                    for cell in week.cells where cell.isVisible {
+                        let rect = frame(for: cell)
+                        let path = Path(roundedRect: rect, cornerRadius: 2)
+                        context.fill(path, with: .color(color(for: cell)))
+                        context.stroke(
+                            path,
+                            with: .color(KeyboardVisualStyle.instrumentSeparator),
+                            lineWidth: 0.5
+                        )
+                    }
+                }
+            }
+            .frame(width: gridWidth, height: gridHeight)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                pinnedCellID = nil
+            }
+            .accessibilityHidden(true)
+
+            ForEach(presentation.visibleCells) { cell in
+                dayInteraction(cell)
+                    .offset(
+                        x: frame(for: cell).minX,
+                        y: frame(for: cell).minY
+                    )
+            }
+
+            if let activeCell {
+                if pinnedCellID == activeCell.id {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .stroke(KeyboardVisualStyle.accent, lineWidth: 1.5)
+                        .frame(width: metrics.cellSize + 2, height: metrics.cellSize + 2)
+                        .position(
+                            x: frame(for: activeCell).midX,
+                            y: frame(for: activeCell).midY
+                        )
+                        .allowsHitTesting(false)
+                }
+
+                KeyboardHeatmapTooltip(
+                    text: activeCell.detailText,
+                    isPinned: pinnedCellID == activeCell.id,
+                    maxWidth: 230
+                )
+                .frame(width: 230)
+                .position(tooltipPosition(for: activeCell))
+                .transition(.opacity)
+                .zIndex(2)
+            }
+        }
+        .frame(width: gridWidth, height: gridHeight, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L10n.tr("每日输入热力图"))
+        .onExitCommand {
+            pinnedCellID = nil
+            hoveredCellID = nil
+        }
+    }
+
+    @ViewBuilder
+    private func dayInteraction(
+        _ cell: TypingYearHeatmapPresentation.DayCell
+    ) -> some View {
+        let hitTarget = Color.clear
+            .frame(width: metrics.cellSize, height: metrics.cellSize)
+            .contentShape(Rectangle())
+            .onHover { isInside in
+                if isInside {
+                    hoveredCellID = cell.id
+                } else if hoveredCellID == cell.id {
+                    hoveredCellID = nil
+                }
+            }
+            .onTapGesture {
+                pinnedCellID = pinnedCellID == cell.id ? nil : cell.id
+            }
+
+        if cell.hasInput || exposesEmptyCellsToAssistiveTech {
+            hitTarget
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(cell.dateText)
+                .accessibilityValue(cell.accessibilityValue)
+        } else {
+            hitTarget.accessibilityHidden(true)
+        }
+    }
+
+    private func frame(
+        for cell: TypingYearHeatmapPresentation.DayCell
+    ) -> CGRect {
+        CGRect(
+            x: CGFloat(cell.weekIndex) * (metrics.cellSize + metrics.spacing),
+            y: CGFloat(cell.weekdayIndex) * (metrics.cellSize + metrics.spacing),
+            width: metrics.cellSize,
+            height: metrics.cellSize
+        )
+    }
+
+    private func color(
+        for cell: TypingYearHeatmapPresentation.DayCell
+    ) -> Color {
+        guard cell.hasInput else {
+            return KeyboardVisualStyle.instrumentSeparator.opacity(0.64)
+        }
+        return KeyboardHeatmapPalette.yearColor(at: cell.normalizedIntensity)
+    }
+
+    private func tooltipPosition(
+        for cell: TypingYearHeatmapPresentation.DayCell
+    ) -> CGPoint {
+        let cellFrame = frame(for: cell)
+        let halfWidth: CGFloat = 115
+        let x = min(
+            max(halfWidth, cellFrame.midX),
+            max(halfWidth, gridWidth - halfWidth)
+        )
+        let prefersBelow = cellFrame.midY < gridHeight / 2
+        let proposedY = cellFrame.midY + (prefersBelow ? 34 : -34)
+        return CGPoint(x: x, y: min(gridHeight - 23, max(23, proposedY)))
+    }
+}
+
+/// Immutable render data keeps calendar traversal, indexing, and string formatting
+/// out of the per-cell SwiftUI body path.
+private struct TypingYearHeatmapPresentation: Equatable {
+    struct DayCell: Identifiable, Equatable {
+        let id: Int
+        let date: Date?
+        let isVisible: Bool
+        let hasInput: Bool
+        let characterCount: Int64
+        let normalizedIntensity: Double
+        let dateText: String
+        let detailText: String
+        let accessibilityValue: String
+
+        var weekIndex: Int { id / 7 }
+        var weekdayIndex: Int { id % 7 }
+    }
+
+    struct Week: Identifiable, Equatable {
+        let index: Int
+        let cells: [DayCell]
+
+        var id: Int { index }
+    }
+
+    let rangeDescription: String
+    let weekCount: Int
+    let monthMarkers: [MonthMarker]
+    let heatScale: TypingHeatmapScale
+    let weeks: [Week]
+    let visibleCells: [DayCell]
+    let visibleCellsByID: [Int: DayCell]
+
+    init(range: TypingDateRange, days: [TypingDaySummary], calendar: Calendar) {
+        let startDate = calendar.startOfDay(for: range.startDate)
+        let endDate = calendar.startOfDay(for: range.endDate)
+        let gridStartDate = calendar.date(
+            byAdding: .day,
+            value: -Self.mondayBasedWeekdayIndex(for: startDate, calendar: calendar),
+            to: startDate
+        ) ?? startDate
+        let remainingDays = 6 - Self.mondayBasedWeekdayIndex(for: endDate, calendar: calendar)
+        let gridEndDate = calendar.date(byAdding: .day, value: remainingDays, to: endDate) ?? endDate
+        let gridDayCount = calendar.dateComponents(
+            [.day],
+            from: gridStartDate,
+            to: gridEndDate
+        ).day ?? 0
+        let resolvedWeekCount = max(1, gridDayCount / 7 + 1)
+        let countsByDate = days.reduce(into: [Date: Int64]()) { result, summary in
+            result[calendar.startOfDay(for: summary.date)] = summary.characterCount
+        }
+        let visibleCounts = countsByDate.compactMap { entry -> Double? in
+            guard entry.key >= startDate, entry.key <= endDate else { return nil }
+            return Double(entry.value)
+        }
+        let resolvedHeatScale = TypingHeatmapScale(values: visibleCounts)
+
+        rangeDescription = "\(startDate.formatted(.dateTime.year().month().day().locale(L10n.locale))) – \(endDate.formatted(.dateTime.year().month().day().locale(L10n.locale)))"
+        weekCount = resolvedWeekCount
+        monthMarkers = Self.monthMarkers(
+            from: startDate,
+            through: endDate,
+            gridStartDate: gridStartDate,
+            calendar: calendar
+        )
+        heatScale = resolvedHeatScale
+        let resolvedWeeks = (0..<resolvedWeekCount).map { weekIndex in
+            let cells = (0..<7).map { weekdayIndex in
+                let id = weekIndex * 7 + weekdayIndex
+                let date = calendar.date(
+                    byAdding: .day,
+                    value: id,
+                    to: gridStartDate
+                ) ?? startDate
+                guard date >= startDate, date <= endDate else {
+                    return DayCell(
+                        id: id,
+                        date: nil,
+                        isVisible: false,
+                        hasInput: false,
+                        characterCount: 0,
+                        normalizedIntensity: 0,
+                        dateText: "",
+                        detailText: "",
+                        accessibilityValue: ""
+                    )
+                }
+
+                let count = countsByDate[date] ?? 0
+                let dateText = date.formatted(
+                    .dateTime.year().month().day().weekday(.wide).locale(L10n.locale)
+                )
+                let formattedCount = count.formatted(
+                    .number.grouping(.automatic).locale(L10n.locale)
+                )
+                return DayCell(
+                    id: id,
+                    date: date,
+                    isVisible: true,
+                    hasInput: count > 0,
+                    characterCount: count,
+                    normalizedIntensity: resolvedHeatScale.normalized(Double(count)),
+                    dateText: dateText,
+                    detailText: L10n.format("%@ · %@ 个字符", dateText, formattedCount),
+                    accessibilityValue: L10n.format("%@ 个字符", formattedCount)
+                )
+            }
+            return Week(index: weekIndex, cells: cells)
+        }
+        weeks = resolvedWeeks
+        let resolvedVisibleCells = resolvedWeeks.flatMap(\.cells).filter(\.isVisible)
+        visibleCells = resolvedVisibleCells
+        visibleCellsByID = Dictionary(
+            uniqueKeysWithValues: resolvedVisibleCells.map { ($0.id, $0) }
+        )
+    }
+
+    private static func mondayBasedWeekdayIndex(for date: Date, calendar: Calendar) -> Int {
+        (calendar.component(.weekday, from: date) + 5) % 7
+    }
+
+    private static func monthMarkers(
+        from startDate: Date,
+        through endDate: Date,
+        gridStartDate: Date,
+        calendar: Calendar
+    ) -> [MonthMarker] {
+        var markers: [MonthMarker] = []
+        var cursor = startDate
+        var previousMonth: Int?
+        var previousYear: Int?
+
+        while cursor <= endDate {
+            let month = calendar.component(.month, from: cursor)
+            let year = calendar.component(.year, from: cursor)
+            if month != previousMonth || year != previousYear {
+                let dayOffset = calendar.dateComponents(
+                    [.day],
+                    from: gridStartDate,
+                    to: cursor
+                ).day ?? 0
+                markers.append(
+                    MonthMarker(
+                        date: cursor,
+                        title: cursor.formatted(
+                            .dateTime.month(.abbreviated).locale(L10n.locale)
+                        ),
+                        weekIndex: max(0, dayOffset / 7)
+                    )
+                )
+                previousMonth = month
+                previousYear = year
+            }
+
+            guard let next = calendar.date(byAdding: .day, value: 1, to: cursor), next > cursor else {
+                break
+            }
+            cursor = next
+        }
+
+        return markers
+    }
+}
+
+private struct MonthMarker: Identifiable, Equatable {
+    let date: Date
+    let title: String
+    let weekIndex: Int
+
+    var id: Date { date }
+}

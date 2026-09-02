@@ -34,7 +34,9 @@ public struct UsageBreakdownPoint: Equatable, Sendable {
         self.outputTokens = outputTokens
     }
 
-    public var totalTokens: Int { inputTokens + outputTokens }
+    public var totalTokens: Int {
+        AIUsageTokenMath.adding(inputTokens, outputTokens)
+    }
 }
 
 /// A sample point on the cumulative usage multi-series chart (total / input / output).
@@ -180,8 +182,14 @@ public enum AIUsageAnalytics {
         for sample in samples where sample.timestamp <= end {
             let day = calendar.startOfDay(for: sample.timestamp)
             guard day >= startDay, day <= endDay else { continue }
-            inputByDay[day, default: 0] += sample.inputTokens
-            outputByDay[day, default: 0] += sample.outputTokens
+            inputByDay[day] = AIUsageTokenMath.adding(
+                inputByDay[day, default: 0],
+                sample.inputTokens
+            )
+            outputByDay[day] = AIUsageTokenMath.adding(
+                outputByDay[day, default: 0],
+                sample.outputTokens
+            )
         }
 
         return (0..<days).compactMap { offset in
@@ -208,17 +216,21 @@ public enum AIUsageAnalytics {
 
         for sample in samples {
             let day = calendar.startOfDay(for: sample.timestamp)
+            let inputTokens = AIUsageTokenMath.nonnegative(sample.inputTokens)
+            let outputTokens = AIUsageTokenMath.nonnegative(sample.outputTokens)
             if var summary = summaries[day] {
-                summary.inputTokens += sample.inputTokens
-                summary.outputTokens += sample.outputTokens
+                summary.inputTokens = AIUsageTokenMath.adding(summary.inputTokens, inputTokens)
+                summary.outputTokens = AIUsageTokenMath.adding(summary.outputTokens, outputTokens)
                 summaries[day] = summary
             } else {
                 summaries[day] = AIUsageSample(
                     sourceID: dailyUsageSummarySourceID(day: day),
                     provider: sample.provider,
                     timestamp: day,
-                    inputTokens: sample.inputTokens,
-                    outputTokens: sample.outputTokens
+                    inputTokens: inputTokens,
+                    outputTokens: outputTokens,
+                    costUSD: sample.costUSD,
+                    model: sample.model
                 )
             }
         }
@@ -264,8 +276,8 @@ public enum AIUsageAnalytics {
             }
             return UsageBreakdownPoint(
                 timestamp: daily[index].timestamp,
-                inputTokens: Int((input / totalWeight).rounded()),
-                outputTokens: Int((output / totalWeight).rounded())
+                inputTokens: roundedTokenCount(input / totalWeight),
+                outputTokens: roundedTokenCount(output / totalWeight)
             )
         }
     }
@@ -284,8 +296,8 @@ public enum AIUsageAnalytics {
 
         for sample in samples where sample.timestamp >= start && sample.timestamp < end {
             let index = Int(sample.timestamp.timeIntervalSince(start) / 3_600)
-            guard index < hours else { continue }
-            tokens[index] += sample.totalTokens
+            guard index >= 0, index < hours else { continue }
+            tokens[index] = AIUsageTokenMath.adding(tokens[index], sample.totalTokens)
         }
 
         return tokens.enumerated().map { index, value in
@@ -351,7 +363,7 @@ public enum AIUsageAnalytics {
             // After sorting, samples at the same timestamp are adjacent; merge them into a single point via prefix sum.
             let timestamp = valid[index].timestamp
             while index < valid.count, valid[index].timestamp == timestamp {
-                cumulative += valid[index].totalTokens
+                cumulative = AIUsageTokenMath.adding(cumulative, valid[index].totalTokens)
                 index += 1
             }
             points.append(UsagePoint(timestamp: timestamp, tokens: cumulative))
@@ -394,14 +406,20 @@ public enum AIUsageAnalytics {
         while index < valid.count {
             let timestamp = valid[index].timestamp
             while index < valid.count, valid[index].timestamp == timestamp {
-                cumulativeInput += max(0, valid[index].inputTokens)
-                cumulativeOutput += max(0, valid[index].outputTokens)
+                cumulativeInput = AIUsageTokenMath.adding(
+                    cumulativeInput,
+                    valid[index].inputTokens
+                )
+                cumulativeOutput = AIUsageTokenMath.adding(
+                    cumulativeOutput,
+                    valid[index].outputTokens
+                )
                 index += 1
             }
             points.append(
                 CumulativeUsagePoint(
                     timestamp: timestamp,
-                    totalTokens: cumulativeInput + cumulativeOutput,
+                    totalTokens: AIUsageTokenMath.adding(cumulativeInput, cumulativeOutput),
                     inputTokens: cumulativeInput,
                     outputTokens: cumulativeOutput
                 )
@@ -412,7 +430,7 @@ public enum AIUsageAnalytics {
             points.append(
                 CumulativeUsagePoint(
                     timestamp: end,
-                    totalTokens: cumulativeInput + cumulativeOutput,
+                    totalTokens: AIUsageTokenMath.adding(cumulativeInput, cumulativeOutput),
                     inputTokens: cumulativeInput,
                     outputTokens: cumulativeOutput
                 )
@@ -446,7 +464,7 @@ public enum AIUsageAnalytics {
 
     /// Compact token Y-axis label (K / M / B), shared between Chart and tests.
     public static func formatTokenAxisValue(_ tokens: Int) -> String {
-        let value = abs(tokens)
+        let value = tokens.magnitude
         let sign = tokens < 0 ? "-" : ""
         switch value {
         case 1_000_000_000...:
@@ -461,6 +479,14 @@ public enum AIUsageAnalytics {
         default:
             return sign + "\(value)"
         }
+    }
+
+    private static func roundedTokenCount(_ value: Double) -> Int {
+        guard value.isFinite else { return value.sign == .minus ? 0 : Int.max }
+        guard value > 0 else { return 0 }
+        let rounded = value.rounded()
+        guard rounded < Double(Int.max) else { return Int.max }
+        return Int(rounded)
     }
 
     private static func formatCompact(_ n: Double) -> String {
@@ -490,7 +516,10 @@ public enum AIUsageAnalytics {
             else { continue }
             let hour = calendar.component(.hour, from: sample.timestamp)
             guard hour >= 0, hour < 24 else { continue }
-            grid[6 - days][hour] += sample.totalTokens
+            grid[6 - days][hour] = AIUsageTokenMath.adding(
+                grid[6 - days][hour],
+                sample.totalTokens
+            )
         }
         return grid
     }
@@ -524,7 +553,10 @@ public enum AIUsageAnalytics {
         for sample in samples where sample.timestamp <= end {
             let day = calendar.startOfDay(for: sample.timestamp)
             guard day <= endDay else { continue }
-            tokensByDay[day, default: 0] += sample.totalTokens
+            tokensByDay[day] = AIUsageTokenMath.adding(
+                tokensByDay[day, default: 0],
+                sample.totalTokens
+            )
         }
 
         var grid: [[ContributionDay?]] = []

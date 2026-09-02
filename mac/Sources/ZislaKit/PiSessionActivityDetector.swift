@@ -36,7 +36,7 @@ public final class PiSessionActivityDetector: AIActivityDetecting {
 
     private let fileManager: FileManager
     private let jsonlReader: IncrementalJSONLReader
-    private let runningProcessIdentifiers: () -> [Int32]
+    private let processIdentifiersForSessions: ([URL: String]) -> [URL: Int32]
     private let now: () -> Date
     private var cache: [URL: CachedSession] = [:]
 
@@ -47,7 +47,8 @@ public final class PiSessionActivityDetector: AIActivityDetecting {
         maximumLineBytes: Int = 256 * 1_024,
         maximumSessionAge: TimeInterval = 30 * 60,
         fileManager: FileManager = .default,
-        runningProcessIdentifiers: @escaping () -> [Int32] = PiSessionActivityDetector.defaultRunningProcessIdentifiers,
+        processIdentifiersForSessions: @escaping ([URL: String]) -> [URL: Int32]
+            = PiSessionActivityDetector.defaultProcessIdentifiersForSessions,
         now: @escaping () -> Date = Date.init
     ) {
         self.sessionsDirectory = sessionsDirectory ?? fileManager.homeDirectoryForCurrentUser
@@ -59,7 +60,7 @@ public final class PiSessionActivityDetector: AIActivityDetecting {
             initialTailBytes: initialTailBytes,
             maximumLineBytes: maximumLineBytes
         )
-        self.runningProcessIdentifiers = runningProcessIdentifiers
+        self.processIdentifiersForSessions = processIdentifiersForSessions
         self.now = now
     }
 
@@ -68,12 +69,18 @@ public final class PiSessionActivityDetector: AIActivityDetecting {
         let selectedURLs = Set(candidates.map(\.url))
         cache = cache.filter { selectedURLs.contains($0.key) }
 
-        var processIdentifiers = runningProcessIdentifiers().makeIterator()
-        return candidates.compactMap { candidate in
+        let detected = candidates.compactMap { candidate -> (AIProgressTask, URL, String)? in
             guard let parsed = parse(candidate: candidate, cached: cache[candidate.url]) else { return nil }
             cache[candidate.url] = parsed
-            guard var task = parsed.task else { return nil }
-            task.processIdentifier = processIdentifiers.next()
+            guard let task = parsed.task else { return nil }
+            return (task, candidate.url.standardizedFileURL, parsed.state.id)
+        }
+
+        let sessionIDsByURL = Dictionary(uniqueKeysWithValues: detected.map { ($0.1, $0.2) })
+        let processIdentifiersByURL = processIdentifiersForSessions(sessionIDsByURL)
+        return detected.map { task, sessionURL, _ in
+            var task = task
+            task.processIdentifier = processIdentifiersByURL[sessionURL]
             return task
         }
         .sorted {
@@ -86,35 +93,141 @@ public final class PiSessionActivityDetector: AIActivityDetecting {
         "pi-session-\(sessionID)"
     }
 
-    public static func defaultRunningProcessIdentifiers() -> [Int32] {
+    public static func defaultProcessIdentifiersForSessions(_ sessions: [URL: String]) -> [URL: Int32] {
+        guard !sessions.isEmpty else { return [:] }
         guard let data = CodexSessionActivityDetector.runProcessOutput(
             executableURL: URL(fileURLWithPath: "/bin/ps"),
             arguments: ["-axo", "pid=,comm=,args="],
             timeout: 2
-        ) else { return [] }
-        return parseRunningProcessIdentifiers(data)
+        ) else { return [:] }
+        return parseRunningProcessIdentifiers(data, matching: sessions)
     }
 
-    static func parseRunningProcessIdentifiers(_ data: Data) -> [Int32] {
-        var identifiers: [Int32] = []
-        var seen = Set<Int32>()
+    static func parseRunningProcessIdentifiers(
+        _ data: Data,
+        matching sessions: [URL: String]
+    ) -> [URL: Int32] {
+        let sessions = Dictionary(uniqueKeysWithValues: sessions.map { ($0.key.standardizedFileURL, $0.value) })
+        var identifiersByURL: [URL: Set<Int32>] = [:]
         for line in String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline) {
-            let fields = line.split(whereSeparator: \.isWhitespace)
-            guard fields.count >= 2,
+            let fields = line.split(maxSplits: 2, whereSeparator: \.isWhitespace)
+            guard fields.count == 3,
                   let processIdentifier = Int32(fields[0]) else {
                 continue
             }
             let executable = URL(fileURLWithPath: String(fields[1])).lastPathComponent
-            let arguments = fields.dropFirst(2).joined(separator: " ")
+            let arguments = String(fields[2])
+            let isNodeLauncher = executable == "node" || executable == "bun"
             guard executable == "pi"
-                    || arguments.contains("/pi-coding-agent/")
-                    || arguments.contains("pi-coding-agent/dist/cli")
+                    || isNodeLauncher && (
+                        arguments.contains("/pi-coding-agent/")
+                            || arguments.contains("pi-coding-agent/dist/cli")
+                    )
             else { continue }
-            if seen.insert(processIdentifier).inserted {
-                identifiers.append(processIdentifier)
+            let argumentFields = fields[2].split(whereSeparator: \.isWhitespace)
+            guard !argumentFields.contains("--no-session") else { continue }
+
+            let exactSessionID = argumentValue(for: "--session-id", in: argumentFields)
+            let matchingURLs: Set<URL>
+            if let exactSessionID {
+                matchingURLs = matchingSessionURLs(
+                    reference: exactSessionID,
+                    requiresExactID: true,
+                    sessions: sessions
+                )
+            } else {
+                let pathMatches = matchingSessionURLPaths(in: arguments, sessions: sessions)
+                if pathMatches.isEmpty,
+                   let sessionReference = argumentValue(for: "--session", in: argumentFields) {
+                    matchingURLs = matchingSessionURLs(
+                        reference: sessionReference,
+                        requiresExactID: false,
+                        sessions: sessions
+                    )
+                } else {
+                    matchingURLs = pathMatches
+                }
+            }
+            guard matchingURLs.count == 1, let sessionURL = matchingURLs.first else { continue }
+            identifiersByURL[sessionURL, default: []].insert(processIdentifier)
+        }
+        return identifiersByURL.compactMapValues { identifiers in
+            identifiers.count == 1 ? identifiers.first : nil
+        }
+    }
+
+    private static func argumentValue(for option: String, in arguments: [Substring]) -> String? {
+        let assignmentPrefix = "\(option)="
+        for (index, argument) in arguments.enumerated() {
+            if argument == Substring(option), arguments.indices.contains(index + 1) {
+                return String(arguments[index + 1])
+            }
+            if argument.hasPrefix(assignmentPrefix) {
+                return String(argument.dropFirst(assignmentPrefix.count))
             }
         }
-        return identifiers.sorted(by: >)
+        return nil
+    }
+
+    /// BSD `ps` drops shell quotes, so a session path containing whitespace cannot be recovered from split fields.
+    private static func matchingSessionURLPaths(in arguments: String, sessions: [URL: String]) -> Set<URL> {
+        let option = "--session"
+        var searchStart = arguments.startIndex
+        var matches: Set<URL> = []
+
+        while let optionRange = arguments.range(of: option, range: searchStart..<arguments.endIndex) {
+            defer { searchStart = optionRange.upperBound }
+            let isOptionStart = optionRange.lowerBound == arguments.startIndex
+                || arguments[arguments.index(before: optionRange.lowerBound)].isWhitespace
+            guard isOptionStart, optionRange.upperBound < arguments.endIndex else { continue }
+
+            var valueStart = optionRange.upperBound
+            if arguments[valueStart] == "=" {
+                valueStart = arguments.index(after: valueStart)
+            } else {
+                guard arguments[valueStart].isWhitespace else { continue }
+                valueStart = arguments[valueStart...].firstIndex(where: { !$0.isWhitespace }) ?? arguments.endIndex
+            }
+            guard valueStart < arguments.endIndex else { continue }
+
+            for url in sessions.keys {
+                let path = url.path
+                guard arguments[valueStart...].hasPrefix(path) else { continue }
+                let pathEnd = arguments.index(valueStart, offsetBy: path.count)
+                guard pathEnd == arguments.endIndex || arguments[pathEnd].isWhitespace else { continue }
+                matches.insert(url)
+            }
+        }
+        return matches
+    }
+
+    private static func matchingSessionURLs(
+        reference: String,
+        requiresExactID: Bool,
+        sessions: [URL: String]
+    ) -> Set<URL> {
+        let reference = reference.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !reference.isEmpty else { return [] }
+
+        var matches = Set(sessions.compactMap { url, sessionID in
+            let matchesID = requiresExactID ? sessionID == reference : sessionID.hasPrefix(reference)
+            return matchesID ? url : nil
+        })
+        guard !requiresExactID else { return matches }
+
+        let expandedPath = NSString(string: reference).expandingTildeInPath
+        if expandedPath.hasPrefix("/") {
+            let referencedURL = URL(fileURLWithPath: expandedPath).standardizedFileURL
+            if sessions[referencedURL] != nil {
+                matches.insert(referencedURL)
+            }
+        } else {
+            for url in sessions.keys where url.lastPathComponent == reference
+                || url.deletingPathExtension().lastPathComponent == reference {
+                matches.insert(url)
+            }
+        }
+        return matches
     }
 
     private func recentCandidates() -> [Candidate] {
@@ -153,7 +266,8 @@ public final class PiSessionActivityDetector: AIActivityDetecting {
         var next: CachedSession
         if let cached,
            candidate.size >= cached.size,
-           !(candidate.size == cached.size && candidate.modificationDate != cached.modificationDate) {
+           !(candidate.size == cached.size && candidate.modificationDate != cached.modificationDate),
+           jsonlReader.hasUnchangedReadPrefix(at: candidate.url, state: cached.readerState) {
             next = cached
         } else {
             next = CachedSession(

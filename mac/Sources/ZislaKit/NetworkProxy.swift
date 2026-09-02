@@ -117,7 +117,8 @@ public final class NetworkProxyAvailabilityMonitor: ObservableObject {
             availability = .notConfigured
             return
         }
-        guard let endpoint = NetworkProxy.endpoint(from: urlString) else {
+        guard let endpoint = NetworkProxy.endpoint(from: urlString),
+              let port = NWEndpoint.Port(rawValue: endpoint.port) else {
             availability = .invalid
             return
         }
@@ -125,7 +126,7 @@ public final class NetworkProxyAvailabilityMonitor: ObservableObject {
         availability = .checking
         let connection = NWConnection(
             host: NWEndpoint.Host(endpoint.host),
-            port: NWEndpoint.Port(rawValue: endpoint.port)!,
+            port: port,
             using: .tcp
         )
         self.connection = connection

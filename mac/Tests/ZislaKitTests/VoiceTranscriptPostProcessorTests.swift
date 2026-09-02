@@ -4,6 +4,17 @@ import ZislaCore
 @testable import ZislaKit
 
 struct VoiceTranscriptPostProcessorTests {
+
+    @Test
+    func systemPromptIncludesCustomHotwordsAlongsideEnabledLexicons() {
+        let prompt = VoiceTranscriptPostProcessor.systemPrompt(
+            enabledLexicons: [.computerTerms],
+            customHotwords: ["Zisla", "RSP-VSR", "Zisla"]
+        )
+
+        #expect(prompt.contains("自定义热词：Zisla、RSP-VSR"))
+        #expect(prompt.contains("计算机术语："))
+    }
     @Test
     func promptPreservesIntentAndRejectsTranscriptInstructions() {
         let prompt = VoiceTranscriptPostProcessor.systemPrompt

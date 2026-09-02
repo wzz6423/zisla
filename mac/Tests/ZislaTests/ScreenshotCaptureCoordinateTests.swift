@@ -60,6 +60,37 @@ struct ScreenshotCaptureCoordinateTests {
     }
 
     @Test
+    func snapTargetProcessKeepsTheLastExternalApplicationAfterZislaIsActivated() {
+        let zislaProcess: pid_t = 101
+        let firstApplication: pid_t = 202
+        let nextApplication: pid_t = 303
+        var tracker = ScreenshotSnapTargetProcessTracker()
+
+        let firstTarget = tracker.target(
+            frontmost: firstApplication,
+            currentProcess: zislaProcess
+        )
+        #expect(firstTarget == firstApplication)
+
+        let secondTarget = tracker.target(
+            frontmost: zislaProcess,
+            currentProcess: zislaProcess
+        )
+        let thirdTarget = tracker.target(
+            frontmost: zislaProcess,
+            currentProcess: zislaProcess
+        )
+        #expect(secondTarget == firstApplication)
+        #expect(thirdTarget == firstApplication)
+
+        let changedTarget = tracker.target(
+            frontmost: nextApplication,
+            currentProcess: zislaProcess
+        )
+        #expect(changedTarget == nextApplication)
+    }
+
+    @Test
     func topLeftSelectionCropsTheSameImageRegion() throws {
         let source = try #require(makeCoordinateImage(width: 8, height: 8))
         let selection = CGRect(x: 1, y: 1, width: 4, height: 2)
@@ -178,13 +209,20 @@ struct ScreenshotCaptureCoordinateTests {
         #expect(long.height == available.height)
     }
 
-    private func makeCoordinateImage(width: Int, height: Int) -> CGImage? {
+    private func makeCoordinateImage(
+        width: Int,
+        height: Int,
+        red: UInt8? = nil,
+        green: UInt8? = nil,
+        blue: UInt8? = nil
+    ) -> CGImage? {
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         for y in 0..<height {
             for x in 0..<width {
                 let offset = (y * width + x) * 4
-                pixels[offset] = UInt8(y * 24)
-                pixels[offset + 1] = UInt8(x * 24)
+                pixels[offset] = red ?? UInt8(y * 24)
+                pixels[offset + 1] = green ?? UInt8(x * 24)
+                pixels[offset + 2] = blue ?? 0
                 pixels[offset + 3] = 255
             }
         }
@@ -257,6 +295,44 @@ struct ScreenshotCaptureCoordinateTests {
         #expect(abs(color.red - 72.0 / 255.0) < 0.001)
         #expect(abs(color.green - 48.0 / 255.0) < 0.001)
         #expect(color.hex == "#483000")
+    }
+
+    @Test
+    func capturedFramesAreDetachedAndDiagnosticsRetainFrameMetadata() throws {
+        let source = try #require(makeCoordinateImage(width: 8, height: 8))
+        let detached = try #require(ScreenshotCaptureService.detachedImage(from: source))
+        let diagnostics = ScreenshotCaptureService.frameDiagnostics(
+            for: source,
+            api: "test"
+        )
+
+        #expect(detached !== source)
+        #expect(detached.width == source.width)
+        #expect(detached.height == source.height)
+        #expect(diagnostics.api == "test")
+        #expect(diagnostics.width == source.width)
+        #expect(diagnostics.height == source.height)
+        #expect(diagnostics.bytesPerRow == source.bytesPerRow)
+        #expect(diagnostics.sampleHash != 0)
+        #expect(diagnostics.uniqueSampleCount > 1)
+        #expect(!diagnostics.appearsUniform)
+    }
+
+    @Test
+    func diagnosticsFlagUniformFramesWithoutDiscardingThem() throws {
+        let source = try #require(
+            makeCoordinateImage(width: 8, height: 8, red: 12, green: 34, blue: 56)
+        )
+        let detached = try #require(ScreenshotCaptureService.detachedImage(from: source))
+        let diagnostics = ScreenshotCaptureService.frameDiagnostics(
+            for: source,
+            api: "test-uniform"
+        )
+
+        #expect(detached.width == source.width)
+        #expect(detached.height == source.height)
+        #expect(diagnostics.appearsUniform)
+        #expect(diagnostics.uniqueSampleCount == 1)
     }
 
     @Test
@@ -337,6 +413,7 @@ struct ScreenshotCaptureCoordinateTests {
             backing: .buffered,
             defer: false
         )
+        panel.alphaValue = 0
         var copyCount = 0
         panel.currentColor = ScreenshotRGBA(red: 1, green: 0, blue: 0)
         panel.onCopyColor = { copyCount += 1 }

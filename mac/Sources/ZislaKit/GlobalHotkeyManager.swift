@@ -10,7 +10,7 @@ public enum GlobalHotkeyRegistrationResult: Equatable, Sendable {
 }
 
 /// Global hotkey wrapper: generic combinations use Carbon; combinations requiring left/right side
-/// modifiers use a read-only event tap.
+/// modifiers prefer a filtering event tap and fall back to a read-only tap.
 /// The event tap is added to the main RunLoop, so its callbacks and register/unregister calls
 /// are all serialized on the main thread.
 public final class GlobalHotkeyManager: @unchecked Sendable {
@@ -31,6 +31,7 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
     private var eventHandler: EventHandlerRef?
     private var eventTap: CFMachPort?
     private var eventTapRunLoopSource: CFRunLoopSource?
+    fileprivate var canSuppressSideSpecificEvents = false
     private var sideSpecificHotkey: VoiceInputHotkeyPreset?
     private var sideSpecificHotkeyIsPressed = false
     private var pressedModifierSides: Set<VoiceInputModifier> = []
@@ -97,10 +98,7 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
     }
 
     public func unregister() {
-        if sideSpecificHotkeyIsPressed {
-            sideSpecificHotkeyIsPressed = false
-            onKeyUp?()
-        }
+        releaseSideSpecificHotkey()
         if let hotKeyRef {
             UnregisterEventHotKey(hotKeyRef)
             self.hotKeyRef = nil
@@ -114,7 +112,11 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), eventTapRunLoopSource, .commonModes)
             self.eventTapRunLoopSource = nil
         }
-        eventTap = nil
+        if let eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
+            self.eventTap = nil
+        }
+        canSuppressSideSpecificEvents = false
         sideSpecificHotkey = nil
         pressedModifierSides.removeAll()
         onKeyDown = nil
@@ -184,20 +186,30 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
     ) -> GlobalHotkeyRegistrationResult {
         let eventMask = eventMask(for: [.flagsChanged, .keyDown, .keyUp])
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
-        guard let eventTap = CGEvent.tapCreate(
+        let filteringTap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: eventMask,
+            callback: globalHotkeyEventTapCallback,
+            userInfo: selfPtr
+        )
+        let eventTap = filteringTap ?? CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
             options: .listenOnly,
             eventsOfInterest: eventMask,
             callback: globalHotkeyEventTapCallback,
             userInfo: selfPtr
-        ) else {
+        )
+        guard let eventTap else {
             return .registrationFailed
         }
 
         let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
         self.eventTap = eventTap
         eventTapRunLoopSource = runLoopSource
+        canSuppressSideSpecificEvents = filteringTap != nil
         sideSpecificHotkey = hotkey
         pressedModifierSides = currentModifierSides()
         self.onKeyDown = onKeyDown
@@ -211,61 +223,91 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
         type: CGEventType,
         keyCode: UInt32?,
         flags: CGEventFlags
-    ) {
+    ) -> Bool {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            releaseSideSpecificHotkey(resamplingModifierSides: true)
             if let eventTap {
                 CGEvent.tapEnable(tap: eventTap, enable: true)
             }
-            return
+            return false
         }
 
         switch type {
         case .flagsChanged:
-            guard let keyCode else { return }
+            guard let keyCode else { return false }
             pressedModifierSides = Self.modifierSides(
                 afterFlagsChangedFor: keyCode,
                 flags: flags,
                 from: pressedModifierSides
             )
             guard let sideSpecificHotkey, sideSpecificHotkey.isModifierOnly else {
-                return
+                return false
             }
+            let shouldSuppress = Self.shouldSuppressModifierOnlyEvent(
+                hotkey: sideSpecificHotkey,
+                hotkeyIsPressed: sideSpecificHotkeyIsPressed,
+                keyCode: keyCode,
+                modifierSides: pressedModifierSides
+            )
             if !sideSpecificHotkeyIsPressed,
                sideSpecificHotkey.matches(keyCode: keyCode, modifierSides: pressedModifierSides) {
                 sideSpecificHotkeyIsPressed = true
                 onKeyDown?()
+                return true
             } else if sideSpecificHotkeyIsPressed,
                       keyCode == sideSpecificHotkey.keyCode,
                       !sideSpecificHotkey.matches(
                         keyCode: keyCode,
                         modifierSides: pressedModifierSides
                       ) {
-                sideSpecificHotkeyIsPressed = false
-                onKeyUp?()
+                releaseSideSpecificHotkey()
             }
+            return shouldSuppress
         case .keyDown:
-            guard let sideSpecificHotkey, !sideSpecificHotkeyIsPressed, let keyCode else { return }
+            guard let sideSpecificHotkey,
+                  let keyCode,
+                  keyCode == sideSpecificHotkey.keyCode else {
+                return false
+            }
+            // Keep auto-repeat events from leaking the registered key into the frontmost app.
+            if sideSpecificHotkeyIsPressed { return true }
             pressedModifierSides = currentModifierSides()
             guard sideSpecificHotkey.matches(
                 keyCode: keyCode,
                 modifierSides: pressedModifierSides
             ) else {
-                return
+                return false
             }
             sideSpecificHotkeyIsPressed = true
             onKeyDown?()
+            return true
         case .keyUp:
             guard let sideSpecificHotkey,
                   sideSpecificHotkeyIsPressed,
                   keyCode == sideSpecificHotkey.keyCode
             else {
-                return
+                return false
             }
-            sideSpecificHotkeyIsPressed = false
-            onKeyUp?()
+            releaseSideSpecificHotkey()
+            return true
         default:
             break
         }
+        return false
+    }
+
+    static func shouldSuppressModifierOnlyEvent(
+        hotkey: VoiceInputHotkeyPreset,
+        hotkeyIsPressed: Bool,
+        keyCode: UInt32,
+        modifierSides: Set<VoiceInputModifier>
+    ) -> Bool {
+        guard hotkey.isModifierOnly else { return false }
+        if hotkeyIsPressed {
+            return keyCode == hotkey.keyCode
+                && !hotkey.matches(keyCode: keyCode, modifierSides: modifierSides)
+        }
+        return hotkey.matches(keyCode: keyCode, modifierSides: modifierSides)
     }
 
     static func modifierSides(
@@ -321,6 +363,15 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
         })
     }
 
+    private func releaseSideSpecificHotkey(resamplingModifierSides: Bool = false) {
+        if resamplingModifierSides {
+            pressedModifierSides = currentModifierSides()
+        }
+        guard sideSpecificHotkeyIsPressed else { return }
+        sideSpecificHotkeyIsPressed = false
+        onKeyUp?()
+    }
+
     private func eventMask(for eventTypes: [CGEventType]) -> CGEventMask {
         eventTypes.reduce(CGEventMask(0)) { mask, eventType in
             mask | (CGEventMask(1) << eventType.rawValue)
@@ -373,8 +424,10 @@ private func globalHotkeyEventTapCallback(
         nil
     }
     let flags = event.flags
-    MainActor.assumeIsolated {
+    let shouldSuppress = MainActor.assumeIsolated {
         manager.handleSideSpecificEvent(type: type, keyCode: keyCode, flags: flags)
     }
-    return Unmanaged.passUnretained(event)
+    return shouldSuppress && manager.canSuppressSideSpecificEvents
+        ? nil
+        : Unmanaged.passUnretained(event)
 }

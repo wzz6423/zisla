@@ -46,6 +46,51 @@ struct UpdateNoticePresentationTests {
         #expect(source.contains("case .updateAvailable: \"arrow.up.circle\""))
     }
 
+    @Test
+    func productUpdateChecksUseSparkleWithoutManualPackageFlow() throws {
+        let source = try String(contentsOf: Self.appModelSourceURL, encoding: .utf8)
+        let updateCheck = try sourceSlice(
+            in: source,
+            from: "func checkForUpdates(manual:",
+            to: "func selectSystemMonitor()"
+        )
+
+        #expect(updateCheck.contains("sparkleUpdateController"))
+        #expect(!updateCheck.contains("releaseService"))
+        #expect(!updateCheck.contains("GitHubReleaseService"))
+        #expect(!source.contains("ReleasePackageDownloadService"))
+        #expect(!source.contains("selectUpdateDownloadDirectory"))
+        #expect(!source.contains("downloadUpdatePackage"))
+    }
+
+    @Test
+    func cancelledModelDiscoveryCannotPublishStaleState() throws {
+        let source = try String(contentsOf: Self.appModelSourceURL, encoding: .utf8)
+        let discovery = try sourceSlice(
+            in: source,
+            from: "func discoverModels()",
+            to: "var selectedVoiceModelConfiguration:"
+        )
+        let reset = try sourceSlice(
+            in: source,
+            from: "private func resetVoiceModelDiscovery()",
+            to: "private func restartActivityNoticesForDurationChange()"
+        )
+        let stop = try sourceSlice(
+            in: source,
+            from: "func stop()",
+            to: "func startScreenCleaning()"
+        )
+
+        #expect(discovery.contains("voiceModelDiscoveryTask?.cancel()"))
+        #expect(discovery.contains("voiceModelDiscoveryGeneration &+= 1"))
+        #expect(discovery.contains("self.voiceModelDiscoveryGeneration == generation"))
+        #expect(reset.contains("voiceModelDiscoveryTask?.cancel()"))
+        #expect(reset.contains("voiceModelDiscoveryGeneration &+= 1"))
+        #expect(stop.contains("voiceModelDiscoveryTask?.cancel()"))
+        #expect(stop.contains("voiceModelDiscoveryGeneration &+= 1"))
+    }
+
     private static var appModelSourceURL: URL {
         sourcesDirectoryURL.appendingPathComponent("Zisla/AppModel.swift")
     }
@@ -64,5 +109,15 @@ struct UpdateNoticePresentationTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Sources")
+    }
+
+    private func sourceSlice(
+        in source: String,
+        from start: String,
+        to end: String
+    ) throws -> Substring {
+        let startRange = try #require(source.range(of: start))
+        let endRange = try #require(source[startRange.upperBound...].range(of: end))
+        return source[startRange.lowerBound..<endRange.lowerBound]
     }
 }

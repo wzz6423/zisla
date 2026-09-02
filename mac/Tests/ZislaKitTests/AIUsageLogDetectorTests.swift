@@ -6,6 +6,14 @@ import Testing
 
 struct AIUsageLogDetectorTests {
     @Test
+    func incrementalVerificationStaysBoundedForLargeUsageLogs() {
+        let largeLogBytes = UInt64(80 * 1_024 * 1_024)
+        #expect(AIUsageLogDetector.incrementalVerificationByteCount(
+            for: largeLogBytes
+        ) == 8 * 1_024)
+    }
+
+    @Test
     func defaultScanKeepsEveryUsageSample() {
         let detector = AIUsageLogDetector()
 
@@ -44,6 +52,68 @@ struct AIUsageLogDetectorTests {
         #expect(sample.provider == .gemini)
         #expect(sample.inputTokens == 90)
         #expect(sample.outputTokens == 12)
+    }
+
+    @Test
+    func preservesLargeTokenValuesWithoutOverflowingOrDroppingUsage() throws {
+        let root = temporaryDirectory(named: "usage-log-large-token-values")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let qwen = root.appendingPathComponent("qwen", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        try writeJSONL([
+            """
+            {"timestamp":"2026-07-26T00:02:00.000Z","model":"qwen3-coder","usage":{"input_tokens":\(UInt64.max),"output_tokens":1}}
+            """,
+            """
+            {"timestamp":"2026-07-26T00:03:00.000Z","model":"qwen3-coder","usage":{"input_tokens":\(Int.max - 1),"output_tokens":2,"cache_creation_input_tokens":2}}
+            """,
+        ], to: qwen.appendingPathComponent("project/session.jsonl"))
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: empty,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: qwen,
+            piSessionsDirectory: empty,
+            qoderRoots: [],
+            doubaoRoots: [],
+            copilotUsageLogRoots: []
+        )
+
+        let samples = try detector.usageSamples()
+        #expect(samples.map(\.inputTokens) == [Int.max, Int.max])
+        #expect(samples.map(\.outputTokens) == [1, 2])
+    }
+
+    @Test
+    func preservesGrokUsageWhenTheTokenTotalWouldOverflow() throws {
+        let root = temporaryDirectory(named: "usage-log-grok-overflow")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let grok = root.appendingPathComponent("grok", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        try writeJSONL([
+            """
+            {"timestamp":1785024180,"method":"_x.ai/session/update","params":{"sessionId":"grok-session","update":{"prompt_id":"grok-overflow","usage":{"inputTokens":\(Int.max),"outputTokens":1}}}}
+            """,
+        ], to: grok.appendingPathComponent("session/updates.jsonl"))
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: empty,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: grok,
+            qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
+            qoderRoots: [],
+            doubaoRoots: [],
+            copilotUsageLogRoots: []
+        )
+
+        let sample = try #require(detector.usageSamples().first)
+        #expect(sample.inputTokens == Int.max)
+        #expect(sample.outputTokens == 1)
+        #expect(sample.totalTokens == Int.max)
     }
 
     @Test
@@ -192,6 +262,64 @@ struct AIUsageLogDetectorTests {
         let samples = try detector.usageSamples()
         #expect(samples.map(\.inputTokens) == [100, 60])
         #expect(samples.map(\.outputTokens) == [20, 30])
+    }
+
+    @Test @MainActor
+    func monitorKeepsGrokPromptDeltasAcrossRepeatedScansAndRestart() throws {
+        let root = temporaryDirectory(named: "usage-monitor-grok-cumulative")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let stateDirectory = root.appendingPathComponent("state", isDirectory: true)
+        let grok = root.appendingPathComponent("grok", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        let log = grok.appendingPathComponent("session/updates.jsonl")
+        try writeJSONL([
+            """
+            {"timestamp":1785024180,"method":"_x.ai/session/update","params":{"sessionId":"grok-session","update":{"prompt_id":"grok-one","usage":{"inputTokens":100,"outputTokens":0}}}}
+            """,
+        ], to: log)
+
+        func makeDetector() -> AIUsageLogDetector {
+            AIUsageLogDetector(
+                codexSessionsDirectory: empty,
+                claudeProjectsDirectory: empty,
+                geminiSessionsDirectory: empty,
+                grokSessionsDirectory: grok,
+                qwenProjectsDirectory: empty,
+                piSessionsDirectory: empty,
+                qoderRoots: [],
+                doubaoRoots: [],
+                copilotUsageLogRoots: [],
+                scanInterval: 0
+            )
+        }
+
+        let monitor = AIStateMonitor(
+            directoryURL: stateDirectory,
+            activityDetectors: [],
+            usageDetectors: [makeDetector()]
+        )
+        monitor.reload()
+        #expect(try AIStateRepository(directoryURL: stateDirectory).load().usageSamples.first?.totalTokens == 100)
+
+        try appendJSONL(
+            """
+            {"timestamp":1785024240,"method":"_x.ai/session/update","params":{"sessionId":"grok-session","update":{"prompt_id":"grok-one","usage":{"inputTokens":160,"outputTokens":0}}}}
+            """,
+            to: log
+        )
+        monitor.reload()
+        #expect(try AIStateRepository(directoryURL: stateDirectory).load().usageSamples.first?.totalTokens == 160)
+
+        monitor.reload()
+        #expect(try AIStateRepository(directoryURL: stateDirectory).load().usageSamples.first?.totalTokens == 160)
+
+        let restartedMonitor = AIStateMonitor(
+            directoryURL: stateDirectory,
+            activityDetectors: [],
+            usageDetectors: [makeDetector()]
+        )
+        restartedMonitor.reload()
+        #expect(try AIStateRepository(directoryURL: stateDirectory).load().usageSamples.first?.totalTokens == 160)
     }
 
     @Test
@@ -532,6 +660,186 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
+    func readsCompleteUnterminatedJSONLUsageAndContinuesAfterTheNextAppend() throws {
+        let root = temporaryDirectory(named: "usage-log-unterminated-jsonl")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        let log = codex.appendingPathComponent("2026/07/25/rollout.jsonl")
+        try writeJSON(
+            """
+            {"timestamp":"2026-07-25T00:00:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":10},"last_token_usage":{"input_tokens":100,"output_tokens":10}}}}
+            """,
+            to: log
+        )
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: codex,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
+            qoderRoots: [],
+            scanInterval: 0
+        )
+        #expect(try detector.usageSamples().map(\.inputTokens) == [100])
+
+        try appendJSONL(
+            """
+            {"timestamp":"2026-07-25T00:01:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":180,"output_tokens":30},"last_token_usage":{"input_tokens":80,"output_tokens":20}}}}
+            """,
+            to: log
+        )
+
+        let samples = try detector.usageSamples()
+        #expect(samples.map(\.inputTokens) == [100, 80])
+        #expect(samples.map(\.outputTokens) == [10, 20])
+    }
+
+    @Test
+    func rewritingCodexLogWithLargerSizeReparsesFromStart() throws {
+        let root = temporaryDirectory(named: "usage-log-codex-rewrite")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        let log = codex.appendingPathComponent("2026/07/25/rollout.jsonl")
+        let padding = String(repeating: "x", count: 512)
+
+        try writeJSONL([
+            """
+            {"timestamp":"2026-07-25T00:00:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":10},"last_token_usage":{"input_tokens":100,"output_tokens":10}}}}
+            """,
+        ], to: log)
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: codex,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
+            qoderRoots: [],
+            scanInterval: 0
+        )
+        #expect(try detector.usageSamples().map(\.inputTokens) == [100])
+
+        try writeJSONL([
+            "{\"type\":\"rewritten\",\"padding\":\"\(padding)\"}",
+            """
+            {"timestamp":"2026-07-25T00:01:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":300,"output_tokens":30},"last_token_usage":{"input_tokens":300,"output_tokens":30}}}}
+            """,
+        ], to: log)
+
+        let samples = try detector.usageSamples()
+        #expect(samples.map(\.inputTokens) == [300])
+        #expect(samples.map(\.outputTokens) == [30])
+    }
+
+    @Test @MainActor
+    func monitorReconcilesAtomicallyReplacedCodexUsageAcrossRestart() throws {
+        let root = temporaryDirectory(named: "usage-monitor-codex-atomic-replace")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let stateDirectory = root.appendingPathComponent("state", isDirectory: true)
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        let log = codex.appendingPathComponent("2026/07/25/rollout.jsonl")
+        try writeJSONL([
+            """
+            {"timestamp":"2026-07-25T00:00:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":0},"last_token_usage":{"input_tokens":100,"output_tokens":0}}}}
+            """,
+        ], to: log)
+
+        func makeDetector() -> AIUsageLogDetector {
+            AIUsageLogDetector(
+                codexSessionsDirectory: codex,
+                claudeProjectsDirectory: empty,
+                geminiSessionsDirectory: empty,
+                grokSessionsDirectory: empty,
+                qwenProjectsDirectory: empty,
+                piSessionsDirectory: empty,
+                qoderRoots: [],
+                doubaoRoots: [],
+                copilotUsageLogRoots: [],
+                scanInterval: 0
+            )
+        }
+
+        let monitor = AIStateMonitor(
+            directoryURL: stateDirectory,
+            activityDetectors: [],
+            usageDetectors: [makeDetector()]
+        )
+        monitor.reload()
+        #expect(try AIStateRepository(directoryURL: stateDirectory).load().usageSamples.first?.totalTokens == 100)
+
+        try replaceJSONLAtomically([
+            """
+            {"timestamp":"2026-07-25T00:00:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":300,"output_tokens":0},"last_token_usage":{"input_tokens":300,"output_tokens":0}}}}
+            """,
+        ], at: log)
+        monitor.reload()
+        #expect(try AIStateRepository(directoryURL: stateDirectory).load().usageSamples.first?.totalTokens == 300)
+
+        monitor.reload()
+        #expect(try AIStateRepository(directoryURL: stateDirectory).load().usageSamples.first?.totalTokens == 300)
+
+        let restartedMonitor = AIStateMonitor(
+            directoryURL: stateDirectory,
+            activityDetectors: [],
+            usageDetectors: [makeDetector()]
+        )
+        restartedMonitor.reload()
+        #expect(try AIStateRepository(directoryURL: stateDirectory).load().usageSamples.first?.totalTokens == 300)
+    }
+
+    @Test
+    func contentChangesWithSameSizeAndModificationDateAreRescanned() throws {
+        let root = temporaryDirectory(named: "usage-log-codex-same-metadata")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        let log = codex.appendingPathComponent("2026/07/25/rollout.jsonl")
+        let fixedDate = Date(timeIntervalSince1970: 1_800_000_000)
+
+        try writeJSONL([
+            """
+            {"timestamp":"2026-07-25T00:00:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":10},"last_token_usage":{"input_tokens":100,"output_tokens":10}}}}
+            """,
+        ], to: log)
+        try FileManager.default.setAttributes(
+            [.modificationDate: fixedDate],
+            ofItemAtPath: log.path
+        )
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: codex,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
+            qoderRoots: [],
+            scanInterval: 0
+        )
+        #expect(try detector.usageSamples().map(\.inputTokens) == [100])
+
+        try writeJSONL([
+            """
+            {"timestamp":"2026-07-25T00:00:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":900,"output_tokens":90},"last_token_usage":{"input_tokens":900,"output_tokens":90}}}}
+            """,
+        ], to: log)
+        try FileManager.default.setAttributes(
+            [.modificationDate: fixedDate],
+            ofItemAtPath: log.path
+        )
+
+        let samples = try detector.usageSamples()
+        #expect(samples.map(\.inputTokens) == [900])
+        #expect(samples.map(\.outputTokens) == [90])
+    }
+
+    @Test
     func retainsOnlyTheNewestSamplesFromEachActiveLog() throws {
         let root = temporaryDirectory(named: "usage-log-sample-limit")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -659,7 +967,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test @MainActor
-    func monitorPersistsUsageWithoutRetainingHistory() throws {
+    func monitorPersistsUsageWithoutRetainingHistory() async throws {
         let directory = temporaryDirectory(named: "usage-monitor-on-demand")
         defer { try? FileManager.default.removeItem(at: directory) }
         let sample = AIUsageSample(
@@ -672,7 +980,8 @@ struct AIUsageLogDetectorTests {
         let monitor = AIStateMonitor(
             directoryURL: directory,
             activityDetectors: [],
-            usageDetectors: [StaticUsageDetector(samples: [sample])]
+            usageDetectors: [StaticUsageDetector(samples: [sample])],
+            now: { sample.timestamp }
         )
 
         monitor.reload(includeUsageSamples: false)
@@ -681,12 +990,54 @@ struct AIUsageLogDetectorTests {
         let summaries = AIUsageAnalytics.dailyAutomaticUsageSamples(samples: [sample])
         #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == summaries)
 
-        monitor.reload()
+        monitor.loadUsageHistory()
+        for _ in 0..<100 where monitor.state.usageSamples != summaries {
+            try await Task.sleep(for: .milliseconds(10))
+        }
 
         #expect(monitor.state.usageSamples == summaries)
         monitor.unloadUsageHistory()
         #expect(monitor.state.usageSamples.isEmpty)
         #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == summaries)
+    }
+
+    @Test @MainActor
+    func loadingUsageHistoryDoesNotRescanUsageLogs() async throws {
+        let directory = temporaryDirectory(named: "usage-history-no-rescan")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let detector = CountingUsageDetector()
+        let sample = AIUsageSample(
+            sourceID: "history-sample",
+            provider: .codex,
+            timestamp: Date(timeIntervalSince1970: 100),
+            inputTokens: 10,
+            outputTokens: 2
+        )
+        let expiredSample = AIUsageSample(
+            sourceID: "expired-history-sample",
+            provider: .claude,
+            timestamp: sample.timestamp.addingTimeInterval(-200 * 24 * 60 * 60),
+            inputTokens: 20,
+            outputTokens: 4
+        )
+        try AIStateRepository(directoryURL: directory).recordUsage([expiredSample, sample])
+        let monitor = AIStateMonitor(
+            directoryURL: directory,
+            activityDetectors: [],
+            usageDetectors: [detector],
+            usageRefreshInterval: 1,
+            now: { sample.timestamp }
+        )
+
+        monitor.loadUsageHistory()
+
+        for _ in 0..<100 where monitor.state.usageSamples.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(monitor.state.usageSamples.count == 1)
+        #expect(monitor.state.usageSamples.first?.sourceID != expiredSample.sourceID)
+        #expect(detector.callCount == 0)
     }
 
     @Test @MainActor
@@ -802,6 +1153,10 @@ private final class CountingActivityDetector: AIActivityDetecting {
 private func writeJSONL(_ lines: [String], to url: URL) throws {
     try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     try Data((lines.joined(separator: "\n") + "\n").utf8).write(to: url)
+}
+
+private func replaceJSONLAtomically(_ lines: [String], at url: URL) throws {
+    try Data((lines.joined(separator: "\n") + "\n").utf8).write(to: url, options: .atomic)
 }
 
 private func writeJSON(_ string: String, to url: URL) throws {

@@ -517,6 +517,7 @@
 "算式" = "Hesaplama";
 "日期时间" = "Tarih ve saat";
 "中文文本" = "Çince metin";
+"非当前系统语言文本" = "Sistem dilinden farklı metin";
 "代码" = "Kod";
 "翻译" = "Çevir";
 "写邮件" = "E-posta yaz";
@@ -524,6 +525,7 @@
 "拨打电话" = "Ara";
 "不再显示来自 %@ 的复制" = "%@ kaynaklı kopyaları artık gösterme";
 "复制结果" = "Sonucu kopyala";
+"复制完整算式" = "Tam ifadeyi kopyala";
 "保存图片" = "Görseli kaydet";
 "保存文本" = "Metni kaydet";
 "新建日程" = "Yeni etkinlik";

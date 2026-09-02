@@ -14,16 +14,14 @@ struct AIProgressModuleView: View {
     }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 15)) { context in
-            HStack(alignment: .top, spacing: 12) {
-                runningTasks
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        HStack(alignment: .top, spacing: 12) {
+            runningTasks
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-                Hairline()
+            Hairline()
 
-                usageSummary(endingAt: context.date)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
+            usageSummary(endingAt: .now)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

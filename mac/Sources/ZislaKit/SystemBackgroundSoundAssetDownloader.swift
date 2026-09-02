@@ -176,6 +176,12 @@ public actor SystemBackgroundSoundAssetDownloader {
         guard (200..<300).contains(response.statusCode) else {
             throw DownloadError.httpError(response.statusCode)
         }
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: tempZipURL.path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              let downloadedSize = (attributes[.size] as? NSNumber)?.int64Value,
+              downloadedSize <= Int64(Self.maxDownloadSize) else {
+            throw DownloadError.downloadFailed("资源大小超出允许范围")
+        }
 
         let actualSHA1 = try computeSHA1(of: tempZipURL)
         guard actualSHA1 == metadata.sha1 else {
@@ -187,17 +193,22 @@ public actor SystemBackgroundSoundAssetDownloader {
 
         let assetName = "\(soundName).asset"
         let assetDirectory = sanitizedTargetDirectory.appendingPathComponent(assetName, isDirectory: true)
-
-        if FileManager.default.fileExists(atPath: assetDirectory.path) {
-            try? FileManager.default.removeItem(at: assetDirectory)
-        }
-
-        try FileManager.default.createDirectory(at: assetDirectory, withIntermediateDirectories: true)
+        let stagingDirectory = sanitizedTargetDirectory.appendingPathComponent(
+            ".\(assetName).\(UUID().uuidString).staging",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: stagingDirectory) }
+        try FileManager.default.createDirectory(at: stagingDirectory, withIntermediateDirectories: false)
 
         do {
-            try unzip(tempZipURL, assetDirectory)
+            try unzip(tempZipURL, stagingDirectory)
+            try Task.checkCancellation()
+            if FileManager.default.fileExists(atPath: assetDirectory.path) {
+                _ = try FileManager.default.replaceItemAt(assetDirectory, withItemAt: stagingDirectory)
+            } else {
+                try FileManager.default.moveItem(at: stagingDirectory, to: assetDirectory)
+            }
         } catch {
-            try? FileManager.default.removeItem(at: assetDirectory)
             throw error
         }
 

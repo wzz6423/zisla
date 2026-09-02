@@ -37,6 +37,8 @@ public enum PomodoroPhase: Equatable, Sendable {
 
 /// Pure state/time calculation: derives remaining time from a deadline; freezes remaining when paused.
 public struct PomodoroEngine: Equatable, Sendable {
+    static let maximumDuration: TimeInterval = TimeInterval(Int.max / 2)
+
     public var mode: PomodoroMode
     public var phase: PomodoroPhase
     /// Running: end time; paused/idle: unused.
@@ -56,19 +58,31 @@ public struct PomodoroEngine: Equatable, Sendable {
         focusDuration: TimeInterval = PomodoroMode.focus.duration,
         restDuration: TimeInterval = PomodoroMode.rest.duration
     ) {
+        let normalizedFocusDuration = Self.normalizedDuration(
+            focusDuration,
+            fallback: PomodoroMode.focus.duration
+        )
+        let normalizedRestDuration = Self.normalizedDuration(
+            restDuration,
+            fallback: PomodoroMode.rest.duration
+        )
         self.mode = mode
         self.phase = phase
         self.deadline = deadline
-        self.focusDuration = focusDuration
-        self.restDuration = restDuration
-        self.remainingWhenPaused = remainingWhenPaused ?? (mode == .focus ? focusDuration : restDuration)
+        self.focusDuration = normalizedFocusDuration
+        self.restDuration = normalizedRestDuration
+        self.remainingWhenPaused = Self.boundedRemaining(
+            remainingWhenPaused ?? (mode == .focus ? normalizedFocusDuration : normalizedRestDuration)
+        )
     }
 
     /// Returns the configured duration for the given mode.
     public func duration(for mode: PomodoroMode) -> TimeInterval {
         switch mode {
-        case .focus: focusDuration
-        case .rest: restDuration
+        case .focus:
+            Self.normalizedDuration(focusDuration, fallback: PomodoroMode.focus.duration)
+        case .rest:
+            Self.normalizedDuration(restDuration, fallback: PomodoroMode.rest.duration)
         }
     }
 
@@ -77,10 +91,10 @@ public struct PomodoroEngine: Equatable, Sendable {
         case .idle:
             return duration(for: mode)
         case .paused:
-            return max(0, remainingWhenPaused)
+            return Self.boundedRemaining(remainingWhenPaused)
         case .running:
             guard let deadline else { return 0 }
-            return max(0, deadline.timeIntervalSince(now))
+            return Self.boundedRemaining(deadline.timeIntervalSince(now))
         }
     }
 
@@ -94,15 +108,25 @@ public struct PomodoroEngine: Equatable, Sendable {
         let t = engine.displayTime(at: now)
         let hours = t.minutes / 60
         if hours > 0 {
-            return String(format: "%02d:%02d:%02d", hours, t.minutes % 60, t.seconds)
+            return String(
+                format: "%02lld:%02lld:%02lld",
+                Int64(hours),
+                Int64(t.minutes % 60),
+                Int64(t.seconds)
+            )
         }
-        return String(format: "%02d:%02d", t.minutes, t.seconds)
+        return String(format: "%02lld:%02lld", Int64(t.minutes), Int64(t.seconds))
     }
 
     /// Always zero-padded `HH:MM:SS` (e.g. 29 minutes 28 seconds → `00:29:28`).
     public static func formatHHMMSS(at now: Date = Date(), engine: PomodoroEngine) -> String {
         let t = engine.displayTime(at: now)
-        return String(format: "%02d:%02d:%02d", t.minutes / 60, t.minutes % 60, t.seconds)
+        return String(
+            format: "%02lld:%02lld:%02lld",
+            Int64(t.minutes / 60),
+            Int64(t.minutes % 60),
+            Int64(t.seconds)
+        )
     }
 
     public mutating func start(at now: Date = Date()) {
@@ -112,7 +136,7 @@ public struct PomodoroEngine: Equatable, Sendable {
             deadline = now.addingTimeInterval(remainingWhenPaused)
             phase = .running
         case .paused:
-            deadline = now.addingTimeInterval(max(0, remainingWhenPaused))
+            deadline = now.addingTimeInterval(Self.boundedRemaining(remainingWhenPaused))
             phase = .running
         case .running:
             break
@@ -147,9 +171,19 @@ public struct PomodoroEngine: Equatable, Sendable {
 
     /// Test helper: force-enters the running state with the specified remaining time.
     public mutating func startWithRemaining(_ remaining: TimeInterval, at now: Date = Date()) {
-        remainingWhenPaused = max(0, remaining)
+        remainingWhenPaused = Self.boundedRemaining(remaining)
         deadline = now.addingTimeInterval(remainingWhenPaused)
         phase = .running
+    }
+
+    static func normalizedDuration(_ duration: TimeInterval, fallback: TimeInterval) -> TimeInterval {
+        guard duration.isFinite, duration > 0 else { return fallback }
+        return min(duration, maximumDuration)
+    }
+
+    private static func boundedRemaining(_ remaining: TimeInterval) -> TimeInterval {
+        guard remaining.isFinite else { return 0 }
+        return min(max(0, remaining), maximumDuration)
     }
 }
 
@@ -161,26 +195,38 @@ public final class PomodoroService: ObservableObject {
     public var notificationsMuted = false
 
     private var timer: Timer?
-    private let notificationCenter: UNUserNotificationCenter
-    private let notificationRequestHandler: (UNNotificationRequest) -> Void
+    private var notificationCenter: UNUserNotificationCenter?
+    private let notificationRequestHandler: ((UNNotificationRequest) -> Void)?
     private let defaults: UserDefaults
     private let focusDurationKey = "zisla.pomodoro.focusDuration"
     private let restDurationKey = "zisla.pomodoro.restDuration"
     private var authorizationPromptHost: NSWindow?
 
     public init(
-        notificationCenter: UNUserNotificationCenter = .current(),
+        notificationCenter: UNUserNotificationCenter? = nil,
         notificationRequestHandler: ((UNNotificationRequest) -> Void)? = nil,
         defaults: UserDefaults = .standard
     ) {
         self.notificationCenter = notificationCenter
         self.defaults = defaults
-        self.notificationRequestHandler = notificationRequestHandler ?? { [notificationCenter] request in
-            notificationCenter.add(request, withCompletionHandler: nil)
+        self.notificationRequestHandler = notificationRequestHandler
+        let savedFocus = defaults.object(forKey: focusDurationKey) as? TimeInterval
+        let savedRest = defaults.object(forKey: restDurationKey) as? TimeInterval
+        let focusDuration = PomodoroEngine.normalizedDuration(
+            savedFocus ?? PomodoroMode.focus.duration,
+            fallback: PomodoroMode.focus.duration
+        )
+        let restDuration = PomodoroEngine.normalizedDuration(
+            savedRest ?? PomodoroMode.rest.duration,
+            fallback: PomodoroMode.rest.duration
+        )
+        if let savedFocus, savedFocus != focusDuration {
+            defaults.set(focusDuration, forKey: focusDurationKey)
         }
-        let savedFocus = defaults.object(forKey: focusDurationKey) as? TimeInterval ?? PomodoroMode.focus.duration
-        let savedRest = defaults.object(forKey: restDurationKey) as? TimeInterval ?? PomodoroMode.rest.duration
-        engine = PomodoroEngine(focusDuration: savedFocus, restDuration: savedRest)
+        if let savedRest, savedRest != restDuration {
+            defaults.set(restDuration, forKey: restDurationKey)
+        }
+        engine = PomodoroEngine(focusDuration: focusDuration, restDuration: restDuration)
         refreshDisplay()
     }
 
@@ -195,8 +241,12 @@ public final class PomodoroService: ObservableObject {
     public var displayClockWithHours: String { PomodoroEngine.formatHHMMSS(engine: engine) }
 
     public func setFocusDuration(_ duration: TimeInterval) {
-        engine.focusDuration = duration
-        defaults.set(duration, forKey: focusDurationKey)
+        let normalized = PomodoroEngine.normalizedDuration(
+            duration,
+            fallback: PomodoroMode.focus.duration
+        )
+        engine.focusDuration = normalized
+        defaults.set(normalized, forKey: focusDurationKey)
         if engine.mode == .focus {
             engine.reset()
             stopTimer()
@@ -205,8 +255,12 @@ public final class PomodoroService: ObservableObject {
     }
 
     public func setRestDuration(_ duration: TimeInterval) {
-        engine.restDuration = duration
-        defaults.set(duration, forKey: restDurationKey)
+        let normalized = PomodoroEngine.normalizedDuration(
+            duration,
+            fallback: PomodoroMode.rest.duration
+        )
+        engine.restDuration = normalized
+        defaults.set(normalized, forKey: restDurationKey)
         if engine.mode == .rest {
             engine.reset()
             stopTimer()
@@ -264,6 +318,13 @@ public final class PomodoroService: ObservableObject {
         timer = nil
     }
 
+    private func resolvedNotificationCenter() -> UNUserNotificationCenter {
+        if let notificationCenter { return notificationCenter }
+        let center = UNUserNotificationCenter.current()
+        notificationCenter = center
+        return center
+    }
+
     private func tick() {
         let completedMode = engine.mode
         if engine.completeIfNeeded() {
@@ -275,18 +336,20 @@ public final class PomodoroService: ObservableObject {
         refreshDisplay()
     }
 
-    private func refreshDisplay() {
-        displayClock = PomodoroEngine.formatMMSS(engine: engine)
+    func refreshDisplay() {
+        let clock = PomodoroEngine.formatMMSS(engine: engine)
+        guard displayClock != clock else { return }
+        displayClock = clock
     }
 
     private func requestNotificationAuthorizationIfNeeded() {
-        notificationCenter.getNotificationSettings { [weak self] settings in
+        resolvedNotificationCenter().getNotificationSettings { [weak self] settings in
             guard settings.authorizationStatus == .notDetermined else { return }
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.dismissAuthorizationPromptHost()
                 self.authorizationPromptHost = WindowPlacement.authorizationPromptHost()
-                _ = try? await self.notificationCenter.requestAuthorization(options: [.alert, .sound])
+                _ = try? await self.resolvedNotificationCenter().requestAuthorization(options: [.alert, .sound])
                 self.dismissAuthorizationPromptHost()
             }
         }
@@ -316,6 +379,10 @@ public final class PomodoroService: ObservableObject {
             content: content,
             trigger: nil
         )
-        notificationRequestHandler(request)
+        if let notificationRequestHandler {
+            notificationRequestHandler(request)
+        } else {
+            resolvedNotificationCenter().add(request, withCompletionHandler: nil)
+        }
     }
 }

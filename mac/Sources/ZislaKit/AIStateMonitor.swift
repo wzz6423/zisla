@@ -3,6 +3,13 @@ import Darwin
 import Foundation
 import ZislaCore
 
+public enum AIUsageHistoryState: Equatable, Sendable {
+    case idle
+    case loading
+    case loaded
+    case failed(String)
+}
+
 @MainActor
 public final class AIStateMonitor: ObservableObject {
     private final class RefreshDependencies: @unchecked Sendable {
@@ -33,19 +40,25 @@ public final class AIStateMonitor: ObservableObject {
         case corruptedState
         case failure(String)
 
-        var allowsDetectorRefresh: Bool {
+        var changedPersistedState: Bool {
             switch self {
-            case .success, .unchanged:
+            case .success:
                 true
-            case .corruptedState, .failure:
+            case .unchanged, .corruptedState, .failure:
                 false
             }
         }
     }
 
     private enum DetectorRefreshResult: Sendable {
-        case tasks([AIProgressTask])
+        case tasks([AIProgressTask], usageChanged: Bool)
         case state(AIState)
+        case corruptedState
+        case failure(String)
+    }
+
+    private enum UsageHistoryLoadResult: Sendable {
+        case samples([AIUsageSample])
         case corruptedState
         case failure(String)
     }
@@ -53,14 +66,22 @@ public final class AIStateMonitor: ObservableObject {
     public static let defaultActiveTaskTTL: TimeInterval = 30 * 60
     public static let defaultDetectorRefreshInterval: TimeInterval = 30
     public static let defaultUsageRefreshInterval: TimeInterval = 3 * 60
+    private static let usageHistoryWeeks = 24
 
     @Published public private(set) var state: AIState = .empty
     @Published public private(set) var errorDescription: String?
+    @Published public private(set) var usageHistoryState: AIUsageHistoryState = .idle
 
     private let repository: AIStateRepository
     private let activityDetectors: [any AIActivityDetecting]
     private let usageDetectors: [any AIUsageDetecting]
     private var source: DispatchSourceFileSystemObject?
+    private var databaseSource: DispatchSourceFileSystemObject?
+    private var walSource: DispatchSourceFileSystemObject?
+    private var stateFileReloadTask: Task<Void, Never>?
+    private var usageHistoryLoadInFlight = false
+    private var usageHistoryLoadPending = false
+    private var usageHistoryGeneration: UInt64 = 0
     private var memoryPressureSource: DispatchSourceMemoryPressure?
     private var descriptor: Int32 = -1
     private var activityTimer: Timer?
@@ -76,12 +97,15 @@ public final class AIStateMonitor: ObservableObject {
     private var persistedReloadPending = false
     private var detectorRefreshInFlight = false
     private var detectorRefreshPending = false
+    private var detectorRefreshPendingAllowsUsageScan = false
     private var refreshGeneration: UInt64 = 0
     private var usageHistoryRequested = false
     private var usageHistoryIsLoaded = false
     private var lastUsageRefreshAt = Date.distantPast
     private var persistedStorageChangeToken: AIStateStorageChangeToken?
     private var persistedReloadPendingForce = false
+    private var persistedReloadPendingRefreshDetectorsAfterLoad = false
+    private var persistedReloadPendingRefreshDetectorsWhenUnchanged = false
     private var persistedTasks: [AIProgressTask] = []
 
     public convenience init(
@@ -170,20 +194,22 @@ public final class AIStateMonitor: ObservableObject {
                 at: repository.directoryURL,
                 withIntermediateDirectories: true
             )
-            schedulePersistedReload(refreshDetectorsAfterLoad: true)
             descriptor = open(repository.directoryURL.path, O_EVTONLY)
             guard descriptor >= 0 else {
                 errorDescription = "无法监听 AI 状态目录"
                 return
             }
 
+            let watcherGeneration = refreshGeneration
             let watcher = DispatchSource.makeFileSystemObjectSource(
                 fileDescriptor: descriptor,
                 eventMask: [.write, .rename, .delete],
                 queue: .main
             )
             watcher.setEventHandler { [weak self] in
-                self?.schedulePersistedReload()
+                guard let self, self.refreshGeneration == watcherGeneration else { return }
+                self.refreshStateFileWatchers(generation: watcherGeneration)
+                self.scheduleStateFileReload()
             }
             let fileDescriptor = descriptor
             watcher.setCancelHandler {
@@ -191,6 +217,10 @@ public final class AIStateMonitor: ObservableObject {
             }
             source = watcher
             watcher.resume()
+            refreshStateFileWatchers(generation: watcherGeneration)
+            // Load persisted tasks first; the completion schedules one activity refresh with the
+            // loaded task snapshot, while usage log scans remain on the throttled timer.
+            schedulePersistedReload(refreshDetectorsAfterLoad: true)
 
             let pressureQueue = refreshQueue
             let memoryPressure = DispatchSource.makeMemoryPressureSource(
@@ -205,7 +235,9 @@ public final class AIStateMonitor: ObservableObject {
 
             if !activityDetectors.isEmpty || !usageDetectors.isEmpty {
                 let timer = Timer(timeInterval: detectorRefreshInterval, repeats: true) { [weak self] _ in
-                    Task { @MainActor [weak self] in self?.scheduleDetectorRefresh() }
+                    Task { @MainActor [weak self] in
+                        self?.scheduleDetectorRefresh(allowUsageScan: true)
+                    }
                 }
                 timer.tolerance = detectorRefreshInterval * 0.1
                 activityTimer = timer
@@ -221,10 +253,22 @@ public final class AIStateMonitor: ObservableObject {
         persistedReloadInFlight = false
         persistedReloadPending = false
         persistedReloadPendingForce = false
+        persistedReloadPendingRefreshDetectorsAfterLoad = false
+        persistedReloadPendingRefreshDetectorsWhenUnchanged = false
+        stateFileReloadTask?.cancel()
+        stateFileReloadTask = nil
         detectorRefreshInFlight = false
         detectorRefreshPending = false
+        detectorRefreshPendingAllowsUsageScan = false
         lastUsageRefreshAt = .distantPast
+        usageHistoryGeneration &+= 1
+        usageHistoryLoadInFlight = false
+        usageHistoryLoadPending = false
         unloadUsageHistory()
+        databaseSource?.cancel()
+        databaseSource = nil
+        walSource?.cancel()
+        walSource = nil
         source?.cancel()
         source = nil
         memoryPressureSource?.cancel()
@@ -235,7 +279,11 @@ public final class AIStateMonitor: ObservableObject {
     }
 
     public func reload(includeUsageSamples: Bool = true) {
+        usageHistoryGeneration &+= 1
+        usageHistoryLoadInFlight = false
+        usageHistoryLoadPending = false
         usageHistoryRequested = includeUsageSamples
+        usageHistoryState = includeUsageSamples ? .loading : .idle
         let dependencies = refreshDependencies()
         applyPersisted(
             refreshQueue.sync {
@@ -258,19 +306,24 @@ public final class AIStateMonitor: ObservableObject {
         })
     }
 
-    /// Loads the full usage history only when the line chart or heatmap appears.
+    /// Loads usage history in the background when the line chart or heatmap appears.
     public func loadUsageHistory() {
-        guard !usageHistoryIsLoaded else { return }
         usageHistoryRequested = true
-        lastUsageRefreshAt = .distantPast
-        schedulePersistedReload(force: true)
+        guard !usageHistoryIsLoaded, !usageHistoryLoadInFlight else { return }
+        requestUsageHistoryLoad()
     }
 
     /// Immediately releases historical samples that are no longer needed for the normal state display after leaving the AI panel.
     public func unloadUsageHistory() {
-        guard usageHistoryRequested || usageHistoryIsLoaded || !state.usageSamples.isEmpty else { return }
+        guard usageHistoryRequested || usageHistoryIsLoaded || usageHistoryLoadInFlight || !state.usageSamples.isEmpty else {
+            return
+        }
         usageHistoryRequested = false
         usageHistoryIsLoaded = false
+        usageHistoryGeneration &+= 1
+        usageHistoryLoadInFlight = false
+        usageHistoryLoadPending = false
+        usageHistoryState = .idle
         let shouldRelieveMemory = !state.usageSamples.isEmpty
         state.usageSamples.removeAll(keepingCapacity: false)
         if shouldRelieveMemory {
@@ -280,35 +333,213 @@ public final class AIStateMonitor: ObservableObject {
 
     /// Schedules a background refresh for interactive paths, avoiding a full decode of large state files on the main thread.
     public func refresh() {
-        schedulePersistedReload()
+        schedulePersistedReload(
+            refreshDetectorsAfterLoad: true,
+            refreshDetectorsWhenUnchanged: true
+        )
+    }
+
+    /// Refreshes only currently active sessions. Historical usage logs are deliberately excluded.
+    public func refreshActiveTasks() {
+        scheduleDetectorRefresh(allowUsageScan: false)
+    }
+
+    private func requestUsageHistoryLoad(force: Bool = false) {
+        guard usageHistoryRequested else { return }
+        if usageHistoryLoadInFlight {
+            usageHistoryLoadPending = usageHistoryLoadPending || force
+            return
+        }
+
+        usageHistoryLoadInFlight = true
+        usageHistoryState = .loading
+        usageHistoryGeneration &+= 1
+        let historyGeneration = usageHistoryGeneration
+        let monitorGeneration = refreshGeneration
+        let repository = repository
+        let usageHistoryStart = usageHistoryStartDate(endingAt: now())
+        let monitor = self
+        refreshQueue.async { [weak monitor] in
+            let result: UsageHistoryLoadResult
+            do {
+                result = .samples(try repository.loadUsageSamples(startingAt: usageHistoryStart))
+            } catch AIStateRepositoryError.corruptedState {
+                result = .corruptedState
+            } catch {
+                result = .failure(error.localizedDescription)
+            }
+            Task { @MainActor [weak monitor] in
+                monitor?.applyUsageHistory(
+                    result,
+                    historyGeneration: historyGeneration,
+                    monitorGeneration: monitorGeneration
+                )
+            }
+        }
+    }
+
+    private func applyUsageHistory(
+        _ result: UsageHistoryLoadResult,
+        historyGeneration: UInt64,
+        monitorGeneration: UInt64
+    ) {
+        guard usageHistoryGeneration == historyGeneration else { return }
+        usageHistoryLoadInFlight = false
+        guard refreshGeneration == monitorGeneration, usageHistoryRequested else { return }
+
+        switch result {
+        case let .samples(samples):
+            if state.usageSamples != samples {
+                state.usageSamples = samples
+            }
+            usageHistoryIsLoaded = true
+            usageHistoryState = .loaded
+            errorDescription = nil
+        case .corruptedState:
+            usageHistoryState = .failed("AI 状态文件已损坏，已保留上一次有效数据")
+            errorDescription = "AI 状态文件已损坏，已保留上一次有效数据"
+        case let .failure(message):
+            usageHistoryState = .failed(message)
+            errorDescription = message
+        }
+
+        guard usageHistoryLoadPending else { return }
+        usageHistoryLoadPending = false
+        requestUsageHistoryLoad()
+    }
+
+    private func refreshStateFileWatchers(generation: UInt64) {
+        guard refreshGeneration == generation else { return }
+        if databaseSource != nil, !FileManager.default.fileExists(atPath: repository.databaseURL.path) {
+            databaseSource?.cancel()
+            databaseSource = nil
+        }
+        if walSource != nil, !FileManager.default.fileExists(atPath: repository.databaseWALURL.path) {
+            walSource?.cancel()
+            walSource = nil
+        }
+        startStateFileWatcher(
+            at: repository.databaseURL,
+            generation: generation,
+            isWAL: false
+        )
+        startStateFileWatcher(
+            at: repository.databaseWALURL,
+            generation: generation,
+            isWAL: true
+        )
+    }
+
+    private func startStateFileWatcher(at url: URL, generation: UInt64, isWAL: Bool) {
+        guard (isWAL ? walSource : databaseSource) == nil,
+              FileManager.default.fileExists(atPath: url.path) else {
+            return
+        }
+        let fileDescriptor = open(url.path, O_EVTONLY)
+        guard fileDescriptor >= 0 else { return }
+
+        let watcher = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fileDescriptor,
+            eventMask: [.write, .rename, .delete],
+            queue: .main
+        )
+        watcher.setEventHandler { [weak self] in
+            guard let self, self.refreshGeneration == generation else { return }
+            let event = watcher.data
+            if event.contains(.rename) || event.contains(.delete) {
+                self.rebindStateFileWatcher(generation: generation, isWAL: isWAL)
+            }
+            self.scheduleStateFileReload()
+        }
+        watcher.setCancelHandler {
+            close(fileDescriptor)
+        }
+        if isWAL {
+            walSource = watcher
+        } else {
+            databaseSource = watcher
+        }
+        watcher.resume()
+    }
+
+    private func rebindStateFileWatcher(generation: UInt64, isWAL: Bool) {
+        guard refreshGeneration == generation else { return }
+        if isWAL {
+            walSource?.cancel()
+            walSource = nil
+        } else {
+            databaseSource?.cancel()
+            databaseSource = nil
+        }
+        startStateFileWatcher(
+            at: isWAL ? repository.databaseWALURL : repository.databaseURL,
+            generation: generation,
+            isWAL: isWAL
+        )
+    }
+
+    private func scheduleStateFileReload() {
+        stateFileReloadTask?.cancel()
+        let generation = refreshGeneration
+        stateFileReloadTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(100))
+            } catch {
+                return
+            }
+            guard let self, self.refreshGeneration == generation else { return }
+            self.stateFileReloadTask = nil
+            // File changes only reconcile persisted tasks. Activity detectors are refreshed by
+            // the page-entry path and the throttled timer, so a noisy SQLite/WAL writer cannot
+            // turn every state update into a full session scan.
+            self.schedulePersistedReload(refreshDetectorsAfterLoad: false)
+        }
     }
 
     private func schedulePersistedReload(
         refreshDetectorsAfterLoad: Bool = true,
-        force: Bool = false
+        force: Bool = false,
+        refreshDetectorsWhenUnchanged: Bool = false
     ) {
         guard !persistedReloadInFlight else {
             persistedReloadPending = true
             persistedReloadPendingForce = persistedReloadPendingForce || force
+            persistedReloadPendingRefreshDetectorsAfterLoad =
+                persistedReloadPendingRefreshDetectorsAfterLoad || refreshDetectorsAfterLoad
+            persistedReloadPendingRefreshDetectorsWhenUnchanged =
+                persistedReloadPendingRefreshDetectorsWhenUnchanged || refreshDetectorsWhenUnchanged
             return
         }
         persistedReloadInFlight = true
         let generation = refreshGeneration
         let dependencies = refreshDependencies()
-        let includesUsageSamples = usageHistoryRequested
+        // Historical samples have their own lazy read path; persisted reloads only reconcile
+        // tasks and notices so a watcher event cannot pull the whole usage table into memory.
+        let includesUsageSamples = false
         let storageChangeToken = force ? nil : persistedStorageChangeToken
         let completion: @MainActor @Sendable (PersistedRefreshResult) -> Void = { [weak self] result in
             guard let self, self.refreshGeneration == generation else { return }
             self.persistedReloadInFlight = false
             self.applyPersisted(result, includesUsageSamples: includesUsageSamples)
-            if refreshDetectorsAfterLoad, result.allowsDetectorRefresh {
-                self.scheduleDetectorRefresh()
+            if refreshDetectorsAfterLoad,
+               result.changedPersistedState || refreshDetectorsWhenUnchanged {
+                self.scheduleDetectorRefresh(allowUsageScan: false)
             }
             if self.persistedReloadPending {
                 self.persistedReloadPending = false
                 let pendingForce = self.persistedReloadPendingForce
                 self.persistedReloadPendingForce = false
-                self.schedulePersistedReload(force: pendingForce)
+                let pendingRefreshDetectorsAfterLoad =
+                    self.persistedReloadPendingRefreshDetectorsAfterLoad
+                self.persistedReloadPendingRefreshDetectorsAfterLoad = false
+                let pendingRefreshDetectorsWhenUnchanged =
+                    self.persistedReloadPendingRefreshDetectorsWhenUnchanged
+                self.persistedReloadPendingRefreshDetectorsWhenUnchanged = false
+                self.schedulePersistedReload(
+                    refreshDetectorsAfterLoad: pendingRefreshDetectorsAfterLoad,
+                    force: pendingForce,
+                    refreshDetectorsWhenUnchanged: pendingRefreshDetectorsWhenUnchanged
+                )
             }
         }
 
@@ -322,17 +553,18 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
-    private func scheduleDetectorRefresh() {
+    private func scheduleDetectorRefresh(allowUsageScan: Bool) {
         guard !detectorRefreshInFlight else {
             detectorRefreshPending = true
+            detectorRefreshPendingAllowsUsageScan =
+                detectorRefreshPendingAllowsUsageScan || allowUsageScan
             return
         }
         detectorRefreshInFlight = true
         let generation = refreshGeneration
         let dependencies = refreshDependencies()
         let storedTasks = persistedTasks
-        let loadsUsageHistory = usageHistoryIsLoaded
-        let detectsUsage = !usageDetectors.isEmpty
+        let detectsUsage = allowUsageScan && !usageDetectors.isEmpty
             && now().timeIntervalSince(lastUsageRefreshAt) >= usageRefreshInterval
         if detectsUsage { lastUsageRefreshAt = now() }
         let completion: @MainActor @Sendable (DetectorRefreshResult) -> Void = { [weak self] result in
@@ -341,7 +573,9 @@ public final class AIStateMonitor: ObservableObject {
             self.applyDetector(result)
             if self.detectorRefreshPending {
                 self.detectorRefreshPending = false
-                self.scheduleDetectorRefresh()
+                let pendingAllowsUsageScan = self.detectorRefreshPendingAllowsUsageScan
+                self.detectorRefreshPendingAllowsUsageScan = false
+                self.scheduleDetectorRefresh(allowUsageScan: pendingAllowsUsageScan)
             }
         }
 
@@ -350,8 +584,11 @@ public final class AIStateMonitor: ObservableObject {
                 using: dependencies,
                 persistedTasks: storedTasks,
                 detectsUsage: detectsUsage,
-                loadsUsageHistory: loadsUsageHistory
+                loadsUsageHistory: false
             )
+            // Page-entry refreshes inspect active tasks only; forcing allocator pressure relief
+            // there can invalidate the just-composited Liquid Glass surface. Reclaim memory only
+            // when this pass actually scanned usage history.
             if detectsUsage { Self.scheduleAllocatorRelief(on: self.refreshQueue) }
             Task { @MainActor in completion(result) }
         }
@@ -374,6 +611,22 @@ public final class AIStateMonitor: ObservableObject {
             activeTaskTTL: activeTaskTTL,
             now: now
         )
+    }
+
+    private func usageHistoryStartDate(endingAt date: Date) -> Date {
+        let calendar = Calendar.current
+        let endDay = calendar.startOfDay(for: date)
+        let weekday = calendar.component(.weekday, from: endDay)
+        let daysFromWeekStart = (weekday - calendar.firstWeekday + 7) % 7
+        guard let lastWeekStart = calendar.date(byAdding: .day, value: -daysFromWeekStart, to: endDay),
+              let gridStart = calendar.date(
+                byAdding: .day,
+                value: -(Self.usageHistoryWeeks - 1) * 7,
+                to: lastWeekStart
+              ) else {
+            return endDay
+        }
+        return gridStart
     }
 
     private nonisolated static func loadPersistedState(
@@ -418,17 +671,18 @@ public final class AIStateMonitor: ObservableObject {
                 persistedTasks,
                 using: dependencies
             )
+            var usageChanged = false
             if detectsUsage, usageScanComplete {
-                let usageChanged = try dependencies.repository.recordDetectedUsage(automaticUsage)
+                usageChanged = try dependencies.repository.recordDetectedUsage(automaticUsage) > 0
                 if loadsUsageHistory {
-                    if usageChanged > 0 {
+                    if usageChanged {
                         var next = try dependencies.repository.load(includeUsageSamples: true)
                         next.tasks = tasks
                         return .state(next)
                     }
                 }
             }
-            return .tasks(tasks)
+            return .tasks(tasks, usageChanged: usageChanged)
         } catch AIStateRepositoryError.corruptedState {
             return .corruptedState
         } catch {
@@ -478,14 +732,18 @@ public final class AIStateMonitor: ObservableObject {
         case let .success(nextState, storageChangeToken):
             var next = nextState
             if updatesPersistedTasks { persistedTasks = nextState.tasks }
-            let keepsUsageSamples = includesUsageSamples && usageHistoryRequested
-            if !keepsUsageSamples {
+            let keepsExistingUsageSamples = !includesUsageSamples && usageHistoryRequested
+            let keepsLoadedUsageSamples = keepsExistingUsageSamples || (includesUsageSamples && usageHistoryRequested)
+            if keepsExistingUsageSamples {
+                next.usageSamples = state.usageSamples
+            } else if !keepsLoadedUsageSamples {
                 next.usageSamples.removeAll(keepingCapacity: false)
             }
             if next != state { state = next }
-            if keepsUsageSamples {
+            if includesUsageSamples && usageHistoryRequested {
                 usageHistoryIsLoaded = true
-            } else {
+                usageHistoryState = .loaded
+            } else if !usageHistoryRequested {
                 usageHistoryIsLoaded = false
             }
             persistedStorageChangeToken = storageChangeToken
@@ -501,9 +759,12 @@ public final class AIStateMonitor: ObservableObject {
 
     private func applyDetector(_ result: DetectorRefreshResult) {
         switch result {
-        case let .tasks(tasks):
+        case let .tasks(tasks, usageChanged):
             if tasks != state.tasks { state.tasks = tasks }
             errorDescription = nil
+            if usageChanged, usageHistoryRequested {
+                requestUsageHistoryLoad(force: true)
+            }
         case let .state(next):
             applyPersisted(
                 .success(next, repository.storageChangeToken()),

@@ -138,6 +138,21 @@ extension AnyTransition {
             )
         )
     }
+
+    /// Lightweight directional transition for the settings window's long, scrollable pages.
+    static func settingsPagePush(direction: CGFloat) -> AnyTransition {
+        let d: CGFloat = direction >= 0 ? 1 : -1
+        return .asymmetric(
+            insertion: .modifier(
+                active: ModulePushModifier(offsetX: 14 * d, blurRadius: 0, scale: 1, opacity: 0),
+                identity: ModulePushModifier(offsetX: 0, blurRadius: 0, scale: 1, opacity: 1)
+            ),
+            removal: .modifier(
+                active: ModulePushModifier(offsetX: -14 * d, blurRadius: 0, scale: 1, opacity: 0),
+                identity: ModulePushModifier(offsetX: 0, blurRadius: 0, scale: 1, opacity: 1)
+            )
+        )
+    }
 }
 
 // MARK: - Deferred mounting

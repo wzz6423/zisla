@@ -291,13 +291,29 @@ struct ToolboxModuleView: View {
     }
 
     private func setDuration(hours: Int, minutes: Int, seconds: Int) {
-        let totalSeconds = max(1, max(0, hours) * 3_600 + max(0, minutes) * 60 + max(0, seconds))
-        let duration = TimeInterval(totalSeconds)
+        let duration = TimeInterval(Self.durationSeconds(
+            hours: hours,
+            minutes: minutes,
+            seconds: seconds
+        ))
         if pomodoro.mode == .focus {
             pomodoro.setFocusDuration(duration)
         } else {
             pomodoro.setRestDuration(duration)
         }
+    }
+
+    static let maximumDurationSeconds = Int.max / 2
+
+    static func durationSeconds(hours: Int, minutes: Int, seconds: Int) -> Int {
+        let (hourSeconds, hourOverflow) = max(0, hours).multipliedReportingOverflow(by: 3_600)
+        let (minuteSeconds, minuteOverflow) = max(0, minutes).multipliedReportingOverflow(by: 60)
+        let (hourAndMinutes, hourAndMinutesOverflow) = hourSeconds.addingReportingOverflow(minuteSeconds)
+        let (totalSeconds, totalOverflow) = hourAndMinutes.addingReportingOverflow(max(0, seconds))
+        guard !hourOverflow, !minuteOverflow, !hourAndMinutesOverflow, !totalOverflow else {
+            return maximumDurationSeconds
+        }
+        return min(maximumDurationSeconds, max(1, totalSeconds))
     }
 
     private var startPauseTitle: String {

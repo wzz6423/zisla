@@ -67,12 +67,17 @@ public enum MarkdownHTMLRenderer {
         var result = escapeHTML(text)
 
         // 1. Inline code `code` → placeholder (protects inner content)
-        var codeStore: [String] = []
+        var codeStore: [(token: String, html: String)] = []
         result = replace(result, pattern: "`([^`]+)`") { match, _ in
-            let code = escapeHTML(match[1])
-            let token = "%%CODE\(codeStore.count)%%"
-            codeStore.append("<code>\(code)</code>")
+            let token = "%%ZISLACODE\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))%%"
+            codeStore.append((token, "<code>\(match[1])</code>"))
             return token
+        }
+
+        // The block parser uses a private marker so leading whitespace survives paragraph joining.
+        result = replace(result, pattern: "%%ZISLA_INDENT:([0-9]+)%%") { match, _ in
+            guard let count = Int(match[1]), count <= 4096 else { return match[0] }
+            return String(repeating: "&nbsp;", count: count)
         }
 
         // 2. Image ![alt](url)
@@ -101,8 +106,8 @@ public enum MarkdownHTMLRenderer {
         result = replace(result, pattern: "~~([^~]+)~~") { match, _ in "<del>\(match[1])</del>" }
 
         // Restore inline code placeholders
-        for (index, code) in codeStore.enumerated().reversed() {
-            result = result.replacingOccurrences(of: "%%CODE\(index)%%", with: code)
+        for code in codeStore.reversed() {
+            result = result.replacingOccurrences(of: code.token, with: code.html)
         }
         return result
     }

@@ -203,6 +203,21 @@ private final class CountingPublicIPProvider: PublicIPProviding, @unchecked Send
     }
 }
 
+private final class DelayedHardwareInfoProvider: @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls = 0
+
+    var callCount: Int {
+        lock.withLock { calls }
+    }
+
+    func read() -> SystemHardwareInfo {
+        lock.withLock { calls += 1 }
+        usleep(100_000)
+        return .unavailable
+    }
+}
+
 /// Controllable clock for tests; `dateProvider` is a `@Sendable` closure, and this class is only read/written on the serial test path.
 private final class ControllableDateProvider: @unchecked Sendable {
     private var current: Date
@@ -1273,6 +1288,48 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
+    func projectBuildArtifactProtectionUsesExecutableAndWorkingDirectoryPaths() {
+        let project = URL(fileURLWithPath: "/Users/test/Projects/Demo")
+        let artifact = project.appendingPathComponent(".build")
+        let executable = artifact.appendingPathComponent("debug/server").path
+        let nestedWorkingDirectory = project.appendingPathComponent("Sources/App").path
+        let homeWorkingDirectory = URL(fileURLWithPath: "/Users/test").path
+        let unrelatedWorkingDirectory = URL(fileURLWithPath: "/Users/test/Projects/Other").path
+
+        #expect(SystemDiskCleanup.projectContainsRunningProcess(
+            projectRoot: project,
+            artifactDirectory: artifact,
+            executablePaths: [executable],
+            workingDirectoryPaths: []
+        ))
+        #expect(SystemDiskCleanup.projectContainsRunningProcess(
+            projectRoot: project,
+            artifactDirectory: artifact,
+            executablePaths: [],
+            workingDirectoryPaths: [nestedWorkingDirectory]
+        ))
+        #expect(!SystemDiskCleanup.projectContainsRunningProcess(
+            projectRoot: project,
+            artifactDirectory: artifact,
+            executablePaths: [],
+            workingDirectoryPaths: [homeWorkingDirectory, unrelatedWorkingDirectory]
+        ))
+
+        let lsofFields = """
+        p101
+        fcwd
+        n/Users/test/Projects/Demo
+        p102
+        fcwd
+        n/Users/test/Projects/Other
+        """
+        #expect(SystemDiskCleanup.workingDirectoryPaths(fromLsofFieldOutput: lsofFields) == Set([
+            project.path,
+            unrelatedWorkingDirectory,
+        ]))
+    }
+
+    @Test
     func applicationResidualsUseBundleIdentifierAndAnalysisItemsCannotBeTrashed() {
         let mock = MockFileManager()
         let home = URL(fileURLWithPath: "/Users/test")
@@ -1350,6 +1407,46 @@ struct SystemMonitorServiceTests {
         let forgedResult = SystemDiskCleanup.trashSelected(candidates: [forgedAnalysisCandidate], fileManager: mock)
         #expect(forgedResult.successCount == 0)
         #expect(forgedResult.failures.first?.message.contains("仅用于分析") == true)
+    }
+
+    @Test
+    func candidateCleanupRejectsCrossKindPathsWhileAllowingUserFileCandidates() {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let downloads = home.appendingPathComponent("Downloads")
+        let importantFile = downloads.appendingPathComponent("important.txt")
+        let installer = downloads.appendingPathComponent("Installer.pkg")
+        mock.homeDirectory = home
+        mock.searchPathResults = [
+            .downloadsDirectory: [downloads],
+            .trashDirectory: [home.appendingPathComponent(".Trash")],
+        ]
+        mock.existingPaths = [importantFile.path, installer.path]
+        mock.trashResults[importantFile.standardizedFileURL] = .success(home.appendingPathComponent(".Trash/important.txt"))
+        mock.trashResults[installer.standardizedFileURL] = .success(home.appendingPathComponent(".Trash/Installer.pkg"))
+
+        let forgedCacheCandidate = DiskCleanupCandidate(
+            url: importantFile,
+            kind: .appCache,
+            byteSize: 1,
+            displayName: "important.txt"
+        )
+        let validInstallerCandidate = DiskCleanupCandidate(
+            url: installer,
+            kind: .diskImage,
+            byteSize: 1,
+            displayName: "Installer.pkg"
+        )
+
+        let result = SystemDiskCleanup.trashSelected(
+            candidates: [forgedCacheCandidate, validInstallerCandidate],
+            fileManager: mock
+        )
+
+        #expect(result.successCount == 1)
+        #expect(result.failures.count == 1)
+        #expect(result.failures.first?.url == importantFile.standardizedFileURL)
+        #expect(result.failures.first?.message.contains("允许清理的用户目录") == true)
     }
 
     @Test
@@ -1565,6 +1662,32 @@ struct SystemMonitorServiceTests {
 
         await service.refreshPublicIPAddress()
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.8")
+    }
+
+    @Test
+    func concurrentSampleRequestsShareOneInFlightTask() async {
+        let mock = MockFileManager()
+        let volume = URL(fileURLWithPath: "/Users/test")
+        mock.homeDirectory = volume
+        mock.fileSystemAttributes[volume.path] = [
+            .systemSize: NSNumber(value: 500_000_000_000),
+            .systemFreeSize: NSNumber(value: 100_000_000_000),
+        ]
+        let hardwareProvider = DelayedHardwareInfoProvider()
+        let service = SystemMonitorService(
+            fileManager: mock,
+            volumeURL: volume,
+            publicIPProvider: StubPublicIPProvider(address: nil),
+            hardwareInfoProvider: { hardwareProvider.read() }
+        )
+
+        let first = Task { @MainActor in await service.sampleOnce() }
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        let second = Task { @MainActor in await service.sampleOnce() }
+        let (firstSnapshot, secondSnapshot) = await (first.value, second.value)
+
+        #expect(firstSnapshot == secondSnapshot)
+        #expect(hardwareProvider.callCount == 1)
     }
 
 

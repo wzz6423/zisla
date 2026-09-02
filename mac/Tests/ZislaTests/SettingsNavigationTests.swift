@@ -6,6 +6,63 @@ import ZislaCore
 
 struct SettingsNavigationTests {
     @Test
+    func settingsContentTransitionTargetsMountedContent() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        let detailRange = try #require(source.range(of: "    private var detail: some View {"))
+        let detailEnd = try #require(source.range(of: "\n    private func selectSettingsSection", range: detailRange.lowerBound..<source.endIndex))
+        let detail = String(source[detailRange.lowerBound..<detailEnd.lowerBound])
+        let compactDetail = detail.components(separatedBy: .whitespacesAndNewlines).joined()
+
+        #expect(compactDetail.contains("DeferredMount{selectedContent.id(input.selection).transition("))
+        #expect(compactDetail.contains(".settingsPagePush(direction:sectionSwitchDirection)"))
+    }
+
+    @Test
+    func settingsPageTransitionAvoidsBlur() throws {
+        let source = try String(contentsOf: Self.motionDesignSourceURL, encoding: .utf8)
+        let transitionStart = try #require(source.range(of: "    static func settingsPagePush(direction: CGFloat) -> AnyTransition {"))
+        let transitionEnd = try #require(source.range(of: "\n    }\n}", range: transitionStart.lowerBound..<source.endIndex))
+        let transition = String(source[transitionStart.lowerBound..<transitionEnd.lowerBound])
+
+        #expect(transition.contains("blurRadius: 0"))
+        #expect(!transition.contains("blurRadius: 5"))
+    }
+
+    @Test
+    func moduleSelectionDoesNotAnimateNavigationGlyphGeometry() throws {
+        let source = try String(contentsOf: Self.islandRootViewSourceURL, encoding: .utf8)
+        let selectorStart = try #require(source.range(of: "private struct ModuleSelector: View {"))
+        let selector = String(source[selectorStart.lowerBound...])
+
+        #expect(selector.contains("MotionFocusLens(cornerRadius: 8)"))
+        #expect(selector.contains(".frame(width: 28, height: 30)"))
+        #expect(!selector.contains("emphasizesSelection: true"))
+    }
+
+    @Test
+    func moduleRailDoesNotInheritSurfaceResizeAnimation() throws {
+        let source = try String(contentsOf: Self.islandRootViewSourceURL, encoding: .utf8)
+        let toolRailUse = try #require(source.range(of: "                            toolRail\n"))
+        let moduleContentEnd = try #require(
+            source[toolRailUse.upperBound...].range(of: "                            Group {")
+        )
+        let moduleContent = source[toolRailUse.lowerBound..<moduleContentEnd.lowerBound]
+
+        #expect(moduleContent.contains(".transaction { transaction in"))
+        #expect(moduleContent.contains("transaction.animation = nil"))
+        #expect(source.contains(".animation(reduceMotion ? nil : ZislaMotion.selection, value: model.selectedModule)"))
+    }
+
+    @Test
+    func updateChannelAppliesToAutomaticAndManualChecks() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+
+        #expect(source.contains("title: \"更新通道\""))
+        #expect(source.contains("用于自动与手动更新"))
+        #expect(!source.contains("仅用于手动检查"))
+    }
+
+    @Test
     func showsOnlyCurrentSettingsSections() {
         #expect(SettingsSection.allCases.map(\.title) == [
             "通用",
@@ -16,6 +73,7 @@ struct SettingsNavigationTests {
             "信息",
             "AI",
             "语音",
+            "键盘音效",
             "宠物",
             "下载",
             "天气",
@@ -26,6 +84,8 @@ struct SettingsNavigationTests {
         #expect(SettingsSection.general.subtitle == "调整语言、外观、启动与展开方式。")
         #expect(SettingsSection.ai.subtitle == "管理 AI CLI 与 Skills。")
         #expect(SettingsSection.voice.subtitle == "配置语音输入、整理模型与本机记录。")
+        #expect(SettingsSection.keyboardSound.subtitle == "键盘音效与输入统计。")
+        #expect(!SettingsSection.keyboardSound.prefersWideLayout)
         #expect(SettingsSection.networkProxy.subtitle == "配置本地代理，用于更新、安装、下载与 GitHub 访问。")
     }
 
@@ -39,8 +99,31 @@ struct SettingsNavigationTests {
         let settings = FeatureSettings()
         #expect(SettingsSection.general.isVisible(settings: settings))
         #expect(SettingsSection.features.isVisible(settings: settings))
+        #expect(!SettingsSection.keyboardSound.isVisible(settings: settings))
         #expect(SettingsSection.networkProxy.isVisible(settings: settings))
         #expect(SettingsSection.recommendations.isVisible(settings: settings))
+
+        var enabledSettings = settings
+        enabledSettings.keyboardEnabled = true
+        #expect(SettingsSection.keyboardSound.isVisible(settings: enabledSettings))
+    }
+
+    @Test
+    func keyboardSettingsDoNotExposePointerOrLaunchItemControls() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        let contentStart = try #require(source.range(of: "    private var keyboardSoundContent: some View {"))
+        let contentEnd = try #require(source.range(of: "\n    private var infoContent", range: contentStart.upperBound..<source.endIndex))
+        let content = String(source[contentStart.lowerBound..<contentEnd.lowerBound])
+
+        #expect(!content.contains("鼠标与触控板"))
+        #expect(!content.contains("启动项"))
+        #expect(!content.contains("启用键盘与点击音效"))
+        #expect(content.contains("试听键盘音"))
+        #expect(!content.contains("settingsGroup(\"输入统计\")"))
+        #expect(!content.contains("KeyboardTypingStatsDashboardView"))
+        #expect(!content.contains("keyboardTypingStatsContent"))
+        #expect(!content.contains("refreshTypingStats()"))
+        #expect(source.contains("featureToggle(\"键盘音效\", detail: \"全局播放键盘音效并记录输入统计\""))
     }
 
     @Test
@@ -145,5 +228,25 @@ struct SettingsNavigationTests {
         #expect(!SettingsView.isApplicationBundleInApplicationsDirectory(
             URL(fileURLWithPath: "/Applications/Example.txt")
         ))
+    }
+
+    private static var settingsViewSourceURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zisla/SettingsView.swift")
+    }
+
+    private static var motionDesignSourceURL: URL {
+        settingsViewSourceURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("MotionDesign.swift")
+    }
+
+    private static var islandRootViewSourceURL: URL {
+        settingsViewSourceURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("IslandRootView.swift")
     }
 }

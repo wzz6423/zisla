@@ -9,6 +9,8 @@ import Speech
 /// Microphone and speech recognition permissions are requested only after the user explicitly taps.
 @MainActor
 final class VoiceInputController: ObservableObject {
+    private static let maximumSystemDictationFormatRetries = 2
+
     @Published private(set) var isRecording = false
     @Published private(set) var isPreparing = false
     @Published private(set) var transcript = ""
@@ -69,8 +71,11 @@ final class VoiceInputController: ObservableObject {
         // The previous take may still be waiting for its final result; deliver it now instead of
         // swallowing this keypress for the whole finalization window.
         if let recordingID { finishRecording(recordingID: recordingID) }
+        let startID = UUID()
+        pendingStartID = startID
+        isPreparing = true
         onRecordingWillStart?()
-        requestPermissionsAndStart()
+        requestPermissionsAndStart(startID: startID)
     }
 
     func stop() {
@@ -88,10 +93,8 @@ final class VoiceInputController: ObservableObject {
         clearRecordingResources(deleteAudioFile: true)
     }
 
-    private func requestPermissionsAndStart() {
-        let startID = UUID()
-        pendingStartID = startID
-        isPreparing = true
+    private func requestPermissionsAndStart(startID: UUID) {
+        guard pendingStartID == startID else { return }
         errorDescription = nil
         // The island surface is already on screen at this point, and the recognizers only reset the
         // transcript once they are live — leaving the previous take's text on display until then.
@@ -193,9 +196,18 @@ final class VoiceInputController: ObservableObject {
         }
     }
 
+    nonisolated static func audioTapFormatNeedsRefresh(
+        preparedFormat: AVAudioFormat,
+        liveFormat: AVAudioFormat
+    ) -> Bool {
+        preparedFormat.sampleRate != liveFormat.sampleRate
+            || preparedFormat.channelCount != liveFormat.channelCount
+            || preparedFormat.commonFormat != liveFormat.commonFormat
+            || preparedFormat.isInterleaved != liveFormat.isInterleaved
+    }
+
     nonisolated private static func installAudioTap(
         on input: AVAudioInputNode,
-        format: AVAudioFormat,
         recordingFile: AVAudioFile,
         recordingID: UUID,
         onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void,
@@ -204,7 +216,9 @@ final class VoiceInputController: ObservableObject {
         input.installTap(
             onBus: 0,
             bufferSize: 1_024,
-            format: format,
+            // The input device can change while dictation prepares asynchronously. Passing a cached
+            // format here makes AVFAudio raise an Objective-C exception instead of returning an error.
+            format: nil,
             block: makeAudioTapHandler(
                 recordingFile: recordingFile,
                 recordingID: recordingID,
@@ -224,11 +238,11 @@ final class VoiceInputController: ObservableObject {
     }
 
     @available(macOS 26.0, *)
-    private func startSystemDictationRecording(startID: UUID) {
+    private func startSystemDictationRecording(startID: UUID, formatRetryCount: Int = 0) {
         let engine = AVAudioEngine()
         let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
+        let preparedFormat = input.outputFormat(forBus: 0)
+        guard preparedFormat.sampleRate > 0, preparedFormat.channelCount > 0 else {
             finishPendingStart(with: "未检测到可用的麦克风输入")
             return
         }
@@ -238,7 +252,7 @@ final class VoiceInputController: ObservableObject {
         Task { [weak self] in
             do {
                 let session = try await SystemDictationSession(
-                    sourceFormat: format,
+                    sourceFormat: preparedFormat,
                     contextualStrings: contextualStrings,
                     onResult: { [weak self] range, text in
                         Task { @MainActor [weak self] in
@@ -264,7 +278,8 @@ final class VoiceInputController: ObservableObject {
                     recordingID: recordingID,
                     engine: engine,
                     input: input,
-                    format: format,
+                    preparedFormat: preparedFormat,
+                    formatRetryCount: formatRetryCount,
                     session: session
                 )
             } catch {
@@ -280,11 +295,33 @@ final class VoiceInputController: ObservableObject {
         recordingID: UUID,
         engine: AVAudioEngine,
         input: AVAudioInputNode,
-        format: AVAudioFormat,
+        preparedFormat: AVAudioFormat,
+        formatRetryCount: Int,
         session: SystemDictationSession
     ) {
         guard pendingStartID == startID else {
             session.cancel()
+            return
+        }
+        let liveFormat = input.outputFormat(forBus: 0)
+        guard liveFormat.sampleRate > 0, liveFormat.channelCount > 0 else {
+            session.cancel()
+            finishPendingStart(with: "未检测到可用的麦克风输入")
+            return
+        }
+        if Self.audioTapFormatNeedsRefresh(
+            preparedFormat: preparedFormat,
+            liveFormat: liveFormat
+        ) {
+            session.cancel()
+            if formatRetryCount < Self.maximumSystemDictationFormatRetries {
+                startSystemDictationRecording(
+                    startID: startID,
+                    formatRetryCount: formatRetryCount + 1
+                )
+            } else {
+                startLegacyRecording(startID: startID)
+            }
             return
         }
         let recordingFile: AVAudioFile
@@ -292,7 +329,7 @@ final class VoiceInputController: ObservableObject {
         do {
             (recordingFileURL, recordingFile) = try makeRecordingFile(
                 recordingID: recordingID,
-                format: format
+                format: liveFormat
             )
         } catch {
             session.cancel()
@@ -310,7 +347,6 @@ final class VoiceInputController: ObservableObject {
         systemDictationSession = session
         Self.installAudioTap(
             on: input,
-            format: format,
             recordingFile: recordingFile,
             recordingID: recordingID,
             onBuffer: { session.append($0) }
@@ -386,7 +422,6 @@ final class VoiceInputController: ObservableObject {
         let requestAppender = LegacyRecognitionRequestAppender(request: request)
         Self.installAudioTap(
             on: input,
-            format: format,
             recordingFile: recordingFile,
             recordingID: recordingID,
             onBuffer: { requestAppender.append($0) }

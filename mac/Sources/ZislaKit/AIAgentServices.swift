@@ -424,6 +424,7 @@ public struct AIAgentSkillService: Sendable {
                 let values = try? url.resourceValues(forKeys: [.contentModificationDateKey])
                 skills.append(AgentSkill(
                     name: parent.lastPathComponent,
+                    description: skillDescription(at: url),
                     path: parent.path,
                     source: root.lastPathComponent,
                     isEnabled: !enabledPaths.contains(parent.path),
@@ -436,6 +437,26 @@ public struct AIAgentSkillService: Sendable {
         return scannedSkills
             .filter { seenNames.insert($0.name.lowercased()).inserted }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func skillDescription(at url: URL) -> String? {
+        guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        let lines = contents.components(separatedBy: .newlines)
+        guard lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) == "---" else { return nil }
+
+        for line in lines.dropFirst() {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed == "---" { break }
+            guard trimmed.hasPrefix("description:") else { continue }
+            let value = trimmed.dropFirst("description:".count)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { return nil }
+            if value.first == "\"", value.last == "\"", value.count >= 2 {
+                return String(value.dropFirst().dropLast())
+            }
+            return String(value)
+        }
+        return nil
     }
 
     public static var defaultRoots: [URL] {
@@ -793,9 +814,7 @@ public struct AIAgentCLIService: Sendable {
             for await update in group {
                 if let update { updates.append(update) }
             }
-            return updates.sorted {
-                AgentCLIKind.allCases.firstIndex(of: $0.kind)! < AgentCLIKind.allCases.firstIndex(of: $1.kind)!
-            }
+            return updates.sorted { Self.cliKindOrder($0.kind, $1.kind) }
         }
     }
 
@@ -1117,7 +1136,7 @@ public struct AIAgentCLIService: Sendable {
         }
     }
 
-    private static func cliKindOrder(_ lhs: AgentCLIKind, _ rhs: AgentCLIKind) -> Bool {
+    static func cliKindOrder(_ lhs: AgentCLIKind, _ rhs: AgentCLIKind) -> Bool {
         guard let left = AgentCLIKind.allCases.firstIndex(of: lhs),
               let right = AgentCLIKind.allCases.firstIndex(of: rhs)
         else { return lhs.rawValue < rhs.rawValue }
@@ -1531,7 +1550,7 @@ public enum AIAgentProcessRunner {
         }
     }
 
-    /// 直接在调用线程跑完子进程，不借道 Swift 并发协作线程池，避免调用方在 `Task` 内等待时线程枯竭。
+    /// Runs the subprocess directly on the calling thread instead of the Swift concurrency cooperative pool, preventing thread starvation while a caller waits inside a `Task`.
     public static func runSynchronously(
         executableURL: URL,
         arguments: [String] = [],
@@ -1610,7 +1629,7 @@ public enum AIAgentProcessRunner {
         }
         let timeoutWork = timeout.map { _ in
             DispatchWorkItem {
-                // 进程已退出时读取线程可能仍在收尾，此时关管道会截断正常输出。
+                // Reader threads may still be draining after the process exits, so closing the pipes here would truncate valid output.
                 guard channels.process.isRunning else { return }
                 capture.markTimedOut()
                 terminate(channels, escalationDelay: 3)
@@ -1621,8 +1640,8 @@ public enum AIAgentProcessRunner {
         }
         channels.process.waitUntilExit()
         timeoutWork?.cancel()
-        // 写端随进程退出而关闭，此后管道里最多只剩缓冲区那点数据；
-        // 还读不完就说明有孙进程占着写端，主动关读端解除阻塞。
+        // The write ends close when the process exits, leaving at most the buffered data in the pipes.
+        // If draining still does not finish, a descendant process is holding a write end open, so close the read ends to unblock.
         if readers.wait(timeout: .now() + readerDrainGrace) == .timedOut {
             closeReadEnds(channels)
             readers.wait()

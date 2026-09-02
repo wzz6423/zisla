@@ -97,6 +97,22 @@ struct BrowserDownloadAgentResolverTests {
     }
 }
 
+struct BrowserDownloadMonitorLifecycleTests {
+    @Test
+    func staleCallbacksAreRejectedAfterStopAndRestart() {
+        var lifecycle = BrowserDownloadMonitorLifecycle()
+        let firstGeneration = lifecycle.start()
+        #expect(lifecycle.accepts(firstGeneration))
+
+        lifecycle.stop()
+        #expect(!lifecycle.accepts(firstGeneration))
+
+        let secondGeneration = lifecycle.start()
+        #expect(!lifecycle.accepts(firstGeneration))
+        #expect(lifecycle.accepts(secondGeneration))
+    }
+}
+
 struct BrowserDownloadSnapshotTests {
     private func snapshot(
         fraction: Double?,
@@ -129,6 +145,19 @@ struct BrowserDownloadSnapshotTests {
     func fractionIsClampedIntoUnitRange() {
         #expect(snapshot(fraction: -0.5).fraction == 0)
         #expect(snapshot(fraction: 1.5).fraction == 1)
+    }
+
+    @Test
+    func nonFiniteFractionFallsBackToUnknownProgress() {
+        for fraction in [Double.nan, Double.infinity, -Double.infinity] {
+            let value = snapshot(fraction: fraction)
+            #expect(value.fraction == nil)
+            #expect(value.progressText == "…")
+        }
+
+        var mutated = snapshot(fraction: 0.5)
+        mutated.fraction = .nan
+        #expect(mutated.progressText == "…")
     }
 
     /// Progress jitter within the same integer percent must not refresh the Dynamic Island.
