@@ -66,16 +66,49 @@ struct AudioSpectrumServiceTests {
         service.stop()
     }
 
+    /// The focus thief: every automatic graph rebuild anchored a permission prompt, and anchoring
+    /// activates the app. A granted tap never fails, so it must never anchor.
     @Test
-    func processTapCreationAlwaysUsesAuthorizationHost() throws {
+    func grantedTapCreationNeverRequestsAuthorizationPrompt() {
+        #expect(!SystemAudioSpectrumCapture.shouldRequestAuthorizationPrompt(
+            creationFailed: false,
+            hasRequestedInCurrentLaunch: false
+        ))
+        #expect(!SystemAudioSpectrumCapture.shouldRequestAuthorizationPrompt(
+            creationFailed: false,
+            hasRequestedInCurrentLaunch: true
+        ))
+    }
+
+    /// A denied tap keeps failing on every reveal, so the prompt is anchored at most once per launch.
+    @Test
+    func failedTapCreationRequestsAuthorizationPromptOncePerLaunch() {
+        #expect(SystemAudioSpectrumCapture.shouldRequestAuthorizationPrompt(
+            creationFailed: true,
+            hasRequestedInCurrentLaunch: false
+        ))
+        #expect(!SystemAudioSpectrumCapture.shouldRequestAuthorizationPrompt(
+            creationFailed: true,
+            hasRequestedInCurrentLaunch: true
+        ))
+    }
+
+    /// `AudioHardwareCreateProcessTap` cannot be injected, so guard the call site itself: the host may
+    /// only be built after the prompt decision, never unconditionally as it once was.
+    @Test
+    func authorizationHostStaysBehindThePromptDecision() throws {
         let source = try String(
             contentsOf: Self.sourcesDirectoryURL.appendingPathComponent("ZislaKit/AudioSpectrumService.swift"),
             encoding: .utf8
         )
         let createGraph = try #require(source.range(of: "private func createGraph("))
         let graphBody = source[createGraph.lowerBound...]
+        let hostCreation = try #require(
+            graphBody.range(of: "WindowPlacement.authorizationPromptHost()")
+        )
 
-        #expect(graphBody.contains("host = WindowPlacement.authorizationPromptHost()"))
+        #expect(graphBody[..<hostCreation.lowerBound]
+            .contains("Self.shouldRequestAuthorizationPrompt("))
         #expect(!graphBody.contains("CGPreflightScreenCaptureAccess()"))
     }
 

@@ -567,7 +567,7 @@ private final class PersistentPetPanelProbe {
 
 extension OverlayCoordinatorTests {
     @Test @MainActor
-    func pinningBeforePendingGlassActivationKeepsGlassWithoutEnablingKeyboardInput() async throws {
+    func pinningKeepsGlassWithoutEnablingKeyboardInput() async throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
         defer { coordinator.stop() }
@@ -583,9 +583,8 @@ extension OverlayCoordinatorTests {
         try await Task.sleep(for: .milliseconds(10))
 
         #expect(panel.keepsNativeGlassActive)
-        #expect(panel.allowsNativeGlassActivation)
         #expect(!panel.allowsKeyWindow)
-        #expect(panel.canBecomeKey)
+        #expect(!panel.canBecomeKey)
         #expect(panel.isPinned)
     }
 
@@ -606,14 +605,13 @@ extension OverlayCoordinatorTests {
         coordinator.updateExpandedSize(CGSize(width: 900, height: 360))
 
         #expect(panel.keepsNativeGlassActive)
-        #expect(panel.allowsNativeGlassActivation)
         #expect(panel.allowsKeyWindow)
         #expect(panel.canBecomeKey)
         #expect(panel.isPinned)
     }
 
     @Test @MainActor
-    func pinningExpandedGlassPanelStopsReclaimingFocus() async throws {
+    func pinningExpandedGlassPanelNeverTakesFocus() async throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
         defer { coordinator.stop() }
@@ -626,16 +624,15 @@ extension OverlayCoordinatorTests {
         let panel = try #require(contentView.window as? IslandPanel)
         try await Task.sleep(for: .milliseconds(10))
         #expect(panel.keepsNativeGlassActive)
-        #expect(panel.canBecomeKey)
+        #expect(!panel.canBecomeKey)
         #expect(!panel.isPinned)
 
         coordinator.setPinned(true)
         #expect(panel.keepsNativeGlassActive)
         #expect(!panel.allowsKeyWindow)
-        #expect(panel.canBecomeKey)
+        #expect(!panel.canBecomeKey)
         #expect(panel.isPinned)
 
-        panel.resignKey()
         try await Task.sleep(for: .milliseconds(50))
 
         #expect(!panel.isKeyWindow)
@@ -664,7 +661,7 @@ extension OverlayCoordinatorTests {
     }
 
     @Test @MainActor
-    func firstShowDelaysGlassActivationUntilAfterVisibilityChanged() async throws {
+    func firstShowActivatesGlassAndReportsVisibilityOnce() async throws {
         let contentView = NSView()
         var visibilityEvents: [Bool] = []
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
@@ -686,7 +683,7 @@ extension OverlayCoordinatorTests {
     }
 
     @Test @MainActor
-    func collapseCancelsPendingGlassActivation() async throws {
+    func collapseTurnsOffNativeGlass() async throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
         defer { coordinator.stop() }
@@ -704,7 +701,7 @@ extension OverlayCoordinatorTests {
     }
 
     @Test @MainActor
-    func stoppingClearsGlassActivationBeforeNextShow() async throws {
+    func stoppingClearsNativeGlassBeforeNextShow() async throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
         defer { coordinator.stop() }
