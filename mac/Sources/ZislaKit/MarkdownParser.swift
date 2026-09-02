@@ -131,10 +131,22 @@ public enum MarkdownParser {
                index + 1 < lines.count, isTableDelimiter(lines[index + 1]) {
                 break
             }
-            collected.append(trimmed)
+            collected.append(normalizeParagraphLine(line))
             index += 1
         }
         return (collected.joined(separator: " "), index)
+    }
+
+    private static func normalizeParagraphLine(_ line: String) -> String {
+        var leadingCount = 0
+        for character in line {
+            guard character == " " || character == "\t" else { break }
+            leadingCount += 1
+        }
+
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard leadingCount > 0 else { return trimmed }
+        return "%%ZISLA_INDENT:\(leadingCount)%%\(trimmed)"
     }
 
     private static func collectList(

@@ -746,7 +746,7 @@ public final class OverlayCoordinator: NSObject {
         return layouts.first { $0.displayID == displayID }
     }
 
-    private func presentCurrentLayout() {
+    private func presentCurrentLayout(activatesFocus: Bool = true) {
         guard let layout = layout(for: activeDisplayID) else { return }
         // After repositioning to a different screen, don't let a pending collapse task on the old screen prematurely hide the shared panel.
         cancelPendingPanelCollapse()
@@ -768,7 +768,8 @@ public final class OverlayCoordinator: NSObject {
         panel.present(
             at: targetFrame,
             from: layout.collapsedFrame,
-            animated: !panel.isVisible
+            animated: !panel.isVisible,
+            activatesFocus: activatesFocus
         )
         applyPanelInteractionPolicy()
         applyPanelLevel()

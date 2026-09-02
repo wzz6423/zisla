@@ -5,7 +5,6 @@ import UniformTypeIdentifiers
 import KeyboardKit
 import ZislaCore
 import ZislaKit
-import BattutaKit
 
 enum IslandModule: String, CaseIterable, Identifiable {
   case dashboard
@@ -450,7 +449,6 @@ final class AppModel: ObservableObject {
   /// Synchronous hook used by the app delegate to arm overlay focus protection before any
   /// recording-start cleanup can reorder windows.
   var onVoiceInputWillStart: (() -> Void)?
-  let battuta = BattutaService()
 
   /// Model discovery state: used by the settings page to show connection test results and the available model list.
   @Published var voiceModelDiscoveryState: VoiceModelDiscoveryState = .idle
@@ -651,7 +649,6 @@ final class AppModel: ObservableObject {
       aiAgent.objectWillChange,
       managedTools.objectWillChange,
       keyboardSound.objectWillChange,
-      battuta.objectWillChange,
     ]
     for publisher in childPublishers {
       publisher
@@ -2245,22 +2242,6 @@ final class AppModel: ObservableObject {
     }
     refreshToolboxReminderNotice()
 
-    // Battuta 键盘音效服务配置
-    if settings.battutaEnabled {
-      battuta.loadProfile(settings.battutaSelectedProfileID)
-      _ = battuta.loadPointerProfile(settings.battutaSelectedPointerProfileID)
-      battuta.start(
-        keyboardEnabled: settings.battutaEnabled,
-        playsReleaseSound: settings.battutaPlaysReleaseSound,
-        pointerEnabled: settings.battutaPointerSoundEnabled,
-        playsPointerReleaseSound: settings.battutaPlaysPointerReleaseSound,
-        pitchVariation: settings.battutaUsesPitchVariation,
-        keyboardVolume: settings.battutaVolume,
-        pointerVolume: settings.battutaPointerVolume
-      )
-    } else {
-      battuta.stop()
-    }
   }
 
   private func configureUpdatePolling(enabled: Bool) {

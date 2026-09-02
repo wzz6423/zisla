@@ -74,6 +74,12 @@ public enum MarkdownHTMLRenderer {
             return token
         }
 
+        // The block parser uses a private marker so leading whitespace survives paragraph joining.
+        result = replace(result, pattern: "%%ZISLA_INDENT:([0-9]+)%%") { match, _ in
+            guard let count = Int(match[1]), count <= 4096 else { return match[0] }
+            return String(repeating: "&nbsp;", count: count)
+        }
+
         // 2. Image ![alt](url)
         result = replace(result, pattern: "!\\[([^\\[]*)\\]\\(([^\\)]+)\\)") { match, _ in
             let alt = match[1]

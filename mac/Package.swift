@@ -10,7 +10,6 @@ let package = Package(
         .library(name: "ZislaCore", targets: ["ZislaCore"]),
         .library(name: "ZislaKit", targets: ["ZislaKit"]),
         .library(name: "KeyboardKit", targets: ["KeyboardKit"]),
-        .library(name: "BattutaKit", targets: ["BattutaKit"]),
         .executable(name: "zisla", targets: ["Zisla"]),
         .executable(name: "zislactl", targets: ["zislactl"]),
     ],
@@ -36,17 +35,6 @@ let package = Package(
         .binaryTarget(
             name: "Sparkle",
             path: "Vendor/Sparkle.xcframework"
-        ),
-        .target(
-            name: "BattutaKit",
-            dependencies: [],
-            resources: [
-                .copy("../../Resources/Battuta")
-            ],
-            linkerSettings: [
-                .linkedFramework("AVFoundation"),
-                .linkedFramework("CoreGraphics"),
-            ]
         ),
         .target(
             name: "ZislaKit",
@@ -83,7 +71,6 @@ let package = Package(
                 "ZislaCore",
                 "ZislaKit",
                 "KeyboardKit",
-                "BattutaKit",
                 "Sparkle",
                 .product(name: "SkyLightWindow", package: "SkyLightWindow"),
             ],
@@ -114,10 +101,6 @@ let package = Package(
         .testTarget(
             name: "ZislaKitTests",
             dependencies: ["ZislaCore", "ZislaKit"]
-        ),
-        .testTarget(
-            name: "BattutaKitTests",
-            dependencies: ["BattutaKit"]
         ),
         .testTarget(
             name: "ZislaTests",
