@@ -63,6 +63,7 @@ else
   print -r -- "$DEVELOPER_DIR" > "$FAKE_CAPTURE_FILE"
   mkdir -p "$bin_directory"
   touch "$bin_directory/zisla"
+  mkdir -p "$bin_directory/zisla_KeyboardKit.bundle"
 fi
 SCRIPT
 
@@ -90,6 +91,43 @@ exit 0
 SCRIPT
 
 chmod +x "$FAKE_BIN"/*
+
+function expect_architecture_failure() {
+  local architectures="$1"
+  local expected_message="$2"
+  local output
+
+  if output="$(
+    PATH="$FAKE_BIN:$PATH" \
+      FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
+      FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
+      FAKE_XCODE_APP="$XCODE_APP" \
+      BUILD_ARCHITECTURES="$architectures" \
+      CODE_SIGN_IDENTITY=- \
+      OUTPUT_DIRECTORY="$TEMPORARY_ROOT/invalid-output" \
+      SIGNING_MODE=adhoc \
+      "$TEST_ROOT/Scripts/build-app.sh" 2>&1
+  )"; then
+    print -u2 -r -- "FAIL: invalid architecture list '$architectures' was accepted"
+    exit 1
+  fi
+  if [[ "$output" != *"$expected_message"* ]]; then
+    print -u2 -r -- "FAIL: invalid architecture list '$architectures' reported the wrong error"
+    print -u2 -r -- "expected message: $expected_message"
+    print -u2 -r -- "actual:           $output"
+    exit 1
+  fi
+}
+
+expect_architecture_failure \
+  "   " \
+  "BUILD_ARCHITECTURES must contain at least one architecture"
+expect_architecture_failure \
+  "arm64e" \
+  "unsupported architecture: arm64e"
+expect_architecture_failure \
+  "arm64 arm64" \
+  "duplicate architecture: arm64"
 
 (
   unset DEVELOPER_DIR

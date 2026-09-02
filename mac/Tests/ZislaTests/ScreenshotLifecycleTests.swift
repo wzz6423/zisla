@@ -1,42 +1,183 @@
+import AppKit
 import Foundation
 import Testing
 
+@testable import Zisla
+
 @Suite("Screenshot lifecycle")
 struct ScreenshotLifecycleTests {
+    @Test @MainActor
+    func screenshotSelectionDismissesOnlyAnActiveModalSession() {
+        var abortCount = 0
+
+        ScreenshotModalSession.dismissForSelectionPresentation(
+            modalWindow: nil,
+            abortModal: { abortCount += 1 }
+        )
+        #expect(abortCount == 0)
+
+        ScreenshotModalSession.dismissForSelectionPresentation(
+            modalWindow: NSWindow(
+                contentRect: .zero,
+                styleMask: [.borderless],
+                backing: .buffered,
+                defer: false
+            ),
+            abortModal: { abortCount += 1 }
+        )
+        #expect(abortCount == 1)
+    }
+
+    @Test
+    func modalSnapshotUsesTopLeftDisplayCoordinates() {
+        let screenFrame = CGRect(x: 1_440, y: -900, width: 1_920, height: 1_080)
+        let modalFrame = CGRect(x: 1_560, y: -300, width: 500, height: 400)
+
+        #expect(ScreenshotModalWindowSnapshot.localTopLeftFrame(
+            for: modalFrame,
+            on: screenFrame
+        ) == CGRect(x: 120, y: 80, width: 500, height: 400))
+    }
+
+    @Test
+    func modalSnapshotIsCompositedAtItsTopLeftScreenPosition() throws {
+        let background = try #require(Self.solidImage(width: 8, height: 8, color: (0, 0, 0)))
+        let modal = try #require(Self.solidImage(width: 2, height: 2, color: (255, 0, 0)))
+        let image = try #require(ScreenshotModalWindowSnapshot.composite(
+            modal,
+            in: CGRect(x: 2, y: 3, width: 2, height: 2),
+            over: background,
+            screenSize: CGSize(width: 8, height: 8)
+        ))
+
+        let inside = try #require(ScreenshotCaptureService.pixelColor(
+            at: CGPoint(x: 2, y: 3),
+            in: image,
+            screenSize: CGSize(width: 8, height: 8)
+        ))
+        let above = try #require(ScreenshotCaptureService.pixelColor(
+            at: CGPoint(x: 2, y: 2),
+            in: image,
+            screenSize: CGSize(width: 8, height: 8)
+        ))
+        #expect(inside.hex == "#FF0000")
+        #expect(above.hex == "#000000")
+    }
+
     @Test
     func screenshotCapturePreservesCurrentIslandPresentation() throws {
         let source = try String(contentsOf: Self.appSourceURL, encoding: .utf8)
         let beginScreenshot = try #require(source.range(of: "private func beginScreenshot"))
-        let registerHotkeys = try #require(source.range(
-            of: "private func registerScreenshotHotkeys",
+        let sessionState = try #require(source.range(
+            of: "private func setScreenshotSessionActive",
             range: beginScreenshot.upperBound..<source.endIndex
         ))
-        let captureLifecycle = source[beginScreenshot.lowerBound..<registerHotkeys.lowerBound]
+        let captureLifecycle = source[beginScreenshot.lowerBound..<sessionState.lowerBound]
 
         #expect(!captureLifecycle.contains("overlayCoordinator?.stop()"))
         #expect(captureLifecycle.contains("setScreenshotSessionActive(true)"))
-        #expect(captureLifecycle.contains("endScreenshotSessionIfNeeded()"))
-        #expect(captureLifecycle.contains("noticePresenter?.setScreenshotActive(active)"))
 
-        // The clipboard assistant row returns only after the capture is frozen, so it stays visible
-        // during the selection without ever appearing inside the screenshot.
-        let capture = try #require(captureLifecycle.range(of: "controller.start(on: captureScreens)"))
-        let restoreRow = try #require(captureLifecycle.range(
-            of: "clipboardAssistant.setScreenshotSelectionActive(true)"
+        let selectionWillPresent = try #require(captureLifecycle.range(
+            of: "controller.onSelectionWillPresent = {"
         ))
-        #expect(capture.upperBound < restoreRow.lowerBound)
-        #expect(captureLifecycle.contains("guard controller.selectionWindowCount > 0 else { return }"))
-        #expect(captureLifecycle.contains("clipboardAssistant.setScreenshotSelectionActive(false)"))
+        let controllerCreation = try #require(captureLifecycle.range(
+            of: "let controller = ScreenshotSelectionController("
+        ))
+        let modalDismissal = try #require(captureLifecycle.range(
+            of: "ScreenshotModalSession.dismissForSelectionPresentation()"
+        ))
+        let modalSnapshot = try #require(captureLifecycle.range(
+            of: "let modalWindowSnapshot = ScreenshotModalWindowSnapshot.capture()"
+        ))
+        let liveCaptureStart = try #require(captureLifecycle.range(
+            of: "setScreenshotLiveCaptureActive(true)"
+        ))
+        let captured = try #require(captureLifecycle.range(
+            of: "controller.onCaptured",
+            range: selectionWillPresent.upperBound..<captureLifecycle.endIndex
+        ))
+        let selectionPresentation = captureLifecycle[selectionWillPresent.lowerBound..<captured.lowerBound]
+        let liveCaptureEnd = try #require(selectionPresentation.range(
+            of: "self.setScreenshotLiveCaptureActive(false)"
+        ))
+        let frozenPresentation = try #require(selectionPresentation.range(
+            of: "self.setScreenshotFrozenPresentationActive(true)"
+        ))
+        #expect(selectionPresentation.contains("self.setScreenshotFrozenPresentationActive(true)"))
+        #expect(selectionPresentation.contains("clipboardAssistant.setScreenshotSelectionActive(true)"))
+        #expect(!selectionPresentation.contains("ScreenshotModalSession.dismissForSelectionPresentation()"))
+        #expect(modalSnapshot.lowerBound < modalDismissal.lowerBound)
+        #expect(modalDismissal.lowerBound < controllerCreation.lowerBound)
+        #expect(captureLifecycle.contains("modalWindowSnapshot?.restoreAfterModalDismissal()"))
+        #expect(captureLifecycle.contains("onClose: { [weak self] in"))
+        #expect(captureLifecycle.contains("modalWindowSnapshot?.restoreAfterModalDismissal()\n                    self.endScreenshotSessionIfNeeded()"))
+        #expect(source.contains("modalWindow.windowController?.showWindow(nil)"))
+        #expect(source.contains("title == \"取消更新\" || title == \"Cancel Update\""))
+        #expect(source.contains("button.action = #selector(ScreenshotModalDismissTarget.close(_:))"))
+        #expect(source.contains("window?.close()"))
+        #expect(source.contains("modalWindow.level = WindowPlacement.modalWindowLevel"))
+        #expect(source.contains("modalWindow.makeKeyAndOrderFront(nil)"))
+        #expect(liveCaptureStart.lowerBound < controllerCreation.lowerBound)
+        #expect(liveCaptureEnd.lowerBound < frozenPresentation.lowerBound)
+        #expect(selectionPresentation.contains("await Task.yield()"))
+        #expect(captureLifecycle.contains("captureScreen: { screen in"))
+        #expect(captureLifecycle.contains("modalWindowSnapshot?.composited(over: capture, on: screen) ?? capture"))
+        #expect(source.contains("CGFloat(captureImage.height) - modalFrame.maxY * scaleY"))
 
-        // A pinned screenshot keeps the session open, so the row must leave the display on every
-        // capture instead of only on the first one.
-        let rowLeavesCapture = try #require(captureLifecycle.range(
+        let captureSource = try String(contentsOf: Self.captureSourceURL, encoding: .utf8)
+        #expect(captureSource.contains("typealias WillPresentPanels = @MainActor () async -> Void"))
+        #expect(captureSource.contains("if let onSelectionWillPresent {\n            await onSelectionWillPresent()"))
+
+        let capture = try #require(captureLifecycle.range(of: "controller.start(on: captureScreens)"))
+        #expect(selectionWillPresent.lowerBound < capture.lowerBound)
+        let afterCapture = captureLifecycle[capture.upperBound..<captureLifecycle.endIndex]
+        #expect(!afterCapture.contains("clipboardAssistant.setScreenshotSelectionActive(true)"))
+        #expect(!captureLifecycle.contains("overlayCoordinator?.setScreenshotActive"))
+        #expect(!captureLifecycle.contains("noticePresenter?.setScreenshotActive"))
+        #expect(!captureLifecycle.contains("Task.sleep(nanoseconds: 120_000_000)"))
+
+        let cancelled = try #require(captureLifecycle.range(
+            of: "controller.onCancelled",
+            range: captured.upperBound..<captureLifecycle.endIndex
+        ))
+        let cancelledLifecycle = captureLifecycle[cancelled.lowerBound..<captureLifecycle.endIndex]
+        let capturedLifecycle = captureLifecycle[captured.lowerBound..<cancelled.lowerBound]
+        #expect(!capturedLifecycle.contains("self.setScreenshotFrozenPresentationActive(false)"))
+        #expect(!capturedLifecycle.contains("clipboardAssistant.setScreenshotSelectionActive(false)"))
+        #expect(capturedLifecycle.contains("self.endScreenshotSessionIfNeeded()"))
+        #expect(cancelledLifecycle.contains("self.setScreenshotLiveCaptureActive(false)"))
+
+        let sessionLifecycle = source[sessionState.lowerBound...]
+        let rowEntersCapture = try #require(sessionLifecycle.range(
             of: "AppModel.shared.clipboardAssistant.setScreenshotActive(active)"
         ))
-        let sessionGuard = try #require(captureLifecycle.range(
+        let sessionGuard = try #require(sessionLifecycle.range(
             of: "guard isScreenshotSessionActive != active else { return }"
         ))
-        #expect(rowLeavesCapture.upperBound < sessionGuard.lowerBound)
+        #expect(rowEntersCapture.upperBound < sessionGuard.lowerBound)
+        #expect(sessionLifecycle.contains("if !active {"))
+        #expect(sessionLifecycle.contains("setScreenshotLiveCaptureActive(false)"))
+        #expect(sessionLifecycle.contains("setScreenshotFrozenPresentationActive(false)"))
+    }
+
+    @Test
+    func screenshotHotkeysStartCaptureSynchronouslyWhileMenusAreTracking() throws {
+        let source = try String(contentsOf: Self.appSourceURL, encoding: .utf8)
+        let registerHotkeys = try #require(source.range(of: "private func registerScreenshotHotkeys"))
+        let registration = source[registerHotkeys.lowerBound..<source.endIndex]
+
+        #expect(registration.contains("onKeyDown: { [weak self] in self?.startScreenshot() }"))
+        #expect(registration.contains("onKeyDown: { [weak self] in self?.startPinnedScreenshot() }"))
+        #expect(!registration.contains("Task { @MainActor [weak self] in self?.startScreenshot() }"))
+
+        let beginScreenshot = try #require(source.range(of: "private func beginScreenshot"))
+        let sessionState = try #require(source.range(
+            of: "private func setScreenshotSessionActive",
+            range: beginScreenshot.upperBound..<source.endIndex
+        ))
+        let captureLifecycle = source[beginScreenshot.lowerBound..<sessionState.lowerBound]
+        #expect(!captureLifecycle.contains("cancelTrackingWithoutAnimation()"))
+        #expect(!captureLifecycle.contains("Task.sleep(nanoseconds: 120_000_000)"))
     }
 
     @Test
@@ -80,6 +221,31 @@ struct ScreenshotLifecycleTests {
         #expect(source.contains("max(screen.backingScaleFactor, 1)"))
         #expect(source.contains("Int((screen.frame.width * scale).rounded())"))
         #expect(source.contains("Int((screen.frame.height * scale).rounded())"))
+    }
+
+    @Test
+    func screenshotCaptureUsesTheMacOS26ConfigurationAndKeepsAnOlderFallback() throws {
+        let source = try String(contentsOf: Self.captureSourceURL, encoding: .utf8)
+
+        #expect(source.contains("if #available(macOS 26.0, *)"))
+        #expect(source.contains("SCScreenshotConfiguration()"))
+        #expect(source.contains("SCScreenshotManager.captureScreenshot("))
+        #expect(source.contains("configuration.displayIntent = .local"))
+        #expect(source.contains("configuration.dynamicRange = .sdr"))
+        #expect(source.contains("output.sdrImage"))
+        #expect(source.contains("detachedImageAndDiagnose(image, api: \"SCScreenshotConfiguration\")"))
+        #expect(source.contains("detachedImageAndDiagnose(image, api: \"SCStreamConfiguration\")"))
+        #expect(source.contains("api: \"CGDisplayCreateImage\""))
+        #expect(source.contains("static func detachedImage(from image: CGImage) -> CGImage?"))
+        #expect(source.contains("static func frameDiagnostics("))
+    }
+
+    @Test
+    func systemScreenshotNotificationObserversDoNotRetainTheMonitor() throws {
+        let source = try String(contentsOf: Self.systemScreenshotMonitorSourceURL, encoding: .utf8)
+
+        #expect(source.contains("queue: .main) { [weak self] notification in"))
+        #expect(source.contains("Task { @MainActor [weak self] in"))
     }
 
     @Test
@@ -217,4 +383,38 @@ struct ScreenshotLifecycleTests {
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .appendingPathComponent("Sources/Zisla/ScreenshotCapture.swift")
+
+    private static let systemScreenshotMonitorSourceURL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("Sources/Zisla/SystemScreenshotMonitor.swift")
+
+    private static func solidImage(
+        width: Int,
+        height: Int,
+        color: (UInt8, UInt8, UInt8)
+    ) -> CGImage? {
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        for offset in stride(from: 0, to: pixels.count, by: 4) {
+            pixels[offset] = color.0
+            pixels[offset + 1] = color.1
+            pixels[offset + 2] = color.2
+            pixels[offset + 3] = 255
+        }
+        guard let provider = CGDataProvider(data: Data(pixels) as CFData) else { return nil }
+        return CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        )
+    }
 }

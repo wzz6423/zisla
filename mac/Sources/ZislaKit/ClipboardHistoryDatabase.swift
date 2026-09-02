@@ -79,6 +79,29 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         }
     }
 
+    func loadRecentHistoryPreview(limit: Int) async throws -> ClipboardHistoryPage {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async { [self] in
+                do {
+                    guard FileManager.default.fileExists(atPath: storageURL.path) else {
+                        continuation.resume(returning: ClipboardHistoryPage(
+                            items: [],
+                            totalCount: 0,
+                            categoryCounts: [:]
+                        ))
+                        return
+                    }
+                    continuation.resume(returning: try readRecentHistoryPreview(
+                        from: database(),
+                        limit: max(1, limit)
+                    ))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     func persist(
         _ mutations: [ClipboardHistoryMutation],
         completion: @escaping @MainActor @Sendable (String?) -> Void
@@ -466,6 +489,66 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             default:
                 throw ClipboardHistoryDatabaseError(
                     message: sqliteMessage(database, fallback: "无法读取剪贴板数据库")
+                )
+            }
+        }
+    }
+
+    private func readRecentHistoryPreview(
+        from database: OpaquePointer,
+        limit: Int
+    ) throws -> ClipboardHistoryPage {
+        let countStatement = try prepare(
+            "SELECT COUNT(*) FROM clipboard_history",
+            on: database
+        )
+        defer { sqlite3_finalize(countStatement) }
+        guard sqlite3_step(countStatement) == SQLITE_ROW else {
+            throw ClipboardHistoryDatabaseError(
+                message: sqliteMessage(database, fallback: "无法统计剪贴板记录")
+            )
+        }
+        let totalCount = Int(sqlite3_column_int64(countStatement, 0))
+        let categoryCounts = try readCategoryCounts(
+            from: database,
+            scope: .all,
+            searchText: ""
+        )
+
+        let statement = try prepare(
+            """
+            SELECT id, content_type, text_value, image_data, last_copied_at, is_pinned,
+                   file_url, file_display_name, file_bookmark
+            FROM clipboard_history
+            WHERE is_pinned = 1
+               OR id IN (
+                   SELECT id
+                   FROM clipboard_history
+                   WHERE is_pinned = 0
+                   ORDER BY last_copied_at DESC
+                   LIMIT ?
+               )
+            ORDER BY is_pinned DESC, last_copied_at DESC
+            """,
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+        try check(sqlite3_bind_int64(statement, 1, sqlite3_int64(limit)), database: database)
+
+        var items: [ClipboardHistoryItem] = []
+        while true {
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                items.append(try readItem(from: statement))
+            case SQLITE_DONE:
+                return ClipboardHistoryPage(
+                    items: items,
+                    totalCount: totalCount,
+                    categoryCounts: categoryCounts
+                )
+            default:
+                throw ClipboardHistoryDatabaseError(
+                    message: sqliteMessage(database, fallback: "无法读取最近剪贴板记录")
                 )
             }
         }

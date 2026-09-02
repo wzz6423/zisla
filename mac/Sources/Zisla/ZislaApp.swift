@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import ObjectiveC.runtime
 import ZislaCore
 import ZislaKit
 import SwiftUI
@@ -74,6 +75,188 @@ final class QuickNotesEditorWindow: NSWindow {
             return super.performKeyEquivalent(with: event)
         }
         return true
+    }
+}
+
+enum ScreenshotModalSession {
+    @MainActor
+    static func dismissForSelectionPresentation(
+        modalWindow: NSWindow? = NSApp.modalWindow,
+        abortModal: () -> Void = { NSApp.abortModal() }
+    ) {
+        guard modalWindow != nil else { return }
+        abortModal()
+    }
+}
+
+@MainActor
+private final class ScreenshotModalDismissTarget: NSObject {
+    weak var window: NSWindow?
+
+    init(window: NSWindow) {
+        self.window = window
+    }
+
+    @objc func close(_ sender: Any?) {
+        window?.close()
+    }
+}
+
+@MainActor
+private var screenshotModalDismissTargetKey: UInt8 = 0
+
+struct ScreenshotModalWindowSnapshot {
+    let image: CGImage
+    let screenFrame: CGRect
+    let modalWindow: NSWindow?
+
+    @MainActor
+    static func capture(from modalWindow: NSWindow? = NSApp.modalWindow) -> Self? {
+        guard let modalWindow,
+              modalWindow.isVisible,
+              let contentView = modalWindow.contentView
+        else {
+            return nil
+        }
+
+        modalWindow.isReleasedWhenClosed = false
+        let snapshotView = contentView.superview ?? contentView
+        guard let bitmap = snapshotView.bitmapImageRepForCachingDisplay(in: snapshotView.bounds) else {
+            return nil
+        }
+        snapshotView.cacheDisplay(in: snapshotView.bounds, to: bitmap)
+        guard let image = bitmap.cgImage else { return nil }
+
+        return Self(
+            image: image,
+            screenFrame: modalWindow.frame,
+            modalWindow: modalWindow
+        )
+    }
+
+    @MainActor
+    func restore() {
+        guard let modalWindow else { return }
+        modalWindow.isReleasedWhenClosed = false
+        modalWindow.windowController?.showWindow(nil)
+        Self.bindDismissAction(toUpdateCancelButtonIn: modalWindow)
+        modalWindow.level = WindowPlacement.modalWindowLevel
+        modalWindow.alphaValue = 1
+        modalWindow.makeKeyAndOrderFront(nil)
+    }
+
+    @MainActor
+    private static func bindDismissAction(toUpdateCancelButtonIn window: NSWindow) {
+        guard let contentView = window.contentView else { return }
+        var pendingViews = ArraySlice(contentView.subviews)
+        while let view = pendingViews.popFirst() {
+            if let button = view as? NSButton {
+                let title = button.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                if title == "取消更新" || title == "Cancel Update" {
+                    let target = ScreenshotModalDismissTarget(window: window)
+                    objc_setAssociatedObject(
+                        button,
+                        &screenshotModalDismissTargetKey,
+                        target,
+                        .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+                    )
+                    button.target = target
+                    button.action = #selector(ScreenshotModalDismissTarget.close(_:))
+                    return
+                }
+            }
+            pendingViews.append(contentsOf: view.subviews)
+        }
+    }
+
+    @MainActor
+    func restoreAfterModalDismissal() {
+        restore()
+        DispatchQueue.main.async { [self] in
+            restore()
+        }
+    }
+
+    func composited(
+        over capture: (image: NSImage, cgImage: CGImage),
+        on screen: NSScreen
+    ) -> (image: NSImage, cgImage: CGImage) {
+        guard screen.frame.contains(screenFrame),
+              capture.cgImage.width > 0,
+              capture.cgImage.height > 0,
+              screen.frame.width > 0,
+              screen.frame.height > 0
+        else {
+            return capture
+        }
+
+        let modalFrame = Self.localTopLeftFrame(for: screenFrame, on: screen.frame)
+        guard let compositedImage = Self.composite(
+            image,
+            in: modalFrame,
+            over: capture.cgImage,
+            screenSize: screen.frame.size
+        ) else {
+            return capture
+        }
+
+        return (
+            NSImage(cgImage: compositedImage, size: screen.frame.size),
+            compositedImage
+        )
+    }
+
+    static func composite(
+        _ modalImage: CGImage,
+        in modalFrame: CGRect,
+        over captureImage: CGImage,
+        screenSize: CGSize
+    ) -> CGImage? {
+        guard captureImage.width > 0,
+              captureImage.height > 0,
+              screenSize.width > 0,
+              screenSize.height > 0
+        else {
+            return nil
+        }
+
+        let scaleX = CGFloat(captureImage.width) / screenSize.width
+        let scaleY = CGFloat(captureImage.height) / screenSize.height
+        let drawFrame = CGRect(
+            x: modalFrame.minX * scaleX,
+            y: CGFloat(captureImage.height) - modalFrame.maxY * scaleY,
+            width: modalFrame.width * scaleX,
+            height: modalFrame.height * scaleY
+        )
+        guard let context = CGContext(
+            data: nil,
+            width: captureImage.width,
+            height: captureImage.height,
+            bitsPerComponent: 8,
+            bytesPerRow: captureImage.width * 4,
+            space: captureImage.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+
+        context.interpolationQuality = .high
+        context.draw(
+            captureImage,
+            in: CGRect(x: 0, y: 0, width: captureImage.width, height: captureImage.height)
+        )
+        context.draw(modalImage, in: drawFrame)
+        return context.makeImage()
+    }
+
+    static func localTopLeftFrame(for modalFrame: CGRect, on screenFrame: CGRect) -> CGRect {
+        let normalized = modalFrame.standardized
+        return CGRect(
+            x: normalized.minX - screenFrame.minX,
+            y: screenFrame.maxY - normalized.maxY,
+            width: normalized.width,
+            height: normalized.height
+        )
     }
 }
 
@@ -169,6 +352,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var screenshotPinHotkeyManager = GlobalHotkeyManager()
     private var pendingScreenshotPin = false
     private var isScreenshotSessionActive = false
+    private var screenshotSnapTargetProcessTracker = ScreenshotSnapTargetProcessTracker()
+    private var lastExternalScreenshotApplication: NSRunningApplication?
+    private var systemScreenshotMonitor: SystemScreenshotMonitor?
     private var cancellables: Set<AnyCancellable> = []
     private var effectiveAppearanceObservation: NSKeyValueObservation?
     private var currentApplicationIconImage: NSImage?
@@ -343,6 +529,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
         overlayCoordinator = coordinator
+        model.onVoiceInputWillStart = { [weak coordinator] in
+            guard let coordinator, coordinator.isRunning else { return }
+            coordinator.setVoiceRecording(true, at: NSEvent.mouseLocation)
+        }
         model.clipboardAssistant.onPresentationChanged = { [weak self, weak coordinator] visible in
             coordinator?.setHoverActivationSuspended(visible)
             self?.noticePresenter?.setClipboardAssistantVisible(visible)
@@ -370,6 +560,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
         configureMainMenu()
         registerScreenshotHotkeys()
+        startSystemScreenshotMonitoring()
         syncAppStatusItem()
         syncMonitorStatusItems(force: true)
 
@@ -584,9 +775,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             self.scheduleVoiceRecordingPanelRestore(saved)
                         }
                         self.overlayCoordinator?.setPinned(model.isPinned)
-                        // Fallback: recording no longer activates the app, so focus should remain in the target app;
-                        // this call switches back only in edge cases so the subsequent paste can reach its target.
-                        AppModel.shared.restoreVoiceInputTargetFocus()
                         self.noticePresenter?.setVoiceRecording(false)
                     }
                 }
@@ -624,6 +812,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         expandedSizeUpdateTask?.cancel()
         lockScreenOverlayController?.stop()
+        systemScreenshotMonitor?.stop()
+        systemScreenshotMonitor = nil
         AppModel.shared.stop()
         screenshotHotkeyManager.unregister()
         screenshotPinHotkeyManager.unregister()
@@ -1156,7 +1346,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         pendingScreenshotPin = pinAfterCapture
-        let capturedApplication = NSWorkspace.shared.frontmostApplication
+        let currentProcess = ProcessInfo.processInfo.processIdentifier
+        let frontmostApplication = NSWorkspace.shared.frontmostApplication
+        if frontmostApplication?.processIdentifier != currentProcess {
+            lastExternalScreenshotApplication = frontmostApplication
+        }
+        let capturedApplication = frontmostApplication?.processIdentifier == currentProcess
+            ? lastExternalScreenshotApplication
+            : frontmostApplication
+        let capturedProcessIdentifier = screenshotSnapTargetProcessTracker.target(
+            frontmost: frontmostApplication?.processIdentifier,
+            currentProcess: currentProcess
+        )
         let screens = NSScreen.screens
         let preferredScreen = WindowPlacement.screenUnderMouse()
         let captureScreens: [NSScreen]
@@ -1170,16 +1371,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
 
+        let modalWindowSnapshot = ScreenshotModalWindowSnapshot.capture()
+        ScreenshotModalSession.dismissForSelectionPresentation()
+        modalWindowSnapshot?.restoreAfterModalDismissal()
         setScreenshotSessionActive(true)
+        setScreenshotLiveCaptureActive(true)
 
         let controller = ScreenshotSelectionController(
-            capturedProcessIdentifier: capturedApplication?.processIdentifier
+            capturedProcessIdentifier: capturedProcessIdentifier,
+            captureScreen: { screen in
+                let capture = try await ScreenshotCaptureService.capture(screen: screen)
+                return modalWindowSnapshot?.composited(over: capture, on: screen) ?? capture
+            }
         )
         screenshotSelectionController = controller
+        controller.onSelectionWillPresent = { [weak self, weak controller] in
+            guard let self, let controller, self.screenshotSelectionController === controller else { return }
+            self.setScreenshotLiveCaptureActive(false)
+            AppModel.shared.clipboardAssistant.setScreenshotSelectionActive(true)
+            self.setScreenshotFrozenPresentationActive(true)
+            await Task.yield()
+        }
         controller.onCaptured = { [weak self] result in
             guard let self else { return }
             self.screenshotSelectionController = nil
-            AppModel.shared.clipboardAssistant.setScreenshotSelectionActive(false)
             let shouldPin = self.pendingScreenshotPin
             self.pendingScreenshotPin = false
             var editor: ScreenshotEditorWindowController!
@@ -1197,6 +1412,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     } else {
                         self.additionalScreenshotEditors.removeAll { $0 === editor }
                     }
+                    modalWindowSnapshot?.restoreAfterModalDismissal()
                     self.endScreenshotSessionIfNeeded()
                 },
                 pinnedToolbarVisible: AppModel.shared.settingsStore.settings.screenshotPinnedToolbarVisible
@@ -1206,6 +1422,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             } else {
                 self.additionalScreenshotEditors.append(editor)
             }
+            modalWindowSnapshot?.restore()
             editor.present()
             if shouldPin {
                 editor.setPinned(true)
@@ -1214,29 +1431,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         controller.onCancelled = { [weak self] in
             guard let self else { return }
             self.screenshotSelectionController = nil
+            self.setScreenshotLiveCaptureActive(false)
             AppModel.shared.clipboardAssistant.setScreenshotSelectionActive(false)
             self.pendingScreenshotPin = false
+            modalWindowSnapshot?.restore()
             self.endScreenshotSessionIfNeeded()
         }
         Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 120_000_000)
             guard let self else { return }
             guard self.screenshotSelectionController === controller else { return }
             await controller.start(on: captureScreens)
-            guard self.screenshotSelectionController === controller else { return }
-            // Selection panels only exist once the capture is frozen, so the clipboard assistant row
-            // can come back above them without landing inside the screenshot.
-            guard controller.selectionWindowCount > 0 else { return }
-            AppModel.shared.clipboardAssistant.setScreenshotSelectionActive(true)
         }
     }
 
     private func setScreenshotSessionActive(_ active: Bool) {
-        // A pinned screenshot keeps the session open, so every capture has to move the clipboard
-        // assistant row out of the frozen display again.
         AppModel.shared.clipboardAssistant.setScreenshotActive(active)
         guard isScreenshotSessionActive != active else { return }
         isScreenshotSessionActive = active
+        if !active {
+            setScreenshotLiveCaptureActive(false)
+            setScreenshotFrozenPresentationActive(false)
+        }
+    }
+
+    private func setScreenshotLiveCaptureActive(_ active: Bool) {
+        overlayCoordinator?.setScreenshotCaptureInProgress(active)
+    }
+
+    private func setScreenshotFrozenPresentationActive(_ active: Bool) {
         overlayCoordinator?.setScreenshotActive(active)
         noticePresenter?.setScreenshotActive(active)
     }
@@ -1256,9 +1478,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard settings.screenshotEnabled else { return }
         let captureResult = screenshotHotkeyManager.register(
             hotkey: settings.screenshotHotkey,
-            onKeyDown: { [weak self] in
-                Task { @MainActor [weak self] in self?.startScreenshot() }
-            },
+            onKeyDown: { [weak self] in self?.startScreenshot() },
             onKeyUp: {}
         )
         reportScreenshotHotkeyRegistration(captureResult, actionName: "截图")
@@ -1269,9 +1489,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         let pinResult = screenshotPinHotkeyManager.register(
             hotkey: settings.screenshotPinHotkey,
-            onKeyDown: { [weak self] in
-                Task { @MainActor [weak self] in self?.startPinnedScreenshot() }
-            },
+            onKeyDown: { [weak self] in self?.startPinnedScreenshot() },
             onKeyUp: {}
         )
         reportScreenshotHotkeyRegistration(pinResult, actionName: "钉图")
@@ -1289,6 +1507,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .registrationFailed:
             AppModel.shared.transientMessage = "\(actionName)快捷键与系统或其他应用冲突，未能启用"
         }
+    }
+
+    private func startSystemScreenshotMonitoring() {
+        let monitor = SystemScreenshotMonitor()
+        monitor.onSystemScreenshotStateChanged = { isActive in
+            AppModel.shared.clipboardAssistant.setSystemScreenshotActive(isActive)
+        }
+        monitor.start()
+        systemScreenshotMonitor = monitor
     }
 
     @objc private func showSystemMonitor() {

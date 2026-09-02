@@ -586,4 +586,132 @@ struct SystemBackgroundSoundAssetDownloaderTests {
         #expect(!FileManager.default.fileExists(atPath: oldFile.path))
         #expect(FileManager.default.fileExists(atPath: result.appendingPathComponent("new.txt").path))
     }
+
+    @Test
+    func failedReplacementPreservesExistingAssetAndCleansStagingDirectory() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "DownloaderTests-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let manifestPath = tempDir.appendingPathComponent("manifest.xml")
+        let targetDir = tempDir.appendingPathComponent("target", isDirectory: true)
+        let existingAsset = targetDir.appendingPathComponent("Train.asset", isDirectory: true)
+        try FileManager.default.createDirectory(at: existingAsset, withIntermediateDirectories: true)
+        let oldFile = existingAsset.appendingPathComponent("old.txt")
+        try Data("old".utf8).write(to: oldFile)
+
+        let archive = Data("archive".utf8)
+        let manifest: [String: Any] = [
+            "Assets": [[
+                "SoundName": "Train",
+                "__BaseURL": "https://cdn.example.com/",
+                "__RelativePath": "train.zip",
+                "_Measurement": Data(Insecure.SHA1.hash(data: archive)),
+            ]],
+        ]
+        let manifestData = try PropertyListSerialization.data(
+            fromPropertyList: manifest,
+            format: .xml,
+            options: 0
+        )
+        try manifestData.write(to: manifestPath)
+
+        let downloader = SystemBackgroundSoundAssetDownloader(
+            manifestPath: manifestPath,
+            loadData: { request in
+                let archiveURL = tempDir.appendingPathComponent("download.zip")
+                try archive.write(to: archiveURL)
+                return (
+                    archiveURL,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: nil
+                    )!
+                )
+            },
+            readPlist: { _ in
+                try PropertyListSerialization.propertyList(
+                    from: manifestData,
+                    options: [],
+                    format: nil
+                ) as! [String: Any]
+            },
+            unzip: { _, destination in
+                try Data("partial".utf8).write(to: destination.appendingPathComponent("partial.txt"))
+                throw CocoaError(.fileWriteUnknown)
+            }
+        )
+
+        await #expect(throws: CocoaError.self) {
+            try await downloader.download(soundName: "Train", to: targetDir)
+        }
+        #expect(try String(contentsOf: oldFile, encoding: .utf8) == "old")
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: targetDir.path)
+            .filter { $0.hasSuffix(".staging") }
+        #expect(leftovers.isEmpty)
+    }
+
+    @Test
+    func rejectsActualDownloadLargerThanLimitBeforeHashing() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "DownloaderTests-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        let manifestPath = tempDir.appendingPathComponent("manifest.xml")
+        let manifest: [String: Any] = [
+            "Assets": [[
+                "SoundName": "Rain",
+                "__BaseURL": "https://cdn.example.com/",
+                "__RelativePath": "rain.zip",
+                "_Measurement": Data(repeating: 0, count: 20),
+            ]],
+        ]
+        let manifestData = try PropertyListSerialization.data(
+            fromPropertyList: manifest,
+            format: .xml,
+            options: 0
+        )
+        try manifestData.write(to: manifestPath)
+
+        let downloader = SystemBackgroundSoundAssetDownloader(
+            manifestPath: manifestPath,
+            loadData: { request in
+                let archiveURL = tempDir.appendingPathComponent("oversized.zip")
+                _ = FileManager.default.createFile(atPath: archiveURL.path, contents: nil)
+                let handle = try FileHandle(forWritingTo: archiveURL)
+                try handle.truncate(atOffset: UInt64(SystemBackgroundSoundAssetDownloader.maxDownloadSize + 1))
+                try handle.close()
+                return (
+                    archiveURL,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: nil
+                    )!
+                )
+            },
+            readPlist: { _ in
+                try PropertyListSerialization.propertyList(
+                    from: manifestData,
+                    options: [],
+                    format: nil
+                ) as! [String: Any]
+            },
+            unzip: { _, _ in
+                Issue.record("Oversized archive must be rejected before extraction")
+            }
+        )
+
+        await #expect(throws: SystemBackgroundSoundAssetDownloader.DownloadError.self) {
+            try await downloader.download(soundName: "Rain", to: tempDir.appendingPathComponent("target"))
+        }
+    }
 }

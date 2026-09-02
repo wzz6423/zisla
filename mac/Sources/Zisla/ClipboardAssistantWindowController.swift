@@ -6,7 +6,7 @@ import ZislaCore
 import ZislaKit
 
 private extension ClipboardAssistantController {
-    /// 复制助手需要同时容纳内容预览和右侧操作，留出额外横向余量。
+    /// The clipboard assistant needs extra horizontal space for the content preview and trailing actions.
     static let islandRowWidth = ScreenLayoutConfiguration().expandedSize.width + 60
     static let defaultRowHeight = ScreenLayoutConfiguration().simulatedIslandSize.height
 
@@ -33,7 +33,6 @@ private extension ClipboardAssistantController {
 @MainActor
 final class ClipboardAssistantWindow: NSPanel {
     static let defaultWindowLevel = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
-    static let aboveScreenshotSelectionLevel = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
@@ -122,7 +121,10 @@ final class ClipboardAssistantController: ObservableObject {
     }
 
     private var screenshotPhase = ScreenshotPhase.inactive
-    private var isScreenshotActive: Bool { screenshotPhase != .inactive }
+    private var isSystemScreenshotActive = false
+    private var isScreenshotActive: Bool {
+        screenshotPhase != .inactive || isSystemScreenshotActive
+    }
     private var isSharingAnchorHeld = false
 
     private var window: ClipboardAssistantWindow?
@@ -131,6 +133,7 @@ final class ClipboardAssistantController: ObservableObject {
     private var dismissalGeneration = 0
     private let triggerMonitor = ClipboardAssistantTriggerMonitor()
     private let gestureMonitor = ClipboardAssistantMouseGestureMonitor()
+    @Published private(set) var isMoreActionsPresented = false
 
     /// Applies the user-configured quick triggers (hotkey + mouse side button).
     /// Returns `false` when a configured trigger needs the input-monitoring permission
@@ -167,16 +170,35 @@ final class ClipboardAssistantController: ObservableObject {
     /// Anchor for system sharing launched from the assistant row.
     var sharingAnchorView: NSView? { window?.contentView }
 
-    /// A screenshot session no longer cancels the prompt: the row only steps out of the frozen
-    /// capture, so it stays available afterwards without ever landing inside the screenshot.
+    func setMoreActionsPresented(_ presented: Bool) {
+        guard isMoreActionsPresented != presented else { return }
+        isMoreActionsPresented = presented
+    }
+
+    /// A screenshot session keeps the prompt long enough for the frozen capture, then restores it
+    /// after the selection overlay leaves.
     func setScreenshotActive(_ active: Bool) {
         setScreenshotPhase(active ? .capturing : .inactive)
     }
 
-    /// The selection overlay renders its own frozen capture, so the row can show again above it.
-    /// It stays click-through there, so it never blocks picking a region.
+    /// Native screenshot selection is live rather than frozen, so the assistant must leave the
+    /// screen before it can cover the system selection or markup UI.
+    func setSystemScreenshotActive(_ active: Bool) {
+        guard isSystemScreenshotActive != active else { return }
+        isSystemScreenshotActive = active
+        if active {
+            presentation.isHovered = false
+            setMoreActionsPresented(false)
+        }
+        applyScreenshotPhase()
+        updateScreenshotDismissal()
+    }
+
+    /// The selection overlay already contains the frozen row, so hide the live window to avoid a
+    /// duplicate outside the selected region.
     func setScreenshotSelectionActive(_ active: Bool) {
-        guard isScreenshotActive else { return }
+        guard screenshotPhase != .inactive else { return }
+        if active { setMoreActionsPresented(false) }
         setScreenshotPhase(active ? .selecting : .restored)
     }
 
@@ -184,33 +206,41 @@ final class ClipboardAssistantController: ObservableObject {
         guard screenshotPhase != phase else { return }
         screenshotPhase = phase
         // The pointer moves onto the selection overlay, so hover must not outlive the capture.
-        if phase == .capturing { presentation.isHovered = false }
+        if phase == .capturing {
+            presentation.isHovered = false
+        }
         applyScreenshotPhase()
-        switch phase {
-        case .capturing, .selecting:
+        updateScreenshotDismissal()
+    }
+
+    private func updateScreenshotDismissal() {
+        if screenshotPhase == .capturing || screenshotPhase == .selecting || isSystemScreenshotActive {
             cancelDismissTask()
-        case .restored, .inactive:
+        } else {
             scheduleDismiss()
         }
     }
 
     private func applyScreenshotPhase() {
         guard let window else { return }
-        let isAboveSelection = screenshotPhase == .selecting
-        window.ignoresMouseEvents = isAboveSelection
-        window.level = isAboveSelection
-            ? ClipboardAssistantWindow.aboveScreenshotSelectionLevel
-            : ClipboardAssistantWindow.defaultWindowLevel
+        let hidesLiveWindow = screenshotPhase == .selecting || isSystemScreenshotActive
+        window.ignoresMouseEvents = hidesLiveWindow
+        window.level = ClipboardAssistantWindow.defaultWindowLevel
         guard presentation.detection != nil else { return }
-        if screenshotPhase == .capturing {
-            window.orderOut(nil)
-        } else if !window.isVisible {
-            window.alphaValue = 1
-            window.orderFrontRegardless()
+        if hidesLiveWindow {
+            if window.isVisible {
+                window.orderOut(nil)
+            }
+        } else if screenshotPhase == .restored || screenshotPhase == .inactive {
+            if !window.isVisible {
+                window.alphaValue = 1
+                window.orderFrontRegardless()
+            }
         }
     }
 
     func present(_ detection: ClipboardAssistantDetection, visualStyle: IslandVisualStyle) {
+        setMoreActionsPresented(false)
         guard !isScreenshotActive else { return }
         isSharingAnchorHeld = false
         cancelDismissTask()
@@ -225,6 +255,7 @@ final class ClipboardAssistantController: ObservableObject {
     }
 
     func dismiss(animated: Bool = true) {
+        setMoreActionsPresented(false)
         isSharingAnchorHeld = false
         cancelDismissTask()
         presentationGeneration &+= 1
@@ -259,6 +290,7 @@ final class ClipboardAssistantController: ObservableObject {
 
     /// Fires the given action and dismisses after completion; sharing keeps the anchor until its picker closes.
     func perform(_ action: ClipboardAssistantAction) {
+        setMoreActionsPresented(false)
         let generation = presentationGeneration
         if case .share = action {
             isSharingAnchorHeld = true
@@ -277,6 +309,7 @@ final class ClipboardAssistantController: ObservableObject {
     }
 
     func setHovered(_ hovered: Bool) {
+        guard presentation.isHovered != hovered else { return }
         presentation.isHovered = hovered
         if hovered {
             cancelDismissTask()
@@ -288,6 +321,7 @@ final class ClipboardAssistantController: ObservableObject {
     private func scheduleDismiss() {
         cancelDismissTask()
         guard presentation.detection != nil else { return }
+        guard !isScreenshotActive else { return }
         guard !isSharingAnchorHeld else { return }
         guard let seconds = displayDuration.expiresAfter else {
             dismissTask = nil
@@ -317,9 +351,13 @@ final class ClipboardAssistantController: ObservableObject {
         dismissalGeneration &+= 1
     }
 
-    private static func thumbnail(for detection: ClipboardAssistantDetection) -> NSImage? {
-        guard case .saveImage(let data)? = detection.action else { return nil }
-        return NSImage(data: data)
+    static func thumbnail(for detection: ClipboardAssistantDetection) -> NSImage? {
+        for action in detection.actions {
+            if case let .saveImage(data) = action {
+                return NSImage(data: data)
+            }
+        }
+        return nil
     }
 
     private func showWindow(_ detection: ClipboardAssistantDetection) {
@@ -562,7 +600,7 @@ struct ClipboardAssistantToastView: View {
     }
 
     private func dragText(for detection: ClipboardAssistantDetection) -> String? {
-        guard [.text, .chineseText, .code, .math].contains(detection.kind),
+        guard [.text, .nonSystemLanguageText, .code, .math].contains(detection.kind),
               let content = detection.fullContent,
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return nil
@@ -636,8 +674,8 @@ struct ClipboardAssistantToastView: View {
                     .help(loc(Self.actionLabel(primary)))
                 }
                 if detection.action != nil {
-                    Menu {
-                        actionMenuItems(menuActions(for: detection))
+                    Button {
+                        controller.setMoreActionsPresented(!controller.isMoreActionsPresented)
                     } label: {
                         Image(systemName: "chevron.down.circle")
                             .font(.system(size: 13, weight: .semibold))
@@ -645,10 +683,14 @@ struct ClipboardAssistantToastView: View {
                             .frame(width: 19, height: 24)
                             .contentShape(Rectangle())
                     }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
+                    .buttonStyle(.plain)
                     .help(loc("更多操作"))
+                    .popover(isPresented: Binding(
+                        get: { controller.isMoreActionsPresented },
+                        set: { controller.setMoreActionsPresented($0) }
+                    ), arrowEdge: .top) {
+                        moreActionsPopover(for: detection)
+                    }
                 }
                 Button {
                     controller.dismiss()
@@ -672,6 +714,40 @@ struct ClipboardAssistantToastView: View {
     }
 
     @ViewBuilder
+    private func moreActionsPopover(for detection: ClipboardAssistantDetection) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(menuActions(for: detection), id: \.identifier) { action in
+                if case .blockSourceApp = action {
+                    Divider()
+                    moreActionButton(action, role: .destructive)
+                } else {
+                    moreActionButton(action)
+                }
+            }
+        }
+        .padding(6)
+        .frame(minWidth: 190)
+    }
+
+    private func moreActionButton(
+        _ action: ClipboardAssistantAction,
+        role: ButtonRole? = nil
+    ) -> some View {
+        Button(role: role) {
+            controller.setMoreActionsPresented(false)
+            controller.perform(action)
+        } label: {
+            Text(actionTitle(action))
+                .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
     private func actionMenuItems(_ actions: [ClipboardAssistantAction]) -> some View {
         ForEach(actions, id: \.identifier) { action in
             if case .blockSourceApp = action {
@@ -692,7 +768,7 @@ struct ClipboardAssistantToastView: View {
     // MARK: Expanded content
 
     private func canExpand(_ detection: ClipboardAssistantDetection) -> Bool {
-        guard ![.url, .text, .chineseText, .code, .math].contains(detection.kind) else {
+        guard ![.url, .text, .nonSystemLanguageText, .code, .math].contains(detection.kind) else {
             return false
         }
         guard !controller.isLightweightMode, let content = detection.fullContent else { return false }
@@ -795,6 +871,7 @@ struct ClipboardAssistantToastView: View {
         case .translate: "翻译"
         case .composeMail: "写邮件"
         case .copyText: "复制结果"
+        case .copyFullExpression: "复制完整算式"
         case .compress: "压缩为 ZIP"
         case .share: "系统共享"
         case .callPhone: "拨打电话"
@@ -963,6 +1040,8 @@ final class ClipboardAssistantMouseGestureMonitor {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var onCopy: (() -> Void)?
+    private var commandCCopyTask: Task<Void, Never>?
+    private var copyGeneration = 0
 
     /// Starts listening; returns `false` when the required permissions are missing.
     @discardableResult
@@ -999,6 +1078,9 @@ final class ClipboardAssistantMouseGestureMonitor {
     }
 
     func stop() {
+        copyGeneration &+= 1
+        commandCCopyTask?.cancel()
+        commandCCopyTask = nil
         if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         }
@@ -1012,6 +1094,7 @@ final class ClipboardAssistantMouseGestureMonitor {
     }
 
     private func handle(type: CGEventType, event: CGEvent) {
+        guard isActive else { return }
         switch type {
         case .otherMouseDown:
             // Right mouse down (CGEvent button 1) while the left button stays held.
@@ -1028,9 +1111,22 @@ final class ClipboardAssistantMouseGestureMonitor {
         }
     }
 
-    /// Simulates ⌘C on a detached queue so the event-tap handler returns immediately.
+    /// Defers ⌘C until the target app has processed the click without letting a stopped monitor post later.
     private func postCommandC() {
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) {
+        commandCCopyTask?.cancel()
+        let generation = copyGeneration
+        commandCCopyTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(50))
+            } catch {
+                return
+            }
+            guard let self,
+                  !Task.isCancelled,
+                  self.isActive,
+                  self.copyGeneration == generation else {
+                return
+            }
             let keyC: CGKeyCode = 8 // kVK_ANSI_C
             guard let down = CGEvent(keyboardEventSource: nil, virtualKey: keyC, keyDown: true),
                   let up = CGEvent(keyboardEventSource: nil, virtualKey: keyC, keyDown: false)
@@ -1038,9 +1134,20 @@ final class ClipboardAssistantMouseGestureMonitor {
             down.flags = .maskCommand
             up.flags = .maskCommand
             down.post(tap: .cghidEventTap)
-            usleep(30_000)
+            do {
+                try await Task.sleep(for: .milliseconds(30))
+            } catch {
+                up.post(tap: .cghidEventTap)
+                return
+            }
             up.post(tap: .cghidEventTap)
+            guard !Task.isCancelled,
+                  self.isActive,
+                  self.copyGeneration == generation else {
+                return
+            }
+            self.commandCCopyTask = nil
+            self.onCopy?()
         }
-        onCopy?()
     }
 }

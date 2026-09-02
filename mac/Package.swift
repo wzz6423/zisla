@@ -9,6 +9,7 @@ let package = Package(
     products: [
         .library(name: "ZislaCore", targets: ["ZislaCore"]),
         .library(name: "ZislaKit", targets: ["ZislaKit"]),
+        .library(name: "KeyboardKit", targets: ["KeyboardKit"]),
         .executable(name: "zisla", targets: ["Zisla"]),
         .executable(name: "zislactl", targets: ["zislactl"]),
     ],
@@ -31,6 +32,10 @@ let package = Package(
                 .linkedFramework("CoreFoundation"),
             ]
         ),
+        .binaryTarget(
+            name: "Sparkle",
+            path: "Vendor/Sparkle.xcframework"
+        ),
         .target(
             name: "ZislaKit",
             dependencies: ["ZislaCore", "ZislaNVMe"],
@@ -46,11 +51,27 @@ let package = Package(
                 .linkedLibrary("sqlite3"),
             ]
         ),
+        .target(
+            name: "KeyboardKit",
+            dependencies: ["Sparkle"],
+            resources: [
+                .copy("../../Resources/Keyboard"),
+            ],
+            linkerSettings: [
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("AudioToolbox"),
+                .linkedFramework("AppKit"),
+                .linkedFramework("CoreGraphics"),
+                .linkedLibrary("sqlite3"),
+            ]
+        ),
         .executableTarget(
             name: "Zisla",
             dependencies: [
                 "ZislaCore",
                 "ZislaKit",
+                "KeyboardKit",
+                "Sparkle",
                 .product(name: "SkyLightWindow", package: "SkyLightWindow"),
             ],
             resources: [
@@ -83,7 +104,13 @@ let package = Package(
         ),
         .testTarget(
             name: "ZislaTests",
-            dependencies: ["Zisla"]
+            dependencies: ["Zisla", "KeyboardKit", "Sparkle"],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "@loader_path/../../..",
+                ]),
+            ]
         ),
     ]
 )

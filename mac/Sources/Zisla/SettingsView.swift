@@ -20,7 +20,9 @@ struct SettingsView: View {
     @State private var isVoiceHistoryBatchDeleteConfirmationPresented = false
     @State private var voiceHistorySelectionMode = false
     @State private var selectedVoiceHistoryIDs: Set<UUID> = []
+    @State private var customVoiceHotword = ""
     @State private var screenshotHotkeyValidationMessage: String?
+    @State private var expandedClipboardAssistantKind: ClipboardAssistantKind?
     @Namespace private var sectionSelectionNamespace
 
     init(model: AppModel) {
@@ -184,13 +186,13 @@ struct SettingsView: View {
                 }
                 DeferredMount {
                     selectedContent
+                        .id(input.selection)
+                        .transition(
+                            reduceMotion
+                                ? .opacity
+                                : .settingsPagePush(direction: sectionSwitchDirection)
+                        )
                 }
-                    .id(input.selection)
-                    .transition(
-                        reduceMotion
-                            ? .opacity
-                            : .modulePush(direction: sectionSwitchDirection)
-                    )
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 18)
@@ -231,6 +233,8 @@ struct SettingsView: View {
             generalContent
         case .features:
             featuresContent
+        case .keyboardSound:
+            keyboardSoundContent
         case .clipboardAssistant, .screenshot:
             featuresContent
         case .workflow:
@@ -667,6 +671,100 @@ struct SettingsView: View {
                         }
                     }
                 }
+                settingsGroup("复制助手") {
+                    ForEach(ClipboardAssistantKind.allCases, id: \.self) { kind in
+                        let actions = clipboardAssistantActionOrder(for: kind)
+                        if kind != ClipboardAssistantKind.allCases.first { rowDivider }
+                        settingRow(
+                            symbol: kind.symbolName,
+                            title: assistantKindTitle(kind),
+                            detail: ""
+                        ) {
+                            HStack(spacing: 4) {
+                                Menu {
+                                    ForEach(actions, id: \.self) { action in
+                                        Button {
+                                            setPrimaryClipboardAssistantAction(action, for: kind)
+                                        } label: {
+                                            Label(
+                                                clipboardAssistantActionTitle(action),
+                                                systemImage: action == actions.first ? "checkmark" : action.symbolName
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "star.fill")
+                                        AppLocalizedText(
+                                            actions.first.map(clipboardAssistantActionTitle) ?? "恢复默认顺序"
+                                        )
+                                    }
+                                }
+                                .menuStyle(.borderlessButton)
+                                .fixedSize()
+
+                                IconButton(
+                                    symbol: expandedClipboardAssistantKind == kind
+                                        ? "chevron.up.circle.fill"
+                                        : "chevron.down.circle",
+                                    help: expandedClipboardAssistantKind == kind ? "收起" : "展开",
+                                    isActive: expandedClipboardAssistantKind == kind,
+                                    size: .compact
+                                ) {
+                                    expandedClipboardAssistantKind =
+                                        expandedClipboardAssistantKind == kind ? nil : kind
+                                }
+                            }
+                        }
+                        if expandedClipboardAssistantKind == kind {
+                            ForEach(Array(actions.dropFirst().enumerated()), id: \.element) { offset, action in
+                                rowDivider
+                                settingRow(
+                                    symbol: action.symbolName,
+                                    title: clipboardAssistantActionTitle(action),
+                                    detail: "",
+                                    isNested: true
+                                ) {
+                                    HStack(spacing: 4) {
+                                        IconButton(
+                                            symbol: "arrow.up",
+                                            help: "上移\(clipboardAssistantActionTitle(action))",
+                                            size: .compact
+                                        ) {
+                                            moveClipboardAssistantAction(action, for: kind, by: -1)
+                                        }
+                                        .disabled(offset == 0)
+
+                                        IconButton(
+                                            symbol: "arrow.down",
+                                            help: "下移\(clipboardAssistantActionTitle(action))",
+                                            size: .compact
+                                        ) {
+                                            moveClipboardAssistantAction(action, for: kind, by: 1)
+                                        }
+                                        .disabled(offset == actions.dropFirst().count - 1)
+                                    }
+                                }
+                            }
+                            rowDivider
+                            settingRow(
+                                symbol: "arrow.counterclockwise",
+                                title: "恢复默认顺序",
+                                detail: "",
+                                isNested: true
+                            ) {
+                                IconButton(
+                                    symbol: "arrow.counterclockwise",
+                                    help: "恢复默认顺序",
+                                    size: .compact
+                                ) {
+                                    resetClipboardAssistantActionOrder(for: kind)
+                                }
+                                .disabled(actions == ClipboardAssistantActionOrder.defaults(for: kind))
+                            }
+                        }
+                    }
+                }
             }
 
             if input.selection == .features {
@@ -704,6 +802,8 @@ struct SettingsView: View {
                     featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
                     rowDivider
                     featureToggle("电池监控", detail: "显示电池详细信息与健康状态", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
+                    rowDivider
+                    featureToggle("键盘音效", detail: "全局播放键盘音效并记录输入统计", symbol: "keyboard.badge.ellipsis", keyPath: \.keyboardEnabled)
                 }
             }
 
@@ -830,8 +930,66 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("自动检查更新", detail: "定期检查当前安装包所属的更新通道", symbol: "arrow.triangle.2.circlepath", keyPath: \.updateChecksEnabled)
                     rowDivider
-                    featureToggle("自动下载更新", detail: "发现新版本时自动下载安装包", symbol: "arrow.down.circle.fill", keyPath: \.automaticDownloadEnabled)
+                    featureToggle("自动下载更新", detail: "发现新版本后下载，并在退出或重启时完成安装", symbol: "arrow.down.circle.fill", keyPath: \.automaticDownloadEnabled)
                         .disabled(!model.settingsStore.settings.updateChecksEnabled)
+                }
+            }
+        }
+    }
+
+    private var keyboardSoundContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            settingsGroup("全局音效") {
+                settingRow(symbol: "waveform", title: "键盘音色", detail: "选择 20 种内置机械键盘音色") {
+                    HStack(spacing: 6) {
+                        Picker("", selection: Binding(
+                            get: { model.settingsStore.settings.keyboardSelectedProfileID },
+                            set: { model.settingsStore.settings.keyboardSelectedProfileID = $0 }
+                        )) {
+                            ForEach(model.keyboardSound.keyboardProfiles) { profile in
+                                Text(profile.name).tag(profile.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .controlSize(.small)
+                        .frame(width: 150, alignment: .trailing)
+
+                        Button("试听键盘音") { model.keyboardSound.preview() }
+                            .controlSize(.small)
+                            .disabled(!model.settingsStore.settings.keyboardEnabled)
+                    }
+                    .disabled(!model.settingsStore.settings.keyboardEnabled)
+                }
+                rowDivider
+                settingRow(symbol: "speaker.wave.2", title: "键盘音量", detail: "调整主音量") {
+                    Slider(value: Binding(
+                        get: { model.settingsStore.settings.keyboardVolume },
+                        set: { model.settingsStore.settings.keyboardVolume = $0 }
+                    ), in: 0...1)
+                    .frame(width: 150)
+                    .disabled(!model.settingsStore.settings.keyboardEnabled)
+                }
+                rowDivider
+                featureToggle("播放键盘回弹音", detail: "为支持的音色播放释放音", symbol: "arrow.uturn.backward", keyPath: \.keyboardPlaysReleaseSound, isNested: true)
+                    .disabled(!model.settingsStore.settings.keyboardEnabled)
+                rowDivider
+                featureToggle("自然音高变化", detail: "在连续击键间使用轻微音量与音高变化", symbol: "waveform.path.ecg", keyPath: \.keyboardUsesPitchVariation, isNested: true)
+                    .disabled(!model.settingsStore.settings.keyboardEnabled)
+            }
+
+            settingsGroup("统计与权限") {
+                featureToggle("记录本地输入统计", detail: "仅保存字符数、按键次数、应用与时间聚合，不保存输入内容", symbol: "chart.bar.xaxis", keyPath: \.keyboardTypingStatsEnabled)
+                rowDivider
+                settingRow(symbol: "lock.shield", title: "输入监控权限", detail: model.keyboardSound.monitoringStateText) {
+                    if model.keyboardSound.isInputMonitoringGranted {
+                        Label("已授权", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                    } else {
+                        Button("打开设置") { model.keyboardSound.openInputMonitoringSettings() }
+                            .controlSize(.small)
+                    }
                 }
             }
         }
@@ -1213,6 +1371,36 @@ struct SettingsView: View {
                             .labelsHidden()
                             .toggleStyle(.switch)
                             .controlSize(.small)
+                    }
+                }
+                rowDivider
+                settingRow(
+                    symbol: "text.badge.plus",
+                    title: "自定义热词",
+                    detail: "用于语音识别和语音整理模型"
+                ) {
+                    HStack(spacing: 6) {
+                        TextField("输入热词", text: $customVoiceHotword)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 150)
+                            .onSubmit(addCustomVoiceHotword)
+                        Button("添加", action: addCustomVoiceHotword)
+                            .controlSize(.small)
+                            .disabled(
+                                customVoiceHotword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            )
+                    }
+                }
+                ForEach(model.settingsStore.settings.voiceCustomHotwords, id: \.self) { hotword in
+                    rowDivider
+                    settingRow(
+                        symbol: "text.badge.checkmark",
+                        title: hotword,
+                        detail: ""
+                    ) {
+                        IconButton(symbol: "trash", help: "删除\(hotword)", size: .compact) {
+                            removeCustomVoiceHotword(hotword)
+                        }
                     }
                 }
             }
@@ -1604,6 +1792,21 @@ struct SettingsView: View {
                 model.settingsStore.settings.voiceEnabledLexicons = selection
             }
         )
+    }
+
+    private func addCustomVoiceHotword() {
+        let newHotword = customVoiceHotword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !newHotword.isEmpty else { return }
+        let updated = VoiceLexicon.normalizedCustomTerms(
+            model.settingsStore.settings.voiceCustomHotwords + [newHotword]
+        )
+        customVoiceHotword = ""
+        guard updated != model.settingsStore.settings.voiceCustomHotwords else { return }
+        model.settingsStore.settings.voiceCustomHotwords = updated
+    }
+
+    private func removeCustomVoiceHotword(_ hotword: String) {
+        model.settingsStore.settings.voiceCustomHotwords.removeAll { $0 == hotword }
     }
 
     private func petDisplayLabel(_ entry: PetLibrary.Entry) -> String {
@@ -2250,8 +2453,8 @@ struct SettingsView: View {
             settingsGroup("更新策略") {
                 settingRow(
                     symbol: "arrow.triangle.branch",
-                    title: "手动检查通道",
-                    detail: "\(model.settingsStore.settings.updateChannel.detail)；仅用于手动检查"
+                    title: "更新通道",
+                    detail: "\(model.settingsStore.settings.updateChannel.detail)；用于自动与手动更新"
                 ) {
                     IslandOutlinedPicker(
                         selection: Binding(
@@ -2322,7 +2525,7 @@ struct SettingsView: View {
             settingRow(
                 symbol: "network",
                 title: "代理链接",
-                detail: "用于 CLI 安装/更新、GitHub 访问和下载"
+                detail: "用于 CLI 安装/更新和媒体下载"
             ) {
                 TextField(
                     "http://127.0.0.1:7897",
@@ -2338,7 +2541,7 @@ struct SettingsView: View {
             settingRow(
                 symbol: "power",
                 title: "启用本地代理",
-                detail: "关闭后所有更新、安装和下载命令都不使用此代理"
+                detail: "关闭后 CLI 安装/更新和媒体下载不使用此代理"
             ) {
                 Toggle(
                     "",
@@ -2471,8 +2674,8 @@ struct SettingsView: View {
         case .color: "颜色值"
         case .math: "算式"
         case .dateTime: "日期时间"
-        case .chineseText: "中文文本"
         case .code: "代码"
+        case .nonSystemLanguageText: "非当前系统语言文本"
         case .text: "文本"
         case .image: "图片"
         case .file: "文件"
@@ -2724,6 +2927,65 @@ struct SettingsView: View {
         model.settingsStore.settings.compactStatusPriority = priorities
     }
 
+    private func clipboardAssistantActionOrder(
+        for kind: ClipboardAssistantKind
+    ) -> [ClipboardAssistantActionKind] {
+        ClipboardAssistantActionOrder.normalized(
+            model.settingsStore.settings.clipboardAssistantActionOrders[kind]
+                ?? ClipboardAssistantActionOrder.defaults(for: kind),
+            for: kind
+        )
+    }
+
+    private func setPrimaryClipboardAssistantAction(
+        _ action: ClipboardAssistantActionKind,
+        for kind: ClipboardAssistantKind
+    ) {
+        var order = clipboardAssistantActionOrder(for: kind)
+        order.removeAll { $0 == action }
+        order.insert(action, at: 0)
+        model.settingsStore.settings.clipboardAssistantActionOrders[kind] = order
+    }
+
+    private func moveClipboardAssistantAction(
+        _ action: ClipboardAssistantActionKind,
+        for kind: ClipboardAssistantKind,
+        by offset: Int
+    ) {
+        var order = clipboardAssistantActionOrder(for: kind)
+        guard let index = order.firstIndex(of: action), index > 0 else { return }
+        let destination = index + offset
+        guard destination > order.startIndex, order.indices.contains(destination) else { return }
+        order.swapAt(index, destination)
+        model.settingsStore.settings.clipboardAssistantActionOrders[kind] = order
+    }
+
+    private func resetClipboardAssistantActionOrder(for kind: ClipboardAssistantKind) {
+        model.settingsStore.settings.clipboardAssistantActionOrders[kind] =
+            ClipboardAssistantActionOrder.defaults(for: kind)
+    }
+
+    private func clipboardAssistantActionTitle(_ action: ClipboardAssistantActionKind) -> String {
+        switch action {
+        case .openURL: "打开链接"
+        case .openDownload: "下载"
+        case .revealInFinder: "在 Finder 中显示"
+        case .search: "搜索"
+        case .translate: "翻译"
+        case .composeMail: "写邮件"
+        case .copyText: "复制结果"
+        case .copyFullExpression: "复制完整算式"
+        case .compress: "压缩为 ZIP"
+        case .share: "系统共享"
+        case .callPhone: "拨打电话"
+        case .addToQuickNote: "发送到随记"
+        case .sendToTeleprompter: "发送到提词器"
+        case .saveImage: "保存图片"
+        case .saveText: "保存文本"
+        case .createCalendarEvent: "新建日程"
+        }
+    }
+
     private func compactStatusPrioritySymbol(for priority: CompactStatusPriority) -> String {
         switch priority {
         case .transient: "bolt.fill"
@@ -2881,13 +3143,13 @@ struct SettingsView: View {
         case .idle: "尚未检查更新"
         case .checking: "正在检查更新"
         case .current: "已是最新版本"
-        case .available(let release, let source): "发现 \(source.displayName) 新版本 \(release.tagName)"
+        case .available: "发现可用新版本"
         case .failed(let message): message
         }
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.6"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.7"
     }
 
     private func searchWeatherLocation() {
@@ -3263,6 +3525,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case info
     case ai
     case voice
+    case keyboardSound
     case pet
     case download
     case weather
@@ -3281,6 +3544,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "通用"
         case .features: "功能"
+        case .keyboardSound: "键盘音效"
         case .clipboardAssistant: "复制助手"
         case .screenshot: "截图"
         case .workflow: "工作流"
@@ -3300,6 +3564,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "gearshape.fill"
         case .features: "switch.2"
+        case .keyboardSound: "keyboard.badge.ellipsis"
         case .clipboardAssistant: "sparkles.rectangle.stack"
         case .screenshot: "camera.viewfinder"
         case .workflow: "square.grid.2x2.fill"
@@ -3319,6 +3584,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "调整语言、外观、启动与展开方式。"
         case .features: "集中开启或关闭所有功能模块。"
+        case .keyboardSound: "键盘音效与输入统计。"
         case .clipboardAssistant: "复制后弹出识别结果和下一步操作"
         case .screenshot: "启用截图、钉图与全局快捷键"
         case .workflow: "管理灵动岛中的工作流模块。"
@@ -3338,6 +3604,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .networkProxy, .recommendations:
             return true
+        case .keyboardSound:
+            return settings.keyboardEnabled
         case .clipboardAssistant:
             return settings.clipboardAssistantEnabled
         case .screenshot:

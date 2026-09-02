@@ -91,6 +91,7 @@ public final class FileShelfStore: ObservableObject {
         var id: UUID
         var bookmarkData: Data
         var addedAt: Date
+        var url: URL?
     }
 
     private let storageURL: URL
@@ -150,14 +151,24 @@ public final class FileShelfStore: ObservableObject {
             var loaded: [FileShelfItem] = []
             for value in stored {
                 var stale = false
-                let url = try URL(
-                    resolvingBookmarkData: value.bookmarkData,
-                    options: [.withSecurityScope, .withoutUI],
-                    relativeTo: nil,
-                    bookmarkDataIsStale: &stale
-                )
-                guard FileManager.default.fileExists(atPath: url.path) else { continue }
-                let bookmark = stale ? try makeBookmark(for: url) : value.bookmarkData
+                let url: URL
+                do {
+                    url = try URL(
+                        resolvingBookmarkData: value.bookmarkData,
+                        options: [.withSecurityScope, .withoutUI],
+                        relativeTo: nil,
+                        bookmarkDataIsStale: &stale
+                    )
+                } catch {
+                    guard let fallbackURL = value.url else { continue }
+                    url = fallbackURL
+                }
+                let bookmark: Data
+                if stale, FileManager.default.fileExists(atPath: url.path) {
+                    bookmark = (try? makeBookmark(for: url)) ?? value.bookmarkData
+                } else {
+                    bookmark = value.bookmarkData
+                }
                 loaded.append(FileShelfItem(
                     id: value.id,
                     url: url.standardizedFileURL,
@@ -168,7 +179,11 @@ public final class FileShelfStore: ObservableObject {
             items = loaded
             errorDescription = nil
             if loaded.count != stored.count || stored.contains(where: { record in
-                !items.contains(where: { $0.id == record.id && $0.bookmarkData == record.bookmarkData })
+                !items.contains(where: {
+                    $0.id == record.id &&
+                    $0.bookmarkData == record.bookmarkData &&
+                    $0.url == record.url
+                })
             }) {
                 persist()
             }
@@ -184,7 +199,12 @@ public final class FileShelfStore: ObservableObject {
                 withIntermediateDirectories: true
             )
             let stored = items.map {
-                StoredItem(id: $0.id, bookmarkData: $0.bookmarkData, addedAt: $0.addedAt)
+                StoredItem(
+                    id: $0.id,
+                    bookmarkData: $0.bookmarkData,
+                    addedAt: $0.addedAt,
+                    url: $0.url
+                )
             }
             let data = try JSONEncoder().encode(stored)
             try data.write(to: storageURL, options: .atomic)

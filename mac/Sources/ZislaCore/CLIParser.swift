@@ -154,16 +154,31 @@ public enum CLIParser {
 
     private static func parseUsage(_ options: [String: String], now: Date) throws -> CLICommand {
         let provider = try requireProvider(options)
-        let input = try requireInt(options, "--input-tokens")
-        let output = try requireInt(options, "--output-tokens")
+        let input = try requireNonNegativeInt(options, "--input-tokens")
+        let output = try requireNonNegativeInt(options, "--output-tokens")
+        guard !input.addingReportingOverflow(output).overflow else {
+            throw CLIParseError.invalidValue(option: "--output-tokens", value: "\(output)")
+        }
         var cost: Double?
         if let raw = options["--cost"], !raw.isEmpty {
-            guard let value = Double(raw) else {
+            guard let value = Double(raw), value.isFinite, value >= 0 else {
                 throw CLIParseError.invalidValue(option: "--cost", value: raw)
             }
             cost = value
         }
-        let timestamp = options["--timestamp"].flatMap(Double.init).map(Date.init(timeIntervalSince1970:)) ?? now
+        let timestamp: Date
+        if let raw = options["--timestamp"] {
+            guard let value = Double(raw), value.isFinite, value >= 0 else {
+                throw CLIParseError.invalidValue(option: "--timestamp", value: raw)
+            }
+            let parsed = Date(timeIntervalSince1970: value)
+            guard parsed.timeIntervalSinceReferenceDate.isFinite else {
+                throw CLIParseError.invalidValue(option: "--timestamp", value: raw)
+            }
+            timestamp = parsed
+        } else {
+            timestamp = now
+        }
         return .usage(AIUsageSample(
             provider: provider, timestamp: timestamp,
             inputTokens: input, outputTokens: output,
@@ -220,6 +235,14 @@ public enum CLIParser {
     private static func requireInt(_ options: [String: String], _ key: String) throws -> Int {
         let raw = try require(options, key)
         guard let value = Int(raw) else {
+            throw CLIParseError.invalidValue(option: key, value: raw)
+        }
+        return value
+    }
+
+    private static func requireNonNegativeInt(_ options: [String: String], _ key: String) throws -> Int {
+        let raw = try require(options, key)
+        guard let value = Int(raw), value >= 0 else {
             throw CLIParseError.invalidValue(option: key, value: raw)
         }
         return value

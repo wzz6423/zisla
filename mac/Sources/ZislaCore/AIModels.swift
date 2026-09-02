@@ -128,6 +128,20 @@ public struct AIProgressTask: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+/// Arithmetic helpers for token counts, which are non-negative and may exceed the platform integer range when aggregating corrupted or unusually large logs.
+public enum AIUsageTokenMath {
+    public static func nonnegative(_ value: Int) -> Int {
+        max(0, value)
+    }
+
+    public static func adding(_ lhs: Int, _ rhs: Int) -> Int {
+        let lhs = nonnegative(lhs)
+        let rhs = nonnegative(rhs)
+        let (sum, overflow) = lhs.addingReportingOverflow(rhs)
+        return overflow ? Int.max : sum
+    }
+}
+
 /// A daily AI usage aggregate. `cost` and `model` are optional.
 public struct AIUsageSample: Codable, Equatable, Sendable {
     /// Stable identifier for an internally maintained daily aggregate.
@@ -157,7 +171,9 @@ public struct AIUsageSample: Codable, Equatable, Sendable {
         self.model = model
     }
 
-    public var totalTokens: Int { inputTokens + outputTokens }
+    public var totalTokens: Int {
+        AIUsageTokenMath.adding(inputTokens, outputTokens)
+    }
 }
 
 public enum NoticeKind: String, Codable, Sendable {

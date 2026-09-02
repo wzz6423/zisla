@@ -134,7 +134,9 @@ public actor ChinaWeatherAlertService: OfficialWeatherAlertProviding {
 
     private func fetchStationID(locationName: String) async throws -> String {
         for query in Self.searchQueries(for: locationName) {
-            var components = URLComponents(string: "https://toy1.weather.com.cn/search")!
+            guard var components = URLComponents(string: "https://toy1.weather.com.cn/search") else {
+                throw ChinaWeatherAlertServiceError.invalidResponse
+            }
             components.queryItems = [URLQueryItem(name: "cityname", value: query)]
             guard let url = components.url else { continue }
             let data = try await request(url)
@@ -146,7 +148,9 @@ public actor ChinaWeatherAlertService: OfficialWeatherAlertProviding {
     }
 
     private func fetchAlerts(stationID: String, region: String) async throws -> [ZislaCore.WeatherAlert] {
-        var components = URLComponents(string: "https://d1.weather.com.cn/dingzhi/\(stationID).html")!
+        guard var components = URLComponents(string: "https://d1.weather.com.cn/dingzhi/\(stationID).html") else {
+            throw ChinaWeatherAlertServiceError.invalidResponse
+        }
         components.queryItems = [URLQueryItem(name: "_", value: String(Int(Date().timeIntervalSince1970)))]
         guard let url = components.url else { throw ChinaWeatherAlertServiceError.invalidResponse }
         let data = try await request(url)
@@ -187,11 +191,14 @@ public actor ChinaWeatherAlertService: OfficialWeatherAlertProviding {
         let source = String(decoding: data, as: UTF8.self)
         let json = try assignedJSONObject(named: "alarmDZ", in: source)
         let response = try JSONDecoder().decode(ChinaWeatherAlertResponse.self, from: Data(json.utf8))
+        guard let fallbackDetailURL = URL(string: "https://www.weather.com.cn/weather1d/\(stationID).shtml") else {
+            throw ChinaWeatherAlertServiceError.invalidResponse
+        }
         return response.w.map { alert in
             let updatedAt = publicationDate(from: alert.w8) ?? Date()
             let detailURL = alert.w11.flatMap { file in
                 URL(string: "https://www.weather.com.cn/alarm/newalarmcontent.shtml?file=\(file)")
-            } ?? URL(string: "https://www.weather.com.cn/weather1d/\(stationID).shtml")!
+            } ?? fallbackDetailURL
             return ZislaCore.WeatherAlert(
                 severity: severity(for: alert.w7),
                 source: "中国天气网（中国气象局）",

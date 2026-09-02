@@ -4,7 +4,7 @@
 
 项目的完整发布流程、双更新通道和 GitHub/Gitee 的资产同步由仓库根目录的 [`skills/zisla-release`](../../skills/zisla-release/SKILL.md) 统一维护。本页只说明签名、公证和更新包的设计约束；发布时以该技能为准。
 
-应用内只检查 Release 和下载 DMG，绝不自动替换或重启应用。Developer ID 发布包仍建议公证；免费 ad-hoc Preview 不能公证，首次打开可能需要在系统设置中选择“仍要打开”。
+当前选择的两个更新通道都使用 Sparkle：先验签 ZIP 和 appcast，再替换并重启应用。每次检查先读取 Gitee；当 Gitee appcast 无法加载或更新包下载失败时，自动重试一次 GitHub。`package-release.sh` 要求通过 `SPARKLE_GENERATE_APPCAST` 指向 Sparkle 2.9.4 的 `generate_appcast`，并会在 ZIP、DMG 同目录写出 `appcast-gitee.xml` 和 `appcast-github.xml`。两份 appcast 都必须独立签名，且只能指向各自站点的 Universal ZIP。上传时分别以 `appcast.xml` 放到对应站点的 Release：Gitee 的 Release/Preview 永久 feed 分别为 `update-release` 和 `preview`；GitHub 的 Release 使用 `latest`，Preview 使用永久 prerelease `preview`。非交互发布时设置 `SPARKLE_ED_KEY_FILE` 指向私下保管的 EdDSA 私钥文件；不设置则读取登录钥匙串的 `zisla-update-ed25519` 账户。私钥绝不能进入仓库。Developer ID 发布包仍建议公证；免费 ad-hoc Preview 不能公证，首次打开可能需要在系统设置中选择“仍要打开”。
 
 ## 前提
 
@@ -29,6 +29,8 @@ dist/zisla-v1.0.0-macOS-universal.zip
 dist/zisla-v1.0.0-macOS-universal.zip.sha256
 dist/zisla-v1.0.0-macOS-universal.dmg
 dist/zisla-v1.0.0-macOS-universal.dmg.sha256
+dist/appcast-gitee.xml
+dist/appcast-github.xml
 ```
 
 ### 免费预览分发
@@ -42,8 +44,7 @@ export CODE_SIGN_IDENTITY=-
 Scripts/package-release.sh
 ```
 
-该包不经过公证，且不包含 WeatherKit 权限。应用会定期检查 GitHub/Gitee Release；发现新版本后，用户确认即可下载对应 DMG，再把 DMG 中的应用拖入
-`Applications`。首次打开仍需在 **系统设置 > 隐私与安全性** 中选择 **仍要打开**。
+该包不经过公证，且不包含 WeatherKit 权限。将已签名 appcast 发布到永久 Preview feed 后，应用会通过 Sparkle 检查、下载、验签、安装并重启 Preview 更新。首次打开仍需在 **系统设置 > 隐私与安全性** 中选择 **仍要打开**。
 Developer ID 和公证仍是面向普通用户无拦截分发的推荐方式。
 
 ## 2. 公证
@@ -64,7 +65,7 @@ Scripts/package-release.sh
 
 ## 3. 发布与验证
 
-将 DMG 上传到 GitHub 和 Gitee 的同一 tag Release。正式版不能标记为 prerelease；Preview 必须标记为 prerelease。客户端根据通道调用 Release API，选择带有 `macOS` 名称的 DMG。
+将 ZIP、DMG、校验文件和 `appcast-github.xml` 以 `appcast.xml` 上传到 GitHub 的同一版本 tag Release；将匹配资产和 `appcast-gitee.xml` 以 `appcast.xml` 上传到 Gitee 的同一 tag。正式版不能标记为 prerelease。Gitee 的正式 appcast 还必须复制到永久 `update-release`；Preview 的 appcast 必须复制到两端永久 `preview`。客户端按选择的通道先检查 Gitee，当 Gitee appcast 无法加载或更新包下载失败时回退一次 GitHub。
 
 ```bash
 codesign --verify --deep --strict --all-architectures --verbose=4 'dist/zisla.app'
@@ -77,4 +78,4 @@ test -L /Volumes/zisla/Applications
 hdiutil detach /Volumes/zisla
 ```
 
-使用旧版本检查新 Release，确认可下载 DMG、DMG 落在所选目录且未覆盖同名文件。安装验收时先退出 zisla，再挂载 DMG 并拖入 `Applications`。
+使用旧版本检查新 Release，确认自动检查和手动检查都先读取所选 Gitee feed，当其无法加载或更新包下载失败时回退一次对应 GitHub feed，且 Sparkle 能验签、安装并重启 Universal ZIP。还要验证 Release→Preview、Preview→Release 和同通道更新。

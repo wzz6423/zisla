@@ -148,31 +148,18 @@ struct IslandDashboardView: View {
     private var mediaCard: some View {
         dashboardCard(symbol: "music.note", title: "正在播放", tint: Color.zislaInfo) {
             if let item = activeMediaItem {
-                TimelineView(.animation(minimumInterval: 0.5, paused: !item.isPlaying)) { context in
-                    let duration = item.duration ?? 0
-                    let elapsed = item.elapsedTime(at: context.date) ?? item.elapsedTime ?? 0
-                    let fraction = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 7) {
-                            mediaArtwork(item)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.title.isEmpty ? "媒体播放" : item.title)
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .lineLimit(1)
-                                Text(mediaSecondaryText(item))
-                                    .font(.islandMicro())
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-
-                        if duration > 0 {
-                            ProgressView(value: fraction)
-                                .tint(Color.zislaInfo)
-                        }
+                HStack(spacing: 7) {
+                    mediaArtwork(item)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title.isEmpty ? "媒体播放" : item.title)
+                            .font(.system(size: 10, weight: .semibold))
+                            .lineLimit(1)
+                        Text(mediaSecondaryText(item))
+                            .font(.islandMicro())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { _ = media.openSourceApplication() }
@@ -264,7 +251,12 @@ struct IslandDashboardView: View {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: IslandDashboardLayout.cardHeight,
+            maxHeight: IslandDashboardLayout.cardHeight,
+            alignment: .topLeading
+        )
     }
 
     private var activeAITask: AIProgressTask? {

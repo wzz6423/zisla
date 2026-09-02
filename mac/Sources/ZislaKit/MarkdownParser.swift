@@ -131,10 +131,22 @@ public enum MarkdownParser {
                index + 1 < lines.count, isTableDelimiter(lines[index + 1]) {
                 break
             }
-            collected.append(trimmed)
+            collected.append(normalizeParagraphLine(line))
             index += 1
         }
         return (collected.joined(separator: " "), index)
+    }
+
+    private static func normalizeParagraphLine(_ line: String) -> String {
+        var leadingCount = 0
+        for character in line {
+            guard character == " " || character == "\t" else { break }
+            leadingCount += 1
+        }
+
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard leadingCount > 0 else { return trimmed }
+        return "%%ZISLA_INDENT:\(leadingCount)%%\(trimmed)"
     }
 
     private static func collectList(
@@ -183,7 +195,7 @@ public enum MarkdownParser {
         var index = start
         while index < lines.count {
             let line = lines[index]
-            if line.trimmingCharacters(in: .whitespaces) == fence {
+            if isClosingFence(line, matching: fence) {
                 return (collected.joined(separator: "\n"), index + 1)
             }
             collected.append(line)
@@ -217,29 +229,38 @@ public enum MarkdownParser {
               let close = trimmed.firstIndex(of: "]"),
               open < close
         else { return nil }
+        guard open == trimmed.index(after: trimmed.startIndex) else { return nil }
         // When `]` ends the line, index(after:) is endIndex; direct subscripting would crash (for example, `![screenshot]`).
         let afterClose = trimmed.index(after: close)
         guard afterClose < trimmed.endIndex, trimmed[afterClose] == "(" else { return nil }
         // The entire line must contain only this one image marker (whitespace allowed around it), to avoid swallowing inline images in body text.
         let alt = String(trimmed[trimmed.index(after: open)..<close])
-        // `inner` starts at '(' (inclusive) so that subsequent startIndex/lastIndex checks are meaningful.
-        let inner = trimmed[afterClose...]
-        guard let endParen = inner.lastIndex(of: ")"),
-              inner[inner.startIndex] == "(",
-              inner[inner.index(before: endParen)] != "("
-        else { return nil }
-        var url = String(inner[inner.index(after: inner.startIndex)..<endParen])
+        var depth = 0
+        var endParen: String.Index?
+        var index = afterClose
+        scanURL: while index < trimmed.endIndex {
+            switch trimmed[index] {
+            case "(":
+                depth += 1
+            case ")":
+                depth -= 1
+                if depth == 0 {
+                    endParen = index
+                    break scanURL
+                }
+            default:
+                break
+            }
+            index = trimmed.index(after: index)
+        }
+        guard let endParen, trimmed.index(after: endParen) == trimmed.endIndex else { return nil }
+        var url = String(trimmed[trimmed.index(after: afterClose)..<endParen])
             .trimmingCharacters(in: .whitespaces)
         // Strip optional trailing "title".
         if let quoteStart = url.firstIndex(of: "\""),
            let quoteEnd = url.lastIndex(of: "\""), quoteStart < quoteEnd {
             url = String(url[..<quoteStart]).trimmingCharacters(in: .whitespaces)
         }
-        // If the line contains any visible characters beyond the image marker, treat it as body text rather than a standalone image.
-        let remainder = trimmed
-            .replacingOccurrences(of: "![" + alt + "]" + inner, with: "")
-            .trimmingCharacters(in: .whitespaces)
-        guard remainder.isEmpty else { return nil }
         return (url, alt)
     }
 
@@ -269,16 +290,17 @@ public enum MarkdownParser {
         return (header: header, rows: rows, next: index)
     }
 
-    /// Delimiter row: `| --- | :--: | ---: |` etc.; each cell contains only `-`, `:`, and spaces.
+    /// Delimiter row: `| --- | :---: | ---: |` etc.; each cell contains at least three `-` with optional edge `:` alignment markers.
     private static func isTableDelimiter(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard trimmed.contains("|") else { return false }
         let cells = splitTableRow(trimmed)
         guard !cells.isEmpty else { return false }
         return cells.allSatisfy { cell in
-            let stripped = cell.trimmingCharacters(in: .whitespaces)
-            guard !stripped.isEmpty else { return false }
-            return stripped.allSatisfy { $0 == "-" || $0 == ":" }
+            var marker = cell.trimmingCharacters(in: .whitespaces)
+            if marker.hasPrefix(":") { marker.removeFirst() }
+            if marker.hasSuffix(":") { marker.removeLast() }
+            return marker.count >= 3 && marker.allSatisfy { $0 == "-" }
         }
     }
 
@@ -294,10 +316,19 @@ public enum MarkdownParser {
 
     private static func fenceInfo(_ line: String) -> (marker: String, language: String?)? {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") else { return nil }
-        let marker = String(trimmed.prefix(3))
-        let language = trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)
+        guard let fenceCharacter = trimmed.first, fenceCharacter == "`" || fenceCharacter == "~" else { return nil }
+        let marker = String(trimmed.prefix { $0 == fenceCharacter })
+        guard marker.count >= 3 else { return nil }
+        let language = trimmed.dropFirst(marker.count).trimmingCharacters(in: .whitespaces)
         return (marker, language.isEmpty ? nil : language)
+    }
+
+    private static func isClosingFence(_ line: String, matching marker: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard let fenceCharacter = marker.first, trimmed.first == fenceCharacter else { return false }
+        let closingMarker = trimmed.prefix { $0 == fenceCharacter }
+        guard closingMarker.count >= marker.count else { return false }
+        return trimmed.dropFirst(closingMarker.count).trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private static func isHorizontalRule(_ line: String) -> Bool {
@@ -346,8 +377,7 @@ public enum MarkdownParser {
         }
         guard !digits.isEmpty, digits.count <= 9 else { return nil }
         let afterDigits = trimmed.dropFirst(digits.count)
-        guard afterDigits.hasPrefix(".") || afterDigits.hasPrefix(")") else { return nil }
-        let delimiter = afterDigits.first!
+        guard let delimiter = afterDigits.first, delimiter == "." || delimiter == ")" else { return nil }
         let rest = afterDigits.dropFirst()
         guard rest.first == " " || rest.first == "\t" else { return nil }
         let marker = digits + String(delimiter)

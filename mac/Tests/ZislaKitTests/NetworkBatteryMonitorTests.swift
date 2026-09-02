@@ -121,9 +121,35 @@ struct NetworkBatteryMonitorTests {
     }
 
     @Test
+    func classifiesAirPodsMaxAsHeadphonesWhileKeepingAppleAdvertisementSupport() throws {
+        let data = Data("""
+        {
+          "SPBluetoothDataType": [{
+            "device_connected": [{
+              "AirPods Max": {
+                "device_minorType": "Headphones",
+                "device_batteryLevelLeft": "77%"
+              }
+            }]
+          }]
+        }
+        """.utf8)
+
+        let discovery = NetworkBatteryMonitor.bluetoothDiscovery(from: data)
+        let device = try #require(discovery.devices.first)
+        let target = try #require(discovery.targets.first)
+
+        #expect(device.deviceType == .headphones)
+        #expect(device.deviceType.symbolName == "headphones")
+        #expect(device.batteryPercentInt == 77)
+        #expect(device.components.isEmpty)
+        #expect(target.supportsAppleHeadphoneAdvertisement)
+    }
+
+    @Test
     func mergesBluetoothReadingsAndKeepsTheRicherFreshSnapshot() throws {
         let profile = NetworkBatteryDevice(
-            identifier: "bluetooth:aabbcc",
+            identifier: "bluetooth:profile-id",
             name: "AirPods Pro",
             deviceType: .airPods,
             batteryLevel: 0.70,
@@ -132,7 +158,7 @@ struct NetworkBatteryMonitorTests {
             connectionDetail: "已连接"
         )
         let advertisement = NetworkBatteryDevice(
-            identifier: "apple-headphone:aabbcc",
+            identifier: "apple-headphone:ble-id",
             name: "airpods pro",
             deviceType: .airPods,
             batteryLevel: 0.42,
@@ -156,6 +182,164 @@ struct NetworkBatteryMonitorTests {
         #expect(merged.components.map(\.percentInt) == [80, 42])
         #expect(merged.isCharging)
         #expect(merged.connectionDetail == "BLE")
+    }
+
+    @Test
+    func mergesTheSamePhoneReportedByBluetoothAndPairedDeviceSources() throws {
+        let bluetooth = NetworkBatteryDevice(
+            identifier: "bluetooth:aabbccddeeff",
+            name: "Zzz 的 iPhone",
+            deviceType: .iPhone,
+            batteryLevel: 0.55,
+            isCharging: false,
+            lastSeen: Date(timeIntervalSince1970: 10),
+            source: .bluetooth,
+            connectionDetail: "已连接"
+        )
+        let paired = NetworkBatteryDevice(
+            identifier: "idevice:1a2b3c4d",
+            name: "Zzz 的 iPhone",
+            deviceType: .iPhone,
+            batteryLevel: 0.63,
+            isCharging: true,
+            lastSeen: Date(timeIntervalSince1970: 20),
+            source: .iDevice,
+            connectionDetail: "Wi-Fi"
+        )
+
+        let merged = NetworkBatteryMonitor.mergedDevices([bluetooth, paired])
+
+        #expect(merged.count == 1)
+        let device = try #require(merged.first)
+        #expect(device.identifier == bluetooth.identifier)
+        #expect(device.deviceType == .iPhone)
+        #expect(device.batteryPercentInt == 63)
+        #expect(device.isCharging)
+        #expect(device.connectionDetail == "Wi-Fi")
+    }
+
+    @Test
+    func mergesARenamedPhoneWhoseBluetoothTypeIsOnlyAWeakGuess() throws {
+        let bluetooth = NetworkBatteryDevice(
+            identifier: "bluetooth:aabbccddeeff",
+            name: "书房备用机",
+            deviceType: .accessory,
+            batteryLevel: 0.40,
+            isCharging: false,
+            lastSeen: Date(timeIntervalSince1970: 30),
+            source: .bluetooth,
+            connectionDetail: "已连接"
+        )
+        let paired = NetworkBatteryDevice(
+            identifier: "idevice:99887766",
+            name: "书房备用机",
+            deviceType: .iPhone,
+            batteryLevel: 0.41,
+            isCharging: false,
+            lastSeen: Date(timeIntervalSince1970: 20),
+            source: .iDevice,
+            connectionDetail: "USB"
+        )
+
+        let merged = NetworkBatteryMonitor.mergedDevices([bluetooth, paired])
+
+        #expect(merged.count == 1)
+        let device = try #require(merged.first)
+        #expect(device.identifier == bluetooth.identifier)
+        // The stale Bluetooth guess must not override the paired device's real type.
+        #expect(device.deviceType == .iPhone)
+    }
+
+    @Test
+    func keepsTwoSameNamedDevicesFromOneSourceSeparate() {
+        let firstPad = NetworkBatteryDevice(
+            identifier: "idevice:aaaa1111",
+            name: "iPad",
+            deviceType: .iPad,
+            batteryLevel: 0.30,
+            isCharging: false,
+            lastSeen: Date(timeIntervalSince1970: 10),
+            source: .iDevice
+        )
+        let secondPad = NetworkBatteryDevice(
+            identifier: "idevice:bbbb2222",
+            name: "iPad",
+            deviceType: .iPad,
+            batteryLevel: 0.80,
+            isCharging: false,
+            lastSeen: Date(timeIntervalSince1970: 10),
+            source: .iDevice
+        )
+        let bluetoothPad = NetworkBatteryDevice(
+            identifier: "bluetooth:ccccdddd",
+            name: "iPad",
+            deviceType: .iPad,
+            batteryLevel: 0.50,
+            isCharging: false,
+            lastSeen: Date(timeIntervalSince1970: 10),
+            source: .bluetooth
+        )
+
+        let merged = NetworkBatteryMonitor.mergedDevices([bluetoothPad, firstPad, secondPad])
+
+        // Two paired iPads named alike make the cross-source pairing ambiguous, so nothing merges.
+        #expect(merged.count == 3)
+        #expect(Set(merged.map(\.identifier)) == [
+            bluetoothPad.identifier,
+            firstPad.identifier,
+            secondPad.identifier,
+        ])
+    }
+
+    @Test
+    func keepsDifferentDeviceTypesSharingANameSeparate() {
+        let keyboard = NetworkBatteryDevice(
+            identifier: "bluetooth:aabbccddeeff",
+            name: "工作室",
+            deviceType: .keyboard,
+            batteryLevel: 0.90,
+            isCharging: false,
+            lastSeen: Date(timeIntervalSince1970: 10),
+            source: .bluetooth
+        )
+        let pad = NetworkBatteryDevice(
+            identifier: "idevice:5f5f5f5f",
+            name: "工作室",
+            deviceType: .iPad,
+            batteryLevel: 0.20,
+            isCharging: false,
+            lastSeen: Date(timeIntervalSince1970: 10),
+            source: .iDevice
+        )
+
+        let merged = NetworkBatteryMonitor.mergedDevices([keyboard, pad])
+
+        #expect(merged.count == 2)
+        #expect(merged.map(\.batteryPercentInt) == [90, 20])
+    }
+
+    @Test
+    func keepsDistinctlyNamedDevicesSeparateAcrossSources() {
+        let phone = NetworkBatteryDevice(
+            identifier: "bluetooth:aabbccddeeff",
+            name: "iPhone 15",
+            deviceType: .iPhone,
+            batteryLevel: 0.55,
+            isCharging: false,
+            lastSeen: Date(timeIntervalSince1970: 10),
+            source: .bluetooth
+        )
+        let otherPhone = NetworkBatteryDevice(
+            identifier: "idevice:1234abcd",
+            name: "iPhone 17",
+            deviceType: .iPhone,
+            batteryLevel: 0.65,
+            isCharging: false,
+            lastSeen: Date(timeIntervalSince1970: 10),
+            source: .iDevice
+        )
+
+        #expect(NetworkBatteryMonitor.mergedDevices([phone, otherPhone]).count == 2)
     }
 
     @Test

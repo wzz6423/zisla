@@ -122,7 +122,7 @@ final class AIStateDatabase {
     func trimUsageIfNeeded() throws {
         let countStatement = try prepare("SELECT COUNT(*) FROM usage_samples")
         defer { sqlite3_finalize(countStatement) }
-        guard sqlite3_step(countStatement) == SQLITE_ROW,
+        guard try stepHasRow(countStatement, fallback: "无法读取 AI 用量记录数量"),
               sqlite3_column_int64(countStatement, 0) > Int64(maximumUsageSamples) else {
             return
         }
@@ -135,6 +135,10 @@ final class AIStateDatabase {
             usageSamples: includeUsageSamples ? try loadUsage() : [],
             notices: try loadNotices()
         )
+    }
+
+    func loadUsageSamples(startingAt startDate: Date? = nil) throws -> [AIUsageSample] {
+        try loadUsage(startingAt: startDate)
     }
 
     func upsertTask(_ task: AIProgressTask) throws {
@@ -152,7 +156,7 @@ final class AIStateDatabase {
         let statement = try prepare("SELECT payload FROM tasks WHERE id = ? LIMIT 1")
         defer { sqlite3_finalize(statement) }
         try bind(id, to: 1, in: statement)
-        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        guard try stepHasRow(statement, fallback: "无法查询 AI 任务") else { return nil }
         return try decode(AIProgressTask.self, from: blob(at: 0, in: statement))
     }
 
@@ -202,20 +206,29 @@ final class AIStateDatabase {
         let statement = try prepare("SELECT payload FROM tasks ORDER BY position")
         defer { sqlite3_finalize(statement) }
         var result: [AIProgressTask] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
+        while try stepHasRow(statement, fallback: "无法读取 AI 任务列表") {
             result.append(try decode(AIProgressTask.self, from: blob(at: 0, in: statement)))
         }
         return result
     }
 
-    private func loadUsage() throws -> [AIUsageSample] {
-        let statement = try prepare("""
+    private func loadUsage(startingAt startDate: Date? = nil) throws -> [AIUsageSample] {
+        let statement = try prepare(startDate == nil
+            ? """
             SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
             FROM usage_samples ORDER BY position
-            """)
+            """
+            : """
+            SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+            FROM usage_samples WHERE timestamp >= ? ORDER BY position
+            """
+        )
         defer { sqlite3_finalize(statement) }
+        if let startDate {
+            try check(sqlite3_bind_double(statement, 1, startDate.timeIntervalSinceReferenceDate))
+        }
         var result: [AIUsageSample] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
+        while try stepHasRow(statement, fallback: "无法读取 AI 用量记录") {
             result.append(try usageSample(
                 from: statement,
                 sourceID: optionalText(at: 0, in: statement),
@@ -277,6 +290,10 @@ final class AIStateDatabase {
                 model TEXT
             )
             """)
+        try execute("""
+            CREATE INDEX IF NOT EXISTS detected_usage_events_timestamp
+            ON detected_usage_events(timestamp)
+            """)
         guard try usageSchemaVersion() < 6 else { return }
         try setUsageSchemaVersion(6)
     }
@@ -289,11 +306,11 @@ final class AIStateDatabase {
             """)
         defer { sqlite3_finalize(statement) }
         var totals: [DetectedUsageTotal] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
+        while try stepHasRow(statement, fallback: "无法读取历史 AI 用量汇总") {
             totals.append(DetectedUsageTotal(
                 timestamp: Date(timeIntervalSinceReferenceDate: sqlite3_column_double(statement, 0)),
-                inputTokens: max(0, Int(sqlite3_column_int64(statement, 1))),
-                outputTokens: max(0, Int(sqlite3_column_int64(statement, 2)))
+                inputTokens: tokenCount(at: 1, in: statement),
+                outputTokens: tokenCount(at: 2, in: statement)
             ))
         }
         return totals
@@ -306,7 +323,7 @@ final class AIStateDatabase {
             """)
         defer { sqlite3_finalize(statement) }
         try bind(name, to: 1, in: statement)
-        return sqlite3_step(statement) == SQLITE_ROW
+        return try stepHasRow(statement, fallback: "无法查询 AI 状态数据库结构")
     }
 
     private func recordUsageDeltasInCurrentTransaction(_ samples: [AIUsageSample]) throws -> Int {
@@ -335,7 +352,7 @@ final class AIStateDatabase {
             sqlite3_reset(lookup)
             sqlite3_clear_bindings(lookup)
             try bind(sourceID, to: 1, in: lookup)
-            if sqlite3_step(lookup) == SQLITE_ROW {
+            if try stepHasRow(lookup, fallback: "无法查询 AI 用量记录") {
                 let existing = try usageSample(
                     from: lookup,
                     sourceID: sourceID,
@@ -345,8 +362,10 @@ final class AIStateDatabase {
                     sourceID: sourceID,
                     provider: existing.provider,
                     timestamp: existing.timestamp,
-                    inputTokens: existing.inputTokens + sample.inputTokens,
-                    outputTokens: existing.outputTokens + sample.outputTokens
+                    inputTokens: AIUsageTokenMath.adding(existing.inputTokens, sample.inputTokens),
+                    outputTokens: AIUsageTokenMath.adding(existing.outputTokens, sample.outputTokens),
+                    costUSD: existing.costUSD ?? sample.costUSD,
+                    model: existing.model ?? sample.model
                 )
                 guard existing != next else { continue }
                 sqlite3_reset(update)
@@ -396,31 +415,30 @@ final class AIStateDatabase {
                 sourceID: sourceID,
                 provider: sample.provider,
                 timestamp: sample.timestamp,
-                inputTokens: max(0, sample.inputTokens),
-                outputTokens: max(0, sample.outputTokens),
+                inputTokens: AIUsageTokenMath.nonnegative(sample.inputTokens),
+                outputTokens: AIUsageTokenMath.nonnegative(sample.outputTokens),
                 costUSD: sample.costUSD,
                 model: sample.model
             )
 
-            sqlite3_reset(lookup)
-            sqlite3_clear_bindings(lookup)
-            try bind(sourceID, to: 1, in: lookup)
-            if sqlite3_step(lookup) == SQLITE_ROW {
-                let existing = try usageSample(
-                    from: lookup,
-                    sourceID: sourceID,
-                    columnOffset: 0
-                )
+            var existing = try detectedUsageEvent(sourceID: sourceID, using: lookup)
+            if existing == nil {
+                try migrateLegacyDetectedUsageEventIfNeeded(for: normalized)
+                existing = try detectedUsageEvent(sourceID: sourceID, using: lookup)
+            }
+            if let existing {
                 let inputDelta = max(0, normalized.inputTokens - existing.inputTokens)
                 let outputDelta = max(0, normalized.outputTokens - existing.outputTokens)
-                guard inputDelta > 0 || outputDelta > 0 else { continue }
+                let addsMetadata = (existing.costUSD == nil && normalized.costUSD != nil)
+                    || (existing.model == nil && normalized.model != nil)
+                guard inputDelta > 0 || outputDelta > 0 || addsMetadata else { continue }
 
                 let updated = AIUsageSample(
                     sourceID: sourceID,
                     provider: existing.provider,
                     timestamp: existing.timestamp,
-                    inputTokens: existing.inputTokens + inputDelta,
-                    outputTokens: existing.outputTokens + outputDelta,
+                    inputTokens: AIUsageTokenMath.adding(existing.inputTokens, inputDelta),
+                    outputTokens: AIUsageTokenMath.adding(existing.outputTokens, outputDelta),
                     costUSD: existing.costUSD ?? normalized.costUSD,
                     model: existing.model ?? normalized.model
                 )
@@ -428,16 +446,18 @@ final class AIStateDatabase {
                 sqlite3_clear_bindings(update)
                 try bindUpdate(updated, to: update)
                 try stepDone(update)
-                let delta = AIUsageSample(
-                    sourceID: sourceID,
-                    provider: existing.provider,
-                    timestamp: existing.timestamp,
-                    inputTokens: inputDelta,
-                    outputTokens: outputDelta
-                )
-                appendDetectedUsageDelta(delta, to: &rawDeltasByDay)
-                if legacyCursor.map({ delta.timestamp > $0 }) ?? false {
-                    cursorDeltas.append(delta)
+                if inputDelta > 0 || outputDelta > 0 {
+                    let delta = AIUsageSample(
+                        sourceID: sourceID,
+                        provider: existing.provider,
+                        timestamp: existing.timestamp,
+                        inputTokens: inputDelta,
+                        outputTokens: outputDelta
+                    )
+                    appendDetectedUsageDelta(delta, to: &rawDeltasByDay)
+                    if legacyCursor.map({ delta.timestamp > $0 }) ?? false {
+                        cursorDeltas.append(delta)
+                    }
                 }
                 continue
             }
@@ -475,8 +495,8 @@ final class AIStateDatabase {
         guard delta.inputTokens > 0 || delta.outputTokens > 0 else { return }
         let day = Calendar.current.startOfDay(for: delta.timestamp)
         if var existing = deltasByDay[day] {
-            existing.inputTokens += delta.inputTokens
-            existing.outputTokens += delta.outputTokens
+            existing.inputTokens = AIUsageTokenMath.adding(existing.inputTokens, delta.inputTokens)
+            existing.outputTokens = AIUsageTokenMath.adding(existing.outputTokens, delta.outputTokens)
             deltasByDay[day] = existing
         } else {
             deltasByDay[day] = AIUsageSample(
@@ -518,19 +538,28 @@ final class AIStateDatabase {
             throw AIStateRepositoryError.storageFailure("无法计算 AI 用量日期范围")
         }
         let statement = try prepare("""
-            SELECT COALESCE(SUM(input_tokens), 0), COALESCE(SUM(output_tokens), 0)
+            SELECT input_tokens, output_tokens
             FROM detected_usage_events WHERE timestamp >= ? AND timestamp < ?
             """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, day.timeIntervalSinceReferenceDate))
         try check(sqlite3_bind_double(statement, 2, nextDay.timeIntervalSinceReferenceDate))
-        guard sqlite3_step(statement) == SQLITE_ROW else {
-            throw AIStateRepositoryError.storageFailure("无法读取 AI 用量事件汇总")
+        var inputTokens = 0
+        var outputTokens = 0
+        while try stepHasRow(statement, fallback: "无法读取 AI 用量事件汇总") {
+            inputTokens = AIUsageTokenMath.adding(
+                inputTokens,
+                tokenCount(at: 0, in: statement)
+            )
+            outputTokens = AIUsageTokenMath.adding(
+                outputTokens,
+                tokenCount(at: 1, in: statement)
+            )
         }
         return DetectedUsageTotal(
             timestamp: day,
-            inputTokens: Int(sqlite3_column_int64(statement, 0)),
-            outputTokens: Int(sqlite3_column_int64(statement, 1))
+            inputTokens: inputTokens,
+            outputTokens: outputTokens
         )
     }
 
@@ -541,13 +570,13 @@ final class AIStateDatabase {
             """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, day.timeIntervalSinceReferenceDate))
-        guard sqlite3_step(statement) == SQLITE_ROW else {
+        guard try stepHasRow(statement, fallback: "无法读取 AI 用量基线") else {
             return DetectedUsageTotal(timestamp: day, inputTokens: 0, outputTokens: 0)
         }
         return DetectedUsageTotal(
             timestamp: day,
-            inputTokens: Int(sqlite3_column_int64(statement, 0)),
-            outputTokens: Int(sqlite3_column_int64(statement, 1))
+            inputTokens: tokenCount(at: 0, in: statement),
+            outputTokens: tokenCount(at: 1, in: statement)
         )
     }
 
@@ -561,8 +590,16 @@ final class AIStateDatabase {
             """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, total.timestamp.timeIntervalSinceReferenceDate))
-        try check(sqlite3_bind_int64(statement, 2, Int64(total.inputTokens)))
-        try check(sqlite3_bind_int64(statement, 3, Int64(total.outputTokens)))
+        try check(sqlite3_bind_int64(
+            statement,
+            2,
+            Int64(AIUsageTokenMath.nonnegative(total.inputTokens))
+        ))
+        try check(sqlite3_bind_int64(
+            statement,
+            3,
+            Int64(AIUsageTokenMath.nonnegative(total.outputTokens))
+        ))
         try stepDone(statement)
     }
 
@@ -574,10 +611,111 @@ final class AIStateDatabase {
         return "zisla-detected-anonymous:\(sample.provider.rawValue):\(timestamp):\(sample.model ?? "")"
     }
 
+    private func detectedUsageEvent(
+        sourceID: String,
+        using statement: OpaquePointer?
+    ) throws -> AIUsageSample? {
+        sqlite3_reset(statement)
+        sqlite3_clear_bindings(statement)
+        try bind(sourceID, to: 1, in: statement)
+        guard try stepHasRow(statement, fallback: "无法查询检测到的 AI 用量记录") else {
+            return nil
+        }
+        return try usageSample(from: statement, sourceID: sourceID, columnOffset: 0)
+    }
+
+    private func migrateLegacyDetectedUsageEventIfNeeded(for sample: AIUsageSample) throws {
+        guard let sourceID = sample.sourceID,
+              let legacySourceID = try uniqueLegacyDetectedUsageSourceID(
+                for: sourceID,
+                provider: sample.provider,
+                timestamp: sample.timestamp
+              ) else {
+            return
+        }
+
+        let statement = try prepare("""
+            UPDATE detected_usage_events SET source_id = ?
+            WHERE source_id = ?
+            """)
+        defer { sqlite3_finalize(statement) }
+        try bind(sourceID, to: 1, in: statement)
+        try bind(legacySourceID, to: 2, in: statement)
+        try stepDone(statement)
+    }
+
+    private func uniqueLegacyDetectedUsageSourceID(
+        for sourceID: String,
+        provider: AIProvider,
+        timestamp: Date
+    ) throws -> String? {
+        if let range = sourceID.range(of: "-update-v2-", options: .backwards) {
+            return try uniqueLegacyDetectedUsageSourceID(
+                matching: String(sourceID[..<range.lowerBound]),
+                provider: provider,
+                timestamp: timestamp
+            )
+        }
+        if let range = sourceID.range(of: "-event-v2-") {
+            return try uniqueLegacyDetectedUsageSourceID(
+                matchingPrefix: String(sourceID[..<range.lowerBound]) + "-event-",
+                provider: provider,
+                timestamp: timestamp
+            )
+        }
+        return nil
+    }
+
+    private func uniqueLegacyDetectedUsageSourceID(
+        matching sourceID: String,
+        provider: AIProvider,
+        timestamp: Date
+    ) throws -> String? {
+        let statement = try prepare("""
+            SELECT source_id FROM detected_usage_events
+            WHERE source_id = ? AND provider = ? AND timestamp = ?
+            LIMIT 2
+            """)
+        defer { sqlite3_finalize(statement) }
+        try bind(sourceID, to: 1, in: statement)
+        try bind(provider.rawValue, to: 2, in: statement)
+        try check(sqlite3_bind_double(statement, 3, timestamp.timeIntervalSinceReferenceDate))
+        return try uniqueDetectedUsageSourceID(from: statement)
+    }
+
+    private func uniqueLegacyDetectedUsageSourceID(
+        matchingPrefix prefix: String,
+        provider: AIProvider,
+        timestamp: Date
+    ) throws -> String? {
+        let statement = try prepare("""
+            SELECT source_id FROM detected_usage_events
+            WHERE source_id LIKE ? AND source_id NOT LIKE ?
+                AND provider = ? AND timestamp = ?
+            ORDER BY source_id
+            LIMIT 2
+            """)
+        defer { sqlite3_finalize(statement) }
+        try bind(prefix + "%", to: 1, in: statement)
+        try bind(prefix + "v2-%", to: 2, in: statement)
+        try bind(provider.rawValue, to: 3, in: statement)
+        try check(sqlite3_bind_double(statement, 4, timestamp.timeIntervalSinceReferenceDate))
+        return try uniqueDetectedUsageSourceID(from: statement)
+    }
+
+    private func uniqueDetectedUsageSourceID(from statement: OpaquePointer?) throws -> String? {
+        var sourceIDs: [String] = []
+        while try stepHasRow(statement, fallback: "无法查询旧版检测到的 AI 用量记录") {
+            guard let sourceID = optionalText(at: 0, in: statement) else { continue }
+            sourceIDs.append(sourceID)
+        }
+        return sourceIDs.count == 1 ? sourceIDs[0] : nil
+    }
+
     private func detectedUsageCursor() throws -> Date? {
         let statement = try prepare("SELECT timestamp FROM detected_usage_cursor WHERE id = 1 LIMIT 1")
         defer { sqlite3_finalize(statement) }
-        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        guard try stepHasRow(statement, fallback: "无法读取 AI 用量游标") else { return nil }
         return Date(timeIntervalSinceReferenceDate: sqlite3_column_double(statement, 0))
     }
 
@@ -594,7 +732,7 @@ final class AIStateDatabase {
     private func usageSchemaVersion() throws -> Int {
         let statement = try prepare("PRAGMA user_version")
         defer { sqlite3_finalize(statement) }
-        guard sqlite3_step(statement) == SQLITE_ROW else {
+        guard try stepHasRow(statement, fallback: "无法读取 AI 用量存储版本") else {
             throw AIStateRepositoryError.storageFailure("无法读取 AI 用量存储版本")
         }
         return Int(sqlite3_column_int64(statement, 0))
@@ -608,7 +746,7 @@ final class AIStateDatabase {
         let statement = try prepare("SELECT payload FROM notices ORDER BY position")
         defer { sqlite3_finalize(statement) }
         var result: [IslandNotice] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
+        while try stepHasRow(statement, fallback: "无法读取通知列表") {
             result.append(try decode(IslandNotice.self, from: blob(at: 0, in: statement)))
         }
         return result
@@ -644,8 +782,8 @@ final class AIStateDatabase {
             timestamp: Date(
                 timeIntervalSinceReferenceDate: sqlite3_column_double(statement, columnOffset + 1)
             ),
-            inputTokens: Int(sqlite3_column_int64(statement, columnOffset + 2)),
-            outputTokens: Int(sqlite3_column_int64(statement, columnOffset + 3)),
+            inputTokens: tokenCount(at: columnOffset + 2, in: statement),
+            outputTokens: tokenCount(at: columnOffset + 3, in: statement),
             costUSD: sqlite3_column_type(statement, columnOffset + 4) == SQLITE_NULL
                 ? nil
                 : sqlite3_column_double(statement, columnOffset + 4),
@@ -661,8 +799,16 @@ final class AIStateDatabase {
             3,
             sample.timestamp.timeIntervalSinceReferenceDate
         ))
-        try check(sqlite3_bind_int64(statement, 4, Int64(sample.inputTokens)))
-        try check(sqlite3_bind_int64(statement, 5, Int64(sample.outputTokens)))
+        try check(sqlite3_bind_int64(
+            statement,
+            4,
+            Int64(AIUsageTokenMath.nonnegative(sample.inputTokens))
+        ))
+        try check(sqlite3_bind_int64(
+            statement,
+            5,
+            Int64(AIUsageTokenMath.nonnegative(sample.outputTokens))
+        ))
         try bind(sample.costUSD, to: 6, in: statement)
         try bind(sample.model, to: 7, in: statement)
     }
@@ -674,8 +820,16 @@ final class AIStateDatabase {
             2,
             sample.timestamp.timeIntervalSinceReferenceDate
         ))
-        try check(sqlite3_bind_int64(statement, 3, Int64(sample.inputTokens)))
-        try check(sqlite3_bind_int64(statement, 4, Int64(sample.outputTokens)))
+        try check(sqlite3_bind_int64(
+            statement,
+            3,
+            Int64(AIUsageTokenMath.nonnegative(sample.inputTokens))
+        ))
+        try check(sqlite3_bind_int64(
+            statement,
+            4,
+            Int64(AIUsageTokenMath.nonnegative(sample.outputTokens))
+        ))
         try bind(sample.costUSD, to: 5, in: statement)
         try bind(sample.model, to: 6, in: statement)
         try bind(sample.sourceID, to: 7, in: statement)
@@ -738,6 +892,19 @@ final class AIStateDatabase {
         }
     }
 
+    private func stepHasRow(_ statement: OpaquePointer?, fallback: String) throws -> Bool {
+        switch sqlite3_step(statement) {
+        case SQLITE_ROW:
+            return true
+        case SQLITE_DONE:
+            return false
+        default:
+            throw AIStateRepositoryError.storageFailure(
+                sqliteMessage(connection, fallback: fallback)
+            )
+        }
+    }
+
     private func check(_ result: Int32) throws {
         guard result == SQLITE_OK else {
             throw AIStateRepositoryError.storageFailure(
@@ -777,6 +944,10 @@ final class AIStateDatabase {
             return nil
         }
         return String(cString: text)
+    }
+
+    private func tokenCount(at index: Int32, in statement: OpaquePointer?) -> Int {
+        AIUsageTokenMath.nonnegative(Int(sqlite3_column_int64(statement, index)))
     }
 
     private func blob(at index: Int32, in statement: OpaquePointer?) -> Data {

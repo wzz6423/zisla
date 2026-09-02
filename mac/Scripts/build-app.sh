@@ -3,11 +3,27 @@ set -euo pipefail
 
 ROOT="${0:A:h:h}"
 CONFIGURATION="${CONFIGURATION:-release}"
-VERSION="${VERSION:-0.1.6}"
-BUILD_NUMBER="${BUILD_NUMBER:-12}"
+VERSION="${VERSION:-0.1.7}"
+BUILD_NUMBER="${BUILD_NUMBER:-13}"
 UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
 DEBUG_BUILD="${DEBUG_BUILD:-false}"
 OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:-$ROOT/dist}"
+BUILD_SCRATCH_DIRECTORY="${BUILD_SCRATCH_DIRECTORY:-$ROOT/.build}"
+
+case "$CONFIGURATION" in
+  debug|release) ;;
+  *)
+    echo "error: CONFIGURATION must be debug or release" >&2
+    exit 1
+    ;;
+esac
+case "$DEBUG_BUILD" in
+  true|false) ;;
+  *)
+    echo "error: DEBUG_BUILD must be true or false" >&2
+    exit 1
+    ;;
+esac
 
 if [[ "$DEBUG_BUILD" == "true" ]]; then
   APP_NAME="zisla-debug"
@@ -28,9 +44,10 @@ SIGNING_MODE="${SIGNING_MODE:-}"
 BUILD_ARCHITECTURES="${BUILD_ARCHITECTURES:-$(uname -m)}"
 ARCHITECTURES=(${=BUILD_ARCHITECTURES})
 BINARIES=()
+KEYBOARD_RESOURCE_BUNDLE=""
 HAND_BUILT_APP_SWIFT_FLAGS=(-Xswiftc -DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE)
 
-[[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}([.-][A-Za-z0-9.-]+)?$ ]] || {
+[[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]] || {
   echo "error: VERSION must be a semantic version (for example 1.2.3 or 1.2.3-preview.1)" >&2
   exit 1
 }
@@ -38,6 +55,26 @@ HAND_BUILT_APP_SWIFT_FLAGS=(-Xswiftc -DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE)
   echo "error: BUILD_NUMBER must contain only digits" >&2
   exit 1
 }
+(( ${#ARCHITECTURES[@]} > 0 )) || {
+  echo "error: BUILD_ARCHITECTURES must contain at least one architecture" >&2
+  exit 1
+}
+
+typeset -A SEEN_ARCHITECTURES=()
+for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
+  case "$ARCHITECTURE" in
+    arm64|x86_64) ;;
+    *)
+      echo "error: unsupported architecture: $ARCHITECTURE" >&2
+      exit 1
+      ;;
+  esac
+  [[ -z "${SEEN_ARCHITECTURES[$ARCHITECTURE]:-}" ]] || {
+    echo "error: duplicate architecture: $ARCHITECTURE" >&2
+    exit 1
+  }
+  SEEN_ARCHITECTURES[$ARCHITECTURE]=1
+done
 
 function supports_swiftui_macros() {
   local developer_directory="$1"
@@ -115,14 +152,22 @@ esac
 
 for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
   TARGET_TRIPLE="${ARCHITECTURE}-apple-macosx"
-  SCRATCH_DIRECTORY="$ROOT/.build/$ARCHITECTURE"
+  SCRATCH_DIRECTORY="$BUILD_SCRATCH_DIRECTORY/$ARCHITECTURE"
   swift build --package-path "$ROOT" -c "$CONFIGURATION" --disable-sandbox --scratch-path "$SCRATCH_DIRECTORY" --triple "$TARGET_TRIPLE" "${HAND_BUILT_APP_SWIFT_FLAGS[@]}" --product zisla
   BIN_DIRECTORY="$(swift build --package-path "$ROOT" -c "$CONFIGURATION" --disable-sandbox --scratch-path "$SCRATCH_DIRECTORY" --triple "$TARGET_TRIPLE" "${HAND_BUILT_APP_SWIFT_FLAGS[@]}" --show-bin-path)"
   BINARIES+=("$BIN_DIRECTORY/zisla")
+  if [[ -z "$KEYBOARD_RESOURCE_BUNDLE" ]]; then
+    KEYBOARD_RESOURCE_BUNDLE="$BIN_DIRECTORY/zisla_KeyboardKit.bundle"
+  fi
 done
 
 rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Frameworks" "$CONTENTS/Helpers"
+[[ -d "$KEYBOARD_RESOURCE_BUNDLE" ]] || {
+  echo "error: missing KeyboardKit resource bundle: $KEYBOARD_RESOURCE_BUNDLE" >&2
+  exit 1
+}
+ditto "$KEYBOARD_RESOURCE_BUNDLE" "$CONTENTS/Resources/zisla_KeyboardKit.bundle"
 if (( ${#BINARIES[@]} == 1 )); then
   install -m 0755 "$BINARIES[1]" "$CONTENTS/MacOS/zisla"
 else
@@ -177,6 +222,13 @@ fi
 
 if [[ -d "$ROOT/Vendor/MediaRemoteAdapter.framework" ]]; then
   ditto "$ROOT/Vendor/MediaRemoteAdapter.framework" "$CONTENTS/Frameworks/MediaRemoteAdapter.framework"
+fi
+
+if [[ -d "$ROOT/Vendor/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" ]]; then
+  ditto \
+    "$ROOT/Vendor/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" \
+    "$CONTENTS/Frameworks/Sparkle.framework"
+  install_name_tool -add_rpath '@executable_path/../Frameworks' "$CONTENTS/MacOS/zisla"
 fi
 
 if [[ -f "$ROOT/Resources/MediaRemoteAdapter/mediaremote-adapter.pl" ]]; then

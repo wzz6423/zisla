@@ -129,20 +129,60 @@ struct OpenCodeSessionActivityDetectorTests {
             id: "msg-assistant",
             sessionID: "ses-updated-user",
             updatedAt: nowMs - 100,
-            data: #"{"role":"assistant","time":{"created":#(nowMs - 2000),"completed":#(nowMs - 1000)},"finish":"stop","modelID":"test-model"}"#
+            data: #"{"role":"assistant","time":{"created":\#(nowMs - 2000),"completed":\#(nowMs - 1000)},"finish":"stop","modelID":"test-model"}"#
         )
         try insertMessage(
             at: dbURL,
             id: "msg-user",
             sessionID: "ses-updated-user",
             updatedAt: nowMs,
-            data: #"{"role":"user","time":{"created":#(nowMs - 3000)}}"#
+            data: #"{"role":"user","time":{"created":\#(nowMs - 3000)}}"#
         )
 
         #expect(try OpenCodeSessionActivityDetector(
             databaseURL: dbURL,
             recencyThreshold: 3600
         ).activeTasks().isEmpty)
+    }
+
+    @Test
+    func reportsSchemaErrorsInsteadOfTreatingDatabaseAsIdle() throws {
+        let dbURL = makeTempDB()
+        defer { try? FileManager.default.removeItem(at: dbURL) }
+        try createEmptyDatabase(at: dbURL)
+
+        #expect(throws: AIStateRepositoryError.self) {
+            try OpenCodeSessionActivityDetector(databaseURL: dbURL).activeTasks()
+        }
+    }
+
+    @Test
+    func doesNotDuplicateSessionsWhenMessageUpdateTimesTie() throws {
+        let dbURL = makeTempDB()
+        defer { try? FileManager.default.removeItem(at: dbURL) }
+
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        try createTables(at: dbURL)
+        for sessionID in ["ses-tie-a", "ses-tie-b"] {
+            try insertSession(at: dbURL, id: sessionID, title: sessionID, updatedAt: nowMs)
+            try insertMessage(
+                at: dbURL,
+                id: "msg-\(sessionID)",
+                sessionID: sessionID,
+                updatedAt: nowMs,
+                data: #"{"role":"user","time":{"created":\#(nowMs)}}"#
+            )
+        }
+
+        let tasks = try OpenCodeSessionActivityDetector(
+            databaseURL: dbURL,
+            maxSessions: 2,
+            recencyThreshold: 3600
+        ).activeTasks()
+        #expect(Set(tasks.map(\.id)) == Set([
+            OpenCodeSessionActivityDetector.taskID(forSessionID: "ses-tie-a"),
+            OpenCodeSessionActivityDetector.taskID(forSessionID: "ses-tie-b"),
+        ]))
     }
 
     @Test
@@ -236,6 +276,15 @@ struct OpenCodeSessionActivityDetectorTests {
 private func makeTempDB() -> URL {
     FileManager.default.temporaryDirectory
         .appendingPathComponent("Zisla-opencode-\(UUID().uuidString).db")
+}
+
+private func createEmptyDatabase(at url: URL) throws {
+    var db: OpaquePointer?
+    guard sqlite3_open(url.path, &db) == SQLITE_OK else {
+        sqlite3_close(db)
+        throw OpenCodeTestError.openFailed
+    }
+    sqlite3_close(db)
 }
 
 private func createTables(at url: URL) throws {

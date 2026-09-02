@@ -1,4 +1,5 @@
 import AppKit
+import NaturalLanguage
 import ZislaCore
 
 /// Pure detection logic for the clipboard assistant. Text classification runs from most specific
@@ -25,7 +26,8 @@ public enum ClipboardAssistantDetector {
     public static func detect(
         text rawText: String,
         enabledKinds: Set<ClipboardAssistantKind>,
-        offersDownload: Bool = false
+        offersDownload: Bool = false,
+        systemLanguageIdentifier: String? = Locale.preferredLanguages.first
     ) -> ClipboardAssistantDetection? {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
@@ -75,29 +77,32 @@ public enum ClipboardAssistantDetector {
                 actions: actions
             )
         }
-        if enabledKinds.contains(.math), let result = evaluateArithmetic(text) {
+        if enabledKinds.contains(.math),
+           let expression = arithmeticExpression(from: text),
+           let result = evaluateArithmetic(expression) {
             let formatted = formatNumber(result)
+            let fullExpression = "\(expression) = \(formatted)"
             return ClipboardAssistantDetection(
                 kind: .math,
                 title: formatted,
-                detail: .mathExpression(text),
-                actions: [.copyText(formatted)],
-                fullContent: "\(text) = \(formatted)"
+                detail: .mathExpression(expression),
+                actions: [.copyText(formatted), .copyFullExpression(fullExpression)],
+                fullContent: fullExpression
             )
         }
         if enabledKinds.contains(.phone), isPhoneNumber(text) {
-            // Copy the normalized digit-only form; dialers and forms prefer it over spacing.
             let normalized = "+\(text.filter(\.isNumber))"
             return ClipboardAssistantDetection(
                 kind: .phone,
                 title: text,
-                actions: [.copyText(normalized), .callPhone(normalized)]
+                actions: [.callPhone(normalized)]
             )
         }
         if enabledKinds.contains(.code), let code = codeDetection(text) {
             return code
         }
-        if enabledKinds.contains(.chineseText), containsChineseCharacters(text) {
+        if enabledKinds.contains(.nonSystemLanguageText),
+           isNonCurrentSystemLanguageText(text, systemLanguageIdentifier: systemLanguageIdentifier) {
             let preview = previewText(text)
             var actions: [ClipboardAssistantAction] = [.translate(text)]
             if text.count <= ClipboardAssistantDefaults.saveableTextLength {
@@ -106,20 +111,16 @@ public enum ClipboardAssistantDetector {
                 actions.append(.saveText(text))
             }
             return ClipboardAssistantDetection(
-                kind: .chineseText,
+                kind: .nonSystemLanguageText,
                 title: preview,
-                detail: .chineseCharacterCount(text.count),
+                detail: textDetail(for: text),
                 actions: actions,
                 fullContent: text
             )
         }
         guard enabledKinds.contains(.text) else { return nil }
         let preview = previewText(text)
-        let words = countWords(text)
-        let detail: ClipboardAssistantDetail =
-            words > 0
-            ? .characterAndWordCount(characters: text.count, words: words)
-            : .characterCount(text.count)
+        let detail = textDetail(for: text)
         var actions: [ClipboardAssistantAction]
         if text.count > ClipboardAssistantDefaults.saveableTextLength {
             // Long content gets a dedicated save-to-file action per the feature spec.
@@ -198,7 +199,7 @@ public enum ClipboardAssistantDetector {
     /// Recognizes local paths by shape. Existence is a strong signal but not a requirement:
     /// temporary files get cleaned up and other apps' container paths are unreachable, yet such
     /// values are still paths to the user — treating them as text sent them down the plain/Chinese
-    /// text branch (a path ending in `图像.png` came back as Chinese prose). Unresolvable paths keep
+    /// text branch (a path ending in `image.png` came back as Chinese prose). Unresolvable paths keep
     /// the path kind and only lose the file-bound actions. Shape rules match the clipboard history
     /// categorization (`ClipboardHistoryItem.category`), tightened for values that do not resolve.
     static func filePathCandidate(from text: String) -> FilePathCandidate? {
@@ -222,18 +223,13 @@ public enum ClipboardAssistantDetector {
     }
 
     /// Existing items get the file-bound actions. Unresolvable ones reveal the nearest surviving
-    /// ancestor instead — a cleaned-up temp file still tells you where it lived — and always keep
-    /// copying the raw path, which is the only thing left to do with a vanished file.
+    /// ancestor instead, so a cleaned-up temp file still tells users where it lived.
     private static func filePathActions(for candidate: FilePathCandidate) -> [ClipboardAssistantAction] {
         guard !candidate.exists else {
             return [.revealInFinder(candidate.url), .compress(candidate.url)]
         }
-        var actions: [ClipboardAssistantAction] = []
-        if let ancestor = nearestExistingAncestor(of: candidate.url) {
-            actions.append(.revealInFinder(ancestor))
-        }
-        actions.append(.copyText(candidate.url.path))
-        return actions
+        guard let ancestor = nearestExistingAncestor(of: candidate.url) else { return [] }
+        return [.revealInFinder(ancestor)]
     }
 
     /// Walks up until a directory exists on disk. The volume root is excluded: opening it says
@@ -363,18 +359,48 @@ public enum ClipboardAssistantDetector {
         return formatter.string(from: date)
     }
 
-    // MARK: - Chinese text
+    // MARK: - Non-current-system-language text
 
-    static func containsChineseCharacters(_ text: String) -> Bool {
-        text.unicodeScalars.contains { isCJKScalar($0) }
+    static func isNonCurrentSystemLanguageText(
+        _ text: String,
+        systemLanguageIdentifier: String?
+    ) -> Bool {
+        guard let systemLanguageCode = primaryLanguageCode(from: systemLanguageIdentifier) else {
+            return false
+        }
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(text)
+        guard let (detectedLanguage, confidence) = recognizer
+            .languageHypotheses(withMaximum: 1)
+            .max(by: { $0.value < $1.value }),
+              confidence >= 0.5,
+              let detectedLanguageCode = primaryLanguageCode(from: detectedLanguage.rawValue) else {
+            return false
+        }
+        return detectedLanguageCode != systemLanguageCode
+    }
+
+    private static func primaryLanguageCode(from identifier: String?) -> String? {
+        identifier?
+            .replacingOccurrences(of: "_", with: "-")
+            .split(separator: "-", maxSplits: 1)
+            .first
+            .map { $0.lowercased() }
+    }
+
+    private static func textDetail(for text: String) -> ClipboardAssistantDetail {
+        let words = countWords(text)
+        return words > 0
+            ? .characterAndWordCount(characters: text.count, words: words)
+            : .characterCount(text.count)
     }
 
     private static func isCJKScalar(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.value {
-        case 0x4E00...0x9FFF,       // CJK Unified Ideographs
-             0x3400...0x4DBF,       // Extension A
-             0x20000...0x2A6DF,     // Extension B
-             0xF900...0xFAFF:       // Compatibility Ideographs
+        case 0x4E00...0x9FFF,
+             0x3400...0x4DBF,
+             0x20000...0x2A6DF,
+             0xF900...0xFAFF:
             true
         default:
             false
@@ -422,6 +448,14 @@ public enum ClipboardAssistantDetector {
         }
         if sample.range(of: #"\bselect\b[\s\S]*\bfrom\b"#, options: [.regularExpression, .caseInsensitive]) != nil {
             return true
+        }
+
+        // Long CJK prose and progress transcripts often include isolated command names, paths,
+        // percentages and operators. Without a declaration/signature above, those fragments must
+        // not let weak structural punctuation reclassify the whole passage as source code.
+        let cjkCharacters = sample.filter(isChineseCharacter).count
+        if cjkCharacters >= 20, cjkCharacters * 4 >= sample.count {
+            return false
         }
 
         // Multi-line assignment-with-call is common in copied snippets (e.g. `x = compute(a, b)` /
@@ -638,16 +672,26 @@ public enum ClipboardAssistantDetector {
     /// NSExpression is deliberately avoided: its initializer raises unrecoverable Objective-C
     /// exceptions on malformed input instead of returning an error.
     public static func evaluateArithmetic(_ text: String) -> Double? {
-        var expression = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard expression.count <= 200 else { return nil }
+        guard var expression = arithmeticExpression(from: text) else { return nil }
         for (source, target) in [("×", "*"), ("÷", "/"), ("−", "-")] {
             expression = expression.replacingOccurrences(of: source, with: target)
         }
         // Must contain at least one binary operator to be worth treating as an expression.
-        guard expression.dropFirst().contains(where: { "+-*/".contains($0) }) else { return nil }
+        guard expression.dropFirst().contains(where: { "+-*/^".contains($0) }) else { return nil }
         var parser = ArithmeticParser(expression)
         guard let value = parser.parse(), value.isFinite else { return nil }
         return value
+    }
+
+    private static func arithmeticExpression(from text: String) -> String? {
+        var expression = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard expression.count <= 200 else { return nil }
+        if expression.last == "=" {
+            expression.removeLast()
+            expression = expression.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !expression.isEmpty, !expression.contains("=") else { return nil }
+        return expression
     }
 
     public static func formatNumber(_ value: Double) -> String {
@@ -659,7 +703,7 @@ public enum ClipboardAssistantDetector {
     }
 }
 
-/// Minimal recursive-descent arithmetic evaluator supporting + - * / parentheses and decimals.
+/// Minimal recursive-descent arithmetic evaluator supporting + - * / ^ ** parentheses and decimals.
 private struct ArithmeticParser {
     private let scalars: [Unicode.Scalar]
     private var index = 0
@@ -704,6 +748,18 @@ private struct ArithmeticParser {
         skipSpaces()
         if consume("+") { return parseFactor() }
         if consume("-") { return parseFactor().map(-) }
+        return parsePower()
+    }
+
+    private mutating func parsePower() -> Double? {
+        guard let base = parsePrimary() else { return nil }
+        guard consumePowerOperator() else { return base }
+        guard let exponent = parseFactor() else { return nil }
+        let value = pow(base, exponent)
+        return value.isFinite ? value : nil
+    }
+
+    private mutating func parsePrimary() -> Double? {
         skipSpaces()
         if consume("(") {
             let value = parseExpression()
@@ -712,6 +768,18 @@ private struct ArithmeticParser {
             return value
         }
         return parseNumber()
+    }
+
+    private mutating func consumePowerOperator() -> Bool {
+        skipSpaces()
+        if consume("^") { return true }
+        guard index + 1 < scalars.count,
+              scalars[index] == "*",
+              scalars[index + 1] == "*" else {
+            return false
+        }
+        index += 2
+        return true
     }
 
     private mutating func parseNumber() -> Double? {
@@ -750,7 +818,7 @@ private struct ArithmeticParser {
     }
 
     private mutating func skipSpaces() {
-        while index < scalars.count, scalars[index] == " " { advance() }
+        while index < scalars.count, scalars[index].properties.isWhitespace { advance() }
     }
 
     private mutating func advance() { index += 1 }

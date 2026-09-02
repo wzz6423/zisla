@@ -1,5 +1,47 @@
 import Foundation
 
+public enum UpdateFeedSource: Equatable, Sendable {
+    case primary
+    case fallback
+}
+
+public struct UpdateFeedFallbackState: Equatable, Sendable {
+    public private(set) var source: UpdateFeedSource = .primary
+    public private(set) var hasLoadedAppcast = false
+    private var didRetryFallback = false
+    private var didFailToDownloadUpdate = false
+
+    public init() {}
+
+    public mutating func beginCheck() {
+        source = .primary
+        hasLoadedAppcast = false
+        didRetryFallback = false
+        didFailToDownloadUpdate = false
+    }
+
+    public mutating func didLoadAppcast() {
+        hasLoadedAppcast = true
+    }
+
+    public mutating func didFailDownloadingUpdate() {
+        didFailToDownloadUpdate = true
+    }
+
+    public mutating func finishCheck(failed: Bool) -> Bool {
+        guard (failed || didFailToDownloadUpdate),
+              source == .primary,
+              (!hasLoadedAppcast || didFailToDownloadUpdate),
+              !didRetryFallback else {
+            return false
+        }
+        source = .fallback
+        hasLoadedAppcast = false
+        didRetryFallback = true
+        return true
+    }
+}
+
 public enum SemanticVersionError: Error, Equatable, Sendable {
     case invalid(String)
 }
@@ -79,97 +121,5 @@ public struct SemanticVersion: Equatable, Comparable, Sendable {
         }
         if lhs.count != rhs.count { return lhs.count < rhs.count ? -1 : 1 }
         return 0
-    }
-}
-
-/// Minimal decode model for a GitHub/Gitee Release JSON.
-public struct GitHubRelease: Decodable, Equatable, Sendable {
-    public struct Asset: Decodable, Equatable, Sendable {
-        public var name: String
-        public var downloadURL: URL
-        public var size: Int
-
-        private enum CodingKeys: String, CodingKey {
-            case name
-            case downloadURL = "browser_download_url"
-            case size
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            name = try container.decode(String.self, forKey: .name)
-            downloadURL = try container.decode(URL.self, forKey: .downloadURL)
-            size = try container.decodeIfPresent(Int.self, forKey: .size) ?? 0
-        }
-    }
-
-    public struct MacUpdateAssets: Equatable, Sendable {
-        public var archive: Asset
-        public var checksum: Asset?
-    }
-
-    public var tagName: String
-    public var htmlURL: URL?
-    public var draft: Bool
-    public var prerelease: Bool
-    public var assets: [Asset]
-
-    private enum CodingKeys: String, CodingKey {
-        case tagName = "tag_name"
-        case htmlURL = "html_url"
-        case draft
-        case prerelease
-        case assets
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        tagName = try container.decode(String.self, forKey: .tagName)
-        htmlURL = try container.decodeIfPresent(URL.self, forKey: .htmlURL)
-        draft = try container.decodeIfPresent(Bool.self, forKey: .draft) ?? false
-        prerelease = try container.decodeIfPresent(Bool.self, forKey: .prerelease) ?? false
-        assets = try container.decodeIfPresent([Asset].self, forKey: .assets) ?? []
-    }
-
-    /// Version parsed from the tag; falls back to 0.0.0 on invalid tags so callers don't need to try.
-    public var version: SemanticVersion {
-        parsedVersion ?? SemanticVersion(major: 0, minor: 0, patch: 0)
-    }
-
-    /// Release tags may be grouped under a path such as `release/v1.2.3`.
-    public var parsedVersion: SemanticVersion? {
-        let versionTag = tagName.split(separator: "/").last.map(String.init) ?? tagName
-        return try? SemanticVersion(versionTag)
-    }
-
-    /// Picks the macOS .zip archive and its accompanying .sha256 checksum file from the assets.
-    public var macUpdateAssets: MacUpdateAssets? {
-        guard let archive = assets.first(where: {
-            let name = $0.name.lowercased()
-            return name.contains("macos") && name.hasSuffix(".zip")
-        }) else {
-            return nil
-        }
-        let checksum = assets.first { $0.name == archive.name + ".sha256" }
-        return MacUpdateAssets(archive: archive, checksum: checksum)
-    }
-
-    /// Disk image used by the manual installation path for ad-hoc signed builds.
-    public var macDiskImage: Asset? {
-        let diskImages = assets.filter { asset in
-            let name = asset.name.lowercased()
-            return name.contains("macos") && name.hasSuffix(".dmg")
-        }
-#if arch(arm64)
-        if let native = diskImages.first(where: { $0.name.lowercased().hasSuffix("-macos-arm64.dmg") }) {
-            return native
-        }
-#elseif arch(x86_64)
-        if let native = diskImages.first(where: { $0.name.lowercased().hasSuffix("-macos-x86_64.dmg") }) {
-            return native
-        }
-#endif
-        return diskImages.first(where: { $0.name.lowercased().hasSuffix("-macos-universal.dmg") })
-            ?? diskImages.first
     }
 }

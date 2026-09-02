@@ -11,7 +11,9 @@ trap cleanup EXIT
 
 TEST_ROOT="$TEMPORARY_ROOT/project"
 FAKE_BIN="$TEMPORARY_ROOT/bin"
+FAKE_ED_KEY_FILE="$TEMPORARY_ROOT/private-ed25519-key"
 mkdir -p "$TEST_ROOT/Scripts" "$FAKE_BIN"
+touch "$FAKE_ED_KEY_FILE"
 cp "$ROOT/Scripts/package-release.sh" "$TEST_ROOT/Scripts/package-release.sh"
 
 cat > "$TEST_ROOT/Scripts/build-app.sh" <<'SCRIPT'
@@ -26,6 +28,10 @@ plutil -insert CFBundleDisplayName -string zisla "$OUTPUT_DIRECTORY/zisla.app/Co
 plutil -insert CFBundleShortVersionString -string "$VERSION" "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
 plutil -insert CFBundleVersion -string "$BUILD_NUMBER" "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
 plutil -insert ZislaDefaultUpdateChannel -string "$UPDATE_CHANNEL" "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
+plutil -insert SUFeedURL -string 'https://gitee.com/wzz6423/zisla/releases/download/update-release/appcast.xml' "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
+plutil -insert ZislaReleaseFallbackAppcastURL -string 'https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml' "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
+plutil -insert ZislaPreviewAppcastURL -string 'https://gitee.com/wzz6423/zisla/releases/download/preview/appcast.xml' "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
+plutil -insert ZislaPreviewFallbackAppcastURL -string 'https://github.com/wzz6423/zisla/releases/download/preview/appcast.xml' "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
 SCRIPT
 chmod +x "$TEST_ROOT/Scripts/build-app.sh"
 
@@ -46,6 +52,22 @@ cat > "$FAKE_BIN/shasum" <<'SCRIPT'
 print -r -- "checksum  ${@: -1}"
 SCRIPT
 
+cat > "$FAKE_BIN/generate_appcast" <<'SCRIPT'
+#!/bin/zsh
+set -euo pipefail
+output=""
+download_url_prefix=""
+for (( index = 1; index <= $#; index += 1 )); do
+  if [[ "${@[index]}" == "-o" ]]; then
+    output="${@[$((index + 1))]}"
+  elif [[ "${@[index]}" == "--download-url-prefix" ]]; then
+    download_url_prefix="${@[$((index + 1))]}"
+  fi
+done
+[[ -n "$output" ]] || exit 1
+print -r -- "$download_url_prefix" > "$output"
+SCRIPT
+
 cat > "$FAKE_BIN/hdiutil" <<'SCRIPT'
 #!/bin/zsh
 set -euo pipefail
@@ -54,9 +76,12 @@ case "$1" in
     touch "${@: -1}"
     ;;
   attach)
-    print -r -- "/dev/disk999 Apple_HFS zisla"
+    mkdir -p "$FAKE_MOUNT_POINT"
+    printf '%s %s\n' "/dev/disk999" "GUID_partition_scheme"
+    printf '%-24s %s %s\n' "$FAKE_MOUNT_DEVICE" "Apple_HFS" "$FAKE_MOUNT_POINT"
     ;;
   detach)
+    print -r -- "${@: -1}" > "$FAKE_DETACH_CAPTURE"
     ;;
   convert)
     output_index=${argv[(i)-o]}
@@ -70,6 +95,7 @@ SCRIPT
 
 cat > "$FAKE_BIN/osascript" <<'SCRIPT'
 #!/bin/zsh
+print -r -- "$2" > "$FAKE_OSASCRIPT_MOUNT_CAPTURE"
 cat >/dev/null
 SCRIPT
 
@@ -145,6 +171,9 @@ for architecture in arm64 x86_64 universal; do
   case_directory="$TEMPORARY_ROOT/$architecture"
   capture_file="$case_directory/architectures.txt"
   verify_capture="$case_directory/dmg-verified"
+  mount_point="$case_directory/mounted-zisla"
+  detach_capture="$case_directory/detached-device.txt"
+  osascript_mount_capture="$case_directory/osascript-mount-point.txt"
   mkdir -p "$case_directory"
 
   if [[ "$architecture" == universal ]]; then
@@ -157,11 +186,17 @@ for architecture in arm64 x86_64 universal; do
     VERSION=0.1.3 \
     BUILD_NUMBER=5 \
     UPDATE_CHANNEL=release \
+    SPARKLE_GENERATE_APPCAST="$FAKE_BIN/generate_appcast" \
+    SPARKLE_ED_KEY_FILE="$FAKE_ED_KEY_FILE" \
     CODE_SIGN_IDENTITY=- \
     BUILD_ARCHITECTURES="$build_architectures" \
     ARCHIVE_DIRECTORY="$case_directory" \
     CAPTURE_FILE="$capture_file" \
     HDIUTIL_VERIFY_CAPTURE="$verify_capture" \
+    FAKE_MOUNT_POINT="$mount_point" \
+    FAKE_MOUNT_DEVICE=/dev/disk999s2 \
+    FAKE_DETACH_CAPTURE="$detach_capture" \
+    FAKE_OSASCRIPT_MOUNT_CAPTURE="$osascript_mount_capture" \
     "$TEST_ROOT/Scripts/package-release.sh" >/dev/null
 
   expect_equal \
@@ -184,6 +219,20 @@ for architecture in arm64 x86_64 universal; do
   expect_file \
     "$case_directory/zisla-v0.1.3-macOS-${architecture}.dmg.sha256" \
     "$architecture DMG checksum uses the architecture suffix"
+  expect_file \
+    "$case_directory/appcast-gitee.xml" \
+    "$architecture Gitee Sparkle appcast is generated"
+  expect_file \
+    "$case_directory/appcast-github.xml" \
+    "$architecture GitHub Sparkle appcast is generated"
+  expect_equal \
+    "https://gitee.com/wzz6423/zisla/releases/download/v0.1.3/" \
+    "$(<"$case_directory/appcast-gitee.xml")" \
+    "$architecture Gitee appcast points to the Gitee release ZIP"
+  expect_equal \
+    "https://github.com/wzz6423/zisla/releases/download/v0.1.3/" \
+    "$(<"$case_directory/appcast-github.xml")" \
+    "$architecture GitHub appcast points to the GitHub release ZIP"
   expect_equal \
     "checksum  zisla-v0.1.3-macOS-${architecture}.dmg" \
     "$(<"$case_directory/zisla-v0.1.3-macOS-${architecture}.dmg.sha256")" \
@@ -192,6 +241,53 @@ for architecture in arm64 x86_64 universal; do
     "$verify_capture" \
     "$architecture DMG is verified before release"
 done
+
+function expect_conflicting_volume_uses_new_mount() {
+  local case_directory="$TEMPORARY_ROOT/conflicting-volume"
+  local existing_mount="$case_directory/zisla"
+  local new_mount="$case_directory/zisla 1"
+  local detach_capture="$case_directory/detached-device.txt"
+  local osascript_mount_capture="$case_directory/osascript-mount-point.txt"
+
+  mkdir -p "$existing_mount"
+  print -r -- "existing volume" > "$existing_mount/Applications"
+
+  PATH="$FAKE_BIN:$PATH" \
+    VERSION=0.1.3 \
+    BUILD_NUMBER=5 \
+    UPDATE_CHANNEL=release \
+    SPARKLE_GENERATE_APPCAST="$FAKE_BIN/generate_appcast" \
+    SPARKLE_ED_KEY_FILE="$FAKE_ED_KEY_FILE" \
+    CODE_SIGN_IDENTITY=- \
+    BUILD_ARCHITECTURES=arm64 \
+    ARCHIVE_DIRECTORY="$case_directory" \
+    CAPTURE_FILE="$case_directory/architectures.txt" \
+    HDIUTIL_VERIFY_CAPTURE="$case_directory/dmg-verified" \
+    FAKE_MOUNT_POINT="$new_mount" \
+    FAKE_MOUNT_DEVICE=/dev/disk1001s2 \
+    FAKE_DETACH_CAPTURE="$detach_capture" \
+    FAKE_OSASCRIPT_MOUNT_CAPTURE="$osascript_mount_capture" \
+    "$TEST_ROOT/Scripts/package-release.sh" >/dev/null
+
+  expect_equal \
+    "$new_mount" \
+    "$(<"$osascript_mount_capture")" \
+    "Finder layout targets the newly attached volume"
+  expect_equal \
+    "/Applications" \
+    "$(readlink "$new_mount/Applications")" \
+    "Applications symlink is created in the newly attached volume"
+  expect_equal \
+    "existing volume" \
+    "$(<"$existing_mount/Applications")" \
+    "an existing same-name volume is not modified"
+  expect_equal \
+    "/dev/disk1001s2" \
+    "$(<"$detach_capture")" \
+    "detach targets the device that owns the new mount point"
+}
+
+expect_conflicting_volume_uses_new_mount
 
 function expect_debug_bundle_failure() {
   local case_directory="$TEMPORARY_ROOT/debug-bundle"

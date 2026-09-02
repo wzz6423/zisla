@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import UniformTypeIdentifiers
+import KeyboardKit
 import ZislaCore
 import ZislaKit
 
@@ -10,6 +11,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
   case shelf
   case clipboard
   case aiMonitor
+  case keyboardSound
   case download
   case agenda
   case mail
@@ -37,6 +39,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
     case .system: "系统"
     case .battery: "电池"
     case .lockScreen: "锁屏"
+    case .keyboardSound: "键盘音效"
     }
   }
 
@@ -55,6 +58,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
     case .system: "gauge.with.dots.needle.67percent"
     case .battery: "battery.100percent"
     case .lockScreen: "lock.display"
+    case .keyboardSound: "keyboard.badge.ellipsis"
     }
   }
 
@@ -86,6 +90,8 @@ enum IslandModule: String, CaseIterable, Identifiable {
       .mail
     case .quickNotes:
       .notes
+    case .keyboardSound:
+      .keyboardSound
     }
   }
 }
@@ -107,6 +113,7 @@ extension IslandModule {
     case .system: settings.systemMonitorEnabled
     case .battery: settings.batteryMonitorEnabled
     case .lockScreen: settings.lockScreenInfoEnabled
+    case .keyboardSound: settings.keyboardEnabled
     }
   }
 }
@@ -124,17 +131,17 @@ struct IslandModuleLayout: Equatable {
     )
   }
 
-  /// Standard island width must accommodate the full toolbar row (module icons + system monitor strip + action buttons).
-  /// Too narrow causes the HStack to overflow at center and clips the first icon behind the island surface, so widened to 660.
-  /// panelSize is widened in sync to preserve 200pt shoulder clearance for shelf/share.
+  private static let unifiedIslandWidth: CGFloat = 820
+  private static let unifiedPanelWidth: CGFloat = 820
+
+  /// All module pages use the former AI monitor panel width.
   static let standard = IslandModuleLayout(
-    islandSize: CGSize(width: 660, height: 340),
-    panelSize: CGSize(width: 860, height: 344)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 340),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 344)
   )
   private static let expandedChromeHeight: CGFloat = 121
   private static let moduleVerticalInsets = IslandSurfaceGeometry.moduleInset * 2
   private static let panelHeightAllowance: CGFloat = 4
-  private static let panelSideClearance: CGFloat = 200
   static let batteryMinimumContentHeight: CGFloat = 0
   static let batteryMaximumContentHeight: CGFloat = 430
 
@@ -142,12 +149,12 @@ struct IslandModuleLayout: Equatable {
   /// the standard panel's unused vertical space.
   private static func compactModule(
     contentHeight: CGFloat,
-    islandWidth: CGFloat = 660
+    islandWidth: CGFloat = unifiedIslandWidth
   ) -> IslandModuleLayout {
     let islandHeight = expandedChromeHeight + contentHeight + moduleVerticalInsets
     return IslandModuleLayout(
       islandSize: CGSize(width: islandWidth, height: islandHeight),
-      panelSize: CGSize(width: islandWidth + panelSideClearance, height: islandHeight + panelHeightAllowance)
+      panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + panelHeightAllowance)
     )
   }
 
@@ -156,32 +163,36 @@ struct IslandModuleLayout: Equatable {
   static let agenda = compactModule(contentHeight: 160)
   /// PDF tools need the full-width toolbar plus enough vertical room for the operation list.
   static let pdf = IslandModuleLayout(
-    islandSize: CGSize(width: 660, height: 600),
-    panelSize: CGSize(width: 860, height: 604)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 600),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 604)
   )
   /// Shelf content is fixed at 320pt and scrolls internally when it contains more files.
   static let shelf = compactModule(contentHeight: 320)
   /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
-  /// Width matches standard (panelSize keeps 200pt shoulder clearance); only the island body is taller.
+  /// Width matches standard; only the island body is taller.
   static let clipboard = IslandModuleLayout(
-    islandSize: CGSize(width: 660, height: 500),
-    panelSize: CGSize(width: 860, height: 504)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 500),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 504)
   )
   static let ai = IslandModuleLayout(
-    islandSize: CGSize(width: 820, height: 470),
-    panelSize: CGSize(width: 820, height: 474)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 470),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 474)
   )
-  static let system = compactModule(contentHeight: 401, islandWidth: 720)
+  static let system = compactModule(contentHeight: 401)
   static let battery = compactModule(contentHeight: batteryMaximumContentHeight)
-  /// Quick Notes: needs a larger editing/preview area for rich content such as images and tables, so wider and taller than standard.
-  static let notes = IslandModuleLayout(
-    islandSize: CGSize(width: 720, height: 560),
-    panelSize: CGSize(width: 720, height: 564)
+  static let keyboardSound = IslandModuleLayout(
+    islandSize: CGSize(width: unifiedIslandWidth, height: 560),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 564)
   )
-  /// Mail: wider and taller; list column expands to 232pt so sender/subject/preview are not truncated prematurely, and more messages are visible.
+  /// Quick Notes keeps its taller editing/preview area for rich content such as images and tables.
+  static let notes = IslandModuleLayout(
+    islandSize: CGSize(width: unifiedIslandWidth, height: 560),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 564)
+  )
+  /// Mail keeps its taller content area; the list column remains 232pt wide for readable previews.
   static let mail = IslandModuleLayout(
-    islandSize: CGSize(width: 860, height: 520),
-    panelSize: CGSize(width: 1060, height: 524)
+    islandSize: CGSize(width: unifiedIslandWidth, height: 520),
+    panelSize: CGSize(width: unifiedPanelWidth, height: 524)
   )
   /// Dashboard height follows the fixed crown chrome and rendered activity-card grid.
   /// The arithmetic lives in `IslandDashboardLayout` (ZislaKit) so it is unit-testable and
@@ -216,8 +227,8 @@ struct IslandModuleLayout: Equatable {
         cardCount: dashboardCardCount
       )
       return IslandModuleLayout(
-        islandSize: CGSize(width: 660, height: islandHeight),
-        panelSize: CGSize(width: 860, height: islandHeight + 4)
+        islandSize: CGSize(width: unifiedIslandWidth, height: islandHeight),
+        panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + 4)
       )
     }
     if module == .battery, let dynamicHeight = batteryDynamicHeight {
@@ -235,7 +246,7 @@ enum UpdateCheckState: Equatable {
   case idle
   case checking
   case current
-  case available(GitHubRelease, source: ReleaseSource)
+  case available
   case failed(String)
 }
 
@@ -433,6 +444,11 @@ final class AppModel: ObservableObject {
   let voiceInput = VoiceInputController()
   let voiceHistory = VoiceHistoryStore()
   let aiAgent = AIAgentWorkspace()
+  /// Integrated keyboard sound engine and local typing statistics.
+  let keyboardSound = KeyboardSoundController()
+  /// Synchronous hook used by the app delegate to arm overlay focus protection before any
+  /// recording-start cleanup can reorder windows.
+  var onVoiceInputWillStart: (() -> Void)?
 
   /// Model discovery state: used by the settings page to show connection test results and the available model list.
   @Published var voiceModelDiscoveryState: VoiceModelDiscoveryState = .idle
@@ -445,8 +461,25 @@ final class AppModel: ObservableObject {
   @Published private(set) var assistantAccessibilityGranted = AccessibilityPermission.isTrusted
   private let weatherService = WeatherService()
   private let weatherLocationService = WeatherLocationService()
-  private let releaseService = GitHubReleaseService()
-  private let releasePackageDownloadService = ReleasePackageDownloadService()
+  private lazy var sparkleUpdateController: SparkleUpdateController? = {
+    let controller = SparkleUpdateController()
+    controller?.onUpdateFound = { [weak self] in
+      guard let self else { return }
+      self.updateState = .available
+      self.productUpdateAvailable = true
+      self.refreshUpdateNotices()
+    }
+    controller?.onNoUpdateFound = { [weak self] in
+      guard let self else { return }
+      self.updateState = .current
+      self.productUpdateAvailable = false
+      self.refreshUpdateNotices()
+    }
+    controller?.onCheckFailed = { [weak self] error in
+      self?.updateState = .failed(error.localizedDescription)
+    }
+    return controller
+  }()
   private let downloadService = DownloadService()
   private let hotkeyManager = GlobalHotkeyManager()
   private let voicePostProcessingQueue = VoicePostProcessingQueue()
@@ -456,8 +489,6 @@ final class AppModel: ObservableObject {
   private let voiceRecordingPlayer = VoiceRecordingPlayer()
   private var cancellables: Set<AnyCancellable> = []
   private var weatherTask: Task<Void, Never>?
-  private var releaseTask: Task<Void, Never>?
-  private var releasePackageDownloadTask: Task<Void, Never>?
   private var updatePollingTask: Task<Void, Never>?
   private var voiceRecordingCleanupTask: Task<Void, Never>?
   private var appliedVoiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy?
@@ -468,6 +499,8 @@ final class AppModel: ObservableObject {
   private var downloadTaskOrder: [UUID] = []
   private var detectedLinkTask: Task<Void, Never>?
   private var translationTask: Task<Void, Never>?
+  private var voiceModelDiscoveryTask: Task<Void, Never>?
+  private var voiceModelDiscoveryGeneration = 0
   private var activeDownloadID: UUID?
   private var knownNoticeIDs: Set<String> = []
   private var wasPinnedBeforeMirror = false
@@ -522,15 +555,12 @@ final class AppModel: ObservableObject {
   private var voiceInputTarget: VoiceTranscriptDeliveryTarget?
   private var voiceInputTargetProcessIdentifier: pid_t?
   private var voiceInputTargetMouseLocation: CGPoint?
-  private var hasRequestedVoiceInputPostEventAccess = false
 
   private init() {
     let networkProxyURL = settingsStore.settings.networkProxyURL
     let networkProxyEnabled = settingsStore.settings.networkProxyEnabled
     aiAgent.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
     managedTools.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
-    Task { await releaseService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
-    Task { await releasePackageDownloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
     Task { await downloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
     sharingPickerDelegate.onCompletion = { [weak self] picker in
       self?.sharingPickerDidComplete(picker)
@@ -561,12 +591,13 @@ final class AppModel: ObservableObject {
     }
     voiceInput.onRecordingWillStart = { [weak self] in
       guard let self else { return }
-      self.clipboardAssistant.dismiss(animated: false)
       let processIdentifier = Self.frontmostVoiceInputTargetProcessIdentifier()
       voiceInputTargetProcessIdentifier = processIdentifier
       voiceInputTarget = processIdentifier.flatMap(VoiceTranscriptDelivery.captureTarget(for:))
       voiceInputTargetMouseLocation = CGEvent(source: nil)?.location
-      requestVoiceInputPostEventAccessIfNeeded()
+      self.updateSpectrumMonitoring()
+      self.onVoiceInputWillStart?()
+      self.clipboardAssistant.dismiss(animated: false)
     }
     voiceInput.onTranscriptCompleted = { [weak self] recording in
       self?.deliverVoiceRecording(recording)
@@ -577,6 +608,12 @@ final class AppModel: ObservableObject {
       .compactMap { $0 }
       .sink { [weak self] message in
         Task { @MainActor [weak self] in self?.transientMessage = message }
+      }
+      .store(in: &cancellables)
+
+    voiceInput.isCapturingInputPublisher
+      .sink { [weak self] _ in
+        Task { @MainActor [weak self] in self?.updateSpectrumMonitoring() }
       }
       .store(in: &cancellables)
 
@@ -611,6 +648,7 @@ final class AppModel: ObservableObject {
       voiceHistory.objectWillChange,
       aiAgent.objectWillChange,
       managedTools.objectWillChange,
+      keyboardSound.objectWillChange,
     ]
     for publisher in childPublishers {
       publisher
@@ -643,8 +681,6 @@ final class AppModel: ObservableObject {
         let networkProxyEnabled = settings.networkProxyEnabled
         self?.aiAgent.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
         self?.managedTools.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
-        Task { await self?.releaseService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
-        Task { await self?.releasePackageDownloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
         Task { await self?.downloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
       }
       .store(in: &cancellables)
@@ -908,11 +944,10 @@ final class AppModel: ObservableObject {
 
   func stop() {
     settingsStore.flushPendingChanges()
+    keyboardSound.stop()
     clipboardHistory.flushPendingChanges()
     aiAgent.store.flushPendingChanges()
     weatherTask?.cancel()
-    releaseTask?.cancel()
-    releasePackageDownloadTask?.cancel()
     updatePollingTask?.cancel()
     voiceRecordingCleanupTask?.cancel()
     voiceRecordingCleanupTask = nil
@@ -925,6 +960,9 @@ final class AppModel: ObservableObject {
     notices.remove(id: "voice-processing-right")
     detectedLinkTask?.cancel()
     translationTask?.cancel()
+    voiceModelDiscoveryTask?.cancel()
+    voiceModelDiscoveryTask = nil
+    voiceModelDiscoveryGeneration &+= 1
     voiceInputTarget = nil
     voiceInputTargetProcessIdentifier = nil
     voiceInputTargetMouseLocation = nil
@@ -1059,7 +1097,7 @@ final class AppModel: ObservableObject {
       try? await Task.sleep(for: .milliseconds(250))
       guard let self, self.isIslandVisible else { return }
       if settings.mediaEnabled { self.media.refresh() }
-      if settings.aiProgressEnabled { self.aiMonitor.refresh() }
+      if settings.aiProgressEnabled, module != .aiMonitor { self.aiMonitor.refresh() }
       if settings.weatherEnabled, weatherStale { self.refreshWeather() }
       if settings.systemMonitorEnabled { await self.systemMonitor.sampleOnce() }
       if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled {
@@ -1261,141 +1299,27 @@ final class AppModel: ObservableObject {
 
   func checkForUpdates(manual: Bool, channel: UpdateChannel? = nil) {
     guard manual || settingsStore.settings.updateChecksEnabled else { return }
-    let selectedChannel = channel ?? (manual ? settingsStore.settings.updateChannel : nil)
-    let fallbackChannel = selectedChannel ?? FeatureSettingsStore.bundledDefaultUpdateChannel
-    releaseTask?.cancel()
-    updateState = .checking
-    let version =
-      Bundle.main.object(
-        forInfoDictionaryKey: "CFBundleShortVersionString"
-      ) as? String ?? "0.1.1"
-    releaseTask = Task { [weak self, releaseService] in
-      do {
-        let result = try await releaseService.check(
-          currentVersion: version,
-          channel: fallbackChannel
-        )
-        guard !Task.isCancelled else { return }
-        switch result {
-        case .upToDate:
-          self?.updateState = .current
-          self?.productUpdateAvailable = false
-          self?.refreshUpdateNotices()
-          if manual { self?.transientMessage = "当前已是最新版本" }
-        case .updateAvailable(let release, let source):
-          guard let self else { return }
-          self.updateState = .available(release, source: source)
-          self.productUpdateAvailable = true
-          self.refreshUpdateNotices()
-          if manual {
-            self.presentUpdateAlert(for: release, source: source)
-          } else if self.settingsStore.settings.automaticDownloadEnabled {
-            self.downloadUpdateInBackground(release: release)
-          }
-        }
-      } catch is CancellationError {
-        return
-      } catch {
-        self?.updateState = .failed(error.localizedDescription)
-        if manual { self?.transientMessage = error.localizedDescription }
-      }
+    let selectedChannel = channel ?? settingsStore.settings.updateChannel
+    guard let sparkleUpdateController else {
+      if manual { updateState = .failed("无法启动自动更新服务") }
+      return
     }
-  }
-
-  private func presentUpdateAlert(for release: GitHubRelease, source: ReleaseSource) {
-    let alert = NSAlert()
-    let diskImage = release.macDiskImage
-    alert.messageText = "发现 \(source.displayName) 新版本 \(release.tagName)"
-    if let diskImage {
-      alert.informativeText = """
-      更新包下载完成后，请先退出 zisla，再打开 DMG 并将 zisla 拖入 Applications 替换旧版本。
-
-      可以下载到默认目录，或为本次下载选择其他目录。
-      """
-      alert.addButton(withTitle: "下载到默认目录")
-      alert.addButton(withTitle: "选择目录…")
-      alert.addButton(withTitle: "稍后")
-      NSApp.activate(ignoringOtherApps: true)
-      WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
-      switch alert.runModal() {
-      case .alertFirstButtonReturn:
-        downloadUpdatePackage(diskImage, to: downloadDirectory, revealInFinder: true)
-      case .alertSecondButtonReturn:
-        guard let directory = selectUpdateDownloadDirectory() else { return }
-        downloadUpdatePackage(diskImage, to: directory, revealInFinder: true)
-      default:
-        return
+    if manual {
+      updateState = .checking
+      if !sparkleUpdateController.checkForUpdates(
+        channel: selectedChannel,
+        checksEnabled: settingsStore.settings.updateChecksEnabled,
+        automaticDownloadEnabled: settingsStore.settings.automaticDownloadEnabled
+      ) {
+        updateState = .failed("无法启动自动更新服务")
       }
       return
     }
-
-    alert.informativeText = "此 Release 未提供可下载的 DMG。请在退出 zisla 后，从 Release 页面下载并手动安装。"
-    alert.addButton(withTitle: "打开 Release")
-    alert.addButton(withTitle: "稍后")
-    NSApp.activate(ignoringOtherApps: true)
-    WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
-    guard alert.runModal() == .alertFirstButtonReturn else { return }
-    guard let url = release.htmlURL else {
-      transientMessage = "Release 未提供可用下载地址"
-      return
-    }
-    NSWorkspace.shared.open(url)
-  }
-
-  private func downloadUpdateInBackground(release: GitHubRelease) {
-    guard settingsStore.settings.updateChecksEnabled,
-          settingsStore.settings.automaticDownloadEnabled else { return }
-    guard let diskImage = release.macDiskImage else { return }
-    downloadUpdatePackage(diskImage, to: downloadDirectory, revealInFinder: false)
-  }
-
-  private func selectUpdateDownloadDirectory() -> URL? {
-    let panel = NSOpenPanel()
-    panel.canChooseFiles = false
-    panel.canChooseDirectories = true
-    panel.allowsMultipleSelection = false
-    panel.canCreateDirectories = true
-    panel.directoryURL = downloadDirectory
-    panel.prompt = "选择保存位置"
-    panel.message = "选择更新包保存位置"
-    WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
-    guard panel.runModal() == .OK else { return nil }
-    return panel.url
-  }
-
-  private func downloadUpdatePackage(
-    _ diskImage: GitHubRelease.Asset,
-    to targetDirectory: URL,
-    revealInFinder: Bool
-  ) {
-    releasePackageDownloadTask?.cancel()
-    transientMessage = "正在下载更新…"
-    let scopedAccess = targetDirectory.startAccessingSecurityScopedResource()
-    let fileName = (diskImage.name as NSString).lastPathComponent
-    let expectedURL = targetDirectory.appendingPathComponent(fileName, isDirectory: false)
-    let existedBeforeDownload = FileManager.default.fileExists(atPath: expectedURL.path)
-    releasePackageDownloadTask = Task { [weak self, releasePackageDownloadService] in
-      defer {
-        if scopedAccess { targetDirectory.stopAccessingSecurityScopedResource() }
-      }
-      do {
-        let destination = try await releasePackageDownloadService.download(
-          asset: diskImage,
-          to: targetDirectory
-        )
-        guard !Task.isCancelled else { return }
-        if revealInFinder {
-          NSWorkspace.shared.activateFileViewerSelecting([destination])
-        }
-        let action = existedBeforeDownload ? "更新包已在" : "更新包已下载到"
-        self?.transientMessage = "\(action) \(destination.path)，请退出 zisla 后手动安装"
-      } catch is CancellationError {
-        return
-      } catch {
-        guard !Task.isCancelled else { return }
-        self?.transientMessage = "下载更新失败：\(error.localizedDescription)"
-      }
-    }
+    _ = sparkleUpdateController.configure(
+      channel: selectedChannel,
+      checksEnabled: settingsStore.settings.updateChecksEnabled,
+      automaticDownloadEnabled: settingsStore.settings.automaticDownloadEnabled
+    )
   }
 
   func selectSystemMonitor() {
@@ -1544,7 +1468,7 @@ final class AppModel: ObservableObject {
     detection.actions.append(.addToQuickNote)
     detection.actions.append(.share)
     if case .text = content,
-       [.text, .chineseText, .code, .math].contains(detection.kind) {
+       [.text, .nonSystemLanguageText, .code, .math].contains(detection.kind) {
       detection.actions.append(.sendToTeleprompter)
     }
     if let bundleIdentifier = sourceApplication?.bundleIdentifier,
@@ -1555,6 +1479,11 @@ final class AppModel: ObservableObject {
         appName: sourceApplication?.localizedName ?? bundleIdentifier
       ))
     }
+    detection.actions = ClipboardAssistantActionOrder.ordered(
+      detection.actions,
+      for: detection.kind,
+      using: settings.clipboardAssistantActionOrders
+    )
     clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle)
     guard clipboardAssistant.presentation.detection == detection else { return .unavailable }
     clipboardAssistantContent = content
@@ -1642,7 +1571,7 @@ final class AppModel: ObservableObject {
       } else {
         openSystemMail(to: address)
       }
-    case .copyText(let text):
+    case .copyText(let text), .copyFullExpression(let text):
       guard ClipboardHistoryPasteboard.write(.text(text)) else {
         transientMessage = clipboardAssistantMessage("无法完成操作")
         return
@@ -2145,8 +2074,21 @@ final class AppModel: ObservableObject {
   private func apply(settings: FeatureSettings) {
     // Regular UI appearance is controlled by user settings; the island panel is separately pinned to dark at the window level (see IslandPanel).
     NSApp.appearance = settings.appearanceMode.nsAppearance
+    keyboardSound.apply(
+      enabled: settings.keyboardEnabled,
+      keyboardProfileID: settings.keyboardSelectedProfileID,
+      keyboardVolume: settings.keyboardVolume,
+      playsReleaseSound: settings.keyboardPlaysReleaseSound,
+      usesPitchVariation: settings.keyboardUsesPitchVariation,
+      typingStatsEnabled: settings.keyboardTypingStatsEnabled
+    )
     media.setPreferredSource(settings.mediaSource)
-    voiceInput.setContextualStrings(VoiceLexicon.contextualTerms(for: settings.voiceEnabledLexicons))
+    voiceInput.setContextualStrings(
+      VoiceLexicon.contextualTerms(
+        for: settings.voiceEnabledLexicons,
+        customTerms: settings.voiceCustomHotwords
+      )
+    )
     pomodoro.notificationsMuted = settings.notificationsMuted
     configureUpdatePolling(enabled: settings.updateChecksEnabled)
     configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
@@ -2299,16 +2241,20 @@ final class AppModel: ObservableObject {
       hotkeyManager.unregister()
     }
     refreshToolboxReminderNotice()
+
   }
 
   private func configureUpdatePolling(enabled: Bool) {
+    _ = sparkleUpdateController?.configure(
+      channel: settingsStore.settings.updateChannel,
+      checksEnabled: enabled,
+      automaticDownloadEnabled: settingsStore.settings.automaticDownloadEnabled
+    ) == true
     guard isUpdatePollingEnabled != enabled else { return }
     isUpdatePollingEnabled = enabled
     updatePollingTask?.cancel()
     updatePollingTask = nil
     guard enabled else {
-      releaseTask?.cancel()
-      releaseTask = nil
       return
     }
 
@@ -2317,7 +2263,6 @@ final class AppModel: ObservableObject {
         guard let self else { return }
         await self.aiAgent.refreshCLIs()
         guard !Task.isCancelled else { return }
-        self.checkForUpdates(manual: false)
         do {
           try await Task.sleep(for: .seconds(600))
         } catch {
@@ -2403,6 +2348,7 @@ final class AppModel: ObservableObject {
     let rawTranscript = recording.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
     let retainsAudio = settingsStore.settings.voiceRecordingRetentionEnabled
     let enabledVoiceLexicons = settingsStore.settings.voiceEnabledLexicons
+    let customVoiceHotwords = settingsStore.settings.voiceCustomHotwords
     let structuredFormattingEnabled = settingsStore.settings.voiceStructuredFormattingEnabled
     let historySaved = voiceHistory.record(recording, retainAudio: retainsAudio)
     guard !rawTranscript.isEmpty else {
@@ -2413,7 +2359,8 @@ final class AppModel: ObservableObject {
     }
     let lexiconNormalizedTranscript = VoiceLexicon.normalizeTranscript(
       rawTranscript,
-      for: enabledVoiceLexicons
+      for: enabledVoiceLexicons,
+      customTerms: customVoiceHotwords
     )
     let localTranscriptSaved = lexiconNormalizedTranscript == rawTranscript
       || voiceHistory.updateProcessedTranscript(
@@ -2442,6 +2389,7 @@ final class AppModel: ObservableObject {
           using: target,
           systemPrompt: VoiceTranscriptPostProcessor.systemPrompt(
             enabledLexicons: enabledVoiceLexicons,
+            customHotwords: customVoiceHotwords,
             structuredFormattingEnabled: structuredFormattingEnabled
           ),
           messages: VoiceTranscriptPostProcessor.messages(
@@ -2456,6 +2404,7 @@ final class AppModel: ObservableObject {
             fallback: lexiconNormalizedTranscript
           ),
           for: enabledVoiceLexicons,
+          customTerms: customVoiceHotwords,
           contextualTranscript: rawTranscript
         )
         let processedTranscriptSaved = self.voiceHistory.updateProcessedTranscript(
@@ -2611,28 +2560,13 @@ final class AppModel: ObservableObject {
       transientMessage = "\(message)；已输入当前文本框并复制"
     case .copiedOnly:
       if targetProcessIdentifier != nil, !CGPreflightPostEventAccess() {
-        transientMessage = "\(message)；已复制。请在系统弹出的授权界面允许 zisla 后重试"
+        transientMessage = "\(message)；已复制。请在系统设置的“隐私与安全性 > 辅助功能”中允许 zisla 后重试"
       } else {
         transientMessage = "\(message)；已复制，未能输入原文本框"
       }
     case .copyFailed:
       transientMessage = "无法复制语音转写结果"
     }
-  }
-
-  private func requestVoiceInputPostEventAccessIfNeeded() {
-    guard VoiceTranscriptDelivery.shouldRequestEventSynthesisAccess(
-      hasAccess: CGPreflightPostEventAccess(),
-      hasRequestedInCurrentLaunch: hasRequestedVoiceInputPostEventAccess
-    ) else { return }
-
-    hasRequestedVoiceInputPostEventAccess = true
-    let authorizationHost = WindowPlacement.authorizationPromptHost()
-    defer {
-      authorizationHost?.orderOut(nil)
-      authorizationHost?.close()
-    }
-    VoiceTranscriptDelivery.requestEventSynthesisAccess()
   }
 
   func playVoiceRecording(id: UUID) {
@@ -2705,6 +2639,10 @@ final class AppModel: ObservableObject {
 
   /// Tests the current model endpoint and discovers available models.
   func discoverModels() {
+    voiceModelDiscoveryTask?.cancel()
+    voiceModelDiscoveryTask = nil
+    voiceModelDiscoveryGeneration &+= 1
+    let generation = voiceModelDiscoveryGeneration
     guard let target = voicePostProcessingTarget() else {
       voiceModelDiscoveryState = .failed("请先在上方添加、启用并选择一个模型配置")
       discoveredModels = []
@@ -2716,15 +2654,27 @@ final class AppModel: ObservableObject {
       return
     }
     voiceModelDiscoveryState = .testing
-    Task { @MainActor in
+    voiceModelDiscoveryTask = Task { @MainActor [weak self] in
       let service = AIModelDiscoveryService()
       do {
         let models = try await service.models(for: endpoint, apiKey: apiKey)
+        guard let self,
+              !Task.isCancelled,
+              self.voiceModelDiscoveryGeneration == generation
+        else { return }
         self.discoveredModels = models
         self.voiceModelDiscoveryState = .success(models.count)
+        self.voiceModelDiscoveryTask = nil
+      } catch is CancellationError {
+        return
       } catch {
+        guard let self,
+              !Task.isCancelled,
+              self.voiceModelDiscoveryGeneration == generation
+        else { return }
         self.voiceModelDiscoveryState = .failed(error.localizedDescription)
         self.discoveredModels = []
+        self.voiceModelDiscoveryTask = nil
       }
     }
   }
@@ -2788,6 +2738,9 @@ final class AppModel: ObservableObject {
   }
 
   private func resetVoiceModelDiscovery() {
+    voiceModelDiscoveryTask?.cancel()
+    voiceModelDiscoveryTask = nil
+    voiceModelDiscoveryGeneration &+= 1
     discoveredModels = []
     voiceModelDiscoveryState = .idle
   }
@@ -2966,6 +2919,7 @@ final class AppModel: ObservableObject {
 
   private func updateSpectrumMonitoring() {
     let settings = settingsStore.settings
+    let voiceInputIsCapturing = voiceInput.isCapturingInput
     let isPlaying = media.snapshot?.isPlaying == true
     let hasVisiblePlaybackNotice = notices.left.contains {
       mediaNoticeIDs.contains($0.id) || backgroundSoundNoticeIDs.contains($0.id)
@@ -2975,12 +2929,14 @@ final class AppModel: ObservableObject {
     // Background sound counts as media playback: its waveform animates while the island
     // is expanded even when no music app is playing.
     media.setSpectrumVisualizationEnabled(
-      settings.mediaEnabled
+      !voiceInputIsCapturing
+        && settings.mediaEnabled
         && (isPlaying || backgroundSounds.isPlaying)
         && (isIslandVisible || hasVisiblePlaybackNotice)
     )
     media.setSpectrumMonitoringEnabled(
-      settings.mediaEnabled
+      !voiceInputIsCapturing
+        && settings.mediaEnabled
         && (isIslandVisible || isPlaying || backgroundSounds.isPlaying)
     )
   }
@@ -3036,6 +2992,7 @@ final class AppModel: ObservableObject {
         kind: .info,
         side: .right,
         style: .headphone,
+        symbolName: connection.device.isAirPodsMax ? "headphones" : nil,
         batteryLevels: connection.battery?.noticeLevels
       ),
       expiresAfter: 3

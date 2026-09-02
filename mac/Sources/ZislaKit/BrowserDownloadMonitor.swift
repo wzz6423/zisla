@@ -99,13 +99,15 @@ public struct BrowserDownloadSnapshot: Equatable, Identifiable, Sendable {
         self.id = id
         self.agent = agent
         self.fileName = fileName
-        self.fraction = fraction.map { min(max($0, 0), 1) }
+        self.fraction = fraction.flatMap {
+            $0.isFinite ? min(max($0, 0), 1) : nil
+        }
         self.isFinished = isFinished
     }
 
     /// Caps in-progress display at 99%, reserving 100% for the finished green checkmark so the two states look distinct.
     public var progressText: String {
-        guard let fraction else { return isFinished ? "100%" : "…" }
+        guard let fraction, fraction.isFinite else { return isFinished ? "100%" : "…" }
         if isFinished { return "100%" }
         return "\(min(99, Int(fraction * 100)))%"
     }
@@ -232,6 +234,16 @@ struct BrowserDownloadTracker: Sendable {
         entries[token]?.agent = agent
     }
 
+    mutating func update(token: UUID, fileURL: URL?, fileName: String?) {
+        guard entries[token] != nil else { return }
+        if let fileURL {
+            entries[token]?.fileURL = fileURL
+        }
+        if let fileName {
+            entries[token]?.fileName = fileName
+        }
+    }
+
     /// Removes the entry; on success, transitions to the hold state and returns true so the caller can schedule the clear timer.
     mutating func finish(token: UUID, succeeded: Bool) -> Bool {
         guard let entry = entries.removeValue(forKey: token) else { return false }
@@ -255,6 +267,23 @@ struct BrowserDownloadTracker: Sendable {
         finishedSnapshot = nil
     }
 }
+
+struct BrowserDownloadMonitorLifecycle: Sendable {
+    private(set) var generation: UInt64 = 0
+
+    mutating func start() -> UInt64 {
+        generation &+= 1
+        return generation
+    }
+
+    mutating func stop() {
+        generation &+= 1
+    }
+
+    func accepts(_ callbackGeneration: UInt64) -> Bool {
+        generation == callbackGeneration
+    }
+}
 /// Monitors `NSProgress` published by browsers to the downloads directory and shows an icon and percentage in the collapsed Dynamic Island.
 ///
 /// Uses the system's public progress-publishing mechanism (Chrome, Safari, etc. publish progress during downloads),
@@ -273,6 +302,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
     private var progressBoxes: [UUID: ProgressBox] = [:]
     private var timer: AnyCancellable?
     private var finishedClearTask: Task<Void, Never>?
+    private var lifecycle = BrowserDownloadMonitorLifecycle()
     private let directories: [URL]
     private let pollInterval: Double
     private let fileManager: FileManager
@@ -302,20 +332,29 @@ public final class BrowserDownloadMonitor: ObservableObject {
 
     public func start() {
         guard subscriberTokens.isEmpty, !directories.isEmpty else { return }
+        let callbackGeneration = lifecycle.start()
         for directory in directories {
             let token = Progress.addSubscriber(forFileURL: directory) { [weak self] published in
                 let entryToken = UUID()
                 let box = ProgressBox(published)
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated { self?.register(token: entryToken, box: box) }
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self, self.lifecycle.accepts(callbackGeneration) else { return }
+                        self.register(token: entryToken, box: box)
+                    }
+                }
+                let unregister: @MainActor @Sendable (Bool) -> Void = { [weak self] succeeded in
+                    guard let self, self.lifecycle.accepts(callbackGeneration) else { return }
+                    self.unregister(token: entryToken, succeeded: succeeded)
                 }
                 return {
                     // Connection is torn down after unpublish; read values synchronously here before hopping to the main thread.
                     let succeeded = box.progress.isFinished
                         || box.progress.fractionCompleted >= 0.999
+                    // Keep teardown on the same serial queue as registration so a short-lived publication cannot finish first.
                     DispatchQueue.main.async {
                         MainActor.assumeIsolated {
-                            self?.unregister(token: entryToken, succeeded: succeeded)
+                            unregister(succeeded)
                         }
                     }
                 }
@@ -325,6 +364,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
     }
 
     public func stop() {
+        lifecycle.stop()
         for token in subscriberTokens { Progress.removeSubscriber(token) }
         subscriberTokens.removeAll()
         timer?.cancel()
@@ -338,8 +378,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
     }
     private func register(token: UUID, box: ProgressBox) {
         let progress = box.progress
-        // `fileURL` is often nil at publish time; the real path is in userInfo.
-        let fileURL = progress.fileURL ?? progress.userInfo[.fileURLKey] as? URL
+        let fileURL = Self.fileURL(for: progress)
         let entry = BrowserDownloadTracker.Entry(
             fileURL: fileURL,
             agent: fileURL.flatMap { resolveAgent(forFileAt: $0) },
@@ -368,7 +407,13 @@ public final class BrowserDownloadMonitor: ObservableObject {
     /// Returns nil when total size is unknown, to avoid staying stuck at 0% for a long time.
     private static func fraction(of progress: Progress) -> Double? {
         guard progress.totalUnitCount > 0 else { return nil }
-        return progress.fractionCompleted
+        let fraction = progress.fractionCompleted
+        return fraction.isFinite ? fraction : nil
+    }
+
+    /// `fileURL` is often nil at publication time; the real path is then carried in userInfo.
+    private static func fileURL(for progress: Progress) -> URL? {
+        progress.fileURL ?? progress.userInfo[.fileURLKey] as? URL
     }
 
     private func startTimerIfNeeded() {
@@ -386,12 +431,32 @@ public final class BrowserDownloadMonitor: ObservableObject {
             timer = nil
             return
         }
+        var runningBundleIdentifiers: Set<String>?
         for (token, box) in progressBoxes {
-            tracker.update(token: token, fraction: Self.fraction(of: box.progress))
+            let progress = box.progress
+            tracker.update(token: token, fraction: Self.fraction(of: progress))
+            // Update fileURL if it becomes available after initial registration
+            let currentFileURL = Self.fileURL(for: progress)
+            if let currentFileURL, tracker.entries[token]?.fileURL != currentFileURL {
+                tracker.update(
+                    token: token,
+                    fileURL: currentFileURL,
+                    fileName: BrowserDownloadAgentResolver.displayFileName(for: currentFileURL)
+                )
+            }
             // The temp file may appear on disk after progress is published; keep retrying while the source is unresolved.
             if tracker.entries[token]?.agent == nil,
                 let fileURL = tracker.entries[token]?.fileURL {
-                tracker.update(token: token, agent: resolveAgent(forFileAt: fileURL))
+                if runningBundleIdentifiers == nil {
+                    runningBundleIdentifiers = Self.runningBundleIdentifiers()
+                }
+                tracker.update(
+                    token: token,
+                    agent: resolveAgent(
+                        forFileAt: fileURL,
+                        runningBundleIdentifiers: runningBundleIdentifiers ?? []
+                    )
+                )
             }
         }
         refresh()
@@ -401,6 +466,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
         finishedClearTask?.cancel()
         let sleeper = holdSleeper
         let duration = Self.finishedHoldDuration
+        let callbackGeneration = lifecycle.generation
         finishedClearTask = Task { [weak self, sleeper] in
             do {
                 try await sleeper(.seconds(duration))
@@ -408,6 +474,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
                 return
             }
             guard let self else { return }
+            guard self.lifecycle.accepts(callbackGeneration) else { return }
             self.tracker.clearFinishedHold()
             self.refresh()
         }
@@ -424,7 +491,10 @@ public final class BrowserDownloadMonitor: ObservableObject {
     }
 
     /// Quarantine gives a precise source; falls back to extension candidates intersected with running browsers when absent.
-    private func resolveAgent(forFileAt url: URL) -> BrowserDownloadAgent? {
+    private func resolveAgent(
+        forFileAt url: URL,
+        runningBundleIdentifiers: Set<String>? = nil
+    ) -> BrowserDownloadAgent? {
         let tempURL = temporaryFileURL(for: url)
         if let name = QuarantineAgentReader.agentName(ofFileAt: tempURL ?? url),
             let agent = BrowserDownloadAgentResolver.agent(forQuarantineAgentName: name) {
@@ -433,7 +503,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
         let tempExtension = (tempURL ?? url).pathExtension.lowercased()
         return BrowserDownloadAgentResolver.agent(
             forTempExtension: BrowserDownloadTempExtension(rawValue: tempExtension),
-            runningBundleIdentifiers: Self.runningBundleIdentifiers()
+            runningBundleIdentifiers: runningBundleIdentifiers ?? Self.runningBundleIdentifiers()
         )
     }
 

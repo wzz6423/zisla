@@ -219,7 +219,8 @@ public final class KimiSessionActivityDetector: AIActivityDetecting {
         if let cached,
            candidate.size >= cached.readerState.offset,
            !(candidate.size == cached.readerState.offset
-               && candidate.modificationDate != cached.modificationDate) {
+               && candidate.modificationDate != cached.modificationDate),
+           jsonlReader.hasUnchangedReadPrefix(at: candidate.wireURL, state: cached.readerState) {
             next = cached
         } else {
             next = CachedTask(

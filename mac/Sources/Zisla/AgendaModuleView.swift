@@ -76,9 +76,18 @@ struct AgendaModuleView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 3)
-                Text("\(weather.temperature, specifier: "%.0f")°")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .monospacedDigit()
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text("\(weather.temperature, specifier: "%.0f")°")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                    if let range = temperatureRange(for: weather) {
+                        Text(range)
+                            .font(.system(size: 8.5, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .lineLimit(1)
+                    }
+                }
             }
 
             HStack(spacing: 7) {
@@ -126,6 +135,11 @@ struct AgendaModuleView: View {
             .font(.system(size: 8, weight: .medium))
             .foregroundStyle(.secondary)
             .lineLimit(1)
+    }
+
+    private func temperatureRange(for weather: WeatherSnapshot) -> String? {
+        guard let minimum = weather.temperatureMin, let maximum = weather.temperatureMax else { return nil }
+        return String(format: "%.0f°–%.0f°", minimum, maximum)
     }
 
     private func displayTime(_ value: String) -> String {

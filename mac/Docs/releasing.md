@@ -4,7 +4,7 @@
 
 The complete release process, dual update channels, and GitHub/Gitee asset synchronization are maintained by [`skills/zisla-release`](../../skills/zisla-release/SKILL.md). This page documents only the design constraints for signing, notarization, and update packages; follow the skill when publishing a release.
 
-The app only checks releases and downloads DMGs. It never replaces or restarts itself. Developer ID packages should still be notarized. Free ad-hoc previews cannot be notarized and may require **Open Anyway** in System Settings on first launch.
+Both selected update channels use Sparkle to verify a signed ZIP and appcast before replacing and relaunching the app. Each check reads Gitee first and retries GitHub exactly once when the Gitee appcast cannot load or its update package fails to download. `package-release.sh` requires `SPARKLE_GENERATE_APPCAST` to point to Sparkle 2.9.4's `generate_appcast` and writes `appcast-gitee.xml` and `appcast-github.xml` alongside the ZIP and DMG. Each appcast must be signed independently and point to the Universal ZIP hosted by its own site. Upload each as `appcast.xml` to its respective release: Gitee keeps permanent `update-release` (Release) and `preview` (Preview) feeds; GitHub uses `latest` for Release and permanent prerelease `preview` for Preview. Set `SPARKLE_ED_KEY_FILE` to the privately stored EdDSA key file when publishing non-interactively, or leave it unset to use the `zisla-update-ed25519` login-keychain account. The private key must never enter the repository. Developer ID packages should still be notarized. Free ad-hoc previews cannot be notarized and may require **Open Anyway** in System Settings on first launch.
 
 ## Prerequisites
 
@@ -29,6 +29,8 @@ dist/zisla-v1.0.0-macOS-universal.zip
 dist/zisla-v1.0.0-macOS-universal.zip.sha256
 dist/zisla-v1.0.0-macOS-universal.dmg
 dist/zisla-v1.0.0-macOS-universal.dmg.sha256
+dist/appcast-gitee.xml
+dist/appcast-github.xml
 ```
 
 ### Free preview distribution
@@ -42,7 +44,7 @@ export CODE_SIGN_IDENTITY=-
 Scripts/package-release.sh
 ```
 
-This package is not notarized and does not include the WeatherKit entitlement. The app periodically checks GitHub/Gitee Releases; after a user confirms an available version, it downloads the matching DMG, which the user then opens and drags into `Applications`. The first launch may still require **System Settings > Privacy & Security > Open Anyway**. Developer ID signing and notarization remain the recommended path for distribution without security prompts.
+This package is not notarized and does not include the WeatherKit entitlement. After publishing its signed appcast to the permanent Preview feed, the app checks, downloads, verifies, installs, and relaunches Preview updates through Sparkle. The first launch may still require **System Settings > Privacy & Security > Open Anyway**. Developer ID signing and notarization remain the recommended path for distribution without security prompts.
 
 ## 2. Notarize
 
@@ -62,7 +64,7 @@ Scripts/package-release.sh
 
 ## 3. Publish and verify
 
-Upload the DMG to releases with the same tag on GitHub and Gitee. A stable release must not be marked as a prerelease; a preview must be marked as a prerelease. The client uses its selected channel's Release API and chooses the DMG whose name contains `macOS`.
+Upload the ZIP, DMG, checksums, and `appcast-github.xml` as `appcast.xml` to the same versioned GitHub tag; upload the matching assets and `appcast-gitee.xml` as `appcast.xml` to the same Gitee tag. A stable release must not be marked as a prerelease. Copy the Gitee appcast to permanent `update-release`; copy Preview appcasts to permanent `preview` on both sites. The selected channel then checks Gitee first and retries GitHub once when Gitee's appcast cannot load or its update package fails to download.
 
 ```bash
 codesign --verify --deep --strict --all-architectures --verbose=4 'dist/zisla.app'
@@ -75,4 +77,4 @@ test -L /Volumes/zisla/Applications
 hdiutil detach /Volumes/zisla
 ```
 
-Use an older app version to check the new release. Confirm that the DMG downloads to the selected directory without overwriting a file with the same name. For installation acceptance, quit zisla before mounting the DMG and dragging the app to `Applications`.
+Use an older app version to check the new release. Confirm that automatic and manual checks use the selected Gitee feed first, retry its GitHub counterpart once when Gitee cannot load or its package download fails, and that Sparkle verifies, installs, and relaunches the Universal ZIP. Test Release→Preview and Preview→Release switching as well as same-channel updates.

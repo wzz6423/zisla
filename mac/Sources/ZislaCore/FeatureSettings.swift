@@ -91,7 +91,7 @@ public enum AppearanceMode: String, Codable, CaseIterable, Sendable, Equatable {
     }
 }
 
-/// Update channel selectable when checking for updates manually.
+/// Target update channel for both automatic and manual checks.
 public enum UpdateChannel: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case release
     case preview
@@ -491,7 +491,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mailCompactStyle: MailCompactStyle
     public var updateChecksEnabled: Bool
     public var automaticDownloadEnabled: Bool
-    /// Target channel for manual update checks.
+    /// Target channel for automatic and manual update checks.
     public var updateChannel: UpdateChannel
     /// Optional proxy URL used by local update, install, and network download tasks.
     public var networkProxyURL: String
@@ -512,6 +512,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var clipboardAssistantBlacklist: Set<String>
     /// Recognized content kinds; an empty set falls back to all kinds.
     public var clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind>
+    /// Primary action and expanded-menu order for each recognized content kind.
+    public var clipboardAssistantActionOrders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
     /// Engine used by the assistant's "search" action for copied text.
     public var clipboardAssistantSearchEngine: ClipboardAssistantSearchEngine
     public var clipboardAssistantCustomSearchURL: String
@@ -559,6 +561,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var voiceModelConfiguration: AIModelConfigurationReference?
     /// Built-in vocabulary sets used to bias ASR and guide transcript typo correction.
     public var voiceEnabledLexicons: Set<VoiceLexicon>
+    /// User-defined hotwords used alongside the enabled built-in vocabulary sets.
+    public var voiceCustomHotwords: [String]
     /// Whether to format explicitly enumerated items into numbered lists during voice transcript cleanup.
     public var voiceStructuredFormattingEnabled: Bool
     /// Whether screenshot capture and its global hotkeys are enabled.
@@ -569,6 +573,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var screenshotPinHotkey: VoiceInputHotkeyPreset
     /// Whether the pinned screenshot shows its bottom control bar.
     public var screenshotPinnedToolbarVisible: Bool
+    /// Whether the integrated keyboard sounds are enabled.
+    public var keyboardEnabled: Bool
+    public var keyboardSelectedProfileID: String
+    public var keyboardVolume: Double
+    public var keyboardPlaysReleaseSound: Bool
+    public var keyboardUsesPitchVariation: Bool
+    public var keyboardTypingStatsEnabled: Bool
 
     public init(
         mediaEnabled: Bool = true,
@@ -611,6 +622,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardAssistantMouseButton: Int? = nil,
         clipboardAssistantBlacklist: Set<String> = [],
         clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind> = Set(ClipboardAssistantKind.allCases),
+        clipboardAssistantActionOrders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]] = [:],
         clipboardAssistantSearchEngine: ClipboardAssistantSearchEngine = .google,
         clipboardAssistantCustomSearchURL: String = "",
         clipboardAssistantLightweightMode: Bool = false,
@@ -640,11 +652,18 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         voiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy = .never,
         voiceModelConfiguration: AIModelConfigurationReference? = nil,
         voiceEnabledLexicons: Set<VoiceLexicon> = VoiceLexicon.defaultEnabled,
+        voiceCustomHotwords: [String] = [],
         voiceStructuredFormattingEnabled: Bool = true,
         screenshotEnabled: Bool = true,
         screenshotHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.capture,
         screenshotPinHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.pin,
-        screenshotPinnedToolbarVisible: Bool = true
+        screenshotPinnedToolbarVisible: Bool = true,
+        keyboardEnabled: Bool = false,
+        keyboardSelectedProfileID: String = "holypanda",
+        keyboardVolume: Double = 0.75,
+        keyboardPlaysReleaseSound: Bool = true,
+        keyboardUsesPitchVariation: Bool = true,
+        keyboardTypingStatsEnabled: Bool = false
     ) {
         self.mediaEnabled = mediaEnabled
         self.mediaSource = mediaSource
@@ -689,6 +708,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             clipboardAssistantEnabledKinds.isEmpty
             ? Set(ClipboardAssistantKind.allCases)
             : clipboardAssistantEnabledKinds
+        self.clipboardAssistantActionOrders = ClipboardAssistantActionOrder.normalized(
+            clipboardAssistantActionOrders
+        )
         self.clipboardAssistantSearchEngine = clipboardAssistantSearchEngine
         self.clipboardAssistantCustomSearchURL = clipboardAssistantCustomSearchURL
         self.clipboardAssistantLightweightMode = clipboardAssistantLightweightMode
@@ -718,11 +740,18 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.voiceRecordingCleanupPolicy = voiceRecordingCleanupPolicy
         self.voiceModelConfiguration = voiceModelConfiguration
         self.voiceEnabledLexicons = voiceEnabledLexicons
+        self.voiceCustomHotwords = VoiceLexicon.normalizedCustomTerms(voiceCustomHotwords)
         self.voiceStructuredFormattingEnabled = voiceStructuredFormattingEnabled
         self.screenshotEnabled = screenshotEnabled
         self.screenshotHotkey = screenshotHotkey
         self.screenshotPinHotkey = screenshotPinHotkey
         self.screenshotPinnedToolbarVisible = screenshotPinnedToolbarVisible
+        self.keyboardEnabled = keyboardEnabled
+        self.keyboardSelectedProfileID = keyboardSelectedProfileID
+        self.keyboardVolume = keyboardVolume
+        self.keyboardPlaysReleaseSound = keyboardPlaysReleaseSound
+        self.keyboardUsesPitchVariation = keyboardUsesPitchVariation
+        self.keyboardTypingStatsEnabled = keyboardTypingStatsEnabled
     }
 
     /// Falls back to all current displays when all selected displays are disconnected, so activity notices remain visible.
@@ -782,6 +811,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantMouseButton
         case clipboardAssistantBlacklist
         case clipboardAssistantEnabledKinds
+        case clipboardAssistantActionOrders
         case clipboardAssistantSearchEngine
         case clipboardAssistantCustomSearchURL
         case clipboardAssistantLightweightMode
@@ -811,11 +841,18 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case voiceRecordingCleanupPolicy
         case voiceModelConfiguration
         case voiceEnabledLexicons
+        case voiceCustomHotwords
         case voiceStructuredFormattingEnabled
         case screenshotEnabled
         case screenshotHotkey
         case screenshotPinHotkey
         case screenshotPinnedToolbarVisible
+        case keyboardEnabled
+        case keyboardSelectedProfileID
+        case keyboardVolume
+        case keyboardPlaysReleaseSound
+        case keyboardUsesPitchVariation
+        case keyboardTypingStatsEnabled
     }
 
     private enum LegacyCodingKeys: String, CodingKey {
@@ -917,6 +954,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Set<ClipboardAssistantKind>.self,
             forKey: .clipboardAssistantEnabledKinds
         ) ?? defaults.clipboardAssistantEnabledKinds
+        clipboardAssistantActionOrders = ClipboardAssistantActionOrder.normalized(
+            try container.decodeIfPresent(
+                [ClipboardAssistantKind: [ClipboardAssistantActionKind]].self,
+                forKey: .clipboardAssistantActionOrders
+            ) ?? defaults.clipboardAssistantActionOrders
+        )
         clipboardAssistantSearchEngine = try container.decodeIfPresent(
             ClipboardAssistantSearchEngine.self,
             forKey: .clipboardAssistantSearchEngine
@@ -948,10 +991,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         )
         notificationsMuted = try container.decodeIfPresent(Bool.self, forKey: .notificationsMuted) ?? defaults.notificationsMuted
         hoverActivationEnabled = try container.decodeIfPresent(Bool.self, forKey: .hoverActivationEnabled) ?? defaults.hoverActivationEnabled
-        activityNoticeDisplayDuration = try container.decode(
+        activityNoticeDisplayDuration = try container.decodeIfPresent(
             ActivityNoticeDisplayDuration.self,
             forKey: .activityNoticeDisplayDuration
-        )
+        ) ?? defaults.activityNoticeDisplayDuration
         focusModeNoticeDisplayDuration = try container.decodeIfPresent(
             FocusModeNoticeDisplayDuration.self,
             forKey: .focusModeNoticeDisplayDuration
@@ -1003,6 +1046,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Set<VoiceLexicon>.self,
             forKey: .voiceEnabledLexicons
         ) ?? defaults.voiceEnabledLexicons
+        voiceCustomHotwords = VoiceLexicon.normalizedCustomTerms(
+            try container.decodeIfPresent([String].self, forKey: .voiceCustomHotwords)
+                ?? defaults.voiceCustomHotwords
+        )
         voiceStructuredFormattingEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .voiceStructuredFormattingEnabled
@@ -1023,6 +1070,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .screenshotPinnedToolbarVisible
         ) ?? defaults.screenshotPinnedToolbarVisible
+        keyboardEnabled = try container.decodeIfPresent(Bool.self, forKey: .keyboardEnabled) ?? defaults.keyboardEnabled
+        keyboardSelectedProfileID = try container.decodeIfPresent(String.self, forKey: .keyboardSelectedProfileID) ?? defaults.keyboardSelectedProfileID
+        keyboardVolume = try container.decodeIfPresent(Double.self, forKey: .keyboardVolume) ?? defaults.keyboardVolume
+        keyboardPlaysReleaseSound = try container.decodeIfPresent(Bool.self, forKey: .keyboardPlaysReleaseSound) ?? defaults.keyboardPlaysReleaseSound
+        keyboardUsesPitchVariation = try container.decodeIfPresent(Bool.self, forKey: .keyboardUsesPitchVariation) ?? defaults.keyboardUsesPitchVariation
+        keyboardTypingStatsEnabled = try container.decodeIfPresent(Bool.self, forKey: .keyboardTypingStatsEnabled) ?? defaults.keyboardTypingStatsEnabled
     }
 }
 

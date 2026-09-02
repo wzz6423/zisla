@@ -4,12 +4,14 @@ import Foundation
 @MainActor
 public final class ClipboardHistoryStore: ObservableObject {
     private static let maximumPendingMutations = 512
+    public static let recentHistoryPreviewLimit = 8
     @Published public private(set) var items: [ClipboardHistoryItem] = []
     @Published public private(set) var categoryCounts: [FileShelfCategory: Int] = [:]
     @Published public private(set) var errorDescription: String?
     @Published public private(set) var totalItemCount = 0
     @Published public private(set) var currentPage = 0
     @Published public private(set) var isLoading = true
+    @Published public private(set) var isHistoryExpanded = false
 
     public let capacity: Int?
     public let maxImageBytes: Int
@@ -25,6 +27,8 @@ public final class ClipboardHistoryStore: ObservableObject {
     private var persistenceTask: Task<Void, Never>?
     private var persistenceGeneration = 0
     private var pendingMutations: [ClipboardHistoryMutation] = []
+    private var inFlightMutations: [ClipboardHistoryMutation] = []
+    private var inFlightPersistenceGeneration: Int?
 
     public init(
         storageURL: URL = AppPaths.clipboardHistory,
@@ -61,6 +65,14 @@ public final class ClipboardHistoryStore: ObservableObject {
         (currentPage + 1) * pageSize < totalItemCount
     }
 
+    public var isShowingHistoryPreview: Bool {
+        pageSize > Self.recentHistoryPreviewLimit
+            && !isHistoryExpanded
+            && scope == .all
+            && searchText.isEmpty
+            && category == .all
+    }
+
     public func waitUntilLoaded() async {
         while true {
             let generation = loadGeneration
@@ -73,6 +85,9 @@ public final class ClipboardHistoryStore: ObservableObject {
     public func updateQuery(scope: ClipboardHistoryScope, searchText: String, category: FileShelfCategory = .all) {
         let normalizedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard self.scope != scope || self.searchText != normalizedSearch || self.category != category else { return }
+        if scope == .history || !normalizedSearch.isEmpty || category != .all {
+            isHistoryExpanded = true
+        }
         self.scope = scope
         self.searchText = normalizedSearch
         self.category = category
@@ -82,13 +97,31 @@ public final class ClipboardHistoryStore: ObservableObject {
 
     public func loadPreviousPage() {
         guard canLoadPreviousPage else { return }
+        isHistoryExpanded = true
         currentPage -= 1
         reload()
     }
 
     public func loadNextPage() {
         guard canLoadNextPage else { return }
+        isHistoryExpanded = true
         currentPage += 1
+        reload()
+    }
+
+    public func loadPage(number: Int) {
+        guard (1...pageCount).contains(number) else { return }
+        let page = number - 1
+        guard currentPage != page else { return }
+        isHistoryExpanded = true
+        currentPage = page
+        reload()
+    }
+
+    public func loadFullHistory() {
+        guard isShowingHistoryPreview else { return }
+        isHistoryExpanded = true
+        currentPage = 0
         reload()
     }
 
@@ -165,11 +198,16 @@ public final class ClipboardHistoryStore: ObservableObject {
         persistenceTask?.cancel()
         persistenceTask = nil
         persistenceGeneration += 1
-        let mutations = takePendingMutations()
+        let mutations = inFlightMutations + takePendingMutations()
         do {
             try database.flush(mutations)
+            inFlightMutations.removeAll(keepingCapacity: true)
+            inFlightPersistenceGeneration = nil
             errorDescription = nil
         } catch {
+            pendingMutations = mutations + pendingMutations
+            inFlightMutations.removeAll(keepingCapacity: true)
+            inFlightPersistenceGeneration = nil
             errorDescription = error.localizedDescription
         }
     }
@@ -183,23 +221,18 @@ public final class ClipboardHistoryStore: ObservableObject {
         let requestedSearch = searchText
         let requestedCategory = category
         let pageSize = pageSize
+        let isHistoryPreview = isShowingHistoryPreview
         let database = database
         isLoading = true
 
         loadTask = Task { [weak self] in
             do {
-                var page = try await database.loadPage(
-                    scope: requestedScope,
-                    searchText: requestedSearch,
-                    category: requestedCategory,
-                    offset: requestedPage * pageSize,
-                    limit: pageSize
-                )
-                guard !Task.isCancelled, let self, loadGeneration == generation else { return }
-
-                let cleaned = cleanedItems(page.items)
-                if !cleaned.mutations.isEmpty {
-                    try await database.apply(cleaned.mutations)
+                var page: ClipboardHistoryPage
+                if isHistoryPreview {
+                    page = try await database.loadRecentHistoryPreview(
+                        limit: ClipboardHistoryStore.recentHistoryPreviewLimit
+                    )
+                } else {
                     page = try await database.loadPage(
                         scope: requestedScope,
                         searchText: requestedSearch,
@@ -208,9 +241,28 @@ public final class ClipboardHistoryStore: ObservableObject {
                         limit: pageSize
                     )
                 }
+                guard !Task.isCancelled, let self, loadGeneration == generation else { return }
+
+                let cleaned = cleanedItems(page.items)
+                if !cleaned.mutations.isEmpty {
+                    try await database.apply(cleaned.mutations)
+                    if isHistoryPreview {
+                        page = try await database.loadRecentHistoryPreview(
+                            limit: ClipboardHistoryStore.recentHistoryPreviewLimit
+                        )
+                    } else {
+                        page = try await database.loadPage(
+                            scope: requestedScope,
+                            searchText: requestedSearch,
+                            category: requestedCategory,
+                            offset: requestedPage * pageSize,
+                            limit: pageSize
+                        )
+                    }
+                }
                 guard !Task.isCancelled, loadGeneration == generation else { return }
 
-                let maximumPage = page.totalCount == 0 ? 0 : (page.totalCount - 1) / pageSize
+                let maximumPage = isHistoryPreview ? 0 : (page.totalCount == 0 ? 0 : (page.totalCount - 1) / pageSize)
                 if requestedPage > maximumPage {
                     currentPage = maximumPage
                     reload()
@@ -340,6 +392,11 @@ public final class ClipboardHistoryStore: ObservableObject {
 
     private func schedulePersistence(_ mutation: ClipboardHistoryMutation) {
         pendingMutations.append(mutation)
+        schedulePendingPersistence()
+    }
+
+    private func schedulePendingPersistence() {
+        guard !pendingMutations.isEmpty, inFlightPersistenceGeneration == nil else { return }
         persistenceTask?.cancel()
         persistenceGeneration += 1
         let generation = persistenceGeneration
@@ -360,14 +417,23 @@ public final class ClipboardHistoryStore: ObservableObject {
     }
 
     private func commitPendingMutations(generation: Int) {
+        guard inFlightPersistenceGeneration == nil, persistenceGeneration == generation else { return }
         let mutations = takePendingMutations()
         guard !mutations.isEmpty else { return }
         persistenceTask = nil
+        inFlightMutations = mutations
+        inFlightPersistenceGeneration = generation
         database.persist(mutations) { [weak self] errorDescription in
-            guard let self, persistenceGeneration == generation else { return }
-            self.errorDescription = errorDescription
-            if errorDescription == nil {
+            guard let self, self.inFlightPersistenceGeneration == generation else { return }
+            self.inFlightMutations.removeAll(keepingCapacity: true)
+            self.inFlightPersistenceGeneration = nil
+            if let errorDescription {
+                self.pendingMutations = mutations + self.pendingMutations
+                self.errorDescription = errorDescription
+            } else {
+                self.errorDescription = nil
                 self.reload()
+                self.schedulePendingPersistence()
             }
         }
     }

@@ -1,4 +1,5 @@
 import AppKit
+import os.log
 import ScreenCaptureKit
 import SwiftUI
 
@@ -16,7 +17,28 @@ enum ScreenshotCaptureError: LocalizedError, Equatable {
     }
 }
 
+struct ScreenshotFrameDiagnostics: Equatable, Sendable {
+    let api: String
+    let width: Int
+    let height: Int
+    let bytesPerRow: Int
+    let colorSpaceName: String?
+    let bitmapInfo: UInt32
+    let alphaInfo: UInt32
+    let sampleHash: UInt64
+    let uniqueSampleCount: Int
+
+    var appearsUniform: Bool {
+        uniqueSampleCount == 1
+    }
+}
+
 enum ScreenshotCaptureService {
+    private static let logger = Logger(
+        subsystem: "dev.wzz.zisla",
+        category: "ScreenshotCapture"
+    )
+
     static func requirePermission(
         _ hasAccess: () -> Bool = CGPreflightScreenCaptureAccess
     ) throws {
@@ -31,9 +53,9 @@ enum ScreenshotCaptureService {
         return CGDirectDisplayID(number.uint32Value)
     }
 
-    /// macOS 15 起 `CGDisplayCreateImage` 被标记为 obsoleted：调用仍能链接，但返回的图像尺寸正确、
-    /// 内容却是回收后的显存，在选区遮罩上表现为整屏色块。所以统一走 ScreenCaptureKit，
-    /// 只有 macOS 14 才在 ScreenCaptureKit 失败时回落到旧接口。
+    /// Starting with macOS 15, `CGDisplayCreateImage` is obsolete. It still links and returns an image
+    /// with the correct dimensions, but its contents may come from reclaimed video memory and appear
+    /// as a solid-color overlay. Always use ScreenCaptureKit, falling back only on macOS 14.
     @MainActor
     static func capture(screen: NSScreen) async throws -> (image: NSImage, cgImage: CGImage) {
         try requirePermission()
@@ -49,7 +71,11 @@ enum ScreenshotCaptureService {
             return (NSImage(cgImage: cgImage, size: screen.frame.size), cgImage)
         } catch {
             if #unavailable(macOS 15.0) {
-                guard let cgImage = CGDisplayCreateImage(displayID) else { throw error }
+                guard let rawImage = CGDisplayCreateImage(displayID) else { throw error }
+                let cgImage = try detachedImageAndDiagnose(
+                    rawImage,
+                    api: "CGDisplayCreateImage"
+                )
                 return (NSImage(cgImage: cgImage, size: screen.frame.size), cgImage)
             }
             throw error
@@ -95,16 +121,129 @@ enum ScreenshotCaptureService {
             excludingApplications: excludedApplications,
             exceptingWindows: []
         )
-        // 显示器重新配置后 NSScreen 可能已失效，缩放读成 0 会让配置里的像素尺寸退化为 0。
+        // NSScreen may become stale after display reconfiguration; a zero scale would collapse pixel dimensions.
         let scale = max(screen.backingScaleFactor, 1)
+        let width = max(1, Int((screen.frame.width * scale).rounded()))
+        let height = max(1, Int((screen.frame.height * scale).rounded()))
+
+        if #available(macOS 26.0, *) {
+            let configuration = SCScreenshotConfiguration()
+            configuration.width = width
+            configuration.height = height
+            configuration.showsCursor = false
+            configuration.displayIntent = .local
+            configuration.dynamicRange = .sdr
+            let output = try await SCScreenshotManager.captureScreenshot(
+                contentFilter: filter,
+                configuration: configuration
+            )
+            guard let image = output.sdrImage else {
+                throw ScreenshotCaptureError.screenUnavailable
+            }
+            return try detachedImageAndDiagnose(image, api: "SCScreenshotConfiguration")
+        }
+
         let configuration = SCStreamConfiguration()
-        configuration.width = max(1, Int((screen.frame.width * scale).rounded()))
-        configuration.height = max(1, Int((screen.frame.height * scale).rounded()))
+        configuration.width = width
+        configuration.height = height
         configuration.captureResolution = .best
         configuration.showsCursor = false
-        return try await SCScreenshotManager.captureImage(
+        let image = try await SCScreenshotManager.captureImage(
             contentFilter: filter,
             configuration: configuration
+        )
+        return try detachedImageAndDiagnose(image, api: "SCStreamConfiguration")
+    }
+
+    @available(macOS 14.0, *)
+    private static func detachedImageAndDiagnose(
+        _ image: CGImage,
+        api: String
+    ) throws -> CGImage {
+        let diagnostics = frameDiagnostics(for: image, api: api)
+        logger.info(
+            "capture api=\(diagnostics.api, privacy: .public) size=\(diagnostics.width)x\(diagnostics.height, privacy: .public) bytesPerRow=\(diagnostics.bytesPerRow, privacy: .public) colorSpace=\(diagnostics.colorSpaceName ?? "unknown", privacy: .public) bitmapInfo=\(diagnostics.bitmapInfo, privacy: .public) alphaInfo=\(diagnostics.alphaInfo, privacy: .public) sampleUnique=\(diagnostics.uniqueSampleCount, privacy: .public) sampleHash=\(String(diagnostics.sampleHash, radix: 16), privacy: .public)"
+        )
+        if diagnostics.appearsUniform {
+            logger.warning(
+                "capture frame appears uniform; preserving frame for diagnosis api=\(diagnostics.api, privacy: .public) sampleHash=\(String(diagnostics.sampleHash, radix: 16), privacy: .public)"
+            )
+        }
+        guard let detached = detachedImage(from: image) else {
+            throw ScreenshotCaptureError.screenUnavailable
+        }
+        return detached
+    }
+
+    static func detachedImage(from image: CGImage) -> CGImage? {
+        guard image.width > 0, image.height > 0 else { return nil }
+        let (bytesPerRow, overflow) = image.width.multipliedReportingOverflow(by: 4)
+        guard !overflow else { return nil }
+        let (_, byteCountOverflow) = bytesPerRow.multipliedReportingOverflow(by: image.height)
+        guard !byteCountOverflow else { return nil }
+        guard let context = CGContext(
+            data: nil,
+            width: image.width,
+            height: image.height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        context.interpolationQuality = .none
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return context.makeImage()
+    }
+
+    static func frameDiagnostics(
+        for image: CGImage,
+        api: String
+    ) -> ScreenshotFrameDiagnostics {
+        let sampleWidth = min(max(image.width, 0), 8)
+        let sampleHeight = min(max(image.height, 0), 8)
+        var sampleBytes = [UInt8](repeating: 0, count: max(sampleWidth * sampleHeight * 4, 1))
+        if sampleWidth > 0, sampleHeight > 0,
+           let context = CGContext(
+               data: &sampleBytes,
+               width: sampleWidth,
+               height: sampleHeight,
+               bitsPerComponent: 8,
+               bytesPerRow: sampleWidth * 4,
+               space: CGColorSpaceCreateDeviceRGB(),
+               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+           ) {
+            context.interpolationQuality = .none
+            context.draw(
+                image,
+                in: CGRect(x: 0, y: 0, width: sampleWidth, height: sampleHeight)
+            )
+        }
+
+        var hash: UInt64 = 1_469_598_103_934_665_603
+        var colors = Set<UInt32>()
+        for offset in stride(from: 0, to: sampleBytes.count, by: 4) {
+            guard offset + 3 < sampleBytes.count else { break }
+            let red = UInt32(sampleBytes[offset])
+            let green = UInt32(sampleBytes[offset + 1])
+            let blue = UInt32(sampleBytes[offset + 2])
+            let alpha = UInt32(sampleBytes[offset + 3])
+            colors.insert((red << 24) | (green << 16) | (blue << 8) | alpha)
+            for byte in sampleBytes[offset...offset + 3] {
+                hash ^= UInt64(byte)
+                hash &*= 1_099_511_628_211
+            }
+        }
+
+        return ScreenshotFrameDiagnostics(
+            api: api,
+            width: image.width,
+            height: image.height,
+            bytesPerRow: image.bytesPerRow,
+            colorSpaceName: image.colorSpace?.name as String?,
+            bitmapInfo: image.bitmapInfo.rawValue,
+            alphaInfo: image.alphaInfo.rawValue,
+            sampleHash: hash,
+            uniqueSampleCount: colors.count
         )
     }
 
@@ -143,11 +282,17 @@ final class ScreenshotPixelSampler {
     private let bytesPerRow: Int
 
     init?(cgImage: CGImage) {
-        width = cgImage.width
-        height = cgImage.height
-        bytesPerRow = width * 4
-        let (byteCount, overflow) = bytesPerRow.multipliedReportingOverflow(by: height)
-        guard width > 0, height > 0, !overflow else { return nil }
+        let sourceWidth = cgImage.width
+        let sourceHeight = cgImage.height
+        guard sourceWidth > 0, sourceHeight > 0 else { return nil }
+        let (sourceBytesPerRow, rowOverflow) = sourceWidth.multipliedReportingOverflow(by: 4)
+        guard !rowOverflow else { return nil }
+        let (byteCount, byteCountOverflow) = sourceBytesPerRow.multipliedReportingOverflow(by: sourceHeight)
+        guard !byteCountOverflow else { return nil }
+
+        width = sourceWidth
+        height = sourceHeight
+        bytesPerRow = sourceBytesPerRow
 
         var buffer = [UInt8](repeating: 0, count: byteCount)
         guard let context = CGContext(
@@ -178,8 +323,12 @@ final class ScreenshotPixelSampler {
             max(Int((point.y / screenSize.height * CGFloat(height)).rounded(.down)), 0),
             height - 1
         )
-        let offset = y * bytesPerRow + x * 4
-        guard offset >= 0, offset + 3 < pixels.count else { return nil }
+        let (rowOffset, rowOverflow) = y.multipliedReportingOverflow(by: bytesPerRow)
+        let (columnOffset, columnOverflow) = x.multipliedReportingOverflow(by: 4)
+        let (offset, offsetOverflow) = rowOffset.addingReportingOverflow(columnOffset)
+        let (endOffset, endOverflow) = offset.addingReportingOverflow(3)
+        guard !rowOverflow, !columnOverflow, !offsetOverflow, !endOverflow,
+              offset >= 0, endOffset < pixels.count else { return nil }
         return ScreenshotRGBA(
             red: CGFloat(pixels[offset]) / 255,
             green: CGFloat(pixels[offset + 1]) / 255,
@@ -292,19 +441,19 @@ enum ScreenshotSelectionGeometry {
         }
     }
 
-    /// 尺寸标签与选区边框、角把手之间的留白。
+    /// Spacing between the size badge and the selection border or resize handles.
     static let badgeInset: CGFloat = 10
 
-    /// 标签的估算尺寸，用于判断外侧是否有足够空间容纳标签。
+    /// Estimated badge size used to determine whether it fits outside the selection.
     static let badgeEstimatedSize = CGSize(width: 104, height: 27)
 
-    /// 尺寸标签的中心点：优先放在选区外右侧（底部对齐），外侧放不下时退到选区内右下角。
+    /// Places the badge outside the selection's lower-right edge, falling back inside when needed.
     static func badgePosition(for selection: CGRect, in bounds: CGSize) -> CGPoint {
         let badge = badgeEstimatedSize
         let gap: CGFloat = 8
         let rect = selection.standardized
 
-        // 水平：优先放外侧右侧，放不下则退到内侧右侧
+        // Prefer the outside right edge, falling back inside when it does not fit.
         let outsideCenterX = rect.maxX + gap + badge.width / 2
         let fitsOutside = outsideCenterX + badge.width / 2 <= bounds.width
         let centerX: CGFloat
@@ -314,7 +463,7 @@ enum ScreenshotSelectionGeometry {
             centerX = max(badge.width / 2, rect.maxX - gap - badge.width / 2)
         }
 
-        // 垂直：标签底部对齐选区底部，超出屏幕时 clamp
+        // Align the badge bottom with the selection and clamp it to the screen bounds.
         let preferredCenterY = rect.maxY - badge.height / 2
         let centerY = min(
             max(badge.height / 2, preferredCenterY),
@@ -351,6 +500,20 @@ enum ScreenshotSnapTargetGeometry {
                 let rhsArea = max(0, rhs.width) * max(0, rhs.height)
                 return lhsArea < rhsArea
             }
+    }
+}
+
+struct ScreenshotSnapTargetProcessTracker {
+    private(set) var lastExternalProcess: pid_t?
+
+    mutating func target(
+        frontmost: pid_t?,
+        currentProcess: pid_t
+    ) -> pid_t? {
+        guard let frontmost else { return lastExternalProcess }
+        guard frontmost != currentProcess else { return lastExternalProcess }
+        lastExternalProcess = frontmost
+        return frontmost
     }
 }
 
@@ -545,12 +708,14 @@ final class ScreenshotColorCopyFeedback: ObservableObject {
 final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
     typealias CaptureScreen = @MainActor (NSScreen) async throws -> (image: NSImage, cgImage: CGImage)
     typealias PresentPanels = @MainActor ([ScreenshotSelectionPanel]) -> Void
+    typealias WillPresentPanels = @MainActor () async -> Void
     typealias SnapTargets = (NSScreen) -> [CGRect]
 
     private var panels: [ScreenshotSelectionPanel] = []
     private var didFinish = false
     private var didRequestPermission = false
-    /// 抓图改成异步之后，两次 start 可能交叠，用会话号丢弃过期的那一次。
+    private var isPreparingPanels = false
+    /// Asynchronous capture allows overlapping starts; use a session ID to discard stale captures.
     private var startSessionID = 0
     private var colorCopyMonitor: Any?
     private let captureScreen: CaptureScreen
@@ -560,6 +725,7 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
 
     var onCaptured: ((ScreenshotCaptureResult) -> Void)?
     var onCancelled: (() -> Void)?
+    var onSelectionWillPresent: WillPresentPanels?
     var selectionWindowCount: Int { panels.count }
 
     init(
@@ -585,6 +751,7 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
 
     func start(on screens: [NSScreen]) async {
         didFinish = false
+        isPreparingPanels = false
         closePanels()
         startSessionID += 1
         let sessionID = startSessionID
@@ -597,15 +764,19 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
         var captures: [(screen: NSScreen, image: NSImage, cgImage: CGImage)] = []
         do {
             for screen in screens {
+                guard sessionID == startSessionID, !didFinish else { return }
                 let capture = try await captureScreen(screen)
+                guard sessionID == startSessionID, !didFinish else { return }
                 captures.append((screen, capture.image, capture.cgImage))
             }
         } catch {
+            guard sessionID == startSessionID, !didFinish else { return }
             if case ScreenshotCaptureError.permissionRequired = error,
                !didRequestPermission {
                 didRequestPermission = true
                 if CGRequestScreenCaptureAccess() {
                     try? await Task.sleep(nanoseconds: 250_000_000)
+                    guard sessionID == startSessionID, !didFinish else { return }
                     await start(on: screens)
                     return
                 }
@@ -616,9 +787,19 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
             return
         }
         didRequestPermission = false
-        // 抓图期间可能又发起了一次截图，过期的这次不能再把遮罩挂上去。
-        guard sessionID == startSessionID else { return }
+        // Another capture may have started in the meantime; do not present an overlay for this stale capture.
+        guard sessionID == startSessionID, !didFinish else { return }
 
+        isPreparingPanels = true
+        if let onSelectionWillPresent {
+            await onSelectionWillPresent()
+        }
+        guard sessionID == startSessionID, !didFinish else {
+            if sessionID == startSessionID {
+                isPreparingPanels = false
+            }
+            return
+        }
         panels = captures.map { capture in
             let copyFeedback = ScreenshotColorCopyFeedback()
             let displayBounds = ScreenshotCaptureService.displayID(for: capture.screen)
@@ -686,13 +867,16 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
             panel.setFrame(capture.screen.frame, display: true)
             return panel
         }
+        isPreparingPanels = false
         presentPanels(panels)
         installColorCopyMonitor()
     }
 
     func cancel() {
-        guard !panels.isEmpty, !didFinish else { return }
+        guard !didFinish, (!panels.isEmpty || isPreparingPanels) else { return }
         didFinish = true
+        startSessionID += 1
+        isPreparingPanels = false
         closePanels()
         onCancelled?()
     }
@@ -1010,7 +1194,7 @@ struct ScreenshotSelectionView: View {
     }
 }
 
-/// 选区尺寸标签：优先贴在选区外右侧，外侧空间不够时退到选区内右下角。
+/// Places the selection size badge outside the right edge, falling back inside when space is limited.
 struct ScreenshotSelectionSizeBadge: View {
     let selection: CGRect
     let bounds: CGSize
