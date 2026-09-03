@@ -77,9 +77,9 @@ struct KeyboardSoundModuleViewTests {
         let historySource = String(dashboardSource[historyStart.lowerBound..<keyboardStart.lowerBound])
         #expect(historySource.contains("LineMark("))
         #expect(!historySource.contains("BarMark("))
-        #expect(historySource.contains("AxisMarks(values: .automatic(desiredCount: 7))"))
-        // 两条曲线同为 LineMark，必须各带 series:，否则 Charts 会把它们并成一条系列，
-        // 峰值线消失、字符数线退化成折返锯齿（已用离屏渲染取证）。
+        #expect(historySource.contains("chartXScale(domain: domain)"))
+        #expect(historySource.contains("AxisMarks(values: axisDates)"))
+        // Both curves are LineMarks and need separate series values so Charts does not merge them.
         #expect(historySource.contains(#"series: .value("系列", "字符数")"#))
         #expect(historySource.contains(#"series: .value("系列", "峰值")"#))
         let historyLineMarkCount = historySource.components(separatedBy: "LineMark(").count - 1
@@ -98,8 +98,7 @@ struct KeyboardSoundModuleViewTests {
         #expect(dashboardSource.contains("Key(\"leftArrow\", \"←\", 123)"))
         #expect(dashboardSource.contains("Key(\"rightShift\", \"shift\", 60"))
 
-        // 今日/累计按键需按内容自然排列：keyboardCount 不能再撑满等分宽度，
-        // 靠外层 HStack 的 Spacer 保持左对齐。
+        // The outer spacer keeps content-sized key counts aligned to the leading edge.
         let keyboardCountBody = try #require(
             dashboardSource
                 .components(separatedBy: "private func keyboardCount")
@@ -109,6 +108,9 @@ struct KeyboardSoundModuleViewTests {
                 .first
         )
         #expect(!keyboardCountBody.contains("maxWidth: .infinity"))
+        #expect(keyboardCountBody.contains("Self.compactCountText(count)"))
+        #expect(keyboardCountBody.contains(".font(.system(size: 10, weight: .semibold, design: .monospaced))"))
+        #expect(keyboardCountBody.contains(".accessibilityValue(count.formatted(.number))"))
         #expect(dashboardSource.contains("keyboardCount(\"累计按键\", summary.allTimeKeyPressCount)\n                Spacer()"))
 
         let modules = IslandModule.allCases
@@ -134,11 +136,10 @@ struct KeyboardSoundModuleViewTests {
 
         #expect(dashboardSource.contains("let todayCount = key.keyCode.map { todayCounts[$0, default: 0] } ?? 0"))
         #expect(dashboardSource.contains("let allTimeCount = key.keyCode.map { allTimeCounts[$0, default: 0] } ?? 0"))
-        #expect(
-            dashboardSource.contains(
-                #"Text("\(todayCount.formatted(.number)) / \(allTimeCount.formatted(.number))")"#
-            )
-        )
+        #expect(dashboardSource.contains("KeyboardTypingStatsDashboardView.compactCountText(todayCount)"))
+        #expect(dashboardSource.contains("KeyboardTypingStatsDashboardView.compactCountText(allTimeCount)"))
+        #expect(dashboardSource.contains(".font(.system(size: 7, design: .monospaced))"))
+        #expect(dashboardSource.contains(".minimumScaleFactor(0.7)"))
 
         #expect(dashboardSource.contains("0.08 + 0.68 * Double(todayCount) / Double(maximum)"))
         #expect(dashboardSource.contains("private var maximum: Int64 { max(1, todayCounts.values.max() ?? 0) }"))
@@ -147,6 +148,77 @@ struct KeyboardSoundModuleViewTests {
         #expect(dashboardSource.contains("if !compact, key.keyCode != nil {"))
         #expect(dashboardSource.contains(#"今日 \(todayCount.formatted(.number))，累计 \(allTimeCount.formatted(.number))"#))
         #expect(dashboardSource.contains(#"} ?? "")"#))
+    }
+
+    @Test
+    @MainActor
+    func dashboardChartAxesPinWindowEndpointsAndToday() throws {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let bucketSeconds: TimeInterval = 900
+        let buckets = (0..<4).map { index in
+            KeyboardTypingStatsTrendPoint(
+                id: index,
+                start: start.addingTimeInterval(bucketSeconds * Double(index)),
+                characterCount: Int64(index)
+            )
+        }
+
+        let trendDomain = try #require(KeyboardTypingStatsDashboardView.trendAxisDomain(for: buckets))
+        #expect(trendDomain.lowerBound == start)
+        #expect(trendDomain.upperBound == start.addingTimeInterval(bucketSeconds * 4))
+        let trendDates = KeyboardTypingStatsDashboardView.trendAxisDates(for: buckets)
+        #expect(trendDates.first == trendDomain.lowerBound)
+        #expect(trendDates.last == trendDomain.upperBound)
+        #expect(KeyboardTypingStatsDashboardView.trendAxisDomain(for: Array(buckets.prefix(1))) == nil)
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let today = calendar.startOfDay(for: now)
+        let firstHistoryDate = try #require(calendar.date(byAdding: .day, value: -13, to: today))
+        let staleHistoryDate = try #require(calendar.date(byAdding: .day, value: -2, to: today))
+        let history = [
+            KeyboardTypingStatsDaySummary(
+                id: "first",
+                date: firstHistoryDate,
+                characterCount: 10,
+                peakCharactersPerSecond: 2,
+                activeMinuteBuckets: 1
+            ),
+            KeyboardTypingStatsDaySummary(
+                id: "stale",
+                date: staleHistoryDate,
+                characterCount: 20,
+                peakCharactersPerSecond: 3,
+                activeMinuteBuckets: 2
+            ),
+        ]
+
+        let historyDomain = KeyboardTypingStatsDashboardView.historyAxisDomain(
+            for: history,
+            now: now,
+            calendar: calendar
+        )
+        #expect(historyDomain.lowerBound == firstHistoryDate)
+        #expect(historyDomain.upperBound == today)
+        let historyDates = KeyboardTypingStatsDashboardView.historyAxisDates(
+            for: history,
+            now: now,
+            calendar: calendar
+        )
+        #expect(historyDates.first == firstHistoryDate)
+        #expect(historyDates.last == today)
+        #expect(historyDates.contains(today))
+    }
+
+    @Test
+    func dashboardCompactCountTextUsesKAndWBoundaries() {
+        #expect(KeyboardTypingStatsDashboardView.compactCountText(-1) == "0")
+        #expect(KeyboardTypingStatsDashboardView.compactCountText(999) == "999")
+        #expect(KeyboardTypingStatsDashboardView.compactCountText(1_000) == "1k")
+        #expect(KeyboardTypingStatsDashboardView.compactCountText(7_468) == "7.5k")
+        #expect(KeyboardTypingStatsDashboardView.compactCountText(10_000) == "1w")
+        #expect(KeyboardTypingStatsDashboardView.compactCountText(19_240) == "1.9w")
     }
 
     @Test

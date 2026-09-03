@@ -113,6 +113,17 @@ struct KeyboardTypingStatsDashboardView: View {
     }
 
     private var chartView: some View {
+        Group {
+            if let domain = Self.trendAxisDomain(for: summary.recentBuckets) {
+                trendChart
+                    .chartXScale(domain: domain)
+            } else {
+                trendChart
+            }
+        }
+    }
+
+    private var trendChart: some View {
         Chart(summary.recentBuckets) { bucket in
             BarMark(
                 x: .value("时间", bucket.start),
@@ -129,9 +140,15 @@ struct KeyboardTypingStatsDashboardView: View {
             .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 3)) {
+            AxisMarks(values: Self.trendAxisDates(for: summary.recentBuckets)) { value in
                 AxisGridLine().foregroundStyle(Color.dividerSubtle)
-                AxisValueLabel()
+                AxisValueLabel {
+                    if let date = value.as(Date.self) {
+                        Text(trendAxisLabel(date))
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .chartYAxis {
@@ -143,39 +160,123 @@ struct KeyboardTypingStatsDashboardView: View {
         .accessibilityLabel("输入趋势")
     }
 
+    static func trendAxisDomain(for buckets: [KeyboardTypingStatsTrendPoint]) -> ClosedRange<Date>? {
+        guard buckets.count > 1,
+              let first = buckets.first,
+              let penultimate = buckets.dropLast().last,
+              let last = buckets.last else {
+            return nil
+        }
+
+        let bucketDuration = last.start.timeIntervalSince(penultimate.start)
+        let end = last.start.addingTimeInterval(bucketDuration)
+        guard bucketDuration > 0, first.start < end else { return nil }
+        return first.start...end
+    }
+
+    static func trendAxisDates(for buckets: [KeyboardTypingStatsTrendPoint]) -> [Date] {
+        guard let domain = trendAxisDomain(for: buckets) else {
+            return buckets.first.map { [$0.start] } ?? []
+        }
+
+        let tickCount = min(5, max(2, buckets.count + 1))
+        let duration = domain.upperBound.timeIntervalSince(domain.lowerBound)
+        return (0..<tickCount).map { index in
+            domain.lowerBound.addingTimeInterval(duration * Double(index) / Double(tickCount - 1))
+        }
+    }
+
+    private func trendAxisLabel(_ date: Date) -> String {
+        switch summary.timelineRange {
+        case "24h", "7d":
+            return date.formatted(
+                .dateTime.month(.twoDigits).day(.twoDigits).hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
+            )
+        default:
+            return date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+        }
+    }
+
     private var historyPanel: some View {
         statsPanel(title: "历史", symbol: "calendar") {
-            Chart(summary.history) { day in
-                LineMark(
-                    x: .value("日期", day.date, unit: .day),
-                    y: .value("字符数", day.characterCount),
-                    series: .value("系列", "字符数")
-                )
-                .interpolationMethod(.monotone)
-                .foregroundStyle(accent)
-                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                LineMark(
-                    x: .value("日期", day.date, unit: .day),
-                    y: .value("峰值", day.peakCharactersPerSecond),
-                    series: .value("系列", "峰值")
-                )
-                .foregroundStyle(Color.zislaInfo)
-                .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
-            }
-            .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: 7)) {
-                    AxisGridLine().foregroundStyle(Color.dividerSubtle)
-                    AxisValueLabel(format: .dateTime.month(.twoDigits).day(.twoDigits))
-                }
-            }
-            .chartYAxis {
-                AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) {
-                    AxisGridLine().foregroundStyle(Color.dividerSubtle)
-                    AxisValueLabel()
-                }
-            }
-            .frame(height: 110)
+            historyChart
+                .frame(height: 110)
         }
+    }
+
+    private var historyChart: some View {
+        let now = Date()
+        let domain = Self.historyAxisDomain(for: summary.history, now: now)
+        let axisDates = Self.historyAxisDates(for: summary.history, now: now)
+
+        return Chart(summary.history) { day in
+            LineMark(
+                x: .value("日期", day.date, unit: .day),
+                y: .value("字符数", day.characterCount),
+                series: .value("系列", "字符数")
+            )
+            .interpolationMethod(.monotone)
+            .foregroundStyle(accent)
+            .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            LineMark(
+                x: .value("日期", day.date, unit: .day),
+                y: .value("峰值", day.peakCharactersPerSecond),
+                series: .value("系列", "峰值")
+            )
+            .foregroundStyle(Color.zislaInfo)
+            .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
+        }
+        .chartXScale(domain: domain)
+        .chartXAxis {
+            AxisMarks(values: axisDates) {
+                AxisGridLine().foregroundStyle(Color.dividerSubtle)
+                AxisValueLabel(format: .dateTime.month(.twoDigits).day(.twoDigits))
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) {
+                AxisGridLine().foregroundStyle(Color.dividerSubtle)
+                AxisValueLabel()
+            }
+        }
+    }
+
+    static func historyAxisDomain(
+        for history: [KeyboardTypingStatsDaySummary],
+        now: Date,
+        calendar: Calendar = .current
+    ) -> ClosedRange<Date> {
+        let today = calendar.startOfDay(for: now)
+        let historyDates = history.map { calendar.startOfDay(for: $0.date) }
+        let start = min(today, historyDates.min() ?? today)
+        let end = max(today, historyDates.max() ?? today)
+        guard start < end else {
+            let previousDay = calendar.date(byAdding: .day, value: -1, to: end)
+                ?? end.addingTimeInterval(-86_400)
+            return previousDay...end
+        }
+        return start...end
+    }
+
+    static func historyAxisDates(
+        for history: [KeyboardTypingStatsDaySummary],
+        now: Date,
+        calendar: Calendar = .current,
+        desiredCount: Int = 7
+    ) -> [Date] {
+        let domain = historyAxisDomain(for: history, now: now, calendar: calendar)
+        let dayCount = max(
+            1,
+            calendar.dateComponents([.day], from: domain.lowerBound, to: domain.upperBound).day ?? 0
+        )
+        let tickCount = max(2, desiredCount)
+        let offsets = Set((0..<tickCount).map { index in
+            Int((Double(dayCount) * Double(index) / Double(tickCount - 1)).rounded())
+        })
+        let dates = offsets.compactMap {
+            calendar.date(byAdding: .day, value: $0, to: domain.lowerBound)
+        }
+        return Array(Set(dates + [calendar.startOfDay(for: now)])).sorted()
     }
 
     private var keyboardPanel: some View {
@@ -198,10 +299,31 @@ struct KeyboardTypingStatsDashboardView: View {
             Text(title)
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
-            Text(count.formatted(.number))
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+            Text(Self.compactCountText(count))
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .monospacedDigit()
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(count.formatted(.number))
+    }
+
+    static func compactCountText(_ count: Int64) -> String {
+        let normalized = max(0, count)
+        if normalized >= 10_000 {
+            return compactCountText(normalized, divisor: 10_000, suffix: "w")
+        }
+        if normalized >= 1_000 {
+            return compactCountText(normalized, divisor: 1_000, suffix: "k")
+        }
+        return normalized.formatted(.number)
+    }
+
+    private static func compactCountText(_ count: Int64, divisor: Int64, suffix: String) -> String {
+        let tenths = Int64((Double(count) * 10 / Double(divisor)).rounded())
+        let whole = tenths / 10
+        let fraction = tenths % 10
+        return fraction == 0 ? "\(whole)\(suffix)" : "\(whole).\(fraction)\(suffix)"
     }
 
     private var applicationPanel: some View {
@@ -473,9 +595,11 @@ private struct KeyboardHeatmapView: View {
                     .minimumScaleFactor(0.65)
             }
             if !compact, key.keyCode != nil {
-                Text("\(todayCount.formatted(.number)) / \(allTimeCount.formatted(.number))")
-                    .font(.system(size: 8, design: .monospaced))
+                Text("\(KeyboardTypingStatsDashboardView.compactCountText(todayCount)) / \(KeyboardTypingStatsDashboardView.compactCountText(allTimeCount))")
+                    .font(.system(size: 7, design: .monospaced))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
         .frame(width: max(10, unit * key.widthUnits), height: compact ? 22 : 38)
