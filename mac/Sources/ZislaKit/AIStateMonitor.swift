@@ -173,6 +173,7 @@ public final class AIStateMonitor: ObservableObject {
             QwenSessionActivityDetector(maxRuntimeFiles: 4, initialTailBytes: 256 * 1_024),
             QoderSessionActivityDetector(maxLogFiles: 4, initialTailBytes: 256 * 1_024),
             ZCodeSessionActivityDetector(),
+            ZedSessionActivityDetector(),
             TraeSessionActivityDetector(maxLogFiles: 4, tailBytes: 256 * 1_024),
             OpenCodeSessionActivityDetector(maxSessions: 4),
             PiSessionActivityDetector(maxSessionFiles: 4),

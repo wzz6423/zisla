@@ -32,6 +32,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     case qwen
     case coder
     case zcode
+    case zed
     case trae
     case opencode
     case pi
@@ -57,6 +58,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .qwen: self = .qwen
         case .coder: self = .coder
         case .zcode: self = .zcode
+        case .zed: self = .zed
         case .trae: self = .trae
         case .opencode: self = .opencode
         case .pi: self = .pi
@@ -89,6 +91,8 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
             self = .coder
         } else if id.contains("zcode") {
             self = .zcode
+        } else if id.contains("zed") {
+            self = .zed
         } else if id.contains("trae") {
             self = .trae
         } else if id.contains("opencode") {
@@ -123,6 +127,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .qwen: .qwen
         case .coder: .coder
         case .zcode: .zcode
+        case .zed: .zed
         case .trae: .trae
         case .opencode: .opencode
         case .pi: .pi
@@ -203,6 +208,12 @@ struct AIMascotView: View {
         case .trae:
             return AIMascotImageCache.shared.image(for: "installed|trae") {
                 AIMascotLibrary.installedTraeApplicationURL().map {
+                    NSWorkspace.shared.icon(forFile: $0.path)
+                }
+            }
+        case .zed:
+            return AIMascotImageCache.shared.image(for: "installed|zed") {
+                AIMascotLibrary.installedZedApplicationURL().map {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }

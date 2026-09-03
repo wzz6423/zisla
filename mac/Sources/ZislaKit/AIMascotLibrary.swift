@@ -26,6 +26,14 @@ public enum AIMascotLibrary {
         "TRAE SOLO CN",
     ]
 
+    public static let zedBundleIdentifiers = [
+        "dev.zed.Zed",
+    ]
+
+    public static let zedApplicationNames = [
+        "Zed",
+    ]
+
     /// The harnext data directory's product uses the WorkBuddy official client icon.
     public static let workBuddyBundleIdentifiers = [
         "com.workbuddy.workbuddy",
@@ -70,6 +78,25 @@ public enum AIMascotLibrary {
         installedApplicationURL(
             bundleIdentifiers: traeBundleIdentifiers,
             applicationNames: traeApplicationNames,
+            resolveBundleIdentifier: resolveBundleIdentifier,
+            applicationDirectories: applicationDirectories,
+            fileExists: fileExists
+        )
+    }
+
+    public static func installedZedApplicationURL(
+        resolveBundleIdentifier: (String) -> URL? = {
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0)
+        },
+        applicationDirectories: [URL] = FileManager.default.urls(
+            for: .applicationDirectory,
+            in: .allDomainsMask
+        ),
+        fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL? {
+        installedApplicationURL(
+            bundleIdentifiers: zedBundleIdentifiers,
+            applicationNames: zedApplicationNames,
             resolveBundleIdentifier: resolveBundleIdentifier,
             applicationDirectories: applicationDirectories,
             fileExists: fileExists
@@ -131,6 +158,7 @@ public enum AIMascotLibrary {
         case .qwen: "qwen-color.svg"
         case .coder: "qoder.icns"
         case .zcode: "zcode.icns"
+        case .zed: "zed.icns"
         case .trae: "trae.icns"
         case .opencode: "opencode.svg"
         case .pi: "pi.svg"
@@ -171,6 +199,7 @@ public enum AIMascotLibrary {
         case .qwen: "千问"
         case .coder: "Qoder"
         case .zcode: "ZCode"
+        case .zed: "Zed"
         case .trae: "TRAE"
         case .opencode: "opencode"
         case .pi: "Pi"

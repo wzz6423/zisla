@@ -77,6 +77,27 @@ struct AIMascotLibraryTests {
     }
 
     @Test
+    func installedZedURLPrefersBundleIdentifierThenApplicationName() {
+        let bundleMatched = URL(fileURLWithPath: "/Applications/Zed.app", isDirectory: true)
+        let byBundleIdentifier = AIMascotLibrary.installedZedApplicationURL(
+            resolveBundleIdentifier: { $0 == "dev.zed.Zed" ? bundleMatched : nil },
+            applicationDirectories: [],
+            fileExists: { _ in false }
+        )
+        #expect(byBundleIdentifier == bundleMatched)
+
+        let directory = URL(fileURLWithPath: "/Applications")
+        let byName = AIMascotLibrary.installedZedApplicationURL(
+            resolveBundleIdentifier: { _ in nil },
+            applicationDirectories: [directory],
+            fileExists: {
+                $0 == directory.appendingPathComponent("Zed.app", isDirectory: true)
+            }
+        )
+        #expect(byName == bundleMatched)
+    }
+
+    @Test
     func installedWorkBuddyURLPrefersBundleIdentifierThenApplicationName() {
         let bundleMatched = URL(fileURLWithPath: "/Applications/WorkBuddy.app", isDirectory: true)
         let byBundleIdentifier = AIMascotLibrary.installedWorkBuddyApplicationURL(
@@ -114,6 +135,7 @@ struct AIMascotLibraryTests {
         #expect(AIMascotLibrary.providerAssetName(for: .harness) == "workbuddy.icns")
         #expect(AIMascotLibrary.providerAssetName(for: .doubao) == "doubao.png")
         #expect(AIMascotLibrary.providerAssetName(for: .zcode) == "zcode.icns")
+        #expect(AIMascotLibrary.providerAssetName(for: .zed) == "zed.icns")
     }
 
     @Test

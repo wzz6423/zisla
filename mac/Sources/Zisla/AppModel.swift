@@ -3307,7 +3307,7 @@ final class AppModel: ObservableObject {
     switch provider {
     case .claude, .gemini, .qwen, .trae, .doubao: .left
     case .pi: .right
-    case .codex, .grok, .gpt, .copilot, .kimi, .coder, .zcode, .opencode, .harness: .right
+    case .codex, .grok, .gpt, .copilot, .kimi, .coder, .zcode, .zed, .opencode, .harness: .right
     }
   }
 

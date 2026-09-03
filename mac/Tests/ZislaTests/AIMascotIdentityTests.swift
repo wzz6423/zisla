@@ -23,4 +23,10 @@ struct AIMascotIdentityTests {
     func recognizesDeepSeekHarnessUpdateNoticeID() {
         #expect(AIMascotIdentity(noticeID: "update-available-cli-dsh-left") == .deepseekHarness)
     }
+
+    @Test
+    func mapsZedProviderAndActivityNotice() {
+        #expect(AIMascotIdentity(provider: .zed, taskID: "zed-thread-1") == .zed)
+        #expect(AIMascotIdentity(noticeID: "ai-active-zed-zed-thread-1") == .zed)
+    }
 }

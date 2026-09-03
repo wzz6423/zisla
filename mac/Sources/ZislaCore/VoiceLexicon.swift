@@ -254,7 +254,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
     /// When adding an AI provider supported by the app, this exhaustive switch requires its dedicated terms to be added here as well.
     private static let supportedAIProviderTerms: [String] = AIProvider.allCases.flatMap { provider -> [String] in
         switch provider {
-        case .claude, .codex, .gemini, .grok, .copilot, .opencode, .pi:
+        case .claude, .codex, .gemini, .grok, .copilot, .zed, .opencode, .pi:
             []
         case .gpt:
             ["GPT", "OpenAI", "ChatGPT"]

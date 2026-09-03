@@ -31,6 +31,13 @@ struct AIStateMonitorActivityDetectorTests {
     }
 
     @Test @MainActor
+    func defaultActivityDetectorsIncludeZedAgentThreads() {
+        #expect(AIStateMonitor.defaultActivityDetectors().contains {
+            $0 is ZedSessionActivityDetector
+        })
+    }
+
+    @Test @MainActor
     func defaultActivityDetectorsIncludePiSessions() {
         #expect(AIStateMonitor.defaultActivityDetectors().contains {
             $0 is PiSessionActivityDetector
