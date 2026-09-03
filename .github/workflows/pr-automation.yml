@@ -1,0 +1,154 @@
+name: PR Automation
+
+on:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] Only the default branch is checked out.
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  automate:
+    name: PR Automation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write # Required to create the labels declared by the contract.
+      pull-requests: write # Required to label and assign the pull request.
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Read pull request metadata
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          ruby .github/scripts/pr-metadata.rb json \
+            --body-file "$RUNNER_TEMP/pr-body.md" > "$RUNNER_TEMP/metadata.json"
+          ruby .github/scripts/pr-metadata.rb labels > "$RUNNER_TEMP/contract-labels.json"
+          cat "$RUNNER_TEMP/metadata.json"
+
+      - name: Create missing labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/labels?per_page=100" \
+            | jq 'flatten(1) | [.[].name]' > "$RUNNER_TEMP/existing-labels.json"
+
+          jq -r --slurpfile have "$RUNNER_TEMP/existing-labels.json" \
+            '.[] | select(($have[0] | index(.label)) == null)
+             | [.label, .color, .description] | @tsv' \
+            "$RUNNER_TEMP/contract-labels.json" > "$RUNNER_TEMP/missing-labels.tsv"
+
+          while IFS=$'\t' read -r name color description; do
+            [ -n "$name" ] || continue
+            jq -n --arg name "$name" --arg color "$color" --arg description "$description" \
+              '{name: $name, color: $color, description: $description}' \
+              | gh api --method POST "repos/$GITHUB_REPOSITORY/labels" --input - >/dev/null
+            echo "::notice::Created label $name"
+          done < "$RUNNER_TEMP/missing-labels.tsv"
+
+      - name: Apply contract labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          metadata="$RUNNER_TEMP/metadata.json"
+          current="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" --jq '[.[].name]')"
+
+          # Only labels this contract owns are removed, so skip-ci and any
+          # manually curated label survive an edit.
+          printf '%s' "$current" | jq -r --slurpfile meta "$metadata" \
+            '. - $meta[0].labels | map(select(. as $name | $meta[0].managedLabels | index($name))) | .[]' \
+            > "$RUNNER_TEMP/stale-labels.txt"
+
+          while IFS= read -r label; do
+            [ -n "$label" ] || continue
+            gh api --method DELETE \
+              "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$label" >/dev/null
+            echo "::notice::Removed stale label $label"
+          done < "$RUNNER_TEMP/stale-labels.txt"
+
+          if [ "$(jq '.labels | length' "$metadata")" -eq 0 ]; then
+            echo '::warning::The body declares no type, so no label was applied.'
+            exit 0
+          fi
+
+          jq '{labels: .labels}' "$metadata" \
+            | gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" \
+              --input - >/dev/null
+          echo "::notice::Applied $(jq -r '.labels | join(", ")' "$metadata")"
+
+      - name: Ensure the pull request has an assignee
+        if: ${{ !endsWith(github.event.pull_request.user.login, '[bot]') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.assignees | length')" -gt 0 ]; then
+            exit 0
+          fi
+
+          jq -n --arg login "$PR_AUTHOR" '{assignees: [$login]}' \
+            | gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/assignees" \
+              --input - >/dev/null
+          echo "::notice::Assigned $PR_AUTHOR"
+
+      - name: Verify AI co-authorship
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          metadata="$RUNNER_TEMP/metadata.json"
+          agent="$(jq -r '.agent // empty' "$metadata")"
+          if [ -z "$agent" ]; then
+            exit 0
+          fi
+
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits" \
+            | jq 'flatten(1) | [.[].commit.message]' > "$RUNNER_TEMP/commit-messages.json"
+
+          # An agent may only be declared when it also signed the commits, which
+          # is the only co-attribution GitHub records for a non-account author.
+          missing="$(jq -r --slurpfile messages "$RUNNER_TEMP/commit-messages.json" '
+            ($messages[0] | map(ascii_downcase | gsub("[ \t]+"; " "))) as $bodies
+            | [.coAuthors[]
+               | . as $trailer
+               | ("co-authored-by: " + ($trailer | ascii_downcase | gsub("[ \t]+"; " "))) as $needle
+               | select($bodies | any(contains($needle)) | not)]
+            | join("; ")
+          ' "$metadata")"
+
+          if [ -n "$missing" ]; then
+            echo "::error::Agent $agent is declared but these trailers are on no commit: $missing"
+            echo 'Amend the commits with the same Co-authored-by trailer, or set Agent: None.'
+            exit 1
+          fi
+
+          echo "::notice::Verified co-authorship for $agent"
+
+      - name: Remove pull request metadata files
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/pr-body.md" "$RUNNER_TEMP/metadata.json" \
+            "$RUNNER_TEMP/contract-labels.json" "$RUNNER_TEMP/existing-labels.json" \
+            "$RUNNER_TEMP/missing-labels.tsv" "$RUNNER_TEMP/stale-labels.txt" \
+            "$RUNNER_TEMP/commit-messages.json"

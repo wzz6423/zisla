@@ -16,61 +16,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  gate:
+    name: Skip Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      skip: ${{ steps.gate.outputs.skip }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - id: gate
+        uses: ./.github/actions/ci-skip-gate
+        with:
+          workflow-name: PR Quality Gates
+          github-token: ${{ github.token }}
+
   validate:
     name: PR Quality
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
       - name: Validate title and body
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
+          printf '%s' "$PR_TITLE" > "$RUNNER_TEMP/pr-title.txt"
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          ruby .github/scripts/pr-metadata.rb validate \
+            --title-file "$RUNNER_TEMP/pr-title.txt" \
+            --body-file "$RUNNER_TEMP/pr-body.md"
 
-          title_pattern='^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\([a-z0-9][a-z0-9-]*\))?!?: [ -~]+$'
-          if [[ ! "$PR_TITLE" =~ $title_pattern ]]; then
-            echo "PR title must use an English Conventional Commit subject."
-            echo "Example: feat(ci): add pull request quality gates"
-            exit 1
-          fi
-
-          require_section() {
-            if ! printf '%s\n' "$PR_BODY" | grep -Fqx "## $1"; then
-              echo "Missing required section: ## $1"
-              exit 1
-            fi
-          }
-
-          require_section "Summary"
-          require_section "Validation"
-          require_section "Risk and Rollback"
-
-          validation_section="$(printf '%s\n' "$PR_BODY" | awk '
-            $0 == "## Validation" { in_section = 1; next }
-            in_section && /^## / { exit }
-            in_section { print }
-          ')"
-
-          status="$(printf '%s\n' "$validation_section" | sed -nE 's/^[[:space:]]*-[[:space:]]*Status:[[:space:]]*(passed|failed|not run)[[:space:]]*$/\1/p' | head -n 1)"
-          if [[ -z "$status" ]]; then
-            echo "Validation must declare one exact status: passed, failed, or not run."
-            exit 1
-          fi
-
-          require_field() {
-            local value
-            value="$(printf '%s\n' "$validation_section" | sed -nE "s/^[[:space:]]*-[[:space:]]*$1:[[:space:]]*(.*)$/\\1/p" | head -n 1)"
-            case "$value" in
-              ''|'<!--'*)
-                echo "Validation must include a non-empty $1 field."
-                exit 1
-                ;;
-            esac
-          }
-
-          if [[ "$status" == "not run" ]]; then
-            require_field "Reason"
-          else
-            require_field "Command"
-            require_field "Result"
-          fi
+      - name: Remove pull request metadata files
+        if: always()
+        run: rm -f "$RUNNER_TEMP/pr-title.txt" "$RUNNER_TEMP/pr-body.md"

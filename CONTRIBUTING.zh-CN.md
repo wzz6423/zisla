@@ -41,15 +41,20 @@ swift test
   - `docs: update contributing guidelines`
   允许的类型：`feat`、`fix`、`docs`、`style`、`refactor`、`perf`、`test`、`chore`、`build`、`ci`、`revert`。
 
-- **PR 正文**必须使用英文并包含 `Summary`、`Validation`、`Risk and Rollback` 三节。`Validation` 中每项都必须声明 `passed`、`failed` 或 `not run`：
-  - `passed` 或 `failed` 必须写明执行命令与实际结果。
-  - `not run` 必须说明未执行的原因。
+- **PR 正文**必须使用英文，并包含 `.github/PULL_REQUEST_TEMPLATE.md` 提供的 `Summary`、`PR Type`、`Validation`、`Risk and Rollback`、`Related Issue`、`AI Attribution` 六节。
+  - `PR Type` 只写一条 `- Type:`，且必须与标题中的类型一致。`PR Automation` 会据此打标签，例如 `fix` 对应 `bug`。
+  - `Validation` 中每项都必须声明 `passed`、`failed` 或 `not run`：前两者需要 `Command` 与 `Result`，后者需要 `Reason`。
+  - `Related Issue` 要么用 `Closes #123` 之类的关键字关联 Issue（同时自动打上 `development`），要么写成 `None`。
+  - `AI Attribution` 必须声明 `- Agent:`。声明了具体 agent 时，必须补一条 `- Co-authored-by: Name <email>`，并且该 trailer 必须真实出现在至少一个 commit 上，同时会自动打上 `ai-assisted`。
 
   正文示例：
 
   ```markdown
   ## Summary
   - Add a repository hygiene check.
+
+  ## PR Type
+  - Type: ci
 
   ## Validation
   - Status: passed
@@ -59,12 +64,34 @@ swift test
   ## Risk and Rollback
   - Risk: Only repository automation is affected.
   - Rollback: Revert this pull request.
+
+  ## Related Issue
+  Closes #123
+
+  ## AI Attribution
+  - Agent: Claude Code
+  - Co-authored-by: Claude <noreply@anthropic.com>
   ```
 
-- `PR Quality` 检查会自动验证上述格式；状态检查未通过时不能合并。
-
-- 使用 PR 模板，说明变更、验证方式和关联 Issue。
+- `PR Quality` 检查会自动验证上述格式；状态检查未通过时不能合并。随后 `PR Automation` 负责打标签与指派。
 - macOS 代码变更必须运行 `cd mac && swift test`；涉及界面时请补充实际验证说明或截图。
 - 更新用户可见行为、构建方式或发布流程时，同步更新相应文档。
 - 不要提交 `.build`、`dist`、下载文件、日志、令牌、签名材料或其他个人数据。
 - `main` 和 `publish-v*` 受保护，只能通过检查并完成评审的 PR 合并。
+
+## 跳过 CI
+
+当改动确实不可能影响某些检查时（例如纯文档修改），维护者与被请求的 reviewer 可以跳过它们。在 PR 评论中单独一行写下指令：
+
+| 指令 | 效果 |
+| --- | --- |
+| `skip-all` | 跳过 `.github/ci-skip.json` 中列出的所有工作流。 |
+| `skip-<workflow>` | 按名称或别名跳过单个工作流，例如 `skip-swift`、`skip-web`。 |
+| `unskip-all` | 取消所有跳过指令。 |
+| `unskip-<workflow>` | 恢复单个工作流。 |
+
+- 指令后面可以接自由文本，例如 `skip-all: documentation only change`。
+- 只有仓库 owner、组织成员、协作者或被请求的 reviewer 的指令才生效，机器人评论一律忽略。
+- `CI Skip` 会取消正在运行的任务，把被跳过的检查标记为成功以满足必需检查，打上 `skip-ci` 标签，并复用同一条评论汇总当前决策。
+- 每次评论都会重放整个评论区，因此最新的指令始终生效。
+- `.github/ci-skip.json` 记录了每个工作流发布的检查名；清单与工作流不一致时 `Test CI Scripts` 会失败。

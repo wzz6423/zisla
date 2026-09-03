@@ -1,0 +1,70 @@
+{
+  "comment": "Pull request workflows that CI skip directives can bypass. 'checks' lists every check name the workflow publishes, including matrix expansions, so the skip processor can report them as successful. The Test CI Scripts job fails when this file drifts from .github/workflows.",
+  "workflows": [
+    {
+      "name": "CI Lint",
+      "file": "ci-lint.yml",
+      "aliases": ["lint", "actionlint"],
+      "checks": ["Lint Workflows", "Audit Workflow Security", "Test CI Scripts"]
+    },
+    {
+      "name": "Core Tests",
+      "file": "core-build.yml",
+      "aliases": ["windows", "core"],
+      "checks": [
+        "Windows Core (Debug)",
+        "Windows Core (Release)",
+        "Windows Core Tests",
+        "Windows App Build",
+        "CodeQL (C/C++)"
+      ]
+    },
+    {
+      "name": "Swift Tests",
+      "file": "swift-tests.yml",
+      "aliases": ["swift", "mac"],
+      "checks": [
+        "Swift Tests",
+        "Build zislactl (Release)",
+        "App Build Smoke Test",
+        "CodeQL (swift)"
+      ]
+    },
+    {
+      "name": "Web CI",
+      "file": "web-ci.yml",
+      "aliases": ["web"],
+      "checks": ["Web Build & Test", "CodeQL (JavaScript)"]
+    },
+    {
+      "name": "Skill CI",
+      "file": "skill-ci.yml",
+      "aliases": ["skills"],
+      "checks": ["Validate Skills"]
+    },
+    {
+      "name": "Repository Hygiene",
+      "file": "repository-hygiene.yml",
+      "aliases": ["hygiene"],
+      "checks": ["Repository Hygiene"]
+    },
+    {
+      "name": "PR Quality Gates",
+      "file": "pr-quality-gates.yml",
+      "aliases": ["quality", "pr-quality"],
+      "checks": ["PR Quality"]
+    },
+    {
+      "name": "CodeQL",
+      "file": "codeql.yml",
+      "aliases": ["codeql-actions"],
+      "checks": ["CodeQL (actions)"]
+    },
+    {
+      "name": "Dependency Review",
+      "file": "dependency-review.yml",
+      "aliases": ["deps", "dependencies"],
+      "checks": ["Dependency Review"]
+    }
+  ]
+}

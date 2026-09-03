@@ -1,0 +1,195 @@
+name: CI Skip
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Apply Skip Directives
+    # Skip directives only exist on pull requests, and the summary comment must
+    # never trigger the workflow again.
+    if: >-
+      github.event.issue.pull_request != null &&
+      contains(github.event.comment.body, 'skip-') &&
+      !endsWith(github.event.comment.user.login, '[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: write # Required to cancel the runs a directive skips.
+      checks: write # Required to report skipped checks as successful.
+      issues: write # Required to manage the skip label.
+      pull-requests: write # Required to comment the applied decision.
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Resolve skip directives
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pull-request.json"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+            | jq 'flatten(1)' > "$RUNNER_TEMP/comments-raw.json"
+
+          jq '[.requested_reviewers[]?.login]' "$RUNNER_TEMP/pull-request.json" > "$RUNNER_TEMP/reviewers.json"
+          jq '[.[] | {login: .user.login, association: .author_association, body: .body}]' \
+            "$RUNNER_TEMP/comments-raw.json" > "$RUNNER_TEMP/comments.json"
+
+          ruby .github/scripts/ci-skip-directives.rb resolve \
+            --comments "$RUNNER_TEMP/comments.json" \
+            --reviewers "$RUNNER_TEMP/reviewers.json" > "$RUNNER_TEMP/decision.json"
+
+          {
+            echo "head-sha=$(jq -r '.head.sha' "$RUNNER_TEMP/pull-request.json")"
+            echo "workflow-count=$(jq '.workflows | length' "$RUNNER_TEMP/decision.json")"
+          } >> "$GITHUB_OUTPUT"
+
+          cat "$RUNNER_TEMP/decision.json"
+
+      - name: Synchronize skip label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          SKIP_COUNT: ${{ steps.resolve.outputs.workflow-count }}
+        run: |
+          set -euo pipefail
+
+          label="$(jq -r '.skipLabel.label' .github/pr-automation.json)"
+
+          if [ "$SKIP_COUNT" -eq 0 ]; then
+            gh api --method DELETE \
+              "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$label" >/dev/null 2>&1 || true
+            exit 0
+          fi
+
+          gh label create "$label" \
+            --color "$(jq -r '.skipLabel.color' .github/pr-automation.json)" \
+            --description "$(jq -r '.skipLabel.description' .github/pr-automation.json)" \
+            --force
+          gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" \
+            --input - >/dev/null <<< "$(jq -n --arg label "$label" '{labels: [$label]}')"
+
+      - name: Cancel skipped runs
+        if: steps.resolve.outputs.workflow-count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.resolve.outputs.head-sha }}
+        run: |
+          set -euo pipefail
+
+          gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$HEAD_SHA&per_page=100" \
+            | jq '[.[].workflow_runs[]]' > "$RUNNER_TEMP/runs.json"
+
+          while IFS= read -r workflow; do
+            WORKFLOW_NAME="$workflow" jq -r \
+              '.[] | select(.name == env.WORKFLOW_NAME and .status != "completed") | .id' \
+              "$RUNNER_TEMP/runs.json" \
+            | while IFS= read -r run_id; do
+              echo "::notice::Cancelling run $run_id of $workflow"
+              gh api --method POST \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/cancel" >/dev/null || true
+            done
+          done < <(jq -r '.workflows[]' "$RUNNER_TEMP/decision.json")
+
+      - name: Report skipped checks as successful
+        if: steps.resolve.outputs.workflow-count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.resolve.outputs.head-sha }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+
+          summary="Skipped by a maintainer directive on pull request #$PR_NUMBER."
+
+          while IFS= read -r check; do
+            jq -n --arg name "$check" --arg sha "$HEAD_SHA" --arg summary "$summary" \
+              '{
+                name: $name,
+                head_sha: $sha,
+                status: "completed",
+                conclusion: "success",
+                output: {title: "CI skipped", summary: $summary}
+              }' \
+              | gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input - >/dev/null
+            echo "::notice::Reported $check as successful"
+          done < <(jq -r '.checks[]' "$RUNNER_TEMP/decision.json")
+
+      - name: Comment the applied decision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MARKER: "<!-- ci-skip-summary -->"
+          PR_NUMBER: ${{ github.event.issue.number }}
+          SKIP_COUNT: ${{ steps.resolve.outputs.workflow-count }}
+        run: |
+          set -euo pipefail
+
+          decision="$RUNNER_TEMP/decision.json"
+          summary="$RUNNER_TEMP/summary.md"
+          # Directives are rendered as inline code so the summary can never be
+          # parsed as a directive itself.
+          {
+            echo "$MARKER"
+            echo
+            echo '### CI skip directives'
+            echo
+            if [ "$SKIP_COUNT" -eq 0 ]; then
+              echo 'No directive is active. Every workflow runs normally.'
+            else
+              printf 'Skipped workflows: %s\n\n' \
+                "$(jq -r '[.workflows[] | "`" + . + "`"] | join(", ")' "$decision")"
+              printf 'Checks reported as successful: %s\n\n' \
+                "$(jq -r '[.checks[] | "`" + . + "`"] | join(", ")' "$decision")"
+              echo 'Requested by:'
+              echo
+              jq -r '.directives[] | "- `" + .login + "` wrote `" + .directive + "`"
+                + (if (.note | length) == 0 then "" else " — " + .note end)' "$decision"
+              echo
+            fi
+            unknown="$(jq -r '[.unknown[] | "`" + . + "`"] | join(", ")' "$decision")"
+            if [ -n "$unknown" ]; then
+              printf 'Ignored unknown targets: %s\n\n' "$unknown"
+            fi
+            # shellcheck disable=SC2016 # The backticks are literal markdown.
+            echo 'Comment `unskip-all` or `unskip-<workflow>` to restore the checks.'
+          } > "$summary"
+
+          existing="$(MARKER="$MARKER" jq -r '
+            map(select(.user.login == "github-actions[bot]"
+              and (.body | contains(env.MARKER)))) | last | .id // empty
+          ' "$RUNNER_TEMP/comments-raw.json")"
+
+          payload="$RUNNER_TEMP/comment.json"
+          jq -n --rawfile body "$summary" '{body: $body}' > "$payload"
+
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" \
+              --input "$payload" >/dev/null
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+              --input "$payload" >/dev/null
+          fi
+
+      - name: Remove resolved directive files
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/pull-request.json" "$RUNNER_TEMP/comments-raw.json" \
+            "$RUNNER_TEMP/comments.json" "$RUNNER_TEMP/reviewers.json" \
+            "$RUNNER_TEMP/decision.json" "$RUNNER_TEMP/runs.json" \
+            "$RUNNER_TEMP/summary.md" "$RUNNER_TEMP/comment.json"
