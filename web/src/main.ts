@@ -2,12 +2,14 @@ import {
   ArrowDownToLine,
   ArrowUpRight,
   Bot,
+  ChartNoAxesColumnIncreasing,
   Check,
   Code2,
   Copy,
   Download,
   ExternalLink,
   Image,
+  Keyboard,
   Lock,
   Menu,
   Mic,
@@ -57,12 +59,14 @@ const siteIcons = {
   ArrowDownToLine,
   ArrowUpRight,
   Bot,
+  ChartNoAxesColumnIncreasing,
   Check,
   Code2,
   Copy,
   Download,
   ExternalLink,
   Image,
+  Keyboard,
   Lock,
   Menu,
   Mic,
@@ -322,7 +326,7 @@ app.innerHTML = `
         <div class="download-copy-block reveal-step" style="--reveal-index: 0">
           <p class="eyebrow">READY WHEN YOU ARE</p>
           <h2 class="download-title">下载 zisla</h2>
-          <p class="download-copy">适用于 Apple 芯片 Mac；版本、其他架构与校验信息均在 Release 页面。安装后可按更新通道检查新版本，并选择手动或自动下载安装包。</p>
+          <p class="download-copy">适用于 Apple 芯片 Mac；版本、其他架构与校验信息均在 Release 页面。安装后可按更新通道检查新版本，Sparkle 会先验证签名，再按设置手动或自动下载、安装并重启。</p>
           <div class="download-actions">
             <a class="button button-light" href="${latestRelease.dmg}" download aria-label="下载">${icon('download', 16)}下载</a>
             <a class="button button-ghost" href="${latestRelease.releasePage}" target="_blank" rel="noreferrer" aria-label="在 GitHub 上查看发布详情">${icon('external-link', 16)}查看 Release</a>
