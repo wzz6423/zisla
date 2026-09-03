@@ -134,11 +134,15 @@ for ARCHITECTURE in arm64 x86_64 universal; do
   codesign --verify --deep --strict --verbose=4 "$STAGING_DIRECTORY/$ARCHITECTURE/zisla.app"
   ARCHES="$(lipo -archs "$STAGING_DIRECTORY/$ARCHITECTURE/zisla.app/Contents/MacOS/zisla")"
   if [[ "$ARCHITECTURE" == universal ]]; then
-    test "$ARCHES" = "arm64 x86_64"
+    # lipo reports fat-header order, which is x86_64 first, so compare as a sorted set.
+    test "$(print -rl -- ${(s: :)ARCHES} | sort | paste -sd' ' -)" = "arm64 x86_64"
   else
     test "$ARCHES" = "$ARCHITECTURE"
   fi
-  shasum -a 256 "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-${ARCHITECTURE}.dmg"
+  # The checksum files carry bare file names, so verify them from inside the output directory.
+  (cd "$RELEASE_OUTPUT_DIRECTORY" && shasum -a 256 -c \
+    "zisla-v${VERSION}-macOS-${ARCHITECTURE}.dmg.sha256" \
+    "zisla-v${VERSION}-macOS-${ARCHITECTURE}.zip.sha256")
   hdiutil attach -nobrowse "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-${ARCHITECTURE}.dmg"
   test -L /Volumes/zisla/Applications
   hdiutil detach /Volumes/zisla
