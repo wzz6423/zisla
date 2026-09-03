@@ -2328,6 +2328,31 @@ enum ScreenshotToolbarLayout {
     }
 }
 
+enum ScreenshotToolPopoverPlacement {
+    static func preferredEdge(
+        toolbarFrame: CGRect,
+        selectionRect: CGRect?,
+        bounds: CGRect
+    ) -> Edge {
+        guard let selectionRect, !selectionRect.isEmpty else { return .bottom }
+
+        let toolbar = toolbarFrame.standardized
+        let selection = selectionRect.standardized
+        let overlapAbove = max(0, toolbar.minY - selection.minY)
+        let overlapBelow = max(0, selection.maxY - toolbar.maxY)
+
+        if overlapAbove == 0, overlapBelow > 0 { return .top }
+        if overlapBelow == 0, overlapAbove > 0 { return .bottom }
+        if overlapAbove != overlapBelow {
+            return overlapAbove < overlapBelow ? .top : .bottom
+        }
+
+        let aboveSpace = max(0, toolbar.minY - bounds.minY)
+        let belowSpace = max(0, bounds.maxY - toolbar.maxY)
+        return aboveSpace > belowSpace ? .top : .bottom
+    }
+}
+
 struct ScreenshotToolbarDragDots: View {
     var body: some View {
         Canvas { context, size in
@@ -3512,6 +3537,17 @@ struct ScreenshotEditorView: View {
                 toolbarSize: toolbarSize,
                 in: bounds
             )
+            let toolbarFrame = CGRect(
+                x: restingToolbarCenter.x - toolbarSize.width / 2,
+                y: restingToolbarCenter.y - toolbarSize.height / 2,
+                width: toolbarSize.width,
+                height: toolbarSize.height
+            )
+            let popoverEdge = ScreenshotToolPopoverPlacement.preferredEdge(
+                toolbarFrame: toolbarFrame,
+                selectionRect: selectionRect,
+                bounds: bounds
+            )
 
             ZStack(alignment: .topLeading) {
                 ScreenshotBackingImage(image: configuration.backgroundImage)
@@ -3549,7 +3585,7 @@ struct ScreenshotEditorView: View {
                         toolbarCenter = newCenter
                     }
                 ) {
-                    toolbar(viewportWidth: toolbarSize.width)
+                    toolbar(viewportWidth: toolbarSize.width, popoverEdge: popoverEdge)
                 }
 
                 ScreenshotSelectionSizeBadge(
@@ -4396,14 +4432,14 @@ struct ScreenshotEditorView: View {
         }
     }
 
-    private func toolbar(viewportWidth: CGFloat) -> some View {
+    private func toolbar(viewportWidth: CGFloat, popoverEdge: Edge = .bottom) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: ScreenshotToolbarLayout.spacing) {
                 toolbarDragHandle
                 ForEach(ScreenshotTool.allCases.filter { $0 != .emoji && $0 != .mosaic }) { tool in
-                    toolButtonWithMenu(tool)
+                    toolButtonWithMenu(tool, popoverEdge: popoverEdge)
                 }
-                obscureButton
+                obscureButton(popoverEdge: popoverEdge)
                 if model.canUndo {
                     iconButton("arrow.uturn.backward", title: "撤销") { model.undo() }
                 }
@@ -4522,7 +4558,7 @@ struct ScreenshotEditorView: View {
         }
     }
 
-    private func toolButtonWithMenu(_ tool: ScreenshotTool) -> some View {
+    private func toolButtonWithMenu(_ tool: ScreenshotTool, popoverEdge: Edge) -> some View {
         Button {
             selectTool(tool)
             activeToolMenuID = tool
@@ -4552,7 +4588,7 @@ struct ScreenshotEditorView: View {
         .popover(isPresented: Binding(
             get: { activeToolMenuID == tool },
             set: { if !$0 { activeToolMenuID = nil } }
-        ), arrowEdge: .bottom) {
+        ), arrowEdge: popoverEdge) {
             toolAttributesMenu(for: tool)
         }
     }
@@ -4595,7 +4631,8 @@ struct ScreenshotEditorView: View {
                 fontSizeSlider
             }
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .frame(height: ScreenshotToolbarLayout.height)
     }
 
     private var colorPicker: some View {
@@ -4661,7 +4698,7 @@ struct ScreenshotEditorView: View {
         model.tool = tool
     }
 
-    private var obscureButton: some View {
+    private func obscureButton(popoverEdge: Edge) -> some View {
         Button {
             selectTool(.mosaic)
             activeToolMenuID = .mosaic
@@ -4690,7 +4727,7 @@ struct ScreenshotEditorView: View {
         .popover(isPresented: Binding(
             get: { activeToolMenuID == .mosaic },
             set: { if !$0 { activeToolMenuID = nil } }
-        ), arrowEdge: .bottom) {
+        ), arrowEdge: popoverEdge) {
             HStack(spacing: 10) {
                 Picker("作用方式", selection: $model.obscureShape) {
                     ForEach(ScreenshotObscureShape.allCases) { shape in
@@ -4723,7 +4760,8 @@ struct ScreenshotEditorView: View {
                     .font(.system(size: 11, design: .monospaced))
                     .frame(width: 18, alignment: .trailing)
             }
-            .padding(10)
+            .padding(.horizontal, 10)
+            .frame(height: ScreenshotToolbarLayout.height)
             .onChange(of: model.obscureShape) { _, _ in selectTool(.mosaic) }
             .onChange(of: model.obscureEffect) { _, _ in selectTool(.mosaic) }
         }

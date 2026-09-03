@@ -172,7 +172,37 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func screenshotToolPopoversPreferBelowToolbar() throws {
+    func screenshotToolPopoverPlacementAvoidsCaptureSelection() {
+        let bounds = CGRect(x: 0, y: 0, width: 1_000, height: 800)
+        let selection = CGRect(x: 200, y: 120, width: 600, height: 500)
+        let toolbarAbove = CGRect(x: 350, y: 40, width: 300, height: ScreenshotToolbarLayout.height)
+        let toolbarBelow = CGRect(x: 350, y: 660, width: 300, height: ScreenshotToolbarLayout.height)
+        let toolbarCentered = CGRect(x: 350, y: 330, width: 300, height: ScreenshotToolbarLayout.height)
+
+        #expect(ScreenshotToolPopoverPlacement.preferredEdge(
+            toolbarFrame: toolbarAbove,
+            selectionRect: selection,
+            bounds: bounds
+        ) == .top)
+        #expect(ScreenshotToolPopoverPlacement.preferredEdge(
+            toolbarFrame: toolbarBelow,
+            selectionRect: selection,
+            bounds: bounds
+        ) == .bottom)
+        #expect(ScreenshotToolPopoverPlacement.preferredEdge(
+            toolbarFrame: toolbarCentered,
+            selectionRect: selection,
+            bounds: bounds
+        ) == .top)
+        #expect(ScreenshotToolPopoverPlacement.preferredEdge(
+            toolbarFrame: toolbarCentered,
+            selectionRect: nil,
+            bounds: bounds
+        ) == .bottom)
+    }
+
+    @Test
+    func screenshotToolPopoversUseContextualPlacement() throws {
         let sourceURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -181,7 +211,7 @@ struct ScreenshotEditorTests {
         let source = try String(contentsOf: sourceURL, encoding: .utf8)
         let toolMenu = try #require(source.range(of: "private func toolButtonWithMenu"))
         let mosaicMenu = try #require(source.range(
-            of: "private var obscureButton",
+            of: "private func obscureButton",
             range: toolMenu.upperBound..<source.endIndex
         ))
         let recognitionMenu = try #require(source.range(
@@ -191,10 +221,32 @@ struct ScreenshotEditorTests {
 
         let toolPopover = source[toolMenu.lowerBound..<mosaicMenu.lowerBound]
         let mosaicPopover = source[mosaicMenu.lowerBound..<recognitionMenu.lowerBound]
-        #expect(toolPopover.contains("arrowEdge: .bottom"))
-        #expect(!toolPopover.contains("arrowEdge: .top"))
-        #expect(mosaicPopover.contains("arrowEdge: .bottom"))
-        #expect(!mosaicPopover.contains("arrowEdge: .top"))
+        #expect(toolPopover.contains("arrowEdge: popoverEdge"))
+        #expect(mosaicPopover.contains("arrowEdge: popoverEdge"))
+    }
+
+    @Test
+    func screenshotToolPopoversMatchToolbarHeight() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zisla/ScreenshotEditorView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let toolMenu = try #require(source.range(of: "private func toolAttributesMenu"))
+        let mosaicMenu = try #require(source.range(
+            of: "private func obscureButton",
+            range: toolMenu.lowerBound..<source.endIndex
+        ))
+        let recognitionMenu = try #require(source.range(
+            of: "private var recognitionMenu",
+            range: mosaicMenu.upperBound..<source.endIndex
+        ))
+
+        let toolPopover = source[toolMenu.lowerBound..<mosaicMenu.lowerBound]
+        let mosaicPopover = source[mosaicMenu.lowerBound..<recognitionMenu.lowerBound]
+        #expect(toolPopover.contains(".frame(height: ScreenshotToolbarLayout.height)"))
+        #expect(mosaicPopover.contains(".frame(height: ScreenshotToolbarLayout.height)"))
     }
 
     @Test
