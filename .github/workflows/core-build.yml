@@ -19,8 +19,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  gate:
+    name: Skip Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      skip: ${{ steps.gate.outputs.skip }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - id: gate
+        uses: ./.github/actions/ci-skip-gate
+        with:
+          workflow-name: Core Tests
+          github-token: ${{ github.token }}
+
   core:
     name: Windows Core (${{ matrix.configuration }})
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     strategy:
@@ -52,8 +73,8 @@ jobs:
     name: Windows Core Tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: core
-    if: always()
+    needs: [gate, core]
+    if: always() && needs.gate.outputs.skip != 'true'
     steps:
       - name: Verify matrix result
         env:
@@ -62,6 +83,8 @@ jobs:
 
   application:
     name: Windows App Build
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -123,6 +146,8 @@ jobs:
 
   codeql:
     name: CodeQL (C/C++)
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: windows-latest
     timeout-minutes: 45
     permissions:

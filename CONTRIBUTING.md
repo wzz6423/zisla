@@ -41,15 +41,20 @@ Thank you for opening a pull request. Check these requirements while it is await
   - `docs: update contributing guidelines`
   Allowed types are `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `build`, `ci`, and `revert`.
 
-- The **PR body** must be in English and contain `Summary`, `Validation`, and `Risk and Rollback` sections. Every `Validation` item must declare `passed`, `failed`, or `not run`:
-  - `passed` and `failed` entries must include the command and observed result.
-  - `not run` entries must explain why the check was not run.
+- The **PR body** must be in English and contain the `Summary`, `PR Type`, `Validation`, `Risk and Rollback`, `Related Issue`, and `AI Attribution` sections that `.github/PULL_REQUEST_TEMPLATE.md` provides.
+  - `PR Type` declares exactly one `- Type:` value, and it must match the type in the title. `PR Automation` turns it into a label, for example `fix` into `bug`.
+  - Every `Validation` block must declare `passed`, `failed`, or `not run`. `passed` and `failed` need `Command` and `Result`; `not run` needs `Reason`.
+  - `Related Issue` must either close an issue with a keyword such as `Closes #123`, which also applies the `development` label, or be exactly `None`.
+  - `AI Attribution` must declare `- Agent:`. Any agent other than `None` requires a matching `- Co-authored-by: Name <email>` line, which must also appear as a trailer on at least one commit, and applies the `ai-assisted` label.
 
   Example:
 
   ```markdown
   ## Summary
   - Add a repository hygiene check.
+
+  ## PR Type
+  - Type: ci
 
   ## Validation
   - Status: passed
@@ -59,11 +64,34 @@ Thank you for opening a pull request. Check these requirements while it is await
   ## Risk and Rollback
   - Risk: Only repository automation is affected.
   - Rollback: Revert this pull request.
+
+  ## Related Issue
+  Closes #123
+
+  ## AI Attribution
+  - Agent: Claude Code
+  - Co-authored-by: Claude <noreply@anthropic.com>
   ```
 
-- The `PR Quality` check validates this format; a pull request cannot be merged while the check is failing.
-- Use the PR template to describe the change, validation, and related issue.
+- The `PR Quality` check validates this format; a pull request cannot be merged while the check is failing. `PR Automation` then applies the labels and assigns the pull request.
 - Run `cd mac && swift test` for macOS code changes; include manual verification or screenshots for UI changes.
 - Update the relevant documentation when changing user-visible behavior, build instructions, or the release process.
 - Do not commit `.build`, `dist`, downloaded files, logs, tokens, signing materials, or personal data.
 - `main` and `publish-v*` are protected and can only be updated through a reviewed pull request that passes its checks.
+
+## Skipping CI
+
+Maintainers and requested reviewers can skip checks that a change cannot affect, for example a documentation-only fix. Write the directive on its own line in a pull request comment:
+
+| Directive | Effect |
+| --- | --- |
+| `skip-all` | Skips every workflow listed in `.github/ci-skip.json`. |
+| `skip-<workflow>` | Skips one workflow by name or alias, such as `skip-swift` or `skip-web`. |
+| `unskip-all` | Clears every skip directive. |
+| `unskip-<workflow>` | Restores one workflow. |
+
+- Free text may follow the directive, for example `skip-all: documentation only change`.
+- Directives are honored only from the repository owner, an organization member, a collaborator, or a requested reviewer. Bot comments are ignored.
+- `CI Skip` cancels the runs in flight, reports the skipped checks as successful so the required checks stay satisfied, applies the `skip-ci` label, and edits one summary comment with the current decision.
+- The whole comment thread is replayed on every comment, so the newest directive always wins.
+- `.github/ci-skip.json` maps each workflow to the check names it publishes. `Test CI Scripts` fails when the manifest drifts from the workflow files.

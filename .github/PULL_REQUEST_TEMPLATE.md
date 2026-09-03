@@ -2,6 +2,12 @@
 
 <!-- Describe the purpose and implementation in English. -->
 
+## PR Type
+
+<!-- Keep exactly one type. It must match the type in the PR title. -->
+<!-- feat | fix | docs | style | refactor | perf | test | chore | build | ci | revert -->
+- Type:
+
 ## Validation
 
 <!-- Use one Validation block for each relevant test or manual check. -->
@@ -17,4 +23,12 @@
 
 ## Related Issue
 
-<!-- Use Closes #123 when applicable; otherwise write None. -->
+<!-- Use a closing keyword so GitHub links the issue in its Development section. -->
+<!-- Example: Closes #123. Write None when no issue is involved. -->
+None
+
+## AI Attribution
+
+<!-- Agent: the AI agent that produced part of this change, or None. -->
+<!-- Co-authored-by: required for every declared agent, and must also appear as a trailer on at least one commit. -->
+- Agent: None
