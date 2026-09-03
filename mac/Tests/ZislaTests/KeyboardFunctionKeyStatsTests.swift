@@ -35,6 +35,72 @@ struct KeyboardFunctionKeyStatsTests {
         (nxKeyType << 16) | ((isDown ? 0x0A : 0x0B) << 8) | (isRepeat ? 1 : 0)
     }
 
+    private typealias Deduplicator = KeyboardMonitor.FunctionKeyDeduplicator
+
+    /// F5 is the key that actually collides in the field: an Apple keyboard reports it both as
+    /// NX_KEYTYPE_ILLUMINATION_DOWN and as the private virtual key code 176 (Dictation).
+    private static let f5KeyCode: UInt16 = 96
+    private static let illuminationDownKeyType = 22
+    private static let dictationVirtualKey: UInt16 = 176
+
+    @MainActor
+    private static func auxiliaryKeyboardEvent(
+        nxKeyType: Int,
+        isDown: Bool,
+        isRepeat: Bool = false
+    ) -> KeyboardEvent? {
+        KeyboardMonitor.AuxiliaryControlKey.keyboardEvent(
+            subtype: KeyboardMonitor.AuxiliaryControlKey.subtypeRawValue,
+            data1: auxiliaryControlData1(nxKeyType: nxKeyType, isDown: isDown, isRepeat: isRepeat),
+            isShortcutModified: false
+        )
+    }
+
+    @MainActor
+    private static func standardKeyboardEvent(
+        virtualKey: UInt16,
+        isDown: Bool,
+        isRepeat: Bool = false
+    ) -> KeyboardEvent? {
+        guard let event = CGEvent(
+            keyboardEventSource: nil,
+            virtualKey: CGKeyCode(virtualKey),
+            keyDown: isDown
+        ) else { return nil }
+        event.setIntegerValueField(.keyboardEventAutorepeat, value: isRepeat ? 1 : 0)
+        guard case let .keyboard(keyboardEvent)? = KeyboardMonitor.decodedInputEvent(
+            rawEventType: isDown ? CGEventType.keyDown.rawValue : CGEventType.keyUp.rawValue,
+            event: event
+        ) else { return nil }
+        return keyboardEvent
+    }
+
+    /// Mirrors `KeyboardMonitor.receive`: an event reaches the handler unless it is a duplicate.
+    @MainActor
+    private static func forwarded(
+        _ stream: [(KeyboardEvent, Deduplicator.Source, TimeInterval)]
+    ) -> [KeyboardEvent] {
+        var deduplicator = Deduplicator()
+        return stream.compactMap { event, source, timestamp in
+            deduplicator.isDuplicate(event, from: source, at: timestamp) ? nil : event
+        }
+    }
+
+    /// `#expect` expands into a closure that cannot call a mutating member, so the decision is
+    /// taken here and only the resulting flag is asserted.
+    @MainActor
+    private static func expect(
+        duplicate isExpected: Bool,
+        _ event: KeyboardEvent,
+        from source: Deduplicator.Source,
+        at timestamp: TimeInterval,
+        in deduplicator: inout Deduplicator,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+        let isDuplicate = deduplicator.isDuplicate(event, from: source, at: timestamp)
+        #expect(isDuplicate == isExpected, sourceLocation: sourceLocation)
+    }
+
     @Test @MainActor
     func keyboardInterestTapsSystemDefinedEvents() {
         let presses = KeyboardMonitor.EventInterest(
@@ -299,6 +365,312 @@ struct KeyboardFunctionKeyStatsTests {
         #expect(aggregates.count == 1)
         #expect(aggregates.first?.keyCode == 99)
         #expect(aggregates.first?.count == 1)
+        #expect(batches.flatMap { $0.characterAggregates }.isEmpty)
+    }
+
+    @Test @MainActor
+    func bothPathsReportTheSameF5PressAsTheSameKeyCode() throws {
+        let auxiliary = try #require(Self.auxiliaryKeyboardEvent(
+            nxKeyType: Self.illuminationDownKeyType,
+            isDown: true
+        ))
+        let standard = try #require(Self.standardKeyboardEvent(
+            virtualKey: Self.dictationVirtualKey,
+            isDown: true
+        ))
+
+        // Without this collision there would be nothing to de-duplicate.
+        #expect(auxiliary.keyCode == Self.f5KeyCode)
+        #expect(standard.keyCode == Self.f5KeyCode)
+        #expect(KeyboardMonitor.AuxiliaryControlKey.reportedFunctionKeyCodes
+            .contains(Self.f5KeyCode))
+    }
+
+    @Test @MainActor
+    func oneF5PressReachesTheHandlerOnceRegardlessOfPathOrder() throws {
+        let auxDown = try #require(Self.auxiliaryKeyboardEvent(
+            nxKeyType: Self.illuminationDownKeyType,
+            isDown: true
+        ))
+        let auxUp = try #require(Self.auxiliaryKeyboardEvent(
+            nxKeyType: Self.illuminationDownKeyType,
+            isDown: false
+        ))
+        let standardDown = try #require(Self.standardKeyboardEvent(
+            virtualKey: Self.dictationVirtualKey,
+            isDown: true
+        ))
+        let standardUp = try #require(Self.standardKeyboardEvent(
+            virtualKey: Self.dictationVirtualKey,
+            isDown: false
+        ))
+
+        // The echo arrives in the same tap burst, ~1 ms behind the first copy.
+        let auxiliaryFirst = Self.forwarded([
+            (auxDown, .auxiliaryControl, 10.000),
+            (standardDown, .standardKey, 10.001),
+            (auxUp, .auxiliaryControl, 10.120),
+            (standardUp, .standardKey, 10.121),
+        ])
+        let standardFirst = Self.forwarded([
+            (standardDown, .standardKey, 10.000),
+            (auxDown, .auxiliaryControl, 10.001),
+            (standardUp, .standardKey, 10.120),
+            (auxUp, .auxiliaryControl, 10.121),
+        ])
+        // Some sources release in the opposite order they pressed.
+        let interleavedRelease = Self.forwarded([
+            (auxDown, .auxiliaryControl, 10.000),
+            (standardDown, .standardKey, 10.001),
+            (standardUp, .standardKey, 10.120),
+            (auxUp, .auxiliaryControl, 10.121),
+        ])
+
+        for stream in [auxiliaryFirst, standardFirst, interleavedRelease] {
+            #expect(stream.map(\.kind) == [.keyDown, .keyUp])
+            #expect(stream.allSatisfy { $0.keyCode == Self.f5KeyCode })
+            #expect(stream.allSatisfy { !$0.isRepeat })
+        }
+    }
+
+    @Test @MainActor
+    func realConsecutiveFunctionKeyPressesAreAllForwarded() throws {
+        let down = try #require(Self.auxiliaryKeyboardEvent(
+            nxKeyType: Self.illuminationDownKeyType,
+            isDown: true
+        ))
+        let up = try #require(Self.auxiliaryKeyboardEvent(
+            nxKeyType: Self.illuminationDownKeyType,
+            isDown: false
+        ))
+
+        // A keyboard on a single path taps F5 three times: nothing may be swallowed.
+        let singlePath = Self.forwarded([
+            (down, .auxiliaryControl, 10.0),
+            (up, .auxiliaryControl, 10.05),
+            (down, .auxiliaryControl, 10.1),
+            (up, .auxiliaryControl, 10.15),
+            (down, .auxiliaryControl, 10.2),
+            (up, .auxiliaryControl, 10.25),
+        ])
+        #expect(singlePath.count == 6)
+        #expect(singlePath.map(\.kind) == [.keyDown, .keyUp, .keyDown, .keyUp, .keyDown, .keyUp])
+
+        // Releases are not always tapped, so consecutive key downs must still all count.
+        let downsOnly = Self.forwarded([
+            (down, .standardKey, 10.0),
+            (down, .standardKey, 10.3),
+            (down, .standardKey, 10.6),
+        ])
+        #expect(downsOnly.count == 3)
+
+        // Whichever path leads may flip between presses; past the window that is a real press.
+        let pathFlips = Self.forwarded([
+            (down, .standardKey, 10.0),
+            (down, .auxiliaryControl, 10.4),
+            (down, .standardKey, 10.8),
+        ])
+        #expect(pathFlips.count == 3)
+
+        // Events inside the window are echoes; events outside it are new presses.
+        var atBoundary = Deduplicator()
+        Self.expect(duplicate: false, down, from: .standardKey, at: 10.0, in: &atBoundary)
+        Self.expect(
+            duplicate: true,
+            down,
+            from: .auxiliaryControl,
+            at: 10.0 + Deduplicator.duplicateWindow - 0.001,
+            in: &atBoundary
+        )
+        var pastBoundary = Deduplicator()
+        Self.expect(duplicate: false, down, from: .standardKey, at: 10.0, in: &pastBoundary)
+        Self.expect(
+            duplicate: false,
+            down,
+            from: .auxiliaryControl,
+            at: 10.0 + Deduplicator.duplicateWindow + 0.001,
+            in: &pastBoundary
+        )
+    }
+
+    @Test @MainActor
+    func holdingF5KeepsAutorepeatAndReleaseSemantics() throws {
+        let auxDown = try #require(Self.auxiliaryKeyboardEvent(
+            nxKeyType: Self.illuminationDownKeyType,
+            isDown: true
+        ))
+        let auxRepeat = try #require(Self.auxiliaryKeyboardEvent(
+            nxKeyType: Self.illuminationDownKeyType,
+            isDown: true,
+            isRepeat: true
+        ))
+        let auxUp = try #require(Self.auxiliaryKeyboardEvent(
+            nxKeyType: Self.illuminationDownKeyType,
+            isDown: false
+        ))
+        let standardDown = try #require(Self.standardKeyboardEvent(
+            virtualKey: Self.dictationVirtualKey,
+            isDown: true
+        ))
+        let standardRepeat = try #require(Self.standardKeyboardEvent(
+            virtualKey: Self.dictationVirtualKey,
+            isDown: true,
+            isRepeat: true
+        ))
+        let standardUp = try #require(Self.standardKeyboardEvent(
+            virtualKey: Self.dictationVirtualKey,
+            isDown: false
+        ))
+        #expect(auxRepeat.isRepeat)
+        #expect(standardRepeat.isRepeat)
+
+        let held = Self.forwarded([
+            (auxDown, .auxiliaryControl, 10.000),
+            (standardDown, .standardKey, 10.001),
+            (auxRepeat, .auxiliaryControl, 10.500),
+            (standardRepeat, .standardKey, 10.501),
+            (auxRepeat, .auxiliaryControl, 10.533),
+            (standardRepeat, .standardKey, 10.534),
+            (auxUp, .auxiliaryControl, 10.700),
+            (standardUp, .standardKey, 10.701),
+        ])
+
+        // One initial press, both autorepeats, one release — each exactly once.
+        #expect(held.map(\.kind) == [.keyDown, .keyDown, .keyDown, .keyUp])
+        #expect(held.map(\.isRepeat) == [false, true, true, false])
+
+        // The two paths can disagree on the autorepeat bit; they still describe one transition.
+        var mismatched = Deduplicator()
+        Self.expect(duplicate: false, auxDown, from: .auxiliaryControl, at: 10.0, in: &mismatched)
+        Self.expect(
+            duplicate: true,
+            standardRepeat,
+            from: .standardKey,
+            at: 10.001,
+            in: &mismatched
+        )
+    }
+
+    @Test @MainActor
+    func keysOnlyOnePathReportsAreNeverDeduplicated() {
+        // 'a', left command, left shift, and F3 (Mission Control has no NX_KEYTYPE_* code).
+        for keyCode in [UInt16(0), 55, 56, 99] {
+            #expect(!KeyboardMonitor.AuxiliaryControlKey.reportedFunctionKeyCodes.contains(keyCode))
+            var deduplicator = Deduplicator()
+            let event = KeyboardEvent(kind: .keyDown, keyCode: keyCode, isRepeat: false)
+            Self.expect(duplicate: false, event, from: .standardKey, at: 10.0, in: &deduplicator)
+            // Even an identical event from the other path stays, so no keystroke can go missing.
+            Self.expect(
+                duplicate: false,
+                event,
+                from: .auxiliaryControl,
+                at: 10.001,
+                in: &deduplicator
+            )
+            Self.expect(duplicate: false, event, from: .standardKey, at: 10.002, in: &deduplicator)
+        }
+    }
+
+    @Test @MainActor
+    func everyAuxiliaryReportedFunctionKeyIsDeduplicated() {
+        let expected = Set(Self.auxiliaryControlMappings.map { $0.keyCode })
+        #expect(KeyboardMonitor.AuxiliaryControlKey.reportedFunctionKeyCodes == expected)
+
+        for keyCode in expected.sorted() {
+            var deduplicator = Deduplicator()
+            let down = KeyboardEvent(kind: .keyDown, keyCode: keyCode, isRepeat: false)
+            let up = KeyboardEvent(kind: .keyUp, keyCode: keyCode, isRepeat: false)
+            Self.expect(duplicate: false, down, from: .auxiliaryControl, at: 10.0, in: &deduplicator)
+            Self.expect(duplicate: true, down, from: .standardKey, at: 10.001, in: &deduplicator)
+            Self.expect(duplicate: false, up, from: .auxiliaryControl, at: 10.1, in: &deduplicator)
+            Self.expect(duplicate: true, up, from: .standardKey, at: 10.101, in: &deduplicator)
+        }
+
+        // Keys are tracked independently: F11 down must not mask F12 down.
+        var shared = Deduplicator()
+        let volumeDown = KeyboardEvent(kind: .keyDown, keyCode: 103, isRepeat: false)
+        let volumeUp = KeyboardEvent(kind: .keyDown, keyCode: 111, isRepeat: false)
+        Self.expect(duplicate: false, volumeDown, from: .auxiliaryControl, at: 10.0, in: &shared)
+        Self.expect(duplicate: false, volumeUp, from: .standardKey, at: 10.001, in: &shared)
+    }
+
+    @Test @MainActor
+    func resetClearsPendingDuplicateStateLikeTapRestarts() {
+        var deduplicator = Deduplicator()
+        let down = KeyboardEvent(kind: .keyDown, keyCode: Self.f5KeyCode, isRepeat: false)
+        Self.expect(duplicate: false, down, from: .auxiliaryControl, at: 10.0, in: &deduplicator)
+
+        // stop() and the tap re-enable path drop the state, so nothing is suppressed afterwards.
+        deduplicator.reset()
+        Self.expect(duplicate: false, down, from: .standardKey, at: 10.001, in: &deduplicator)
+    }
+
+    @Test @MainActor
+    func sourceIsDerivedFromTheRawEventType() {
+        #expect(Deduplicator.Source(
+            rawEventType: KeyboardMonitor.AuxiliaryControlKey.eventTypeRawValue
+        ) == .auxiliaryControl)
+        for rawEventType in [
+            CGEventType.keyDown.rawValue,
+            CGEventType.keyUp.rawValue,
+            CGEventType.flagsChanged.rawValue,
+        ] {
+            #expect(Deduplicator.Source(rawEventType: rawEventType) == .standardKey)
+        }
+    }
+
+    @Test @MainActor
+    func duplicatedF5PressesCountOncePerRealPressInUsageStats() async throws {
+        let persistence = CapturingTypingStatsPersistence()
+        let model = TypingStatsModel(persistence: persistence)
+        let auxDown = try #require(Self.auxiliaryKeyboardEvent(
+            nxKeyType: Self.illuminationDownKeyType,
+            isDown: true
+        ))
+        let auxUp = try #require(Self.auxiliaryKeyboardEvent(
+            nxKeyType: Self.illuminationDownKeyType,
+            isDown: false
+        ))
+        let standardDown = try #require(Self.standardKeyboardEvent(
+            virtualKey: Self.dictationVirtualKey,
+            isDown: true
+        ))
+        let standardUp = try #require(Self.standardKeyboardEvent(
+            virtualKey: Self.dictationVirtualKey,
+            isDown: false
+        ))
+
+        // Two real F5 presses, each echoed on the other path a millisecond later.
+        let stream: [(KeyboardEvent, Deduplicator.Source, TimeInterval)] = [
+            (auxDown, .auxiliaryControl, 10.000),
+            (standardDown, .standardKey, 10.001),
+            (auxUp, .auxiliaryControl, 10.120),
+            (standardUp, .standardKey, 10.121),
+            (auxDown, .auxiliaryControl, 10.400),
+            (standardDown, .standardKey, 10.401),
+            (auxUp, .auxiliaryControl, 10.520),
+            (standardUp, .standardKey, 10.521),
+        ]
+
+        let application = TypingApplicationIdentity.unknown
+        let occurredAt = Date(timeIntervalSince1970: 1_756_000_000)
+        for event in Self.forwarded(stream) where event.kind == .keyDown {
+            model.recordKeyDown(
+                keyCode: event.keyCode,
+                isRepeat: event.isRepeat,
+                isShortcutModified: event.isShortcutModified,
+                application: application,
+                at: occurredAt
+            )
+        }
+
+        #expect(await model.flushPending())
+        let batches = await persistence.recordedBatches()
+        let aggregates = batches.flatMap { $0.keyAggregates }
+        #expect(aggregates.count == 1)
+        #expect(aggregates.first?.keyCode == Self.f5KeyCode)
+        // Two presses, not the four the un-deduplicated stream would have produced.
+        #expect(aggregates.first?.count == 2)
         #expect(batches.flatMap { $0.characterAggregates }.isEmpty)
     }
 }

@@ -83,6 +83,7 @@ final class KeyboardMonitor {
     private var runState: RunState?
     private var handler: (@MainActor (GlobalInputEvent) -> Void)?
     private var pressedModifierKeyCodes: Set<UInt16> = []
+    private var functionKeyDeduplicator = FunctionKeyDeduplicator()
 
     static let observedEventTypes = EventInterest.all.eventTypes
     static let observedEventMask = EventInterest.all.eventMask
@@ -118,6 +119,7 @@ final class KeyboardMonitor {
 
     func stop() {
         pressedModifierKeyCodes.removeAll()
+        functionKeyDeduplicator.reset()
         guard let runState else {
             handler = nil
             return
@@ -137,6 +139,10 @@ final class KeyboardMonitor {
         let wasDisabled = rawEventType == CGEventType.tapDisabledByTimeout.rawValue
             || rawEventType == CGEventType.tapDisabledByUserInput.rawValue
         let payload = decodedInputEvent(rawEventType: rawEventType, event: event)
+        let source = FunctionKeyDeduplicator.Source(rawEventType: rawEventType)
+        let timestamp = event.timestamp == 0
+            ? ProcessInfo.processInfo.systemUptime
+            : Double(event.timestamp) / 1_000_000_000
         let modifierKeyCode = rawEventType == CGEventType.flagsChanged.rawValue
             ? UInt16(event.getIntegerValueField(.keyboardEventKeycode))
             : nil
@@ -146,7 +152,7 @@ final class KeyboardMonitor {
             if wasDisabled {
                 monitor.reenableTap()
             } else if let payload {
-                monitor.receive(payload)
+                monitor.receive(payload, from: source, at: timestamp)
             } else if let modifierKeyCode {
                 monitor.receiveModifierChange(
                     keyCode: modifierKeyCode,
@@ -216,11 +222,24 @@ final class KeyboardMonitor {
 
     private func reenableTap() {
         pressedModifierKeyCodes.removeAll()
+        functionKeyDeduplicator.reset()
         if let port = runState?.port { CGEvent.tapEnable(tap: port, enable: true) }
     }
 
-    private func receive(_ payload: GlobalInputEvent) {
+    private func receive(
+        _ payload: GlobalInputEvent,
+        from source: FunctionKeyDeduplicator.Source = .standardKey,
+        at timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime
+    ) {
         guard let handler else { return }
+        if case let .keyboard(keyboardEvent) = payload,
+           functionKeyDeduplicator.isDuplicate(
+               keyboardEvent,
+               from: source,
+               at: timestamp
+           ) {
+            return
+        }
         handler(payload)
     }
 
@@ -331,6 +350,10 @@ extension KeyboardMonitor {
             0: 111, // SOUND_UP -> F12
         ]
 
+        /// The F1-F12 codes NX_SYSDEFINED is able to report, i.e. exactly the keys an ordinary
+        /// key event can duplicate. F3 is absent because Mission Control has no NX_KEYTYPE_* code.
+        static let reportedFunctionKeyCodes = Set(functionKeyCodes.values)
+
         /// Some modern top-row controls arrive as ordinary key events with a private virtual
         /// key code instead of an NX_SYSDEFINED event.
         private static let standardFunctionKeyCodeAliases: [UInt16: UInt16] = [
@@ -372,6 +395,70 @@ extension KeyboardMonitor {
                 isRepeat: keyFlags & 0x1 != 0,
                 isShortcutModified: isShortcutModified
             )
+        }
+    }
+}
+
+extension KeyboardMonitor {
+    /// A single physical top-row press can reach the tap twice: once as an ordinary keyDown/keyUp
+    /// and once as an NX_SYSDEFINED auxiliary-control event. Both decode to the same F1-F12
+    /// virtual key code, which played the key sound twice and double-counted the usage stats.
+    struct FunctionKeyDeduplicator {
+        /// Which path delivered an event. Only an echo from the *other* path is a duplicate; the
+        /// same path reporting again is a genuine press, an autorepeat or a release.
+        enum Source: Equatable, Sendable {
+            case standardKey
+            case auxiliaryControl
+
+            init(rawEventType: UInt32) {
+                self = rawEventType == AuxiliaryControlKey.eventTypeRawValue
+                    ? .auxiliaryControl
+                    : .standardKey
+            }
+        }
+
+        /// Both copies of one press arrive in the same tap burst, far faster than a human can tap
+        /// twice. Expiring the state also lets it recover if one path skips a keyUp.
+        static let duplicateWindow: TimeInterval = 0.05
+
+        private struct Forwarded {
+            let kind: KeyboardEvent.Kind
+            let source: Source
+            let timestamp: TimeInterval
+        }
+
+        private var forwarded: [UInt16: Forwarded] = [:]
+
+        /// Remembers `event` as the accepted copy and reports whether it is instead an echo of the
+        /// transition the other path already delivered for the same key inside `duplicateWindow`.
+        mutating func isDuplicate(
+            _ event: KeyboardEvent,
+            from source: Source,
+            at timestamp: TimeInterval
+        ) -> Bool {
+            // Keys only one path can report — every ordinary character, the modifiers, F3 — can
+            // never collide, so they stay out of the bookkeeping entirely.
+            guard AuxiliaryControlKey.reportedFunctionKeyCodes.contains(event.keyCode) else {
+                return false
+            }
+
+            if let previous = forwarded[event.keyCode],
+               previous.source != source,
+               previous.kind == event.kind,
+               abs(timestamp - previous.timestamp) <= Self.duplicateWindow {
+                return true
+            }
+
+            forwarded[event.keyCode] = Forwarded(
+                kind: event.kind,
+                source: source,
+                timestamp: timestamp
+            )
+            return false
+        }
+
+        mutating func reset() {
+            forwarded.removeAll()
         }
     }
 }
