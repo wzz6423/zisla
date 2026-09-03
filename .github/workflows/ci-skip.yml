@@ -3,12 +3,17 @@ name: CI Skip
 on:
   issue_comment:
     types: [created, edited]
+  workflow_dispatch:
+    inputs:
+      pull-request:
+        description: Pull request number whose directives are re-applied.
+        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.issue.number }}
+  group: ${{ github.workflow }}-${{ github.event.issue.number || inputs.pull-request }}
   cancel-in-progress: false
 
 jobs:
@@ -17,9 +22,10 @@ jobs:
     # Skip directives only exist on pull requests, and the summary comment must
     # never trigger the workflow again.
     if: >-
-      github.event.issue.pull_request != null &&
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request != null &&
       contains(github.event.comment.body, 'skip-') &&
-      !endsWith(github.event.comment.user.login, '[bot]')
+      !endsWith(github.event.comment.user.login, '[bot]'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -31,14 +37,18 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          # A manual dispatch re-applies the directives with the resolver on the
+          # dispatched ref, which only a maintainer with write access can pick.
+          ref: >-
+            ${{ github.event_name == 'workflow_dispatch' && github.ref
+            || github.event.repository.default_branch }}
           persist-credentials: false
 
       - name: Resolve skip directives
         id: resolve
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.issue.number }}
+          PR_NUMBER: ${{ github.event.issue.number || inputs.pull-request }}
         run: |
           set -euo pipefail
 
@@ -64,7 +74,7 @@ jobs:
       - name: Synchronize skip label
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.issue.number }}
+          PR_NUMBER: ${{ github.event.issue.number || inputs.pull-request }}
           SKIP_COUNT: ${{ steps.resolve.outputs.workflow-count }}
         run: |
           set -euo pipefail
@@ -112,7 +122,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.resolve.outputs.head-sha }}
-          PR_NUMBER: ${{ github.event.issue.number }}
+          PR_NUMBER: ${{ github.event.issue.number || inputs.pull-request }}
         run: |
           set -euo pipefail
 
@@ -135,7 +145,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           MARKER: "<!-- ci-skip-summary -->"
-          PR_NUMBER: ${{ github.event.issue.number }}
+          PR_NUMBER: ${{ github.event.issue.number || inputs.pull-request }}
           SKIP_COUNT: ${{ steps.resolve.outputs.workflow-count }}
         run: |
           set -euo pipefail
