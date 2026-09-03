@@ -1103,6 +1103,14 @@ final class ScreenshotEditorModel: ObservableObject {
     private var nextNumber = 1
     private var lastLongCaptureFrame: NSImage?
 
+    struct PendingTextDraft: Equatable {
+        let id: UUID
+        var text: String
+        let isNew: Bool
+    }
+
+    private(set) var pendingTextDraft: PendingTextDraft?
+
     init(image: NSImage) {
         self.image = image
         mosaicPreviewImage = image
@@ -1298,7 +1306,72 @@ final class ScreenshotEditorModel: ObservableObject {
         lastLongCaptureFrame = nil
     }
 
+    func beginTextDraft(id: UUID, text: String, isNew: Bool) {
+        pendingTextDraft = PendingTextDraft(id: id, text: text, isNew: isNew)
+    }
+
+    func updateTextDraft(id: UUID, text: String, isNew: Bool) {
+        guard let pendingTextDraft, pendingTextDraft.id == id else {
+            self.pendingTextDraft = PendingTextDraft(id: id, text: text, isNew: isNew)
+            return
+        }
+        self.pendingTextDraft = PendingTextDraft(
+            id: pendingTextDraft.id,
+            text: text,
+            isNew: pendingTextDraft.isNew
+        )
+    }
+
+    @discardableResult
+    func commitPendingTextDraft() -> Bool {
+        guard let draft = pendingTextDraft else { return false }
+        pendingTextDraft = nil
+        guard var annotation = annotations.first(where: { $0.id == draft.id }) else { return false }
+
+        let value = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else {
+            if draft.isNew { remove(id: draft.id, saveUndo: false) }
+            return false
+        }
+
+        annotation.text = value
+        if !annotation.points.isEmpty {
+            let rect = ScreenshotAnnotationGeometry.bounds(for: annotation)
+            let width = ScreenshotInlineTextLayout.width(
+                for: annotation.text,
+                fontSize: annotation.fontSize,
+                from: rect.minX,
+                to: image.size.width
+            )
+            let height = ScreenshotInlineTextLayout.contentHeight(
+                for: annotation.text,
+                fontSize: annotation.fontSize,
+                width: width
+            )
+            annotation.rect = CGRect(
+                x: rect.minX,
+                y: rect.minY,
+                width: width,
+                height: height
+            )
+            annotation.points = [annotation.rect.center]
+        }
+
+        if draft.isNew {
+            remove(id: draft.id, saveUndo: false)
+        }
+        add(annotation)
+        return true
+    }
+
+    func discardPendingTextDraft() {
+        guard let draft = pendingTextDraft else { return }
+        pendingTextDraft = nil
+        if draft.isNew { remove(id: draft.id, saveUndo: false) }
+    }
+
     func renderedImage() -> NSImage {
+        commitPendingTextDraft()
         let renderedBase = imageApplyingMosaics()
         guard let base = renderedBase.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return image
@@ -3150,6 +3223,7 @@ private struct ScreenshotInlineTextEditor: NSViewRepresentable {
     let fontSize: CGFloat
     let width: CGFloat
     let onCancel: () -> Void
+    let onTextChange: (String) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -3229,6 +3303,7 @@ private struct ScreenshotInlineTextEditor: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+            parent.onTextChange(textView.string)
         }
 
         func textDidEndEditing(_ notification: Notification) {
@@ -3841,7 +3916,8 @@ struct ScreenshotEditorView: View {
             placeholderColor: inlineTextPlaceholderColor,
             fontSize: annotation.fontSize * geometry.scale,
             width: canvasRect.width,
-            onCancel: cancelInlineText
+            onCancel: cancelInlineText,
+            onTextChange: updateInlineTextDraft
         )
             .frame(width: canvasRect.width, height: height)
             .position(x: canvasRect.midX, y: canvasRect.minY + height / 2)
@@ -3898,7 +3974,13 @@ struct ScreenshotEditorView: View {
         inlineTextIsNew = isNew
         inlineTextPlaceholderColor = placeholderColor ?? textPlaceholderColor(for: annotation)
         textDraft = annotation.text
+        model.beginTextDraft(id: annotation.id, text: annotation.text, isNew: isNew)
         DispatchQueue.main.async { inlineTextFocused = true }
+    }
+
+    private func updateInlineTextDraft(_ text: String) {
+        guard let inlineTextID else { return }
+        model.updateTextDraft(id: inlineTextID, text: text, isNew: inlineTextIsNew)
     }
 
     private func textPlaceholderColor(for annotation: ScreenshotAnnotation) -> ScreenshotRGBA {
@@ -3914,45 +3996,14 @@ struct ScreenshotEditorView: View {
     }
 
     private func commitInlineText() {
-        guard let inlineTextID,
-              var annotation = model.annotations.first(where: { $0.id == inlineTextID })
-        else {
+        guard let inlineTextID else {
             selectionState.isInlineTextEditing = false
             return
         }
-        let value = textDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty else {
-            cancelInlineText()
-            return
+        if model.pendingTextDraft?.id != inlineTextID {
+            model.beginTextDraft(id: inlineTextID, text: textDraft, isNew: inlineTextIsNew)
         }
-        annotation.text = value
-        if !annotation.points.isEmpty {
-            let rect = ScreenshotAnnotationGeometry.bounds(for: annotation)
-            let width = ScreenshotInlineTextLayout.width(
-                for: annotation.text,
-                fontSize: annotation.fontSize,
-                from: rect.minX,
-                to: model.image.size.width
-            )
-            let height = ScreenshotInlineTextLayout.contentHeight(
-                for: annotation.text,
-                fontSize: annotation.fontSize,
-                width: width
-            )
-            annotation.rect = CGRect(
-                x: rect.minX,
-                y: rect.minY,
-                width: width,
-                height: height
-            )
-            annotation.points = [annotation.rect.center]
-        }
-        if inlineTextIsNew {
-            model.remove(id: inlineTextID, saveUndo: false)
-            model.add(annotation)
-        } else {
-            model.add(annotation)
-        }
+        model.commitPendingTextDraft()
         self.inlineTextID = nil
         inlineTextIsNew = false
         inlineTextFocused = false
@@ -3960,6 +4011,7 @@ struct ScreenshotEditorView: View {
     }
 
     private func cancelInlineText() {
+        model.discardPendingTextDraft()
         if inlineTextIsNew, let inlineTextID {
             model.remove(id: inlineTextID, saveUndo: false)
         }
@@ -4379,7 +4431,10 @@ struct ScreenshotEditorView: View {
                     model.isPinned.toggle()
                     onPinToggle(model.isPinned)
                 }
-                iconButton("doc.on.doc", title: "复制", action: onCopy)
+                iconButton("doc.on.doc", title: "复制") {
+                    commitInlineText()
+                    onCopy()
+                }
                 iconButton("square.and.arrow.down", title: "保存") { saveImage() }
                 iconButton("xmark", title: "关闭") { onClose() }
             }
@@ -4737,6 +4792,7 @@ struct ScreenshotEditorView: View {
     }
 
     private func saveImage() {
+        commitInlineText()
         guard let data = model.pngData() else {
             model.statusMessage = "图片生成失败"
             return
@@ -6094,6 +6150,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     private func quickPasteAndClose() {
         invalidateLongCaptureSession()
+        model.commitPendingTextDraft()
         guard let data = model.pngData() else {
             model.statusMessage = "图片生成失败"
             return

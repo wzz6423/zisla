@@ -1945,6 +1945,76 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func imageExportCommitsPendingTextDraftForNewAnnotation() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let annotationID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: annotationID,
+            kind: .text,
+            points: [CGPoint(x: 80, y: 60)],
+            rect: CGRect(x: 80, y: 50, width: 80, height: 20)
+        ), saveUndo: false)
+
+        model.beginTextDraft(id: annotationID, text: "", isNew: true)
+        model.updateTextDraft(id: annotationID, text: "自动保存", isNew: true)
+
+        let data = try #require(model.pngData())
+
+        #expect(!data.isEmpty)
+        #expect(model.pendingTextDraft == nil)
+        #expect(model.annotations.count == 1)
+        #expect(model.annotations.first?.text == "自动保存")
+    }
+
+    @Test
+    func imageExportCommitsPendingTextDraftForExistingAnnotation() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let annotationID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: annotationID,
+            kind: .text,
+            points: [CGPoint(x: 80, y: 60)],
+            rect: CGRect(x: 80, y: 50, width: 80, height: 20),
+            text: "原始文本"
+        ), saveUndo: false)
+
+        model.beginTextDraft(id: annotationID, text: "原始文本", isNew: false)
+        model.updateTextDraft(id: annotationID, text: "导出后的文本", isNew: false)
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingTextDraft == nil)
+        #expect(model.annotations.first?.text == "导出后的文本")
+        #expect(model.canUndo)
+
+        model.undo()
+        #expect(model.annotations.first?.text == "原始文本")
+    }
+
+    @Test
+    func imageExportDiscardsEmptyNewTextDraft() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let annotationID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: annotationID,
+            kind: .text,
+            points: [CGPoint(x: 80, y: 60)],
+            rect: CGRect(x: 80, y: 50, width: 80, height: 20)
+        ), saveUndo: false)
+
+        model.beginTextDraft(id: annotationID, text: "", isNew: true)
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingTextDraft == nil)
+        #expect(model.annotations.isEmpty)
+        #expect(!model.canUndo)
+    }
+
+    @Test
     func annotationTransformSupportsMoveResizeRotateAndTextBoxSizing() {
         let id = UUID()
         let rectangle = ScreenshotAnnotation(
