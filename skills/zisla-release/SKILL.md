@@ -143,9 +143,9 @@ for ARCHITECTURE in arm64 x86_64 universal; do
   (cd "$RELEASE_OUTPUT_DIRECTORY" && shasum -a 256 -c \
     "zisla-v${VERSION}-macOS-${ARCHITECTURE}.dmg.sha256" \
     "zisla-v${VERSION}-macOS-${ARCHITECTURE}.zip.sha256")
-  hdiutil attach -nobrowse "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-${ARCHITECTURE}.dmg"
+  diskutil image attach --mountOptions nobrowse "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-${ARCHITECTURE}.dmg"
   test -L /Volumes/zisla/Applications
-  hdiutil detach /Volumes/zisla
+  diskutil eject /Volumes/zisla
 done
 for APPCAST in "$RELEASE_OUTPUT_DIRECTORY/appcast-gitee.xml" "$RELEASE_OUTPUT_DIRECTORY/appcast-github.xml"; do
   xmllint --noout "$APPCAST"
