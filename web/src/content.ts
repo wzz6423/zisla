@@ -83,7 +83,7 @@ export const showcaseModules: ShowcaseModule[] = [
     name: 'AI 监控',
     group: 'AI 工作流',
     caption:
-      '自动识别受支持的 AI CLI、桌面端与 IDE 活动，展示任务、状态、Token 趋势和贡献热力图；只解析结构化事件，不读取对话正文。',
+      '自动识别受支持的 AI CLI、桌面端与 IDE 活动，包括 Zed Agent 线程，展示任务、状态、累计 Token 趋势和贡献热力图；只解析结构化事件，不读取对话正文。',
     points: ['多工具任务聚合', 'Token 消耗趋势', '不读取提示词与回答'],
   },
   {
@@ -131,8 +131,8 @@ export const showcaseModules: ShowcaseModule[] = [
     name: '小工具',
     group: '实用工具',
     caption:
-      '将专注倒计时、保持亮屏、屏幕/键盘清理、闹钟、提词器、镜子和废纸篓集中在同一页。',
-    points: ['专注倒计时', '屏幕与键盘清理', '提词器与镜子'],
+      '将专注倒计时、保持亮屏、屏幕/键盘清理、F1-F12 使用统计、闹钟、提词器、镜子和废纸篓集中在同一页。',
+    points: ['专注倒计时', '键盘清理与按键统计', '提词器与镜子'],
   },
   {
     id: 'system',
@@ -171,6 +171,7 @@ export const supportedAITools = [
   { name: 'WorkBuddy' },
   { name: '豆包' },
   { name: 'Pi' },
+  { name: 'Zed Agent' },
 ];
 
 export const privacyPoints = [
@@ -193,8 +194,8 @@ export const crossModuleFeatures: CrossModuleFeature[] = [
     icon: 'image',
     title: '截图、长截图与钉图',
     description:
-      '用全局快捷键截取或钉住屏幕内容，继续标注、拼接长截图，并识别或导出表格。',
-    detail: '全局快捷键 · 标注与撤销 · 图片 / 表格导出',
+      '用全局快捷键截取或钉住屏幕内容，继续标注、拼接长截图，并识别或导出表格；导出前会保留正在编辑的文字标注。',
+    detail: '全局快捷键 · 标注与撤销 · 编辑内容随导出保存',
   },
   {
     id: 'voice',

@@ -1,11 +1,11 @@
 # zisla 官网
 
-这是仓库根目录下的 TypeScript 官网，使用 Vite 构建，页面文案和下载入口与仓库当前 macOS Release 保持一致。
+这是仓库根目录下的 TypeScript 官网，使用 Vite 构建，页面文案和下载入口与仓库当前 macOS Release 保持一致。官网会同步已发布的 Zed Agent 监控、截图标注导出和键盘统计等能力。
 
 ## 本地运行
 
 ```bash
-cd Web
+cd web
 npm install
 npm run dev
 ```
