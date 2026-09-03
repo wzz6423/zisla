@@ -17,4 +17,4 @@ build-package:
 clean: stop
 	@rm -rf outputs .impeccable .playwright-cli \
 		mac/dist mac/.build mac/.swiftpm mac/DerivedData mac/.release-* \
-		Web/dist Web/.playwright Web/screenshots
+		web/dist web/.playwright web/screenshots

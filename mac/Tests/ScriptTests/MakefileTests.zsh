@@ -85,20 +85,20 @@ ARTIFACT_FILES=(
   mac/.swiftpm/configuration/state
   mac/DerivedData/Build/product
   mac/.release-v0.1.3/universal/zisla.app/Contents/Info.plist
-  Web/dist/index.html
-  Web/.playwright/state
-  Web/screenshots/home.png
+  web/dist/index.html
+  web/.playwright/state
+  web/screenshots/home.png
 )
 ARTIFACT_ROOTS=(
   outputs .impeccable .playwright-cli
   mac/dist mac/.build mac/.swiftpm mac/DerivedData mac/.release-v0.1.3
-  Web/dist Web/.playwright Web/screenshots
+  web/dist web/.playwright web/screenshots
 )
 PRESERVED_FILES=(
   docs/notes/history-peak-axis.md
   mac/Docs/releasing.md
   mac/Sources/Zisla/main.swift
-  Web/src/main.ts
+  web/src/main.ts
 )
 
 # `path` is tied to PATH in zsh, so fixtures use a distinct loop variable.

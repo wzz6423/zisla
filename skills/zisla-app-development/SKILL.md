@@ -50,6 +50,7 @@ description: 此技能用于开发、修复、重构或评审 zisla 应用及其
 ## 调试服务的单一入口
 
 - 对需要实际启动 macOS 调试应用的排障，只使用仓库根目录的 Makefile：首次启动使用 `make run`；代码变更后重建并重启使用 `make update`；明确结束本次 AI 调试服务时使用 `make stop`。`make update` 当前与 `make run` 使用同一受控服务生命周期。
+- 仓库级清理同样只走 Makefile：需要清空本地调试与发版产物时，在开发者明确要求下执行仓库根目录的 `make clean`，它会先停止调试服务再删除 `outputs`、`mac/dist`、`mac/.build`、`web/dist` 等产物；不得自行拼接 `rm -rf` 代替它。
 - 不得绕过 Makefile 直接执行 `mac/Scripts/dev-service.sh`、构建产物、`open`、`launchctl` 或手工启动 `zisla-debug`；不得同时启动第二个调试实例。不得用裸 `kill`、`pkill` 停止该服务。
 - 发现已有用户或 AI 启动的受控调试服务时，不等待用户手动退出，也不另起进程竞争。继续进行不依赖运行实例的代码阅读、日志分析和隔离测试；需要刷新实际应用时直接执行相应的 `make update`，让同一 Makefile 先串行停止并清理已跟踪服务，再构建和启动唯一实例。
 - 若 Makefile 报告无法停止、构建或启动，先保留错误输出并进行只读诊断；不得绕过其进程匹配范围强杀未知进程。只有需要停止 Makefile 未管理的实例或会影响用户进行中的操作时，向开发者说明 PID/命令证据并请求决定。
@@ -57,7 +58,7 @@ description: 此技能用于开发、修复、重构或评审 zisla 应用及其
 
 ## 编写可执行测试 case
 
-将 case 放入与被测模块对应的既有测试目标：Core 放入 `mac/Tests/ZislaCoreTests`，服务与系统适配逻辑放入 `mac/Tests/ZislaKitTests`，应用行为契约放入 `mac/Tests/ZislaTests`，shell 构建/打包行为放入 `mac/Tests/ScriptTests`；Web 使用已有 `Web/` 测试工具链。测试必须验证外部可观察契约，而不是私有实现调用次数。
+将 case 放入与被测模块对应的既有测试目标：Core 放入 `mac/Tests/ZislaCoreTests`，服务与系统适配逻辑放入 `mac/Tests/ZislaKitTests`，应用行为契约放入 `mac/Tests/ZislaTests`，shell 构建/打包行为放入 `mac/Tests/ScriptTests`；web 使用已有 `web/` 测试工具链。测试必须验证外部可观察契约，而不是私有实现调用次数。
 
 每个新增或改动的行为至少覆盖：正常路径、空/边界输入、无效输入或依赖失败、状态不变性/资源清理，以及此前回归路径。为每个 case 写清确定的前置状态、唯一断言目标和失败信息；固定时钟、随机源、网络和文件系统边界，避免 `sleep` 竞态和真实互联网依赖。
 
@@ -86,8 +87,8 @@ description: 此技能用于开发、修复、重构或评审 zisla 应用及其
 
 ## 运行、隔离与清理
 
-1. 先运行与改动直接对应的最快 case，再运行该模块测试、必要的集成/脚本测试，最后运行与风险相称的构建或 smoke 检查。使用仓库既有命令；运行 Swift 测试时优先将 `swift test --scratch-path` 指向本次创建的唯一临时目录，避免在脏工作区留下 `.build`。Web 常用入口为 `npm --prefix Web run typecheck`、`npm --prefix Web run test` 和 `npm --prefix Web run build`（仅在对应变更相关时执行）。
-2. 为新增临时文件、数据库、模拟服务和构建缓存创建唯一的 `mktemp -d` 目录，记录精确路径；测试结束只删除本次创建且已确认的路径。不得删除预存的 `.build`、`dist`、用户数据或其他未确认目录。仓库级清理只在开发者明确要求时执行仓库根目录的 `make clean`，它会先停止调试服务再删除 `outputs`、`mac/dist`、`mac/.build`、`Web/dist` 等本地调试与发版产物；不得自行拼接 `rm -rf` 代替它。
+1. 先运行与改动直接对应的最快 case，再运行该模块测试、必要的集成/脚本测试，最后运行与风险相称的构建或 smoke 检查。使用仓库既有命令；运行 Swift 测试时优先将 `swift test --scratch-path` 指向本次创建的唯一临时目录，避免在脏工作区留下 `.build`。web 常用入口为 `npm --prefix web run typecheck`、`npm --prefix web run test` 和 `npm --prefix web run build`（仅在对应变更相关时执行）。
+2. 为新增临时文件、数据库、模拟服务和构建缓存创建唯一的 `mktemp -d` 目录，记录精确路径；测试结束只删除本次创建且已确认的路径。不得删除预存的 `.build`、`dist`、用户数据或其他未确认目录。
 3. 将高成本 fuzz、chaos、性能和真实系统集成测试设计为显式 opt-in；默认测试保持快速、离线、确定、可并行。若它们进入 CI，设置确定预算、超时、资源上限和失败语料归档规则。
 4. 失败时保留最小可复现输入和不含敏感信息的日志，修复根因后重跑相关 case；不通过删除、放宽断言、随机重试或 `skip` 来制造绿色结果。
 
