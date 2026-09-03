@@ -215,6 +215,7 @@ struct KeyboardTypingStatsDashboardView: View {
         let now = Date()
         let domain = Self.historyAxisDomain(for: summary.history, now: now)
         let axisDates = Self.historyAxisDates(for: summary.history, now: now)
+        let maximumCharacterCount = Self.historyCharacterCountUpperBound(for: summary.history)
 
         return Chart(summary.history) { day in
             LineMark(
@@ -237,6 +238,7 @@ struct KeyboardTypingStatsDashboardView: View {
             domain: domain,
             range: .plotDimension(padding: Self.chartXAxisLabelPadding)
         )
+        .chartYScale(domain: 0...maximumCharacterCount)
         .chartXAxis {
             AxisMarks(values: axisDates) { value in
                 AxisGridLine().foregroundStyle(Color.dividerSubtle)
@@ -274,6 +276,10 @@ struct KeyboardTypingStatsDashboardView: View {
         return start...end
     }
 
+    static func historyCharacterCountUpperBound(for history: [KeyboardTypingStatsDaySummary]) -> Int64 {
+        max(1, history.map(\.characterCount).max() ?? 0)
+    }
+
     static func historyAxisDates(
         for history: [KeyboardTypingStatsDaySummary],
         now: Date,
@@ -286,11 +292,10 @@ struct KeyboardTypingStatsDashboardView: View {
             calendar.dateComponents([.day], from: domain.lowerBound, to: domain.upperBound).day ?? 0
         )
         let tickStride = historyAxisTickStride(dayCount: dayCount, desiredCount: desiredCount)
-        let dates = stride(from: 0, through: dayCount, by: tickStride).compactMap {
-            calendar.date(byAdding: .day, value: $0, to: domain.lowerBound)
+        let dates = stride(from: 0, through: dayCount, by: tickStride).compactMap { offset in
+            calendar.date(byAdding: .day, value: -offset, to: domain.upperBound)
         }
-        // Keep labels legible without changing the real calendar domain or omitting today.
-        return dates.last == domain.upperBound ? dates : dates + [domain.upperBound]
+        return Array(dates.reversed())
     }
 
     private static func historyAxisTickStride(dayCount: Int, desiredCount: Int) -> Int {

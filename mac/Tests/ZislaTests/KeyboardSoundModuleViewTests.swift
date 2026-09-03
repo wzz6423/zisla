@@ -78,6 +78,8 @@ struct KeyboardSoundModuleViewTests {
         #expect(historySource.contains("LineMark("))
         #expect(!historySource.contains("BarMark("))
         #expect(historySource.contains("range: .plotDimension(padding: Self.chartXAxisLabelPadding)"))
+        #expect(historySource.contains("let maximumCharacterCount = Self.historyCharacterCountUpperBound(for: summary.history)"))
+        #expect(historySource.contains(".chartYScale(domain: 0...maximumCharacterCount)"))
         #expect(historySource.contains("AxisMarks(values: axisDates)"))
         #expect(historySource.contains("AxisValueLabel(anchor: .top, collisionResolution: .disabled)"))
         // Both curves are LineMarks and need separate series values so Charts does not merge them.
@@ -208,22 +210,54 @@ struct KeyboardSoundModuleViewTests {
             now: now,
             calendar: calendar
         )
-        #expect(historyDates.first == firstHistoryDate)
         #expect(historyDates.last == today)
         #expect(historyDates.contains(today))
         let expectedHistoryAxisDates = try [
-            firstHistoryDate,
-            #require(calendar.date(byAdding: .day, value: 3, to: firstHistoryDate)),
-            #require(calendar.date(byAdding: .day, value: 6, to: firstHistoryDate)),
-            #require(calendar.date(byAdding: .day, value: 9, to: firstHistoryDate)),
-            #require(calendar.date(byAdding: .day, value: 12, to: firstHistoryDate)),
+            #require(calendar.date(byAdding: .day, value: -12, to: today)),
+            #require(calendar.date(byAdding: .day, value: -9, to: today)),
+            #require(calendar.date(byAdding: .day, value: -6, to: today)),
+            #require(calendar.date(byAdding: .day, value: -3, to: today)),
             today,
         ]
         #expect(historyDates == expectedHistoryAxisDates)
         let historyDayIntervals = zip(historyDates, historyDates.dropFirst()).map {
             calendar.dateComponents([.day], from: $0, to: $1).day
         }
-        #expect(historyDayIntervals == [3, 3, 3, 3, 1])
+        #expect(historyDayIntervals == [3, 3, 3, 3])
+    }
+
+    @Test
+    @MainActor
+    func dashboardHistoryYAxisUsesCharacterCountMaximum() {
+        let history = [
+            KeyboardTypingStatsDaySummary(
+                id: "first",
+                date: Date(timeIntervalSince1970: 1_700_000_000),
+                characterCount: 8_000,
+                peakCharactersPerSecond: 80_000,
+                activeMinuteBuckets: 1
+            ),
+            KeyboardTypingStatsDaySummary(
+                id: "second",
+                date: Date(timeIntervalSince1970: 1_700_086_400),
+                characterCount: 12_345,
+                peakCharactersPerSecond: 120_000,
+                activeMinuteBuckets: 1
+            ),
+        ]
+        let zeroHistory = [
+            KeyboardTypingStatsDaySummary(
+                id: "zero",
+                date: Date(timeIntervalSince1970: 1_700_000_000),
+                characterCount: 0,
+                peakCharactersPerSecond: 1,
+                activeMinuteBuckets: 0
+            ),
+        ]
+
+        #expect(KeyboardTypingStatsDashboardView.historyCharacterCountUpperBound(for: history) == 12_345)
+        #expect(KeyboardTypingStatsDashboardView.historyCharacterCountUpperBound(for: zeroHistory) == 1)
+        #expect(KeyboardTypingStatsDashboardView.historyCharacterCountUpperBound(for: []) == 1)
     }
 
     @Test
