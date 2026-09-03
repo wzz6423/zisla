@@ -77,8 +77,9 @@ struct KeyboardSoundModuleViewTests {
         let historySource = String(dashboardSource[historyStart.lowerBound..<keyboardStart.lowerBound])
         #expect(historySource.contains("LineMark("))
         #expect(!historySource.contains("BarMark("))
-        #expect(historySource.contains("chartXScale(domain: domain)"))
+        #expect(historySource.contains("range: .plotDimension(padding: Self.chartXAxisLabelPadding)"))
         #expect(historySource.contains("AxisMarks(values: axisDates)"))
+        #expect(historySource.contains("AxisValueLabel(anchor: .top, collisionResolution: .disabled)"))
         // Both curves are LineMarks and need separate series values so Charts does not merge them.
         #expect(historySource.contains(#"series: .value("系列", "字符数")"#))
         #expect(historySource.contains(#"series: .value("系列", "峰值")"#))
@@ -169,12 +170,7 @@ struct KeyboardSoundModuleViewTests {
         let trendDates = KeyboardTypingStatsDashboardView.trendAxisDates(for: buckets)
         #expect(trendDates.first == trendDomain.lowerBound)
         #expect(trendDates.last == trendDomain.upperBound)
-        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[0], in: trendDates).x == 0)
-        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[0], in: trendDates).y == 0)
-        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[1], in: trendDates).x == 0.5)
-        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[1], in: trendDates).y == 0)
-        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[4], in: trendDates).x == 1)
-        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[4], in: trendDates).y == 0)
+        #expect(KeyboardTypingStatsDashboardView.chartXAxisLabelPadding > 0)
         #expect(KeyboardTypingStatsDashboardView.trendAxisDomain(for: Array(buckets.prefix(1))) == nil)
 
         var calendar = Calendar(identifier: .gregorian)
@@ -205,21 +201,29 @@ struct KeyboardSoundModuleViewTests {
             now: now,
             calendar: calendar
         )
-        let expectedHistoryAxisStart = try #require(calendar.date(byAdding: .day, value: -14, to: today))
-        #expect(historyDomain.lowerBound == expectedHistoryAxisStart)
+        #expect(historyDomain.lowerBound == firstHistoryDate)
         #expect(historyDomain.upperBound == today)
         let historyDates = KeyboardTypingStatsDashboardView.historyAxisDates(
             for: history,
             now: now,
             calendar: calendar
         )
-        #expect(historyDates.first == expectedHistoryAxisStart)
+        #expect(historyDates.first == firstHistoryDate)
         #expect(historyDates.last == today)
         #expect(historyDates.contains(today))
-        #expect(historyDates.count == 8)
-        for (earlier, later) in zip(historyDates, historyDates.dropFirst()) {
-            #expect(calendar.dateComponents([.day], from: earlier, to: later).day == 2)
+        let expectedHistoryAxisDates = try [
+            firstHistoryDate,
+            #require(calendar.date(byAdding: .day, value: 3, to: firstHistoryDate)),
+            #require(calendar.date(byAdding: .day, value: 6, to: firstHistoryDate)),
+            #require(calendar.date(byAdding: .day, value: 9, to: firstHistoryDate)),
+            #require(calendar.date(byAdding: .day, value: 12, to: firstHistoryDate)),
+            today,
+        ]
+        #expect(historyDates == expectedHistoryAxisDates)
+        let historyDayIntervals = zip(historyDates, historyDates.dropFirst()).map {
+            calendar.dateComponents([.day], from: $0, to: $1).day
         }
+        #expect(historyDayIntervals == [3, 3, 3, 3, 1])
     }
 
     @Test

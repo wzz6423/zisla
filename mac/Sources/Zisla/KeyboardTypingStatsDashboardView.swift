@@ -8,6 +8,7 @@ struct KeyboardTypingStatsDashboardView: View {
     let summary: KeyboardTypingStatsSummary
 
     private var accent: Color { Color.accentColor }
+    static let chartXAxisLabelPadding: CGFloat = 24
 
     var body: some View {
         compactDashboard
@@ -116,9 +117,13 @@ struct KeyboardTypingStatsDashboardView: View {
         Group {
             if let domain = Self.trendAxisDomain(for: summary.recentBuckets) {
                 trendChart
-                    .chartXScale(domain: domain)
+                    .chartXScale(
+                        domain: domain,
+                        range: .plotDimension(padding: Self.chartXAxisLabelPadding)
+                    )
             } else {
                 trendChart
+                    .chartXScale(range: .plotDimension(padding: Self.chartXAxisLabelPadding))
             }
         }
     }
@@ -145,11 +150,7 @@ struct KeyboardTypingStatsDashboardView: View {
             AxisMarks(values: axisDates) { value in
                 AxisGridLine().foregroundStyle(Color.dividerSubtle)
                 if let date = value.as(Date.self) {
-                    AxisValueLabel(
-                        centered: false,
-                        anchor: Self.axisLabelAnchor(for: date, in: axisDates),
-                        collisionResolution: .disabled
-                    ) {
+                    AxisValueLabel(anchor: .top, collisionResolution: .disabled) {
                         Text(trendAxisLabel(date))
                             .font(.system(size: 8, design: .monospaced))
                             .foregroundStyle(.secondary)
@@ -192,15 +193,6 @@ struct KeyboardTypingStatsDashboardView: View {
         }
     }
 
-    static func axisLabelAnchor(for date: Date, in axisDates: [Date]) -> UnitPoint {
-        guard let first = axisDates.first, let last = axisDates.last, first != last else {
-            return .top
-        }
-        if date == first { return .topLeading }
-        if date == last { return .topTrailing }
-        return .top
-    }
-
     private func trendAxisLabel(_ date: Date) -> String {
         switch summary.timelineRange {
         case "24h", "7d":
@@ -241,17 +233,18 @@ struct KeyboardTypingStatsDashboardView: View {
             .foregroundStyle(Color.zislaInfo)
             .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
         }
-        .chartXScale(domain: domain)
+        .chartXScale(
+            domain: domain,
+            range: .plotDimension(padding: Self.chartXAxisLabelPadding)
+        )
         .chartXAxis {
             AxisMarks(values: axisDates) { value in
                 AxisGridLine().foregroundStyle(Color.dividerSubtle)
                 if let date = value.as(Date.self) {
-                    AxisValueLabel(
-                        centered: false,
-                        anchor: Self.axisLabelAnchor(for: date, in: axisDates),
-                        collisionResolution: .disabled
-                    ) {
+                    AxisValueLabel(anchor: .top, collisionResolution: .disabled) {
                         Text(date, format: .dateTime.month(.twoDigits).day(.twoDigits))
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -267,22 +260,17 @@ struct KeyboardTypingStatsDashboardView: View {
     static func historyAxisDomain(
         for history: [KeyboardTypingStatsDaySummary],
         now: Date,
-        calendar: Calendar = .current,
-        desiredCount: Int = 7
+        calendar: Calendar = .current
     ) -> ClosedRange<Date> {
         let today = calendar.startOfDay(for: now)
         let historyDates = history.map { calendar.startOfDay(for: $0.date) }
-        let historyStart = min(today, historyDates.min() ?? today)
+        let start = min(today, historyDates.min() ?? today)
         let end = max(today, historyDates.max() ?? today)
-        let dayCount = max(
-            1,
-            calendar.dateComponents([.day], from: historyStart, to: end).day ?? 0
-        )
-        let tickStride = historyAxisTickStride(dayCount: dayCount, desiredCount: desiredCount)
-        let alignedDayCount = ((dayCount + tickStride - 1) / tickStride) * tickStride
-        // Extend only the lower bound so every displayed date stays evenly spaced through today.
-        let start = calendar.date(byAdding: .day, value: -alignedDayCount, to: end)
-            ?? end.addingTimeInterval(-Double(alignedDayCount) * 86_400)
+        guard start < end else {
+            let previousDay = calendar.date(byAdding: .day, value: -1, to: end)
+                ?? end.addingTimeInterval(-86_400)
+            return previousDay...end
+        }
         return start...end
     }
 
@@ -292,25 +280,22 @@ struct KeyboardTypingStatsDashboardView: View {
         calendar: Calendar = .current,
         desiredCount: Int = 7
     ) -> [Date] {
-        let domain = historyAxisDomain(
-            for: history,
-            now: now,
-            calendar: calendar,
-            desiredCount: desiredCount
-        )
+        let domain = historyAxisDomain(for: history, now: now, calendar: calendar)
         let dayCount = max(
             1,
             calendar.dateComponents([.day], from: domain.lowerBound, to: domain.upperBound).day ?? 0
         )
         let tickStride = historyAxisTickStride(dayCount: dayCount, desiredCount: desiredCount)
-        return stride(from: 0, through: dayCount, by: tickStride).compactMap {
+        let dates = stride(from: 0, through: dayCount, by: tickStride).compactMap {
             calendar.date(byAdding: .day, value: $0, to: domain.lowerBound)
         }
+        // Keep labels legible without changing the real calendar domain or omitting today.
+        return dates.last == domain.upperBound ? dates : dates + [domain.upperBound]
     }
 
     private static func historyAxisTickStride(dayCount: Int, desiredCount: Int) -> Int {
         let desiredIntervals = max(1, desiredCount - 1)
-        return max(1, Int((Double(dayCount) / Double(desiredIntervals)).rounded()))
+        return max(1, Int(ceil(Double(dayCount) / Double(desiredIntervals))))
     }
 
     private var keyboardPanel: some View {
