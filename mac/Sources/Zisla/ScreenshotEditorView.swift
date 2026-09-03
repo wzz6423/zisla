@@ -4552,7 +4552,7 @@ struct ScreenshotEditorView: View {
         .popover(isPresented: Binding(
             get: { activeToolMenuID == tool },
             set: { if !$0 { activeToolMenuID = nil } }
-        ), arrowEdge: .top) {
+        ), arrowEdge: .bottom) {
             toolAttributesMenu(for: tool)
         }
     }
@@ -4690,7 +4690,7 @@ struct ScreenshotEditorView: View {
         .popover(isPresented: Binding(
             get: { activeToolMenuID == .mosaic },
             set: { if !$0 { activeToolMenuID = nil } }
-        ), arrowEdge: .top) {
+        ), arrowEdge: .bottom) {
             HStack(spacing: 10) {
                 Picker("作用方式", selection: $model.obscureShape) {
                     ForEach(ScreenshotObscureShape.allCases) { shape in

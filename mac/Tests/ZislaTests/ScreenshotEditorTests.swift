@@ -172,6 +172,32 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func screenshotToolPopoversPreferBelowToolbar() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zisla/ScreenshotEditorView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let toolMenu = try #require(source.range(of: "private func toolButtonWithMenu"))
+        let mosaicMenu = try #require(source.range(
+            of: "private var obscureButton",
+            range: toolMenu.upperBound..<source.endIndex
+        ))
+        let recognitionMenu = try #require(source.range(
+            of: "private var recognitionMenu",
+            range: mosaicMenu.upperBound..<source.endIndex
+        ))
+
+        let toolPopover = source[toolMenu.lowerBound..<mosaicMenu.lowerBound]
+        let mosaicPopover = source[mosaicMenu.lowerBound..<recognitionMenu.lowerBound]
+        #expect(toolPopover.contains("arrowEdge: .bottom"))
+        #expect(!toolPopover.contains("arrowEdge: .top"))
+        #expect(mosaicPopover.contains("arrowEdge: .bottom"))
+        #expect(!mosaicPopover.contains("arrowEdge: .top"))
+    }
+
+    @Test
     func shapeDraftsUseSolidStrokes() {
         #expect(ScreenshotCanvasStyle.draftDashPattern.isEmpty)
     }
