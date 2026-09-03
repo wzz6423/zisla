@@ -26,7 +26,7 @@ Current implementation: **macOS 14+**. Apple Silicon is the supported configurat
 
 ### Make AI work visible
 
-zisla monitors local activity from Codex, Claude Code, Pi, GitHub Copilot, Gemini, Grok, Kimi Code, Qwen Code, Qoder, ZCode, TRAE, OpenCode, Harnext, WorkBuddy, Doubao, and other supported sources. It shows tasks, status, token trends, contribution heatmaps, and side notices.
+zisla monitors local activity from Codex, Claude Code, Pi, GitHub Copilot, Gemini, Grok, Kimi Code, Qwen Code, Qoder, ZCode, Zed Agent, TRAE, OpenCode, Harnext, WorkBuddy, Doubao, and other supported sources. It shows tasks, status, token trends, contribution heatmaps, and side notices.
 
 For tools without a stable local activity source, `zislactl` lets scripts, CI, and tool hooks report progress, usage, and notifications while keeping protocol state on this Mac. Settings can also detect, install, update, and remove common AI CLIs and manage local Skills. See the [CLI integration reference](mac/Docs/cli-reference.md) for providers and commands.
 

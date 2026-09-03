@@ -12,6 +12,7 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
     case qwen
     case coder
     case zcode
+    case zed
     case trae
     case opencode
     case harness
@@ -42,6 +43,8 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
             self = .coder
         case "zcode", "z-code", "zcode-cli", "zcode-desktop", "glm", "glm-coding", "z-ai", "z.ai":
             self = .zcode
+        case "zed", "zed-agent", "zed-editor", "zed-ai":
+            self = .zed
         case "trae", "trae-work", "traework", "trae-work-cn", "trae-solo", "trae-solo-cn", "trae-cn":
             self = .trae
         case "opencode", "open-code", "open_code":

@@ -261,7 +261,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return true
         case .pi:
             return url.lastPathComponent.hasSuffix(".jsonl")
-        case .kimi, .zcode, .trae, .opencode, .harness:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness:
             return false
         case .codex, .claude, .qwen, .gpt, .doubao:
             return true
@@ -309,7 +309,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             if parserState.copilotHasDetailedUsage {
                 samples.removeAll(where: isCopilotShutdownSummary)
             }
-        case .kimi, .zcode, .trae, .opencode, .harness:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness:
             return []
         }
         return Array(samples.suffix(maxSamplesPerFile))
@@ -430,7 +430,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return parseCopilot(root, candidate: candidate, parserState: &parserState)
         case .pi:
             return parsePi(root, candidate: candidate).map { [$0] } ?? []
-        case .kimi, .zcode, .trae, .opencode, .harness:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness:
             return []
         }
     }
