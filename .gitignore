@@ -10,6 +10,9 @@
 # Generated reports
 **/[Rr]eports/
 
+# Release packaging output
+/outputs/
+
 # Future Windows build outputs
 /windows/[Bb]in/
 /windows/[Oo]bj/

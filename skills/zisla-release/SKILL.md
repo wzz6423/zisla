@@ -41,9 +41,11 @@ security find-generic-password -a 'wzz6423' -s 'gitee.com.zisla.release-token' >
 
 ## 构建
 
-从 `mac/` 目录执行脚本。`CODE_SIGN_IDENTITY=-` 是免费 ad-hoc 分发；它不需要 Apple Developer Program，但未公证，首次启动可能需要用户在系统设置中选择“仍要打开”。后续更新仍由 Sparkle 的 EdDSA 签名保护。
+在仓库根目录执行 `make build-package` 完成打包。它按 `arm64`、`x86_64`、`arm64 x86_64` 顺序调用 `mac/Scripts/package-release.sh`，对每次调用强制 `DEBUG_BUILD=false`，把三套 DMG、ZIP 及其 SHA-256 平铺到仓库根 `outputs/`，并只保留 Universal 的 `appcast-gitee.xml` 与 `appcast-github.xml`。`outputs/` 每次重建，其内容即本次需要上传的全部资产；GitHub Release 自动生成的源码压缩包不属于它，不得手工构造或补传。三套 `zisla.app` 保留在 `outputs/.staging/<架构>/`，只用于下面的发布前验证，不上传。
 
-**必须构建三套包**：`arm64`、`x86_64`（X86）单架构包，以及同时包含两个架构的 `universal` 包：
+`CODE_SIGN_IDENTITY=-` 是免费 ad-hoc 分发；它不需要 Apple Developer Program，但未公证，首次启动可能需要用户在系统设置中选择“仍要打开”。后续更新仍由 Sparkle 的 EdDSA 签名保护。
+
+**必须构建三套包**：`arm64`、`x86_64`（X86）单架构包，以及同时包含两个架构的 `universal` 包；`make build-package` 一次生成三套，缺任一套即视为打包失败：
 
 ```zsh
 export VERSION='0.1.1'
@@ -51,23 +53,20 @@ export BUILD_NUMBER='2'
 export UPDATE_CHANNEL='release'
 export CODE_SIGN_IDENTITY=-
 export DEBUG_BUILD=false
-export ARCHIVE_DIRECTORY="$PWD/.release-v${VERSION}"
 export SPARKLE_GENERATE_APPCAST='/安全位置/Sparkle/bin/generate_appcast'
 export SPARKLE_ED_KEY_FILE='/安全位置/zisla-sparkle-ed25519-private-key.txt'
+export RELEASE_OUTPUT_DIRECTORY="$(git rev-parse --show-toplevel)/outputs"
 test -x "$SPARKLE_GENERATE_APPCAST"
 test -f "$SPARKLE_ED_KEY_FILE"
 
-# arm64：只包含 arm64，最终资产必须带 -macOS-arm64 后缀
-DEBUG_BUILD=false ARCHIVE_DIRECTORY="$ARCHIVE_DIRECTORY/arm64" \
+make build-package
+```
+
+只有需要单独重建某一套包时，才从 `mac/` 目录直接调用脚本并显式指定架构与归档目录，例如只重建 arm64：
+
+```zsh
+DEBUG_BUILD=false ARCHIVE_DIRECTORY="$PWD/.release-v${VERSION}/arm64" \
   BUILD_ARCHITECTURES=arm64 Scripts/package-release.sh
-
-# x86_64（X86）：只包含 x86_64，最终资产必须带 -macOS-x86_64 后缀
-DEBUG_BUILD=false ARCHIVE_DIRECTORY="$ARCHIVE_DIRECTORY/x86_64" \
-  BUILD_ARCHITECTURES=x86_64 Scripts/package-release.sh
-
-# universal：同时包含 arm64 和 x86_64，最终资产必须带 -macOS-universal 后缀
-DEBUG_BUILD=false ARCHIVE_DIRECTORY="$ARCHIVE_DIRECTORY/universal" \
-  BUILD_ARCHITECTURES="arm64 x86_64" Scripts/package-release.sh
 ```
 
 单架构构建不得生成 Universal 内容；Universal 构建不得只包含一个架构。若脚本的输出文件名与上述后缀不一致，先调整脚本，再继续发版；禁止仅修改文件名后上传未经架构验证的包。
@@ -85,19 +84,19 @@ if [[ "$UPDATE_CHANNEL" == preview ]]; then
 fi
 
 gh release create "v${VERSION}" \
-  "$ARCHIVE_DIRECTORY/arm64/zisla-v${VERSION}-macOS-arm64.dmg" \
-  "$ARCHIVE_DIRECTORY/arm64/zisla-v${VERSION}-macOS-arm64.dmg.sha256" \
-  "$ARCHIVE_DIRECTORY/arm64/zisla-v${VERSION}-macOS-arm64.zip" \
-  "$ARCHIVE_DIRECTORY/arm64/zisla-v${VERSION}-macOS-arm64.zip.sha256" \
-  "$ARCHIVE_DIRECTORY/x86_64/zisla-v${VERSION}-macOS-x86_64.dmg" \
-  "$ARCHIVE_DIRECTORY/x86_64/zisla-v${VERSION}-macOS-x86_64.dmg.sha256" \
-  "$ARCHIVE_DIRECTORY/x86_64/zisla-v${VERSION}-macOS-x86_64.zip" \
-  "$ARCHIVE_DIRECTORY/x86_64/zisla-v${VERSION}-macOS-x86_64.zip.sha256" \
-  "$ARCHIVE_DIRECTORY/universal/zisla-v${VERSION}-macOS-universal.dmg" \
-  "$ARCHIVE_DIRECTORY/universal/zisla-v${VERSION}-macOS-universal.dmg.sha256" \
-  "$ARCHIVE_DIRECTORY/universal/zisla-v${VERSION}-macOS-universal.zip" \
-  "$ARCHIVE_DIRECTORY/universal/zisla-v${VERSION}-macOS-universal.zip.sha256" \
-  "$ARCHIVE_DIRECTORY/universal/appcast-github.xml#appcast.xml" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-arm64.dmg" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-arm64.dmg.sha256" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-arm64.zip" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-arm64.zip.sha256" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-x86_64.dmg" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-x86_64.dmg.sha256" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-x86_64.zip" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-x86_64.zip.sha256" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-universal.dmg" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-universal.dmg.sha256" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-universal.zip" \
+  "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-universal.zip.sha256" \
+  "$RELEASE_OUTPUT_DIRECTORY/appcast-github.xml#appcast.xml" \
   --repo wzz6423/zisla --title "zisla v${VERSION}" \
   "${RELEASE_CREATE_OPTIONS[@]}"
 ```
@@ -109,7 +108,7 @@ if [[ "$UPDATE_CHANNEL" == preview ]]; then
   gh release view preview --repo wzz6423/zisla >/dev/null 2>&1 || \
     gh release create preview --repo wzz6423/zisla \
       --title "zisla Preview update feed" --notes "Preview Sparkle feed" --prerelease
-  gh release upload preview "$ARCHIVE_DIRECTORY/universal/appcast-github.xml#appcast.xml" \
+  gh release upload preview "$RELEASE_OUTPUT_DIRECTORY/appcast-github.xml#appcast.xml" \
     --repo wzz6423/zisla --clobber
 fi
 ```
@@ -120,42 +119,43 @@ Gitee API 的 PATCH 必须携带 `tag_name`，否则返回 `400: tag_name is mis
 
 ## 验证与清理
 
-在上传前对三套资产分别执行：
+在 `mac/` 目录对三套资产分别执行上传前验证，`RELEASE_OUTPUT_DIRECTORY` 沿用构建时的取值：
 
 ```zsh
-zsh -n Scripts/build-app.sh Scripts/package-release.sh
-test "$(plutil -extract CFBundleIdentifier raw -o - "$ARCHIVE_DIRECTORY/arm64/zisla.app/Contents/Info.plist")" = "dev.wzz.zisla"
-test "$(plutil -extract CFBundleDisplayName raw -o - "$ARCHIVE_DIRECTORY/arm64/zisla.app/Contents/Info.plist")" = "zisla"
-test "$(plutil -extract CFBundleIconFile raw -o - "$ARCHIVE_DIRECTORY/arm64/zisla.app/Contents/Info.plist")" = "AppIcon"
-test ! -e "$ARCHIVE_DIRECTORY/arm64/zisla-debug.app"
+zsh -n Scripts/build-app.sh Scripts/package-release.sh Scripts/build-package.sh
+STAGING_DIRECTORY="$RELEASE_OUTPUT_DIRECTORY/.staging"
+test "$(plutil -extract CFBundleIdentifier raw -o - "$STAGING_DIRECTORY/arm64/zisla.app/Contents/Info.plist")" = "dev.wzz.zisla"
+test "$(plutil -extract CFBundleDisplayName raw -o - "$STAGING_DIRECTORY/arm64/zisla.app/Contents/Info.plist")" = "zisla"
+test "$(plutil -extract CFBundleIconFile raw -o - "$STAGING_DIRECTORY/arm64/zisla.app/Contents/Info.plist")" = "AppIcon"
+test ! -e "$STAGING_DIRECTORY/arm64/zisla-debug.app"
 for ARCHITECTURE in arm64 x86_64 universal; do
-  cmp -s "$ARCHIVE_DIRECTORY/$ARCHITECTURE/zisla.app/Contents/Resources/AppIcon.icns" Resources/AppIcon.icns
-  cmp -s "$ARCHIVE_DIRECTORY/$ARCHITECTURE/zisla.app/Contents/Resources/AppIconNight.icns" Resources/AppIconNight.icns
-  codesign --verify --deep --strict --verbose=4 "$ARCHIVE_DIRECTORY/$ARCHITECTURE/zisla.app"
-  ARCHES="$(lipo -archs "$ARCHIVE_DIRECTORY/$ARCHITECTURE/zisla.app/Contents/MacOS/zisla")"
+  cmp -s "$STAGING_DIRECTORY/$ARCHITECTURE/zisla.app/Contents/Resources/AppIcon.icns" Resources/AppIcon.icns
+  cmp -s "$STAGING_DIRECTORY/$ARCHITECTURE/zisla.app/Contents/Resources/AppIconNight.icns" Resources/AppIconNight.icns
+  codesign --verify --deep --strict --verbose=4 "$STAGING_DIRECTORY/$ARCHITECTURE/zisla.app"
+  ARCHES="$(lipo -archs "$STAGING_DIRECTORY/$ARCHITECTURE/zisla.app/Contents/MacOS/zisla")"
   if [[ "$ARCHITECTURE" == universal ]]; then
     test "$ARCHES" = "arm64 x86_64"
   else
     test "$ARCHES" = "$ARCHITECTURE"
   fi
-  shasum -a 256 "$ARCHIVE_DIRECTORY/$ARCHITECTURE/zisla-v${VERSION}-macOS-${ARCHITECTURE}.dmg"
-  hdiutil attach -nobrowse "$ARCHIVE_DIRECTORY/$ARCHITECTURE/zisla-v${VERSION}-macOS-${ARCHITECTURE}.dmg"
+  shasum -a 256 "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-${ARCHITECTURE}.dmg"
+  hdiutil attach -nobrowse "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-${ARCHITECTURE}.dmg"
   test -L /Volumes/zisla/Applications
   hdiutil detach /Volumes/zisla
 done
-for APPCAST in "$ARCHIVE_DIRECTORY/universal/appcast-gitee.xml" "$ARCHIVE_DIRECTORY/universal/appcast-github.xml"; do
+for APPCAST in "$RELEASE_OUTPUT_DIRECTORY/appcast-gitee.xml" "$RELEASE_OUTPUT_DIRECTORY/appcast-github.xml"; do
   xmllint --noout "$APPCAST"
   rg -q 'sparkle:edSignature=' "$APPCAST"
   rg -q "<sparkle:version>${BUILD_NUMBER}</sparkle:version>" "$APPCAST"
   rg -q "zisla-v${VERSION}-macOS-universal.zip" "$APPCAST"
 done
-rg -q "https://gitee.com/wzz6423/zisla/releases/download/v${VERSION}/" "$ARCHIVE_DIRECTORY/universal/appcast-gitee.xml"
-rg -q "https://github.com/wzz6423/zisla/releases/download/v${VERSION}/" "$ARCHIVE_DIRECTORY/universal/appcast-github.xml"
-test -d "$ARCHIVE_DIRECTORY/universal/zisla.app/Contents/Frameworks/Sparkle.framework"
-codesign --verify --deep --strict "$ARCHIVE_DIRECTORY/universal/zisla.app"
+rg -q "https://gitee.com/wzz6423/zisla/releases/download/v${VERSION}/" "$RELEASE_OUTPUT_DIRECTORY/appcast-gitee.xml"
+rg -q "https://github.com/wzz6423/zisla/releases/download/v${VERSION}/" "$RELEASE_OUTPUT_DIRECTORY/appcast-github.xml"
+test -d "$STAGING_DIRECTORY/universal/zisla.app/Contents/Frameworks/Sparkle.framework"
+codesign --verify --deep --strict "$STAGING_DIRECTORY/universal/zisla.app"
 ```
 
-上传后分别获取 Gitee 主 feed 与 GitHub fallback feed，确认两者均返回 HTTP 200、为有效 XML、含签名并指向对应站点的本次 Universal ZIP：Release 验证 Gitee `update-release/download/appcast.xml` 和 GitHub `latest/download/appcast.xml`；Preview 验证两端 `releases/download/preview/appcast.xml`。任一 feed 非 200、无法解析、未签名或未指向本次 ZIP 时，停止发布并修复本次发布资产，不能以客户端版本比较作为替代。使用一台已安装旧 Sparkle 版应用的测试机，分别验证 Release→Release、Preview→Preview、Release→Preview 与 Preview→Release：切换通道后手动检查应先访问 Gitee；断开 Gitee 或让 Gitee 更新包下载失败时只能自动重试 GitHub 一次；开启自动下载时应在退出或重启时完成替换。最后清理 `.release-*`、临时挂载和本次测试下载物，不清理私钥备份。
+上传后分别获取 Gitee 主 feed 与 GitHub fallback feed，确认两者均返回 HTTP 200、为有效 XML、含签名并指向对应站点的本次 Universal ZIP：Release 验证 Gitee `update-release/download/appcast.xml` 和 GitHub `latest/download/appcast.xml`；Preview 验证两端 `releases/download/preview/appcast.xml`。任一 feed 非 200、无法解析、未签名或未指向本次 ZIP 时，停止发布并修复本次发布资产，不能以客户端版本比较作为替代。使用一台已安装旧 Sparkle 版应用的测试机，分别验证 Release→Release、Preview→Preview、Release→Preview 与 Preview→Release：切换通道后手动检查应先访问 Gitee；断开 Gitee 或让 Gitee 更新包下载失败时只能自动重试 GitHub 一次；开启自动下载时应在退出或重启时完成替换。最后在仓库根目录执行 `make clean` 删除 `outputs/`（含 `.staging/`）与本地调试产物，并清理 `.release-*`、临时挂载和本次测试下载物，不清理私钥备份。
 
 ## 交付记录
 

@@ -1,4 +1,4 @@
-.PHONY: run stop update
+.PHONY: run stop update build-package clean
 
 LOCAL_SIGNING_ENV := SIGNING_MODE=dev
 
@@ -10,3 +10,11 @@ stop:
 
 update:
 	@$(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
+
+build-package:
+	@mac/Scripts/build-package.sh
+
+clean: stop
+	@rm -rf outputs .impeccable .playwright-cli \
+		mac/dist mac/.build mac/.swiftpm mac/DerivedData mac/.release-* \
+		Web/dist Web/.playwright Web/screenshots
