@@ -172,6 +172,84 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func screenshotToolPopoverPlacementAvoidsCaptureSelection() {
+        let bounds = CGRect(x: 0, y: 0, width: 1_000, height: 800)
+        let selection = CGRect(x: 200, y: 120, width: 600, height: 500)
+        let toolbarAbove = CGRect(x: 350, y: 40, width: 300, height: ScreenshotToolbarLayout.height)
+        let toolbarBelow = CGRect(x: 350, y: 660, width: 300, height: ScreenshotToolbarLayout.height)
+        let toolbarCentered = CGRect(x: 350, y: 330, width: 300, height: ScreenshotToolbarLayout.height)
+
+        #expect(ScreenshotToolPopoverPlacement.preferredEdge(
+            toolbarFrame: toolbarAbove,
+            selectionRect: selection,
+            bounds: bounds
+        ) == .top)
+        #expect(ScreenshotToolPopoverPlacement.preferredEdge(
+            toolbarFrame: toolbarBelow,
+            selectionRect: selection,
+            bounds: bounds
+        ) == .bottom)
+        #expect(ScreenshotToolPopoverPlacement.preferredEdge(
+            toolbarFrame: toolbarCentered,
+            selectionRect: selection,
+            bounds: bounds
+        ) == .top)
+        #expect(ScreenshotToolPopoverPlacement.preferredEdge(
+            toolbarFrame: toolbarCentered,
+            selectionRect: nil,
+            bounds: bounds
+        ) == .bottom)
+    }
+
+    @Test
+    func screenshotToolPopoversUseContextualPlacement() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zisla/ScreenshotEditorView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let toolMenu = try #require(source.range(of: "private func toolButtonWithMenu"))
+        let mosaicMenu = try #require(source.range(
+            of: "private func obscureButton",
+            range: toolMenu.upperBound..<source.endIndex
+        ))
+        let recognitionMenu = try #require(source.range(
+            of: "private var recognitionMenu",
+            range: mosaicMenu.upperBound..<source.endIndex
+        ))
+
+        let toolPopover = source[toolMenu.lowerBound..<mosaicMenu.lowerBound]
+        let mosaicPopover = source[mosaicMenu.lowerBound..<recognitionMenu.lowerBound]
+        #expect(toolPopover.contains("arrowEdge: popoverEdge"))
+        #expect(mosaicPopover.contains("arrowEdge: popoverEdge"))
+    }
+
+    @Test
+    func screenshotToolPopoversMatchToolbarHeight() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zisla/ScreenshotEditorView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let toolMenu = try #require(source.range(of: "private func toolAttributesMenu"))
+        let mosaicMenu = try #require(source.range(
+            of: "private func obscureButton",
+            range: toolMenu.lowerBound..<source.endIndex
+        ))
+        let recognitionMenu = try #require(source.range(
+            of: "private var recognitionMenu",
+            range: mosaicMenu.upperBound..<source.endIndex
+        ))
+
+        let toolPopover = source[toolMenu.lowerBound..<mosaicMenu.lowerBound]
+        let mosaicPopover = source[mosaicMenu.lowerBound..<recognitionMenu.lowerBound]
+        #expect(toolPopover.contains(".frame(height: ScreenshotToolbarLayout.height)"))
+        #expect(mosaicPopover.contains(".frame(height: ScreenshotToolbarLayout.height)"))
+    }
+
+    @Test
     func shapeDraftsUseSolidStrokes() {
         #expect(ScreenshotCanvasStyle.draftDashPattern.isEmpty)
     }
@@ -1942,6 +2020,76 @@ struct ScreenshotEditorTests {
         }
         #expect(model.annotations.count == 1)
         #expect(model.annotations.first?.text == "修改后文本")
+    }
+
+    @Test
+    func imageExportCommitsPendingTextDraftForNewAnnotation() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let annotationID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: annotationID,
+            kind: .text,
+            points: [CGPoint(x: 80, y: 60)],
+            rect: CGRect(x: 80, y: 50, width: 80, height: 20)
+        ), saveUndo: false)
+
+        model.beginTextDraft(id: annotationID, text: "", isNew: true)
+        model.updateTextDraft(id: annotationID, text: "自动保存", isNew: true)
+
+        let data = try #require(model.pngData())
+
+        #expect(!data.isEmpty)
+        #expect(model.pendingTextDraft == nil)
+        #expect(model.annotations.count == 1)
+        #expect(model.annotations.first?.text == "自动保存")
+    }
+
+    @Test
+    func imageExportCommitsPendingTextDraftForExistingAnnotation() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let annotationID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: annotationID,
+            kind: .text,
+            points: [CGPoint(x: 80, y: 60)],
+            rect: CGRect(x: 80, y: 50, width: 80, height: 20),
+            text: "原始文本"
+        ), saveUndo: false)
+
+        model.beginTextDraft(id: annotationID, text: "原始文本", isNew: false)
+        model.updateTextDraft(id: annotationID, text: "导出后的文本", isNew: false)
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingTextDraft == nil)
+        #expect(model.annotations.first?.text == "导出后的文本")
+        #expect(model.canUndo)
+
+        model.undo()
+        #expect(model.annotations.first?.text == "原始文本")
+    }
+
+    @Test
+    func imageExportDiscardsEmptyNewTextDraft() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let annotationID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: annotationID,
+            kind: .text,
+            points: [CGPoint(x: 80, y: 60)],
+            rect: CGRect(x: 80, y: 50, width: 80, height: 20)
+        ), saveUndo: false)
+
+        model.beginTextDraft(id: annotationID, text: "", isNew: true)
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingTextDraft == nil)
+        #expect(model.annotations.isEmpty)
+        #expect(!model.canUndo)
     }
 
     @Test
