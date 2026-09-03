@@ -2,14 +2,12 @@ import {
   ArrowDownToLine,
   ArrowUpRight,
   Bot,
-  ChartNoAxesColumnIncreasing,
   Check,
   Code2,
   Copy,
   Download,
   ExternalLink,
   Image,
-  Keyboard,
   Lock,
   Menu,
   Mic,
@@ -59,14 +57,12 @@ const siteIcons = {
   ArrowDownToLine,
   ArrowUpRight,
   Bot,
-  ChartNoAxesColumnIncreasing,
   Check,
   Code2,
   Copy,
   Download,
   ExternalLink,
   Image,
-  Keyboard,
   Lock,
   Menu,
   Mic,
@@ -213,7 +209,7 @@ app.innerHTML = `
           <aside class="workflow-summary reveal">
             <span class="mono-label">${showcaseModules.length} MODULES / ${showcaseGroups.length} WORKFLOWS</span>
             <p>从顶部工作流到本地工具，实际能完成的任务都在这里逐项写清。</p>
-            <span>${showcaseModules.length} 个顶部模块 + ${crossModuleFeatures.length} 项独立能力，覆盖截图、语音、媒体、下载、AI 管理、宠物与锁屏。</span>
+            <span>${showcaseModules.length} 个顶部模块 + ${crossModuleFeatures.length} 项独立能力，覆盖截图、语音、媒体、下载、复制助手、AI 管理、宠物与锁屏。</span>
           </aside>
           <div class="workflow-groups">${workflowMarkup}</div>
         </div>
