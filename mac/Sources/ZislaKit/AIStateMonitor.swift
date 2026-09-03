@@ -116,7 +116,7 @@ public final class AIStateMonitor: ObservableObject {
         self.init(
             directoryURL: directoryURL,
             activityDetectors: Self.defaultActivityDetectors(),
-            usageDetectors: [AIUsageLogDetector()],
+            usageDetectors: [AIUsageLogDetector(), ZedUsageLogDetector()],
             activeTaskTTL: activeTaskTTL,
             now: now
         )
