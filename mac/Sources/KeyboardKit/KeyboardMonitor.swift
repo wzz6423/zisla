@@ -140,6 +140,7 @@ final class KeyboardMonitor {
             || rawEventType == CGEventType.tapDisabledByUserInput.rawValue
         let payload = decodedInputEvent(rawEventType: rawEventType, event: event)
         let source = FunctionKeyDeduplicator.Source(rawEventType: rawEventType)
+        let sourceProcessID = event.getIntegerValueField(.eventSourceUnixProcessID)
         let timestamp = event.timestamp == 0
             ? ProcessInfo.processInfo.systemUptime
             : Double(event.timestamp) / 1_000_000_000
@@ -152,7 +153,12 @@ final class KeyboardMonitor {
             if wasDisabled {
                 monitor.reenableTap()
             } else if let payload {
-                monitor.receive(payload, from: source, at: timestamp)
+                monitor.receive(
+                    payload,
+                    from: source,
+                    at: timestamp,
+                    processID: sourceProcessID
+                )
             } else if let modifierKeyCode {
                 monitor.receiveModifierChange(
                     keyCode: modifierKeyCode,
@@ -229,14 +235,16 @@ final class KeyboardMonitor {
     private func receive(
         _ payload: GlobalInputEvent,
         from source: FunctionKeyDeduplicator.Source = .standardKey,
-        at timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime
+        at timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime,
+        processID: Int64 = 0
     ) {
         guard let handler else { return }
         if case let .keyboard(keyboardEvent) = payload,
            functionKeyDeduplicator.isDuplicate(
                keyboardEvent,
                from: source,
-               at: timestamp
+               at: timestamp,
+               processID: processID
            ) {
             return
         }
@@ -404,9 +412,8 @@ extension KeyboardMonitor {
     /// and once as an NX_SYSDEFINED auxiliary-control event. Both decode to the same F1-F12
     /// virtual key code, which played the key sound twice and double-counted the usage stats.
     struct FunctionKeyDeduplicator {
-        /// Which path delivered an event. Only an echo from the *other* path is a duplicate; the
-        /// same path reporting again is a genuine press, an autorepeat or a release.
-        enum Source: Equatable, Sendable {
+        /// Which path delivered an event.
+        enum Source: Hashable, Sendable {
             case standardKey
             case auxiliaryControl
 
@@ -418,23 +425,36 @@ extension KeyboardMonitor {
         }
 
         /// Both copies of one press arrive in the same tap burst, far faster than a human can tap
-        /// twice. Expiring the state also lets it recover if one path skips a keyUp.
+        /// twice. It also bounds the post-release Siri echo observed for the Dictation/F5 key.
         static let duplicateWindow: TimeInterval = 0.05
 
-        private struct Forwarded {
-            let kind: KeyboardEvent.Kind
-            let source: Source
+        private struct EventSource: Hashable {
+            let path: Source
+            let processID: Int64
+        }
+
+        private struct Transition {
+            let source: EventSource
             let timestamp: TimeInterval
         }
 
-        private var forwarded: [UInt16: Forwarded] = [:]
+        private struct KeyState {
+            var isPressed = false
+            var activeSource: EventSource?
+            var lastDown: Transition?
+            var lastRelease: Transition?
+            var suppressedSources: Set<EventSource> = []
+        }
 
-        /// Remembers `event` as the accepted copy and reports whether it is instead an echo of the
-        /// transition the other path already delivered for the same key inside `duplicateWindow`.
+        private var states: [UInt16: KeyState] = [:]
+
+        /// Merges top-row aliases into one logical press. The source process matters because Siri
+        /// can emit its F5/Dictation echo only after the hardware key has already released.
         mutating func isDuplicate(
             _ event: KeyboardEvent,
             from source: Source,
-            at timestamp: TimeInterval
+            at timestamp: TimeInterval,
+            processID: Int64 = 0
         ) -> Bool {
             // Keys only one path can report — every ordinary character, the modifiers, F3 — can
             // never collide, so they stay out of the bookkeeping entirely.
@@ -442,23 +462,122 @@ extension KeyboardMonitor {
                 return false
             }
 
-            if let previous = forwarded[event.keyCode],
-               previous.source != source,
-               previous.kind == event.kind,
-               abs(timestamp - previous.timestamp) <= Self.duplicateWindow {
-                return true
-            }
-
-            forwarded[event.keyCode] = Forwarded(
-                kind: event.kind,
-                source: source,
+            let currentSource = EventSource(path: source, processID: processID)
+            let transition = Transition(
+                source: currentSource,
                 timestamp: timestamp
             )
-            return false
+            var state = states[event.keyCode] ?? KeyState()
+
+            let isDuplicate: Bool
+            switch event.kind {
+            case .keyDown:
+                isDuplicate = deduplicateKeyDown(
+                    event,
+                    transition: transition,
+                    state: &state
+                )
+            case .keyUp:
+                isDuplicate = deduplicateKeyUp(
+                    transition: transition,
+                    state: &state
+                )
+            }
+
+            states[event.keyCode] = state
+            return isDuplicate
         }
 
         mutating func reset() {
-            forwarded.removeAll()
+            states.removeAll()
+        }
+
+        private func deduplicateKeyDown(
+            _ event: KeyboardEvent,
+            transition: Transition,
+            state: inout KeyState
+        ) -> Bool {
+            if state.suppressedSources.contains(transition.source) {
+                if state.isPressed || isWithinDuplicateWindow(
+                    transition.timestamp,
+                    of: state.lastRelease?.timestamp
+                ) {
+                    return true
+                }
+                state.suppressedSources.remove(transition.source)
+            }
+
+            if state.isPressed {
+                if let activeSource = state.activeSource,
+                   activeSource.processID != transition.source.processID
+                    || (!event.isRepeat && isWithinDuplicateWindow(
+                        transition.timestamp,
+                        of: state.lastDown?.timestamp
+                    ))
+                    || (activeSource.path != transition.source.path
+                        && isWithinDuplicateWindow(
+                            transition.timestamp,
+                            of: state.lastDown?.timestamp
+                        )) {
+                    state.suppressedSources.insert(transition.source)
+                    return true
+                }
+
+                // When callers do not observe keyUp, a later non-repeat keyDown from the same
+                // source is the next physical press rather than an indefinitely held key.
+                state.activeSource = transition.source
+                state.lastDown = transition
+                state.lastRelease = nil
+                state.suppressedSources.removeAll()
+                return false
+            }
+
+            if let lastRelease = state.lastRelease,
+               lastRelease.source != transition.source,
+               isWithinDuplicateWindow(transition.timestamp, of: lastRelease.timestamp) {
+                state.suppressedSources.insert(transition.source)
+                return true
+            }
+
+            state.isPressed = true
+            state.activeSource = transition.source
+            state.lastDown = transition
+            state.lastRelease = nil
+            state.suppressedSources.removeAll()
+            return false
+        }
+
+        private func deduplicateKeyUp(
+            transition: Transition,
+            state: inout KeyState
+        ) -> Bool {
+            if state.suppressedSources.contains(transition.source) {
+                return true
+            }
+
+            if state.isPressed {
+                state.isPressed = false
+                state.activeSource = transition.source
+                state.lastRelease = transition
+                return false
+            }
+
+            if let lastRelease = state.lastRelease,
+               isWithinDuplicateWindow(transition.timestamp, of: lastRelease.timestamp) {
+                state.suppressedSources.insert(transition.source)
+                return true
+            }
+
+            state.lastRelease = transition
+            return false
+        }
+
+        private func isWithinDuplicateWindow(
+            _ timestamp: TimeInterval,
+            of otherTimestamp: TimeInterval?
+        ) -> Bool {
+            guard let otherTimestamp else { return false }
+            return abs(timestamp - otherTimestamp) <= Self.duplicateWindow
         }
     }
 }

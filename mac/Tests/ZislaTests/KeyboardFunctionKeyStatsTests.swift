@@ -86,6 +86,21 @@ struct KeyboardFunctionKeyStatsTests {
         }
     }
 
+    @MainActor
+    private static func forwarded(
+        _ stream: [(KeyboardEvent, Deduplicator.Source, TimeInterval, Int64)]
+    ) -> [KeyboardEvent] {
+        var deduplicator = Deduplicator()
+        return stream.compactMap { event, source, timestamp, processID in
+            deduplicator.isDuplicate(
+                event,
+                from: source,
+                at: timestamp,
+                processID: processID
+            ) ? nil : event
+        }
+    }
+
     /// `#expect` expands into a closure that cannot call a mutating member, so the decision is
     /// taken here and only the resulting flag is asserted.
     @MainActor
@@ -672,6 +687,31 @@ struct KeyboardFunctionKeyStatsTests {
         // Two presses, not the four the un-deduplicated stream would have produced.
         #expect(aggregates.first?.count == 2)
         #expect(batches.flatMap { $0.characterAggregates }.isEmpty)
+    }
+
+    @Test @MainActor
+    func siriEchoAfterF5ReleaseIsForwardedOnlyOnce() throws {
+        let down = try #require(Self.standardKeyboardEvent(
+            virtualKey: Self.dictationVirtualKey,
+            isDown: true
+        ))
+        let up = try #require(Self.standardKeyboardEvent(
+            virtualKey: Self.dictationVirtualKey,
+            isDown: false
+        ))
+
+        // A physical F5 press can be followed by Siri's ordinary key echo after the
+        // original keyUp. The real trace had PID 0 followed by Siri's PID 1718.
+        let stream: [(KeyboardEvent, Deduplicator.Source, TimeInterval, Int64)] = [
+            (down, .standardKey, 10.000000, 0),
+            (up, .standardKey, 10.200000, 0),
+            (down, .standardKey, 10.201500, 1718),
+            (up, .standardKey, 10.202000, 1718),
+        ]
+
+        let forwarded = Self.forwarded(stream)
+        #expect(forwarded.map(\.kind) == [.keyDown, .keyUp])
+        #expect(forwarded.map(\.keyCode) == [Self.f5KeyCode, Self.f5KeyCode])
     }
 }
 
