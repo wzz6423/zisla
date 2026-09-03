@@ -1092,6 +1092,7 @@ struct CLIParserTests {
         #expect(AIProvider(token: "zcode") == .zcode)
         #expect(AIProvider(token: "zcode-cli") == .zcode)
         #expect(AIProvider(token: "glm-coding") == .zcode)
+        #expect(AIProvider(token: "zed-agent") == .zed)
     }
 
     @Test

@@ -26,7 +26,7 @@
 
 ### 让 AI 工作状态可见
 
-zisla 可监控 Codex、Claude Code、Pi、GitHub Copilot、Gemini、Grok、Kimi Code、Qwen Code、Qoder、ZCode、TRAE、OpenCode、Harnext、WorkBuddy、豆包等本地活动源，展示任务、状态、token 趋势、贡献热力图和侧边通知。
+zisla 可监控 Codex、Claude Code、Pi、GitHub Copilot、Gemini、Grok、Kimi Code、Qwen Code、Qoder、ZCode、Zed Agent、TRAE、OpenCode、Harnext、WorkBuddy、豆包等本地活动源，展示任务、状态、token 趋势、贡献热力图和侧边通知。
 
 对于没有稳定本地活动源的工具，可通过 `zislactl` 让脚本、CI 和工具 hook 上报进度、用量与通知，协议状态始终保存在这台 Mac 上。设置中还可检测、安装、更新和卸载常用 AI CLI，并管理本机 Skills。Provider 与命令见 [CLI 接入设计](mac/Docs/cli-reference.zh-CN.md)。
 
