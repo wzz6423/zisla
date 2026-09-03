@@ -15,6 +15,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "Vendor/SkyLightWindow"),
+        .package(url: "https://github.com/awxkee/zstd.swift", exact: "1.0.2"),
     ],
     targets: [
         .target(
@@ -38,7 +39,11 @@ let package = Package(
         ),
         .target(
             name: "ZislaKit",
-            dependencies: ["ZislaCore", "ZislaNVMe"],
+            dependencies: [
+                "ZislaCore",
+                "ZislaNVMe",
+                .product(name: "zstd", package: "zstd.swift"),
+            ],
             linkerSettings: [
                 .linkedFramework("WeatherKit"),
                 .linkedFramework("Network"),

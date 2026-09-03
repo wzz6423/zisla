@@ -1,0 +1,15 @@
+{
+  "originHash" : "f6f0176254e5b409855737f0736f25c5cf451f0817a73da8b544a155c3b51bf1",
+  "pins" : [
+    {
+      "identity" : "zstd.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/awxkee/zstd.swift",
+      "state" : {
+        "revision" : "475fe3175c1aacccf9f420add35bf55e69936936",
+        "version" : "1.0.2"
+      }
+    }
+  ],
+  "version" : 3
+}
