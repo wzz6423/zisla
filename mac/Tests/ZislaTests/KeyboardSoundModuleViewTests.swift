@@ -169,6 +169,12 @@ struct KeyboardSoundModuleViewTests {
         let trendDates = KeyboardTypingStatsDashboardView.trendAxisDates(for: buckets)
         #expect(trendDates.first == trendDomain.lowerBound)
         #expect(trendDates.last == trendDomain.upperBound)
+        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[0], in: trendDates).x == 0)
+        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[0], in: trendDates).y == 0)
+        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[1], in: trendDates).x == 0.5)
+        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[1], in: trendDates).y == 0)
+        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[4], in: trendDates).x == 1)
+        #expect(KeyboardTypingStatsDashboardView.axisLabelAnchor(for: trendDates[4], in: trendDates).y == 0)
         #expect(KeyboardTypingStatsDashboardView.trendAxisDomain(for: Array(buckets.prefix(1))) == nil)
 
         var calendar = Calendar(identifier: .gregorian)
@@ -199,16 +205,21 @@ struct KeyboardSoundModuleViewTests {
             now: now,
             calendar: calendar
         )
-        #expect(historyDomain.lowerBound == firstHistoryDate)
+        let expectedHistoryAxisStart = try #require(calendar.date(byAdding: .day, value: -14, to: today))
+        #expect(historyDomain.lowerBound == expectedHistoryAxisStart)
         #expect(historyDomain.upperBound == today)
         let historyDates = KeyboardTypingStatsDashboardView.historyAxisDates(
             for: history,
             now: now,
             calendar: calendar
         )
-        #expect(historyDates.first == firstHistoryDate)
+        #expect(historyDates.first == expectedHistoryAxisStart)
         #expect(historyDates.last == today)
         #expect(historyDates.contains(today))
+        #expect(historyDates.count == 8)
+        for (earlier, later) in zip(historyDates, historyDates.dropFirst()) {
+            #expect(calendar.dateComponents([.day], from: earlier, to: later).day == 2)
+        }
     }
 
     @Test
