@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -57,10 +58,19 @@ final class KeyboardMonitor {
         }
 
         var eventMask: CGEventMask {
-            eventTypes.reduce(CGEventMask(0)) { mask, type in
+            var mask = eventTypes.reduce(CGEventMask(0)) { mask, type in
                 mask | (CGEventMask(1) << type.rawValue)
             }
+            // Top-row keys acting as brightness/media controls never emit keyDown/keyUp,
+            // so the F1-F12 presses only show up through NX_SYSDEFINED.
+            if observesAuxiliaryControls {
+                mask |= CGEventMask(1) << AuxiliaryControlKey.eventTypeRawValue
+            }
+            return mask
         }
+
+        /// NX_SYSDEFINED carries both transitions, so either keyboard interest opts in.
+        var observesAuxiliaryControls: Bool { keyboardPresses || keyboardReleases }
 
         var isEmpty: Bool { eventTypes.isEmpty }
     }
@@ -122,10 +132,14 @@ final class KeyboardMonitor {
     private static let eventTapCallback: CGEventTapCallBack = { _, type, event, userInfo in
         guard let userInfo else { return Unmanaged.passUnretained(event) }
         let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(userInfo).takeUnretainedValue()
-        let wasDisabled = type == .tapDisabledByTimeout || type == .tapDisabledByUserInput
-        let payload = decodedInputEvent(type: type, event: event)
-        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
-        let modifierKeyCode = type == .flagsChanged ? keyCode : nil
+        // NX_SYSDEFINED has no CGEventType case, so compare raw values instead of cases.
+        let rawEventType = type.rawValue
+        let wasDisabled = rawEventType == CGEventType.tapDisabledByTimeout.rawValue
+            || rawEventType == CGEventType.tapDisabledByUserInput.rawValue
+        let payload = decodedInputEvent(rawEventType: rawEventType, event: event)
+        let modifierKeyCode = rawEventType == CGEventType.flagsChanged.rawValue
+            ? UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+            : nil
 
         precondition(Thread.isMainThread)
         MainActor.assumeIsolated {
@@ -143,12 +157,36 @@ final class KeyboardMonitor {
         return Unmanaged.passUnretained(event)
     }
 
+    static func decodedInputEvent(rawEventType: UInt32, event: CGEvent) -> GlobalInputEvent? {
+        if rawEventType == AuxiliaryControlKey.eventTypeRawValue {
+            guard let systemEvent = NSEvent(cgEvent: event) else { return nil }
+            return decodedSystemDefinedEvent(systemEvent)
+        }
+        guard let type = CGEventType(rawValue: rawEventType) else { return nil }
+        return decodedInputEvent(type: type, event: event)
+    }
+
+    /// Only the aux-control buttons that map onto F1-F12 become keyboard events; every other
+    /// system-defined event (caps lock, power, eject, aux mouse buttons…) is left alone.
+    static func decodedSystemDefinedEvent(_ event: NSEvent) -> GlobalInputEvent? {
+        guard event.type == .systemDefined else { return nil }
+        guard let keyboardEvent = AuxiliaryControlKey.keyboardEvent(
+            subtype: event.subtype.rawValue,
+            data1: event.data1,
+            isShortcutModified: event.modifierFlags.contains(.command)
+                || event.modifierFlags.contains(.control)
+        ) else { return nil }
+        return .keyboard(keyboardEvent)
+    }
+
     static func decodedInputEvent(type: CGEventType, event: CGEvent) -> GlobalInputEvent? {
         switch type {
         case .keyDown, .keyUp:
             let keyboardEvent = KeyboardEvent(
                 kind: type == .keyDown ? .keyDown : .keyUp,
-                keyCode: UInt16(event.getIntegerValueField(.keyboardEventKeycode)),
+                keyCode: AuxiliaryControlKey.standardFunctionKeyCode(
+                    for: UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+                ),
                 isRepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0,
                 isShortcutModified: event.flags.contains(.maskCommand)
                     || event.flags.contains(.maskControl)
@@ -257,5 +295,83 @@ final class KeyboardMonitor {
         CGEvent.tapEnable(tap: runState.port, enable: false)
         CFRunLoopRemoveSource(CFRunLoopGetMain(), runState.source, .commonModes)
         CFMachPortInvalidate(runState.port)
+    }
+}
+
+extension KeyboardMonitor {
+    /// Decodes the auxiliary-control buttons the HID system reports as NX_SYSDEFINED events
+    /// (see `IOKit/hidsystem/IOLLEvent.h` and `ev_keymap.h`). The top row emits these instead
+    /// of keyDown/keyUp whenever the keys behave as brightness/media controls.
+    enum AuxiliaryControlKey {
+        /// NX_SYSDEFINED. `CGEventType` declares no case for it.
+        static let eventTypeRawValue: UInt32 = 14
+        /// NX_SUBTYPE_AUX_CONTROL_BUTTONS
+        static let subtypeRawValue: Int16 = 8
+
+        private static let keyDownState = 0x0A // NX_KEYDOWN
+        private static let keyUpState = 0x0B // NX_KEYUP
+
+        /// NX_KEYTYPE_* codes whose physical position on the top row is unambiguous, mapped to
+        /// the F1-F12 virtual key codes the layout and the stats already use. Mission Control,
+        /// Spotlight, Dictation and Do Not Disturb have no NX_KEYTYPE_* code, so F3 is counted
+        /// only while the row acts as standard function keys.
+        private static let functionKeyCodes: [Int: UInt16] = [
+            3: 122, // BRIGHTNESS_DOWN -> F1
+            2: 120, // BRIGHTNESS_UP -> F2
+            13: 118, // LAUNCH_PANEL -> F4
+            22: 96, // ILLUMINATION_DOWN -> F5
+            21: 97, // ILLUMINATION_UP -> F6
+            20: 98, // REWIND -> F7
+            18: 98, // PREVIOUS -> F7
+            16: 100, // PLAY -> F8
+            19: 101, // FAST -> F9
+            17: 101, // NEXT -> F9
+            7: 109, // MUTE -> F10
+            1: 103, // SOUND_DOWN -> F11
+            0: 111, // SOUND_UP -> F12
+        ]
+
+        /// Some modern top-row controls arrive as ordinary key events with a private virtual
+        /// key code instead of an NX_SYSDEFINED event.
+        private static let standardFunctionKeyCodeAliases: [UInt16: UInt16] = [
+            129: 118, // Spotlight / older keyboards -> F4
+            131: 118, // App Exposé / older keyboards -> F4
+            160: 99, // Mission Control -> F3
+            177: 118, // Spotlight -> F4
+            176: 96, // Dictation -> F5
+            178: 97, // Focus / Do Not Disturb -> F6
+            179: 98, // Previous track -> F7
+            180: 101, // Next track -> F9
+        ]
+
+        static func standardFunctionKeyCode(for keyCode: UInt16) -> UInt16 {
+            standardFunctionKeyCodeAliases[keyCode] ?? keyCode
+        }
+
+        /// `data1` packs the NX_KEYTYPE_* code in the high half, and the key state plus the
+        /// autorepeat bit in the low half.
+        static func keyboardEvent(
+            subtype: Int16,
+            data1: Int,
+            isShortcutModified: Bool
+        ) -> KeyboardEvent? {
+            guard subtype == subtypeRawValue else { return nil }
+            guard let keyCode = functionKeyCodes[(data1 & 0xFFFF_0000) >> 16] else { return nil }
+
+            let keyFlags = data1 & 0x0000_FFFF
+            let kind: KeyboardEvent.Kind? = switch (keyFlags & 0xFF00) >> 8 {
+            case keyDownState: .keyDown
+            case keyUpState: .keyUp
+            default: nil
+            }
+            guard let kind else { return nil }
+
+            return KeyboardEvent(
+                kind: kind,
+                keyCode: keyCode,
+                isRepeat: keyFlags & 0x1 != 0,
+                isShortcutModified: isShortcutModified
+            )
+        }
     }
 }
