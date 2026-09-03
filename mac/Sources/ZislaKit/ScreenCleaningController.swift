@@ -41,6 +41,21 @@ public final class ScreenCleaningController: ObservableObject {
         return AXIsProcessTrustedWithOptions(options)
     }
 
+    private static let systemDefinedEventTypeRawValue: UInt32 =
+        UInt32(NSEvent.EventType.systemDefined.rawValue)
+    private nonisolated static let auxiliaryControlSubtypeRawValue: Int16 = 8
+
+    static let keyboardCleaningEventMask: CGEventMask = [
+        CGEventType.keyDown.rawValue,
+        CGEventType.keyUp.rawValue,
+        CGEventType.flagsChanged.rawValue,
+        // CoreGraphics omits the system-defined case from its Swift API, although event taps
+        // still deliver it for hardware function/media keys.
+        systemDefinedEventTypeRawValue,
+    ].reduce(CGEventMask(0)) {
+        $0 | (CGEventMask(1) << $1)
+    }
+
     isolated deinit {
         for window in overlayWindows {
             window.orderOut(nil)
@@ -203,15 +218,12 @@ public final class ScreenCleaningController: ObservableObject {
 
     private func installKeyboardEventTap() -> Bool {
         removeKeyboardEventTap()
-        let eventMask = [CGEventType.keyDown, .keyUp, .flagsChanged].reduce(CGEventMask(0)) {
-            $0 | (CGEventMask(1) << $1.rawValue)
-        }
         let selfPointer = Unmanaged.passUnretained(self).toOpaque()
         guard let eventTap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
+            tap: .cghidEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
-            eventsOfInterest: eventMask,
+            eventsOfInterest: Self.keyboardCleaningEventMask,
             callback: keyboardCleaningEventTapCallback,
             userInfo: selfPointer
         ) else {
@@ -234,13 +246,28 @@ public final class ScreenCleaningController: ObservableObject {
         keyboardEventTap = nil
     }
 
-    fileprivate func shouldPassKeyboardEventTap(type: CGEventType) -> Bool {
-        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+    nonisolated static func shouldBlockSystemDefinedEvent(_ event: NSEvent) -> Bool {
+        event.type == .systemDefined
+            && event.subtype.rawValue == auxiliaryControlSubtypeRawValue
+    }
+
+    fileprivate func shouldPassKeyboardEventTap(
+        type: CGEventType,
+        blocksAuxiliaryControl: Bool
+    ) -> Bool {
+        let rawEventType = type.rawValue
+        if rawEventType == CGEventType.tapDisabledByTimeout.rawValue
+            || rawEventType == CGEventType.tapDisabledByUserInput.rawValue {
             if let keyboardEventTap {
                 CGEvent.tapEnable(tap: keyboardEventTap, enable: true)
             }
             return true
         }
+
+        if rawEventType == Self.systemDefinedEventTypeRawValue {
+            return !blocksAuxiliaryControl
+        }
+
         return false
     }
 }
@@ -357,6 +384,13 @@ private func keyboardCleaningEventTapCallback(
 ) -> Unmanaged<CGEvent>? {
     guard let userData else { return Unmanaged.passUnretained(event) }
     let controller = Unmanaged<ScreenCleaningController>.fromOpaque(userData).takeUnretainedValue()
-    let shouldPass = MainActor.assumeIsolated { controller.shouldPassKeyboardEventTap(type: type) }
+    let blocksAuxiliaryControl = type.rawValue == UInt32(NSEvent.EventType.systemDefined.rawValue)
+        && (NSEvent(cgEvent: event).map(ScreenCleaningController.shouldBlockSystemDefinedEvent) ?? false)
+    let shouldPass = MainActor.assumeIsolated {
+        controller.shouldPassKeyboardEventTap(
+            type: type,
+            blocksAuxiliaryControl: blocksAuxiliaryControl
+        )
+    }
     return shouldPass ? Unmanaged.passUnretained(event) : nil
 }
