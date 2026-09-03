@@ -130,6 +130,7 @@ struct KeyboardTypingStatsDashboardView: View {
 
     private var trendChart: some View {
         let axisDates = Self.trendAxisDates(for: summary.recentBuckets)
+        let maximumCharacterCount = Self.trendCharacterCountUpperBound(for: summary.recentBuckets)
 
         return Chart(summary.recentBuckets) { bucket in
             BarMark(
@@ -146,6 +147,7 @@ struct KeyboardTypingStatsDashboardView: View {
             .foregroundStyle(accent)
             .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         }
+        .chartYScale(domain: 0...maximumCharacterCount)
         .chartXAxis {
             AxisMarks(values: axisDates) { value in
                 AxisGridLine().foregroundStyle(Color.dividerSubtle)
@@ -191,6 +193,10 @@ struct KeyboardTypingStatsDashboardView: View {
         return (0..<tickCount).map { index in
             domain.lowerBound.addingTimeInterval(duration * Double(index) / Double(tickCount - 1))
         }
+    }
+
+    static func trendCharacterCountUpperBound(for buckets: [KeyboardTypingStatsTrendPoint]) -> Int64 {
+        max(1, buckets.map(\.characterCount).max() ?? 0)
     }
 
     private func trendAxisLabel(_ date: Date) -> String {
