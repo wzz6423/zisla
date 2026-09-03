@@ -78,7 +78,7 @@ struct AIMascotLibraryTests {
 
     @Test
     func installedZedURLPrefersBundleIdentifierThenApplicationName() {
-        let bundleMatched = URL(fileURLWithPath: "/Applications/Zed.app")
+        let bundleMatched = URL(fileURLWithPath: "/Applications/Zed.app", isDirectory: true)
         let byBundleIdentifier = AIMascotLibrary.installedZedApplicationURL(
             resolveBundleIdentifier: { $0 == "dev.zed.Zed" ? bundleMatched : nil },
             applicationDirectories: [],
