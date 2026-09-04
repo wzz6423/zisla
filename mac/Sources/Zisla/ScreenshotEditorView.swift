@@ -3337,6 +3337,39 @@ private struct ScreenshotInlineTextEditor: NSViewRepresentable {
     }
 }
 
+/// Presents the PNG save panel shared by the editor toolbar and the ⌘S shortcut.
+@MainActor
+enum ScreenshotImageExport {
+    /// - Parameter status: Receives the result message, or `nil` when the panel closes without writing a file.
+    static func presentSavePanel(
+        for data: Data,
+        status: @escaping @MainActor (String?) -> Void
+    ) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "截图.png"
+        panel.allowedContentTypes = [.png]
+        panel.canCreateDirectories = true
+        let response: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, let url = panel.url else {
+                Task { @MainActor in status(nil) }
+                return
+            }
+            do {
+                try data.write(to: url, options: .atomic)
+                Task { @MainActor in status("已保存：\(url.lastPathComponent)") }
+            } catch {
+                Task { @MainActor in status("保存失败：\(error.localizedDescription)") }
+            }
+        }
+        if let window = NSApp.keyWindow ?? NSApp.mainWindow, window.isVisible {
+            panel.beginSheetModal(for: window, completionHandler: response)
+        } else {
+            WindowPlacement.prepareModal(panel)
+            panel.begin(completionHandler: response)
+        }
+    }
+}
+
 struct ScreenshotEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @ObservedObject var model: ScreenshotEditorModel
@@ -3345,6 +3378,7 @@ struct ScreenshotEditorView: View {
     let toolbarOnly: Bool
     let onClose: () -> Void
     let onCopy: () -> Void
+    let onSave: () -> Void
     let onPinToggle: (Bool) -> Void
     let onLongCapture: () -> Void
     let onLongCaptureFinish: () -> Void
@@ -3390,6 +3424,7 @@ struct ScreenshotEditorView: View {
         toolbarOnly: Bool = false,
         onClose: @escaping () -> Void,
         onCopy: @escaping () -> Void,
+        onSave: @escaping () -> Void = {},
         onPinToggle: @escaping (Bool) -> Void,
         onLongCapture: @escaping () -> Void,
         onLongCaptureFinish: @escaping () -> Void = {}
@@ -3400,6 +3435,7 @@ struct ScreenshotEditorView: View {
         self.toolbarOnly = toolbarOnly
         self.onClose = onClose
         self.onCopy = onCopy
+        self.onSave = onSave
         self.onPinToggle = onPinToggle
         self.onLongCapture = onLongCapture
         self.onLongCaptureFinish = onLongCaptureFinish
@@ -4471,7 +4507,10 @@ struct ScreenshotEditorView: View {
                     commitInlineText()
                     onCopy()
                 }
-                iconButton("square.and.arrow.down", title: "保存") { saveImage() }
+                iconButton("square.and.arrow.down", title: "保存") {
+                    commitInlineText()
+                    onSave()
+                }
                 iconButton("xmark", title: "关闭") { onClose() }
             }
             .frame(
@@ -4827,33 +4866,6 @@ struct ScreenshotEditorView: View {
             toolbarSelectionBackground(isSelected: selected, cornerRadius: 6)
         }
         .contentShape(Rectangle())
-    }
-
-    private func saveImage() {
-        commitInlineText()
-        guard let data = model.pngData() else {
-            model.statusMessage = "图片生成失败"
-            return
-        }
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "截图.png"
-        panel.allowedContentTypes = [.png]
-        panel.canCreateDirectories = true
-        let response: (NSApplication.ModalResponse) -> Void = { response in
-            guard response == .OK, let url = panel.url else { return }
-            do {
-                try data.write(to: url, options: .atomic)
-                Task { @MainActor in model.statusMessage = "已保存：\(url.lastPathComponent)" }
-            } catch {
-                Task { @MainActor in model.statusMessage = "保存失败：\(error.localizedDescription)" }
-            }
-        }
-        if let window = NSApp.keyWindow ?? NSApp.mainWindow, window.isVisible {
-            panel.beginSheetModal(for: window, completionHandler: response)
-        } else {
-            WindowPlacement.prepareModal(panel)
-            panel.begin(completionHandler: response)
-        }
     }
 
     private func chooseTableDestination(_ completion: @escaping (URL?) -> Void) {
@@ -5736,6 +5748,9 @@ final class ScreenshotEditorWindow: NSWindow {
     var onUndo: (() -> Void)?
     var onRedo: (() -> Void)?
     var onDelete: (() -> Bool)?
+    var onSave: (() -> Void)?
+    /// Returns false while editing so ⌘C stays with the inline text editor; only the pinned image copies here.
+    var onCopyImage: (() -> Bool)?
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -5745,8 +5760,12 @@ final class ScreenshotEditorWindow: NSWindow {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if handleImageShortcut(event) { return true }
+        // sendAction(_:to:from:) raises NSInvalidArgumentException when the explicit target lacks the selector,
+        // which happens whenever no text editor holds focus.
         if let action = Self.editingAction(for: event),
            let firstResponder,
+           firstResponder.responds(to: action),
            NSApp.sendAction(action, to: firstResponder, from: self) {
             return true
         }
@@ -5754,6 +5773,7 @@ final class ScreenshotEditorWindow: NSWindow {
     }
 
     override func keyDown(with event: NSEvent) {
+        if handleImageShortcut(event) { return }
         if handleEditingKey(event) { return }
         super.keyDown(with: event)
     }
@@ -5774,6 +5794,23 @@ final class ScreenshotEditorWindow: NSWindow {
         case ("v", .command): #selector(NSText.paste(_:))
         case ("x", .command): #selector(NSText.cut(_:))
         default: nil
+        }
+    }
+
+    private func handleImageShortcut(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags
+            .intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        guard modifiers == [.command] else { return false }
+        switch event.charactersIgnoringModifiers?.lowercased() {
+        case "s":
+            guard let onSave else { return false }
+            onSave()
+            return true
+        case "c":
+            return onCopyImage?() ?? false
+        default:
+            return false
         }
     }
 
@@ -5809,6 +5846,9 @@ final class ScreenshotEditorWindow: NSWindow {
 
 @MainActor
 final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelegate {
+    /// Presents the PNG save panel; `nil` in the status callback means the panel closed without writing a file.
+    typealias PresentSavePanel = @MainActor (Data, @escaping @MainActor (String?) -> Void) -> Void
+
     private let model: ScreenshotEditorModel
     private let annotationSelectionState: ScreenshotAnnotationSelectionState
     private var onCloseHandler: (() -> Void)?
@@ -5819,6 +5859,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private var captureRect: CGRect
     private weak var capturedApplication: NSRunningApplication?
     private let writeImageToPasteboard: (Data) -> Bool
+    private let presentSavePanel: PresentSavePanel
     private var isLongCaptureInProgress = false
     private var longCaptureSessionID = 0
     private var longCaptureCaptureWorkItem: DispatchWorkItem?
@@ -5875,6 +5916,9 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         writeImageToPasteboard: @escaping (Data) -> Bool = {
             ClipboardHistoryPasteboard.write(.image($0))
         },
+        presentSavePanel: @escaping PresentSavePanel = { data, status in
+            ScreenshotImageExport.presentSavePanel(for: data, status: status)
+        },
         onClose: @escaping () -> Void,
         pinnedToolbarVisible: Bool = true
     ) {
@@ -5887,6 +5931,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         self.captureRect = captureRect
         self.capturedApplication = capturedApplication
         self.writeImageToPasteboard = writeImageToPasteboard
+        self.presentSavePanel = presentSavePanel
         self.pinnedToolbarVisible = pinnedToolbarVisible
         onCloseHandler = onClose
         let overlayFrame = screen?.frame ?? CGRect(origin: .zero, size: screenImage.size)
@@ -5915,6 +5960,8 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         window.onUndo = { [weak self] in self?.model.undo() }
         window.onRedo = { [weak self] in self?.model.redo() }
         window.onDelete = { [weak self] in self?.deleteSelectedAnnotation() ?? false }
+        window.onSave = { [weak self] in self?.saveImage() }
+        window.onCopyImage = { [weak self] in self?.copyPinnedImage() ?? false }
         configureOverlayView(in: window)
         window.delegate = self
     }
@@ -5985,6 +6032,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                 ),
                 onClose: { [weak self] in self?.close() },
                 onCopy: { [weak self] in self?.quickPasteAndClose() },
+                onSave: { [weak self] in self?.saveImage() },
                 onPinToggle: { [weak self] pinned in self?.setPinned(pinned) },
                 onLongCapture: { [weak self] in self?.captureNextScreen() },
                 onLongCaptureFinish: { [weak self] in self?.finishLongCapture() }
@@ -6000,6 +6048,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                 toolbarOnly: true,
                 onClose: { [weak self] in self?.close() },
                 onCopy: { [weak self] in self?.quickPasteAndClose() },
+                onSave: { [weak self] in self?.saveImage() },
                 onPinToggle: { [weak self] pinned in self?.setPinned(pinned) },
                 onLongCapture: { [weak self] in self?.captureNextScreen() },
                 onLongCaptureFinish: { [weak self] in self?.finishLongCapture() }
@@ -6047,16 +6096,19 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
             )
         )
         window.setFrame(pinnedFrame, display: true)
-        if window.isVisible {
-            pinnedEscapeHotkeyManager.register(
-                keyCode: UInt32(kVK_Escape),
-                modifiers: 0,
-                action: { [weak self] in
-                    Task { @MainActor [weak self] in self?.close() }
-                }
-            )
-        }
+        registerPinnedEscapeHotkey()
         capturedApplication?.activate()
+    }
+
+    private func registerPinnedEscapeHotkey() {
+        guard let window, window.isVisible else { return }
+        pinnedEscapeHotkeyManager.register(
+            keyCode: UInt32(kVK_Escape),
+            modifiers: 0,
+            action: { [weak self] in
+                Task { @MainActor [weak self] in self?.close() }
+            }
+        )
     }
 
     private func initialPinnedScale(for imageSize: CGSize) -> CGFloat {
@@ -6184,6 +6236,42 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         ) else { return nil }
         captureRect = normalized
         return image
+    }
+
+    /// Shared by the toolbar's save button and ⌘S in both the editor and the pinned image.
+    private func saveImage() {
+        model.commitPendingTextDraft()
+        guard let data = model.pngData() else {
+            model.statusMessage = "图片生成失败"
+            return
+        }
+        // The pinned image keeps a global Escape hotkey, which would close it instead of dismissing the panel.
+        let suspendsPinnedEscapeHotkey = isPinnedImagePresentation
+        if suspendsPinnedEscapeHotkey {
+            pinnedEscapeHotkeyManager.unregister()
+        }
+        presentSavePanel(data) { [weak self] message in
+            guard let self else { return }
+            if suspendsPinnedEscapeHotkey {
+                registerPinnedEscapeHotkey()
+            }
+            if let message {
+                model.statusMessage = message
+            }
+        }
+    }
+
+    /// ⌘C copies the pinned image and keeps it on screen, unlike the editor's Enter shortcut.
+    private func copyPinnedImage() -> Bool {
+        guard isPinnedPresentation else { return false }
+        guard let data = model.pngData() else {
+            model.statusMessage = "图片生成失败"
+            return true
+        }
+        if !writeImageToPasteboard(data) {
+            model.statusMessage = "粘贴板写入失败"
+        }
+        return true
     }
 
     private func quickPasteAndClose() {

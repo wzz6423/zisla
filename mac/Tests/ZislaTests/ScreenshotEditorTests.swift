@@ -1062,6 +1062,175 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func editorWindowRoutesCommandSToSaveAndLeavesCommandCForTextEditing() throws {
+        let window = ScreenshotEditorWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        let save = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_S),
+            characters: "s",
+            modifiers: [.command]
+        ))
+        let copy = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_C),
+            characters: "c",
+            modifiers: [.command]
+        ))
+
+        #expect(!window.performKeyEquivalent(with: save))
+
+        var saveCount = 0
+        window.onSave = { saveCount += 1 }
+        #expect(window.performKeyEquivalent(with: save))
+        #expect(saveCount == 1)
+
+        var copyAttempts = 0
+        window.onCopyImage = {
+            copyAttempts += 1
+            return false
+        }
+        #expect(!window.performKeyEquivalent(with: copy))
+        #expect(copyAttempts == 1)
+    }
+
+    @Test
+    func editorCommandSSendsRenderedPNGDataToTheSavePanel() throws {
+        let image = try #require(makeGradientImage(width: 320, height: 200))
+        let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        var savedData: [Data] = []
+        var closeCount = 0
+        let controller = ScreenshotEditorWindowController(
+            image: image,
+            screenImage: image,
+            screenCGImage: cgImage,
+            screen: nil,
+            captureRect: CGRect(x: 20, y: 20, width: 160, height: 100),
+            capturedApplication: nil,
+            presentSavePanel: { data, status in
+                savedData.append(data)
+                status("已保存：截图.png")
+            },
+            onClose: { closeCount += 1 }
+        )
+        let window = try #require(controller.window as? ScreenshotEditorWindow)
+        window.alphaValue = 0
+        let save = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_S),
+            characters: "s",
+            modifiers: [.command]
+        ))
+
+        #expect(window.performKeyEquivalent(with: save))
+        #expect(savedData.count == 1)
+        let data = try #require(savedData.first)
+        #expect(data.starts(with: [0x89, 0x50, 0x4E, 0x47]))
+        #expect(NSImage(data: data) != nil)
+        #expect(closeCount == 0)
+    }
+
+    @Test
+    func editorCommandCLeavesTheImageUncopiedBeforePinning() throws {
+        let image = try #require(makeGradientImage(width: 320, height: 200))
+        let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        var writeCount = 0
+        var closeCount = 0
+        let controller = ScreenshotEditorWindowController(
+            image: image,
+            screenImage: image,
+            screenCGImage: cgImage,
+            screen: nil,
+            captureRect: CGRect(x: 20, y: 20, width: 160, height: 100),
+            capturedApplication: nil,
+            writeImageToPasteboard: { _ in
+                writeCount += 1
+                return true
+            },
+            onClose: { closeCount += 1 }
+        )
+        let window = try #require(controller.window as? ScreenshotEditorWindow)
+        window.alphaValue = 0
+        let copy = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_C),
+            characters: "c",
+            modifiers: [.command]
+        ))
+
+        _ = window.performKeyEquivalent(with: copy)
+        #expect(writeCount == 0)
+        #expect(closeCount == 0)
+    }
+
+    @Test
+    func pinnedCommandCCopiesTheImageAndKeepsThePinOnScreen() throws {
+        let image = try #require(makeGradientImage(width: 320, height: 200))
+        let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        var writeCount = 0
+        var closeCount = 0
+        let controller = ScreenshotEditorWindowController(
+            image: image,
+            screenImage: image,
+            screenCGImage: cgImage,
+            screen: nil,
+            captureRect: CGRect(x: 20, y: 20, width: 160, height: 100),
+            capturedApplication: nil,
+            writeImageToPasteboard: { _ in
+                writeCount += 1
+                return true
+            },
+            onClose: { closeCount += 1 }
+        )
+        controller.setPinned(true)
+        let window = try #require(controller.window as? ScreenshotEditorWindow)
+        window.alphaValue = 0
+        let copy = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_C),
+            characters: "c",
+            modifiers: [.command]
+        ))
+
+        #expect(window.performKeyEquivalent(with: copy))
+        #expect(writeCount == 1)
+        #expect(closeCount == 0)
+    }
+
+    @Test
+    func pinnedCommandSSavesWithoutClosingThePin() throws {
+        let image = try #require(makeGradientImage(width: 320, height: 200))
+        let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        var savedData: [Data] = []
+        var closeCount = 0
+        let controller = ScreenshotEditorWindowController(
+            image: image,
+            screenImage: image,
+            screenCGImage: cgImage,
+            screen: nil,
+            captureRect: CGRect(x: 20, y: 20, width: 160, height: 100),
+            capturedApplication: nil,
+            presentSavePanel: { data, status in
+                savedData.append(data)
+                status(nil)
+            },
+            onClose: { closeCount += 1 }
+        )
+        controller.setPinned(true)
+        let window = try #require(controller.window as? ScreenshotEditorWindow)
+        window.alphaValue = 0
+        let save = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_S),
+            characters: "s",
+            modifiers: [.command]
+        ))
+
+        #expect(window.performKeyEquivalent(with: save))
+        #expect(savedData.count == 1)
+        #expect(closeCount == 0)
+    }
+
+    @Test
     func pinPresentationPlacesACompactToolbarBelowTheImage() throws {
         let image = try #require(makeGradientImage(width: 320, height: 200))
         let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
