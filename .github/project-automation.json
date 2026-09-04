@@ -18,10 +18,13 @@
     { "label": "development", "status": "Feature Development" },
     { "label": "performance", "status": "Feature Development" },
     { "label": "refactor", "status": "Feature Development" },
+    { "label": "style", "status": "Feature Development" },
     { "label": "bug", "status": "Bug Fix" },
+    { "label": "revert", "status": "Bug Fix" },
     { "label": "ci", "status": "CI & Build" },
     { "label": "build", "status": "CI & Build" },
     { "label": "test", "status": "CI & Build" },
+    { "label": "chore", "status": "CI & Build" },
     { "label": "documentation", "status": "Documentation" }
   ]
 }

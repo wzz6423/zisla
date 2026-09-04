@@ -101,6 +101,7 @@ Maintainers and requested reviewers can skip checks that a change cannot affect,
 - Directives are honored only from the repository owner, an organization member, a collaborator, or a requested reviewer. Bot comments are ignored.
 - `CI Skip` cancels the runs in flight, reports the skipped checks as successful so the required checks stay satisfied, applies the `skip-ci` label, and edits one summary comment with the current decision.
 - The whole comment thread is replayed on every comment, so the newest directive always wins.
+- A directive expires as soon as a newer commit is pushed: it can only speak about the code its author had seen, and a check reported as successful would otherwise let the new commit merge unbuilt. `CI Skip` re-runs on every push to drop the `skip-ci` label and restore the checks, and the summary comment lists the directives that expired. Comment the directive again to skip the new commit as well.
 - A maintainer can re-apply the current decision without a new comment from **Actions -> CI Skip -> Run workflow**, passing the pull request number.
 - `.github/ci-skip.json` maps each workflow to the check names it publishes. `Test CI Scripts` fails when the manifest drifts from the workflow files.
 
