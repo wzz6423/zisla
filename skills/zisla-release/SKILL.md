@@ -18,6 +18,7 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 - **三种包都必须保留**：`x86_64` 和 `arm64` 包分别只包含单一架构，`universal` 包必须同时包含两个架构；三类资产都要分别压缩、分别上传，文件名必须带对应后缀。
 - 无论安装包构建时的 `UPDATE_CHANNEL` 是什么，运行时选择 Release 或 Preview 都必须切换到对应的 Sparkle feed；自动检查和“检查更新”均遵循当前选择。切换后 Sparkle 重置下一次检查周期，手动检查立即使用新通道。
 - 使用 `CFBundleShortVersionString` 作为用户可见版本。版本 tag 一律为 `v${VERSION}`（Preview 形如 `v0.2.0-preview.1`），与签名 appcast 的默认 ZIP URL 一致；禁止使用 `release/v1.2.3` 等路径前缀 tag，那会迫使每次发布额外覆盖 `SPARKLE_GITEE_DOWNLOAD_URL_PREFIX` 和 `SPARKLE_GITHUB_DOWNLOAD_URL_PREFIX`。
+- Release 正文引用的截图必须先作为同一 `v${VERSION}` Release 的附件上传，并使用该 tag 的稳定下载地址。禁止带路径前缀的 `.../releases/download/release/v${VERSION}/`、会随下一版移动的 `.../releases/latest/download/` 和临时图床；正文同步到另一镜像时，可以引用已验证可达的原站图片地址。发布后要在实际页面确认每张图返回 HTTP 200 且内容确实是 PNG。
 - 每次发布前验证 DMG 中只有 `zisla.app` 和 `Applications` 软链接。首次安装 Sparkle 版仍需要用户手动安装；之后的已安装 Sparkle 版本才可自动更新。
 - 发版构建严禁使用调试变体：必须显式使用 `DEBUG_BUILD=false`，产物必须是 `zisla.app`、Bundle ID `dev.wzz.zisla`；`zisla-debug.app` 或 `dev.wzz.zisla.debug` 只能用于本地调试，不能上传。
 - 发版资源必须来自正式资源目录：`AppIcon.icns` 必须作为主图标，`AppIconNight.icns` 只能作为深色模式备用图标；调试构建使用的黑底白字图标复制方式，以及 `zisla-debug.app` 中的任何资源，都不能用于正式包或通过改名后上传。
@@ -159,8 +160,29 @@ test -d "$STAGING_DIRECTORY/universal/zisla.app/Contents/Frameworks/Sparkle.fram
 codesign --verify --deep --strict "$STAGING_DIRECTORY/universal/zisla.app"
 ```
 
-上传后分别获取 Gitee 主 feed 与 GitHub fallback feed，确认两者均返回 HTTP 200、为有效 XML、含签名并指向对应站点的本次 Universal ZIP：Release 验证 Gitee `update-release/download/appcast.xml` 和 GitHub `latest/download/appcast.xml`；Preview 验证两端 `releases/download/preview/appcast.xml`。任一 feed 非 200、无法解析、未签名或未指向本次 ZIP 时，停止发布并修复本次发布资产，不能以客户端版本比较作为替代。使用一台已安装旧 Sparkle 版应用的测试机，分别验证 Release→Release、Preview→Preview、Release→Preview 与 Preview→Release：切换通道后手动检查应先访问 Gitee；断开 Gitee 或让 Gitee 更新包下载失败时只能自动重试 GitHub 一次；开启自动下载时应在退出或重启时完成替换。最后在仓库根目录执行 `make clean` 删除 `outputs/`（含 `.staging/`）与本地调试产物，并清理 `.release-*`、临时挂载和本次测试下载物，不清理私钥备份。
+上传后分别获取 Gitee 主 feed 与 GitHub fallback feed，确认两者均返回 HTTP 200、为有效 XML、含签名并指向对应站点的本次 Universal ZIP：Release 验证 Gitee `update-release/download/appcast.xml` 和 GitHub `latest/download/appcast.xml`；Preview 验证两端 `releases/download/preview/appcast.xml`。任一 feed 非 200、无法解析、未签名或未指向本次 ZIP 时，停止发布并修复本次发布资产，不能以客户端版本比较作为替代。使用一台已安装旧 Sparkle 版应用的测试机，分别验证 Release→Release、Preview→Preview、Release→Preview 与 Preview→Release：切换通道后手动检查应先访问 Gitee；断开 Gitee 或让 Gitee 更新包下载失败时只能自动重试 GitHub 一次；开启自动下载时应在退出或重启时完成替换。再验证两端 Release 正文里的截图：每个地址都必须使用本次 `v${VERSION}` tag 的稳定下载地址，返回 HTTP 200，且下载到的字节确实是 PNG。任一截图不满足时补传附件并改正正文，不能以“本地图片没问题”替代。
+
+```zsh
+for HOST in github gitee; do
+  case "$HOST" in
+    github) RELEASE_BODY="$(gh release view "v${VERSION}" --repo wzz6423/zisla --json body --jq .body)" ;;
+    gitee) RELEASE_BODY="$(curl -sS "https://gitee.com/api/v5/repos/wzz6423/zisla/releases/tags/v${VERSION}" | jq -r .body)" ;;
+  esac
+  IMAGE_URLS=(${(f)"$(print -r -- "$RELEASE_BODY" | rg -o '!\[[^]]*\]\((https://[^)]+)\)' -r '$1')"})
+  test "${#IMAGE_URLS}" -ge 1
+  for IMAGE_URL in "${IMAGE_URLS[@]}"; do
+    [[ "$IMAGE_URL" == "https://github.com/wzz6423/zisla/releases/download/v${VERSION}/"*.png || \
+      "$IMAGE_URL" == "https://gitee.com/wzz6423/zisla/releases/download/v${VERSION}/"*.png ]]
+    IMAGE_FILE="$(mktemp "${TMPDIR:-/tmp}/zisla-release-image.XXXXXX")"
+    test "$(curl -sSL -o "$IMAGE_FILE" -w '%{http_code}' "$IMAGE_URL")" = 200
+    file -b "$IMAGE_FILE" | rg -q '^PNG image data'
+    rm -f "$IMAGE_FILE"
+  done
+done
+```
+
+最后在仓库根目录执行 `make clean` 删除 `outputs/`（含 `.staging/`）与本地调试产物，并清理 `.release-*`、临时挂载和本次测试下载物，不清理私钥备份。
 
 ## 交付记录
 
-在 Release 正文中写清楚版本类型、签名方式、公证状态、已测试的 macOS 范围、WeatherKit 限制、GitHub Issues/PR 入口，以及 Gitee 不受理 Issues/PR 的事实。说明首次安装需手动完成，Sparkle 版后续更新会自动验签并在退出或重启时安装。不要包含证书序列号、访问令牌、私钥、Keychain 密码或个人 Apple ID 信息。
+在 Release 正文中写清楚版本类型、签名方式、公证状态、已测试的 macOS 范围、WeatherKit 限制、GitHub Issues/PR 入口，以及 Gitee 不受理 Issues/PR 的事实。说明首次安装需手动完成，Sparkle 版后续更新会自动验签并在退出或重启时安装。不要包含证书序列号、访问令牌、私钥、Keychain 密码或个人 Apple ID 信息。截图不由 `make build-package` 产出，也不属于 `outputs/`：先将截图作为 `v${VERSION}` Release 的附件上传，再在正文引用该 tag 的稳定地址；若两端都承载截图，则分别引用各自站点的地址。

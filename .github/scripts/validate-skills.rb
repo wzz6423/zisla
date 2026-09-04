@@ -8,6 +8,7 @@ require 'yaml'
 ALLOWED_FIELDS = %w[name description license compatibility metadata allowed-tools].freeze
 NAME_PATTERN = /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/
 MARKDOWN_LINK_PATTERN = /!?\[[^\]\n]*\]\(\s*(?:<([^>\n]+)>|([^\s)]+))[^\n]*?\)/
+RELEASE_DOWNLOAD_URL_PATTERN = %r{https?://(?:github|gitee)\.com/[^/\s]+/[^/\s]+/releases/download/([^\s`"'()<>]+)}
 
 class SkillValidator
   def initialize(skills_directory)
@@ -57,6 +58,7 @@ class SkillValidator
     validate_frontmatter(skill_file, directory.basename.to_s, frontmatter)
     add_error(skill_file, 'Markdown body must not be empty') if body.strip.empty?
     validate_links(skill_file, directory, body)
+    validate_release_download_urls(skill_file, body)
   end
 
   def parse_skill(skill_file)
@@ -139,6 +141,15 @@ class SkillValidator
       validate_local_path(skill_file, skill_directory, local_path)
     rescue ArgumentError => e
       add_error(skill_file, "invalid local Markdown reference #{destination.inspect}: #{e.message}")
+    end
+  end
+
+  def validate_release_download_urls(skill_file, body)
+    body.scan(RELEASE_DOWNLOAD_URL_PATTERN).each do |(path)|
+      # GitHub 和 Gitee 的 Release 资产路径应为 <tag>/<file>；多出的路径段表示 tag 带了前缀。
+      next if path.split('/').reject(&:empty?).length <= 2
+
+      add_error(skill_file, "release download URL must use an unprefixed tag: #{path}")
     end
   end
 
