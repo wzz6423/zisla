@@ -30,7 +30,6 @@ updates:
     directory: /mac
     schedule:
       interval: monthly
-      day: "1"
       time: "04:30"
       timezone: Asia/Shanghai
     open-pull-requests-limit: 2
