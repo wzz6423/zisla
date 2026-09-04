@@ -166,7 +166,7 @@ summary:focus-visible {
 
 .section-title {
   margin: 0;
-  font-size: var(--text-4xl);
+  font-size: clamp(32px, 3.4vw, var(--text-4xl));
   font-weight: 700;
   letter-spacing: 0;
   line-height: var(--leading-tight);
@@ -422,6 +422,16 @@ summary:focus-visible {
   color: var(--paper);
 }
 
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(54% 44% at 76% 32%, rgba(237, 109, 95, 0.13), transparent 62%),
+    radial-gradient(38% 34% at 16% 82%, rgba(237, 109, 95, 0.05), transparent 60%);
+  pointer-events: none;
+}
+
 .hero-inner {
   position: relative;
   z-index: 1;
@@ -484,7 +494,7 @@ summary:focus-visible {
 
 .hero-title {
   margin: 0 0 var(--space-5);
-  font-size: 52px;
+  font-size: clamp(42px, 4.6vw, 58px);
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1.08;
@@ -623,7 +633,7 @@ summary:focus-visible {
 }
 
 .proof-item strong {
-  font-size: 14.5px;
+  font-size: var(--text-md);
   font-weight: 700;
   letter-spacing: 0;
 }
@@ -637,9 +647,25 @@ summary:focus-visible {
 /* ============ Download section ============ */
 
 .download-section {
+  position: relative;
+  overflow: hidden;
   background: var(--ink-deep);
   color: var(--paper);
   padding: 110px 0;
+}
+
+.download-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(48% 62% at 86% 16%, rgba(237, 109, 95, 0.12), transparent 62%),
+    radial-gradient(34% 44% at 8% 90%, rgba(237, 109, 95, 0.05), transparent 60%);
+  pointer-events: none;
+}
+
+.download-section .section-wrap {
+  position: relative;
 }
 
 .download-layout {
@@ -651,7 +677,7 @@ summary:focus-visible {
 
 .download-title {
   margin: 0 0 var(--space-2);
-  font-size: var(--text-4xl);
+  font-size: clamp(32px, 3.4vw, var(--text-4xl));
   letter-spacing: 0;
 }
 
@@ -672,6 +698,7 @@ summary:focus-visible {
   display: grid;
   gap: 0;
   margin: 0;
+  border-top: 1px solid rgba(245, 246, 247, 0.16);
 }
 
 .download-note {
@@ -683,7 +710,7 @@ summary:focus-visible {
 }
 
 .download-note dt {
-  color: rgba(245, 246, 247, 0.45);
+  color: var(--signal);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: 0;
@@ -1537,11 +1564,24 @@ summary:focus-visible {
   gap: var(--space-3);
   padding: 11px 13px;
   border: 1px solid rgba(245, 246, 247, 0.18);
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--ink-deep);
 }
 
+/* Traffic-light dots read as a terminal window at a glance. */
+.command-box::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-right: 26px;
+  border-radius: 50%;
+  background: #ff5f57;
+  box-shadow: 13px 0 0 #febc2e, 26px 0 0 #28c840;
+}
+
 .command-box code {
+  flex: 1;
   overflow-x: auto;
   color: var(--paper-deep);
   font-family: var(--font-mono);
@@ -1596,7 +1636,6 @@ summary:focus-visible {
   }
 }
 
-.download-section,
 .developers-section,
 .flow-section {
   border-top: 1px solid rgba(17, 18, 20, 0.12);
@@ -1606,60 +1645,6 @@ summary:focus-visible {
 .flow-section,
 .developers-section {
   background: var(--paper-deep);
-}
-
-.download-section {
-  background: var(--paper);
-  color: var(--ink);
-}
-
-.download-section .eyebrow {
-  color: var(--signal-deep);
-}
-
-.download-copy {
-  color: var(--muted);
-}
-
-.download-section .button-light {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--paper);
-}
-
-.download-section .button-light:hover {
-  background: var(--ink-soft);
-  box-shadow: 0 10px 24px rgba(10, 13, 18, 0.14);
-}
-
-.download-section .button-ghost {
-  border-color: rgba(17, 18, 20, 0.22);
-  color: var(--ink);
-}
-
-.download-section .button-ghost:hover {
-  border-color: var(--signal-deep);
-  background: rgba(237, 109, 95, 0.05);
-}
-
-.download-notes {
-  border-top: 1px solid rgba(17, 18, 20, 0.18);
-}
-
-.download-note {
-  border-bottom-color: rgba(17, 18, 20, 0.12);
-}
-
-.download-note dt {
-  color: var(--signal-deep);
-}
-
-.download-note dd {
-  color: var(--ink-soft);
-}
-
-.download-note a {
-  border-bottom-color: rgba(17, 18, 20, 0.3);
 }
 
 .faq-list {
@@ -1689,6 +1674,10 @@ summary:focus-visible {
 .faq-item summary {
   padding: var(--space-5) 0;
   transition: color var(--motion-fast) ease;
+}
+
+.faq-item summary:hover {
+  color: var(--signal-deep);
 }
 
 .faq-item[open] summary {
