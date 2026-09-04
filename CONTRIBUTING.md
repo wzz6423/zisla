@@ -10,8 +10,10 @@ Thank you for opening an issue. Search existing Issues and Discussions first so 
 
 - Use `[Bug] Short problem description` for bug reports, for example `[Bug] Voice input is not written to the current text field`. Include the zisla version, macOS version and device, installation method, reproduction steps, expected behavior, and actual behavior.
 - Use `[Feature] Short request description` for feature requests, for example `[Feature] Support custom voice-organization prompts`. Describe the problem, the proposed solution, and alternatives you considered.
+- Pick one **Area** in the form. It is required and decides the `area:*` label: `Feature Development`, `Bug Fix`, `CI & Build`, `Documentation`, or `Community & Discussion`. The Simplified Chinese forms offer the same options and map to the same labels.
 - Remove tokens, account details, local paths, and other sensitive information from logs, screenshots, and recordings.
 - Report security vulnerabilities privately through [Security Advisories](https://github.com/wzz6423/zisla/security/advisories/new) instead of opening a public issue.
+- Automation applies `bug` or `enhancement` together with the matching `area:*` label, and leaves every other label untouched. When the title prefix or a required field does not follow the form, it also applies `needs-more-info` and keeps a single comment listing what is missing; edit the issue and that comment updates itself.
 
 ## Development
 
@@ -35,6 +37,7 @@ Remove test, build, and packaging binaries before committing.
 
 Thank you for opening a pull request. Check these requirements while it is awaiting review.
 
+- The PR body must also keep the GitHub Project section with the exact value Project: zisla Development. CI uses it to place the pull request on the shared project board.
 - The **PR title** must use an English Conventional Commit subject, for example:
   - `feat(ci): add PR quality gates`
   - `fix(mac): resolve memory leak in overlay`

@@ -2,6 +2,11 @@
 
 <!-- Describe the purpose and implementation in English. -->
 
+## GitHub Project
+
+<!-- Keep the exact project name so CI can place this pull request on the shared board. -->
+- Project: zisla Development
+
 ## PR Type
 
 <!-- Keep exactly one type. It must match the type in the PR title. -->

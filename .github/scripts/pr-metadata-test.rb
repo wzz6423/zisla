@@ -49,6 +49,12 @@ class PullRequestMetadataTest < Minitest::Test
     assert_includes errors.join("\n"), 'exactly one'
   end
 
+  def test_requires_the_configured_github_project
+    assert_includes validate('ci: add automation', project: '').join("\n"), 'GitHub Project must declare exactly one'
+    assert_includes validate('ci: add automation', project: 'another project').join("\n"), 'must be "zisla Development"'
+    assert_empty validate('ci: add automation')
+  end
+
   def test_requires_validation_status_and_fields
     assert_includes validate('ci: add automation', validation: '- Status: skipped').join("\n"), 'one exact status'
     assert_includes validate('ci: add automation', validation: '- Status: passed').join("\n"), 'non-empty Command'
@@ -160,11 +166,15 @@ class PullRequestMetadataTest < Minitest::Test
     PullRequestMetadata.parse(build_body(**overrides), @contract)
   end
 
-  def build_body(type: 'ci', validation: nil, related: 'None', attribution: '- Agent: None')
+  def build_body(type: 'ci', project: 'zisla Development', validation: nil, related: 'None', attribution: '- Agent: None')
     <<~BODY
       ## Summary
 
       - Add pull request automation.
+
+      ## GitHub Project
+
+      - Project: #{project}
 
       ## PR Type
 

@@ -10,8 +10,10 @@
 
 - 缺陷报告标题使用 `[Bug] 简短问题描述`，例如 `[Bug] 语音输入结束后未写入当前文本框`。正文至少包含 zisla 版本、macOS 与设备、安装方式、复现步骤、预期行为和实际行为。
 - 功能建议标题使用 `[Feature] 简短需求描述`，例如 `[Feature] 支持自定义语音整理提示词`。正文说明当前问题、建议方案和已考虑的替代方案。
+- 表单中的**所属范围**为必填，它决定 `area:*` 标签：`功能开发`、`缺陷修复`、`CI 与构建`、`文档`、`社区与讨论`。英文表单提供同一组选项，并映射到同一批标签。
 - 日志、截图和录屏需先移除令牌、账号、本地路径等敏感信息。
 - 安全漏洞请通过 [安全通告](https://github.com/wzz6423/zisla/security/advisories/new) 私下报告，不要公开提交 Issue。
+- 自动化会打上 `bug` 或 `enhancement` 以及对应的 `area:*` 标签，并保留其他所有标签。标题前缀或必填字段不符合表单时会追加 `needs-more-info`，并用同一条评论列出缺失项；编辑 Issue 后该评论会自动更新。
 
 ## 开发
 
@@ -35,6 +37,7 @@ swift test
 
 感谢你提交 Pull Request。请在等待评审时确认以下要求。
 
+- PR 正文还必须保留 GitHub Project 段落，并填写 Project: zisla Development。CI 会据此把 PR 放入共享项目看板。
 - **PR 标题**必须使用英文 Conventional Commit 格式，例如：
   - `feat(ci): add PR quality gates`
   - `fix(mac): resolve memory leak in overlay`

@@ -19,7 +19,7 @@ module PullRequestMetadata
   # must never be parsed: the shipped template documents `Closes #123`, which
   # would otherwise link that issue and contradict the `None` above it.
   COMMENT = /<!--.*?-->/m
-  REQUIRED_SECTIONS = ['Summary', 'PR Type', 'Validation', 'Risk and Rollback', 'Related Issue', 'AI Attribution'].freeze
+  REQUIRED_SECTIONS = ['Summary', 'GitHub Project', 'PR Type', 'Validation', 'Risk and Rollback', 'Related Issue', 'AI Attribution'].freeze
 
   class ContractError < StandardError; end
 
@@ -35,6 +35,7 @@ module PullRequestMetadata
       @types = Array(document['types'])
       raise ContractError, 'contract declares no types' if @types.empty?
 
+      @project = document.fetch('project')
       @issue_label = document.fetch('issueLabel')
       @ai_label = document.fetch('aiLabel')
       @skip_label = document.fetch('skipLabel')
@@ -42,6 +43,10 @@ module PullRequestMetadata
 
     def type_names
       @types.map { |entry| entry['type'] }
+    end
+
+    def project_name
+      @project.fetch('name')
     end
 
     def label_for(type)
@@ -108,6 +113,7 @@ module PullRequestMetadata
     {
       'type' => type,
       'typeLabel' => type && contract.label_for(type),
+      'project' => field(parsed['GitHub Project'], 'Project'),
       'issues' => (related.scan(ISSUE_REFERENCE) + related.scan(ISSUE_URL)).flatten.map(&:to_i).uniq.sort,
       'relatedIsNone' => Array(parsed['Related Issue']).any? { |line| line.match?(/\A[[:space:]]*-?[[:space:]]*none[[:space:]]*\z/i) },
       'agent' => agent,
@@ -142,6 +148,7 @@ module PullRequestMetadata
     errors << "Missing required section(s): #{missing.map { |section| "## #{section}" }.join(', ')}." unless missing.empty?
 
     errors.concat(validate_type(metadata, contract, title_match))
+    errors.concat(validate_project(metadata, contract))
     errors.concat(validate_validation(metadata))
     errors.concat(validate_related_issue(metadata))
     errors.concat(validate_attribution(metadata))
@@ -160,6 +167,17 @@ module PullRequestMetadata
     return [] if title_match.nil? || title_match[1] == type
 
     ["PR Type #{type.inspect} does not match the title type #{title_match[1].inspect}."]
+  end
+
+  def self.validate_project(metadata, contract)
+    lines = metadata['sections']['GitHub Project']
+    return [] if lines.nil?
+
+    values = field_values(lines, 'Project')
+    return ['GitHub Project must declare exactly one "- Project: zisla Development" entry.'] unless values.length == 1
+    return [] if values.first == contract.project_name
+
+    ["GitHub Project must be #{contract.project_name.inspect}."]
   end
 
   def self.validate_validation(metadata)
@@ -227,6 +245,7 @@ def command_json(options, contract)
   puts JSON.pretty_generate(
     'type' => metadata['type'],
     'typeLabel' => metadata['typeLabel'],
+    'project' => metadata['project'],
     'issues' => metadata['issues'],
     'agent' => metadata['agent'],
     'coAuthors' => metadata['coAuthors'],

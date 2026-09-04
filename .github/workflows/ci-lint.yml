@@ -112,3 +112,24 @@ jobs:
 
       - name: Test pull request metadata
         run: ruby .github/scripts/pr-metadata-test.rb
+
+      - name: Verify the issue automation contract
+        run: ruby .github/scripts/issue-metadata.rb verify-manifest
+
+      - name: Test issue metadata
+        run: ruby .github/scripts/issue-metadata-test.rb
+
+      - name: Verify the project name is declared once
+        run: |
+          set -euo pipefail
+
+          # The PR body contract knows the project by name, the board automation by
+          # title. Nothing else links the two files, so a rename in one of them
+          # would silently stop placing pull requests on the board.
+          contract="$(jq -r '.project.name' .github/pr-automation.json)"
+          board="$(jq -r '.project.title' .github/project-automation.json)"
+          if [ "$contract" != "$board" ]; then
+            echo "::error::pr-automation.json project name $contract does not match project-automation.json title $board."
+            exit 1
+          fi
+          echo "Both contracts declare the project $contract."
