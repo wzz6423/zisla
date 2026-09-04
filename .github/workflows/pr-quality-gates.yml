@@ -38,7 +38,7 @@ jobs:
   validate:
     name: PR Quality
     needs: gate
-    if: needs.gate.outputs.skip != 'true'
+    if: github.event.pull_request.user.login != 'dependabot[bot]' && needs.gate.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
