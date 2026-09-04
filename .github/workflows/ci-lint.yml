@@ -19,8 +19,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  gate:
+    name: Skip Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      skip: ${{ steps.gate.outputs.skip }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - id: gate
+        uses: ./.github/actions/ci-skip-gate
+        with:
+          workflow-name: CI Lint
+          github-token: ${{ github.token }}
+
   actionlint:
     name: Lint Workflows
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -48,6 +69,8 @@ jobs:
 
   security:
     name: Audit Workflow Security
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -63,3 +86,50 @@ jobs:
           collect: workflows
           color: false
           version: 1.29.0
+
+  scripts:
+    name: Test CI Scripts
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Syntax check automation scripts
+        run: |
+          for script in .github/scripts/*.rb; do
+            ruby -c "$script"
+          done
+
+      - name: Verify the CI skip manifest
+        run: ruby .github/scripts/ci-skip-directives.rb verify-manifest
+
+      - name: Test CI skip directives
+        run: ruby .github/scripts/ci-skip-directives-test.rb
+
+      - name: Test pull request metadata
+        run: ruby .github/scripts/pr-metadata-test.rb
+
+      - name: Verify the issue automation contract
+        run: ruby .github/scripts/issue-metadata.rb verify-manifest
+
+      - name: Test issue metadata
+        run: ruby .github/scripts/issue-metadata-test.rb
+
+      - name: Verify the project name is declared once
+        run: |
+          set -euo pipefail
+
+          # The PR body contract knows the project by name, the board automation by
+          # title. Nothing else links the two files, so a rename in one of them
+          # would silently stop placing pull requests on the board.
+          contract="$(jq -r '.project.name' .github/pr-automation.json)"
+          board="$(jq -r '.project.title' .github/project-automation.json)"
+          if [ "$contract" != "$board" ]; then
+            echo "::error::pr-automation.json project name $contract does not match project-automation.json title $board."
+            exit 1
+          fi
+          echo "Both contracts declare the project $contract."

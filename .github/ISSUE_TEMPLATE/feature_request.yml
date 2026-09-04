@@ -8,6 +8,19 @@ body:
     attributes:
       value: |
         Search existing Issues and Discussions first to avoid duplicate proposals.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Pick the area this issue belongs to. It decides the `area:*` label.
+      options:
+        - Feature Development
+        - Bug Fix
+        - CI & Build
+        - Documentation
+        - Community & Discussion
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:

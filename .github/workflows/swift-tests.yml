@@ -19,8 +19,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  gate:
+    name: Skip Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      skip: ${{ steps.gate.outputs.skip }}
+      relevant: ${{ steps.gate.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - id: gate
+        uses: ./.github/actions/ci-skip-gate
+        with:
+          workflow-name: Swift Tests
+          github-token: ${{ github.token }}
+
   test:
     name: Swift Tests
+    needs: gate
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: macos-26
     timeout-minutes: 30
     defaults:
@@ -52,6 +74,8 @@ jobs:
 
   zislactl:
     name: Build zislactl (Release)
+    needs: gate
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: macos-26
     timeout-minutes: 20
     defaults:
@@ -74,6 +98,8 @@ jobs:
 
   app-smoke:
     name: App Build Smoke Test
+    needs: gate
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: macos-26
     timeout-minutes: 30
     defaults:
@@ -107,6 +133,8 @@ jobs:
 
   codeql:
     name: CodeQL (swift)
+    needs: gate
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: macos-26
     timeout-minutes: 45
     permissions:
