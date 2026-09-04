@@ -26,6 +26,7 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github-token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         WORKFLOW_NAME: ${{ inputs.workflow-name }}
       run: |
         set -euo pipefail
@@ -59,9 +60,18 @@ runs:
 
         # flatten(1) keeps the output shape stable whether or not gh slurps pages.
         if ! gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
-          | jq 'flatten(1) | [.[] | {login: .user.login, association: .author_association, body: .body}]' \
+          | jq 'flatten(1) | [.[] | {login: .user.login, association: .author_association,
+              body: .body, created_at: .created_at}]' \
           > "$comments"; then
           fail_open 'The pull request comments could not be read.'
+        fi
+
+        # The head commit's own date, not the run's clock: a directive written
+        # before this commit existed has to expire, or one `skip-all` would keep
+        # disabling the checks for every later push to the same pull request.
+        if ! head_date="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA" \
+          --jq '.commit.committer.date')" || [[ -z "$head_date" ]]; then
+          fail_open 'The head commit date could not be read.'
         fi
 
         if ! gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
@@ -80,6 +90,7 @@ runs:
         if ! skip="$(ruby "$GITHUB_ACTION_PATH/../../scripts/ci-skip-directives.rb" resolve \
           --comments "$comments" \
           --reviewers "$reviewers" \
+          --since "$head_date" \
           --for "$WORKFLOW_NAME")"; then
           fail_open 'The skip directives could not be resolved.'
         fi
