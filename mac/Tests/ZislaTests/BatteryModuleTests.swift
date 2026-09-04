@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import ZislaKit
 
@@ -127,5 +128,96 @@ struct BatteryModuleTests {
         #expect(presentation.topology == .adapterToMac)
         #expect(presentation.batteryWatts == 0)
         #expect(presentation.batteryRoute == .idle)
+    }
+
+    @Test
+    func displaysBatteryHistoryWhileRunningOnBattery() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let snapshot = BatterySnapshot(
+            level: 0.59,
+            isCharging: false,
+            isPluggedIn: false,
+            isCharged: false,
+            timeRemainingMinutes: 180
+        )
+
+        let presentation = BatteryHistoryPresentation(
+            battery: snapshot,
+            lastFullyChargedAt: now.addingTimeInterval(-2 * 3_600 - 5 * 60),
+            lastUnpluggedAt: now.addingTimeInterval(-65 * 60),
+            now: now
+        )
+
+        #expect(presentation.text == "上次充满 2小时5分，已脱电使用 1小时5分")
+    }
+
+    @Test
+    func hidesBatteryHistoryWhileChargingOnly() {
+        let now = Date(timeIntervalSince1970: 11_000)
+        let history = (
+            lastFullyChargedAt: now.addingTimeInterval(-7_200),
+            lastUnpluggedAt: now.addingTimeInterval(-3_600)
+        )
+
+        let charging = BatterySnapshot(
+            level: 0.8,
+            isCharging: true,
+            isPluggedIn: true,
+            isCharged: false,
+            timeRemainingMinutes: 30
+        )
+        let pluggedIn = BatterySnapshot(
+            level: 1,
+            isCharging: false,
+            isPluggedIn: true,
+            isCharged: true,
+            timeRemainingMinutes: nil
+        )
+
+        #expect(
+            BatteryHistoryPresentation(
+                battery: charging,
+                lastFullyChargedAt: history.lastFullyChargedAt,
+                lastUnpluggedAt: history.lastUnpluggedAt,
+                now: now
+            ).text == nil
+        )
+        #expect(
+            BatteryHistoryPresentation(
+                battery: pluggedIn,
+                lastFullyChargedAt: history.lastFullyChargedAt,
+                lastUnpluggedAt: history.lastUnpluggedAt,
+                now: now
+            ).text == "上次充满 2小时0分，已脱电使用 1小时0分"
+        )
+    }
+
+    @Test
+    func hidesBatteryHistoryWhenEitherTimestampIsMissing() {
+        let now = Date(timeIntervalSince1970: 12_000)
+        let snapshot = BatterySnapshot(
+            level: 0.5,
+            isCharging: false,
+            isPluggedIn: false,
+            isCharged: false,
+            timeRemainingMinutes: 120
+        )
+
+        #expect(
+            BatteryHistoryPresentation(
+                battery: snapshot,
+                lastFullyChargedAt: nil,
+                lastUnpluggedAt: now.addingTimeInterval(-60),
+                now: now
+            ).text == nil
+        )
+        #expect(
+            BatteryHistoryPresentation(
+                battery: snapshot,
+                lastFullyChargedAt: now.addingTimeInterval(-60),
+                lastUnpluggedAt: nil,
+                now: now
+            ).text == nil
+        )
     }
 }

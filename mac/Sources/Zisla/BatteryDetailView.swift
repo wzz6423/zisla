@@ -67,6 +67,40 @@ struct LocalPowerFlowPresentation: Equatable {
     }
 }
 
+struct BatteryHistoryPresentation: Equatable {
+    let text: String?
+
+    init(
+        battery: BatterySnapshot,
+        lastFullyChargedAt: Date?,
+        lastUnpluggedAt: Date?,
+        now: Date
+    ) {
+        guard !battery.isCharging,
+              let lastFullyChargedAt,
+              let lastUnpluggedAt
+        else {
+            text = nil
+            return
+        }
+
+        text = "上次充满 \(Self.durationText(from: lastFullyChargedAt, to: now))，已脱电使用 \(Self.durationText(from: lastUnpluggedAt, to: now))"
+    }
+
+    static func durationText(from start: Date, to end: Date) -> String {
+        let totalSeconds = max(0, Int(end.timeIntervalSince(start)))
+        return durationText(forMinutes: totalSeconds / 60)
+    }
+
+    static func durationText(forMinutes minutes: Int) -> String {
+        let normalizedMinutes = max(0, minutes)
+        let hours = normalizedMinutes / 60
+        let remainder = normalizedMinutes % 60
+        if hours > 0 { return "\(hours)小时\(remainder)分" }
+        return "\(remainder)分钟"
+    }
+}
+
 private struct LocalPowerFlowView: View {
     let battery: BatterySnapshot
 
@@ -578,6 +612,7 @@ struct BatteryDetailView: View {
                 Label("本机电池", systemImage: "laptopcomputer")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer(minLength: 8)
+                batteryHistoryView(for: battery)
                 Text(statusText(battery))
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
@@ -606,6 +641,31 @@ struct BatteryDetailView: View {
                     value: timeRemainingText(minutes)
                 )
                 .padding(.horizontal, 2)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func batteryHistoryView(for battery: BatterySnapshot) -> some View {
+        if !battery.isCharging,
+           batteryMonitor.lastFullyChargedAt != nil,
+           batteryMonitor.lastUnpluggedAt != nil {
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                let presentation = BatteryHistoryPresentation(
+                    battery: battery,
+                    lastFullyChargedAt: batteryMonitor.lastFullyChargedAt,
+                    lastUnpluggedAt: batteryMonitor.lastUnpluggedAt,
+                    now: context.date
+                )
+                if let text = presentation.text {
+                    Text(text)
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .layoutPriority(1)
+                }
             }
         }
     }
@@ -965,10 +1025,7 @@ struct BatteryDetailView: View {
     }
 
     private func timeRemainingText(_ minutes: Int) -> String {
-        let hours = minutes / 60
-        let remainder = minutes % 60
-        if hours > 0 { return "\(hours)小时\(remainder)分" }
-        return "\(remainder)分钟"
+        BatteryHistoryPresentation.durationText(forMinutes: minutes)
     }
 
     private func batteryLevelTint(_ level: Double) -> Color {
