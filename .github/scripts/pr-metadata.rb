@@ -15,6 +15,10 @@ module PullRequestMetadata
   ISSUE_URL = %r{#{CLOSING_KEYWORD}[[:space:]]+https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/issues/(\d+)}
   COAUTHOR_TRAILER = /\A[^<>]+<[^<>@[:space:]]+@[^<>[:space:]]+>\z/
   PLACEHOLDER = /\A<!--/
+  # Nothing inside a template comment is visible in the rendered body, so it
+  # must never be parsed: the shipped template documents `Closes #123`, which
+  # would otherwise link that issue and contradict the `None` above it.
+  COMMENT = /<!--.*?-->/m
   REQUIRED_SECTIONS = ['Summary', 'PR Type', 'Validation', 'Risk and Rollback', 'Related Issue', 'AI Attribution'].freeze
 
   class ContractError < StandardError; end
@@ -64,7 +68,7 @@ module PullRequestMetadata
 
   def self.sections(body)
     current = nil
-    body.to_s.gsub("\r\n", "\n").each_line.each_with_object({}) do |raw_line, map|
+    body.to_s.gsub("\r\n", "\n").gsub(COMMENT, '').each_line.each_with_object({}) do |raw_line, map|
       line = raw_line.chomp
       heading = line.match(/\A##[[:space:]]+(.+?)[[:space:]]*\z/)
       if heading

@@ -126,6 +126,21 @@ class PullRequestMetadataTest < Minitest::Test
     assert_nil parse(attribution: '- Agent: none')['agent']
   end
 
+  def test_repository_template_needs_only_its_own_fields_filled_in
+    template = File.read(File.expand_path('../PULL_REQUEST_TEMPLATE.md', __dir__))
+                   .sub(/^- Type:$/, '- Type: ci')
+                   .sub(/^- Status:.*$/, '- Status: not run')
+                   .sub(/^- Reason:.*$/, '- Reason: Automation only.')
+    metadata = PullRequestMetadata.parse(template, @contract)
+
+    # The comment above the Related Issue placeholder documents `Closes #123`, so
+    # a contributor who keeps the invisible comments must not have that issue
+    # linked, labelled or reported as contradicting the `None` they left in place.
+    assert_empty metadata['issues']
+    assert_equal ['ci'], PullRequestMetadata.labels(metadata, @contract)
+    assert_empty PullRequestMetadata.validate(title: 'ci: fill in the template', body: template, contract: @contract)
+  end
+
   def test_repository_template_declares_every_required_section
     template = File.read(File.expand_path('../PULL_REQUEST_TEMPLATE.md', __dir__))
     sections = PullRequestMetadata.sections(template)
