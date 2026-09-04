@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import ZislaCore
 
 final class TypingStatsSQLiteConnection: @unchecked Sendable {
     enum ReusableStatementKey: Hashable {
@@ -208,10 +209,7 @@ actor TypingStatsStore: TypingStatsPersistence {
     }
 
     nonisolated static func defaultDatabaseURL() -> URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library", isDirectory: true)
-            .appendingPathComponent("Application Support", isDirectory: true)
-            .appendingPathComponent("SimuBoard", isDirectory: true)
+        LegacyAppDataMigration.applicationSupport
             .appendingPathComponent("typing-stats.sqlite3", isDirectory: false)
     }
 
@@ -493,6 +491,10 @@ actor TypingStatsStore: TypingStatsPersistence {
             try execute("PRAGMA journal_mode = WAL;", in: openedDatabase)
             try execute("PRAGMA synchronous = NORMAL;", in: openedDatabase)
             try migrateIfNeeded(openedDatabase)
+            // A crash or a force quit leaves every recent write sitting in the WAL; reclaiming
+            // it at launch keeps the sidecar from carrying over between sessions. Best-effort
+            // because a concurrent reader legitimately defers it to the next launch.
+            try? execute("PRAGMA wal_checkpoint(TRUNCATE);", in: openedDatabase)
             connection = TypingStatsSQLiteConnection(pointer: openedDatabase)
             return openedDatabase
         } catch {
@@ -918,6 +920,11 @@ actor TypingStatsStore: TypingStatsPersistence {
             "SELECT Id FROM AppProfile WHERE ProcessKey = ?1 LIMIT 1;",
             in: database
         )
+        // A cached statement parked on SQLITE_ROW keeps its read transaction open, which blocks
+        // every WAL checkpoint for the rest of the process lifetime. cachedApplicationIDs means
+        // this statement is normally never stepped again, so reusableStatement's lazy reset on
+        // the next borrow would never run.
+        defer { sqlite3_reset(select) }
         try bind(application.processKey, at: 1, to: select, in: database)
         let result = sqlite3_step(select)
         guard result == SQLITE_ROW else { throw queryError(database, code: result) }
