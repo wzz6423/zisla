@@ -209,7 +209,7 @@ app.innerHTML = `
           <aside class="workflow-summary reveal">
             <span class="mono-label">${showcaseModules.length} MODULES / ${showcaseGroups.length} WORKFLOWS</span>
             <p>从顶部工作流到本地工具，实际能完成的任务都在这里逐项写清。</p>
-            <span>${showcaseModules.length} 个顶部模块 + ${crossModuleFeatures.length} 项独立能力，覆盖截图、语音、媒体、下载、AI 管理、宠物与锁屏。</span>
+            <span>${showcaseModules.length} 个顶部模块 + ${crossModuleFeatures.length} 项独立能力，覆盖截图、语音、媒体、下载、复制助手、AI 管理、宠物与锁屏。</span>
           </aside>
           <div class="workflow-groups">${workflowMarkup}</div>
         </div>
@@ -322,7 +322,7 @@ app.innerHTML = `
         <div class="download-copy-block reveal-step" style="--reveal-index: 0">
           <p class="eyebrow">READY WHEN YOU ARE</p>
           <h2 class="download-title">下载 zisla</h2>
-          <p class="download-copy">适用于 Apple 芯片 Mac；版本、其他架构与校验信息均在 Release 页面。安装后可按更新通道检查新版本，并选择手动或自动下载安装包。</p>
+          <p class="download-copy">适用于 Apple 芯片 Mac；版本、其他架构与校验信息均在 Release 页面。安装后可按更新通道检查新版本，Sparkle 会先验证签名，再按设置手动或自动下载、安装并重启。</p>
           <div class="download-actions">
             <a class="button button-light" href="${latestRelease.dmg}" download aria-label="下载">${icon('download', 16)}下载</a>
             <a class="button button-ghost" href="${latestRelease.releasePage}" target="_blank" rel="noreferrer" aria-label="在 GitHub 上查看发布详情">${icon('external-link', 16)}查看 Release</a>

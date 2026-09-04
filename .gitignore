@@ -1,14 +1,15 @@
 # Shared workspace files
 .DS_Store
 
-# Web test artifacts
-/Web/.playwright/
-/Web/screenshots/
+# web test artifacts
+/web/.playwright/
+/web/screenshots/
 .playwright-cli/
 .impeccable/
 
 # Generated reports
 **/[Rr]eports/
+/output/
 
 # Future Windows build outputs
 /windows/[Bb]in/

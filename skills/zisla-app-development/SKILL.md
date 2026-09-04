@@ -1,6 +1,6 @@
 ---
 name: zisla-app-development
-description: 此技能用于开发、修复、重构或评审 zisla 应用及其 macOS、Web、Windows 代码。执行最小可验证修改，要求 AI 编写风险驱动的自动化测试，并把真实设备和真实交互体验验收明确交给开发者。
+description: 此技能用于开发、修复、重构或评审 zisla 应用及其 macOS、web、Windows 代码。执行最小可验证修改，要求 AI 编写风险驱动的自动化测试，并把真实设备和真实交互体验验收明确交给开发者。
 ---
 
 # zisla 应用开发
@@ -42,7 +42,7 @@ description: 此技能用于开发、修复、重构或评审 zisla 应用及其
 
 ## 编写可执行测试 case
 
-将 case 放入与被测模块对应的既有测试目标：Core 放入 `mac/Tests/ZislaCoreTests`，服务与系统适配逻辑放入 `mac/Tests/ZislaKitTests`，应用行为契约放入 `mac/Tests/ZislaTests`，shell 构建/打包行为放入 `mac/Tests/ScriptTests`；Web 使用已有 `Web/` 测试工具链。测试必须验证外部可观察契约，而不是私有实现调用次数。
+将 case 放入与被测模块对应的既有测试目标：Core 放入 `mac/Tests/ZislaCoreTests`，服务与系统适配逻辑放入 `mac/Tests/ZislaKitTests`，应用行为契约放入 `mac/Tests/ZislaTests`，shell 构建/打包行为放入 `mac/Tests/ScriptTests`；web 使用已有 `web/` 测试工具链。测试必须验证外部可观察契约，而不是私有实现调用次数。
 
 每个新增或改动的行为至少覆盖：正常路径、空/边界输入、无效输入或依赖失败、状态不变性/资源清理，以及此前回归路径。为每个 case 写清确定的前置状态、唯一断言目标和失败信息；固定时钟、随机源、网络和文件系统边界，避免 `sleep` 竞态和真实互联网依赖。
 
@@ -71,10 +71,12 @@ description: 此技能用于开发、修复、重构或评审 zisla 应用及其
 
 ## 运行、隔离与清理
 
-1. 先运行与改动直接对应的最快 case，再运行该模块测试、必要的集成/脚本测试，最后运行与风险相称的构建或 smoke 检查。使用仓库既有命令；运行 Swift 测试时优先将 `swift test --scratch-path` 指向本次创建的唯一临时目录，避免在脏工作区留下 `.build`。Web 常用入口为 `npm --prefix Web run typecheck`、`npm --prefix Web run test` 和 `npm --prefix Web run build`（仅在对应变更相关时执行）。
+1. 先运行与改动直接对应的最快 case，再运行该模块测试、必要的集成/脚本测试，最后运行与风险相称的构建或 smoke 检查。使用仓库既有命令；运行 Swift 测试时优先将 `swift test --scratch-path` 指向本次创建的唯一临时目录，避免在脏工作区留下 `.build`。web 常用入口为 `npm --prefix web run typecheck`、`npm --prefix web run test` 和 `npm --prefix web run build`（仅在对应变更相关时执行）。
 2. 为新增临时文件、数据库、模拟服务和构建缓存创建唯一的 `mktemp -d` 目录，记录精确路径；测试结束只删除本次创建且已确认的路径。不得删除预存的 `.build`、`dist`、用户数据或其他未确认目录。
-3. 将高成本 fuzz、chaos、性能和真实系统集成测试设计为显式 opt-in；默认测试保持快速、离线、确定、可并行。若它们进入 CI，设置确定预算、超时、资源上限和失败语料归档规则。
-4. 失败时保留最小可复现输入和不含敏感信息的日志，修复根因后重跑相关 case；不通过删除、放宽断言、随机重试或 `skip` 来制造绿色结果。
+3. 自动或临时生成的报告、调研/分析/审查资料、测试导出物和临时工作文件默认不得写入仓库或纳入提交；确有长期版本化价值的文档，须明确其产品/项目用途、所有者和目标目录后按项目文档处理，不得将过程材料以文档名义保留。
+4. 提交或创建 PR 前，使用 `git status --short` 和 `git diff --cached --name-only` 检查工作区与暂存区，移除所有非版本化过程产物。
+5. 将高成本 fuzz、chaos、性能和真实系统集成测试设计为显式 opt-in；默认测试保持快速、离线、确定、可并行。若它们进入 CI，设置确定预算、超时、资源上限和失败语料归档规则。
+6. 失败时保留最小可复现输入和不含敏感信息的日志，修复根因后重跑相关 case；不通过删除、放宽断言、随机重试或 `skip` 来制造绿色结果。
 
 ## 交付与人工验收交接
 

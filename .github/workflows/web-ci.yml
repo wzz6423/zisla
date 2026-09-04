@@ -28,16 +28,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Check if Web directory exists
+      - name: Check if web directory exists
         id: check-web
         run: |
-          if [ ! -d "Web" ]; then
+          if [ ! -d "web" ]; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "Web directory not present in this revision."
-          elif [ -f "Web/package.json" ] && [ -f "Web/package-lock.json" ]; then
+            echo "web directory not present in this revision."
+          elif [ -f "web/package.json" ] && [ -f "web/package-lock.json" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Web/package.json and Web/package-lock.json are both required." >&2
+            echo "web/package.json and web/package-lock.json are both required." >&2
             exit 1
           fi
 
@@ -47,41 +47,41 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: Web/package-lock.json
+          cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
         if: steps.check-web.outputs.exists == 'true'
-        working-directory: Web
+        working-directory: web
         run: npm ci
 
       - name: Type check
         if: steps.check-web.outputs.exists == 'true'
-        working-directory: Web
+        working-directory: web
         run: npm run typecheck
 
       - name: Lint
         if: steps.check-web.outputs.exists == 'true'
-        working-directory: Web
+        working-directory: web
         run: npm run lint --if-present
 
       - name: Test
         if: steps.check-web.outputs.exists == 'true'
-        working-directory: Web
+        working-directory: web
         run: npm run test --if-present
 
       - name: Build
         if: steps.check-web.outputs.exists == 'true'
-        working-directory: Web
+        working-directory: web
         run: npm run build
 
       - name: Audit production dependencies
         if: steps.check-web.outputs.exists == 'true'
-        working-directory: Web
+        working-directory: web
         run: npm audit --omit=dev --audit-level=high
 
       - name: Verify build artifacts
         if: steps.check-web.outputs.exists == 'true'
-        working-directory: Web
+        working-directory: web
         run: |
           test -f dist/index.html || { echo "dist/index.html not found"; exit 1; }
           test -s dist/index.html || { echo "dist/index.html is empty"; exit 1; }
@@ -95,13 +95,13 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: Web-Build
-          path: Web/dist/
+          path: web/dist/
           retention-days: 7
           if-no-files-found: error
 
       - name: Clean up build artifacts
         if: always() && steps.check-web.outputs.exists == 'true'
-        working-directory: Web
+        working-directory: web
         run: rm -rf dist node_modules
 
   codeql:
@@ -117,14 +117,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Check if Web directory exists
+      - name: Check if web directory exists
         id: check-web
         run: |
-          if [ -d "Web" ]; then
+          if [ -d "web" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "Web directory not present in this revision."
+            echo "web directory not present in this revision."
           fi
 
       - uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
