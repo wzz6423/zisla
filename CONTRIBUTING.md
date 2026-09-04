@@ -28,7 +28,7 @@ Remove test, build, and packaging binaries before committing.
 
 ## Branches and commits
 
-- Create branches from the latest `main` and use a `feature/`, `fix/`, `docs/`, or `chore/` prefix, such as `fix/download-timeout`.
+- Create branches from the latest `main` and prefix them with the type the pull request will declare — `feat/` (or `feature/`), `fix/`, `docs/`, `style/`, `refactor/`, `perf/`, `test/`, `chore/`, `build/`, `ci/`, or `revert/` — such as `fix/download-timeout` or `ci/skip-directive-timing`.
 - Use the English [Conventional Commits](https://www.conventionalcommits.org/) format, such as `type(scope): description` or `fix(ui): resolve layout issue in notch area`.
 - Keep one branch and one pull request focused on one clear goal; avoid formatting-only changes and unrelated refactors.
 - `publish-v*` branches are reserved for release maintenance. Submit all other contributions to `main`.

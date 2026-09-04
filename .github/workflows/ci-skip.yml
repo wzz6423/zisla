@@ -106,6 +106,7 @@ jobs:
             "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$HEAD_SHA&per_page=100" \
             | jq '[.[].workflow_runs[]]' > "$RUNNER_TEMP/runs.json"
 
+          : > "$RUNNER_TEMP/cancelled-runs.txt"
           while IFS= read -r workflow; do
             WORKFLOW_NAME="$workflow" jq -r \
               '.[] | select(.name == env.WORKFLOW_NAME and .status != "completed") | .id' \
@@ -114,8 +115,39 @@ jobs:
               echo "::notice::Cancelling run $run_id of $workflow"
               gh api --method POST \
                 "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/cancel" >/dev/null || true
+              echo "$run_id" >> "$RUNNER_TEMP/cancelled-runs.txt"
             done
           done < <(jq -r '.workflows[]' "$RUNNER_TEMP/decision.json")
+
+      # Cancellation is asynchronous: the API answers while the runner is still
+      # finalizing the job, so the cancelled check run completes after the
+      # successful one reported below. GitHub resolves a check name to its newest
+      # run, so reporting without waiting hands the name back to the cancelled job
+      # and leaves a required check red.
+      - name: Wait for the cancelled runs to finish
+        if: steps.resolve.outputs.workflow-count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          POLL_SECONDS: 5
+          TIMEOUT_SECONDS: 300
+        run: |
+          set -euo pipefail
+
+          deadline=$(( $(date +%s) + TIMEOUT_SECONDS ))
+
+          while IFS= read -r run_id; do
+            while :; do
+              status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --jq '.status')"
+              if [ "$status" = completed ]; then
+                break
+              fi
+              if [ "$(date +%s)" -ge "$deadline" ]; then
+                echo "::warning title=CI skip degraded::Run $run_id is still $status; its checks may stay red."
+                break
+              fi
+              sleep "$POLL_SECONDS"
+            done
+          done < "$RUNNER_TEMP/cancelled-runs.txt"
 
       - name: Report skipped checks as successful
         if: steps.resolve.outputs.workflow-count != '0'
@@ -203,4 +235,5 @@ jobs:
           rm -f "$RUNNER_TEMP/pull-request.json" "$RUNNER_TEMP/comments-raw.json" \
             "$RUNNER_TEMP/comments.json" "$RUNNER_TEMP/reviewers.json" \
             "$RUNNER_TEMP/decision.json" "$RUNNER_TEMP/runs.json" \
-            "$RUNNER_TEMP/summary.md" "$RUNNER_TEMP/comment.json"
+            "$RUNNER_TEMP/cancelled-runs.txt" "$RUNNER_TEMP/summary.md" \
+            "$RUNNER_TEMP/comment.json"
