@@ -99,7 +99,36 @@ jobs:
       - name: Audit production dependencies
         if: steps.check-web.outputs.exists == 'true'
         working-directory: web
-        run: npm audit --omit=dev --audit-level=high
+        run: |
+          max_attempts=3
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            if audit_output="$(timeout 120s npm audit --omit=dev --audit-level=high 2>&1)"; then
+              printf '%s\n' "$audit_output"
+              exit 0
+            else
+              audit_status=$?
+            fi
+            printf '%s\n' "$audit_output" >&2
+
+            if [ "$audit_status" -eq 124 ]; then
+              failure_reason="timed out after 120 seconds"
+            elif printf '%s\n' "$audit_output" | grep -Eqi '(EAI_AGAIN|ECONNRESET|ECONNREFUSED|ENETUNREACH|ENOTFOUND|ETIMEDOUT|E500|E502|E503|E504|(^|[^0-9])50(0|2|3|4)([^0-9]|$))'; then
+              failure_reason="transient registry or network error"
+            else
+              echo "npm audit failed with non-retryable exit status $audit_status." >&2
+              exit "$audit_status"
+            fi
+
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              echo "npm audit failed after $max_attempts attempts: $failure_reason." >&2
+              exit "$audit_status"
+            fi
+
+            echo "npm audit attempt $attempt/$max_attempts failed: $failure_reason. Retrying in 5 seconds." >&2
+            attempt=$((attempt + 1))
+            sleep 5
+          done
 
       - name: Verify build artifacts
         if: steps.check-web.outputs.exists == 'true'
