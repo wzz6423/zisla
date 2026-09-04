@@ -17,7 +17,7 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 - GitHub 和 Gitee 都承载 Sparkle feed 与更新 ZIP。每个同版本 Release 必须在两端都上传 `x86_64`（X86）、`arm64` 和 `universal` 三套 DMG、ZIP 和 SHA-256，以及对应的已签名 appcast。
 - **三种包都必须保留**：`x86_64` 和 `arm64` 包分别只包含单一架构，`universal` 包必须同时包含两个架构；三类资产都要分别压缩、分别上传，文件名必须带对应后缀。
 - 无论安装包构建时的 `UPDATE_CHANNEL` 是什么，运行时选择 Release 或 Preview 都必须切换到对应的 Sparkle feed；自动检查和“检查更新”均遵循当前选择。切换后 Sparkle 重置下一次检查周期，手动检查立即使用新通道。
-- 使用 `CFBundleShortVersionString` 作为用户可见版本。默认签名 appcast 的 ZIP URL 假定 tag 为 `v${VERSION}`；使用 `release/v1.2.3` 等路径前缀 tag 时，必须同时显式设置正确的 `SPARKLE_GITEE_DOWNLOAD_URL_PREFIX` 和 `SPARKLE_GITHUB_DOWNLOAD_URL_PREFIX`。
+- 使用 `CFBundleShortVersionString` 作为用户可见版本。版本 tag 一律为 `v${VERSION}`（Preview 形如 `v0.2.0-preview.1`），与签名 appcast 的默认 ZIP URL 一致；禁止使用 `release/v1.2.3` 等路径前缀 tag，那会迫使每次发布额外覆盖 `SPARKLE_GITEE_DOWNLOAD_URL_PREFIX` 和 `SPARKLE_GITHUB_DOWNLOAD_URL_PREFIX`。
 - 每次发布前验证 DMG 中只有 `zisla.app` 和 `Applications` 软链接。首次安装 Sparkle 版仍需要用户手动安装；之后的已安装 Sparkle 版本才可自动更新。
 - 发版构建严禁使用调试变体：必须显式使用 `DEBUG_BUILD=false`，产物必须是 `zisla.app`、Bundle ID `dev.wzz.zisla`；`zisla-debug.app` 或 `dev.wzz.zisla.debug` 只能用于本地调试，不能上传。
 - 发版资源必须来自正式资源目录：`AppIcon.icns` 必须作为主图标，`AppIconNight.icns` 只能作为深色模式备用图标；调试构建使用的黑底白字图标复制方式，以及 `zisla-debug.app` 中的任何资源，都不能用于正式包或通过改名后上传。
