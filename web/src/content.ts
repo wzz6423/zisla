@@ -180,7 +180,7 @@ export const latestRelease = {
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.3-preview.1',
 };
 
-export const license = 'MIT';
+export const license = 'PolyForm Noncommercial 1.0.0';
 
 export const runCommand = 'cd mac && swift run zisla';
 

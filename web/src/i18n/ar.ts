@@ -244,7 +244,7 @@ export const ar = createCatalog({
   developers: {
     eyebrow: 'مصدر مفتوح افتراضيًا',
     title: 'موارد المطورين.',
-    lede: 'مرخص بترخيص MIT؛ استخدمه كما هو أو ابنِه من المصدر.',
+    lede: 'مرخص بموجب PolyForm Noncommercial 1.0.0؛ للاستخدام غير التجاري فقط: استخدمه كما هو أو ابنِه من المصدر.',
     docs: {
       macos: { title: 'دليل تطوير macOS', description: 'الميزات والبناء والاختبارات وحدود النظام' },
       architecture: { title: 'البنية والأداء', description: 'المشغل العلوي والنوافذ وتصميم الأداء' },

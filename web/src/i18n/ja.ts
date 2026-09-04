@@ -346,7 +346,7 @@ export const ja: SiteContent = {
   developers: {
     eyebrow: '既定でオープンソース',
     title: '開発者向けリソース。',
-    lede: 'MIT ライセンス。そのまま使うことも、ソースからビルドすることもできます。',
+    lede: 'PolyForm Noncommercial 1.0.0 ライセンス。非商用利用に限り、そのまま使うこともソースからビルドすることもできます。',
     docs: {
       macos: { title: 'macOS 開発ガイド', description: '機能、ビルド、テスト、システムの制約' },
       architecture: {

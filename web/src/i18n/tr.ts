@@ -196,7 +196,7 @@ export const tr = createCatalog({
   developers: {
     eyebrow: 'VARSAYILAN OLARAK AÇIK KAYNAK',
     title: 'Geliştirici kaynakları.',
-    lede: 'MIT lisanslıdır — olduğu gibi kullanın veya kaynak koddan derleyin.',
+    lede: 'PolyForm Noncommercial 1.0.0 lisanslıdır — yalnızca ticari olmayan kullanım için; olduğu gibi kullanın veya kaynak koddan derleyin.',
     docs: {
       macos: { title: 'macOS geliştirme kılavuzu', description: 'Özellikler, derleme, testler ve sistem sınırları' },
       architecture: { title: 'Mimari ve performans', description: 'Ekran üstü tetikleme, pencereler ve performans tasarımı' },

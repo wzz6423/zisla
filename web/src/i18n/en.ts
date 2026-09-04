@@ -353,7 +353,7 @@ export const en: SiteContent = {
   developers: {
     eyebrow: 'OPEN SOURCE BY DEFAULT',
     title: 'Developer resources.',
-    lede: 'MIT licensed — use it as is, or build it from source.',
+    lede: 'PolyForm Noncommercial 1.0.0 — noncommercial use only; take it as is, or build it from source.',
     docs: {
       macos: {
         title: 'macOS development guide',

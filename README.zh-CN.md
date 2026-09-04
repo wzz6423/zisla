@@ -119,4 +119,4 @@ zisla 仅在启用的功能首次实际需要时请求系统权限。你可以�
 
 ## 许可证
 
-MIT
+[PolyForm Noncommercial License 1.0.0](LICENSE.md)。允许非商业使用；禁止出售本软件或用于其他商业用途。

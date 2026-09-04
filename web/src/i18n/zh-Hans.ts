@@ -333,7 +333,7 @@ export const zhHans: SiteContent = {
   developers: {
     eyebrow: '默认开源',
     title: '开发者资源。',
-    lede: 'MIT License，可直接使用或从源码构建。',
+    lede: 'PolyForm Noncommercial 1.0.0 许可，仅限非商业用途，可直接使用或从源码构建。',
     docs: {
       macos: { title: 'macOS 开发指南', description: '功能、构建、测试与系统限制' },
       architecture: { title: '架构与性能设计', description: '顶部触发、窗口和性能设计' },
