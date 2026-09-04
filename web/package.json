@@ -10,11 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "lucide": "^1.30.0"
+    "lucide": "^1.38.0"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
-    "typescript": "^5.7.0",
-    "vite": "^7.0.2"
+    "@types/node": "^26.4.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
   }
 }
