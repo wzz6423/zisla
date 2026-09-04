@@ -193,7 +193,7 @@ struct BatteryModuleTests {
     }
 
     @Test
-    func hidesBatteryHistoryWhenEitherTimestampIsMissing() {
+    func displaysAvailableBatteryHistoryWhenTimestampIsMissing() {
         let now = Date(timeIntervalSince1970: 12_000)
         let snapshot = BatterySnapshot(
             level: 0.5,
@@ -203,21 +203,27 @@ struct BatteryModuleTests {
             timeRemainingMinutes: 120
         )
 
-        #expect(
-            BatteryHistoryPresentation(
-                battery: snapshot,
-                lastFullyChargedAt: nil,
-                lastUnpluggedAt: now.addingTimeInterval(-60),
-                now: now
-            ).text == nil
+        let onlyUnplugged = BatteryHistoryPresentation(
+            battery: snapshot,
+            lastFullyChargedAt: nil,
+            lastUnpluggedAt: now.addingTimeInterval(-60),
+            now: now
         )
-        #expect(
-            BatteryHistoryPresentation(
-                battery: snapshot,
-                lastFullyChargedAt: now.addingTimeInterval(-60),
-                lastUnpluggedAt: nil,
-                now: now
-            ).text == nil
+        let onlyFullyCharged = BatteryHistoryPresentation(
+            battery: snapshot,
+            lastFullyChargedAt: now.addingTimeInterval(-60),
+            lastUnpluggedAt: nil,
+            now: now
         )
+        let noHistory = BatteryHistoryPresentation(
+            battery: snapshot,
+            lastFullyChargedAt: nil,
+            lastUnpluggedAt: nil,
+            now: now
+        )
+
+        #expect(onlyUnplugged.text == "已脱电使用 1分钟")
+        #expect(onlyFullyCharged.text == "上次充满 1分钟")
+        #expect(noHistory.text == nil)
     }
 }

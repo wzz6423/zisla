@@ -76,15 +76,16 @@ struct BatteryHistoryPresentation: Equatable {
         lastUnpluggedAt: Date?,
         now: Date
     ) {
-        guard !battery.isCharging,
-              let lastFullyChargedAt,
-              let lastUnpluggedAt
-        else {
+        guard !battery.isCharging else {
             text = nil
             return
         }
 
-        text = "上次充满 \(Self.durationText(from: lastFullyChargedAt, to: now))，已脱电使用 \(Self.durationText(from: lastUnpluggedAt, to: now))"
+        let parts = [
+            lastFullyChargedAt.map { "上次充满 \(Self.durationText(from: $0, to: now))" },
+            lastUnpluggedAt.map { "已脱电使用 \(Self.durationText(from: $0, to: now))" }
+        ].compactMap { $0 }
+        text = parts.isEmpty ? nil : parts.joined(separator: "，")
     }
 
     static func durationText(from start: Date, to end: Date) -> String {
@@ -648,8 +649,7 @@ struct BatteryDetailView: View {
     @ViewBuilder
     private func batteryHistoryView(for battery: BatterySnapshot) -> some View {
         if !battery.isCharging,
-           batteryMonitor.lastFullyChargedAt != nil,
-           batteryMonitor.lastUnpluggedAt != nil {
+           batteryMonitor.lastFullyChargedAt != nil || batteryMonitor.lastUnpluggedAt != nil {
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 let presentation = BatteryHistoryPresentation(
                     battery: battery,
