@@ -28,6 +28,7 @@ jobs:
       pull-requests: read
     outputs:
       skip: ${{ steps.gate.outputs.skip }}
+      relevant: ${{ steps.gate.outputs.relevant }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -41,7 +42,7 @@ jobs:
   build:
     name: Web Build & Test
     needs: gate
-    if: needs.gate.outputs.skip != 'true'
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -128,7 +129,7 @@ jobs:
   codeql:
     name: CodeQL (JavaScript)
     needs: gate
-    if: needs.gate.outputs.skip != 'true'
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

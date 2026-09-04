@@ -28,6 +28,7 @@ jobs:
       pull-requests: read
     outputs:
       skip: ${{ steps.gate.outputs.skip }}
+      relevant: ${{ steps.gate.outputs.relevant }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -41,7 +42,7 @@ jobs:
   core:
     name: Windows Core (${{ matrix.configuration }})
     needs: gate
-    if: needs.gate.outputs.skip != 'true'
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: windows-latest
     timeout-minutes: 30
     strategy:
@@ -74,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [gate, core]
-    if: always() && needs.gate.outputs.skip != 'true'
+    if: always() && needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     steps:
       - name: Verify matrix result
         env:
@@ -84,7 +85,7 @@ jobs:
   application:
     name: Windows App Build
     needs: gate
-    if: needs.gate.outputs.skip != 'true'
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -147,7 +148,7 @@ jobs:
   codeql:
     name: CodeQL (C/C++)
     needs: gate
-    if: needs.gate.outputs.skip != 'true'
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: windows-latest
     timeout-minutes: 45
     permissions:

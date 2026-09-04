@@ -1,5 +1,5 @@
 {
-  "comment": "Pull request workflows that CI skip directives can bypass. 'checks' lists every check name the workflow publishes, including matrix expansions, so the skip processor can report them as successful. The Test CI Scripts job fails when this file drifts from .github/workflows.",
+  "comment": "Pull request workflows that CI skip directives can bypass. 'checks' lists every check name the workflow publishes, including matrix expansions, so the skip processor can report them as successful. The Test CI Scripts job fails when this file drifts from .github/workflows. 'paths' lists the files whose change makes the workflow relevant: a workflow that declares paths only runs when a pull request touches one of them, and a workflow without paths always runs.",
   "workflows": [
     {
       "name": "CI Lint",
@@ -11,6 +11,7 @@
       "name": "Core Tests",
       "file": "core-build.yml",
       "aliases": ["windows", "core"],
+      "paths": ["windows/**", ".github/**"],
       "checks": [
         "Windows Core (Debug)",
         "Windows Core (Release)",
@@ -23,6 +24,7 @@
       "name": "Swift Tests",
       "file": "swift-tests.yml",
       "aliases": ["swift", "mac"],
+      "paths": ["mac/**", "Makefile", ".github/**"],
       "checks": [
         "Swift Tests",
         "Build zislactl (Release)",
@@ -34,12 +36,14 @@
       "name": "Web CI",
       "file": "web-ci.yml",
       "aliases": ["web"],
+      "paths": ["web/**", ".github/**"],
       "checks": ["Web Build & Test", "CodeQL (JavaScript)"]
     },
     {
       "name": "Skill CI",
       "file": "skill-ci.yml",
       "aliases": ["skills"],
+      "paths": ["skills/**", ".github/**"],
       "checks": ["Validate Skills"]
     },
     {

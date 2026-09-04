@@ -86,13 +86,30 @@ Maintainers and requested reviewers can skip checks that a change cannot affect,
 | Directive | Effect |
 | --- | --- |
 | `skip-all` | Skips every workflow listed in `.github/ci-skip.json`. |
-| `skip-<workflow>` | Skips one workflow by name or alias, such as `skip-swift` or `skip-web`. |
+| `skip-<workflow>` | Skips one workflow by name, file name or alias, such as `skip-swift`, `skip-web-ci` or `skip-Web CI`. |
 | `unskip-all` | Clears every skip directive. |
 | `unskip-<workflow>` | Restores one workflow. |
 
 - Free text may follow the directive, for example `skip-all: documentation only change`.
+- A workflow may be named the way GitHub displays it, spaces included, so `skip-Repository Hygiene` and `skip-hygiene` are the same directive. The longest name that matches wins and the words left over become the note.
 - Directives are honored only from the repository owner, an organization member, a collaborator, or a requested reviewer. Bot comments are ignored.
 - `CI Skip` cancels the runs in flight, reports the skipped checks as successful so the required checks stay satisfied, applies the `skip-ci` label, and edits one summary comment with the current decision.
 - The whole comment thread is replayed on every comment, so the newest directive always wins.
 - A maintainer can re-apply the current decision without a new comment from **Actions -> CI Skip -> Run workflow**, passing the pull request number.
 - `.github/ci-skip.json` maps each workflow to the check names it publishes. `Test CI Scripts` fails when the manifest drifts from the workflow files.
+
+## Path-scoped checks
+
+A platform workflow only runs when the pull request touches the files it builds, so a documentation change never boots a Windows or macOS runner:
+
+| Workflow | Runs when the pull request touches |
+| --- | --- |
+| `Swift Tests` | `mac/**`, `Makefile`, `.github/**` |
+| `Core Tests` | `windows/**`, `.github/**` |
+| `Web CI` | `web/**`, `.github/**` |
+| `Skill CI` | `skills/**`, `.github/**` |
+
+- The `paths` field of `.github/ci-skip.json` owns the scopes, and a workflow that declares none always runs. `CI Lint`, `Repository Hygiene`, `PR Quality Gates`, `CodeQL` and `Dependency Review` therefore run on every pull request.
+- Any change under `.github/` runs everything, because a change to CI must be proven against every platform.
+- The jobs are skipped by a job condition instead of a workflow `paths:` filter, so a required check reports success rather than staying pending forever.
+- A renamed file is matched under both its old and its new path, and the comparison ignores case.

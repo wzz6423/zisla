@@ -86,13 +86,30 @@ swift test
 | 指令 | 效果 |
 | --- | --- |
 | `skip-all` | 跳过 `.github/ci-skip.json` 中列出的所有工作流。 |
-| `skip-<workflow>` | 按名称或别名跳过单个工作流，例如 `skip-swift`、`skip-web`。 |
+| `skip-<workflow>` | 按名称、文件名或别名跳过单个工作流，例如 `skip-swift`、`skip-web-ci`、`skip-Web CI`。 |
 | `unskip-all` | 取消所有跳过指令。 |
 | `unskip-<workflow>` | 恢复单个工作流。 |
 
 - 指令后面可以接自由文本，例如 `skip-all: documentation only change`。
+- 工作流可以直接写 GitHub 上显示的名字（含空格），因此 `skip-Repository Hygiene` 与 `skip-hygiene` 等价；匹配时取最长的已知名称，剩下的词作为备注。
 - 只有仓库 owner、组织成员、协作者或被请求的 reviewer 的指令才生效，机器人评论一律忽略。
 - `CI Skip` 会取消正在运行的任务，把被跳过的检查标记为成功以满足必需检查，打上 `skip-ci` 标签，并复用同一条评论汇总当前决策。
 - 每次评论都会重放整个评论区，因此最新的指令始终生效。
 - 维护者也可以不用新增评论，在 **Actions -> CI Skip -> Run workflow** 里填入 PR 编号重新应用当前决策。
 - `.github/ci-skip.json` 记录了每个工作流发布的检查名；清单与工作流不一致时 `Test CI Scripts` 会失败。
+
+## 按路径裁剪检查
+
+平台相关的工作流只在 PR 改动了它构建的文件时才运行，所以纯文档改动不会再启动 Windows 或 macOS runner：
+
+| 工作流 | 触发它的改动路径 |
+| --- | --- |
+| `Swift Tests` | `mac/**`、`Makefile`、`.github/**` |
+| `Core Tests` | `windows/**`、`.github/**` |
+| `Web CI` | `web/**`、`.github/**` |
+| `Skill CI` | `skills/**`、`.github/**` |
+
+- 范围由 `.github/ci-skip.json` 的 `paths` 字段决定；没有声明 `paths` 的工作流始终运行，因此 `CI Lint`、`Repository Hygiene`、`PR Quality Gates`、`CodeQL`、`Dependency Review` 每个 PR 都会跑。
+- 只要改动了 `.github/` 下的文件就全部运行，因为改 CI 必须在所有平台上验证。
+- 裁剪用的是 job 级条件而不是工作流的 `paths:` 过滤器，这样必需检查会报告成功，而不是一直挂在 pending。
+- 文件重命名会同时按旧路径和新路径匹配，且比较时忽略大小写。

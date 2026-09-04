@@ -96,11 +96,74 @@ class CiSkipDirectivesTest < Minitest::Test
     assert_equal false, decision['skipAll']
   end
 
+  def test_multi_word_workflow_name_resolves
+    ['skip-PR Quality Gates', 'skip-pr quality gates', 'skip-PR_Quality_Gates'].each do |body|
+      decision = resolve_spaced([comment('owner', 'OWNER', body)])
+
+      assert_equal ['PR Quality Gates'], decision['workflows'], body
+      assert_equal 'skip-pr-quality-gates', decision['directives'].first['directive'], body
+    end
+  end
+
+  def test_words_after_a_multi_word_name_become_the_note
+    decision = resolve_spaced([comment('owner', 'OWNER', 'skip-PR Quality Gates nothing to validate')])
+
+    assert_equal ['PR Quality Gates'], decision['workflows']
+    assert_equal 'nothing to validate', decision['directives'].first['note']
+  end
+
+  def test_a_separator_still_ends_a_multi_word_name
+    decision = resolve_spaced([comment('owner', 'OWNER', 'unskip-PR Quality Gates: the body changed')])
+
+    assert_empty decision['workflows']
+    assert_equal 'unskip-pr-quality-gates', decision['directives'].first['directive']
+    assert_equal 'the body changed', decision['directives'].first['note']
+  end
+
+  def test_free_text_after_skip_all_never_becomes_part_of_the_target
+    decision = resolve_spaced([comment('owner', 'OWNER', 'skip-all documentation only change')])
+
+    assert_equal true, decision['skipAll']
+    assert_equal 'documentation only change', decision['directives'].first['note']
+  end
+
   def test_unknown_alias_is_reported_without_selecting_anything
     decision = resolve([comment('owner', 'OWNER', 'skip-android')])
 
     assert_empty decision['workflows']
     assert_equal ['android'], decision['unknown']
+  end
+
+  def test_a_workflow_without_declared_paths_always_runs
+    manifest = CiSkip::Manifest.new(MANIFEST)
+
+    assert manifest.relevant?('Web CI', ['docs/notes/plan.md'])
+  end
+
+  def test_declared_paths_scope_a_workflow_to_the_files_it_builds
+    manifest = scoped_manifest
+
+    assert manifest.relevant?('Swift Tests', ['docs/notes/plan.md', 'mac/Sources/App.swift'])
+    assert manifest.relevant?('Swift Tests', ['Makefile'])
+    refute manifest.relevant?('Swift Tests', ['docs/notes/plan.md', 'README.md'])
+    # The directory name is a prefix of nothing else, so a sibling never matches.
+    refute manifest.relevant?('Swift Tests', ['machine/notes.md'])
+  end
+
+  def test_an_unreadable_change_set_runs_every_workflow
+    assert scoped_manifest.relevant?('Swift Tests', [])
+  end
+
+  def test_relevance_of_an_unknown_workflow_is_an_error
+    assert_raises(CiSkip::ManifestError) { scoped_manifest.relevant?('Nothing', ['mac/x']) }
+  end
+
+  def test_manifest_rejects_malformed_paths
+    [[], 'mac/**', ['']].each do |paths|
+      document = { 'workflows' => [MANIFEST['workflows'].first.merge('paths' => paths)] }
+
+      assert_raises(CiSkip::ManifestError, paths.inspect) { CiSkip::Manifest.new(document) }
+    end
   end
 
   def test_manifest_rejects_duplicate_and_reserved_aliases
@@ -166,7 +229,43 @@ class CiSkipDirectivesTest < Minitest::Test
     assert_empty errors, errors.join("\n")
   end
 
+  def test_repository_manifest_scopes_every_platform_workflow
+    manifest = CiSkip::Manifest.load(File.expand_path('../ci-skip.json', __dir__))
+    platform = ['Swift Tests', 'Core Tests', 'Web CI', 'Skill CI']
+
+    {
+      'mac/Sources/App.swift' => 'Swift Tests',
+      'windows/CMakeLists.txt' => 'Core Tests',
+      'web/src/main.ts' => 'Web CI',
+      # The site directory was renamed from Web/ to web/, and either spelling
+      # must keep its own workflow relevant.
+      'Web/src/main.ts' => 'Web CI',
+      'skills/development-workflow/SKILL.md' => 'Skill CI'
+    }.each do |file, owner|
+      assert_equal [owner], platform.select { |name| manifest.relevant?(name, [file]) }, file
+    end
+
+    # A documentation change runs none of them, and a CI change runs all of them.
+    assert_empty platform.select { |name| manifest.relevant?(name, ['README.md', 'docs/notes/plan.md']) }
+    assert_equal platform, platform.select { |name| manifest.relevant?(name, ['.github/ci-skip.json']) }
+  end
+
   private
+
+  # A name whose first word is no alias proves the target is read as a whole.
+  def resolve_spaced(comments)
+    document = {
+      'workflows' => MANIFEST['workflows'] +
+        [{ 'name' => 'PR Quality Gates', 'file' => 'pr-quality-gates.yml', 'checks' => ['PR Quality'] }]
+    }
+    CiSkip::Resolver.new(CiSkip::Manifest.new(document)).resolve(comments: comments, reviewers: [])
+  end
+
+  def scoped_manifest
+    CiSkip::Manifest.new(
+      'workflows' => [MANIFEST['workflows'].first.merge('paths' => ['mac/**', 'Makefile'])]
+    )
+  end
 
   def resolve(comments, reviewers: [])
     CiSkip::Resolver.new(CiSkip::Manifest.new(MANIFEST)).resolve(comments: comments, reviewers: reviewers)

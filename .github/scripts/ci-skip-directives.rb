@@ -11,6 +11,7 @@ require 'yaml'
 # A directive is the first token on a line and may be followed by free text:
 #   skip-all            skip every pull request workflow
 #   skip-web-ci         skip one workflow by name, file name or alias
+#   skip-Web CI         the name may be written the way GitHub displays it
 #   unskip-all          clear every skip
 #   unskip-web-ci       clear one skip
 #
@@ -21,7 +22,8 @@ require 'yaml'
 module CiSkip
   AUTHORIZED_ASSOCIATIONS = %w[OWNER MEMBER COLLABORATOR].freeze
   RESERVED_ALIAS = 'all'
-  DIRECTIVE_LINE = /\A[[:space:]]*((?:un)?skip-[A-Za-z0-9][A-Za-z0-9-]*)(?:[[:space:]:,.;!]+(.*))?\z/i
+  DIRECTIVE_LINE = /\A[[:space:]]*((?:un)?skip)-([A-Za-z0-9].*)\z/i
+  NOTE_SEPARATOR = /[[:space:]]*[:,;!][[:space:]]*/
   FENCE_LINE = /\A[[:space:]]{0,3}(?:```|~~~)/
   QUOTE_LINE = /\A[[:space:]]*>/
   GATE_ACTION = '.github/actions/ci-skip-gate'
@@ -30,6 +32,20 @@ module CiSkip
 
   def self.normalize(value)
     value.to_s.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/\A-+|-+\z/, '')
+  end
+
+  # Matches one manifest path pattern against one changed file. A pattern ending
+  # in `/**` covers a whole directory tree; anything else is a plain fnmatch so a
+  # single file such as `Makefile` can be scoped too. The comparison ignores case
+  # because a directory renamed between `Web/` and `web/` must never silently
+  # disable a required check while a branch still carries the other spelling.
+  def self.path_match?(pattern, path)
+    pattern = pattern.to_s
+    if pattern.end_with?('/**')
+      path.to_s.downcase.start_with?(pattern.delete_suffix('**').downcase)
+    else
+      File.fnmatch?(pattern, path.to_s, File::FNM_PATHNAME | File::FNM_EXTGLOB | File::FNM_CASEFOLD)
+    end
   end
 
   # Extracts directives from one comment body, ignoring fenced code blocks and
@@ -47,7 +63,7 @@ module CiSkip
       match = DIRECTIVE_LINE.match(line)
       next unless match
 
-      found << { 'directive' => match[1].downcase, 'note' => match[2].to_s.strip }
+      found << { 'negated' => match[1].casecmp('unskip').zero?, 'remainder' => match[2].strip }
     end
   end
 
@@ -66,6 +82,7 @@ module CiSkip
       raise ManifestError, 'manifest declares no workflows' if @workflows.empty?
 
       @alias_map = build_alias_map
+      validate_paths!
     end
 
     def names
@@ -76,8 +93,40 @@ module CiSkip
       @alias_map[CiSkip.normalize(value)]
     end
 
+    # A maintainer writes the target the way GitHub displays it, so it may carry
+    # spaces. The longest known target wins and the words it leaves become the
+    # note, which keeps `skip-Web CI nothing to build` unambiguous.
+    def split_remainder(remainder)
+      head, _, tail = remainder.partition(NOTE_SEPARATOR)
+      words = head.split(/[[:space:]]+/)
+      words.length.downto(1) do |count|
+        requested = CiSkip.normalize(words.take(count).join('-'))
+        next unless requested == RESERVED_ALIAS || @alias_map.key?(requested)
+
+        return [requested, note_from(words.drop(count), tail)]
+      end
+
+      [CiSkip.normalize(words.first), note_from(words.drop(1), tail)]
+    end
+
     def aliases_for(name)
       @alias_map.select { |_, workflow| workflow == name }.keys.sort
+    end
+
+    # A workflow that declares no paths always runs. One that declares them only
+    # runs when the pull request touches a matching file, which keeps a
+    # documentation-only change from booting a Windows or macOS runner. An empty
+    # file list means the caller could not read the change set, so the workflow
+    # runs rather than silently reporting a check nobody verified.
+    def relevant?(name, files)
+      workflow = find(name)
+      raise ManifestError, "unknown workflow #{name.inspect}" unless workflow
+
+      patterns = Array(workflow['paths'])
+      changed = Array(files)
+      return true if patterns.empty? || changed.empty?
+
+      changed.any? { |file| patterns.any? { |pattern| CiSkip.path_match?(pattern, file) } }
     end
 
     def checks_for(names)
@@ -90,6 +139,21 @@ module CiSkip
     end
 
     private
+
+    def validate_paths!
+      workflows.each do |workflow|
+        next unless workflow.key?('paths')
+
+        patterns = workflow['paths']
+        valid = patterns.is_a?(Array) && !patterns.empty? &&
+                patterns.all? { |pattern| pattern.is_a?(String) && !pattern.strip.empty? }
+        raise ManifestError, "#{workflow['name']}: paths must be a non-empty array of strings" unless valid
+      end
+    end
+
+    def note_from(words, tail)
+      (words + [tail]).reject(&:empty?).join(' ').strip
+    end
 
     def build_alias_map
       workflows.each_with_object({}) do |workflow, map|
@@ -148,9 +212,8 @@ module CiSkip
     end
 
     def apply(state, comment, directive)
-      token = directive['directive']
-      negated = token.start_with?('unskip-')
-      requested = CiSkip.normalize(token.sub(/\A(?:un)?skip-/, ''))
+      negated = directive['negated']
+      requested, note = @manifest.split_remainder(directive['remainder'])
 
       if requested == RESERVED_ALIAS
         state[:skip_all] = !negated
@@ -168,8 +231,8 @@ module CiSkip
 
       state[:applied] << {
         'login' => comment['login'].to_s,
-        'directive' => token,
-        'note' => directive['note'].to_s
+        'directive' => "#{negated ? 'unskip' : 'skip'}-#{requested}",
+        'note' => note
       }
     end
   end
@@ -275,6 +338,14 @@ def command_resolve(options)
   end
 end
 
+def command_relevant(options)
+  manifest = CiSkip::Manifest.load(options[:manifest])
+  target = options[:for]
+  raise CiSkip::ManifestError, 'relevant requires --for NAME' unless target
+
+  puts manifest.relevant?(target, read_json(options[:files], [])) ? 'true' : 'false'
+end
+
 def command_verify_manifest(options)
   manifest = CiSkip::Manifest.load(options[:manifest])
   errors = CiSkip::ManifestVerifier.new(manifest, options[:workflows]).run
@@ -290,11 +361,12 @@ if $PROGRAM_NAME == __FILE__
     workflows: File.expand_path('../workflows', __dir__)
   }
   parser = OptionParser.new do |opts|
-    opts.banner = 'Usage: ci-skip-directives.rb <resolve|verify-manifest> [options]'
+    opts.banner = 'Usage: ci-skip-directives.rb <resolve|relevant|verify-manifest> [options]'
     opts.on('--manifest PATH', 'Skip manifest path') { |value| options[:manifest] = value }
     opts.on('--comments PATH', 'JSON array of {login, association, body}') { |value| options[:comments] = value }
     opts.on('--reviewers PATH', 'JSON array of requested reviewer logins') { |value| options[:reviewers] = value }
     opts.on('--workflows PATH', 'Workflow directory') { |value| options[:workflows] = value }
+    opts.on('--files PATH', 'JSON array of changed file paths') { |value| options[:files] = value }
     opts.on('--for NAME', 'Print only whether NAME is skipped') { |value| options[:for] = value }
   end
 
@@ -304,6 +376,7 @@ if $PROGRAM_NAME == __FILE__
   begin
     case command
     when 'resolve' then command_resolve(options)
+    when 'relevant' then command_relevant(options)
     when 'verify-manifest' then command_verify_manifest(options)
     else
       warn parser.banner

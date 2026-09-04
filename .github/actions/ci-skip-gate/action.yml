@@ -1,5 +1,5 @@
 name: CI Skip Gate
-description: Decides whether an authorized skip directive disables this workflow for the current pull request.
+description: Decides whether a skip directive or the changed paths disable this workflow for the current pull request.
 
 inputs:
   workflow-name:
@@ -13,11 +13,14 @@ outputs:
   skip:
     description: "true when the workflow must not run for this pull request."
     value: ${{ steps.decide.outputs.skip }}
+  relevant:
+    description: "false when no changed file matches the paths declared for this workflow."
+    value: ${{ steps.decide.outputs.relevant }}
 
 runs:
   using: composite
   steps:
-    - name: Resolve skip directives
+    - name: Resolve skip directives and changed paths
       id: decide
       shell: bash
       env:
@@ -29,7 +32,10 @@ runs:
 
         if [[ -z "$PR_NUMBER" ]]; then
           echo "Not a pull request event; the workflow runs normally."
-          echo "skip=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "skip=false"
+            echo "relevant=true"
+          } >> "$GITHUB_OUTPUT"
           exit 0
         fi
 
@@ -53,7 +59,27 @@ runs:
           echo "::notice title=CI skipped::An authorized skip directive disabled $WORKFLOW_NAME for this pull request."
         fi
 
+        files="$RUNNER_TEMP/ci-skip-files.json"
+        # Renames are listed under their new path, so the previous one is kept as
+        # well: moving a file out of a scoped directory still affects it. An empty
+        # list means the change set could not be read, and the resolver then runs
+        # the workflow instead of reporting a check nobody verified.
+        gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
+          | jq 'flatten(1) | [.[] | .filename, .previous_filename] | map(select(. != null))' \
+          > "$files"
+
+        relevant="$(ruby "$GITHUB_ACTION_PATH/../../scripts/ci-skip-directives.rb" relevant \
+          --files "$files" \
+          --for "$WORKFLOW_NAME")"
+
+        echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+        if [[ "$relevant" == "false" ]]; then
+          echo "::notice title=CI out of scope::No file in this pull request matches the paths declared for $WORKFLOW_NAME."
+        fi
+
     - name: Remove skip directive files
       if: always()
       shell: bash
-      run: rm -f "$RUNNER_TEMP/ci-skip-comments.json" "$RUNNER_TEMP/ci-skip-reviewers.json"
+      run: |
+        rm -f "$RUNNER_TEMP/ci-skip-comments.json" "$RUNNER_TEMP/ci-skip-reviewers.json" \
+          "$RUNNER_TEMP/ci-skip-files.json"

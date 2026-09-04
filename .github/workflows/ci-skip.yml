@@ -161,6 +161,7 @@ jobs:
             echo
             if [ "$SKIP_COUNT" -eq 0 ]; then
               echo 'No directive is active. Every workflow runs normally.'
+              echo
             else
               printf 'Skipped workflows: %s\n\n' \
                 "$(jq -r '[.workflows[] | "`" + . + "`"] | join(", ")' "$decision")"
