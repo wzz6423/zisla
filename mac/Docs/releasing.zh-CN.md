@@ -73,9 +73,9 @@ spctl --assess --type execute --verbose=4 'dist/zisla.app'
 xcrun stapler validate 'dist/zisla.app'
 shasum -a 256 dist/zisla-v1.0.0-macOS-universal.dmg
 
-hdiutil attach -nobrowse 'dist/zisla-v1.0.0-macOS-universal.dmg'
+diskutil image attach --mountOptions nobrowse 'dist/zisla-v1.0.0-macOS-universal.dmg'
 test -L /Volumes/zisla/Applications
-hdiutil detach /Volumes/zisla
+diskutil eject /Volumes/zisla
 ```
 
 使用旧版本检查新 Release，确认自动检查和手动检查都先读取所选 Gitee feed，当其无法加载或更新包下载失败时回退一次对应 GitHub feed，且 Sparkle 能验签、安装并重启 Universal ZIP。还要验证 Release→Preview、Preview→Release 和同通道更新。

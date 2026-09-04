@@ -72,9 +72,9 @@ spctl --assess --type execute --verbose=4 'dist/zisla.app'
 xcrun stapler validate 'dist/zisla.app'
 shasum -a 256 dist/zisla-v1.0.0-macOS-universal.dmg
 
-hdiutil attach -nobrowse 'dist/zisla-v1.0.0-macOS-universal.dmg'
+diskutil image attach --mountOptions nobrowse 'dist/zisla-v1.0.0-macOS-universal.dmg'
 test -L /Volumes/zisla/Applications
-hdiutil detach /Volumes/zisla
+diskutil eject /Volumes/zisla
 ```
 
 Use an older app version to check the new release. Confirm that automatic and manual checks use the selected Gitee feed first, retry its GitHub counterpart once when Gitee cannot load or its package download fails, and that Sparkle verifies, installs, and relaunches the Universal ZIP. Test Release→Preview and Preview→Release switching as well as same-channel updates.

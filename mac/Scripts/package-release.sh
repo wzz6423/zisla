@@ -119,15 +119,15 @@ STAGED_DMG="$PACKAGE_STAGING_DIRECTORY/${DMG:t}"
 STAGED_GITEE_APPCAST="$PACKAGE_STAGING_DIRECTORY/${GITEE_APPCAST:t}"
 STAGED_GITHUB_APPCAST="$PACKAGE_STAGING_DIRECTORY/${GITHUB_APPCAST:t}"
 TEMPORARY_DIRECTORY=""
-WRITABLE_DMG=""
+WRITABLE_IMAGE=""
 MOUNTED_DEVICE=""
 MOUNT_POINT=""
 cleanup() {
   if [[ -n "$MOUNTED_DEVICE" ]]; then
-    hdiutil detach -quiet "$MOUNTED_DEVICE" || true
+    diskutil eject "$MOUNTED_DEVICE" >/dev/null 2>&1 || true
   fi
-  if [[ -n "$WRITABLE_DMG" && "$WRITABLE_DMG" == "${TMP_ROOT%/}/zisla-dmg."*.dmg ]]; then
-    rm -f "$WRITABLE_DMG"
+  if [[ -n "$WRITABLE_IMAGE" && "$WRITABLE_IMAGE" == "${TMP_ROOT%/}/zisla-dmg."*.asif ]]; then
+    rm -f "$WRITABLE_IMAGE"
   fi
   if [[ -n "$TEMPORARY_DIRECTORY" && "$TEMPORARY_DIRECTORY" == "${TMP_ROOT%/}/zisla-dmg."* ]]; then
     rm -rf "$TEMPORARY_DIRECTORY"
@@ -139,7 +139,7 @@ cleanup() {
 trap cleanup EXIT
 
 TEMPORARY_DIRECTORY="$(mktemp -d "${TMP_ROOT%/}/zisla-dmg.XXXXXX")"
-WRITABLE_DMG="${TEMPORARY_DIRECTORY}.dmg"
+WRITABLE_IMAGE="${TEMPORARY_DIRECTORY}.asif"
 
 ditto -c -k --keepParent "$APP" "$STAGED_ARCHIVE"
 (
@@ -180,9 +180,11 @@ fi
 }
 
 ditto "$APP" "$TEMPORARY_DIRECTORY/zisla.app"
-hdiutil create -quiet -volname zisla -srcfolder "$TEMPORARY_DIRECTORY" -format UDRW -ov "$WRITABLE_DMG"
+# `diskutil image create` cannot produce UDRW, so staging uses ASIF, its
+# single-file writable format. The shipped DMG is still UDZO.
+diskutil image create from "$TEMPORARY_DIRECTORY" --format ASIF --volumeName zisla "$WRITABLE_IMAGE" >/dev/null
 
-ATTACH_OUTPUT="$(hdiutil attach -readwrite -noverify -noautoopen "$WRITABLE_DMG")"
+ATTACH_OUTPUT="$(diskutil image attach --mountOptions nobrowse "$WRITABLE_IMAGE")"
 while read -r device _ mount_point; do
   device="${device%%[[:space:]]*}"
   if [[ "$device" == /dev/disk* && -n "$mount_point" ]]; then
@@ -223,9 +225,9 @@ then
 fi
 
 sync
-hdiutil detach -quiet "$MOUNTED_DEVICE"
+diskutil eject "$MOUNTED_DEVICE" >/dev/null
 MOUNTED_DEVICE=""
-hdiutil convert -quiet "$WRITABLE_DMG" -format UDZO -imagekey zlib-level=9 -ov -o "$STAGED_DMG"
+diskutil image create from "$WRITABLE_IMAGE" --format UDZO "$STAGED_DMG" >/dev/null
 hdiutil verify "$STAGED_DMG"
 (
   cd "$PACKAGE_STAGING_DIRECTORY"

@@ -68,25 +68,32 @@ done
 print -r -- "$download_url_prefix" > "$output"
 SCRIPT
 
+cat > "$FAKE_BIN/diskutil" <<'SCRIPT'
+#!/bin/zsh
+set -euo pipefail
+case "$1" in
+  image)
+    case "$2" in
+      create)
+        touch "${@: -1}"
+        ;;
+      attach)
+        mkdir -p "$FAKE_MOUNT_POINT"
+        printf '%s %s\n' "/dev/disk999" "GUID_partition_scheme"
+        printf '%-24s %s %s\n' "$FAKE_MOUNT_DEVICE" "Apple_APFS_Volume" "$FAKE_MOUNT_POINT"
+        ;;
+    esac
+    ;;
+  eject)
+    print -r -- "${@: -1}" > "$FAKE_EJECT_CAPTURE"
+    ;;
+esac
+SCRIPT
+
 cat > "$FAKE_BIN/hdiutil" <<'SCRIPT'
 #!/bin/zsh
 set -euo pipefail
 case "$1" in
-  create)
-    touch "${@: -1}"
-    ;;
-  attach)
-    mkdir -p "$FAKE_MOUNT_POINT"
-    printf '%s %s\n' "/dev/disk999" "GUID_partition_scheme"
-    printf '%-24s %s %s\n' "$FAKE_MOUNT_DEVICE" "Apple_HFS" "$FAKE_MOUNT_POINT"
-    ;;
-  detach)
-    print -r -- "${@: -1}" > "$FAKE_DETACH_CAPTURE"
-    ;;
-  convert)
-    output_index=${argv[(i)-o]}
-    touch "$argv[$(( output_index + 1 ))]"
-    ;;
   verify)
     touch "$HDIUTIL_VERIFY_CAPTURE"
     ;;
@@ -172,7 +179,7 @@ for architecture in arm64 x86_64 universal; do
   capture_file="$case_directory/architectures.txt"
   verify_capture="$case_directory/dmg-verified"
   mount_point="$case_directory/mounted-zisla"
-  detach_capture="$case_directory/detached-device.txt"
+  eject_capture="$case_directory/ejected-device.txt"
   osascript_mount_capture="$case_directory/osascript-mount-point.txt"
   mkdir -p "$case_directory"
 
@@ -195,7 +202,7 @@ for architecture in arm64 x86_64 universal; do
     HDIUTIL_VERIFY_CAPTURE="$verify_capture" \
     FAKE_MOUNT_POINT="$mount_point" \
     FAKE_MOUNT_DEVICE=/dev/disk999s2 \
-    FAKE_DETACH_CAPTURE="$detach_capture" \
+    FAKE_EJECT_CAPTURE="$eject_capture" \
     FAKE_OSASCRIPT_MOUNT_CAPTURE="$osascript_mount_capture" \
     "$TEST_ROOT/Scripts/package-release.sh" >/dev/null
 
@@ -246,7 +253,7 @@ function expect_conflicting_volume_uses_new_mount() {
   local case_directory="$TEMPORARY_ROOT/conflicting-volume"
   local existing_mount="$case_directory/zisla"
   local new_mount="$case_directory/zisla 1"
-  local detach_capture="$case_directory/detached-device.txt"
+  local eject_capture="$case_directory/ejected-device.txt"
   local osascript_mount_capture="$case_directory/osascript-mount-point.txt"
 
   mkdir -p "$existing_mount"
@@ -265,7 +272,7 @@ function expect_conflicting_volume_uses_new_mount() {
     HDIUTIL_VERIFY_CAPTURE="$case_directory/dmg-verified" \
     FAKE_MOUNT_POINT="$new_mount" \
     FAKE_MOUNT_DEVICE=/dev/disk1001s2 \
-    FAKE_DETACH_CAPTURE="$detach_capture" \
+    FAKE_EJECT_CAPTURE="$eject_capture" \
     FAKE_OSASCRIPT_MOUNT_CAPTURE="$osascript_mount_capture" \
     "$TEST_ROOT/Scripts/package-release.sh" >/dev/null
 
@@ -283,8 +290,8 @@ function expect_conflicting_volume_uses_new_mount() {
     "an existing same-name volume is not modified"
   expect_equal \
     "/dev/disk1001s2" \
-    "$(<"$detach_capture")" \
-    "detach targets the device that owns the new mount point"
+    "$(<"$eject_capture")" \
+    "eject targets the device that owns the new mount point"
 }
 
 expect_conflicting_volume_uses_new_mount
