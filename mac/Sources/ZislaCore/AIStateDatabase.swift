@@ -31,7 +31,7 @@ final class AIStateDatabase {
                     contents: nil,
                     attributes: [.posixPermissions: NSNumber(value: 0o600)]
                 ) else {
-                    throw AIStateRepositoryError.storageFailure("无法创建私有 AI 状态数据库")
+                    throw AIStateRepositoryError.storageFailure(AppLocalization.text("无法创建私有 AI 状态数据库"))
                 }
             }
             try setPrivateFilePermissions(using: fileManager)
@@ -49,7 +49,7 @@ final class AIStateDatabase {
             nil
         )
         guard result == SQLITE_OK, let opened else {
-            let message = sqliteMessage(opened, fallback: "无法打开 AI 状态数据库")
+            let message = sqliteMessage(opened, fallback: AppLocalization.text("无法打开 AI 状态数据库"))
             sqlite3_close(opened)
             throw AIStateRepositoryError.storageFailure(message)
         }
@@ -58,7 +58,7 @@ final class AIStateDatabase {
         do {
             guard sqlite3_busy_timeout(opened, 1_000) == SQLITE_OK else {
                 throw AIStateRepositoryError.storageFailure(
-                    sqliteMessage(opened, fallback: "无法配置 AI 状态数据库")
+                    sqliteMessage(opened, fallback: AppLocalization.text("无法配置 AI 状态数据库"))
                 )
             }
             try execute("PRAGMA journal_mode=WAL")
@@ -122,7 +122,7 @@ final class AIStateDatabase {
     func trimUsageIfNeeded() throws {
         let countStatement = try prepare("SELECT COUNT(*) FROM usage_samples")
         defer { sqlite3_finalize(countStatement) }
-        guard try stepHasRow(countStatement, fallback: "无法读取 AI 用量记录数量"),
+        guard try stepHasRow(countStatement, fallback: AppLocalization.text("无法读取 AI 用量记录数量")),
               sqlite3_column_int64(countStatement, 0) > Int64(maximumUsageSamples) else {
             return
         }
@@ -156,7 +156,7 @@ final class AIStateDatabase {
         let statement = try prepare("SELECT payload FROM tasks WHERE id = ? LIMIT 1")
         defer { sqlite3_finalize(statement) }
         try bind(id, to: 1, in: statement)
-        guard try stepHasRow(statement, fallback: "无法查询 AI 任务") else { return nil }
+        guard try stepHasRow(statement, fallback: AppLocalization.text("无法查询 AI 任务")) else { return nil }
         return try decode(AIProgressTask.self, from: blob(at: 0, in: statement))
     }
 
@@ -206,7 +206,7 @@ final class AIStateDatabase {
         let statement = try prepare("SELECT payload FROM tasks ORDER BY position")
         defer { sqlite3_finalize(statement) }
         var result: [AIProgressTask] = []
-        while try stepHasRow(statement, fallback: "无法读取 AI 任务列表") {
+        while try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 任务列表")) {
             result.append(try decode(AIProgressTask.self, from: blob(at: 0, in: statement)))
         }
         return result
@@ -228,7 +228,7 @@ final class AIStateDatabase {
             try check(sqlite3_bind_double(statement, 1, startDate.timeIntervalSinceReferenceDate))
         }
         var result: [AIUsageSample] = []
-        while try stepHasRow(statement, fallback: "无法读取 AI 用量记录") {
+        while try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
             result.append(try usageSample(
                 from: statement,
                 sourceID: optionalText(at: 0, in: statement),
@@ -306,7 +306,7 @@ final class AIStateDatabase {
             """)
         defer { sqlite3_finalize(statement) }
         var totals: [DetectedUsageTotal] = []
-        while try stepHasRow(statement, fallback: "无法读取历史 AI 用量汇总") {
+        while try stepHasRow(statement, fallback: AppLocalization.text("无法读取历史 AI 用量汇总")) {
             totals.append(DetectedUsageTotal(
                 timestamp: Date(timeIntervalSinceReferenceDate: sqlite3_column_double(statement, 0)),
                 inputTokens: tokenCount(at: 1, in: statement),
@@ -323,7 +323,7 @@ final class AIStateDatabase {
             """)
         defer { sqlite3_finalize(statement) }
         try bind(name, to: 1, in: statement)
-        return try stepHasRow(statement, fallback: "无法查询 AI 状态数据库结构")
+        return try stepHasRow(statement, fallback: AppLocalization.text("无法查询 AI 状态数据库结构"))
     }
 
     private func recordUsageDeltasInCurrentTransaction(_ samples: [AIUsageSample]) throws -> Int {
@@ -352,7 +352,7 @@ final class AIStateDatabase {
             sqlite3_reset(lookup)
             sqlite3_clear_bindings(lookup)
             try bind(sourceID, to: 1, in: lookup)
-            if try stepHasRow(lookup, fallback: "无法查询 AI 用量记录") {
+            if try stepHasRow(lookup, fallback: AppLocalization.text("无法查询 AI 用量记录")) {
                 let existing = try usageSample(
                     from: lookup,
                     sourceID: sourceID,
@@ -535,7 +535,7 @@ final class AIStateDatabase {
 
     private func detectedUsageEventTotal(at day: Date) throws -> DetectedUsageTotal {
         guard let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: day) else {
-            throw AIStateRepositoryError.storageFailure("无法计算 AI 用量日期范围")
+            throw AIStateRepositoryError.storageFailure(AppLocalization.text("无法计算 AI 用量日期范围"))
         }
         let statement = try prepare("""
             SELECT input_tokens, output_tokens
@@ -546,7 +546,7 @@ final class AIStateDatabase {
         try check(sqlite3_bind_double(statement, 2, nextDay.timeIntervalSinceReferenceDate))
         var inputTokens = 0
         var outputTokens = 0
-        while try stepHasRow(statement, fallback: "无法读取 AI 用量事件汇总") {
+        while try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量事件汇总")) {
             inputTokens = AIUsageTokenMath.adding(
                 inputTokens,
                 tokenCount(at: 0, in: statement)
@@ -570,7 +570,7 @@ final class AIStateDatabase {
             """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, day.timeIntervalSinceReferenceDate))
-        guard try stepHasRow(statement, fallback: "无法读取 AI 用量基线") else {
+        guard try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量基线")) else {
             return DetectedUsageTotal(timestamp: day, inputTokens: 0, outputTokens: 0)
         }
         return DetectedUsageTotal(
@@ -618,7 +618,7 @@ final class AIStateDatabase {
         sqlite3_reset(statement)
         sqlite3_clear_bindings(statement)
         try bind(sourceID, to: 1, in: statement)
-        guard try stepHasRow(statement, fallback: "无法查询检测到的 AI 用量记录") else {
+        guard try stepHasRow(statement, fallback: AppLocalization.text("无法查询检测到的 AI 用量记录")) else {
             return nil
         }
         return try usageSample(from: statement, sourceID: sourceID, columnOffset: 0)
@@ -705,7 +705,7 @@ final class AIStateDatabase {
 
     private func uniqueDetectedUsageSourceID(from statement: OpaquePointer?) throws -> String? {
         var sourceIDs: [String] = []
-        while try stepHasRow(statement, fallback: "无法查询旧版检测到的 AI 用量记录") {
+        while try stepHasRow(statement, fallback: AppLocalization.text("无法查询旧版检测到的 AI 用量记录")) {
             guard let sourceID = optionalText(at: 0, in: statement) else { continue }
             sourceIDs.append(sourceID)
         }
@@ -715,7 +715,7 @@ final class AIStateDatabase {
     private func detectedUsageCursor() throws -> Date? {
         let statement = try prepare("SELECT timestamp FROM detected_usage_cursor WHERE id = 1 LIMIT 1")
         defer { sqlite3_finalize(statement) }
-        guard try stepHasRow(statement, fallback: "无法读取 AI 用量游标") else { return nil }
+        guard try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量游标")) else { return nil }
         return Date(timeIntervalSinceReferenceDate: sqlite3_column_double(statement, 0))
     }
 
@@ -732,8 +732,8 @@ final class AIStateDatabase {
     private func usageSchemaVersion() throws -> Int {
         let statement = try prepare("PRAGMA user_version")
         defer { sqlite3_finalize(statement) }
-        guard try stepHasRow(statement, fallback: "无法读取 AI 用量存储版本") else {
-            throw AIStateRepositoryError.storageFailure("无法读取 AI 用量存储版本")
+        guard try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量存储版本")) else {
+            throw AIStateRepositoryError.storageFailure(AppLocalization.text("无法读取 AI 用量存储版本"))
         }
         return Int(sqlite3_column_int64(statement, 0))
     }
@@ -746,7 +746,7 @@ final class AIStateDatabase {
         let statement = try prepare("SELECT payload FROM notices ORDER BY position")
         defer { sqlite3_finalize(statement) }
         var result: [IslandNotice] = []
-        while try stepHasRow(statement, fallback: "无法读取通知列表") {
+        while try stepHasRow(statement, fallback: AppLocalization.text("无法读取通知列表")) {
             result.append(try decode(IslandNotice.self, from: blob(at: 0, in: statement)))
         }
         return result
@@ -866,7 +866,7 @@ final class AIStateDatabase {
         defer { sqlite3_free(errorMessage) }
         guard result == SQLITE_OK else {
             let message = errorMessage.map { String(cString: $0) }
-                ?? sqliteMessage(connection, fallback: "AI 状态数据库操作失败")
+                ?? sqliteMessage(connection, fallback: AppLocalization.text("AI 状态数据库操作失败"))
             throw AIStateRepositoryError.storageFailure(message)
         }
     }
@@ -877,7 +877,7 @@ final class AIStateDatabase {
         guard result == SQLITE_OK else {
             sqlite3_finalize(statement)
             throw AIStateRepositoryError.storageFailure(
-                sqliteMessage(connection, fallback: "无法准备 AI 状态数据库操作")
+                sqliteMessage(connection, fallback: AppLocalization.text("无法准备 AI 状态数据库操作"))
             )
         }
         return statement
@@ -887,7 +887,7 @@ final class AIStateDatabase {
         let result = sqlite3_step(statement)
         guard result == SQLITE_DONE else {
             throw AIStateRepositoryError.storageFailure(
-                sqliteMessage(connection, fallback: "AI 状态数据库写入失败")
+                sqliteMessage(connection, fallback: AppLocalization.text("AI 状态数据库写入失败"))
             )
         }
     }
@@ -908,7 +908,7 @@ final class AIStateDatabase {
     private func check(_ result: Int32) throws {
         guard result == SQLITE_OK else {
             throw AIStateRepositoryError.storageFailure(
-                sqliteMessage(connection, fallback: "AI 状态数据库参数绑定失败")
+                sqliteMessage(connection, fallback: AppLocalization.text("AI 状态数据库参数绑定失败"))
             )
         }
     }

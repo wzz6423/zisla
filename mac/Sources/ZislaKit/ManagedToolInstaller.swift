@@ -1,4 +1,5 @@
 import Foundation
+import ZislaCore
 
 enum ManagedToolInstallationSource: Sendable, Equatable {
     case githubRelease(repository: String)
@@ -324,8 +325,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
 
     public var installDetail: String {
         usesHomebrew
-            ? "通过本机 Homebrew 安装和更新"
-            : "点击安装由 Zisla 自动完成"
+            ? AppLocalization.text("通过本机 Homebrew 安装和更新")
+            : AppLocalization.text("点击安装由 Zisla 自动完成")
     }
 
     public var installHelp: String {

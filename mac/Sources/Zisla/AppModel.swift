@@ -868,7 +868,7 @@ final class AppModel: ObservableObject {
     guard let url = URL(
       string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
     ), NSWorkspace.shared.open(url) else {
-      transientMessage = "无法打开系统设置的输入监控页面"
+      transientMessage = AppLocalization.text("无法打开系统设置的输入监控页面")
       return
     }
   }
@@ -889,7 +889,7 @@ final class AppModel: ObservableObject {
     guard let url = URL(
       string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
     ), NSWorkspace.shared.open(url) else {
-      transientMessage = "无法打开系统设置的辅助功能页面"
+      transientMessage = AppLocalization.text("无法打开系统设置的辅助功能页面")
       return
     }
   }
@@ -933,11 +933,11 @@ final class AppModel: ObservableObject {
 
       switch registration {
       case .registered:
-        transientMessage = "语音输入快捷键已启用"
+        transientMessage = AppLocalization.text("语音输入快捷键已启用")
       case .inputMonitoringPermissionRequired:
-        transientMessage = "快捷键需要输入监控权限，请在系统设置中授权后重启 App"
+        transientMessage = AppLocalization.text("快捷键需要输入监控权限，请在系统设置中授权后重启 App")
       case .registrationFailed:
-        transientMessage = "无法注册语音输入快捷键"
+        transientMessage = AppLocalization.text("无法注册语音输入快捷键")
       }
     }
   }
@@ -1021,9 +1021,9 @@ final class AppModel: ObservableObject {
       enablePowerAssertionsForCleaning()
     case .accessibilityPermissionRequired:
       _ = ScreenCleaningController.requestAccessibilityAccess()
-      transientMessage = "清洁键盘需要在系统设置中允许辅助功能"
+      transientMessage = AppLocalization.text("清洁键盘需要在系统设置中允许辅助功能")
     case .registrationFailed:
-      transientMessage = "无法接管键盘输入"
+      transientMessage = AppLocalization.text("无法接管键盘输入")
     case .alreadyActive:
       break
     }
@@ -1039,9 +1039,9 @@ final class AppModel: ObservableObject {
       switch await DesktopOrganizer.tidyDesktop() {
       case .success(let outcome):
         if outcome.skippedForStacks {
-          transientMessage = "桌面已开启叠放，由系统自动排布"
+          transientMessage = AppLocalization.text("桌面已开启叠放，由系统自动排布")
         } else if outcome.arrangedCount == 0 {
-          transientMessage = "桌面没有需要整理的项目"
+          transientMessage = AppLocalization.text("桌面没有需要整理的项目")
         } else {
           transientMessage = "已按网格整理 \(outcome.arrangedCount) 个项目"
         }
@@ -1064,16 +1064,16 @@ final class AppModel: ObservableObject {
         return
       }
       guard count > 0 else {
-        transientMessage = "废纸篓已经是空的"
+        transientMessage = AppLocalization.text("废纸篓已经是空的")
         return
       }
 
       let alert = NSAlert()
-      alert.messageText = "清空废纸篓？"
-      alert.informativeText = "将永久删除 \(count) 个项目，此操作无法撤销。"
+      alert.messageText = AppLocalization.text("清空废纸篓？")
+      alert.informativeText = AppLocalization.text("将永久删除 %ld 个项目，此操作无法撤销。", count)
       alert.alertStyle = .warning
-      alert.addButton(withTitle: "清空")
-      alert.addButton(withTitle: "取消")
+      alert.addButton(withTitle: AppLocalization.text("清空"))
+      alert.addButton(withTitle: AppLocalization.text("取消"))
       NSApp.activate(ignoringOtherApps: true)
       WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
       guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -1197,7 +1197,7 @@ final class AppModel: ObservableObject {
       weatherSnapshotsByLocationID = snapshots
       let ordered = weatherLocations.orderedSnapshots(snapshots)
       if ordered.isEmpty {
-        let message = firstError ?? "没有可用的天气数据"
+        let message = firstError ?? AppLocalization.text("没有可用的天气数据")
         weatherLocationState = .failed(message)
         transientMessage = message
       } else {
@@ -1265,15 +1265,15 @@ final class AppModel: ObservableObject {
   }
 
   func markMailRead(_ message: MailMessage) async {
-    _ = reportMailOperation(await mail.markRead(message), successMessage: "已标记为已读")
+    _ = reportMailOperation(await mail.markRead(message), successMessage: AppLocalization.text("已标记为已读"))
   }
 
   func markMailJunk(_ message: MailMessage) async {
-    _ = reportMailOperation(await mail.markJunk(message), successMessage: "已标记为垃圾邮件")
+    _ = reportMailOperation(await mail.markJunk(message), successMessage: AppLocalization.text("已标记为垃圾邮件"))
   }
 
   func deleteMail(_ message: MailMessage) async {
-    _ = reportMailOperation(await mail.delete(message), successMessage: "已移到废纸篓")
+    _ = reportMailOperation(await mail.delete(message), successMessage: AppLocalization.text("已移到废纸篓"))
   }
 
   func sendMail(
@@ -1284,12 +1284,12 @@ final class AppModel: ObservableObject {
   ) async -> Bool {
     reportMailOperation(
       await mail.send(fromAddress: fromAddress, to: recipients, subject: subject, body: body),
-      successMessage: "邮件已发送"
+      successMessage: AppLocalization.text("邮件已发送")
     )
   }
 
   func replyToMail(_ message: MailMessage, body: String) async -> Bool {
-    reportMailOperation(await mail.reply(to: message, body: body), successMessage: "回复已发送")
+    reportMailOperation(await mail.reply(to: message, body: body), successMessage: AppLocalization.text("回复已发送"))
   }
 
   func takeMailComposeRequest() -> MailComposeRequest? {
@@ -1301,7 +1301,7 @@ final class AppModel: ObservableObject {
     guard manual || settingsStore.settings.updateChecksEnabled else { return }
     let selectedChannel = channel ?? settingsStore.settings.updateChannel
     guard let sparkleUpdateController else {
-      if manual { updateState = .failed("无法启动自动更新服务") }
+      if manual { updateState = .failed(AppLocalization.text("无法启动自动更新服务")) }
       return
     }
     if manual {
@@ -1311,7 +1311,7 @@ final class AppModel: ObservableObject {
         checksEnabled: settingsStore.settings.updateChecksEnabled,
         automaticDownloadEnabled: settingsStore.settings.automaticDownloadEnabled
       ) {
-        updateState = .failed("无法启动自动更新服务")
+        updateState = .failed(AppLocalization.text("无法启动自动更新服务"))
       }
       return
     }
@@ -1365,7 +1365,7 @@ final class AppModel: ObservableObject {
   func pasteFilesToShelf() {
     let urls = FileShelfPasteboard.readFileURLs()
     guard !urls.isEmpty else {
-      transientMessage = "剪贴板没有可粘贴的文件"
+      transientMessage = AppLocalization.text("剪贴板没有可粘贴的文件")
       return
     }
     addToShelf(urls)
@@ -1373,7 +1373,7 @@ final class AppModel: ObservableObject {
 
   func copyShelfFiles(_ urls: [URL]) {
     guard FileShelfPasteboard.writeFileURLs(urls) else {
-      transientMessage = "没有可复制的文件"
+      transientMessage = AppLocalization.text("没有可复制的文件")
       return
     }
     transientMessage = "已复制 \(urls.count) 个文件"
@@ -1381,10 +1381,10 @@ final class AppModel: ObservableObject {
 
   func copyClipboardHistoryItem(_ item: ClipboardHistoryItem) {
     guard ClipboardHistoryPasteboard.write(item.content) else {
-      transientMessage = "无法写入剪贴板"
+      transientMessage = AppLocalization.text("无法写入剪贴板")
       return
     }
-    transientMessage = "已复制到剪贴板"
+    transientMessage = AppLocalization.text("已复制到剪贴板")
   }
 
   // MARK: - Clipboard Assistant
@@ -1666,7 +1666,7 @@ final class AppModel: ObservableObject {
   nonisolated static func zipArchiveError(source: URL, destination: URL) async -> String? {
     var isDirectory: ObjCBool = false
     guard FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory) else {
-      return "源文件不存在"
+      return AppLocalization.text("源文件不存在")
     }
     let sourceAccess = source.startAccessingSecurityScopedResource()
     let destinationDirectory = destination.deletingLastPathComponent()
@@ -1689,10 +1689,10 @@ final class AppModel: ObservableObject {
         maximumErrorBytes: 256 * 1_024
       )
       if output.didTimeout {
-        return "压缩操作超时"
+        return AppLocalization.text("压缩操作超时")
       }
       guard output.status == 0 else {
-        return output.standardError.isEmpty ? "无法创建 ZIP 文件" : output.standardError
+        return output.standardError.isEmpty ? AppLocalization.text("无法创建 ZIP 文件") : output.standardError
       }
       return nil
     } catch {
@@ -1787,23 +1787,23 @@ final class AppModel: ObservableObject {
   func sendQuickNoteToTeleprompter(_ content: String) {
     let content = content.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !content.isEmpty else {
-      transientMessage = "随记没有可发送的内容"
+      transientMessage = AppLocalization.text("随记没有可发送的内容")
       return
     }
     UserDefaults.standard.set(content, forKey: "toolbox.teleprompterScript")
-    transientMessage = "已发送到提词器"
+    transientMessage = AppLocalization.text("已发送到提词器")
     presentTeleprompter()
   }
 
   func receiveQuickNoteTransferItems(_ items: [TransferDropItem]) {
     let content = transferableText(from: items)
     guard !content.isEmpty else {
-      transientMessage = "没有可写入随记的内容"
+      transientMessage = AppLocalization.text("没有可写入随记的内容")
       return
     }
     Task {
       if await quickNotes.create(markdown: content) {
-        transientMessage = "已创建随记"
+        transientMessage = AppLocalization.text("已创建随记")
         selectModule(.quickNotes)
       }
     }
@@ -1850,7 +1850,7 @@ final class AppModel: ObservableObject {
     }).first {
       prepareDownload(link)
     } else if files.isEmpty {
-      transientMessage = "中转站支持文件或媒体链接"
+      transientMessage = AppLocalization.text("中转站支持文件或媒体链接")
     }
   }
 
@@ -1919,7 +1919,7 @@ final class AppModel: ObservableObject {
     selectModule(.download)
     detectedLinkTask?.cancel()
     detectedLink = nil
-    transientMessage = "链接已放入下载中转"
+    transientMessage = AppLocalization.text("链接已放入下载中转")
   }
 
   func startDownload() {
@@ -1932,9 +1932,9 @@ final class AppModel: ObservableObject {
       )
     } catch {
       if hasActiveDownloads {
-        transientMessage = "链接或输出目录无效"
+        transientMessage = AppLocalization.text("链接或输出目录无效")
       } else {
-        downloadState = .failed("链接或输出目录无效")
+        downloadState = .failed(AppLocalization.text("链接或输出目录无效"))
       }
       return
     }
@@ -2234,7 +2234,7 @@ final class AppModel: ObservableObject {
         }
       )
       if registration == .registrationFailed {
-        transientMessage = "无法注册语音输入快捷键"
+        transientMessage = AppLocalization.text("无法注册语音输入快捷键")
       }
     } else {
       voiceInput.cancel()
@@ -2353,8 +2353,8 @@ final class AppModel: ObservableObject {
     let historySaved = voiceHistory.record(recording, retainAudio: retainsAudio)
     guard !rawTranscript.isEmpty else {
       transientMessage = historySaved
-        ? (retainsAudio ? "录音已保存，但未识别到文字" : "未识别到文字")
-        : (retainsAudio ? "录音文件已保留，但记录索引保存失败" : "语音记录保存失败")
+        ? (retainsAudio ? AppLocalization.text("录音已保存，但未识别到文字") : "未识别到文字")
+        : (retainsAudio ? AppLocalization.text("录音文件已保留，但记录索引保存失败") : AppLocalization.text("语音记录保存失败"))
       return
     }
     let lexiconNormalizedTranscript = VoiceLexicon.normalizeTranscript(
@@ -2373,7 +2373,7 @@ final class AppModel: ObservableObject {
         to: targetProcessIdentifier,
         at: targetMouseLocation,
         target: inputTarget,
-        message: historySaved && localTranscriptSaved ? "语音转写已保存" : "语音转写完成；记录保存失败"
+        message: historySaved && localTranscriptSaved ? AppLocalization.text("语音转写已保存") : AppLocalization.text("语音转写完成；记录保存失败")
       )
       return
     }
@@ -2417,8 +2417,8 @@ final class AppModel: ObservableObject {
           at: targetMouseLocation,
           target: inputTarget,
           message: historySaved && processedTranscriptSaved
-            ? "语音整理结果已保存"
-            : "语音整理完成；记录保存失败"
+            ? AppLocalization.text("语音整理结果已保存")
+            : AppLocalization.text("语音整理完成；记录保存失败")
         )
       } catch is CancellationError {
         return
@@ -2565,27 +2565,27 @@ final class AppModel: ObservableObject {
         transientMessage = "\(message)；已复制，未能输入原文本框"
       }
     case .copyFailed:
-      transientMessage = "无法复制语音转写结果"
+      transientMessage = AppLocalization.text("无法复制语音转写结果")
     }
   }
 
   func playVoiceRecording(id: UUID) {
     guard let entry = voiceHistory.entries.first(where: { $0.id == id }),
           let url = voiceHistory.audioURL(for: entry) else {
-      transientMessage = "无法播放该语音原文件"
+      transientMessage = AppLocalization.text("无法播放该语音原文件")
       return
     }
     if voiceRecordingPlayer.play(id: id, url: url) {
-      transientMessage = "正在播放原始录音"
+      transientMessage = AppLocalization.text("正在播放原始录音")
     } else {
-      transientMessage = "无法播放该语音原文件"
+      transientMessage = AppLocalization.text("无法播放该语音原文件")
     }
   }
 
   func revealVoiceRecording(id: UUID) {
     guard let entry = voiceHistory.entries.first(where: { $0.id == id }),
           let url = voiceHistory.audioURL(for: entry) else {
-      transientMessage = "未找到该语音原文件"
+      transientMessage = AppLocalization.text("未找到该语音原文件")
       return
     }
     NSWorkspace.shared.activateFileViewerSelecting([url])
@@ -2644,12 +2644,12 @@ final class AppModel: ObservableObject {
     voiceModelDiscoveryGeneration &+= 1
     let generation = voiceModelDiscoveryGeneration
     guard let target = voicePostProcessingTarget() else {
-      voiceModelDiscoveryState = .failed("请先在上方添加、启用并选择一个模型配置")
+      voiceModelDiscoveryState = .failed(AppLocalization.text("请先在上方添加、启用并选择一个模型配置"))
       discoveredModels = []
       return
     }
     guard case let .http(endpoint, _, _, apiKey, _) = target else {
-      voiceModelDiscoveryState = .failed("官方 CLI 档案不支持 API 模型发现")
+      voiceModelDiscoveryState = .failed(AppLocalization.text("官方 CLI 档案不支持 API 模型发现"))
       discoveredModels = []
       return
     }
@@ -2716,7 +2716,7 @@ final class AppModel: ObservableObject {
       let modelName = configuration.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
       return modelName.isEmpty ? configuration.name : modelName
     case .channel:
-      guard let channel = aiAgent.store.channel(id: reference.id) else { return "远端模型" }
+      guard let channel = aiAgent.store.channel(id: reference.id) else { return AppLocalization.text("远端模型") }
       let modelName = channel.defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
       return modelName.isEmpty ? channel.name : modelName
     }
@@ -2732,7 +2732,7 @@ final class AppModel: ObservableObject {
       let credentialKinds = channel.endpointGroups
         .flatMap(\.accountIDs)
         .compactMap { aiAgent.store.account(id: $0)?.credentialKind.displayName }
-      let credential = credentialKinds.first ?? "未配置凭据"
+      let credential = credentialKinds.first ?? AppLocalization.text("未配置凭据")
       return "远端 · \(credential)"
     }
   }
@@ -2802,7 +2802,7 @@ final class AppModel: ObservableObject {
           IslandNotice(
             id: "task-\(task.id)-\(task.updatedAt.timeIntervalSince1970)",
             title: task.title,
-            detail: task.status == .succeeded ? "任务已完成" : "任务执行失败",
+            detail: task.status == .succeeded ? AppLocalization.text("任务已完成") : AppLocalization.text("任务执行失败"),
             kind: task.status == .succeeded ? .success : .error,
             side: task.status == .succeeded ? .right : .left,
             createdAt: task.updatedAt
@@ -2884,7 +2884,7 @@ final class AppModel: ObservableObject {
     let source =
       snapshot.sourceApplication
       ?? snapshot.sourceBundleIdentifier
-      ?? "媒体播放器"
+      ?? AppLocalization.text("媒体播放器")
     let leftNotice = IslandNotice(
       id: "media-active-left",
       title: source,
@@ -3044,7 +3044,7 @@ final class AppModel: ObservableObject {
       IslandNotice(
         id: "focus-transition",
         title: presentation.title,
-        detail: status.isActive ? "已开启" : "已关闭",
+        detail: status.isActive ? AppLocalization.text("已开启") : "已关闭",
         kind: status.isActive ? .success : .info,
         side: .left,
         style: .status,
@@ -3358,7 +3358,7 @@ final class AppModel: ObservableObject {
     case .duplicateTask: return "下载任务已在运行"
     case .cannotPrepareDirectory: return "无法写入下载目录"
     case .launchFailed: return "无法启动下载任务"
-    case .processFailed(_, let diagnostic): return diagnostic.isEmpty ? "下载失败" : diagnostic
+    case .processFailed(_, let diagnostic): return diagnostic.isEmpty ? AppLocalization.text("下载失败") : diagnostic
     case .missingCompletedFile: return "未获得下载文件"
     case .unsafeCompletedFile: return "下载结果位于授权目录之外"
     case .completedFileDoesNotExist: return "下载文件不存在"

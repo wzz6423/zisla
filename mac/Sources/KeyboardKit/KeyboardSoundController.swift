@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import SwiftUI
+import ZislaCore
 
 /// Public integration surface used by Zisla. The complete keyboard sound implementation remains
 /// inside this target; Zisla only synchronizes feature settings and presents its own UI.
@@ -145,7 +146,7 @@ public struct KeyboardTypingStatsSummary: Equatable, Sendable {
 @MainActor
 public final class KeyboardSoundController: ObservableObject {
     @Published public private(set) var isInputMonitoringGranted = false
-    @Published public private(set) var monitoringStateText = "未启动"
+    @Published public private(set) var monitoringStateText = AppLocalization.text("未启动")
     @Published public private(set) var audioError: String?
     @Published public private(set) var typingStatsSummary: KeyboardTypingStatsSummary?
 

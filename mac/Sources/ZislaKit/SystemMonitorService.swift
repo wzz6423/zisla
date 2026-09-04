@@ -4,6 +4,7 @@ import Darwin
 import Foundation
 import IOKit
 import SystemConfiguration
+import ZislaCore
 import ZislaNVMe
 
 // MARK: - Snapshots
@@ -48,7 +49,7 @@ public enum TemperatureMetric: Equatable, Sendable {
     case celsius(Double)
 
     public static let unavailableByPublicAPI = TemperatureMetric.unavailable(
-        reason: "此 Mac 未提供公开温度传感器接口"
+        reason: AppLocalization.text("此 Mac 未提供公开温度传感器接口")
     )
 }
 
@@ -932,7 +933,7 @@ enum SystemSampler {
                 }
             }
         }
-        return .unavailable(reason: "内置存储未提供可读取的温度传感器")
+        return .unavailable(reason: AppLocalization.text("内置存储未提供可读取的温度传感器"))
     }
 
     /// Reads cumulative disk I/O counters from IORegistry; returns nil when the reading cannot be verified.
@@ -1119,7 +1120,7 @@ enum SystemSampler {
                 )
             )
         }
-        return .unavailable(reason: "当前 GPU 未提供可读取的性能统计")
+        return .unavailable(reason: AppLocalization.text("当前 GPU 未提供可读取的性能统计"))
     }
 
     private static func counterValue(_ value: Any?) -> UInt64? {
@@ -1229,9 +1230,9 @@ enum AppleSMCSensorReader {
     fileprivate static func sample(chipName: String?) -> AppleSMCSensorSample {
         guard let connection = openConnection() else {
             return AppleSMCSensorSample(
-                cpuTemperature: .unavailable(reason: "AppleSMC 只读传感器不可用"),
-                gpuTemperature: .unavailable(reason: "AppleSMC 只读传感器不可用"),
-                fan: .unavailable(reason: "AppleSMC 只读传感器不可用")
+                cpuTemperature: .unavailable(reason: AppLocalization.text("AppleSMC 只读传感器不可用")),
+                gpuTemperature: .unavailable(reason: AppLocalization.text("AppleSMC 只读传感器不可用")),
+                fan: .unavailable(reason: AppLocalization.text("AppleSMC 只读传感器不可用"))
             )
         }
         defer { IOServiceClose(connection) }
@@ -1303,13 +1304,13 @@ enum AppleSMCSensorReader {
     private static func cpuTemperature(chipName: String?, connection: io_connect_t) -> TemperatureMetric {
         let generation = AppleSiliconGeneration.from(chipName: chipName)
         guard generation != .unknown else {
-            return .unavailable(reason: "当前芯片没有经过验证的温度键映射")
+            return .unavailable(reason: AppLocalization.text("当前芯片没有经过验证的温度键映射"))
         }
         let values = generation.cpuTemperatureKeys.compactMap { key in
             read(key, connection: connection).flatMap(floatingPointValue)
         }
         guard let average = averageCelsius(values) else {
-            return .unavailable(reason: "未返回有效 CPU 温度读数")
+            return .unavailable(reason: AppLocalization.text("未返回有效 CPU 温度读数"))
         }
         return .celsius(average)
     }
@@ -1317,13 +1318,13 @@ enum AppleSMCSensorReader {
     private static func gpuTemperature(chipName: String?, connection: io_connect_t) -> TemperatureMetric {
         let generation = AppleSiliconGeneration.from(chipName: chipName)
         guard generation != .unknown else {
-            return .unavailable(reason: "当前芯片没有经过验证的温度键映射")
+            return .unavailable(reason: AppLocalization.text("当前芯片没有经过验证的温度键映射"))
         }
         let values = generation.gpuTemperatureKeys.compactMap { key in
             read(key, connection: connection).flatMap(floatingPointValue)
         }
         guard let average = averageCelsius(values) else {
-            return .unavailable(reason: "未返回有效 GPU 温度读数")
+            return .unavailable(reason: AppLocalization.text("未返回有效 GPU 温度读数"))
         }
         return .celsius(average)
     }
@@ -1332,10 +1333,10 @@ enum AppleSMCSensorReader {
         guard let countValue = read("FNum", connection: connection),
               let firstByte = countValue.bytes.first
         else {
-            return .unavailable(reason: "此 Mac 未返回风扇数量")
+            return .unavailable(reason: AppLocalization.text("此 Mac 未返回风扇数量"))
         }
         let count = min(Int(firstByte), 8)
-        guard count > 0 else { return .unavailable(reason: "此 Mac 没有可读风扇") }
+        guard count > 0 else { return .unavailable(reason: AppLocalization.text("此 Mac 没有可读风扇")) }
 
         let rpm = (0..<count).compactMap { index -> Double? in
             guard let value = read("F\(index)Ac", connection: connection),
@@ -1344,7 +1345,7 @@ enum AppleSMCSensorReader {
             else { return nil }
             return rpm
         }
-        guard !rpm.isEmpty else { return .unavailable(reason: "未返回有效风扇转速") }
+        guard !rpm.isEmpty else { return .unavailable(reason: AppLocalization.text("未返回有效风扇转速")) }
         return .available(rpm: rpm, detail: "AppleSMC 只读")
     }
 
@@ -3768,12 +3769,12 @@ public final class SystemMonitorService: ObservableObject {
         let sensors = payload.sensors ?? cachedSensorSample ?? AppleSMCSensorSample(
             cpuTemperature: .unavailableByPublicAPI,
             gpuTemperature: .unavailableByPublicAPI,
-            fan: .unavailable(reason: "AppleSMC 只读传感器不可用")
+            fan: .unavailable(reason: AppLocalization.text("AppleSMC 只读传感器不可用"))
         )
         var cpu = payload.cpu
         cpu.temperature = sensors.cpuTemperature
 
-        let gpu = payload.gpu ?? cachedGPUMetrics ?? .unavailable(reason: "当前 GPU 未提供可读取的性能统计")
+        let gpu = payload.gpu ?? cachedGPUMetrics ?? .unavailable(reason: AppLocalization.text("当前 GPU 未提供可读取的性能统计"))
         var finalGPU = gpu
         if case .available(var metrics) = finalGPU {
             metrics.temperature = sensors.gpuTemperature

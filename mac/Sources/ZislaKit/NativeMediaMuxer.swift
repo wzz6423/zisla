@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import ZislaCore
 
 public protocol MediaMuxing: Sendable {
     func mux(videoURL: URL, audioURL: URL, outputURL: URL) async throws
@@ -151,7 +152,7 @@ private final class ExportSessionBox: @unchecked Sendable {
                 default:
                     continuation.resume(
                         throwing: error
-                            ?? NativeMediaMuxerError.exportFailed("AVFoundation 导出失败")
+                            ?? NativeMediaMuxerError.exportFailed(AppLocalization.text("AVFoundation 导出失败"))
                     )
                 }
             }

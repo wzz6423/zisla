@@ -1,5 +1,6 @@
 import AppKit
 import ImageIO
+import ZislaCore
 import ZislaKit
 import SwiftUI
 import UniformTypeIdentifiers
@@ -101,7 +102,7 @@ struct ClipboardHistoryModuleView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Label("剪贴板", systemImage: "clipboard")
+                Label(AppLocalization.text("剪贴板"), systemImage: "clipboard")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
                 Text("\(store.totalItemCount)")
@@ -110,7 +111,7 @@ struct ClipboardHistoryModuleView: View {
                 if filter == .pinned {
                     IconButton(
                         symbol: "plus",
-                        help: "添加常用信息",
+                        help: AppLocalization.text("添加常用信息"),
                         isActive: additionPresentation != nil,
                         size: .compact
                     ) {
@@ -119,7 +120,7 @@ struct ClipboardHistoryModuleView: View {
                 }
                 IconButton(
                     symbol: "trash",
-                    help: "清空历史（保留常用）",
+                    help: AppLocalization.text("清空历史（保留常用）"),
                     size: .compact
                 ) {
                     store.removeAllHistory()
@@ -142,7 +143,7 @@ struct ClipboardHistoryModuleView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                TextField("搜索", text: $searchText)
+                TextField(AppLocalization.text("搜索"), text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11))
                     .focused($isSearchFocused)
@@ -219,14 +220,14 @@ struct ClipboardHistoryModuleView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(!store.canLoadPreviousPage)
-                    .help("上一页")
+                    .help(AppLocalization.text("上一页"))
 
-                    TextField("页码", text: $pageInput)
+                    TextField(AppLocalization.text("页码"), text: $pageInput)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .multilineTextAlignment(.center)
                         .frame(width: 36)
-                        .help("输入页码后按回车跳转")
+                        .help(AppLocalization.text("输入页码后按回车跳转"))
                         .onSubmit(jumpToEnteredPage)
 
                     Text("/\(store.pageCount)")
@@ -241,7 +242,7 @@ struct ClipboardHistoryModuleView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(!store.canLoadNextPage)
-                    .help("下一页")
+                    .help(AppLocalization.text("下一页"))
                 }
                 .frame(height: 30)
             }
@@ -294,7 +295,7 @@ struct ClipboardHistoryModuleView: View {
 
     private var additionPicker: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("添加常用项")
+            Text(AppLocalization.text("添加常用项"))
                 .font(.islandMicro(weight: .semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8)
@@ -321,7 +322,7 @@ struct ClipboardHistoryModuleView: View {
     private var textAdditionEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Text("添加常用文字")
+                Text(AppLocalization.text("添加常用文字"))
                     .font(.system(size: 12, weight: .semibold))
                 Spacer(minLength: 0)
                 Button(action: dismissAddition) {
@@ -331,7 +332,7 @@ struct ClipboardHistoryModuleView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("取消")
+                .help(AppLocalization.text("取消"))
             }
 
             ZStack(alignment: .topLeading) {
@@ -342,7 +343,7 @@ struct ClipboardHistoryModuleView: View {
                     .padding(7)
 
                 if draftText.isEmpty {
-                    Text("输入文字或 Emoji")
+                    Text(AppLocalization.text("输入文字或 Emoji"))
                         .font(.system(size: 12))
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 12)
@@ -355,9 +356,9 @@ struct ClipboardHistoryModuleView: View {
 
             HStack(spacing: 8) {
                 Spacer()
-                Button("取消", action: dismissAddition)
+                Button(AppLocalization.text("取消"), action: dismissAddition)
                     .controlSize(.small)
-                Button("添加", action: addDraftText)
+                Button(AppLocalization.text("添加"), action: addDraftText)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .disabled(draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -492,7 +493,7 @@ struct ClipboardHistoryModuleView: View {
                         HStack(spacing: 4) {
                             Image(systemName: category.symbol)
                                 .font(.system(size: 10, weight: .medium))
-                            Text(category.rawValue)
+                            Text(category.title)
                                 .font(.system(size: 10, weight: .medium))
                             if category != .all {
                                 Text("\(count)")
@@ -550,7 +551,7 @@ private struct ClipboardFilterSegmentedControl: View {
                     HStack(spacing: 4) {
                         Image(systemName: isActive ? filter.activeIcon : filter.icon)
                             .font(.system(size: 11, weight: .semibold))
-                        Text(filter.title)
+                        Text(AppLocalization.text(filter.title))
                     }
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(isActive ? .primary : .secondary)
@@ -571,7 +572,7 @@ private struct ClipboardFilterSegmentedControl: View {
                     }
                 }
                 .buttonStyle(PressableStyle(hoverScale: 1.025, pressedScale: 0.95))
-                .help("只看\(filter.title)")
+                .help(AppLocalization.text("只看%@", filter.title))
             }
         }
         .padding(2)
@@ -615,7 +616,7 @@ private struct ClipboardHistoryItemRow: View, Equatable {
                 }
             }
             .buttonStyle(.plain)
-            .help("复制到剪贴板")
+            .help(AppLocalization.text("复制到剪贴板"))
 
             Button {
                 onSendToQuickNote(item)
@@ -623,7 +624,7 @@ private struct ClipboardHistoryItemRow: View, Equatable {
                 HStack(spacing: 3) {
                     Image(systemName: "note.text")
                         .font(.system(size: 10))
-                    Text("随记")
+                    Text(AppLocalization.text("随记"))
                         .font(.system(size: 10, weight: .medium))
                 }
                 .padding(.horizontal, 6)
@@ -631,7 +632,7 @@ private struct ClipboardHistoryItemRow: View, Equatable {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("发送到随记")
+            .help(AppLocalization.text("发送到随记"))
 
             // Favorites toggle: filled star = already in favorites; tap to add/remove from favorites.
             Button {
@@ -640,7 +641,7 @@ private struct ClipboardHistoryItemRow: View, Equatable {
                 HStack(spacing: 3) {
                     Image(systemName: item.isPinned ? "star.fill" : "star")
                         .font(.system(size: 10))
-                    Text("常用")
+                    Text(AppLocalization.text("常用"))
                         .font(.system(size: 10, weight: .medium))
                 }
                 .padding(.horizontal, 6)
@@ -648,7 +649,7 @@ private struct ClipboardHistoryItemRow: View, Equatable {
             }
             .buttonStyle(.plain)
             .foregroundStyle(item.isPinned ? Color.accentColor : .secondary)
-            .help(item.isPinned ? "移出常用" : "设为常用")
+            .help(item.isPinned ? AppLocalization.text("移出常用") : AppLocalization.text("设为常用"))
 
             Button {
                 onRemove()
@@ -656,7 +657,7 @@ private struct ClipboardHistoryItemRow: View, Equatable {
                 HStack(spacing: 3) {
                     Image(systemName: "xmark")
                         .font(.system(size: 10))
-                    Text("删除")
+                    Text(AppLocalization.text("删除"))
                         .font(.system(size: 10, weight: .medium))
                 }
                 .padding(.horizontal, 6)
@@ -664,7 +665,7 @@ private struct ClipboardHistoryItemRow: View, Equatable {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("删除")
+            .help(AppLocalization.text("删除"))
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -672,13 +673,13 @@ private struct ClipboardHistoryItemRow: View, Equatable {
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .onDrag { dragProvider }
         .contextMenu {
-            Button("复制") { onCopy(item) }
-            Button("发送到随记") { onSendToQuickNote(item) }
-            Button(item.isPinned ? "移出常用" : "设为常用") {
+            Button(AppLocalization.text("复制")) { onCopy(item) }
+            Button(AppLocalization.text("发送到随记")) { onSendToQuickNote(item) }
+            Button(item.isPinned ? AppLocalization.text("移出常用") : AppLocalization.text("设为常用")) {
                 onSetPinned(!item.isPinned)
             }
             Divider()
-            Button("删除", role: .destructive) {
+            Button(AppLocalization.text("删除"), role: .destructive) {
                 onRemove()
             }
         }

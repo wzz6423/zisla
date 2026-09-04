@@ -4,6 +4,7 @@ import CoreImage
 import SwiftUI
 import UniformTypeIdentifiers
 import Vision
+import ZislaCore
 import ZislaKit
 
 enum ScreenshotTool: String, CaseIterable, Identifiable {
@@ -1335,7 +1336,7 @@ final class ScreenshotEditorModel: ObservableObject {
         if let previous, let next,
            ScreenshotLongCaptureMatcher.isVisuallyUnchanged(previous: previous, next: next) {
             lastLongCaptureFrame = nextImage
-            statusMessage = "等待页面滚动"
+            statusMessage = AppLocalization.text("等待页面滚动")
             return false
         }
         let match: ScreenshotLongCaptureMatch? = {
@@ -1347,7 +1348,7 @@ final class ScreenshotEditorModel: ObservableObject {
             )
         }()
         if isLongCapturePreviewing, match == nil {
-            statusMessage = "未检测到可拼接区域，请放慢滚动"
+            statusMessage = AppLocalization.text("未检测到可拼接区域，请放慢滚动")
             return false
         }
         guard let combined = Self.stackedImage(
@@ -1356,7 +1357,7 @@ final class ScreenshotEditorModel: ObservableObject {
             direction: direction,
             match: match
         ) else {
-            statusMessage = "长截图拼接失败"
+            statusMessage = AppLocalization.text("长截图拼接失败")
             return false
         }
         saveUndoPoint()
@@ -1377,7 +1378,7 @@ final class ScreenshotEditorModel: ObservableObject {
         }
         lastLongCaptureFrame = nextImage
         refreshMosaicPreview()
-        statusMessage = "已追加一屏，继续点击长截图可继续拼接"
+        statusMessage = AppLocalization.text("已追加一屏，继续点击长截图可继续拼接")
         return true
     }
 
@@ -2321,7 +2322,7 @@ final class ScreenshotToolbarDragContainer<Content: View>: NSView {
         toolbarView.addSubview(hostingView)
         toolbarView.addSubview(dragHandleView)
         addSubview(toolbarView)
-        dragHandleView.toolTip = "拖动工具栏"
+        dragHandleView.toolTip = AppLocalization.text("拖动工具栏")
 
         dragHandleView.onMouseDown = { [weak self] event in
             self?.beginDrag(with: event)
@@ -3178,7 +3179,7 @@ enum ScreenshotXLSXExporter {
             maximumErrorBytes: 256 * 1_024
         )
         if output.didTimeout {
-            throw ExportError.archiveFailed("压缩操作超时")
+            throw ExportError.archiveFailed(AppLocalization.text("压缩操作超时"))
         }
         guard output.status == 0 else {
             throw ExportError.archiveFailed(output.standardError)
@@ -3474,7 +3475,7 @@ private struct ScreenshotInlineTextEditor: NSViewRepresentable {
 
     func updateNSView(_ textView: ScreenshotInlineTextView, context: Context) {
         context.coordinator.parent = self
-        textView.placeholder = "输入文字"
+        textView.placeholder = AppLocalization.text("输入文字")
         textView.placeholderColor = placeholderColor.nsColor.withAlphaComponent(
             placeholderColor.alpha * ScreenshotInlineTextLayout.placeholderOpacity
         )
@@ -3543,7 +3544,7 @@ enum ScreenshotImageExport {
         status: @escaping @MainActor (String?) -> Void
     ) {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "截图.png"
+        panel.nameFieldStringValue = AppLocalization.text("截图.png")
         panel.allowedContentTypes = [.png]
         panel.canCreateDirectories = true
         let response: (NSApplication.ModalResponse) -> Void = { response in
@@ -3854,7 +3855,7 @@ struct ScreenshotEditorView: View {
         HStack(spacing: 10) {
             Image(systemName: "camera.viewfinder")
                 .foregroundStyle(Color.accentColor)
-            Text("截图编辑")
+            Text(AppLocalization.text("截图编辑"))
                 .font(.system(size: 14, weight: .semibold))
             Text("\(Int(model.image.size.width.rounded())) × \(Int(model.image.size.height.rounded()))")
                 .font(.system(size: 11, design: .monospaced))
@@ -3867,12 +3868,12 @@ struct ScreenshotEditorView: View {
                     .lineLimit(1)
             }
             Button(action: onClose) {
-                Label("关闭", systemImage: "xmark")
+                Label(AppLocalization.text("关闭"), systemImage: "xmark")
                     .font(.system(size: 11, weight: .medium))
                     .frame(height: 26)
             }
             .buttonStyle(.plain)
-            .help("关闭截图编辑器")
+            .help(AppLocalization.text("关闭截图编辑器"))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -4014,7 +4015,7 @@ struct ScreenshotEditorView: View {
         guard previous != next, let overlayConfiguration else { return }
         guard let image = overlayConfiguration.cropImage(next) else {
             selectionRect = previous
-            model.statusMessage = "选区无效"
+            model.statusMessage = AppLocalization.text("选区无效")
             return
         }
         model.replaceCapture(
@@ -4732,42 +4733,42 @@ struct ScreenshotEditorView: View {
                 }
                 obscureButton(popoverEdge: popoverEdge)
                 if model.canUndo {
-                    iconButton("arrow.uturn.backward", title: "撤销") { model.undo() }
+                    iconButton("arrow.uturn.backward", title: AppLocalization.text("撤销")) { model.undo() }
                 }
                 if model.canRedo {
-                    iconButton("arrow.uturn.forward", title: "重做") { model.redo() }
+                    iconButton("arrow.uturn.forward", title: AppLocalization.text("重做")) { model.redo() }
                 }
                 recognitionMenu
                 iconButton(
                     model.isLongCapturePreviewing ? "arrow.clockwise" : "rectangle.on.rectangle",
-                    title: model.isLongCapturePreviewing ? "继续" : "长截图"
+                    title: model.isLongCapturePreviewing ? AppLocalization.text("继续") : AppLocalization.text("长截图")
                 ) { onLongCapture() }
                 if model.isLongCapturePreviewing {
                     longCaptureDirectionMenu
-                    iconButton("checkmark", title: "完成") { onLongCaptureFinish() }
+                    iconButton("checkmark", title: AppLocalization.text("完成")) { onLongCaptureFinish() }
                 }
                 if model.hasLongCaptureResult {
-                    iconButton("minus.magnifyingglass", title: "缩小") {
+                    iconButton("minus.magnifyingglass", title: AppLocalization.text("缩小")) {
                         updateCanvasZoom(to: canvasZoom - 0.1)
                     }
-                    iconButton("plus.magnifyingglass", title: "放大") {
+                    iconButton("plus.magnifyingglass", title: AppLocalization.text("放大")) {
                         updateCanvasZoom(to: canvasZoom + 0.1)
                     }
                 }
-                iconButton(model.isPinned ? "pin.fill" : "pin", title: model.isPinned ? "取消置顶" : "钉图") {
+                iconButton(model.isPinned ? "pin.fill" : "pin", title: model.isPinned ? AppLocalization.text("取消置顶") : AppLocalization.text("钉图")) {
                     commitInlineText()
                     model.isPinned.toggle()
                     onPinToggle(model.isPinned)
                 }
-                iconButton("doc.on.doc", title: "复制") {
+                iconButton("doc.on.doc", title: AppLocalization.text("复制")) {
                     commitInlineText()
                     onCopy()
                 }
-                iconButton("square.and.arrow.down", title: "保存") {
+                iconButton("square.and.arrow.down", title: AppLocalization.text("保存")) {
                     commitInlineText()
                     onSave()
                 }
-                iconButton("xmark", title: "关闭") { onClose() }
+                iconButton("xmark", title: AppLocalization.text("关闭")) { onClose() }
             }
             .frame(
                 width: ScreenshotToolbarLayout.contentWidth(forControlCount: toolbarControlCount)
@@ -4814,9 +4815,9 @@ struct ScreenshotEditorView: View {
                     model.longCaptureDirection = direction
                 } label: {
                     if model.longCaptureDirection == direction {
-                        Label(direction.title, systemImage: "checkmark")
+                        Label(AppLocalization.text(direction.title), systemImage: "checkmark")
                     } else {
-                        Label(direction.title, systemImage: direction.symbol)
+                        Label(AppLocalization.text(direction.title), systemImage: direction.symbol)
                     }
                 }
             }
@@ -4828,7 +4829,7 @@ struct ScreenshotEditorView: View {
             )
         }
         .menuStyle(.borderlessButton)
-        .help("长截图方向")
+        .help(AppLocalization.text("长截图方向"))
     }
 
     private var toolbarDragHandle: some View {
@@ -4861,7 +4862,7 @@ struct ScreenshotEditorView: View {
             HStack(spacing: 3) {
                 Image(systemName: tool.symbol)
                     .font(.system(size: 12, weight: .semibold))
-                Text(tool.title)
+                Text(AppLocalization.text(tool.title))
                     .font(.system(size: 10, weight: .medium))
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
@@ -4879,7 +4880,7 @@ struct ScreenshotEditorView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
-        .help(tool.title)
+        .help(AppLocalization.text(tool.title))
         .popover(isPresented: Binding(
             get: { activeToolMenuID == tool },
             set: { if !$0 { activeToolMenuID = nil } }
@@ -4898,22 +4899,22 @@ struct ScreenshotEditorView: View {
             } else if tool == .arrow {
                 colorPicker
                 Divider().frame(height: 24)
-                Picker("样式", selection: $model.arrowStyle) {
+                Picker(AppLocalization.text("样式"), selection: $model.arrowStyle) {
                     ForEach(ScreenshotArrowStyle.allCases) { style in
-                        Label(style.title, systemImage: style.symbol).tag(style)
+                        Label(AppLocalization.text(style.title), systemImage: style.symbol).tag(style)
                     }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 150)
-                .help("箭头样式：\(model.arrowStyle.title)")
+                .help(AppLocalization.text("箭头样式：%@", model.arrowStyle.title))
                 Divider().frame(height: 24)
                 lineWidthSlider
             } else if tool == .number {
                 colorPicker
                 Divider().frame(height: 24)
                 HStack(spacing: 8) {
-                    Text("大小").font(.system(size: 12, weight: .semibold))
+                    Text(AppLocalization.text("大小")).font(.system(size: 12, weight: .semibold))
                     Slider(value: $model.lineWidth, in: 1...12, step: 1)
                         .frame(width: 130)
                     Text("\(Int(model.lineWidth.rounded()))")
@@ -4932,7 +4933,7 @@ struct ScreenshotEditorView: View {
 
     private var colorPicker: some View {
         HStack(spacing: 8) {
-            Text("颜色").font(.system(size: 12, weight: .semibold))
+            Text(AppLocalization.text("颜色")).font(.system(size: 12, weight: .semibold))
             ForEach(Array(Self.colorPresets.enumerated()), id: \.offset) { _, preset in
                 Button {
                     model.color = preset
@@ -4959,14 +4960,14 @@ struct ScreenshotEditorView: View {
                     .font(.system(size: 11, weight: .medium))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("取色")
+            .accessibilityLabel(AppLocalization.text("取色"))
             .accessibilityValue(model.color.hex)
         }
     }
 
     private var lineWidthSlider: some View {
         HStack(spacing: 8) {
-            Text("粗细").font(.system(size: 12, weight: .semibold))
+            Text(AppLocalization.text("粗细")).font(.system(size: 12, weight: .semibold))
             Slider(value: $model.lineWidth, in: 1...12, step: 1)
                 .frame(width: 130)
             Text("\(Int(model.lineWidth.rounded()))")
@@ -4977,7 +4978,7 @@ struct ScreenshotEditorView: View {
 
     private var fontSizeSlider: some View {
         HStack(spacing: 8) {
-            Text("字号").font(.system(size: 12, weight: .semibold))
+            Text(AppLocalization.text("字号")).font(.system(size: 12, weight: .semibold))
             Slider(value: $model.fontSize, in: 3...72, step: 1)
                 .frame(width: 130)
             Text("\(Int(model.fontSize.rounded()))")
@@ -5001,7 +5002,7 @@ struct ScreenshotEditorView: View {
             HStack(spacing: 4) {
                 Image(systemName: model.obscureEffect == .pixelate ? "square.grid.3x3" : "aqi.medium")
                     .font(.system(size: 12, weight: .semibold))
-                Text(model.obscureEffect.title)
+                Text(AppLocalization.text(model.obscureEffect.title))
                     .font(.system(size: 10, weight: .medium))
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
@@ -5018,28 +5019,28 @@ struct ScreenshotEditorView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
-        .help("马赛克 / 模糊")
+        .help(AppLocalization.text("马赛克 / 模糊"))
         .popover(isPresented: Binding(
             get: { activeToolMenuID == .mosaic },
             set: { if !$0 { activeToolMenuID = nil } }
         ), arrowEdge: popoverEdge) {
             HStack(spacing: 10) {
-                Picker("作用方式", selection: $model.obscureShape) {
+                Picker(AppLocalization.text("作用方式"), selection: $model.obscureShape) {
                     ForEach(ScreenshotObscureShape.allCases) { shape in
-                        Label(shape.title, systemImage: shape.symbol)
+                        Label(AppLocalization.text(shape.title), systemImage: shape.symbol)
                             .tag(shape)
                     }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 150)
-                .help(model.obscureShape.title)
+                .help(AppLocalization.text(model.obscureShape.title))
 
                 Divider().frame(height: 24)
 
-                Picker("处理效果", selection: $model.obscureEffect) {
+                Picker(AppLocalization.text("处理效果"), selection: $model.obscureEffect) {
                     ForEach(ScreenshotObscureEffect.allCases) { effect in
-                        Text(effect.title).tag(effect)
+                        Text(AppLocalization.text(effect.title)).tag(effect)
                     }
                 }
                 .pickerStyle(.menu)
@@ -5136,16 +5137,16 @@ struct ScreenshotEditorView: View {
     private var recognitionMenu: some View {
         Menu {
             Button { recognize(.text) } label: {
-                Label("识图 / OCR", systemImage: "text.viewfinder")
+                Label(AppLocalization.text("识图 / OCR"), systemImage: "text.viewfinder")
             }
             Button { recognize(.table) } label: {
-                Label("表格识别", systemImage: "tablecells")
+                Label(AppLocalization.text("表格识别"), systemImage: "tablecells")
             }
         } label: {
             toolbarControlLabel(symbol: "text.viewfinder", title: "识图")
         }
         .menuStyle(.borderlessButton)
-        .help("识别图片中的文字或表格")
+        .help(AppLocalization.text("识别图片中的文字或表格"))
     }
 
     private static let colorPresets: [ScreenshotRGBA] = [
@@ -5197,7 +5198,7 @@ struct ScreenshotEditorView: View {
 
     private func chooseTableDestination(_ completion: @escaping (URL?) -> Void) {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "识别表格.xlsx"
+        panel.nameFieldStringValue = AppLocalization.text("识别表格.xlsx")
         panel.allowedContentTypes = [UTType(filenameExtension: "xlsx") ?? .spreadsheet]
         panel.canCreateDirectories = true
         let response: (NSApplication.ModalResponse) -> Void = { response in
@@ -5227,7 +5228,7 @@ struct ScreenshotEditorView: View {
         if case .table = mode, tableURL == nil {
             chooseTableDestination { url in
                 guard let url else {
-                    model.statusMessage = "已取消保存表格"
+                    model.statusMessage = AppLocalization.text("已取消保存表格")
                     return
                 }
                 recognize(.table, tableURL: url)
@@ -5235,10 +5236,10 @@ struct ScreenshotEditorView: View {
             return
         }
         guard let cgImage = model.image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            model.statusMessage = "无法读取图片"
+            model.statusMessage = AppLocalization.text("无法读取图片")
             return
         }
-        model.statusMessage = "正在识别..."
+        model.statusMessage = AppLocalization.text("正在识别...")
         DispatchQueue.global(qos: .userInitiated).async {
             let request = VNRecognizeTextRequest()
             request.recognitionLevel = .accurate
@@ -5282,7 +5283,7 @@ struct ScreenshotEditorView: View {
                     return
                 }
                 guard !text.isEmpty else {
-                    model.statusMessage = "未识别到文字"
+                    model.statusMessage = AppLocalization.text("未识别到文字")
                     return
                 }
                 if case .table = mode, let tableURL {
@@ -5291,7 +5292,7 @@ struct ScreenshotEditorView: View {
                 }
                 let result = text
                 let alert = NSAlert()
-                alert.messageText = mode.title
+                alert.messageText = AppLocalization.text(mode.title)
                 let contentWidth: CGFloat = 480
                 let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: contentWidth, height: 0))
                 textView.string = result
@@ -5341,8 +5342,8 @@ struct ScreenshotEditorView: View {
                 scrollView.autoresizingMask = [.width, .height]
                 resultContainer.addSubview(scrollView)
                 alert.accessoryView = resultContainer
-                alert.addButton(withTitle: "复制")
-                alert.addButton(withTitle: "关闭")
+                alert.addButton(withTitle: AppLocalization.text("复制"))
+                alert.addButton(withTitle: AppLocalization.text("关闭"))
                 let handleResponse: (NSApplication.ModalResponse) -> Void = { response in
                     guard response == .alertFirstButtonReturn else { return }
                     let pasteboard = NSPasteboard.general
@@ -5845,7 +5846,7 @@ struct ScreenshotPinnedImageView: View {
 
                 HStack(spacing: 3) {
                     Image(systemName: "circle.lefthalf.filled")
-                    Text("透明度")
+                    Text(AppLocalization.text("透明度"))
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                     Slider(
@@ -5903,7 +5904,7 @@ struct ScreenshotPinnedImageView: View {
             width: ScreenshotPinnedLayout.dragHandleWidth,
             height: ScreenshotPinnedLayout.controlHeight
         )
-        .help("拖动钉图位置")
+        .help(AppLocalization.text("拖动钉图位置"))
     }
 
     private func pinnedButton(
@@ -6573,7 +6574,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private func saveImage() {
         model.commitPendingTextDraft()
         guard let data = model.pngData() else {
-            model.statusMessage = "图片生成失败"
+            model.statusMessage = AppLocalization.text("图片生成失败")
             return
         }
         // The pinned image keeps a global Escape hotkey, which would close it instead of dismissing the panel.
@@ -6596,11 +6597,11 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private func copyPinnedImage() -> Bool {
         guard isPinnedPresentation else { return false }
         guard let data = model.pngData() else {
-            model.statusMessage = "图片生成失败"
+            model.statusMessage = AppLocalization.text("图片生成失败")
             return true
         }
         if !writeImageToPasteboard(data) {
-            model.statusMessage = "粘贴板写入失败"
+            model.statusMessage = AppLocalization.text("粘贴板写入失败")
         }
         return true
     }
@@ -6609,11 +6610,11 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         invalidateLongCaptureSession()
         model.commitPendingTextDraft()
         guard let data = model.pngData() else {
-            model.statusMessage = "图片生成失败"
+            model.statusMessage = AppLocalization.text("图片生成失败")
             return
         }
         guard writeImageToPasteboard(data) else {
-            model.statusMessage = "粘贴板写入失败"
+            model.statusMessage = AppLocalization.text("粘贴板写入失败")
             return
         }
         close()
@@ -6656,14 +6657,14 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     private func completeLongCapture() {
         invalidateLongCaptureSession(preservingLongCaptureResult: true)
-        model.statusMessage = "长截图已完成"
+        model.statusMessage = AppLocalization.text("长截图已完成")
         restoreEditorPresentation()
     }
 
     private func captureNextScreen() {
         guard !isClosed else { return }
         guard let screen = activeScreen else {
-            model.statusMessage = "找不到显示器"
+            model.statusMessage = AppLocalization.text("找不到显示器")
             return
         }
         if isLongCaptureInProgress {
@@ -6677,7 +6678,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         isLongCaptureInProgress = true
         longCaptureSessionID += 1
         let sessionID = longCaptureSessionID
-        model.statusMessage = "请滚动页面，停止后自动拼接"
+        model.statusMessage = AppLocalization.text("请滚动页面，停止后自动拼接")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
             guard let self,
                   !self.isClosed,
@@ -6884,7 +6885,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                     screenSize: screen.frame.size
                 ) else {
                     self.isLongCaptureCaptureInFlight = false
-                    self.model.statusMessage = "长截图选区无效"
+                    self.model.statusMessage = AppLocalization.text("长截图选区无效")
                     self.invalidateLongCaptureSession()
                     self.restoreEditorPresentation()
                     return
@@ -6901,8 +6902,8 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                     self.completeLongCapture()
                 } else {
                     self.model.statusMessage = didAppend
-                        ? "已自动拼接，继续滚动或点击“完成”"
-                        : "长截图采集中，请滚动页面"
+                        ? AppLocalization.text("已自动拼接，继续滚动或点击“完成”")
+                        : AppLocalization.text("长截图采集中，请滚动页面")
                     self.scheduleLongCapture(screen: screen, sessionID: sessionID, after: 0.35)
                 }
             } catch {

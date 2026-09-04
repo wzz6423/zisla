@@ -1,6 +1,8 @@
 import Charts
 import KeyboardKit
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 /// Zisla-native presentation for keyboard statistics. It intentionally uses the app design tokens
 /// instead of embedding KeyboardKit's standalone statistics window.
@@ -37,28 +39,28 @@ struct KeyboardTypingStatsDashboardView: View {
         HStack(spacing: 8) {
             compactMetricCard(
                 symbol: "character.cursor.ibeam",
-                title: "今日字符",
+                title: AppLocalization.text("今日字符"),
                 value: summary.todayCharacterCount.formatted(.number),
-                detail: "按键估算"
+                detail: AppLocalization.text("按键估算")
             )
             compactMetricCard(
                 symbol: "app.fill",
-                title: "最多应用",
-                value: summary.todayTopApplication ?? "暂无",
+                title: AppLocalization.text("最多应用"),
+                value: summary.todayTopApplication ?? AppLocalization.text("暂无"),
                 detail: summary.applications.first.map {
                     "\($0.characterCount.formatted(.number)) 字符"
-                } ?? "暂无输入"
+                } ?? AppLocalization.text("暂无输入")
             )
             compactMetricCard(
                 symbol: "bolt.fill",
-                title: "今日峰值",
+                title: AppLocalization.text("今日峰值"),
                 value: summary.todayPeakCharactersPerSecond.formatted(.number),
-                unit: "字/秒",
+                unit: AppLocalization.text("字/秒"),
                 detail: lastInputText
             )
             compactMetricCard(
                 symbol: "clock.fill",
-                title: "活跃时间",
+                title: AppLocalization.text("活跃时间"),
                 value: durationText(summary.todayActiveSeconds),
                 detail: "\(summary.todayActiveMinuteBuckets.formatted(.number)) 分钟"
             )
@@ -107,7 +109,7 @@ struct KeyboardTypingStatsDashboardView: View {
     }
 
     private var trendPanel: some View {
-        statsPanel(title: "输入趋势", symbol: "waveform.path.ecg") {
+        statsPanel(title: AppLocalization.text("输入趋势"), symbol: "waveform.path.ecg") {
             chartView
                 .frame(height: 110)
         }
@@ -134,14 +136,14 @@ struct KeyboardTypingStatsDashboardView: View {
 
         return Chart(summary.recentBuckets) { bucket in
             BarMark(
-                x: .value("时间", bucket.start),
-                y: .value("字符数", bucket.characterCount)
+                x: .value(AppLocalization.text("时间"), bucket.start),
+                y: .value(AppLocalization.text("字符数"), bucket.characterCount)
             )
             .foregroundStyle(accent.opacity(0.16))
             .cornerRadius(2)
             LineMark(
-                x: .value("时间", bucket.start),
-                y: .value("字符数", bucket.characterCount)
+                x: .value(AppLocalization.text("时间"), bucket.start),
+                y: .value(AppLocalization.text("字符数"), bucket.characterCount)
             )
             .interpolationMethod(.monotone)
             .foregroundStyle(accent)
@@ -166,7 +168,7 @@ struct KeyboardTypingStatsDashboardView: View {
                 AxisValueLabel()
             }
         }
-        .accessibilityLabel("输入趋势")
+        .accessibilityLabel(AppLocalization.text("输入趋势"))
     }
 
     static func trendAxisDomain(for buckets: [KeyboardTypingStatsTrendPoint]) -> ClosedRange<Date>? {
@@ -211,7 +213,7 @@ struct KeyboardTypingStatsDashboardView: View {
     }
 
     private var historyPanel: some View {
-        statsPanel(title: "历史", symbol: "calendar") {
+        statsPanel(title: AppLocalization.text("历史"), symbol: "calendar") {
             historyChart
                 .frame(height: 110)
         }
@@ -225,17 +227,17 @@ struct KeyboardTypingStatsDashboardView: View {
 
         return Chart(summary.history) { day in
             LineMark(
-                x: .value("日期", day.date, unit: .day),
-                y: .value("字符数", day.characterCount),
-                series: .value("系列", "字符数")
+                x: .value(AppLocalization.text("日期"), day.date, unit: .day),
+                y: .value(AppLocalization.text("字符数"), day.characterCount),
+                series: .value(AppLocalization.text("系列"), AppLocalization.text("字符数"))
             )
             .interpolationMethod(.monotone)
             .foregroundStyle(accent)
             .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
             LineMark(
-                x: .value("日期", day.date, unit: .day),
-                y: .value("峰值", day.peakCharactersPerSecond),
-                series: .value("系列", "峰值")
+                x: .value(AppLocalization.text("日期"), day.date, unit: .day),
+                y: .value(AppLocalization.text("峰值"), day.peakCharactersPerSecond),
+                series: .value(AppLocalization.text("系列"), AppLocalization.text("峰值"))
             )
             .foregroundStyle(Color.zislaInfo)
             .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
@@ -310,10 +312,10 @@ struct KeyboardTypingStatsDashboardView: View {
     }
 
     private var keyboardPanel: some View {
-        statsPanel(title: "键盘", symbol: "keyboard") {
+        statsPanel(title: AppLocalization.text("键盘"), symbol: "keyboard") {
             HStack(spacing: 8) {
-                keyboardCount("今日按键", summary.todayKeyPressCount)
-                keyboardCount("累计按键", summary.allTimeKeyPressCount)
+                keyboardCount(AppLocalization.text("今日按键"), summary.todayKeyPressCount)
+                keyboardCount(AppLocalization.text("累计按键"), summary.allTimeKeyPressCount)
                 Spacer()
             }
             KeyboardHeatmapView(
@@ -357,9 +359,9 @@ struct KeyboardTypingStatsDashboardView: View {
     }
 
     private var applicationPanel: some View {
-        statsPanel(title: "应用时间线", symbol: "app.fill") {
+        statsPanel(title: AppLocalization.text("应用时间线"), symbol: "app.fill") {
             if summary.applicationTimelines.isEmpty {
-                Text("记录输入后会在这里展示应用时间线。")
+                Text(AppLocalization.text("记录输入后会在这里展示应用时间线。"))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 90, alignment: .leading)
@@ -604,7 +606,7 @@ private struct KeyboardHeatmapView: View {
         }
         .frame(height: CGFloat(rows.count) * (compact ? 22 : 38) + CGFloat(rows.count - 1) * (compact ? 3 : 6))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("键盘按键热力图")
+        .accessibilityLabel(AppLocalization.text("键盘按键热力图"))
     }
 
     private func keycap(_ key: Key, unit: CGFloat) -> some View {
@@ -643,7 +645,7 @@ private struct KeyboardHeatmapView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(key.systemImage == nil ? key.label : "锁定")
-        .accessibilityValue(key.keyCode.map { _ in "今日 \(todayCount.formatted(.number))，累计 \(allTimeCount.formatted(.number))" } ?? "")
+        .accessibilityValue(key.keyCode.map { _ in AppLocalization.text("今日 %@，累计 %@", todayCount.formatted(.number), allTimeCount.formatted(.number)) } ?? "")
     }
 }
 

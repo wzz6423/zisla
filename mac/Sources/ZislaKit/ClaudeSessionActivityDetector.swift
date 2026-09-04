@@ -313,7 +313,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
                 }
                 if result["is_error"] as? Bool == true || result["isError"] as? Bool == true {
                     state.hasError = true
-                    state.failureReason = "工具执行失败"
+                    state.failureReason = AppLocalization.text("工具执行失败")
                 } else {
                     // Successful tool_result can clear error.
                     state.hasError = false
@@ -491,7 +491,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
     private static func apiFailureReason(from value: Any?) -> String {
         if let status = value as? NSNumber { return "API 请求失败（HTTP \(status.intValue)）" }
         if let status = value as? String, !status.isEmpty { return "API 请求失败（HTTP \(status)）" }
-        return "API 请求失败，未提供详细原因"
+        return AppLocalization.text("API 请求失败，未提供详细原因")
     }
 
     private static func parseTimestamp(_ value: Any?) -> Date? {

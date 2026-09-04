@@ -1,4 +1,5 @@
 import AppKit
+import ZislaCore
 import ZislaKit
 import SwiftUI
 
@@ -98,7 +99,7 @@ struct SystemMonitorView: View {
                             .monospacedDigit()
                     }
                 }
-                Text(service.snapshot?.hardware.cpuName ?? "正在识别芯片")
+                Text(service.snapshot?.hardware.cpuName ?? AppLocalization.text("正在识别芯片"))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -129,7 +130,7 @@ struct SystemMonitorView: View {
                             .monospacedDigit()
                     }
                 }
-                Text(service.snapshot?.hardware.gpuName ?? "正在识别图形处理器")
+                Text(service.snapshot?.hardware.gpuName ?? AppLocalization.text("正在识别图形处理器"))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -147,8 +148,8 @@ struct SystemMonitorView: View {
     private var memoryCard: some View {
         MonitorCard {
             VStack(alignment: .leading, spacing: 7) {
-                CardHeader(symbol: "memorychip", title: "内存") {
-                    Text("使用率 \(memoryUsageText)")
+                CardHeader(symbol: "memorychip", title: AppLocalization.text("内存")) {
+                    Text(AppLocalization.text("使用率 %@", memoryUsageText))
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .foregroundStyle(capacityTint(memoryUsage))
                         .monospacedDigit()
@@ -166,7 +167,7 @@ struct SystemMonitorView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Spacer(minLength: 4)
-                    miniActionButton("释放", help: "整理系统内存，回收非活跃与压缩页面") {
+                    miniActionButton(AppLocalization.text("释放"), help: AppLocalization.text("整理系统内存，回收非活跃与压缩页面")) {
                         releaseMemory()
                     }
                 }
@@ -177,7 +178,7 @@ struct SystemMonitorView: View {
     private var diskCard: some View {
         MonitorCard {
             VStack(alignment: .leading, spacing: 7) {
-                CardHeader(symbol: "internaldrive", title: "硬盘") {
+                CardHeader(symbol: "internaldrive", title: AppLocalization.text("硬盘")) {
                     HStack(spacing: 6) {
                         if let temp = temperatureText(service.snapshot?.disk.temperature) {
                             Text(temp)
@@ -186,7 +187,7 @@ struct SystemMonitorView: View {
                                 .monospacedDigit()
                         }
                         if let usage = diskUsageText {
-                            Text("使用率 \(usage)")
+                            Text(AppLocalization.text("使用率 %@", usage))
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                                 .foregroundStyle(capacityTint(diskUsage))
                                 .monospacedDigit()
@@ -206,7 +207,7 @@ struct SystemMonitorView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Spacer(minLength: 4)
-                    miniActionButton("清理", help: "扫描可清理的缓存、日志与开发产物") {
+                    miniActionButton(AppLocalization.text("清理"), help: AppLocalization.text("扫描可清理的缓存、日志与开发产物")) {
                         onCleanupRequested()
                     }
                 }
@@ -217,7 +218,7 @@ struct SystemMonitorView: View {
     private var fanCard: some View {
         MonitorCard {
             VStack(alignment: .leading, spacing: 8) {
-                CardHeader(symbol: "fan", title: "风扇")
+                CardHeader(symbol: "fan", title: AppLocalization.text("风扇"))
                 fanContent
             }
         }
@@ -226,8 +227,8 @@ struct SystemMonitorView: View {
     private var networkCard: some View {
         MonitorCard {
             VStack(alignment: .leading, spacing: 7) {
-                CardHeader(symbol: "globe", title: "网络") {
-                    IconButton(symbol: "arrow.clockwise", help: "通过 ipify 查询公网地址", size: .compact) {
+                CardHeader(symbol: "globe", title: AppLocalization.text("网络")) {
+                    IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("通过 ipify 查询公网地址"), size: .compact) {
                         Task { await service.refreshPublicIPAddress() }
                     }
                 }
@@ -331,7 +332,7 @@ struct SystemMonitorView: View {
 
     private var gpuUnavailableReason: String {
         guard case let .unavailable(reason)? = service.snapshot?.gpu else {
-            return "GPU 性能统计为只读实验数据，可能随 macOS 更新变化"
+            return AppLocalization.text("GPU 性能统计为只读实验数据，可能随 macOS 更新变化")
         }
         return reason
     }
@@ -398,7 +399,7 @@ struct SystemMonitorView: View {
         case .unavailable:
             fanUnavailableLabel
         case .none:
-            Text("正在读取风扇状态")
+            Text(AppLocalization.text("正在读取风扇状态"))
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
         }
@@ -413,13 +414,13 @@ struct SystemMonitorView: View {
     }
 
     private var noFanLabel: some View {
-        Text("无风扇")
+        Text(AppLocalization.text("无风扇"))
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)
     }
 
     private var fanUnavailableLabel: some View {
-        Text("风扇数据不可用")
+        Text(AppLocalization.text("风扇数据不可用"))
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)
     }
@@ -449,9 +450,9 @@ struct SystemMonitorView: View {
         format: (UInt64) -> String = { _ in "--" }
     ) -> some View {
         HStack {
-            Text("已用 \(used.map { format($0) } ?? "--") / 可用 \(available.map { format($0) } ?? "--")")
+            Text(AppLocalization.text("已用 %@ / 可用 %@", used.map { format($0) } ?? "--", available.map { format($0) } ?? "--"))
             Spacer(minLength: 0)
-            Text("总量 \(total.map { format($0) } ?? "--")")
+            Text(AppLocalization.text("总量 %@", total.map { format($0) } ?? "--"))
         }
         .font(.islandMicro())
         .foregroundStyle(.secondary)
@@ -498,7 +499,7 @@ struct SystemMonitorView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help("拷贝")
+                    .help(AppLocalization.text("拷贝"))
                 }
             }
         }
@@ -645,7 +646,7 @@ struct SystemCleanupPanelPresenter: NSViewRepresentable {
                 backing: .buffered,
                 defer: false
             )
-            panel.title = "磁盘清理"
+            panel.title = AppLocalization.text("磁盘清理")
             panel.isReleasedWhenClosed = false
             // System authorization temporarily deactivates the app; keep the panel so scanning can resume immediately after authorization.
             panel.hidesOnDeactivate = false
@@ -893,9 +894,9 @@ private struct SystemCleanupSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("清理候选项")
+                    Text(AppLocalization.text("清理候选项"))
                         .font(.system(size: 16, weight: .semibold))
-                    Text("按来源分组展示可清理项和需复核项；所有可操作项只会移入废纸篓")
+                    Text(AppLocalization.text("按来源分组展示可清理项和需复核项；所有可操作项只会移入废纸篓"))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
@@ -905,26 +906,26 @@ private struct SystemCleanupSheet: View {
                     toggleSelectAll()
                 } label: {
                     Label(
-                        allCandidatesSelected ? "取消全选" : "全选",
+                        allCandidatesSelected ? AppLocalization.text("取消全选") : AppLocalization.text("全选"),
                         systemImage: allCandidatesSelected ? "checkmark.square.fill" : "checkmark.square"
                     )
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help(allCandidatesSelected ? "取消所有选择" : "选择全部候选项")
-                .accessibilityLabel(allCandidatesSelected ? "取消全选" : "全选")
+                .help(allCandidatesSelected ? AppLocalization.text("取消所有选择") : AppLocalization.text("选择全部候选项"))
+                .accessibilityLabel(allCandidatesSelected ? AppLocalization.text("取消全选") : "全选")
                 .disabled(candidates.isEmpty || isScanning || isCleaning)
                 Button {
                     guard !confirmationPresented else { return }
                     invertSelection()
                 } label: {
-                    Label("反选", systemImage: "arrow.left.arrow.right.square")
+                    Label(AppLocalization.text("反选"), systemImage: "arrow.left.arrow.right.square")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help("反转当前选择：已选变未选，未选变已选")
-                .accessibilityLabel("反选")
-                .accessibilityHint("已选中的项取消选中，未选中的项选中")
+                .help(AppLocalization.text("反转当前选择：已选变未选，未选变已选"))
+                .accessibilityLabel(AppLocalization.text("反选"))
+                .accessibilityHint(AppLocalization.text("已选中的项取消选中，未选中的项选中"))
                 .disabled(candidates.isEmpty || isScanning || isCleaning)
                 Button {
                     guard !confirmationPresented else { return }
@@ -934,20 +935,20 @@ private struct SystemCleanupSheet: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help("重新扫描")
-                .accessibilityLabel("重新扫描")
+                .help(AppLocalization.text("重新扫描"))
+                .accessibilityLabel(AppLocalization.text("重新扫描"))
                 .disabled(isScanning || isCleaning)
             }
 
             Group {
                 if candidates.isEmpty && isScanning {
-                    ProgressView("正在扫描")
+                    ProgressView(AppLocalization.text("正在扫描"))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if candidates.isEmpty {
                     ContentUnavailableView(
-                        "未找到可清理项",
+                        AppLocalization.text("未找到可清理项"),
                         systemImage: "checkmark.circle",
-                        description: Text("可安全清理的缓存与日志当前为空")
+                        description: Text(AppLocalization.text("可安全清理的缓存与日志当前为空"))
                     )
                 } else {
                     List {
@@ -955,7 +956,7 @@ private struct SystemCleanupSheet: View {
                             HStack(spacing: 6) {
                                 ProgressView()
                                     .controlSize(.small)
-                                Text("正在扫描更多项目...")
+                                Text(AppLocalization.text("正在扫描更多项目..."))
                                     .font(.system(size: 10))
                                     .foregroundStyle(.secondary)
                                 Spacer()
@@ -978,7 +979,7 @@ private struct SystemCleanupSheet: View {
                                                         Text(candidate.displayName)
                                                             .font(.system(size: 11, weight: .medium))
                                                             .lineLimit(1)
-                                                        Text(candidate.safetyLevel.title)
+                                                        Text(AppLocalization.text(candidate.safetyLevel.title))
                                                             .font(.system(size: 9, weight: .medium))
                                                             .foregroundStyle(
                                                                 candidate.safetyLevel == .safeToClean
@@ -1029,13 +1030,13 @@ private struct SystemCleanupSheet: View {
             }
 
             HStack {
-                Text("已选 \(selectedURLs.count) / \(candidates.count) 项 · \(byteText(selectedByteSize))")
+                Text(AppLocalization.text("已选 %ld / %ld 项 · %@", selectedURLs.count, candidates.count, byteText(selectedByteSize)))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("取消", action: onDismiss)
+                Button(AppLocalization.text("取消"), action: onDismiss)
                     .buttonStyle(.bordered)
-                Button("移入废纸篓", role: .destructive) {
+                Button(AppLocalization.text("移入废纸篓"), role: .destructive) {
                     guard !confirmationPresented, !isCleaning, !isScanning, !selectedURLs.isEmpty else { return }
                     confirmationPresented = true
                 }
@@ -1048,18 +1049,18 @@ private struct SystemCleanupSheet: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .task { await scan() }
         .confirmationDialog(
-            "将 \(selectedURLs.count) 项移入废纸篓？",
+            AppLocalization.text("将 %ld 项移入废纸篓？", selectedURLs.count),
             isPresented: $confirmationPresented,
             titleVisibility: .visible
         ) {
-            Button("移入废纸篓", role: .destructive) {
+            Button(AppLocalization.text("移入废纸篓"), role: .destructive) {
                 beginCleanupAndDismiss()
             }
         } message: {
             Text(
                 cachedManualReviewCount > 0
                     ? "其中 \(cachedManualReviewCount) 项需人工复核。zisla 不会永久删除这些内容。"
-                    : "zisla 不会永久删除这些内容。"
+                    : AppLocalization.text("zisla 不会永久删除这些内容。")
             )
         }
     }
@@ -1100,17 +1101,17 @@ private struct SystemCleanupSheet: View {
                         .frame(width: 10)
                     Image(systemName: section.kind.symbol)
                         .foregroundStyle(section.kind.tint)
-                    Text(section.kind.title)
+                    Text(AppLocalization.text(section.kind.title))
                         .font(.system(size: 10, weight: .semibold))
-                    Text("· \(section.selectedCount(in: selectedURLs))/\(section.selectableItems.count) 项")
+                    Text(AppLocalization.text("· %ld/%ld 项", section.selectedCount(in: selectedURLs), section.selectableItems.count))
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(isSectionCollapsed(section) ? "展开\(section.kind.title)" : "折叠\(section.kind.title)")
-            .accessibilityLabel(isSectionCollapsed(section) ? "展开\(section.kind.title)" : "折叠\(section.kind.title)")
+            .help(isSectionCollapsed(section) ? AppLocalization.text("展开%@", section.kind.title) : AppLocalization.text("折叠%@", section.kind.title))
+            .accessibilityLabel(isSectionCollapsed(section) ? AppLocalization.text("展开%@", section.kind.title) : AppLocalization.text("折叠%@", section.kind.title))
             Spacer(minLength: 4)
             Text(byteText(section.totalBytes))
                 .font(.system(size: 9, design: .monospaced))

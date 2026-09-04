@@ -1,5 +1,6 @@
 import SwiftUI
 import ZislaCore
+import ZislaKit
 
 /// Zisla's motion system: spring tokens, button press feedback, directional module
 /// transitions, and the island's ambient light effects.

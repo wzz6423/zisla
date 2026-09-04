@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import ZislaCore
 
 /// View model for the Quick Notes module, backed by the system Notes app with one local welcome item.
 ///
@@ -17,7 +18,7 @@ public final class QuickNotesService: ObservableObject {
         let deleteNote: (String) async -> Result<Void, NotesAppError>
     }
 
-    public static let welcomeNoteTitle = "朋友，看这里。"
+    public static var welcomeNoteTitle: String { AppLocalization.text("朋友，看这里。") }
     private static let builtInWelcomeNoteID = "zisla.builtin.quick-notes-welcome"
     private static let welcomeDismissedDefaultsKey = "QuickNotesService.isBuiltInWelcomeNoteDismissed"
     private static let welcomeNoteResourcePath = "QuickNotes/welcome-note.md"
@@ -320,7 +321,8 @@ public final class QuickNotesService: ObservableObject {
 
     /// Creates a new note in Notes, then refreshes the list and selects it.
     @discardableResult
-    public func create(markdown: String = "# 新随记\n") async -> Bool {
+    public func create(markdown: String? = nil) async -> Bool {
+        let markdown = markdown ?? "# \(AppLocalization.text("新随记"))\n"
         let title = Self.title(for: markdown)
         isSaving = true
         let result = await NotesAppBridge.createNote(title: title, markdown: markdown)
@@ -337,7 +339,8 @@ public final class QuickNotesService: ObservableObject {
 
     /// Creates a rich-text note, then refreshes the list and selects it.
     @discardableResult
-    public func create(html: String, title: String = "新随记") async -> Bool {
+    public func create(html: String, title: String? = nil) async -> Bool {
+        let title = title ?? AppLocalization.text("新随记")
         isSaving = true
         let result = await NotesAppBridge.createNote(title: title, html: html)
         isSaving = false
@@ -402,7 +405,7 @@ public final class QuickNotesService: ObservableObject {
         let stripped = firstLine
             .replacingOccurrences(of: "^#{1,6}\\s*", with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespaces)
-        return stripped.isEmpty ? "新随记" : stripped
+        return stripped.isEmpty ? AppLocalization.text("新随记") : stripped
     }
 
 }

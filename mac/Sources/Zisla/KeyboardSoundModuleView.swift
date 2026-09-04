@@ -1,5 +1,7 @@
 import KeyboardKit
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 struct KeyboardSoundModuleView: View {
     @ObservedObject var model: AppModel
@@ -10,7 +12,7 @@ struct KeyboardSoundModuleView: View {
                 if let summary = model.keyboardSound.typingStatsSummary {
                     KeyboardTypingStatsDashboardView(summary: summary)
                 } else {
-                    Label("暂无可显示的输入统计", systemImage: "chart.xyaxis.line")
+                    Label(AppLocalization.text("暂无可显示的输入统计"), systemImage: "chart.xyaxis.line")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)

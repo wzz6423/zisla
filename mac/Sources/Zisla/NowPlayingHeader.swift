@@ -44,7 +44,7 @@ enum MediaTextFormatting {
         } else {
             parts = [album, artist]
         }
-        guard !parts.isEmpty else { return "视频正在播放" }
+        guard !parts.isEmpty else { return AppLocalization.text("视频正在播放") }
         return parts.joined(separator: " · ")
     }
 
@@ -55,9 +55,9 @@ enum MediaTextFormatting {
     ) -> String {
         let elapsed = item.elapsedTime(at: date) ?? 0
         return if let lyrics {
-            lyrics.currentLine(at: elapsed) ?? "歌词即将开始"
+            lyrics.currentLine(at: elapsed) ?? AppLocalization.text("歌词即将开始")
         } else {
-            "暂无同步歌词"
+            AppLocalization.text("暂无同步歌词")
         }
     }
 }
@@ -135,7 +135,7 @@ struct NowPlayingHeader: View {
                         textColor: .primary
                     )
                     .layoutPriority(2)
-                    .help("打开播放软件")
+                    .help(AppLocalization.text("打开播放软件"))
                     .contentShape(Rectangle())
                     .onTapGesture(perform: openSourceApplication)
 
@@ -260,7 +260,7 @@ struct NowPlayingHeader: View {
                 if item.playbackModeIsApproximate {
                     IconButton(
                         symbol: playbackMode.symbol,
-                        help: "切换播放模式",
+                        help: AppLocalization.text("切换播放模式"),
                         isActive: playbackMode != .sequential,
                         size: .compact
                     ) {
@@ -275,7 +275,7 @@ struct NowPlayingHeader: View {
             if item.favoriteControl != nil {
                 IconButton(
                     symbol: item.isFavorite == true ? "heart.fill" : "heart",
-                    help: item.isFavorite == true ? "取消收藏" : "添加收藏",
+                    help: item.isFavorite == true ? AppLocalization.text("取消收藏") : AppLocalization.text("添加收藏"),
                     isActive: item.isFavorite == true,
                     activeColor: Color(red: 1, green: 106.0 / 255, blue: 106.0 / 255),
                     size: .compact
@@ -291,17 +291,17 @@ struct NowPlayingHeader: View {
                     onSelect: { audioOutput.select($0) }
                 )
             }
-            IconButton(symbol: "backward.fill", help: "上一首", size: .compact) {
+            IconButton(symbol: "backward.fill", help: AppLocalization.text("上一首"), size: .compact) {
                 _ = media.send(.previous)
             }
             IconButton(
                 symbol: item.isPlaying ? "pause.fill" : "play.fill",
-                help: item.isPlaying ? "暂停" : "播放",
+                help: item.isPlaying ? AppLocalization.text("暂停") : AppLocalization.text("播放"),
                 size: .compact
             ) {
                 _ = media.send(.togglePlayPause)
             }
-            IconButton(symbol: "forward.fill", help: "下一首", size: .compact) {
+            IconButton(symbol: "forward.fill", help: AppLocalization.text("下一首"), size: .compact) {
                 _ = media.send(.next)
             }
         }
@@ -339,7 +339,7 @@ struct NowPlayingHeader: View {
             font: .system(size: 10.5, weight: .medium),
             textColor: .secondary
         )
-        .help("打开播放软件")
+        .help(AppLocalization.text("打开播放软件"))
         .contentShape(Rectangle())
         .onTapGesture(perform: openSourceApplication)
     }
@@ -470,7 +470,7 @@ struct NowPlayingHeader: View {
         }
         .frame(width: 54, height: 54)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .help("打开播放软件")
+        .help(AppLocalization.text("打开播放软件"))
         .contentShape(Rectangle())
         .onTapGesture(perform: openSourceApplication)
     }
@@ -555,7 +555,7 @@ struct PlaybackModeMenu: View {
                 Button {
                     onSelect(option)
                 } label: {
-                    Label(option.title, systemImage: option.symbol)
+                    Label(AppLocalization.text(option.title), systemImage: option.symbol)
                 }
             }
         } label: {
@@ -564,7 +564,7 @@ struct PlaybackModeMenu: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("播放模式：\(mode.title)")
+        .help(AppLocalization.text("播放模式：%@", mode.title))
     }
 }
 
@@ -594,7 +594,7 @@ struct AudioOutputDeviceMenu: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("选择播放设备")
+        .help(AppLocalization.text("选择播放设备"))
         .onHover { isHovering in
             if isHovering { onPrepare() }
         }

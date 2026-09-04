@@ -11,18 +11,18 @@ struct DownloadModuleView: View {
             HStack(spacing: 8) {
                 Image(systemName: "link")
                     .foregroundStyle(.secondary)
-                TextField("视频或音频链接", text: $model.downloadURL)
+                TextField(AppLocalization.text("视频或音频链接"), text: $model.downloadURL)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
                     .onSubmit { model.startDownload() }
 
-                IconButton(symbol: "doc.on.clipboard", help: "粘贴") {
+                IconButton(symbol: "doc.on.clipboard", help: AppLocalization.text("粘贴")) {
                     if let value = NSPasteboard.general.string(forType: .string) {
                         model.downloadURL = value.trimmingCharacters(in: .whitespacesAndNewlines)
                     }
                 }
                 if !model.downloadURL.isEmpty {
-                    IconButton(symbol: "xmark", help: "清空") {
+                    IconButton(symbol: "xmark", help: AppLocalization.text("清空")) {
                         model.downloadURL = ""
                         if !model.hasActiveDownloads { model.downloadState = .idle }
                     }
@@ -41,7 +41,7 @@ struct DownloadModuleView: View {
                 IslandOutlinedPicker(
                     selection: $model.downloadMode,
                     options: [.video, .audio],
-                    title: { $0 == .video ? "视频" : "音频" },
+                    title: { $0 == .video ? "视频" : AppLocalization.text("音频") },
                     selectionID: "download-mode-selection",
                     symbol: { $0 == .video ? "film.fill" : "waveform" },
                     fontSize: 11,
@@ -69,7 +69,7 @@ struct DownloadModuleView: View {
                 Button {
                     model.startDownload()
                 } label: {
-                    Label("下载", systemImage: "arrow.down")
+                    Label(AppLocalization.text("下载"), systemImage: "arrow.down")
                         .frame(width: 76)
                 }
                 .buttonStyle(.bordered)
@@ -78,7 +78,7 @@ struct DownloadModuleView: View {
                 .disabled(model.downloadURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                 if model.hasActiveDownloads {
-                    IconButton(symbol: "stop.fill", help: "取消全部下载", size: .compact) {
+                    IconButton(symbol: "stop.fill", help: AppLocalization.text("取消全部下载"), size: .compact) {
                         model.cancelAllDownloads()
                     }
                     .foregroundStyle(Color.zislaError)
@@ -97,10 +97,10 @@ struct DownloadModuleView: View {
             switch model.downloadState {
             case .idle:
                 HStack(spacing: 8) {
-                    Label("准备就绪", systemImage: "arrow.down.circle.fill")
+                    Label(AppLocalization.text("准备就绪"), systemImage: "arrow.down.circle.fill")
                     Spacer()
                     if model.settingsStore.settings.clipboardDetectionEnabled {
-                        Label("剪贴板检测已开启", systemImage: "clipboard.fill")
+                        Label(AppLocalization.text("剪贴板检测已开启"), systemImage: "clipboard.fill")
                             .foregroundStyle(Color.zislaSuccess)
                     }
                 }
@@ -109,7 +109,7 @@ struct DownloadModuleView: View {
             case .preparing:
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text("正在准备下载")
+                    Text(AppLocalization.text("正在准备下载"))
                         .font(.system(size: 10, weight: .medium))
                 }
             case let .downloading(fraction, speed, eta):
@@ -131,7 +131,7 @@ struct DownloadModuleView: View {
                         .foregroundStyle(Color.zislaSuccess)
                         .lineLimit(1)
                     Spacer()
-                    Button("在 Finder 中显示") {
+                    Button(AppLocalization.text("在 Finder 中显示")) {
                         NSWorkspace.shared.activateFileViewerSelecting([url])
                     }
                     .buttonStyle(.bordered)
@@ -172,7 +172,7 @@ struct DownloadModuleView: View {
                     .truncationMode(.middle)
                 Spacer(minLength: 4)
                 downloadTaskSummary(task.state)
-                IconButton(symbol: "xmark", help: "取消此下载", size: .compact) {
+                IconButton(symbol: "xmark", help: AppLocalization.text("取消此下载"), size: .compact) {
                     model.cancelDownload(taskID: task.id)
                 }
                 .foregroundStyle(Color.zislaError)
@@ -193,7 +193,7 @@ struct DownloadModuleView: View {
             case .preparing:
                 HStack(spacing: 4) {
                     ProgressView().controlSize(.mini)
-                    Text("准备中")
+                    Text(AppLocalization.text("准备中"))
                 }
                 .foregroundStyle(.secondary)
             case let .downloading(fraction, speed, eta):
@@ -204,11 +204,11 @@ struct DownloadModuleView: View {
                 }
                 .foregroundStyle(.secondary)
             case .idle:
-                Text("已停止")
+                Text(AppLocalization.text("已停止"))
             case .completed:
-                Text("已完成")
+                Text(AppLocalization.text("已完成"))
             case .failed:
-                Text("失败")
+                Text(AppLocalization.text("失败"))
             }
         }
         .font(.system(size: 9, design: .monospaced))

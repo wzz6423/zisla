@@ -679,7 +679,7 @@ private struct NoticeRow: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
-        .help("关闭")
+        .help(AppLocalization.text("关闭"))
     }
 
     private var symbol: String {
@@ -973,7 +973,7 @@ private struct CompactFocusTransitionBar: View {
                 Text(notice.title)
                     .font(.system(size: 10, weight: .semibold))
                     .lineLimit(1)
-                Text(notice.detail ?? "状态已更新")
+                Text(notice.detail ?? AppLocalization.text("状态已更新"))
                     .font(.system(size: 8, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -1152,8 +1152,8 @@ private struct CompactVoiceProcessingWing: View {
         .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("正在整理语音"))
-        .help("正在整理语音…")
+        .accessibilityLabel(Text(AppLocalization.text("正在整理语音")))
+        .help(AppLocalization.text("正在整理语音…"))
     }
 }
 
@@ -1190,7 +1190,7 @@ private struct CompactUpdateWing: View {
         )
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(side == .left ? "\(notice.title)有可用更新" : "查看更新"))
+        .accessibilityLabel(Text(side == .left ? AppLocalization.text("%@有可用更新", notice.title) : AppLocalization.text("查看更新")))
     }
 }
 
@@ -1238,7 +1238,7 @@ private struct CompactAIWing: View {
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(
-            role == .identity ? "AI 任务图标" : "\(count) 个 AI 任务\(statusDescription)\(errorAccessibilityText)"
+            role == .identity ? AppLocalization.text("AI 任务图标") : "\(count) 个 AI 任务\(statusDescription)\(errorAccessibilityText)"
         ))
     }
 
@@ -1387,8 +1387,8 @@ private struct CompactMediaWing: View {
         .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("正在播放 \(notice.title)"))
-        .help("正在播放：\(notice.title)")
+        .accessibilityLabel(Text(AppLocalization.text("正在播放 %@", notice.title)))
+        .help(AppLocalization.text("正在播放：%@", notice.title))
     }
 
     private var artworkSize: CGFloat {
@@ -1411,8 +1411,8 @@ private struct CompactMediaWing: View {
         .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("正在播放：\(notice.detail ?? notice.title)"))
-        .help("正在播放：\(notice.detail ?? notice.title)")
+        .accessibilityLabel(Text(AppLocalization.text("正在播放：%@", notice.detail ?? notice.title)))
+        .help(AppLocalization.text("正在播放：%@", notice.detail ?? notice.title))
     }
 
     private var sourceSymbol: String {
@@ -1456,8 +1456,8 @@ private struct CompactBackgroundSoundWing: View {
                 .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
                 .contentShape(CompactAIWingShape(side: side))
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text("背景音正在播放：\(notice.title)"))
-                .help("背景音正在播放：\(notice.title)")
+                .accessibilityLabel(Text(AppLocalization.text("背景音正在播放：%@", notice.title)))
+                .help(AppLocalization.text("背景音正在播放：%@", notice.title))
         } else {
             MediaWaveformView(
                 artworkData: nil,
@@ -1470,8 +1470,8 @@ private struct CompactBackgroundSoundWing: View {
             .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
             .contentShape(CompactAIWingShape(side: side))
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text("背景音正在播放：\(notice.title)"))
-            .help("背景音正在播放：\(notice.title)")
+            .accessibilityLabel(Text(AppLocalization.text("背景音正在播放：%@", notice.title)))
+            .help(AppLocalization.text("背景音正在播放：%@", notice.title))
         }
     }
 }
@@ -1512,8 +1512,8 @@ private struct DetailedMediaBar: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("正在播放 \(MediaTextFormatting.titleArtistText(item))"))
-        .help("正在播放：\(MediaTextFormatting.titleArtistText(item))")
+        .accessibilityLabel(Text(AppLocalization.text("正在播放 %@", MediaTextFormatting.titleArtistText(item))))
+        .help(AppLocalization.text("正在播放：%@", MediaTextFormatting.titleArtistText(item)))
     }
 
     private var trackIdentity: some View {
@@ -1645,7 +1645,7 @@ private struct CompactToolboxWing: View {
                 Image(systemName: "toolbox.fill")
                     .font(.system(size: min(15, height * 0.56), weight: .semibold))
             } else {
-                Text(notice.detail ?? "工具")
+                Text(notice.detail ?? AppLocalization.text("工具"))
                     .font(.system(size: compactFontSize, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .lineLimit(1)
@@ -1662,8 +1662,8 @@ private struct CompactToolboxWing: View {
         .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("小工具：\(notice.title)"))
-        .help("小工具：\(notice.title)")
+        .accessibilityLabel(Text(AppLocalization.text("小工具：%@", notice.title)))
+        .help(AppLocalization.text("小工具：%@", notice.title))
     }
 
     private var compactFontSize: CGFloat {
@@ -1700,8 +1700,8 @@ private struct CompactFocusCountdownWing: View {
         .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("专注倒计时：\(notice.detail ?? "00:00:00")"))
-        .help("专注倒计时：\(notice.detail ?? "00:00:00")")
+        .accessibilityLabel(Text(AppLocalization.text("专注倒计时：%@", notice.detail ?? "00:00:00")))
+        .help(AppLocalization.text("专注倒计时：%@", notice.detail ?? "00:00:00"))
     }
 }
 
@@ -1732,8 +1732,8 @@ private struct CompactFocusModeWing: View {
         .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("专注模式：\(notice.title)"))
-        .help("专注模式：\(notice.title)")
+        .accessibilityLabel(Text(AppLocalization.text("专注模式：%@", notice.title)))
+        .help(AppLocalization.text("专注模式：%@", notice.title))
     }
 }
 
@@ -1799,7 +1799,7 @@ private struct CompactMailWing: View {
         .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(side == .left ? "新邮件" : "新邮件 \(notice.title) 封"))
+        .accessibilityLabel(Text(side == .left ? AppLocalization.text("新邮件") : AppLocalization.text("新邮件 %@ 封", notice.title)))
     }
 }
 
@@ -1836,7 +1836,7 @@ private struct DetailedMailBar: View {
                     .frame(width: centerWidth)
 
                 HStack(spacing: 6) {
-                    Text(leftNotice.detail ?? "未知发件人")
+                    Text(leftNotice.detail ?? AppLocalization.text("未知发件人"))
                         .font(.system(size: 9, weight: .medium))
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -1852,7 +1852,7 @@ private struct DetailedMailBar: View {
         }
         .foregroundStyle(.white)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("新邮件：\(leftNotice.title)，来自 \(leftNotice.detail ?? "未知发件人")，共 \(rightNotice.title) 封"))
+        .accessibilityLabel(Text(AppLocalization.text("新邮件：%@，来自 %@，共 %@ 封", leftNotice.title, leftNotice.detail ?? "未知发件人", rightNotice.title)))
     }
 }
 
@@ -2134,8 +2134,8 @@ private struct CompactFocusCountdownBar: View {
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("专注倒计时：\(notice.detail ?? "00:00:00")"))
-        .help("专注倒计时：\(notice.detail ?? "00:00:00")")
+        .accessibilityLabel(Text(AppLocalization.text("专注倒计时：%@", notice.detail ?? "00:00:00")))
+        .help(AppLocalization.text("专注倒计时：%@", notice.detail ?? "00:00:00"))
     }
 }
 

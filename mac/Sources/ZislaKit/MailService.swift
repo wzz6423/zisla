@@ -119,7 +119,7 @@ public final class MailService: ObservableObject {
             case let .success(.snapshot(snapshot)):
                 apply(snapshot)
             case .success:
-                errorDescription = "邮件服务返回了无法识别的数据"
+                errorDescription = AppLocalization.text("邮件服务返回了无法识别的数据")
             case let .failure(error):
                 errorDescription = Self.message(for: error)
             }
@@ -197,9 +197,9 @@ public final class MailService: ObservableObject {
             .split(separator: ",")
             .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        guard !addresses.isEmpty else { return .failed("请填写至少一个收件人") }
+        guard !addresses.isEmpty else { return .failed(AppLocalization.text("请填写至少一个收件人")) }
         guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return .failed("邮件正文不能为空")
+            return .failed(AppLocalization.text("邮件正文不能为空"))
         }
         return await perform(Self.composeScript(
             fromAddress: fromAddress,
@@ -211,7 +211,7 @@ public final class MailService: ObservableObject {
 
     public func reply(to message: MailMessage, body: String) async -> MailOperationResult {
         guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return .failed("回复内容不能为空")
+            return .failed(AppLocalization.text("回复内容不能为空"))
         }
         return await perform(Self.replyScript(message: message, body: body))
     }
@@ -285,7 +285,7 @@ public final class MailService: ObservableObject {
                     set accountAddresses to {}
                 end try
                 if accountName is "" then
-                    set end of accountRows to {"未知账户 " & i, accountAddresses}
+                    set end of accountRows to {"\(AppLocalization.text("未知账户")) " & i, accountAddresses}
                 else
                     set end of accountRows to {accountName, accountAddresses}
                 end if
@@ -394,9 +394,9 @@ public final class MailService: ObservableObject {
     }
 
     private func perform(_ script: String) async -> MailOperationResult {
-        guard !isMutating else { return .failed("正在处理另一项邮件操作") }
+        guard !isMutating else { return .failed(AppLocalization.text("正在处理另一项邮件操作")) }
         guard Self.isMailRunning() else {
-            return .failed(Self.mailUnavailableMessage(isRunning: false) ?? "Mail.app 当前未运行")
+            return .failed(Self.mailUnavailableMessage(isRunning: false) ?? AppLocalization.text("Mail.app 当前未运行"))
         }
         isMutating = true
         defer { isMutating = false }
@@ -415,7 +415,7 @@ public final class MailService: ObservableObject {
         case let .failed(message):
             let lower = message.lowercased()
             if lower.contains("未获得授权") || lower.contains("not authorized") || lower.contains("not allowed") || lower.contains("permission") || lower.contains("(-1743)") || lower.contains("(-1744)") || lower.contains("(-1745)") {
-                return "需要授权 zisla 控制 Mail.app\n请打开「系统设置 → 隐私与安全性 → 自动化」，\n在列表中找到并开启 zisla 对 Mail 的访问权限"
+                return AppLocalization.text("需要授权 zisla 控制 Mail.app\n请打开「系统设置 → 隐私与安全性 → 自动化」，\n在列表中找到并开启 zisla 对 Mail 的访问权限")
             }
             return message
         }
@@ -424,9 +424,9 @@ public final class MailService: ObservableObject {
     private static func message(for error: MailIndexReaderError) -> String {
         switch error {
         case .unavailable, .openFailed:
-            return "无法访问 Mail 的本地邮件索引。请在「系统设置 → 隐私与安全性 → 完全磁盘访问」中允许 zisla，然后重新读取。"
+            return AppLocalization.text("无法访问 Mail 的本地邮件索引。请在「系统设置 → 隐私与安全性 → 完全磁盘访问」中允许 zisla，然后重新读取。")
         case .queryFailed:
-            return "无法解析 Mail 的本地邮件索引，请稍后重新读取"
+            return AppLocalization.text("无法解析 Mail 的本地邮件索引，请稍后重新读取")
         }
     }
 
@@ -457,13 +457,13 @@ public final class MailService: ObservableObject {
             if let retry = execute(source: source, expectsSnapshot: expectsSnapshot) {
                 return retry
             }
-            return .failure(.failed("Mail.app 尚未就绪，请稍后再试"))
+            return .failure(.failed(AppLocalization.text("Mail.app 尚未就绪，请稍后再试")))
         }.value
     }
 
     nonisolated static func mailUnavailableMessage(isRunning: Bool) -> String? {
         guard !isRunning else { return nil }
-        return "Mail.app 当前未运行。zisla 不会自动打开它；请在需要同步时自行启动 Mail.app 后重试。"
+        return AppLocalization.text("Mail.app 当前未运行。zisla 不会自动打开它；请在需要同步时自行启动 Mail.app 后重试。")
     }
 
     nonisolated private static func isMailRunning() -> Bool {
@@ -476,14 +476,14 @@ public final class MailService: ObservableObject {
         expectsSnapshot: Bool
     ) -> Result<MailScriptOutput, MailScriptError>? {
         guard let appleScript = NSAppleScript(source: source) else {
-            return .failure(.failed("无法创建 Mail.app 自动化脚本"))
+            return .failure(.failed(AppLocalization.text("无法创建 Mail.app 自动化脚本")))
         }
         var errorInfo: NSDictionary?
         let descriptor = appleScript.executeAndReturnError(&errorInfo)
         if let errorInfo {
             let message = (errorInfo[NSAppleScript.errorMessage] as? String)
                 ?? (errorInfo[NSLocalizedDescriptionKey] as? String)
-                ?? "无法访问 Mail.app，请检查自动化授权"
+                ?? AppLocalization.text("无法访问 Mail.app，请检查自动化授权")
             let lower = message.lowercased()
             // Typical signs of "Mail still loading": reference resolution failure / can't find inbox for item / account unavailable.
             let looksUnready = lower.contains("inbox") ||

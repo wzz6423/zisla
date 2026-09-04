@@ -34,10 +34,10 @@ struct AgendaModuleView: View {
     private var weatherColumn: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("天气")
+                Text(AppLocalization.text("天气"))
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                IconButton(symbol: "arrow.clockwise", help: "刷新天气") {
+                IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("刷新天气")) {
                     model.refreshWeather()
                 }
             }
@@ -67,10 +67,10 @@ struct AgendaModuleView: View {
                     .font(.system(size: 17))
                     .frame(width: 22)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(weather.locationName ?? "当前位置")
+                    Text(weather.locationName ?? AppLocalization.text("当前位置"))
                         .font(.system(size: 9.5, weight: .semibold))
                         .lineLimit(1)
-                    Text("\(weather.condition.summary) · 体感 \(weather.apparentTemperature, specifier: "%.0f")°")
+                    Text(AppLocalization.text("%@ · 体感 %.0f°", weather.condition.summary, weather.apparentTemperature))
                         .font(.system(size: 8.5))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -120,7 +120,7 @@ struct AgendaModuleView: View {
                     .help(weatherAlertDetail(alert))
                 }
             } else if let error = weather.alertErrorDescription {
-                Label("官方预警不可用", systemImage: "exclamationmark.triangle")
+                Label(AppLocalization.text("官方预警不可用"), systemImage: "exclamationmark.triangle")
                     .font(.system(size: 8.5, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -176,14 +176,14 @@ struct AgendaModuleView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case let .failed(message):
             VStack(alignment: .leading, spacing: 7) {
-                Label("无法获取天气", systemImage: "location.slash.fill")
+                Label(AppLocalization.text("无法获取天气"), systemImage: "location.slash.fill")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color.zislaWarning)
                 Text(message)
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-                Button("定位设置") {
+                Button(AppLocalization.text("定位设置")) {
                     NSWorkspace.shared.open(URL(
                         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices"
                     )!)
@@ -192,7 +192,7 @@ struct AgendaModuleView: View {
                 .controlSize(.mini)
             }
         case .idle, .ready:
-            Label("等待刷新", systemImage: "cloud.sun")
+            Label(AppLocalization.text("等待刷新"), systemImage: "cloud.sun")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -202,7 +202,7 @@ struct AgendaModuleView: View {
     private var calendarColumn: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Text("日历与待办")
+                Text(AppLocalization.text("日历与待办"))
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
                 if calendar.hasAnyReadAccess {
@@ -212,7 +212,7 @@ struct AgendaModuleView: View {
                             .frame(width: 20, height: 20)
                     }
                     .buttonStyle(.plain)
-                    .help("新增日程或提醒")
+                    .help(AppLocalization.text("新增日程或提醒"))
                 }
                 if !calendar.hasFullAgendaAccess {
                     Button(action: handleAuthorizationAction) {
@@ -222,7 +222,7 @@ struct AgendaModuleView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.zislaWarning)
-                    .help("授权日历与提醒事项")
+                    .help(AppLocalization.text("授权日历与提醒事项"))
                 }
                 Text(selection.selectedDay, format: .dateTime.month(.abbreviated).day())
                     .font(.system(size: 10, weight: .medium))
@@ -241,14 +241,14 @@ struct AgendaModuleView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = calendar.errorDescription, calendar.events.isEmpty {
                 VStack(spacing: 7) {
-                    Label("无法读取日程", systemImage: "calendar.badge.exclamationmark")
+                    Label(AppLocalization.text("无法读取日程"), systemImage: "calendar.badge.exclamationmark")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Color.zislaWarning)
                     Text(error)
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
-                    Button("重新读取") {
+                    Button(AppLocalization.text("重新读取")) {
                         Task { await calendar.refresh(referenceDate: selection.selectedDay) }
                     }
                     .buttonStyle(.bordered)
@@ -256,7 +256,7 @@ struct AgendaModuleView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if dayEvents.isEmpty {
-                EmptyState(symbol: "calendar.badge.checkmark", title: "当天暂无事项")
+                EmptyState(symbol: "calendar.badge.checkmark", title: AppLocalization.text("当天暂无事项"))
             } else {
                 ScrollView(.vertical) {
                     LazyVStack(spacing: 0) {
@@ -351,7 +351,7 @@ struct AgendaModuleView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.zislaSuccess)
-                .help(event.isCompleted ? "标记未完成" : "标记完成")
+                .help(event.isCompleted ? AppLocalization.text("标记未完成") : AppLocalization.text("标记完成"))
             }
             if !event.isProjectedOccurrence {
                 Button {
@@ -363,7 +363,7 @@ struct AgendaModuleView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("删除")
+                .help(AppLocalization.text("删除"))
             }
         }
         .frame(height: 34)
@@ -399,18 +399,18 @@ struct AgendaModuleView: View {
 
     private var calendarAuthorizationView: some View {
         VStack(spacing: 7) {
-            Label("需要日历权限", systemImage: "calendar.badge.exclamationmark")
+            Label(AppLocalization.text("需要日历权限"), systemImage: "calendar.badge.exclamationmark")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(Color.zislaWarning)
             Text(calendar.authorizationStatus == .notDetermined
                 || calendar.reminderAuthorizationStatus == .notDetermined
-                ? "允许后即可显示日历事件与计划提醒"
-                : "请在系统设置中允许访问日历和提醒事项")
+                ? AppLocalization.text("允许后即可显示日历事件与计划提醒")
+                : AppLocalization.text("请在系统设置中允许访问日历和提醒事项"))
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-            Button(calendar.hasUndeterminedAccess ? "授权日历" : "打开系统设置") {
+            Button(calendar.hasUndeterminedAccess ? AppLocalization.text("授权日历") : AppLocalization.text("打开系统设置")) {
                 handleAuthorizationAction()
             }
             .buttonStyle(.bordered)
@@ -442,7 +442,7 @@ struct AgendaModuleView: View {
 
     private func eventDetail(_ event: CalendarEventSnapshot) -> String {
         let time = event.isAllDay
-            ? "全天"
+            ? AppLocalization.text("全天")
             : event.startDate.formatted(date: .omitted, time: .shortened)
         if event.kind == .reminder {
             if event.isProjectedOccurrence {
@@ -455,8 +455,8 @@ struct AgendaModuleView: View {
 
     private func presentNewItemEditor() {
         var availableKinds: [(title: String, kind: CalendarItemKind)] = []
-        if calendar.hasEventAccess { availableKinds.append(("日历事件", .event)) }
-        if calendar.hasReminderAccess { availableKinds.append(("提醒事项", .reminder)) }
+        if calendar.hasEventAccess { availableKinds.append((AppLocalization.text("日历事件"), .event)) }
+        if calendar.hasReminderAccess { availableKinds.append((AppLocalization.text("提醒事项"), .reminder)) }
         guard !availableKinds.isEmpty else {
             handleAuthorizationAction()
             return
@@ -465,15 +465,15 @@ struct AgendaModuleView: View {
         let kindPicker = NSPopUpButton(frame: .zero, pullsDown: false)
         kindPicker.addItems(withTitles: availableKinds.map(\.title))
         let titleField = NSTextField(string: "")
-        titleField.placeholderString = "标题"
+        titleField.placeholderString = AppLocalization.text("标题")
         let datePicker = NSDatePicker()
         datePicker.datePickerStyle = .textFieldAndStepper
         datePicker.datePickerElements = [.yearMonthDay, .hourMinute]
         datePicker.dateValue = defaultNewItemDate
-        let allDay = NSButton(checkboxWithTitle: "全天", target: nil, action: nil)
+        let allDay = NSButton(checkboxWithTitle: AppLocalization.text("全天"), target: nil, action: nil)
 
         let grid = NSGridView(views: [
-            [NSTextField(labelWithString: "类型"), kindPicker],
+            [NSTextField(labelWithString: AppLocalization.text("类型")), kindPicker],
             [NSTextField(labelWithString: "标题"), titleField],
             [NSTextField(labelWithString: "时间"), datePicker],
             [NSView(), allDay],
@@ -485,11 +485,11 @@ struct AgendaModuleView: View {
         grid.frame = CGRect(x: 0, y: 0, width: 300, height: 126)
 
         let alert = NSAlert()
-        alert.messageText = "新增日程"
-        alert.informativeText = "保存到系统日历或提醒事项。"
+        alert.messageText = AppLocalization.text("新增日程")
+        alert.informativeText = AppLocalization.text("保存到系统日历或提醒事项。")
         alert.accessoryView = grid
-        alert.addButton(withTitle: "新增")
-        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: AppLocalization.text("新增"))
+        alert.addButton(withTitle: AppLocalization.text("取消"))
         NSApp.activate(ignoringOtherApps: true)
         WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
         guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -542,12 +542,12 @@ struct AgendaModuleView: View {
     private func confirmDelete(_ item: CalendarEventSnapshot) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "删除“\(item.title)”？"
+        alert.messageText = AppLocalization.text("删除“%@”？", item.title)
         alert.informativeText = item.kind == .reminder
-            ? "该提醒事项会从系统提醒中删除。"
-            : "该事件会从系统日历中删除。"
-        alert.addButton(withTitle: "删除")
-        alert.addButton(withTitle: "取消")
+            ? AppLocalization.text("该提醒事项会从系统提醒中删除。")
+            : AppLocalization.text("该事件会从系统日历中删除。")
+        alert.addButton(withTitle: AppLocalization.text("删除"))
+        alert.addButton(withTitle: AppLocalization.text("取消"))
         WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {

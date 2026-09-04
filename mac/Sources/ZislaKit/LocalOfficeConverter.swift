@@ -1,4 +1,5 @@
 import Foundation
+import ZislaCore
 
 public enum LocalOfficeConverterError: LocalizedError, Equatable, Sendable {
     case unsupportedInput(URL)
@@ -91,7 +92,7 @@ public struct LocalOfficeConverter: Sendable {
             throw LocalOfficeConverterError.launchFailed(error.localizedDescription)
         }
         if processOutput.didTimeout {
-            throw LocalOfficeConverterError.conversionFailed("转换超时")
+            throw LocalOfficeConverterError.conversionFailed(AppLocalization.text("转换超时"))
         }
         guard processOutput.status == 0 else {
             throw LocalOfficeConverterError.conversionFailed(processOutput.standardError)

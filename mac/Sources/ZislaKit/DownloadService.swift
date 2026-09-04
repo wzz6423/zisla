@@ -521,7 +521,7 @@ public actor DownloadService {
         guard case YTDLPResolverError.executableNotFound = error else {
             return error.localizedDescription
         }
-        return "下载工具不可用"
+        return AppLocalization.text("下载工具不可用")
     }
 }
 

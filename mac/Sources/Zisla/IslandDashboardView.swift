@@ -61,7 +61,7 @@ struct IslandDashboardView: View {
     private var focusCard: some View {
         dashboardCard(
             symbol: "timer",
-            title: pomodoro.mode == .focus ? "专注倒计时" : "休息倒计时",
+            title: pomodoro.mode == .focus ? AppLocalization.text("专注倒计时") : AppLocalization.text("休息倒计时"),
             tint: pomodoro.phase == .running ? Color.zislaWarning : .secondary
         ) {
             HStack(alignment: .lastTextBaseline, spacing: 8) {
@@ -80,7 +80,7 @@ struct IslandDashboardView: View {
     }
 
     private var aiCard: some View {
-        dashboardCard(symbol: "sparkles", title: "AI 工作", tint: Color.zislaInfo) {
+        dashboardCard(symbol: "sparkles", title: AppLocalization.text("AI 工作"), tint: Color.zislaInfo) {
             if let task = activeAITask {
                 HStack(spacing: 7) {
                     AIMascotView(
@@ -116,12 +116,12 @@ struct IslandDashboardView: View {
     }
 
     private var transferCard: some View {
-        dashboardCard(symbol: "arrow.down.circle", title: "下载进度", tint: Color.zislaInfo) {
+        dashboardCard(symbol: "arrow.down.circle", title: AppLocalization.text("下载进度"), tint: Color.zislaInfo) {
             switch model.downloadState {
             case .preparing:
                 HStack(spacing: 7) {
                     ProgressView().controlSize(.small)
-                    Text("正在准备下载")
+                    Text(AppLocalization.text("正在准备下载"))
                         .font(.system(size: 10, weight: .medium))
                 }
             case let .downloading(fraction, speed, eta):
@@ -131,7 +131,7 @@ struct IslandDashboardView: View {
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .monospacedDigit()
                         Spacer(minLength: 4)
-                        Text([speed, eta.isEmpty ? nil : "剩余 \(eta)"].compactMap { $0 }.joined(separator: " · "))
+                        Text([speed, eta.isEmpty ? nil : AppLocalization.text("剩余 %@", eta)].compactMap { $0 }.joined(separator: " · "))
                             .font(.islandMicro(design: .monospaced))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -146,12 +146,12 @@ struct IslandDashboardView: View {
     }
 
     private var mediaCard: some View {
-        dashboardCard(symbol: "music.note", title: "正在播放", tint: Color.zislaInfo) {
+        dashboardCard(symbol: "music.note", title: AppLocalization.text("正在播放"), tint: Color.zislaInfo) {
             if let item = activeMediaItem {
                 HStack(spacing: 7) {
                     mediaArtwork(item)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title.isEmpty ? "媒体播放" : item.title)
+                        Text(item.title.isEmpty ? AppLocalization.text("媒体播放") : item.title)
                             .font(.system(size: 10, weight: .semibold))
                             .lineLimit(1)
                         Text(mediaSecondaryText(item))
@@ -199,10 +199,10 @@ struct IslandDashboardView: View {
     }
 
     private func browserDownloadCard(_ snapshot: BrowserDownloadSnapshot) -> some View {
-        dashboardCard(symbol: "arrow.down.circle", title: "浏览器下载", tint: Color.zislaInfo) {
+        dashboardCard(symbol: "arrow.down.circle", title: AppLocalization.text("浏览器下载"), tint: Color.zislaInfo) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 5) {
-                    Text(snapshot.agent?.displayName ?? "未知浏览器")
+                    Text(snapshot.agent?.displayName ?? AppLocalization.text("未知浏览器"))
                         .font(.islandMicro(weight: .semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -230,7 +230,7 @@ struct IslandDashboardView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "浏览器下载：\(snapshot.agent?.displayName ?? "未知浏览器")，\(snapshot.fileName)，\(snapshot.progressText)"
+            AppLocalization.text("浏览器下载：%@，%@，%@", snapshot.agent?.displayName ?? AppLocalization.text("未知浏览器"), snapshot.fileName, snapshot.progressText)
         )
     }
 
@@ -312,7 +312,7 @@ struct IslandDashboardView: View {
         case .queued: "等待运行"
         case .running: "正在运行"
         case .blocked: "等待操作"
-        case .error, .failed: "需要处理"
+        case .error, .failed: AppLocalization.text("需要处理")
         case .succeeded: "已完成"
         }
     }

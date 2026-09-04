@@ -101,7 +101,7 @@ struct MailModuleView: View {
     private var messageList: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
-                Text("邮件")
+                Text(AppLocalization.text("邮件"))
                     .font(.system(size: 12, weight: .semibold))
                 if unreadCount > 0 {
                     Text("\(unreadCount)")
@@ -110,10 +110,10 @@ struct MailModuleView: View {
                 }
                 accountMenu
                 Spacer(minLength: 2)
-                IconButton(symbol: "square.and.pencil", help: "发邮件", size: .compact) {
+                IconButton(symbol: "square.and.pencil", help: AppLocalization.text("发邮件"), size: .compact) {
                     beginNewMessage()
                 }
-                IconButton(symbol: "arrow.clockwise", help: "刷新收件箱", size: .compact) {
+                IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("刷新收件箱"), size: .compact) {
                     Task { await model.refreshMail() }
                 }
                 .disabled(mail.isLoading)
@@ -127,7 +127,7 @@ struct MailModuleView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = mail.errorDescription, mail.messages.isEmpty {
                 VStack(spacing: 10) {
-                    Label("无法读取邮件", systemImage: "envelope.badge.shield.half.filled")
+                    Label(AppLocalization.text("无法读取邮件"), systemImage: "envelope.badge.shield.half.filled")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color.zislaWarning)
                     Text(error)
@@ -136,7 +136,7 @@ struct MailModuleView: View {
                         .lineLimit(5)
                         .multilineTextAlignment(.center)
                     HStack(spacing: 8) {
-                        Button("重新读取") { Task { await model.refreshMail() } }
+                        Button(AppLocalization.text("重新读取")) { Task { await model.refreshMail() } }
                             .buttonStyle(.bordered)
                             .controlSize(.mini)
                         Button {
@@ -147,7 +147,7 @@ struct MailModuleView: View {
                             }
                         } label: {
                             Label(
-                                mail.needsMailIndexAccess ? "授权磁盘访问" : "打开系统设置",
+                                mail.needsMailIndexAccess ? AppLocalization.text("授权磁盘访问") : AppLocalization.text("打开系统设置"),
                                 systemImage: mail.needsMailIndexAccess ? "externaldrive.badge.checkmark" : "gear"
                             )
                         }
@@ -159,7 +159,7 @@ struct MailModuleView: View {
             } else if visibleMessages.isEmpty {
                 EmptyState(
                     symbol: selectedAccount == nil ? "tray" : "envelope.badge",
-                    title: selectedAccount == nil ? "收件箱为空" : "此账户没有邮件"
+                    title: selectedAccount == nil ? AppLocalization.text("收件箱为空") : AppLocalization.text("此账户没有邮件")
                 )
             } else {
                 ScrollView(.vertical) {
@@ -184,9 +184,9 @@ struct MailModuleView: View {
                 selectAccount(nil)
             } label: {
                 if selectedAccountName == nil {
-                    Label("全部已启用账户", systemImage: "checkmark")
+                    Label(AppLocalization.text("全部已启用账户"), systemImage: "checkmark")
                 } else {
-                    Text("全部已启用账户")
+                    Text(AppLocalization.text("全部已启用账户"))
                 }
             }
             ForEach(mail.activeAccounts) { account in
@@ -210,7 +210,7 @@ struct MailModuleView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(selectedAccount?.displayName ?? "全部已启用账户")
+        .help(selectedAccount?.displayName ?? AppLocalization.text("全部已启用账户"))
     }
 
     // MARK: - Message Row
@@ -234,7 +234,7 @@ struct MailModuleView: View {
                     Circle()
                         .fill(message.isRead ? Color.clear : Color.accentColor)
                         .frame(width: 5, height: 5)
-                    Text(message.sender.isEmpty ? "未知发件人" : message.sender)
+                    Text(message.sender.isEmpty ? AppLocalization.text("未知发件人") : message.sender)
                         .font(.system(size: 10.5, weight: message.isRead ? .medium : .semibold))
                         .lineLimit(1)
                     Spacer(minLength: 0)
@@ -277,7 +277,7 @@ struct MailModuleView: View {
                         Text(message.title)
                             .font(.system(size: 12, weight: .semibold))
                             .lineLimit(2)
-                        Text(message.sender.isEmpty ? "未知发件人" : message.sender)
+                        Text(message.sender.isEmpty ? AppLocalization.text("未知发件人") : message.sender)
                             .font(.islandMicro())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -310,7 +310,7 @@ struct MailModuleView: View {
                 }
             }
         } else {
-            EmptyState(symbol: "envelope.open", title: "选择一封邮件")
+            EmptyState(symbol: "envelope.open", title: AppLocalization.text("选择一封邮件"))
         }
     }
 
@@ -321,34 +321,34 @@ struct MailModuleView: View {
             Button {
                 beginReply(to: message)
             } label: {
-                Label("回复", systemImage: "arrowshape.turn.up.left")
+                Label(AppLocalization.text("回复"), systemImage: "arrowshape.turn.up.left")
                     .font(.islandMicro(weight: .semibold))
             }
             .buttonStyle(.bordered)
             .controlSize(.mini)
-            .help("打开回复编辑器")
+            .help(AppLocalization.text("打开回复编辑器"))
 
             Menu {
                 Button {
                     Task { await model.markMailJunk(message) }
                 } label: {
-                    Label("标记为垃圾邮件", systemImage: "exclamationmark.triangle")
+                    Label(AppLocalization.text("标记为垃圾邮件"), systemImage: "exclamationmark.triangle")
                 }
                 Divider()
                 Button(role: .destructive) {
                     confirmDelete(message)
                 } label: {
-                    Label("移到废纸篓", systemImage: "trash")
+                    Label(AppLocalization.text("移到废纸篓"), systemImage: "trash")
                 }
             } label: {
-                Label("其他操作", systemImage: "ellipsis.circle")
+                Label(AppLocalization.text("其他操作"), systemImage: "ellipsis.circle")
                     .font(.islandMicro(weight: .semibold))
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
             .controlSize(.mini)
-            .help("标记为垃圾邮件或移到废纸篓")
+            .help(AppLocalization.text("标记为垃圾邮件或移到废纸篓"))
             .disabled(mail.isMutating)
         }
     }
@@ -397,10 +397,10 @@ struct MailModuleView: View {
     private func confirmDelete(_ message: MailMessage) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "将邮件移到废纸篓？"
-        alert.informativeText = "这封邮件可在 Mail.app 的废纸篓中恢复。"
-        alert.addButton(withTitle: "移到废纸篓")
-        alert.addButton(withTitle: "取消")
+        alert.messageText = AppLocalization.text("将邮件移到废纸篓？")
+        alert.informativeText = AppLocalization.text("这封邮件可在 Mail.app 的废纸篓中恢复。")
+        alert.addButton(withTitle: AppLocalization.text("移到废纸篓"))
+        alert.addButton(withTitle: AppLocalization.text("取消"))
         WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         Task { await model.deleteMail(message) }
@@ -519,7 +519,7 @@ private struct MailComposerView: View {
 
     private var composerHeader: some View {
         HStack {
-            Label(isReply ? "回复邮件" : "新邮件", systemImage: isReply ? "arrowshape.turn.up.left" : "square.and.pencil")
+            Label(isReply ? AppLocalization.text("回复邮件") : AppLocalization.text("新邮件"), systemImage: isReply ? "arrowshape.turn.up.left" : "square.and.pencil")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
             Spacer()
@@ -529,7 +529,7 @@ private struct MailComposerView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help("关闭")
+            .help(AppLocalization.text("关闭"))
         }
         .frame(height: 32)
         .padding(.horizontal, 4)
@@ -540,13 +540,13 @@ private struct MailComposerView: View {
     @ViewBuilder
     private var replyInfo: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label("原始邮件", systemImage: "envelope.open")
+            Label(AppLocalization.text("原始邮件"), systemImage: "envelope.open")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
             Text(replyTarget?.title ?? "")
                 .font(.system(size: 12, weight: .semibold))
                 .lineLimit(2)
-            Text("通过 \(replyTarget?.accountName ?? "") 回复给 \(replyTarget?.sender ?? "")")
+            Text(AppLocalization.text("通过 %@ 回复给 %@", replyTarget?.accountName ?? "", replyTarget?.sender ?? ""))
                 .font(.islandMicro())
                 .foregroundStyle(.secondary)
         }
@@ -568,7 +568,7 @@ private struct MailComposerView: View {
     private var senderPicker: some View {
         if senderIdentities.count > 1 {
             HStack(spacing: 6) {
-                Text("发件人")
+                Text(AppLocalization.text("发件人"))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(width: 52, alignment: .leading)
@@ -592,7 +592,7 @@ private struct MailComposerView: View {
                     }
                 } label: {
                     HStack(spacing: 3) {
-                        Text(selectedIdentity?.address ?? "系统默认账户")
+                        Text(selectedIdentity?.address ?? AppLocalization.text("系统默认账户"))
                             .font(.system(size: 11, weight: .medium))
                             .lineLimit(1)
                         if let identity = selectedIdentity, identity.accountName != identity.address {
@@ -611,7 +611,7 @@ private struct MailComposerView: View {
             }
         } else if let identity = senderIdentities.first {
             HStack(spacing: 6) {
-                Text("发件人")
+                Text(AppLocalization.text("发件人"))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(width: 52, alignment: .leading)
@@ -629,11 +629,11 @@ private struct MailComposerView: View {
 
     private var recipientField: some View {
         HStack(spacing: 6) {
-            Text("收件人")
+            Text(AppLocalization.text("收件人"))
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 52, alignment: .leading)
-            TextField("多个地址用逗号分隔", text: $recipients)
+            TextField(AppLocalization.text("多个地址用逗号分隔"), text: $recipients)
                 .font(.system(size: 11))
                 .textFieldStyle(.plain)
         }
@@ -641,11 +641,11 @@ private struct MailComposerView: View {
 
     private var subjectField: some View {
         HStack(spacing: 6) {
-            Text("主题")
+            Text(AppLocalization.text("主题"))
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 52, alignment: .leading)
-            TextField("邮件主题", text: $subject)
+            TextField(AppLocalization.text("邮件主题"), text: $subject)
                 .font(.system(size: 11))
                 .textFieldStyle(.plain)
         }
@@ -692,29 +692,29 @@ private struct MailComposerView: View {
                 Button {
                     chooseAttachments(title: "添加附件", allowedContentTypes: [.item])
                 } label: {
-                    Label("添加文件", systemImage: "paperclip")
+                    Label(AppLocalization.text("添加文件"), systemImage: "paperclip")
                         .font(.system(size: 10.5))
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help("添加附件")
+                .help(AppLocalization.text("添加附件"))
 
                 // add image
                 Button {
                     chooseAttachments(title: "添加图片", allowedContentTypes: [.image])
                 } label: {
-                    Label("添加图片", systemImage: "photo")
+                    Label(AppLocalization.text("添加图片"), systemImage: "photo")
                         .font(.system(size: 10.5))
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help("插入图片")
+                .help(AppLocalization.text("插入图片"))
 
                 Divider()
                     .frame(height: 16)
 
                 if !attachmentURLs.isEmpty {
-                    Text("\(attachmentURLs.count) 个附件")
+                    Text(AppLocalization.text("%ld 个附件", attachmentURLs.count))
                         .font(.islandMicro())
                         .foregroundStyle(.tertiary)
                 }
@@ -724,7 +724,7 @@ private struct MailComposerView: View {
 
             // right side: cancel / send
             HStack(spacing: 8) {
-                Button("取消") { onCancel() }
+                Button(AppLocalization.text("取消")) { onCancel() }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
 
@@ -734,7 +734,7 @@ private struct MailComposerView: View {
                     if isSending {
                         ProgressView().controlSize(.small)
                     } else {
-                        Label("发送", systemImage: "paperplane.fill")
+                        Label(AppLocalization.text("发送"), systemImage: "paperplane.fill")
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -751,7 +751,7 @@ private struct MailComposerView: View {
     private func chooseAttachments(title: String, allowedContentTypes: [UTType]) {
         let panel = NSOpenPanel()
         panel.title = title
-        panel.prompt = "添加"
+        panel.prompt = AppLocalization.text("添加")
         panel.allowedContentTypes = allowedContentTypes
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false

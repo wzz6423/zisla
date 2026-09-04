@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import AppKit
+import ZislaCore
 @preconcurrency import UserNotifications
 
 public enum PomodoroMode: String, Equatable, Sendable {
@@ -366,12 +367,12 @@ public final class PomodoroService: ObservableObject {
         let content = UNMutableNotificationContent()
         switch mode {
         case .focus:
-            content.title = "专注结束"
+            content.title = AppLocalization.text("专注结束")
             let restMinutes = max(1, Int(engine.restDuration / 60))
             content.body = "休息 \(restMinutes) 分钟吧"
         case .rest:
-            content.title = "休息结束"
-            content.body = "开始下一段专注"
+            content.title = AppLocalization.text("休息结束")
+            content.body = AppLocalization.text("开始下一段专注")
         }
         content.sound = .default
         let request = UNNotificationRequest(

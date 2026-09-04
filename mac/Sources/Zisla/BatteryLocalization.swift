@@ -1,4 +1,5 @@
 import Foundation
+import ZislaCore
 import ZislaKit
 
 enum BatteryLocalization {

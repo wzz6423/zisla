@@ -115,7 +115,7 @@ final class VoiceInputController: ObservableObject {
                 self.dismissAuthorizationPromptHost()
                 guard status == .authorized else {
                     self.finishPendingStart(
-                        with: "未获得语音识别权限。请在系统设置的“隐私与安全性 > 语音识别”中允许 zisla。"
+                        with: AppLocalization.text("未获得语音识别权限。请在系统设置的“隐私与安全性 > 语音识别”中允许 zisla。")
                     )
                     return
                 }
@@ -139,7 +139,7 @@ final class VoiceInputController: ObservableObject {
                 self.dismissAuthorizationPromptHost()
                 guard granted else {
                     self.finishPendingStart(
-                        with: "未获得麦克风权限。请在系统设置的“隐私与安全性 > 麦克风”中允许 zisla。"
+                        with: AppLocalization.text("未获得麦克风权限。请在系统设置的“隐私与安全性 > 麦克风”中允许 zisla。")
                     )
                     return
                 }
@@ -243,7 +243,7 @@ final class VoiceInputController: ObservableObject {
         let input = engine.inputNode
         let preparedFormat = input.outputFormat(forBus: 0)
         guard preparedFormat.sampleRate > 0, preparedFormat.channelCount > 0 else {
-            finishPendingStart(with: "未检测到可用的麦克风输入")
+            finishPendingStart(with: AppLocalization.text("未检测到可用的麦克风输入"))
             return
         }
 
@@ -306,7 +306,7 @@ final class VoiceInputController: ObservableObject {
         let liveFormat = input.outputFormat(forBus: 0)
         guard liveFormat.sampleRate > 0, liveFormat.channelCount > 0 else {
             session.cancel()
-            finishPendingStart(with: "未检测到可用的麦克风输入")
+            finishPendingStart(with: AppLocalization.text("未检测到可用的麦克风输入"))
             return
         }
         if Self.audioTapFormatNeedsRefresh(
@@ -370,7 +370,7 @@ final class VoiceInputController: ObservableObject {
         guard pendingStartID == startID else { return }
         let recognizer = SFSpeechRecognizer(locale: Locale.autoupdatingCurrent)
         guard recognizer?.isAvailable == true else {
-            finishPendingStart(with: "当前语音识别不可用")
+            finishPendingStart(with: AppLocalization.text("当前语音识别不可用"))
             return
         }
 
@@ -384,7 +384,7 @@ final class VoiceInputController: ObservableObject {
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else {
-            finishPendingStart(with: "未检测到可用的麦克风输入")
+            finishPendingStart(with: AppLocalization.text("未检测到可用的麦克风输入"))
             return
         }
         let recordingID = UUID()
@@ -555,7 +555,7 @@ final class VoiceInputController: ObservableObject {
         } ?? fallbackDuration
         guard let recordingFileURL else {
             clearRecordingResources(deleteAudioFile: true)
-            errorDescription = "录音文件未能保存"
+            errorDescription = AppLocalization.text("录音文件未能保存")
             return
         }
         clearRecordingResources(deleteAudioFile: false)

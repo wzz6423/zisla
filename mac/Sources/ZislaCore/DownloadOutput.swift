@@ -123,7 +123,7 @@ public enum DownloadFailureDiagnostics {
         guard isBilibiliHTTP412(rawDiagnostic: rawDiagnostic, urlString: urlString) else {
             return rawDiagnostic
         }
-        return "B站返回 HTTP 412 风控拦截。请先在浏览器登录 B站并完成验证，稍后或更换网络重试；若仍被拦截，需要 Cookies 导入支持后再下载。"
+        return AppLocalization.text("B站返回 HTTP 412 风控拦截。请先在浏览器登录 B站并完成验证，稍后或更换网络重试；若仍被拦截，需要 Cookies 导入支持后再下载。")
     }
 
     public static func isBilibiliHTTP412(

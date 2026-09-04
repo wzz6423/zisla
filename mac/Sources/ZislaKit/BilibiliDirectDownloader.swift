@@ -150,7 +150,7 @@ public struct BilibiliDirectDownloader: BilibiliDownloading, Sendable {
         let candidates = ([track.baseURL] + track.backupURLs)
             .compactMap(URL.init(string:))
             .filter { $0.scheme?.lowercased() == "https" }
-        var lastFailure = "没有可用的 HTTPS 媒体地址"
+        var lastFailure = AppLocalization.text("没有可用的 HTTPS 媒体地址")
 
         for url in candidates {
             try Task.checkCancellation()
@@ -225,7 +225,7 @@ private struct URLSessionBilibiliHTTPClient: BilibiliHTTPClient, Sendable {
     func data(for request: URLRequest) async throws -> BilibiliHTTPDataResponse {
         let (data, response) = try await session.data(for: request)
         guard let response = response as? HTTPURLResponse else {
-            throw BilibiliDirectDownloaderError.invalidAPIResponse("无效 HTTP 响应")
+            throw BilibiliDirectDownloaderError.invalidAPIResponse(AppLocalization.text("无效 HTTP 响应"))
         }
         return BilibiliHTTPDataResponse(data: data, statusCode: response.statusCode)
     }
@@ -236,7 +236,7 @@ private struct URLSessionBilibiliHTTPClient: BilibiliHTTPClient, Sendable {
         let (temporaryURL, response) = try await session.download(for: request)
         defer { try? FileManager.default.removeItem(at: temporaryURL) }
         guard let response = response as? HTTPURLResponse else {
-            throw BilibiliDirectDownloaderError.invalidAPIResponse("无效 HTTP 响应")
+            throw BilibiliDirectDownloaderError.invalidAPIResponse(AppLocalization.text("无效 HTTP 响应"))
         }
         guard (200..<300).contains(response.statusCode) else {
             return BilibiliHTTPResponse(statusCode: response.statusCode)

@@ -1,4 +1,5 @@
 import Foundation
+import ZislaCore
 
 /// Tool management for the download page: locating, checking for updates, and installing managed components.
 @MainActor
@@ -292,12 +293,12 @@ public final class ManagedToolService: ObservableObject {
         tool: ManagedTool
     ) throws -> Release {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw ManagedToolError.releaseUnavailable("响应不是合法 JSON")
+            throw ManagedToolError.releaseUnavailable(AppLocalization.text("响应不是合法 JSON"))
         }
         guard let tag = root["tag_name"] as? String,
               let version = normalizeVersion(tag)
         else {
-            throw ManagedToolError.releaseUnavailable("响应缺少版本号")
+            throw ManagedToolError.releaseUnavailable(AppLocalization.text("响应缺少版本号"))
         }
         let assets = root["assets"] as? [[String: Any]] ?? []
         let matched = assets.first { asset in
@@ -317,7 +318,7 @@ public final class ManagedToolService: ObservableObject {
     /// Without checksum verification, provenance rests entirely on GitHub's TLS, so HTTPS is required and hosts are restricted.
     static func validate(_ url: URL) throws {
         guard url.scheme?.lowercased() == "https", let host = url.host?.lowercased() else {
-            throw ManagedToolError.untrustedHost(url.host ?? "非 HTTPS 地址")
+            throw ManagedToolError.untrustedHost(url.host ?? AppLocalization.text("非 HTTPS 地址"))
         }
         let trusted = host == "github.com"
             || host == "objects.githubusercontent.com"
@@ -576,15 +577,15 @@ public final class ManagedToolService: ObservableObject {
             )
         }
         guard let finalURL = http.url else {
-            throw ManagedToolError.downloadFailed("无效的 HTTP 响应")
+            throw ManagedToolError.downloadFailed(AppLocalization.text("无效的 HTTP 响应"))
         }
         try Self.validate(finalURL)
         if response.expectedContentLength > Int64(Self.maximumDownloadBytes) {
-            throw ManagedToolError.downloadFailed("下载文件超过大小限制")
+            throw ManagedToolError.downloadFailed(AppLocalization.text("下载文件超过大小限制"))
         }
         let downloadedSize = try FileManager.default.attributesOfItem(atPath: temporaryURL.path)[.size] as? NSNumber
         guard downloadedSize?.int64Value ?? 0 <= Int64(Self.maximumDownloadBytes) else {
-            throw ManagedToolError.downloadFailed("下载文件超过大小限制")
+            throw ManagedToolError.downloadFailed(AppLocalization.text("下载文件超过大小限制"))
         }
         // The temporary file from download(for:) is reclaimed right after this await, so move it into a directory we own first.
         let workDirectory = FileManager.default.temporaryDirectory

@@ -1,5 +1,7 @@
 import AppKit
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 struct TeleprompterView: View {
     var onClose: () -> Void
@@ -83,7 +85,7 @@ struct TeleprompterView: View {
             }
             .buttonStyle(.plain)
             .disabled(script.isEmpty)
-            .help(isAutoScrolling ? "暂停自动滚动" : "开始自动滚动")
+            .help(isAutoScrolling ? AppLocalization.text("暂停自动滚动") : AppLocalization.text("开始自动滚动"))
 
             Button {
                 isAutoScrolling = false
@@ -94,13 +96,13 @@ struct TeleprompterView: View {
             }
             .buttonStyle(.plain)
             .disabled(script.isEmpty)
-            .help("回到开头")
+            .help(AppLocalization.text("回到开头"))
 
             Slider(value: $scrollSpeed, in: 15...150, step: 5)
                 .frame(width: 132)
-                .help("自动滚动速度")
+                .help(AppLocalization.text("自动滚动速度"))
 
-            Text("\(Int(scrollSpeed)) 点/秒")
+            Text(AppLocalization.text("%ld 点/秒", Int(scrollSpeed)))
                 .font(.system(size: 11, weight: .medium))
                 .monospacedDigit()
                 .foregroundStyle(.white.opacity(0.85))
@@ -113,7 +115,7 @@ struct TeleprompterView: View {
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
-            .help("从剪贴板粘贴")
+            .help(AppLocalization.text("从剪贴板粘贴"))
 
             Spacer(minLength: 0)
 
@@ -122,7 +124,7 @@ struct TeleprompterView: View {
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
-            .help("关闭提词器")
+            .help(AppLocalization.text("关闭提词器"))
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 14)

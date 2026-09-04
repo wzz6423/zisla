@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ZislaCore
 import ZislaKit
 import SwiftUI
 
@@ -43,7 +44,7 @@ struct LockScreenOverlayView: View {
                         .multilineTextAlignment(.center)
                 }
                 if let lunar {
-                    Text("农历 \(lunar)")
+                    Text(AppLocalization.text("农历 %@", lunar))
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.white.opacity(0.78))
                 }

@@ -33,7 +33,7 @@ public final class ZedUsageLogDetector: AIUsageDetecting {
             nil
         )
         guard openResult == SQLITE_OK, let database else {
-            let message = sqliteMessage(database, fallback: "无法打开 Zed 线程数据库")
+            let message = sqliteMessage(database, fallback: AppLocalization.text("无法打开 Zed 线程数据库"))
             sqlite3_close(database)
             throw AIStateRepositoryError.storageFailure(message)
         }
@@ -49,7 +49,7 @@ public final class ZedUsageLogDetector: AIUsageDetecting {
         var statement: OpaquePointer?
         let prepareResult = sqlite3_prepare_v2(database, sql, -1, &statement, nil)
         guard prepareResult == SQLITE_OK, let statement else {
-            let message = sqliteMessage(database, fallback: "无法查询 Zed 用量")
+            let message = sqliteMessage(database, fallback: AppLocalization.text("无法查询 Zed 用量"))
             sqlite3_finalize(statement)
             throw AIStateRepositoryError.storageFailure(message)
         }
@@ -57,7 +57,7 @@ public final class ZedUsageLogDetector: AIUsageDetecting {
 
         guard sqlite3_bind_int(statement, 1, Int32(maxThreads)) == SQLITE_OK else {
             throw AIStateRepositoryError.storageFailure(
-                sqliteMessage(database, fallback: "无法设置 Zed 用量查询范围")
+                sqliteMessage(database, fallback: AppLocalization.text("无法设置 Zed 用量查询范围"))
             )
         }
 
@@ -95,7 +95,7 @@ public final class ZedUsageLogDetector: AIUsageDetecting {
                 break readRows
             default:
                 throw AIStateRepositoryError.storageFailure(
-                    sqliteMessage(database, fallback: "无法读取 Zed 用量")
+                    sqliteMessage(database, fallback: AppLocalization.text("无法读取 Zed 用量"))
                 )
             }
         }

@@ -1,3 +1,4 @@
+import ZislaCore
 import ZislaKit
 import SwiftUI
 
@@ -97,7 +98,7 @@ struct LockScreenModuleView: View {
     }
 
     private func lunarDateText(for date: Date) -> String {
-        LunarCalendar.components(from: date)?.fullText ?? "农历日期未知"
+        LunarCalendar.components(from: date)?.fullText ?? AppLocalization.text("农历日期未知")
     }
 
     private var lockScreenMessage: String {

@@ -1,3 +1,4 @@
+import ZislaCore
 import ZislaKit
 import SwiftUI
 
@@ -19,7 +20,7 @@ struct AlarmEditorView: View {
             header
 
             if service.alarms.isEmpty {
-                Text("还没有闹钟，在下方添加")
+                Text(AppLocalization.text("还没有闹钟，在下方添加"))
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -54,18 +55,18 @@ struct AlarmEditorView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Label("闹钟", systemImage: "alarm")
+            Label(AppLocalization.text("闹钟"), systemImage: "alarm")
                 .font(.system(size: 13, weight: .semibold))
             Spacer(minLength: 8)
             Button {
                 service.openSystemClock()
             } label: {
-                Text("打开时钟")
+                Text(AppLocalization.text("打开时钟"))
                     .font(.islandMicro(weight: .semibold))
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("打开系统「时钟」App")
+            .help(AppLocalization.text("打开系统「时钟」App"))
         }
     }
 
@@ -96,7 +97,7 @@ struct AlarmEditorView: View {
             .labelsHidden()
             .toggleStyle(.switch)
             .controlSize(.mini)
-            .help(alarm.isEnabled ? "停用" : "启用")
+            .help(alarm.isEnabled ? AppLocalization.text("停用") : AppLocalization.text("启用"))
 
             Button {
                 beginEditing(alarm)
@@ -108,7 +109,7 @@ struct AlarmEditorView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("编辑")
+            .help(AppLocalization.text("编辑"))
 
             Button {
                 if editingID == alarm.id { resetForm() }
@@ -121,7 +122,7 @@ struct AlarmEditorView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("删除")
+            .help(AppLocalization.text("删除"))
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -136,7 +137,7 @@ struct AlarmEditorView: View {
                 Text(":").foregroundStyle(.secondary)
                 timeField("分", value: $minute, range: 0...59)
 
-                TextField("备注", text: $label)
+                TextField(AppLocalization.text("备注"), text: $label)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 11))
             }
@@ -148,20 +149,20 @@ struct AlarmEditorView: View {
             }
 
             HStack(spacing: 8) {
-                Button(editingID == nil ? "添加" : "保存") {
+                Button(editingID == nil ? AppLocalization.text("添加") : AppLocalization.text("保存")) {
                     commit()
                 }
                 .keyboardShortcut(.defaultAction)
                 .font(.system(size: 11, weight: .semibold))
 
                 if editingID != nil {
-                    Button("取消") { resetForm() }
+                    Button(AppLocalization.text("取消")) { resetForm() }
                         .font(.system(size: 11))
                 }
 
                 Spacer(minLength: 4)
 
-                Text(weekdays.isEmpty ? "仅响一次" : "每周重复")
+                Text(weekdays.isEmpty ? AppLocalization.text("仅响一次") : AppLocalization.text("每周重复"))
                     .font(.islandMicro())
                     .foregroundStyle(.secondary)
             }

@@ -1,5 +1,7 @@
 import AppKit
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 struct MenuBarView: View {
     @Environment(\.dismiss) private var dismiss
@@ -103,13 +105,13 @@ struct MenuBarView: View {
 
     private func monitoringFailureCard(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 9) {
-            Label("键盘与点击监听未启动", systemImage: "exclamationmark.triangle.fill")
+            Label(AppLocalization.text("键盘与点击监听未启动"), systemImage: "exclamationmark.triangle.fill")
                 .font(.subheadline.weight(.semibold))
             Text(L10n.tr(message))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("重试输入监听") { model.retryKeyboardMonitor() }
+            Button(AppLocalization.text("重试输入监听")) { model.retryKeyboardMonitor() }
                 .buttonStyle(.bordered)
         }
         .padding(12)
@@ -119,7 +121,7 @@ struct MenuBarView: View {
 
     private func audioFailureCard(_ failures: [(module: String, message: String)]) -> some View {
         VStack(alignment: .leading, spacing: 9) {
-            Label("声音暂时不可用", systemImage: "speaker.slash.fill")
+            Label(AppLocalization.text("声音暂时不可用"), systemImage: "speaker.slash.fill")
                 .font(.subheadline.weight(.semibold))
             ForEach(failures, id: \.module) { failure in
                 VStack(alignment: .leading, spacing: 2) {
@@ -139,18 +141,18 @@ struct MenuBarView: View {
 
     private var permissionCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("需要输入监控权限", systemImage: "keyboard.badge.eye")
+            Label(AppLocalization.text("需要输入监控权限"), systemImage: "keyboard.badge.eye")
                 .font(.subheadline.weight(.semibold))
-            Text("Keyboard 使用按键编号播放声音，并可在你主动开启后于本机统计字符数量、物理按键次数和前台应用；不读取或保存文字、点击位置或输入内容。")
+            Text(AppLocalization.text("Keyboard 使用按键编号播放声音，并可在你主动开启后于本机统计字符数量、物理按键次数和前台应用；不读取或保存文字、点击位置或输入内容。"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("如果系统开关已经打开但这里仍显示等待，请选中旧的 Zisla 条目，点列表下方“−”删除，再重新添加 /Applications/Zisla.app。完成后退出并重新打开应用。")
+            Text(AppLocalization.text("如果系统开关已经打开但这里仍显示等待，请选中旧的 Zisla 条目，点列表下方“−”删除，再重新添加 /Applications/Zisla.app。完成后退出并重新打开应用。"))
                 .font(.caption2)
                 .foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                Button("请求授权") {
+                Button(AppLocalization.text("请求授权")) {
                     model.requestInputMonitoring()
                     if !permission.isGranted {
                         model.openInputMonitoringSettings()
@@ -158,7 +160,7 @@ struct MenuBarView: View {
                     dismiss()
                 }
                     .buttonStyle(.borderedProminent)
-                Button("打开系统设置") {
+                Button(AppLocalization.text("打开系统设置")) {
                     model.openInputMonitoringSettings()
                     dismiss()
                 }
@@ -267,14 +269,14 @@ private struct KeyboardSoundSection: View {
                     symbol: "keyboard.fill"
                 )
                 Spacer()
-                Toggle("启用键盘声音", isOn: $settings.isEnabled)
+                Toggle(AppLocalization.text("启用键盘声音"), isOn: $settings.isEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .accessibilityLabel("启用键盘声音")
-                    .help("启用或暂停键盘声音")
+                    .accessibilityLabel(AppLocalization.text("启用键盘声音"))
+                    .help(AppLocalization.text("启用或暂停键盘声音"))
             }
 
-            Picker("轴体音色", selection: $settings.selectedProfileID) {
+            Picker(AppLocalization.text("轴体音色"), selection: $settings.selectedProfileID) {
                 ForEach(model.soundPacks) { soundPack in
                     Text(L10n.format("%@ · %@", soundPack.name, L10n.tr(soundPack.family)))
                         .tag(soundPack.id)
@@ -287,13 +289,13 @@ private struct KeyboardSoundSection: View {
                 Button {
                     model.preview()
                 } label: {
-                    Label("试听", systemImage: "play.fill")
+                    Label(AppLocalization.text("试听"), systemImage: "play.fill")
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!settings.isEnabled)
 
                 Button(action: onOpenEditor) {
-                    Label("DIY 音色", systemImage: "slider.horizontal.3")
+                    Label(AppLocalization.text("DIY 音色"), systemImage: "slider.horizontal.3")
                 }
                 .buttonStyle(.bordered)
 
@@ -308,21 +310,21 @@ private struct KeyboardSoundSection: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("键盘音量")
+                    Text(AppLocalization.text("键盘音量"))
                     Spacer()
                     Text("\(Int(settings.volume * 100))%")
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
                 Slider(value: $settings.volume, in: 0...1, step: 0.01)
-                    .accessibilityLabel("键盘音量")
+                    .accessibilityLabel(AppLocalization.text("键盘音量"))
             }
             .disabled(!settings.isEnabled)
 
-            Toggle("播放键盘回弹音", isOn: $settings.playsReleaseSound)
+            Toggle(AppLocalization.text("播放键盘回弹音"), isOn: $settings.playsReleaseSound)
                 .disabled(!settings.isEnabled)
-            Toggle("自然音色变化（键盘轮换 / 点击音高）", isOn: $settings.usesPitchVariation)
-                .help("键盘在四种轻微变化间轮换；点击音使用轻微随机音高")
+            Toggle(AppLocalization.text("自然音色变化（键盘轮换 / 点击音高）"), isOn: $settings.usesPitchVariation)
+                .help(AppLocalization.text("键盘在四种轻微变化间轮换；点击音使用轻微随机音高"))
         }
         .font(.subheadline)
         .padding(KeyboardVisualStyle.cardPadding)
@@ -343,10 +345,10 @@ private struct MenuBarFooter: View {
                 .foregroundStyle(status.color)
 
             Spacer()
-            Button("收起", action: onDismiss)
+            Button(AppLocalization.text("收起"), action: onDismiss)
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-            Button("退出") { NSApplication.shared.terminate(nil) }
+            Button(AppLocalization.text("退出")) { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
         }
@@ -378,15 +380,15 @@ private struct InterfacePreferencesSection: View {
                 symbol: "paintbrush.pointed"
             )
 
-            Text("首次安装默认跟随系统，可在这里单独覆盖语言和外观。")
+            Text(AppLocalization.text("首次安装默认跟随系统，可在这里单独覆盖语言和外观。"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             preferenceRow("语言") {
-                Picker("语言", selection: $settings.languagePreference) {
+                Picker(AppLocalization.text("语言"), selection: $settings.languagePreference) {
                     ForEach(AppLanguagePreference.allCases) { preference in
-                        Text(L10n.tr(preference.displayNameKey)).tag(preference)
+                        Text(preference.displayName).tag(preference)
                     }
                 }
                 .labelsHidden()
@@ -396,7 +398,7 @@ private struct InterfacePreferencesSection: View {
             }
 
             preferenceRow("外观") {
-                Picker("外观", selection: $settings.appearancePreference) {
+                Picker(AppLocalization.text("外观"), selection: $settings.appearancePreference) {
                     ForEach(AppAppearancePreference.allCases) { preference in
                         Text(L10n.tr(preference.displayNameKey)).tag(preference)
                     }
@@ -439,10 +441,10 @@ private struct LaunchAtLoginSection: View {
                     symbol: "power"
                 )
                 Spacer()
-                Toggle("登录时自动启动", isOn: $settings.isLaunchAtLoginEnabled)
+                Toggle(AppLocalization.text("登录时自动启动"), isOn: $settings.isLaunchAtLoginEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .accessibilityLabel("登录时自动启动")
+                    .accessibilityLabel(AppLocalization.text("登录时自动启动"))
             }
 
             Label(L10n.tr(statusText), systemImage: statusSymbol)
@@ -453,11 +455,11 @@ private struct LaunchAtLoginSection: View {
             if shouldShowActions {
                 HStack(spacing: 8) {
                     if shouldShowRetry {
-                        Button("重试") { onRetry() }
+                        Button(AppLocalization.text("重试")) { onRetry() }
                             .buttonStyle(.bordered)
                     }
                     if shouldShowSystemSettings {
-                        Button("打开登录项设置") { onOpenSettings() }
+                        Button(AppLocalization.text("打开登录项设置")) { onOpenSettings() }
                             .buttonStyle(.bordered)
                     }
                 }
@@ -533,13 +535,13 @@ private struct PointerSoundSection: View {
                     symbol: "computermouse.fill"
                 )
                 Spacer()
-                Toggle("启用点击音", isOn: $settings.isPointerSoundEnabled)
+                Toggle(AppLocalization.text("启用点击音"), isOn: $settings.isPointerSoundEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .accessibilityLabel("启用鼠标与触控板点击音")
+                    .accessibilityLabel(AppLocalization.text("启用鼠标与触控板点击音"))
             }
 
-            Picker("点击音色", selection: $settings.selectedPointerProfileID) {
+            Picker(AppLocalization.text("点击音色"), selection: $settings.selectedPointerProfileID) {
                 ForEach(PointerSoundProfile.allCases) { profile in
                     Text(L10n.format("%@ · %@", profile.displayName, profile.family))
                         .tag(profile.rawValue)
@@ -553,7 +555,7 @@ private struct PointerSoundSection: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Toggle("播放抬起音", isOn: $settings.playsPointerReleaseSound)
+                Toggle(AppLocalization.text("播放抬起音"), isOn: $settings.playsPointerReleaseSound)
                     .disabled(!settings.isPointerSoundEnabled)
                     .toggleStyle(.checkbox)
             }
@@ -562,18 +564,18 @@ private struct PointerSoundSection: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("点击音量")
+                    Text(AppLocalization.text("点击音量"))
                     Spacer()
                     Text("\(Int(settings.pointerVolume * 100))%")
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
                 Slider(value: $settings.pointerVolume, in: 0...1, step: 0.01)
-                    .accessibilityLabel("鼠标与触控板点击音量")
+                    .accessibilityLabel(AppLocalization.text("鼠标与触控板点击音量"))
                     .disabled(!settings.isPointerSoundEnabled)
             }
 
-            Text("触控板轻点、物理点按和鼠标点击共用此配置；点击音量独立于键盘音量。")
+            Text(AppLocalization.text("触控板轻点、物理点按和鼠标点击共用此配置；点击音量独立于键盘音量。"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

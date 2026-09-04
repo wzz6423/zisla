@@ -790,7 +790,7 @@ public final class CodexSessionActivityDetector {
         case "function_call_output", "custom_tool_call_output":
             let output = payload["output"]
             failed = Self.outputIndicatesError(output)
-            failureReason = failed == true ? "工具执行失败" : nil
+            failureReason = failed == true ? AppLocalization.text("工具执行失败") : nil
         default:
             failed = nil
             failureReason = nil

@@ -1,4 +1,6 @@
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 @MainActor
 struct TypingStatsSummarySection: View {
@@ -15,13 +17,13 @@ struct TypingStatsSummarySection: View {
                     symbol: "chart.bar.fill"
                 )
                 Spacer()
-                Toggle("记录本地输入统计", isOn: $settings.isTypingStatsEnabled)
+                Toggle(AppLocalization.text("记录本地输入统计"), isOn: $settings.isTypingStatsEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .accessibilityLabel("记录本地输入统计")
+                    .accessibilityLabel(AppLocalization.text("记录本地输入统计"))
             }
 
-            Text("仅保存聚合数量、物理键码、时间与前台应用；不保存输入内容或按键顺序。")
+            Text(AppLocalization.text("仅保存聚合数量、物理键码、时间与前台应用；不保存输入内容或按键顺序。"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -29,21 +31,21 @@ struct TypingStatsSummarySection: View {
             if settings.isTypingStatsEnabled {
                 content
             } else {
-                Label("统计已暂停，已有历史数据仍会保留。", systemImage: "pause.circle")
+                Label(AppLocalization.text("统计已暂停，已有历史数据仍会保留。"), systemImage: "pause.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Button(action: onOpenDetails) {
                 HStack {
-                    Label("查看详细统计", systemImage: "chart.xyaxis.line")
+                    Label(AppLocalization.text("查看详细统计"), systemImage: "chart.xyaxis.line")
                     Spacer()
                     Image(systemName: "arrow.up.forward.square")
                         .foregroundStyle(.secondary)
                 }
             }
             .buttonStyle(.bordered)
-            .help("查看今日、应用、历史和逐键热力图")
+            .help(AppLocalization.text("查看今日、应用、历史和逐键热力图"))
         }
         .padding(KeyboardVisualStyle.cardPadding)
         .keyboardPanel()
@@ -60,7 +62,7 @@ struct TypingStatsSummarySection: View {
                 HStack(spacing: 9) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("正在读取本地统计…")
+                    Text(AppLocalization.text("正在读取本地统计…"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

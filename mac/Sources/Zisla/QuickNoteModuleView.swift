@@ -1,3 +1,4 @@
+import ZislaCore
 import ZislaKit
 import SwiftUI
 
@@ -49,16 +50,16 @@ struct QuickNoteModuleView: View {
     private var noteListColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
-                Text("随记")
+                Text(AppLocalization.text("随记"))
                     .font(.system(size: 12, weight: .semibold))
                 Spacer(minLength: 4)
                 Text("\(service.notes.count)")
                     .font(.islandMicro())
                     .foregroundStyle(.secondary)
-                IconButton(symbol: "arrow.clockwise", help: "刷新备忘录", size: .compact) {
+                IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("刷新备忘录"), size: .compact) {
                     Task { await service.refresh() }
                 }
-                IconButton(symbol: "plus", help: "新建随记", size: .compact) {
+                IconButton(symbol: "plus", help: AppLocalization.text("新建随记"), size: .compact) {
                     Task { await createNew() }
                 }
             }
@@ -73,7 +74,7 @@ struct QuickNoteModuleView: View {
                 } else if let error = service.errorMessage, service.notes.isEmpty, service.welcomeNote == nil {
                     listErrorView(error)
                 } else if service.notes.isEmpty, service.welcomeNote == nil {
-                    EmptyState(symbol: "note.text", title: "备忘录暂无笔记", detail: "点 + 新建一条")
+                    EmptyState(symbol: "note.text", title: AppLocalization.text("备忘录暂无笔记"), detail: AppLocalization.text("点 + 新建一条"))
                 } else {
                     ScrollView(.vertical) {
                         LazyVStack(spacing: 0) {
@@ -103,14 +104,14 @@ struct QuickNoteModuleView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 16))
                 .foregroundStyle(Color.zislaWarning)
-            Text("无法读取备忘录")
+            Text(AppLocalization.text("无法读取备忘录"))
                 .font(.system(size: 10, weight: .semibold))
             Text(message)
                 .font(.islandMicro())
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
-            Button("重试") { Task { await service.refresh() } }
+            Button(AppLocalization.text("重试")) { Task { await service.refresh() } }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
         }
@@ -123,7 +124,7 @@ struct QuickNoteModuleView: View {
             service.select(id: note.id)
         } label: {
             VStack(alignment: .leading, spacing: 2) {
-                Text(note.title.isEmpty ? "无标题" : note.title)
+                Text(note.title.isEmpty ? AppLocalization.text("无标题") : note.title)
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundStyle(selected ? Color.primary : Color.primary.opacity(0.86))
                     .lineLimit(2)
@@ -131,7 +132,7 @@ struct QuickNoteModuleView: View {
                     if note.isPasswordProtected {
                         Image(systemName: "lock.fill")
                     }
-                    Text(service.isBuiltInWelcomeNote(id: note.id) ? "内置说明" : note.modifiedAt.map { relativeTime($0) } ?? "—")
+                    Text(service.isBuiltInWelcomeNote(id: note.id) ? AppLocalization.text("内置说明") : note.modifiedAt.map { relativeTime($0) } ?? "—")
                 }
                 .font(.islandMicro())
                 .foregroundStyle(.tertiary)
@@ -148,7 +149,7 @@ struct QuickNoteModuleView: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button("删除", role: .destructive) {
+            Button(AppLocalization.text("删除"), role: .destructive) {
                 Task { await service.delete(id: note.id) }
             }
         }
@@ -195,7 +196,7 @@ struct QuickNoteModuleView: View {
             Image(systemName: "note.text")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
-            Text(service.selectedNote?.title ?? "随记")
+            Text(service.selectedNote?.title ?? AppLocalization.text("随记"))
                 .font(.system(size: 11, weight: .semibold))
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -208,14 +209,14 @@ struct QuickNoteModuleView: View {
             RichNoteToolbar(command: $editorCommand)
                 .frame(maxWidth: .infinity)
                 .disabled(service.isBuiltInWelcomeNoteSelected)
-            IconButton(symbol: "text.viewfinder", help: "发送到提词器", size: .compact) {
+            IconButton(symbol: "text.viewfinder", help: AppLocalization.text("发送到提词器"), size: .compact) {
                 model.sendQuickNoteToTeleprompter(draftPlainText)
             }
             .disabled(draftPlainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            IconButton(symbol: "arrow.up.left.and.arrow.down.right", help: "展开大窗口编辑", size: .compact) {
+            IconButton(symbol: "arrow.up.left.and.arrow.down.right", help: AppLocalization.text("展开大窗口编辑"), size: .compact) {
                 (NSApp.delegate as? AppDelegate)?.openQuickNotesEditor()
             }
-            IconButton(symbol: "square.and.arrow.up", help: "系统共享", size: .compact) {
+            IconButton(symbol: "square.and.arrow.up", help: AppLocalization.text("系统共享"), size: .compact) {
                 model.share([.text(draftPlainText)])
             }
             .disabled(draftPlainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -276,11 +277,11 @@ struct QuickNoteModuleView: View {
 
     private func relativeTime(_ date: Date) -> String {
         let interval = Date().timeIntervalSince(date)
-        if interval < 60 { return "刚刚" }
+        if interval < 60 { return AppLocalization.text("刚刚") }
         if interval < 3600 { return "\(Int(interval / 60)) 分钟前" }
         if interval < 86400 { return "\(Int(interval / 3600)) 小时前" }
         let calendar = Calendar.current
-        if calendar.isDateInYesterday(date) { return "昨天" }
+        if calendar.isDateInYesterday(date) { return AppLocalization.text("昨天") }
         if calendar.isDateInToday(date) {
             return date.formatted(date: .omitted, time: .shortened)
         }

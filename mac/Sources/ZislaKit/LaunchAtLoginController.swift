@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import ServiceManagement
+import ZislaCore
 
 public enum LaunchAtLoginStatus: Equatable, Sendable {
     case notRegistered
@@ -100,15 +101,15 @@ public final class LaunchAtLoginController: ObservableObject {
     private static func message(for status: LaunchAtLoginStatus) -> String? {
         switch status {
         case .enabled:
-            return "已在登录时自动启动"
+            return AppLocalization.text("已在登录时自动启动")
         case .notRegistered:
             return "开机或登录后自动在后台运行"
         case .requiresApproval:
-            return "需要在系统设置中批准登录项"
+            return AppLocalization.text("需要在系统设置中批准登录项")
         case .notFound:
-            return "找不到登录项，请确认应用已正确安装到“应用程序”文件夹"
+            return AppLocalization.text("找不到登录项，请确认应用已正确安装到“应用程序”文件夹")
         case .unknown:
-            return "无法读取登录项状态"
+            return AppLocalization.text("无法读取登录项状态")
         }
     }
 

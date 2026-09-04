@@ -51,7 +51,7 @@ struct AIProgressModuleView: View {
     private func usageSummary(endingAt date: Date) -> some View {
         let series = usageTrend(endingAt: date)
         return VStack(alignment: .leading, spacing: 5) {
-            Label("Token 消耗趋势", systemImage: "chart.xyaxis.line")
+            Label(AppLocalization.text("Token 消耗趋势"), systemImage: "chart.xyaxis.line")
                 .font(.system(size: 11, weight: .semibold))
 
             UsageTrendChart(series: series)
@@ -64,7 +64,7 @@ struct AIProgressModuleView: View {
     private var runningTasks: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack {
-                Label("运行任务", systemImage: "cpu")
+                Label(AppLocalization.text("运行任务"), systemImage: "cpu")
                     .font(.system(size: 10, weight: .semibold))
                 Spacer()
                 Text("\(activeTasks.count)")
@@ -73,7 +73,7 @@ struct AIProgressModuleView: View {
             }
 
             if activeTasks.isEmpty {
-                EmptyState(symbol: "checkmark.circle", title: "暂无活动任务")
+                EmptyState(symbol: "checkmark.circle", title: AppLocalization.text("暂无活动任务"))
             } else {
                 List(activeTasks) { task in
                     TaskProgressRow(task: task)
@@ -125,18 +125,18 @@ private struct UsageTrendChart: View {
             if hasUsage {
                 chart
             } else {
-                EmptyState(symbol: "chart.line.downtrend.xyaxis", title: "暂无 Token 用量")
+                EmptyState(symbol: "chart.line.downtrend.xyaxis", title: AppLocalization.text("暂无 Token 用量"))
             }
         }
-        .accessibilityLabel(hasUsage ? "最近七天 AI token 总量趋势" : "暂无 AI token 用量")
+        .accessibilityLabel(hasUsage ? AppLocalization.text("最近七天 AI token 总量趋势") : AppLocalization.text("暂无 AI token 用量"))
     }
 
     private var chart: some View {
         let scale = yScale
         return Chart(series, id: \.timestamp) { point in
             AreaMark(
-                x: .value("时间", point.timestamp),
-                y: .value("总 Token", point.totalTokens)
+                x: .value(AppLocalization.text("时间"), point.timestamp),
+                y: .value(AppLocalization.text("总 Token"), point.totalTokens)
             )
             .interpolationMethod(.monotone)
             .foregroundStyle(
@@ -147,8 +147,8 @@ private struct UsageTrendChart: View {
                 )
             )
             LineMark(
-                x: .value("时间", point.timestamp),
-                y: .value("总 Token", point.totalTokens)
+                x: .value(AppLocalization.text("时间"), point.timestamp),
+                y: .value(AppLocalization.text("总 Token"), point.totalTokens)
             )
             .interpolationMethod(.monotone)
             .foregroundStyle(Color.blue)
@@ -204,7 +204,7 @@ private struct TaskProgressRow: View {
             }
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .help("在 \(task.title) 中打开会话")
+            .help(AppLocalization.text("在 %@ 中打开会话", task.title))
         } else {
             content
         }
@@ -286,7 +286,7 @@ private struct TaskProgressRow: View {
                             .scaledToFit()
                             .frame(width: 16, height: 16)
                             .foregroundStyle(.red)
-                            .help(failureReason ?? "任务失败")
+                            .help(failureReason ?? AppLocalization.text("任务失败"))
                     } else if let progress = task.progress {
                         ProgressView(value: progress)
                             .tint(providerColor)
@@ -309,7 +309,7 @@ private struct TaskProgressRow: View {
                 .scaledToFit()
                 .frame(width: 16, height: 16)
                 .foregroundStyle(.red)
-                .help(failureReason ?? "任务失败")
+                .help(failureReason ?? AppLocalization.text("任务失败"))
         } else if let progress = task.progress {
             ProgressView(value: progress)
                 .tint(providerColor)
@@ -366,7 +366,7 @@ private struct TaskProgressRow: View {
 
     private var failureReason: String? {
         guard task.status == .error else { return nil }
-        return task.failureReason ?? "任务失败，未提供详细原因"
+        return task.failureReason ?? AppLocalization.text("任务失败，未提供详细原因")
     }
 }
 
@@ -441,7 +441,7 @@ private struct UsageHeatmap: View {
             .frame(height: 13)
 
             HStack(spacing: 4) {
-                Text("少")
+                Text(AppLocalization.text("少"))
                     .font(.islandMicro())
                     .foregroundStyle(.secondary)
                 ForEach(ContributionIntensity.allCases, id: \.self) { intensity in
@@ -455,7 +455,7 @@ private struct UsageHeatmap: View {
                         }
                         .frame(width: 7, height: 7)
                 }
-                Text("多 · \(maxLabel)")
+                Text(AppLocalization.text("多 · %@", maxLabel))
                     .font(.islandMicro(design: .monospaced))
                     .foregroundStyle(.secondary)
             }
@@ -472,7 +472,7 @@ private struct UsageHeatmap: View {
             .foregroundStyle(.secondary)
             .frame(height: 13, alignment: .leading)
         }
-        .accessibilityLabel("最近二十四周 AI token 用量热力图")
+        .accessibilityLabel(AppLocalization.text("最近二十四周 AI token 用量热力图"))
     }
 
     private func isSelected(_ day: ContributionDay?) -> Bool {

@@ -577,7 +577,7 @@ struct ClipboardAssistantToastView: View {
             leadingAccessory(detection)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(detection.title)
+                Text(AppLocalization.text(detection.title))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.92))
                     .lineLimit(1)

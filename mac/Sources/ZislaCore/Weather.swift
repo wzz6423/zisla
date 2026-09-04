@@ -62,43 +62,43 @@ public struct WeatherCondition: Equatable, Sendable {
     public init(code: Int, isDay: Bool) {
         switch code {
         case 0:
-            summary = "晴"
+            summary = AppLocalization.text("晴")
             symbolName = isDay ? "sun.max.fill" : "moon.stars.fill"
         case 1:
-            summary = "晴间少云"
+            summary = AppLocalization.text("晴间少云")
             symbolName = isDay ? "sun.max.fill" : "moon.fill"
         case 2:
-            summary = "多云"
+            summary = AppLocalization.text("多云")
             symbolName = isDay ? "cloud.sun.fill" : "cloud.moon.fill"
         case 3:
-            summary = "阴"
+            summary = AppLocalization.text("阴")
             symbolName = "cloud.fill"
         case 45, 48:
-            summary = "雾"
+            summary = AppLocalization.text("雾")
             symbolName = "cloud.fog.fill"
         case 51, 53, 55, 56, 57:
-            summary = "毛毛雨"
+            summary = AppLocalization.text("毛毛雨")
             symbolName = "cloud.drizzle.fill"
         case 61, 63, 65, 66, 67:
-            summary = "雨"
+            summary = AppLocalization.text("雨")
             symbolName = "cloud.rain.fill"
         case 71, 73, 75, 77:
-            summary = "雪"
+            summary = AppLocalization.text("雪")
             symbolName = "cloud.snow.fill"
         case 80, 81, 82:
-            summary = "阵雨"
+            summary = AppLocalization.text("阵雨")
             symbolName = "cloud.heavyrain.fill"
         case 85, 86:
-            summary = "阵雪"
+            summary = AppLocalization.text("阵雪")
             symbolName = "cloud.snow.fill"
         case 95:
-            summary = "雷阵雨"
+            summary = AppLocalization.text("雷阵雨")
             symbolName = "cloud.bolt.rain.fill"
         case 96, 99:
-            summary = "雷阵雨伴冰雹"
+            summary = AppLocalization.text("雷阵雨伴冰雹")
             symbolName = "cloud.bolt.rain.fill"
         default:
-            summary = "天气未知"
+            summary = AppLocalization.text("天气未知")
             symbolName = "questionmark.circle"
         }
     }

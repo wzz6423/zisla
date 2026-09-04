@@ -1493,7 +1493,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         reportScreenshotHotkeyRegistration(captureResult, actionName: "截图")
 
         guard !settings.screenshotHotkey.conflicts(with: settings.screenshotPinHotkey) else {
-            AppModel.shared.transientMessage = "截图与钉图快捷键冲突，钉图快捷键未启用"
+            AppModel.shared.transientMessage = AppLocalization.text("截图与钉图快捷键冲突，钉图快捷键未启用")
             return
         }
         let pinResult = screenshotPinHotkeyManager.register(

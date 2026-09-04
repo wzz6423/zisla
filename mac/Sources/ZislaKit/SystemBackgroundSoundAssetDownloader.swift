@@ -97,7 +97,7 @@ public actor SystemBackgroundSoundAssetDownloader {
         self.loadData = { request in
             let (tempURL, response) = try await activeSession.download(for: request)
             guard let response = response as? HTTPURLResponse else {
-                throw DownloadError.downloadFailed("无效的 HTTP 响应")
+                throw DownloadError.downloadFailed(AppLocalization.text("无效的 HTTP 响应"))
             }
             return (tempURL, response)
         }
@@ -158,7 +158,7 @@ public actor SystemBackgroundSoundAssetDownloader {
         let metadata = try readManifest(for: soundName)
         guard (metadata.downloadSize == 0 || metadata.downloadSize <= Self.maxDownloadSize),
               (metadata.unarchivedSize == 0 || metadata.unarchivedSize <= Self.maxUnarchivedSize) else {
-            throw DownloadError.downloadFailed("资源大小超出允许范围")
+            throw DownloadError.downloadFailed(AppLocalization.text("资源大小超出允许范围"))
         }
         let sanitizedTargetDirectory = targetDirectory.standardizedFileURL
 
@@ -180,7 +180,7 @@ public actor SystemBackgroundSoundAssetDownloader {
               attributes[.type] as? FileAttributeType == .typeRegular,
               let downloadedSize = (attributes[.size] as? NSNumber)?.int64Value,
               downloadedSize <= Int64(Self.maxDownloadSize) else {
-            throw DownloadError.downloadFailed("资源大小超出允许范围")
+            throw DownloadError.downloadFailed(AppLocalization.text("资源大小超出允许范围"))
         }
 
         let actualSHA1 = try computeSHA1(of: tempZipURL)
@@ -229,7 +229,7 @@ public actor SystemBackgroundSoundAssetDownloader {
         }
 
         guard let assets = manifest["Assets"] as? [[String: Any]] else {
-            throw DownloadError.manifestReadFailed("Assets 数组不存在")
+            throw DownloadError.manifestReadFailed(AppLocalization.text("Assets 数组不存在"))
         }
 
         let candidates = assets.filter { ($0["SoundName"] as? String) == soundName }
@@ -250,7 +250,7 @@ public actor SystemBackgroundSoundAssetDownloader {
         }
 
         guard let measurementData = asset["_Measurement"] as? Data else {
-            throw DownloadError.manifestReadFailed("_Measurement 字段缺失或格式错误")
+            throw DownloadError.manifestReadFailed(AppLocalization.text("_Measurement 字段缺失或格式错误"))
         }
 
         let downloadSize = (asset["_DownloadSize"] as? Int) ?? 0

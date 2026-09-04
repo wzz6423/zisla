@@ -1,5 +1,7 @@
 import Charts
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 private struct TypingOverviewMetric: Identifiable {
     let title: String
@@ -76,14 +78,14 @@ struct TypingStatsOverviewView: View {
     private var metrics: [TypingOverviewMetric] {
         [
             TypingOverviewMetric(
-                title: "今日字符",
+                title: L10n.tr("今日字符"),
                 value: statsCount(snapshot.today.characterCount),
-                unit: "字符",
+                unit: L10n.tr("字符"),
                 detail: L10n.tr("按字符键触发估算"),
                 symbol: "keyboard"
             ),
             TypingOverviewMetric(
-                title: "最多应用",
+                title: L10n.tr("最多应用"),
                 value: snapshot.today.topAppName ?? L10n.tr("暂无"),
                 detail: snapshot.apps.first.map {
                     L10n.format("%@ 个字符", statsCount($0.characterCount))
@@ -91,14 +93,14 @@ struct TypingStatsOverviewView: View {
                 symbol: "app.fill"
             ),
             TypingOverviewMetric(
-                title: "今日峰值",
+                title: L10n.tr("今日峰值"),
                 value: statsCount(snapshot.today.peakCPS),
-                unit: "字/秒",
+                unit: L10n.tr("字/秒"),
                 detail: lastInputDescription(snapshot.lastInputAt),
                 symbol: "bolt.fill"
             ),
             TypingOverviewMetric(
-                title: "活跃时间",
+                title: L10n.tr("活跃时间"),
                 value: statsActiveTime(snapshot.today.activeSeconds),
                 detail: L10n.format("%@ 个输入分钟", "\(snapshot.today.activeMinuteBuckets)"),
                 symbol: "clock.fill"
@@ -254,7 +256,7 @@ private struct TypingRecentTrendCard: View {
                 )
                 Spacer(minLength: 8)
                 Picker(
-                    "时间范围",
+                    AppLocalization.text("时间范围"),
                     selection: Binding(
                         get: { selectedRange },
                         set: { onSelectRange($0) }
@@ -267,7 +269,7 @@ private struct TypingRecentTrendCard: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .frame(width: 196)
-                .help("调整输入趋势与应用时间线的统计范围")
+                .help(AppLocalization.text("调整输入趋势与应用时间线的统计范围"))
                 .accessibilityLabel(L10n.tr("统计时间范围"))
             }
 
@@ -284,9 +286,9 @@ private struct TypingRecentTrendCard: View {
                     Image(systemName: "keyboard")
                         .font(.title2.weight(.medium))
                         .foregroundStyle(KeyboardVisualStyle.accentStrong)
-                    Text("这一时段还没有输入")
+                    Text(AppLocalization.text("这一时段还没有输入"))
                         .font(.subheadline.weight(.semibold))
-                    Text("开始打字后，曲线会立即出现。")
+                    Text(AppLocalization.text("开始打字后，曲线会立即出现。"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -296,8 +298,8 @@ private struct TypingRecentTrendCard: View {
                 Chart {
                     ForEach(buckets) { bucket in
                         BarMark(
-                            x: .value("时间", bucket.start),
-                            y: .value("原始字符数", bucket.characterCount)
+                            x: .value(L10n.tr("时间"), bucket.start),
+                            y: .value(L10n.tr("原始字符数"), bucket.characterCount)
                         )
                         .foregroundStyle(KeyboardVisualStyle.accent.opacity(0.11))
                         .cornerRadius(2)
@@ -305,8 +307,8 @@ private struct TypingRecentTrendCard: View {
 
                     ForEach(trendPoints) { point in
                         AreaMark(
-                            x: .value("时间", point.start),
-                            y: .value("平滑趋势", point.value)
+                            x: .value(L10n.tr("时间"), point.start),
+                            y: .value(L10n.tr("平滑趋势"), point.value)
                         )
                         .foregroundStyle(
                             LinearGradient(
@@ -321,8 +323,8 @@ private struct TypingRecentTrendCard: View {
                         .interpolationMethod(.monotone)
 
                         LineMark(
-                            x: .value("时间", point.start),
-                            y: .value("平滑趋势", point.value)
+                            x: .value(L10n.tr("时间"), point.start),
+                            y: .value(L10n.tr("平滑趋势"), point.value)
                         )
                         .foregroundStyle(KeyboardVisualStyle.accentStrong)
                         .lineStyle(

@@ -93,7 +93,7 @@ struct IslandRootView: View {
                         }
                     )
                     .contextMenu {
-                        Button("粘贴并共享") {
+                        Button(AppLocalization.text("粘贴并共享")) {
                             model.shareFromPasteboard()
                         }
                         .keyboardShortcut("v", modifiers: .command)
@@ -225,7 +225,7 @@ struct IslandRootView: View {
                                     }
                                 } else {
                                     ContentUnavailableView {
-                                        Label("没有启用模块", systemImage: "rectangle.slash")
+                                        Label(AppLocalization.text("没有启用模块"), systemImage: "rectangle.slash")
                                     }
                                 }
                             }
@@ -345,13 +345,13 @@ struct IslandRootView: View {
             )
             IconButton(
                 symbol: model.isPinned ? "pin.fill" : "pin",
-                help: model.isPinned ? "取消固定" : "固定灵动岛",
+                help: model.isPinned ? AppLocalization.text("取消固定") : AppLocalization.text("固定灵动岛"),
                 isActive: model.isPinned
             ) {
                 model.isPinned.toggle()
                 onPinChanged(model.isPinned)
             }
-            IconButton(symbol: "gearshape.fill", help: "设置") {
+            IconButton(symbol: "gearshape.fill", help: AppLocalization.text("设置")) {
                 onSettingsRequested()
             }
         }
@@ -582,7 +582,7 @@ private struct VoiceTranscriptionView: View {
                 Image(systemName: "mic.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(voiceInput.isRecording ? Color.zislaError : .white.opacity(0.45))
-                    .accessibilityLabel(voiceInput.isRecording ? "正在录音" : "正在准备录音")
+                    .accessibilityLabel(voiceInput.isRecording ? AppLocalization.text("正在录音") : AppLocalization.text("正在准备录音"))
 
                 Spacer(minLength: 12)
 
@@ -677,12 +677,12 @@ private struct BackgroundSoundControl: View {
                 ForEach(service.availableSounds, id: \.self) { sound in
                     if service.downloadState(for: sound) == .queued {
                         Button {} label: {
-                            Label("等待下载 \(sound.title)…", systemImage: "clock")
+                            Label(AppLocalization.text("等待下载 %@…", sound.title), systemImage: "clock")
                         }
                         .disabled(true)
                     } else if service.isDownloading(sound) {
                         Button {} label: {
-                            Label("正在下载 \(sound.title)…", systemImage: "arrow.down.circle")
+                            Label(AppLocalization.text("正在下载 %@…", sound.title), systemImage: "arrow.down.circle")
                         }
                         .disabled(true)
                     } else if service.isInstalled(sound) {
@@ -715,8 +715,8 @@ private struct BackgroundSoundControl: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("选择背景音：\(selectedSound.title)")
-            .accessibilityLabel("选择背景音：\(selectedSound.title)")
+            .help(AppLocalization.text("选择背景音：%@", selectedSound.title))
+            .accessibilityLabel(AppLocalization.text("选择背景音：%@", selectedSound.title))
             .onHover { hovering in
                 if hovering { service.refresh() }
             }
@@ -740,9 +740,9 @@ private struct BackgroundSoundControl: View {
     }
 
     private var toggleHelp: String {
-        if isSelectedSoundQueued { return "背景音等待下载，点击取消" }
-        if service.isDownloading(selectedSound) { return "正在下载背景音，点击取消" }
-        return service.isPlaying ? "关闭背景音" : "开启背景音"
+        if isSelectedSoundQueued { return AppLocalization.text("背景音等待下载，点击取消") }
+        if service.isDownloading(selectedSound) { return AppLocalization.text("正在下载背景音，点击取消") }
+        return service.isPlaying ? AppLocalization.text("关闭背景音") : AppLocalization.text("开启背景音")
     }
 }
 
@@ -767,7 +767,7 @@ private struct NavMonitorStrip: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help("系统监控实时读数 — 点按查看详情")
+        .help(AppLocalization.text("系统监控实时读数 — 点按查看详情"))
     }
 
     private func metricCell(label: String, ratio: Double?) -> some View {
@@ -855,7 +855,7 @@ private struct ModuleSelector: View {
                             .matchedGeometryEffect(id: "module-selection", in: selectionNamespace)
                     }
                 }
-                .help(module.title)
+                .help(AppLocalization.text(module.title))
             }
         }
         .animation(reduceMotion ? nil : ZislaMotion.selection, value: model.selectedModule)

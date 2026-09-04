@@ -295,8 +295,8 @@ public final class AIAgentWorkspace: ObservableObject {
         let kinds = updates.map(\.kind)
         let commands = commandsForCLIInstallation(kinds, update: true)
         guard !commands.isEmpty else { return }
-        let names = kinds.map(\.displayName).joined(separator: "、")
-        startCLICommands(commands, title: "自动更新 \(names)", kinds: kinds)
+        let names = kinds.map(\.displayName).joined(separator: AppLocalization.text("、"))
+        startCLICommands(commands, title: AppLocalization.text("自动更新 %@", names), kinds: kinds)
     }
 
     public func refreshSkills() async {
@@ -379,7 +379,7 @@ public final class AIAgentWorkspace: ObservableObject {
 
     public func uninstallSkill(path: String) async -> Bool {
         guard store.state.skills.contains(where: { $0.path == path }) else {
-            lastError = "未找到要卸载的 Skill"
+            lastError = AppLocalization.text("未找到要卸载的 Skill")
             return false
         }
         let fileManager = FileManager.default
@@ -595,7 +595,7 @@ public final class AIAgentWorkspace: ObservableObject {
             completedCount: commands.count,
             totalCount: commands.count,
             state: failureDetail == nil ? .succeeded : .failed,
-            detail: failureDetail ?? "已重新检测 CLI 版本"
+            detail: failureDetail ?? AppLocalization.text("已重新检测 CLI 版本")
         )
         lastError = failureDetail
     }
@@ -641,7 +641,7 @@ public final class AIAgentWorkspace: ObservableObject {
               account.isEligible(),
               let profile = account.cliProfile,
               let contents = try store.cliProfileContents(for: account) else {
-            throw AIAgentCLIRelayError.failed("CLI 登录档案尚未配置完整")
+            throw AIAgentCLIRelayError.failed(AppLocalization.text("CLI 登录档案尚未配置完整"))
         }
 
         await relayLock.acquire()
