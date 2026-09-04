@@ -3,6 +3,10 @@ name: CI Skip
 on:
   issue_comment:
     types: [created, edited]
+  # A push expires every earlier directive, so the label and the summary comment
+  # have to be brought back in line with what the checks will actually do.
+  pull_request_target: # zizmor: ignore[dangerous-triggers] Only the default branch is checked out.
+    types: [synchronize]
   workflow_dispatch:
     inputs:
       pull-request:
@@ -13,17 +17,21 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.issue.number || inputs.pull-request }}
+  group: ${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || inputs.pull-request }}
   cancel-in-progress: false
 
 jobs:
   apply:
     name: Apply Skip Directives
     # Skip directives only exist on pull requests, and the summary comment must
-    # never trigger the workflow again.
+    # never trigger the workflow again. A push only needs re-applying when a skip
+    # is actually in force, which the label records.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.issue.pull_request != null &&
+      (github.event_name == 'pull_request_target' &&
+      contains(github.event.pull_request.labels.*.name, 'skip-ci')) ||
+      (github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request != null &&
       contains(github.event.comment.body, 'skip-') &&
       !endsWith(github.event.comment.user.login, '[bot]'))
     runs-on: ubuntu-latest
@@ -48,7 +56,7 @@ jobs:
         id: resolve
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.issue.number || inputs.pull-request }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || inputs.pull-request }}
         run: |
           set -euo pipefail
 
@@ -57,15 +65,27 @@ jobs:
             | jq 'flatten(1)' > "$RUNNER_TEMP/comments-raw.json"
 
           jq '[.requested_reviewers[]?.login]' "$RUNNER_TEMP/pull-request.json" > "$RUNNER_TEMP/reviewers.json"
-          jq '[.[] | {login: .user.login, association: .author_association, body: .body}]' \
+          jq '[.[] | {login: .user.login, association: .author_association,
+              body: .body, created_at: .created_at}]' \
             "$RUNNER_TEMP/comments-raw.json" > "$RUNNER_TEMP/comments.json"
+
+          head_sha="$(jq -r '.head.sha' "$RUNNER_TEMP/pull-request.json")"
+          # Directives older than the head commit expire, so a push re-enables
+          # every check the resolver would otherwise still report as skipped.
+          head_date="$(gh api "repos/$GITHUB_REPOSITORY/commits/$head_sha" \
+            --jq '.commit.committer.date')"
+          if [ -z "$head_date" ]; then
+            echo "::error::The head commit date of $head_sha could not be read."
+            exit 1
+          fi
 
           ruby .github/scripts/ci-skip-directives.rb resolve \
             --comments "$RUNNER_TEMP/comments.json" \
-            --reviewers "$RUNNER_TEMP/reviewers.json" > "$RUNNER_TEMP/decision.json"
+            --reviewers "$RUNNER_TEMP/reviewers.json" \
+            --since "$head_date" > "$RUNNER_TEMP/decision.json"
 
           {
-            echo "head-sha=$(jq -r '.head.sha' "$RUNNER_TEMP/pull-request.json")"
+            echo "head-sha=$head_sha"
             echo "workflow-count=$(jq '.workflows | length' "$RUNNER_TEMP/decision.json")"
           } >> "$GITHUB_OUTPUT"
 
@@ -74,7 +94,7 @@ jobs:
       - name: Synchronize skip label
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.issue.number || inputs.pull-request }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || inputs.pull-request }}
           SKIP_COUNT: ${{ steps.resolve.outputs.workflow-count }}
         run: |
           set -euo pipefail
@@ -154,7 +174,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.resolve.outputs.head-sha }}
-          PR_NUMBER: ${{ github.event.issue.number || inputs.pull-request }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || inputs.pull-request }}
         run: |
           set -euo pipefail
 
@@ -177,7 +197,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           MARKER: "<!-- ci-skip-summary -->"
-          PR_NUMBER: ${{ github.event.issue.number || inputs.pull-request }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || inputs.pull-request }}
           SKIP_COUNT: ${{ steps.resolve.outputs.workflow-count }}
         run: |
           set -euo pipefail
@@ -205,12 +225,20 @@ jobs:
                 + (if (.note | length) == 0 then "" else " — " + .note end)' "$decision"
               echo
             fi
+            if [ "$(jq '.expired | length' "$decision")" -ne 0 ]; then
+              echo 'Expired because a newer commit was pushed:'
+              echo
+              jq -r '.expired[] | "- `" + .login + "` wrote `" + .directive + "`"' "$decision"
+              echo
+            fi
             unknown="$(jq -r '[.unknown[] | "`" + . + "`"] | join(", ")' "$decision")"
             if [ -n "$unknown" ]; then
               printf 'Ignored unknown targets: %s\n\n' "$unknown"
             fi
             # shellcheck disable=SC2016 # The backticks are literal markdown.
             echo 'Comment `unskip-all` or `unskip-<workflow>` to restore the checks.'
+            # shellcheck disable=SC2016 # The backticks are literal markdown.
+            echo 'A new commit expires every earlier directive; comment `skip-all` again to skip it.'
           } > "$summary"
 
           existing="$(MARKER="$MARKER" jq -r '

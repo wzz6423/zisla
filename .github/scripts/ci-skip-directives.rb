@@ -4,6 +4,7 @@
 require 'json'
 require 'optparse'
 require 'set'
+require 'time'
 require 'yaml'
 
 # Resolves CI skip directives written in pull request comments.
@@ -19,6 +20,11 @@ require 'yaml'
 # earlier one. Only comments from OWNER, MEMBER or COLLABORATOR authors and from
 # requested reviewers count: anyone can submit a review on a public repository,
 # but only accounts with write access can request one.
+#
+# A directive expires as soon as a newer commit reaches the pull request. It can
+# only speak about the code its author had seen, and a skipped check satisfies a
+# required status check, so an indefinitely sticky `skip-all` would let arbitrary
+# later commits merge without ever being built.
 module CiSkip
   AUTHORIZED_ASSOCIATIONS = %w[OWNER MEMBER COLLABORATOR].freeze
   RESERVED_ALIAS = 'all'
@@ -29,6 +35,19 @@ module CiSkip
   GATE_ACTION = '.github/actions/ci-skip-gate'
 
   class ManifestError < StandardError; end
+
+  # `since` is the committer date of the pull request head. A comment written
+  # before that commit existed cannot have been about it, so its directives are
+  # dropped instead of being replayed onto code nobody has looked at. A timestamp
+  # that is missing or unreadable expires too: losing a directive only costs a
+  # redundant CI run, while keeping one alive lets unbuilt code merge.
+  def self.expired?(comment, since)
+    return false if since.nil?
+
+    Time.parse((comment['created_at'] || comment['createdAt']).to_s) < since
+  rescue ArgumentError, TypeError
+    true
+  end
 
   def self.normalize(value)
     value.to_s.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/\A-+|-+\z/, '')
@@ -179,15 +198,19 @@ module CiSkip
       @manifest = manifest
     end
 
-    def resolve(comments:, reviewers: [])
+    def resolve(comments:, reviewers: [], since: nil)
       reviewer_set = Array(reviewers).map { |login| login.to_s.downcase }.to_set
-      state = { selected: Set.new, skip_all: false, unknown: [], applied: [] }
+      state = { selected: Set.new, skip_all: false, unknown: [], applied: [], expired: [] }
 
       Array(comments).each do |comment|
         next unless authorized?(comment, reviewer_set)
 
+        expired = CiSkip.expired?(comment, since)
         CiSkip.directives(comment['body']).each do |directive|
-          apply(state, comment, directive)
+          next apply(state, comment, directive) unless expired
+
+          requested, note = @manifest.split_remainder(directive['remainder'])
+          state[:expired] << entry(comment, directive['negated'], requested, note)
         end
       end
 
@@ -197,7 +220,8 @@ module CiSkip
         'workflows' => selected,
         'checks' => @manifest.checks_for(selected),
         'unknown' => state[:unknown],
-        'directives' => state[:applied]
+        'directives' => state[:applied],
+        'expired' => state[:expired]
       }
     end
 
@@ -229,7 +253,11 @@ module CiSkip
         negated ? state[:selected].delete(name) : state[:selected].add(name)
       end
 
-      state[:applied] << {
+      state[:applied] << entry(comment, negated, requested, note)
+    end
+
+    def entry(comment, negated, requested, note)
+      {
         'login' => comment['login'].to_s,
         'directive' => "#{negated ? 'unskip' : 'skip'}-#{requested}",
         'note' => note
@@ -321,11 +349,20 @@ def read_json(path, fallback)
   JSON.parse(File.read(path))
 end
 
+def parse_since(value)
+  return nil if value.nil? || value.to_s.strip.empty?
+
+  Time.parse(value.to_s)
+rescue ArgumentError
+  raise CiSkip::ManifestError, "invalid --since timestamp #{value.inspect}"
+end
+
 def command_resolve(options)
   manifest = CiSkip::Manifest.load(options[:manifest])
   decision = CiSkip::Resolver.new(manifest).resolve(
     comments: read_json(options[:comments], []),
-    reviewers: read_json(options[:reviewers], [])
+    reviewers: read_json(options[:reviewers], []),
+    since: parse_since(options[:since])
   )
 
   target = options[:for]
@@ -363,7 +400,8 @@ if $PROGRAM_NAME == __FILE__
   parser = OptionParser.new do |opts|
     opts.banner = 'Usage: ci-skip-directives.rb <resolve|relevant|verify-manifest> [options]'
     opts.on('--manifest PATH', 'Skip manifest path') { |value| options[:manifest] = value }
-    opts.on('--comments PATH', 'JSON array of {login, association, body}') { |value| options[:comments] = value }
+    opts.on('--comments PATH', 'JSON array of {login, association, body, created_at}') { |value| options[:comments] = value }
+    opts.on('--since TIMESTAMP', 'Head commit date; older directives expire') { |value| options[:since] = value }
     opts.on('--reviewers PATH', 'JSON array of requested reviewer logins') { |value| options[:reviewers] = value }
     opts.on('--workflows PATH', 'Workflow directory') { |value| options[:workflows] = value }
     opts.on('--files PATH', 'JSON array of changed file paths') { |value| options[:files] = value }

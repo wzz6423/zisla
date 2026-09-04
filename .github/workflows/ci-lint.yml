@@ -133,3 +133,19 @@ jobs:
             exit 1
           fi
           echo "Both contracts declare the project $contract."
+
+      - name: Verify every type label has a board column
+        run: |
+          set -euo pipefail
+
+          # A type label without a labelStatus rule falls back to defaultStatus,
+          # so the pull request stays in the triage column for its whole life
+          # instead of moving to the column its type belongs to.
+          missing="$(jq -r --slurpfile board .github/project-automation.json \
+            '[.types[].label] - [$board[0].labelStatus[].label] | join(", ")' \
+            .github/pr-automation.json)"
+          if [ -n "$missing" ]; then
+            echo "::error::Type label(s) $missing have no project-automation.json labelStatus rule."
+            exit 1
+          fi
+          echo "Every type label maps to a board column."

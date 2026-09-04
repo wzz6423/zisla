@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'fileutils'
+require 'json'
 require 'minitest/autorun'
 require 'tmpdir'
 
@@ -132,6 +133,96 @@ class CiSkipDirectivesTest < Minitest::Test
 
     assert_empty decision['workflows']
     assert_equal ['android'], decision['unknown']
+  end
+
+  def test_a_directive_older_than_the_head_commit_expires
+    decision = resolve(
+      [comment('owner', 'OWNER', 'skip-all', created_at: '2026-09-04T04:22:00Z')],
+      since: '2026-09-04T04:30:00Z'
+    )
+
+    assert_empty decision['workflows']
+    assert_empty decision['checks']
+    assert_equal false, decision['skipAll']
+    assert_equal ['skip-all'], decision['expired'].map { |entry| entry['directive'] }
+    assert_empty decision['directives']
+  end
+
+  def test_a_directive_written_after_the_head_commit_still_applies
+    decision = resolve(
+      [comment('owner', 'OWNER', 'skip-web', created_at: '2026-09-04T04:31:00Z')],
+      since: '2026-09-04T04:30:00Z'
+    )
+
+    assert_equal ['Web CI'], decision['workflows']
+    assert_empty decision['expired']
+  end
+
+  # The push clears the earlier blanket skip, and only the directive a maintainer
+  # wrote after seeing the new commit survives.
+  def test_a_push_expires_earlier_directives_without_touching_later_ones
+    decision = resolve(
+      [
+        comment('owner', 'OWNER', 'skip-all', created_at: '2026-09-04T04:22:00Z'),
+        comment('owner', 'OWNER', 'skip-swift', created_at: '2026-09-04T04:35:00Z')
+      ],
+      since: '2026-09-04T04:30:00Z'
+    )
+
+    assert_equal ['Swift Tests'], decision['workflows']
+    assert_equal false, decision['skipAll']
+    assert_equal ['skip-all'], decision['expired'].map { |entry| entry['directive'] }
+    assert_equal ['skip-swift'], decision['directives'].map { |entry| entry['directive'] }
+  end
+
+  def test_a_missing_or_unreadable_timestamp_expires
+    ['', 'last tuesday', nil].each do |created_at|
+      decision = resolve(
+        [comment('owner', 'OWNER', 'skip-all', created_at: created_at)],
+        since: '2026-09-04T04:30:00Z'
+      )
+
+      assert_empty decision['workflows'], created_at.inspect
+      assert_equal ['skip-all'], decision['expired'].map { |entry| entry['directive'] }, created_at.inspect
+    end
+  end
+
+  def test_without_a_head_commit_date_nothing_expires
+    decision = resolve([comment('owner', 'OWNER', 'skip-all', created_at: '2020-01-01T00:00:00Z')])
+
+    assert_equal ['Swift Tests', 'Web CI'], decision['workflows']
+    assert_empty decision['expired']
+  end
+
+  def test_an_unreadable_head_commit_date_is_an_error
+    assert_raises(CiSkip::ManifestError) { parse_since('yesterday') }
+    assert_nil parse_since(nil)
+    assert_nil parse_since('   ')
+  end
+
+  # Both call sites have to scope the replay, or one `skip-all` silently keeps
+  # reporting later commits as successful.
+  def test_every_resolver_invocation_passes_the_head_commit_date
+    {
+      '../workflows/ci-skip.yml' => 'ci-skip.yml',
+      '../actions/ci-skip-gate/action.yml' => 'ci-skip-gate/action.yml'
+    }.each do |relative, label|
+      body = File.read(File.expand_path(relative, __dir__))
+      resolve_call = body[/ci-skip-directives\.rb"? resolve.*?\n\n/m]
+
+      refute_nil resolve_call, label
+      assert_includes resolve_call, '--since', label
+    end
+  end
+
+  # The push re-application in ci-skip.yml is gated on the label the workflow
+  # itself manages, so the two spellings must not drift apart.
+  def test_the_push_trigger_is_gated_on_the_managed_skip_label
+    label = JSON.parse(File.read(File.expand_path('../pr-automation.json', __dir__)))
+                .fetch('skipLabel').fetch('label')
+    workflow = File.read(File.expand_path('../workflows/ci-skip.yml', __dir__))
+
+    assert_includes workflow, "contains(github.event.pull_request.labels.*.name, '#{label}')"
   end
 
   def test_a_workflow_without_declared_paths_always_runs
@@ -267,12 +358,13 @@ class CiSkipDirectivesTest < Minitest::Test
     )
   end
 
-  def resolve(comments, reviewers: [])
-    CiSkip::Resolver.new(CiSkip::Manifest.new(MANIFEST)).resolve(comments: comments, reviewers: reviewers)
+  def resolve(comments, reviewers: [], since: nil)
+    CiSkip::Resolver.new(CiSkip::Manifest.new(MANIFEST))
+                    .resolve(comments: comments, reviewers: reviewers, since: parse_since(since))
   end
 
-  def comment(login, association, body)
-    { 'login' => login, 'association' => association, 'body' => body }
+  def comment(login, association, body, created_at: '2026-09-04T04:35:00Z')
+    { 'login' => login, 'association' => association, 'body' => body, 'created_at' => created_at }
   end
 
   def write_workflow(directory, file, name, job_names)
