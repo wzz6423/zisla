@@ -809,6 +809,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .store(in: &cancellables)
     }
 
+    /// Typing statistics buffer in memory for up to 750ms, so the last keystrokes only survive
+    /// if the flush completes before the process goes away. `applicationWillTerminate` is too
+    /// late for that — it cannot await anything — hence the `.terminateLater` handshake here.
+    func applicationShouldTerminate(
+        _ application: NSApplication
+    ) -> NSApplication.TerminateReply {
+        AppModel.shared.keyboardSound.applicationShouldTerminate(application)
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         expandedSizeUpdateTask?.cancel()
         lockScreenOverlayController?.stop()
