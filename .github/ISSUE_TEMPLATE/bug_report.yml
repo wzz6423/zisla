@@ -8,6 +8,19 @@ body:
     attributes:
       value: |
         Thank you for the report. Search existing Issues first to avoid duplicates.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Pick the area this issue belongs to. It decides the `area:*` label.
+      options:
+        - Feature Development
+        - Bug Fix
+        - CI & Build
+        - Documentation
+        - Community & Discussion
+    validations:
+      required: true
   - type: input
     id: version
     attributes:

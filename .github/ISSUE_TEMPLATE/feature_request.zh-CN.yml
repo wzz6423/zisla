@@ -8,6 +8,19 @@ body:
     attributes:
       value: |
         请先搜索已有 Issue 或 Discussions，避免提出相同建议。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 所属范围
+      description: 选择该 Issue 所属的范围，它决定 `area:*` 标签。
+      options:
+        - 功能开发
+        - 缺陷修复
+        - CI 与构建
+        - 文档
+        - 社区与讨论
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:

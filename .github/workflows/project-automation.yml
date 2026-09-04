@@ -1,0 +1,262 @@
+name: Project Automation
+
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled, reopened, closed]
+  pull_request_target: # zizmor: ignore[dangerous-triggers] Only the default branch is checked out.
+    types: [opened, edited, labeled, unlabeled, reopened, synchronize, ready_for_review, closed]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  synchronize:
+    name: Add and synchronize project item
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Add item and synchronize status
+        env:
+          PROJECT_TOKEN: ${{ secrets.PROJECT_AUTOMATION_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$PROJECT_TOKEN" ]; then
+            echo "::warning::PROJECT_AUTOMATION_TOKEN is not configured; project synchronization is skipped."
+            exit 0
+          fi
+
+          export GH_TOKEN="$PROJECT_TOKEN"
+          config=.github/project-automation.json
+          event="$GITHUB_EVENT_PATH"
+
+          content_id="$(jq -r '.issue.node_id // .pull_request.node_id // empty' "$event")"
+          state="$(jq -r '.issue.state // .pull_request.state // empty' "$event")"
+          labels_json="$(jq -c '(.issue.labels // .pull_request.labels // []) | map(.name)' "$event")"
+
+          if [ -z "$content_id" ]; then
+            echo "::error::The event did not contain an Issue or pull request node id."
+            exit 1
+          fi
+
+          project_owner="$(jq -r '.project.owner' "$config")"
+          project_number="$(jq -r '.project.number' "$config")"
+          expected_title="$(jq -r '.project.title' "$config")"
+          status_field_name="$(jq -r '.statusField' "$config")"
+          desired_status="$(jq -r \
+            --arg state "$state" \
+            --argjson labels "$labels_json" \
+            'if $state == "closed" then
+               .closedStatus
+             else
+               (first(
+                 .labelStatus[] as $rule
+                 | select(($labels | index($rule.label)) != null)
+                 | $rule.status
+               ) // .defaultStatus)
+             end' "$config")"
+
+          # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
+          project_query='
+            query($login: String!, $number: Int!) {
+              user(login: $login) {
+                projectV2(number: $number) {
+                  id
+                  title
+                  fields(first: 100) {
+                    nodes {
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }'
+
+          gh api graphql \
+            -f query="$project_query" \
+            -f login="$project_owner" \
+            -F number="$project_number" \
+            > "$RUNNER_TEMP/project.json"
+
+          if jq -e '.errors? | length > 0' "$RUNNER_TEMP/project.json" >/dev/null; then
+            jq -r '.errors[]?.message' "$RUNNER_TEMP/project.json" >&2
+            exit 1
+          fi
+
+          project_id="$(jq -r '.data.user.projectV2.id // empty' "$RUNNER_TEMP/project.json")"
+          project_title="$(jq -r '.data.user.projectV2.title // empty' "$RUNNER_TEMP/project.json")"
+          [ -n "$project_id" ] || {
+            echo "::error::Configured ProjectV2 was not found."
+            exit 1
+          }
+          [ "$project_title" = "$expected_title" ] || {
+            echo "::error::Project title does not match the configured project."
+            exit 1
+          }
+
+          status_field_id="$(jq -r \
+            --arg field "$status_field_name" \
+            'first(
+              .data.user.projectV2.fields.nodes[]?
+              | select(.name == $field)
+              | .id
+            ) // empty' "$RUNNER_TEMP/project.json")"
+          status_option_id="$(jq -r \
+            --arg field "$status_field_name" \
+            --arg status "$desired_status" \
+            'first(
+              .data.user.projectV2.fields.nodes[]?
+              | select(.name == $field)
+              | .options[]?
+              | select(.name == $status)
+              | .id
+            ) // empty' "$RUNNER_TEMP/project.json")"
+          [ -n "$status_field_id" ] || {
+            echo "::error::The configured single-select Status field was not found."
+            exit 1
+          }
+          [ -n "$status_option_id" ] || {
+            echo "::error::The project has no Status option named $desired_status."
+            exit 1
+          }
+
+          # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
+          item_query='
+            query($projectId: ID!, $endCursor: String) {
+              node(id: $projectId) {
+                ... on ProjectV2 {
+                  items(first: 100, after: $endCursor) {
+                    nodes {
+                      id
+                      content {
+                        ... on Issue {
+                          id
+                        }
+                        ... on PullRequest {
+                          id
+                        }
+                      }
+                    }
+                    pageInfo {
+                      hasNextPage
+                      endCursor
+                    }
+                  }
+                }
+              }
+            }'
+
+          find_item() {
+            gh api graphql --paginate --slurp \
+              -f query="$item_query" \
+              -f projectId="$project_id" \
+              | jq -r --arg content "$content_id" '
+                [.[].data.node.items.nodes[]?
+                 | select(.content.id == $content)
+                 | .id]
+                | first // empty
+              '
+          }
+
+          item_id="$(find_item)"
+          if [ -z "$item_id" ]; then
+            # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
+            add_query='
+              mutation($projectId: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: {
+                  projectId: $projectId
+                  contentId: $contentId
+                }) {
+                  item {
+                    id
+                  }
+                }
+              }'
+
+            add_error="$RUNNER_TEMP/project-add-error.txt"
+            if add_response="$(gh api graphql \
+              -f query="$add_query" \
+              -f projectId="$project_id" \
+              -f contentId="$content_id" \
+              2> "$add_error")"; then
+              item_id="$(printf '%s' "$add_response" | jq -r '.data.addProjectV2ItemById.item.id // empty')"
+            fi
+          fi
+
+          # A concurrent event may have added the item between the lookup and
+          # mutation, so always re-query before failing.
+          if [ -z "$item_id" ]; then
+            item_id="$(find_item)"
+          fi
+          if [ -z "$item_id" ]; then
+            echo "::error::Could not add the item to the configured project."
+            if [ -s "$RUNNER_TEMP/project-add-error.txt" ]; then
+              sed -n '1,40p' "$RUNNER_TEMP/project-add-error.txt" >&2
+            fi
+            exit 1
+          fi
+
+          # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
+          update_query='
+            mutation(
+              $projectId: ID!
+              $itemId: ID!
+              $fieldId: ID!
+              $optionId: String!
+            ) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: {
+                  singleSelectOptionId: $optionId
+                }
+              }) {
+                projectV2Item {
+                  id
+                }
+              }
+            }'
+
+          gh api graphql \
+            -f query="$update_query" \
+            -f projectId="$project_id" \
+            -f itemId="$item_id" \
+            -f fieldId="$status_field_id" \
+            -f optionId="$status_option_id" \
+            > "$RUNNER_TEMP/project-update.json"
+
+          if jq -e '.errors? | length > 0' "$RUNNER_TEMP/project-update.json" >/dev/null; then
+            jq -r '.errors[]?.message' "$RUNNER_TEMP/project-update.json" >&2
+            exit 1
+          fi
+
+          echo "::notice::Project item synchronized with status $desired_status."
+
+      - name: Remove project payloads
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/project.json" "$RUNNER_TEMP/project-add-error.txt" \
+            "$RUNNER_TEMP/project-update.json"

@@ -1,0 +1,107 @@
+name: CI Skip Gate
+description: Decides whether a skip directive or the changed paths disable this workflow for the current pull request.
+
+inputs:
+  workflow-name:
+    description: Workflow name as declared in .github/ci-skip.json.
+    required: true
+  github-token:
+    description: Token used to read pull request comments and requested reviewers.
+    required: true
+
+outputs:
+  skip:
+    description: "true when the workflow must not run for this pull request."
+    value: ${{ steps.decide.outputs.skip }}
+  relevant:
+    description: "false when no changed file matches the paths declared for this workflow."
+    value: ${{ steps.decide.outputs.relevant }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve skip directives and changed paths
+      id: decide
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        WORKFLOW_NAME: ${{ inputs.workflow-name }}
+      run: |
+        set -euo pipefail
+
+        emit() {
+          {
+            echo "skip=$1"
+            echo "relevant=$2"
+          } >> "$GITHUB_OUTPUT"
+        }
+
+        # A failing gate must never decide a check on its own: the dependent jobs
+        # read `needs.gate.outputs`, so a failed gate skips them, and a skipped
+        # job satisfies a required status check. Every unexpected failure
+        # therefore falls open and runs the workflow, which can only cost time.
+        fail_open() {
+          echo "::warning title=CI skip gate degraded::$1 Running $WORKFLOW_NAME normally."
+          emit false true
+          exit 0
+        }
+
+        if [[ -z "$PR_NUMBER" ]]; then
+          echo "Not a pull request event; the workflow runs normally."
+          emit false true
+          exit 0
+        fi
+
+        comments="$RUNNER_TEMP/ci-skip-comments.json"
+        reviewers="$RUNNER_TEMP/ci-skip-reviewers.json"
+        files="$RUNNER_TEMP/ci-skip-files.json"
+
+        # flatten(1) keeps the output shape stable whether or not gh slurps pages.
+        if ! gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+          | jq 'flatten(1) | [.[] | {login: .user.login, association: .author_association, body: .body}]' \
+          > "$comments"; then
+          fail_open 'The pull request comments could not be read.'
+        fi
+
+        if ! gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+          | jq '[.requested_reviewers[]?.login]' > "$reviewers"; then
+          fail_open 'The requested reviewers could not be read.'
+        fi
+
+        # Renames are listed under their new path, so the previous one is kept as
+        # well: moving a file out of a scoped directory still affects it.
+        if ! gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
+          | jq 'flatten(1) | [.[] | .filename, .previous_filename] | map(select(. != null))' \
+          > "$files"; then
+          fail_open 'The changed files could not be read.'
+        fi
+
+        if ! skip="$(ruby "$GITHUB_ACTION_PATH/../../scripts/ci-skip-directives.rb" resolve \
+          --comments "$comments" \
+          --reviewers "$reviewers" \
+          --for "$WORKFLOW_NAME")"; then
+          fail_open 'The skip directives could not be resolved.'
+        fi
+
+        if ! relevant="$(ruby "$GITHUB_ACTION_PATH/../../scripts/ci-skip-directives.rb" relevant \
+          --files "$files" \
+          --for "$WORKFLOW_NAME")"; then
+          fail_open 'The changed paths could not be matched against the manifest.'
+        fi
+
+        emit "$skip" "$relevant"
+
+        if [[ "$skip" == "true" ]]; then
+          echo "::notice title=CI skipped::An authorized skip directive disabled $WORKFLOW_NAME for this pull request."
+        fi
+        if [[ "$relevant" == "false" ]]; then
+          echo "::notice title=CI out of scope::No file in this pull request matches the paths declared for $WORKFLOW_NAME."
+        fi
+
+    - name: Remove skip directive files
+      if: always()
+      shell: bash
+      run: |
+        rm -f "$RUNNER_TEMP/ci-skip-comments.json" "$RUNNER_TEMP/ci-skip-reviewers.json" \
+          "$RUNNER_TEMP/ci-skip-files.json"

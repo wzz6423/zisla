@@ -1,0 +1,80 @@
+name: Release Milestone
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  milestone:
+    name: Ensure Release Milestone
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write # Milestones live behind the issues scope; nothing else is touched.
+    steps:
+      - name: Ensure a milestone named after the release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          listing="$RUNNER_TEMP/release-milestones.json"
+          created="$RUNNER_TEMP/release-milestone-created.json"
+
+          if [ -z "${RELEASE_TAG:-}" ]; then
+            echo "::error::The release payload carries no tag name; refusing to guess a milestone title."
+            exit 1
+          fi
+
+          # Closed milestones still occupy the title, so both states have to be searched.
+          # jq reads the tag from the environment instead of an interpolated string, which keeps
+          # quotes or metacharacters in a tag name from rewriting the filter.
+          find_milestone() {
+            gh api --paginate \
+              --header 'Accept: application/vnd.github+json' \
+              "repos/$GITHUB_REPOSITORY/milestones?state=all&per_page=100" > "$listing" || return 1
+            # --paginate concatenates one array per page, so inputs[] walks every page at once.
+            jq -rn 'first(inputs[] | select(.title == env.RELEASE_TAG) | .number) // empty' "$listing"
+          }
+
+          if ! number="$(find_milestone)"; then
+            echo "::error::Could not list the milestones of $GITHUB_REPOSITORY."
+            exit 1
+          fi
+
+          if [ -n "$number" ]; then
+            echo "Reusing milestone #$number for $RELEASE_TAG."
+          elif gh api --method POST \
+            --header 'Accept: application/vnd.github+json' \
+            "repos/$GITHUB_REPOSITORY/milestones" \
+            --raw-field "title=$RELEASE_TAG" > "$created"; then
+            number="$(jq -r '.number' "$created")"
+            echo "Created milestone #$number for $RELEASE_TAG."
+          else
+            # Two releases published at once race here, and GitHub rejects the second title with 422.
+            # Anything else that failed the request leaves the lookup empty and fails the step below.
+            if ! number="$(find_milestone)"; then
+              echo "::error::Could not list the milestones of $GITHUB_REPOSITORY."
+              exit 1
+            fi
+            if [ -z "$number" ]; then
+              echo "::error::Could not create a milestone named $RELEASE_TAG."
+              exit 1
+            fi
+            echo "Reusing milestone #$number for $RELEASE_TAG after a concurrent run created it."
+          fi
+
+          printf 'Milestone [#%s](%s/%s/milestone/%s) tracks release %s.\n' \
+            "$number" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$number" "$RELEASE_TAG" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove milestone payloads
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release-milestones.json" "$RUNNER_TEMP/release-milestone-created.json"
