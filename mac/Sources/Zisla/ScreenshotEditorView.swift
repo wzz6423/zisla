@@ -5832,7 +5832,7 @@ struct ScreenshotPinnedImageView: View {
             HStack(spacing: ScreenshotPinnedLayout.spacing) {
                 pinnedDragHandle
 
-                pinnedButton("minus.magnifyingglass", title: "缩小") {
+                pinnedButton("minus.magnifyingglass", title: AppLocalization.text("缩小")) {
                     updateScale(scale - 0.1)
                 }
 
@@ -5840,7 +5840,7 @@ struct ScreenshotPinnedImageView: View {
                     .font(.system(size: 9, weight: .medium, design: .monospaced))
                     .frame(width: ScreenshotPinnedLayout.scaleLabelWidth)
 
-                pinnedButton("plus.magnifyingglass", title: "放大") {
+                pinnedButton("plus.magnifyingglass", title: AppLocalization.text("放大")) {
                     updateScale(scale + 0.1)
                 }
 
@@ -5861,7 +5861,7 @@ struct ScreenshotPinnedImageView: View {
                 .font(.system(size: 9, weight: .medium))
                 .frame(width: ScreenshotPinnedLayout.opacityControlWidth)
 
-                pinnedButton("xmark", title: "关闭", action: onClose)
+                pinnedButton("xmark", title: AppLocalization.text("关闭"), action: onClose)
             }
             .padding(.horizontal, ScreenshotPinnedLayout.horizontalPadding)
             .frame(height: ScreenshotPinnedLayout.toolbarHeight)

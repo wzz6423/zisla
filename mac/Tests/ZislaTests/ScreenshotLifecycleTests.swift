@@ -339,8 +339,8 @@ struct ScreenshotLifecycleTests {
         #expect(source.contains("@State private var canvasZoom: CGFloat = 1"))
         #expect(source.contains("zoom: model.hasLongCaptureResult ? canvasZoom : 1"))
         #expect(source.contains("adjustCanvasZoom(by: magnification)"))
-        #expect(source.contains("iconButton(\"minus.magnifyingglass\", title: \"缩小\")"))
-        #expect(source.contains("iconButton(\"plus.magnifyingglass\", title: \"放大\")"))
+        #expect(source.contains("iconButton(\"minus.magnifyingglass\", title: AppLocalization.text(\"缩小\"))"))
+        #expect(source.contains("iconButton(\"plus.magnifyingglass\", title: AppLocalization.text(\"放大\"))"))
     }
 
     @Test
@@ -353,8 +353,8 @@ struct ScreenshotLifecycleTests {
         let lightMaterial = try #require(recognition.range(of: "resultContainer.material = .sidebar"))
         let transparentScrollBackground = try #require(recognition.range(of: "scrollView.drawsBackground = false"))
         let scrollView = try #require(recognition.range(of: "scrollView.hasVerticalScroller = true"))
-        let copyButton = try #require(recognition.range(of: "alert.addButton(withTitle: \"复制\")"))
-        let closeButton = try #require(recognition.range(of: "alert.addButton(withTitle: \"关闭\")"))
+        let copyButton = try #require(recognition.range(of: "alert.addButton(withTitle: AppLocalization.text(\"复制\"))"))
+        let closeButton = try #require(recognition.range(of: "alert.addButton(withTitle: AppLocalization.text(\"关闭\"))"))
         let copyGuard = try #require(recognition.range(of: "guard response == .alertFirstButtonReturn else { return }"))
         let pasteboard = try #require(recognition.range(of: "let pasteboard = NSPasteboard.general"))
 
