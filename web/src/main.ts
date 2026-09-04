@@ -31,6 +31,7 @@ import {
   getSiteContent,
   latestRelease,
   license,
+  loadSiteContent,
   navHrefs,
   navIds,
   repositoryLinks,
@@ -40,6 +41,7 @@ import {
   zislactlCommandTemplate,
 } from './content';
 import {
+  defaultLocale,
   isSiteLocale,
   localeDirection,
   localeNativeNames,
@@ -687,7 +689,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     } catch {
       // Keep the in-memory selection when persistence is unavailable.
     }
-    renderSite(value, true);
+    void showLocale(value, true);
   });
 
   document.querySelectorAll<HTMLAnchorElement>('.nav a, .header-cta').forEach((link) => {
@@ -724,6 +726,24 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
   }
 };
 
+let pendingLocale: SiteLocale = currentLocale;
+
+/** Renders `locale` once its catalog chunk resolved; on rapid switching the last request wins. */
+const showLocale = async (locale: SiteLocale, preserveScroll = false) => {
+  pendingLocale = locale;
+  try {
+    await loadSiteContent(locale);
+  } catch (error) {
+    if (pendingLocale !== locale) return;
+    if (locale === defaultLocale) throw error;
+    // A chunk that never arrives would leave the page blank, so fall back to the default catalog.
+    await showLocale(defaultLocale, preserveScroll);
+    return;
+  }
+  if (pendingLocale !== locale) return;
+  renderSite(locale, preserveScroll);
+};
+
 window.addEventListener('scroll', updateScrollProgress, { passive: true });
 window.addEventListener('resize', updateScrollProgress);
 const desktopQuery = window.matchMedia('(min-width: 901px)');
@@ -731,4 +751,4 @@ desktopQuery.addEventListener?.('change', ({ matches }) => {
   if (matches) setMenuOpen(false);
 });
 
-renderSite(currentLocale);
+void showLocale(currentLocale);

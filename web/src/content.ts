@@ -1,4 +1,4 @@
-import { catalogs } from './i18n';
+import { loadCatalog, loadedCatalog } from './i18n';
 import type { SiteLocale } from './locales';
 
 /* ===== Locale-independent structure =====
@@ -374,4 +374,12 @@ export const format = (
     key in values ? String(values[key]) : match,
   );
 
-export const getSiteContent = (locale: SiteLocale): SiteContent => catalogs[locale];
+/** Fetches the locale's catalog chunk; already resolved catalogs return instantly. */
+export const loadSiteContent = loadCatalog;
+
+/** Sync accessor for the locale already rendered; every render awaits its load first. */
+export const getSiteContent = (locale: SiteLocale): SiteContent => {
+  const catalog = loadedCatalog(locale);
+  if (!catalog) throw new Error('语言包尚未加载：' + locale);
+  return catalog;
+};
