@@ -37,14 +37,14 @@ swift test
 
 感谢你提交 Pull Request。请在等待评审时确认以下要求。
 
-- PR 正文还必须保留 GitHub Project 段落，并填写 Project: zisla Development。CI 会据此把 PR 放入共享项目看板。
 - **PR 标题**必须使用英文 Conventional Commit 格式，例如：
   - `feat(ci): add PR quality gates`
   - `fix(mac): resolve memory leak in overlay`
   - `docs: update contributing guidelines`
   允许的类型：`feat`、`fix`、`docs`、`style`、`refactor`、`perf`、`test`、`chore`、`build`、`ci`、`revert`。
 
-- **PR 正文**必须使用英文，并包含 `.github/PULL_REQUEST_TEMPLATE.md` 提供的 `Summary`、`PR Type`、`Validation`、`Risk and Rollback`、`Related Issue`、`AI Attribution` 六节。
+- **PR 正文**必须使用英文，并包含 `.github/PULL_REQUEST_TEMPLATE.md` 提供的 `Summary`、`GitHub Project`、`PR Type`、`Validation`、`Risk and Rollback`、`Related Issue`、`AI Attribution` 七节。
+  - `GitHub Project` 保留模板给出的 `- Project: zisla Development`。`Project Automation` 据此把 PR 放进共享看板。
   - `PR Type` 只写一条 `- Type:`，且必须与标题中的类型一致。`PR Automation` 会据此打标签，例如 `fix` 对应 `bug`。
   - `Validation` 中每项都必须声明 `passed`、`failed` 或 `not run`：前两者需要 `Command` 与 `Result`，后者需要 `Reason`。
   - `Related Issue` 要么用 `Closes #123` 之类的关键字关联 Issue（同时自动打上 `development`），要么写成 `None`。
@@ -55,6 +55,9 @@ swift test
   ```markdown
   ## Summary
   - Add a repository hygiene check.
+
+  ## GitHub Project
+  - Project: zisla Development
 
   ## PR Type
   - Type: ci

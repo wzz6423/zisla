@@ -37,14 +37,14 @@ Remove test, build, and packaging binaries before committing.
 
 Thank you for opening a pull request. Check these requirements while it is awaiting review.
 
-- The PR body must also keep the GitHub Project section with the exact value Project: zisla Development. CI uses it to place the pull request on the shared project board.
 - The **PR title** must use an English Conventional Commit subject, for example:
   - `feat(ci): add PR quality gates`
   - `fix(mac): resolve memory leak in overlay`
   - `docs: update contributing guidelines`
   Allowed types are `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `build`, `ci`, and `revert`.
 
-- The **PR body** must be in English and contain the `Summary`, `PR Type`, `Validation`, `Risk and Rollback`, `Related Issue`, and `AI Attribution` sections that `.github/PULL_REQUEST_TEMPLATE.md` provides.
+- The **PR body** must be in English and contain the `Summary`, `GitHub Project`, `PR Type`, `Validation`, `Risk and Rollback`, `Related Issue`, and `AI Attribution` sections that `.github/PULL_REQUEST_TEMPLATE.md` provides.
+  - `GitHub Project` keeps the template value `- Project: zisla Development`. `Project Automation` reads it to place the pull request on the shared board.
   - `PR Type` declares exactly one `- Type:` value, and it must match the type in the title. `PR Automation` turns it into a label, for example `fix` into `bug`.
   - Every `Validation` block must declare `passed`, `failed`, or `not run`. `passed` and `failed` need `Command` and `Result`; `not run` needs `Reason`.
   - `Related Issue` must either close an issue with a keyword such as `Closes #123`, which also applies the `development` label, or be exactly `None`.
@@ -55,6 +55,9 @@ Thank you for opening a pull request. Check these requirements while it is await
   ```markdown
   ## Summary
   - Add a repository hygiene check.
+
+  ## GitHub Project
+  - Project: zisla Development
 
   ## PR Type
   - Type: ci
