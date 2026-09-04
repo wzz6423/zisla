@@ -215,4 +215,4 @@ swift test \
 
 ## 许可证
 
-MIT
+[PolyForm Noncommercial License 1.0.0](../LICENSE.md)。允许非商业使用；禁止出售本软件或用于其他商业用途。

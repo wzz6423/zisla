@@ -97,4 +97,4 @@ Issues and pull requests are welcome. Read the [contributing guide](CONTRIBUTING
 
 ## License
 
-MIT
+[PolyForm Noncommercial License 1.0.0](LICENSE.md). Noncommercial use is permitted; selling this software, or any other commercial use, is not.

@@ -338,7 +338,7 @@ export const it = createCatalog({
   developers: {
     eyebrow: 'OPEN SOURCE PER IMPOSTAZIONE PREDEFINITA',
     title: 'Risorse per sviluppatori.',
-    lede: 'Licenza MIT: usalo così com’è o compilalo dal codice sorgente.',
+    lede: 'Licenza PolyForm Noncommercial 1.0.0: solo uso non commerciale, così com’è o compilato dal codice sorgente.',
     docs: {
       macos: { title: 'Guida allo sviluppo macOS', description: 'Funzioni, build, test e limiti del sistema' },
       architecture: { title: 'Architettura e prestazioni', description: 'Trigger superiore, finestre e progettazione delle prestazioni' },

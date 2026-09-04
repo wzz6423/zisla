@@ -191,7 +191,7 @@ export const id = createCatalog({
   developers: {
     eyebrow: 'OPEN SOURCE SEBAGAI DEFAULT',
     title: 'Sumber daya pengembang.',
-    lede: 'Berlisensi MIT—gunakan apa adanya atau build dari kode sumber.',
+    lede: 'Berlisensi PolyForm Noncommercial 1.0.0—hanya untuk penggunaan nonkomersial, apa adanya atau di-build dari kode sumber.',
     docs: {
       macos: { title: 'Panduan pengembangan macOS', description: 'Fitur, build, pengujian, dan batas sistem' },
       architecture: { title: 'Arsitektur dan performa', description: 'Pemicu atas layar, jendela, dan desain performa' },

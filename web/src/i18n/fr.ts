@@ -382,7 +382,7 @@ export const fr: SiteContent = {
   developers: {
     eyebrow: 'OPEN SOURCE PAR DÉFAUT',
     title: 'Ressources pour développeurs.',
-    lede: 'Sous licence MIT : utilisez l’app telle quelle ou compilez-la depuis les sources.',
+    lede: 'Sous licence PolyForm Noncommercial 1.0.0 : usage non commercial uniquement, telle quelle ou compilée depuis les sources.',
     docs: {
       macos: {
         title: 'Guide de développement macOS',

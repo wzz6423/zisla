@@ -335,7 +335,7 @@ export const zhHant: SiteContent = {
   developers: {
     eyebrow: '預設開源',
     title: '開發者資源。',
-    lede: 'MIT License，可直接使用或從原始碼建置。',
+    lede: 'PolyForm Noncommercial 1.0.0 授權，僅限非商業用途，可直接使用或從原始碼建置。',
     docs: {
       macos: { title: 'macOS 開發指南', description: '功能、建置、測試與系統限制' },
       architecture: { title: '架構與效能設計', description: '頂端觸發、視窗與效能設計' },
