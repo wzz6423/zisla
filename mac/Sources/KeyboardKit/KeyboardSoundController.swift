@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 import SwiftUI
@@ -221,6 +222,14 @@ public final class KeyboardSoundController: ObservableObject {
 
     public func stop() {
         model.stop()
+    }
+
+    /// Host apps must route `applicationShouldTerminate` here. `stop()` alone can only fire the
+    /// final flush off into a detached task, which the terminating process rarely lets finish.
+    public func applicationShouldTerminate(
+        _ application: NSApplication
+    ) -> NSApplication.TerminateReply {
+        model.applicationShouldTerminate(application)
     }
 
     public func preview() {

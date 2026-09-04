@@ -5,6 +5,23 @@ public enum LegacyAppDataMigration {
     private static let legacyBundleIdentifier = "dev.wzz.orbit"
     private static let userDefaultsMigrationMarker = "zisla.legacy-user-defaults-migrated"
 
+    /// The Info.plist key is authoritative because `Scripts/build-app.sh` writes it alongside the
+    /// bundle identifier; the suffix check only covers builds made before the key existed.
+    public static var isDebugBuild: Bool {
+        if let directory = Bundle.main.object(
+            forInfoDictionaryKey: "ZislaApplicationSupportDirectory"
+        ) as? String {
+            return directory == "zisla-debug"
+        }
+        return Bundle.main.bundleIdentifier?.hasSuffix(".debug") ?? false
+    }
+
+    /// The single entry point every module should use, so a debug build can never end up writing
+    /// into the release directory (or the reverse) by forgetting to pass `isDebugBuild`.
+    public static var applicationSupport: URL {
+        applicationSupportDirectory(isDebugBuild: isDebugBuild)
+    }
+
     public static func applicationSupportDirectory(
         isDebugBuild: Bool = false,
         fileManager: FileManager = .default
@@ -57,10 +74,6 @@ public enum LegacyAppDataMigration {
     }
 
     public static func migrateUserDefaults() {
-        let isDebugBuild = (Bundle.main.object(
-            forInfoDictionaryKey: "ZislaApplicationSupportDirectory"
-        ) as? String) == "zisla-debug"
-            || Bundle.main.bundleIdentifier?.hasSuffix(".debug") == true
         guard !isDebugBuild else { return }
         guard let legacyDefaults = UserDefaults(suiteName: legacyBundleIdentifier) else { return }
         migrateUserDefaults(

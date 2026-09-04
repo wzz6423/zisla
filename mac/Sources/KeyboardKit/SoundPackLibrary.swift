@@ -1,4 +1,5 @@
 import Foundation
+import ZislaCore
 
 actor SoundPackLibrary {
     private let fileManager: FileManager
@@ -19,7 +20,7 @@ actor SoundPackLibrary {
         self.limits = limits
         self.builtInDescriptors = builtInDescriptors
         self.bundledPackRootURL = bundledPackRootURL
-        self.rootURL = rootURL ?? Self.defaultRootURL(fileManager: fileManager)
+        self.rootURL = rootURL ?? Self.defaultRootURL()
     }
 
     func descriptors() throws -> [SoundPackDescriptor] {
@@ -390,14 +391,8 @@ actor SoundPackLibrary {
         )
     }
 
-    private static func defaultRootURL(fileManager: FileManager) -> URL {
-        let applicationSupport = fileManager.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first ?? URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent("Library/Application Support", isDirectory: true)
-        return applicationSupport
-            .appendingPathComponent("SimuBoard", isDirectory: true)
+    private static func defaultRootURL() -> URL {
+        LegacyAppDataMigration.applicationSupport
             .appendingPathComponent("SoundPacks", isDirectory: true)
     }
 

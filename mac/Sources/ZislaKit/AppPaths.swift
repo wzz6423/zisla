@@ -2,17 +2,8 @@ import Foundation
 import ZislaCore
 
 public enum AppPaths {
-    private static var isDebugBuild: Bool {
-        if let directory = Bundle.main.object(
-            forInfoDictionaryKey: "ZislaApplicationSupportDirectory"
-        ) as? String {
-            return directory == "zisla-debug"
-        }
-        return Bundle.main.bundleIdentifier?.hasSuffix(".debug") ?? false
-    }
-
     public static var applicationSupport: URL {
-        LegacyAppDataMigration.applicationSupportDirectory(isDebugBuild: isDebugBuild)
+        LegacyAppDataMigration.applicationSupport
     }
 
     public static var aiStateDatabase: URL {

@@ -58,7 +58,7 @@ let package = Package(
         ),
         .target(
             name: "KeyboardKit",
-            dependencies: ["Sparkle"],
+            dependencies: ["ZislaCore", "Sparkle"],
             resources: [
                 .copy("../../Resources/Keyboard"),
             ],
@@ -109,7 +109,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ZislaTests",
-            dependencies: ["Zisla", "KeyboardKit", "Sparkle"],
+            dependencies: ["Zisla", "ZislaCore", "KeyboardKit", "Sparkle"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-rpath",
