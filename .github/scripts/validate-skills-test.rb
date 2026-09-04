@@ -85,6 +85,40 @@ class SkillValidatorTest < Minitest::Test
     assert_validation false
   end
 
+  def test_accepts_unprefixed_release_download_urls
+    write_skill(
+      'flat-tag-skill',
+      <<~YAML,
+        name: flat-tag-skill
+        description: References release assets through unprefixed tags.
+      YAML
+      <<~MARKDOWN
+        - https://github.com/wzz6423/zisla/releases/download/v0.1.3/zisla-ai-activity.png
+        - https://gitee.com/wzz6423/zisla/releases/download/update-release/appcast.xml
+        - https://github.com/wzz6423/zisla/releases/download/v${VERSION}/
+        - https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml
+      MARKDOWN
+    )
+
+    assert_validation true
+  end
+
+  def test_rejects_path_prefixed_release_download_urls
+    write_skill(
+      'prefixed-tag-skill',
+      <<~YAML,
+        name: prefixed-tag-skill
+        description: References release assets through a path-prefixed tag.
+      YAML
+      <<~MARKDOWN
+        - https://github.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-ai-activity.png
+        - https://gitee.com/wzz6423/zisla/releases/download/release/v0.1.3/zisla-pdf-tools.png
+      MARKDOWN
+    )
+
+    assert_validation false
+  end
+
   private
 
   def write_skill(name, frontmatter, body)
