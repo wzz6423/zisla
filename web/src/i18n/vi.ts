@@ -191,7 +191,7 @@ export const vi = createCatalog({
   developers: {
     eyebrow: 'MÃ NGUỒN MỞ THEO MẶC ĐỊNH',
     title: 'Tài nguyên cho nhà phát triển.',
-    lede: 'Giấy phép MIT — dùng nguyên trạng hoặc build từ mã nguồn.',
+    lede: 'Giấy phép PolyForm Noncommercial 1.0.0 — chỉ dùng cho mục đích phi thương mại, dùng nguyên trạng hoặc build từ mã nguồn.',
     docs: {
       macos: { title: 'Hướng dẫn phát triển macOS', description: 'Tính năng, build, kiểm thử và giới hạn hệ thống' },
       architecture: { title: 'Kiến trúc và hiệu năng', description: 'Kích hoạt trên cùng, cửa sổ và thiết kế hiệu năng' },

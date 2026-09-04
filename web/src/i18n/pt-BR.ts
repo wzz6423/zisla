@@ -338,7 +338,7 @@ export const ptBR = createCatalog({
   developers: {
     eyebrow: 'CÓDIGO ABERTO POR PADRÃO',
     title: 'Recursos para desenvolvedores.',
-    lede: 'Licença MIT: use como está ou compile a partir do código-fonte.',
+    lede: 'Licença PolyForm Noncommercial 1.0.0: apenas uso não comercial, como está ou compilado a partir do código-fonte.',
     docs: {
       macos: { title: 'Guia de desenvolvimento macOS', description: 'Recursos, build, testes e limites do sistema' },
       architecture: { title: 'Arquitetura e desempenho', description: 'Acionamento no topo, janelas e design de desempenho' },

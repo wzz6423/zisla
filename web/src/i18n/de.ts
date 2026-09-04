@@ -369,7 +369,7 @@ export const de: SiteContent = {
   developers: {
     eyebrow: 'STANDARDMÄSSIG OPEN SOURCE',
     title: 'Ressourcen für Entwickler.',
-    lede: 'MIT-Lizenz: direkt nutzen oder aus dem Quellcode bauen.',
+    lede: 'PolyForm Noncommercial 1.0.0: nur nicht-kommerzielle Nutzung – direkt nutzen oder aus dem Quellcode bauen.',
     docs: {
       macos: {
         title: 'macOS-Entwicklungsleitfaden',

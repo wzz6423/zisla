@@ -345,7 +345,7 @@ export const ko: SiteContent = {
   developers: {
     eyebrow: '기본이 오픈 소스',
     title: '개발자 리소스.',
-    lede: 'MIT 라이선스. 그대로 쓰거나 소스에서 빌드할 수 있습니다.',
+    lede: 'PolyForm Noncommercial 1.0.0 라이선스. 비상업적 용도로만, 그대로 쓰거나 소스에서 빌드할 수 있습니다.',
     docs: {
       macos: { title: 'macOS 개발 가이드', description: '기능, 빌드, 테스트, 시스템 제약' },
       architecture: { title: '아키텍처와 성능 설계', description: '상단 트리거, 창, 성능 설계' },

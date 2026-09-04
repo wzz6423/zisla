@@ -304,7 +304,7 @@ export const nl = createCatalog({
   developers: {
     eyebrow: 'STANDAARD OPEN SOURCE',
     title: 'Bronnen voor ontwikkelaars.',
-    lede: 'MIT-licentie: gebruik het zoals het is of bouw het vanuit de broncode.',
+    lede: 'PolyForm Noncommercial 1.0.0-licentie: alleen niet-commercieel gebruik, zoals het is of gebouwd vanuit de broncode.',
     docs: {
       macos: { title: 'macOS-ontwikkelgids', description: 'Functies, bouwen, testen en systeemgrenzen' },
       architecture: { title: 'Architectuur en prestaties', description: 'Triggers, vensters en prestatieontwerp bovenaan' },
