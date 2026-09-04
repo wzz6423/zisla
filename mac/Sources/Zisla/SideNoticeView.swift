@@ -709,6 +709,7 @@ private struct HeadphoneConnectionNotice: View {
     var onDismiss: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.locale) private var locale
     @State private var isPresented = false
 
     var body: some View {
@@ -724,7 +725,7 @@ private struct HeadphoneConnectionNotice: View {
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Text(notice.detail ?? "已连接")
+                Text(connectionDetail)
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -743,7 +744,7 @@ private struct HeadphoneConnectionNotice: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("关闭")
+            .help(BatteryLocalization.string("关闭", locale: locale))
         }
         .onAppear {
             guard !reduceMotion else {
@@ -759,14 +760,22 @@ private struct HeadphoneConnectionNotice: View {
     }
 
     private var accessibilityDescription: String {
+        let connected = BatteryLocalization.string("已连接", locale: locale)
+        let unknownLevel = BatteryLocalization.string("电量未知", locale: locale)
         if isSingleUnit {
-            let level = notice.batteryLevels?.first?.level.map { "\($0)%" } ?? "电量未知"
-            return "\(notice.title)已连接，耳机电量\(level)"
+            let level = notice.batteryLevels?.first?.level.map { "\($0)%" } ?? unknownLevel
+            let headphones = BatteryLocalization.string("耳机", locale: locale)
+            return "\(notice.title) \(connected), \(headphones) \(level)"
         }
         let batteries = (notice.batteryLevels ?? []).map { level in
-            "\(level.label)耳\(level.level.map { "\($0)%" } ?? "电量未知")"
+            let label = BatteryLocalization.metadataText(level.label, locale: locale)
+            return "\(label) \(level.level.map { "\($0)%" } ?? unknownLevel)"
         }
-        return (["\(notice.title)已连接"] + batteries).joined(separator: "，")
+        return (["\(notice.title) \(connected)"] + batteries).joined(separator: ", ")
+    }
+
+    private var connectionDetail: String {
+        BatteryLocalization.metadataText(notice.detail ?? "已连接", locale: locale)
     }
 
     private var isSingleUnit: Bool {
@@ -831,6 +840,8 @@ private struct HeadphoneBatteryLevels: View {
 private struct HeadphoneBatteryRing: View {
     var level: NoticeBatteryLevel
 
+    @Environment(\.locale) private var locale
+
     var body: some View {
         VStack(spacing: 2) {
             ZStack {
@@ -848,7 +859,7 @@ private struct HeadphoneBatteryRing: View {
                     .foregroundStyle(.white.opacity(level.level == nil ? 0.42 : 0.9))
             }
             .frame(width: 20, height: 20)
-            Text(level.label)
+            Text(BatteryLocalization.metadataText(level.label, locale: locale))
                 .font(.system(size: 7, weight: .medium))
                 .foregroundStyle(.secondary)
         }
@@ -869,6 +880,7 @@ private struct CompactHeadphoneConnectionBar: View {
     var centerInset: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.locale) private var locale
     @State private var isPresented = false
 
     var body: some View {
@@ -916,7 +928,7 @@ private struct CompactHeadphoneConnectionBar: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("耳机已连接：\(notice.title)"))
+        .accessibilityLabel(Text("\(BatteryLocalization.string("耳机已连接：", locale: locale))\(notice.title)"))
     }
 
     private var headphoneIdentity: some View {
@@ -933,7 +945,7 @@ private struct CompactHeadphoneConnectionBar: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .truncationMode(.tail)
-                Text(notice.detail ?? "已连接")
+                Text(BatteryLocalization.metadataText(notice.detail ?? "已连接", locale: locale))
                     .font(.system(size: 8, weight: .medium))
                     .foregroundStyle(.secondary)
             }

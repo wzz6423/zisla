@@ -152,7 +152,7 @@ struct BatteryModuleTests {
     }
 
     @Test
-    func hidesBatteryHistoryWhileChargingOnly() {
+    func hidesBatteryHistoryWheneverExternalPowerIsConnected() {
         let now = Date(timeIntervalSince1970: 11_000)
         let history = (
             lastFullyChargedAt: now.addingTimeInterval(-7_200),
@@ -166,7 +166,7 @@ struct BatteryModuleTests {
             isCharged: false,
             timeRemainingMinutes: 30
         )
-        let pluggedIn = BatterySnapshot(
+        let pluggedInAndFull = BatterySnapshot(
             level: 1,
             isCharging: false,
             isPluggedIn: true,
@@ -184,11 +184,11 @@ struct BatteryModuleTests {
         )
         #expect(
             BatteryHistoryPresentation(
-                battery: pluggedIn,
+                battery: pluggedInAndFull,
                 lastFullyChargedAt: history.lastFullyChargedAt,
                 lastUnpluggedAt: history.lastUnpluggedAt,
                 now: now
-            ).text == "上次充满 2小时0分，已脱电使用 1小时0分"
+            ).text == nil
         )
     }
 

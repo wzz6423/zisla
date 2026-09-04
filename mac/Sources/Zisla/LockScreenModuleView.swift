@@ -4,6 +4,8 @@ import SwiftUI
 struct LockScreenModuleView: View {
     @ObservedObject var model: AppModel
 
+    @Environment(\.locale) private var locale
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             let date = context.date
@@ -39,11 +41,15 @@ struct LockScreenModuleView: View {
             if let battery = model.battery.snapshot {
                 statusItem(
                     symbol: battery.symbolName,
-                    title: "电量",
+                    title: BatteryLocalization.string("电量", locale: locale),
                     value: "\(battery.percentInt)% · \(batteryDetail(battery))"
                 )
             } else {
-                statusItem(symbol: "battery.0", title: "电量", value: "未检测到内置电池")
+                statusItem(
+                    symbol: "battery.0",
+                    title: BatteryLocalization.string("电量", locale: locale),
+                    value: BatteryLocalization.string("未检测到内置电池", locale: locale)
+                )
             }
         }
     }
@@ -79,11 +85,7 @@ struct LockScreenModuleView: View {
     }
 
     private func batteryDetail(_ battery: BatterySnapshot) -> String {
-        if battery.isCharging { return "充电中" }
-        if battery.isCharged { return "已充满" }
-        if battery.isPluggedIn { return "已接通电源" }
-        if let minutes = battery.timeRemainingMinutes { return "剩余 \(minutes) 分钟" }
-        return "电池供电"
+        BatteryLocalization.detailStatusText(battery, locale: locale)
     }
 
     private func solarDateText(for date: Date) -> String {
