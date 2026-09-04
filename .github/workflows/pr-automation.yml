@@ -47,8 +47,9 @@ jobs:
             | jq 'flatten(1) | [.[].name]' > "$RUNNER_TEMP/existing-labels.json"
 
           jq -r --slurpfile have "$RUNNER_TEMP/existing-labels.json" \
-            '.[] | select(($have[0] | index(.label)) == null)
-             | [.label, .color, .description] | @tsv' \
+            '.[] | . as $entry
+             | select(($have[0] | index($entry.label)) == null)
+             | [$entry.label, $entry.color, $entry.description] | @tsv' \
             "$RUNNER_TEMP/contract-labels.json" > "$RUNNER_TEMP/missing-labels.tsv"
 
           while IFS=$'\t' read -r name color description; do
