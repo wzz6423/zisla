@@ -35,7 +35,7 @@ export const heroHints = [
 ];
 
 export const proofItems = [
-  { title: '12 个顶部模块', desc: '顶部工作流按需开启' },
+  { title: '13 个顶部模块', desc: '顶部工作流按需开启' },
   { title: 'macOS 14+', desc: '原生桌面体验' },
   { title: '多显示器', desc: '刘海屏与外接屏都能使用' },
   { title: '本地优先', desc: 'AI 状态不读取对话正文' },
@@ -83,8 +83,16 @@ export const showcaseModules: ShowcaseModule[] = [
     name: 'AI 监控',
     group: 'AI 工作流',
     caption:
-      '自动识别受支持的 AI CLI、桌面端与 IDE 活动，展示任务、状态、Token 趋势和贡献热力图；只解析结构化事件，不读取对话正文。',
+      '自动识别受支持的 AI CLI、桌面端与 IDE 活动，包括 Zed Agent 线程，展示任务、状态、累计 Token 趋势和贡献热力图；只解析结构化事件，不读取对话正文。',
     points: ['多工具任务聚合', 'Token 消耗趋势', '不读取提示词与回答'],
+  },
+  {
+    id: 'keyboardSound',
+    name: '键盘音效',
+    group: '实用工具',
+    caption:
+      '为全局按键播放 20 种内置机械键盘音色，可调音量与自然音高变化，并为支持的音色播放回弹音；开启本地输入统计后，可在岛内查看今日概览、输入趋势、历史、应用时间线和含 F1-F12 的逐键热力图。',
+    points: ['20 种内置音色', '回弹音与音高变化', '输入统计可选开启'],
   },
   {
     id: 'download',
@@ -131,8 +139,8 @@ export const showcaseModules: ShowcaseModule[] = [
     name: '小工具',
     group: '实用工具',
     caption:
-      '将专注倒计时、保持亮屏、屏幕/键盘清理、闹钟、提词器、镜子和废纸篓集中在同一页。',
-    points: ['专注倒计时', '屏幕与键盘清理', '提词器与镜子'],
+      '将专注倒计时、保持亮屏、屏幕清理、键盘清理（清理期间屏蔽包括 F1-F12 在内的按键）、闹钟、提词器、镜子和废纸篓集中在同一页。',
+    points: ['专注倒计时', '清理时屏蔽 F1-F12', '提词器与镜子'],
   },
   {
     id: 'system',
@@ -171,6 +179,7 @@ export const supportedAITools = [
   { name: 'WorkBuddy' },
   { name: '豆包' },
   { name: 'Pi' },
+  { name: 'Zed Agent' },
 ];
 
 export const privacyPoints = [
@@ -193,16 +202,16 @@ export const crossModuleFeatures: CrossModuleFeature[] = [
     icon: 'image',
     title: '截图、长截图与钉图',
     description:
-      '用全局快捷键截取或钉住屏幕内容，继续标注、拼接长截图，并识别或导出表格。',
-    detail: '全局快捷键 · 标注与撤销 · 图片 / 表格导出',
+      '用全局快捷键截取或钉住屏幕内容，继续标注、拼接长截图，并识别或导出表格；导出前会保留正在编辑的文字标注。',
+    detail: '全局快捷键 · 标注与撤销 · 编辑内容随导出保存',
   },
   {
     id: 'voice',
     icon: 'mic',
     title: '语音输入与整理',
     description:
-      '按键切换或按住说话，使用系统语音识别，再按需启用领域词库、结构化格式或本地 / 远端模型整理。',
-    detail: '两种录音方式 · 领域词库 · 可选模型整理',
+      '按键切换或按住说话，使用系统语音识别，再按需启用领域词库、自定义热词、结构化格式或本地 / 远端模型整理。',
+    detail: '两种录音方式 · 词库与自定义热词 · 可选模型整理',
   },
   {
     id: 'media',
@@ -346,7 +355,7 @@ export const faqItems: FAQItem[] = [
         <li><strong>定位服务：</strong>选择“使用当前位置”的天气时请求；只获取一次当前位置，不会持续跟踪。手动添加城市不需要定位权限。</li>
         <li><strong>麦克风与语音识别：</strong>点击开始语音输入时请求；只在主动录音期间采集声音，只处理该次录音的转写。</li>
         <li><strong>辅助功能：</strong>自动将语音转写填入当前应用、鼠标手势快速复制、键盘清洁及部分受支持播放器控制时需要；用于定位非密码输入控件或发送必要的系统按键。</li>
-        <li><strong>输入监控：</strong>仅在使用单独修饰键、鼠标侧键等全局触发方式，或键盘清洁时需要；普通全局快捷键不需要这项授权。</li>
+        <li><strong>输入监控：</strong>键盘音效、可选的本地输入统计，以及使用单独修饰键或鼠标侧键等全局触发方式时按需使用；仅监听完成这些功能所需的全局事件，普通全局快捷键不需要这项授权。</li>
         <li><strong>屏幕录制与系统音频录制：</strong>截图、截图编辑和显示系统播放音频波形时需要。截图会读取屏幕图像；音频波形只分析当前系统音频能量，不保存或上传音频内容。</li>
         <li><strong>摄像头：</strong>只在打开镜子窗口期间使用。</li>
         <li><strong>蓝牙：</strong>只在打开电池模块时读取已连接或已配对设备公开的电量信息。</li>
@@ -355,12 +364,13 @@ export const faqItems: FAQItem[] = [
         <li><strong>通知：</strong>启用番茄钟或闹钟提醒时请求，只用于在计时结束或闹钟触发时显示本机通知。</li>
       </ul>
       <p><strong>文件与下载目录不是完全磁盘访问：</strong>你通过系统文件选择器选中的中转、导入导出或下载目录，zisla 只获得该目录的访问权，不会获得整块磁盘的读取权限。</p>
+      <p><strong>键盘音效与输入统计：</strong>两项功能都默认关闭，任一项开启后才会监听全局键盘事件；开启键盘音效后只处理按键事件以播放声音，开启输入统计后只保存字符数、物理键码、时间和前台应用等聚合数据，不保存输入内容。你可以在设置中分别关闭，关闭后不再记录；已保存的聚合数据留在本机数据库文件中，可自行删除。</p>
       <p>你可在应用设置中关闭对应功能，或随时在“系统设置 → 隐私与安全性”中撤销授权。撤销某一项只会停用相关功能，不会影响其他模块；不同 macOS 版本中的项目名称可能略有不同。</p>
     `.trim(),
   },
   {
     question: 'zisla 会联网吗？',
-    answer: '天气、更新、主动下载和可选远端语音整理会按需联网；剪贴板链接检测只在本机识别，不会自行发起下载。',
+    answer: '天气、签名更新检查、主动下载和可选远端语音整理会按需联网；剪贴板链接检测只在本机识别，不会自行发起下载。',
   },
   {
     question: 'zisla 支持多显示器吗？',
@@ -372,7 +382,8 @@ export const faqItems: FAQItem[] = [
   },
   {
     question: 'zisla 的数据存储在哪里？',
-    answer: '本地数据位于 ~/Library/Application Support/zisla/；随记使用系统「备忘录」。',
+    answer:
+      '本地数据位于 ~/Library/Application Support/zisla/；键盘输入统计单独保存在 ~/Library/Application Support/SimuBoard/typing-stats.sqlite3；随记使用系统「备忘录」。',
   },
 ];
 
