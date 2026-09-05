@@ -282,7 +282,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 132, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
                 rowDivider
@@ -323,7 +323,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 132, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
                 if model.settingsStore.settings.systemMonitorEnabled {
@@ -486,7 +486,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(minWidth: 150, alignment: .trailing)
+                        .keepsIntrinsicWidth()
                     }
                     rowDivider
                     settingRow(
@@ -552,7 +552,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(minWidth: 150, alignment: .trailing)
+                        .keepsIntrinsicWidth()
                     }
                     rowDivider
                     featureToggle(
@@ -581,7 +581,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(minWidth: 150, alignment: .trailing)
+                        .keepsIntrinsicWidth()
                     }
                     if model.settingsStore.settings.clipboardAssistantSearchEngine == .custom {
                         rowDivider
@@ -956,11 +956,13 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(minWidth: 150, alignment: .trailing)
+                        .keepsIntrinsicWidth()
 
-                        Button(AppLocalization.text("试听键盘音")) { model.keyboardSound.preview() }
-                            .controlSize(.small)
-                            .keepsIntrinsicWidth()
+                        IconButton(
+                            symbol: "play.fill",
+                            help: AppLocalization.text("试听键盘音"),
+                            size: .compact
+                        ) { model.keyboardSound.preview() }
                             .disabled(!model.settingsStore.settings.keyboardEnabled)
                     }
                     .disabled(!model.settingsStore.settings.keyboardEnabled)
@@ -1064,7 +1066,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 96, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
                 rowDivider
@@ -1087,7 +1089,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 96, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
             }
@@ -1244,18 +1246,20 @@ struct SettingsView: View {
                         ForEach(model.aiAgent.store.state.localModels.filter(\.isEnabled)) { localModel in
                             let reference = AIModelConfigurationReference.local(localModel.id)
                             Text(AppLocalization.text("本地 · %@", model.voiceModelConfigurationTitle(reference)))
+                                .fitsMenuItem(maxWidth: 170)
                                 .tag(Optional(reference))
                         }
                         ForEach(model.aiAgent.store.state.channels.filter(\.isEnabled)) { channel in
                             let reference = AIModelConfigurationReference.channel(channel.id)
                             Text(AppLocalization.text("远端 · %@", model.voiceModelConfigurationTitle(reference)))
+                                .fitsMenuItem(maxWidth: 170)
                                 .tag(Optional(reference))
                         }
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 220, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                 }
                 rowDivider
                 settingRow(
@@ -1352,7 +1356,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 120, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                 }
                 rowDivider
                 settingRow(
@@ -1669,7 +1673,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(maxWidth: 110, alignment: .trailing)
+                        .keepsIntrinsicWidth()
                     }
                     rowDivider
                     settingRow(
@@ -1738,7 +1742,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(minWidth: 150, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
                 rowDivider
@@ -1760,7 +1764,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(minWidth: 150, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
             }
@@ -1938,7 +1942,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 180, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                 }
                 rowDivider
                 settingRow(
@@ -2867,7 +2871,7 @@ struct SettingsView: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .controlSize(.small)
-            .frame(maxWidth: 108, alignment: .trailing)
+            .keepsIntrinsicWidth()
         }
         rowDivider
         mailAppAccountSettings

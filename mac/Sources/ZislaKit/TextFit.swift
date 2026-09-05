@@ -18,14 +18,26 @@ public extension View {
         modifier(TextFit(lines: lines, minScale: minScale))
     }
 
-    /// For a control whose label *is* its content (action buttons, status labels) sitting next to
-    /// wrappable copy. A settings row gives its title/description column `.layoutPriority(1)`, so the
-    /// description takes the width it wants and leaves the control only its minimum — which, once
-    /// tightening and scaling are allowed, is close to zero: German "Tastenklang anhören" rendered as
-    /// "T…". Claiming the label's own width instead pushes the description into wrapping, and changes
-    /// nothing wherever the description already fits on one line.
+    /// For a control whose label *is* its content (action buttons, status labels, menu pickers) sitting
+    /// next to wrappable copy. A settings row gives its title/description column `.layoutPriority(1)`,
+    /// so the description takes the width it wants and leaves the control only its minimum — which,
+    /// once tightening and scaling are allowed, is close to zero: German "Tastenklang anhören" rendered
+    /// as "T…". Claiming the label's own width instead pushes the description into wrapping, and
+    /// changes nothing wherever the description already fits on one line.
+    ///
+    /// A menu picker gets this twice over: its intrinsic width comes from its widest menu item, so a
+    /// hard-coded width both starves long option sets (German "Umschaltmodus" laid out at 31.5 of
+    /// 151.5pt) and wastes space on short ones (pet side left/right claiming 150pt for 61.5pt of text).
     func keepsIntrinsicWidth() -> some View {
         fixedSize(horizontal: true, vertical: false)
+    }
+
+    /// For menu items whose text comes from user data (model names, imported file names): caps how much
+    /// width one item may contribute to the picker's intrinsic size, keeping the row's description
+    /// readable. A 40-character model name would otherwise widen the picker to 300pt and push the row
+    /// from 27 to 85pt tall.
+    func fitsMenuItem(maxWidth: CGFloat) -> some View {
+        modifier(MenuItemFit(maxWidth: maxWidth))
     }
 }
 
@@ -42,5 +54,16 @@ private struct TextFit: ViewModifier {
             .lineLimit(lines)
             .minimumScaleFactor(minScale)
             .allowsTightening(true)
+    }
+}
+
+private struct MenuItemFit: ViewModifier {
+    let maxWidth: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .frame(maxWidth: maxWidth)
     }
 }
