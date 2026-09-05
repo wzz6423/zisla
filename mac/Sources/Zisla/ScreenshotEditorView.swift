@@ -5181,7 +5181,7 @@ struct ScreenshotEditorView: View {
         .buttonStyle(.plain)
         .foregroundStyle(disabled ? .secondary : .primary)
         .disabled(disabled)
-        .help(title)
+        .help(AppLocalization.text(title))
     }
 
     private func toolbarControlLabel(
@@ -5192,7 +5192,7 @@ struct ScreenshotEditorView: View {
         HStack(spacing: 5) {
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .semibold))
-            Text(title)
+            AppLocalizedText(title)
                 .font(.system(size: 10, weight: .medium))
                 .lineLimit(1)
         }
@@ -6193,6 +6193,9 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     private let model: ScreenshotEditorModel
     private let annotationSelectionState: ScreenshotAnnotationSelectionState
+    /// SF Symbols such as `textformat` render a localized glyph, so this window needs the
+    /// interface locale even when every string already goes through AppLocalization.
+    private let languageStore = AppLanguageStore()
     private var onCloseHandler: (() -> Void)?
     private var currentScreen: NSScreen?
     private var currentDisplayID: CGDirectDisplayID?
@@ -6364,36 +6367,42 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     private func configureOverlayView(in window: NSWindow) {
         window.contentView = ScreenshotInteractiveHostingView(
-            rootView: ScreenshotEditorView(
-                model: model,
-                selectionState: annotationSelectionState,
-                overlayConfiguration: ScreenshotEditorOverlayConfiguration(
-                    backgroundImage: screenImage,
-                    initialSelection: captureRect,
-                    cropImage: { [weak self] rect in self?.updateCaptureRect(rect) }
-                ),
-                onClose: { [weak self] in self?.close() },
-                onCopy: { [weak self] in self?.quickPasteAndClose() },
-                onSave: { [weak self] in self?.saveImage() },
-                onPinToggle: { [weak self] pinned in self?.setPinned(pinned) },
-                onLongCapture: { [weak self] in self?.captureNextScreen() },
-                onLongCaptureFinish: { [weak self] in self?.finishLongCapture() }
+            rootView: AppLanguageEnvironment(
+                languageStore: languageStore,
+                content: ScreenshotEditorView(
+                    model: model,
+                    selectionState: annotationSelectionState,
+                    overlayConfiguration: ScreenshotEditorOverlayConfiguration(
+                        backgroundImage: screenImage,
+                        initialSelection: captureRect,
+                        cropImage: { [weak self] rect in self?.updateCaptureRect(rect) }
+                    ),
+                    onClose: { [weak self] in self?.close() },
+                    onCopy: { [weak self] in self?.quickPasteAndClose() },
+                    onSave: { [weak self] in self?.saveImage() },
+                    onPinToggle: { [weak self] pinned in self?.setPinned(pinned) },
+                    onLongCapture: { [weak self] in self?.captureNextScreen() },
+                    onLongCaptureFinish: { [weak self] in self?.finishLongCapture() }
+                )
             )
         )
     }
 
     private func configureLongCaptureToolbar(in window: NSWindow) {
         window.contentView = ScreenshotInteractiveHostingView(
-            rootView: ScreenshotEditorView(
-                model: model,
-                selectionState: annotationSelectionState,
-                toolbarOnly: true,
-                onClose: { [weak self] in self?.close() },
-                onCopy: { [weak self] in self?.quickPasteAndClose() },
-                onSave: { [weak self] in self?.saveImage() },
-                onPinToggle: { [weak self] pinned in self?.setPinned(pinned) },
-                onLongCapture: { [weak self] in self?.captureNextScreen() },
-                onLongCaptureFinish: { [weak self] in self?.finishLongCapture() }
+            rootView: AppLanguageEnvironment(
+                languageStore: languageStore,
+                content: ScreenshotEditorView(
+                    model: model,
+                    selectionState: annotationSelectionState,
+                    toolbarOnly: true,
+                    onClose: { [weak self] in self?.close() },
+                    onCopy: { [weak self] in self?.quickPasteAndClose() },
+                    onSave: { [weak self] in self?.saveImage() },
+                    onPinToggle: { [weak self] pinned in self?.setPinned(pinned) },
+                    onLongCapture: { [weak self] in self?.captureNextScreen() },
+                    onLongCaptureFinish: { [weak self] in self?.finishLongCapture() }
+                )
             )
         )
     }

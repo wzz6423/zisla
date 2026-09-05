@@ -1527,7 +1527,7 @@ struct SettingsView: View {
                 .frame(width: 26, height: 26)
                 .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 3) {
-                Text(title)
+                AppLocalizedText(title)
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
                 Text(value)
