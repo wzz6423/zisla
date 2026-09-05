@@ -61,7 +61,7 @@ xattr -d com.apple.quarantine /Applications/zisla.app
 
 ### 更新应用
 
-无论用哪种方式安装，zisla 都通过 Sparkle 自行更新。用 Homebrew 安装的情况需要额外说明：直接执行 `brew upgrade` 不会替换已安装的应用，若希望由 Homebrew 完成替换，需显式指定 cask：
+无论用哪种方式安装，zisla 都通过 Sparkle 自行更新。用 Homebrew 安装的情况需要额外说明：`brew upgrade` 只在已装应用确实旧于 tap 中的版本时才替换它——Homebrew 5.1.6 起会读取应用包内的版本号，因此它既不与 Sparkle 相争，也不会放着落后的安装不管。显式指定 cask 依据的是 Homebrew 自己的安装记录，可能把 Sparkle 更新过的应用退回 tap 的版本：
 
 ```bash
 brew upgrade --cask zisla

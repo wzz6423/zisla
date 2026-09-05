@@ -264,7 +264,7 @@ export const zhHant: SiteContent = {
     releaseCta: '查看 Release',
     releaseCtaAriaLabel: '在 GitHub 上查看發佈詳情',
     brewMono: 'HOMEBREW / 一行指令',
-    brewNote: 'zisla 由 Sparkle 自行更新，直接執行 brew upgrade 不會替換已安裝的應用程式；需要 Homebrew 接手時執行 brew upgrade --cask zisla。tap 只提供正式版。該 tap 屬於第三方，應用程式也未經公證，首次打開需在「系統設定 → 隱私權與安全性」中選擇「仍要打開」。',
+    brewNote: 'zisla 由 Sparkle 自行更新，因此 brew upgrade 只在已安裝的應用程式確實舊於 tap 中的版本時才替換它——Homebrew 5.1.6 起會讀取應用程式自身的版本號。明確指定 cask（brew upgrade --cask zisla）依據的是 Homebrew 自己的安裝記錄，在 Sparkle 更新過之後可能把應用程式退回 tap 的版本。tap 只提供正式版。該 tap 屬於第三方，應用程式也未經公證，首次打開需在「系統設定 → 隱私權與安全性」中選擇「仍要打開」。',
     copyBrewCommandAriaLabel: '複製 Homebrew 安裝指令',
     notes: {
       system: { term: '系統', value: 'macOS 14 或以上版本 · 目前受支援的組態為 Apple 晶片 Mac' },

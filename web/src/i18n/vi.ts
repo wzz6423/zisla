@@ -145,7 +145,7 @@ export const vi = createCatalog({
     releaseCta: 'Xem bản phát hành',
     releaseCtaAriaLabel: 'Xem chi tiết bản phát hành trên GitHub',
     brewMono: 'HOMEBREW / MỘT LỆNH',
-    brewNote: 'Sparkle tự cập nhật zisla, nên brew upgrade thông thường không thay thế ứng dụng; chạy brew upgrade --cask zisla nếu muốn Homebrew làm việc đó. Tap chỉ phục vụ bản chính thức. Đây là tap của bên thứ ba và ứng dụng chưa được Apple công chứng, nên lần mở đầu tiên cần chọn "Vẫn mở" trong Cài đặt hệ thống → Quyền riêng tư & Bảo mật.',
+    brewNote: 'Sparkle tự cập nhật zisla, nên brew upgrade chỉ thay thế ứng dụng khi bản đã cài thực sự cũ hơn bản trong tap — từ Homebrew 5.1.6, lệnh này đọc chính phiên bản ghi trong ứng dụng. Việc nêu rõ cask, như brew upgrade --cask zisla, lại dựa vào bản ghi cài đặt của Homebrew và có thể đưa bạn về bản trong tap sau một lần cập nhật qua Sparkle. Tap chỉ phục vụ bản chính thức. Đây là tap của bên thứ ba và ứng dụng chưa được Apple công chứng, nên lần mở đầu tiên cần chọn "Vẫn mở" trong Cài đặt hệ thống → Quyền riêng tư & Bảo mật.',
     copyBrewCommandAriaLabel: 'Sao chép lệnh cài đặt Homebrew',
     notes: {
       system: { term: 'Hệ thống', value: 'macOS 14 trở lên · Cấu hình được hỗ trợ: Mac Apple Silicon' },

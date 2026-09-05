@@ -29,7 +29,7 @@ module HomebrewCask
     'name' => '  name "zisla"',
     'homepage' => '  homepage "https://github.com/wzz6423/zisla"',
     'app artifact' => '  app "zisla.app"',
-    # Sparkle ships the updates, so brew must not fight it on a plain `brew upgrade`.
+    # Sparkle ships the updates, so brew defers unless the installed app is really stale.
     'auto_updates' => '  auto_updates true',
     'minimum macOS' => '  depends_on macos: :sonoma',
     'livecheck block' => '  livecheck do'

@@ -16,9 +16,11 @@ cask "zisla" do
     strategy :github_latest
   end
 
-  # Sparkle installs later versions itself, so `brew upgrade` replaces the app only
-  # when the cask is named explicitly or --greedy is passed. Sparkle reads the appcast
-  # for this slice, so an in-app update keeps the install on a single architecture.
+  # Sparkle installs later versions itself, so `brew upgrade` replaces the app only when
+  # the installed bundle really is behind the tap; Homebrew 5.1.6 and later read the
+  # version inside the app, while naming the cask or --greedy goes by Homebrew's own
+  # install records and can undo a Sparkle update. Sparkle reads the appcast for this
+  # slice, so an in-app update keeps the install on a single architecture.
   auto_updates true
   depends_on macos: :sonoma
 

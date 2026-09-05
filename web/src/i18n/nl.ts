@@ -258,7 +258,7 @@ export const nl = createCatalog({
     releaseCta: 'Release bekijken',
     releaseCtaAriaLabel: 'Releasedetails op GitHub bekijken',
     brewMono: 'HOMEBREW / ÉÉN OPDRACHT',
-    brewNote: 'Sparkle houdt zisla zelf bij, dus een gewone brew upgrade laat de app staan; voer brew upgrade --cask zisla uit als Homebrew hem moet vervangen. De tap levert alleen stabiele releases. Het is een tap van derden en de app is niet genotariseerd, dus de eerste start vraagt om "Toch openen" in Systeeminstellingen → Privacy en beveiliging.',
+    brewNote: 'Sparkle houdt zisla zelf bij, dus brew upgrade vervangt de app alleen als de geïnstalleerde versie echt ouder is dan die in de tap — vanaf Homebrew 5.1.6 wordt de versie in de app zelf gelezen. Noem je de cask expliciet, zoals in brew upgrade --cask zisla, dan gelden de installatiegegevens van Homebrew en kun je na een Sparkle-update terugvallen op de versie uit de tap. De tap levert alleen stabiele releases. Het is een tap van derden en de app is niet genotariseerd, dus de eerste start vraagt om "Toch openen" in Systeeminstellingen → Privacy en beveiliging.',
     copyBrewCommandAriaLabel: 'Homebrew-installatieopdracht kopiëren',
     notes: {
       system: { term: 'Systeem', value: 'macOS 14 of later · Huidige ondersteunde configuratie: Mac met Apple Silicon' },

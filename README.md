@@ -61,7 +61,7 @@ xattr -d com.apple.quarantine /Applications/zisla.app
 
 ### Update the app
 
-zisla updates itself through Sparkle however you installed it. A Homebrew install is the one case worth a note: a plain `brew upgrade` leaves the app alone, so name the cask when you want Homebrew to do the replacement instead:
+zisla updates itself through Sparkle however you installed it. A Homebrew install is the one case worth a note: `brew upgrade` replaces the app only when the installed copy really is older than the version in the tap, because Homebrew 5.1.6 and later read the version inside the app bundle — so Homebrew stays out of Sparkle's way without leaving a stale install behind. Naming the cask goes by the Homebrew install records instead, so it can put a Sparkle-updated app back on the tap version:
 
 ```bash
 brew upgrade --cask zisla

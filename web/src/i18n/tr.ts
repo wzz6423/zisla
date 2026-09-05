@@ -150,7 +150,7 @@ export const tr = createCatalog({
     releaseCta: 'Sürümü görüntüle',
     releaseCtaAriaLabel: 'Sürüm ayrıntılarını GitHub\'da görüntüle',
     brewMono: 'HOMEBREW / TEK KOMUT',
-    brewNote: 'zisla güncellemelerini Sparkle üstlenir; bu yüzden sade bir brew upgrade uygulamaya dokunmaz. Değişimi Homebrew yapsın istiyorsan brew upgrade --cask zisla komutunu çalıştır. Tap yalnızca kararlı sürümleri sunar. Bu tap üçüncü tarafa ait ve uygulama noter onaylı değil; bu nedenle ilk açılışta Sistem Ayarları → Gizlilik ve Güvenlik bölümünden "Yine de Aç" seçilmelidir.',
+    brewNote: 'zisla güncellemelerini Sparkle üstlenir; bu yüzden brew upgrade uygulamayı yalnızca kurulu kopya tap içindeki sürümden gerçekten eskiyse değiştirir — Homebrew 5.1.6 ve sonrası uygulamanın kendi sürümünü okur. Cask adını açıkça vermek, örneğin brew upgrade --cask zisla, Homebrew tarafındaki kurulum kayıtlarına dayanır ve Sparkle güncellemesinden sonra seni tap içindeki sürüme geri götürebilir. Tap yalnızca kararlı sürümleri sunar. Bu tap üçüncü tarafa ait ve uygulama noter onaylı değil; bu nedenle ilk açılışta Sistem Ayarları → Gizlilik ve Güvenlik bölümünden "Yine de Aç" seçilmelidir.',
     copyBrewCommandAriaLabel: 'Homebrew kurulum komutunu kopyala',
     notes: {
       system: { term: 'Sistem', value: 'macOS 14 veya sonrası · Bugün desteklenen yapılandırma Apple Silicon Mac\'lerdir' },

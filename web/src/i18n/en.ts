@@ -276,7 +276,7 @@ export const en: SiteContent = {
     releaseCta: 'View release',
     releaseCtaAriaLabel: 'View the release details on GitHub',
     brewMono: 'HOMEBREW / ONE COMMAND',
-    brewNote: 'Sparkle keeps zisla up to date, so a plain brew upgrade leaves the app alone — run brew upgrade --cask zisla when you want Homebrew to replace it. The tap serves stable releases only. It is a third-party tap and the app is not notarized, so the first launch needs Open Anyway in System Settings → Privacy & Security.',
+    brewNote: 'Sparkle keeps zisla up to date, so brew upgrade replaces the app only when the installed copy really is older than the one in the tap — Homebrew 5.1.6 and later read the version inside the app itself. Naming the cask, as in brew upgrade --cask zisla, goes by the Homebrew install records instead, which can move you back to the tap version after a Sparkle update. The tap serves stable releases only. It is a third-party tap and the app is not notarized, so the first launch needs Open Anyway in System Settings → Privacy & Security.',
     copyBrewCommandAriaLabel: 'Copy the Homebrew install command',
     notes: {
       system: {

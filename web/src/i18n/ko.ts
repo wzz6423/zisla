@@ -268,7 +268,7 @@ export const ko: SiteContent = {
     releaseCta: '릴리스 보기',
     releaseCtaAriaLabel: 'GitHub에서 릴리스 상세 보기',
     brewMono: 'HOMEBREW / 명령 한 줄',
-    brewNote: 'zisla는 Sparkle이 직접 업데이트하므로 일반 brew upgrade로는 앱이 교체되지 않습니다. Homebrew가 교체하도록 하려면 brew upgrade --cask zisla를 실행하세요. tap은 정식 버전만 제공합니다. 이 tap은 서드파티이고 앱도 공증을 받지 않았으므로 처음 실행할 때 "시스템 설정 → 개인정보 보호 및 보안"에서 "그래도 열기"를 선택해야 합니다.',
+    brewNote: 'zisla는 Sparkle이 직접 업데이트하므로 brew upgrade는 설치된 앱이 tap의 버전보다 실제로 오래된 경우에만 교체합니다(Homebrew 5.1.6부터 앱 자체의 버전을 읽습니다). brew upgrade --cask zisla처럼 cask를 직접 지정하면 Homebrew의 설치 기록을 기준으로 하므로 Sparkle로 업데이트한 뒤에는 tap의 버전으로 되돌아갈 수 있습니다. tap은 정식 버전만 제공합니다. 이 tap은 서드파티이고 앱도 공증을 받지 않았으므로 처음 실행할 때 "시스템 설정 → 개인정보 보호 및 보안"에서 "그래도 열기"를 선택해야 합니다.',
     copyBrewCommandAriaLabel: 'Homebrew 설치 명령 복사',
     notes: {
       system: {
