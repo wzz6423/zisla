@@ -526,8 +526,28 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
     var number = 1
     var obscureShape: ScreenshotObscureShape = .rectangle
     var obscureEffect: ScreenshotObscureEffect = .blur
-    var obscureStrength: CGFloat = 3
+    var obscurePixelateStrength: CGFloat = 3
+    /// 0 leaves a mosaic as plain blocks; a blur region always gets a real value written through
+    /// `obscureStrength`, so the default only ever applies to pixelate.
+    var obscureBlurStrength: CGFloat = 0
     var rotation: CGFloat = 0
+
+    /// The strength each effect drives itself with: block size for pixelate, radius for blur. A
+    /// mosaic keeps its extra blur in `obscureBlurStrength`, so the two knobs move independently.
+    var obscureStrength: CGFloat {
+        get {
+            switch obscureEffect {
+            case .pixelate: obscurePixelateStrength
+            case .blur: obscureBlurStrength
+            }
+        }
+        set {
+            switch obscureEffect {
+            case .pixelate: obscurePixelateStrength = newValue
+            case .blur: obscureBlurStrength = newValue
+            }
+        }
+    }
 
     init(
         id: UUID = UUID(),
@@ -543,6 +563,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         obscureShape: ScreenshotObscureShape = .rectangle,
         obscureEffect: ScreenshotObscureEffect = .blur,
         obscureStrength: CGFloat = 3,
+        obscureBlurStrength: CGFloat? = nil,
         rotation: CGFloat = 0
     ) {
         self.id = id
@@ -557,8 +578,9 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         self.number = number
         self.obscureShape = obscureShape
         self.obscureEffect = obscureEffect
-        self.obscureStrength = obscureStrength
         self.rotation = rotation
+        self.obscureStrength = obscureStrength
+        if let obscureBlurStrength { self.obscureBlurStrength = obscureBlurStrength }
     }
 }
 
@@ -1104,11 +1126,21 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var obscureEffect: ScreenshotObscureEffect = .blur
     @Published var pixelateStrength: CGFloat = 3
     @Published var blurStrength: CGFloat = 3
+    /// Blur stacked on top of the mosaic blocks; 0 by default so a new mosaic stays plain blocks.
+    @Published var mosaicBlurStrength: CGFloat = 0
     @Published var statusMessage: String?
     @Published var isPinned = false
     @Published private(set) var isLongCapturePreviewing = false
     @Published private(set) var hasLongCaptureResult = false
     @Published var longCaptureDirection = ScreenshotLongCaptureDirection.vertical
+
+    /// Blur amount: the blur effect's own strength, or the extra blur a mosaic stacks on its blocks.
+    var obscureBlurStrength: CGFloat {
+        switch obscureEffect {
+        case .pixelate: mosaicBlurStrength
+        case .blur: blurStrength
+        }
+    }
 
     /// Strength of the effect that is currently selected; each effect keeps its own slider value.
     var obscureStrength: CGFloat {
@@ -1179,7 +1211,8 @@ final class ScreenshotEditorModel: ObservableObject {
         lineWidth: CGFloat? = nil,
         arrowStyle: ScreenshotArrowStyle? = nil,
         fontSize: CGFloat? = nil,
-        obscureStrength: CGFloat? = nil
+        obscureStrength: CGFloat? = nil,
+        obscureBlurStrength: CGFloat? = nil
     ) {
         guard let annotation = annotations.first(where: { $0.id == annotationID }) else { return }
         var updated = annotation
@@ -1211,6 +1244,10 @@ final class ScreenshotEditorModel: ObservableObject {
             }
             if let obscureStrength, annotation.obscureStrength != obscureStrength {
                 updated.obscureStrength = obscureStrength
+                changed = true
+            }
+            if let obscureBlurStrength, annotation.obscureBlurStrength != obscureBlurStrength {
+                updated.obscureBlurStrength = obscureBlurStrength
                 changed = true
             }
         default:
@@ -1540,13 +1577,25 @@ final class ScreenshotEditorModel: ObservableObject {
                     max(8, annotation.obscureStrength * 3) * max(scaleX, scaleY),
                     forKey: kCIInputScaleKey
                 )
-                let pixelated = pixelate?.outputImage
-                filtered = pixelated?.clamped(to: extent).cropped(to: extent)
+                let pixelated = pixelate?.outputImage?.clamped(to: extent).cropped(to: extent)
+                // Blur can ride on top of the blocks; 0 keeps the plain mosaic it used to be.
+                if let pixelated,
+                   annotation.obscureBlurStrength > 0,
+                   let blur = CIFilter(name: "CIGaussianBlur") {
+                    blur.setValue(pixelated, forKey: kCIInputImageKey)
+                    blur.setValue(
+                        annotation.obscureBlurStrength * 1.5 * max(scaleX, scaleY),
+                        forKey: kCIInputRadiusKey
+                    )
+                    filtered = blur.outputImage?.clamped(to: extent).cropped(to: extent) ?? pixelated
+                } else {
+                    filtered = pixelated
+                }
             case .blur:
                 let blur = CIFilter(name: "CIGaussianBlur")
                 blur?.setValue(output, forKey: kCIInputImageKey)
                 blur?.setValue(
-                    max(4, annotation.obscureStrength * 1.5) * max(scaleX, scaleY),
+                    max(4, annotation.obscureBlurStrength * 1.5) * max(scaleX, scaleY),
                     forKey: kCIInputRadiusKey
                 )
                 let blurred = blur?.outputImage
@@ -3548,8 +3597,11 @@ struct ScreenshotEditorView: View {
             case .mosaic:
                 model.lineWidth = annotation.lineWidth
                 switch annotation.obscureEffect {
-                case .pixelate: model.pixelateStrength = annotation.obscureStrength
-                case .blur: model.blurStrength = annotation.obscureStrength
+                case .pixelate:
+                    model.pixelateStrength = annotation.obscurePixelateStrength
+                    model.mosaicBlurStrength = annotation.obscureBlurStrength
+                case .blur:
+                    model.blurStrength = annotation.obscureBlurStrength
                 }
             default:
                 break
@@ -3576,6 +3628,9 @@ struct ScreenshotEditorView: View {
         }
         .onChange(of: model.blurStrength) { _, newValue in
             applyObscureStrength(newValue, ifSelectedRegionUses: .blur)
+        }
+        .onChange(of: model.mosaicBlurStrength) { _, newValue in
+            applyObscureBlurStrength(newValue, ifSelectedRegionUses: .pixelate)
         }
     }
 
@@ -4247,7 +4302,8 @@ struct ScreenshotEditorView: View {
                 lineWidth: model.lineWidth,
                 obscureShape: .rectangle,
                 obscureEffect: model.obscureEffect,
-                obscureStrength: model.obscureStrength
+                obscureStrength: model.obscureStrength,
+                obscureBlurStrength: model.obscureBlurStrength
             )
         case .brush:
             guard draftPoints.count > 1 else { return nil }
@@ -4257,7 +4313,8 @@ struct ScreenshotEditorView: View {
                 lineWidth: model.lineWidth,
                 obscureShape: .brush,
                 obscureEffect: model.obscureEffect,
-                obscureStrength: model.obscureStrength
+                obscureStrength: model.obscureStrength,
+                obscureBlurStrength: model.obscureBlurStrength
             )
         }
     }
@@ -4530,7 +4587,8 @@ struct ScreenshotEditorView: View {
                 lineWidth: model.lineWidth,
                 obscureShape: model.obscureShape,
                 obscureEffect: model.obscureEffect,
-                obscureStrength: model.obscureStrength
+                obscureStrength: model.obscureStrength,
+                obscureBlurStrength: model.obscureBlurStrength
             )
         case .brush:
             guard draftPoints.count > 1 else { return nil }
@@ -4928,11 +4986,24 @@ struct ScreenshotEditorView: View {
                     Divider().frame(height: 24)
                 }
 
-                obscureStrengthControl(for: .pixelate)
+                if model.obscureEffect == .pixelate {
+                    obscureStrengthControl(
+                        title: ScreenshotObscureEffect.pixelate.strengthTitle,
+                        value: $model.pixelateStrength,
+                        range: 1...12
+                    )
 
-                Divider().frame(height: 24)
+                    Divider().frame(height: 24)
+                }
 
-                obscureStrengthControl(for: .blur)
+                obscureStrengthControl(
+                    title: ScreenshotObscureEffect.blur.strengthTitle,
+                    value: model.obscureEffect == .pixelate
+                        ? $model.mosaicBlurStrength
+                        : $model.blurStrength,
+                    // A mosaic may skip the blur entirely; the blur effect has to blur something.
+                    range: model.obscureEffect == .pixelate ? 0...12 : 1...12
+                )
             }
             .padding(.horizontal, 10)
             .frame(height: ScreenshotToolbarLayout.height)
@@ -4941,19 +5012,18 @@ struct ScreenshotEditorView: View {
         }
     }
 
-    /// Both strengths stay on screen so a rectangle region can be tuned for either effect; the one
-    /// the effect picker does not select is dimmed to show it is only holding its value.
-    private func obscureStrengthControl(for effect: ScreenshotObscureEffect) -> some View {
-        let value = effect == .pixelate ? $model.pixelateStrength : $model.blurStrength
-        let isActive = model.obscureEffect == effect
-        return HStack(spacing: 10) {
-            Text(effect.strengthTitle)
+    private func obscureStrengthControl(
+        title: String,
+        value: Binding<CGFloat>,
+        range: ClosedRange<CGFloat>
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(isActive ? Color.primary : Color.secondary)
                 .frame(width: 36, alignment: .leading)
-            Slider(value: value, in: 1...12, step: 1)
+            Slider(value: value, in: range, step: 1)
                 .frame(width: 90)
-                .help(effect.strengthTitle)
+                .help(title)
             Text("\(Int(value.wrappedValue.rounded()))")
                 .font(.system(size: 11, design: .monospaced))
                 .frame(width: 18, alignment: .trailing)
@@ -4964,10 +5034,25 @@ struct ScreenshotEditorView: View {
         _ strength: CGFloat,
         ifSelectedRegionUses effect: ScreenshotObscureEffect
     ) {
+        guard let annotationID = selectedObscureAnnotationID(usingEffect: effect) else { return }
+        model.applySelectedStyle(to: annotationID, obscureStrength: strength)
+    }
+
+    private func applyObscureBlurStrength(
+        _ strength: CGFloat,
+        ifSelectedRegionUses effect: ScreenshotObscureEffect
+    ) {
+        guard let annotationID = selectedObscureAnnotationID(usingEffect: effect) else { return }
+        model.applySelectedStyle(to: annotationID, obscureBlurStrength: strength)
+    }
+
+    private func selectedObscureAnnotationID(
+        usingEffect effect: ScreenshotObscureEffect
+    ) -> UUID? {
         guard let annotationID = selectionState.selectedAnnotationID,
               model.annotations.first(where: { $0.id == annotationID })?.obscureEffect == effect
-        else { return }
-        model.applySelectedStyle(to: annotationID, obscureStrength: strength)
+        else { return nil }
+        return annotationID
     }
 
     private var recognitionMenu: some View {
