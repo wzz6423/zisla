@@ -1811,7 +1811,7 @@ struct SettingsView: View {
 
     private func petDisplayLabel(_ entry: PetLibrary.Entry) -> String {
         switch entry.origin {
-        case .builtin: entry.manifest.displayName
+        case .builtin: AppLocalization.text(entry.manifest.displayName)
         case .imported: AppLocalization.text("%@（已导入）", entry.manifest.displayName)
         }
     }
@@ -2565,7 +2565,7 @@ struct SettingsView: View {
                 detail: networkProxyStatusDetail
             ) {
                 HStack(spacing: 8) {
-                    Text(networkProxyStatusText)
+                    AppLocalizedText(networkProxyStatusText)
                         .font(.system(size: 10))
                         .foregroundStyle(networkProxyStatusColor)
                     IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("重新检测代理"), size: .compact) {

@@ -129,6 +129,22 @@
 "宠物出现在灵动岛内部的左侧或右侧" = "Evcil hayvan Dynamic Island içinde sol veya sağda görünür";
 "左侧" = "Sol";
 "右侧" = "Sağ";
+"小熊" = "Ayı";
+"小鸡" = "Civciv";
+"奶牛" = "İnek";
+"小狗" = "Köpek";
+"小鸭" = "Ördek";
+"青蛙" = "Kurbağa";
+"小马" = "At";
+"小猴" = "Maymun";
+"猫头鹰" = "Baykuş";
+"熊猫" = "Panda";
+"鹦鹉" = "Papağan";
+"企鹅" = "Penguen";
+"小猪" = "Domuz";
+"小兔" = "Tavşan";
+"树懒" = "Tembel Hayvan";
+"鲸鱼" = "Balina";
 
 /* Settings - Interaction */
 "外观" = "Görünüm";

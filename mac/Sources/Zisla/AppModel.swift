@@ -2959,7 +2959,8 @@ final class AppModel: ObservableObject {
       return
     }
 
-    let soundName = backgroundSounds.playingSound?.title ?? "背景音"
+    let soundName = backgroundSounds.playingSound.map { AppLocalization.text($0.title) }
+      ?? AppLocalization.text("背景音")
     let leftNotice = IslandNotice(
       id: "background-sound-left",
       title: soundName,
@@ -3047,7 +3048,7 @@ final class AppModel: ObservableObject {
       IslandNotice(
         id: "focus-transition",
         title: presentation.title,
-        detail: status.isActive ? AppLocalization.text("已开启") : "已关闭",
+        detail: AppLocalization.text(status.isActive ? "已开启" : "已关闭"),
         kind: status.isActive ? .success : .info,
         side: .left,
         style: .status,

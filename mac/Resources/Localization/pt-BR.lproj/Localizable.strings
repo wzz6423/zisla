@@ -129,6 +129,22 @@
 "宠物出现在灵动岛内部的左侧或右侧" = "Pet aparece à esquerda ou direita dentro da Dynamic Island";
 "左侧" = "Esquerda";
 "右侧" = "Direita";
+"小熊" = "Urso";
+"小鸡" = "Pintinho";
+"奶牛" = "Vaca";
+"小狗" = "Cachorro";
+"小鸭" = "Pato";
+"青蛙" = "Sapo";
+"小马" = "Cavalo";
+"小猴" = "Macaco";
+"猫头鹰" = "Coruja";
+"熊猫" = "Panda";
+"鹦鹉" = "Papagaio";
+"企鹅" = "Pinguim";
+"小猪" = "Porquinho";
+"小兔" = "Coelhinho";
+"树懒" = "Bicho-preguiça";
+"鲸鱼" = "Baleia";
 
 /* Settings - Interaction */
 "外观" = "Aparência";

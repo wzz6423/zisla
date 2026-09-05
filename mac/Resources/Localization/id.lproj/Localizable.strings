@@ -129,6 +129,22 @@
 "宠物出现在灵动岛内部的左侧或右侧" = "Pet muncul di sisi kiri atau kanan di dalam Dynamic Island";
 "左侧" = "Kiri";
 "右侧" = "Kanan";
+"小熊" = "Beruang";
+"小鸡" = "Anak Ayam";
+"奶牛" = "Sapi";
+"小狗" = "Anjing";
+"小鸭" = "Bebek";
+"青蛙" = "Katak";
+"小马" = "Kuda";
+"小猴" = "Monyet";
+"猫头鹰" = "Burung Hantu";
+"熊猫" = "Panda";
+"鹦鹉" = "Burung Beo";
+"企鹅" = "Penguin";
+"小猪" = "Babi";
+"小兔" = "Kelinci";
+"树懒" = "Kungkang";
+"鲸鱼" = "Ikan Paus";
 
 /* Settings - Interaction */
 "外观" = "Tampilan";

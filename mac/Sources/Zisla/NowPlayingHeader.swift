@@ -19,8 +19,8 @@ enum MediaTextFormatting {
         for sound: SystemBackgroundSound
     ) -> NowPlayingSnapshot {
         NowPlayingSnapshot(
-            title: "背景音",
-            artist: sound.title,
+            title: AppLocalization.text("背景音"),
+            artist: AppLocalization.text(sound.title),
             album: nil,
             artworkData: nil,
             duration: nil,

@@ -129,6 +129,22 @@
 "宠物出现在灵动岛内部的左侧或右侧" = "Huisdier verschijnt links of rechts binnen Dynamic Island";
 "左侧" = "Links";
 "右侧" = "Rechts";
+"小熊" = "Beer";
+"小鸡" = "Kuiken";
+"奶牛" = "Koe";
+"小狗" = "Hond";
+"小鸭" = "Eend";
+"青蛙" = "Kikker";
+"小马" = "Paard";
+"小猴" = "Aap";
+"猫头鹰" = "Uil";
+"熊猫" = "Panda";
+"鹦鹉" = "Papegaai";
+"企鹅" = "Pinguïn";
+"小猪" = "Varken";
+"小兔" = "Konijn";
+"树懒" = "Luiaard";
+"鲸鱼" = "Walvis";
 
 /* Settings - Interaction */
 "外观" = "Uiterlijk";

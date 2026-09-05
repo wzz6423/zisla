@@ -796,7 +796,7 @@ private struct BackgroundSoundControl: View {
                             onSelect(sound)
                         } label: {
                             Label(
-                                sound.title,
+                                AppLocalization.text(sound.title),
                                 systemImage: sound == selectedSound ? "checkmark" : "waveform"
                             )
                         }
@@ -838,7 +838,10 @@ private struct BackgroundSoundControl: View {
     }
 
     private var controlTitle: String {
-        service.isPlaying ? (service.playingSound?.title ?? "背景音") : "背景音"
+        guard service.isPlaying, let playing = service.playingSound else {
+            return AppLocalization.text("背景音")
+        }
+        return AppLocalization.text(playing.title)
     }
 
     private var isSelectedSoundQueued: Bool {

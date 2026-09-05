@@ -129,6 +129,22 @@
 "宠物出现在灵动岛内部的左侧或右侧" = "Thú cưng xuất hiện ở bên trái hoặc bên phải bên trong Dynamic Island";
 "左侧" = "Trái";
 "右侧" = "Phải";
+"小熊" = "Gấu";
+"小鸡" = "Gà con";
+"奶牛" = "Bò sữa";
+"小狗" = "Cún";
+"小鸭" = "Vịt";
+"青蛙" = "Ếch";
+"小马" = "Ngựa";
+"小猴" = "Khỉ";
+"猫头鹰" = "Cú";
+"熊猫" = "Gấu trúc";
+"鹦鹉" = "Vẹt";
+"企鹅" = "Chim cánh cụt";
+"小猪" = "Heo";
+"小兔" = "Thỏ";
+"树懒" = "Thú lười";
+"鲸鱼" = "Cá voi";
 
 /* Settings - Interaction */
 "外观" = "Giao diện";

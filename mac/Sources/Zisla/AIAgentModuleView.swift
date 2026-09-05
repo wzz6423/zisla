@@ -524,7 +524,7 @@ struct AIAgentModuleView: View {
     private func cliCommandGroup(title: String, commands: [AIAgentCLICommand]) -> some View {
         if !commands.isEmpty {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                AppLocalizedText(title)
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
                 cliCommandRows(commands: commands, paddingLeading: 0)

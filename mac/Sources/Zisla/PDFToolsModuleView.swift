@@ -95,7 +95,7 @@ struct PDFToolsModuleView: View {
                         }
                     }
                     .zIndex(hoveredOperation == item ? 1 : 0)
-                    .help(item.detail)
+                    .help(AppLocalization.text(item.detail))
                 }
             }
             .padding(.horizontal, 3)
@@ -108,7 +108,7 @@ struct PDFToolsModuleView: View {
         HStack(alignment: .firstTextBaseline) {
             Label(AppLocalization.text(operation.title), systemImage: operation.symbol)
                 .font(.system(size: 14, weight: .semibold))
-            Text(operation.detail)
+            AppLocalizedText(operation.detail)
                 .font(.islandMicro())
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
