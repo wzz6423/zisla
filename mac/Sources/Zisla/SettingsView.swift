@@ -452,6 +452,7 @@ struct SettingsView: View {
                                         .foregroundStyle(.green)
                                 }
                                 .font(.caption)
+                                .keepsIntrinsicWidth()
                             } else {
                                 Button {
                                     model.openVoiceInputInputMonitoringSettings()
@@ -459,6 +460,7 @@ struct SettingsView: View {
                                     AppLocalizedText("去授权")
                                 }
                                 .controlSize(.small)
+                                .keepsIntrinsicWidth()
                             }
                         }
                     }
@@ -520,6 +522,7 @@ struct SettingsView: View {
                                 AppLocalizedText("去授权")
                             }
                             .controlSize(.small)
+                            .keepsIntrinsicWidth()
                         }
                     }
                     rowDivider
@@ -624,6 +627,7 @@ struct SettingsView: View {
                             }
                         }
                         .controlSize(.small)
+                        .keepsIntrinsicWidth()
                     }
                     ForEach(assistantBlacklistEntries, id: \.bundleIdentifier) { entry in
                         rowDivider
@@ -893,11 +897,13 @@ struct SettingsView: View {
                                     Label(AppLocalization.text("已授权"), systemImage: "checkmark.circle.fill")
                                         .foregroundStyle(.green)
                                         .font(.caption)
+                                        .keepsIntrinsicWidth()
                                 } else {
                                     Button(AppLocalization.text("打开设置")) {
                                         model.openVoiceInputInputMonitoringSettings()
                                     }
                                     .controlSize(.small)
+                                    .keepsIntrinsicWidth()
                                 }
                             }
                         }
@@ -953,8 +959,8 @@ struct SettingsView: View {
                         .frame(minWidth: 150, alignment: .trailing)
 
                         Button(AppLocalization.text("试听键盘音")) { model.keyboardSound.preview() }
-                            .fitsSingleLine()
                             .controlSize(.small)
+                            .keepsIntrinsicWidth()
                             .disabled(!model.settingsStore.settings.keyboardEnabled)
                     }
                     .disabled(!model.settingsStore.settings.keyboardEnabled)
@@ -984,9 +990,11 @@ struct SettingsView: View {
                         Label(AppLocalization.text("已授权"), systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                             .font(.caption)
+                            .keepsIntrinsicWidth()
                     } else {
                         Button(AppLocalization.text("打开设置")) { model.keyboardSound.openInputMonitoringSettings() }
                             .controlSize(.small)
+                            .keepsIntrinsicWidth()
                     }
                 }
             }
@@ -1288,6 +1296,7 @@ struct SettingsView: View {
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
+                            .keepsIntrinsicWidth()
                             .disabled(model.voiceModelDiscoveryState.isTesting)
                         }
                     }
@@ -1384,6 +1393,7 @@ struct SettingsView: View {
                             .onSubmit(addCustomVoiceHotword)
                         Button(AppLocalization.text("添加"), action: addCustomVoiceHotword)
                             .controlSize(.small)
+                            .keepsIntrinsicWidth()
                             .disabled(
                                 customVoiceHotword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             )
@@ -1629,8 +1639,8 @@ struct SettingsView: View {
 
     private var discoveryStatusText: String {
         switch model.voiceModelDiscoveryState {
-        case .idle: "尚未测试连接"
-        case .testing: "正在连接…"
+        case .idle: AppLocalization.text("尚未测试连接")
+        case .testing: AppLocalization.text("正在连接…")
         case .success(let count): AppLocalization.text("已发现 %ld 个模型", count)
         case .failed(let message): message
         }
@@ -1691,11 +1701,13 @@ struct SettingsView: View {
                                 Label(AppLocalization.text("已授权"), systemImage: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
                                     .font(.caption)
+                                    .keepsIntrinsicWidth()
                             } else {
                                 Button(AppLocalization.text("打开设置")) {
                                     model.openVoiceInputInputMonitoringSettings()
                                 }
                                 .controlSize(.small)
+                                .keepsIntrinsicWidth()
                             }
                         }
                     }
@@ -2006,6 +2018,7 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .keepsIntrinsicWidth()
                     }
                 }
 
@@ -2084,7 +2097,7 @@ struct SettingsView: View {
                     Button(AppLocalization.text("选择默认下载目录")) { chooseDownloadDirectory() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        .fixedSize(horizontal: true, vertical: false)
+                        .keepsIntrinsicWidth()
                 }
             }
 
@@ -2129,6 +2142,7 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .keepsIntrinsicWidth()
                 .disabled(state.isBusy)
                 .help(
                     state.isInstalled
@@ -2400,6 +2414,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .keepsIntrinsicWidth()
                 }
             }
         }
@@ -2565,6 +2580,7 @@ struct SettingsView: View {
                     AppLocalizedText(networkProxyStatusText)
                         .font(.system(size: 10))
                         .foregroundStyle(networkProxyStatusColor)
+                        .keepsIntrinsicWidth()
                     IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("重新检测代理"), size: .compact) {
                         checkNetworkProxy()
                     }
@@ -2871,6 +2887,7 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .keepsIntrinsicWidth()
             }
         } else {
             ForEach(Array(accounts.enumerated()), id: \.element.id) { index, account in

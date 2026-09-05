@@ -17,6 +17,16 @@ public extension View {
     func fitsLines(_ lines: Int, minScale: CGFloat = 0.8) -> some View {
         modifier(TextFit(lines: lines, minScale: minScale))
     }
+
+    /// For a control whose label *is* its content (action buttons, status labels) sitting next to
+    /// wrappable copy. A settings row gives its title/description column `.layoutPriority(1)`, so the
+    /// description takes the width it wants and leaves the control only its minimum — which, once
+    /// tightening and scaling are allowed, is close to zero: German "Tastenklang anhören" rendered as
+    /// "T…". Claiming the label's own width instead pushes the description into wrapping, and changes
+    /// nothing wherever the description already fits on one line.
+    func keepsIntrinsicWidth() -> some View {
+        fixedSize(horizontal: true, vertical: false)
+    }
 }
 
 /// Applying the three modifiers through a `ViewModifier` instead of chaining them at each call site
