@@ -119,6 +119,27 @@ struct AIMascotLibraryTests {
     }
 
     @Test
+    func installedGeminiURLPrefersBundleIdentifierThenApplicationName() {
+        let bundleMatched = URL(fileURLWithPath: "/Applications/Gemini.app", isDirectory: true)
+        let byBundleIdentifier = AIMascotLibrary.installedGeminiApplicationURL(
+            resolveBundleIdentifier: { $0 == "com.google.GeminiMacOS" ? bundleMatched : nil },
+            applicationDirectories: [],
+            fileExists: { _ in false }
+        )
+        #expect(byBundleIdentifier == bundleMatched)
+
+        let directory = URL(fileURLWithPath: "/Applications")
+        let byName = AIMascotLibrary.installedGeminiApplicationURL(
+            resolveBundleIdentifier: { _ in nil },
+            applicationDirectories: [directory],
+            fileExists: {
+                $0 == directory.appendingPathComponent("Gemini.app", isDirectory: true)
+            }
+        )
+        #expect(byName == bundleMatched)
+    }
+
+    @Test
     func mapsProvidersToBundledBrandAssets() {
         #expect(AIMascotLibrary.providerAssetName(for: .codex) == "codex-color.svg")
         #expect(AIMascotLibrary.providerAssetName(for: .gpt) == "openai.svg")

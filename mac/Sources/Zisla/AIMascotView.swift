@@ -25,6 +25,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     case claude
     case codex
     case gemini
+    case geminiDesktop
     case grok
     case gpt
     case copilot
@@ -42,9 +43,15 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
-    init(provider: AIProvider, taskID _: String, title: String? = nil) {
+    init(provider: AIProvider, taskID: String, title: String? = nil) {
         if provider == .harness, title == "DeepSeek Harness" {
             self = .deepseekHarness
+            return
+        }
+        // The desktop app and the CLI share one provider, so the task ID decides which logo applies.
+        if provider == .gemini,
+           taskID.contains(GeminiDesktopSessionActivityDetector.taskIDPrefix) {
+            self = .geminiDesktop
             return
         }
         switch provider {
@@ -69,7 +76,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
 
     init(noticeID: String?) {
         if let provider = AIMascotLibrary.provider(fromNoticeID: noticeID) {
-            self.init(provider: provider, taskID: "")
+            self.init(provider: provider, taskID: noticeID ?? "")
             return
         }
         let id = noticeID?.lowercased() ?? ""
@@ -120,6 +127,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .claude: .claude
         case .codex: .codex
         case .gemini: .gemini
+        case .geminiDesktop: .gemini
         case .grok: .grok
         case .gpt: .gpt
         case .copilot: .copilot
@@ -199,6 +207,12 @@ struct AIMascotView: View {
     /// Installed client's official icon takes priority over the bundled offline asset.
     private var installedProviderImage: NSImage? {
         switch identity {
+        case .geminiDesktop:
+            return AIMascotImageCache.shared.image(for: "installed|gemini") {
+                AIMascotLibrary.installedGeminiApplicationURL().map {
+                    NSWorkspace.shared.icon(forFile: $0.path)
+                }
+            }
         case .coder:
             return AIMascotImageCache.shared.image(for: "installed|coder") {
                 AIMascotLibrary.installedCoderApplicationURL().map {
