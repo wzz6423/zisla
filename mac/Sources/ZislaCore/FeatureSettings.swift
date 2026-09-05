@@ -658,12 +658,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         screenshotHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.capture,
         screenshotPinHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.pin,
         screenshotPinnedToolbarVisible: Bool = true,
-        keyboardEnabled: Bool = false,
+        keyboardEnabled: Bool = true,
         keyboardSelectedProfileID: String = "holypanda",
         keyboardVolume: Double = 0.75,
         keyboardPlaysReleaseSound: Bool = true,
         keyboardUsesPitchVariation: Bool = true,
-        keyboardTypingStatsEnabled: Bool = false
+        keyboardTypingStatsEnabled: Bool = true
     ) {
         self.mediaEnabled = mediaEnabled
         self.mediaSource = mediaSource

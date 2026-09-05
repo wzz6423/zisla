@@ -102,12 +102,84 @@ struct MailServiceTests {
 
         // If any account's inbox fails to resolve, the whole fetch must not blow up.
         #expect(script.contains("on error"))
-        #expect(script.contains("messages of inbox of mailAccount"))
+        #expect(script.contains("messages of mailbox \"INBOX\" of mailAccount"))
         #expect(script.contains("set mailAccount to item i of accountList"))
         #expect(script.contains("-- Skip unreadable individual messages (corrupt or excessively large)."))
         #expect(script.contains("-- This account's inbox is currently unavailable"))
         // When an account name is unreadable, fill a placeholder so later indices stay aligned.
         #expect(script.contains("未知账户"))
+    }
+
+    @Test @MainActor
+    func everyScriptAddressesTheAccountInboxByMailboxName() {
+        // Mail 16 rejects `inbox of <account>` with "can't get inbox of account id …", which made
+        // the fetch return zero messages and every write-back unreachable.
+        let message = MailMessage(
+            accountName: "工作邮箱",
+            messageID: 42,
+            sender: "alice@example.com",
+            subject: "主题",
+            body: "正文",
+            receivedAt: .now,
+            isRead: false
+        )
+        let scripts = [
+            MailService.inboxScript(accountNames: []),
+            MailService.markReadScript(message: message),
+            MailService.markJunkScript(message: message),
+            MailService.deleteScript(message: message),
+            MailService.replyScript(message: message, body: "收到"),
+        ]
+
+        for script in scripts {
+            #expect(script.contains("mailbox \"INBOX\" of "))
+            #expect(!script.contains("of inbox of "))
+        }
+    }
+
+    @Test @MainActor
+    func mailBundleIdentifierMatchesMailAppExactly() throws {
+        // `runningApplications(withBundleIdentifier:)` compares case-sensitively, so a camel-cased
+        // identifier silently reports "Mail.app isn't running" while Mail is open.
+        #expect(MailService.mailBundleIdentifier == MailService.mailBundleIdentifier.lowercased())
+
+        let installedPlist = [
+            "/System/Applications/Mail.app/Contents/Info.plist",
+            "/Applications/Mail.app/Contents/Info.plist",
+        ].first { FileManager.default.fileExists(atPath: $0) }
+        // Nothing to compare against on a machine without Mail.app.
+        guard let installedPlist else { return }
+
+        let plist = try PropertyListSerialization.propertyList(
+            from: Data(contentsOf: URL(fileURLWithPath: installedPlist)),
+            format: nil
+        ) as? [String: Any]
+        let identifier = try #require(plist?["CFBundleIdentifier"] as? String)
+        #expect(MailService.mailBundleIdentifier == identifier)
+    }
+
+    @Test @MainActor
+    func runningMailIsLookedUpThroughThePinnedIdentifier() throws {
+        // The constant above is only worth pinning if the lookup actually uses it; the original
+        // defect was a camel-cased literal at this call site. Scan for the call line, skipping the
+        // comments that name the very API being matched.
+        let source = try String(contentsOf: Self.mailServiceSourceURL, encoding: .utf8)
+        let lookup = try #require(
+            source
+                .split(separator: "\n")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .first { !$0.hasPrefix("//") && $0.contains("runningApplications(withBundleIdentifier:") }
+        )
+
+        #expect(lookup.contains("withBundleIdentifier: mailBundleIdentifier"))
+    }
+
+    private static var mailServiceSourceURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/ZislaKit/MailService.swift")
     }
 
     @Test @MainActor

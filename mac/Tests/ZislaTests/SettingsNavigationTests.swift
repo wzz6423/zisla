@@ -99,13 +99,13 @@ struct SettingsNavigationTests {
         let settings = FeatureSettings()
         #expect(SettingsSection.general.isVisible(settings: settings))
         #expect(SettingsSection.features.isVisible(settings: settings))
-        #expect(!SettingsSection.keyboardSound.isVisible(settings: settings))
+        #expect(SettingsSection.keyboardSound.isVisible(settings: settings))
         #expect(SettingsSection.networkProxy.isVisible(settings: settings))
         #expect(SettingsSection.recommendations.isVisible(settings: settings))
 
-        var enabledSettings = settings
-        enabledSettings.keyboardEnabled = true
-        #expect(SettingsSection.keyboardSound.isVisible(settings: enabledSettings))
+        var disabledSettings = settings
+        disabledSettings.keyboardEnabled = false
+        #expect(!SettingsSection.keyboardSound.isVisible(settings: disabledSettings))
     }
 
     @Test

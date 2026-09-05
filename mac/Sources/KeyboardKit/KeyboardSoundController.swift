@@ -196,6 +196,7 @@ public final class KeyboardSoundController: ObservableObject {
         model.settings.isTypingStatsEnabled = typingStatsEnabled
         if enabled || typingStatsEnabled {
             model.startServicesIfNeeded()
+            requestInputMonitoringIfNeeded()
         } else {
             model.stop()
         }
@@ -205,8 +206,31 @@ public final class KeyboardSoundController: ObservableObject {
         model.requestInputMonitoring()
     }
 
+    /// Mirrors the clipboard, screenshot and voice authorization rows: ask first, because the system
+    /// dialog grants in a single click, and fall back to System Settings once the prompt is spent —
+    /// from then on it is the only way left to grant.
     public func openInputMonitoringSettings() {
+        requestInputMonitoringIfNeeded()
+        guard !model.permission.isGranted else { return }
         model.openInputMonitoringSettings()
+    }
+
+    static func shouldRequestInputMonitoring(
+        hasAccess: Bool,
+        hasRequestedBefore: Bool
+    ) -> Bool {
+        !hasAccess && !hasRequestedBefore
+    }
+
+    /// Keyboard sound and typing stats are passive global listeners: no user action marks the moment
+    /// the permission is needed, and both default to on, so a fresh install has to be asked while
+    /// the listener is starting up.
+    private func requestInputMonitoringIfNeeded() {
+        guard Self.shouldRequestInputMonitoring(
+            hasAccess: model.permission.refresh(),
+            hasRequestedBefore: model.permission.hasRequestedOnce
+        ) else { return }
+        model.requestInputMonitoring()
     }
 
     public func retryInputMonitoring() {
