@@ -270,6 +270,9 @@ export const ptBR = createCatalog({
     primaryCtaAriaLabel: 'Baixar o zisla',
     releaseCta: 'Ver release',
     releaseCtaAriaLabel: 'Ver os detalhes da release no GitHub',
+    brewMono: 'HOMEBREW / UM COMANDO',
+    brewNote: 'O Sparkle mantém o zisla atualizado, então um brew upgrade simples não mexe no app; execute brew upgrade --cask zisla se quiser que o Homebrew faça a substituição. O tap serve apenas versões estáveis.',
+    copyBrewCommandAriaLabel: 'Copiar o comando de instalação do Homebrew',
     notes: {
       system: { term: 'Sistema', value: 'macOS 14 ou posterior · Configuração compatível atual: Mac com Apple Silicon' },
       install: { term: 'Instalação', value: 'Monte o DMG e arraste para Aplicativos' },
@@ -372,5 +375,6 @@ export const ptBR = createCatalog({
   toast: {
     runCommandCopied: 'Comando de execução copiado',
     zislactlCopied: 'Comando zislactl copiado',
+    brewCommandCopied: 'Comando de instalação do Homebrew copiado',
   },
 });

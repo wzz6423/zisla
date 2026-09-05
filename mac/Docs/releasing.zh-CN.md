@@ -79,3 +79,23 @@ diskutil eject /Volumes/zisla
 ```
 
 使用旧版本检查新 Release，确认自动检查和手动检查都先读取所选 Gitee feed，当其无法加载或更新包下载失败时回退一次对应 GitHub feed，且 Sparkle 能验签、安装并重启 Universal ZIP。还要验证 Release→Preview、Preview→Release 和同通道更新。
+
+## 4. 同步 Homebrew cask
+
+正式版的最后一站是 Homebrew。Preview 版本到上一步为止：tap 只提供正式版，`brew upgrade` 因此不会把用户带到预发布版本。
+
+发布资产上传完成后，在仓库根目录执行：
+
+```bash
+VERSION=1.0.0 RELEASE_OUTPUT_DIRECTORY=mac/dist PUBLISH_TAP=true make sync-cask
+```
+
+脚本会改写 `Casks/zisla.rb` 中的 `version` 与 `sha256`：`$RELEASE_OUTPUT_DIRECTORY/zisla-v$VERSION-macOS-universal.zip.sha256` 存在时读本地摘要，否则从已发布的 GitHub 资产拉取。未通过 `homebrew-cask.rb verify` 的 cask 不会被写回，通过后再镜像到 `wzz6423/homebrew-tap`。不带 `PUBLISH_TAP` 即为试运行，只更新仓库内的 cask。
+
+cask 声明 `auto_updates true`，因为更新链路归 Sparkle 所有：直接执行 `brew upgrade` 不会动已安装的应用，只有 `brew upgrade --cask zisla` 或 `--greedy` 才让 Homebrew 替换。改写后的 cask 必须与官网 `latestRelease` 的版本一起提交——两者版本不一致时 CI 会失败。随后验证 tap：
+
+```bash
+brew update
+brew install --cask wzz6423/tap/zisla
+brew livecheck --cask wzz6423/tap/zisla
+```

@@ -257,6 +257,9 @@ export const nl = createCatalog({
     primaryCtaAriaLabel: 'zisla downloaden',
     releaseCta: 'Release bekijken',
     releaseCtaAriaLabel: 'Releasedetails op GitHub bekijken',
+    brewMono: 'HOMEBREW / ÉÉN OPDRACHT',
+    brewNote: 'Sparkle houdt zisla zelf bij, dus een gewone brew upgrade laat de app staan; voer brew upgrade --cask zisla uit als Homebrew hem moet vervangen. De tap levert alleen stabiele releases.',
+    copyBrewCommandAriaLabel: 'Homebrew-installatieopdracht kopiëren',
     notes: {
       system: { term: 'Systeem', value: 'macOS 14 of later · Huidige ondersteunde configuratie: Mac met Apple Silicon' },
       install: { term: 'Installeren', value: 'Koppel de DMG en sleep hem naar Programma’s' },
@@ -332,5 +335,5 @@ export const nl = createCatalog({
     tagline: 'Open source, native en onder jouw controle.',
   },
   common: { copyCommandTitle: 'Opdracht kopiëren', copiedAriaLabel: 'Gekopieerd' },
-  toast: { runCommandCopied: 'Startopdracht gekopieerd', zislactlCopied: 'zislactl-opdracht gekopieerd' },
+  toast: { runCommandCopied: 'Startopdracht gekopieerd', zislactlCopied: 'zislactl-opdracht gekopieerd', brewCommandCopied: 'Homebrew-installatieopdracht gekopieerd' },
 });

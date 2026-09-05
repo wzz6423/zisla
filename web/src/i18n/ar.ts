@@ -197,6 +197,9 @@ export const ar = createCatalog({
     primaryCtaAriaLabel: 'تنزيل zisla',
     releaseCta: 'عرض الإصدار',
     releaseCtaAriaLabel: 'عرض تفاصيل الإصدار على GitHub',
+    brewMono: 'HOMEBREW / أمر واحد',
+    brewNote: 'يحدّث Sparkle تطبيق zisla بنفسه، لذا لا يمسّه أمر brew upgrade العادي؛ نفّذ brew upgrade --cask zisla إذا أردت أن يتولى Homebrew الاستبدال. ولا يقدّم الـ tap سوى الإصدارات المستقرة.',
+    copyBrewCommandAriaLabel: 'نسخ أمر التثبيت عبر Homebrew',
     notes: {
       system: { term: 'النظام', value: 'macOS 14 أو أحدث · التكوين المدعوم حاليًا: Mac مع Apple Silicon' },
       install: { term: 'التثبيت', value: 'ثبّت DMG واسحبه إلى التطبيقات' },
@@ -272,5 +275,5 @@ export const ar = createCatalog({
     tagline: 'مفتوح المصدر، أصلي، وتحت سيطرتك.',
   },
   common: { copyCommandTitle: 'نسخ الأمر', copiedAriaLabel: 'تم النسخ' },
-  toast: { runCommandCopied: 'تم نسخ أمر التشغيل', zislactlCopied: 'تم نسخ أمر zislactl' },
+  toast: { runCommandCopied: 'تم نسخ أمر التشغيل', zislactlCopied: 'تم نسخ أمر zislactl', brewCommandCopied: 'تم نسخ أمر التثبيت عبر Homebrew' },
 });

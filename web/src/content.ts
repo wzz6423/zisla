@@ -184,6 +184,9 @@ export const license = 'PolyForm Noncommercial 1.0.0';
 
 export const runCommand = 'cd mac && swift run zisla';
 
+/** Third-party tap: `wzz6423/homebrew-tap` is addressed as `wzz6423/tap`. */
+export const brewInstallCommand = 'brew install --cask wzz6423/tap/zisla';
+
 /** `{title}` is filled from the catalog so the sample task reads naturally. */
 export const zislactlCommandTemplate =
   'zislactl update --id build --provider coder --title "{title}" --progress 62';
@@ -324,6 +327,9 @@ export interface SiteContent {
     primaryCtaAriaLabel: string;
     releaseCta: string;
     releaseCtaAriaLabel: string;
+    brewMono: string;
+    brewNote: string;
+    copyBrewCommandAriaLabel: string;
     notes: Record<DownloadNoteId, DownloadNoteCopy>;
   };
   faq: {
@@ -357,6 +363,7 @@ export interface SiteContent {
   toast: {
     runCommandCopied: string;
     zislactlCopied: string;
+    brewCommandCopied: string;
   };
 }
 

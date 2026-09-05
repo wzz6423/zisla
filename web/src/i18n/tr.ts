@@ -149,6 +149,9 @@ export const tr = createCatalog({
     primaryCtaAriaLabel: 'zisla indir',
     releaseCta: 'Sürümü görüntüle',
     releaseCtaAriaLabel: 'Sürüm ayrıntılarını GitHub\'da görüntüle',
+    brewMono: 'HOMEBREW / TEK KOMUT',
+    brewNote: 'zisla güncellemelerini Sparkle üstlenir; bu yüzden sade bir brew upgrade uygulamaya dokunmaz. Değişimi Homebrew yapsın istiyorsan brew upgrade --cask zisla komutunu çalıştır. Tap yalnızca kararlı sürümleri sunar.',
+    copyBrewCommandAriaLabel: 'Homebrew kurulum komutunu kopyala',
     notes: {
       system: { term: 'Sistem', value: 'macOS 14 veya sonrası · Bugün desteklenen yapılandırma Apple Silicon Mac\'lerdir' },
       install: { term: 'Kurulum', value: 'DMG\'yi bağlayın ve Applications klasörüne sürükleyin' },
@@ -224,5 +227,5 @@ export const tr = createCatalog({
     tagline: 'Açık kaynak, yerel ve kontrol sizin elinizde.',
   },
   common: { copyCommandTitle: 'Komutu kopyala', copiedAriaLabel: 'Kopyalandı' },
-  toast: { runCommandCopied: 'Kaynak çalıştırma komutu kopyalandı', zislactlCopied: 'zislactl komutu kopyalandı' },
+  toast: { runCommandCopied: 'Kaynak çalıştırma komutu kopyalandı', zislactlCopied: 'zislactl komutu kopyalandı', brewCommandCopied: 'Homebrew kurulum komutu kopyalandı' },
 });

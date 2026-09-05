@@ -144,6 +144,9 @@ export const th = createCatalog({
     primaryCtaAriaLabel: 'ดาวน์โหลด zisla',
     releaseCta: 'ดูรีลีส',
     releaseCtaAriaLabel: 'ดูรายละเอียดรีลีสบน GitHub',
+    brewMono: 'HOMEBREW / คำสั่งเดียว',
+    brewNote: 'Sparkle อัปเดต zisla ด้วยตัวเอง จึงทำให้ brew upgrade ธรรมดาไม่แทนที่แอป หากต้องการให้ Homebrew จัดการ ให้รัน brew upgrade --cask zisla ส่วน tap ให้บริการเฉพาะรุ่นเสถียร',
+    copyBrewCommandAriaLabel: 'คัดลอกคำสั่งติดตั้ง Homebrew',
     notes: {
       system: { term: 'ระบบ', value: 'macOS 14 ขึ้นไป · การกำหนดค่าที่รองรับ: Mac ที่ใช้ Apple Silicon' },
       install: { term: 'ติดตั้ง', value: 'เมานต์ DMG แล้วลากไปยัง Applications' },
@@ -219,5 +222,5 @@ export const th = createCatalog({
     tagline: 'โอเพนซอร์ส เนทีฟ และอยู่ในการควบคุมของคุณ',
   },
   common: { copyCommandTitle: 'คัดลอกคำสั่ง', copiedAriaLabel: 'คัดลอกแล้ว' },
-  toast: { runCommandCopied: 'คัดลอกคำสั่งรันแล้ว', zislactlCopied: 'คัดลอกคำสั่ง zislactl แล้ว' },
+  toast: { runCommandCopied: 'คัดลอกคำสั่งรันแล้ว', zislactlCopied: 'คัดลอกคำสั่ง zislactl แล้ว', brewCommandCopied: 'คัดลอกคำสั่งติดตั้ง Homebrew แล้ว' },
 });

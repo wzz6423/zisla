@@ -78,3 +78,23 @@ diskutil eject /Volumes/zisla
 ```
 
 Use an older app version to check the new release. Confirm that automatic and manual checks use the selected Gitee feed first, retry its GitHub counterpart once when Gitee cannot load or its package download fails, and that Sparkle verifies, installs, and relaunches the Universal ZIP. Test Release→Preview and Preview→Release switching as well as same-channel updates.
+
+## 4. Sync the Homebrew cask
+
+A stable release ends at Homebrew. Preview releases stop before this step: the tap serves stable versions only, so `brew upgrade` never moves a user onto a prerelease.
+
+From the repository root, after the release assets are published:
+
+```bash
+VERSION=1.0.0 RELEASE_OUTPUT_DIRECTORY=mac/dist PUBLISH_TAP=true make sync-cask
+```
+
+The script rewrites `version` and `sha256` in `Casks/zisla.rb`, reading the digest from `$RELEASE_OUTPUT_DIRECTORY/zisla-v$VERSION-macOS-universal.zip.sha256` when that file exists and from the published GitHub asset otherwise. It refuses to write a cask that fails `homebrew-cask.rb verify`, then mirrors the file to `wzz6423/homebrew-tap`. Omit `PUBLISH_TAP` for a dry run that only updates the in-repo cask.
+
+The cask carries `auto_updates true` because Sparkle owns the update path: a plain `brew upgrade` leaves the app alone, and only `brew upgrade --cask zisla` or `--greedy` makes Homebrew replace it. Commit the rewritten cask together with the site's `latestRelease` bump — CI fails when the two pin different versions. Then confirm the tap:
+
+```bash
+brew update
+brew install --cask wzz6423/tap/zisla
+brew livecheck --cask wzz6423/tap/zisla
+```

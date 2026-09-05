@@ -291,6 +291,9 @@ export const de: SiteContent = {
     primaryCtaAriaLabel: 'Laden',
     releaseCta: 'Release ansehen',
     releaseCtaAriaLabel: 'Details des Release auf GitHub ansehen',
+    brewMono: 'HOMEBREW / EIN BEFEHL',
+    brewNote: 'Sparkle hält zisla selbst aktuell, deshalb lässt ein einfaches brew upgrade die App unberührt – führe brew upgrade --cask zisla aus, wenn Homebrew sie ersetzen soll. Der Tap liefert nur stabile Releases.',
+    copyBrewCommandAriaLabel: 'Homebrew-Installationsbefehl kopieren',
     notes: {
       system: {
         term: 'System',
@@ -415,5 +418,6 @@ export const de: SiteContent = {
   toast: {
     runCommandCopied: 'Befehl zum Start aus dem Quellcode kopiert',
     zislactlCopied: 'zislactl-Befehl kopiert',
+    brewCommandCopied: 'Homebrew-Installationsbefehl kopiert',
   },
 };

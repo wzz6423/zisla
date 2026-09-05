@@ -213,6 +213,9 @@ export const ru = createCatalog({
     primaryCtaAriaLabel: 'Скачать zisla',
     releaseCta: 'Открыть релиз',
     releaseCtaAriaLabel: 'Открыть сведения о релизе на GitHub',
+    brewMono: 'HOMEBREW / ОДНА КОМАНДА',
+    brewNote: 'Sparkle обновляет zisla самостоятельно, поэтому обычный brew upgrade не трогает приложение — выполните brew upgrade --cask zisla, если хотите, чтобы заменой занялся Homebrew. Tap отдаёт только стабильные версии.',
+    copyBrewCommandAriaLabel: 'Скопировать команду установки Homebrew',
     notes: {
       system: { term: 'Система', value: 'macOS 14 или новее · Поддерживаемая конфигурация: Mac с Apple Silicon' },
       install: { term: 'Установка', value: 'Подключите DMG и перетащите приложение в «Программы»' },
@@ -288,5 +291,5 @@ export const ru = createCatalog({
     tagline: 'Открытый исходный код, нативное приложение и ваш контроль.',
   },
   common: { copyCommandTitle: 'Скопировать команду', copiedAriaLabel: 'Скопировано' },
-  toast: { runCommandCopied: 'Команда запуска скопирована', zislactlCopied: 'Команда zislactl скопирована' },
+  toast: { runCommandCopied: 'Команда запуска скопирована', zislactlCopied: 'Команда zislactl скопирована', brewCommandCopied: 'Команда установки Homebrew скопирована' },
 });

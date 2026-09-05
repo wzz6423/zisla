@@ -43,9 +43,25 @@ zisla 可监控 Codex、Claude Code、Pi、GitHub Copilot、Gemini、Grok、Kimi
 
 ### 安装应用
 
-从 [GitHub Releases](https://github.com/wzz6423/zisla/releases) 或 [Gitee Releases](https://gitee.com/wzz6423/zisla/releases) 下载最新 DMG，挂载后将 `zisla.app` 拖入 `Applications`。
+使用 Homebrew 安装：
+
+```bash
+brew install --cask wzz6423/tap/zisla
+```
+
+也可以从 [GitHub Releases](https://github.com/wzz6423/zisla/releases) 或 [Gitee Releases](https://gitee.com/wzz6423/zisla/releases) 下载最新 DMG，挂载后将 `zisla.app` 拖入 `Applications`。
 
 启动后，将鼠标移到当前屏幕顶部中央即可展开；也可从菜单栏图标选择“显示灵动岛”。非公证的预览包首次打开时，可能需要在“系统设置 > 隐私与安全性”中选择“仍要打开”。
+
+### 更新应用
+
+zisla 通过 Sparkle 自行更新，因此直接执行 `brew upgrade` 不会替换已安装的应用。若希望由 Homebrew 完成替换，显式指定 cask：
+
+```bash
+brew upgrade --cask zisla
+```
+
+tap 只提供正式版，预览包仅发布在 Releases，`brew upgrade` 不会把你带到预发布版本。`brew uninstall --cask zisla` 卸载应用，`brew uninstall --zap --cask zisla` 会连同本地数据一起清除。
 
 ### 从源码运行
 

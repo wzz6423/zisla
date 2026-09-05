@@ -43,9 +43,25 @@ For tools without a stable local activity source, `zislactl` lets scripts, CI, a
 
 ### Install the app
 
-Download the latest DMG from [GitHub Releases](https://github.com/wzz6423/zisla/releases) or [Gitee Releases](https://gitee.com/wzz6423/zisla/releases), mount it, and drag `zisla.app` to `Applications`.
+Install with Homebrew:
+
+```bash
+brew install --cask wzz6423/tap/zisla
+```
+
+Or download the latest DMG from [GitHub Releases](https://github.com/wzz6423/zisla/releases) or [Gitee Releases](https://gitee.com/wzz6423/zisla/releases), mount it, and drag `zisla.app` to `Applications`.
 
 After launching, move the pointer to the top center of the current screen, or choose **Show Island** from the menu bar icon. An unsigned preview package may require **Open Anyway** in **System Settings > Privacy & Security** on first launch.
+
+### Update the app
+
+zisla updates itself through Sparkle, so a plain `brew upgrade` leaves the installed app alone. Name the cask when you want Homebrew to do the replacement instead:
+
+```bash
+brew upgrade --cask zisla
+```
+
+The tap serves stable releases only; preview builds stay on Releases so `brew upgrade` never moves you onto a prerelease. `brew uninstall --cask zisla` removes the app, and `brew uninstall --zap --cask zisla` also trashes its local data.
 
 ### Run from source
 

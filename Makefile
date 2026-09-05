@@ -1,4 +1,4 @@
-.PHONY: run stop update build-package clean
+.PHONY: run stop update build-package sync-cask clean
 
 LOCAL_SIGNING_ENV := SIGNING_MODE=dev
 
@@ -13,6 +13,10 @@ update:
 
 build-package:
 	@mac/Scripts/build-package.sh
+
+# VERSION is required. Add PUBLISH_TAP=true to push the cask to the Homebrew tap.
+sync-cask:
+	@mac/Scripts/sync-homebrew-cask.sh
 
 clean: stop
 	@rm -rf outputs .impeccable .playwright-cli \

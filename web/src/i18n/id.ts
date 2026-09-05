@@ -144,6 +144,9 @@ export const id = createCatalog({
     primaryCtaAriaLabel: 'Unduh zisla',
     releaseCta: 'Lihat rilis',
     releaseCtaAriaLabel: 'Lihat detail rilis di GitHub',
+    brewMono: 'HOMEBREW / SATU PERINTAH',
+    brewNote: 'Sparkle memperbarui zisla sendiri, jadi brew upgrade biasa tidak mengganti aplikasi; jalankan brew upgrade --cask zisla bila ingin Homebrew yang menggantinya. Tap hanya menyediakan versi stabil.',
+    copyBrewCommandAriaLabel: 'Salin perintah pemasangan Homebrew',
     notes: {
       system: { term: 'Sistem', value: 'macOS 14 atau lebih baru · Konfigurasi yang didukung: Mac Apple Silicon' },
       install: { term: 'Pasang', value: 'Pasang DMG lalu seret ke Applications' },
@@ -219,5 +222,5 @@ export const id = createCatalog({
     tagline: 'Open source, native, dan berada dalam kendali Anda.',
   },
   common: { copyCommandTitle: 'Salin perintah', copiedAriaLabel: 'Tersalin' },
-  toast: { runCommandCopied: 'Perintah menjalankan sumber disalin', zislactlCopied: 'Perintah zislactl disalin' },
+  toast: { runCommandCopied: 'Perintah menjalankan sumber disalin', zislactlCopied: 'Perintah zislactl disalin', brewCommandCopied: 'Perintah pemasangan Homebrew disalin' },
 });

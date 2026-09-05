@@ -268,6 +268,9 @@ export const ja: SiteContent = {
     primaryCtaAriaLabel: 'ダウンロード',
     releaseCta: 'リリースを見る',
     releaseCtaAriaLabel: 'GitHub でリリースの詳細を見る',
+    brewMono: 'HOMEBREW / コマンド 1 行',
+    brewNote: 'zisla は Sparkle が自動更新するため、単なる brew upgrade ではアプリを置き換えません。Homebrew に任せる場合は brew upgrade --cask zisla を実行してください。tap は正式版のみを配信します。',
+    copyBrewCommandAriaLabel: 'Homebrew のインストールコマンドをコピー',
     notes: {
       system: {
         term: 'システム',
@@ -386,5 +389,6 @@ export const ja: SiteContent = {
   toast: {
     runCommandCopied: 'ソース実行コマンドをコピーしました',
     zislactlCopied: 'zislactl コマンドをコピーしました',
+    brewCommandCopied: 'Homebrew のインストールコマンドをコピーしました',
   },
 };

@@ -100,7 +100,7 @@ jobs:
 
       - name: Syntax check automation scripts
         run: |
-          for script in .github/scripts/*.rb; do
+          for script in .github/scripts/*.rb Casks/*.rb; do
             ruby -c "$script"
           done
 
@@ -118,6 +118,12 @@ jobs:
 
       - name: Test issue metadata
         run: ruby .github/scripts/issue-metadata-test.rb
+
+      - name: Verify the Homebrew cask
+        run: ruby .github/scripts/homebrew-cask.rb verify --content web/src/content.ts
+
+      - name: Test the Homebrew cask contract
+        run: ruby .github/scripts/homebrew-cask-test.rb
 
       - name: Verify the project name is declared once
         run: |

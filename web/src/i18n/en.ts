@@ -275,6 +275,9 @@ export const en: SiteContent = {
     primaryCtaAriaLabel: 'Download',
     releaseCta: 'View release',
     releaseCtaAriaLabel: 'View the release details on GitHub',
+    brewMono: 'HOMEBREW / ONE COMMAND',
+    brewNote: 'Sparkle keeps zisla up to date, so a plain brew upgrade leaves the app alone — run brew upgrade --cask zisla when you want Homebrew to replace it. The tap serves stable releases only.',
+    copyBrewCommandAriaLabel: 'Copy the Homebrew install command',
     notes: {
       system: {
         term: 'System',
@@ -399,5 +402,6 @@ export const en: SiteContent = {
   toast: {
     runCommandCopied: 'Source run command copied',
     zislactlCopied: 'zislactl command copied',
+    brewCommandCopied: 'Homebrew install command copied',
   },
 };

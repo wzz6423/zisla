@@ -262,6 +262,9 @@ export const zhHans: SiteContent = {
     primaryCtaAriaLabel: '下载',
     releaseCta: '查看 Release',
     releaseCtaAriaLabel: '在 GitHub 上查看发布详情',
+    brewMono: 'HOMEBREW / 一条命令',
+    brewNote: 'zisla 由 Sparkle 自行更新，直接执行 brew upgrade 不会替换已安装的应用；需要 Homebrew 接手时执行 brew upgrade --cask zisla。tap 只提供正式版。',
+    copyBrewCommandAriaLabel: '复制 Homebrew 安装命令',
     notes: {
       system: { term: '系统', value: 'macOS 14 或更高版本 · 当前受支持配置为 Apple 芯片 Mac' },
       install: { term: '安装', value: '挂载 DMG 后拖入 Applications' },
@@ -367,5 +370,6 @@ export const zhHans: SiteContent = {
   toast: {
     runCommandCopied: '源码运行命令已复制',
     zislactlCopied: 'zislactl 命令已复制',
+    brewCommandCopied: 'Homebrew 安装命令已复制',
   },
 };
