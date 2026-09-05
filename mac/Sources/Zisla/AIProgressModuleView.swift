@@ -8,6 +8,10 @@ struct AIProgressModuleView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var monitor: AIStateMonitor
 
+    /// Both columns push their content this far below the header. The trend chart's topmost
+    /// Y-axis tick is drawn above its plot frame, so a tighter gap lets it collide with the title.
+    private static let sectionSpacing: CGFloat = 12
+
     init(model: AppModel) {
         _model = ObservedObject(wrappedValue: model)
         _monitor = ObservedObject(wrappedValue: model.aiMonitor)
@@ -50,7 +54,7 @@ struct AIProgressModuleView: View {
 
     private func usageSummary(endingAt date: Date) -> some View {
         let series = usageTrend(endingAt: date)
-        return VStack(alignment: .leading, spacing: 5) {
+        return VStack(alignment: .leading, spacing: Self.sectionSpacing) {
             Label(AppLocalization.text("Token 消耗趋势"), systemImage: "chart.xyaxis.line")
                 .font(.system(size: 11, weight: .semibold))
 
@@ -62,7 +66,7 @@ struct AIProgressModuleView: View {
 
     @ViewBuilder
     private var runningTasks: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: Self.sectionSpacing) {
             HStack {
                 Label(AppLocalization.text("运行任务"), systemImage: "cpu")
                     .font(.system(size: 10, weight: .semibold))
