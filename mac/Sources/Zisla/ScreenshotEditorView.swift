@@ -1111,6 +1111,10 @@ final class ScreenshotEditorModel: ObservableObject {
 
     private(set) var pendingTextDraft: PendingTextDraft?
 
+    /// Geometry the canvas has drawn but not yet handed over, so an interrupted mouse-up cannot
+    /// silently drop a shape, number, stroke, or emoji when the image is exported.
+    private(set) var pendingAnnotationDraft: ScreenshotAnnotation?
+
     init(image: NSImage) {
         self.image = image
         mosaicPreviewImage = image
@@ -1180,25 +1184,31 @@ final class ScreenshotEditorModel: ObservableObject {
 
     func remove(id: UUID, saveUndo: Bool = true) {
         guard let removed = annotations.first(where: { $0.id == id }) else { return }
+        if pendingAnnotationDraft?.id == id { pendingAnnotationDraft = nil }
         if saveUndo { saveUndoPoint() }
         annotations.removeAll { $0.id == id }
         if removed.kind == .mosaic { refreshMosaicPreview() }
     }
 
-    func addNumber(at point: CGPoint) {
-        add(ScreenshotAnnotation(
+    func numberAnnotation(at point: CGPoint) -> ScreenshotAnnotation {
+        ScreenshotAnnotation(
             kind: .number,
             points: [point],
             color: color,
             lineWidth: lineWidth,
             number: nextNumber
-        ))
+        )
+    }
+
+    func addNumber(at point: CGPoint) {
+        add(numberAnnotation(at: point))
     }
 
     func replaceCapture(
         with newImage: NSImage,
         translatingAnnotationsBy translation: CGSize
     ) {
+        pendingAnnotationDraft = nil
         image = newImage
         annotations = Self.translated(annotations, by: translation)
         undoStack = undoStack.map { snapshot in
@@ -1219,6 +1229,7 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func undo() {
+        pendingAnnotationDraft = nil
         guard let previous = undoStack.popLast() else { return }
         redoStack.append(snapshot)
         restore(previous)
@@ -1226,6 +1237,7 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func redo() {
+        pendingAnnotationDraft = nil
         guard let next = redoStack.popLast() else { return }
         undoStack.append(snapshot)
         restore(next)
@@ -1370,8 +1382,25 @@ final class ScreenshotEditorModel: ObservableObject {
         if draft.isNew { remove(id: draft.id, saveUndo: false) }
     }
 
+    func updatePendingAnnotationDraft(_ annotation: ScreenshotAnnotation?) {
+        pendingAnnotationDraft = annotation
+    }
+
+    @discardableResult
+    func commitPendingAnnotationDraft() -> Bool {
+        guard let draft = pendingAnnotationDraft else { return false }
+        pendingAnnotationDraft = nil
+        add(draft)
+        return true
+    }
+
+    func discardPendingAnnotationDraft() {
+        pendingAnnotationDraft = nil
+    }
+
     func renderedImage() -> NSImage {
         commitPendingTextDraft()
+        commitPendingAnnotationDraft()
         let renderedBase = imageApplyingMosaics()
         guard let base = renderedBase.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return image
@@ -3715,6 +3744,13 @@ struct ScreenshotEditorView: View {
                             geometry: geometry
                         )
                     },
+                    onDragBegan: {
+                        // A lost mouse-up leaves the previous stroke pending; pressing again keeps
+                        // it instead of folding its geometry into the next one.
+                        model.commitPendingAnnotationDraft()
+                        draftPoints.removeAll(keepingCapacity: true)
+                        draftRect = .zero
+                    },
                     onDoubleClick: { location in
                         let point = geometry.imagePoint(from: location)
                         guard let annotation = editableAnnotation(at: point), annotation.kind == .text else {
@@ -4298,7 +4334,13 @@ struct ScreenshotEditorView: View {
             } else {
                 editPreview = current
             }
-            guard isComplete else { return }
+            guard isComplete else {
+                model.updatePendingAnnotationDraft(
+                    current == activeAnnotationEdit.original ? nil : current
+                )
+                return
+            }
+            model.discardPendingAnnotationDraft()
             if current != activeAnnotationEdit.original {
                 model.add(current)
             }
@@ -4339,64 +4381,20 @@ struct ScreenshotEditorView: View {
             break
         }
 
-        guard isComplete else { return }
+        guard isComplete else {
+            model.updatePendingAnnotationDraft(committableDraftAnnotation(at: point))
+            return
+        }
+        model.discardPendingAnnotationDraft()
         defer {
             draftPoints.removeAll(keepingCapacity: true)
             draftRect = .zero
         }
 
         switch model.tool {
-        case .rectangle:
-            guard draftRect.width > 2, draftRect.height > 2 else { return }
-            model.add(ScreenshotAnnotation(
-                kind: .rectangle,
-                rect: draftRect,
-                color: model.color,
-                lineWidth: model.lineWidth
-            ))
-        case .ellipse:
-            guard draftRect.width > 2, draftRect.height > 2 else { return }
-            model.add(ScreenshotAnnotation(
-                kind: .ellipse,
-                rect: draftRect,
-                color: model.color,
-                lineWidth: model.lineWidth
-            ))
-        case .mosaic:
-            switch model.obscureShape {
-            case .rectangle:
-                guard draftRect.width > 2, draftRect.height > 2 else { return }
-            case .brush:
-                guard draftPoints.count > 1 else { return }
-            }
-            model.add(ScreenshotAnnotation(
-                kind: .mosaic,
-                points: draftPoints,
-                rect: draftRect,
-                color: model.color,
-                lineWidth: model.lineWidth,
-                obscureShape: model.obscureShape,
-                obscureEffect: model.obscureEffect
-            ))
-        case .brush:
-            guard draftPoints.count > 1 else { return }
-            model.add(ScreenshotAnnotation(
-                kind: .brush,
-                points: draftPoints,
-                color: model.color,
-                lineWidth: model.lineWidth
-            ))
-        case .arrow:
-            guard draftPoints.count == 2 else { return }
-            model.add(ScreenshotAnnotation(
-                kind: .arrow,
-                points: draftPoints,
-                color: model.color,
-                lineWidth: model.lineWidth,
-                arrowStyle: model.arrowStyle
-            ))
-        case .number:
-            model.addNumber(at: point)
+        case .rectangle, .ellipse, .mosaic, .brush, .arrow, .number, .emoji:
+            guard let annotation = committableDraftAnnotation(at: point) else { return }
+            model.add(annotation)
         case .text:
             let placeholderColor: ScreenshotRGBA
             if let cgImage = model.image.cgImage(forProposedRect: nil, context: nil, hints: nil),
@@ -4432,15 +4430,76 @@ struct ScreenshotEditorView: View {
             )
             model.add(annotation, saveUndo: false)
             beginInlineTextEditing(annotation, isNew: true, placeholderColor: placeholderColor)
+        }
+    }
+
+    /// The annotation the current draft would produce, or `nil` while it stays below the commit
+    /// thresholds. Shared by the drag handler and the export fallback so both agree on what counts
+    /// as a finished annotation.
+    private func committableDraftAnnotation(at point: CGPoint) -> ScreenshotAnnotation? {
+        switch model.tool {
+        case .rectangle:
+            guard draftRect.width > 2, draftRect.height > 2 else { return nil }
+            return ScreenshotAnnotation(
+                kind: .rectangle,
+                rect: draftRect,
+                color: model.color,
+                lineWidth: model.lineWidth
+            )
+        case .ellipse:
+            guard draftRect.width > 2, draftRect.height > 2 else { return nil }
+            return ScreenshotAnnotation(
+                kind: .ellipse,
+                rect: draftRect,
+                color: model.color,
+                lineWidth: model.lineWidth
+            )
+        case .mosaic:
+            switch model.obscureShape {
+            case .rectangle:
+                guard draftRect.width > 2, draftRect.height > 2 else { return nil }
+            case .brush:
+                guard draftPoints.count > 1 else { return nil }
+            }
+            return ScreenshotAnnotation(
+                kind: .mosaic,
+                points: draftPoints,
+                rect: draftRect,
+                color: model.color,
+                lineWidth: model.lineWidth,
+                obscureShape: model.obscureShape,
+                obscureEffect: model.obscureEffect
+            )
+        case .brush:
+            guard draftPoints.count > 1 else { return nil }
+            return ScreenshotAnnotation(
+                kind: .brush,
+                points: draftPoints,
+                color: model.color,
+                lineWidth: model.lineWidth
+            )
+        case .arrow:
+            guard draftPoints.count == 2 else { return nil }
+            return ScreenshotAnnotation(
+                kind: .arrow,
+                points: draftPoints,
+                color: model.color,
+                lineWidth: model.lineWidth,
+                arrowStyle: model.arrowStyle
+            )
+        case .number:
+            return model.numberAnnotation(at: point)
         case .emoji:
-            model.add(ScreenshotAnnotation(
+            return ScreenshotAnnotation(
                 kind: .emoji,
                 points: [point],
                 text: model.selectedEmoji,
                 color: model.color,
                 lineWidth: model.lineWidth,
                 fontSize: ScreenshotAnnotationGeometry.defaultEmojiDiameter
-            ))
+            )
+        case .text:
+            return nil
         }
     }
 
@@ -4500,6 +4559,7 @@ struct ScreenshotEditorView: View {
                     }
                 }
                 iconButton(model.isPinned ? "pin.fill" : "pin", title: model.isPinned ? "取消置顶" : "钉图") {
+                    commitInlineText()
                     model.isPinned.toggle()
                     onPinToggle(model.isPinned)
                 }
@@ -5052,6 +5112,7 @@ final class ScreenshotPinnedFocusState: ObservableObject {
 
 struct ScreenshotPointerInteractionView: NSViewRepresentable {
     let onDrag: (CGPoint, CGPoint, Bool) -> Void
+    var onDragBegan: (() -> Void)? = nil
     var usesScreenCoordinatesForDrag = false
     var onDoubleClick: ((CGPoint) -> Void)? = nil
     var onMagnify: ((CGFloat) -> Void)? = nil
@@ -5067,6 +5128,7 @@ struct ScreenshotPointerInteractionView: NSViewRepresentable {
 
     func updateNSView(_ nsView: ScreenshotPointerInteractionNSView, context: Context) {
         nsView.onDrag = onDrag
+        nsView.onDragBegan = onDragBegan
         nsView.usesScreenCoordinatesForDrag = usesScreenCoordinatesForDrag
         nsView.onDoubleClick = onDoubleClick
         nsView.onMagnify = onMagnify
@@ -5082,6 +5144,7 @@ struct ScreenshotPointerInteractionView: NSViewRepresentable {
 @MainActor
 final class ScreenshotPointerInteractionNSView: NSView {
     var onDrag: ((CGPoint, CGPoint, Bool) -> Void)?
+    var onDragBegan: (() -> Void)?
     var usesScreenCoordinatesForDrag = false
     var onDoubleClick: ((CGPoint) -> Void)?
     var onMagnify: ((CGFloat) -> Void)?
@@ -5172,6 +5235,7 @@ final class ScreenshotPointerInteractionNSView: NSView {
         if let resizeCorner {
             onResize?(resizeCorner, point, point, false)
         } else {
+            onDragBegan?()
             onDrag?(point, point, false)
         }
     }

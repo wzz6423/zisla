@@ -2262,6 +2262,218 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func imageExportCommitsPendingShapeDraft() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let rect = CGRect(x: 20, y: 30, width: 60, height: 40)
+        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .rectangle,
+            rect: rect,
+            lineWidth: 4
+        ))
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.count == 1)
+        #expect(model.annotations.first?.kind == .rectangle)
+        #expect(model.annotations.first?.rect == rect)
+        #expect(model.canUndo)
+    }
+
+    @Test
+    func imageExportCommitsPendingNumberDraftAndAdvancesCounter() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        model.updatePendingAnnotationDraft(model.numberAnnotation(at: CGPoint(x: 40, y: 50)))
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.map(\.number) == [1])
+
+        model.addNumber(at: CGPoint(x: 90, y: 50))
+        #expect(model.annotations.map(\.number) == [1, 2])
+    }
+
+    @Test
+    func imageExportCommitsPendingBrushAndArrowDrafts() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let brushModel = ScreenshotEditorModel(image: sourceImage)
+        brushModel.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .brush,
+            points: [CGPoint(x: 10, y: 10), CGPoint(x: 25, y: 40), CGPoint(x: 60, y: 70)],
+            lineWidth: 5
+        ))
+
+        _ = try #require(brushModel.pngData())
+
+        #expect(brushModel.pendingAnnotationDraft == nil)
+        #expect(brushModel.annotations.first?.kind == .brush)
+        #expect(brushModel.annotations.first?.points.count == 3)
+
+        let arrowModel = ScreenshotEditorModel(image: sourceImage)
+        arrowModel.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .arrow,
+            points: [CGPoint(x: 10, y: 10), CGPoint(x: 90, y: 80)],
+            arrowStyle: .tapered
+        ))
+
+        _ = try #require(arrowModel.pngData())
+
+        #expect(arrowModel.pendingAnnotationDraft == nil)
+        #expect(arrowModel.annotations.first?.kind == .arrow)
+        #expect(arrowModel.annotations.first?.arrowStyle == .tapered)
+    }
+
+    @Test
+    func imageExportCommitsPendingMosaicDraftAndRefreshesPreview() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        #expect(model.mosaicPreviewImage === sourceImage)
+
+        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .mosaic,
+            rect: CGRect(x: 20, y: 20, width: 80, height: 60),
+            obscureShape: .rectangle,
+            obscureEffect: .pixelate
+        ))
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.first?.kind == .mosaic)
+        #expect(model.mosaicPreviewImage !== sourceImage)
+    }
+
+    @Test
+    func pinnedRenderCommitsPendingEmojiDraft() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .emoji,
+            points: [CGPoint(x: 50, y: 60)],
+            text: "⭐️",
+            fontSize: ScreenshotAnnotationGeometry.defaultEmojiDiameter
+        ))
+
+        _ = model.renderedImage()
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.first?.kind == .emoji)
+        #expect(model.annotations.first?.text == "⭐️")
+    }
+
+    @Test
+    func imageExportCommitsPendingEditDraftWithoutDuplicatingAnnotation() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let annotationID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: annotationID,
+            kind: .ellipse,
+            rect: CGRect(x: 10, y: 10, width: 40, height: 40)
+        ), saveUndo: false)
+
+        var moved = try #require(model.annotations.first)
+        moved.rect = CGRect(x: 60, y: 70, width: 40, height: 40)
+        model.updatePendingAnnotationDraft(moved)
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.count == 1)
+        #expect(model.annotations.first?.id == annotationID)
+        #expect(model.annotations.first?.rect == CGRect(x: 60, y: 70, width: 40, height: 40))
+    }
+
+    @Test
+    func imageExportCommitsPendingTextAndShapeDraftsTogether() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let textID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: textID,
+            kind: .text,
+            points: [CGPoint(x: 80, y: 60)],
+            rect: CGRect(x: 80, y: 50, width: 80, height: 20)
+        ), saveUndo: false)
+        model.beginTextDraft(id: textID, text: "", isNew: true)
+        model.updateTextDraft(id: textID, text: "备注", isNew: true)
+        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .brush,
+            points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 40)]
+        ))
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingTextDraft == nil)
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.count == 2)
+        #expect(model.annotations.contains { $0.kind == .text && $0.text == "备注" })
+        #expect(model.annotations.contains { $0.kind == .brush })
+    }
+
+    @Test
+    func imageExportWithoutPendingAnnotationDraftLeavesAnnotationsUntouched() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        model.add(ScreenshotAnnotation(
+            kind: .rectangle,
+            rect: CGRect(x: 5, y: 5, width: 30, height: 30)
+        ), saveUndo: false)
+
+        #expect(!model.commitPendingAnnotationDraft())
+
+        _ = try #require(model.pngData())
+
+        #expect(model.annotations.count == 1)
+        #expect(!model.canUndo)
+    }
+
+    @Test
+    func undoDiscardsPendingAnnotationDraft() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        model.add(ScreenshotAnnotation(
+            kind: .rectangle,
+            rect: CGRect(x: 5, y: 5, width: 30, height: 30)
+        ))
+        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .arrow,
+            points: [CGPoint(x: 10, y: 10), CGPoint(x: 80, y: 80)]
+        ))
+
+        model.undo()
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.isEmpty)
+    }
+
+    @Test
+    func removingAnnotationDiscardsItsPendingDraft() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let annotationID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: annotationID,
+            kind: .rectangle,
+            rect: CGRect(x: 5, y: 5, width: 30, height: 30)
+        ), saveUndo: false)
+
+        var edited = try #require(model.annotations.first)
+        edited.rect = CGRect(x: 40, y: 40, width: 30, height: 30)
+        model.updatePendingAnnotationDraft(edited)
+
+        model.remove(id: annotationID)
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.isEmpty)
+    }
+
+    @Test
     func annotationTransformSupportsMoveResizeRotateAndTextBoxSizing() {
         let id = UUID()
         let rectangle = ScreenshotAnnotation(
