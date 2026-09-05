@@ -48,6 +48,43 @@ struct GlobalHotkeyManagerTests {
     }
 
     @Test
+    func carbonModifiersIgnoreFlagsThatAreNotPartOfACombination() {
+        #expect(GlobalHotkeyManager.carbonModifiers(from: []) == 0)
+        #expect(GlobalHotkeyManager.carbonModifiers(from: .control) == UInt32(controlKey))
+        #expect(
+            GlobalHotkeyManager.carbonModifiers(from: [.command, .shift, .option, .control])
+                == UInt32(cmdKey | shiftKey | optionKey | controlKey)
+        )
+        // Caps lock, Fn and the numeric pad ride along in NSEvent.modifierFlags; letting them through
+        // would make the polled comparison miss the registered combination.
+        #expect(
+            GlobalHotkeyManager.carbonModifiers(from: [.control, .capsLock, .function, .numericPad])
+                == UInt32(controlKey)
+        )
+    }
+
+    @Test
+    func carbonHotkeysPollTheKeyStateWhileOneOfOurOwnMenusTracks() throws {
+        let source = try String(contentsOf: globalHotkeyManagerSourceURL, encoding: .utf8)
+        let registration = try sourceSlice(
+            in: source,
+            from: "private func registerCarbon(",
+            to: "private func registerSideSpecific("
+        )
+
+        #expect(registration.contains("startObservingMenuTracking()"))
+        #expect(registration.contains("NSMenu.didBeginTrackingNotification"))
+        #expect(registration.contains("NSMenu.didEndTrackingNotification"))
+        // Event tracking mode only runs timers registered in the common modes.
+        #expect(registration.contains("RunLoop.main.add(timer, forMode: .common)"))
+        #expect(registration.contains("CGEventSource.keyState("))
+        // The press the tracking loop replays after the menu closes must not fire the action twice.
+        #expect(registration.contains("menuTrackingPressConsumedAt"))
+        // Esc and other bare keys belong to the menu itself while it tracks.
+        #expect(registration.contains("guard let carbonHotkey, carbonHotkey.modifiers != 0 else { return }"))
+    }
+
+    @Test
     func flagsChangedTracksRightOptionWithoutGlobalKeyState() {
         let rightOption = VoiceInputModifier.rightOption
         var modifierSides = GlobalHotkeyManager.modifierSides(
