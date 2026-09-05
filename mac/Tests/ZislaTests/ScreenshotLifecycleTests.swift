@@ -204,6 +204,39 @@ struct ScreenshotLifecycleTests {
         #expect(toolbarAcceptsInput.lowerBound < completeToolbar.lowerBound)
     }
 
+    /// The editor overlay is an opaque black window covering the whole screen, so any moment where it is
+    /// on screen without its content flashes solid black. Probed with a standalone `swiftc` window plus
+    /// `screencapture`: clearing the content view while visible reads #000000, ordering the window out
+    /// first reads the desktop underneath.
+    @Test
+    func editorOverlayIsNeverVisibleWithoutItsContent() throws {
+        let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)
+
+        let willClose = try #require(source.range(of: "func windowWillClose(_ notification: Notification)"))
+        let didBecomeKey = try #require(source.range(
+            of: "func windowDidBecomeKey(_ notification: Notification)",
+            range: willClose.upperBound..<source.endIndex
+        ))
+        let closeLifecycle = source[willClose.lowerBound..<didBecomeKey.lowerBound]
+        let ordersOut = try #require(closeLifecycle.range(of: "window?.orderOut(nil)"))
+        let clearsContent = try #require(closeLifecycle.range(of: "window?.contentView = nil"))
+        let notifiesOwner = try #require(closeLifecycle.range(of: "onCloseHandler?()"))
+        #expect(ordersOut.lowerBound < clearsContent.lowerBound)
+        #expect(clearsContent.lowerBound < notifiesOwner.lowerBound)
+
+        let restore = try #require(source.range(of: "private func restoreEditorPresentation()"))
+        let dismissOverlays = try #require(source.range(
+            of: "private func dismissLongCaptureOverlays()",
+            range: restore.upperBound..<source.endIndex
+        ))
+        let restoreLifecycle = source[restore.lowerBound..<dismissOverlays.lowerBound]
+        let restoresContent = try #require(restoreLifecycle.range(of: "configureOverlayView(in: window)"))
+        let turnsOpaque = try #require(restoreLifecycle.range(of: "window.isOpaque = true"))
+        let paintsBlack = try #require(restoreLifecycle.range(of: "window.backgroundColor = .black"))
+        #expect(restoresContent.lowerBound < turnsOpaque.lowerBound)
+        #expect(restoresContent.lowerBound < paintsBlack.lowerBound)
+    }
+
     @Test
     func longCaptureDoesNotDependOnGlobalScrollMonitoring() throws {
         let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)

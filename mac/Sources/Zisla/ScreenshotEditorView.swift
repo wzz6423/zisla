@@ -6410,6 +6410,10 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         pinnedFocusState.isSelected = false
         pinnedFocusState.isPointerInside = false
         pinnedFocusState.windowIsKey = false
+        // This overlay is opaque black and covers the whole screen, so clearing the content view while the
+        // window is still on screen exposes a full-screen black frame (probed as #000000). Restoring the pet
+        // and the dismissed dialogs from onCloseHandler then composites it — the flash seen when exiting.
+        window?.orderOut(nil)
         window?.contentView = nil
         onCloseHandler?()
         onCloseHandler = nil
@@ -6916,13 +6920,15 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private func restoreEditorPresentation() {
         guard let window, !isClosed else { return }
         dismissLongCaptureOverlays()
-        window.isOpaque = true
-        window.backgroundColor = .black
         window.sharingType = .readWrite
         if let screen = activeScreen {
             window.setFrame(screen.frame, display: true)
         }
         configureOverlayView(in: window)
+        // Same reason: turn the window opaque only once the editor view is back, or the frame where the
+        // long-capture toolbar is stretched over the whole screen renders as solid black.
+        window.isOpaque = true
+        window.backgroundColor = .black
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
