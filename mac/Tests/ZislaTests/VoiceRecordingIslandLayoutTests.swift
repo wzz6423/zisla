@@ -99,7 +99,8 @@ struct VoiceRecordingIslandLayoutTests {
         // keypress; every presentation decision has to read the combined flag instead.
         #expect(controllerSource.contains("var isCapturingInput: Bool { isPreparing || isRecording }"))
         #expect(controllerSource.contains("private func finishPreparingIntoRecording()"))
-        #expect(rootViewSource.contains("usesCompactGlassSurface: voiceInput.isCapturingInput"))
+        #expect(rootViewSource.contains("let usesCompactSurface = voiceInput.isCapturingInput"))
+        #expect(rootViewSource.contains("usesCompactGlassSurface: usesCompactSurface"))
         #expect(rootViewSource.contains("if voiceInput.isCapturingInput {"))
         #expect(appSource.contains("model.voiceInput.isCapturingInputPublisher"))
         // The island content is mounted up front, so the first take's reveal animates from the

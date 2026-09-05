@@ -372,7 +372,11 @@ final class AppModel: ObservableObject {
   @Published var downloadDirectory = AppPaths.downloads
   @Published var downloadState: DownloadUIState = .idle
   @Published private(set) var activeDownloads: [DownloadTaskSnapshot] = []
-  @Published var transientMessage: String?
+  @Published var transientMessage: String? {
+    didSet { scheduleTransientMessageDismissal() }
+  }
+
+  private var transientMessageDismissTask: Task<Void, Never>?
   var hasActiveDownloads: Bool { !activeDownloadIDs.isEmpty }
   @Published private(set) var mailComposeRequest: MailComposeRequest?
   @Published var collapsedIslandSize = CGSize(width: 240, height: 34)
@@ -1030,26 +1034,24 @@ final class AppModel: ObservableObject {
     refreshToolboxReminderNotice()
   }
 
-  // MARK: - Desktop and Trash
+  // MARK: - Transient notice
 
-  /// Snaps desktop icons to the grid in one click; does nothing if Stacks are enabled.
-  func tidyDesktop() {
-    Task { @MainActor [weak self] in
-      guard let self else { return }
-      switch await DesktopOrganizer.tidyDesktop() {
-      case .success(let outcome):
-        if outcome.skippedForStacks {
-          transientMessage = AppLocalization.text("桌面已开启叠放，由系统自动排布")
-        } else if outcome.arrangedCount == 0 {
-          transientMessage = AppLocalization.text("桌面没有需要整理的项目")
-        } else {
-          transientMessage = AppLocalization.text("已按网格整理 %ld 个项目", outcome.arrangedCount)
-        }
-      case .failure(let error):
-        transientMessage = error.message
-      }
+  /// The island shows `transientMessage` as a row protruding under the pill, so it has to recycle
+  /// itself — nothing else ever clears it.
+  private static let transientMessageDuration: Duration = .seconds(4)
+
+  private func scheduleTransientMessageDismissal() {
+    transientMessageDismissTask?.cancel()
+    transientMessageDismissTask = nil
+    guard let message = transientMessage else { return }
+    transientMessageDismissTask = Task { @MainActor [weak self] in
+      try? await Task.sleep(for: Self.transientMessageDuration)
+      guard !Task.isCancelled, let self, self.transientMessage == message else { return }
+      self.transientMessage = nil
     }
   }
+
+  // MARK: - Trash
 
   /// Empties the Trash. Irreversible — shows a confirmation dialog with the item count first.
   func emptyTrash() {
@@ -1864,7 +1866,7 @@ final class AppModel: ObservableObject {
     let values = items.map(\.shareValue)
     let anchor = Self.sharingPickerAnchor(from: view)
     guard let anchor else {
-      transientMessage = "无法打开系统共享菜单"
+      transientMessage = AppLocalization.text("无法打开系统共享菜单")
       return
     }
     let picker = NSSharingServicePicker(items: values)
@@ -1899,7 +1901,7 @@ final class AppModel: ObservableObject {
       }
     }
     guard !items.isEmpty else {
-      transientMessage = "剪贴板没有可共享内容"
+      transientMessage = AppLocalization.text("剪贴板没有可共享内容")
       return
     }
     share(items, from: view)
@@ -2379,7 +2381,7 @@ final class AppModel: ObservableObject {
     }
     // Recording already ended and the island HUD is gone, so without this the cleanup round-trip
     // looks like the shortcut simply swallowed the dictation.
-    transientMessage = "正在整理语音…"
+    transientMessage = AppLocalization.text("正在整理语音…")
     beginVoiceProcessingIndicator()
     voicePostProcessingQueue.enqueue { [weak self] in
       guard let self else { return }

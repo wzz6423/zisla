@@ -21,7 +21,7 @@ public final class QuickNotesService: ObservableObject {
     public static var welcomeNoteTitle: String { AppLocalization.text("朋友，看这里。") }
     private static let builtInWelcomeNoteID = "zisla.builtin.quick-notes-welcome"
     private static let welcomeDismissedDefaultsKey = "QuickNotesService.isBuiltInWelcomeNoteDismissed"
-    private static let welcomeNoteResourcePath = "QuickNotes/welcome-note.md"
+    private static let welcomeNoteResourceFolder = "QuickNotes"
     private static let fallbackWelcomeNoteText = """
     从现在开始，你可以在记事本中写记事了。 那么，你都能做些什么呢？
     记忆力并不是智慧，但没有记忆力还成什么智慧呢？
@@ -111,16 +111,26 @@ public final class QuickNotesService: ObservableObject {
     }
 
     static var welcomeNoteText: String {
+        welcomeNoteText(language: AppLocalization.currentLanguage)
+    }
+
+    /// Reads `welcome-note-<language>.md`, then the Simplified Chinese source note, then the inline copy.
+    static func welcomeNoteText(language: AppLanguage) -> String {
         let sourceResources = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Resources", isDirectory: true)
-        let candidates = [Bundle.main.resourceURL, sourceResources].compactMap { $0 }
-        for root in candidates {
-            let url = root.appendingPathComponent(welcomeNoteResourcePath, isDirectory: false)
-            if let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
-                return text
+        let roots = [Bundle.main.resourceURL, sourceResources].compactMap { $0 }
+        let names = ["welcome-note-\(language.rawValue).md", "welcome-note.md"]
+        for name in names {
+            for root in roots {
+                let url = root
+                    .appendingPathComponent(welcomeNoteResourceFolder, isDirectory: true)
+                    .appendingPathComponent(name, isDirectory: false)
+                if let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
+                    return text
+                }
             }
         }
         return fallbackWelcomeNoteText

@@ -2075,7 +2075,6 @@
 "无法读取 Zed 用量" = "Kan het Zed-gebruik niet lezen";
 "无法读取 Zed 线程" = "Kan de Zed-threads niet lezen";
 "无法读取最近剪贴板记录" = "Kan de recente klembordvermeldingen niet lezen";
-"桌面没有需要整理的项目" = "Er is niets op te ruimen op het bureaublad";
 "正在处理另一项邮件操作" = "Er wordt al een andere e-mailactie verwerkt";
 "每次保存图片时选择位置" = "Bij elke afbeelding een locatie kiezen";
 "读取备忘录锁定状态失败" = "Lezen van de vergrendelstatus van de notitie mislukt";
@@ -2143,7 +2142,6 @@
 "无法设置 Zed 用量查询范围" = "Kan het zoekbereik voor het Zed-gebruik niet instellen";
 "无法设置 Zed 线程查询范围" = "Kan het zoekbereik voor de Zed-threads niet instellen";
 "未检测到可拼接区域，请放慢滚动" = "Er is geen samen te voegen gebied gevonden, scroll langzamer";
-"桌面已开启叠放，由系统自动排布" = "Op het bureaublad zijn stapels ingeschakeld; het systeem ordent ze automatisch";
 "访达操作失败，请检查自动化授权" = "Finder-bewerking mislukt, controleer de automatiseringstoegang";
 "该提醒事项会从系统提醒中删除。" = "Deze herinnering wordt uit de systeemherinneringen verwijderd.";
 "API 请求失败，未提供详细原因" = "Het API-verzoek is mislukt, zonder gedetailleerde reden";
@@ -2216,7 +2214,6 @@
 "重复提醒 · %@" = "Terugkerende herinnering · %@";
 "提醒 · 已完成 · %@" = "Herinnering · Voltooid · %@";
 "提醒 · %@" = "Herinnering · %@";
-"已按网格整理 %ld 个项目" = "%ld items in een raster gerangschikt";
 "已清空废纸篓（%ld 个项目）" = "Prullenmand geleegd (%ld items)";
 "%ld 个地点" = "%ld locaties";
 "已加入 %ld 个项目" = "%ld items toegevoegd";

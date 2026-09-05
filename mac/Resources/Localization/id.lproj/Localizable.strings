@@ -2075,7 +2075,6 @@
 "无法读取 Zed 用量" = "Tidak bisa membaca penggunaan Zed";
 "无法读取 Zed 线程" = "Tidak bisa membaca thread Zed";
 "无法读取最近剪贴板记录" = "Tidak bisa membaca catatan clipboard terbaru";
-"桌面没有需要整理的项目" = "Tidak ada item di desktop yang perlu dirapikan";
 "正在处理另一项邮件操作" = "Sedang memproses operasi email lain";
 "每次保存图片时选择位置" = "Pilih lokasi setiap kali menyimpan gambar";
 "读取备忘录锁定状态失败" = "Gagal membaca status kunci Notes";
@@ -2143,7 +2142,6 @@
 "无法设置 Zed 用量查询范围" = "Tidak bisa menetapkan rentang kueri penggunaan Zed";
 "无法设置 Zed 线程查询范围" = "Tidak bisa menetapkan rentang kueri thread Zed";
 "未检测到可拼接区域，请放慢滚动" = "Area yang bisa digabung tidak terdeteksi, gulir lebih lambat";
-"桌面已开启叠放，由系统自动排布" = "Desktop mengaktifkan tumpukan, sistem menatanya sendiri";
 "访达操作失败，请检查自动化授权" = "Operasi Finder gagal, periksa izin otomatisasi";
 "该提醒事项会从系统提醒中删除。" = "Pengingat ini akan dihapus dari Pengingat sistem.";
 "API 请求失败，未提供详细原因" = "Permintaan API gagal, alasan rinci tidak diberikan";
@@ -2216,7 +2214,6 @@
 "重复提醒 · %@" = "Pengingat berulang · %@";
 "提醒 · 已完成 · %@" = "Pengingat · Selesai · %@";
 "提醒 · %@" = "Pengingat · %@";
-"已按网格整理 %ld 个项目" = "%ld item dirapikan dalam kisi";
 "已清空废纸篓（%ld 个项目）" = "Tempat Sampah dikosongkan (%ld item)";
 "%ld 个地点" = "%ld lokasi";
 "已加入 %ld 个项目" = "%ld item ditambahkan";

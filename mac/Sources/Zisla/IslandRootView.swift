@@ -70,7 +70,8 @@ struct IslandRootView: View {
                 collapsedSize: model.collapsedIslandSize,
                 availableSize: surfaceSize
             )
-            let renderedSurfaceSize = voiceInput.isCapturingInput
+            let usesCompactSurface = voiceInput.isCapturingInput || showsCompactTransientNotice
+            let renderedSurfaceSize = usesCompactSurface
                 ? voiceRecordingGeometry.surfaceSize
                 : surfaceSize
 
@@ -132,7 +133,7 @@ struct IslandRootView: View {
                 expandedSize: renderedSurfaceSize,
                 visualStyle: settingsStore.settings.islandVisualStyle,
                 notchBackground: settingsStore.settings.islandNotchBackground,
-                usesCompactGlassSurface: voiceInput.isCapturingInput,
+                usesCompactGlassSurface: usesCompactSurface,
                 collapsedCenterOffsetX: collapsedCenterOffsetX
             ) {
                 if model.isMirrorPresented {
@@ -159,6 +160,9 @@ struct IslandRootView: View {
                                 voiceInput: voiceInput,
                                 geometry: voiceRecordingGeometry
                             )
+                                .frame(height: layout.islandSize.height, alignment: .top)
+                        } else if showsCompactTransientNotice, let notice = model.transientMessage {
+                            TransientNoticeView(message: notice, geometry: voiceRecordingGeometry)
                                 .frame(height: layout.islandSize.height, alignment: .top)
                         } else if !isIslandCollapsed {
                             // Keep the top shell fixed so module changes replace only the functional area below.
@@ -271,6 +275,20 @@ struct IslandRootView: View {
                     // spring runs — read as the page dropping in from the top. Top alignment keeps
                     // the crown at y=0 and lets only the module region below overflow into the mask.
                     .frame(width: surfaceSize.width, height: surfaceSize.height, alignment: .top)
+                    .overlay(alignment: .bottom) {
+                        if showsTransientNotice, !isIslandCollapsed, let notice = model.transientMessage {
+                            transientNoticeBar(notice)
+                                .transition(
+                                    reduceMotion
+                                        ? .opacity
+                                        : .move(edge: .bottom).combined(with: .opacity)
+                                )
+                        }
+                    }
+                    .animation(
+                        reduceMotion ? nil : .snappy(duration: 0.22),
+                        value: model.transientMessage
+                    )
                 }
             }
             .frame(width: surfaceSize.width, height: surfaceSize.height)
@@ -366,8 +384,23 @@ struct IslandRootView: View {
     private var hidesIslandSurface: Bool {
         !model.isIslandVisible
             && !voiceInput.isCapturingInput
+            && !showsTransientNotice
             && !model.isMirrorPresented
             && !model.isTeleprompterPresented
+    }
+
+    private var showsTransientNotice: Bool {
+        model.transientMessage != nil
+            && !voiceInput.isCapturingInput
+            && !model.isMirrorPresented
+            && !model.isTeleprompterPresented
+    }
+
+    /// While the island is idle the notice borrows the voice-recording surface — pill plus one row.
+    /// Expanded panels keep their own layout and take the notice as a bottom bar instead, so a result
+    /// message never rips away the module the user is working in.
+    private var showsCompactTransientNotice: Bool {
+        showsTransientNotice && !model.isIslandVisible
     }
 
     private var contentTopInset: CGFloat { ExpandedPetLayout.contentTopInset }
@@ -448,7 +481,7 @@ struct IslandRootView: View {
         if model.isTeleprompterPresented {
             return .teleprompter
         }
-        if voiceInput.isCapturingInput {
+        if voiceInput.isCapturingInput || showsCompactTransientNotice {
             // The recording surface matches the collapsed capsule's overflow width and extends downward by one row.
             return IslandModuleLayout.voiceRecording
                 .matchingWidth(model.collapsedOverflowWidth)
@@ -459,6 +492,38 @@ struct IslandRootView: View {
             dashboardCardCount: model.dashboardCardCount,
             batteryDynamicHeight: model.batteryModuleDynamicHeight
         )
+    }
+
+    /// Expanded panels keep their module; the notice rides the surface's bottom edge for a few seconds.
+    private func transientNoticeBar(_ message: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.zislaError)
+                .accessibilityHidden(true)
+
+            MarqueeText(
+                message,
+                font: .system(size: 10.5),
+                textColor: .white.opacity(0.9),
+                fontWeight: .medium,
+                repeats: false,
+                scrollProgress: 1,
+                clipsOverflowWhenStatic: true
+            )
+        }
+        .padding(.horizontal, 10)
+        .frame(height: VoiceRecordingIslandGeometry.transcriptRowHeight + 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            .black.opacity(0.62),
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
+        .padding(.horizontal, IslandSurfaceGeometry.moduleInset)
+        .padding(.bottom, IslandSurfaceGeometry.moduleInset)
+        .environment(\.colorScheme, .dark)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(message)
     }
 
     private func shareDetectedLink() {
@@ -627,9 +692,50 @@ private struct VoiceTranscriptionView: View {
         // spins up the row stays a bare ellipsis rather than claiming to listen.
         guard voiceInput.isRecording else { return "…" }
         let text = voiceInput.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? "正在聆听…" : text
+        return text.isEmpty ? AppLocalization.text("正在聆听…") : text
     }
 }
+
+/// Mirrors `VoiceTranscriptionView`: the collapsed pill keeps a warning glyph while the message
+/// scrolls in the row protruding underneath it.
+private struct TransientNoticeView: View {
+    let message: String
+    let geometry: VoiceRecordingIslandGeometry
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.zislaError)
+                    .accessibilityHidden(true)
+                Spacer(minLength: 12)
+            }
+            .padding(.horizontal, 12)
+            .frame(width: geometry.topRowFrame.width, height: geometry.topRowFrame.height)
+
+            MarqueeText(
+                message,
+                font: .system(size: 10.5),
+                textColor: .white.opacity(0.82),
+                fontWeight: .medium,
+                repeats: false,
+                scrollProgress: 1,
+                clipsOverflowWhenStatic: true
+            )
+                .padding(.horizontal, 12)
+                .frame(
+                    width: geometry.transcriptRowFrame.width,
+                    height: geometry.transcriptRowFrame.height,
+                    alignment: .leading
+                )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(message)
+    }
+}
+
 
 @MainActor
 private final class IslandDropState: ObservableObject {
