@@ -247,6 +247,15 @@ public final class MailService: ObservableObject {
         .sorted { $0.receivedAt > $1.receivedAt }
     }
 
+    /// Mail's scripting dictionary exposes `inbox` on the application, not on `account`:
+    /// `inbox of <account>` fails with "can't get inbox of account id …" (verified on Mail 16 /
+    /// macOS 27), which silently emptied every fetch and made every write-back unreachable.
+    /// Address the account's own mailbox named INBOX instead — Mail keeps that name untranslated
+    /// even when the surrounding folders are localized.
+    static func accountInbox(_ accountExpression: String) -> String {
+        "mailbox \"INBOX\" of \(accountExpression)"
+    }
+
     static func inboxScript(accountNames: Set<String>) -> String {
         let accountNames = accountNames
             .sorted()
@@ -291,7 +300,7 @@ public final class MailService: ObservableObject {
                 end if
                 if (count of selectedAccountNames) is 0 or accountName is in selectedAccountNames then
                     try
-                        set inboxMessages to messages of inbox of mailAccount
+                        set inboxMessages to messages of \(accountInbox("mailAccount"))
                         set messageCount to count of inboxMessages
                         set maximumCount to 30
                         if messageCount > maximumCount then set messageCount to maximumCount
@@ -322,7 +331,7 @@ public final class MailService: ObservableObject {
         """
         tell application "Mail"
             set targetAccount to first account whose name is \(appleScriptString(message.accountName))
-            set targetMessage to first message of inbox of targetAccount whose id is \(message.messageID)
+            set targetMessage to first message of \(accountInbox("targetAccount")) whose id is \(message.messageID)
             set read status of targetMessage to true
         end tell
         """
@@ -332,7 +341,7 @@ public final class MailService: ObservableObject {
         """
         tell application "Mail"
             set targetAccount to first account whose name is \(appleScriptString(message.accountName))
-            set targetMessage to first message of inbox of targetAccount whose id is \(message.messageID)
+            set targetMessage to first message of \(accountInbox("targetAccount")) whose id is \(message.messageID)
             set junk mail status of targetMessage to true
         end tell
         """
@@ -342,7 +351,7 @@ public final class MailService: ObservableObject {
         """
         tell application "Mail"
             set targetAccount to first account whose name is \(appleScriptString(message.accountName))
-            set targetMessage to first message of inbox of targetAccount whose id is \(message.messageID)
+            set targetMessage to first message of \(accountInbox("targetAccount")) whose id is \(message.messageID)
             delete targetMessage
         end tell
         """
@@ -376,7 +385,7 @@ public final class MailService: ObservableObject {
         """
         tell application "Mail"
             set targetAccount to first account whose name is \(appleScriptString(message.accountName))
-            set targetMessage to first message of inbox of targetAccount whose id is \(message.messageID)
+            set targetMessage to first message of \(accountInbox("targetAccount")) whose id is \(message.messageID)
             set replyMessage to reply targetMessage
             set content of replyMessage to \(appleScriptString(body)) & return & return & content of replyMessage
             send replyMessage
@@ -466,8 +475,14 @@ public final class MailService: ObservableObject {
         return AppLocalization.text("Mail.app 当前未运行。zisla 不会自动打开它；请在需要同步时自行启动 Mail.app 后重试。")
     }
 
+    /// Mail.app's bundle identifier is all-lowercase, and
+    /// `runningApplications(withBundleIdentifier:)` compares case-sensitively — the camel-cased
+    /// `com.apple.Mail` matched nothing, so Zisla reported "Mail.app isn't running" while Mail was
+    /// open and refused every mutation.
+    nonisolated static let mailBundleIdentifier = "com.apple.mail"
+
     nonisolated private static func isMailRunning() -> Bool {
-        !NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Mail").isEmpty
+        !NSRunningApplication.runningApplications(withBundleIdentifier: mailBundleIdentifier).isEmpty
     }
 
     /// Executes one AppleScript run; returns nil to indicate failure requiring a retry by the caller.

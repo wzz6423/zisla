@@ -119,13 +119,15 @@ struct FeatureSettingsCompatibilityTests {
     func keyboardSoundSettingsDefaultForLegacyPayloadAndRoundTrip() throws {
         let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
         let decodedLegacy = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
-        #expect(!decodedLegacy.keyboardEnabled)
+        #expect(decodedLegacy.keyboardEnabled)
+        #expect(decodedLegacy.keyboardTypingStatsEnabled)
         #expect(decodedLegacy.keyboardSelectedProfileID == "holypanda")
 
+        // Round-trip a non-default value, or a dropped key would still decode to what we expect.
         var settings = FeatureSettings.default
-        settings.keyboardEnabled = true
+        settings.keyboardEnabled = false
         settings.keyboardVolume = 0.62
-        settings.keyboardTypingStatsEnabled = true
+        settings.keyboardTypingStatsEnabled = false
         let encoded = try JSONEncoder().encode(settings)
         let encodedText = String(decoding: encoded, as: UTF8.self)
         #expect(encodedText.contains("\"keyboardEnabled\""))
@@ -133,9 +135,9 @@ struct FeatureSettingsCompatibilityTests {
             FeatureSettings.self,
             from: encoded
         )
-        #expect(decoded.keyboardEnabled)
+        #expect(!decoded.keyboardEnabled)
         #expect(decoded.keyboardVolume == 0.62)
-        #expect(decoded.keyboardTypingStatsEnabled)
+        #expect(!decoded.keyboardTypingStatsEnabled)
     }
     @Test
     func activityNoticeDisplayDurationRoundTripsAllCases() throws {
