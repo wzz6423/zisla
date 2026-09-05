@@ -271,11 +271,11 @@ export const es = createCatalog({
     releaseCta: 'Ver versión',
     releaseCtaAriaLabel: 'Ver los detalles de la versión en GitHub',
     brewMono: 'HOMEBREW / UN COMANDO',
-    brewNote: 'Sparkle mantiene zisla actualizada, así que un brew upgrade normal no toca la app; ejecuta brew upgrade --cask zisla si quieres que Homebrew la reemplace. El tap solo sirve versiones estables.',
+    brewNote: 'Sparkle mantiene zisla actualizada, así que un brew upgrade normal no toca la app; ejecuta brew upgrade --cask zisla si quieres que Homebrew la reemplace. El tap solo sirve versiones estables. Es un tap de terceros y la app no está notarizada, por lo que el primer arranque necesita «Abrir de todos modos» en Ajustes del Sistema → Privacidad y seguridad.',
     copyBrewCommandAriaLabel: 'Copiar el comando de instalación de Homebrew',
     notes: {
       system: { term: 'Sistema', value: 'macOS 14 o posterior · Configuración compatible actual: Mac con Apple Silicon' },
-      install: { term: 'Instalar', value: 'Monta el DMG y arrástralo a Aplicaciones' },
+      install: { term: 'Instalar', value: 'brew install --cask, o monta el DMG y arrástralo a Aplicaciones' },
       package: { term: 'Paquete', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Otras arquitecturas', value: 'Página de versiones' },
       mirror: { term: 'Espejo', value: 'Gitee Releases' },

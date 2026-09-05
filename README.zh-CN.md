@@ -49,11 +49,15 @@ zisla 可监控 Codex、Claude Code、Pi、GitHub Copilot、Gemini、Grok、Kimi
 brew install --cask wzz6423/tap/zisla
 ```
 
-Homebrew 会按你的芯片选择对应架构的包，Apple Silicon 与 Intel 各自只下载自己那一份。
+Homebrew 会按你的芯片选择对应架构的包，Apple Silicon 与 Intel 各自只下载自己那一份。该 cask 来自第三方 tap `wzz6423/tap`，不在 Homebrew 官方 cask 仓库中，安装即意味着信任这个 tap。
 
 也可以从 [GitHub Releases](https://github.com/wzz6423/zisla/releases) 或 [Gitee Releases](https://gitee.com/wzz6423/zisla/releases) 下载最新 DMG，挂载后将 `zisla.app` 拖入 `Applications`。
 
-启动后，将鼠标移到当前屏幕顶部中央即可展开；也可从菜单栏图标选择“显示灵动岛”。非公证的预览包首次打开时，可能需要在“系统设置 > 隐私与安全性”中选择“仍要打开”。
+启动后，将鼠标移到当前屏幕顶部中央即可展开；也可从菜单栏图标选择“显示灵动岛”。所有发布包都是 ad-hoc 签名且未经公证，因此无论用哪种方式安装，首次打开都需要在“系统设置 > 隐私与安全性”中选择“仍要打开”，或自行清除隔离标记：
+
+```bash
+xattr -d com.apple.quarantine /Applications/zisla.app
+```
 
 ### 更新应用
 

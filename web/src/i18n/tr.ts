@@ -150,11 +150,11 @@ export const tr = createCatalog({
     releaseCta: 'Sürümü görüntüle',
     releaseCtaAriaLabel: 'Sürüm ayrıntılarını GitHub\'da görüntüle',
     brewMono: 'HOMEBREW / TEK KOMUT',
-    brewNote: 'zisla güncellemelerini Sparkle üstlenir; bu yüzden sade bir brew upgrade uygulamaya dokunmaz. Değişimi Homebrew yapsın istiyorsan brew upgrade --cask zisla komutunu çalıştır. Tap yalnızca kararlı sürümleri sunar.',
+    brewNote: 'zisla güncellemelerini Sparkle üstlenir; bu yüzden sade bir brew upgrade uygulamaya dokunmaz. Değişimi Homebrew yapsın istiyorsan brew upgrade --cask zisla komutunu çalıştır. Tap yalnızca kararlı sürümleri sunar. Bu tap üçüncü tarafa ait ve uygulama noter onaylı değil; bu nedenle ilk açılışta Sistem Ayarları → Gizlilik ve Güvenlik bölümünden "Yine de Aç" seçilmelidir.',
     copyBrewCommandAriaLabel: 'Homebrew kurulum komutunu kopyala',
     notes: {
       system: { term: 'Sistem', value: 'macOS 14 veya sonrası · Bugün desteklenen yapılandırma Apple Silicon Mac\'lerdir' },
-      install: { term: 'Kurulum', value: 'DMG\'yi bağlayın ve Applications klasörüne sürükleyin' },
+      install: { term: 'Kurulum', value: 'brew install --cask ya da DMG\'yi bağlayıp Applications klasörüne sürükleyin' },
       package: { term: 'Paket', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Diğer mimariler', value: 'Sürüm sayfası' },
       mirror: { term: 'Ayna', value: 'Gitee Releases' },

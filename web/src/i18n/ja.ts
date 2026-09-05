@@ -269,14 +269,14 @@ export const ja: SiteContent = {
     releaseCta: 'リリースを見る',
     releaseCtaAriaLabel: 'GitHub でリリースの詳細を見る',
     brewMono: 'HOMEBREW / コマンド 1 行',
-    brewNote: 'zisla は Sparkle が自動更新するため、単なる brew upgrade ではアプリを置き換えません。Homebrew に任せる場合は brew upgrade --cask zisla を実行してください。tap は正式版のみを配信します。',
+    brewNote: 'zisla は Sparkle が自動更新するため、単なる brew upgrade ではアプリを置き換えません。Homebrew に任せる場合は brew upgrade --cask zisla を実行してください。tap は正式版のみを配信します。tap はサードパーティ製で、アプリも公証を受けていないため、初回起動時は「システム設定 → プライバシーとセキュリティ」で「このまま開く」を選ぶ必要があります。',
     copyBrewCommandAriaLabel: 'Homebrew のインストールコマンドをコピー',
     notes: {
       system: {
         term: 'システム',
         value: 'macOS 14 以降 · 現在の対応構成は Apple シリコン搭載 Mac',
       },
-      install: { term: 'インストール', value: 'DMG をマウントして「アプリケーション」へドラッグ' },
+      install: { term: 'インストール', value: 'brew install --cask、または DMG をマウントして「アプリケーション」へドラッグ' },
       package: { term: 'パッケージ', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'ほかのアーキテクチャ', value: 'リリースページ' },
       mirror: { term: 'ミラー', value: 'Gitee Releases' },

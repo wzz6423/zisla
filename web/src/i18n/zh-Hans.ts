@@ -263,11 +263,11 @@ export const zhHans: SiteContent = {
     releaseCta: '查看 Release',
     releaseCtaAriaLabel: '在 GitHub 上查看发布详情',
     brewMono: 'HOMEBREW / 一条命令',
-    brewNote: 'zisla 由 Sparkle 自行更新，直接执行 brew upgrade 不会替换已安装的应用；需要 Homebrew 接手时执行 brew upgrade --cask zisla。tap 只提供正式版。',
+    brewNote: 'zisla 由 Sparkle 自行更新，直接执行 brew upgrade 不会替换已安装的应用；需要 Homebrew 接手时执行 brew upgrade --cask zisla。tap 只提供正式版。该 tap 属于第三方，应用也未经公证，首次打开需在“系统设置 → 隐私与安全性”中选择“仍要打开”。',
     copyBrewCommandAriaLabel: '复制 Homebrew 安装命令',
     notes: {
       system: { term: '系统', value: 'macOS 14 或更高版本 · 当前受支持配置为 Apple 芯片 Mac' },
-      install: { term: '安装', value: '挂载 DMG 后拖入 Applications' },
+      install: { term: '安装', value: 'brew install --cask，或挂载 DMG 后拖入 Applications' },
       package: { term: '包体', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: '其他架构', value: 'Release 页面' },
       mirror: { term: '镜像', value: 'Gitee Releases' },

@@ -276,14 +276,14 @@ export const en: SiteContent = {
     releaseCta: 'View release',
     releaseCtaAriaLabel: 'View the release details on GitHub',
     brewMono: 'HOMEBREW / ONE COMMAND',
-    brewNote: 'Sparkle keeps zisla up to date, so a plain brew upgrade leaves the app alone — run brew upgrade --cask zisla when you want Homebrew to replace it. The tap serves stable releases only.',
+    brewNote: 'Sparkle keeps zisla up to date, so a plain brew upgrade leaves the app alone — run brew upgrade --cask zisla when you want Homebrew to replace it. The tap serves stable releases only. It is a third-party tap and the app is not notarized, so the first launch needs Open Anyway in System Settings → Privacy & Security.',
     copyBrewCommandAriaLabel: 'Copy the Homebrew install command',
     notes: {
       system: {
         term: 'System',
         value: 'macOS 14 or later · Apple silicon Macs are the supported configuration today',
       },
-      install: { term: 'Install', value: 'Mount the DMG and drag it into Applications' },
+      install: { term: 'Install', value: 'brew install --cask, or mount the DMG and drag it into Applications' },
       package: { term: 'Package', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Other architectures', value: 'Release page' },
       mirror: { term: 'Mirror', value: 'Gitee Releases' },

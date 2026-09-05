@@ -214,11 +214,11 @@ export const ru = createCatalog({
     releaseCta: 'Открыть релиз',
     releaseCtaAriaLabel: 'Открыть сведения о релизе на GitHub',
     brewMono: 'HOMEBREW / ОДНА КОМАНДА',
-    brewNote: 'Sparkle обновляет zisla самостоятельно, поэтому обычный brew upgrade не трогает приложение — выполните brew upgrade --cask zisla, если хотите, чтобы заменой занялся Homebrew. Tap отдаёт только стабильные версии.',
+    brewNote: 'Sparkle обновляет zisla самостоятельно, поэтому обычный brew upgrade не трогает приложение — выполните brew upgrade --cask zisla, если хотите, чтобы заменой занялся Homebrew. Tap отдаёт только стабильные версии. Это сторонний tap, а приложение не нотаризовано, поэтому при первом запуске нужно выбрать «Всё равно открыть» в Системных настройках → Конфиденциальность и безопасность.',
     copyBrewCommandAriaLabel: 'Скопировать команду установки Homebrew',
     notes: {
       system: { term: 'Система', value: 'macOS 14 или новее · Поддерживаемая конфигурация: Mac с Apple Silicon' },
-      install: { term: 'Установка', value: 'Подключите DMG и перетащите приложение в «Программы»' },
+      install: { term: 'Установка', value: 'brew install --cask или подключите DMG и перетащите приложение в «Программы»' },
       package: { term: 'Пакет', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Другие архитектуры', value: 'Страница релизов' },
       mirror: { term: 'Зеркало', value: 'Gitee Releases' },

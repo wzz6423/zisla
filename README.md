@@ -49,11 +49,15 @@ Install with Homebrew:
 brew install --cask wzz6423/tap/zisla
 ```
 
-Homebrew fetches the build that matches your chip, so an Apple Silicon or Intel Mac downloads only its own slice.
+Homebrew fetches the build that matches your chip, so an Apple Silicon or Intel Mac downloads only its own slice. The cask comes from the third-party tap `wzz6423/tap` rather than Homebrew's own cask repository, so installing it means trusting this tap.
 
 Or download the latest DMG from [GitHub Releases](https://github.com/wzz6423/zisla/releases) or [Gitee Releases](https://gitee.com/wzz6423/zisla/releases), mount it, and drag `zisla.app` to `Applications`.
 
-After launching, move the pointer to the top center of the current screen, or choose **Show Island** from the menu bar icon. An unsigned preview package may require **Open Anyway** in **System Settings > Privacy & Security** on first launch.
+After launching, move the pointer to the top center of the current screen, or choose **Show Island** from the menu bar icon. Every package ships with an ad-hoc signature and is not notarized, so however you installed it, the first launch needs **Open Anyway** in **System Settings > Privacy & Security**, or clear the quarantine attribute yourself:
+
+```bash
+xattr -d com.apple.quarantine /Applications/zisla.app
+```
 
 ### Update the app
 

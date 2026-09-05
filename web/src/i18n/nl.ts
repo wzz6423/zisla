@@ -258,11 +258,11 @@ export const nl = createCatalog({
     releaseCta: 'Release bekijken',
     releaseCtaAriaLabel: 'Releasedetails op GitHub bekijken',
     brewMono: 'HOMEBREW / ÉÉN OPDRACHT',
-    brewNote: 'Sparkle houdt zisla zelf bij, dus een gewone brew upgrade laat de app staan; voer brew upgrade --cask zisla uit als Homebrew hem moet vervangen. De tap levert alleen stabiele releases.',
+    brewNote: 'Sparkle houdt zisla zelf bij, dus een gewone brew upgrade laat de app staan; voer brew upgrade --cask zisla uit als Homebrew hem moet vervangen. De tap levert alleen stabiele releases. Het is een tap van derden en de app is niet genotariseerd, dus de eerste start vraagt om "Toch openen" in Systeeminstellingen → Privacy en beveiliging.',
     copyBrewCommandAriaLabel: 'Homebrew-installatieopdracht kopiëren',
     notes: {
       system: { term: 'Systeem', value: 'macOS 14 of later · Huidige ondersteunde configuratie: Mac met Apple Silicon' },
-      install: { term: 'Installeren', value: 'Koppel de DMG en sleep hem naar Programma’s' },
+      install: { term: 'Installeren', value: 'brew install --cask, of koppel de DMG en sleep hem naar Programma’s' },
       package: { term: 'Pakket', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Andere architecturen', value: 'Releasepagina' },
       mirror: { term: 'Mirror', value: 'Gitee Releases' },

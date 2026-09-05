@@ -145,11 +145,11 @@ export const id = createCatalog({
     releaseCta: 'Lihat rilis',
     releaseCtaAriaLabel: 'Lihat detail rilis di GitHub',
     brewMono: 'HOMEBREW / SATU PERINTAH',
-    brewNote: 'Sparkle memperbarui zisla sendiri, jadi brew upgrade biasa tidak mengganti aplikasi; jalankan brew upgrade --cask zisla bila ingin Homebrew yang menggantinya. Tap hanya menyediakan versi stabil.',
+    brewNote: 'Sparkle memperbarui zisla sendiri, jadi brew upgrade biasa tidak mengganti aplikasi; jalankan brew upgrade --cask zisla bila ingin Homebrew yang menggantinya. Tap hanya menyediakan versi stabil. Tap ini milik pihak ketiga dan aplikasinya belum dinotarisasi, jadi peluncuran pertama perlu memilih "Buka Saja" di Pengaturan Sistem → Privasi & Keamanan.',
     copyBrewCommandAriaLabel: 'Salin perintah pemasangan Homebrew',
     notes: {
       system: { term: 'Sistem', value: 'macOS 14 atau lebih baru · Konfigurasi yang didukung: Mac Apple Silicon' },
-      install: { term: 'Pasang', value: 'Pasang DMG lalu seret ke Applications' },
+      install: { term: 'Pasang', value: 'brew install --cask, atau pasang DMG lalu seret ke Applications' },
       package: { term: 'Paket', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Arsitektur lain', value: 'Halaman rilis' },
       mirror: { term: 'Mirror', value: 'Gitee Releases' },

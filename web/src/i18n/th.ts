@@ -145,11 +145,11 @@ export const th = createCatalog({
     releaseCta: 'ดูรีลีส',
     releaseCtaAriaLabel: 'ดูรายละเอียดรีลีสบน GitHub',
     brewMono: 'HOMEBREW / คำสั่งเดียว',
-    brewNote: 'Sparkle อัปเดต zisla ด้วยตัวเอง จึงทำให้ brew upgrade ธรรมดาไม่แทนที่แอป หากต้องการให้ Homebrew จัดการ ให้รัน brew upgrade --cask zisla ส่วน tap ให้บริการเฉพาะรุ่นเสถียร',
+    brewNote: 'Sparkle อัปเดต zisla ด้วยตัวเอง จึงทำให้ brew upgrade ธรรมดาไม่แทนที่แอป หากต้องการให้ Homebrew จัดการ ให้รัน brew upgrade --cask zisla ส่วน tap ให้บริการเฉพาะรุ่นเสถียร ทั้ง tap นี้เป็นของบุคคลที่สามและแอปยังไม่ผ่านการรับรองจาก Apple จึงต้องเลือก "เปิดต่อไป" ในการตั้งค่าระบบ → ความเป็นส่วนตัวและความปลอดภัย เมื่อเปิดครั้งแรก',
     copyBrewCommandAriaLabel: 'คัดลอกคำสั่งติดตั้ง Homebrew',
     notes: {
       system: { term: 'ระบบ', value: 'macOS 14 ขึ้นไป · การกำหนดค่าที่รองรับ: Mac ที่ใช้ Apple Silicon' },
-      install: { term: 'ติดตั้ง', value: 'เมานต์ DMG แล้วลากไปยัง Applications' },
+      install: { term: 'ติดตั้ง', value: 'brew install --cask หรือเมานต์ DMG แล้วลากไปยัง Applications' },
       package: { term: 'แพ็กเกจ', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'สถาปัตยกรรมอื่น', value: 'หน้ารีลีส' },
       mirror: { term: 'มิเรอร์', value: 'Gitee Releases' },

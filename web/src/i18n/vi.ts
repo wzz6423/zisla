@@ -145,11 +145,11 @@ export const vi = createCatalog({
     releaseCta: 'Xem bản phát hành',
     releaseCtaAriaLabel: 'Xem chi tiết bản phát hành trên GitHub',
     brewMono: 'HOMEBREW / MỘT LỆNH',
-    brewNote: 'Sparkle tự cập nhật zisla, nên brew upgrade thông thường không thay thế ứng dụng; chạy brew upgrade --cask zisla nếu muốn Homebrew làm việc đó. Tap chỉ phục vụ bản chính thức.',
+    brewNote: 'Sparkle tự cập nhật zisla, nên brew upgrade thông thường không thay thế ứng dụng; chạy brew upgrade --cask zisla nếu muốn Homebrew làm việc đó. Tap chỉ phục vụ bản chính thức. Đây là tap của bên thứ ba và ứng dụng chưa được Apple công chứng, nên lần mở đầu tiên cần chọn "Vẫn mở" trong Cài đặt hệ thống → Quyền riêng tư & Bảo mật.',
     copyBrewCommandAriaLabel: 'Sao chép lệnh cài đặt Homebrew',
     notes: {
       system: { term: 'Hệ thống', value: 'macOS 14 trở lên · Cấu hình được hỗ trợ: Mac Apple Silicon' },
-      install: { term: 'Cài đặt', value: 'Gắn DMG rồi kéo vào Applications' },
+      install: { term: 'Cài đặt', value: 'brew install --cask, hoặc gắn DMG rồi kéo vào Applications' },
       package: { term: 'Gói', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Kiến trúc khác', value: 'Trang phát hành' },
       mirror: { term: 'Bản sao', value: 'Gitee Releases' },
