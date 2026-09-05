@@ -67,7 +67,12 @@ struct UpdateSection: View {
                 )
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(KeyboardVisualStyle.accentStrong)
-                installationContent(for: release)
+                Button {
+                    openURL(release.releaseURL)
+                } label: {
+                    Label(AppLocalization.text("前往 GitHub 下载"), systemImage: "arrow.up.right.square")
+                }
+                .buttonStyle(.borderedProminent)
             }
         } else if let snapshot = controller.state.snapshot {
             switch snapshot.result {
@@ -102,93 +107,6 @@ struct UpdateSection: View {
         }
     }
 
-    @ViewBuilder
-    private func installationContent(for release: ReleaseSummary) -> some View {
-        switch controller.installationState {
-        case .ready:
-            installButton
-
-        case .checking:
-            installationProgress("正在准备更新…", progress: nil)
-
-        case let .downloading(progress):
-            installationProgress("正在下载更新…", progress: progress)
-
-        case let .extracting(progress):
-            installationProgress("正在验证并解压…", progress: progress)
-
-        case .installing:
-            installationProgress("正在安装，Keyboard 将自动重启…", progress: nil)
-
-        case let .failed(message):
-            Label(L10n.tr(message), systemImage: "exclamationmark.triangle")
-                .failureCaptionStyle()
-            installButton
-            Button {
-                openURL(release.releaseURL)
-            } label: {
-                Label(AppLocalization.text("改为 GitHub 手动下载"), systemImage: "arrow.up.right.square")
-            }
-            .buttonStyle(.bordered)
-
-        case let .unavailable(reason):
-            installerUnavailableLabel(reason)
-            Button {
-                openURL(release.releaseURL)
-            } label: {
-                Label(AppLocalization.text("前往 GitHub 下载"), systemImage: "arrow.up.right.square")
-            }
-            .buttonStyle(.borderedProminent)
-        }
-    }
-
-    private var installButton: some View {
-        Button {
-            controller.installAvailableUpdate()
-        } label: {
-            Label(AppLocalization.text("一键更新并重启"), systemImage: "arrow.down.app.fill")
-        }
-        .buttonStyle(.borderedProminent)
-        .disabled(!controller.canInstallAvailableUpdate)
-    }
-
-    @ViewBuilder
-    private func installationProgress(_ title: String, progress: Double?) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            if let progress {
-                ProgressView(value: progress)
-            } else {
-                ProgressView()
-                    .controlSize(.small)
-            }
-            Text(L10n.tr(title))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    @ViewBuilder
-    private func installerUnavailableLabel(_ reason: AppUpdateInstallerUnavailability) -> some View {
-        switch reason {
-        case .developmentBuild:
-            Label(AppLocalization.text("开发构建不执行应用内更新"), systemImage: "hammer")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        case .notConfigured:
-            Label(AppLocalization.text("应用内更新源尚未配置"), systemImage: "wrench.and.screwdriver")
-                .failureCaptionStyle()
-        case .invalidConfiguration:
-            Label(AppLocalization.text("应用内更新签名配置无效"), systemImage: "exclamationmark.shield.fill")
-                .failureCaptionStyle()
-        case let .startupFailed(message):
-            Label(
-                L10n.format("更新服务启动失败：%@", L10n.tr(message)),
-                systemImage: "exclamationmark.arrow.triangle.2.circlepath"
-            )
-                .failureCaptionStyle()
-        }
-    }
-
     private var controls: some View {
         HStack {
             if controller.state.isChecking {
@@ -201,7 +119,7 @@ struct UpdateSection: View {
             Spacer()
             Button(AppLocalization.text("检查更新")) { controller.checkManually() }
                 .buttonStyle(.bordered)
-                .disabled(controller.state.isChecking || controller.installationState.isActive)
+                .disabled(controller.state.isChecking)
         }
     }
 

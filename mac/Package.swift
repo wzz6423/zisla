@@ -62,7 +62,7 @@ let package = Package(
         ),
         .target(
             name: "KeyboardKit",
-            dependencies: ["ZislaCore", "ZislaKit", "Sparkle"],
+            dependencies: ["ZislaCore", "ZislaKit"],
             resources: [
                 .copy("../../Resources/Keyboard"),
             ],

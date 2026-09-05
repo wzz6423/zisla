@@ -1181,7 +1181,6 @@
 "%@ 文件过大" = "%@ is te groot";
 "%@字符数曲线" = "Tekencurve van %@";
 "%@：%@ 次" = "%@: %@ aanslagen";
-"一键更新并重启" = "Updaten en herstarten";
 "与 %@ 相比" = "Vergeleken met %@";
 "今天还没有输入" = "Vandaag nog niet getypt";
 "全年输入热力图" = "Jaarlijkse typheatmap";
@@ -1266,7 +1265,6 @@
 "多个资源使用相同路径" = "Meerdere bestanddelen gebruiken hetzelfde pad";
 "峰值 %@ 字符/秒" = "Piek van %@ tekens/s";
 "已选：%@ · %@" = "Geselecteerd: %@ · %@";
-"应用内更新源尚未配置" = "De feed voor updates in de app is niet geconfigureerd";
 "当前离线，稍后可重试" = "Je bent offline. Probeer het later opnieuw.";
 "无法分配输入缓冲区。" = "De invoerbuffer kan niet worden toegewezen.";
 "无法创建源音频缓冲区" = "De buffer voor de bronaudio kan niet worden gemaakt";
@@ -1289,10 +1287,8 @@
 "上传完整击键并自动拆分" = "Volledige aanslag uploaden en automatisch splitsen";
 "保存当前修改后即可导出" = "Sla je wijzigingen op om te kunnen exporteren";
 "启用鼠标与触控板点击音" = "Klikgeluiden van muis en trackpad aanzetten";
-"应用内更新签名配置无效" = "Ongeldige ondertekeningsconfiguratie voor updates in de app";
 "当前音色有未保存的更改" = "Dit geluidspakket heeft niet-opgeslagen wijzigingen";
 "无法创建目标音频缓冲区" = "De doelaudiobuffer kan niet worden gemaakt";
-"更新服务启动失败：%@" = "De updateservice kon niet worden gestart: %@";
 "正在整理过去一年的统计" = "Statistieken van het afgelopen jaar voorbereiden";
 "清晰了解每天的输入习惯" = "Een helderder beeld van je dagelijkse typgewoonten";
 "移除这个自定义音色包？" = "Dit aangepaste geluidspakket verwijderen?";
@@ -1305,7 +1301,6 @@
 "前往 GitHub 下载" = "Downloaden van GitHub";
 "备用音频转换时长限制无效" = "De duurlimiet van de terugvalaudioconversie is ongeldig";
 "导入结果不是自定义音色包" = "Het geïmporteerde resultaat is geen aangepast geluidspakket.";
-"开发构建不执行应用内更新" = "Updates in de app zijn niet beschikbaar in ontwikkelbuilds";
 "无法创建导出音频缓冲区。" = "De audiobuffer voor exporteren kan niet worden gemaakt.";
 "无法读取自定义音频：%@" = "Aangepaste audio kan niet worden gelezen: %@";
 "未设置的位置会继承 %@" = "Niet-toegewezen posities erven van %@";
@@ -1332,7 +1327,6 @@
 "开始打字后，曲线会立即出现。" = "Begin te typen en de grafiek verschijnt direct.";
 "当前版本不支持键盘布局：%@" = "Deze versie ondersteunt de toetsenbordindeling niet: %@";
 "所选区间没有可显示的应用记录" = "Er zijn geen app-gegevens beschikbaar voor het gekozen bereik";
-"改为 GitHub 手动下载" = "In plaats daarvan downloaden van GitHub";
 "无法启动备用音频转换器：%@" = "De terugvalaudioconverter kon niet worden gestart: %@";
 "正在监听键盘 · 统计已开启" = "Toetsenbord monitoren · Statistieken aan";
 "正在监听键盘 · 统计已暂停" = "Toetsenbord monitoren · Statistieken gepauzeerd";
@@ -1629,8 +1623,6 @@
 "已创建空白草稿" = "Lege versie aangemaakt";
 "最近输入 %@" = "Laatste invoer %@";
 "未获得下载文件" = "Er is geen bestand gedownload";
-"正在下载更新…" = "Update downloaden…";
-"正在准备更新…" = "Update voorbereiden…";
 "正在准备试听…" = "Voorbeeld voorbereiden…";
 "正在转换音频…" = "Audio converteren…";
 "移除当前音色包" = "Huidig geluidspakket verwijderen";
@@ -1665,7 +1657,6 @@
 "正在导出音色包…" = "Geluidspakket exporteren…";
 "正在打开音色包…" = "Geluidspakket openen…";
 "正在移到废纸篓…" = "Naar de prullenmand verplaatsen…";
-"正在验证并解压…" = "Verifiëren en uitpakken…";
 "灵动岛与下载展示" = "Dynamic Island en downloads";
 "直接写入页面内容" = "De pagina-inhoud direct schrijven";
 "设置页面裁剪区域" = "Het uitsnijgebied van de pagina instellen";
@@ -1816,7 +1807,6 @@
 "可再生数据；下次使用时可能重新生成或下载" = "Herbruikbare gegevens; die worden mogelijk opnieuw aangemaakt of gedownload";
 "左侧封面、歌名与歌手，右侧音浪与滚动歌词" = "Hoes, titel en artiest links; golfvorm en meelopende songtekst rechts";
 "按所选周期删除过期音频，文字记录继续保留" = "Verlopen audio verwijderen volgens de gekozen periode; transcripties blijven bewaard";
-"正在安装，Keyboard 将自动重启…" = "Installeren; Keyboard start automatisch opnieuw op…";
 "上传一组按下/回弹音，快速应用到整把键盘。" = "Upload één aanslag-/terugslagpaar om dat op het hele toetsenbord toe te passen.";
 "发现新版本后下载，并在退出或重启时完成安装" = "Nieuwe versies downloaden en de installatie afronden bij afsluiten of opnieuw opstarten";
 "无法连接代理主机和端口，请检查代理是否运行" = "Kan geen verbinding maken met de proxyhost en -poort; controleer of de proxy actief is";
