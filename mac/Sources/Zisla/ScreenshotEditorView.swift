@@ -324,15 +324,22 @@ enum ScreenshotObscureShape: String, CaseIterable, Identifiable {
 }
 
 enum ScreenshotObscureEffect: String, CaseIterable, Identifiable {
-    case pixelate
     case blur
+    case pixelate
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .pixelate: "马赛克"
         case .blur: "模糊"
+        case .pixelate: "马赛克"
+        }
+    }
+
+    var strengthTitle: String {
+        switch self {
+        case .blur: "模糊度"
+        case .pixelate: "格子"
         }
     }
 }
@@ -517,9 +524,36 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
     var arrowStyle: ScreenshotArrowStyle = .straight
     var fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize
     var number = 1
+    /// Upper bound of the obscure strength sliders. A mosaic's refraction is expressed as a
+    /// fraction of it, so the popover and the render pass cannot drift apart.
+    static let obscureStrengthUpperBound: CGFloat = 12
+
     var obscureShape: ScreenshotObscureShape = .rectangle
-    var obscureEffect: ScreenshotObscureEffect = .pixelate
+    var obscureEffect: ScreenshotObscureEffect = .blur
+    var obscurePixelateStrength: CGFloat = 3
+    /// For a mosaic this is how far each block refracts what sits under it; 0 leaves the content
+    /// unbent, which is the plain mosaic. A blur region always gets a real value written through
+    /// `obscureStrength`, so the default only ever applies to pixelate.
+    var obscureBlurStrength: CGFloat = 0
     var rotation: CGFloat = 0
+
+    /// The strength each effect drives itself with: block size for pixelate, radius for blur. A
+    /// mosaic keeps how far its blocks refract in `obscureBlurStrength`, so the two knobs move
+    /// independently.
+    var obscureStrength: CGFloat {
+        get {
+            switch obscureEffect {
+            case .pixelate: obscurePixelateStrength
+            case .blur: obscureBlurStrength
+            }
+        }
+        set {
+            switch obscureEffect {
+            case .pixelate: obscurePixelateStrength = newValue
+            case .blur: obscureBlurStrength = newValue
+            }
+        }
+    }
 
     init(
         id: UUID = UUID(),
@@ -533,7 +567,9 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize,
         number: Int = 1,
         obscureShape: ScreenshotObscureShape = .rectangle,
-        obscureEffect: ScreenshotObscureEffect = .pixelate,
+        obscureEffect: ScreenshotObscureEffect = .blur,
+        obscureStrength: CGFloat = 3,
+        obscureBlurStrength: CGFloat? = nil,
         rotation: CGFloat = 0
     ) {
         self.id = id
@@ -549,6 +585,8 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         self.obscureShape = obscureShape
         self.obscureEffect = obscureEffect
         self.rotation = rotation
+        self.obscureStrength = obscureStrength
+        if let obscureBlurStrength { self.obscureBlurStrength = obscureBlurStrength }
     }
 }
 
@@ -1091,12 +1129,40 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize
     @Published var selectedEmoji = "⭐️"
     @Published var obscureShape: ScreenshotObscureShape = .rectangle
-    @Published var obscureEffect: ScreenshotObscureEffect = .pixelate
+    @Published var obscureEffect: ScreenshotObscureEffect = .blur
+    @Published var pixelateStrength: CGFloat = 3
+    @Published var blurStrength: CGFloat = 3
+    /// How far a mosaic block refracts what sits under it; 0 by default, the plain mosaic.
+    @Published var mosaicBlurStrength: CGFloat = 0
     @Published var statusMessage: String?
     @Published var isPinned = false
     @Published private(set) var isLongCapturePreviewing = false
     @Published private(set) var hasLongCaptureResult = false
     @Published var longCaptureDirection = ScreenshotLongCaptureDirection.vertical
+
+    /// Blur amount: the blur effect's own strength, or how far a mosaic's blocks refract.
+    var obscureBlurStrength: CGFloat {
+        switch obscureEffect {
+        case .pixelate: mosaicBlurStrength
+        case .blur: blurStrength
+        }
+    }
+
+    /// Strength of the effect that is currently selected; each effect keeps its own slider value.
+    var obscureStrength: CGFloat {
+        get {
+            switch obscureEffect {
+            case .pixelate: pixelateStrength
+            case .blur: blurStrength
+            }
+        }
+        set {
+            switch obscureEffect {
+            case .pixelate: pixelateStrength = newValue
+            case .blur: blurStrength = newValue
+            }
+        }
+    }
 
     private var undoStack: [Snapshot] = []
     private var redoStack: [Snapshot] = []
@@ -1110,6 +1176,10 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     private(set) var pendingTextDraft: PendingTextDraft?
+
+    /// Geometry the canvas has drawn but not yet handed over, so an interrupted mouse-up cannot
+    /// silently drop a shape, number, stroke, or emoji when the image is exported.
+    private(set) var pendingAnnotationDraft: ScreenshotAnnotation?
 
     init(image: NSImage) {
         self.image = image
@@ -1146,7 +1216,9 @@ final class ScreenshotEditorModel: ObservableObject {
         color: ScreenshotRGBA? = nil,
         lineWidth: CGFloat? = nil,
         arrowStyle: ScreenshotArrowStyle? = nil,
-        fontSize: CGFloat? = nil
+        fontSize: CGFloat? = nil,
+        obscureStrength: CGFloat? = nil,
+        obscureBlurStrength: CGFloat? = nil
     ) {
         guard let annotation = annotations.first(where: { $0.id == annotationID }) else { return }
         var updated = annotation
@@ -1171,6 +1243,19 @@ final class ScreenshotEditorModel: ObservableObject {
                 updated.fontSize = fontSize
                 changed = true
             }
+        case .mosaic:
+            if let lineWidth, annotation.lineWidth != lineWidth {
+                updated.lineWidth = lineWidth
+                changed = true
+            }
+            if let obscureStrength, annotation.obscureStrength != obscureStrength {
+                updated.obscureStrength = obscureStrength
+                changed = true
+            }
+            if let obscureBlurStrength, annotation.obscureBlurStrength != obscureBlurStrength {
+                updated.obscureBlurStrength = obscureBlurStrength
+                changed = true
+            }
         default:
             break
         }
@@ -1180,25 +1265,31 @@ final class ScreenshotEditorModel: ObservableObject {
 
     func remove(id: UUID, saveUndo: Bool = true) {
         guard let removed = annotations.first(where: { $0.id == id }) else { return }
+        if pendingAnnotationDraft?.id == id { pendingAnnotationDraft = nil }
         if saveUndo { saveUndoPoint() }
         annotations.removeAll { $0.id == id }
         if removed.kind == .mosaic { refreshMosaicPreview() }
     }
 
-    func addNumber(at point: CGPoint) {
-        add(ScreenshotAnnotation(
+    func numberAnnotation(at point: CGPoint) -> ScreenshotAnnotation {
+        ScreenshotAnnotation(
             kind: .number,
             points: [point],
             color: color,
             lineWidth: lineWidth,
             number: nextNumber
-        ))
+        )
+    }
+
+    func addNumber(at point: CGPoint) {
+        add(numberAnnotation(at: point))
     }
 
     func replaceCapture(
         with newImage: NSImage,
         translatingAnnotationsBy translation: CGSize
     ) {
+        pendingAnnotationDraft = nil
         image = newImage
         annotations = Self.translated(annotations, by: translation)
         undoStack = undoStack.map { snapshot in
@@ -1219,6 +1310,7 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func undo() {
+        pendingAnnotationDraft = nil
         guard let previous = undoStack.popLast() else { return }
         redoStack.append(snapshot)
         restore(previous)
@@ -1226,6 +1318,7 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func redo() {
+        pendingAnnotationDraft = nil
         guard let next = redoStack.popLast() else { return }
         undoStack.append(snapshot)
         restore(next)
@@ -1370,8 +1463,25 @@ final class ScreenshotEditorModel: ObservableObject {
         if draft.isNew { remove(id: draft.id, saveUndo: false) }
     }
 
+    func updatePendingAnnotationDraft(_ annotation: ScreenshotAnnotation?) {
+        pendingAnnotationDraft = annotation
+    }
+
+    @discardableResult
+    func commitPendingAnnotationDraft() -> Bool {
+        guard let draft = pendingAnnotationDraft else { return false }
+        pendingAnnotationDraft = nil
+        add(draft)
+        return true
+    }
+
+    func discardPendingAnnotationDraft() {
+        pendingAnnotationDraft = nil
+    }
+
     func renderedImage() -> NSImage {
         commitPendingTextDraft()
+        commitPendingAnnotationDraft()
         let renderedBase = imageApplyingMosaics()
         guard let base = renderedBase.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return image
@@ -1432,7 +1542,13 @@ final class ScreenshotEditorModel: ObservableObject {
     func imageApplyingMosaics(adding draft: ScreenshotAnnotation?) -> NSImage {
         var obscures = annotations.filter { $0.kind == .mosaic }
         if let draft, draft.kind == .mosaic {
-            obscures.append(draft)
+            // A draft carrying an existing id is an in-flight edit of that region, so it replaces the
+            // stored copy instead of stacking a second obscure pass over the same pixels.
+            if let index = obscures.firstIndex(where: { $0.id == draft.id }) {
+                obscures[index] = draft
+            } else {
+                obscures.append(draft)
+            }
         }
         guard !obscures.isEmpty,
               image.size.width > 0,
@@ -1461,19 +1577,41 @@ final class ScreenshotEditorModel: ObservableObject {
             let filtered: CIImage?
             switch annotation.obscureEffect {
             case .pixelate:
-                let pixelate = CIFilter(name: "CIPixellate")
-                pixelate?.setValue(output, forKey: kCIInputImageKey)
-                pixelate?.setValue(
-                    max(8, annotation.lineWidth * 3) * max(scaleX, scaleY),
-                    forKey: kCIInputScaleKey
+                let blockSize = max(8, annotation.obscureStrength * 3) * max(scaleX, scaleY)
+                // Bends what sits under each block through a lens the size of that block, so the
+                // slider raises how far the block's own content is refracted and displaced while
+                // CIPixellate still runs last and leaves every block edge hard. Any pass that
+                // blurs the blocks themselves instead bleeds them together until they all sit at
+                // one colour, which reads as a plain blur however hard the grid still is.
+                // CIGlassDistortion displaces along the texture's gradient, and that gradient
+                // flattens as the lens grows, so the scale has to follow the square of the block
+                // size for the distortion to stay proportional to it: measured across 9pt, 16pt and
+                // 36pt blocks, a scale linear in the block size all but vanishes at 36pt.
+                let refraction = blockSize * blockSize * 0.47 * min(
+                    1,
+                    annotation.obscureBlurStrength / ScreenshotAnnotation.obscureStrengthUpperBound
                 )
-                let pixelated = pixelate?.outputImage
-                filtered = pixelated?.clamped(to: extent).cropped(to: extent)
+                var sampled = output
+                if refraction > 0,
+                   let glass = CIFilter(name: "CIGlassDistortion"),
+                   let texture = Self.lensTexture(blockSize: blockSize, extent: extent) {
+                    glass.setValue(output.clamped(to: extent), forKey: kCIInputImageKey)
+                    glass.setValue(texture, forKey: "inputTexture")
+                    glass.setValue(CIVector(x: extent.midX, y: extent.midY), forKey: kCIInputCenterKey)
+                    glass.setValue(refraction, forKey: kCIInputScaleKey)
+                    sampled = glass.outputImage?.clamped(to: extent).cropped(to: extent) ?? output
+                }
+                let pixelate = CIFilter(name: "CIPixellate")
+                pixelate?.setValue(sampled, forKey: kCIInputImageKey)
+                pixelate?.setValue(blockSize, forKey: kCIInputScaleKey)
+                // Aligns the block grid with the lens tiling, which starts at the image origin.
+                pixelate?.setValue(CIVector(x: 0, y: 0), forKey: kCIInputCenterKey)
+                filtered = pixelate?.outputImage?.clamped(to: extent).cropped(to: extent)
             case .blur:
                 let blur = CIFilter(name: "CIGaussianBlur")
                 blur?.setValue(output, forKey: kCIInputImageKey)
                 blur?.setValue(
-                    max(4, annotation.lineWidth * 1.5) * max(scaleX, scaleY),
+                    max(4, annotation.obscureBlurStrength * 1.5) * max(scaleX, scaleY),
                     forKey: kCIInputRadiusKey
                 )
                 let blurred = blur?.outputImage
@@ -1491,6 +1629,27 @@ final class ScreenshotEditorModel: ObservableObject {
 
         guard let result = Self.ciContext.createCGImage(output, from: extent) else { return image }
         return NSImage(cgImage: result, size: image.size)
+    }
+
+    /// One spherical lens per mosaic block, tiled from the image origin: a radial white-to-black
+    /// gradient is the height field CIGlassDistortion refracts through, so each block bends only
+    /// what sits under it.
+    private static func lensTexture(blockSize: CGFloat, extent: CGRect) -> CIImage? {
+        guard blockSize > 0,
+              let gradient = CIFilter(name: "CIRadialGradient"),
+              let tile = CIFilter(name: "CIAffineTile")
+        else { return nil }
+        gradient.setValue(CIVector(x: blockSize / 2, y: blockSize / 2), forKey: kCIInputCenterKey)
+        gradient.setValue(0, forKey: "inputRadius0")
+        gradient.setValue(blockSize / 2, forKey: "inputRadius1")
+        gradient.setValue(CIColor(red: 1, green: 1, blue: 1), forKey: "inputColor0")
+        gradient.setValue(CIColor(red: 0, green: 0, blue: 0), forKey: "inputColor1")
+        guard let cell = gradient.outputImage?.cropped(
+            to: CGRect(x: 0, y: 0, width: blockSize, height: blockSize)
+        ) else { return nil }
+        tile.setValue(cell, forKey: kCIInputImageKey)
+        tile.setValue(CGAffineTransform.identity, forKey: kCIInputTransformKey)
+        return tile.outputImage?.clamped(to: extent).cropped(to: extent)
     }
 
     private static func obscureMask(
@@ -3510,6 +3669,15 @@ struct ScreenshotEditorView: View {
                 model.arrowStyle = annotation.arrowStyle
             case .text, .emoji:
                 model.fontSize = annotation.fontSize
+            case .mosaic:
+                model.lineWidth = annotation.lineWidth
+                switch annotation.obscureEffect {
+                case .pixelate:
+                    model.pixelateStrength = annotation.obscurePixelateStrength
+                    model.mosaicBlurStrength = annotation.obscureBlurStrength
+                case .blur:
+                    model.blurStrength = annotation.obscureBlurStrength
+                }
             default:
                 break
             }
@@ -3529,6 +3697,15 @@ struct ScreenshotEditorView: View {
         .onChange(of: model.fontSize) { _, newValue in
             guard let annotationID = selectionState.selectedAnnotationID else { return }
             model.applySelectedStyle(to: annotationID, fontSize: newValue)
+        }
+        .onChange(of: model.pixelateStrength) { _, newValue in
+            applyObscureStrength(newValue, ifSelectedRegionUses: .pixelate)
+        }
+        .onChange(of: model.blurStrength) { _, newValue in
+            applyObscureStrength(newValue, ifSelectedRegionUses: .blur)
+        }
+        .onChange(of: model.mosaicBlurStrength) { _, newValue in
+            applyObscureBlurStrength(newValue, ifSelectedRegionUses: .pixelate)
         }
     }
 
@@ -3753,6 +3930,13 @@ struct ScreenshotEditorView: View {
                             isComplete: isComplete,
                             geometry: geometry
                         )
+                    },
+                    onDragBegan: {
+                        // A lost mouse-up leaves the previous stroke pending; pressing again keeps
+                        // it instead of folding its geometry into the next one.
+                        model.commitPendingAnnotationDraft()
+                        draftPoints.removeAll(keepingCapacity: true)
+                        draftRect = .zero
                     },
                     onDoubleClick: { location in
                         let point = geometry.imagePoint(from: location)
@@ -4181,6 +4365,9 @@ struct ScreenshotEditorView: View {
     }
 
     private var mosaicDraftAnnotation: ScreenshotAnnotation? {
+        // Dragging or resizing a committed region only updates `editPreview`, so feed it through the
+        // obscure pass to keep the pixels following the frame instead of snapping on mouse-up.
+        if let editPreview, editPreview.kind == .mosaic { return editPreview }
         guard model.tool == .mosaic else { return nil }
         switch model.obscureShape {
         case .rectangle:
@@ -4190,7 +4377,9 @@ struct ScreenshotEditorView: View {
                 rect: draftRect,
                 lineWidth: model.lineWidth,
                 obscureShape: .rectangle,
-                obscureEffect: model.obscureEffect
+                obscureEffect: model.obscureEffect,
+                obscureStrength: model.obscureStrength,
+                obscureBlurStrength: model.obscureBlurStrength
             )
         case .brush:
             guard draftPoints.count > 1 else { return nil }
@@ -4199,7 +4388,9 @@ struct ScreenshotEditorView: View {
                 points: draftPoints,
                 lineWidth: model.lineWidth,
                 obscureShape: .brush,
-                obscureEffect: model.obscureEffect
+                obscureEffect: model.obscureEffect,
+                obscureStrength: model.obscureStrength,
+                obscureBlurStrength: model.obscureBlurStrength
             )
         }
     }
@@ -4337,7 +4528,13 @@ struct ScreenshotEditorView: View {
             } else {
                 editPreview = current
             }
-            guard isComplete else { return }
+            guard isComplete else {
+                model.updatePendingAnnotationDraft(
+                    current == activeAnnotationEdit.original ? nil : current
+                )
+                return
+            }
+            model.discardPendingAnnotationDraft()
             if current != activeAnnotationEdit.original {
                 model.add(current)
             }
@@ -4378,64 +4575,20 @@ struct ScreenshotEditorView: View {
             break
         }
 
-        guard isComplete else { return }
+        guard isComplete else {
+            model.updatePendingAnnotationDraft(committableDraftAnnotation(at: point))
+            return
+        }
+        model.discardPendingAnnotationDraft()
         defer {
             draftPoints.removeAll(keepingCapacity: true)
             draftRect = .zero
         }
 
         switch model.tool {
-        case .rectangle:
-            guard draftRect.width > 2, draftRect.height > 2 else { return }
-            model.add(ScreenshotAnnotation(
-                kind: .rectangle,
-                rect: draftRect,
-                color: model.color,
-                lineWidth: model.lineWidth
-            ))
-        case .ellipse:
-            guard draftRect.width > 2, draftRect.height > 2 else { return }
-            model.add(ScreenshotAnnotation(
-                kind: .ellipse,
-                rect: draftRect,
-                color: model.color,
-                lineWidth: model.lineWidth
-            ))
-        case .mosaic:
-            switch model.obscureShape {
-            case .rectangle:
-                guard draftRect.width > 2, draftRect.height > 2 else { return }
-            case .brush:
-                guard draftPoints.count > 1 else { return }
-            }
-            model.add(ScreenshotAnnotation(
-                kind: .mosaic,
-                points: draftPoints,
-                rect: draftRect,
-                color: model.color,
-                lineWidth: model.lineWidth,
-                obscureShape: model.obscureShape,
-                obscureEffect: model.obscureEffect
-            ))
-        case .brush:
-            guard draftPoints.count > 1 else { return }
-            model.add(ScreenshotAnnotation(
-                kind: .brush,
-                points: draftPoints,
-                color: model.color,
-                lineWidth: model.lineWidth
-            ))
-        case .arrow:
-            guard draftPoints.count == 2 else { return }
-            model.add(ScreenshotAnnotation(
-                kind: .arrow,
-                points: draftPoints,
-                color: model.color,
-                lineWidth: model.lineWidth,
-                arrowStyle: model.arrowStyle
-            ))
-        case .number:
-            model.addNumber(at: point)
+        case .rectangle, .ellipse, .mosaic, .brush, .arrow, .number, .emoji:
+            guard let annotation = committableDraftAnnotation(at: point) else { return }
+            model.add(annotation)
         case .text:
             let placeholderColor: ScreenshotRGBA
             if let cgImage = model.image.cgImage(forProposedRect: nil, context: nil, hints: nil),
@@ -4471,15 +4624,78 @@ struct ScreenshotEditorView: View {
             )
             model.add(annotation, saveUndo: false)
             beginInlineTextEditing(annotation, isNew: true, placeholderColor: placeholderColor)
+        }
+    }
+
+    /// The annotation the current draft would produce, or `nil` while it stays below the commit
+    /// thresholds. Shared by the drag handler and the export fallback so both agree on what counts
+    /// as a finished annotation.
+    private func committableDraftAnnotation(at point: CGPoint) -> ScreenshotAnnotation? {
+        switch model.tool {
+        case .rectangle:
+            guard draftRect.width > 2, draftRect.height > 2 else { return nil }
+            return ScreenshotAnnotation(
+                kind: .rectangle,
+                rect: draftRect,
+                color: model.color,
+                lineWidth: model.lineWidth
+            )
+        case .ellipse:
+            guard draftRect.width > 2, draftRect.height > 2 else { return nil }
+            return ScreenshotAnnotation(
+                kind: .ellipse,
+                rect: draftRect,
+                color: model.color,
+                lineWidth: model.lineWidth
+            )
+        case .mosaic:
+            switch model.obscureShape {
+            case .rectangle:
+                guard draftRect.width > 2, draftRect.height > 2 else { return nil }
+            case .brush:
+                guard draftPoints.count > 1 else { return nil }
+            }
+            return ScreenshotAnnotation(
+                kind: .mosaic,
+                points: draftPoints,
+                rect: draftRect,
+                color: model.color,
+                lineWidth: model.lineWidth,
+                obscureShape: model.obscureShape,
+                obscureEffect: model.obscureEffect,
+                obscureStrength: model.obscureStrength,
+                obscureBlurStrength: model.obscureBlurStrength
+            )
+        case .brush:
+            guard draftPoints.count > 1 else { return nil }
+            return ScreenshotAnnotation(
+                kind: .brush,
+                points: draftPoints,
+                color: model.color,
+                lineWidth: model.lineWidth
+            )
+        case .arrow:
+            guard draftPoints.count == 2 else { return nil }
+            return ScreenshotAnnotation(
+                kind: .arrow,
+                points: draftPoints,
+                color: model.color,
+                lineWidth: model.lineWidth,
+                arrowStyle: model.arrowStyle
+            )
+        case .number:
+            return model.numberAnnotation(at: point)
         case .emoji:
-            model.add(ScreenshotAnnotation(
+            return ScreenshotAnnotation(
                 kind: .emoji,
                 points: [point],
                 text: model.selectedEmoji,
                 color: model.color,
                 lineWidth: model.lineWidth,
                 fontSize: ScreenshotAnnotationGeometry.defaultEmojiDiameter
-            ))
+            )
+        case .text:
+            return nil
         }
     }
 
@@ -4492,7 +4708,7 @@ struct ScreenshotEditorView: View {
         case .number: [.number]
         case .text: [.text]
         case .emoji: [.emoji]
-        case .mosaic: []
+        case .mosaic: [.mosaic]
         }
         return model.annotations.reversed().first {
             guard expectedKinds.contains($0.kind) else { return false }
@@ -4539,6 +4755,7 @@ struct ScreenshotEditorView: View {
                     }
                 }
                 iconButton(model.isPinned ? "pin.fill" : "pin", title: model.isPinned ? "取消置顶" : "钉图") {
+                    commitInlineText()
                     model.isPinned.toggle()
                     onPinToggle(model.isPinned)
                 }
@@ -4831,18 +5048,89 @@ struct ScreenshotEditorView: View {
 
                 Divider().frame(height: 24)
 
-                Slider(value: $model.lineWidth, in: 1...12, step: 1)
-                    .frame(width: 110)
-                    .help("调整范围")
-                Text("\(Int(model.lineWidth.rounded()))")
-                    .font(.system(size: 11, design: .monospaced))
-                    .frame(width: 18, alignment: .trailing)
+                if model.obscureShape == .brush {
+                    Text("粗细")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(width: 36, alignment: .leading)
+                    Slider(value: $model.lineWidth, in: 1...12, step: 1)
+                        .frame(width: 90)
+                        .help("画笔粗细")
+                    Text("\(Int(model.lineWidth.rounded()))")
+                        .font(.system(size: 11, design: .monospaced))
+                        .frame(width: 18, alignment: .trailing)
+
+                    Divider().frame(height: 24)
+                }
+
+                if model.obscureEffect == .pixelate {
+                    obscureStrengthControl(
+                        title: ScreenshotObscureEffect.pixelate.strengthTitle,
+                        value: $model.pixelateStrength,
+                        range: 1...12
+                    )
+
+                    Divider().frame(height: 24)
+                }
+
+                obscureStrengthControl(
+                    title: ScreenshotObscureEffect.blur.strengthTitle,
+                    value: model.obscureEffect == .pixelate
+                        ? $model.mosaicBlurStrength
+                        : $model.blurStrength,
+                    // A mosaic may skip the blur entirely; the blur effect has to blur something.
+                    range: model.obscureEffect == .pixelate
+                        ? 0...ScreenshotAnnotation.obscureStrengthUpperBound
+                        : 1...ScreenshotAnnotation.obscureStrengthUpperBound
+                )
             }
             .padding(.horizontal, 10)
             .frame(height: ScreenshotToolbarLayout.height)
             .onChange(of: model.obscureShape) { _, _ in selectTool(.mosaic) }
             .onChange(of: model.obscureEffect) { _, _ in selectTool(.mosaic) }
         }
+    }
+
+    private func obscureStrengthControl(
+        title: String,
+        value: Binding<CGFloat>,
+        range: ClosedRange<CGFloat>
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.system(size: 11, weight: .medium))
+                .frame(width: 36, alignment: .leading)
+            Slider(value: value, in: range, step: 1)
+                .frame(width: 90)
+                .help(title)
+            Text("\(Int(value.wrappedValue.rounded()))")
+                .font(.system(size: 11, design: .monospaced))
+                .frame(width: 18, alignment: .trailing)
+        }
+    }
+
+    private func applyObscureStrength(
+        _ strength: CGFloat,
+        ifSelectedRegionUses effect: ScreenshotObscureEffect
+    ) {
+        guard let annotationID = selectedObscureAnnotationID(usingEffect: effect) else { return }
+        model.applySelectedStyle(to: annotationID, obscureStrength: strength)
+    }
+
+    private func applyObscureBlurStrength(
+        _ strength: CGFloat,
+        ifSelectedRegionUses effect: ScreenshotObscureEffect
+    ) {
+        guard let annotationID = selectedObscureAnnotationID(usingEffect: effect) else { return }
+        model.applySelectedStyle(to: annotationID, obscureBlurStrength: strength)
+    }
+
+    private func selectedObscureAnnotationID(
+        usingEffect effect: ScreenshotObscureEffect
+    ) -> UUID? {
+        guard let annotationID = selectionState.selectedAnnotationID,
+              model.annotations.first(where: { $0.id == annotationID })?.obscureEffect == effect
+        else { return nil }
+        return annotationID
     }
 
     private var recognitionMenu: some View {
@@ -5091,6 +5379,7 @@ final class ScreenshotPinnedFocusState: ObservableObject {
 
 struct ScreenshotPointerInteractionView: NSViewRepresentable {
     let onDrag: (CGPoint, CGPoint, Bool) -> Void
+    var onDragBegan: (() -> Void)? = nil
     var usesScreenCoordinatesForDrag = false
     var onDoubleClick: ((CGPoint) -> Void)? = nil
     var onMagnify: ((CGFloat) -> Void)? = nil
@@ -5106,6 +5395,7 @@ struct ScreenshotPointerInteractionView: NSViewRepresentable {
 
     func updateNSView(_ nsView: ScreenshotPointerInteractionNSView, context: Context) {
         nsView.onDrag = onDrag
+        nsView.onDragBegan = onDragBegan
         nsView.usesScreenCoordinatesForDrag = usesScreenCoordinatesForDrag
         nsView.onDoubleClick = onDoubleClick
         nsView.onMagnify = onMagnify
@@ -5121,6 +5411,7 @@ struct ScreenshotPointerInteractionView: NSViewRepresentable {
 @MainActor
 final class ScreenshotPointerInteractionNSView: NSView {
     var onDrag: ((CGPoint, CGPoint, Bool) -> Void)?
+    var onDragBegan: (() -> Void)?
     var usesScreenCoordinatesForDrag = false
     var onDoubleClick: ((CGPoint) -> Void)?
     var onMagnify: ((CGFloat) -> Void)?
@@ -5211,6 +5502,7 @@ final class ScreenshotPointerInteractionNSView: NSView {
         if let resizeCorner {
             onResize?(resizeCorner, point, point, false)
         } else {
+            onDragBegan?()
             onDrag?(point, point, false)
         }
     }
