@@ -18,33 +18,13 @@ enum BatteryLocalization {
     }
 
     static func historyText(
-        lastFullyChargedAt: Date?,
         lastUnpluggedAt: Date?,
         now: Date,
         locale: Locale
     ) -> String? {
-        let fullyChargedDuration = lastFullyChargedAt.map {
-            durationText(from: $0, to: now, locale: locale)
-        }
-        let unpluggedDuration = lastUnpluggedAt.map {
-            durationText(from: $0, to: now, locale: locale)
-        }
-
-        switch (fullyChargedDuration, unpluggedDuration) {
-        case let (fullyChargedDuration?, unpluggedDuration?):
-            return format(
-                "上次充满 %@，已脱电使用 %@",
-                locale: locale,
-                fullyChargedDuration,
-                unpluggedDuration
-            )
-        case let (fullyChargedDuration?, nil):
-            return format("上次充满 %@", locale: locale, fullyChargedDuration)
-        case let (nil, unpluggedDuration?):
-            return format("已脱电使用 %@", locale: locale, unpluggedDuration)
-        case (nil, nil):
-            return nil
-        }
+        guard let lastUnpluggedAt else { return nil }
+        let duration = durationText(from: lastUnpluggedAt, to: now, locale: locale)
+        return format("已脱电使用 %@", locale: locale, duration)
     }
 
     static func durationText(from start: Date, to end: Date, locale: Locale) -> String {

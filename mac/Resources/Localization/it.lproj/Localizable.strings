@@ -516,9 +516,7 @@
 "盒" = "Custodia";
 "通过" = "tramite";
 "正在充电" = "In carica";
-"上次充满 %@" = "Carica %@ fa";
 "已脱电使用 %@" = "A batteria %@";
-"上次充满 %@，已脱电使用 %@" = "Carica %@ fa, a batteria %@";
 "%ld小时%ld分" = "%ld h %ld min";
 "%ld分钟" = "%ld min";
 "剩余 %ld 分钟" = "%ld min rimanenti";

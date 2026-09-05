@@ -516,9 +516,7 @@
 "盒" = "Case";
 "通过" = "melalui";
 "正在充电" = "Mengisi daya";
-"上次充满 %@" = "Penuh %@ lalu";
 "已脱电使用 %@" = "Pakai baterai %@";
-"上次充满 %@，已脱电使用 %@" = "Penuh %@ lalu, pakai baterai %@";
 "%ld小时%ld分" = "%ld j %ld mnt";
 "%ld分钟" = "%ld mnt";
 "剩余 %ld 分钟" = "Sisa %ld mnt";

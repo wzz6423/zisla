@@ -516,9 +516,7 @@
 "盒" = "Estuche";
 "通过" = "vía";
 "正在充电" = "Cargando";
-"上次充满 %@" = "Cargada hace %@";
 "已脱电使用 %@" = "Con batería %@";
-"上次充满 %@，已脱电使用 %@" = "Cargada hace %@, con batería %@";
 "%ld小时%ld分" = "%ld h %ld min";
 "%ld分钟" = "%ld min";
 "剩余 %ld 分钟" = "%ld min restantes";

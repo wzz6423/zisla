@@ -180,37 +180,6 @@ struct BatteryMonitorTests {
     }
 
     @Test @MainActor
-    func recordsTimestampWhenBatteryBecomesFullyCharged() throws {
-        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        var clock = Date(timeIntervalSince1970: 1_000_000)
-        let monitor = BatteryMonitor(defaults: defaults, now: { clock })
-
-        let charging = BatterySnapshot(
-            level: 0.95,
-            isCharging: true,
-            isPluggedIn: true,
-            isCharged: false,
-            timeRemainingMinutes: 10
-        )
-        monitor.detectStateTransitions(from: nil, to: charging)
-        #expect(monitor.lastFullyChargedAt == nil)
-
-        clock = Date(timeIntervalSince1970: 1_000_100)
-        let charged = BatterySnapshot(
-            level: 1.0,
-            isCharging: false,
-            isPluggedIn: true,
-            isCharged: true,
-            timeRemainingMinutes: nil
-        )
-        monitor.detectStateTransitions(from: charging, to: charged)
-        #expect(monitor.lastFullyChargedAt == clock)
-    }
-
-    @Test @MainActor
     func recordsTimestampWhenExternalPowerDisconnects() throws {
         let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -250,24 +219,24 @@ struct BatteryMonitorTests {
         let clock = Date(timeIntervalSince1970: 3_000_000)
         let first = BatteryMonitor(defaults: defaults, now: { clock })
 
-        let charging = BatterySnapshot(
-            level: 1.0,
-            isCharging: false,
-            isPluggedIn: true,
-            isCharged: false,
-            timeRemainingMinutes: nil
-        )
-        let charged = BatterySnapshot(
+        let plugged = BatterySnapshot(
             level: 1.0,
             isCharging: false,
             isPluggedIn: true,
             isCharged: true,
             timeRemainingMinutes: nil
         )
-        first.detectStateTransitions(from: charging, to: charged)
+        let onBattery = BatterySnapshot(
+            level: 1.0,
+            isCharging: false,
+            isPluggedIn: false,
+            isCharged: false,
+            timeRemainingMinutes: 300
+        )
+        first.detectStateTransitions(from: plugged, to: onBattery)
 
         let second = BatteryMonitor(defaults: defaults, now: { Date() })
-        #expect(second.lastFullyChargedAt == clock)
+        #expect(second.lastUnpluggedAt == clock)
     }
 
     @Test @MainActor
@@ -288,17 +257,6 @@ struct BatteryMonitorTests {
         first.detectStateTransitions(from: nil, to: plugged)
 
         let second = BatteryMonitor(defaults: defaults, now: { clock })
-        clock = Date(timeIntervalSince1970: 3_100_100)
-        let charged = BatterySnapshot(
-            level: 1,
-            isCharging: false,
-            isPluggedIn: true,
-            isCharged: true,
-            timeRemainingMinutes: nil
-        )
-        second.detectStateTransitions(from: nil, to: charged)
-        #expect(second.lastFullyChargedAt == clock)
-
         clock = Date(timeIntervalSince1970: 3_100_200)
         let onBattery = BatterySnapshot(
             level: 0.99,
@@ -319,7 +277,6 @@ struct BatteryMonitorTests {
 
         let monitor = BatteryMonitor(defaults: defaults, now: Date.init)
 
-        #expect(monitor.lastFullyChargedAt == nil)
         #expect(monitor.lastUnpluggedAt == nil)
 
         let onBattery = BatterySnapshot(
@@ -331,7 +288,6 @@ struct BatteryMonitorTests {
         )
         monitor.detectStateTransitions(from: nil, to: onBattery)
 
-        #expect(monitor.lastFullyChargedAt == nil)
         #expect(monitor.lastUnpluggedAt == nil)
     }
 
@@ -341,45 +297,11 @@ struct BatteryMonitorTests {
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set("not-a-date", forKey: "zisla.battery.last-fully-charged-at")
         defaults.set("2024-13-45T99:99:99Z", forKey: "zisla.battery.last-unplugged-at")
 
         let monitor = BatteryMonitor(defaults: defaults, now: Date.init)
 
-        #expect(monitor.lastFullyChargedAt == nil)
         #expect(monitor.lastUnpluggedAt == nil)
-    }
-
-    @Test @MainActor
-    func doesNotRecordFullyChargedWhenAlreadyCharged() throws {
-        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        var clock = Date(timeIntervalSince1970: 4_000_000)
-        let monitor = BatteryMonitor(defaults: defaults, now: { clock })
-
-        let charged1 = BatterySnapshot(
-            level: 1.0,
-            isCharging: false,
-            isPluggedIn: true,
-            isCharged: true,
-            timeRemainingMinutes: nil
-        )
-        monitor.detectStateTransitions(from: nil, to: charged1)
-        let firstTimestamp = monitor.lastFullyChargedAt
-
-        clock = Date(timeIntervalSince1970: 4_000_500)
-        let charged2 = BatterySnapshot(
-            level: 1.0,
-            isCharging: false,
-            isPluggedIn: true,
-            isCharged: true,
-            timeRemainingMinutes: nil
-        )
-        monitor.detectStateTransitions(from: charged1, to: charged2)
-
-        #expect(monitor.lastFullyChargedAt == firstTimestamp)
     }
 
     @Test @MainActor
@@ -432,7 +354,6 @@ struct BatteryMonitorTests {
         monitor.detectStateTransitions(from: nil, to: charging)
         monitor.detectStateTransitions(from: charging, to: nil)
 
-        #expect(monitor.lastFullyChargedAt == nil)
         #expect(monitor.lastUnpluggedAt == nil)
     }
 

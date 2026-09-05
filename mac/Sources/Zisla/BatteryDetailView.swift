@@ -72,7 +72,6 @@ struct BatteryHistoryPresentation: Equatable {
 
     init(
         battery: BatterySnapshot,
-        lastFullyChargedAt: Date?,
         lastUnpluggedAt: Date?,
         now: Date,
         locale: Locale = BatteryLocalization.defaultLocale
@@ -83,7 +82,6 @@ struct BatteryHistoryPresentation: Equatable {
         }
 
         text = BatteryLocalization.historyText(
-            lastFullyChargedAt: lastFullyChargedAt,
             lastUnpluggedAt: lastUnpluggedAt,
             now: now,
             locale: locale
@@ -668,11 +666,10 @@ struct BatteryDetailView: View {
     private func batteryHistoryView(for battery: BatterySnapshot) -> some View {
         if !battery.isCharging,
            !battery.isPluggedIn,
-           batteryMonitor.lastFullyChargedAt != nil || batteryMonitor.lastUnpluggedAt != nil {
+           batteryMonitor.lastUnpluggedAt != nil {
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 let presentation = BatteryHistoryPresentation(
                     battery: battery,
-                    lastFullyChargedAt: batteryMonitor.lastFullyChargedAt,
                     lastUnpluggedAt: batteryMonitor.lastUnpluggedAt,
                     now: context.date,
                     locale: locale

@@ -14,15 +14,13 @@ struct BatteryLocalizationTests {
 
         #expect(
             BatteryLocalization.historyText(
-                lastFullyChargedAt: now.addingTimeInterval(-2 * 3_600),
                 lastUnpluggedAt: now.addingTimeInterval(-30 * 60),
                 now: now,
                 locale: Locale(identifier: "en")
-            ) == "Full 2h 0m ago, on battery 30 min"
+            ) == "On battery 30 min"
         )
         #expect(
             BatteryLocalization.historyText(
-                lastFullyChargedAt: nil,
                 lastUnpluggedAt: now.addingTimeInterval(-90 * 60),
                 now: now,
                 locale: Locale(identifier: "ja")
@@ -30,7 +28,6 @@ struct BatteryLocalizationTests {
         )
         #expect(
             BatteryLocalization.historyText(
-                lastFullyChargedAt: nil,
                 lastUnpluggedAt: nil,
                 now: now,
                 locale: Locale(identifier: "en")

@@ -516,9 +516,7 @@
 "盒" = "Case";
 "通过" = "via";
 "正在充电" = "Wordt opgeladen";
-"上次充满 %@" = "Vol %@ geleden";
 "已脱电使用 %@" = "Op accu %@";
-"上次充满 %@，已脱电使用 %@" = "Vol %@ geleden, op accu %@";
 "%ld小时%ld分" = "%ld u %ld min";
 "%ld分钟" = "%ld min";
 "剩余 %ld 分钟" = "%ld min resterend";

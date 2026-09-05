@@ -516,9 +516,7 @@
 "盒" = "Kutu";
 "通过" = "üzerinden";
 "正在充电" = "Şarj oluyor";
-"上次充满 %@" = "%@ önce doldu";
 "已脱电使用 %@" = "Pilde %@";
-"上次充满 %@，已脱电使用 %@" = "%@ önce doldu, pilde %@";
 "%ld小时%ld分" = "%ld sa %ld dk";
 "%ld分钟" = "%ld dk";
 "剩余 %ld 分钟" = "%ld dk kaldı";

@@ -143,21 +143,17 @@ struct BatteryModuleTests {
 
         let presentation = BatteryHistoryPresentation(
             battery: snapshot,
-            lastFullyChargedAt: now.addingTimeInterval(-2 * 3_600 - 5 * 60),
             lastUnpluggedAt: now.addingTimeInterval(-65 * 60),
             now: now
         )
 
-        #expect(presentation.text == "上次充满 2小时5分，已脱电使用 1小时5分")
+        #expect(presentation.text == "已脱电使用 1小时5分")
     }
 
     @Test
     func hidesBatteryHistoryWheneverExternalPowerIsConnected() {
         let now = Date(timeIntervalSince1970: 11_000)
-        let history = (
-            lastFullyChargedAt: now.addingTimeInterval(-7_200),
-            lastUnpluggedAt: now.addingTimeInterval(-3_600)
-        )
+        let lastUnpluggedAt = now.addingTimeInterval(-3_600)
 
         let charging = BatterySnapshot(
             level: 0.8,
@@ -177,16 +173,14 @@ struct BatteryModuleTests {
         #expect(
             BatteryHistoryPresentation(
                 battery: charging,
-                lastFullyChargedAt: history.lastFullyChargedAt,
-                lastUnpluggedAt: history.lastUnpluggedAt,
+                lastUnpluggedAt: lastUnpluggedAt,
                 now: now
             ).text == nil
         )
         #expect(
             BatteryHistoryPresentation(
                 battery: pluggedInAndFull,
-                lastFullyChargedAt: history.lastFullyChargedAt,
-                lastUnpluggedAt: history.lastUnpluggedAt,
+                lastUnpluggedAt: lastUnpluggedAt,
                 now: now
             ).text == nil
         )
@@ -205,25 +199,16 @@ struct BatteryModuleTests {
 
         let onlyUnplugged = BatteryHistoryPresentation(
             battery: snapshot,
-            lastFullyChargedAt: nil,
             lastUnpluggedAt: now.addingTimeInterval(-60),
-            now: now
-        )
-        let onlyFullyCharged = BatteryHistoryPresentation(
-            battery: snapshot,
-            lastFullyChargedAt: now.addingTimeInterval(-60),
-            lastUnpluggedAt: nil,
             now: now
         )
         let noHistory = BatteryHistoryPresentation(
             battery: snapshot,
-            lastFullyChargedAt: nil,
             lastUnpluggedAt: nil,
             now: now
         )
 
         #expect(onlyUnplugged.text == "已脱电使用 1分钟")
-        #expect(onlyFullyCharged.text == "上次充满 1分钟")
         #expect(noHistory.text == nil)
     }
 }

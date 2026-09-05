@@ -98,21 +98,16 @@ public struct BatterySnapshot: Equatable, Sendable {
 public final class BatteryMonitor: ObservableObject {
     @Published public private(set) var snapshot: BatterySnapshot?
 
-    /// Timestamp when the battery last reached fully charged state.
-    @Published public private(set) var lastFullyChargedAt: Date?
     /// Timestamp when external power was last disconnected.
     @Published public private(set) var lastUnpluggedAt: Date?
 
     private var runLoopSource: CFRunLoopSource?
     private let defaults: UserDefaults
     private let now: () -> Date
-    private var lastObservedIsCharged: Bool?
     private var lastObservedIsPluggedIn: Bool?
 
     private enum HistoryKey {
-        static let lastFullyChargedAt = "zisla.battery.last-fully-charged-at"
         static let lastUnpluggedAt = "zisla.battery.last-unplugged-at"
-        static let lastObservedIsCharged = "zisla.battery.last-observed-is-charged"
         static let lastObservedIsPluggedIn = "zisla.battery.last-observed-is-plugged-in"
     }
 
@@ -122,9 +117,7 @@ public final class BatteryMonitor: ObservableObject {
     ) {
         self.defaults = defaults
         self.now = now
-        self.lastFullyChargedAt = Self.loadDate(defaults, forKey: HistoryKey.lastFullyChargedAt)
         self.lastUnpluggedAt = Self.loadDate(defaults, forKey: HistoryKey.lastUnpluggedAt)
-        self.lastObservedIsCharged = defaults.object(forKey: HistoryKey.lastObservedIsCharged) as? Bool
         self.lastObservedIsPluggedIn = defaults.object(forKey: HistoryKey.lastObservedIsPluggedIn) as? Bool
     }
 
@@ -160,14 +153,7 @@ public final class BatteryMonitor: ObservableObject {
     func detectStateTransitions(from previous: BatterySnapshot?, to current: BatterySnapshot?) {
         guard let current else { return }
 
-        let previousIsCharged = previous?.isCharged ?? lastObservedIsCharged
         let previousIsPluggedIn = previous?.isPluggedIn ?? lastObservedIsPluggedIn
-
-        if current.isCharged, previousIsCharged == false {
-            let date = now()
-            lastFullyChargedAt = date
-            storeDate(date, forKey: HistoryKey.lastFullyChargedAt)
-        }
 
         if !current.isPluggedIn, previousIsPluggedIn == true {
             let date = now()
@@ -175,9 +161,7 @@ public final class BatteryMonitor: ObservableObject {
             storeDate(date, forKey: HistoryKey.lastUnpluggedAt)
         }
 
-        lastObservedIsCharged = current.isCharged
         lastObservedIsPluggedIn = current.isPluggedIn
-        defaults.set(current.isCharged, forKey: HistoryKey.lastObservedIsCharged)
         defaults.set(current.isPluggedIn, forKey: HistoryKey.lastObservedIsPluggedIn)
     }
 

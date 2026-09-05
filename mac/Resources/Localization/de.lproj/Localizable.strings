@@ -517,9 +517,7 @@
 "盒" = "Ladecase";
 "通过" = "über";
 "正在充电" = "Wird geladen";
-"上次充满 %@" = "Voll vor %@";
 "已脱电使用 %@" = "Akkubetrieb %@";
-"上次充满 %@，已脱电使用 %@" = "Voll vor %@, Akkubetrieb %@";
 "%ld小时%ld分" = "%ld Std. %ld Min.";
 "%ld分钟" = "%ld Min.";
 "剩余 %ld 分钟" = "%ld Min. übrig";
