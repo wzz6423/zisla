@@ -2428,9 +2428,12 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func mosaicBlurSoftensWhatEachBlockSamplesWithoutBlurringTheBlocks() throws {
-        let sourceImage = try #require(makeCheckerboardImage(width: 96, height: 96))
-        let region = CGRect(x: 20, y: 20, width: 56, height: 56)
+    func mosaicBlurSoftensTheBlockEdgesWithoutFlatteningTheirContrast() throws {
+        let sourceImage = try #require(
+            makeClusteredNoiseImage(width: 120, height: 120, clusterSize: 8)
+        )
+        let region = CGRect(x: 12, y: 12, width: 96, height: 96)
+        let blockSize = 12
         func obscured(blurStrength: CGFloat) throws -> CGImage {
             let model = ScreenshotEditorModel(image: sourceImage)
             model.add(ScreenshotAnnotation(
@@ -2447,27 +2450,35 @@ struct ScreenshotEditorTests {
         }
 
         let original = try #require(sourceImage.cgImage(forProposedRect: nil, context: nil, hints: nil))
-        let pureBlocks = try obscured(blurStrength: 0)
-        let softenedBlocks = try obscured(blurStrength: 8)
-        let softened = [28, 40, 52, 64].contains { offset in
-            let probe = CGPoint(x: offset, y: offset)
-            guard let blocks = pixelColor(in: pureBlocks, at: probe),
-                  let blurred = pixelColor(in: softenedBlocks, at: probe)
-            else { return false }
-            return colorDistance(blocks, blurred) > 8
-        }
-        #expect(softened, "模糊滑块应改变每个格子从底图取到的颜色")
-        // A gaussian blur of the region would leave no flat runs at all; the blocks have to survive
-        // at full strength, otherwise the slider has turned the mosaic into a blur.
-        let blockRun = try #require(
-            longestFlatRun(in: softenedBlocks, alongRow: 48, from: 26, through: 69)
+        let hardBlocks = try obscured(blurStrength: 0)
+        let softBlocks = try obscured(
+            blurStrength: ScreenshotAnnotation.obscureStrengthUpperBound
+        )
+
+        // Hard block edges alone do not keep a mosaic readable as one: once neighbouring blocks
+        // bleed together they all settle on the same colour and the region just looks blurred.
+        let hardContrast = try #require(
+            blockContrast(in: hardBlocks, blockSize: blockSize, within: region)
+        )
+        let softContrast = try #require(
+            blockContrast(in: softBlocks, blockSize: blockSize, within: region)
         )
         #expect(
-            blockRun >= 8,
-            "格子边界应保持锐利，模糊只作用在格子取样的底图上，实测最长同色段 \(blockRun) 像素"
+            Double(softContrast) >= Double(hardContrast) * 0.7,
+            "格子之间的明暗差异应保留，否则整片看起来就是模糊，实测 \(hardContrast) → \(softContrast)"
         )
-        try expectPixelsOutside(region, unchangedFrom: original, to: softenedBlocks)
-        try expectPixelsOutside(region, unchangedFrom: original, to: pureBlocks)
+        let blockRun = try #require(longestFlatRun(in: softBlocks, alongRow: 60, from: 20, through: 99))
+        #expect(blockRun >= 6, "格子中心应仍是纯色，实测最长同色段 \(blockRun) 像素")
+
+        let hardPixels = try #require(rgbaPixels(in: hardBlocks))
+        let softPixels = try #require(rgbaPixels(in: softBlocks))
+        let softenedSomewhere = (20...99).contains { x in
+            let offset = 60 * softBlocks.width * 4 + x * 4
+            return abs(Int(hardPixels[offset]) - Int(softPixels[offset])) > 8
+        }
+        #expect(softenedSomewhere, "模糊滑块应柔化格子边缘")
+        try expectPixelsOutside(region, unchangedFrom: original, to: softBlocks)
+        try expectPixelsOutside(region, unchangedFrom: original, to: hardBlocks)
     }
 
     @Test
@@ -2527,7 +2538,8 @@ struct ScreenshotEditorTests {
             ),
             "模糊滑块的缩进说明它没有被效果门控包住"
         )
-        #expect(popover.contains("range: model.obscureEffect == .pixelate ? 0...12 : 1...12"))
+        #expect(popover.contains("? 0...ScreenshotAnnotation.obscureStrengthUpperBound"))
+        #expect(popover.contains(": 1...ScreenshotAnnotation.obscureStrengthUpperBound"))
     }
 
     @Test
@@ -3561,6 +3573,64 @@ struct ScreenshotEditorTests {
         ) else { return nil }
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
         return pixels
+    }
+
+    /// White canvas carrying pseudo-random dark clusters, which behaves like text under a mosaic:
+    /// every block lands on a colour of its own, so blocks bleeding together shows up as lost
+    /// contrast between them.
+    private func makeClusteredNoiseImage(width: Int, height: Int, clusterSize: Int) -> NSImage? {
+        let bytesPerRow = width * 4
+        var pixels = [UInt8](repeating: 255, count: height * bytesPerRow)
+        var seed: UInt64 = 12345
+        func next() -> UInt64 {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return seed >> 33
+        }
+        for clusterY in 0..<(height / clusterSize) {
+            for clusterX in 0..<(width / clusterSize) where next() % 10 < 4 {
+                for y in (clusterY * clusterSize)..<((clusterY + 1) * clusterSize) {
+                    for x in (clusterX * clusterSize)..<((clusterX + 1) * clusterSize) {
+                        let offset = y * bytesPerRow + x * 4
+                        pixels[offset] = 0
+                        pixels[offset + 1] = 0
+                        pixels[offset + 2] = 0
+                    }
+                }
+            }
+        }
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ), let cgImage = context.makeImage() else {
+            return nil
+        }
+        return NSImage(cgImage: cgImage, size: CGSize(width: width, height: height))
+    }
+
+    /// How far the blocks of a mosaic spread apart in brightness, sampled at block centres. Blocks
+    /// that have bled into one another all land on the same colour and collapse it towards zero.
+    private func blockContrast(in cgImage: CGImage, blockSize: Int, within bounds: CGRect) -> Int? {
+        guard let pixels = rgbaPixels(in: cgImage) else { return nil }
+        let bytesPerRow = cgImage.width * 4
+        var samples: [Double] = []
+        var y = Int(bounds.minY) + blockSize
+        while y < Int(bounds.maxY) - blockSize {
+            var x = Int(bounds.minX) + blockSize
+            while x < Int(bounds.maxX) - blockSize {
+                samples.append(Double(pixels[y * bytesPerRow + x * 4]))
+                x += blockSize
+            }
+            y += blockSize
+        }
+        guard !samples.isEmpty else { return nil }
+        let mean = samples.reduce(0, +) / Double(samples.count)
+        let variance = samples.map { ($0 - mean) * ($0 - mean) }.reduce(0, +) / Double(samples.count)
+        return Int(variance.squareRoot())
     }
 
     /// Longest stretch of identically coloured pixels along one row, which is what tells a pixel
