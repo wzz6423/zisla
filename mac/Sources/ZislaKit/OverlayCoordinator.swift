@@ -55,6 +55,7 @@ public final class OverlayCoordinator: NSObject {
     private var isExternalDragging = false
     private var isTransientInteractionVisible = false
     private var isVoiceRecording = false
+    private var isTransientNoticePresented = false
     private var isHoverActivationSuspended = false
     private var isScreenshotCaptureInProgress = false
     private var isScreenshotActive = false
@@ -149,6 +150,7 @@ public final class OverlayCoordinator: NSObject {
         isExternalDragging = false
         isTransientInteractionVisible = false
         isVoiceRecording = false
+        isTransientNoticePresented = false
         isHoverActivationSuspended = false
         isScreenshotCaptureInProgress = false
         isScreenshotActive = false
@@ -421,6 +423,15 @@ public final class OverlayCoordinator: NSObject {
         }
         applyPanelFocusPolicy()
         applyPanelInteractionPolicy()
+    }
+
+    /// The collapsed transient notice takes over the pill's row, so the pet panel folds away for
+    /// it exactly as it does for recording — otherwise the sprite keeps sitting beside a row it is
+    /// no longer part of.
+    public func setTransientNoticePresented(_ presented: Bool) {
+        guard presented != isTransientNoticePresented else { return }
+        isTransientNoticePresented = presented
+        updatePersistentPanels()
     }
 
     public func setAllowsKeyWindow(_ allows: Bool) {
@@ -756,6 +767,7 @@ public final class OverlayCoordinator: NSObject {
 
     private func updatePersistentPanels(forcePresent: Bool = false) {
         guard !isVoiceRecording,
+            !isTransientNoticePresented,
             isPersistentContentVisible,
             let persistentContentViewProvider,
             let persistentPanelFrameProvider

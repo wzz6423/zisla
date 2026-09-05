@@ -156,6 +156,36 @@ struct VoiceRecordingIslandLayoutTests {
         #expect(ZislaMotion.islandRecycleSettleDelay > .milliseconds(220))
     }
 
+    /// The collapsed notice reuses the recording surface, so it has to reuse its exclusivity too:
+    /// centered on the notch, with the status wings and the pet panel folded away.
+    @Test
+    func theCollapsedNoticeMatchesTheRecordingSurfaceExclusivity() throws {
+        let rootViewSource = try Self.source(of: "Zisla/IslandRootView.swift")
+        let appSource = try Self.source(of: "Zisla/ZislaApp.swift")
+        let presenterSource = try Self.source(of: "Zisla/SideNoticePresenter.swift")
+        let coordinatorSource = try Self.source(of: "ZislaKit/OverlayCoordinator.swift")
+
+        // The module panel is wider than the compact surface and reserves a pet slot on one side, so
+        // keeping the slot would push the notice row half a slot off the notch. Recording only
+        // escapes that because its panel is resized down to the compact width.
+        let petSlot = try #require(rootViewSource.range(of: "let reservesPetSlot = "))
+        let petSlotEnd = try #require(
+            rootViewSource[petSlot.upperBound...].range(of: "let petSlotWidth")
+        )
+        #expect(
+            rootViewSource[petSlot.lowerBound..<petSlotEnd.lowerBound]
+                .contains("&& !usesCompactSurface")
+        )
+
+        #expect(presenterSource.contains("updateSuppression { $0.isTransientNoticePresented = presented }"))
+        #expect(coordinatorSource.contains("guard !isVoiceRecording,\n            !isTransientNoticePresented,"))
+        #expect(appSource.contains("noticePresenter?.setTransientNoticePresented(presented)"))
+        #expect(appSource.contains("coordinator?.setTransientNoticePresented(presented)"))
+        #expect(
+            appSource.contains("hasMessage && !islandVisible && !mirror && !teleprompter")
+        )
+    }
+
     private static func source(of relativePath: String) throws -> String {
         try String(
             contentsOf: sourcesDirectoryURL.appendingPathComponent(relativePath),

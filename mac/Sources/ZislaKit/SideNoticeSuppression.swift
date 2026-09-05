@@ -7,10 +7,15 @@ public struct SideNoticeSuppression: Equatable, Sendable {
     public var isIslandExpanded = false
     public var isVoiceRecording = false
     public var isClipboardAssistantVisible = false
+    /// The island's own transient message replaces the collapsed pill's row, just like recording.
+    public var isTransientNoticePresented = false
 
     public init() {}
 
     public var hidesNotices: Bool {
-        isIslandExpanded || isVoiceRecording || isClipboardAssistantVisible
+        isIslandExpanded
+            || isVoiceRecording
+            || isClipboardAssistantVisible
+            || isTransientNoticePresented
     }
 }

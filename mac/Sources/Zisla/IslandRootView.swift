@@ -46,12 +46,19 @@ struct IslandRootView: View {
                 contentSize: layout.panelSize,
                 availableSize: proxy.size
             )
+            let usesCompactSurface = voiceInput.isCapturingInput || showsCompactTransientNotice
             // The slot stays reserved while the island is collapsed: dropping it would shift the
             // surface back to the panel center at the exact frame the recycle fold starts, so the
             // fold would jump sideways before it ever reached the notch.
+            //
+            // Compact surfaces are the exception — they replace the pill's own row and belong on the
+            // notch center. Recording gets that for free by resizing its panel down to the compact
+            // width, leaving no slack for a slot; a notice keeps the module panel, whose reserved
+            // slot would push the row half a slot off the notch.
             let reservesPetSlot = !model.isMirrorPresented
                 && !model.isTeleprompterPresented
                 && model.settingsStore.settings.petEnabled
+                && !usesCompactSurface
             let petSlotWidth = reservesPetSlot
                 ? min(
                     ExpandedPetLayout.sideSlotWidth,
@@ -70,7 +77,6 @@ struct IslandRootView: View {
                 collapsedSize: model.collapsedIslandSize,
                 availableSize: surfaceSize
             )
-            let usesCompactSurface = voiceInput.isCapturingInput || showsCompactTransientNotice
             let renderedSurfaceSize = usesCompactSurface
                 ? voiceRecordingGeometry.surfaceSize
                 : surfaceSize
