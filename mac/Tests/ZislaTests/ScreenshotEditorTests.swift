@@ -2272,6 +2272,134 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func obscureStrengthSliderOnlyRetunesARegionUsingThatEffect() async throws {
+        let size = CGSize(width: 400, height: 300)
+        let selection = CGRect(x: 60, y: 50, width: 220, height: 140)
+        let image = try #require(makeGradientImage(width: 400, height: 300))
+        let model = ScreenshotEditorModel(image: NSImage(size: selection.size))
+        let selectionState = ScreenshotAnnotationSelectionState()
+        model.tool = .mosaic
+        model.obscureShape = .rectangle
+        model.obscureEffect = .blur
+        model.blurStrength = 9
+        let hostingView = NSHostingView(rootView:
+            ScreenshotEditorView(
+                model: model,
+                selectionState: selectionState,
+                overlayConfiguration: ScreenshotEditorOverlayConfiguration(
+                    backgroundImage: image,
+                    initialSelection: selection,
+                    cropImage: { _ in image }
+                ),
+                onClose: {},
+                onCopy: {},
+                onPinToggle: { _ in },
+                onLongCapture: {}
+            )
+            .frame(width: size.width, height: size.height)
+        )
+        let window = NSWindow(
+            contentRect: CGRect(origin: .zero, size: size),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        window.contentView = hostingView
+        func settle() async {
+            for _ in 0..<3 {
+                hostingView.layoutSubtreeIfNeeded()
+                await Task.yield()
+            }
+        }
+        await settle()
+        let interactionView = try #require(
+            findSubview(ScreenshotPointerInteractionNSView.self, in: hostingView)
+        )
+
+        try sendMouseDrag(
+            from: CGPoint(x: 30, y: 30),
+            to: CGPoint(x: 130, y: 110),
+            through: interactionView,
+            in: window
+        )
+        let region = try #require(model.annotations.first)
+        #expect(region.obscureEffect == .blur)
+        #expect(region.obscureStrength == 9)
+
+        try sendMouseDrag(
+            from: CGPoint(x: 70, y: 70),
+            to: CGPoint(x: 90, y: 90),
+            through: interactionView,
+            in: window
+        )
+        await settle()
+        #expect(selectionState.selectedAnnotationID == region.id)
+        #expect(model.blurStrength == 9, "选中模糊区域应回填模糊度滑块")
+
+        model.pixelateStrength = 12
+        await settle()
+        #expect(model.annotations.first?.obscureStrength == 9, "格子滑块不应改动模糊区域")
+
+        model.blurStrength = 5
+        await settle()
+        #expect(model.annotations.first?.obscureStrength == 5, "模糊度滑块应重调模糊区域")
+    }
+
+    @Test
+    func obscureDraftWithAnExistingIDReplacesTheStoredRegion() throws {
+        let sourceImage = try #require(makeGradientImage(width: 96, height: 96))
+        let original = try #require(
+            sourceImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        let region = ScreenshotAnnotation(
+            kind: .mosaic,
+            rect: CGRect(x: 8, y: 8, width: 32, height: 32),
+            lineWidth: 3,
+            obscureShape: .rectangle,
+            obscureEffect: .pixelate,
+            obscureStrength: 8
+        )
+        let model = ScreenshotEditorModel(image: sourceImage)
+        model.add(region)
+
+        var moved = region
+        moved.rect = CGRect(x: 56, y: 56, width: 32, height: 32)
+        let live = try #require(
+            model.imageApplyingMosaics(adding: moved)
+                .cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+
+        let reference = ScreenshotEditorModel(image: sourceImage)
+        reference.add(moved)
+        let committed = try #require(
+            reference.mosaicPreviewImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        #expect(rgbaPixels(in: live) == rgbaPixels(in: committed), "拖动中的打码应替换原位置而非叠加一层")
+
+        let vacated = CGPoint(x: 24, y: 24)
+        let before = try #require(pixelColor(in: original, at: vacated))
+        let after = try #require(pixelColor(in: live, at: vacated))
+        #expect(colorDistance(before, after) <= 8, "离开的位置应恢复原始像素")
+    }
+
+    @Test
+    func eachObscureEffectRemembersItsOwnStrength() {
+        let model = ScreenshotEditorModel(image: NSImage(size: CGSize(width: 32, height: 32)))
+        model.obscureEffect = .pixelate
+        model.obscureStrength = 10
+        #expect(model.pixelateStrength == 10)
+
+        model.obscureEffect = .blur
+        model.obscureStrength = 6
+        #expect(model.blurStrength == 6)
+        #expect(model.pixelateStrength == 10, "调模糊度不应覆盖格子大小")
+
+        model.obscureEffect = .pixelate
+        #expect(model.obscureStrength == 10)
+    }
+
+    @Test
     func pinnedFocusStateOnlyActivatesAfterClickWhilePointerAndWindowAreFocused() {
         let state = ScreenshotPinnedFocusState()
         #expect(!state.isActive)

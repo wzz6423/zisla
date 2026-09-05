@@ -1102,12 +1102,29 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var selectedEmoji = "⭐️"
     @Published var obscureShape: ScreenshotObscureShape = .rectangle
     @Published var obscureEffect: ScreenshotObscureEffect = .blur
-    @Published var obscureStrength: CGFloat = 3
+    @Published var pixelateStrength: CGFloat = 3
+    @Published var blurStrength: CGFloat = 3
     @Published var statusMessage: String?
     @Published var isPinned = false
     @Published private(set) var isLongCapturePreviewing = false
     @Published private(set) var hasLongCaptureResult = false
     @Published var longCaptureDirection = ScreenshotLongCaptureDirection.vertical
+
+    /// Strength of the effect that is currently selected; each effect keeps its own slider value.
+    var obscureStrength: CGFloat {
+        get {
+            switch obscureEffect {
+            case .pixelate: pixelateStrength
+            case .blur: blurStrength
+            }
+        }
+        set {
+            switch obscureEffect {
+            case .pixelate: pixelateStrength = newValue
+            case .blur: blurStrength = newValue
+            }
+        }
+    }
 
     private var undoStack: [Snapshot] = []
     private var redoStack: [Snapshot] = []
@@ -1482,7 +1499,13 @@ final class ScreenshotEditorModel: ObservableObject {
     func imageApplyingMosaics(adding draft: ScreenshotAnnotation?) -> NSImage {
         var obscures = annotations.filter { $0.kind == .mosaic }
         if let draft, draft.kind == .mosaic {
-            obscures.append(draft)
+            // A draft carrying an existing id is an in-flight edit of that region, so it replaces the
+            // stored copy instead of stacking a second obscure pass over the same pixels.
+            if let index = obscures.firstIndex(where: { $0.id == draft.id }) {
+                obscures[index] = draft
+            } else {
+                obscures.append(draft)
+            }
         }
         guard !obscures.isEmpty,
               image.size.width > 0,
@@ -3524,7 +3547,10 @@ struct ScreenshotEditorView: View {
                 model.fontSize = annotation.fontSize
             case .mosaic:
                 model.lineWidth = annotation.lineWidth
-                model.obscureStrength = annotation.obscureStrength
+                switch annotation.obscureEffect {
+                case .pixelate: model.pixelateStrength = annotation.obscureStrength
+                case .blur: model.blurStrength = annotation.obscureStrength
+                }
             default:
                 break
             }
@@ -3545,9 +3571,11 @@ struct ScreenshotEditorView: View {
             guard let annotationID = selectionState.selectedAnnotationID else { return }
             model.applySelectedStyle(to: annotationID, fontSize: newValue)
         }
-        .onChange(of: model.obscureStrength) { _, newValue in
-            guard let annotationID = selectionState.selectedAnnotationID else { return }
-            model.applySelectedStyle(to: annotationID, obscureStrength: newValue)
+        .onChange(of: model.pixelateStrength) { _, newValue in
+            applyObscureStrength(newValue, ifSelectedRegionUses: .pixelate)
+        }
+        .onChange(of: model.blurStrength) { _, newValue in
+            applyObscureStrength(newValue, ifSelectedRegionUses: .blur)
         }
     }
 
@@ -4206,6 +4234,9 @@ struct ScreenshotEditorView: View {
     }
 
     private var mosaicDraftAnnotation: ScreenshotAnnotation? {
+        // Dragging or resizing a committed region only updates `editPreview`, so feed it through the
+        // obscure pass to keep the pixels following the frame instead of snapping on mouse-up.
+        if let editPreview, editPreview.kind == .mosaic { return editPreview }
         guard model.tool == .mosaic else { return nil }
         switch model.obscureShape {
         case .rectangle:
@@ -4897,21 +4928,46 @@ struct ScreenshotEditorView: View {
                     Divider().frame(height: 24)
                 }
 
-                Text(model.obscureEffect.strengthTitle)
-                    .font(.system(size: 11, weight: .medium))
-                    .frame(width: 36, alignment: .leading)
-                Slider(value: $model.obscureStrength, in: 1...12, step: 1)
-                    .frame(width: 90)
-                    .help(model.obscureEffect.strengthTitle)
-                Text("\(Int(model.obscureStrength.rounded()))")
-                    .font(.system(size: 11, design: .monospaced))
-                    .frame(width: 18, alignment: .trailing)
+                obscureStrengthControl(for: .pixelate)
+
+                Divider().frame(height: 24)
+
+                obscureStrengthControl(for: .blur)
             }
             .padding(.horizontal, 10)
             .frame(height: ScreenshotToolbarLayout.height)
             .onChange(of: model.obscureShape) { _, _ in selectTool(.mosaic) }
             .onChange(of: model.obscureEffect) { _, _ in selectTool(.mosaic) }
         }
+    }
+
+    /// Both strengths stay on screen so a rectangle region can be tuned for either effect; the one
+    /// the effect picker does not select is dimmed to show it is only holding its value.
+    private func obscureStrengthControl(for effect: ScreenshotObscureEffect) -> some View {
+        let value = effect == .pixelate ? $model.pixelateStrength : $model.blurStrength
+        let isActive = model.obscureEffect == effect
+        return HStack(spacing: 10) {
+            Text(effect.strengthTitle)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(isActive ? Color.primary : Color.secondary)
+                .frame(width: 36, alignment: .leading)
+            Slider(value: value, in: 1...12, step: 1)
+                .frame(width: 90)
+                .help(effect.strengthTitle)
+            Text("\(Int(value.wrappedValue.rounded()))")
+                .font(.system(size: 11, design: .monospaced))
+                .frame(width: 18, alignment: .trailing)
+        }
+    }
+
+    private func applyObscureStrength(
+        _ strength: CGFloat,
+        ifSelectedRegionUses effect: ScreenshotObscureEffect
+    ) {
+        guard let annotationID = selectionState.selectedAnnotationID,
+              model.annotations.first(where: { $0.id == annotationID })?.obscureEffect == effect
+        else { return }
+        model.applySelectedStyle(to: annotationID, obscureStrength: strength)
     }
 
     private var recognitionMenu: some View {
