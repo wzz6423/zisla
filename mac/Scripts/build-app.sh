@@ -228,6 +228,13 @@ if [[ -d "$ROOT/Vendor/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
   ditto \
     "$ROOT/Vendor/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" \
     "$CONTENTS/Frameworks/Sparkle.framework"
+  # Sparkle launches its installer through Updater.app. The ad-hoc re-sign below runs with
+  # --deep and regenerates the framework's CodeResources, so a missing Updater.app survives
+  # every later codesign check and only surfaces as an update that refuses to install.
+  if [[ ! -x "$CONTENTS/Frameworks/Sparkle.framework/Updater.app/Contents/MacOS/Updater" ]]; then
+    echo "error: Sparkle.framework is missing Updater.app; updates would fail to install" >&2
+    exit 1
+  fi
   install_name_tool -add_rpath '@executable_path/../Frameworks' "$CONTENTS/MacOS/zisla"
 fi
 

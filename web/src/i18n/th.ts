@@ -144,6 +144,9 @@ export const th = createCatalog({
     primaryCtaAriaLabel: 'ดาวน์โหลด zisla',
     releaseCta: 'ดูรีลีส',
     releaseCtaAriaLabel: 'ดูรายละเอียดรีลีสบน GitHub',
+    brewMono: 'HOMEBREW / คำสั่งเดียว',
+    brewNote: 'Sparkle อัปเดต zisla ด้วยตัวเอง จึงทำให้ brew upgrade แทนที่แอปเฉพาะเมื่อเวอร์ชันที่ติดตั้งอยู่เก่ากว่าใน tap จริง ๆ โดย Homebrew 5.1.6 ขึ้นไปจะอ่านเวอร์ชันจากตัวแอปเอง ส่วนการระบุ cask อย่างชัดเจน เช่น brew upgrade --cask zisla จะยึดตามบันทึกการติดตั้งของ Homebrew และอาจพาคุณย้อนกลับไปที่เวอร์ชันใน tap หลังจากอัปเดตผ่าน Sparkle ส่วน tap ให้บริการเฉพาะรุ่นเสถียร ทั้ง tap นี้เป็นของบุคคลที่สามและแอปยังไม่ผ่านการรับรองจาก Apple จึงต้องเลือก "เปิดต่อไป" ในการตั้งค่าระบบ → ความเป็นส่วนตัวและความปลอดภัย เมื่อเปิดครั้งแรก',
+    copyBrewCommandAriaLabel: 'คัดลอกคำสั่งติดตั้ง Homebrew',
     notes: {
       system: { term: 'ระบบ', value: 'macOS 14 ขึ้นไป · การกำหนดค่าที่รองรับ: Mac ที่ใช้ Apple Silicon' },
       install: { term: 'ติดตั้ง', value: 'เมานต์ DMG แล้วลากไปยัง Applications' },
@@ -219,5 +222,5 @@ export const th = createCatalog({
     tagline: 'โอเพนซอร์ส เนทีฟ และอยู่ในการควบคุมของคุณ',
   },
   common: { copyCommandTitle: 'คัดลอกคำสั่ง', copiedAriaLabel: 'คัดลอกแล้ว' },
-  toast: { runCommandCopied: 'คัดลอกคำสั่งรันแล้ว', zislactlCopied: 'คัดลอกคำสั่ง zislactl แล้ว' },
+  toast: { runCommandCopied: 'คัดลอกคำสั่งรันแล้ว', zislactlCopied: 'คัดลอกคำสั่ง zislactl แล้ว', brewCommandCopied: 'คัดลอกคำสั่งติดตั้ง Homebrew แล้ว' },
 });

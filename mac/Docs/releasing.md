@@ -4,7 +4,7 @@
 
 The complete release process, dual update channels, and GitHub/Gitee asset synchronization are maintained by [`skills/zisla-release`](../../skills/zisla-release/SKILL.md). This page documents only the design constraints for signing, notarization, and update packages; follow the skill when publishing a release.
 
-Both selected update channels use Sparkle to verify a signed ZIP and appcast before replacing and relaunching the app. Each check reads Gitee first and retries GitHub exactly once when the Gitee appcast cannot load or its update package fails to download. `package-release.sh` requires `SPARKLE_GENERATE_APPCAST` to point to Sparkle 2.9.4's `generate_appcast` and writes `appcast-gitee.xml` and `appcast-github.xml` alongside the ZIP and DMG. Each appcast must be signed independently and point to the Universal ZIP hosted by its own site. Upload each as `appcast.xml` to its respective release: Gitee keeps permanent `update-release` (Release) and `preview` (Preview) feeds; GitHub uses `latest` for Release and permanent prerelease `preview` for Preview. Set `SPARKLE_ED_KEY_FILE` to the privately stored EdDSA key file when publishing non-interactively, or leave it unset to use the `zisla-update-ed25519` login-keychain account. The private key must never enter the repository. Developer ID packages should still be notarized. Free ad-hoc previews cannot be notarized and may require **Open Anyway** in System Settings on first launch.
+Both selected update channels use Sparkle to verify a signed ZIP and appcast before replacing and relaunching the app. Each check reads Gitee first and retries GitHub exactly once when the Gitee appcast cannot load or its update package fails to download. `package-release.sh` requires `SPARKLE_GENERATE_APPCAST` to point to Sparkle 2.9.4's `generate_appcast` and writes `appcast-gitee.xml` and `appcast-github.xml` alongside the ZIP and DMG. Each appcast must be signed independently and point to the ZIP from that run, hosted by its own site. `build-package.sh` runs the script once per architecture, so a release carries three pairs: upload the universal pair as `appcast.xml`, the name apps released before per-architecture updates still request, and the single-architecture pairs as `appcast-arm64.xml` and `appcast-x86_64.xml`. A single-architecture install rewrites its Info.plist feed URL to the appcast for the running slice, a translated x86_64 slice asking for `arm64`, so it keeps updating to its own architecture instead of growing into the universal build; a universal install counts its own slices, keeps the shared name, and stays universal. Gitee keeps permanent `update-release` (Release) and `preview` (Preview) feeds; GitHub uses `latest` for Release and permanent prerelease `preview` for Preview. Set `SPARKLE_ED_KEY_FILE` to the privately stored EdDSA key file when publishing non-interactively, or leave it unset to use the `zisla-update-ed25519` login-keychain account. The private key must never enter the repository. Developer ID packages should still be notarized. Free ad-hoc previews cannot be notarized and may require **Open Anyway** in System Settings on first launch.
 
 ## Prerequisites
 
@@ -64,7 +64,7 @@ Scripts/package-release.sh
 
 ## 3. Publish and verify
 
-Upload the ZIP, DMG, checksums, and `appcast-github.xml` as `appcast.xml` to the same versioned GitHub tag; upload the matching assets and `appcast-gitee.xml` as `appcast.xml` to the same Gitee tag. A stable release must not be marked as a prerelease. Copy the Gitee appcast to permanent `update-release`; copy Preview appcasts to permanent `preview` on both sites. The selected channel then checks Gitee first and retries GitHub once when Gitee's appcast cannot load or its update package fails to download.
+Upload the ZIPs, DMGs, checksums, and the GitHub appcasts to the same versioned GitHub tag, named `appcast.xml` (universal), `appcast-arm64.xml`, and `appcast-x86_64.xml`; upload the matching assets and the Gitee appcasts under the same three names to the same Gitee tag. A stable release must not be marked as a prerelease. Copy all three Gitee appcasts to permanent `update-release`; copy Preview appcasts to permanent `preview` on both sites. The selected channel then checks Gitee first and retries GitHub once when Gitee's appcast cannot load or its update package fails to download.
 
 ```bash
 codesign --verify --deep --strict --all-architectures --verbose=4 'dist/zisla.app'
@@ -77,4 +77,24 @@ test -L /Volumes/zisla/Applications
 diskutil eject /Volumes/zisla
 ```
 
-Use an older app version to check the new release. Confirm that automatic and manual checks use the selected Gitee feed first, retry its GitHub counterpart once when Gitee cannot load or its package download fails, and that Sparkle verifies, installs, and relaunches the Universal ZIP. Test Release→Preview and Preview→Release switching as well as same-channel updates.
+Use an older app version to check the new release. Confirm that automatic and manual checks use the selected Gitee feed first, retry its GitHub counterpart once when Gitee cannot load or its package download fails, and that Sparkle verifies, installs, and relaunches the ZIP for the running architecture, leaving a single-architecture install on a single architecture. Test Release→Preview and Preview→Release switching as well as same-channel updates.
+
+## 4. Sync the Homebrew cask
+
+A stable release ends at Homebrew. Preview releases stop before this step: the tap serves stable versions only, so `brew upgrade` never moves a user onto a prerelease.
+
+From the repository root, after the release assets are published:
+
+```bash
+VERSION=1.0.0 RELEASE_OUTPUT_DIRECTORY=mac/dist PUBLISH_TAP=true make sync-cask
+```
+
+The script rewrites `version` and both `sha256` values in `Casks/zisla.rb`, reading each digest from `$RELEASE_OUTPUT_DIRECTORY/zisla-v$VERSION-macOS-arm64.zip.sha256` and its `x86_64` counterpart when those files exist and from the published GitHub assets otherwise. The cask resolves `#{arch}` per machine, so Apple Silicon and Intel download only their own slice; verification rejects a cask that reuses one digest for both. It refuses to write a cask that fails `homebrew-cask.rb verify`, then mirrors the file to `wzz6423/homebrew-tap`. Omit `PUBLISH_TAP` for a dry run that only updates the in-repo cask.
+
+The cask carries `auto_updates true` because Sparkle owns the update path: `brew upgrade` then replaces the app only when the installed bundle really is behind the tap, which Homebrew 5.1.6 and later decide by reading the version inside the app. `brew upgrade --cask zisla` and `--greedy` go by the Homebrew install records instead, so they can undo a Sparkle update by putting the tap version back. Commit the rewritten cask together with the site's `latestRelease` bump — CI fails when the two pin different versions. Then confirm the tap:
+
+```bash
+brew update
+brew install --cask wzz6423/tap/zisla
+brew livecheck --cask wzz6423/tap/zisla
+```

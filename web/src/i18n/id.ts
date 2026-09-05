@@ -144,6 +144,9 @@ export const id = createCatalog({
     primaryCtaAriaLabel: 'Unduh zisla',
     releaseCta: 'Lihat rilis',
     releaseCtaAriaLabel: 'Lihat detail rilis di GitHub',
+    brewMono: 'HOMEBREW / SATU PERINTAH',
+    brewNote: 'Sparkle memperbarui zisla sendiri, jadi brew upgrade hanya mengganti aplikasi bila salinan terpasang benar-benar lebih lama daripada versi di tap — sejak Homebrew 5.1.6 yang dibaca adalah versi di dalam aplikasi itu sendiri. Menyebut cask secara eksplisit, seperti brew upgrade --cask zisla, berpatokan pada catatan pemasangan Homebrew dan bisa mengembalikanmu ke versi tap setelah pembaruan lewat Sparkle. Tap hanya menyediakan versi stabil. Tap ini milik pihak ketiga dan aplikasinya belum dinotarisasi, jadi peluncuran pertama perlu memilih "Buka Saja" di Pengaturan Sistem → Privasi & Keamanan.',
+    copyBrewCommandAriaLabel: 'Salin perintah pemasangan Homebrew',
     notes: {
       system: { term: 'Sistem', value: 'macOS 14 atau lebih baru · Konfigurasi yang didukung: Mac Apple Silicon' },
       install: { term: 'Pasang', value: 'Pasang DMG lalu seret ke Applications' },
@@ -219,5 +222,5 @@ export const id = createCatalog({
     tagline: 'Open source, native, dan berada dalam kendali Anda.',
   },
   common: { copyCommandTitle: 'Salin perintah', copiedAriaLabel: 'Tersalin' },
-  toast: { runCommandCopied: 'Perintah menjalankan sumber disalin', zislactlCopied: 'Perintah zislactl disalin' },
+  toast: { runCommandCopied: 'Perintah menjalankan sumber disalin', zislactlCopied: 'Perintah zislactl disalin', brewCommandCopied: 'Perintah pemasangan Homebrew disalin' },
 });

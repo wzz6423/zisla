@@ -45,7 +45,29 @@ For tools without a stable local activity source, `zislactl` lets scripts, CI, a
 
 Download the latest DMG from [GitHub Releases](https://github.com/wzz6423/zisla/releases) or [Gitee Releases](https://gitee.com/wzz6423/zisla/releases), mount it, and drag `zisla.app` to `Applications`.
 
-After launching, move the pointer to the top center of the current screen, or choose **Show Island** from the menu bar icon. An unsigned preview package may require **Open Anyway** in **System Settings > Privacy & Security** on first launch.
+Homebrew is another way in:
+
+```bash
+brew install --cask wzz6423/tap/zisla
+```
+
+Homebrew fetches the build that matches your chip, so an Apple Silicon or Intel Mac downloads only its own slice. The cask comes from the third-party tap `wzz6423/tap` rather than Homebrew's own cask repository, so installing it means trusting this tap.
+
+After launching, move the pointer to the top center of the current screen, or choose **Show Island** from the menu bar icon. Every package ships with an ad-hoc signature and is not notarized, so however you installed it, the first launch needs **Open Anyway** in **System Settings > Privacy & Security**, or clear the quarantine attribute yourself:
+
+```bash
+xattr -d com.apple.quarantine /Applications/zisla.app
+```
+
+### Update the app
+
+zisla updates itself through Sparkle however you installed it. A Homebrew install is the one case worth a note: `brew upgrade` replaces the app only when the installed copy really is older than the version in the tap, because Homebrew 5.1.6 and later read the version inside the app bundle — so Homebrew stays out of Sparkle's way without leaving a stale install behind. Naming the cask goes by the Homebrew install records instead, so it can put a Sparkle-updated app back on the tap version:
+
+```bash
+brew upgrade --cask zisla
+```
+
+The tap serves stable releases only; preview builds stay on Releases so `brew upgrade` never moves you onto a prerelease — and naming the cask while you are on a preview replaces it with the current stable build. Sparkle itself never downgrades, so switching back to Release leaves you on the preview build until a stable release passes it. `brew uninstall --cask zisla` removes the app, and `brew uninstall --zap --cask zisla` also trashes its local data.
 
 ### Run from source
 

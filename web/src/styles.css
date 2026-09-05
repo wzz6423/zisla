@@ -694,6 +694,30 @@ summary:focus-visible {
   gap: var(--space-3);
 }
 
+.download-brew {
+  display: grid;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.download-brew .mono-label {
+  color: rgba(245, 246, 247, 0.5);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+/* The section already paints --ink-deep, so the shared box needs a lighter fill. */
+.download-brew .command-box {
+  background: rgba(245, 246, 247, 0.06);
+}
+
+.download-brew p {
+  margin: 0;
+  color: rgba(245, 246, 247, 0.52);
+  font-size: 12.5px;
+  line-height: var(--leading-relaxed);
+}
+
 .download-notes {
   display: grid;
   gap: 0;

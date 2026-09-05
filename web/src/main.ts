@@ -19,6 +19,7 @@ import {
   createIcons,
 } from 'lucide';
 import {
+  brewInstallCommand,
   crossModuleFeatureIcons,
   crossModuleFeatureIds,
   documentationCardIds,
@@ -603,7 +604,19 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     '">' +
     icon('external-link', 16) +
     escapeHtml(content.download.releaseCta) +
-    '</a></div></div><dl class="download-notes reveal-step" style="--reveal-index: 1">' +
+    '</a></div><div class="download-brew"><span class="mono-label">' +
+    escapeHtml(content.download.brewMono) +
+    '</span><div class="command-box"><code>' +
+    escapeHtml(brewInstallCommand) +
+    '</code><button id="copyBrewCommand" type="button" aria-label="' +
+    escapeHtml(content.download.copyBrewCommandAriaLabel) +
+    '" title="' +
+    escapeHtml(content.common.copyCommandTitle) +
+    '">' +
+    icon('copy', 15) +
+    '</button></div><p>' +
+    escapeHtml(content.download.brewNote) +
+    '</p></div></div><dl class="download-notes reveal-step" style="--reveal-index: 1">' +
     downloadNoteIds.map(renderDownloadNote).join('') +
     '</dl></div></section><section class="section faq-section" id="faq"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
     escapeHtml(content.faq.eyebrow) +
@@ -700,6 +713,13 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
   });
   document.querySelector<HTMLButtonElement>('#copyZislactl')?.addEventListener('click', (event) => {
     copyText(zislactlCommand, content.toast.zislactlCopied, event.currentTarget as HTMLButtonElement);
+  });
+  document.querySelector<HTMLButtonElement>('#copyBrewCommand')?.addEventListener('click', (event) => {
+    copyText(
+      brewInstallCommand,
+      content.toast.brewCommandCopied,
+      event.currentTarget as HTMLButtonElement,
+    );
   });
 
   document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]').forEach((anchor) => {

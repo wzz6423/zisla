@@ -60,6 +60,35 @@ struct SparkleUpdateIntegrationTests {
         #expect(harness.fallbackRequestCount == 1)
     }
 
+    // Preview and Release share one globally increasing build number, so switching a
+    // preview install back to Release points it at a feed whose build can be lower than
+    // what is already installed. Sparkle must report no update instead of walking the
+    // install backwards; the user stays on the newer build until the release catches up.
+    @Test
+    func realSparkleCheckRefusesToDowngradeAnInstallAheadOfTheFeed() async throws {
+        let primaryURL = try Self.signedFixtureAppcastURL
+        let fallbackURL = try #require(URL(string: "https://httpbin.org/status/500"))
+
+        let harness = try SparkleIntegrationHarness(
+            feeds: SparkleFeedPair(gitee: primaryURL, github: fallbackURL),
+            installedVersion: "0.1.9",
+            installedBuild: "15",
+            updateChoice: .dismiss
+        )
+        defer { harness.cleanup() }
+
+        try harness.checkForUpdates()
+        try await harness.waitUntil {
+            harness.userDriver.didReportNoUpdate || harness.finalCheckError != nil
+        }
+
+        #expect(harness.userDriver.didReportNoUpdate)
+        #expect(harness.userDriver.foundVersion == nil)
+        #expect(harness.userDriver.updaterErrors.isEmpty)
+        #expect(harness.finalCheckError == nil, "\(String(describing: harness.finalCheckError))")
+        #expect(harness.fallbackRequestCount == 0)
+    }
+
     private static var signedFixtureAppcastURL: URL {
         get throws {
             let base64 = signedFixtureAppcastBase64

@@ -5,6 +5,10 @@ DerivedData/
 dist/
 reports/
 *.app/
+# Sparkle keeps Updater.app inside its framework and seals it into the framework's
+# signature; *.app/ would silently drop it, leaving every release with a broken Sparkle
+# that cannot launch its installer.
+!Vendor/Sparkle.xcframework/**/Updater.app/
 *.dmg
 *.zip
 *.xcarchive/

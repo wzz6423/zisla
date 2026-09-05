@@ -270,6 +270,9 @@ export const it = createCatalog({
     primaryCtaAriaLabel: 'Scarica zisla',
     releaseCta: 'Vedi release',
     releaseCtaAriaLabel: 'Vedi i dettagli della release su GitHub',
+    brewMono: 'HOMEBREW / UN COMANDO',
+    brewNote: 'Sparkle aggiorna zisla da sé, quindi brew upgrade sostituisce l\'app solo se la copia installata è davvero più vecchia di quella nel tap: da Homebrew 5.1.6 viene letta la versione contenuta nell\'app. Indicare il cask, come in brew upgrade --cask zisla, si basa invece sui registri di installazione di Homebrew e dopo un aggiornamento Sparkle può riportarti alla versione del tap. Il tap distribuisce solo versioni stabili. È un tap di terze parti e l\'app non è notarizzata, quindi al primo avvio serve «Apri comunque» in Impostazioni di Sistema → Privacy e sicurezza.',
+    copyBrewCommandAriaLabel: 'Copia il comando di installazione Homebrew',
     notes: {
       system: { term: 'Sistema', value: 'macOS 14 o successivo · Configurazione supportata: Mac con Apple Silicon' },
       install: { term: 'Installazione', value: 'Monta il DMG e trascinalo in Applicazioni' },
@@ -372,5 +375,6 @@ export const it = createCatalog({
   toast: {
     runCommandCopied: 'Comando di esecuzione copiato',
     zislactlCopied: 'Comando zislactl copiato',
+    brewCommandCopied: 'Comando di installazione Homebrew copiato',
   },
 });
