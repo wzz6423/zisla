@@ -89,7 +89,7 @@ zisla 会读取各工具公开或稳定的本地会话状态，只提取判断�
 | 环境 | 自动检测范围 |
 | --- | --- |
 | OpenAI / Anthropic | Codex CLI 与 Desktop、Claude Code 及其宿主环境 |
-| GitHub / Google / xAI | GitHub Copilot CLI 与 VS Code、Gemini CLI、Grok CLI |
+| GitHub / Google / xAI | GitHub Copilot CLI 与 VS Code、Gemini CLI 与 Desktop、Grok CLI |
 | 国内与独立工具 | Pi、Kimi Code、Qwen Code、Qoder、ZCode Desktop 与 CLI、TRAE、OpenCode、Harnext/Harness、WorkBuddy、豆包 |
 
 检测到等待审批或等待用户回答时显示黄色，工具或命令报错时显示红色，正常运行时显示绿色；同一时刻按红色、黄色、绿色的顺序聚合。Qwen runtime sidecar 只有在 PID 仍存活时才生效，避免退出后长期误报。
