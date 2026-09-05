@@ -125,6 +125,9 @@ jobs:
       - name: Test the Homebrew cask contract
         run: ruby .github/scripts/homebrew-cask-test.rb
 
+      - name: Test the appcast feed contract
+        run: ruby .github/scripts/appcast-feeds-test.rb
+
       - name: Verify the project name is declared once
         run: |
           set -euo pipefail

@@ -20,7 +20,7 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 - 使用 `CFBundleShortVersionString` 作为用户可见版本。版本 tag 一律为 `v${VERSION}`（Preview 形如 `v0.2.0-preview.1`），与签名 appcast 的默认 ZIP URL 一致；禁止使用 `release/v1.2.3` 等路径前缀 tag，那会迫使每次发布额外覆盖 `SPARKLE_GITEE_DOWNLOAD_URL_PREFIX` 和 `SPARKLE_GITHUB_DOWNLOAD_URL_PREFIX`。
 - Release 正文引用的截图必须先作为同一 `v${VERSION}` Release 的附件上传，并使用该 tag 的稳定下载地址。禁止带路径前缀的 `.../releases/download/release/v${VERSION}/`、会随下一版移动的 `.../releases/latest/download/` 和临时图床；正文同步到另一镜像时，可以引用已验证可达的原站图片地址。发布后要在实际页面确认每张图返回 HTTP 200 且内容确实是 PNG。
 - 每次发布前验证 DMG 中只有 `zisla.app` 和 `Applications` 软链接。首次安装 Sparkle 版仍需要用户手动安装；之后的已安装 Sparkle 版本才可自动更新。
-- 正式版发布完成后必须同步 Homebrew cask：`Casks/zisla.rb` 的 `version` 与两个 `sha256` 必须分别对应本次 `arm64` 与 `x86_64` ZIP，并与官网 `latestRelease` 同版本，否则 CI 的 `Verify the Homebrew cask` 失败。cask 用 `arch` 映射按机器解析下载地址，Apple Silicon 与 Intel 各自只取对应架构的包；Sparkle 之后读同一架构的 appcast，安装不会在一次应用内更新后变成 Universal。Preview 不进 tap，避免 `brew upgrade` 把用户带到预发布版本。cask 保留 `auto_updates true`，更新链路仍归 Sparkle，Homebrew 只负责首次安装与显式升级。
+- 正式版发布完成后必须同步 Homebrew cask：`Casks/zisla.rb` 的 `version` 与两个 `sha256` 必须分别对应本次 `arm64` 与 `x86_64` ZIP，并与官网 `latestRelease` 同版本，否则 CI 的 `Verify the Homebrew cask` 失败。cask 用 `arch` 映射按机器解析下载地址，Apple Silicon 与 Intel 各自只取对应架构的包；Sparkle 之后读同一架构的 appcast，安装不会在一次应用内更新后变成 Universal。Preview 不进 tap，避免 `brew upgrade` 把用户带到预发布版本。cask 保留 `auto_updates true`，更新链路仍归 Sparkle，Homebrew 只负责首次安装与显式升级。因为 `auto_updates true` 让不带参数的 `brew upgrade` 跳过这个 cask，tap 里的版本只能是已经上传完三份 appcast 的版本：不含 Sparkle 或 appcast 缺失的版本会让 brew 用户既等不到应用内更新、也等不到 `brew upgrade`，必须先从 tap 移除该 cask（`Casks/zisla.rb` 曾因指向不含 Sparkle 的 0.1.6 而被撤下）。
 - 发版构建严禁使用调试变体：必须显式使用 `DEBUG_BUILD=false`，产物必须是 `zisla.app`、Bundle ID `dev.wzz.zisla`；`zisla-debug.app` 或 `dev.wzz.zisla.debug` 只能用于本地调试，不能上传。
 - 发版资源必须来自正式资源目录：`AppIcon.icns` 必须作为主图标，`AppIconNight.icns` 只能作为深色模式备用图标；调试构建使用的黑底白字图标复制方式，以及 `zisla-debug.app` 中的任何资源，都不能用于正式包或通过改名后上传。
 - 发版不得把 `make run` 生成的 `dist/zisla-debug.app` 直接压缩、改名或复制资源；必须由 `Scripts/package-release.sh` 重新构建正式包并通过身份与图标校验。
@@ -35,11 +35,15 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 4. 清除调试构建状态：即使当前 shell 继承了 `DEBUG_BUILD=true`，也必须在每次发版构建前显式设置 `DEBUG_BUILD=false`，并在产物中核对正式 Bundle ID。
 5. 核对资源身份：正式包的主图标必须与 `Resources/AppIcon.icns` 完全一致，不能是 `Resources/AppIconNight.icns` 的副本。
 6. 确认 Sparkle 2.9.4 的 `generate_appcast` 可执行，私钥位于钥匙串或已移动到受限的离线/加密位置；不得打印、提交或上传私钥。
-7. 正式版还要确认 `wzz6423/homebrew-tap` 已存在且当前凭据可向它推送；Preview 不涉及 tap。
+7. 核对签名密钥配对：私钥推导出的公钥必须与 `mac/Resources/Info.plist` 的 `SUPublicEDKey` 完全一致。签错密钥的表现是客户端发现更新、下载完成后静默不安装，而整套 appcast 必须重新生成，所以必须在构建前查。
+8. 正式版还要确认 `wzz6423/homebrew-tap` 已存在且当前凭据可向它推送；Preview 不涉及 tap。
 
 ```zsh
 gh auth status
 security find-generic-password -a 'wzz6423' -s 'gitee.com.zisla.release-token' >/dev/null
+# -p 只打印公钥，不输出私钥；generate_keys 与 generate_appcast 同目录。
+test "$("${SPARKLE_GENERATE_APPCAST:h}/generate_keys" -p)" = \
+  "$(plutil -extract SUPublicEDKey raw -o - mac/Resources/Info.plist)"
 ```
 
 ## 构建
@@ -175,7 +179,26 @@ test -d "$STAGING_DIRECTORY/universal/zisla.app/Contents/Frameworks/Sparkle.fram
 codesign --verify --deep --strict "$STAGING_DIRECTORY/universal/zisla.app"
 ```
 
-上传后分别获取 Gitee 主 feed 与 GitHub fallback feed 上的三份 appcast，确认每份都返回 HTTP 200、为有效 XML、含签名，并指向对应站点、对应架构的本次 ZIP：Release 验证 Gitee `update-release/download/` 与 GitHub `latest/download/` 下的 `appcast.xml`、`appcast-arm64.xml`、`appcast-x86_64.xml`；Preview 验证两端 `releases/download/preview/` 下的同三份。任一 feed 非 200、无法解析、未签名或未指向本次对应架构 ZIP 时，停止发布并修复本次发布资产，不能以客户端版本比较作为替代。使用一台已安装旧 Sparkle 版应用的测试机，分别验证 Release→Release、Preview→Preview、Release→Preview 与 Preview→Release：切换通道后手动检查应先访问 Gitee；断开 Gitee 或让 Gitee 更新包下载失败时只能自动重试 GitHub 一次；开启自动下载时应在退出或重启时完成替换。单架构测试机更新后还要用 `lipo -archs` 确认应用仍只含本机架构，Universal 安装更新后同样用 `lipo -archs` 确认仍含两个架构，Rosetta 下运行的 x86_64 安装则应更新到 `arm64` 包。再验证两端 Release 正文里的截图：每个地址都必须使用本次 `v${VERSION}` tag 的稳定下载地址，返回 HTTP 200，且下载到的字节确实是 PNG。任一截图不满足时补传附件并改正正文，不能以“本地图片没问题”替代。
+上传后分别获取 Gitee 主 feed 与 GitHub fallback feed 上的三份 appcast，确认每份都返回 HTTP 200、为有效 XML、含签名，并指向对应站点、对应架构的本次 ZIP：Release 验证 Gitee `update-release/download/` 与 GitHub `latest/download/` 下的 `appcast.xml`、`appcast-arm64.xml`、`appcast-x86_64.xml`；Preview 验证两端 `releases/download/preview/` 下的同三份。任一 feed 非 200、无法解析、未签名或未指向本次对应架构 ZIP 时，停止发布并修复本次发布资产，不能以客户端版本比较作为替代。使用一台已安装旧 Sparkle 版应用的测试机，分别验证 Release→Release、Preview→Preview、Release→Preview 与 Preview→Release：切换通道后手动检查应先访问 Gitee；断开 Gitee 或让 Gitee 更新包下载失败时只能自动重试 GitHub 一次；开启自动下载时应在退出或重启时完成替换。线上还没有任何含 Sparkle 的已发布版本时（0.1.6 及更早都不含），用本次包自建旧版代替，不得因为“没有旧版可装”而跳过这一步。单架构测试机更新后还要用 `lipo -archs` 确认应用仍只含本机架构，Universal 安装更新后同样用 `lipo -archs` 确认仍含两个架构，Rosetta 下运行的 x86_64 安装则应更新到 `arm64` 包。再验证两端 Release 正文里的截图：每个地址都必须使用本次 `v${VERSION}` tag 的稳定下载地址，返回 HTTP 200，且下载到的字节确实是 PNG。任一截图不满足时补传附件并改正正文，不能以“本地图片没问题”替代。
+
+两端资产清单与六份 feed 用与 CI 同一份脚本核对，避免逐个 URL 手点漏掉某个架构：
+
+```zsh
+# 六份 feed 各自 200、恰好一个 item、带 edSignature，且指向本站本架构的本次 ZIP。
+ruby .github/scripts/appcast-feeds.rb verify --tag "v${VERSION}" --channel "$UPDATE_CHANNEL"
+# 15 份必需资产：三套 DMG/ZIP 及其 SHA-256，加三份 appcast。截图和源码包属于额外资产。
+gh release view "v${VERSION}" --repo wzz6423/zisla --json assets --jq '.assets[].name' \
+  | ruby .github/scripts/appcast-feeds.rb verify-assets --tag "v${VERSION}"
+curl -sS "https://gitee.com/api/v5/repos/wzz6423/zisla/releases/tags/v${VERSION}" \
+  | jq -r '.assets[].name' \
+  | ruby .github/scripts/appcast-feeds.rb verify-assets --tag "v${VERSION}"
+if [[ "$UPDATE_CHANNEL" == preview ]]; then
+  gh release view preview --repo wzz6423/zisla --json assets --jq '.assets[].name' \
+    | ruby .github/scripts/appcast-feeds.rb verify-assets --tag preview --layout feed
+fi
+```
+
+发布后 GitHub Actions 的 `Release Feeds` 会自动跑上面这套校验：`release: published` 触发，prerelease 自动走 preview 通道，永久 feed tag（`preview`、`update-release`）跳过。永久 feed 是手工发版的后续步骤，所以它最多轮询 10 次、每次间隔 60 秒，任一环节始终缺失才失败；补齐资产后用 `gh workflow run 'Release Feeds' -f tag="v${VERSION}" -f channel="$UPDATE_CHANNEL"` 重跑即可。runner 访问 Gitee 常被限流或拒绝，此时该工作流只验 GitHub 回退 feed 并给出 warning，Gitee 主 feed 仍必须按上面的命令人工验证过才算发版完成。
 
 ```zsh
 for HOST in github gitee; do
@@ -194,6 +217,22 @@ for HOST in github gitee; do
     rm -f "$IMAGE_FILE"
   done
 done
+```
+
+自建旧版只改版本号与 Bundle ID，因此它验的是真实私钥签出的线上 feed、应用内置的真实 `SUPublicEDKey`，以及终止旧实例后重新拉起新版这一段——这三项本地测试都覆盖不到。改 Bundle ID 是为了不污染正式实例的 Sparkle 偏好；改过 Info.plist 必须重签，否则 Sparkle 校验宿主签名时失败。
+
+```zsh
+TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/zisla-update-test.XXXXXX")"
+ditto "$RELEASE_OUTPUT_DIRECTORY/.staging/arm64/zisla.app" "$TEST_ROOT/zisla.app"
+TEST_INFO="$TEST_ROOT/zisla.app/Contents/Info.plist"
+plutil -replace CFBundleShortVersionString -string 0.0.1 "$TEST_INFO"
+plutil -replace CFBundleVersion -string 1 "$TEST_INFO"
+plutil -replace CFBundleIdentifier -string dev.wzz.zisla.updatetest "$TEST_INFO"
+codesign --force --deep --sign - "$TEST_ROOT/zisla.app"
+open "$TEST_ROOT/zisla.app"
+# 在这个实例里切换通道并手动检查更新，走完下载、验签、替换与重启。
+# 验完删除测试实例与它的偏好文件：
+# rm -rf "$TEST_ROOT" ~/Library/Preferences/dev.wzz.zisla.updatetest.plist
 ```
 
 正式版还要先完成下节的 Homebrew cask 同步（它要读 `outputs/` 里 `arm64` 与 `x86_64` ZIP 的校验文件），再在仓库根目录执行 `make clean` 删除 `outputs/`（含 `.staging/`）与本地调试产物，并清理 `.release-*`、临时挂载和本次测试下载物，不清理私钥备份。
