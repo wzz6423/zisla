@@ -322,6 +322,54 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func resizingSelectionKeepsAnnotationsAnchoredOnScreen() {
+        let imageSize = CGSize(width: 400, height: 300)
+        let start = CGRect(x: 100, y: 100, width: 400, height: 300)
+        let imagePoint = CGPoint(x: 50, y: 60)
+        let base = ScreenshotCanvasGeometry.fitting(imageSize: imageSize, in: start, frozenAt: nil)
+        let anchor = CGPoint(
+            x: start.minX + base.canvasPoint(from: imagePoint).x,
+            y: start.minY + base.canvasPoint(from: imagePoint).y
+        )
+
+        // Dragging the top-left handle inward shrinks and moves the canvas before the crop lands.
+        let shrunk = CGRect(x: 150, y: 140, width: 350, height: 260)
+        let frozen = ScreenshotCanvasGeometry.fitting(
+            imageSize: imageSize,
+            in: shrunk,
+            frozenAt: start
+        )
+        let rendered = frozen.canvasPoint(from: imagePoint)
+        #expect(frozen.scale == base.scale)
+        #expect(abs(shrunk.minX + rendered.x - anchor.x) < 0.01)
+        #expect(abs(shrunk.minY + rendered.y - anchor.y) < 0.01)
+
+        // Dragging it outward reveals more of the screen without moving the annotation either.
+        let grown = CGRect(x: 60, y: 70, width: 440, height: 330)
+        let grownRendered = ScreenshotCanvasGeometry
+            .fitting(imageSize: imageSize, in: grown, frozenAt: start)
+            .canvasPoint(from: imagePoint)
+        #expect(abs(grown.minX + grownRendered.x - anchor.x) < 0.01)
+        #expect(abs(grown.minY + grownRendered.y - anchor.y) < 0.01)
+
+        // Without the frozen mapping the annotation rescales to the in-flight selection, which is the drift being fixed.
+        let drifted = ScreenshotCanvasGeometry
+            .fitting(imageSize: imageSize, in: shrunk, frozenAt: nil)
+            .canvasPoint(from: imagePoint)
+        #expect(abs(shrunk.minX + drifted.x - anchor.x) > 1)
+
+        // Releasing the handle crops to the selection and translates annotations: no jump versus the frozen frame.
+        let committed = ScreenshotCanvasGeometry
+            .fitting(imageSize: shrunk.size, in: shrunk, frozenAt: nil)
+            .canvasPoint(from: CGPoint(
+                x: imagePoint.x + start.minX - shrunk.minX,
+                y: imagePoint.y + start.minY - shrunk.minY
+            ))
+        #expect(abs(committed.x - rendered.x) < 0.01)
+        #expect(abs(committed.y - rendered.y) < 0.01)
+    }
+
+    @Test
     func pointerInteractionReportsTwoAxisScrollDeltas() {
         var offsets: [CGSize] = []
         let interactionView = ScreenshotPointerInteractionNSView()
