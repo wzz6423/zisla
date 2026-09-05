@@ -67,7 +67,7 @@ xattr -d com.apple.quarantine /Applications/zisla.app
 brew upgrade --cask zisla
 ```
 
-tap 只提供正式版，预览包仅发布在 Releases，`brew upgrade` 不会把你带到预发布版本。`brew uninstall --cask zisla` 卸载应用，`brew uninstall --zap --cask zisla` 会连同本地数据一起清除。
+tap 只提供正式版，预览包仅发布在 Releases，`brew upgrade` 不会把你带到预发布版本；反过来，正在用预览版时显式指定 cask 会把它替换成当前正式版。Sparkle 自身从不降级，切回 Release 通道后会停在预览版本，直到正式版的构建号超过它。`brew uninstall --cask zisla` 卸载应用，`brew uninstall --zap --cask zisla` 会连同本地数据一起清除。
 
 ### 从源码运行
 

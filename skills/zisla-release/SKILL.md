@@ -9,10 +9,10 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 
 ## 发布原则
 
-- Release 主 feed 固定为 `https://gitee.com/wzz6423/zisla/releases/download/update-release/appcast.xml`，失败时仅回退一次 `https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml`；Preview 主 feed 固定为 `https://gitee.com/wzz6423/zisla/releases/download/preview/appcast.xml`，失败时仅回退一次 `https://github.com/wzz6423/zisla/releases/download/preview/appcast.xml`。这四个地址是 Info.plist 里的基准值，单架构安装把文件名改写为运行架构的 `appcast-arm64.xml` 或 `appcast-x86_64.xml`（Rosetta 下运行的 x86_64 slice 按 `arm64` 请求，否则这台 Mac 会被永久留在 Intel 包上）；Universal 安装按可执行文件里的 slice 数判定，保留 `appcast.xml`，更新后仍是 Universal，0.1.6 及更早的版本请求的也是这一份。Gitee appcast 检查或其更新包下载失败时回退；每次新的自动或手动检查都会重新从 Gitee 开始。appcast 与 ZIP 必须同时通过 EdDSA 签名；客户端在解压前验证，再替换并重启应用。
+- Release 主 feed 固定为 `https://gitee.com/wzz6423/zisla/releases/download/update-release/appcast.xml`，失败时仅回退一次 `https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml`；Preview 主 feed 固定为 `https://gitee.com/wzz6423/zisla/releases/download/preview/appcast.xml`，失败时仅回退一次 `https://github.com/wzz6423/zisla/releases/download/preview/appcast.xml`。这四个地址是 Info.plist 里的基准值，单架构安装把文件名改写为运行架构的 `appcast-arm64.xml` 或 `appcast-x86_64.xml`（Rosetta 下运行的 x86_64 slice 按 `arm64` 请求，否则这台 Mac 会被永久留在 Intel 包上）；Universal 安装按可执行文件里的 slice 数判定，保留 `appcast.xml`，更新后仍是 Universal。0.1.6 及更早的版本不含 Sparkle，只能手动下载新版，因此没有任何已发布版本依赖这份基准名。Gitee appcast 检查或其更新包下载失败时回退；每次新的自动或手动检查都会重新从 Gitee 开始。appcast 与 ZIP 必须同时通过 EdDSA 签名；客户端在解压前验证，再替换并重启应用。
 - Gitee 的正式永久 feed tag 是 `update-release`，Preview 永久 feed tag 是 `preview`；GitHub 的正式 feed 使用 `latest`，Preview 使用永久 prerelease tag `preview`。两个 `preview` feed 都只保存当前 Preview 的三份 appcast，且各自指向实际版本 tag（例如 `v0.2.0-preview.1`）中本站对应架构的 ZIP。GitHub 的 `preview` 必须保持 prerelease，避免污染正式 `latest`。
 - 每个版本仍构建 `x86_64`、`arm64` 和 `universal` 三套包，三套 ZIP 都参与自动更新：每套各有一份只引用自己那套 ZIP 的 appcast，装哪套就一直更新哪套——单架构安装不会被 Universal 包换掉，装机体积优势不会在一次应用内更新后消失；Universal 安装也不会被换成单架构包，跨架构可用不会因为一次更新而失去。DMG 和校验文件只用于首次安装与 Release 页面下载，不参与应用内更新流程。
-- 每次运行 `package-release.sh` 都会在同目录生成 `appcast-gitee.xml` 和 `appcast-github.xml`，两者只引用本次构建的那一套 ZIP，分别指向 Gitee 与 GitHub。`make build-package` 因此产出三对；上传时 Universal 那对命名为 `appcast.xml`（0.1.6 及更早版本请求的就是它），单架构那两对命名为 `appcast-arm64.xml` 与 `appcast-x86_64.xml`。不得手改已签名 appcast；需修改时重新运行生成工具。
+- 每次运行 `package-release.sh` 都会在同目录生成 `appcast-gitee.xml` 和 `appcast-github.xml`，两者只引用本次构建的那一套 ZIP，分别指向 Gitee 与 GitHub。`make build-package` 因此产出三对；上传时 Universal 那对命名为 `appcast.xml`（Universal 安装请求的就是它），单架构那两对命名为 `appcast-arm64.xml` 与 `appcast-x86_64.xml`。不得手改已签名 appcast；需修改时重新运行生成工具。
 - 将“实际版本的三套 ZIP 与两端三份签名 appcast（`appcast.xml`、`appcast-arm64.xml`、`appcast-x86_64.xml`）已上传，并且永久 feed 已指向该版本”视为自动更新发布的原子门禁；缺少某份架构 appcast 会让该架构的已安装版本在主 feed 和回退 feed 上同时得到 404；任一环节缺失即视为发版失败，不得宣称线上检查、发现更新或自动安装可用。不得以 Release API 的版本号、debug 专用逻辑或“已是最新”提示替代 Sparkle appcast 检查。若未获明确授权修复指定历史版本，不得回填或改动已发布版本及其永久 feed；默认在下一次更高版本发版时完整满足该门禁。
 - GitHub 和 Gitee 都承载 Sparkle feed 与更新 ZIP。每个同版本 Release 必须在两端都上传 `x86_64`（X86）、`arm64` 和 `universal` 三套 DMG、ZIP 和 SHA-256，以及三份对应架构的已签名 appcast。
 - **三种包都必须保留**：`x86_64` 和 `arm64` 包分别只包含单一架构，`universal` 包必须同时包含两个架构；三类资产都要分别压缩、分别上传，文件名必须带对应后缀。
@@ -156,8 +156,8 @@ for ARCHITECTURE in arm64 x86_64 universal; do
   diskutil eject /Volumes/zisla
 done
 for ARCHITECTURE in universal arm64 x86_64; do
-  # The universal pair keeps the bare name because it is the appcast.xml that 0.1.6 and
-  # earlier still request.
+  # The universal pair keeps the bare name because that is the appcast.xml a universal
+  # install requests.
   SUFFIX=""
   [[ "$ARCHITECTURE" == universal ]] || SUFFIX="-$ARCHITECTURE"
   for HOST in gitee github; do

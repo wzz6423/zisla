@@ -67,7 +67,7 @@ zisla updates itself through Sparkle however you installed it. A Homebrew instal
 brew upgrade --cask zisla
 ```
 
-The tap serves stable releases only; preview builds stay on Releases so `brew upgrade` never moves you onto a prerelease. `brew uninstall --cask zisla` removes the app, and `brew uninstall --zap --cask zisla` also trashes its local data.
+The tap serves stable releases only; preview builds stay on Releases so `brew upgrade` never moves you onto a prerelease — and naming the cask while you are on a preview replaces it with the current stable build. Sparkle itself never downgrades, so switching back to Release leaves you on the preview build until a stable release passes it. `brew uninstall --cask zisla` removes the app, and `brew uninstall --zap --cask zisla` also trashes its local data.
 
 ### Run from source
 
