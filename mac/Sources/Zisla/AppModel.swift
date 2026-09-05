@@ -1037,15 +1037,19 @@ final class AppModel: ObservableObject {
   // MARK: - Transient notice
 
   /// The island shows `transientMessage` as a row protruding under the pill, so it has to recycle
-  /// itself — nothing else ever clears it.
-  private static let transientMessageDuration: Duration = .seconds(4)
-
+  /// itself — nothing else ever clears it. A message too wide for the row scrolls once, so the
+  /// lifetime follows that pass instead of a fixed beat: a long error would otherwise be swapped out
+  /// mid-scroll, having shown only its opening words.
   private func scheduleTransientMessageDismissal() {
     transientMessageDismissTask?.cancel()
     transientMessageDismissTask = nil
     guard let message = transientMessage else { return }
+    let duration = TransientNoticeMetrics.displayDuration(
+      for: message,
+      rowWidth: collapsedOverflowWidth
+    )
     transientMessageDismissTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: Self.transientMessageDuration)
+      try? await Task.sleep(for: duration)
       guard !Task.isCancelled, let self, self.transientMessage == message else { return }
       self.transientMessage = nil
     }

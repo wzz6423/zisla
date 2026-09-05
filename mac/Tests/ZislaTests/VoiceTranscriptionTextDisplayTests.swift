@@ -9,7 +9,9 @@ struct VoiceTranscriptionTextDisplayTests {
         let source = try String(contentsOf: Self.islandRootSourceURL, encoding: .utf8)
         let start = try #require(source.range(of: "private struct VoiceTranscriptionView"))
         let suffix = source[start.lowerBound...]
-        let end = try #require(suffix.range(of: "@MainActor\nprivate final class IslandDropState"))
+        // Ends at the next declaration so the slice cannot pick up `TransientNoticeView`, whose notice
+        // scrolls itself and must stay free of an external `scrollProgress`.
+        let end = try #require(suffix.range(of: "private struct TransientNoticeView"))
         let transcriptView = suffix[..<end.lowerBound]
 
         #expect(transcriptView.contains("MarqueeText("))

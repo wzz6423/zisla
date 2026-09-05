@@ -508,14 +508,16 @@ struct IslandRootView: View {
                 .foregroundStyle(Color.zislaError)
                 .accessibilityHidden(true)
 
+            // No `scrollProgress`: an external position would pin an overflowing notice at the end of
+            // its travel, hiding the head. The automatic pass reads head to tail once instead, and the
+            // dismissal timer is derived from the same metrics so it outlives the pass.
             MarqueeText(
                 message,
-                font: .system(size: 10.5),
+                font: TransientNoticeMetrics.font,
                 textColor: .white.opacity(0.9),
-                fontWeight: .medium,
-                repeats: false,
-                scrollProgress: 1,
-                clipsOverflowWhenStatic: true
+                fontWeight: TransientNoticeMetrics.fontWeight,
+                pointsPerSecond: TransientNoticeMetrics.pointsPerSecond,
+                repeats: false
             )
         }
         .padding(.horizontal, 10)
@@ -720,16 +722,17 @@ private struct TransientNoticeView: View {
             .padding(.horizontal, 12)
             .frame(width: geometry.topRowFrame.width, height: geometry.topRowFrame.height)
 
+            // See `transientNoticeBar`: the notice scrolls itself once, so it must not take an external
+            // `scrollProgress`, which would show only the tail of a long error.
             MarqueeText(
                 message,
-                font: .system(size: 10.5),
+                font: TransientNoticeMetrics.font,
                 textColor: .white.opacity(0.82),
-                fontWeight: .medium,
-                repeats: false,
-                scrollProgress: 1,
-                clipsOverflowWhenStatic: true
+                fontWeight: TransientNoticeMetrics.fontWeight,
+                pointsPerSecond: TransientNoticeMetrics.pointsPerSecond,
+                repeats: false
             )
-                .padding(.horizontal, 12)
+                .padding(.horizontal, TransientNoticeMetrics.rowHorizontalPadding)
                 .frame(
                     width: geometry.transcriptRowFrame.width,
                     height: geometry.transcriptRowFrame.height,
