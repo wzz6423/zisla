@@ -123,7 +123,7 @@ struct FeatureSettingsCompatibilityTests {
         #expect(decodedLegacy.keyboardTypingStatsEnabled)
         #expect(decodedLegacy.keyboardSelectedProfileID == "holypanda")
 
-        // 往回写非默认值，避免默认值恰好等于期望值时掩盖解码丢字段的问题。
+        // Round-trip a non-default value, or a dropped key would still decode to what we expect.
         var settings = FeatureSettings.default
         settings.keyboardEnabled = false
         settings.keyboardVolume = 0.62
