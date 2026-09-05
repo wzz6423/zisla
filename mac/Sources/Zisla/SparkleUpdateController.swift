@@ -20,19 +20,22 @@ struct SparkleUpdateConfiguration: Equatable {
 
     init?(
         infoDictionary: [String: Any],
-        architecture: String = SparkleUpdateConfiguration.hostArchitecture
+        architecture: String = SparkleUpdateConfiguration.hostArchitecture,
+        installedSliceCount: Int = SparkleUpdateConfiguration.installedSliceCount
     ) {
         guard let releaseFeeds = Self.feedPair(
             giteeKey: "SUFeedURL",
             githubKey: "ZislaReleaseFallbackAppcastURL",
             in: infoDictionary,
-            architecture: architecture
+            architecture: architecture,
+            installedSliceCount: installedSliceCount
         ),
         let previewFeeds = Self.feedPair(
             giteeKey: "ZislaPreviewAppcastURL",
             githubKey: "ZislaPreviewFallbackAppcastURL",
             in: infoDictionary,
-            architecture: architecture
+            architecture: architecture,
+            installedSliceCount: installedSliceCount
         ),
         let publicKey = infoDictionary["SUPublicEDKey"] as? String,
         Data(base64Encoded: publicKey)?.count == 32 else {
@@ -58,10 +61,21 @@ struct SparkleUpdateConfiguration: Equatable {
         giteeKey: String,
         githubKey: String,
         in infoDictionary: [String: Any],
-        architecture: String
+        architecture: String,
+        installedSliceCount: Int
     ) -> SparkleFeedPair? {
-        guard let giteeURL = feedURL(forKey: giteeKey, in: infoDictionary, architecture: architecture),
-              let githubURL = feedURL(forKey: githubKey, in: infoDictionary, architecture: architecture) else {
+        guard let giteeURL = feedURL(
+                  forKey: giteeKey,
+                  in: infoDictionary,
+                  architecture: architecture,
+                  installedSliceCount: installedSliceCount
+              ),
+              let githubURL = feedURL(
+                  forKey: githubKey,
+                  in: infoDictionary,
+                  architecture: architecture,
+                  installedSliceCount: installedSliceCount
+              ) else {
             return nil
         }
         return SparkleFeedPair(gitee: giteeURL, github: githubURL)
@@ -70,7 +84,8 @@ struct SparkleUpdateConfiguration: Equatable {
     private static func feedURL(
         forKey key: String,
         in infoDictionary: [String: Any],
-        architecture: String
+        architecture: String,
+        installedSliceCount: Int
     ) -> URL? {
         guard let value = infoDictionary[key] as? String,
               let url = URL(string: value),
@@ -81,9 +96,18 @@ struct SparkleUpdateConfiguration: Equatable {
         // Every release publishes one appcast per architecture next to the shared
         // appcast.xml, so an install stays on its own slice instead of being replaced by
         // the fat universal build. Info.plist keeps the shared name for both channels.
+        // A universal install stays on that shared name: following a slice feed would
+        // spend the portability it was installed for on one update's size saving.
+        guard installedSliceCount == 1 else {
+            return url
+        }
         return url.deletingLastPathComponent()
             .appendingPathComponent("appcast-\(architecture).xml")
     }
+
+    // Counts the slices in the running app, not the machine, so a universal install is
+    // recognized even on a Mac that can only execute one of them.
+    static let installedSliceCount: Int = Bundle.main.executableArchitectures?.count ?? 1
 
     static let hostArchitecture: String = {
         #if arch(arm64)

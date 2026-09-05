@@ -5,7 +5,7 @@
 | Release | Gitee `update-release/download/appcast-<架构>.xml` | GitHub `latest/download/appcast-<架构>.xml` | 各自 EdDSA 签名的同架构 ZIP；Sparkle 自动下载、验签、替换与重启 |
 | Preview | Gitee `releases/download/preview/appcast-<架构>.xml` | GitHub `releases/download/preview/appcast-<架构>.xml` | 各自 EdDSA 签名的同架构 ZIP；Sparkle 自动下载、验签、替换与重启 |
 
-`<架构>` 是运行中的 slice：`arm64` 或 `x86_64`，Rosetta 下运行的 x86_64 slice 按 `arm64` 请求，否则这台 Mac 会被永久留在 Intel 包上。Info.plist 里四个 feed 键仍写 `appcast.xml` 基准地址，客户端只改写文件名；`appcast.xml` 本身继续引用 Universal ZIP，供 0.1.6 及更早的版本使用。
+`<架构>` 是运行中的 slice：`arm64` 或 `x86_64`，Rosetta 下运行的 x86_64 slice 按 `arm64` 请求，否则这台 Mac 会被永久留在 Intel 包上。Info.plist 里四个 feed 键仍写 `appcast.xml` 基准地址，只有单架构安装改写文件名；Universal 安装按可执行文件里的 slice 数判定，仍请求 `appcast.xml`。`appcast.xml` 本身继续引用 Universal ZIP，因此它同时服务于 Universal 安装和 0.1.6 及更早的版本。
 
 运行时设置的 `UpdateChannel` 同时决定自动检查与手动检查的目标，不受安装包初始 `ZislaDefaultUpdateChannel` 限制。每次检查都先读取 Gitee；Gitee appcast 检查或更新包下载失败时重试 GitHub 一次，GitHub 失败后不会再次回到 Gitee。切换通道时，Sparkle 将重置下一次自动检查周期；手动检查立即读取新 feed。更新 ZIP 验签后会在退出或重启时安装。
 
