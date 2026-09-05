@@ -95,14 +95,8 @@ struct AIProgressModuleView: View {
 private struct UsageTrendChart: View {
     var series: [UsageBreakdownPoint]
 
-    private var ticks: [Int] {
-        AIUsageAnalytics.tokenAxisTicks(maximum: maximumTokens, desiredCount: 5)
-    }
-
-    private var maximumTokens: Int {
-        let raw = max(series.map(\.totalTokens).max() ?? 0, 1)
-        // Leave 15% headroom at the top so the curve does not touch or exceed the top axis edge
-        return max(Int((Double(raw) * 1.15).rounded()), raw + 1)
+    private var yScale: AIUsageAnalytics.TokenAxisScale {
+        AIUsageAnalytics.tokenAxisScale(values: series.map(\.totalTokens), desiredCount: 5)
     }
 
     private var hasUsage: Bool {
@@ -138,7 +132,8 @@ private struct UsageTrendChart: View {
     }
 
     private var chart: some View {
-        Chart(series, id: \.timestamp) { point in
+        let scale = yScale
+        return Chart(series, id: \.timestamp) { point in
             AreaMark(
                 x: .value("时间", point.timestamp),
                 y: .value("总 Token", point.totalTokens)
@@ -160,10 +155,9 @@ private struct UsageTrendChart: View {
             .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
         }
         .chartXScale(domain: xDomain)
-        // Preserve the zero baseline while keeping quieter days visible beside order-of-magnitude spikes.
-        .chartYScale(domain: 0...(ticks.last ?? 1), type: .symmetricLog(slopeAtZero: 0.000_001))
+        .chartYScale(domain: 0...scale.upperBound, type: scale.chartScaleType)
         .chartYAxis {
-            AxisMarks(position: .leading, values: ticks) { value in
+            AxisMarks(position: .leading, values: scale.ticks) { value in
                 AxisGridLine().foregroundStyle(Color.primary.opacity(0.12))
                 AxisValueLabel {
                     if let tokens = value.as(Int.self) {
@@ -184,6 +178,16 @@ private struct UsageTrendChart: View {
                     }
                 }
             }
+        }
+    }
+}
+
+private extension AIUsageAnalytics.TokenAxisScale {
+    /// `slopeAtZero` keeps the zero baseline finite so idle days still render on the log branch.
+    var chartScaleType: ScaleType {
+        switch kind {
+        case .linear: .linear
+        case .symmetricLog: .symmetricLog(slopeAtZero: 0.000_001)
         }
     }
 }
