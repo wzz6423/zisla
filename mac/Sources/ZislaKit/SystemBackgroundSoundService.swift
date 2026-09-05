@@ -252,6 +252,13 @@ public final class SystemBackgroundSoundService: ObservableObject {
 
             engine.prepare()
             try engine.start()
+            // Playing before the engine sees an IO cycle throws an uncatchable ObjC exception that
+            // aborts the process; the output node's lastRenderTime is the only signal that rendering
+            // actually started.
+            guard engine.isRunning, engine.outputNode.lastRenderTime != nil else {
+                stop()
+                return false
+            }
             node.play()
         } catch {
             stop()
@@ -286,7 +293,9 @@ public final class SystemBackgroundSoundService: ObservableObject {
 
     public func stop() {
         playbackID = nil
-        playbackNode?.stop()
+        if playbackEngine?.outputNode.lastRenderTime != nil {
+            playbackNode?.stop()
+        }
         playbackEngine?.stop()
         playbackNode = nil
         playbackEngine = nil

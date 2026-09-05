@@ -1,6 +1,8 @@
 import AppKit
 import Foundation
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 /// Shared square-cell geometry for the history page's rhythm and annual grids.
 /// Use `.standard` for both grids so their cells and gutters remain visually
@@ -80,7 +82,7 @@ struct TypingYearHeatmap: View, Equatable {
 
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("全年输入热力图")
+                Text(AppLocalization.text("全年输入热力图"))
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(KeyboardVisualStyle.instrumentPrimary)
 

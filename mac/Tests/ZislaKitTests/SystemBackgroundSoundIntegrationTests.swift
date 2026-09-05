@@ -4,6 +4,7 @@ import Testing
 
 @testable import ZislaKit
 
+@Suite(.serialized)
 struct SystemBackgroundSoundIntegrationTests {
     @Test
     func readsRealManifestIfAvailable() async throws {

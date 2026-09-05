@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ZislaKit
 
 @MainActor
 final class SoundPackEditorWindowController: NSWindowController, NSWindowDelegate {

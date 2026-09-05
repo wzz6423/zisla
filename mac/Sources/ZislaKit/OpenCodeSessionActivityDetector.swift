@@ -99,7 +99,7 @@ public final class OpenCodeSessionActivityDetector: AIActivityDetecting {
             nil
         )
         guard openResult == SQLITE_OK, let db else {
-            let message = sqliteMessage(db, fallback: "无法打开 OpenCode 数据库")
+            let message = sqliteMessage(db, fallback: AppLocalization.text("无法打开 OpenCode 数据库"))
             sqlite3_close(db)
             throw AIStateRepositoryError.storageFailure(message)
         }
@@ -201,7 +201,7 @@ public final class OpenCodeSessionActivityDetector: AIActivityDetecting {
         var stmt: OpaquePointer?
         let prepareResult = sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
         guard prepareResult == SQLITE_OK, let stmt else {
-            let message = sqliteMessage(db, fallback: "无法查询 OpenCode 会话")
+            let message = sqliteMessage(db, fallback: AppLocalization.text("无法查询 OpenCode 会话"))
             sqlite3_finalize(stmt)
             throw AIStateRepositoryError.storageFailure(message)
         }
@@ -209,7 +209,7 @@ public final class OpenCodeSessionActivityDetector: AIActivityDetecting {
 
         guard sqlite3_bind_int64(stmt, 1, Int64(maxSessions)) == SQLITE_OK else {
             throw AIStateRepositoryError.storageFailure(
-                sqliteMessage(db, fallback: "无法设置 OpenCode 会话查询范围")
+                sqliteMessage(db, fallback: AppLocalization.text("无法设置 OpenCode 会话查询范围"))
             )
         }
 
@@ -253,7 +253,7 @@ public final class OpenCodeSessionActivityDetector: AIActivityDetecting {
                 break readRows
             default:
                 throw AIStateRepositoryError.storageFailure(
-                    sqliteMessage(db, fallback: "无法读取 OpenCode 会话")
+                    sqliteMessage(db, fallback: AppLocalization.text("无法读取 OpenCode 会话"))
                 )
             }
         }

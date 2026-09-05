@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import UserNotifications
+import ZislaCore
 
 /// An alarm item. An empty `weekdays` set means it fires only once (auto-dismissed after firing).
 public struct AlarmItem: Identifiable, Codable, Equatable, Sendable {
@@ -194,7 +195,7 @@ public final class AlarmService: ObservableObject {
     public func openSystemClock() {
         let clock = URL(fileURLWithPath: "/System/Applications/Clock.app")
         guard FileManager.default.fileExists(atPath: clock.path) else {
-            errorMessage = "未找到系统「时钟」App"
+            errorMessage = AppLocalization.text("未找到系统「时钟」App")
             return
         }
         NSWorkspace.shared.open(clock)
@@ -211,7 +212,7 @@ public final class AlarmService: ObservableObject {
     private func schedule(_ alarm: AlarmItem) {
         guard schedulingEnabled, alarm.isEnabled else { return }
         let content = UNMutableNotificationContent()
-        content.title = alarm.label.isEmpty ? "闹钟" : alarm.label
+        content.title = alarm.label.isEmpty ? AppLocalization.text("闹钟") : alarm.label
         content.body = "\(alarm.timeText) · \(alarm.repeatText)"
         content.sound = .default
 

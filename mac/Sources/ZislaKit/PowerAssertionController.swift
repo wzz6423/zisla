@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import IOKit.pwr_mgt
+import ZislaCore
 
 /// IOPM assertion abstraction for unit test injection.
 @MainActor
@@ -41,7 +42,7 @@ public final class IOPMPowerAssertionManager: PowerAssertionManaging {
 @MainActor
 public final class PowerAssertionController: ObservableObject {
     public static let clamshellLimitationHint =
-        "macOS 仍可能因合盖、低电量、用户主动休眠或硬件策略进入睡眠；外接显示器并接通电源时可获得系统原生 clamshell 支持。"
+        AppLocalization.text("macOS 仍可能因合盖、低电量、用户主动休眠或硬件策略进入睡眠；外接显示器并接通电源时可获得系统原生 clamshell 支持。")
 
     @Published public private(set) var keepDisplayAwake = false
     @Published public private(set) var preventIdleSystemSleep = false

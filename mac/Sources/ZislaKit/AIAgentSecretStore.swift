@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import ZislaCore
 
 public protocol AIAgentSecretStoring: Sendable {
     func secret(for reference: String) throws -> String?
@@ -16,7 +17,7 @@ public enum AIAgentSecretStoreError: LocalizedError, Sendable, Equatable {
         switch self {
         case .invalidReference: "密钥引用无效"
         case .invalidSecret: "API Key 不能为空"
-        case let .storageFailed(detail): "无法保存模型凭据：\(detail)"
+        case let .storageFailed(detail): AppLocalization.text("无法保存模型凭据：%@", detail)
         }
     }
 }
@@ -53,7 +54,7 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
             case SQLITE_DONE:
                 return nil
             default:
-                throw databaseError(database, fallback: "无法读取模型凭据")
+                throw databaseError(database, fallback: AppLocalization.text("无法读取模型凭据"))
             }
         }
     }
@@ -75,7 +76,7 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
             try bind(reference, to: statement, index: 1, database: database)
             try bind(secret, to: statement, index: 2, database: database)
             guard sqlite3_step(statement) == SQLITE_DONE else {
-                throw databaseError(database, fallback: "无法保存模型凭据")
+                throw databaseError(database, fallback: AppLocalization.text("无法保存模型凭据"))
             }
         }
     }
@@ -90,7 +91,7 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
             defer { sqlite3_finalize(statement) }
             try bind(reference, to: statement, index: 1, database: database)
             guard sqlite3_step(statement) == SQLITE_DONE else {
-                throw databaseError(database, fallback: "无法删除模型凭据")
+                throw databaseError(database, fallback: AppLocalization.text("无法删除模型凭据"))
             }
         }
     }
@@ -119,7 +120,7 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
                         contents: nil,
                         attributes: [.posixPermissions: NSNumber(value: 0o600)]
                     ) else {
-                        throw AIAgentSecretStoreError.storageFailed("无法创建私有 SQLite 数据库")
+                        throw AIAgentSecretStoreError.storageFailed(AppLocalization.text("无法创建私有 SQLite 数据库"))
                     }
                 }
                 var database: OpaquePointer?
@@ -131,11 +132,11 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
                 )
                 guard opened == SQLITE_OK, let database else {
                     sqlite3_close(database)
-                    throw AIAgentSecretStoreError.storageFailed("无法打开私有 SQLite 数据库")
+                    throw AIAgentSecretStoreError.storageFailed(AppLocalization.text("无法打开私有 SQLite 数据库"))
                 }
                 defer { sqlite3_close_v2(database) }
                 guard sqlite3_busy_timeout(database, 1_000) == SQLITE_OK else {
-                    throw databaseError(database, fallback: "无法配置私有 SQLite 数据库")
+                    throw databaseError(database, fallback: AppLocalization.text("无法配置私有 SQLite 数据库"))
                 }
                 defer { try? setPrivateFilePermissions(using: manager) }
                 try execute(
@@ -177,7 +178,7 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
               let statement else {
             sqlite3_finalize(statement)
-            throw databaseError(database, fallback: "无法准备私有 SQLite 操作")
+            throw databaseError(database, fallback: AppLocalization.text("无法准备私有 SQLite 操作"))
         }
         return statement
     }
@@ -187,7 +188,7 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
             sqlite3_bind_text(statement, index, $0, -1, aiAgentSQLiteTransient)
         }
         guard result == SQLITE_OK else {
-            throw databaseError(database, fallback: "无法写入私有 SQLite 数据")
+            throw databaseError(database, fallback: AppLocalization.text("无法写入私有 SQLite 数据"))
         }
     }
 
@@ -204,7 +205,7 @@ public final class DatabaseAIAgentSecretStore: AIAgentSecretStoring, @unchecked 
         let result = sqlite3_exec(database, sql, nil, nil, &errorMessage)
         defer { sqlite3_free(errorMessage) }
         guard result == SQLITE_OK else {
-            let detail = errorMessage.map { String(cString: $0) } ?? "私有 SQLite 操作失败"
+            let detail = errorMessage.map { String(cString: $0) } ?? AppLocalization.text("私有 SQLite 操作失败")
             throw AIAgentSecretStoreError.storageFailed(detail)
         }
     }

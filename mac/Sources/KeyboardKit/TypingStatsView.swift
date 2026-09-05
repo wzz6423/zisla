@@ -1,5 +1,7 @@
 import Charts
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 private enum TypingStatsSection: String, CaseIterable, Identifiable, Hashable {
     case today = "今日"
@@ -69,13 +71,13 @@ struct TypingStatsView: View {
                 range: model.timelineRange
             )
         }
-        .alert("清除全部输入统计？", isPresented: $showsClearConfirmation) {
-            Button("取消", role: .cancel) {}
-            Button("清除", role: .destructive) {
+        .alert(AppLocalization.text("清除全部输入统计？"), isPresented: $showsClearConfirmation) {
+            Button(AppLocalization.text("取消"), role: .cancel) {}
+            Button(AppLocalization.text("清除"), role: .destructive) {
                 Task { await model.clearAll() }
             }
         } message: {
-            Text("今日、历史、应用排行和全部逐键累计都将从本机删除，且无法恢复。")
+            Text(AppLocalization.text("今日、历史、应用排行和全部逐键累计都将从本机删除，且无法恢复。"))
         }
     }
 
@@ -90,9 +92,9 @@ struct TypingStatsView: View {
                 )
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("输入统计")
+                    Text(AppLocalization.text("输入统计"))
                         .font(.title2.weight(.semibold))
-                    Text("清晰了解每天的输入习惯")
+                    Text(AppLocalization.text("清晰了解每天的输入习惯"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -109,9 +111,9 @@ struct TypingStatsView: View {
                 }
 
                 if showsRecordingToggle {
-                    Toggle("记录统计", isOn: $settings.isTypingStatsEnabled)
+                    Toggle(AppLocalization.text("记录统计"), isOn: $settings.isTypingStatsEnabled)
                         .toggleStyle(.switch)
-                        .help("开启后仅在本机保存聚合统计，不保存输入内容")
+                        .help(AppLocalization.text("开启后仅在本机保存聚合统计，不保存输入内容"))
                 }
 
                 Button {
@@ -135,13 +137,13 @@ struct TypingStatsView: View {
                     }
                 }
                 .buttonStyle(.bordered)
-                .help("刷新输入统计")
-                .accessibilityLabel("刷新输入统计")
+                .help(AppLocalization.text("刷新输入统计"))
+                .accessibilityLabel(AppLocalization.text("刷新输入统计"))
                 .disabled(model.isRefreshing || model.isLoadingReport)
             }
 
             HStack(spacing: 16) {
-                Picker("统计页面", selection: $selectedSection) {
+                Picker(AppLocalization.text("统计页面"), selection: $selectedSection) {
                     ForEach(TypingStatsSection.allCases) { section in
                         Text(L10n.tr(section.rawValue)).tag(section)
                     }
@@ -212,14 +214,14 @@ struct TypingStatsView: View {
         HStack(spacing: 7) {
             Image(systemName: "lock.shield.fill")
                 .foregroundStyle(KeyboardVisualStyle.accentStrong)
-            Text("只记录字符键数量、物理键码、时间与前台应用；不保存输入内容。")
+            Text(AppLocalization.text("只记录字符键数量、物理键码、时间与前台应用；不保存输入内容。"))
             Spacer()
             if model.isClearing {
                 ProgressView()
                     .controlSize(.small)
-                    .accessibilityLabel("正在清除输入统计")
+                    .accessibilityLabel(AppLocalization.text("正在清除输入统计"))
             }
-            Button("清除全部统计", role: .destructive) {
+            Button(AppLocalization.text("清除全部统计"), role: .destructive) {
                 showsClearConfirmation = true
             }
             .buttonStyle(.borderless)
@@ -257,15 +259,15 @@ struct TypingStatsView: View {
         let symbol: String
         let color: Color
         if model.staleDataMessage != nil {
-            title = "显示上次数据"
+            title = L10n.tr("显示上次数据")
             symbol = "clock.arrow.circlepath"
             color = .orange
         } else if !settings.isTypingStatsEnabled {
-            title = "统计已暂停"
+            title = L10n.tr("统计已暂停")
             symbol = "pause.circle.fill"
             color = .secondary
         } else {
-            title = "本地统计"
+            title = L10n.tr("本地统计")
             symbol = "chart.bar.fill"
             color = KeyboardVisualStyle.accentStrong
         }
@@ -440,9 +442,9 @@ private struct TypingStatsTodayView: View {
                                 .background(KeyboardVisualStyle.accentSoft, in: Circle())
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("这一时段还没有输入")
+                                Text(AppLocalization.text("这一时段还没有输入"))
                                     .font(.subheadline.weight(.semibold))
-                                Text("开始打字后，趋势会立即出现在这里。")
+                                Text(AppLocalization.text("开始打字后，趋势会立即出现在这里。"))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -454,8 +456,8 @@ private struct TypingStatsTodayView: View {
                     } else {
                         Chart(snapshot.recentBuckets) { bucket in
                             AreaMark(
-                                x: .value("时间", bucket.start),
-                                y: .value("字符数", bucket.characterCount)
+                                x: .value(L10n.tr("时间"), bucket.start),
+                                y: .value(L10n.tr("字符数"), bucket.characterCount)
                             )
                             .foregroundStyle(
                                 LinearGradient(
@@ -470,8 +472,8 @@ private struct TypingStatsTodayView: View {
                             .interpolationMethod(.linear)
 
                             LineMark(
-                                x: .value("时间", bucket.start),
-                                y: .value("字符数", bucket.characterCount)
+                                x: .value(L10n.tr("时间"), bucket.start),
+                                y: .value(L10n.tr("字符数"), bucket.characterCount)
                             )
                             .foregroundStyle(KeyboardVisualStyle.accentStrong)
                             .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
@@ -499,7 +501,7 @@ private struct TypingStatsTodayView: View {
                             )
                         )
 
-                        Text("空白区间表示没有有效输入。")
+                        Text(AppLocalization.text("空白区间表示没有有效输入。"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -534,9 +536,9 @@ private struct TypingStatsAppsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("今日应用排行")
+                        Text(AppLocalization.text("今日应用排行"))
                             .font(.headline)
-                        Text("按字符数排序，仅展示聚合结果。")
+                        Text(AppLocalization.text("按字符数排序，仅展示聚合结果。"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -719,12 +721,12 @@ private struct TypingAppRow: View {
                 HStack {
                     Text(app.displayName)
                         .font(.subheadline.weight(.medium))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     if let bundleIdentifier = app.bundleIdentifier {
                         Text(bundleIdentifier)
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
-                            .lineLimit(1)
+                            .fitsSingleLine()
                     }
                     Spacer()
                     Text(statsCount(app.characterCount))

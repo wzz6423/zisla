@@ -1,5 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import ZislaCore
+import ZislaKit
 
 private enum SoundPackEditorImportPurpose: Hashable {
     case audio(SoundPackEditorAudioTarget)
@@ -85,33 +87,33 @@ struct SoundPackEditorView: View {
             Alert(
                 title: Text(L10n.tr(error.title)),
                 message: Text(L10n.tr(error.message)),
-                dismissButton: .default(Text("好"))
+                dismissButton: .default(Text(AppLocalization.text("好")))
             )
         }
         .confirmationDialog(
-            "移除这个自定义音色包？",
+            AppLocalization.text("移除这个自定义音色包？"),
             isPresented: $isConfirmingDeletion,
             titleVisibility: .visible
         ) {
-            Button("移到 Keyboard 废纸篓", role: .destructive) {
+            Button(AppLocalization.text("移到 Keyboard 废纸篓"), role: .destructive) {
                 Task { await editor.deleteSelectedPack() }
             }
-            Button("取消", role: .cancel) {}
+            Button(AppLocalization.text("取消"), role: .cancel) {}
         } message: {
-            Text("音色包不会被永久删除，可从 Keyboard 音色目录的 .Trash 中恢复。")
+            Text(AppLocalization.text("音色包不会被永久删除，可从 Keyboard 音色目录的 .Trash 中恢复。"))
         }
         .confirmationDialog(
-            "当前音色有未保存的更改",
+            AppLocalization.text("当前音色有未保存的更改"),
             isPresented: $isConfirmingUnsavedChanges,
             titleVisibility: .visible
         ) {
-            Button("保存后继续") { saveThenPerformPendingAction() }
-            Button("放弃更改并继续", role: .destructive) {
+            Button(AppLocalization.text("保存后继续")) { saveThenPerformPendingAction() }
+            Button(AppLocalization.text("放弃更改并继续"), role: .destructive) {
                 performPendingActionAfterDialogDismissal()
             }
-            Button("取消", role: .cancel) { pendingAction = nil }
+            Button(AppLocalization.text("取消"), role: .cancel) { pendingAction = nil }
         } message: {
-            Text("继续将替换当前草稿。")
+            Text(AppLocalization.text("继续将替换当前草稿。"))
         }
     }
 
@@ -216,16 +218,16 @@ private struct SoundPackSidebar: View {
                     symbolSize: 14
                 )
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("DIY 音色")
+                    Text(AppLocalization.text("DIY 音色"))
                         .font(.headline)
-                    Text("我的音色包")
+                    Text(AppLocalization.text("我的音色包"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Menu {
-                    Button("新建空白音色", action: onCreateBlank)
-                    Button("基于当前音色", action: onCreateBasedOnCurrent)
+                    Button(AppLocalization.text("新建空白音色"), action: onCreateBlank)
+                    Button(AppLocalization.text("基于当前音色"), action: onCreateBasedOnCurrent)
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -276,10 +278,10 @@ private struct SoundPackSidebar: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!editor.canExport || editor.isWorking || editor.isDirty)
-                .help(L10n.tr(editor.isDirty ? "请先保存当前修改，再导出音色包" : "导出当前音色包"))
+                .help(L10n.tr(editor.isDirty ? AppLocalization.text("请先保存当前修改，再导出音色包") : "导出当前音色包"))
 
                 if editor.canExport, editor.isDirty {
-                    Text("保存当前修改后即可导出")
+                    Text(AppLocalization.text("保存当前修改后即可导出"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -321,11 +323,11 @@ private struct SoundPackSidebarRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(pack.name)
                         .fontWeight(isSelected ? .semibold : .regular)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     Text("\(pack.family) · \(pack.tone)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
                 Spacer(minLength: 0)
             }
@@ -364,7 +366,7 @@ private struct SoundPackKeyboardWorkspace: View {
                 )
                 KeyboardSectionHeading("键盘映射", subtitle: instruction)
                 Spacer()
-                Picker("映射方式", selection: $editor.mappingMode) {
+                Picker(AppLocalization.text("映射方式"), selection: $editor.mappingMode) {
                     ForEach(SoundPackEditorMappingMode.allCases) { mode in
                         Text(mode.displayName).tag(mode)
                     }
@@ -430,12 +432,12 @@ private struct SoundPackInspector: View {
                     symbolSize: 14
                 )
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("检查器")
+                    Text(AppLocalization.text("检查器"))
                         .font(.headline)
                     Text(L10n.tr(inspectorContext))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsLines(2)
                 }
                 Spacer()
             }
@@ -450,7 +452,7 @@ private struct SoundPackInspector: View {
                     if editor.hasDraft {
                         mappingEditor
                     } else if editor.isWorking {
-                        ProgressView("正在载入…")
+                        ProgressView(L10n.tr("正在载入…"))
                             .frame(maxWidth: .infinity, minHeight: 180)
                     }
                 }
@@ -473,19 +475,19 @@ private struct SoundPackInspector: View {
 
                 HStack {
                     if editor.isDirty {
-                        Label("未保存", systemImage: "circle.fill")
+                        Label(AppLocalization.text("未保存"), systemImage: "circle.fill")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
 
                     Spacer()
 
-                    Button("保存") {
+                    Button(AppLocalization.text("保存")) {
                         Task { await editor.save(enableAfterSaving: false) }
                     }
                     .disabled(!editor.hasDraft || editor.isWorking)
 
-                    Button("保存并启用") {
+                    Button(AppLocalization.text("保存并启用")) {
                         Task { await editor.save(enableAfterSaving: true) }
                     }
                     .buttonStyle(.borderedProminent)
@@ -507,21 +509,21 @@ private struct SoundPackInspector: View {
         VStack(alignment: .leading, spacing: 11) {
             KeyboardSectionHeading("音色包信息", symbol: "info.circle")
             TextField(
-                "名称",
+                AppLocalization.text("名称"),
                 text: Binding(
                     get: { editor.manifest?.name ?? "" },
                     set: { editor.setName($0) }
                 )
             )
             TextField(
-                "作者（可选）",
+                AppLocalization.text("作者（可选）"),
                 text: Binding(
                     get: { editor.manifest?.author ?? "" },
                     set: { editor.setAuthor($0) }
                 )
             )
             TextField(
-                "备注（可选）",
+                AppLocalization.text("备注（可选）"),
                 text: Binding(
                     get: { editor.manifest?.notes ?? "" },
                     set: { editor.setNotes($0) }
@@ -555,14 +557,14 @@ private struct SoundPackInspector: View {
             )
         case .recommended:
             VStack(alignment: .leading, spacing: 10) {
-                Picker("映射区域", selection: $editor.recommendedSlot) {
-                    Section("行") {
+                Picker(AppLocalization.text("映射区域"), selection: $editor.recommendedSlot) {
+                    Section(AppLocalization.text("行")) {
                         ForEach(KeyboardRowID.allCases, id: \.self) { row in
                             Text(row.diyDisplayName)
                                 .tag(SoundPackEditorSlot.row(row))
                         }
                     }
-                    Section("特殊键") {
+                    Section(AppLocalization.text("特殊键")) {
                         ForEach(KeyboardSpecialKeyID.allCases, id: \.self) { special in
                             Text(special.displayName)
                                 .tag(SoundPackEditorSlot.special(special))
@@ -581,7 +583,7 @@ private struct SoundPackInspector: View {
             if let key = editor.selectedKey {
                 SoundPackPerKeyEditor(editor: editor, key: key, onImport: onImport)
             } else {
-                Text("请先在键盘上选择一个按键。")
+                Text(AppLocalization.text("请先在键盘上选择一个按键。"))
                     .foregroundStyle(.secondary)
             }
         }
@@ -615,7 +617,7 @@ private struct SoundPackSlotPairEditor: View {
             Button {
                 onImport(.completeKeystroke(slot))
             } label: {
-                Label("上传完整击键并自动拆分", systemImage: "scissors")
+                Label(AppLocalization.text("上传完整击键并自动拆分"), systemImage: "scissors")
                     .frame(maxWidth: .infinity)
             }
             .help(L10n.tr("适合一个文件同时包含按下与抬起声音的录音"))
@@ -654,16 +656,16 @@ private struct SoundPackPhaseAssignmentCard: View {
             Text(editor.assetLabel(assetID))
                 .font(.caption)
                 .foregroundStyle(assetID == nil ? .secondary : .primary)
-                .lineLimit(1)
+                .fitsSingleLine()
 
             HStack(spacing: 7) {
-                Button("导入音频") {
+                Button(AppLocalization.text("导入音频")) {
                     onImport(.audio(SoundPackEditorAudioTarget(slot: slot, phase: phase)))
                 }
 
-                Menu("已有音频") {
+                Menu(AppLocalization.text("已有音频")) {
                     if editor.assetChoices.isEmpty {
-                        Text("暂无已导入音频")
+                        Text(AppLocalization.text("暂无已导入音频"))
                     } else {
                         ForEach(editor.assetChoices) { asset in
                             Button(asset.originalFilename ?? String(asset.id.rawValue.prefix(10))) {
@@ -674,7 +676,7 @@ private struct SoundPackPhaseAssignmentCard: View {
                 }
 
                 if assetID != nil {
-                    Button("清除") {
+                    Button(AppLocalization.text("清除")) {
                         editor.setExistingAsset(nil, slot: slot, phase: phase)
                     }
                     .buttonStyle(.borderless)
@@ -708,7 +710,7 @@ private struct SoundPackPerKeyEditor: View {
             Button {
                 onImport(.completeKeystroke(.key(key.id)))
             } label: {
-                Label("上传完整击键并自动拆分", systemImage: "scissors")
+                Label(AppLocalization.text("上传完整击键并自动拆分"), systemImage: "scissors")
                     .frame(maxWidth: .infinity)
             }
         }
@@ -734,7 +736,7 @@ private struct SoundPackPerKeyEditor: View {
             }
 
             Picker(
-                "覆盖方式",
+                AppLocalization.text("覆盖方式"),
                 selection: Binding(
                     get: { editor.overrideChoice(for: key.id, phase: phase) },
                     set: { newChoice in
@@ -756,12 +758,12 @@ private struct SoundPackPerKeyEditor: View {
             if choice == .asset {
                 Text(editor.assetLabel(editor.assignmentAsset(for: slot, phase: phase)))
                     .font(.caption)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                 HStack {
-                    Button("更换音频") {
+                    Button(AppLocalization.text("更换音频")) {
                         onImport(.audio(SoundPackEditorAudioTarget(slot: slot, phase: phase)))
                     }
-                    Menu("已有音频") {
+                    Menu(AppLocalization.text("已有音频")) {
                         ForEach(editor.assetChoices) { asset in
                             Button(asset.originalFilename ?? String(asset.id.rawValue.prefix(10))) {
                                 editor.setExistingAsset(asset.id, slot: slot, phase: phase)
@@ -771,7 +773,7 @@ private struct SoundPackPerKeyEditor: View {
                 }
                 .controlSize(.small)
             } else {
-                Text(L10n.tr(choice == .inherit ? "沿用特殊键、所在行、通用音或基础音色。" : "这个阶段不播放声音。"))
+                Text(L10n.tr(choice == .inherit ? AppLocalization.text("沿用特殊键、所在行、通用音或基础音色。") : "这个阶段不播放声音。"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

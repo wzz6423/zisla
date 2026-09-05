@@ -1,4 +1,6 @@
 import AppKit
+import ZislaCore
+import ZislaKit
 import os.log
 import ScreenCaptureKit
 import SwiftUI
@@ -974,9 +976,9 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
     private func presentCaptureError(_ error: Error) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "截图失败"
+        alert.messageText = AppLocalization.text("截图失败")
         alert.informativeText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        alert.addButton(withTitle: "好")
+        alert.addButton(withTitle: AppLocalization.text("好"))
         alert.runModal()
     }
 }
@@ -1053,11 +1055,11 @@ struct ScreenshotSelectionView: View {
 
                 VStack {
                     HStack(spacing: 10) {
-                        Text("拖动选择截图区域")
+                        Text(AppLocalization.text("拖动选择截图区域"))
                             .font(.system(size: 13, weight: .semibold))
                         Spacer()
                         Button(action: onCancel) {
-                            Label("取消", systemImage: "xmark")
+                            Label(AppLocalization.text("取消"), systemImage: "xmark")
                         }
                             .buttonStyle(.bordered)
                     }
@@ -1152,7 +1154,7 @@ struct ScreenshotSelectionView: View {
             if isCopied {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
-                Text("已复制")
+                Text(AppLocalization.text("已复制"))
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.green)
             }

@@ -1,6 +1,7 @@
 import Dispatch
 import Foundation
 import SQLite3
+import ZislaCore
 
 private let clipboardSQLiteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
@@ -153,7 +154,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             nil
         )
         guard result == SQLITE_OK, let opened else {
-            let message = sqliteMessage(opened, fallback: "无法打开剪贴板数据库")
+            let message = sqliteMessage(opened, fallback: AppLocalization.text("无法打开剪贴板数据库"))
             sqlite3_close(opened)
             throw ClipboardHistoryDatabaseError(message: message)
         }
@@ -162,7 +163,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             try restrictDatabaseFilePermissions()
             guard sqlite3_busy_timeout(opened, 1_000) == SQLITE_OK else {
                 throw ClipboardHistoryDatabaseError(
-                    message: sqliteMessage(opened, fallback: "无法配置剪贴板数据库")
+                    message: sqliteMessage(opened, fallback: AppLocalization.text("无法配置剪贴板数据库"))
                 )
             }
             try execute("PRAGMA journal_mode = WAL", on: opened)
@@ -357,7 +358,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 return result
             default:
                 throw ClipboardHistoryDatabaseError(
-                    message: sqliteMessage(database, fallback: "无法重新分类文本")
+                    message: sqliteMessage(database, fallback: AppLocalization.text("无法重新分类文本"))
                 )
             }
         }
@@ -403,7 +404,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 return result
             default:
                 throw ClipboardHistoryDatabaseError(
-                    message: sqliteMessage(database, fallback: "无法迁移剪贴板分类")
+                    message: sqliteMessage(database, fallback: AppLocalization.text("无法迁移剪贴板分类"))
                 )
             }
         }
@@ -421,7 +422,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 return names
             default:
                 throw ClipboardHistoryDatabaseError(
-                    message: sqliteMessage(database, fallback: "无法读取剪贴板表结构")
+                    message: sqliteMessage(database, fallback: AppLocalization.text("无法读取剪贴板表结构"))
                 )
             }
         }
@@ -444,7 +445,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         try bind(query.values, to: countStatement, database: database)
         guard sqlite3_step(countStatement) == SQLITE_ROW else {
             throw ClipboardHistoryDatabaseError(
-                message: sqliteMessage(database, fallback: "无法统计剪贴板记录")
+                message: sqliteMessage(database, fallback: AppLocalization.text("无法统计剪贴板记录"))
             )
         }
         let totalCount = Int(sqlite3_column_int64(countStatement, 0))
@@ -488,7 +489,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 )
             default:
                 throw ClipboardHistoryDatabaseError(
-                    message: sqliteMessage(database, fallback: "无法读取剪贴板数据库")
+                    message: sqliteMessage(database, fallback: AppLocalization.text("无法读取剪贴板数据库"))
                 )
             }
         }
@@ -505,7 +506,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         defer { sqlite3_finalize(countStatement) }
         guard sqlite3_step(countStatement) == SQLITE_ROW else {
             throw ClipboardHistoryDatabaseError(
-                message: sqliteMessage(database, fallback: "无法统计剪贴板记录")
+                message: sqliteMessage(database, fallback: AppLocalization.text("无法统计剪贴板记录"))
             )
         }
         let totalCount = Int(sqlite3_column_int64(countStatement, 0))
@@ -548,7 +549,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 )
             default:
                 throw ClipboardHistoryDatabaseError(
-                    message: sqliteMessage(database, fallback: "无法读取最近剪贴板记录")
+                    message: sqliteMessage(database, fallback: AppLocalization.text("无法读取最近剪贴板记录"))
                 )
             }
         }
@@ -584,7 +585,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 return counts
             default:
                 throw ClipboardHistoryDatabaseError(
-                    message: sqliteMessage(database, fallback: "无法统计剪贴板分类")
+                    message: sqliteMessage(database, fallback: AppLocalization.text("无法统计剪贴板分类"))
                 )
             }
         }
@@ -712,7 +713,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             return false
         default:
             throw ClipboardHistoryDatabaseError(
-                message: sqliteMessage(database, fallback: "无法检查重复剪贴板记录")
+                message: sqliteMessage(database, fallback: AppLocalization.text("无法检查重复剪贴板记录"))
             )
         }
     }
@@ -861,7 +862,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         guard result == SQLITE_OK, let statement else {
             sqlite3_finalize(statement)
             throw ClipboardHistoryDatabaseError(
-                message: sqliteMessage(database, fallback: "无法准备剪贴板数据库操作")
+                message: sqliteMessage(database, fallback: AppLocalization.text("无法准备剪贴板数据库操作"))
             )
         }
         return statement
@@ -873,7 +874,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         defer { sqlite3_free(errorMessage) }
         guard result == SQLITE_OK else {
             let message = errorMessage.map { String(cString: $0) }
-                ?? sqliteMessage(database, fallback: "剪贴板数据库操作失败")
+                ?? sqliteMessage(database, fallback: AppLocalization.text("剪贴板数据库操作失败"))
             throw ClipboardHistoryDatabaseError(message: message)
         }
     }
@@ -919,7 +920,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
     ) throws {
         guard result == expected else {
             throw ClipboardHistoryDatabaseError(
-                message: sqliteMessage(database, fallback: "剪贴板数据库操作失败")
+                message: sqliteMessage(database, fallback: AppLocalization.text("剪贴板数据库操作失败"))
             )
         }
     }

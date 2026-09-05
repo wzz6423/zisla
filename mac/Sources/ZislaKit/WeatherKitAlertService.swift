@@ -201,7 +201,7 @@ public actor ChinaWeatherAlertService: OfficialWeatherAlertProviding {
             } ?? fallbackDetailURL
             return ZislaCore.WeatherAlert(
                 severity: severity(for: alert.w7),
-                source: "中国天气网（中国气象局）",
+                source: AppLocalization.text("中国天气网（中国气象局）"),
                 summary: alert.w13 ?? [alert.w5, alert.w7].compactMap { $0 }.joined(separator: " "),
                 region: region,
                 detailsURL: detailURL,

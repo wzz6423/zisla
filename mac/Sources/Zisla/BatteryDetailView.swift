@@ -67,8 +67,47 @@ struct LocalPowerFlowPresentation: Equatable {
     }
 }
 
+struct BatteryHistoryPresentation: Equatable {
+    let text: String?
+
+    init(
+        battery: BatterySnapshot,
+        lastUnpluggedAt: Date?,
+        now: Date,
+        locale: Locale = BatteryLocalization.defaultLocale
+    ) {
+        guard !battery.isCharging, !battery.isPluggedIn else {
+            text = nil
+            return
+        }
+
+        text = BatteryLocalization.historyText(
+            lastUnpluggedAt: lastUnpluggedAt,
+            now: now,
+            locale: locale
+        )
+    }
+
+    static func durationText(
+        from start: Date,
+        to end: Date,
+        locale: Locale = BatteryLocalization.defaultLocale
+    ) -> String {
+        BatteryLocalization.durationText(from: start, to: end, locale: locale)
+    }
+
+    static func durationText(
+        forMinutes minutes: Int,
+        locale: Locale = BatteryLocalization.defaultLocale
+    ) -> String {
+        BatteryLocalization.durationText(forMinutes: minutes, locale: locale)
+    }
+}
+
 private struct LocalPowerFlowView: View {
     let battery: BatterySnapshot
+
+    @Environment(\.locale) private var locale
 
     private var presentation: LocalPowerFlowPresentation {
         LocalPowerFlowPresentation(battery: battery)
@@ -96,7 +135,7 @@ private struct LocalPowerFlowView: View {
             endpointNode(
                 symbol: "powerplug.fill",
                 value: wattsText(presentation.inputWatts, wholeIfExact: true),
-                caption: presentation.inputIsRated ? "充电器额定" : "充电器输入",
+                caption: adapterInputTitle,
                 tint: .zislaWarning
             )
             .frame(width: 84)
@@ -126,7 +165,7 @@ private struct LocalPowerFlowView: View {
                     )
                     routeLabel(
                         watts: presentation.systemWatts,
-                        title: "系统使用"
+                        title: localized("系统使用")
                     )
                     .position(
                         x: proxy.size.width / 2,
@@ -149,7 +188,7 @@ private struct LocalPowerFlowView: View {
                     endpointNode(
                         symbol: "laptopcomputer",
                         value: nil,
-                        caption: "本机 Mac",
+                        caption: localized("本机 Mac"),
                         tint: .zislaInfo
                     )
                     .frame(height: availableHeight - upperHeight)
@@ -169,14 +208,14 @@ private struct LocalPowerFlowView: View {
                     endpointNode(
                         symbol: "powerplug.fill",
                         value: wattsText(presentation.inputWatts, wholeIfExact: true),
-                        caption: presentation.inputIsRated ? "充电器额定" : "充电器输入",
+                        caption: adapterInputTitle,
                         tint: .zislaWarning
                     )
                     .frame(height: upperHeight)
                     endpointNode(
                         symbol: battery.symbolName,
                         value: "\(battery.percentInt)%",
-                        caption: "电池供电",
+                        caption: localized("电池供电"),
                         tint: .zislaWarning
                     )
                     .frame(height: availableHeight - upperHeight)
@@ -203,7 +242,7 @@ private struct LocalPowerFlowView: View {
                 GeometryReader { proxy in
                     routeLabel(
                         watts: presentation.inputWatts,
-                        title: presentation.inputIsRated ? "充电器额定" : "充电器输入"
+                        title: adapterInputTitle
                     )
                     .position(
                         x: proxy.size.width / 2,
@@ -211,7 +250,7 @@ private struct LocalPowerFlowView: View {
                     )
                     routeLabel(
                         watts: presentation.batteryWatts,
-                        title: "电池供电"
+                        title: localized("电池供电")
                     )
                     .position(
                         x: proxy.size.width / 2,
@@ -223,7 +262,7 @@ private struct LocalPowerFlowView: View {
             endpointNode(
                 symbol: "laptopcomputer",
                 value: wattsText(presentation.systemWatts),
-                caption: "系统使用",
+                caption: localized("系统使用"),
                 tint: .zislaInfo
             )
             .frame(width: 84)
@@ -236,14 +275,14 @@ private struct LocalPowerFlowView: View {
             endpointNode(
                 symbol: "powerplug.fill",
                 value: wattsText(presentation.inputWatts, wholeIfExact: true),
-                caption: presentation.inputIsRated ? "充电器额定" : "充电器输入",
+                caption: adapterInputTitle,
                 tint: .zislaWarning
             )
             .frame(width: 84)
 
             simpleRouteLane(
                 watts: presentation.systemWatts,
-                title: "系统使用",
+                title: localized("系统使用"),
                 startTint: presentation.systemWatts == nil ? .secondary : .zislaWarning,
                 endTint: presentation.systemWatts == nil ? .secondary : .zislaInfo
             )
@@ -251,7 +290,7 @@ private struct LocalPowerFlowView: View {
             endpointNode(
                 symbol: "laptopcomputer",
                 value: nil,
-                caption: "本机 Mac",
+                caption: localized("本机 Mac"),
                 tint: .zislaInfo
             )
             .frame(width: 84)
@@ -264,14 +303,14 @@ private struct LocalPowerFlowView: View {
             endpointNode(
                 symbol: battery.symbolName,
                 value: "\(battery.percentInt)%",
-                caption: "电池供电",
+                caption: localized("电池供电"),
                 tint: batteryLevelTint
             )
             .frame(width: 84)
 
             simpleRouteLane(
                 watts: presentation.systemWatts,
-                title: "电池供电",
+                title: localized("电池供电"),
                 startTint: .zislaWarning,
                 endTint: .zislaInfo
             )
@@ -279,7 +318,7 @@ private struct LocalPowerFlowView: View {
             endpointNode(
                 symbol: "laptopcomputer",
                 value: nil,
-                caption: "本机 Mac",
+                caption: localized("本机 Mac"),
                 tint: .zislaInfo
             )
             .frame(width: 84)
@@ -401,11 +440,15 @@ private struct LocalPowerFlowView: View {
 
     private var batteryRouteTitle: String {
         switch presentation.batteryRoute {
-        case .charging: "充入电池"
-        case .supplying: "电池供电"
-        case .idle: "电池未参与"
-        case .unavailable: "电池功率"
+        case .charging: localized("充入电池")
+        case .supplying: localized("电池供电")
+        case .idle: localized("电池未参与")
+        case .unavailable: localized("电池功率")
         }
+    }
+
+    private var adapterInputTitle: String {
+        localized(presentation.inputIsRated ? "充电器额定" : "充电器输入")
     }
 
     private var batteryRouteTint: Color {
@@ -426,26 +469,33 @@ private struct LocalPowerFlowView: View {
     private func wattsText(_ watts: Double?, wholeIfExact: Bool = false) -> String {
         guard let watts else { return "-- W" }
         if wholeIfExact, abs(watts.rounded() - watts) < 0.15 {
-            return String(format: "%.0f W", watts)
+            return BatteryLocalization.number("%.0f W", locale: locale, watts)
         }
         if abs(watts) < 10 {
-            return String(format: "%.2f W", watts)
+            return BatteryLocalization.number("%.2f W", locale: locale, watts)
         }
-        return String(format: "%.1f W", watts)
+        return BatteryLocalization.number("%.1f W", locale: locale, watts)
     }
 
     private var accessibilityText: String {
-        let inputKind = presentation.inputIsRated ? "充电器额定功率" : "充电器实时输入"
+        let mac = localized("本机 Mac")
+        let localBattery = localized("本机电池")
+        let systemLoad = localized("系统使用")
+        let percent = "\(battery.percentInt)%"
         switch presentation.topology {
         case .batteryToMac:
-            return "本机功率流，电池\(battery.percentInt)%，系统使用\(wattsText(presentation.systemWatts))"
+            return "\(mac), \(localized("电池供电")) \(percent), \(systemLoad) \(wattsText(presentation.systemWatts))"
         case .adapterSplit:
-            return "本机功率流，\(inputKind)\(wattsText(presentation.inputWatts))，电池\(battery.percentInt)%，\(batteryRouteTitle)\(wattsText(presentation.batteryWatts))，系统使用\(wattsText(presentation.systemWatts))"
+            return "\(mac), \(adapterInputTitle) \(wattsText(presentation.inputWatts)), \(localBattery) \(percent), \(batteryRouteTitle) \(wattsText(presentation.batteryWatts)), \(systemLoad) \(wattsText(presentation.systemWatts))"
         case .adapterAndBatteryMerge:
-            return "本机功率流，\(inputKind)\(wattsText(presentation.inputWatts))，电池\(battery.percentInt)%供电\(wattsText(presentation.batteryWatts))，合流后系统使用\(wattsText(presentation.systemWatts))"
+            return "\(mac), \(adapterInputTitle) \(wattsText(presentation.inputWatts)), \(localized("电池供电")) \(percent) \(wattsText(presentation.batteryWatts)), \(systemLoad) \(wattsText(presentation.systemWatts))"
         case .adapterToMac:
-            return "本机功率流，\(inputKind)\(wattsText(presentation.inputWatts))，电池\(battery.percentInt)%，\(batteryRouteTitle)，系统使用\(wattsText(presentation.systemWatts))"
+            return "\(mac), \(adapterInputTitle) \(wattsText(presentation.inputWatts)), \(localBattery) \(percent), \(batteryRouteTitle), \(systemLoad) \(wattsText(presentation.systemWatts))"
         }
+    }
+
+    private func localized(_ key: String) -> String {
+        BatteryLocalization.string(key, locale: locale)
     }
 }
 
@@ -517,6 +567,7 @@ struct BatteryDetailView: View {
     var onContentHeightChange: (CGFloat) -> Void = { _ in }
 
     @State private var contentHeight = IslandModuleLayout.batteryMaximumContentHeight
+    @Environment(\.locale) private var locale
 
     private var deviceCardShape: UnevenRoundedRectangle {
         IslandSurfaceGeometry.moduleContentShape(
@@ -575,10 +626,11 @@ struct BatteryDetailView: View {
     private func localBatterySection(_ battery: BatterySnapshot) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label("本机电池", systemImage: "laptopcomputer")
+                Label(localized("本机电池"), systemImage: "laptopcomputer")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer(minLength: 8)
-                Text(statusText(battery))
+                batteryHistoryView(for: battery)
+                Text(BatteryLocalization.summaryStatusText(battery, locale: locale))
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 4) {
@@ -592,7 +644,7 @@ struct BatteryDetailView: View {
                     Image(systemName: "leaf.fill")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(Color.zislaSuccess)
-                        .help("低电量模式已开启")
+                        .help(localized("低电量模式已开启"))
                 }
             }
 
@@ -602,10 +654,35 @@ struct BatteryDetailView: View {
             if let minutes = battery.timeRemainingMinutes {
                 overviewRow(
                     symbol: "clock",
-                    label: battery.isCharging ? "距离充满" : "预计可用",
+                    label: localized(battery.isCharging ? "距离充满" : "预计可用"),
                     value: timeRemainingText(minutes)
                 )
                 .padding(.horizontal, 2)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func batteryHistoryView(for battery: BatterySnapshot) -> some View {
+        if !battery.isCharging,
+           !battery.isPluggedIn,
+           batteryMonitor.lastUnpluggedAt != nil {
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                let presentation = BatteryHistoryPresentation(
+                    battery: battery,
+                    lastUnpluggedAt: batteryMonitor.lastUnpluggedAt,
+                    now: context.date,
+                    locale: locale
+                )
+                if let text = presentation.text {
+                    Text(text)
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .layoutPriority(1)
+                }
             }
         }
     }
@@ -616,49 +693,57 @@ struct BatteryDetailView: View {
             spacing: 8
         ) {
             metricTile(
-                title: "健康度",
+                title: localized("健康度"),
                 value: battery.healthPercent.map { "\($0)%" } ?? "--",
                 symbol: "heart.fill",
                 tint: battery.healthPercent.map(healthTint) ?? .secondary
             )
             metricTile(
-                title: "循环次数",
+                title: localized("循环次数"),
                 value: battery.cycleCount.map(String.init) ?? "--",
                 symbol: "arrow.triangle.2.circlepath"
             )
             metricTile(
-                title: "温度",
-                value: battery.temperatureCelsius.map { String(format: "%.1f°C", $0) } ?? "--",
+                title: localized("温度"),
+                value: battery.temperatureCelsius.map {
+                    BatteryLocalization.number("%.1f°C", locale: locale, $0)
+                } ?? "--",
                 symbol: "thermometer.medium"
             )
             metricTile(
-                title: "最大容量",
+                title: localized("最大容量"),
                 value: battery.maxCapacityMAh.map { "\($0) mAh" } ?? "--",
                 symbol: "battery.100percent"
             )
             metricTile(
-                title: "设计容量",
+                title: localized("设计容量"),
                 value: battery.designCapacityMAh.map { "\($0) mAh" } ?? "--",
                 symbol: "ruler"
             )
             metricTile(
-                title: "当前电量",
+                title: localized("当前电量"),
                 value: battery.currentCapacityMAh.map { "\($0) mAh" } ?? "--",
                 symbol: "battery.50percent"
             )
             metricTile(
-                title: "电流",
-                value: battery.currentMilliamps.map { String(format: "%.2f A", $0 / 1_000) } ?? "--",
+                title: localized("电流"),
+                value: battery.currentMilliamps.map {
+                    BatteryLocalization.number("%.2f A", locale: locale, $0 / 1_000)
+                } ?? "--",
                 symbol: "waveform.path.ecg"
             )
             metricTile(
-                title: "电压",
-                value: battery.voltageVolts.map { String(format: "%.2f V", $0) } ?? "--",
+                title: localized("电压"),
+                value: battery.voltageVolts.map {
+                    BatteryLocalization.number("%.2f V", locale: locale, $0)
+                } ?? "--",
                 symbol: "bolt.circle"
             )
             metricTile(
-                title: "充电器额定",
-                value: battery.adapterRatedWatts.map { String(format: "%.0f W", $0) } ?? "--",
+                title: localized("充电器额定"),
+                value: battery.adapterRatedWatts.map {
+                    BatteryLocalization.number("%.0f W", locale: locale, $0)
+                } ?? "--",
                 symbol: "powerplug.fill"
             )
         }
@@ -674,7 +759,7 @@ struct BatteryDetailView: View {
             Label(title, systemImage: symbol)
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
+                .fitsSingleLine()
             Text(value)
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(tint)
@@ -700,7 +785,7 @@ struct BatteryDetailView: View {
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label("设备电量", systemImage: "rectangle.stack.badge.person.crop")
+                Label(localized("设备电量"), systemImage: "rectangle.stack.badge.person.crop")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
                 if networkMonitor.isScanning {
@@ -716,17 +801,17 @@ struct BatteryDetailView: View {
                             .frame(width: 24, height: 24)
                     }
                     .buttonStyle(.plain)
-                    .help("刷新设备电量")
-                    .accessibilityLabel("刷新设备电量")
+                    .help(localized("刷新设备电量"))
+                    .accessibilityLabel(localized("刷新设备电量"))
                 }
             }
 
             if devices.isEmpty {
-                ContentUnavailableView(
-                    "未发现其他设备",
-                    systemImage: "battery.0percent",
-                    description: Text("当前没有 macOS 可读取的蓝牙设备或已信任的 Apple 移动设备")
-                )
+                ContentUnavailableView {
+                    Label(localized("未发现其他设备"), systemImage: "battery.0percent")
+                } description: {
+                    Text(localized("当前没有 macOS 可读取的蓝牙设备或已信任的 Apple 移动设备"))
+                }
                 .frame(maxWidth: .infinity, minHeight: 112)
             } else if devices.count <= 2 {
                 VStack(spacing: 0) {
@@ -790,14 +875,14 @@ struct BatteryDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(device.name)
                     .font(.system(size: 11, weight: .semibold))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
                     .help(device.name)
                 HStack(spacing: 4) {
                     Image(systemName: device.source.symbolName)
                         .font(.system(size: 8, weight: .semibold))
                     Text(deviceSubtitle(device))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
@@ -841,7 +926,7 @@ struct BatteryDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(device.name)
                     .font(.system(size: 10, weight: .semibold))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
                     .help(device.name)
 
@@ -849,7 +934,7 @@ struct BatteryDetailView: View {
                     Image(systemName: device.source.symbolName)
                         .font(.system(size: 8, weight: .semibold))
                     Text(deviceSubtitle(device))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
                 .font(.system(size: 8))
                 .foregroundStyle(.secondary)
@@ -895,9 +980,9 @@ struct BatteryDetailView: View {
                 .font(.system(size: 28))
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
-                Text("此 Mac 无内置电池")
+                Text(localized("此 Mac 无内置电池"))
                     .font(.system(size: 12, weight: .semibold))
-                Text("仍会显示可读取电量的蓝牙设备和已信任的 Apple 移动设备")
+                Text(localized("仍会显示可读取电量的蓝牙设备和已信任的 Apple 移动设备"))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
@@ -925,38 +1010,36 @@ struct BatteryDetailView: View {
             Text(value)
                 .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .lineLimit(1)
+                .fitsSingleLine()
         }
-    }
-
-    private func statusText(_ battery: BatterySnapshot) -> String {
-        if battery.isCharged { return "已充满" }
-        if battery.isCharging { return "充电中" }
-        if battery.isPluggedIn { return "电源已接通" }
-        return "使用电池"
     }
 
     private func deviceSubtitle(_ device: NetworkBatteryDevice) -> String {
-        var parts = [device.source.displayName, device.deviceType.displayName]
+        var parts = [
+            BatteryLocalization.sourceName(device.source, locale: locale),
+            BatteryLocalization.deviceTypeName(device.deviceType, locale: locale),
+        ]
         if let parentName = device.parentName {
-            parts.append("通过 \(parentName)")
+            parts.append("\(localized("通过")) \(parentName)")
         }
         if let detail = device.connectionDetail {
-            parts.append(detail)
+            parts.append(BatteryLocalization.metadataText(detail, locale: locale))
         }
         return parts.joined(separator: " · ")
     }
 
     private func componentText(_ components: [BatteryLevelComponent]) -> String {
         components
-            .map { "\($0.kind.displayName) \($0.percentInt)%" }
+            .map {
+                "\(BatteryLocalization.componentName($0.kind, locale: locale)) \($0.percentInt)%"
+            }
             .joined(separator: " · ")
     }
 
     private func deviceAccessibilityLabel(_ device: NetworkBatteryDevice) -> String {
         var parts = [device.name, "\(device.batteryPercentInt)%"]
         if device.isCharging {
-            parts.append("正在充电")
+            parts.append(localized("正在充电"))
         }
         if !device.components.isEmpty {
             parts.append(componentText(device.components))
@@ -965,10 +1048,11 @@ struct BatteryDetailView: View {
     }
 
     private func timeRemainingText(_ minutes: Int) -> String {
-        let hours = minutes / 60
-        let remainder = minutes % 60
-        if hours > 0 { return "\(hours)小时\(remainder)分" }
-        return "\(remainder)分钟"
+        BatteryHistoryPresentation.durationText(forMinutes: minutes, locale: locale)
+    }
+
+    private func localized(_ key: String) -> String {
+        BatteryLocalization.string(key, locale: locale)
     }
 
     private func batteryLevelTint(_ level: Double) -> Color {

@@ -1,8 +1,11 @@
+import ZislaCore
 import ZislaKit
 import SwiftUI
 
 struct LockScreenModuleView: View {
     @ObservedObject var model: AppModel
+
+    @Environment(\.locale) private var locale
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -39,11 +42,15 @@ struct LockScreenModuleView: View {
             if let battery = model.battery.snapshot {
                 statusItem(
                     symbol: battery.symbolName,
-                    title: "电量",
+                    title: BatteryLocalization.string("电量", locale: locale),
                     value: "\(battery.percentInt)% · \(batteryDetail(battery))"
                 )
             } else {
-                statusItem(symbol: "battery.0", title: "电量", value: "未检测到内置电池")
+                statusItem(
+                    symbol: "battery.0",
+                    title: BatteryLocalization.string("电量", locale: locale),
+                    value: BatteryLocalization.string("未检测到内置电池", locale: locale)
+                )
             }
         }
     }
@@ -73,29 +80,25 @@ struct LockScreenModuleView: View {
                     .foregroundStyle(.secondary)
                 Text(value)
                     .font(.system(size: 11, weight: .semibold))
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
         }
     }
 
     private func batteryDetail(_ battery: BatterySnapshot) -> String {
-        if battery.isCharging { return "充电中" }
-        if battery.isCharged { return "已充满" }
-        if battery.isPluggedIn { return "已接通电源" }
-        if let minutes = battery.timeRemainingMinutes { return "剩余 \(minutes) 分钟" }
-        return "电池供电"
+        BatteryLocalization.detailStatusText(battery, locale: locale)
     }
 
     private func solarDateText(for date: Date) -> String {
         let components = Calendar.current.dateComponents([.year, .month, .day, .weekday], from: date)
-        let weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+        let weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"].map(AppLocalization.text)
         let weekday = components.weekday.flatMap { weekdays.indices.contains($0 - 1) ? weekdays[$0 - 1] : nil }
             ?? ""
-        return "\(components.year ?? 0)年\(components.month ?? 0)月\(components.day ?? 0)日 \(weekday)"
+        return AppLocalization.text("%ld年%ld月%ld日 %@", components.year ?? 0, components.month ?? 0, components.day ?? 0, weekday)
     }
 
     private func lunarDateText(for date: Date) -> String {
-        LunarCalendar.components(from: date)?.fullText ?? "农历日期未知"
+        LunarCalendar.components(from: date)?.fullText ?? AppLocalization.text("农历日期未知")
     }
 
     private var lockScreenMessage: String {

@@ -48,6 +48,11 @@ struct SideNoticeLayoutTests {
 
         suppression.isVoiceRecording = false
         #expect(!suppression.hidesNotices)
+
+        suppression.isTransientNoticePresented = true
+        #expect(suppression.hidesNotices)
+        suppression.isTransientNoticePresented = false
+        #expect(!suppression.hidesNotices)
     }
 
     @Test

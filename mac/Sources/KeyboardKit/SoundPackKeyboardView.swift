@@ -1,4 +1,6 @@
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 enum SoundPackKeyboardPalette {
     static func color(for row: KeyboardRowID) -> Color {
@@ -363,7 +365,7 @@ private struct SoundPackKeycapBody: View {
         .animation(.easeOut(duration: 0.08), value: isPointerDown)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(key.label)
-        .accessibilityValue(L10n.tr(hasOverride ? "已设置单键覆盖" : "继承映射"))
+        .accessibilityValue(L10n.tr(hasOverride ? AppLocalization.text("已设置单键覆盖") : "继承映射"))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction {
             guard key.isAssignable else { return }

@@ -1,6 +1,7 @@
 import Combine
 import EventKit
 import Foundation
+import ZislaCore
 
 public enum CalendarItemKind: Equatable, Sendable {
     case event
@@ -210,7 +211,7 @@ public final class CalendarService: ObservableObject {
                 completeRefresh(
                     with: [],
                     generation: generation,
-                    errorDescription: "未授予日历或提醒事项访问权限"
+                    errorDescription: AppLocalization.text("未授予日历或提醒事项访问权限")
                 )
                 return
             }
@@ -225,7 +226,7 @@ public final class CalendarService: ObservableObject {
                 completeRefresh(
                     with: [],
                     generation: generation,
-                    errorDescription: "无法计算日程查询范围"
+                    errorDescription: AppLocalization.text("无法计算日程查询范围")
                 )
                 return
             }
@@ -242,7 +243,7 @@ public final class CalendarService: ObservableObject {
                     let identifier = $0.eventIdentifier ?? "untitled"
                     return CalendarEventSnapshot(
                         id: "event:\(identifier):\($0.startDate.timeIntervalSince1970)",
-                        title: $0.title?.isEmpty == false ? $0.title : "未命名日程",
+                        title: $0.title?.isEmpty == false ? $0.title : AppLocalization.text("未命名日程"),
                         startDate: $0.startDate,
                         endDate: $0.endDate,
                         isAllDay: $0.isAllDay,
@@ -468,7 +469,7 @@ public final class CalendarService: ObservableObject {
                     : occurrenceDate
                 return CalendarEventSnapshot(
                     id: "reminder:\(reminder.calendarItemIdentifier):\(occurrenceDate.timeIntervalSince1970)",
-                    title: reminder.title?.isEmpty == false ? reminder.title : "未命名提醒",
+                    title: reminder.title?.isEmpty == false ? reminder.title : AppLocalization.text("未命名提醒"),
                     startDate: occurrenceDate,
                     endDate: endDate,
                     isAllDay: due.isAllDay,

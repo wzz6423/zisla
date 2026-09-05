@@ -87,8 +87,8 @@ struct KeyboardSoundModuleViewTests {
         #expect(historySource.contains("AxisMarks(values: axisDates)"))
         #expect(historySource.contains("AxisValueLabel(anchor: .top, collisionResolution: .disabled)"))
         // Both curves are LineMarks and need separate series values so Charts does not merge them.
-        #expect(historySource.contains(#"series: .value("系列", "字符数")"#))
-        #expect(historySource.contains(#"series: .value("系列", "峰值")"#))
+        #expect(historySource.contains(#"series: .value(AppLocalization.text("系列"), AppLocalization.text("字符数"))"#))
+        #expect(historySource.contains(#"series: .value(AppLocalization.text("系列"), AppLocalization.text("峰值"))"#))
         let historyLineMarkCount = historySource.components(separatedBy: "LineMark(").count - 1
         let historySeriesCount = historySource.components(separatedBy: "series: .value(").count - 1
         #expect(historyLineMarkCount == 2)
@@ -118,7 +118,7 @@ struct KeyboardSoundModuleViewTests {
         #expect(keyboardCountBody.contains("Self.compactCountText(count)"))
         #expect(keyboardCountBody.contains(".font(.system(size: 10, weight: .semibold, design: .monospaced))"))
         #expect(keyboardCountBody.contains(".accessibilityValue(count.formatted(.number))"))
-        #expect(dashboardSource.contains("keyboardCount(\"累计按键\", summary.allTimeKeyPressCount)\n                Spacer()"))
+        #expect(dashboardSource.contains("keyboardCount(AppLocalization.text(\"累计按键\"), summary.allTimeKeyPressCount)\n                Spacer()"))
 
         let modules = IslandModule.allCases
         let aiIndex = try #require(modules.firstIndex(of: .aiMonitor))
@@ -153,7 +153,7 @@ struct KeyboardSoundModuleViewTests {
         #expect(!dashboardSource.contains("Double(allTimeCount) / Double(maximum)"))
 
         #expect(dashboardSource.contains("if !compact, key.keyCode != nil {"))
-        #expect(dashboardSource.contains(#"今日 \(todayCount.formatted(.number))，累计 \(allTimeCount.formatted(.number))"#))
+        #expect(dashboardSource.contains(#"AppLocalization.text("今日 %@，累计 %@", todayCount.formatted(.number), allTimeCount.formatted(.number))"#))
         #expect(dashboardSource.contains(#"} ?? "")"#))
     }
 

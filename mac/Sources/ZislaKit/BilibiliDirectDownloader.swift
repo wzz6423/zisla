@@ -17,11 +17,11 @@ public enum BilibiliDirectDownloaderError: LocalizedError, Equatable, Sendable {
         case .invalidVideoURL:
             return "无法从链接中识别 B 站 BV 号"
         case let .invalidAPIResponse(message):
-            return "B站接口返回异常：\(message)"
+            return AppLocalization.text("B站接口返回异常：%@", message)
         case .missingDASHTracks:
             return "B站接口未返回可封装的 DASH 视频轨和音频轨"
         case let .mediaDownloadFailed(message):
-            return "B站媒体轨下载失败：\(message)"
+            return AppLocalization.text("B站媒体轨下载失败：%@", message)
         }
     }
 }
@@ -150,7 +150,7 @@ public struct BilibiliDirectDownloader: BilibiliDownloading, Sendable {
         let candidates = ([track.baseURL] + track.backupURLs)
             .compactMap(URL.init(string:))
             .filter { $0.scheme?.lowercased() == "https" }
-        var lastFailure = "没有可用的 HTTPS 媒体地址"
+        var lastFailure = AppLocalization.text("没有可用的 HTTPS 媒体地址")
 
         for url in candidates {
             try Task.checkCancellation()
@@ -162,7 +162,7 @@ public struct BilibiliDirectDownloader: BilibiliDownloading, Sendable {
                 if (200..<300).contains(response.statusCode) {
                     return
                 }
-                lastFailure = "\(url.host ?? "B站 CDN") 返回 HTTP \(response.statusCode)"
+                lastFailure = AppLocalization.text("%@ 返回 HTTP %ld", url.host ?? "B站 CDN", response.statusCode)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -225,7 +225,7 @@ private struct URLSessionBilibiliHTTPClient: BilibiliHTTPClient, Sendable {
     func data(for request: URLRequest) async throws -> BilibiliHTTPDataResponse {
         let (data, response) = try await session.data(for: request)
         guard let response = response as? HTTPURLResponse else {
-            throw BilibiliDirectDownloaderError.invalidAPIResponse("无效 HTTP 响应")
+            throw BilibiliDirectDownloaderError.invalidAPIResponse(AppLocalization.text("无效 HTTP 响应"))
         }
         return BilibiliHTTPDataResponse(data: data, statusCode: response.statusCode)
     }
@@ -236,7 +236,7 @@ private struct URLSessionBilibiliHTTPClient: BilibiliHTTPClient, Sendable {
         let (temporaryURL, response) = try await session.download(for: request)
         defer { try? FileManager.default.removeItem(at: temporaryURL) }
         guard let response = response as? HTTPURLResponse else {
-            throw BilibiliDirectDownloaderError.invalidAPIResponse("无效 HTTP 响应")
+            throw BilibiliDirectDownloaderError.invalidAPIResponse(AppLocalization.text("无效 HTTP 响应"))
         }
         guard (200..<300).contains(response.statusCode) else {
             return BilibiliHTTPResponse(statusCode: response.statusCode)

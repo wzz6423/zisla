@@ -1,4 +1,6 @@
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 @MainActor
 struct UpdateSection: View {
@@ -29,27 +31,27 @@ struct UpdateSection: View {
         switch controller.automaticCheckPreference {
         case .undecided:
             VStack(alignment: .leading, spacing: 8) {
-                Label("允许打开菜单时检查更新？", systemImage: "arrow.triangle.2.circlepath")
+                Label(AppLocalization.text("允许打开菜单时检查更新？"), systemImage: "arrow.triangle.2.circlepath")
                     .font(.subheadline.weight(.semibold))
                 privacyText
                 HStack {
-                    Button("开启") { controller.enableAutomaticChecks() }
+                    Button(AppLocalization.text("开启")) { controller.enableAutomaticChecks() }
                         .buttonStyle(.borderedProminent)
-                    Button("暂不开启") { controller.disableAutomaticChecks() }
+                    Button(AppLocalization.text("暂不开启")) { controller.disableAutomaticChecks() }
                         .buttonStyle(.bordered)
                 }
             }
 
         case .enabled, .disabled:
             VStack(alignment: .leading, spacing: 6) {
-                Toggle("打开菜单时自动检查", isOn: automaticCheckBinding)
+                Toggle(AppLocalization.text("打开菜单时自动检查"), isOn: automaticCheckBinding)
                 privacyText
             }
         }
     }
 
     private var privacyText: some View {
-        Text("自动请求至少间隔 5 分钟，手动检查至少间隔 65 秒；不会上传按键、输入内容或音色设置。")
+        Text(AppLocalization.text("自动请求至少间隔 5 分钟，手动检查至少间隔 65 秒；不会上传按键、输入内容或音色设置。"))
             .font(.caption2)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -90,7 +92,7 @@ struct UpdateSection: View {
                 .font(.caption)
             }
         } else {
-            Text("尚未检查更新")
+            Text(AppLocalization.text("尚未检查更新"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -125,7 +127,7 @@ struct UpdateSection: View {
             Button {
                 openURL(release.releaseURL)
             } label: {
-                Label("改为 GitHub 手动下载", systemImage: "arrow.up.right.square")
+                Label(AppLocalization.text("改为 GitHub 手动下载"), systemImage: "arrow.up.right.square")
             }
             .buttonStyle(.bordered)
 
@@ -134,7 +136,7 @@ struct UpdateSection: View {
             Button {
                 openURL(release.releaseURL)
             } label: {
-                Label("前往 GitHub 下载", systemImage: "arrow.up.right.square")
+                Label(AppLocalization.text("前往 GitHub 下载"), systemImage: "arrow.up.right.square")
             }
             .buttonStyle(.borderedProminent)
         }
@@ -144,7 +146,7 @@ struct UpdateSection: View {
         Button {
             controller.installAvailableUpdate()
         } label: {
-            Label("一键更新并重启", systemImage: "arrow.down.app.fill")
+            Label(AppLocalization.text("一键更新并重启"), systemImage: "arrow.down.app.fill")
         }
         .buttonStyle(.borderedProminent)
         .disabled(!controller.canInstallAvailableUpdate)
@@ -169,14 +171,14 @@ struct UpdateSection: View {
     private func installerUnavailableLabel(_ reason: AppUpdateInstallerUnavailability) -> some View {
         switch reason {
         case .developmentBuild:
-            Label("开发构建不执行应用内更新", systemImage: "hammer")
+            Label(AppLocalization.text("开发构建不执行应用内更新"), systemImage: "hammer")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         case .notConfigured:
-            Label("应用内更新源尚未配置", systemImage: "wrench.and.screwdriver")
+            Label(AppLocalization.text("应用内更新源尚未配置"), systemImage: "wrench.and.screwdriver")
                 .failureCaptionStyle()
         case .invalidConfiguration:
-            Label("应用内更新签名配置无效", systemImage: "exclamationmark.shield.fill")
+            Label(AppLocalization.text("应用内更新签名配置无效"), systemImage: "exclamationmark.shield.fill")
                 .failureCaptionStyle()
         case let .startupFailed(message):
             Label(
@@ -192,12 +194,12 @@ struct UpdateSection: View {
             if controller.state.isChecking {
                 ProgressView()
                     .controlSize(.small)
-                Text("正在检查…")
+                Text(AppLocalization.text("正在检查…"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button("检查更新") { controller.checkManually() }
+            Button(AppLocalization.text("检查更新")) { controller.checkManually() }
                 .buttonStyle(.bordered)
                 .disabled(controller.state.isChecking || controller.installationState.isActive)
         }
@@ -207,10 +209,10 @@ struct UpdateSection: View {
     private func failureLabel(_ failure: UpdateCheckFailure) -> some View {
         switch failure {
         case .offline:
-            Label("当前离线，稍后可重试", systemImage: "wifi.slash")
+            Label(AppLocalization.text("当前离线，稍后可重试"), systemImage: "wifi.slash")
                 .failureCaptionStyle()
         case .timedOut:
-            Label("连接 GitHub 超时，稍后可重试", systemImage: "clock.badge.exclamationmark")
+            Label(AppLocalization.text("连接 GitHub 超时，稍后可重试"), systemImage: "clock.badge.exclamationmark")
                 .failureCaptionStyle()
         case let .requestedTooSoon(retryAt):
             Label {
@@ -241,16 +243,16 @@ struct UpdateSection: View {
             }
             .failureCaptionStyle()
         case .noPublishedRelease:
-            Label("GitHub 上暂时没有公开版本", systemImage: "shippingbox")
+            Label(AppLocalization.text("GitHub 上暂时没有公开版本"), systemImage: "shippingbox")
                 .failureCaptionStyle()
         case .apiVersionRetired:
-            Label("更新服务需要升级，请稍后手动查看 GitHub", systemImage: "exclamationmark.arrow.triangle.2.circlepath")
+            Label(AppLocalization.text("更新服务需要升级，请稍后手动查看 GitHub"), systemImage: "exclamationmark.arrow.triangle.2.circlepath")
                 .failureCaptionStyle()
         case .invalidInstalledVersion, .invalidResponse:
-            Label("版本信息格式异常", systemImage: "exclamationmark.triangle")
+            Label(AppLocalization.text("版本信息格式异常"), systemImage: "exclamationmark.triangle")
                 .failureCaptionStyle()
         case .serverUnavailable:
-            Label("暂时无法连接 GitHub，稍后可重试", systemImage: "network.slash")
+            Label(AppLocalization.text("暂时无法连接 GitHub，稍后可重试"), systemImage: "network.slash")
                 .failureCaptionStyle()
         }
     }

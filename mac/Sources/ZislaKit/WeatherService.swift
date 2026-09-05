@@ -147,7 +147,7 @@ public actor WeatherService {
             throw CancellationError()
         } catch {
             officialAlerts = []
-            alertErrorDescription = "无法读取官方天气预警：\(error.localizedDescription)"
+            alertErrorDescription = AppLocalization.text("无法读取官方天气预警：%@", error.localizedDescription)
         }
         return WeatherSnapshot(
             temperature: decoded.current.temperature,

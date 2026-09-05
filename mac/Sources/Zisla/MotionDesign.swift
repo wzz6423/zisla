@@ -1,5 +1,6 @@
 import SwiftUI
 import ZislaCore
+import ZislaKit
 
 /// Zisla's motion system: spring tokens, button press feedback, directional module
 /// transitions, and the island's ambient light effects.
@@ -633,7 +634,7 @@ struct IslandOutlinedPicker<Option: Hashable>: View {
                 Image(systemName: symbol(option))
             }
             AppLocalizedText(title(option))
-                .lineLimit(1)
+                .fitsSingleLine()
         }
         .font(.system(size: fontSize, weight: isSelected ? .semibold : .medium))
         .frame(maxWidth: .infinity, minHeight: height - 6)

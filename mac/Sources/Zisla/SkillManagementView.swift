@@ -15,7 +15,7 @@ struct SkillManagementView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Skills")
                         .font(.system(size: 11, weight: .semibold))
-                    Text("统一存储并同步到已启用的 CLI")
+                    Text(AppLocalization.text("统一存储并同步到已启用的 CLI"))
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                 }
@@ -26,13 +26,13 @@ struct SkillManagementView: View {
                     Image(systemName: "arrow.triangle.2.circlepath")
                 }
                 .buttonStyle(.borderless)
-                .help("立即同步 Skills")
+                .help(AppLocalization.text("立即同步 Skills"))
             }
 
             skillLibraryRow
 
             VStack(alignment: .leading, spacing: 5) {
-                Text("同步方式")
+                Text(AppLocalization.text("同步方式"))
                     .font(.system(size: 10, weight: .medium))
                 syncModePicker
                 Text(agent.store.state.skillSyncConfiguration.mode.detail)
@@ -41,7 +41,7 @@ struct SkillManagementView: View {
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("同步目标")
+                Text(AppLocalization.text("同步目标"))
                     .font(.system(size: 10, weight: .medium))
                     .padding(.bottom, 4)
                 ForEach(AgentSkillSyncDestination.allCases, id: \.self) { destination in
@@ -58,22 +58,22 @@ struct SkillManagementView: View {
             skillsList
         }
         .alert(
-            "卸载 Skill？",
+            AppLocalization.text("卸载 Skill？"),
             isPresented: Binding(
                 get: { pendingUninstallSkill != nil },
                 set: { if !$0 { pendingUninstallSkill = nil } }
             ),
             presenting: pendingUninstallSkill
         ) { skill in
-            Button("卸载", role: .destructive) {
+            Button(AppLocalization.text("卸载"), role: .destructive) {
                 pendingUninstallSkill = nil
                 uninstallSkill(skill)
             }
-            Button("取消", role: .cancel) {
+            Button(AppLocalization.text("取消"), role: .cancel) {
                 pendingUninstallSkill = nil
             }
         } message: { _ in
-            Text("普通 Skill 会移到废纸篓；由 npm、pnpm、yarn、bun 或 Homebrew 全局安装的 Skill 会调用对应包管理器卸载。")
+            Text(AppLocalization.text("普通 Skill 会移到废纸篓；由 npm、pnpm、yarn、bun 或 Homebrew 全局安装的 Skill 会调用对应包管理器卸载。"))
         }
     }
 
@@ -82,12 +82,12 @@ struct SkillManagementView: View {
             Image(systemName: "folder.badge.gearshape")
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 1) {
-                Text("受管库")
+                Text(AppLocalization.text("受管库"))
                     .font(.system(size: 10, weight: .medium))
                 Text(agent.managedSkillsDirectory.path)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
             }
             Spacer(minLength: 8)
@@ -98,7 +98,7 @@ struct SkillManagementView: View {
                 Image(systemName: "folder")
             }
             .buttonStyle(.borderless)
-            .help("在访达中打开受管库")
+            .help(AppLocalization.text("在访达中打开受管库"))
         }
         .padding(7)
         .background(Color.primary.opacity(0.05))
@@ -126,7 +126,7 @@ struct SkillManagementView: View {
                         }
                     }
                 } label: {
-                    Text(mode.displayName)
+                    Text(AppLocalization.text(mode.displayName))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(isSelected ? Color.primary : Color.secondary)
                         .frame(maxWidth: .infinity)
@@ -162,12 +162,12 @@ struct SkillManagementView: View {
             .toggleStyle(.switch)
             .controlSize(.mini)
             VStack(alignment: .leading, spacing: 1) {
-                Text(destination.displayName)
+                Text(AppLocalization.text(destination.displayName))
                     .font(.system(size: 10, weight: .medium))
                 Text(agent.managedSkillDestinationDirectory(for: destination).path)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
             }
             Spacer(minLength: 0)
@@ -178,7 +178,7 @@ struct SkillManagementView: View {
     @ViewBuilder
     private var skillsList: some View {
         if !agent.store.state.skills.isEmpty {
-            Text("已发现 Skills（\(agent.store.state.skills.count)）")
+            Text(AppLocalization.text("已发现 Skills（%ld）", agent.store.state.skills.count))
                 .font(.system(size: 10, weight: .medium))
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(agent.store.state.skills) { skill in
@@ -201,7 +201,7 @@ struct SkillManagementView: View {
                         Text(skill.path)
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundStyle(.tertiary)
-                            .lineLimit(1)
+                            .fitsSingleLine()
                             .truncationMode(.middle)
                         Button {
                             pendingUninstallSkill = skill
@@ -211,7 +211,7 @@ struct SkillManagementView: View {
                         }
                         .buttonStyle(.borderless)
                         .foregroundStyle(.secondary)
-                        .help("卸载 Skill")
+                        .help(AppLocalization.text("卸载 Skill"))
                     }
                     .padding(.vertical, 2)
                 }

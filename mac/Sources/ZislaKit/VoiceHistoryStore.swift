@@ -149,11 +149,11 @@ public final class VoiceHistoryStore: ObservableObject {
     @discardableResult
     public func record(_ result: VoiceRecordingResult, retainAudio: Bool = true) -> Bool {
         guard isSafeRecordingURL(result.audioFileURL, id: result.id) else {
-            errorDescription = "录音文件不在语音记录目录中"
+            errorDescription = AppLocalization.text("录音文件不在语音记录目录中")
             return false
         }
         guard isRegularFile(at: result.audioFileURL) else {
-            errorDescription = "录音文件不存在或不可读取"
+            errorDescription = AppLocalization.text("录音文件不存在或不可读取")
             return false
         }
         let transcript = result.transcript.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -781,6 +781,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
+        // A collapsed transient message occupies the pill exactly like recording, so the status
+        // wings and the pet panel give way for it too. The conditions mirror the view's own
+        // `showsCompactTransientNotice`: an expanded panel keeps the message as a bottom bar with the
+        // wings already suppressed by the expansion, and the mirror and teleprompter swallow it
+        // entirely — suppressing anything for a message that never renders would be a regression.
+        model.$transientMessage
+            .map { $0 != nil }
+            .combineLatest(model.$isIslandVisible, model.$isMirrorPresented, model.$isTeleprompterPresented)
+            .map { hasMessage, islandVisible, mirror, teleprompter in
+                hasMessage && !islandVisible && !mirror && !teleprompter
+            }
+            .removeDuplicates()
+            .sink { [weak self, weak coordinator] presented in
+                Task { @MainActor [weak self, weak coordinator] in
+                    self?.noticePresenter?.setTransientNoticePresented(presented)
+                    coordinator?.setTransientNoticePresented(presented)
+                }
+            }
+            .store(in: &cancellables)
+
         // Disk-cleanup panels should remain above the collapsed island without becoming a global topmost window.
         model.$islandCollapseRequested
             .removeDuplicates()
@@ -1490,10 +1510,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             onKeyDown: { [weak self] in self?.startScreenshot() },
             onKeyUp: {}
         )
-        reportScreenshotHotkeyRegistration(captureResult, actionName: "截图")
+        reportScreenshotHotkeyRegistration(captureResult, actionName: AppLocalization.text("截图"))
 
         guard !settings.screenshotHotkey.conflicts(with: settings.screenshotPinHotkey) else {
-            AppModel.shared.transientMessage = "截图与钉图快捷键冲突，钉图快捷键未启用"
+            AppModel.shared.transientMessage = AppLocalization.text("截图与钉图快捷键冲突，钉图快捷键未启用")
             return
         }
         let pinResult = screenshotPinHotkeyManager.register(
@@ -1501,7 +1521,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             onKeyDown: { [weak self] in self?.startPinnedScreenshot() },
             onKeyUp: {}
         )
-        reportScreenshotHotkeyRegistration(pinResult, actionName: "钉图")
+        reportScreenshotHotkeyRegistration(pinResult, actionName: AppLocalization.text("钉图"))
     }
 
     private func reportScreenshotHotkeyRegistration(
@@ -1512,9 +1532,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .registered:
             break
         case .inputMonitoringPermissionRequired:
-            AppModel.shared.transientMessage = "\(actionName)快捷键需要输入监控权限"
+            AppModel.shared.transientMessage = AppLocalization.text("%@快捷键需要输入监控权限", actionName)
         case .registrationFailed:
-            AppModel.shared.transientMessage = "\(actionName)快捷键与系统或其他应用冲突，未能启用"
+            AppModel.shared.transientMessage = AppLocalization.text("%@快捷键与系统或其他应用冲突，未能启用", actionName)
         }
     }
 

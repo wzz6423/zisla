@@ -263,7 +263,7 @@ public final class AIAgentStore: ObservableObject {
             protocolKind: protocolKind,
             defaultModel: defaultModel,
             endpointGroups: [AgentEndpointGroup(
-                name: "默认端点",
+                name: AppLocalization.text("默认端点"),
                 baseURLs: [baseURL],
                 accountIDs: [account.id]
             )]

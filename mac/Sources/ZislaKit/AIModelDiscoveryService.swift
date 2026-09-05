@@ -10,7 +10,7 @@ public enum AIModelDiscoveryError: LocalizedError, Sendable {
         switch self {
         case .invalidEndpoint: "端点地址无效"
         case .invalidResponse: "端点返回了无法识别的模型目录"
-        case let .http(statusCode): "读取模型目录失败（HTTP \(statusCode)）"
+        case let .http(statusCode): AppLocalization.text("读取模型目录失败（HTTP %ld）", statusCode)
         }
     }
 }

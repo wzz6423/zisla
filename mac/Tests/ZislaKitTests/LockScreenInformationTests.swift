@@ -45,17 +45,4 @@ struct LockScreenInformationTests {
 
         #expect(lunar?.yearMonthDayText == "丙午年六月十二")
     }
-
-    @Test
-    func dailyQuoteIsStableWithinOneDay() {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        let date = calendar.date(from: DateComponents(year: 2026, month: 7, day: 23, hour: 12))!
-
-        let first = DailyQuote.quote(for: date, calendar: calendar)
-        let second = DailyQuote.quote(for: date, calendar: calendar)
-
-        #expect(first == second)
-        #expect(DailyQuote.library.contains(first))
-    }
 }

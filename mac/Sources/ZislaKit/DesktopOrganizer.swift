@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ZislaCore
 
 /// Bulk operations for the desktop and Trash.
 ///
@@ -121,7 +122,7 @@ public enum DesktopOrganizer {
                 return .failure(.failureMessage(from: errorInfo))
             }
             guard let descriptor else {
-                return .failure(.failed("访达没有返回内容"))
+                return .failure(.failed(AppLocalization.text("访达没有返回内容")))
             }
             return .success(descriptor.stringValue ?? "")
         }.value
@@ -146,7 +147,7 @@ private extension DesktopOrganizerError {
     static func failureMessage(from errorInfo: NSDictionary) -> DesktopOrganizerError {
         let message = (errorInfo[NSAppleScript.errorMessage] as? String)
             ?? (errorInfo[NSLocalizedDescriptionKey] as? String)
-            ?? "访达操作失败，请检查自动化授权"
+            ?? AppLocalization.text("访达操作失败，请检查自动化授权")
         return .failed(message)
     }
 }

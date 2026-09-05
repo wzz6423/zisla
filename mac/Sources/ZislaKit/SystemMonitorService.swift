@@ -4,6 +4,7 @@ import Darwin
 import Foundation
 import IOKit
 import SystemConfiguration
+import ZislaCore
 import ZislaNVMe
 
 // MARK: - Snapshots
@@ -48,7 +49,7 @@ public enum TemperatureMetric: Equatable, Sendable {
     case celsius(Double)
 
     public static let unavailableByPublicAPI = TemperatureMetric.unavailable(
-        reason: "此 Mac 未提供公开温度传感器接口"
+        reason: AppLocalization.text("此 Mac 未提供公开温度传感器接口")
     )
 }
 
@@ -932,7 +933,7 @@ enum SystemSampler {
                 }
             }
         }
-        return .unavailable(reason: "内置存储未提供可读取的温度传感器")
+        return .unavailable(reason: AppLocalization.text("内置存储未提供可读取的温度传感器"))
     }
 
     /// Reads cumulative disk I/O counters from IORegistry; returns nil when the reading cannot be verified.
@@ -1119,7 +1120,7 @@ enum SystemSampler {
                 )
             )
         }
-        return .unavailable(reason: "当前 GPU 未提供可读取的性能统计")
+        return .unavailable(reason: AppLocalization.text("当前 GPU 未提供可读取的性能统计"))
     }
 
     private static func counterValue(_ value: Any?) -> UInt64? {
@@ -1229,9 +1230,9 @@ enum AppleSMCSensorReader {
     fileprivate static func sample(chipName: String?) -> AppleSMCSensorSample {
         guard let connection = openConnection() else {
             return AppleSMCSensorSample(
-                cpuTemperature: .unavailable(reason: "AppleSMC 只读传感器不可用"),
-                gpuTemperature: .unavailable(reason: "AppleSMC 只读传感器不可用"),
-                fan: .unavailable(reason: "AppleSMC 只读传感器不可用")
+                cpuTemperature: .unavailable(reason: AppLocalization.text("AppleSMC 只读传感器不可用")),
+                gpuTemperature: .unavailable(reason: AppLocalization.text("AppleSMC 只读传感器不可用")),
+                fan: .unavailable(reason: AppLocalization.text("AppleSMC 只读传感器不可用"))
             )
         }
         defer { IOServiceClose(connection) }
@@ -1303,13 +1304,13 @@ enum AppleSMCSensorReader {
     private static func cpuTemperature(chipName: String?, connection: io_connect_t) -> TemperatureMetric {
         let generation = AppleSiliconGeneration.from(chipName: chipName)
         guard generation != .unknown else {
-            return .unavailable(reason: "当前芯片没有经过验证的温度键映射")
+            return .unavailable(reason: AppLocalization.text("当前芯片没有经过验证的温度键映射"))
         }
         let values = generation.cpuTemperatureKeys.compactMap { key in
             read(key, connection: connection).flatMap(floatingPointValue)
         }
         guard let average = averageCelsius(values) else {
-            return .unavailable(reason: "未返回有效 CPU 温度读数")
+            return .unavailable(reason: AppLocalization.text("未返回有效 CPU 温度读数"))
         }
         return .celsius(average)
     }
@@ -1317,13 +1318,13 @@ enum AppleSMCSensorReader {
     private static func gpuTemperature(chipName: String?, connection: io_connect_t) -> TemperatureMetric {
         let generation = AppleSiliconGeneration.from(chipName: chipName)
         guard generation != .unknown else {
-            return .unavailable(reason: "当前芯片没有经过验证的温度键映射")
+            return .unavailable(reason: AppLocalization.text("当前芯片没有经过验证的温度键映射"))
         }
         let values = generation.gpuTemperatureKeys.compactMap { key in
             read(key, connection: connection).flatMap(floatingPointValue)
         }
         guard let average = averageCelsius(values) else {
-            return .unavailable(reason: "未返回有效 GPU 温度读数")
+            return .unavailable(reason: AppLocalization.text("未返回有效 GPU 温度读数"))
         }
         return .celsius(average)
     }
@@ -1332,10 +1333,10 @@ enum AppleSMCSensorReader {
         guard let countValue = read("FNum", connection: connection),
               let firstByte = countValue.bytes.first
         else {
-            return .unavailable(reason: "此 Mac 未返回风扇数量")
+            return .unavailable(reason: AppLocalization.text("此 Mac 未返回风扇数量"))
         }
         let count = min(Int(firstByte), 8)
-        guard count > 0 else { return .unavailable(reason: "此 Mac 没有可读风扇") }
+        guard count > 0 else { return .unavailable(reason: AppLocalization.text("此 Mac 没有可读风扇")) }
 
         let rpm = (0..<count).compactMap { index -> Double? in
             guard let value = read("F\(index)Ac", connection: connection),
@@ -1344,7 +1345,7 @@ enum AppleSMCSensorReader {
             else { return nil }
             return rpm
         }
-        guard !rpm.isEmpty else { return .unavailable(reason: "未返回有效风扇转速") }
+        guard !rpm.isEmpty else { return .unavailable(reason: AppLocalization.text("未返回有效风扇转速")) }
         return .available(rpm: rpm, detail: "AppleSMC 只读")
     }
 
@@ -2173,7 +2174,7 @@ public enum SystemDiskCleanup {
             url: url,
             kind: .appCache,
             byteSize: allocatedByteSize(of: url, fileManager: fileManager),
-            displayName: "\(identifier) 缓存",
+            displayName: AppLocalization.text("%@ 缓存", identifier),
             detail: "\(source.detailPrefix) · \(url.path)"
         )
     }
@@ -2338,7 +2339,7 @@ public enum SystemDiskCleanup {
         }
         let age = (referenceDate ?? Date()).timeIntervalSince(modificationDate)
         guard age >= temporaryFileMinAge else { return nil }
-        return "\(Int(age / 86400)) 天未修改"
+        return AppLocalization.text("%ld 天未修改", Int(age / 86400))
     }
 
     private static func directoryCandidateDetail(
@@ -2348,13 +2349,13 @@ public enum SystemDiskCleanup {
     ) -> String? {
         switch kind {
         case .mailDownloads:
-            return "Mail 附件下载 · \(url.path)"
+            return AppLocalization.text("Mail 附件下载 · %@", url.path)
         case .iosBackup:
-            return "iPhone/iPad 备份 · \(url.path)"
+            return AppLocalization.text("iPhone/iPad 备份 · %@", url.path)
         case .xcodeArchive:
             return "Xcode Archive · \(url.path)"
         case .aiToolCache:
-            return "AI 工具缓存 · \(url.path)"
+            return AppLocalization.text("AI 工具缓存 · %@", url.path)
         default:
             return fallback
         }
@@ -2382,7 +2383,7 @@ public enum SystemDiskCleanup {
                     kind: .browserCache,
                     byteSize: size,
                     displayName: root.lastPathComponent,
-                    detail: "浏览器可再生缓存 · \(root.path)",
+                    detail: AppLocalization.text("浏览器可再生缓存 · %@", root.path),
                     source: browserName(for: root)
                 )
             )
@@ -2473,7 +2474,7 @@ public enum SystemDiskCleanup {
                         kind: .diskImage,
                         byteSize: size,
                         displayName: standardized.lastPathComponent,
-                        detail: "安装包/磁盘镜像 · \(standardized.deletingLastPathComponent().path)"
+                        detail: AppLocalization.text("安装包/磁盘镜像 · %@", standardized.deletingLastPathComponent().path)
                     )
                 )
             }
@@ -2542,7 +2543,7 @@ public enum SystemDiskCleanup {
                             kind: .largeFile,
                             byteSize: size,
                             displayName: standardized.lastPathComponent,
-                            detail: "\(days) 天前修改"
+                            detail: AppLocalization.text("%ld 天前修改", days)
                         )
                     )
                 }
@@ -2601,7 +2602,7 @@ public enum SystemDiskCleanup {
                             kind: .duplicateFile,
                             byteSize: size,
                             displayName: standardized.lastPathComponent,
-                            detail: "与 \(original.url.lastPathComponent) 重复 · 保留副本：\(original.url.path)"
+                            detail: AppLocalization.text("与 %@ 重复 · 保留副本：%@", original.url.lastPathComponent, original.url.path)
                         )
                     )
                 } else {
@@ -2654,7 +2655,7 @@ public enum SystemDiskCleanup {
                         kind: .unfinishedDownload,
                         byteSize: size,
                         displayName: standardized.lastPathComponent,
-                        detail: "未完成下载 · \(days) 天未修改",
+                        detail: AppLocalization.text("未完成下载 · %ld 天未修改", days),
                         source: standardized.deletingLastPathComponent().lastPathComponent
                     )
                 )
@@ -2773,7 +2774,7 @@ public enum SystemDiskCleanup {
                         kind: .projectBuildArtifact,
                         byteSize: size,
                         displayName: name,
-                        detail: "项目构建产物 · 项目根：\(url.path)",
+                        detail: AppLocalization.text("项目构建产物 · 项目根：%@", url.path),
                         source: url.path
                     )
                 )
@@ -2863,7 +2864,7 @@ public enum SystemDiskCleanup {
                             kind: .applicationResidual,
                             byteSize: size,
                             displayName: child.lastPathComponent,
-                            detail: "可能是已卸载应用残留 · bundle id：\(identifier) · 需确认归属",
+                            detail: AppLocalization.text("可能是已卸载应用残留 · bundle id：%@ · 需确认归属", identifier),
                             source: identifier
                         )
                     )
@@ -3768,12 +3769,12 @@ public final class SystemMonitorService: ObservableObject {
         let sensors = payload.sensors ?? cachedSensorSample ?? AppleSMCSensorSample(
             cpuTemperature: .unavailableByPublicAPI,
             gpuTemperature: .unavailableByPublicAPI,
-            fan: .unavailable(reason: "AppleSMC 只读传感器不可用")
+            fan: .unavailable(reason: AppLocalization.text("AppleSMC 只读传感器不可用"))
         )
         var cpu = payload.cpu
         cpu.temperature = sensors.cpuTemperature
 
-        let gpu = payload.gpu ?? cachedGPUMetrics ?? .unavailable(reason: "当前 GPU 未提供可读取的性能统计")
+        let gpu = payload.gpu ?? cachedGPUMetrics ?? .unavailable(reason: AppLocalization.text("当前 GPU 未提供可读取的性能统计"))
         var finalGPU = gpu
         if case .available(var metrics) = finalGPU {
             metrics.temperature = sensors.gpuTemperature

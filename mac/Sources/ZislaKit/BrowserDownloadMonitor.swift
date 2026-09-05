@@ -211,7 +211,7 @@ struct BrowserDownloadTracker: Sendable {
         let knownFractions = active.compactMap(\.fraction)
         return BrowserDownloadSnapshot(
             agent: nil,
-            fileName: "\(active.count) 项下载",
+            fileName: AppLocalization.text("%ld 项下载", active.count),
             fraction: knownFractions.isEmpty
                 ? nil
                 : knownFractions.reduce(0, +) / Double(knownFractions.count),

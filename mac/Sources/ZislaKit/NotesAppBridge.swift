@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ZislaCore
 
 /// Integration with the system Notes app: the Quick Note module uses Notes as its data source,
 /// supporting list, view, edit, create, and delete operations on existing notes.
@@ -147,7 +148,7 @@ public enum NotesAppBridge {
             if let summaries = parseSummaries(json) {
                 return .success(summaries)
             }
-            return .failure(.failed("解析备忘录列表失败"))
+            return .failure(.failed(AppLocalization.text("解析备忘录列表失败")))
         case .failure(let error):
             return .failure(error)
         }
@@ -165,7 +166,7 @@ public enum NotesAppBridge {
         switch await runAppleScriptReturningStrings(script) {
         case .success(let values):
             guard values.count == 3 else {
-                return .failure(.failed("读取备忘录内容失败"))
+                return .failure(.failed(AppLocalization.text("读取备忘录内容失败")))
             }
             let attachmentResult = await readAttachments(noteID: id)
             let attachments: [NoteAttachment]
@@ -195,7 +196,7 @@ public enum NotesAppBridge {
         switch await runAppleScriptReturningStrings(script) {
         case .success(let values):
             guard values.count == 1 else {
-                return .failure(.failed("读取备忘录锁定状态失败"))
+                return .failure(.failed(AppLocalization.text("读取备忘录锁定状态失败")))
             }
             return .success(["true", "1", "yes"].contains(values[0].lowercased()))
         case .failure(let error):
@@ -355,18 +356,18 @@ public enum NotesAppBridge {
                 maximumErrorBytes: 256 * 1024
             )
             if output.didTimeout {
-                return .failure(.failed("备忘录操作超时"))
+                return .failure(.failed(AppLocalization.text("备忘录操作超时")))
             }
             if output.status != 0 {
                 let message = output.standardError
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                return .failure(.failed(message.isEmpty ? "备忘录访问失败" : message))
+                return .failure(.failed(message.isEmpty ? AppLocalization.text("备忘录访问失败") : message))
             }
             let text = String(data: output.standardOutput, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return .success(text)
         } catch {
-            return .failure(.failed("无法启动 osascript：\(error.localizedDescription)"))
+            return .failure(.failed(AppLocalization.text("无法启动 osascript：%@", error.localizedDescription)))
         }
     }
 
@@ -382,11 +383,11 @@ public enum NotesAppBridge {
                 return .failure(.failureMessage(from: errorInfo))
             }
             guard let descriptor else {
-                return .failure(.failed("备忘录没有返回内容"))
+                return .failure(.failed(AppLocalization.text("备忘录没有返回内容")))
             }
             let itemCount = descriptor.numberOfItems
             guard itemCount > 0 else {
-                return .failure(.failed("备忘录返回了无效内容"))
+                return .failure(.failed(AppLocalization.text("备忘录返回了无效内容")))
             }
             return .success((1...itemCount).map {
                 descriptor.atIndex($0)?.stringValue ?? ""
@@ -406,7 +407,7 @@ public enum NotesAppBridge {
                 return .failure(.failureMessage(from: errorInfo))
             }
             guard let descriptor else {
-                return .failure(.failed("备忘录没有返回附件"))
+                return .failure(.failed(AppLocalization.text("备忘录没有返回附件")))
             }
             guard descriptor.numberOfItems > 0 else { return .success([]) }
             return .success((1...descriptor.numberOfItems).map { index in
@@ -491,7 +492,7 @@ private extension NotesAppError {
     static func failureMessage(from errorInfo: NSDictionary) -> NotesAppError {
         let message = (errorInfo[NSAppleScript.errorMessage] as? String)
             ?? (errorInfo[NSLocalizedDescriptionKey] as? String)
-            ?? "备忘录操作失败，请检查自动化授权"
+            ?? AppLocalization.text("备忘录操作失败，请检查自动化授权")
         return .failed(message)
     }
 }
