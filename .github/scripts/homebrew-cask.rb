@@ -88,8 +88,8 @@ module HomebrewCask
     end
 
     def verify_url
-      declared = @source[/^  url "([^"]*)",$/, 1]
-      return ['cask declares no url, or its url carries no verified owner'] if declared.nil?
+      declared = @source[/^  url "([^"]*)"$/, 1]
+      return ['cask declares no url'] if declared.nil?
       return [] if declared == ARCHIVE_URL
 
       ["cask url #{declared.inspect} does not match #{ARCHIVE_URL.inspect}"]

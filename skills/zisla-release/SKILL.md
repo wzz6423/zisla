@@ -136,6 +136,8 @@ fi
 
 Gitee API 的 PATCH 必须携带 `tag_name`，否则返回 `400: tag_name is missing`。上传新附件后再删除同名旧附件，避免 Release 出现空档。
 
+Gitee 的「最新版」徽章按 Release 创建顺序（id）判定，既不看 `prerelease` 标记也不看更新时间，因此永久 `update-release` 必须在实际版本 Release **之前**创建或刷新。顺序颠倒时徽章会落在只放 appcast 的永久 feed 上，`PATCH` 重新保存实际版本 Release 也纠正不了，只能删掉它再按同 tag 重建（`DELETE /releases/{id}` 不会删除 git tag，重建会得到更大的 id）。
+
 ## 验证与清理
 
 在 `mac/` 目录对三套资产分别执行上传前验证，`RELEASE_OUTPUT_DIRECTORY` 沿用构建时的取值：
