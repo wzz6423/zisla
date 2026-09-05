@@ -109,4 +109,42 @@ struct SparkleUpdateConfigurationTests {
             "SUPublicEDKey": "invalid",
         ]) == nil)
     }
+
+    // A stray `*.app/` ignore rule once kept Updater.app out of the vendored framework. The
+    // release build re-signs the app with `--deep`, which regenerates the framework's
+    // CodeResources, so every codesign check still passed and the only symptom was an update
+    // that downloaded and then refused to install on users' machines.
+    @Test
+    func vendoredSparkleFrameworkKeepsItsInstallerLauncher() throws {
+        let framework = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent(
+                "Vendor/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+            )
+        let updater = framework.appendingPathComponent(
+            "Versions/B/Updater.app/Contents/MacOS/Updater"
+        )
+
+        #expect(
+            FileManager.default.isExecutableFile(atPath: updater.path),
+            "missing \(updater.path); Sparkle cannot launch its installer without it"
+        )
+
+        let codesign = Process()
+        codesign.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        codesign.arguments = ["--verify", "--strict", "--deep", framework.path]
+        let diagnostics = Pipe()
+        codesign.standardOutput = diagnostics
+        codesign.standardError = diagnostics
+        try codesign.run()
+        let output = diagnostics.fileHandleForReading.readDataToEndOfFile()
+        codesign.waitUntilExit()
+
+        #expect(
+            codesign.terminationStatus == 0,
+            "\(String(data: output, encoding: .utf8) ?? "")"
+        )
+    }
 }
