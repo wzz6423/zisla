@@ -43,6 +43,15 @@ public enum AIMascotLibrary {
         "WorkBuddy",
     ]
 
+    /// The desktop app ships its own logo, which differs from the Gemini CLI brand mark.
+    public static let geminiBundleIdentifiers = [
+        "com.google.GeminiMacOS",
+    ]
+
+    public static let geminiApplicationNames = [
+        "Gemini",
+    ]
+
     /// Locates the locally installed Qoder/QoderWork.app; returns nil if not found, falling back to bundled brand assets.
     /// Uses injected closures to keep logic pure and testable; defaults to NSWorkspace / FileManager.
     public static func installedCoderApplicationURL(
@@ -117,6 +126,26 @@ public enum AIMascotLibrary {
         installedApplicationURL(
             bundleIdentifiers: workBuddyBundleIdentifiers,
             applicationNames: workBuddyApplicationNames,
+            resolveBundleIdentifier: resolveBundleIdentifier,
+            applicationDirectories: applicationDirectories,
+            fileExists: fileExists
+        )
+    }
+
+    /// Locates the locally installed Gemini desktop app; returns nil if not found, falling back to bundled brand assets.
+    public static func installedGeminiApplicationURL(
+        resolveBundleIdentifier: (String) -> URL? = {
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0)
+        },
+        applicationDirectories: [URL] = FileManager.default.urls(
+            for: .applicationDirectory,
+            in: .allDomainsMask
+        ),
+        fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL? {
+        installedApplicationURL(
+            bundleIdentifiers: geminiBundleIdentifiers,
+            applicationNames: geminiApplicationNames,
             resolveBundleIdentifier: resolveBundleIdentifier,
             applicationDirectories: applicationDirectories,
             fileExists: fileExists

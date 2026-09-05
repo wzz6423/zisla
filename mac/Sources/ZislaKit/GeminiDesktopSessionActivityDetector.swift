@@ -49,8 +49,11 @@ public final class GeminiDesktopSessionActivityDetector: AIActivityDetecting {
         }.prefix(maxChats))
     }
 
+    /// Shared with the island's icon lookup, which tells a desktop chat apart from a CLI session.
+    public static let taskIDPrefix = "gemini-desktop-chat-"
+
     public static func taskID(forChatUUID chatUUID: String) -> String {
-        "gemini-desktop-chat-\(chatUUID)"
+        "\(taskIDPrefix)\(chatUUID)"
     }
 
     /// Every signed-in profile keeps its own store and the file name carries the schema generation,
