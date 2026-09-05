@@ -45,6 +45,13 @@ struct AIStateMonitorActivityDetectorTests {
     }
 
     @Test @MainActor
+    func defaultActivityDetectorsIncludeGeminiDesktopChats() {
+        #expect(AIStateMonitor.defaultActivityDetectors().contains {
+            $0 is GeminiDesktopSessionActivityDetector
+        })
+    }
+
+    @Test @MainActor
     func reloadMergesEveryInjectedProvider() {
         let directory = monitorTempDirectory("providers")
         defer { try? FileManager.default.removeItem(at: directory) }
