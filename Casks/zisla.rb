@@ -5,8 +5,7 @@ cask "zisla" do
   sha256 arm:   "5b01c0876d7767a16efda6f3bad94e24103e9f2f672c9b47e40662f9f68e0bbd",
          intel: "e71d87afe5d4eec8decf5bf6ca97826c156e6e0a061541340000615d0f01b094"
 
-  url "https://github.com/wzz6423/zisla/releases/download/v#{version}/zisla-v#{version}-macOS-#{arch}.zip",
-      verified: "github.com/wzz6423/zisla/"
+  url "https://github.com/wzz6423/zisla/releases/download/v#{version}/zisla-v#{version}-macOS-#{arch}.zip"
   name "zisla"
   desc "Top workspace for media, files, system tools, and local AI activity"
   homepage "https://github.com/wzz6423/zisla"
