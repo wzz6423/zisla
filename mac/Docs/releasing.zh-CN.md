@@ -90,7 +90,7 @@ diskutil eject /Volumes/zisla
 VERSION=1.0.0 RELEASE_OUTPUT_DIRECTORY=mac/dist PUBLISH_TAP=true make sync-cask
 ```
 
-脚本会改写 `Casks/zisla.rb` 中的 `version` 与 `sha256`：`$RELEASE_OUTPUT_DIRECTORY/zisla-v$VERSION-macOS-universal.zip.sha256` 存在时读本地摘要，否则从已发布的 GitHub 资产拉取。未通过 `homebrew-cask.rb verify` 的 cask 不会被写回，通过后再镜像到 `wzz6423/homebrew-tap`。不带 `PUBLISH_TAP` 即为试运行，只更新仓库内的 cask。
+脚本会改写 `Casks/zisla.rb` 中的 `version` 与两个 `sha256`：`$RELEASE_OUTPUT_DIRECTORY/zisla-v$VERSION-macOS-arm64.zip.sha256` 及其 `x86_64` 同名文件存在时读本地摘要，否则从已发布的 GitHub 资产拉取。cask 按 `#{arch}` 逐机解析下载地址，Apple Silicon 与 Intel 各自只取对应架构的包；两个架构复用同一摘要会被校验拒绝。未通过 `homebrew-cask.rb verify` 的 cask 不会被写回，通过后再镜像到 `wzz6423/homebrew-tap`。不带 `PUBLISH_TAP` 即为试运行，只更新仓库内的 cask。
 
 cask 声明 `auto_updates true`，因为更新链路归 Sparkle 所有：直接执行 `brew upgrade` 不会动已安装的应用，只有 `brew upgrade --cask zisla` 或 `--greedy` 才让 Homebrew 替换。改写后的 cask 必须与官网 `latestRelease` 的版本一起提交——两者版本不一致时 CI 会失败。随后验证 tap：
 

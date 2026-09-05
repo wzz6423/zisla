@@ -20,7 +20,7 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 - 使用 `CFBundleShortVersionString` 作为用户可见版本。版本 tag 一律为 `v${VERSION}`（Preview 形如 `v0.2.0-preview.1`），与签名 appcast 的默认 ZIP URL 一致；禁止使用 `release/v1.2.3` 等路径前缀 tag，那会迫使每次发布额外覆盖 `SPARKLE_GITEE_DOWNLOAD_URL_PREFIX` 和 `SPARKLE_GITHUB_DOWNLOAD_URL_PREFIX`。
 - Release 正文引用的截图必须先作为同一 `v${VERSION}` Release 的附件上传，并使用该 tag 的稳定下载地址。禁止带路径前缀的 `.../releases/download/release/v${VERSION}/`、会随下一版移动的 `.../releases/latest/download/` 和临时图床；正文同步到另一镜像时，可以引用已验证可达的原站图片地址。发布后要在实际页面确认每张图返回 HTTP 200 且内容确实是 PNG。
 - 每次发布前验证 DMG 中只有 `zisla.app` 和 `Applications` 软链接。首次安装 Sparkle 版仍需要用户手动安装；之后的已安装 Sparkle 版本才可自动更新。
-- 正式版发布完成后必须同步 Homebrew cask：`Casks/zisla.rb` 的 `version` 与 `sha256` 必须对应本次 Universal ZIP，并与官网 `latestRelease` 同版本，否则 CI 的 `Verify the Homebrew cask` 失败。Preview 不进 tap，避免 `brew upgrade` 把用户带到预发布版本。cask 保留 `auto_updates true`，更新链路仍归 Sparkle，Homebrew 只负责首次安装与显式升级。
+- 正式版发布完成后必须同步 Homebrew cask：`Casks/zisla.rb` 的 `version` 与两个 `sha256` 必须分别对应本次 `arm64` 与 `x86_64` ZIP，并与官网 `latestRelease` 同版本，否则 CI 的 `Verify the Homebrew cask` 失败。cask 用 `arch` 映射按机器解析下载地址，Apple Silicon 与 Intel 各自只取对应架构的包，自动更新仍走 Universal ZIP。Preview 不进 tap，避免 `brew upgrade` 把用户带到预发布版本。cask 保留 `auto_updates true`，更新链路仍归 Sparkle，Homebrew 只负责首次安装与显式升级。
 - 发版构建严禁使用调试变体：必须显式使用 `DEBUG_BUILD=false`，产物必须是 `zisla.app`、Bundle ID `dev.wzz.zisla`；`zisla-debug.app` 或 `dev.wzz.zisla.debug` 只能用于本地调试，不能上传。
 - 发版资源必须来自正式资源目录：`AppIcon.icns` 必须作为主图标，`AppIconNight.icns` 只能作为深色模式备用图标；调试构建使用的黑底白字图标复制方式，以及 `zisla-debug.app` 中的任何资源，都不能用于正式包或通过改名后上传。
 - 发版不得把 `make run` 生成的 `dist/zisla-debug.app` 直接压缩、改名或复制资源；必须由 `Scripts/package-release.sh` 重新构建正式包并通过身份与图标校验。
@@ -183,7 +183,7 @@ for HOST in github gitee; do
 done
 ```
 
-正式版还要先完成下节的 Homebrew cask 同步（它要读 `outputs/` 里的 Universal ZIP 校验文件），再在仓库根目录执行 `make clean` 删除 `outputs/`（含 `.staging/`）与本地调试产物，并清理 `.release-*`、临时挂载和本次测试下载物，不清理私钥备份。
+正式版还要先完成下节的 Homebrew cask 同步（它要读 `outputs/` 里 `arm64` 与 `x86_64` ZIP 的校验文件），再在仓库根目录执行 `make clean` 删除 `outputs/`（含 `.staging/`）与本地调试产物，并清理 `.release-*`、临时挂载和本次测试下载物，不清理私钥备份。
 
 ## 同步 Homebrew cask
 
@@ -193,7 +193,7 @@ done
 PUBLISH_TAP=true make sync-cask
 ```
 
-脚本沿用已导出的 `VERSION` 与 `RELEASE_OUTPUT_DIRECTORY`，改写 `Casks/zisla.rb` 的 `version` 与 `sha256`：优先读 `$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-universal.zip.sha256`，该文件缺失时从已发布的 GitHub 资产拉取。校验不通过的 cask 不会写回；通过后镜像到 `wzz6423/homebrew-tap`。不带 `PUBLISH_TAP` 即为试运行，只更新仓库内的 cask。
+脚本沿用已导出的 `VERSION` 与 `RELEASE_OUTPUT_DIRECTORY`，改写 `Casks/zisla.rb` 的 `version` 与两个 `sha256`：优先读 `$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-arm64.zip.sha256` 与同目录的 `x86_64` 校验文件，缺失时从已发布的 GitHub 资产拉取。校验不通过的 cask 不会写回；通过后镜像到 `wzz6423/homebrew-tap`。不带 `PUBLISH_TAP` 即为试运行，只更新仓库内的 cask。
 
 改写后的 cask 必须与官网 `latestRelease` 的版本改动一起提交，随后确认 tap 真的可安装：
 
@@ -205,7 +205,7 @@ brew list --cask --versions zisla
 brew livecheck --cask wzz6423/tap/zisla
 ```
 
-`brew list --cask --versions` 必须报出本次版本，`brew livecheck` 必须解析到同一版本。cask 只允许指向 Universal ZIP：单架构包或写死版本号的 URL 会让 `brew upgrade` 在下一版拉到旧包。
+`brew list --cask --versions` 必须报出本次版本，`brew livecheck` 必须解析到同一版本。cask 的下载地址必须同时保留 `#{version}` 与 `#{arch}` 插值：写死版本号会让 `brew upgrade` 在下一版拉到旧包，写死架构会把另一半用户带到错误的包。
 
 ## 交付记录
 

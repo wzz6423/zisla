@@ -89,7 +89,7 @@ From the repository root, after the release assets are published:
 VERSION=1.0.0 RELEASE_OUTPUT_DIRECTORY=mac/dist PUBLISH_TAP=true make sync-cask
 ```
 
-The script rewrites `version` and `sha256` in `Casks/zisla.rb`, reading the digest from `$RELEASE_OUTPUT_DIRECTORY/zisla-v$VERSION-macOS-universal.zip.sha256` when that file exists and from the published GitHub asset otherwise. It refuses to write a cask that fails `homebrew-cask.rb verify`, then mirrors the file to `wzz6423/homebrew-tap`. Omit `PUBLISH_TAP` for a dry run that only updates the in-repo cask.
+The script rewrites `version` and both `sha256` values in `Casks/zisla.rb`, reading each digest from `$RELEASE_OUTPUT_DIRECTORY/zisla-v$VERSION-macOS-arm64.zip.sha256` and its `x86_64` counterpart when those files exist and from the published GitHub assets otherwise. The cask resolves `#{arch}` per machine, so Apple Silicon and Intel download only their own slice; verification rejects a cask that reuses one digest for both. It refuses to write a cask that fails `homebrew-cask.rb verify`, then mirrors the file to `wzz6423/homebrew-tap`. Omit `PUBLISH_TAP` for a dry run that only updates the in-repo cask.
 
 The cask carries `auto_updates true` because Sparkle owns the update path: a plain `brew upgrade` leaves the app alone, and only `brew upgrade --cask zisla` or `--greedy` makes Homebrew replace it. Commit the rewritten cask together with the site's `latestRelease` bump — CI fails when the two pin different versions. Then confirm the tap:
 

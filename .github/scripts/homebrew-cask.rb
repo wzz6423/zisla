@@ -11,9 +11,10 @@ module HomebrewCask
 
   RELEASE_VERSION = /\A\d+\.\d+\.\d+\z/
   SHA256 = /\A[0-9a-f]{64}\z/
-  # The archive name interpolates version, so a release bump cannot leave the URL behind.
+  # Both placeholders stay unresolved on purpose: version keeps a release bump from
+  # leaving the URL behind, and arch keeps every machine on its own slice.
   ARCHIVE_URL = 'https://github.com/wzz6423/zisla/releases/download/v#{version}/' \
-                'zisla-v#{version}-macOS-universal.zip'
+                'zisla-v#{version}-macOS-#{arch}.zip'
   ZAP_PATHS = [
     '~/Library/Application Support/zisla',
     '~/Library/Caches/dev.wzz.zisla',
@@ -23,6 +24,8 @@ module HomebrewCask
   ].freeze
   REQUIRED_LINES = {
     'cask header' => 'cask "zisla" do',
+    # Homebrew resolves the arch token per machine, so one cask serves both chips.
+    'architecture map' => '  arch arm: "arm64", intel: "x86_64"',
     'name' => '  name "zisla"',
     'homepage' => '  homepage "https://github.com/wzz6423/zisla"',
     'app artifact' => '  app "zisla.app"',
@@ -73,11 +76,15 @@ module HomebrewCask
     end
 
     def verify_checksum
-      checksum = @source[/^  sha256 "([^"]*)"$/, 1]
-      return ['cask declares no sha256'] if checksum.nil?
-      return [] if SHA256.match?(checksum)
+      digests = @source.match(/^  sha256 arm:\s+"([^"]*)",\s+intel:\s+"([^"]*)"$/)
+      return ['cask declares no per-architecture sha256'] if digests.nil?
 
-      ["cask sha256 #{checksum.inspect} is not a lowercase SHA-256 digest"]
+      errors = digests.captures.reject { |digest| SHA256.match?(digest) }.map do |digest|
+        "cask sha256 #{digest.inspect} is not a lowercase SHA-256 digest"
+      end
+      # One digest in both slots means an architecture would fetch the other's archive.
+      errors << 'cask reuses one sha256 for both architectures' if digests[1] == digests[2]
+      errors
     end
 
     def verify_url

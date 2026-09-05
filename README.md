@@ -49,6 +49,8 @@ Install with Homebrew:
 brew install --cask wzz6423/tap/zisla
 ```
 
+Homebrew fetches the build that matches your chip, so an Apple Silicon or Intel Mac downloads only its own slice.
+
 Or download the latest DMG from [GitHub Releases](https://github.com/wzz6423/zisla/releases) or [Gitee Releases](https://gitee.com/wzz6423/zisla/releases), mount it, and drag `zisla.app` to `Applications`.
 
 After launching, move the pointer to the top center of the current screen, or choose **Show Island** from the menu bar icon. An unsigned preview package may require **Open Anyway** in **System Settings > Privacy & Security** on first launch.

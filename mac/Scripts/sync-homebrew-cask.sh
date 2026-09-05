@@ -10,7 +10,6 @@ CASK_FILE="${CASK_FILE:-$ROOT/Casks/zisla.rb}"
 RELEASE_OUTPUT_DIRECTORY="${RELEASE_OUTPUT_DIRECTORY:-}"
 HOMEBREW_TAP_REPOSITORY="${HOMEBREW_TAP_REPOSITORY:-wzz6423/homebrew-tap}"
 PUBLISH_TAP="${PUBLISH_TAP:-false}"
-ARCHIVE_NAME="zisla-v${VERSION}-macOS-universal.zip"
 
 [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}$ ]] || {
   echo "error: VERSION must be a release version such as 1.2.3" >&2
@@ -26,19 +25,30 @@ case "$PUBLISH_TAP" in
 esac
 [[ -f "$CASK_FILE" ]] || { echo "error: missing cask: $CASK_FILE" >&2; exit 1; }
 
-LOCAL_CHECKSUM_FILE="${RELEASE_OUTPUT_DIRECTORY:+$RELEASE_OUTPUT_DIRECTORY/$ARCHIVE_NAME.sha256}"
-if [[ -n "$LOCAL_CHECKSUM_FILE" && -f "$LOCAL_CHECKSUM_FILE" ]]; then
-  CHECKSUM="$(awk 'NR == 1 { print $1 }' "$LOCAL_CHECKSUM_FILE")"
-  CHECKSUM_SOURCE="$LOCAL_CHECKSUM_FILE"
-else
-  CHECKSUM_SOURCE="https://github.com/wzz6423/zisla/releases/download/v${VERSION}/${ARCHIVE_NAME}.sha256"
-  CHECKSUM="$(curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
-    "$CHECKSUM_SOURCE" | awk 'NR == 1 { print $1 }')"
-fi
-[[ "$CHECKSUM" =~ '^[0-9a-f]{64}$' ]] || {
-  echo "error: $CHECKSUM_SOURCE did not yield a SHA-256 digest" >&2
-  exit 1
+# The cask resolves its archive per chip, so a release needs one digest per architecture.
+read_digest() {
+  local ARCHIVE_NAME="zisla-v${VERSION}-macOS-$1.zip"
+  local LOCAL_CHECKSUM_FILE="${RELEASE_OUTPUT_DIRECTORY:+$RELEASE_OUTPUT_DIRECTORY/$ARCHIVE_NAME.sha256}"
+  if [[ -n "$LOCAL_CHECKSUM_FILE" && -f "$LOCAL_CHECKSUM_FILE" ]]; then
+    DIGEST_SOURCE="$LOCAL_CHECKSUM_FILE"
+    DIGEST="$(awk 'NR == 1 { print $1 }' "$LOCAL_CHECKSUM_FILE")"
+  else
+    DIGEST_SOURCE="https://github.com/wzz6423/zisla/releases/download/v${VERSION}/${ARCHIVE_NAME}.sha256"
+    DIGEST="$(curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
+      "$DIGEST_SOURCE" | awk 'NR == 1 { print $1 }')"
+  fi
+  [[ "$DIGEST" =~ '^[0-9a-f]{64}$' ]] || {
+    echo "error: $DIGEST_SOURCE did not yield a SHA-256 digest" >&2
+    return 1
+  }
 }
+
+read_digest arm64
+ARM_CHECKSUM="$DIGEST"
+ARM_CHECKSUM_SOURCE="$DIGEST_SOURCE"
+read_digest x86_64
+INTEL_CHECKSUM="$DIGEST"
+INTEL_CHECKSUM_SOURCE="$DIGEST_SOURCE"
 
 STAGED_CASK="$(mktemp "${TMPDIR:-/tmp}/zisla-cask.XXXXXX")"
 TAP_CLONE=""
@@ -51,14 +61,16 @@ cleanup() {
 trap cleanup EXIT
 
 sed -e "s|^  version \".*\"\$|  version \"${VERSION}\"|" \
-  -e "s|^  sha256 \".*\"\$|  sha256 \"${CHECKSUM}\"|" \
+  -e "s|^\(  sha256 arm: *\)\".*\",\$|\1\"${ARM_CHECKSUM}\",|" \
+  -e "s|^\( *intel: \)\".*\"\$|\1\"${INTEL_CHECKSUM}\"|" \
   "$CASK_FILE" > "$STAGED_CASK"
 ruby -c "$STAGED_CASK" >/dev/null
 ruby "$ROOT/.github/scripts/homebrew-cask.rb" verify --cask "$STAGED_CASK" --version "$VERSION"
 cat "$STAGED_CASK" > "$CASK_FILE"
 
 echo "cask: ${CASK_FILE} now pins v${VERSION}"
-echo "sha256: ${CHECKSUM} (from ${CHECKSUM_SOURCE})"
+echo "sha256 arm64: ${ARM_CHECKSUM} (from ${ARM_CHECKSUM_SOURCE})"
+echo "sha256 x86_64: ${INTEL_CHECKSUM} (from ${INTEL_CHECKSUM_SOURCE})"
 
 [[ "$PUBLISH_TAP" == true ]] || {
   echo "note: set PUBLISH_TAP=true to mirror this cask to ${HOMEBREW_TAP_REPOSITORY}"

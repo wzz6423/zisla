@@ -1,8 +1,11 @@
 cask "zisla" do
-  version "0.1.6"
-  sha256 "0d51249e87801ca17faba6a6b8044d89fbcbd4a8aa701ec29f4a90ce39675d4d"
+  arch arm: "arm64", intel: "x86_64"
 
-  url "https://github.com/wzz6423/zisla/releases/download/v#{version}/zisla-v#{version}-macOS-universal.zip",
+  version "0.1.6"
+  sha256 arm:   "21aa93b9620981a2bfe46fe12e3690822dafd48a9d2b43548e39fdcda1f6680f",
+         intel: "f34d0992221a39a1baf513de0b84dfe130b816e544200967d41be4a42b20f41a"
+
+  url "https://github.com/wzz6423/zisla/releases/download/v#{version}/zisla-v#{version}-macOS-#{arch}.zip",
       verified: "github.com/wzz6423/zisla/"
   name "zisla"
   desc "Top workspace for media, files, system tools, and local AI activity"
@@ -14,7 +17,8 @@ cask "zisla" do
   end
 
   # Sparkle installs later versions itself, so `brew upgrade` replaces the app only
-  # when the cask is named explicitly or --greedy is passed.
+  # when the cask is named explicitly or --greedy is passed. Sparkle ships the
+  # universal ZIP, so an in-app update turns this single-architecture install fat.
   auto_updates true
   depends_on macos: :sonoma
 

@@ -40,8 +40,25 @@ class HomebrewCaskTest < Minitest::Test
   end
 
   def test_uppercase_checksum_is_rejected
-    source = @cask.sub(/^  sha256 ".*"$/, "  sha256 \"#{'A' * 64}\"")
+    source = @cask.sub(/^(  sha256 arm:\s+)"[^"]*"/) { "#{Regexp.last_match(1)}\"#{'A' * 64}\"" }
     assert_includes errors(source).join("\n"), 'is not a lowercase SHA-256 digest'
+  end
+
+  def test_missing_intel_checksum_is_rejected
+    source = @cask.sub(/,\n\s+intel: "[^"]*"/, '')
+    assert_includes errors(source).join("\n"), 'no per-architecture sha256'
+  end
+
+  # Both slots carrying one digest would send Intel machines to the arm64 archive.
+  def test_reused_checksum_is_rejected
+    arm = @cask[/^  sha256 arm:\s+"([^"]*)"/, 1]
+    source = @cask.sub(/^(\s+intel: )"[^"]*"/) { "#{Regexp.last_match(1)}\"#{arm}\"" }
+    assert_includes errors(source).join("\n"), 'reuses one sha256'
+  end
+
+  def test_missing_arch_stanza_is_rejected
+    source = @cask.sub(/^  arch .*\n\n/, '')
+    assert_includes errors(source).join("\n"), 'architecture map'
   end
 
   def test_url_pinned_to_a_literal_version_is_rejected
@@ -49,8 +66,8 @@ class HomebrewCaskTest < Minitest::Test
     assert_includes errors(source).join("\n"), 'does not match'
   end
 
-  def test_single_architecture_archive_is_rejected
-    source = @cask.sub('macOS-universal.zip', 'macOS-arm64.zip')
+  def test_url_pinned_to_a_literal_architecture_is_rejected
+    source = @cask.sub('macOS-#{arch}.zip', 'macOS-universal.zip')
     assert_includes errors(source).join("\n"), 'does not match'
   end
 
