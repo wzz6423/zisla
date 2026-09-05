@@ -439,6 +439,54 @@ public enum AIUsageAnalytics {
         return points
     }
 
+    /// Y-axis configuration for the token trend chart: the tick values plus the scale that keeps them readable.
+    public struct TokenAxisScale: Equatable, Sendable {
+        public enum Kind: Equatable, Sendable {
+            case linear
+            case symmetricLog
+        }
+
+        public var ticks: [Int]
+        public var kind: Kind
+
+        public init(ticks: [Int], kind: Kind) {
+            self.ticks = ticks
+            self.kind = kind
+        }
+
+        public var upperBound: Int { ticks.last ?? 1 }
+    }
+
+    /// Above this busiest-to-quietest ratio a linear axis would flatten the quiet day onto the baseline,
+    /// which is the only case where the log axis is worth the price of squashing same-magnitude days.
+    static let tokenAxisLogSpreadThreshold = 20.0
+
+    /// Picks the Y-axis ticks and scale type for the token trend chart.
+    ///
+    /// Days sharing an order of magnitude (830M beside 520M) are nearly indistinguishable on a log axis, so
+    /// they get a linear axis; only a genuine order-of-magnitude spread falls back to symmetric-log.
+    public static func tokenAxisScale(values: [Int], desiredCount: Int = 5) -> TokenAxisScale {
+        let used = values.filter { $0 > 0 }
+        guard let maximum = used.max(), let minimum = used.min() else {
+            return TokenAxisScale(ticks: [0, 1], kind: .linear)
+        }
+        guard Double(maximum) / Double(minimum) > tokenAxisLogSpreadThreshold else {
+            return TokenAxisScale(
+                ticks: linearTokenAxisTicks(maximum: maximum, desiredCount: desiredCount),
+                kind: .linear
+            )
+        }
+        // Leave 15% headroom so the log curve does not touch or exceed the top axis edge.
+        let padded = max(
+            roundedTokenCount(Double(maximum) * 1.15),
+            AIUsageTokenMath.adding(maximum, 1)
+        )
+        return TokenAxisScale(
+            ticks: tokenAxisTicks(maximum: padded, desiredCount: desiredCount),
+            kind: .symmetricLog
+        )
+    }
+
     /// Generates power-of-ten tick marks for the symmetric-log trend axis.
     ///
     /// - Returns `[0, 1]` when `maximum <= 0` to ensure Chart has a valid domain.
@@ -460,6 +508,30 @@ public enum AIUsageAnalytics {
             ticks.append(Int(value.rounded()))
         }
         return ticks
+    }
+
+    /// Generates evenly spaced "nice" tick marks (1 / 2 / 2.5 / 5 × 10ⁿ) for the linear trend axis.
+    ///
+    /// The last tick sits strictly above `maximum`, which keeps the curve clear of the top axis edge.
+    public static func linearTokenAxisTicks(maximum: Int, desiredCount: Int = 5) -> [Int] {
+        guard maximum > 0 else { return [0, 1] }
+        let count = min(6, max(2, desiredCount))
+        let step = niceTokenStep(atLeast: Double(maximum) / Double(count - 1))
+        let (upper, overflow) = (maximum / step + 1).multipliedReportingOverflow(by: step)
+        // A saturated token total has no linear layout; fall back to the power-of-ten ladder.
+        guard !overflow else { return tokenAxisTicks(maximum: maximum, desiredCount: desiredCount) }
+        return Array(stride(from: 0, through: upper, by: step))
+    }
+
+    /// Smallest 1 / 2 / 2.5 / 5 × 10ⁿ value that is at least `rough`, clamped to whole tokens.
+    private static func niceTokenStep(atLeast rough: Double) -> Int {
+        guard rough.isFinite, rough > 0 else { return 1 }
+        let base = pow(10.0, floor(log10(rough)))
+        let candidate = [1.0, 2.0, 2.5, 5.0, 10.0]
+            .lazy
+            .map { $0 * base }
+            .first { $0 >= rough } ?? 10 * base
+        return max(1, roundedTokenCount(candidate.rounded(.up)))
     }
 
     /// Compact token Y-axis label (K / M / B), shared between Chart and tests.

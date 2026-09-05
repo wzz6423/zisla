@@ -2072,6 +2072,53 @@ struct AIUsageAnalyticsTests {
         #expect(AIUsageAnalytics.tokenAxisTicks(maximum: 0) == [0, 1])
     }
 
+    /// Regression: a log axis draws 830M and 520M at nearly the same height, so days sharing an order of
+    /// magnitude must get a linear axis, where plotted height tracks the token ratio.
+    @Test
+    func tokenAxisScaleUsesLinearTicksWhenDaysShareAMagnitude() {
+        let scale = AIUsageAnalytics.tokenAxisScale(
+            values: [0, 520_000_000, 830_000_000, 610_000_000, 700_000_000, 480_000_000, 900_000_000],
+            desiredCount: 5
+        )
+
+        #expect(scale.kind == .linear)
+        #expect(scale.ticks == [0, 250_000_000, 500_000_000, 750_000_000, 1_000_000_000])
+        #expect(scale.upperBound == 1_000_000_000)
+
+        let tall = Double(830_000_000) / Double(scale.upperBound)
+        let short = Double(520_000_000) / Double(scale.upperBound)
+        #expect(tall - short > 0.25)
+    }
+
+    @Test
+    func tokenAxisScaleKeepsLogTicksWhenUsageSpansOrdersOfMagnitude() {
+        let scale = AIUsageAnalytics.tokenAxisScale(
+            values: [3_000_000, 640_000_000, 900_000_000],
+            desiredCount: 5
+        )
+
+        #expect(scale.kind == .symmetricLog)
+        #expect(scale.ticks == [0, 10_000_000, 100_000_000, 1_000_000_000, 10_000_000_000])
+
+        // Idle-only history still needs a valid Chart domain.
+        let idle = AIUsageAnalytics.tokenAxisScale(values: [0, 0], desiredCount: 5)
+        #expect(idle.kind == .linear)
+        #expect(idle.ticks == [0, 1])
+        #expect(idle.upperBound == 1)
+    }
+
+    @Test
+    func linearTokenAxisTicksAreEvenlySpacedAndClearTheMaximum() {
+        for maximum in [1, 9, 4_096, 12_345_678, 830_000_000] {
+            let ticks = AIUsageAnalytics.linearTokenAxisTicks(maximum: maximum, desiredCount: 5)
+            #expect(ticks.first == 0)
+            #expect((ticks.last ?? 0) > maximum)
+            #expect(ticks.count >= 3)
+            #expect(Set(zip(ticks, ticks.dropFirst()).map { $1 - $0 }).count == 1)
+        }
+        #expect(AIUsageAnalytics.linearTokenAxisTicks(maximum: 0) == [0, 1])
+    }
+
     /// Regression: the trend series uses daily deltas; alternating high/low usage should rise and fall,
     /// not a monotonically increasing cumulative curve (AreaMark/LineMark with unit:.day would sum cumulatively).
     @Test
