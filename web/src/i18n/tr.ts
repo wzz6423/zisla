@@ -154,7 +154,7 @@ export const tr = createCatalog({
     copyBrewCommandAriaLabel: 'Homebrew kurulum komutunu kopyala',
     notes: {
       system: { term: 'Sistem', value: 'macOS 14 veya sonrası · Bugün desteklenen yapılandırma Apple Silicon Mac\'lerdir' },
-      install: { term: 'Kurulum', value: 'brew install --cask ya da DMG\'yi bağlayıp Applications klasörüne sürükleyin' },
+      install: { term: 'Kurulum', value: 'DMG\'yi bağlayın ve Applications klasörüne sürükleyin' },
       package: { term: 'Paket', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Diğer mimariler', value: 'Sürüm sayfası' },
       mirror: { term: 'Ayna', value: 'Gitee Releases' },

@@ -43,15 +43,15 @@ For tools without a stable local activity source, `zislactl` lets scripts, CI, a
 
 ### Install the app
 
-Install with Homebrew:
+Download the latest DMG from [GitHub Releases](https://github.com/wzz6423/zisla/releases) or [Gitee Releases](https://gitee.com/wzz6423/zisla/releases), mount it, and drag `zisla.app` to `Applications`.
+
+Homebrew is another way in:
 
 ```bash
 brew install --cask wzz6423/tap/zisla
 ```
 
 Homebrew fetches the build that matches your chip, so an Apple Silicon or Intel Mac downloads only its own slice. The cask comes from the third-party tap `wzz6423/tap` rather than Homebrew's own cask repository, so installing it means trusting this tap.
-
-Or download the latest DMG from [GitHub Releases](https://github.com/wzz6423/zisla/releases) or [Gitee Releases](https://gitee.com/wzz6423/zisla/releases), mount it, and drag `zisla.app` to `Applications`.
 
 After launching, move the pointer to the top center of the current screen, or choose **Show Island** from the menu bar icon. Every package ships with an ad-hoc signature and is not notarized, so however you installed it, the first launch needs **Open Anyway** in **System Settings > Privacy & Security**, or clear the quarantine attribute yourself:
 
@@ -61,7 +61,7 @@ xattr -d com.apple.quarantine /Applications/zisla.app
 
 ### Update the app
 
-zisla updates itself through Sparkle, so a plain `brew upgrade` leaves the installed app alone. Name the cask when you want Homebrew to do the replacement instead:
+zisla updates itself through Sparkle however you installed it. A Homebrew install is the one case worth a note: a plain `brew upgrade` leaves the app alone, so name the cask when you want Homebrew to do the replacement instead:
 
 ```bash
 brew upgrade --cask zisla

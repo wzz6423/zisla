@@ -268,7 +268,7 @@ export const zhHant: SiteContent = {
     copyBrewCommandAriaLabel: '複製 Homebrew 安裝指令',
     notes: {
       system: { term: '系統', value: 'macOS 14 或以上版本 · 目前受支援的組態為 Apple 晶片 Mac' },
-      install: { term: '安裝', value: 'brew install --cask，或掛載 DMG 後拖入「應用程式」' },
+      install: { term: '安裝', value: '掛載 DMG 後拖入「應用程式」' },
       package: { term: '檔案', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: '其他架構', value: 'Release 頁面' },
       mirror: { term: '鏡像', value: 'Gitee Releases' },

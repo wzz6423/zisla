@@ -202,7 +202,7 @@ export const ar = createCatalog({
     copyBrewCommandAriaLabel: 'نسخ أمر التثبيت عبر Homebrew',
     notes: {
       system: { term: 'النظام', value: 'macOS 14 أو أحدث · التكوين المدعوم حاليًا: Mac مع Apple Silicon' },
-      install: { term: 'التثبيت', value: 'brew install --cask أو ثبّت DMG واسحبه إلى التطبيقات' },
+      install: { term: 'التثبيت', value: 'ثبّت DMG واسحبه إلى التطبيقات' },
       package: { term: 'الحزمة', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'بنى أخرى', value: 'صفحة الإصدارات' },
       mirror: { term: 'مرآة', value: 'Gitee Releases' },

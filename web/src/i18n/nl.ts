@@ -262,7 +262,7 @@ export const nl = createCatalog({
     copyBrewCommandAriaLabel: 'Homebrew-installatieopdracht kopiëren',
     notes: {
       system: { term: 'Systeem', value: 'macOS 14 of later · Huidige ondersteunde configuratie: Mac met Apple Silicon' },
-      install: { term: 'Installeren', value: 'brew install --cask, of koppel de DMG en sleep hem naar Programma’s' },
+      install: { term: 'Installeren', value: 'Koppel de DMG en sleep hem naar Programma’s' },
       package: { term: 'Pakket', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Andere architecturen', value: 'Releasepagina' },
       mirror: { term: 'Mirror', value: 'Gitee Releases' },

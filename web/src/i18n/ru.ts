@@ -218,7 +218,7 @@ export const ru = createCatalog({
     copyBrewCommandAriaLabel: 'Скопировать команду установки Homebrew',
     notes: {
       system: { term: 'Система', value: 'macOS 14 или новее · Поддерживаемая конфигурация: Mac с Apple Silicon' },
-      install: { term: 'Установка', value: 'brew install --cask или подключите DMG и перетащите приложение в «Программы»' },
+      install: { term: 'Установка', value: 'Подключите DMG и перетащите приложение в «Программы»' },
       package: { term: 'Пакет', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Другие архитектуры', value: 'Страница релизов' },
       mirror: { term: 'Зеркало', value: 'Gitee Releases' },

@@ -283,7 +283,7 @@ export const en: SiteContent = {
         term: 'System',
         value: 'macOS 14 or later · Apple silicon Macs are the supported configuration today',
       },
-      install: { term: 'Install', value: 'brew install --cask, or mount the DMG and drag it into Applications' },
+      install: { term: 'Install', value: 'Mount the DMG and drag it into Applications' },
       package: { term: 'Package', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Other architectures', value: 'Release page' },
       mirror: { term: 'Mirror', value: 'Gitee Releases' },

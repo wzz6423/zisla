@@ -276,7 +276,7 @@ export const ja: SiteContent = {
         term: 'システム',
         value: 'macOS 14 以降 · 現在の対応構成は Apple シリコン搭載 Mac',
       },
-      install: { term: 'インストール', value: 'brew install --cask、または DMG をマウントして「アプリケーション」へドラッグ' },
+      install: { term: 'インストール', value: 'DMG をマウントして「アプリケーション」へドラッグ' },
       package: { term: 'パッケージ', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'ほかのアーキテクチャ', value: 'リリースページ' },
       mirror: { term: 'ミラー', value: 'Gitee Releases' },

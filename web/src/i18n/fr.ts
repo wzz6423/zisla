@@ -312,7 +312,7 @@ export const fr: SiteContent = {
         term: 'Système',
         value: 'macOS 14 ou version ultérieure · les Mac Apple silicon sont la configuration prise en charge aujourd’hui',
       },
-      install: { term: 'Installation', value: 'brew install --cask, ou montez le DMG et déposez l’app dans Applications' },
+      install: { term: 'Installation', value: 'Montez le DMG et déposez l’app dans Applications' },
       package: { term: 'Paquet', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Autres architectures', value: 'Page de publication' },
       mirror: { term: 'Miroir', value: 'Gitee Releases' },

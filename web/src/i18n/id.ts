@@ -149,7 +149,7 @@ export const id = createCatalog({
     copyBrewCommandAriaLabel: 'Salin perintah pemasangan Homebrew',
     notes: {
       system: { term: 'Sistem', value: 'macOS 14 atau lebih baru · Konfigurasi yang didukung: Mac Apple Silicon' },
-      install: { term: 'Pasang', value: 'brew install --cask, atau pasang DMG lalu seret ke Applications' },
+      install: { term: 'Pasang', value: 'Pasang DMG lalu seret ke Applications' },
       package: { term: 'Paket', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Arsitektur lain', value: 'Halaman rilis' },
       mirror: { term: 'Mirror', value: 'Gitee Releases' },

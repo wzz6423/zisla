@@ -149,7 +149,7 @@ export const vi = createCatalog({
     copyBrewCommandAriaLabel: 'Sao chép lệnh cài đặt Homebrew',
     notes: {
       system: { term: 'Hệ thống', value: 'macOS 14 trở lên · Cấu hình được hỗ trợ: Mac Apple Silicon' },
-      install: { term: 'Cài đặt', value: 'brew install --cask, hoặc gắn DMG rồi kéo vào Applications' },
+      install: { term: 'Cài đặt', value: 'Gắn DMG rồi kéo vào Applications' },
       package: { term: 'Gói', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Kiến trúc khác', value: 'Trang phát hành' },
       mirror: { term: 'Bản sao', value: 'Gitee Releases' },

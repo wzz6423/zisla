@@ -299,7 +299,7 @@ export const de: SiteContent = {
         term: 'System',
         value: 'macOS 14 oder neuer · unterstützte Konfiguration sind derzeit Macs mit Apple Silicon',
       },
-      install: { term: 'Installation', value: 'brew install --cask oder DMG öffnen und in „Programme“ ziehen' },
+      install: { term: 'Installation', value: 'DMG öffnen und in „Programme“ ziehen' },
       package: { term: 'Paket', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'Weitere Architekturen', value: 'Release-Seite' },
       mirror: { term: 'Spiegel', value: 'Gitee Releases' },

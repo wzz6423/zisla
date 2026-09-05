@@ -149,7 +149,7 @@ export const th = createCatalog({
     copyBrewCommandAriaLabel: 'คัดลอกคำสั่งติดตั้ง Homebrew',
     notes: {
       system: { term: 'ระบบ', value: 'macOS 14 ขึ้นไป · การกำหนดค่าที่รองรับ: Mac ที่ใช้ Apple Silicon' },
-      install: { term: 'ติดตั้ง', value: 'brew install --cask หรือเมานต์ DMG แล้วลากไปยัง Applications' },
+      install: { term: 'ติดตั้ง', value: 'เมานต์ DMG แล้วลากไปยัง Applications' },
       package: { term: 'แพ็กเกจ', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: 'สถาปัตยกรรมอื่น', value: 'หน้ารีลีส' },
       mirror: { term: 'มิเรอร์', value: 'Gitee Releases' },

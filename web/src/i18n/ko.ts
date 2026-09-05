@@ -275,7 +275,7 @@ export const ko: SiteContent = {
         term: '시스템',
         value: 'macOS 14 이상 · 현재 지원 구성은 Apple 실리콘 Mac',
       },
-      install: { term: '설치', value: 'brew install --cask, 또는 DMG를 마운트한 뒤 "응용 프로그램"으로 끌어다 놓기' },
+      install: { term: '설치', value: 'DMG를 마운트한 뒤 "응용 프로그램"으로 끌어다 놓기' },
       package: { term: '패키지', value: 'Apple Silicon (arm64) · DMG' },
       architectures: { term: '다른 아키텍처', value: '릴리스 페이지' },
       mirror: { term: '미러', value: 'Gitee Releases' },
