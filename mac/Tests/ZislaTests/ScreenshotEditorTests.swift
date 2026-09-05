@@ -2428,14 +2428,11 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func mosaicBlurSoftensTheBlockEdgesWithoutFlatteningTheirContrast() throws {
-        let sourceImage = try #require(
-            makeClusteredNoiseImage(width: 120, height: 120, clusterSize: 8)
-        )
+    func mosaicBlurRefractsWhatEachBlockSamplesWhileTheGridStaysHard() throws {
         let region = CGRect(x: 12, y: 12, width: 96, height: 96)
         let blockSize = 12
-        func obscured(blurStrength: CGFloat) throws -> CGImage {
-            let model = ScreenshotEditorModel(image: sourceImage)
+        func obscured(_ source: NSImage, blurStrength: CGFloat) throws -> CGImage {
+            let model = ScreenshotEditorModel(image: source)
             model.add(ScreenshotAnnotation(
                 kind: .mosaic,
                 rect: region,
@@ -2449,36 +2446,73 @@ struct ScreenshotEditorTests {
             )
         }
 
-        let original = try #require(sourceImage.cgImage(forProposedRect: nil, context: nil, hints: nil))
-        let hardBlocks = try obscured(blurStrength: 0)
-        let softBlocks = try obscured(
+        // Coarse blocks of colour, the shape of a real screenshot's panels: what a mosaic has to keep
+        // looking like a mosaic on.
+        let coarse = try #require(
+            makeClusteredNoiseImage(width: 120, height: 120, clusterSize: 24)
+        )
+        let coarseOriginal = try #require(
+            coarse.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        let plainBlocks = try obscured(coarse, blurStrength: 0)
+        let refracted = try obscured(
+            coarse,
             blurStrength: ScreenshotAnnotation.obscureStrengthUpperBound
         )
 
-        // Hard block edges alone do not keep a mosaic readable as one: once neighbouring blocks
-        // bleed together they all settle on the same colour and the region just looks blurred.
-        let hardContrast = try #require(
-            blockContrast(in: hardBlocks, blockSize: blockSize, within: region)
+        // Blurring the source before the blocks sample it makes neighbours converge on each other,
+        // which reads as a blur however hard the geometry is; displacing the content must not.
+        let plainContrast = try #require(
+            adjacentBlockContrast(in: plainBlocks, blockSize: blockSize, within: region)
         )
-        let softContrast = try #require(
-            blockContrast(in: softBlocks, blockSize: blockSize, within: region)
+        let refractedContrast = try #require(
+            adjacentBlockContrast(in: refracted, blockSize: blockSize, within: region)
         )
         #expect(
-            Double(softContrast) >= Double(hardContrast) * 0.7,
-            "格子之间的明暗差异应保留，否则整片看起来就是模糊，实测 \(hardContrast) → \(softContrast)"
+            Double(refractedContrast) >= Double(plainContrast) * 0.7,
+            "相邻格子之间应仍然跳变，否则整片看起来就是模糊，实测 \(plainContrast) → \(refractedContrast)"
         )
-        let blockRun = try #require(longestFlatRun(in: softBlocks, alongRow: 60, from: 20, through: 99))
-        #expect(blockRun >= 6, "格子中心应仍是纯色，实测最长同色段 \(blockRun) 像素")
+        try expectPixelsOutside(region, unchangedFrom: coarseOriginal, to: refracted)
+        try expectPixelsOutside(region, unchangedFrom: coarseOriginal, to: plainBlocks)
 
-        let hardPixels = try #require(rgbaPixels(in: hardBlocks))
-        let softPixels = try #require(rgbaPixels(in: softBlocks))
-        let softenedSomewhere = (20...99).contains { x in
-            let offset = 60 * softBlocks.width * 4 + x * 4
-            return abs(Int(hardPixels[offset]) - Int(softPixels[offset])) > 8
+        // Fine detail, the shape of text: here the slider has to visibly bend what each block picks
+        // up, which a coarse panel cannot show because a displaced sample lands on the same colour.
+        let fine = try #require(makeClusteredNoiseImage(width: 120, height: 120, clusterSize: 8))
+        let finePlain = try obscured(fine, blurStrength: 0)
+        let fineRefracted = try obscured(
+            fine,
+            blurStrength: ScreenshotAnnotation.obscureStrengthUpperBound
+        )
+        // The grid has to survive the slider too, which only shows where neighbouring blocks differ:
+        // a pass that softens the blocks themselves leaves no flat centre and reads as a plain blur.
+        let blockRun = try #require(
+            longestFlatRun(in: fineRefracted, alongRow: 60, from: 24, through: 95)
+        )
+        #expect(
+            blockRun >= blockSize - 2,
+            "格子内部应仍是纯色、边界锐利，实测最长同色段 \(blockRun) 像素"
+        )
+        let finePlainPixels = try #require(rgbaPixels(in: finePlain))
+        let fineRefractedPixels = try #require(rgbaPixels(in: fineRefracted))
+        var movedBlocks = 0
+        var totalBlocks = 0
+        var y = Int(region.minY) + blockSize / 2
+        while y < Int(region.maxY) - blockSize / 2 {
+            var x = Int(region.minX) + blockSize / 2
+            while x < Int(region.maxX) - blockSize / 2 {
+                let offset = y * fineRefracted.width * 4 + x * 4
+                totalBlocks += 1
+                if abs(Int(finePlainPixels[offset]) - Int(fineRefractedPixels[offset])) > 8 {
+                    movedBlocks += 1
+                }
+                x += blockSize
+            }
+            y += blockSize
         }
-        #expect(softenedSomewhere, "模糊滑块应柔化格子边缘")
-        try expectPixelsOutside(region, unchangedFrom: original, to: softBlocks)
-        try expectPixelsOutside(region, unchangedFrom: original, to: hardBlocks)
+        #expect(
+            movedBlocks * 3 >= totalBlocks,
+            "折射应改变多数格子取到的内容，实测 \(movedBlocks)/\(totalBlocks) 个格子变化"
+        )
     }
 
     @Test
@@ -3612,25 +3646,42 @@ struct ScreenshotEditorTests {
         return NSImage(cgImage: cgImage, size: CGSize(width: width, height: height))
     }
 
-    /// How far the blocks of a mosaic spread apart in brightness, sampled at block centres. Blocks
-    /// that have bled into one another all land on the same colour and collapse it towards zero.
-    private func blockContrast(in cgImage: CGImage, blockSize: Int, within bounds: CGRect) -> Int? {
+    /// Mean brightness jump between neighbouring blocks of a mosaic, sampled at block centres. This
+    /// is what separates a mosaic from a blur: blurring the source before the blocks sample it makes
+    /// neighbours converge on each other and drives the jump towards zero, while displacing the
+    /// content leaves neighbouring blocks as unrelated as they were.
+    private func adjacentBlockContrast(
+        in cgImage: CGImage,
+        blockSize: Int,
+        within bounds: CGRect
+    ) -> Int? {
         guard let pixels = rgbaPixels(in: cgImage) else { return nil }
         let bytesPerRow = cgImage.width * 4
-        var samples: [Double] = []
+        var grid: [[Double]] = []
         var y = Int(bounds.minY) + blockSize
         while y < Int(bounds.maxY) - blockSize {
+            var row: [Double] = []
             var x = Int(bounds.minX) + blockSize
             while x < Int(bounds.maxX) - blockSize {
-                samples.append(Double(pixels[y * bytesPerRow + x * 4]))
+                row.append(Double(pixels[y * bytesPerRow + x * 4]))
                 x += blockSize
             }
+            grid.append(row)
             y += blockSize
         }
-        guard !samples.isEmpty else { return nil }
-        let mean = samples.reduce(0, +) / Double(samples.count)
-        let variance = samples.map { ($0 - mean) * ($0 - mean) }.reduce(0, +) / Double(samples.count)
-        return Int(variance.squareRoot())
+        var jumps: [Double] = []
+        for (rowIndex, row) in grid.enumerated() {
+            for (columnIndex, value) in row.enumerated() {
+                if columnIndex + 1 < row.count {
+                    jumps.append(abs(value - row[columnIndex + 1]))
+                }
+                if rowIndex + 1 < grid.count, columnIndex < grid[rowIndex + 1].count {
+                    jumps.append(abs(value - grid[rowIndex + 1][columnIndex]))
+                }
+            }
+        }
+        guard !jumps.isEmpty else { return nil }
+        return Int(jumps.reduce(0, +) / Double(jumps.count))
     }
 
     /// Longest stretch of identically coloured pixels along one row, which is what tells a pixel

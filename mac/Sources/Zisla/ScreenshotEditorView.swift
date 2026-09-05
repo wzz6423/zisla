@@ -524,21 +524,21 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
     var arrowStyle: ScreenshotArrowStyle = .straight
     var fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize
     var number = 1
-    /// Upper bound of the obscure strength sliders. A mosaic's block softening is expressed as a
+    /// Upper bound of the obscure strength sliders. A mosaic's refraction is expressed as a
     /// fraction of it, so the popover and the render pass cannot drift apart.
     static let obscureStrengthUpperBound: CGFloat = 12
 
     var obscureShape: ScreenshotObscureShape = .rectangle
     var obscureEffect: ScreenshotObscureEffect = .blur
     var obscurePixelateStrength: CGFloat = 3
-    /// For a mosaic this is how soft its blocks' own edges are; 0 leaves them hard, which is the
-    /// plain mosaic. A blur region always gets a real value written through `obscureStrength`, so
-    /// the default only ever applies to pixelate.
+    /// For a mosaic this is how far each block refracts what sits under it; 0 leaves the content
+    /// unbent, which is the plain mosaic. A blur region always gets a real value written through
+    /// `obscureStrength`, so the default only ever applies to pixelate.
     var obscureBlurStrength: CGFloat = 0
     var rotation: CGFloat = 0
 
     /// The strength each effect drives itself with: block size for pixelate, radius for blur. A
-    /// mosaic keeps how soft its block edges are in `obscureBlurStrength`, so the two knobs move
+    /// mosaic keeps how far its blocks refract in `obscureBlurStrength`, so the two knobs move
     /// independently.
     var obscureStrength: CGFloat {
         get {
@@ -1132,7 +1132,7 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var obscureEffect: ScreenshotObscureEffect = .blur
     @Published var pixelateStrength: CGFloat = 3
     @Published var blurStrength: CGFloat = 3
-    /// How soft a mosaic block's own edge is; 0 by default, which is the plain hard-edged mosaic.
+    /// How far a mosaic block refracts what sits under it; 0 by default, the plain mosaic.
     @Published var mosaicBlurStrength: CGFloat = 0
     @Published var statusMessage: String?
     @Published var isPinned = false
@@ -1140,7 +1140,7 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published private(set) var hasLongCaptureResult = false
     @Published var longCaptureDirection = ScreenshotLongCaptureDirection.vertical
 
-    /// Blur amount: the blur effect's own strength, or how soft a mosaic's block edges are.
+    /// Blur amount: the blur effect's own strength, or how far a mosaic's blocks refract.
     var obscureBlurStrength: CGFloat {
         switch obscureEffect {
         case .pixelate: mosaicBlurStrength
@@ -1578,26 +1578,35 @@ final class ScreenshotEditorModel: ObservableObject {
             switch annotation.obscureEffect {
             case .pixelate:
                 let blockSize = max(8, annotation.obscureStrength * 3) * max(scaleX, scaleY)
-                // Softens each block's own edge instead of what the block shows, so the grid stays
-                // visible at every setting. A radius anywhere near the block size bleeds neighbours
-                // into each other until they all sit at the same colour, which reads as a blur
-                // however hard the grid still is: on text-like content a quarter of a block keeps
-                // 81% of the brightness spread between blocks, half a block keeps only 42%.
-                let softenRadius = blockSize * 0.25 * min(
+                // Bends what sits under each block through a lens the size of that block, so the
+                // slider raises how far the block's own content is refracted and displaced while
+                // CIPixellate still runs last and leaves every block edge hard. Any pass that
+                // blurs the blocks themselves instead bleeds them together until they all sit at
+                // one colour, which reads as a plain blur however hard the grid still is.
+                // CIGlassDistortion displaces along the texture's gradient, and that gradient
+                // flattens as the lens grows, so the scale has to follow the square of the block
+                // size for the distortion to stay proportional to it: measured across 9pt, 16pt and
+                // 36pt blocks, a scale linear in the block size all but vanishes at 36pt.
+                let refraction = blockSize * blockSize * 0.47 * min(
                     1,
                     annotation.obscureBlurStrength / ScreenshotAnnotation.obscureStrengthUpperBound
                 )
-                let pixelate = CIFilter(name: "CIPixellate")
-                pixelate?.setValue(output, forKey: kCIInputImageKey)
-                pixelate?.setValue(blockSize, forKey: kCIInputScaleKey)
-                let pixelated = pixelate?.outputImage?.clamped(to: extent).cropped(to: extent)
-                if let pixelated, softenRadius > 0, let blur = CIFilter(name: "CIGaussianBlur") {
-                    blur.setValue(pixelated, forKey: kCIInputImageKey)
-                    blur.setValue(softenRadius, forKey: kCIInputRadiusKey)
-                    filtered = blur.outputImage?.clamped(to: extent).cropped(to: extent) ?? pixelated
-                } else {
-                    filtered = pixelated
+                var sampled = output
+                if refraction > 0,
+                   let glass = CIFilter(name: "CIGlassDistortion"),
+                   let texture = Self.lensTexture(blockSize: blockSize, extent: extent) {
+                    glass.setValue(output.clamped(to: extent), forKey: kCIInputImageKey)
+                    glass.setValue(texture, forKey: "inputTexture")
+                    glass.setValue(CIVector(x: extent.midX, y: extent.midY), forKey: kCIInputCenterKey)
+                    glass.setValue(refraction, forKey: kCIInputScaleKey)
+                    sampled = glass.outputImage?.clamped(to: extent).cropped(to: extent) ?? output
                 }
+                let pixelate = CIFilter(name: "CIPixellate")
+                pixelate?.setValue(sampled, forKey: kCIInputImageKey)
+                pixelate?.setValue(blockSize, forKey: kCIInputScaleKey)
+                // Aligns the block grid with the lens tiling, which starts at the image origin.
+                pixelate?.setValue(CIVector(x: 0, y: 0), forKey: kCIInputCenterKey)
+                filtered = pixelate?.outputImage?.clamped(to: extent).cropped(to: extent)
             case .blur:
                 let blur = CIFilter(name: "CIGaussianBlur")
                 blur?.setValue(output, forKey: kCIInputImageKey)
@@ -1620,6 +1629,27 @@ final class ScreenshotEditorModel: ObservableObject {
 
         guard let result = Self.ciContext.createCGImage(output, from: extent) else { return image }
         return NSImage(cgImage: result, size: image.size)
+    }
+
+    /// One spherical lens per mosaic block, tiled from the image origin: a radial white-to-black
+    /// gradient is the height field CIGlassDistortion refracts through, so each block bends only
+    /// what sits under it.
+    private static func lensTexture(blockSize: CGFloat, extent: CGRect) -> CIImage? {
+        guard blockSize > 0,
+              let gradient = CIFilter(name: "CIRadialGradient"),
+              let tile = CIFilter(name: "CIAffineTile")
+        else { return nil }
+        gradient.setValue(CIVector(x: blockSize / 2, y: blockSize / 2), forKey: kCIInputCenterKey)
+        gradient.setValue(0, forKey: "inputRadius0")
+        gradient.setValue(blockSize / 2, forKey: "inputRadius1")
+        gradient.setValue(CIColor(red: 1, green: 1, blue: 1), forKey: "inputColor0")
+        gradient.setValue(CIColor(red: 0, green: 0, blue: 0), forKey: "inputColor1")
+        guard let cell = gradient.outputImage?.cropped(
+            to: CGRect(x: 0, y: 0, width: blockSize, height: blockSize)
+        ) else { return nil }
+        tile.setValue(cell, forKey: kCIInputImageKey)
+        tile.setValue(CGAffineTransform.identity, forKey: kCIInputTransformKey)
+        return tile.outputImage?.clamped(to: extent).cropped(to: extent)
     }
 
     private static func obscureMask(
