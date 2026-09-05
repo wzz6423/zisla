@@ -1968,6 +1968,44 @@ struct ScreenshotCanvasGeometry {
         )
     }
 
+    private init(canvasSize: CGSize, imageSize: CGSize, scale: CGFloat, origin: CGPoint, offset: CGSize) {
+        self.canvasSize = canvasSize
+        self.imageSize = imageSize
+        self.scale = scale
+        self.origin = origin
+        self.offset = offset
+    }
+
+    /// Maps the image into the canvas that renders it. While a selection handle is being dragged the
+    /// canvas already follows the new selection but the crop only lands on release, so the mapping stays
+    /// frozen to `canvasAtResizeStart`: annotations hold their on-screen position instead of rescaling to
+    /// the in-flight selection and snapping back once the new crop replaces the image.
+    static func fitting(
+        imageSize: CGSize,
+        in canvas: CGRect,
+        frozenAt canvasAtResizeStart: CGRect?,
+        zoom: CGFloat = 1,
+        offset: CGSize = .zero
+    ) -> ScreenshotCanvasGeometry {
+        let base = ScreenshotCanvasGeometry(
+            canvasSize: canvasAtResizeStart?.size ?? canvas.size,
+            imageSize: imageSize,
+            zoom: zoom,
+            offset: offset
+        )
+        guard let canvasAtResizeStart else { return base }
+        return ScreenshotCanvasGeometry(
+            canvasSize: canvas.size,
+            imageSize: imageSize,
+            scale: base.scale,
+            origin: CGPoint(
+                x: base.origin.x + canvasAtResizeStart.minX - canvas.minX,
+                y: base.origin.y + canvasAtResizeStart.minY - canvas.minY
+            ),
+            offset: base.offset
+        )
+    }
+
     var renderedSize: CGSize {
         CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
     }
@@ -3665,9 +3703,10 @@ struct ScreenshotEditorView: View {
 
     private func canvas(showsImage: Bool) -> some View {
         GeometryReader { proxy in
-            let geometry = ScreenshotCanvasGeometry(
-                canvasSize: proxy.size,
+            let geometry = ScreenshotCanvasGeometry.fitting(
                 imageSize: model.image.size,
+                in: CGRect(origin: selectionRect.standardized.origin, size: proxy.size),
+                frozenAt: resizeStartRect,
                 zoom: model.hasLongCaptureResult ? canvasZoom : 1,
                 offset: model.hasLongCaptureResult ? canvasOffset : .zero
             )
