@@ -424,7 +424,6 @@ struct SettingsView: View {
                                     }
                                 )
                             )
-                            .frame(minWidth: 142, minHeight: 26)
                             if model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey != nil {
                                 Button {
                                     model.settingsStore.settings.clipboardAssistantTriggerConfiguration = .none
@@ -831,7 +830,6 @@ struct SettingsView: View {
                                     }
                                 )
                             )
-                            .frame(minWidth: 142, minHeight: 26)
                         }
                         rowDivider
                         settingRow(
@@ -848,7 +846,6 @@ struct SettingsView: View {
                                     }
                                 )
                             )
-                            .frame(minWidth: 142, minHeight: 26)
                         }
                         rowDivider
                         featureToggle(
@@ -1681,7 +1678,6 @@ struct SettingsView: View {
                                 }
                             )
                         )
-                        .frame(minWidth: 142, minHeight: 26)
                     }
                     if model.settingsStore.settings.voiceInputHotkeyPreset.requiresInputMonitoring {
                         rowDivider
@@ -3290,6 +3286,17 @@ private struct HotkeyRecorder: NSViewRepresentable {
         nsView.locale = locale
     }
 
+    /// A representable without a reported size takes the whole settings row. The field is measured
+    /// against every title it can settle on rather than the current one, because a recording in
+    /// progress swaps the title inside the NSView, where SwiftUI never gets to re-measure it.
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: HotkeyRecorderButton,
+        context: Context
+    ) -> CGSize? {
+        CGSize(width: nsView.settledWidth, height: 26)
+    }
+
     @MainActor
     final class Coordinator {
         private var parent: HotkeyRecorder
@@ -3434,6 +3441,23 @@ private final class HotkeyRecorderButton: NSButton {
             isRecording = false
         }
         return didResign
+    }
+
+    /// Fits the recorded shortcut and both prompts, so a longer localization widens the field
+    /// instead of truncating inside it. The floor keeps every language that fits — Chinese included
+    /// — on the field's original width.
+    var settledWidth: CGFloat {
+        let bezelWidth = fittingSize.width - textWidth(title)
+        let widest = [hotkey?.settingsDisplayName, loc("点击录制"), loc("按下组合键...")]
+            .compactMap { $0 }
+            .map(textWidth)
+            .max() ?? 0
+        return max(142, ceil(widest + bezelWidth))
+    }
+
+    private func textWidth(_ text: String) -> CGFloat {
+        let font = font ?? .monospacedSystemFont(ofSize: 10, weight: .medium)
+        return (text as NSString).size(withAttributes: [.font: font]).width
     }
 
     private func updateTitle() {
