@@ -2533,6 +2533,23 @@ enum ScreenshotToolbarLayout {
             .size(withAttributes: [.font: font]).width
     }
 
+    /// The obscure panel's strength labels share a 36pt column, which every Chinese wording fits
+    /// (widest: 模糊度 at 33pt). Translations run to 89pt (de "Weichzeichnung"), so widen the column
+    /// by the overflow only: Chinese keeps its 36pt and the popover grows instead of truncating.
+    static var obscureStrengthLabelWidth: CGFloat {
+        obscureStrengthLabelWidth(for: AppLocalization.currentLanguage)
+    }
+
+    static func obscureStrengthLabelWidth(for language: AppLanguage) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        func widest(_ language: AppLanguage) -> CGFloat {
+            ["粗细", "模糊度", "格子"]
+                .map { ceil(titleWidth($0, language: language, font: font)) }
+                .max() ?? 0
+        }
+        return 36 + max(0, widest(language) - widest(.simplifiedChinese))
+    }
+
     /// The Chinese wording is what the 60pt cells were sized around, so it is also the budget: a
     /// language keeps its titles only while no label is wider than the widest Chinese one, which lets
     /// `fitsSingleLine` absorb the remainder. Chinese is compared against itself and always fits, so
@@ -5105,12 +5122,12 @@ struct ScreenshotEditorView: View {
                 Divider().frame(height: 24)
 
                 if model.obscureShape == .brush {
-                    Text("粗细")
+                    Text(AppLocalization.text("粗细"))
                         .font(.system(size: 11, weight: .medium))
-                        .frame(width: 36, alignment: .leading)
+                        .frame(width: ScreenshotToolbarLayout.obscureStrengthLabelWidth, alignment: .leading)
                     Slider(value: $model.lineWidth, in: 1...12, step: 1)
                         .frame(width: 90)
-                        .help("画笔粗细")
+                        .help(AppLocalization.text("画笔粗细"))
                     Text("\(Int(model.lineWidth.rounded()))")
                         .font(.system(size: 11, design: .monospaced))
                         .frame(width: 18, alignment: .trailing)
@@ -5152,12 +5169,12 @@ struct ScreenshotEditorView: View {
         range: ClosedRange<CGFloat>
     ) -> some View {
         HStack(spacing: 10) {
-            Text(title)
+            Text(AppLocalization.text(title))
                 .font(.system(size: 11, weight: .medium))
-                .frame(width: 36, alignment: .leading)
+                .frame(width: ScreenshotToolbarLayout.obscureStrengthLabelWidth, alignment: .leading)
             Slider(value: value, in: range, step: 1)
                 .frame(width: 90)
-                .help(title)
+                .help(AppLocalization.text(title))
             Text("\(Int(value.wrappedValue.rounded()))")
                 .font(.system(size: 11, design: .monospaced))
                 .frame(width: 18, alignment: .trailing)

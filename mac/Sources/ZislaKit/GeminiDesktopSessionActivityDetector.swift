@@ -115,7 +115,7 @@ public final class GeminiDesktopSessionActivityDetector: AIActivityDetecting {
             nil
         )
         guard openResult == SQLITE_OK, let database else {
-            let message = sqliteMessage(database, fallback: "无法打开 Gemini 桌面端会话数据库")
+            let message = sqliteMessage(database, fallback: AppLocalization.text("无法打开 Gemini 桌面端会话数据库"))
             sqlite3_close(database)
             throw AIStateRepositoryError.storageFailure(message)
         }
@@ -125,7 +125,7 @@ public final class GeminiDesktopSessionActivityDetector: AIActivityDetecting {
         var statement: OpaquePointer?
         let prepareResult = sqlite3_prepare_v2(database, Self.sql, -1, &statement, nil)
         guard prepareResult == SQLITE_OK, let statement else {
-            let message = sqliteMessage(database, fallback: "无法查询 Gemini 桌面端会话")
+            let message = sqliteMessage(database, fallback: AppLocalization.text("无法查询 Gemini 桌面端会话"))
             sqlite3_finalize(statement)
             throw AIStateRepositoryError.storageFailure(message)
         }
@@ -136,7 +136,7 @@ public final class GeminiDesktopSessionActivityDetector: AIActivityDetecting {
         guard sqlite3_bind_double(statement, 1, cutoff) == SQLITE_OK,
               sqlite3_bind_int(statement, 2, Int32(maxChats)) == SQLITE_OK else {
             throw AIStateRepositoryError.storageFailure(
-                sqliteMessage(database, fallback: "无法设置 Gemini 桌面端会话查询范围")
+                sqliteMessage(database, fallback: AppLocalization.text("无法设置 Gemini 桌面端会话查询范围"))
             )
         }
 
@@ -171,7 +171,7 @@ public final class GeminiDesktopSessionActivityDetector: AIActivityDetecting {
                 break readRows
             default:
                 throw AIStateRepositoryError.storageFailure(
-                    sqliteMessage(database, fallback: "无法读取 Gemini 桌面端会话")
+                    sqliteMessage(database, fallback: AppLocalization.text("无法读取 Gemini 桌面端会话"))
                 )
             }
         }

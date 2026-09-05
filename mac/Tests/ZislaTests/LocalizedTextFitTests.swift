@@ -119,6 +119,40 @@ struct LocalizedTextFitTests {
         }
     }
 
+    /// 打码面板的强度标签列同样按译文差额生长：中文恰好等于 36pt 基线，其他语言只增不减，且必须
+    /// 容得下自己最宽的那个标签，否则滑块会把文字挤成截断。
+    @Test
+    func obscureStrengthLabelColumnFitsEveryLanguage() {
+        let font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        #expect(ScreenshotToolbarLayout.obscureStrengthLabelWidth(for: .simplifiedChinese) == 36)
+
+        for language in AppLanguage.allCases {
+            let column = ScreenshotToolbarLayout.obscureStrengthLabelWidth(for: language)
+            #expect(column >= 36, "\(language.rawValue) 的强度标签列窄于中文基线")
+            for key in ["粗细", "模糊度", "格子"] {
+                let text = AppLocalization.string(key, language: language)
+                let width = Self.width(text, font: font)
+                #expect(
+                    width <= column,
+                    "\(language.rawValue) 的「\(key)」→「\(text)」宽 \(Int(width))pt，超出 \(Int(column))pt 的标签列"
+                )
+            }
+        }
+    }
+
+    /// 打码面板的强度与粗细文案随 main 的新面板一起进来，17 张表缺 key 时界面会静默回退中文原文。
+    @Test
+    func obscurePanelLabelsAreTranslated() {
+        for key in ["粗细", "模糊度", "格子", "画笔粗细"] {
+            for language in AppLanguage.allCases {
+                let text = AppLocalization.string(key, language: language)
+                #expect(!text.isEmpty, "\(language.rawValue) 的「\(key)」为空")
+                guard language != .simplifiedChinese, language != .traditionalChinese else { continue }
+                #expect(text != key, "\(language.rawValue) 缺「\(key)」的译文")
+            }
+        }
+    }
+
     private static func width(_ text: String, font: NSFont) -> CGFloat {
         ceil((text as NSString).size(withAttributes: [.font: font]).width)
     }
