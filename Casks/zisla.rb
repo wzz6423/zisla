@@ -17,8 +17,8 @@ cask "zisla" do
   end
 
   # Sparkle installs later versions itself, so `brew upgrade` replaces the app only
-  # when the cask is named explicitly or --greedy is passed. Sparkle ships the
-  # universal ZIP, so an in-app update turns this single-architecture install fat.
+  # when the cask is named explicitly or --greedy is passed. Sparkle reads the appcast
+  # for this slice, so an in-app update keeps the install on a single architecture.
   auto_updates true
   depends_on macos: :sonoma
 

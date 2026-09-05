@@ -18,16 +18,21 @@ struct SparkleUpdateConfiguration: Equatable {
     private let feedURLs: [UpdateChannel: SparkleFeedPair]
     let publicKey: String
 
-    init?(infoDictionary: [String: Any]) {
+    init?(
+        infoDictionary: [String: Any],
+        architecture: String = SparkleUpdateConfiguration.hostArchitecture
+    ) {
         guard let releaseFeeds = Self.feedPair(
             giteeKey: "SUFeedURL",
             githubKey: "ZislaReleaseFallbackAppcastURL",
-            in: infoDictionary
+            in: infoDictionary,
+            architecture: architecture
         ),
         let previewFeeds = Self.feedPair(
             giteeKey: "ZislaPreviewAppcastURL",
             githubKey: "ZislaPreviewFallbackAppcastURL",
-            in: infoDictionary
+            in: infoDictionary,
+            architecture: architecture
         ),
         let publicKey = infoDictionary["SUPublicEDKey"] as? String,
         Data(base64Encoded: publicKey)?.count == 32 else {
@@ -52,23 +57,51 @@ struct SparkleUpdateConfiguration: Equatable {
     private static func feedPair(
         giteeKey: String,
         githubKey: String,
-        in infoDictionary: [String: Any]
+        in infoDictionary: [String: Any],
+        architecture: String
     ) -> SparkleFeedPair? {
-        guard let giteeURL = feedURL(forKey: giteeKey, in: infoDictionary),
-              let githubURL = feedURL(forKey: githubKey, in: infoDictionary) else {
+        guard let giteeURL = feedURL(forKey: giteeKey, in: infoDictionary, architecture: architecture),
+              let githubURL = feedURL(forKey: githubKey, in: infoDictionary, architecture: architecture) else {
             return nil
         }
         return SparkleFeedPair(gitee: giteeURL, github: githubURL)
     }
 
-    private static func feedURL(forKey key: String, in infoDictionary: [String: Any]) -> URL? {
+    private static func feedURL(
+        forKey key: String,
+        in infoDictionary: [String: Any],
+        architecture: String
+    ) -> URL? {
         guard let value = infoDictionary[key] as? String,
               let url = URL(string: value),
               url.scheme == "https",
               url.host != nil else {
             return nil
         }
-        return url
+        // Every release publishes one appcast per architecture next to the shared
+        // appcast.xml, so an install stays on its own slice instead of being replaced by
+        // the fat universal build. Info.plist keeps the shared name for both channels.
+        return url.deletingLastPathComponent()
+            .appendingPathComponent("appcast-\(architecture).xml")
+    }
+
+    static let hostArchitecture: String = {
+        #if arch(arm64)
+        "arm64"
+        #else
+        // A translated slice runs on Apple silicon, where following the slice would leave
+        // this Mac on the Intel build, and therefore on Rosetta, for every later update.
+        isTranslatedProcess() ? "arm64" : "x86_64"
+        #endif
+    }()
+
+    private static func isTranslatedProcess() -> Bool {
+        var translated: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        guard sysctlbyname("sysctl.proc_translated", &translated, &size, nil, 0) == 0 else {
+            return false
+        }
+        return translated == 1
     }
 }
 

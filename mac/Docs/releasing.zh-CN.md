@@ -4,7 +4,7 @@
 
 项目的完整发布流程、双更新通道和 GitHub/Gitee 的资产同步由仓库根目录的 [`skills/zisla-release`](../../skills/zisla-release/SKILL.md) 统一维护。本页只说明签名、公证和更新包的设计约束；发布时以该技能为准。
 
-当前选择的两个更新通道都使用 Sparkle：先验签 ZIP 和 appcast，再替换并重启应用。每次检查先读取 Gitee；当 Gitee appcast 无法加载或更新包下载失败时，自动重试一次 GitHub。`package-release.sh` 要求通过 `SPARKLE_GENERATE_APPCAST` 指向 Sparkle 2.9.4 的 `generate_appcast`，并会在 ZIP、DMG 同目录写出 `appcast-gitee.xml` 和 `appcast-github.xml`。两份 appcast 都必须独立签名，且只能指向各自站点的 Universal ZIP。上传时分别以 `appcast.xml` 放到对应站点的 Release：Gitee 的 Release/Preview 永久 feed 分别为 `update-release` 和 `preview`；GitHub 的 Release 使用 `latest`，Preview 使用永久 prerelease `preview`。非交互发布时设置 `SPARKLE_ED_KEY_FILE` 指向私下保管的 EdDSA 私钥文件；不设置则读取登录钥匙串的 `zisla-update-ed25519` 账户。私钥绝不能进入仓库。Developer ID 发布包仍建议公证；免费 ad-hoc Preview 不能公证，首次打开可能需要在系统设置中选择“仍要打开”。
+当前选择的两个更新通道都使用 Sparkle：先验签 ZIP 和 appcast，再替换并重启应用。每次检查先读取 Gitee；当 Gitee appcast 无法加载或更新包下载失败时，自动重试一次 GitHub。`package-release.sh` 要求通过 `SPARKLE_GENERATE_APPCAST` 指向 Sparkle 2.9.4 的 `generate_appcast`，并会在 ZIP、DMG 同目录写出 `appcast-gitee.xml` 和 `appcast-github.xml`。两份 appcast 都必须独立签名，且只能指向各自站点、本次构建那一套架构的 ZIP。`build-package.sh` 按架构各跑一次脚本，因此一次发布有三对：Universal 那对上传为 `appcast.xml`，也就是按架构更新之前发布的版本仍在请求的名字；单架构那两对上传为 `appcast-arm64.xml` 和 `appcast-x86_64.xml`。应用会把 Info.plist 里的 feed 地址改写为运行 slice 对应的 appcast（Rosetta 下的 x86_64 slice 按 `arm64` 请求），因此单架构安装始终更新到同一架构，不会在一次应用内更新后变成 Universal。上传目标：Gitee 的 Release/Preview 永久 feed 分别为 `update-release` 和 `preview`；GitHub 的 Release 使用 `latest`，Preview 使用永久 prerelease `preview`。非交互发布时设置 `SPARKLE_ED_KEY_FILE` 指向私下保管的 EdDSA 私钥文件；不设置则读取登录钥匙串的 `zisla-update-ed25519` 账户。私钥绝不能进入仓库。Developer ID 发布包仍建议公证；免费 ad-hoc Preview 不能公证，首次打开可能需要在系统设置中选择“仍要打开”。
 
 ## 前提
 
@@ -65,7 +65,7 @@ Scripts/package-release.sh
 
 ## 3. 发布与验证
 
-将 ZIP、DMG、校验文件和 `appcast-github.xml` 以 `appcast.xml` 上传到 GitHub 的同一版本 tag Release；将匹配资产和 `appcast-gitee.xml` 以 `appcast.xml` 上传到 Gitee 的同一 tag。正式版不能标记为 prerelease。Gitee 的正式 appcast 还必须复制到永久 `update-release`；Preview 的 appcast 必须复制到两端永久 `preview`。客户端按选择的通道先检查 Gitee，当 Gitee appcast 无法加载或更新包下载失败时回退一次 GitHub。
+将三套 ZIP、DMG、校验文件和三份 GitHub appcast 上传到 GitHub 的同一版本 tag Release，分别命名为 `appcast.xml`（Universal）、`appcast-arm64.xml` 和 `appcast-x86_64.xml`；将匹配资产和三份 Gitee appcast 以同样的三个名字上传到 Gitee 的同一 tag。正式版不能标记为 prerelease。Gitee 的三份正式 appcast 还必须复制到永久 `update-release`；Preview 的 appcast 必须复制到两端永久 `preview`。客户端按选择的通道先检查 Gitee，当 Gitee appcast 无法加载或更新包下载失败时回退一次 GitHub。
 
 ```bash
 codesign --verify --deep --strict --all-architectures --verbose=4 'dist/zisla.app'
@@ -78,7 +78,7 @@ test -L /Volumes/zisla/Applications
 diskutil eject /Volumes/zisla
 ```
 
-使用旧版本检查新 Release，确认自动检查和手动检查都先读取所选 Gitee feed，当其无法加载或更新包下载失败时回退一次对应 GitHub feed，且 Sparkle 能验签、安装并重启 Universal ZIP。还要验证 Release→Preview、Preview→Release 和同通道更新。
+使用旧版本检查新 Release，确认自动检查和手动检查都先读取所选 Gitee feed，当其无法加载或更新包下载失败时回退一次对应 GitHub feed，且 Sparkle 能验签、安装并重启运行架构对应的 ZIP，单架构安装更新后仍只含本机架构。还要验证 Release→Preview、Preview→Release 和同通道更新。
 
 ## 4. 同步 Homebrew cask
 

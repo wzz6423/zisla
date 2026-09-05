@@ -44,4 +44,4 @@ Swift 使用 `Process.executableURL` 和参数数组启动 `yt-dlp`，URL 永远
 
 ## 检查和下载更新
 
-当前选择的更新通道由 Sparkle 读取已签名的 `appcast.xml`，经 HTTPS 下载其中引用的 ZIP，并在解压前验证 EdDSA 归档与 feed 签名，随后替换并重启应用。每次自动或手动检查都先读取 Gitee（Release 为 `update-release`，Preview 为 `preview`）；当 Gitee appcast 无法加载或更新包下载失败时，自动重试一次对应 GitHub feed。两份 appcast 分别只引用本站已签名的 Universal ZIP。切换设置同时影响自动和手动检查，并重置 Sparkle 的下一次检查周期。内置公钥不含账户信息；私钥仅保存在维护者的 macOS 钥匙串或受保护的私钥文件中。
+当前选择的更新通道由 Sparkle 读取运行架构对应的已签名 appcast，经 HTTPS 下载其中引用的 ZIP，并在解压前验证 EdDSA 归档与 feed 签名，随后替换并重启应用。每次自动或手动检查都先读取 Gitee（Release 为 `update-release`，Preview 为 `preview`）；当 Gitee appcast 无法加载或更新包下载失败时，自动重试一次对应 GitHub feed。两份 appcast 分别只引用本站已签名的 ZIP。每次发布在共享的 `appcast.xml` 旁再发布每个架构各自的 appcast，应用只请求自己 slice 对应的那份（Rosetta 下的 x86_64 slice 按 `arm64` 请求），因此单架构安装不会被 Universal 包替换；`appcast.xml` 继续服务于按架构更新之前发布的版本。切换设置同时影响自动和手动检查，并重置 Sparkle 的下一次检查周期。内置公钥不含账户信息；私钥仅保存在维护者的 macOS 钥匙串或受保护的私钥文件中。

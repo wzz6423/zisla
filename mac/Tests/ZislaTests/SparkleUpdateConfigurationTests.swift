@@ -19,8 +19,29 @@ struct SparkleUpdateConfigurationTests {
         #expect(acknowledged)
     }
 
+    @Test(arguments: ["arm64", "x86_64"])
+    func resolvesEveryFeedToTheArchitectureAppcast(architecture: String) throws {
+        let configuration = try #require(SparkleUpdateConfiguration(
+            infoDictionary: [
+                "SUFeedURL": "https://gitee.example.com/release/appcast.xml",
+                "ZislaReleaseFallbackAppcastURL": "https://github.example.com/release/appcast.xml",
+                "ZislaPreviewAppcastURL": "https://gitee.example.com/preview/appcast.xml",
+                "ZislaPreviewFallbackAppcastURL": "https://github.example.com/preview/appcast.xml",
+                "SUPublicEDKey": "RTy+qQHkv0VMQ/6VS/D/oyzOdRmRld7+3nqUywhuqNI=",
+            ],
+            architecture: architecture
+        ))
+
+        #expect(configuration.feedURL(for: .release, source: .primary)?.absoluteString == "https://gitee.example.com/release/appcast-\(architecture).xml")
+        #expect(configuration.feedURL(for: .release, source: .fallback)?.absoluteString == "https://github.example.com/release/appcast-\(architecture).xml")
+        #expect(configuration.feedURL(for: .preview, source: .primary)?.absoluteString == "https://gitee.example.com/preview/appcast-\(architecture).xml")
+        #expect(configuration.feedURL(for: .preview, source: .fallback)?.absoluteString == "https://github.example.com/preview/appcast-\(architecture).xml")
+    }
+
+    // The default keeps this Mac on its own slice, so a single-architecture install is
+    // never replaced by the universal build.
     @Test
-    func acceptsHTTPSPrimaryAndFallbackFeedsWithEd25519PublicKey() throws {
+    func defaultsToAnAppcastForTheHostArchitecture() throws {
         let configuration = try #require(SparkleUpdateConfiguration(infoDictionary: [
             "SUFeedURL": "https://gitee.example.com/release/appcast.xml",
             "ZislaReleaseFallbackAppcastURL": "https://github.example.com/release/appcast.xml",
@@ -29,10 +50,11 @@ struct SparkleUpdateConfigurationTests {
             "SUPublicEDKey": "RTy+qQHkv0VMQ/6VS/D/oyzOdRmRld7+3nqUywhuqNI=",
         ]))
 
-        #expect(configuration.feedURL(for: .release, source: .primary)?.absoluteString == "https://gitee.example.com/release/appcast.xml")
-        #expect(configuration.feedURL(for: .release, source: .fallback)?.absoluteString == "https://github.example.com/release/appcast.xml")
-        #expect(configuration.feedURL(for: .preview, source: .primary)?.absoluteString == "https://gitee.example.com/preview/appcast.xml")
-        #expect(configuration.feedURL(for: .preview, source: .fallback)?.absoluteString == "https://github.example.com/preview/appcast.xml")
+        #expect(["arm64", "x86_64"].contains(SparkleUpdateConfiguration.hostArchitecture))
+        #expect(
+            configuration.feedURL(for: .release, source: .primary)?.lastPathComponent
+                == "appcast-\(SparkleUpdateConfiguration.hostArchitecture).xml"
+        )
     }
 
     @Test
