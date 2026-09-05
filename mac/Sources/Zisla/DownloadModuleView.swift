@@ -57,7 +57,7 @@ struct DownloadModuleView: View {
                         Image(systemName: "folder.fill")
                             .foregroundStyle(Color.cyan)
                         Text(model.downloadDirectory.lastPathComponent)
-                            .lineLimit(1)
+                            .fitsSingleLine()
                         Image(systemName: "chevron.down")
                             .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(.secondary)
@@ -70,7 +70,8 @@ struct DownloadModuleView: View {
                     model.startDownload()
                 } label: {
                     Label(AppLocalization.text("下载"), systemImage: "arrow.down")
-                        .frame(width: 76)
+                        .fitsSingleLine()
+                        .frame(minWidth: 76)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -129,7 +130,7 @@ struct DownloadModuleView: View {
                 HStack {
                     Label(url.lastPathComponent, systemImage: "checkmark.circle.fill")
                         .foregroundStyle(Color.zislaSuccess)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     Spacer()
                     Button(AppLocalization.text("在 Finder 中显示")) {
                         NSWorkspace.shared.activateFileViewerSelecting([url])
@@ -168,7 +169,7 @@ struct DownloadModuleView: View {
                     .foregroundStyle(Color.zislaInfo)
                 Text(downloadSourceLabel(task.urlString))
                     .font(.system(size: 9, weight: .medium))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
                 Spacer(minLength: 4)
                 downloadTaskSummary(task.state)

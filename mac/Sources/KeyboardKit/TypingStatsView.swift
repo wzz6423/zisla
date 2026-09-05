@@ -721,12 +721,12 @@ private struct TypingAppRow: View {
                 HStack {
                     Text(app.displayName)
                         .font(.subheadline.weight(.medium))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     if let bundleIdentifier = app.bundleIdentifier {
                         Text(bundleIdentifier)
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
-                            .lineLimit(1)
+                            .fitsSingleLine()
                     }
                     Spacer()
                     Text(statsCount(app.characterCount))

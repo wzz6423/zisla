@@ -100,7 +100,7 @@ struct TypingStatsSummarySection: View {
             )
             .font(.caption)
             .foregroundStyle(.secondary)
-            .lineLimit(1)
+            .fitsLines(2)
 
             if let message = model.staleDataMessage {
                 Label(

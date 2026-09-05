@@ -87,7 +87,7 @@ struct SkillManagementView: View {
                 Text(agent.managedSkillsDirectory.path)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
             }
             Spacer(minLength: 8)
@@ -167,7 +167,7 @@ struct SkillManagementView: View {
                 Text(agent.managedSkillDestinationDirectory(for: destination).path)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
             }
             Spacer(minLength: 0)
@@ -201,7 +201,7 @@ struct SkillManagementView: View {
                         Text(skill.path)
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundStyle(.tertiary)
-                            .lineLimit(1)
+                            .fitsSingleLine()
                             .truncationMode(.middle)
                         Button {
                             pendingUninstallSkill = skill

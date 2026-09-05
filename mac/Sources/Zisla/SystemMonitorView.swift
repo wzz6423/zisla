@@ -102,7 +102,7 @@ struct SystemMonitorView: View {
                 Text(service.snapshot?.hardware.cpuName ?? AppLocalization.text("正在识别芯片"))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                 MultiLineWaveform(series: cpuWaveSeries, height: 65.5)
                 VStack(spacing: 4) {
                     metricRow(color: WaveformPalette.blue, label: "用户", value: percent(cpuUserUsage))
@@ -133,7 +133,7 @@ struct SystemMonitorView: View {
                 Text(service.snapshot?.hardware.gpuName ?? AppLocalization.text("正在识别图形处理器"))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                 MultiLineWaveform(series: gpuWaveSeries, height: 65.5)
                 VStack(spacing: 4) {
                     metricRow(color: WaveformPalette.blue, label: "利用率", value: gpuUsageText)
@@ -165,7 +165,7 @@ struct SystemMonitorView: View {
                     Text(memoryDetail)
                         .font(.islandMicro())
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     Spacer(minLength: 4)
                     miniActionButton(AppLocalization.text("释放"), help: AppLocalization.text("整理系统内存，回收非活跃与压缩页面")) {
                         releaseMemory()
@@ -205,7 +205,7 @@ struct SystemMonitorView: View {
                     Text("R \(rateText(service.snapshot?.disk.readBytesPerSecond))   W \(rateText(service.snapshot?.disk.writeBytesPerSecond))")
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     Spacer(minLength: 4)
                     miniActionButton(AppLocalization.text("清理"), help: AppLocalization.text("扫描可清理的缓存、日志与开发产物")) {
                         onCleanupRequested()
@@ -468,7 +468,7 @@ struct SystemMonitorView: View {
                 .font(.system(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(.primary)
                 .monospacedDigit()
-                .lineLimit(1)
+                .fitsSingleLine()
         }
     }
 
@@ -485,7 +485,7 @@ struct SystemMonitorView: View {
                 Text(value.map { $0.isEmpty ? placeholder : $0 } ?? placeholder)
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
                     .textSelection(.enabled)
                 Spacer(minLength: 0)
@@ -747,7 +747,7 @@ private struct CardHeader<Trailing: View>: View {
                 .foregroundStyle(.secondary)
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
-                .lineLimit(1)
+                .fitsSingleLine()
             Spacer(minLength: 0)
             trailing()
         }
@@ -978,7 +978,7 @@ private struct SystemCleanupSheet: View {
                                                     HStack(spacing: 5) {
                                                         Text(candidate.displayName)
                                                             .font(.system(size: 11, weight: .medium))
-                                                            .lineLimit(1)
+                                                            .fitsSingleLine()
                                                         Text(AppLocalization.text(candidate.safetyLevel.title))
                                                             .font(.system(size: 9, weight: .medium))
                                                             .foregroundStyle(
@@ -991,13 +991,13 @@ private struct SystemCleanupSheet: View {
                                                         Text(detail)
                                                             .font(.system(size: 9))
                                                             .foregroundStyle(.secondary)
-                                                            .lineLimit(1)
+                                                            .fitsSingleLine()
                                                             .help(detail)
                                                     }
                                                     Text(candidate.safetyLevel.reason)
                                                         .font(.system(size: 9))
                                                         .foregroundStyle(.secondary)
-                                                        .lineLimit(1)
+                                                        .fitsSingleLine()
                                                 }
                                                 Spacer(minLength: 8)
                                                 Text(byteText(candidate.byteSize))

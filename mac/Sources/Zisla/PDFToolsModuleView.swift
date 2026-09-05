@@ -111,7 +111,7 @@ struct PDFToolsModuleView: View {
             AppLocalizedText(operation.detail)
                 .font(.islandMicro())
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
+                .fitsSingleLine()
             Spacer(minLength: 8)
         }
     }
@@ -128,12 +128,12 @@ struct PDFToolsModuleView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(inputURLs.isEmpty ? AppLocalization.text("尚未选择文件") : inputDescription)
                     .font(.system(size: 11, weight: .medium))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                 if !inputSummary.isEmpty {
                     Text(inputSummary)
                         .font(.islandMicro())
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
             }
             Spacer(minLength: 0)
@@ -183,7 +183,7 @@ struct PDFToolsModuleView: View {
                 Text(watermarkImageURL?.lastPathComponent ?? AppLocalization.text("未选择"))
                     .font(.islandMicro())
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
         case .pageNumbers:
             HStack(spacing: 8) {
@@ -238,7 +238,7 @@ struct PDFToolsModuleView: View {
                 Text(statusMessage)
                     .font(.islandMicro())
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
             Spacer(minLength: 8)
             Button(operation.actionTitle) {

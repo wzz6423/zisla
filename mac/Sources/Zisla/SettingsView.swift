@@ -112,7 +112,7 @@ struct SettingsView: View {
                                 .frame(width: 17)
                             AppLocalizedText(section.title)
                                 .font(.system(size: 11, weight: .medium))
-                                .lineLimit(1)
+                                .fitsLines(2, minScale: 0.7)
                             Spacer(minLength: 0)
                         }
                         .padding(.horizontal, 8)
@@ -142,6 +142,7 @@ struct SettingsView: View {
                 Text(AppLocalization.text("版本 %@", appVersion))
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.tertiary)
+                    .fitsSingleLine(0.7)
                 Spacer(minLength: 0)
                 Button {
                     NSApp.terminate(nil)
@@ -154,8 +155,7 @@ struct SettingsView: View {
                         )
                         Text(AppLocalization.text("退出"))
                             .font(.system(size: 10, weight: .medium))
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
+                            .fitsSingleLine(0.7)
                     }
                     .padding(.trailing, 7)
                     .background(Color.fillControl)
@@ -424,7 +424,7 @@ struct SettingsView: View {
                                     }
                                 )
                             )
-                            .frame(width: 142, height: 26)
+                            .frame(minWidth: 142, minHeight: 26)
                             if model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey != nil {
                                 Button {
                                     model.settingsStore.settings.clipboardAssistantTriggerConfiguration = .none
@@ -485,7 +485,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(width: 150, alignment: .trailing)
+                        .frame(minWidth: 150, alignment: .trailing)
                     }
                     rowDivider
                     settingRow(
@@ -550,7 +550,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(width: 150, alignment: .trailing)
+                        .frame(minWidth: 150, alignment: .trailing)
                     }
                     rowDivider
                     featureToggle(
@@ -579,7 +579,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(width: 150, alignment: .trailing)
+                        .frame(minWidth: 150, alignment: .trailing)
                     }
                     if model.settingsStore.settings.clipboardAssistantSearchEngine == .custom {
                         rowDivider
@@ -831,7 +831,7 @@ struct SettingsView: View {
                                     }
                                 )
                             )
-                            .frame(width: 142, height: 26)
+                            .frame(minWidth: 142, minHeight: 26)
                         }
                         rowDivider
                         settingRow(
@@ -848,7 +848,7 @@ struct SettingsView: View {
                                     }
                                 )
                             )
-                            .frame(width: 142, height: 26)
+                            .frame(minWidth: 142, minHeight: 26)
                         }
                         rowDivider
                         featureToggle(
@@ -953,9 +953,10 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(width: 150, alignment: .trailing)
+                        .frame(minWidth: 150, alignment: .trailing)
 
                         Button(AppLocalization.text("试听键盘音")) { model.keyboardSound.preview() }
+                            .fitsSingleLine()
                             .controlSize(.small)
                             .disabled(!model.settingsStore.settings.keyboardEnabled)
                     }
@@ -1532,7 +1533,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                 Text(value)
                     .font(.system(size: 15, weight: .semibold))
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
             Spacer(minLength: 0)
         }
@@ -1680,7 +1681,7 @@ struct SettingsView: View {
                                 }
                             )
                         )
-                        .frame(width: 142, height: 26)
+                        .frame(minWidth: 142, minHeight: 26)
                     }
                     if model.settingsStore.settings.voiceInputHotkeyPreset.requiresInputMonitoring {
                         rowDivider
@@ -1729,7 +1730,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 150, alignment: .trailing)
+                    .frame(minWidth: 150, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
                 rowDivider
@@ -1751,7 +1752,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 150, alignment: .trailing)
+                    .frame(minWidth: 150, alignment: .trailing)
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
             }
@@ -2769,12 +2770,12 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
                     .font(.system(size: 11, weight: .medium))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.tail)
                 Text(entry.bundleIdentifier)
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
             }
             .layoutPriority(1)
@@ -3021,7 +3022,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 AppLocalizedText(title)
                     .font(.system(size: 11, weight: .medium))
-                    .lineLimit(1)
+                    .fitsLines(2)
                     .truncationMode(.tail)
                 if !detail.isEmpty {
                     AppLocalizedText(detail)

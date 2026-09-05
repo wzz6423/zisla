@@ -323,11 +323,11 @@ private struct SoundPackSidebarRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(pack.name)
                         .fontWeight(isSelected ? .semibold : .regular)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     Text("\(pack.family) · \(pack.tone)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
                 Spacer(minLength: 0)
             }
@@ -437,7 +437,7 @@ private struct SoundPackInspector: View {
                     Text(L10n.tr(inspectorContext))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsLines(2)
                 }
                 Spacer()
             }
@@ -656,7 +656,7 @@ private struct SoundPackPhaseAssignmentCard: View {
             Text(editor.assetLabel(assetID))
                 .font(.caption)
                 .foregroundStyle(assetID == nil ? .secondary : .primary)
-                .lineLimit(1)
+                .fitsSingleLine()
 
             HStack(spacing: 7) {
                 Button(AppLocalization.text("导入音频")) {
@@ -758,7 +758,7 @@ private struct SoundPackPerKeyEditor: View {
             if choice == .asset {
                 Text(editor.assetLabel(editor.assignmentAsset(for: slot, phase: phase)))
                     .font(.caption)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                 HStack {
                     Button(AppLocalization.text("更换音频")) {
                         onImport(.audio(SoundPackEditorAudioTarget(slot: slot, phase: phase)))

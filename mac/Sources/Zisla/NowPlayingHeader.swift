@@ -374,7 +374,7 @@ struct NowPlayingHeader: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
                     .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                 HStack(spacing: 5) {
                     Text("\(task.provider.rawValue.uppercased()) \(statusText(for: task.status))")
                         .font(.system(size: 9, weight: .medium))
@@ -389,7 +389,7 @@ struct NowPlayingHeader: View {
                     Text(detail)
                         .font(.islandMicro())
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
             }
             .layoutPriority(1)
@@ -428,10 +428,9 @@ struct NowPlayingHeader: View {
                     .joined(separator: " · "))
                     .font(.system(size: 9.5, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
         }
-        .fixedSize(horizontal: true, vertical: false)
     }
 
     @ViewBuilder

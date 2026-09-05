@@ -207,7 +207,7 @@ private struct MenuBarHeader: View {
                 Text(L10n.tr(statusText))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsLines(2)
             }
 
             Spacer()

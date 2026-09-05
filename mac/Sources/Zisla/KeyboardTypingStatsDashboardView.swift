@@ -371,7 +371,7 @@ struct KeyboardTypingStatsDashboardView: View {
                         HStack(spacing: 8) {
                             Text(timeline.name)
                                 .font(.system(size: 10, weight: .medium))
-                                .lineLimit(1)
+                                .fitsSingleLine()
                                 .frame(width: 110, alignment: .leading)
                             GeometryReader { proxy in
                                 HStack(alignment: .bottom, spacing: Self.timelineBucketSpacing) {

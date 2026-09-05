@@ -2480,7 +2480,11 @@ final class ScreenshotToolbarDragHandleView: NSView {
 
 enum ScreenshotToolbarLayout {
     static let controlCount = 15
-    static let controlWidth: CGFloat = 60
+    /// Chinese fits every toolbar label in a 60pt cell (widest: 取消置顶 at 40pt). The same words run
+    /// 61–145pt in other languages, and growing 15 equal cells to fit would push the rail from 968pt
+    /// to 1.6–2.5k and let `viewportWidth` clip tools away. Those languages drop to icons only —
+    /// every button already carries the full wording in `.help`.
+    static var controlWidth: CGFloat { showsControlTitles ? 60 : 34 }
     static let controlHeight: CGFloat = 28
     static let dragHandleWidth: CGFloat = 28
     static let dragHandleColumns = 2
@@ -2510,6 +2514,43 @@ enum ScreenshotToolbarLayout {
         controlCount: Int = controlCount
     ) -> CGFloat {
         min(contentWidth(forControlCount: controlCount), max(0, availableWidth - 24))
+    }
+
+    /// Every label the 60pt cells host, in the same order `toolbar(viewportWidth:popoverEdge:)` builds
+    /// them — emoji and mosaic are excluded because the rail renders the obscure effect instead.
+    private static var titleKeys: [String] {
+        ScreenshotTool.allCases.filter { $0 != .emoji && $0 != .mosaic }.map(\.title)
+            + ScreenshotObscureEffect.allCases.map(\.title)
+            + ScreenshotLongCaptureDirection.allCases.map(\.title)
+            + ["撤销", "重做", "继续", "长截图", "完成", "缩小", "放大", "取消置顶", "钉图", "复制", "保存", "关闭"]
+    }
+
+    /// `NSCache` is thread-safe; declared with `nonisolated(unsafe)` to satisfy strict concurrency checking.
+    private nonisolated(unsafe) static let titleFitCache = NSCache<NSString, NSNumber>()
+
+    private static func titleWidth(_ key: String, language: AppLanguage, font: NSFont) -> CGFloat {
+        (AppLocalization.string(key, language: language) as NSString)
+            .size(withAttributes: [.font: font]).width
+    }
+
+    /// The Chinese wording is what the 60pt cells were sized around, so it is also the budget: a
+    /// language keeps its titles only while no label is wider than the widest Chinese one, which lets
+    /// `fitsSingleLine` absorb the remainder. Chinese is compared against itself and always fits, so
+    /// its rail never changes.
+    static var showsControlTitles: Bool {
+        showsControlTitles(for: AppLocalization.currentLanguage)
+    }
+
+    static func showsControlTitles(for language: AppLanguage) -> Bool {
+        let cacheKey = language.rawValue as NSString
+        if let cached = titleFitCache.object(forKey: cacheKey) { return cached.boolValue }
+        let font = NSFont.systemFont(ofSize: 10, weight: .medium)
+        let budget = titleKeys
+            .map { ceil(titleWidth($0, language: .simplifiedChinese, font: font)) }
+            .max() ?? 0
+        let fits = titleKeys.allSatisfy { ceil(titleWidth($0, language: language, font: font)) <= budget }
+        titleFitCache.setObject(NSNumber(value: fits), forKey: cacheKey)
+        return fits
     }
 
     static func clampedCenter(_ center: CGPoint, toolbarSize: CGSize, in bounds: CGRect) -> CGPoint {
@@ -3875,7 +3916,7 @@ struct ScreenshotEditorView: View {
                 Text(message)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
             Button(action: onClose) {
                 Label(AppLocalization.text("关闭"), systemImage: "xmark")
@@ -4872,10 +4913,11 @@ struct ScreenshotEditorView: View {
             HStack(spacing: 3) {
                 Image(systemName: tool.symbol)
                     .font(.system(size: 12, weight: .semibold))
-                Text(AppLocalization.text(tool.title))
-                    .font(.system(size: 10, weight: .medium))
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+                if ScreenshotToolbarLayout.showsControlTitles {
+                    Text(AppLocalization.text(tool.title))
+                        .fitsSingleLine()
+                        .font(.system(size: 10, weight: .medium))
+                }
                 Image(systemName: "chevron.down")
                     .font(.system(size: 6, weight: .bold))
             }
@@ -5012,10 +5054,11 @@ struct ScreenshotEditorView: View {
             HStack(spacing: 4) {
                 Image(systemName: model.obscureEffect == .pixelate ? "square.grid.3x3" : "aqi.medium")
                     .font(.system(size: 12, weight: .semibold))
-                Text(AppLocalization.text(model.obscureEffect.title))
-                    .font(.system(size: 10, weight: .medium))
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+                if ScreenshotToolbarLayout.showsControlTitles {
+                    Text(AppLocalization.text(model.obscureEffect.title))
+                        .fitsSingleLine()
+                        .font(.system(size: 10, weight: .medium))
+                }
                 Image(systemName: "chevron.down")
                     .font(.system(size: 7, weight: .bold))
             }
@@ -5029,7 +5072,9 @@ struct ScreenshotEditorView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
-        .help(AppLocalization.text("马赛克 / 模糊"))
+        .help(ScreenshotToolbarLayout.showsControlTitles
+            ? AppLocalization.text("马赛克 / 模糊")
+            : AppLocalization.text(model.obscureEffect.title))
         .popover(isPresented: Binding(
             get: { activeToolMenuID == .mosaic },
             set: { if !$0 { activeToolMenuID = nil } }
@@ -5192,9 +5237,11 @@ struct ScreenshotEditorView: View {
         HStack(spacing: 5) {
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .semibold))
-            AppLocalizedText(title)
-                .font(.system(size: 10, weight: .medium))
-                .lineLimit(1)
+            if ScreenshotToolbarLayout.showsControlTitles {
+                AppLocalizedText(title)
+                    .font(.system(size: 10, weight: .medium))
+                    .fitsSingleLine()
+            }
         }
         .frame(
             width: ScreenshotToolbarLayout.controlWidth,
@@ -5607,7 +5654,21 @@ enum ScreenshotPinnedLayout {
     static let dragHandleWidth = ScreenshotToolbarLayout.dragHandleWidth
     static let buttonWidth: CGFloat = 46
     static let scaleLabelWidth: CGFloat = 32
-    static let opacityControlWidth: CGFloat = 98
+    /// Chinese "透明度" (27pt) fits the 98pt baseline, but translations run to 67pt (ru
+    /// "Прозрачность") and would squeeze the 54pt slider out of the row. Widen the pill by exactly
+    /// the overflow so the Chinese layout keeps its original 98pt.
+    static var opacityControlWidth: CGFloat {
+        opacityControlWidth(for: AppLocalization.currentLanguage)
+    }
+
+    static func opacityControlWidth(for language: AppLanguage) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: 9, weight: .medium)
+        func width(_ language: AppLanguage) -> CGFloat {
+            ceil((AppLocalization.string("透明度", language: language) as NSString)
+                .size(withAttributes: [.font: font]).width)
+        }
+        return 98 + max(0, width(language) - width(.simplifiedChinese))
+    }
     static let spacing: CGFloat = 2
     static let horizontalPadding: CGFloat = 4
     static let toolbarCornerRadius: CGFloat = 10
@@ -5857,8 +5918,7 @@ struct ScreenshotPinnedImageView: View {
                 HStack(spacing: 3) {
                     Image(systemName: "circle.lefthalf.filled")
                     Text(AppLocalization.text("透明度"))
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
+                        .fitsSingleLine()
                     Slider(
                         value: Binding(
                             get: { imageOpacity },

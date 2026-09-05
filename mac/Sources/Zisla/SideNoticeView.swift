@@ -647,7 +647,7 @@ private struct NoticeRow: View {
                         Text(appName)
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .fitsSingleLine()
                             .truncationMode(.tail)
                     }
                 }
@@ -723,7 +723,7 @@ private struct HeadphoneConnectionNotice: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(notice.title)
                     .font(.system(size: 11, weight: .semibold))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.tail)
                 Text(connectionDetail)
                     .font(.system(size: 9, weight: .medium))
@@ -972,7 +972,7 @@ private struct CompactFocusTransitionBar: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(notice.title)
                     .font(.system(size: 10, weight: .semibold))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                 Text(notice.detail ?? AppLocalization.text("状态已更新"))
                     .font(.system(size: 8, weight: .medium))
                     .foregroundStyle(.secondary)
@@ -1035,7 +1035,7 @@ private struct MessageScrollingText: View {
                 if reduceMotion {
                     Text(text)
                         .font(.system(size: 11, weight: .medium))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                         .truncationMode(.tail)
                         .frame(width: available, alignment: .leading)
                 } else {
@@ -1825,7 +1825,7 @@ private struct DetailedMailBar: View {
                         .font(.system(size: min(15, height * 0.56), weight: .semibold))
                     Text(leftNotice.title)
                         .font(.system(size: 10, weight: .semibold))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                         .truncationMode(.tail)
                 }
                 .padding(.leading, CompactStatusMetrics.horizontalContentInset)
@@ -1838,7 +1838,7 @@ private struct DetailedMailBar: View {
                 HStack(spacing: 6) {
                     Text(leftNotice.detail ?? AppLocalization.text("未知发件人"))
                         .font(.system(size: 9, weight: .medium))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                         .truncationMode(.tail)
                     Text(rightNotice.title)
                         .font(.system(size: 10, weight: .bold, design: .rounded))

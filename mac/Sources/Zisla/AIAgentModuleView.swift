@@ -336,7 +336,7 @@ struct AIAgentModuleView: View {
                                     Text(path)
                                         .font(.system(size: 9, design: .monospaced))
                                         .foregroundStyle(.tertiary)
-                                        .lineLimit(1)
+                                        .fitsSingleLine()
                                         .truncationMode(.middle)
                                 }
                             } else {
@@ -543,7 +543,7 @@ struct AIAgentModuleView: View {
                 Text(commandText)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Button {

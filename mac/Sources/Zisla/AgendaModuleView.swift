@@ -69,11 +69,11 @@ struct AgendaModuleView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(weather.locationName ?? AppLocalization.text("当前位置"))
                         .font(.system(size: 9.5, weight: .semibold))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     Text(AppLocalization.text("%@ · 体感 %.0f°", weather.condition.summary, weather.apparentTemperature))
                         .font(.system(size: 8.5))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
                 Spacer(minLength: 3)
                 VStack(alignment: .trailing, spacing: 1) {
@@ -85,7 +85,7 @@ struct AgendaModuleView: View {
                             .font(.system(size: 8.5, weight: .medium, design: .rounded))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
-                            .lineLimit(1)
+                            .fitsSingleLine()
                     }
                 }
             }
@@ -115,7 +115,7 @@ struct AgendaModuleView: View {
                         )
                         .font(.system(size: 8.5, weight: .semibold))
                         .foregroundStyle(weatherAlertColor(alert.severity))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     }
                     .help(weatherAlertDetail(alert))
                 }
@@ -123,7 +123,7 @@ struct AgendaModuleView: View {
                 Label(AppLocalization.text("官方预警不可用"), systemImage: "exclamationmark.triangle")
                     .font(.system(size: 8.5, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .help(error)
             }
         }
@@ -134,7 +134,7 @@ struct AgendaModuleView: View {
         Label(value, systemImage: symbol)
             .font(.system(size: 8, weight: .medium))
             .foregroundStyle(.secondary)
-            .lineLimit(1)
+            .fitsSingleLine()
     }
 
     private func temperatureRange(for weather: WeatherSnapshot) -> String? {
@@ -333,7 +333,7 @@ struct AgendaModuleView: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(event.isCompleted ? .secondary : .primary)
                     .strikethrough(event.isCompleted, color: .secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                 Text(eventDetail(event))
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)

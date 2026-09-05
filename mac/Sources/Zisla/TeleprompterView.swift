@@ -106,7 +106,8 @@ struct TeleprompterView: View {
                 .font(.system(size: 11, weight: .medium))
                 .monospacedDigit()
                 .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 58, alignment: .trailing)
+                .fitsSingleLine()
+                .frame(minWidth: 58, alignment: .trailing)
 
             Button {
                 pasteFromClipboard()

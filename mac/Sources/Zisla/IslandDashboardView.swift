@@ -73,7 +73,7 @@ struct IslandDashboardView: View {
                 Text(pomodoroPhaseText)
                     .font(.islandMicro(weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -91,7 +91,7 @@ struct IslandDashboardView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(task.title)
                             .font(.system(size: 10, weight: .semibold))
-                            .lineLimit(1)
+                            .fitsSingleLine()
 
                         if let progress = task.progress {
                             ProgressView(value: progress)
@@ -134,7 +134,7 @@ struct IslandDashboardView: View {
                         Text([speed, eta.isEmpty ? nil : AppLocalization.text("剩余 %@", eta)].compactMap { $0 }.joined(separator: " · "))
                             .font(.islandMicro(design: .monospaced))
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .fitsSingleLine()
                     }
                     ProgressView(value: fraction)
                         .tint(Color.zislaInfo)
@@ -153,11 +153,11 @@ struct IslandDashboardView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.title.isEmpty ? AppLocalization.text("媒体播放") : item.title)
                             .font(.system(size: 10, weight: .semibold))
-                            .lineLimit(1)
+                            .fitsSingleLine()
                         Text(mediaSecondaryText(item))
                             .font(.islandMicro())
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .fitsSingleLine()
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -206,10 +206,10 @@ struct IslandDashboardView: View {
                     Text(snapshot.agent?.displayName ?? AppLocalization.text("未知浏览器"))
                         .font(.islandMicro(weight: .semibold))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     Text(snapshot.fileName)
                         .font(.system(size: 10, weight: .semibold))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                         .truncationMode(.middle)
                 }
 
@@ -245,7 +245,7 @@ struct IslandDashboardView: View {
             Label(title, systemImage: symbol)
                 .font(.islandMicro(weight: .semibold))
                 .foregroundStyle(tint)
-                .lineLimit(1)
+                .fitsSingleLine()
 
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)

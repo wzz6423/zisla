@@ -236,17 +236,17 @@ struct MailModuleView: View {
                         .frame(width: 5, height: 5)
                     Text(message.sender.isEmpty ? AppLocalization.text("未知发件人") : message.sender)
                         .font(.system(size: 10.5, weight: message.isRead ? .medium : .semibold))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     Spacer(minLength: 0)
                 }
                 Text(message.title)
                     .font(.islandMicro(weight: message.isRead ? .regular : .semibold))
                     .foregroundStyle(message.isRead ? .secondary : .primary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                 Text(message.preview)
                     .font(.islandMicro())
                     .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)
@@ -280,11 +280,11 @@ struct MailModuleView: View {
                         Text(message.sender.isEmpty ? AppLocalization.text("未知发件人") : message.sender)
                             .font(.islandMicro())
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .fitsSingleLine()
                         Text("\(message.accountName) · \(message.receivedAt, format: .dateTime.month().day().hour().minute())")
                             .font(.islandMicro())
                             .foregroundStyle(.tertiary)
-                            .lineLimit(1)
+                            .fitsSingleLine()
                     }
                     Spacer(minLength: 6)
                     actionRail(for: message)
@@ -571,6 +571,7 @@ private struct MailComposerView: View {
                 Text(AppLocalization.text("发件人"))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
+                    .fitsSingleLine()
                     .frame(width: 52, alignment: .leading)
                 Menu {
                     // group by account, show all addresses under each account inline
@@ -594,12 +595,12 @@ private struct MailComposerView: View {
                     HStack(spacing: 3) {
                         Text(selectedIdentity?.address ?? AppLocalization.text("系统默认账户"))
                             .font(.system(size: 11, weight: .medium))
-                            .lineLimit(1)
+                            .fitsSingleLine()
                         if let identity = selectedIdentity, identity.accountName != identity.address {
                             Text("· \(identity.accountName)")
                                 .font(.islandMicro())
                                 .foregroundStyle(.tertiary)
-                                .lineLimit(1)
+                                .fitsSingleLine()
                         }
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(size: 8))
@@ -614,6 +615,7 @@ private struct MailComposerView: View {
                 Text(AppLocalization.text("发件人"))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
+                    .fitsSingleLine()
                     .frame(width: 52, alignment: .leading)
                 Text(identity.address)
                     .font(.system(size: 11, weight: .medium))
@@ -632,6 +634,7 @@ private struct MailComposerView: View {
             Text(AppLocalization.text("收件人"))
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
+                .fitsSingleLine()
                 .frame(width: 52, alignment: .leading)
             TextField(AppLocalization.text("多个地址用逗号分隔"), text: $recipients)
                 .font(.system(size: 11))
@@ -644,6 +647,7 @@ private struct MailComposerView: View {
             Text(AppLocalization.text("主题"))
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
+                .fitsSingleLine()
                 .frame(width: 52, alignment: .leading)
             TextField(AppLocalization.text("邮件主题"), text: $subject)
                 .font(.system(size: 11))
@@ -832,7 +836,7 @@ private struct AttachmentChip: View {
             }
             Text(url.lastPathComponent)
                 .font(.system(size: 8))
-                .lineLimit(1)
+                .fitsSingleLine()
                 .foregroundStyle(.secondary)
         }
         .onAppear {

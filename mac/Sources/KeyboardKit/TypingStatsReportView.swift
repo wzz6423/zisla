@@ -562,7 +562,7 @@ struct TypingStatsHistoryView: View {
                 Text(app.application.displayName)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(KeyboardVisualStyle.instrumentPrimary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.tail)
             }
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
@@ -623,7 +623,7 @@ struct TypingStatsHistoryView: View {
             Text(L10n.tr(title))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
-                .lineLimit(1)
+                .fitsLines(2)
     }
 
     private func tableValue(_ value: String) -> some View {
@@ -748,7 +748,7 @@ struct TypingStatsHistoryView: View {
                 Text(detail)
                     .font(.caption2)
                     .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
             Spacer(minLength: 0)
         }

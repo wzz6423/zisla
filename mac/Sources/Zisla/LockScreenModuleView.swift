@@ -80,7 +80,7 @@ struct LockScreenModuleView: View {
                     .foregroundStyle(.secondary)
                 Text(value)
                     .font(.system(size: 11, weight: .semibold))
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
         }
     }

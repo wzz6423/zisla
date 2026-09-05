@@ -386,7 +386,7 @@ struct ToolboxModuleView: View {
                             ? Color.secondary.opacity(0.5)
                             : (isOn ? Color.primary : Color.secondary)
                     )
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .frame(maxWidth: .infinity)
                     .frame(height: Metrics.controlHeight)
                     .background(isOn ? Color.accentColor.opacity(0.2) : Color.fillControl)

@@ -729,7 +729,7 @@ struct ReadOnlyNoteMetadata: View {
                         } label: {
                             Label(attachment.displayName, systemImage: attachmentSymbol(for: attachment))
                                 .font(.islandMicro(weight: .medium))
-                                .lineLimit(1)
+                                .fitsSingleLine()
                                 .truncationMode(.middle)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 4)

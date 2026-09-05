@@ -759,7 +759,7 @@ struct BatteryDetailView: View {
             Label(title, systemImage: symbol)
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
+                .fitsSingleLine()
             Text(value)
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(tint)
@@ -875,14 +875,14 @@ struct BatteryDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(device.name)
                     .font(.system(size: 11, weight: .semibold))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
                     .help(device.name)
                 HStack(spacing: 4) {
                     Image(systemName: device.source.symbolName)
                         .font(.system(size: 8, weight: .semibold))
                     Text(deviceSubtitle(device))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
@@ -926,7 +926,7 @@ struct BatteryDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(device.name)
                     .font(.system(size: 10, weight: .semibold))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
                     .help(device.name)
 
@@ -934,7 +934,7 @@ struct BatteryDetailView: View {
                     Image(systemName: device.source.symbolName)
                         .font(.system(size: 8, weight: .semibold))
                     Text(deviceSubtitle(device))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
                 .font(.system(size: 8))
                 .foregroundStyle(.secondary)
@@ -1010,7 +1010,7 @@ struct BatteryDetailView: View {
             Text(value)
                 .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .lineLimit(1)
+                .fitsSingleLine()
         }
     }
 

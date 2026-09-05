@@ -161,7 +161,7 @@ private struct TypingOverviewMetricCard: View {
                 Text(L10n.tr(metric.title))
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
 
             Spacer(minLength: 8)
@@ -576,7 +576,7 @@ private struct TypingAppTimelineRow: View {
         HStack(spacing: 12) {
             Text(timeline.application.displayName)
                 .font(.subheadline.weight(.medium))
-                .lineLimit(1)
+                .fitsSingleLine()
                 .truncationMode(.tail)
                 .help(timeline.application.displayName)
                 .frame(width: appWidth, alignment: .leading)

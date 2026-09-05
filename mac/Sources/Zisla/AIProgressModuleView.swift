@@ -221,12 +221,12 @@ private struct TaskProgressRow: View {
                 HStack {
                     Text(task.title)
                         .font(.system(size: 11, weight: .semibold))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                     if let failureReason {
                         HStack(spacing: 3) {
                             Image(systemName: "exclamationmark.triangle.fill")
                             Text(failureReason)
-                                .lineLimit(1)
+                                .fitsSingleLine()
                                 .truncationMode(.tail)
                         }
                         .font(.system(size: 9, weight: .medium))
@@ -248,7 +248,7 @@ private struct TaskProgressRow: View {
                     Text(metadataText)
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
                 statusContent
             }
@@ -276,7 +276,7 @@ private struct TaskProgressRow: View {
                     Text(statusTimeText(startedAt, context.date))
                         .font(.islandMicro(design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                         .layoutPriority(1)
 
                     Spacer(minLength: 2)

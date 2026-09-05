@@ -198,7 +198,7 @@ struct QuickNoteModuleView: View {
                 .foregroundStyle(Color.accentColor)
             Text(service.selectedNote?.title ?? AppLocalization.text("随记"))
                 .font(.system(size: 11, weight: .semibold))
-                .lineLimit(1)
+                .fitsSingleLine()
                 .truncationMode(.tail)
             if service.isLoadingNote {
                 ProgressView().controlSize(.mini)

@@ -554,7 +554,7 @@ struct IslandRootView: View {
                     Text(detail)
                         .font(.islandMicro())
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
             }
             .foregroundStyle(targeted ? color : .primary)
@@ -768,8 +768,7 @@ private struct BackgroundSoundControl: View {
                     Text(controlTitle)
                         .font(.islandMicro(weight: .semibold))
                         .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .fixedSize()
+                        .fitsSingleLine(0.7)
                         .padding(.leading, 2)
                         .padding(.trailing, 4)
                 }

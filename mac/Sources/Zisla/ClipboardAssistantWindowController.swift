@@ -580,13 +580,13 @@ struct ClipboardAssistantToastView: View {
                 Text(AppLocalization.text(detection.title))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.92))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
                 if detailIsVisible, let detailText = detailText(detection.detail) {
                     Text(detailText)
                         .font(.system(size: 9.5, weight: .regular))
                         .foregroundStyle(.white.opacity(0.55))
-                        .lineLimit(1)
+                        .fitsSingleLine()
                         .truncationMode(.middle)
                 }
             }
