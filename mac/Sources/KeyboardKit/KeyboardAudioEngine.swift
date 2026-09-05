@@ -676,13 +676,23 @@ final class KeyboardAudioEngine {
     private func handleEngineConfigurationChange() {
         idlePauseTask?.cancel()
         idlePauseTask = nil
+        // The engine is uninitialized before this notification arrives, and its voice connections
+        // stop passing audio afterwards even though `outputConnectionPoints` still reports them and
+        // `player.isPlaying` stays true. Measured on AirPods, which flip the output device between
+        // 48 kHz and 24 kHz as voice input opens and closes the microphone: without rebuilding the
+        // pool every later key press is silent. Buffers still in flight belong to the previous
+        // hardware format, so they are dropped instead of draining at the wrong rate.
+        for voice in voices {
+            voice.playbackGeneration &+= 1
+            voice.isActive = false
+            voice.gainState = nil
+            voice.player.stop()
+            _ = connect(voice.player, to: voice.speed)
+            _ = connect(voice.speed, to: engine.mainMixerNode)
+        }
         engine.prepare()
-        if allVoicesAreIdle {
-            if engine.isRunning {
-                engine.pause()
-            }
-        } else {
-            _ = startEngineIfNeeded()
+        if engine.isRunning {
+            engine.pause()
         }
     }
 
