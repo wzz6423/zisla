@@ -2428,7 +2428,7 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func mosaicRegionsStackBlurOnTopOfTheirPixelBlocks() throws {
+    func mosaicBlurSoftensWhatEachBlockSamplesWithoutBlurringTheBlocks() throws {
         let sourceImage = try #require(makeCheckerboardImage(width: 96, height: 96))
         let region = CGRect(x: 20, y: 20, width: 56, height: 56)
         func obscured(blurStrength: CGFloat) throws -> CGImage {
@@ -2448,16 +2448,25 @@ struct ScreenshotEditorTests {
 
         let original = try #require(sourceImage.cgImage(forProposedRect: nil, context: nil, hints: nil))
         let pureBlocks = try obscured(blurStrength: 0)
-        let blurredBlocks = try obscured(blurStrength: 8)
+        let softenedBlocks = try obscured(blurStrength: 8)
         let softened = [28, 40, 52, 64].contains { offset in
             let probe = CGPoint(x: offset, y: offset)
             guard let blocks = pixelColor(in: pureBlocks, at: probe),
-                  let blurred = pixelColor(in: blurredBlocks, at: probe)
+                  let blurred = pixelColor(in: softenedBlocks, at: probe)
             else { return false }
             return colorDistance(blocks, blurred) > 8
         }
-        #expect(softened, "马赛克的模糊滑块应叠在格子之上")
-        try expectPixelsOutside(region, unchangedFrom: original, to: blurredBlocks)
+        #expect(softened, "模糊滑块应改变每个格子从底图取到的颜色")
+        // A gaussian blur of the region would leave no flat runs at all; the blocks have to survive
+        // at full strength, otherwise the slider has turned the mosaic into a blur.
+        let blockRun = try #require(
+            longestFlatRun(in: softenedBlocks, alongRow: 48, from: 26, through: 69)
+        )
+        #expect(
+            blockRun >= 8,
+            "格子边界应保持锐利，模糊只作用在格子取样的底图上，实测最长同色段 \(blockRun) 像素"
+        )
+        try expectPixelsOutside(region, unchangedFrom: original, to: softenedBlocks)
         try expectPixelsOutside(region, unchangedFrom: original, to: pureBlocks)
     }
 
@@ -3552,6 +3561,37 @@ struct ScreenshotEditorTests {
         ) else { return nil }
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
         return pixels
+    }
+
+    /// Longest stretch of identically coloured pixels along one row, which is what tells a pixel
+    /// block apart from a gradient a blur would leave behind.
+    private func longestFlatRun(
+        in cgImage: CGImage,
+        alongRow row: Int,
+        from startX: Int,
+        through endX: Int
+    ) -> Int? {
+        guard let pixels = rgbaPixels(in: cgImage),
+              row >= 0, row < cgImage.height,
+              startX >= 0, endX < cgImage.width, startX <= endX
+        else { return nil }
+        let bytesPerRow = cgImage.width * 4
+        func pixel(at x: Int) -> ArraySlice<UInt8> {
+            let offset = row * bytesPerRow + x * 4
+            return pixels[offset..<(offset + 4)]
+        }
+
+        var longest = 1
+        var current = 1
+        for x in (startX + 1)...endX {
+            if pixel(at: x).elementsEqual(pixel(at: x - 1)) {
+                current += 1
+                longest = max(longest, current)
+            } else {
+                current = 1
+            }
+        }
+        return longest
     }
 
     private func colorDistance(

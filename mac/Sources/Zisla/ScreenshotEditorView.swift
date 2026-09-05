@@ -527,13 +527,15 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
     var obscureShape: ScreenshotObscureShape = .rectangle
     var obscureEffect: ScreenshotObscureEffect = .blur
     var obscurePixelateStrength: CGFloat = 3
-    /// 0 leaves a mosaic as plain blocks; a blur region always gets a real value written through
-    /// `obscureStrength`, so the default only ever applies to pixelate.
+    /// For a mosaic this is how far each block reaches into what lies under it before taking its
+    /// colour; 0 samples a single point, which is the plain mosaic. A blur region always gets a real
+    /// value written through `obscureStrength`, so the default only ever applies to pixelate.
     var obscureBlurStrength: CGFloat = 0
     var rotation: CGFloat = 0
 
     /// The strength each effect drives itself with: block size for pixelate, radius for blur. A
-    /// mosaic keeps its extra blur in `obscureBlurStrength`, so the two knobs move independently.
+    /// mosaic keeps how far its blocks sample in `obscureBlurStrength`, so the two knobs move
+    /// independently.
     var obscureStrength: CGFloat {
         get {
             switch obscureEffect {
@@ -1126,7 +1128,8 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var obscureEffect: ScreenshotObscureEffect = .blur
     @Published var pixelateStrength: CGFloat = 3
     @Published var blurStrength: CGFloat = 3
-    /// Blur stacked on top of the mosaic blocks; 0 by default so a new mosaic stays plain blocks.
+    /// How much of what sits under a mosaic block bleeds into its colour; 0 by default, which is the
+    /// plain mosaic a single sample point produces.
     @Published var mosaicBlurStrength: CGFloat = 0
     @Published var statusMessage: String?
     @Published var isPinned = false
@@ -1134,7 +1137,7 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published private(set) var hasLongCaptureResult = false
     @Published var longCaptureDirection = ScreenshotLongCaptureDirection.vertical
 
-    /// Blur amount: the blur effect's own strength, or the extra blur a mosaic stacks on its blocks.
+    /// Blur amount: the blur effect's own strength, or how far a mosaic block samples underneath it.
     var obscureBlurStrength: CGFloat {
         switch obscureEffect {
         case .pixelate: mosaicBlurStrength
@@ -1571,26 +1574,27 @@ final class ScreenshotEditorModel: ObservableObject {
             let filtered: CIImage?
             switch annotation.obscureEffect {
             case .pixelate:
-                let pixelate = CIFilter(name: "CIPixellate")
-                pixelate?.setValue(output, forKey: kCIInputImageKey)
-                pixelate?.setValue(
-                    max(8, annotation.obscureStrength * 3) * max(scaleX, scaleY),
-                    forKey: kCIInputScaleKey
-                )
-                let pixelated = pixelate?.outputImage?.clamped(to: extent).cropped(to: extent)
-                // Blur can ride on top of the blocks; 0 keeps the plain mosaic it used to be.
-                if let pixelated,
-                   annotation.obscureBlurStrength > 0,
-                   let blur = CIFilter(name: "CIGaussianBlur") {
-                    blur.setValue(pixelated, forKey: kCIInputImageKey)
+                // Blurring the source before sampling decides how much of what sits under a block
+                // ends up in its colour; the blocks themselves stay hard-edged, so raising it never
+                // turns the mosaic into a blur.
+                var sampled = output
+                if annotation.obscureBlurStrength > 0, let blur = CIFilter(name: "CIGaussianBlur") {
+                    blur.setValue(output, forKey: kCIInputImageKey)
                     blur.setValue(
                         annotation.obscureBlurStrength * 1.5 * max(scaleX, scaleY),
                         forKey: kCIInputRadiusKey
                     )
-                    filtered = blur.outputImage?.clamped(to: extent).cropped(to: extent) ?? pixelated
-                } else {
-                    filtered = pixelated
+                    if let blurred = blur.outputImage?.clamped(to: extent).cropped(to: extent) {
+                        sampled = blurred
+                    }
                 }
+                let pixelate = CIFilter(name: "CIPixellate")
+                pixelate?.setValue(sampled, forKey: kCIInputImageKey)
+                pixelate?.setValue(
+                    max(8, annotation.obscureStrength * 3) * max(scaleX, scaleY),
+                    forKey: kCIInputScaleKey
+                )
+                filtered = pixelate?.outputImage?.clamped(to: extent).cropped(to: extent)
             case .blur:
                 let blur = CIFilter(name: "CIGaussianBlur")
                 blur?.setValue(output, forKey: kCIInputImageKey)
