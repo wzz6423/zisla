@@ -63,10 +63,10 @@ struct SettingsView: View {
                 set: { if !$0 { pendingRecommendedToolAction = nil } }
             )
         ) {
-            Button("取消", role: .cancel) {
+            Button(AppLocalization.text("取消"), role: .cancel) {
                 pendingRecommendedToolAction = nil
             }
-            Button("继续") {
+            Button(AppLocalization.text("继续")) {
                 guard let action = pendingRecommendedToolAction else { return }
                 pendingRecommendedToolAction = nil
                 Task { await performRecommendedToolAction(action) }
@@ -74,21 +74,21 @@ struct SettingsView: View {
         } message: {
             Text(recommendedToolActionMessage)
         }
-        .alert("清空所有语音记录？", isPresented: $isVoiceHistoryClearConfirmationPresented) {
-            Button("取消", role: .cancel) {}
-            Button("清空", role: .destructive) {
+        .alert(AppLocalization.text("清空所有语音记录？"), isPresented: $isVoiceHistoryClearConfirmationPresented) {
+            Button(AppLocalization.text("取消"), role: .cancel) {}
+            Button(AppLocalization.text("清空"), role: .destructive) {
                 model.removeAllVoiceRecordings()
             }
         } message: {
-            Text("本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。")
+            Text(AppLocalization.text("本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。"))
         }
-        .alert("删除选中的语音记录？", isPresented: $isVoiceHistoryBatchDeleteConfirmationPresented) {
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
+        .alert(AppLocalization.text("删除选中的语音记录？"), isPresented: $isVoiceHistoryBatchDeleteConfirmationPresented) {
+            Button(AppLocalization.text("取消"), role: .cancel) {}
+            Button(AppLocalization.text("删除"), role: .destructive) {
                 deleteSelectedVoiceHistoryEntries()
             }
         } message: {
-            Text("选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。")
+            Text(AppLocalization.text("选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。"))
         }
     }
 
@@ -96,7 +96,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("zisla")
                 .font(.system(size: 14, weight: .semibold))
-            Text("设置")
+            Text(AppLocalization.text("设置"))
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
                 .padding(.top, 1)
@@ -112,7 +112,7 @@ struct SettingsView: View {
                                 .frame(width: 17)
                             AppLocalizedText(section.title)
                                 .font(.system(size: 11, weight: .medium))
-                                .lineLimit(1)
+                                .fitsLines(2, minScale: 0.7)
                             Spacer(minLength: 0)
                         }
                         .padding(.horizontal, 8)
@@ -130,7 +130,7 @@ struct SettingsView: View {
                                 )
                         }
                     }
-                    .accessibilityLabel("\(section.title)设置")
+                    .accessibilityLabel(AppLocalization.text("%@设置", AppLocalization.text(section.title)))
                 }
             }
             .padding(.top, 20)
@@ -139,9 +139,10 @@ struct SettingsView: View {
             Spacer(minLength: 12)
 
             HStack(spacing: 6) {
-                Text("版本 \(appVersion)")
+                Text(AppLocalization.text("版本 %@", appVersion))
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.tertiary)
+                    .fitsSingleLine(0.7)
                 Spacer(minLength: 0)
                 Button {
                     NSApp.terminate(nil)
@@ -152,10 +153,9 @@ struct SettingsView: View {
                             size: .compact,
                             showsInactiveBackground: false
                         )
-                        Text("退出")
+                        Text(AppLocalization.text("退出"))
                             .font(.system(size: 10, weight: .medium))
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
+                            .fitsSingleLine(0.7)
                     }
                     .padding(.trailing, 7)
                     .background(Color.fillControl)
@@ -163,8 +163,8 @@ struct SettingsView: View {
                     .contentShape(Capsule())
                 }
                 .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
-                .help("退出应用")
-                .accessibilityLabel("退出应用")
+                .help(AppLocalization.text("退出应用"))
+                .accessibilityLabel(AppLocalization.text("退出应用"))
             }
             .frame(maxWidth: .infinity)
         }
@@ -282,7 +282,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 132, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
                 rowDivider
@@ -323,7 +323,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 132, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
                 if model.settingsStore.settings.systemMonitorEnabled {
@@ -381,7 +381,7 @@ struct SettingsView: View {
                     featureToggle("媒体播放", detail: "显示系统正在播放的音乐或视频", symbol: "play.square.fill", keyPath: \.mediaEnabled)
                     rowDivider
                     featureToggle(
-                        "Mac 未使用时关闭背景音",
+                        AppLocalization.text("Mac 未使用时关闭背景音"),
                         detail: "锁屏、屏保启动或显示器休眠时，自动关闭背景音",
                         symbol: "lock.display",
                         keyPath: \.systemBackgroundSoundStopsWhenUnused
@@ -391,9 +391,9 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("链接下载", detail: "下载视频或音频", symbol: "arrow.down.circle.fill", keyPath: \.downloaderEnabled)
                     rowDivider
-                    featureToggle("剪贴板历史", detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
+                    featureToggle(AppLocalization.text("剪贴板历史"), detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
                     rowDivider
-                    featureToggle("剪贴板链接检测", detail: "发现可下载链接时提示", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
+                    featureToggle(AppLocalization.text("剪贴板链接检测"), detail: "发现可下载链接时提示", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
                 }
             }
 
@@ -424,7 +424,6 @@ struct SettingsView: View {
                                     }
                                 )
                             )
-                            .frame(width: 142, height: 26)
                             if model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey != nil {
                                 Button {
                                     model.settingsStore.settings.clipboardAssistantTriggerConfiguration = .none
@@ -453,6 +452,7 @@ struct SettingsView: View {
                                         .foregroundStyle(.green)
                                 }
                                 .font(.caption)
+                                .keepsIntrinsicWidth()
                             } else {
                                 Button {
                                     model.openVoiceInputInputMonitoringSettings()
@@ -460,6 +460,7 @@ struct SettingsView: View {
                                     AppLocalizedText("去授权")
                                 }
                                 .controlSize(.small)
+                                .keepsIntrinsicWidth()
                             }
                         }
                     }
@@ -485,7 +486,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(width: 150, alignment: .trailing)
+                        .keepsIntrinsicWidth()
                     }
                     rowDivider
                     settingRow(
@@ -521,6 +522,7 @@ struct SettingsView: View {
                                 AppLocalizedText("去授权")
                             }
                             .controlSize(.small)
+                            .keepsIntrinsicWidth()
                         }
                     }
                     rowDivider
@@ -550,11 +552,11 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(width: 150, alignment: .trailing)
+                        .keepsIntrinsicWidth()
                     }
                     rowDivider
                     featureToggle(
-                        "每次保存图片时选择位置",
+                        AppLocalization.text("每次保存图片时选择位置"),
                         detail: "关闭时保存到“下载”中的默认下载目录",
                         symbol: "folder",
                         keyPath: \.clipboardAssistantPromptsForImageSaveLocation
@@ -579,7 +581,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(width: 150, alignment: .trailing)
+                        .keepsIntrinsicWidth()
                     }
                     if model.settingsStore.settings.clipboardAssistantSearchEngine == .custom {
                         rowDivider
@@ -600,7 +602,7 @@ struct SettingsView: View {
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 10, design: .monospaced))
                             .frame(width: 220)
-                            .accessibilityLabel("自定义搜索网址")
+                            .accessibilityLabel(AppLocalization.text("自定义搜索网址"))
                         }
                     }
                     if let conflictMessage = clipboardAssistantHotkeyConflictMessage {
@@ -625,6 +627,7 @@ struct SettingsView: View {
                             }
                         }
                         .controlSize(.small)
+                        .keepsIntrinsicWidth()
                     }
                     ForEach(assistantBlacklistEntries, id: \.bundleIdentifier) { entry in
                         rowDivider
@@ -707,7 +710,7 @@ struct SettingsView: View {
                                     symbol: expandedClipboardAssistantKind == kind
                                         ? "chevron.up.circle.fill"
                                         : "chevron.down.circle",
-                                    help: expandedClipboardAssistantKind == kind ? "收起" : "展开",
+                                    help: expandedClipboardAssistantKind == kind ? AppLocalization.text("收起") : AppLocalization.text("展开"),
                                     isActive: expandedClipboardAssistantKind == kind,
                                     size: .compact
                                 ) {
@@ -728,7 +731,7 @@ struct SettingsView: View {
                                     HStack(spacing: 4) {
                                         IconButton(
                                             symbol: "arrow.up",
-                                            help: "上移\(clipboardAssistantActionTitle(action))",
+                                            help: AppLocalization.text("上移%@", AppLocalization.text(clipboardAssistantActionTitle(action))),
                                             size: .compact
                                         ) {
                                             moveClipboardAssistantAction(action, for: kind, by: -1)
@@ -737,7 +740,7 @@ struct SettingsView: View {
 
                                         IconButton(
                                             symbol: "arrow.down",
-                                            help: "下移\(clipboardAssistantActionTitle(action))",
+                                            help: AppLocalization.text("下移%@", AppLocalization.text(clipboardAssistantActionTitle(action))),
                                             size: .compact
                                         ) {
                                             moveClipboardAssistantAction(action, for: kind, by: 1)
@@ -755,7 +758,7 @@ struct SettingsView: View {
                             ) {
                                 IconButton(
                                     symbol: "arrow.counterclockwise",
-                                    help: "恢复默认顺序",
+                                    help: AppLocalization.text("恢复默认顺序"),
                                     size: .compact
                                 ) {
                                     resetClipboardAssistantActionOrder(for: kind)
@@ -811,7 +814,7 @@ struct SettingsView: View {
                 settingsGroup("截图") {
                     if input.selection == .features {
                         featureToggle(
-                            "启用截图",
+                            AppLocalization.text("启用截图"),
                             detail: "启用截图、钉图与全局快捷键",
                             symbol: "camera.viewfinder",
                             keyPath: \.screenshotEnabled
@@ -831,7 +834,6 @@ struct SettingsView: View {
                                     }
                                 )
                             )
-                            .frame(width: 142, height: 26)
                         }
                         rowDivider
                         settingRow(
@@ -848,11 +850,10 @@ struct SettingsView: View {
                                     }
                                 )
                             )
-                            .frame(width: 142, height: 26)
                         }
                         rowDivider
                         featureToggle(
-                            "显示钉图控制条",
+                            AppLocalization.text("显示钉图控制条"),
                             detail: "隐藏后仍支持快捷键、手势和鼠标操作",
                             symbol: "rectangle.bottomhalf.inset.filled",
                             keyPath: \.screenshotPinnedToolbarVisible
@@ -893,14 +894,16 @@ struct SettingsView: View {
                                 isNested: true
                             ) {
                                 if model.voiceInputInputMonitoringAccessGranted {
-                                    Label("已授权", systemImage: "checkmark.circle.fill")
+                                    Label(AppLocalization.text("已授权"), systemImage: "checkmark.circle.fill")
                                         .foregroundStyle(.green)
                                         .font(.caption)
+                                        .keepsIntrinsicWidth()
                                 } else {
-                                    Button("打开设置") {
+                                    Button(AppLocalization.text("打开设置")) {
                                         model.openVoiceInputInputMonitoringSettings()
                                     }
                                     .controlSize(.small)
+                                    .keepsIntrinsicWidth()
                                 }
                             }
                         }
@@ -914,7 +917,7 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("显示 zisla 图标", detail: "关闭后不影响已启用的菜单栏监控项", symbol: "app.badge", keyPath: \.menuBarAppIconEnabled)
                     rowDivider
-                    featureToggle("始终置顶", detail: "收起时保持在其他窗口和菜单栏图标上方", symbol: "rectangle.topthird.inset.filled", keyPath: \.islandCollapsedOnTop)
+                    featureToggle(AppLocalization.text("始终置顶"), detail: "收起时保持在其他窗口和菜单栏图标上方", symbol: "rectangle.topthird.inset.filled", keyPath: \.islandCollapsedOnTop)
                     rowDivider
                     featureToggle("浏览器下载进度", detail: "在灵动岛显示来源图标与百分比", symbol: "arrow.down.circle.fill", keyPath: \.browserDownloadIslandEnabled)
                         .disabled(!model.settingsStore.settings.sideNoticesEnabled)
@@ -922,15 +925,15 @@ struct SettingsView: View {
                     featureToggle("原生下载进度", detail: "下载器工作时显示来源平台图标与百分比", symbol: "arrow.down.square.fill", keyPath: \.videoDownloadIslandEnabled)
                         .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                     rowDivider
-                    featureToggle("静音 Zisla 通知", detail: "不发送番茄钟等由 Zisla 产生的系统通知", symbol: "bell.slash.fill", keyPath: \.notificationsMuted)
+                    featureToggle(AppLocalization.text("静音 Zisla 通知"), detail: "不发送番茄钟等由 Zisla 产生的系统通知", symbol: "bell.slash.fill", keyPath: \.notificationsMuted)
                 }
 
                 settingsGroup("宠物与更新") {
                     featureToggle("宠物", detail: "在灵动岛养一只小宠物", symbol: "pawprint.fill", keyPath: \.petEnabled)
                     rowDivider
-                    featureToggle("自动检查更新", detail: "定期检查当前安装包所属的更新通道", symbol: "arrow.triangle.2.circlepath", keyPath: \.updateChecksEnabled)
+                    featureToggle(AppLocalization.text("自动检查更新"), detail: "定期检查当前安装包所属的更新通道", symbol: "arrow.triangle.2.circlepath", keyPath: \.updateChecksEnabled)
                     rowDivider
-                    featureToggle("自动下载更新", detail: "发现新版本后下载，并在退出或重启时完成安装", symbol: "arrow.down.circle.fill", keyPath: \.automaticDownloadEnabled)
+                    featureToggle(AppLocalization.text("自动下载更新"), detail: "发现新版本后下载，并在退出或重启时完成安装", symbol: "arrow.down.circle.fill", keyPath: \.automaticDownloadEnabled)
                         .disabled(!model.settingsStore.settings.updateChecksEnabled)
                 }
             }
@@ -953,10 +956,13 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(width: 150, alignment: .trailing)
+                        .keepsIntrinsicWidth()
 
-                        Button("试听键盘音") { model.keyboardSound.preview() }
-                            .controlSize(.small)
+                        IconButton(
+                            symbol: "play.fill",
+                            help: AppLocalization.text("试听键盘音"),
+                            size: .compact
+                        ) { model.keyboardSound.preview() }
                             .disabled(!model.settingsStore.settings.keyboardEnabled)
                     }
                     .disabled(!model.settingsStore.settings.keyboardEnabled)
@@ -974,7 +980,7 @@ struct SettingsView: View {
                 featureToggle("播放键盘回弹音", detail: "为支持的音色播放释放音", symbol: "arrow.uturn.backward", keyPath: \.keyboardPlaysReleaseSound, isNested: true)
                     .disabled(!model.settingsStore.settings.keyboardEnabled)
                 rowDivider
-                featureToggle("自然音高变化", detail: "在连续击键间使用轻微音量与音高变化", symbol: "waveform.path.ecg", keyPath: \.keyboardUsesPitchVariation, isNested: true)
+                featureToggle(AppLocalization.text("自然音高变化"), detail: "在连续击键间使用轻微音量与音高变化", symbol: "waveform.path.ecg", keyPath: \.keyboardUsesPitchVariation, isNested: true)
                     .disabled(!model.settingsStore.settings.keyboardEnabled)
             }
 
@@ -983,12 +989,14 @@ struct SettingsView: View {
                 rowDivider
                 settingRow(symbol: "lock.shield", title: "输入监控权限", detail: model.keyboardSound.monitoringStateText) {
                     if model.keyboardSound.isInputMonitoringGranted {
-                        Label("已授权", systemImage: "checkmark.circle.fill")
+                        Label(AppLocalization.text("已授权"), systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                             .font(.caption)
+                            .keepsIntrinsicWidth()
                     } else {
-                        Button("打开设置") { model.keyboardSound.openInputMonitoringSettings() }
+                        Button(AppLocalization.text("打开设置")) { model.keyboardSound.openInputMonitoringSettings() }
                             .controlSize(.small)
+                            .keepsIntrinsicWidth()
                     }
                 }
             }
@@ -1010,7 +1018,7 @@ struct SettingsView: View {
                         detail: "显示在系统时间上方；留空则不显示"
                     ) {
                         TextField(
-                            "输入一句话",
+                            AppLocalization.text("输入一句话"),
                             text: Binding(
                                 get: { model.settingsStore.settings.lockScreenMessage },
                                 set: { model.settingsStore.settings.lockScreenMessage = $0 }
@@ -1058,7 +1066,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 96, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
                 rowDivider
@@ -1081,7 +1089,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 96, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
             }
@@ -1098,7 +1106,7 @@ struct SettingsView: View {
                         HStack(spacing: 4) {
                             IconButton(
                                 symbol: "arrow.up",
-                                help: "上移\(priority.title)",
+                                help: AppLocalization.text("上移%@", AppLocalization.text(priority.title)),
                                 size: .compact
                             ) {
                                 moveCompactStatusPriority(priority, by: -1)
@@ -1107,7 +1115,7 @@ struct SettingsView: View {
 
                             IconButton(
                                 symbol: "arrow.down",
-                                help: "下移\(priority.title)",
+                                help: AppLocalization.text("下移%@", AppLocalization.text(priority.title)),
                                 size: .compact
                             ) {
                                 moveCompactStatusPriority(priority, by: 1)
@@ -1125,7 +1133,7 @@ struct SettingsView: View {
                 ) {
                     IconButton(
                         symbol: "arrow.counterclockwise",
-                        help: "恢复默认顺序",
+                        help: AppLocalization.text("恢复默认顺序"),
                         size: .compact
                     ) {
                         model.settingsStore.settings.compactStatusPriority = CompactStatusPriority.defaultOrder
@@ -1234,22 +1242,24 @@ struct SettingsView: View {
                             set: { model.selectVoiceModelConfiguration($0) }
                         )
                     ) {
-                        Text("不使用模型整理").tag(Optional<AIModelConfigurationReference>.none)
+                        Text(AppLocalization.text("不使用模型整理")).tag(Optional<AIModelConfigurationReference>.none)
                         ForEach(model.aiAgent.store.state.localModels.filter(\.isEnabled)) { localModel in
                             let reference = AIModelConfigurationReference.local(localModel.id)
-                            Text("本地 · \(model.voiceModelConfigurationTitle(reference))")
+                            Text(AppLocalization.text("本地 · %@", model.voiceModelConfigurationTitle(reference)))
+                                .fitsMenuItem(maxWidth: 170)
                                 .tag(Optional(reference))
                         }
                         ForEach(model.aiAgent.store.state.channels.filter(\.isEnabled)) { channel in
                             let reference = AIModelConfigurationReference.channel(channel.id)
-                            Text("远端 · \(model.voiceModelConfigurationTitle(reference))")
+                            Text(AppLocalization.text("远端 · %@", model.voiceModelConfigurationTitle(reference)))
+                                .fitsMenuItem(maxWidth: 170)
                                 .tag(Optional(reference))
                         }
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(maxWidth: 220, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                 }
                 rowDivider
                 settingRow(
@@ -1285,11 +1295,12 @@ struct SettingsView: View {
                                 if model.voiceModelDiscoveryState.isTesting {
                                     ProgressView().controlSize(.small)
                                 } else {
-                                    Text("测试连接")
+                                    Text(AppLocalization.text("测试连接"))
                                 }
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
+                            .keepsIntrinsicWidth()
                             .disabled(model.voiceModelDiscoveryState.isTesting)
                         }
                     }
@@ -1339,13 +1350,13 @@ struct SettingsView: View {
                         )
                     ) {
                         ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
-                            Text(policy.menuTitle).tag(policy)
+                            Text(AppLocalization.text(policy.menuTitle)).tag(policy)
                         }
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 120, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                 }
                 rowDivider
                 settingRow(
@@ -1353,7 +1364,7 @@ struct SettingsView: View {
                     title: "记录目录",
                     detail: "原始音频和文字记录只保存在本机"
                 ) {
-                    IconButton(symbol: "folder", help: "打开语音记录目录", size: .compact) {
+                    IconButton(symbol: "folder", help: AppLocalization.text("打开语音记录目录"), size: .compact) {
                         model.openVoiceRecordingsDirectory()
                     }
                 }
@@ -1380,12 +1391,13 @@ struct SettingsView: View {
                     detail: "用于语音识别和语音整理模型"
                 ) {
                     HStack(spacing: 6) {
-                        TextField("输入热词", text: $customVoiceHotword)
+                        TextField(AppLocalization.text("输入热词"), text: $customVoiceHotword)
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 150)
                             .onSubmit(addCustomVoiceHotword)
-                        Button("添加", action: addCustomVoiceHotword)
+                        Button(AppLocalization.text("添加"), action: addCustomVoiceHotword)
                             .controlSize(.small)
+                            .keepsIntrinsicWidth()
                             .disabled(
                                 customVoiceHotword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             )
@@ -1398,7 +1410,7 @@ struct SettingsView: View {
                         title: hotword,
                         detail: ""
                     ) {
-                        IconButton(symbol: "trash", help: "删除\(hotword)", size: .compact) {
+                        IconButton(symbol: "trash", help: AppLocalization.text("删除%@", hotword), size: .compact) {
                             removeCustomVoiceHotword(hotword)
                         }
                     }
@@ -1417,7 +1429,7 @@ struct SettingsView: View {
                 voiceStatistic(
                     symbol: "textformat",
                     title: "总识别字词",
-                    value: "\(statistics.totalWordCount) 字词"
+                    value: AppLocalization.text("%ld 字词", statistics.totalWordCount)
                 )
                 voiceStatistic(
                     symbol: "waveform",
@@ -1427,7 +1439,7 @@ struct SettingsView: View {
                 voiceStatistic(
                     symbol: "bolt.fill",
                     title: "输入速度",
-                    value: "\(Int(statistics.wordsPerMinute.rounded())) 字词/分"
+                    value: AppLocalization.text("%ld 字词/分", Int(statistics.wordsPerMinute.rounded()))
                 )
                 voiceStatistic(
                     symbol: "clock",
@@ -1438,25 +1450,25 @@ struct SettingsView: View {
 
             settingsGroup("语音记录") {
                 HStack(spacing: 8) {
-                    Text("全部记录仅保存在本机")
+                    Text(AppLocalization.text("全部记录仅保存在本机"))
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
                     if voiceHistorySelectionMode {
-                        IconButton(symbol: "xmark", help: "退出选择模式", size: .compact) {
+                        IconButton(symbol: "xmark", help: AppLocalization.text("退出选择模式"), size: .compact) {
                             voiceHistorySelectionMode = false
                             selectedVoiceHistoryIDs.removeAll()
                         }
                     } else {
-                        IconButton(symbol: "checkmark.circle", help: "选择多条记录", size: .compact) {
+                        IconButton(symbol: "checkmark.circle", help: AppLocalization.text("选择多条记录"), size: .compact) {
                             voiceHistorySelectionMode = true
                             selectedVoiceHistoryIDs.removeAll()
                         }
                         .disabled(model.voiceHistory.entries.isEmpty)
-                        IconButton(symbol: "folder", help: "打开语音记录目录", size: .compact) {
+                        IconButton(symbol: "folder", help: AppLocalization.text("打开语音记录目录"), size: .compact) {
                             model.openVoiceRecordingsDirectory()
                         }
-                        IconButton(symbol: "trash", help: "清空语音记录", size: .compact) {
+                        IconButton(symbol: "trash", help: AppLocalization.text("清空语音记录"), size: .compact) {
                             isVoiceHistoryClearConfirmationPresented = true
                         }
                         .disabled(model.voiceHistory.entries.isEmpty)
@@ -1468,7 +1480,7 @@ struct SettingsView: View {
                 if voiceHistorySelectionMode && !model.voiceHistory.entries.isEmpty {
                     rowDivider
                     HStack(spacing: 8) {
-                        Button(selectedVoiceHistoryIDs.count == model.voiceHistory.entries.count ? "取消全选" : "全选") {
+                        Button(selectedVoiceHistoryIDs.count == model.voiceHistory.entries.count ? AppLocalization.text("取消全选") : AppLocalization.text("全选")) {
                             if selectedVoiceHistoryIDs.count == model.voiceHistory.entries.count {
                                 selectedVoiceHistoryIDs.removeAll()
                             } else {
@@ -1481,11 +1493,11 @@ struct SettingsView: View {
                         Spacer(minLength: 8)
 
                         if !selectedVoiceHistoryIDs.isEmpty {
-                            Text("已选 \(selectedVoiceHistoryIDs.count) 条")
+                            Text(AppLocalization.text("已选 %ld 条", selectedVoiceHistoryIDs.count))
                                 .font(.system(size: 9))
                                 .foregroundStyle(.secondary)
 
-                            Button("删除选中") {
+                            Button(AppLocalization.text("删除选中")) {
                                 isVoiceHistoryBatchDeleteConfirmationPresented = true
                             }
                             .buttonStyle(.bordered)
@@ -1502,7 +1514,7 @@ struct SettingsView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "waveform.slash")
                             .foregroundStyle(.secondary)
-                        Text("暂无语音记录")
+                        Text(AppLocalization.text("暂无语音记录"))
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                     }
@@ -1527,12 +1539,12 @@ struct SettingsView: View {
                 .frame(width: 26, height: 26)
                 .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 3) {
-                Text(title)
+                AppLocalizedText(title)
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
                 Text(value)
                     .font(.system(size: 15, weight: .semibold))
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
             Spacer(minLength: 0)
         }
@@ -1569,20 +1581,20 @@ struct SettingsView: View {
                     Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
-                    Text("\(voiceDurationText(entry.duration)) · \(entry.wordCount) 字词")
+                    Text(AppLocalization.text("%@ · %ld 字词", voiceDurationText(entry.duration), entry.wordCount))
                         .font(.system(size: 9))
                         .foregroundStyle(.tertiary)
                 }
                 if let processed = entry.processedTranscript {
-                    Text("AI 整理：\(processed)")
+                    Text(AppLocalization.text("AI 整理：%@", processed))
                         .font(.system(size: 11, weight: .medium))
                         .lineLimit(2)
-                    Text("原始识别：\(entry.rawTranscript.isEmpty ? "未识别到文字" : entry.rawTranscript)")
+                    Text(AppLocalization.text("原始识别：%@", entry.rawTranscript.isEmpty ? "未识别到文字" : entry.rawTranscript))
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 } else {
-                    Text(entry.rawTranscript.isEmpty ? "未识别到文字" : entry.rawTranscript)
+                    Text(entry.rawTranscript.isEmpty ? AppLocalization.text("未识别到文字") : entry.rawTranscript)
                         .font(.system(size: 11, weight: .medium))
                         .lineLimit(3)
                 }
@@ -1593,14 +1605,14 @@ struct SettingsView: View {
             if !voiceHistorySelectionMode {
                 HStack(spacing: 4) {
                     if model.voiceHistory.audioURL(for: entry) != nil {
-                        IconButton(symbol: "play.fill", help: "播放原始录音", size: .compact) {
+                        IconButton(symbol: "play.fill", help: AppLocalization.text("播放原始录音"), size: .compact) {
                             model.playVoiceRecording(id: entry.id)
                         }
-                        IconButton(symbol: "magnifyingglass", help: "在 Finder 中显示", size: .compact) {
+                        IconButton(symbol: "magnifyingglass", help: AppLocalization.text("在 Finder 中显示"), size: .compact) {
                             model.revealVoiceRecording(id: entry.id)
                         }
                     }
-                    IconButton(symbol: "trash", help: "删除这条语音记录", size: .compact) {
+                    IconButton(symbol: "trash", help: AppLocalization.text("删除这条语音记录"), size: .compact) {
                         model.removeVoiceRecording(id: entry.id)
                     }
                 }
@@ -1614,12 +1626,12 @@ struct SettingsView: View {
     private func voiceDurationText(_ duration: TimeInterval) -> String {
         let duration = max(0, duration)
         if duration < 60 {
-            return "\(Int(duration.rounded())) 秒"
+            return AppLocalization.text("%ld 秒", Int(duration.rounded()))
         }
         if duration < 3_600 {
-            return String(format: "%.1f 分钟", duration / 60)
+            return AppLocalization.text("%.1f 分钟", duration / 60)
         }
-        return String(format: "%.1f 小时", duration / 3_600)
+        return AppLocalization.text("%.1f 小时", duration / 3_600)
     }
 
     private func deleteSelectedVoiceHistoryEntries() {
@@ -1631,9 +1643,9 @@ struct SettingsView: View {
 
     private var discoveryStatusText: String {
         switch model.voiceModelDiscoveryState {
-        case .idle: "尚未测试连接"
-        case .testing: "正在连接…"
-        case .success(let count): "已发现 \(count) 个模型"
+        case .idle: AppLocalization.text("尚未测试连接")
+        case .testing: AppLocalization.text("正在连接…")
+        case .success(let count): AppLocalization.text("已发现 %ld 个模型", count)
         case .failed(let message): message
         }
     }
@@ -1661,7 +1673,7 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        .frame(maxWidth: 110, alignment: .trailing)
+                        .keepsIntrinsicWidth()
                     }
                     rowDivider
                     settingRow(
@@ -1680,7 +1692,6 @@ struct SettingsView: View {
                                 }
                             )
                         )
-                        .frame(width: 142, height: 26)
                     }
                     if model.settingsStore.settings.voiceInputHotkeyPreset.requiresInputMonitoring {
                         rowDivider
@@ -1691,14 +1702,16 @@ struct SettingsView: View {
                             isNested: true
                         ) {
                             if model.voiceInputInputMonitoringAccessGranted {
-                                Label("已授权", systemImage: "checkmark.circle.fill")
+                                Label(AppLocalization.text("已授权"), systemImage: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
                                     .font(.caption)
+                                    .keepsIntrinsicWidth()
                             } else {
-                                Button("打开设置") {
+                                Button(AppLocalization.text("打开设置")) {
                                     model.openVoiceInputInputMonitoringSettings()
                                 }
                                 .controlSize(.small)
+                                .keepsIntrinsicWidth()
                             }
                         }
                     }
@@ -1729,7 +1742,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 150, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
                 rowDivider
@@ -1745,13 +1758,13 @@ struct SettingsView: View {
                             set: { model.settingsStore.settings.petSide = $0 }
                         )
                     ) {
-                        Text("左侧").tag(PetSide.left)
-                        Text("右侧").tag(PetSide.right)
+                        Text(AppLocalization.text("左侧")).tag(PetSide.left)
+                        Text(AppLocalization.text("右侧")).tag(PetSide.right)
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 150, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
             }
@@ -1811,8 +1824,8 @@ struct SettingsView: View {
 
     private func petDisplayLabel(_ entry: PetLibrary.Entry) -> String {
         switch entry.origin {
-        case .builtin: entry.manifest.displayName
-        case .imported: "\(entry.manifest.displayName)（已导入）"
+        case .builtin: AppLocalization.text(entry.manifest.displayName)
+        case .imported: AppLocalization.text("%@（已导入）", entry.manifest.displayName)
         }
     }
 
@@ -1820,7 +1833,7 @@ struct SettingsView: View {
         NSScreen.screens.enumerated().compactMap { index, screen in
             let key = NSDeviceDescriptionKey("NSScreenNumber")
             guard let number = screen.deviceDescription[key] as? NSNumber else { return nil }
-            let name = screen.localizedName.isEmpty ? "显示器 \(index + 1)" : screen.localizedName
+            let name = screen.localizedName.isEmpty ? AppLocalization.text("显示器 %ld", index + 1) : screen.localizedName
             return ActivityNoticeDisplay(id: number.uint32Value, name: name)
         }
     }
@@ -1885,16 +1898,16 @@ struct SettingsView: View {
     ) {
         var settings = model.settingsStore.settings
         let other = action == .capture ? settings.screenshotPinHotkey : settings.screenshotHotkey
-        let actionName = action == .capture ? "截图" : "钉图"
-        let otherName = action == .capture ? "钉图" : "截图"
+        let actionName = AppLocalization.text(action == .capture ? "截图" : "钉图")
+        let otherName = AppLocalization.text(action == .capture ? "钉图" : "截图")
         guard !hotkey.conflicts(with: other) else {
-            screenshotHotkeyValidationMessage = "\(actionName)快捷键与\(otherName)冲突，未保存"
+            screenshotHotkeyValidationMessage = AppLocalization.text("%@快捷键与%@冲突，未保存", actionName, otherName)
             return
         }
         guard !settings.voiceInputEnabled
             || !hotkey.conflicts(with: settings.voiceInputHotkeyPreset)
         else {
-            screenshotHotkeyValidationMessage = "\(actionName)快捷键与语音输入冲突，未保存"
+            screenshotHotkeyValidationMessage = AppLocalization.text("%@快捷键与语音输入冲突，未保存", actionName)
             return
         }
         switch action {
@@ -1923,13 +1936,13 @@ struct SettingsView: View {
                         )
                     ) {
                         ForEach(AppLanguage.allCases, id: \.self) { language in
-                            Text(languageDisplayName(language)).tag(language)
+                            Text(language.nativeDisplayName).tag(language)
                         }
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
-                    .frame(width: 180, alignment: .trailing)
+                    .keepsIntrinsicWidth()
                 }
                 rowDivider
                 settingRow(
@@ -2004,11 +2017,12 @@ struct SettingsView: View {
                         title: "需要系统批准",
                         detail: "在登录项中允许 zisla 后即可生效"
                     ) {
-                        Button("打开登录项…") {
+                        Button(AppLocalization.text("打开登录项…")) {
                             launchAtLogin.openLoginItemsSettings()
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .keepsIntrinsicWidth()
                     }
                 }
 
@@ -2084,10 +2098,10 @@ struct SettingsView: View {
                     title: "默认下载目录",
                     detail: model.downloadDirectory.path(percentEncoded: false)
                 ) {
-                    Button("选择默认下载目录") { chooseDownloadDirectory() }
+                    Button(AppLocalization.text("选择默认下载目录")) { chooseDownloadDirectory() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        .fixedSize(horizontal: true, vertical: false)
+                        .keepsIntrinsicWidth()
                 }
             }
 
@@ -2127,11 +2141,12 @@ struct SettingsView: View {
                         .foregroundStyle(Color.zislaSuccess)
                 }
 
-                Button(state.isInstalled ? "更新" : "安装") {
+                Button(state.isInstalled ? AppLocalization.text("更新") : AppLocalization.text("安装")) {
                     Task { await model.managedTools.install(tool) }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .keepsIntrinsicWidth()
                 .disabled(state.isBusy)
                 .help(
                     state.isInstalled
@@ -2145,47 +2160,49 @@ struct SettingsView: View {
     private func managedToolDetail(_ tool: ManagedTool, state: ManagedToolState) -> String {
         if let errorMessage = state.errorMessage { return errorMessage }
         switch state.phase {
-        case .checking: return "正在查询最新版本…"
+        case .checking: return AppLocalization.text("正在查询最新版本…")
         case .downloading(let fraction):
-            return fraction > 0 ? "正在下载 \(Int(fraction * 100))%" : "正在下载…"
-        case .installing: return "正在安装…"
+            return fraction > 0
+                ? AppLocalization.text("正在下载 %ld%%", Int(fraction * 100))
+                : AppLocalization.text("正在下载…")
+        case .installing: return AppLocalization.text("正在安装…")
         case .idle: break
         }
         guard let location = state.location else {
-            return "未安装 · \(tool.purpose) · \(tool.installDetail)"
+            return AppLocalization.text("未安装 · %@ · %@", AppLocalization.text(tool.purpose), tool.installDetail)
         }
-        let version = state.installedVersion ?? "版本未知"
+        let version = state.installedVersion ?? AppLocalization.text("版本未知")
         if state.hasUpdate, let latest = state.latestVersion {
-            return "\(version) · \(location.label) · 可更新到 \(latest)"
+            return AppLocalization.text("%@ · %@ · 可更新到 %@", version, AppLocalization.text(location.label), latest)
         }
-        return "\(version) · \(location.label) · \(tool.purpose)"
+        return "\(version) · \(AppLocalization.text(location.label)) · \(AppLocalization.text(tool.purpose))"
     }
 
     private var recommendationsContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("一键管理") {
                 HStack(spacing: 8) {
-                    Text("\(recommendedTools.count) 个推荐工具")
+                    Text(AppLocalization.text("%ld 个推荐工具", recommendedTools.count))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
                     recommendationActionButton(
                         symbol: "arrow.clockwise",
-                        help: "重新检测推荐工具",
+                        help: AppLocalization.text("重新检测推荐工具"),
                         disabled: recommendedToolsAreBusy
                     ) {
                         Task { await refreshRecommendedTools() }
                     }
                     recommendationActionButton(
                         symbol: "arrow.down.circle",
-                        help: "一键下载所有未安装的推荐工具",
+                        help: AppLocalization.text("一键下载所有未安装的推荐工具"),
                         disabled: recommendedToolsAreBusy || missingRecommendedTools.isEmpty
                     ) {
                         pendingRecommendedToolAction = .install
                     }
                     recommendationActionButton(
                         symbol: "arrow.up.circle",
-                        help: "一键更新所有已安装的推荐工具",
+                        help: AppLocalization.text("一键更新所有已安装的推荐工具"),
                         disabled: recommendedToolsAreBusy || installedRecommendedTools.isEmpty
                     ) {
                         pendingRecommendedToolAction = .update
@@ -2269,7 +2286,9 @@ struct SettingsView: View {
 
                 recommendationActionButton(
                     symbol: state.isInstalled ? "arrow.up.circle" : "arrow.down.circle",
-                    help: state.isInstalled ? "更新 \(tool.displayName)" : "下载并安装 \(tool.displayName)",
+                    help: state.isInstalled
+                        ? AppLocalization.text("更新 %@", tool.displayName)
+                        : AppLocalization.text("下载并安装 %@", tool.displayName),
                     disabled: state.isBusy
                 ) {
                     Task { await model.managedTools.install(tool) }
@@ -2395,10 +2414,11 @@ struct SettingsView: View {
                     Button {
                         model.refreshWeather()
                     } label: {
-                        Label("刷新", systemImage: "arrow.clockwise")
+                        Label(AppLocalization.text("刷新"), systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .keepsIntrinsicWidth()
                 }
             }
         }
@@ -2423,7 +2443,7 @@ struct SettingsView: View {
                             draggedWeatherLocationID = location.id
                             return NSItemProvider(object: location.id as NSString)
                         }
-                        .help("拖动调整 \(location.displayName) 的展示顺序")
+                        .help(AppLocalization.text("拖动调整 %@ 的展示顺序", location.displayName))
 
                     Button {
                         model.removeWeatherLocation(id: location.id)
@@ -2433,7 +2453,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
-                    .help("删除 \(location.displayName)")
+                    .help(AppLocalization.text("删除 %@", location.displayName))
                 }
             }
         }
@@ -2454,7 +2474,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "arrow.triangle.branch",
                     title: "更新通道",
-                    detail: "\(model.settingsStore.settings.updateChannel.detail)；用于自动与手动更新"
+                    detail: AppLocalization.text("%@；用于自动与手动更新", AppLocalization.text(model.settingsStore.settings.updateChannel.detail))
                 ) {
                     IslandOutlinedPicker(
                         selection: Binding(
@@ -2490,7 +2510,7 @@ struct SettingsView: View {
                             )
                         } label: {
                             Label(
-                                "检查 \(model.settingsStore.settings.updateChannel.menuTitle)",
+                                AppLocalization.text("检查 %@", AppLocalization.text(model.settingsStore.settings.updateChannel.menuTitle)),
                                 systemImage: "arrow.clockwise"
                             )
                         }
@@ -2561,10 +2581,11 @@ struct SettingsView: View {
                 detail: networkProxyStatusDetail
             ) {
                 HStack(spacing: 8) {
-                    Text(networkProxyStatusText)
+                    AppLocalizedText(networkProxyStatusText)
                         .font(.system(size: 10))
                         .foregroundStyle(networkProxyStatusColor)
-                    IconButton(symbol: "arrow.clockwise", help: "重新检测代理", size: .compact) {
+                        .keepsIntrinsicWidth()
+                    IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("重新检测代理"), size: .compact) {
                         checkNetworkProxy()
                     }
                     .disabled(networkProxyMonitor.availability == .checking)
@@ -2583,7 +2604,7 @@ struct SettingsView: View {
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 24)
             HStack(spacing: 6) {
-                TextField("城市、区县或地区", text: $input.weatherQuery)
+                TextField(AppLocalization.text("城市、区县或地区"), text: $input.weatherQuery)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11))
                     .focused($searchFieldFocused)
@@ -2598,7 +2619,7 @@ struct SettingsView: View {
                             .foregroundStyle(.tertiary)
                     }
                     .buttonStyle(.plain)
-                    .help("清除")
+                    .help(AppLocalization.text("清除"))
                 }
             }
             .padding(.horizontal, 8)
@@ -2632,7 +2653,7 @@ struct SettingsView: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
             )
-            .help("搜索地区")
+            .help(AppLocalization.text("搜索地区"))
             .disabled(input.weatherQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(.horizontal, 4)
@@ -2716,7 +2737,7 @@ struct SettingsView: View {
         ].compactMap { $0 }
         guard !conflicts.isEmpty else { return nil }
         return loc("快速触发快捷键与%@快捷键冲突，请更换其中一个")
-            .replacingOccurrences(of: "%@", with: conflicts.joined(separator: "、"))
+            .replacingOccurrences(of: "%@", with: conflicts.joined(separator: AppLocalization.text("、")))
     }
 
     private var assistantBlacklistEntries: [AssistantBlacklistEntry] {
@@ -2765,12 +2786,12 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
                     .font(.system(size: 11, weight: .medium))
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.tail)
                 Text(entry.bundleIdentifier)
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.middle)
             }
             .layoutPriority(1)
@@ -2844,13 +2865,13 @@ struct SettingsView: View {
                 )
             ) {
                 ForEach(MailCompactStyle.allCases, id: \.self) { style in
-                    Text(style.title).tag(style)
+                    Text(AppLocalization.text(style.title)).tag(style)
                 }
             }
             .labelsHidden()
             .pickerStyle(.menu)
             .controlSize(.small)
-            .frame(maxWidth: 108, alignment: .trailing)
+            .keepsIntrinsicWidth()
         }
         rowDivider
         mailAppAccountSettings
@@ -2865,11 +2886,12 @@ struct SettingsView: View {
                 title: "邮件账户",
                 detail: "尚未读取到系统 Mail.app 账户"
             ) {
-                Button("刷新") {
+                Button(AppLocalization.text("刷新")) {
                     Task { await model.refreshMail() }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .keepsIntrinsicWidth()
             }
         } else {
             ForEach(Array(accounts.enumerated()), id: \.element.id) { index, account in
@@ -2877,7 +2899,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "envelope",
                     title: account.displayName,
-                    detail: account.id == account.displayName ? "系统 Mail.app 账户" : account.id
+                    detail: account.id == account.displayName ? AppLocalization.text("系统 Mail.app 账户") : account.id
                 ) {
                     Toggle("", isOn: mailAccountBinding(for: account.id, availableAccounts: accounts))
                         .labelsHidden()
@@ -3017,7 +3039,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 AppLocalizedText(title)
                     .font(.system(size: 11, weight: .medium))
-                    .lineLimit(1)
+                    .fitsLines(2)
                     .truncationMode(.tail)
                 if !detail.isEmpty {
                     AppLocalizedText(detail)
@@ -3080,8 +3102,8 @@ struct SettingsView: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .strokeBorder(tint.opacity(colorScheme == .dark ? 0.42 : 0.24), lineWidth: 0.5)
         )
-        .help("在浏览器中打开 \(title)")
-        .accessibilityLabel("在浏览器中打开 \(title)")
+        .help(AppLocalization.text("在浏览器中打开 %@", title))
+        .accessibilityLabel(AppLocalization.text("在浏览器中打开 %@", title))
     }
 
     private func settingsGroup<Content: View>(
@@ -3109,7 +3131,7 @@ struct SettingsView: View {
         if model.productUpdateAvailable {
             IconButton(
                 symbol: "arrow.up.circle",
-                help: "查看更新",
+                help: AppLocalization.text("查看更新"),
                 isActive: true,
                 size: .compact
             ) {
@@ -3190,29 +3212,6 @@ struct SettingsView: View {
             .compactMap(NSImage.init(contentsOf:))
             .first
     }
-
-    private func languageDisplayName(_ language: AppLanguage) -> String {
-        switch language {
-        case .simplifiedChinese: return "简体中文"
-        case .traditionalChinese: return "繁體中文"
-        case .english: return "English"
-        case .japanese: return "日本語"
-        case .korean: return "한국어"
-        case .french: return "Français"
-        case .german: return "Deutsch"
-        case .spanish: return "Español"
-        case .brazilianPortuguese: return "Português (Brasil)"
-        case .italian: return "Italiano"
-        case .dutch: return "Nederlands"
-        case .russian: return "Русский"
-        case .arabic: return "العربية"
-        case .thai: return "ไทย"
-        case .indonesian: return "Bahasa Indonesia"
-        case .vietnamese: return "Tiếng Việt"
-        case .turkish: return "Türkçe"
-        }
-    }
-
 }
 
 private struct ActivityNoticeDisplay: Identifiable {
@@ -3306,6 +3305,17 @@ private struct HotkeyRecorder: NSViewRepresentable {
     func updateNSView(_ nsView: HotkeyRecorderButton, context: Context) {
         nsView.hotkey = hotkey
         nsView.locale = locale
+    }
+
+    /// A representable without a reported size takes the whole settings row. The field is measured
+    /// against every title it can settle on rather than the current one, because a recording in
+    /// progress swaps the title inside the NSView, where SwiftUI never gets to re-measure it.
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: HotkeyRecorderButton,
+        context: Context
+    ) -> CGSize? {
+        CGSize(width: nsView.settledWidth, height: 26)
     }
 
     @MainActor
@@ -3452,6 +3462,23 @@ private final class HotkeyRecorderButton: NSButton {
             isRecording = false
         }
         return didResign
+    }
+
+    /// Fits the recorded shortcut and both prompts, so a longer localization widens the field
+    /// instead of truncating inside it. The floor keeps every language that fits — Chinese included
+    /// — on the field's original width.
+    var settledWidth: CGFloat {
+        let bezelWidth = fittingSize.width - textWidth(title)
+        let widest = [hotkey?.settingsDisplayName, loc("点击录制"), loc("按下组合键...")]
+            .compactMap { $0 }
+            .map(textWidth)
+            .max() ?? 0
+        return max(142, ceil(widest + bezelWidth))
+    }
+
+    private func textWidth(_ text: String) -> CGFloat {
+        let font = font ?? .monospacedSystemFont(ofSize: 10, weight: .medium)
+        return (text as NSString).size(withAttributes: [.font: font]).width
     }
 
     private func updateTitle() {
@@ -3665,9 +3692,9 @@ private enum RecommendedToolAction {
     func message(itemCount: Int) -> String {
         switch self {
         case .install:
-            "将通过官方安装来源下载并安装 \(itemCount) 项缺失工具。工具较多时可能需要一些时间。"
+            AppLocalization.text("将通过官方安装来源下载并安装 %ld 项缺失工具。工具较多时可能需要一些时间。", itemCount)
         case .update:
-            "将通过官方安装来源更新 \(itemCount) 项已安装工具。工具较多时可能需要一些时间。"
+            AppLocalization.text("将通过官方安装来源更新 %ld 项已安装工具。工具较多时可能需要一些时间。", itemCount)
         }
     }
 }

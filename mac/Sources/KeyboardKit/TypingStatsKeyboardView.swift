@@ -1,6 +1,8 @@
 import AppKit
 import Foundation
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 private enum TypingKeyCountScope: String, CaseIterable, Identifiable {
     case today = "今日"
@@ -78,7 +80,7 @@ struct TypingStatsKeyboardView: View {
                         Spacer()
 
                         VStack(alignment: .trailing, spacing: 10) {
-                            Picker("统计范围", selection: $scope) {
+                            Picker(AppLocalization.text("统计范围"), selection: $scope) {
                                 ForEach(TypingKeyCountScope.allCases) { scope in
                                     Text(L10n.tr(scope.rawValue)).tag(scope)
                                 }
@@ -96,8 +98,8 @@ struct TypingStatsKeyboardView: View {
                     if presentation.totalPresses == 0 {
                         Label(
                             scope == .today
-                                ? "今天还没有按键记录；开始输入后键盘会逐键点亮。"
-                                : "还没有累计按键记录；开始输入后键盘会逐键点亮。",
+                                ? L10n.tr("今天还没有按键记录；开始输入后键盘会逐键点亮。")
+                                : L10n.tr("还没有累计按键记录；开始输入后键盘会逐键点亮。"),
                             systemImage: "keyboard"
                         )
                         .font(.caption)
@@ -126,14 +128,14 @@ struct TypingStatsKeyboardView: View {
                         .equatable()
                             .padding(.top, 12)
                     } label: {
-                        Text("外接键盘与扩展按键")
+                        Text(AppLocalization.text("外接键盘与扩展按键"))
                             .font(.subheadline.weight(.medium))
                     }
 
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "info.circle")
                         Text(
-                            "按下计数包含 Shift、Command、回车、退格和方向键；长按产生的系统自动重复不增加物理按下次数。"
+                            AppLocalization.text("按下计数包含 Shift、Command、回车、退格和方向键；长按产生的系统自动重复不增加物理按下次数。")
                         )
                     }
                     .font(.caption2)
@@ -214,7 +216,7 @@ private struct TypingStatsKeyboardExtendedSection: View, Equatable {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !TypingStatsKeyboardPresentation.unplacedLayoutKeys.isEmpty {
-                Text("额外修饰键")
+                Text(AppLocalization.text("额外修饰键"))
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 4) {
@@ -229,7 +231,7 @@ private struct TypingStatsKeyboardExtendedSection: View, Equatable {
                 }
             }
 
-            Text("导航、功能、数字键盘与国际键")
+            Text(AppLocalization.text("导航、功能、数字键盘与国际键"))
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
@@ -248,7 +250,7 @@ private struct TypingStatsKeyboardExtendedSection: View, Equatable {
             }
 
             if !otherKeys.isEmpty {
-                Text("其他已识别键")
+                Text(AppLocalization.text("其他已识别键"))
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
                     .padding(.top, 4)

@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import ZislaCore
 
 /// View model for the Quick Notes module, backed by the system Notes app with one local welcome item.
 ///
@@ -17,10 +18,10 @@ public final class QuickNotesService: ObservableObject {
         let deleteNote: (String) async -> Result<Void, NotesAppError>
     }
 
-    public static let welcomeNoteTitle = "朋友，看这里。"
+    public static var welcomeNoteTitle: String { AppLocalization.text("朋友，看这里。") }
     private static let builtInWelcomeNoteID = "zisla.builtin.quick-notes-welcome"
     private static let welcomeDismissedDefaultsKey = "QuickNotesService.isBuiltInWelcomeNoteDismissed"
-    private static let welcomeNoteResourcePath = "QuickNotes/welcome-note.md"
+    private static let welcomeNoteResourceFolder = "QuickNotes"
     private static let fallbackWelcomeNoteText = """
     从现在开始，你可以在记事本中写记事了。 那么，你都能做些什么呢？
     记忆力并不是智慧，但没有记忆力还成什么智慧呢？
@@ -110,16 +111,26 @@ public final class QuickNotesService: ObservableObject {
     }
 
     static var welcomeNoteText: String {
+        welcomeNoteText(language: AppLocalization.currentLanguage)
+    }
+
+    /// Reads `welcome-note-<language>.md`, then the Simplified Chinese source note, then the inline copy.
+    static func welcomeNoteText(language: AppLanguage) -> String {
         let sourceResources = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Resources", isDirectory: true)
-        let candidates = [Bundle.main.resourceURL, sourceResources].compactMap { $0 }
-        for root in candidates {
-            let url = root.appendingPathComponent(welcomeNoteResourcePath, isDirectory: false)
-            if let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
-                return text
+        let roots = [Bundle.main.resourceURL, sourceResources].compactMap { $0 }
+        let names = ["welcome-note-\(language.rawValue).md", "welcome-note.md"]
+        for name in names {
+            for root in roots {
+                let url = root
+                    .appendingPathComponent(welcomeNoteResourceFolder, isDirectory: true)
+                    .appendingPathComponent(name, isDirectory: false)
+                if let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
+                    return text
+                }
             }
         }
         return fallbackWelcomeNoteText
@@ -320,7 +331,8 @@ public final class QuickNotesService: ObservableObject {
 
     /// Creates a new note in Notes, then refreshes the list and selects it.
     @discardableResult
-    public func create(markdown: String = "# 新随记\n") async -> Bool {
+    public func create(markdown: String? = nil) async -> Bool {
+        let markdown = markdown ?? "# \(AppLocalization.text("新随记"))\n"
         let title = Self.title(for: markdown)
         isSaving = true
         let result = await NotesAppBridge.createNote(title: title, markdown: markdown)
@@ -337,7 +349,8 @@ public final class QuickNotesService: ObservableObject {
 
     /// Creates a rich-text note, then refreshes the list and selects it.
     @discardableResult
-    public func create(html: String, title: String = "新随记") async -> Bool {
+    public func create(html: String, title: String? = nil) async -> Bool {
+        let title = title ?? AppLocalization.text("新随记")
         isSaving = true
         let result = await NotesAppBridge.createNote(title: title, html: html)
         isSaving = false
@@ -402,7 +415,7 @@ public final class QuickNotesService: ObservableObject {
         let stripped = firstLine
             .replacingOccurrences(of: "^#{1,6}\\s*", with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespaces)
-        return stripped.isEmpty ? "新随记" : stripped
+        return stripped.isEmpty ? AppLocalization.text("新随记") : stripped
     }
 
 }

@@ -46,12 +46,19 @@ struct IslandRootView: View {
                 contentSize: layout.panelSize,
                 availableSize: proxy.size
             )
+            let usesCompactSurface = voiceInput.isCapturingInput || showsCompactTransientNotice
             // The slot stays reserved while the island is collapsed: dropping it would shift the
             // surface back to the panel center at the exact frame the recycle fold starts, so the
             // fold would jump sideways before it ever reached the notch.
+            //
+            // Compact surfaces are the exception — they replace the pill's own row and belong on the
+            // notch center. Recording gets that for free by resizing its panel down to the compact
+            // width, leaving no slack for a slot; a notice keeps the module panel, whose reserved
+            // slot would push the row half a slot off the notch.
             let reservesPetSlot = !model.isMirrorPresented
                 && !model.isTeleprompterPresented
                 && model.settingsStore.settings.petEnabled
+                && !usesCompactSurface
             let petSlotWidth = reservesPetSlot
                 ? min(
                     ExpandedPetLayout.sideSlotWidth,
@@ -70,7 +77,7 @@ struct IslandRootView: View {
                 collapsedSize: model.collapsedIslandSize,
                 availableSize: surfaceSize
             )
-            let renderedSurfaceSize = voiceInput.isCapturingInput
+            let renderedSurfaceSize = usesCompactSurface
                 ? voiceRecordingGeometry.surfaceSize
                 : surfaceSize
 
@@ -93,7 +100,7 @@ struct IslandRootView: View {
                         }
                     )
                     .contextMenu {
-                        Button("粘贴并共享") {
+                        Button(AppLocalization.text("粘贴并共享")) {
                             model.shareFromPasteboard()
                         }
                         .keyboardShortcut("v", modifiers: .command)
@@ -132,7 +139,7 @@ struct IslandRootView: View {
                 expandedSize: renderedSurfaceSize,
                 visualStyle: settingsStore.settings.islandVisualStyle,
                 notchBackground: settingsStore.settings.islandNotchBackground,
-                usesCompactGlassSurface: voiceInput.isCapturingInput,
+                usesCompactGlassSurface: usesCompactSurface,
                 collapsedCenterOffsetX: collapsedCenterOffsetX
             ) {
                 if model.isMirrorPresented {
@@ -159,6 +166,9 @@ struct IslandRootView: View {
                                 voiceInput: voiceInput,
                                 geometry: voiceRecordingGeometry
                             )
+                                .frame(height: layout.islandSize.height, alignment: .top)
+                        } else if showsCompactTransientNotice, let notice = model.transientMessage {
+                            TransientNoticeView(message: notice, geometry: voiceRecordingGeometry)
                                 .frame(height: layout.islandSize.height, alignment: .top)
                         } else if !isIslandCollapsed {
                             // Keep the top shell fixed so module changes replace only the functional area below.
@@ -225,7 +235,7 @@ struct IslandRootView: View {
                                     }
                                 } else {
                                     ContentUnavailableView {
-                                        Label("没有启用模块", systemImage: "rectangle.slash")
+                                        Label(AppLocalization.text("没有启用模块"), systemImage: "rectangle.slash")
                                     }
                                 }
                             }
@@ -271,6 +281,20 @@ struct IslandRootView: View {
                     // spring runs — read as the page dropping in from the top. Top alignment keeps
                     // the crown at y=0 and lets only the module region below overflow into the mask.
                     .frame(width: surfaceSize.width, height: surfaceSize.height, alignment: .top)
+                    .overlay(alignment: .bottom) {
+                        if showsTransientNotice, !isIslandCollapsed, let notice = model.transientMessage {
+                            transientNoticeBar(notice)
+                                .transition(
+                                    reduceMotion
+                                        ? .opacity
+                                        : .move(edge: .bottom).combined(with: .opacity)
+                                )
+                        }
+                    }
+                    .animation(
+                        reduceMotion ? nil : .snappy(duration: 0.22),
+                        value: model.transientMessage
+                    )
                 }
             }
             .frame(width: surfaceSize.width, height: surfaceSize.height)
@@ -345,13 +369,13 @@ struct IslandRootView: View {
             )
             IconButton(
                 symbol: model.isPinned ? "pin.fill" : "pin",
-                help: model.isPinned ? "取消固定" : "固定灵动岛",
+                help: model.isPinned ? AppLocalization.text("取消固定") : AppLocalization.text("固定灵动岛"),
                 isActive: model.isPinned
             ) {
                 model.isPinned.toggle()
                 onPinChanged(model.isPinned)
             }
-            IconButton(symbol: "gearshape.fill", help: "设置") {
+            IconButton(symbol: "gearshape.fill", help: AppLocalization.text("设置")) {
                 onSettingsRequested()
             }
         }
@@ -366,8 +390,23 @@ struct IslandRootView: View {
     private var hidesIslandSurface: Bool {
         !model.isIslandVisible
             && !voiceInput.isCapturingInput
+            && !showsTransientNotice
             && !model.isMirrorPresented
             && !model.isTeleprompterPresented
+    }
+
+    private var showsTransientNotice: Bool {
+        model.transientMessage != nil
+            && !voiceInput.isCapturingInput
+            && !model.isMirrorPresented
+            && !model.isTeleprompterPresented
+    }
+
+    /// While the island is idle the notice borrows the voice-recording surface — pill plus one row.
+    /// Expanded panels keep their own layout and take the notice as a bottom bar instead, so a result
+    /// message never rips away the module the user is working in.
+    private var showsCompactTransientNotice: Bool {
+        showsTransientNotice && !model.isIslandVisible
     }
 
     private var contentTopInset: CGFloat { ExpandedPetLayout.contentTopInset }
@@ -448,7 +487,7 @@ struct IslandRootView: View {
         if model.isTeleprompterPresented {
             return .teleprompter
         }
-        if voiceInput.isCapturingInput {
+        if voiceInput.isCapturingInput || showsCompactTransientNotice {
             // The recording surface matches the collapsed capsule's overflow width and extends downward by one row.
             return IslandModuleLayout.voiceRecording
                 .matchingWidth(model.collapsedOverflowWidth)
@@ -459,6 +498,38 @@ struct IslandRootView: View {
             dashboardCardCount: model.dashboardCardCount,
             batteryDynamicHeight: model.batteryModuleDynamicHeight
         )
+    }
+
+    /// Expanded panels keep their module; the notice rides the surface's bottom edge for a few seconds.
+    private func transientNoticeBar(_ message: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.zislaError)
+                .accessibilityHidden(true)
+
+            MarqueeText(
+                message,
+                font: .system(size: 10.5),
+                textColor: .white.opacity(0.9),
+                fontWeight: .medium,
+                repeats: false,
+                scrollProgress: 1,
+                clipsOverflowWhenStatic: true
+            )
+        }
+        .padding(.horizontal, 10)
+        .frame(height: VoiceRecordingIslandGeometry.transcriptRowHeight + 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            .black.opacity(0.62),
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
+        .padding(.horizontal, IslandSurfaceGeometry.moduleInset)
+        .padding(.bottom, IslandSurfaceGeometry.moduleInset)
+        .environment(\.colorScheme, .dark)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(message)
     }
 
     private func shareDetectedLink() {
@@ -489,7 +560,7 @@ struct IslandRootView: View {
                     Text(detail)
                         .font(.islandMicro())
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fitsSingleLine()
                 }
             }
             .foregroundStyle(targeted ? color : .primary)
@@ -582,7 +653,7 @@ private struct VoiceTranscriptionView: View {
                 Image(systemName: "mic.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(voiceInput.isRecording ? Color.zislaError : .white.opacity(0.45))
-                    .accessibilityLabel(voiceInput.isRecording ? "正在录音" : "正在准备录音")
+                    .accessibilityLabel(voiceInput.isRecording ? AppLocalization.text("正在录音") : AppLocalization.text("正在准备录音"))
 
                 Spacer(minLength: 12)
 
@@ -627,9 +698,50 @@ private struct VoiceTranscriptionView: View {
         // spins up the row stays a bare ellipsis rather than claiming to listen.
         guard voiceInput.isRecording else { return "…" }
         let text = voiceInput.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? "正在聆听…" : text
+        return text.isEmpty ? AppLocalization.text("正在聆听…") : text
     }
 }
+
+/// Mirrors `VoiceTranscriptionView`: the collapsed pill keeps a warning glyph while the message
+/// scrolls in the row protruding underneath it.
+private struct TransientNoticeView: View {
+    let message: String
+    let geometry: VoiceRecordingIslandGeometry
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.zislaError)
+                    .accessibilityHidden(true)
+                Spacer(minLength: 12)
+            }
+            .padding(.horizontal, 12)
+            .frame(width: geometry.topRowFrame.width, height: geometry.topRowFrame.height)
+
+            MarqueeText(
+                message,
+                font: .system(size: 10.5),
+                textColor: .white.opacity(0.82),
+                fontWeight: .medium,
+                repeats: false,
+                scrollProgress: 1,
+                clipsOverflowWhenStatic: true
+            )
+                .padding(.horizontal, 12)
+                .frame(
+                    width: geometry.transcriptRowFrame.width,
+                    height: geometry.transcriptRowFrame.height,
+                    alignment: .leading
+                )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(message)
+    }
+}
+
 
 @MainActor
 private final class IslandDropState: ObservableObject {
@@ -662,8 +774,7 @@ private struct BackgroundSoundControl: View {
                     Text(controlTitle)
                         .font(.islandMicro(weight: .semibold))
                         .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .fixedSize()
+                        .fitsSingleLine(0.7)
                         .padding(.leading, 2)
                         .padding(.trailing, 4)
                 }
@@ -677,12 +788,12 @@ private struct BackgroundSoundControl: View {
                 ForEach(service.availableSounds, id: \.self) { sound in
                     if service.downloadState(for: sound) == .queued {
                         Button {} label: {
-                            Label("等待下载 \(sound.title)…", systemImage: "clock")
+                            Label(AppLocalization.text("等待下载 %@…", AppLocalization.text(sound.title)), systemImage: "clock")
                         }
                         .disabled(true)
                     } else if service.isDownloading(sound) {
                         Button {} label: {
-                            Label("正在下载 \(sound.title)…", systemImage: "arrow.down.circle")
+                            Label(AppLocalization.text("正在下载 %@…", AppLocalization.text(sound.title)), systemImage: "arrow.down.circle")
                         }
                         .disabled(true)
                     } else if service.isInstalled(sound) {
@@ -690,7 +801,7 @@ private struct BackgroundSoundControl: View {
                             onSelect(sound)
                         } label: {
                             Label(
-                                sound.title,
+                                AppLocalization.text(sound.title),
                                 systemImage: sound == selectedSound ? "checkmark" : "waveform"
                             )
                         }
@@ -699,8 +810,8 @@ private struct BackgroundSoundControl: View {
                             onSelect(sound)
                         } label: {
                             let title = service.downloadState(for: sound) == nil
-                                ? "\(sound.title)（下载）"
-                                : "\(sound.title)（重试下载）"
+                                ? AppLocalization.text("%@（下载）", AppLocalization.text(sound.title))
+                                : AppLocalization.text("%@（重试下载）", AppLocalization.text(sound.title))
                             Label(title, systemImage: "arrow.down.circle")
                         }
                     }
@@ -715,8 +826,8 @@ private struct BackgroundSoundControl: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("选择背景音：\(selectedSound.title)")
-            .accessibilityLabel("选择背景音：\(selectedSound.title)")
+            .help(AppLocalization.text("选择背景音：%@", AppLocalization.text(selectedSound.title)))
+            .accessibilityLabel(AppLocalization.text("选择背景音：%@", AppLocalization.text(selectedSound.title)))
             .onHover { hovering in
                 if hovering { service.refresh() }
             }
@@ -732,7 +843,10 @@ private struct BackgroundSoundControl: View {
     }
 
     private var controlTitle: String {
-        service.isPlaying ? (service.playingSound?.title ?? "背景音") : "背景音"
+        guard service.isPlaying, let playing = service.playingSound else {
+            return AppLocalization.text("背景音")
+        }
+        return AppLocalization.text(playing.title)
     }
 
     private var isSelectedSoundQueued: Bool {
@@ -740,9 +854,9 @@ private struct BackgroundSoundControl: View {
     }
 
     private var toggleHelp: String {
-        if isSelectedSoundQueued { return "背景音等待下载，点击取消" }
-        if service.isDownloading(selectedSound) { return "正在下载背景音，点击取消" }
-        return service.isPlaying ? "关闭背景音" : "开启背景音"
+        if isSelectedSoundQueued { return AppLocalization.text("背景音等待下载，点击取消") }
+        if service.isDownloading(selectedSound) { return AppLocalization.text("正在下载背景音，点击取消") }
+        return service.isPlaying ? AppLocalization.text("关闭背景音") : AppLocalization.text("开启背景音")
     }
 }
 
@@ -767,7 +881,7 @@ private struct NavMonitorStrip: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help("系统监控实时读数 — 点按查看详情")
+        .help(AppLocalization.text("系统监控实时读数 — 点按查看详情"))
     }
 
     private func metricCell(label: String, ratio: Double?) -> some View {
@@ -855,7 +969,7 @@ private struct ModuleSelector: View {
                             .matchedGeometryEffect(id: "module-selection", in: selectionNamespace)
                     }
                 }
-                .help(module.title)
+                .help(AppLocalization.text(module.title))
             }
         }
         .animation(reduceMotion ? nil : ZislaMotion.selection, value: model.selectedModule)

@@ -107,7 +107,7 @@ public enum ClipboardHistoryContentError: LocalizedError {
         case .notAFileURL:
             "该项目不是文件"
         case .fileMissing(let url):
-            "文件不存在：\(url.lastPathComponent)"
+            AppLocalization.text("文件不存在：%@", url.lastPathComponent)
         }
     }
 }

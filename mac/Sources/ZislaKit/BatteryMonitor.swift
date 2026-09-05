@@ -1,4 +1,5 @@
 import Combine
+import CoreFoundation
 import Foundation
 import IOKit
 import IOKit.ps
@@ -97,9 +98,28 @@ public struct BatterySnapshot: Equatable, Sendable {
 public final class BatteryMonitor: ObservableObject {
     @Published public private(set) var snapshot: BatterySnapshot?
 
-    private var runLoopSource: CFRunLoopSource?
+    /// Timestamp when external power was last disconnected.
+    @Published public private(set) var lastUnpluggedAt: Date?
 
-    public init() {}
+    private var runLoopSource: CFRunLoopSource?
+    private let defaults: UserDefaults
+    private let now: () -> Date
+    private var lastObservedIsPluggedIn: Bool?
+
+    private enum HistoryKey {
+        static let lastUnpluggedAt = "zisla.battery.last-unplugged-at"
+        static let lastObservedIsPluggedIn = "zisla.battery.last-observed-is-plugged-in"
+    }
+
+    public init(
+        defaults: UserDefaults = .standard,
+        now: @escaping () -> Date = Date.init
+    ) {
+        self.defaults = defaults
+        self.now = now
+        self.lastUnpluggedAt = Self.loadDate(defaults, forKey: HistoryKey.lastUnpluggedAt)
+        self.lastObservedIsPluggedIn = defaults.object(forKey: HistoryKey.lastObservedIsPluggedIn) as? Bool
+    }
 
     public func start() {
         refresh()
@@ -124,7 +144,25 @@ public final class BatteryMonitor: ObservableObject {
     }
 
     public func refresh() {
-        snapshot = Self.currentSnapshot()
+        let previous = snapshot
+        let current = Self.currentSnapshot()
+        detectStateTransitions(from: previous, to: current)
+        snapshot = current
+    }
+
+    func detectStateTransitions(from previous: BatterySnapshot?, to current: BatterySnapshot?) {
+        guard let current else { return }
+
+        let previousIsPluggedIn = previous?.isPluggedIn ?? lastObservedIsPluggedIn
+
+        if !current.isPluggedIn, previousIsPluggedIn == true {
+            let date = now()
+            lastUnpluggedAt = date
+            storeDate(date, forKey: HistoryKey.lastUnpluggedAt)
+        }
+
+        lastObservedIsPluggedIn = current.isPluggedIn
+        defaults.set(current.isPluggedIn, forKey: HistoryKey.lastObservedIsPluggedIn)
     }
 
     nonisolated static func currentSnapshot() -> BatterySnapshot? {
@@ -328,5 +366,24 @@ public final class BatteryMonitor: ObservableObject {
 
     nonisolated private static func milliwattsValue(_ value: Any?) -> Double? {
         doubleValue(value).flatMap { $0 >= 0 ? $0 / 1_000 : nil }
+    }
+
+    private static func loadDate(_ defaults: UserDefaults, forKey key: String) -> Date? {
+        guard let value = defaults.object(forKey: key) as? NSNumber,
+              CFGetTypeID(value) == CFNumberGetTypeID()
+        else {
+            return nil
+        }
+        let timestamp = value.doubleValue
+        guard timestamp.isFinite, timestamp > 0 else { return nil }
+        return Date(timeIntervalSince1970: timestamp)
+    }
+
+    private func storeDate(_ date: Date?, forKey key: String) {
+        if let date {
+            defaults.set(date.timeIntervalSince1970, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
     }
 }

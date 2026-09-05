@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import UniformTypeIdentifiers
+import ZislaCore
 
 public enum FileShelfCategory: String, CaseIterable, Hashable, Identifiable, Sendable {
     case all = "全部"
@@ -17,6 +18,9 @@ public enum FileShelfCategory: String, CaseIterable, Hashable, Identifiable, Sen
     case other = "其他"
 
     public var id: String { rawValue }
+
+    /// Raw values are persisted in the clipboard database, so localize only the display label.
+    public var title: String { AppLocalization.text(rawValue) }
 
     public var symbol: String {
         switch self {

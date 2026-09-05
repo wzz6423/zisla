@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import ZislaCore
 
 public enum WeatherLocationKind: String, Codable, Equatable, Sendable {
     case current
@@ -112,7 +113,7 @@ public final class WeatherLocationStore: ObservableObject {
 
     public func addSaved(name: String, coordinate: GeoCoordinate) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let displayName = trimmed.isEmpty ? "未命名地点" : trimmed
+        let displayName = trimmed.isEmpty ? AppLocalization.text("未命名地点") : trimmed
 
         if let index = locations.firstIndex(where: {
             $0.kind == .saved && Self.coordinatesApproximatelyEqual($0.coordinate, coordinate)

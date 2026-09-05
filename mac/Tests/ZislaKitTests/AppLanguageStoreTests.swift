@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 
+@testable import ZislaCore
 @testable import ZislaKit
 
 struct AppLanguageStoreTests {

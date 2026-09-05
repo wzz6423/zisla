@@ -1,46 +1,10 @@
 import Combine
 import Foundation
-
-public enum AppLanguage: String, CaseIterable, Codable, Equatable, Sendable {
-    case simplifiedChinese = "zh-Hans"
-    case traditionalChinese = "zh-Hant"
-    case english = "en"
-    case japanese = "ja"
-    case korean = "ko"
-    case french = "fr"
-    case german = "de"
-    case spanish = "es"
-    case brazilianPortuguese = "pt-BR"
-    case italian = "it"
-    case dutch = "nl"
-    case russian = "ru"
-    case arabic = "ar"
-    case thai = "th"
-    case indonesian = "id"
-    case vietnamese = "vi"
-    case turkish = "tr"
-
-    public var locale: Locale {
-        Locale(identifier: rawValue)
-    }
-
-    /// BCP-47-ish code used as the translation target for the clipboard assistant.
-    public var translateTargetCode: String {
-        switch self {
-        case .simplifiedChinese: "zh-CN"
-        case .traditionalChinese: "zh-TW"
-        default: rawValue
-        }
-    }
-
-    public var isRightToLeft: Bool {
-        self == .arabic
-    }
-}
+import ZislaCore
 
 @MainActor
 public final class AppLanguageStore: ObservableObject {
-    public static let defaultKey = "zisla.interface-language"
+    public nonisolated static let defaultKey = AppLocalization.defaultsKey
 
     @Published public var language: AppLanguage {
         didSet {

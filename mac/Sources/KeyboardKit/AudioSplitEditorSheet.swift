@@ -1,4 +1,6 @@
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 @MainActor
 struct AudioSplitEditorSheet: View {
@@ -39,9 +41,9 @@ struct AudioSplitEditorSheet: View {
                     symbolSize: 17
                 )
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("拆分完整击键")
+                    Text(AppLocalization.text("拆分完整击键"))
                         .font(.title2.weight(.semibold))
-                    Text("调整下方切点，使左侧只保留按下、右侧从回弹瞬态开始。")
+                    Text(AppLocalization.text("调整下方切点，使左侧只保留按下、右侧从回弹瞬态开始。"))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -71,7 +73,7 @@ struct AudioSplitEditorSheet: View {
                             )
                         }
                     } label: {
-                        Label("试听按下", systemImage: "play.fill")
+                        Label(AppLocalization.text("试听按下"), systemImage: "play.fill")
                     }
                     Button {
                         Task {
@@ -83,13 +85,13 @@ struct AudioSplitEditorSheet: View {
                             )
                         }
                     } label: {
-                        Label("试听回弹", systemImage: "play.fill")
+                        Label(AppLocalization.text("试听回弹"), systemImage: "play.fill")
                     }
                     Spacer()
                     if editor.isWorking {
                         ProgressView()
                             .controlSize(.small)
-                        Text("正在生成试听…")
+                        Text(AppLocalization.text("正在生成试听…"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -98,7 +100,7 @@ struct AudioSplitEditorSheet: View {
 
                 VStack(alignment: .leading, spacing: 7) {
                     HStack {
-                        Label("按下 / 回弹切点", systemImage: "scissors")
+                        Label(AppLocalization.text("按下 / 回弹切点"), systemImage: "scissors")
                         Spacer()
                         Text(timeLabel(splitTime))
                             .monospacedDigit()
@@ -124,7 +126,7 @@ struct AudioSplitEditorSheet: View {
 
                 VStack(alignment: .leading, spacing: 7) {
                     HStack {
-                        Label("回弹结束", systemImage: "stop.fill")
+                        Label(AppLocalization.text("回弹结束"), systemImage: "stop.fill")
                         Spacer()
                         Text(timeLabel(releaseEndTime))
                             .monospacedDigit()
@@ -135,7 +137,7 @@ struct AudioSplitEditorSheet: View {
                         in: minimumReleaseEnd...draft.analysis.duration,
                         step: 0.001
                     )
-                    Text("如果录音末尾还有下一次击键，可提前结束，避免混入下一个声音。")
+                    Text(AppLocalization.text("如果录音末尾还有下一次击键，可提前结束，避免混入下一个声音。"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -161,11 +163,11 @@ struct AudioSplitEditorSheet: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("取消") {
+                Button(AppLocalization.text("取消")) {
                     editor.cancelSplit()
                     dismiss()
                 }
-                Button("拆分并导入") {
+                Button(AppLocalization.text("拆分并导入")) {
                     Task {
                         let succeeded = await editor.confirmSplit(
                             draft: draft,

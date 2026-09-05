@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import ZislaCore
 
 public protocol MediaMuxing: Sendable {
     func mux(videoURL: URL, audioURL: URL, outputURL: URL) async throws
@@ -26,7 +27,7 @@ public enum NativeMediaMuxerError: LocalizedError, Equatable, Sendable {
         case .outputAlreadyExists:
             return "目标文件已存在，未执行覆盖"
         case let .exportFailed(message):
-            return "系统媒体封装失败：\(message)"
+            return AppLocalization.text("系统媒体封装失败：%@", message)
         }
     }
 }
@@ -151,7 +152,7 @@ private final class ExportSessionBox: @unchecked Sendable {
                 default:
                     continuation.resume(
                         throwing: error
-                            ?? NativeMediaMuxerError.exportFailed("AVFoundation 导出失败")
+                            ?? NativeMediaMuxerError.exportFailed(AppLocalization.text("AVFoundation 导出失败"))
                     )
                 }
             }

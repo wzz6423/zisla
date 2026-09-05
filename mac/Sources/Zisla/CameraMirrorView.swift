@@ -1,6 +1,7 @@
 import AppKit
 @preconcurrency import AVFoundation
 import SwiftUI
+import ZislaCore
 import ZislaKit
 
 /// Camera "mirror" preview: fills the available space with a live mirrored feed, for the Dynamic Island as a grooming aid.
@@ -43,7 +44,7 @@ struct CameraMirrorView: View {
                 ProgressView()
                     .controlSize(.small)
                     .tint(.white)
-                Text("正在开启摄像头…")
+                Text(AppLocalization.text("正在开启摄像头…"))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
             }
@@ -70,7 +71,7 @@ struct CameraMirrorView: View {
                 .background(.black.opacity(0.55), in: Circle())
         }
         .buttonStyle(.plain)
-        .help("关闭镜子")
+        .help(AppLocalization.text("关闭镜子"))
         .padding(8)
     }
 }

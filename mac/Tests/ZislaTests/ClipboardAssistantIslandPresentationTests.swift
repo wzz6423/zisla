@@ -485,7 +485,7 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(appModelSource.contains("detection.actions.append(.sendToTeleprompter)"))
         #expect(appModelSource.contains("case .addToQuickNote:"))
         #expect(appModelSource.contains("case .sendToTeleprompter:"))
-        #expect(appModelSource.contains("transientMessage = \"已发送到提词器\""))
+        #expect(appModelSource.contains("transientMessage = AppLocalization.text(\"已发送到提词器\")"))
         #expect(appModelSource.contains("presentTeleprompter()"))
         let downloadActionStart = try #require(appModelSource.range(of: "case .openDownload(let url):"))
         let downloadActionEnd = try #require(appModelSource[downloadActionStart.upperBound...]
@@ -543,7 +543,7 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(source.contains("eta"))
         #expect(source.contains("model.cancelDownload(taskID: task.id)"))
         #expect(source.contains("model.cancelAllDownloads()"))
-        #expect(source.contains("IconButton(symbol: \"xmark\", help: \"取消此下载\""))
+        #expect(source.contains("IconButton(symbol: \"xmark\", help: AppLocalization.text(\"取消此下载\")"))
         #expect(!source.contains("Button(\"取消此下载\""))
 
         let appModelSource = try String(contentsOf: appModelSourceURL, encoding: .utf8)

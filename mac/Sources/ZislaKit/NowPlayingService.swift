@@ -736,7 +736,7 @@ public final class NowPlayingService: ObservableObject {
       case nil: nil
       }
     return NowPlayingSnapshot(
-      title: title ?? "未知媒体",
+      title: title ?? AppLocalization.text("未知媒体"),
       artist: artist ?? "",
       album: album,
       artworkData: dictionary["kMRMediaRemoteNowPlayingInfoArtworkData"] as? Data,
@@ -793,7 +793,7 @@ public final class NowPlayingService: ObservableObject {
       ISO8601DateFormatter().date(from: $0)
     }
     return NowPlayingSnapshot(
-      title: title ?? "未知媒体",
+      title: title ?? AppLocalization.text("未知媒体"),
       artist: artist ?? "",
       album: album,
       artworkData: payload.artworkData.flatMap {
@@ -1419,7 +1419,7 @@ public final class NowPlayingService: ObservableObject {
     // Core Audio can only confirm that the app is producing audio; do not fabricate a video identity from that alone.
     return NowPlayingSnapshot(
       title: source.applicationName,
-      artist: "正在播放音频",
+      artist: AppLocalization.text("正在播放音频"),
       album: nil,
       artworkData: nil,
       duration: nil,

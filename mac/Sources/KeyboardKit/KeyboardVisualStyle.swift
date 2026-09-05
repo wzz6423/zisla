@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ZislaKit
 
 /// Shared visual language for Keyboard's menu, statistics and editor surfaces.
 /// System semantic colors keep the hierarchy legible in both light and dark mode;

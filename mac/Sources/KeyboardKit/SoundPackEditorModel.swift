@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import UniformTypeIdentifiers
+import ZislaKit
 
 enum SoundPackEditorMappingMode: String, CaseIterable, Identifiable, Sendable {
     case generic
@@ -12,7 +13,7 @@ enum SoundPackEditorMappingMode: String, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
-        case .generic: "通用".localized
+        case .generic: "通用音".localized
         case .recommended: "推荐分布".localized
         case .perKey: "单键".localized
         }
@@ -259,7 +260,7 @@ final class SoundPackEditorModel: ObservableObject {
         selectedPackID = nil
         mappingMode = .generic
         isDirty = true
-        statusMessage = "已创建空白草稿"
+        statusMessage = L10n.tr("已创建空白草稿")
     }
 
     func createBasedOnCurrent() async {
@@ -325,7 +326,7 @@ final class SoundPackEditorModel: ObservableObject {
                 await discardTemporaryAudioResources(reportFailure: true)
                 installBlankDraft()
             }
-            statusMessage = "音色包已移入 Keyboard 的可恢复废纸篓"
+            statusMessage = L10n.tr("音色包已移入 Keyboard 的可恢复废纸篓")
         }
     }
 
@@ -441,7 +442,7 @@ final class SoundPackEditorModel: ObservableObject {
             )
             splitDraft = nil
             discardSplitSource(for: draft)
-            statusMessage = "已拆分并设置按下/回弹音"
+            statusMessage = L10n.tr("已拆分并设置按下/回弹音")
             succeeded = true
         }
         return succeeded
@@ -693,7 +694,7 @@ final class SoundPackEditorModel: ObservableObject {
         guard hasTemporaryAudioResources else { return true }
 
         isWorking = true
-        statusMessage = "正在清理临时音频…"
+        statusMessage = L10n.tr("正在清理临时音频…")
         defer { isWorking = false }
         let succeeded = await discardTemporaryAudioResources(reportFailure: true)
         if succeeded { statusMessage = nil }
@@ -736,7 +737,7 @@ final class SoundPackEditorModel: ObservableObject {
                 persistedPackID = nil
                 selectedPackID = nil
                 isDirty = true
-                statusMessage = "已基于当前音色创建草稿"
+                statusMessage = L10n.tr("已基于当前音色创建草稿")
                 return
             } catch let cancellation as CancellationError {
                 throw cancellation

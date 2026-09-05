@@ -32,11 +32,11 @@ struct AIAgentModuleView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .alert(pendingCLIActionTitle, isPresented: $showCLIConfirmation) {
-            Button("取消", role: .cancel) {
+            Button(AppLocalization.text("取消"), role: .cancel) {
                 pendingCLICommands = []
                 pendingCLIKinds = []
             }
-            Button("继续") {
+            Button(AppLocalization.text("继续")) {
                 let commands = pendingCLICommands
                 guard !commands.isEmpty else { return }
                 pendingCLICommands = []
@@ -66,9 +66,9 @@ struct AIAgentModuleView: View {
                 remoteModelRow(channel)
             }
             emptyModelRow(
-                title: agent.store.state.channels.isEmpty ? "尚未配置远端模型" : "添加远端模型",
+                title: agent.store.state.channels.isEmpty ? AppLocalization.text("尚未配置远端模型") : AppLocalization.text("添加远端模型"),
                 symbol: "cloud.slash",
-                help: "添加远端模型",
+                help: AppLocalization.text("添加远端模型"),
                 action: addProvider
             )
         }
@@ -81,8 +81,8 @@ struct AIAgentModuleView: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .accessibilityLabel("启用远端模型")
-            Picker("协议", selection: channelProtocolBinding(channel.id)) {
+                .accessibilityLabel(AppLocalization.text("启用远端模型"))
+            Picker(AppLocalization.text("协议"), selection: channelProtocolBinding(channel.id)) {
                 ForEach(Self.configurableRemoteProtocols, id: \.self) { proto in
                     Text(proto == .openAICompatible ? "OpenAI" : "Anthropic").tag(proto)
                 }
@@ -90,7 +90,7 @@ struct AIAgentModuleView: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(width: 92)
-            .accessibilityLabel("协议")
+            .accessibilityLabel(AppLocalization.text("协议"))
             TextField("URL", text: channelURLBinding(channel.id))
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 10, design: .monospaced))
@@ -99,12 +99,12 @@ struct AIAgentModuleView: View {
             SecureField("Key", text: channelSecretBinding(channel.id))
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 125)
-            TextField("模型名", text: channelModelBinding(channel.id))
+            TextField(AppLocalization.text("模型名"), text: channelModelBinding(channel.id))
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 125)
             Picker("Effort", selection: channelEffortBinding(channel.id)) {
                 ForEach(AgentModelEffort.allCases, id: \.self) { effort in
-                    Text(effort.displayName).tag(effort)
+                    Text(AppLocalization.text(effort.displayName)).tag(effort)
                 }
             }
             .labelsHidden()
@@ -119,8 +119,8 @@ struct AIAgentModuleView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel("删除远端模型")
-            .help("删除远端模型")
+            .accessibilityLabel(AppLocalization.text("删除远端模型"))
+            .help(AppLocalization.text("删除远端模型"))
         }
         .padding(7)
         .background(Color.primary.opacity(0.05))
@@ -129,7 +129,7 @@ struct AIAgentModuleView: View {
 
     private func addProvider() {
         _ = agent.store.createRemoteProvider(
-            name: "远端模型 \(agent.store.state.channels.count + 1)"
+            name: AppLocalization.text("远端模型 %ld", agent.store.state.channels.count + 1)
         )
     }
 
@@ -143,7 +143,7 @@ struct AIAgentModuleView: View {
         updateChannel(channelID) { channel in
             if channel.endpointGroups.isEmpty {
                 channel.endpointGroups.append(AgentEndpointGroup(
-                    name: "默认端点",
+                    name: AppLocalization.text("默认端点"),
                     baseURLs: ["https://api.openai.com/v1"],
                     accountIDs: [accountID]
                 ))
@@ -159,9 +159,9 @@ struct AIAgentModuleView: View {
                 localModelRow(localModel)
             }
             emptyModelRow(
-                title: agent.store.state.localModels.isEmpty ? "尚未配置本地模型" : "添加本地模型",
+                title: agent.store.state.localModels.isEmpty ? AppLocalization.text("尚未配置本地模型") : AppLocalization.text("添加本地模型"),
                 symbol: "cpu",
-                help: "添加本地模型",
+                help: AppLocalization.text("添加本地模型"),
                 action: addLocalModelConfiguration
             )
         }
@@ -201,19 +201,19 @@ struct AIAgentModuleView: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .accessibilityLabel("启用本地模型")
-            TextField("URL / IP:端口", text: localModelURLBinding(localModel.id))
+                .accessibilityLabel(AppLocalization.text("启用本地模型"))
+            TextField(AppLocalization.text("URL / IP:端口"), text: localModelURLBinding(localModel.id))
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 10, design: .monospaced))
                 .frame(minWidth: 240)
                 .layoutPriority(1)
-            TextField("模型名", text: localModelIDBinding(localModel.id))
+            TextField(AppLocalization.text("模型名"), text: localModelIDBinding(localModel.id))
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 180)
             Button { agent.store.removeLocalModel(id: localModel.id) } label: { Image(systemName: "trash") }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("删除本地模型")
-                .help("删除本地模型")
+                .accessibilityLabel(AppLocalization.text("删除本地模型"))
+                .help(AppLocalization.text("删除本地模型"))
         }
         .padding(7)
         .background(Color.primary.opacity(0.05))
@@ -246,11 +246,11 @@ struct AIAgentModuleView: View {
                     .frame(width: 16, height: 16)
                 }
                 .buttonStyle(.borderless)
-                .help("重新检测本机 CLI")
+                .help(AppLocalization.text("重新检测本机 CLI"))
                 Button {
                     queueCLIAction(
                         title: "下载缺失 CLI？",
-                        message: cliActionMessage("将下载并安装", kinds: missingKinds),
+                        message: cliActionMessage(AppLocalization.text("将下载并安装"), kinds: missingKinds),
                         kinds: missingKinds,
                         commands: installCommands
                     )
@@ -259,11 +259,11 @@ struct AIAgentModuleView: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(installCommands.isEmpty)
-                .help("一键下载所有未安装的 CLI")
+                .help(AppLocalization.text("一键下载所有未安装的 CLI"))
                 Button {
                     queueCLIAction(
                         title: "更新已安装 CLI？",
-                        message: cliActionMessage("将更新", kinds: installedKinds),
+                        message: cliActionMessage(AppLocalization.text("将更新"), kinds: installedKinds),
                         kinds: installedKinds,
                         commands: updateCommands
                     )
@@ -272,11 +272,11 @@ struct AIAgentModuleView: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(updateCommands.isEmpty)
-                .help("一键更新所有已安装的 CLI")
+                .help(AppLocalization.text("一键更新所有已安装的 CLI"))
                 Button(role: .destructive) {
                     queueCLIAction(
                         title: "卸载已安装 CLI？",
-                        message: cliActionMessage("将卸载", kinds: installedKinds),
+                        message: cliActionMessage(AppLocalization.text("将卸载"), kinds: installedKinds, isUninstall: true),
                         kinds: installedKinds,
                         commands: uninstallCommands
                     )
@@ -285,7 +285,7 @@ struct AIAgentModuleView: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(uninstallCommands.isEmpty)
-                .help("一键卸载所有受支持的 CLI")
+                .help(AppLocalization.text("一键卸载所有受支持的 CLI"))
             }
             cliCommandGroup(title: "下载命令", commands: installCommands)
             cliCommandGroup(title: "更新命令", commands: updateCommands)
@@ -298,9 +298,9 @@ struct AIAgentModuleView: View {
                     .background(Color.fillControl)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("自动更新 CLI")
+                    Text(AppLocalization.text("自动更新 CLI"))
                         .font(.system(size: 11, weight: .semibold))
-                    Text("检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成")
+                    Text(AppLocalization.text("检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成"))
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -329,19 +329,19 @@ struct AIAgentModuleView: View {
                         Text(kind.displayName).frame(width: 80, alignment: .leading)
                         VStack(alignment: .leading, spacing: 2) {
                             if isInstalled {
-                                Text(status?.version ?? "已安装（版本未知）")
+                                Text(status?.version ?? AppLocalization.text("已安装（版本未知）"))
                                     .font(.system(size: 10, design: .monospaced))
                                     .foregroundStyle(.primary)
                                 if let path = status?.executablePath {
                                     Text(path)
                                         .font(.system(size: 9, design: .monospaced))
                                         .foregroundStyle(.tertiary)
-                                        .lineLimit(1)
+                                        .fitsSingleLine()
                                         .truncationMode(.middle)
                                 }
                             } else {
                                 HStack(spacing: 5) {
-                                    Text("未安装")
+                                    Text(AppLocalization.text("未安装"))
                                         .font(.system(size: 10, design: .monospaced))
                                         .foregroundStyle(.secondary)
                                     cliCommandRows(
@@ -359,12 +359,12 @@ struct AIAgentModuleView: View {
                                 ProgressView()
                                     .controlSize(.small)
                                     .frame(width: 16, height: 16)
-                                    .help("正在检查 \(kind.displayName) 更新")
+                                    .help(AppLocalization.text("正在检查 %@ 更新", kind.displayName))
                             } else if let availableUpdate {
                                 Button {
                                     queueCLIAction(
-                                        title: "更新 \(kind.displayName)？",
-                                        message: "将 \(kind.displayName) 从 \(availableUpdate.installedVersion) 更新到 \(availableUpdate.latestVersion)",
+                                        title: AppLocalization.text("更新 %@？", kind.displayName),
+                                        message: AppLocalization.text("将 %@ 从 %@ 更新到 %@", kind.displayName, availableUpdate.installedVersion, availableUpdate.latestVersion),
                                         kinds: [kind],
                                         commands: update
                                     )
@@ -374,16 +374,16 @@ struct AIAgentModuleView: View {
                                 .buttonStyle(.borderless)
                                 .foregroundStyle(Color.zislaInfo)
                                 .disabled(agent.isRunningCLICommands || update.isEmpty)
-                                .help("已确认新版本 \(availableUpdate.latestVersion)，更新 \(kind.displayName)")
+                                .help(AppLocalization.text("已确认新版本 %@，更新 %@", availableUpdate.latestVersion, kind.displayName))
                             } else if status?.version != nil, kind != .kimi {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(kind == .grok && agent.grokUpdateState == .upToDate ? .green : .secondary)
-                                    .help(kind == .grok && agent.grokUpdateState == .upToDate ? "Grok 已是最新版本" : "当前未检测到可用更新")
+                                    .help(kind == .grok && agent.grokUpdateState == .upToDate ? AppLocalization.text("Grok 已是最新版本") : AppLocalization.text("当前未检测到可用更新"))
                             } else {
                                 Button {
                                     queueCLIAction(
-                                        title: "更新 \(kind.displayName)？",
-                                        message: cliActionMessage("将更新", kinds: [kind]),
+                                        title: AppLocalization.text("更新 %@？", kind.displayName),
+                                        message: cliActionMessage(AppLocalization.text("将更新"), kinds: [kind]),
                                         kinds: [kind],
                                         commands: update
                                     )
@@ -393,13 +393,13 @@ struct AIAgentModuleView: View {
                                 .buttonStyle(.borderless)
                                 .foregroundStyle(.secondary)
                                 .disabled(agent.isRunningCLICommands || update.isEmpty)
-                                .help(status?.version == nil ? "版本未知，可尝试更新 \(kind.displayName)" : "检查并升级 \(kind.displayName)")
+                                .help(status?.version == nil ? AppLocalization.text("版本未知，可尝试更新 %@", kind.displayName) : AppLocalization.text("检查并升级 %@", kind.displayName))
                             }
                             let uninstall = agent.commandsForCLIUninstallation([kind])
                             Button(role: .destructive) {
                                 queueCLIAction(
-                                    title: "卸载 \(kind.displayName)？",
-                                    message: cliActionMessage("将卸载", kinds: [kind]),
+                                    title: AppLocalization.text("卸载 %@？", kind.displayName),
+                                    message: cliActionMessage(AppLocalization.text("将卸载"), kinds: [kind], isUninstall: true),
                                     kinds: [kind],
                                     commands: uninstall
                                 )
@@ -408,13 +408,13 @@ struct AIAgentModuleView: View {
                             }
                             .buttonStyle(.borderless)
                             .disabled(agent.isRunningCLICommands || uninstall.isEmpty)
-                            .help("卸载 \(kind.displayName)")
+                            .help(AppLocalization.text("卸载 %@", kind.displayName))
                         } else if AgentCLIKind.managedCases.contains(kind) {
                             let install = agent.commandsForCLIInstallation([kind], update: false)
                             Button {
                                 queueCLIAction(
-                                    title: "下载 \(kind.displayName)？",
-                                    message: cliActionMessage("将下载并安装", kinds: [kind]),
+                                    title: AppLocalization.text("下载 %@？", kind.displayName),
+                                    message: cliActionMessage(AppLocalization.text("将下载并安装"), kinds: [kind]),
                                     kinds: [kind],
                                     commands: install
                                 )
@@ -423,7 +423,7 @@ struct AIAgentModuleView: View {
                             }
                             .buttonStyle(.borderless)
                             .disabled(install.isEmpty)
-                            .help("下载并安装 \(kind.displayName)")
+                            .help(AppLocalization.text("下载并安装 %@", kind.displayName))
                         }
                     }
                     if AgentCLIKind.managedCases.contains(kind), isInstalled {
@@ -451,13 +451,21 @@ struct AIAgentModuleView: View {
         }
     }
 
-    private func cliActionMessage(_ action: String, kinds: [AgentCLIKind]) -> String {
-        let names = kinds.map(\.displayName).joined(separator: "、")
+    private func cliActionMessage(
+        _ action: String,
+        kinds: [AgentCLIKind],
+        isUninstall: Bool = false
+    ) -> String {
+        let separator = AppLocalization.text("、")
+        let names = kinds.map(\.displayName).joined(separator: separator)
         let standaloneKinds = kinds.filter { $0 == .grok || $0 == .kimi }
-        let uninstallNote = !standaloneKinds.isEmpty && action.contains("卸载")
-            ? "\(standaloneKinds.map(\.displayName).joined(separator: "、")) 只会移除 CLI 可执行文件，保留账号和本地配置。"
-            : "命令会在本机执行，完成后将重新检测安装状态。"
-        return "\(action)：\(names)。\(uninstallNote)"
+        let uninstallNote = !standaloneKinds.isEmpty && isUninstall
+            ? AppLocalization.text(
+                "%@ 只会移除 CLI 可执行文件，保留账号和本地配置。",
+                standaloneKinds.map(\.displayName).joined(separator: separator)
+            )
+            : AppLocalization.text("命令会在本机执行，完成后将重新检测安装状态。")
+        return AppLocalization.text("%@：%@。%@", action, names, uninstallNote)
     }
 
     private func queueCLIAction(
@@ -502,11 +510,13 @@ struct AIAgentModuleView: View {
     }
 
     private func cliCommandProgressTitle(_ progress: AIAgentCLICommandProgress) -> String {
-        let action = progress.title.replacingOccurrences(of: "？", with: "")
+        let action = progress.title
+            .replacingOccurrences(of: "？", with: "")
+            .replacingOccurrences(of: "?", with: "")
         switch progress.state {
-        case .running: return "正在\(action)"
-        case .succeeded: return "\(action) 已完成"
-        case .failed: return "\(action) 失败"
+        case .running: return AppLocalization.text("正在%@", action)
+        case .succeeded: return AppLocalization.text("%@ 已完成", action)
+        case .failed: return AppLocalization.text("%@ 失败", action)
         }
     }
 
@@ -514,7 +524,7 @@ struct AIAgentModuleView: View {
     private func cliCommandGroup(title: String, commands: [AIAgentCLICommand]) -> some View {
         if !commands.isEmpty {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                AppLocalizedText(title)
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
                 cliCommandRows(commands: commands, paddingLeading: 0)
@@ -533,7 +543,7 @@ struct AIAgentModuleView: View {
                 Text(commandText)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Button {
@@ -544,7 +554,7 @@ struct AIAgentModuleView: View {
                         .font(.system(size: 9))
                 }
                 .buttonStyle(.borderless)
-                .help("复制命令")
+                .help(AppLocalization.text("复制命令"))
             }
             .padding(.leading, paddingLeading)
         }
@@ -617,7 +627,7 @@ struct AIAgentModuleView: View {
                 updateChannel(id) { channel in
                     if channel.endpointGroups.isEmpty {
                         channel.endpointGroups.append(AgentEndpointGroup(
-                            name: "默认端点",
+                            name: AppLocalization.text("默认端点"),
                             baseURLs: baseURLs,
                             accountIDs: []
                         ))

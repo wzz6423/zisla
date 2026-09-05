@@ -16,10 +16,10 @@ public enum AIAgentServiceError: LocalizedError, Sendable {
         case .invalidBaseURL: "渠道地址无效"
         case .missingAPIKey: "账号未配置 API Key"
         case .unsupportedBalanceProbe: "当前余额检测方式不支持该渠道"
-        case let .invalidScript(path): "余额脚本不可执行：\(path)"
-        case let .scriptFailed(status): "余额脚本执行失败（退出状态 \(status)）"
+        case let .invalidScript(path): AppLocalization.text("余额脚本不可执行：%@", path)
+        case let .scriptFailed(status): AppLocalization.text("余额脚本执行失败（退出状态 %ld）", Int(status))
         case .invalidResponse: "渠道返回了无法识别的结果"
-        case let .http(statusCode): "渠道请求失败（HTTP \(statusCode)）"
+        case let .http(statusCode): AppLocalization.text("渠道请求失败（HTTP %ld）", statusCode)
         }
     }
 }
@@ -330,7 +330,7 @@ public struct AIAgentChannelProbeService: Sendable {
                 baseURL: route.baseURL,
                 health: health,
                 latencyMilliseconds: latency,
-                detail: health == .healthy ? nil : "渠道请求失败（HTTP \(http.statusCode)）"
+                detail: health == .healthy ? nil : AppLocalization.text("渠道请求失败（HTTP %ld）", http.statusCode)
             )
         } catch {
             return AgentChannelProbe(
@@ -583,7 +583,7 @@ public enum AIAgentCLIProfileError: LocalizedError, Sendable {
         switch self {
         case .incompleteProfile: "CLI 档案必须同时配置两个不同的绝对路径"
         case .emptyProfile: "配置文件和认证文件都不能为空"
-        case let .unableToRestore(path): "切换失败且无法恢复原文件：\(path)"
+        case let .unableToRestore(path): AppLocalization.text("切换失败且无法恢复原文件：%@", path)
         }
     }
 }
@@ -688,10 +688,10 @@ public enum AIAgentCLIRelayError: LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case let .unsupportedRelay(kind): "\(kind.displayName) 暂不支持语音整理"
-        case let .unavailable(kind): "未找到 \(kind.displayName) CLI"
-        case let .failed(detail): "CLI 执行失败：\(detail)"
-        case .emptyResponse: "CLI 没有返回内容"
+        case let .unsupportedRelay(kind): AppLocalization.text("%@ 暂不支持语音整理", kind.displayName)
+        case let .unavailable(kind): AppLocalization.text("未找到 %@ CLI", kind.displayName)
+        case let .failed(detail): AppLocalization.text("CLI 执行失败：%@", detail)
+        case .emptyResponse: AppLocalization.text("CLI 没有返回内容")
         }
     }
 }
@@ -1189,7 +1189,7 @@ public struct AIAgentCLIService: Sendable {
             timeout: 300
         )
         guard output.status == 0 else {
-            throw AIAgentCLIRelayError.failed("退出状态 \(output.status)")
+            throw AIAgentCLIRelayError.failed(AppLocalization.text("退出状态 %ld", Int(output.status)))
         }
         let response = String(decoding: output.standardOutput, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)

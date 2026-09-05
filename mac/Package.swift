@@ -20,6 +20,10 @@ let package = Package(
     targets: [
         .target(
             name: "ZislaCore",
+            resources: [
+                // Localization lives here so every target (ZislaKit, KeyboardKit, Zisla) shares one table.
+                .process("../../Resources/Localization"),
+            ],
             linkerSettings: [
                 .linkedLibrary("sqlite3"),
             ]
@@ -58,7 +62,7 @@ let package = Package(
         ),
         .target(
             name: "KeyboardKit",
-            dependencies: ["ZislaCore", "Sparkle"],
+            dependencies: ["ZislaCore", "ZislaKit", "Sparkle"],
             resources: [
                 .copy("../../Resources/Keyboard"),
             ],
@@ -86,7 +90,6 @@ let package = Package(
                 .copy("../../Resources/QuickNotes"),
                 .copy("../../Resources/BrandIcons"),
                 .copy("../../Resources/ThirdPartyLicenses"),
-                .process("../../Resources/Localization"),
             ],
             linkerSettings: [
                 .linkedFramework("Speech"),

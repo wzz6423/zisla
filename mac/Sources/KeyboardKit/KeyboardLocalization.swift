@@ -1,25 +1,46 @@
 import Foundation
+import ZislaCore
+import ZislaKit
 
-enum AppLanguagePreference: String, CaseIterable, Identifiable, Sendable {
+/// Language override for the Keyboard windows. Stored raw values stay compatible with the
+/// three-option era: "system" plus the `AppLanguage` codes "en" and "zh-Hans".
+enum AppLanguagePreference: RawRepresentable, CaseIterable, Identifiable, Hashable, Sendable {
     case system
-    case english
-    case simplifiedChinese
+    case explicit(AppLanguage)
 
-    var id: Self { self }
+    static let allCases: [AppLanguagePreference] = [.system] + AppLanguage.allCases.map(Self.explicit)
+
+    init?(rawValue: String) {
+        if rawValue == "system" {
+            self = .system
+        } else if let language = AppLanguage(rawValue: rawValue) {
+            self = .explicit(language)
+        } else {
+            return nil
+        }
+    }
+
+    var rawValue: String {
+        switch self {
+        case .system: "system"
+        case .explicit(let language): language.rawValue
+        }
+    }
+
+    var id: String { rawValue }
 
     var localizationIdentifier: String? {
         switch self {
         case .system: nil
-        case .english: "en"
-        case .simplifiedChinese: "zh-Hans"
+        case .explicit(let language): language.rawValue
         }
     }
 
-    var displayNameKey: String {
+    /// Endonyms are used verbatim so a language name never gets translated into another language.
+    var displayName: String {
         switch self {
-        case .system: "跟随系统"
-        case .english: "English"
-        case .simplifiedChinese: "简体中文"
+        case .system: AppLocalization.text("跟随系统")
+        case .explicit(let language): language.nativeDisplayName
         }
     }
 }
@@ -53,7 +74,6 @@ enum L10n {
         }
     }
 
-    private static let supportedLocalizations = ["zh-Hans", "en"]
     private static let fallbackLocalization = "en"
     private static let storage = Storage(state: makeState(for: .system))
 
@@ -73,17 +93,19 @@ enum L10n {
     }
 
     static func tr(_ key: String) -> String {
+        let shared = AppLocalization.text(key)
+        if shared != key { return shared }
         let snapshot = currentState()
         return snapshot.bundle.localizedString(forKey: key, value: key, table: nil)
     }
 
     static func format(_ format: String, _ arguments: CVarArg...) -> String {
         let snapshot = currentState()
-        return String(
-            format: snapshot.bundle.localizedString(forKey: format, value: format, table: nil),
-            locale: snapshot.locale,
-            arguments: arguments
-        )
+        let shared = AppLocalization.text(format)
+        let template = shared != format
+            ? shared
+            : snapshot.bundle.localizedString(forKey: format, value: format, table: nil)
+        return String(format: template, locale: snapshot.locale, arguments: arguments)
     }
 
     static func locale(for preference: AppLanguagePreference) -> Locale {
@@ -94,8 +116,16 @@ enum L10n {
         currentState().locale
     }
 
+    /// Keyboard windows live inside Zisla, so ".system" follows the app-wide language picker
+    /// instead of the OS preference; only an explicit override keeps its own localization.
     private static func currentState() -> State {
-        storage.current()
+        let snapshot = storage.current()
+        guard snapshot.languagePreference == .system else { return snapshot }
+        let expected = canonicalLocalizationIdentifier(AppLocalization.currentLanguage.rawValue)
+        guard expected != snapshot.resolvedLocalization else { return snapshot }
+        let refreshed = makeState(for: .system)
+        storage.replace(with: refreshed)
+        return refreshed
     }
 
     private static func makeState(for preference: AppLanguagePreference) -> State {
@@ -104,7 +134,9 @@ enum L10n {
             languagePreference: preference,
             resolvedLocalization: resolvedLocalization,
             bundle: localizedBundle(for: resolvedLocalization),
-            locale: preference == .system ? .autoupdatingCurrent : locale(for: resolvedLocalization)
+            locale: preference == .system
+                ? AppLocalization.currentLanguage.locale
+                : locale(for: resolvedLocalization)
         )
     }
 
@@ -115,45 +147,32 @@ enum L10n {
             return localization
         }
 
-        let preferences = UserDefaults.standard.stringArray(forKey: "AppleLanguages")
-            ?? Locale.preferredLanguages
-        let preferred = Bundle.preferredLocalizations(
-            from: supportedLocalizations,
-            forPreferences: preferences
-        ).first
-        return canonicalLocalizationIdentifier(preferred)
+        return canonicalLocalizationIdentifier(AppLocalization.currentLanguage.rawValue)
     }
 
     private static func canonicalLocalizationIdentifier(_ identifier: String?) -> String {
-        guard let identifier else { return fallbackLocalization }
-        let lowercased = identifier.lowercased()
-        if lowercased.hasPrefix("zh") {
-            return "zh-Hans"
+        guard let identifier, let language = AppLanguage(rawValue: identifier) else {
+            return fallbackLocalization
         }
-        if lowercased.hasPrefix("en") {
-            return "en"
-        }
-        return fallbackLocalization
+        return language.rawValue
     }
 
+    /// Only zh-Hans and en ship a Keyboard catalog; other languages resolve through the shared
+    /// table and fall back to en here for any key that has not been merged into it yet.
     private static func localizedBundle(for localization: String) -> Bundle {
-        guard let url = Bundle.module.url(
-            forResource: localization,
-            withExtension: "lproj",
-            subdirectory: "Keyboard"
-        ), let bundle = Bundle(url: url) else {
-            return .main
+        for candidate in [localization, fallbackLocalization] {
+            guard let url = Bundle.module.url(
+                forResource: candidate,
+                withExtension: "lproj",
+                subdirectory: "Keyboard"
+            ), let bundle = Bundle(url: url) else { continue }
+            return bundle
         }
-        return bundle
+        return .main
     }
 
     private static func locale(for localization: String) -> Locale {
-        switch localization {
-        case "zh-Hans":
-            return Locale(identifier: "zh-Hans")
-        default:
-            return Locale(identifier: "en")
-        }
+        (AppLanguage(rawValue: localization) ?? .english).locale
     }
 }
 

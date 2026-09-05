@@ -2,6 +2,7 @@ import Combine
 import Darwin
 import Foundation
 import ObjectiveC.runtime
+import ZislaCore
 
 public struct FocusModePresentation: Equatable, Sendable {
     public var title: String
@@ -70,17 +71,17 @@ public struct FocusModeStatus: Equatable, Sendable {
     private static func knownMode(for identifier: String?) -> FocusModePresentation? {
         guard let identifier = identifier?.lowercased() else { return nil }
         let modes: [(token: String, title: String, symbolName: String)] = [
-            ("workout", "健身", "figure.run"),
-            ("work", "工作", "briefcase.fill"),
-            ("personal", "个人", "person.fill"),
-            ("sleep", "睡眠", "bed.double.fill"),
-            ("fitness", "健身", "figure.run"),
-            ("driving", "驾驶", "car.fill"),
-            ("mindfulness", "正念", "brain.head.profile"),
-            ("reading", "阅读", "book.fill"),
-            ("gaming", "游戏", "gamecontroller.fill"),
-            ("do-not-disturb", "勿扰", "moon.fill"),
-            ("donotdisturb", "勿扰", "moon.fill"),
+            ("workout", AppLocalization.text("健身"), "figure.run"),
+            ("work", AppLocalization.text("工作"), "briefcase.fill"),
+            ("personal", AppLocalization.text("个人"), "person.fill"),
+            ("sleep", AppLocalization.text("睡眠"), "bed.double.fill"),
+            ("fitness", AppLocalization.text("健身"), "figure.run"),
+            ("driving", AppLocalization.text("驾驶"), "car.fill"),
+            ("mindfulness", AppLocalization.text("正念"), "brain.head.profile"),
+            ("reading", AppLocalization.text("阅读"), "book.fill"),
+            ("gaming", AppLocalization.text("游戏"), "gamecontroller.fill"),
+            ("do-not-disturb", AppLocalization.text("勿扰"), "moon.fill"),
+            ("donotdisturb", AppLocalization.text("勿扰"), "moon.fill"),
         ]
         let mode = modes.first {
             identifier == $0.token || identifier.hasSuffix(".\($0.token)")

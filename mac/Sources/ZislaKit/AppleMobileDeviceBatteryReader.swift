@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import ZislaCore
 
 // Adapted for Zisla from MacTools' Apache-2.0 DeviceBattery mobile-device reader.
 
@@ -92,7 +93,7 @@ enum AppleMobileDeviceBatteryParser {
         case .phone: "iPhone"
         case .tablet: "iPad"
         case .watch: "Apple Watch"
-        case .other: productType.isEmpty ? "Apple 设备" : productType
+        case .other: productType.isEmpty ? AppLocalization.text("Apple 设备") : productType
         }
     }
 

@@ -36,7 +36,7 @@ public final class ZCodeSessionActivityDetector: AIActivityDetecting {
             nil
         )
         guard openResult == SQLITE_OK, let database else {
-            let message = sqliteMessage(database, fallback: "无法打开 ZCode 数据库")
+            let message = sqliteMessage(database, fallback: AppLocalization.text("无法打开 ZCode 数据库"))
             sqlite3_close(database)
             throw AIStateRepositoryError.storageFailure(message)
         }
@@ -77,7 +77,7 @@ public final class ZCodeSessionActivityDetector: AIActivityDetecting {
         var statement: OpaquePointer?
         let prepareResult = sqlite3_prepare_v2(database, sql, -1, &statement, nil)
         guard prepareResult == SQLITE_OK, let statement else {
-            let message = sqliteMessage(database, fallback: "无法查询 ZCode 会话")
+            let message = sqliteMessage(database, fallback: AppLocalization.text("无法查询 ZCode 会话"))
             sqlite3_finalize(statement)
             throw AIStateRepositoryError.storageFailure(message)
         }
@@ -88,7 +88,7 @@ public final class ZCodeSessionActivityDetector: AIActivityDetecting {
         )
         guard sqlite3_bind_int64(statement, 1, cutoff) == SQLITE_OK else {
             throw AIStateRepositoryError.storageFailure(
-                sqliteMessage(database, fallback: "无法设置 ZCode 会话查询范围")
+                sqliteMessage(database, fallback: AppLocalization.text("无法设置 ZCode 会话查询范围"))
             )
         }
 
@@ -126,7 +126,7 @@ public final class ZCodeSessionActivityDetector: AIActivityDetecting {
                 break readRows
             default:
                 throw AIStateRepositoryError.storageFailure(
-                    sqliteMessage(database, fallback: "无法读取 ZCode 会话")
+                    sqliteMessage(database, fallback: AppLocalization.text("无法读取 ZCode 会话"))
                 )
             }
         }

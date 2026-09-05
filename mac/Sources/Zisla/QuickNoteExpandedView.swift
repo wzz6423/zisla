@@ -1,3 +1,4 @@
+import ZislaCore
 import ZislaKit
 import SwiftUI
 
@@ -75,7 +76,7 @@ struct QuickNoteExpandedView: View {
                 .disabled(service.isBuiltInWelcomeNoteSelected)
 
             if noteContent != nil {
-                Text("\(draftPlainText.count) 字")
+                Text(AppLocalization.text("%ld 字", draftPlainText.count))
                     .font(.islandMicro())
                     .foregroundStyle(.tertiary)
                     .fixedSize()
@@ -95,15 +96,15 @@ struct QuickNoteExpandedView: View {
             Image(systemName: "note.text")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
-            Text(service.selectedNote?.title ?? "随记")
+            Text(service.selectedNote?.title ?? AppLocalization.text("随记"))
                 .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
+                .fitsSingleLine()
                 .truncationMode(.tail)
             if service.isLoadingNote || service.isSaving {
                 ProgressView().controlSize(.small)
             }
             Spacer(minLength: 6)
-            IconButton(symbol: "square.and.arrow.up", help: "系统共享", size: .compact) {
+            IconButton(symbol: "square.and.arrow.up", help: AppLocalization.text("系统共享"), size: .compact) {
                 model.share([.text(draftPlainText)])
             }
             .disabled(draftPlainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ZislaCore
 import ZislaKit
 import SwiftUI
 
@@ -8,6 +9,7 @@ struct LockScreenOverlayView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var media: NowPlayingService
     @StateObject private var scrubState = MediaScrubState()
+    @Environment(\.locale) private var locale
     let kind: LockScreenOverlayKind
 
     init(model: AppModel, kind: LockScreenOverlayKind) {
@@ -42,7 +44,7 @@ struct LockScreenOverlayView: View {
                         .multilineTextAlignment(.center)
                 }
                 if let lunar {
-                    Text("农历 \(lunar)")
+                    Text(AppLocalization.text("农历 %@", lunar))
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.white.opacity(0.78))
                 }
@@ -345,11 +347,7 @@ struct LockScreenOverlayView: View {
     }
 
     private func batteryDetail(_ battery: BatterySnapshot) -> String {
-        if battery.isCharging { return "充电中" }
-        if battery.isCharged { return "已充满" }
-        if battery.isPluggedIn { return "已接通电源" }
-        if let minutes = battery.timeRemainingMinutes { return "剩余 \(minutes) 分钟" }
-        return "电池供电"
+        BatteryLocalization.detailStatusText(battery, locale: locale)
     }
 
     private func timeText(_ seconds: Double) -> String {

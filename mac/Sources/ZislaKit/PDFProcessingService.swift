@@ -2,6 +2,7 @@ import AppKit
 import CoreText
 import Foundation
 import PDFKit
+import ZislaCore
 
 public struct PDFDocumentSummary: Equatable, Sendable {
     public let pageCount: Int
@@ -71,22 +72,22 @@ public enum PDFProcessingError: LocalizedError, Equatable, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case let .invalidInput(url): "不是可访问的本地 PDF 文件：\(url.lastPathComponent)"
-        case let .invalidDocument(url): "无法读取 PDF：\(url.lastPathComponent)"
-        case let .lockedDocument(url): "PDF 已加密且尚未解锁：\(url.lastPathComponent)"
-        case let .invalidPageIndex(index): "页码 \(index + 1) 超出文档范围"
-        case let .invalidRotation(degrees): "旋转角度必须是 90 度的整数倍：\(degrees)"
-        case let .invalidPageSelection(selection): "页码范围无效：\(selection)"
+        case let .invalidInput(url): AppLocalization.text("不是可访问的本地 PDF 文件：%@", url.lastPathComponent)
+        case let .invalidDocument(url): AppLocalization.text("无法读取 PDF：%@", url.lastPathComponent)
+        case let .lockedDocument(url): AppLocalization.text("PDF 已加密且尚未解锁：%@", url.lastPathComponent)
+        case let .invalidPageIndex(index): AppLocalization.text("页码 %ld 超出文档范围", index + 1)
+        case let .invalidRotation(degrees): AppLocalization.text("旋转角度必须是 90 度的整数倍：%ld", degrees)
+        case let .invalidPageSelection(selection): AppLocalization.text("页码范围无效：%@", selection)
         case .emptyPageSelection: "至少需要选择一页"
-        case let .duplicateOutput(url): "同一任务不能重复使用输出文件：\(url.lastPathComponent)"
-        case let .outputAlreadyExists(url): "输出文件已存在，未覆盖：\(url.lastPathComponent)"
-        case let .outputMatchesInput(url): "输出文件不能覆盖输入文件：\(url.lastPathComponent)"
-        case let .cannotCreateOutputDirectory(message): "无法创建输出目录：\(message)"
-        case let .cannotWriteOutput(url): "无法写入 PDF：\(url.lastPathComponent)"
-        case let .cannotRenderPage(index): "无法渲染第 \(index + 1) 页"
-        case let .unsupportedImage(url): "无法读取图片：\(url.lastPathComponent)"
-        case let .invalidCropBox(rect): "裁剪区域无效：\(rect)"
-        case let .invalidWatermarkScale(scale): "水印缩放比例无效：\(scale)"
+        case let .duplicateOutput(url): AppLocalization.text("同一任务不能重复使用输出文件：%@", url.lastPathComponent)
+        case let .outputAlreadyExists(url): AppLocalization.text("输出文件已存在，未覆盖：%@", url.lastPathComponent)
+        case let .outputMatchesInput(url): AppLocalization.text("输出文件不能覆盖输入文件：%@", url.lastPathComponent)
+        case let .cannotCreateOutputDirectory(message): AppLocalization.text("无法创建输出目录：%@", message)
+        case let .cannotWriteOutput(url): AppLocalization.text("无法写入 PDF：%@", url.lastPathComponent)
+        case let .cannotRenderPage(index): AppLocalization.text("无法渲染第 %ld 页", index + 1)
+        case let .unsupportedImage(url): AppLocalization.text("无法读取图片：%@", url.lastPathComponent)
+        case let .invalidCropBox(rect): AppLocalization.text("裁剪区域无效：%@", "\(rect)")
+        case let .invalidWatermarkScale(scale): AppLocalization.text("水印缩放比例无效：%@", "\(scale)")
         case .invalidPassword: "用户密码和所有者密码均不能为空"
         case .incorrectPassword: "PDF 密码不正确"
         }

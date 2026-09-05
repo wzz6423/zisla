@@ -204,6 +204,39 @@ struct ScreenshotLifecycleTests {
         #expect(toolbarAcceptsInput.lowerBound < completeToolbar.lowerBound)
     }
 
+    /// The editor overlay is an opaque black window covering the whole screen, so any moment where it is
+    /// on screen without its content flashes solid black. Probed with a standalone `swiftc` window plus
+    /// `screencapture`: clearing the content view while visible reads #000000, ordering the window out
+    /// first reads the desktop underneath.
+    @Test
+    func editorOverlayIsNeverVisibleWithoutItsContent() throws {
+        let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)
+
+        let willClose = try #require(source.range(of: "func windowWillClose(_ notification: Notification)"))
+        let didBecomeKey = try #require(source.range(
+            of: "func windowDidBecomeKey(_ notification: Notification)",
+            range: willClose.upperBound..<source.endIndex
+        ))
+        let closeLifecycle = source[willClose.lowerBound..<didBecomeKey.lowerBound]
+        let ordersOut = try #require(closeLifecycle.range(of: "window?.orderOut(nil)"))
+        let clearsContent = try #require(closeLifecycle.range(of: "window?.contentView = nil"))
+        let notifiesOwner = try #require(closeLifecycle.range(of: "onCloseHandler?()"))
+        #expect(ordersOut.lowerBound < clearsContent.lowerBound)
+        #expect(clearsContent.lowerBound < notifiesOwner.lowerBound)
+
+        let restore = try #require(source.range(of: "private func restoreEditorPresentation()"))
+        let dismissOverlays = try #require(source.range(
+            of: "private func dismissLongCaptureOverlays()",
+            range: restore.upperBound..<source.endIndex
+        ))
+        let restoreLifecycle = source[restore.lowerBound..<dismissOverlays.lowerBound]
+        let restoresContent = try #require(restoreLifecycle.range(of: "configureOverlayView(in: window)"))
+        let turnsOpaque = try #require(restoreLifecycle.range(of: "window.isOpaque = true"))
+        let paintsBlack = try #require(restoreLifecycle.range(of: "window.backgroundColor = .black"))
+        #expect(restoresContent.lowerBound < turnsOpaque.lowerBound)
+        #expect(restoresContent.lowerBound < paintsBlack.lowerBound)
+    }
+
     @Test
     func longCaptureDoesNotDependOnGlobalScrollMonitoring() throws {
         let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)
@@ -339,8 +372,8 @@ struct ScreenshotLifecycleTests {
         #expect(source.contains("@State private var canvasZoom: CGFloat = 1"))
         #expect(source.contains("zoom: model.hasLongCaptureResult ? canvasZoom : 1"))
         #expect(source.contains("adjustCanvasZoom(by: magnification)"))
-        #expect(source.contains("iconButton(\"minus.magnifyingglass\", title: \"缩小\")"))
-        #expect(source.contains("iconButton(\"plus.magnifyingglass\", title: \"放大\")"))
+        #expect(source.contains("iconButton(\"minus.magnifyingglass\", title: AppLocalization.text(\"缩小\"))"))
+        #expect(source.contains("iconButton(\"plus.magnifyingglass\", title: AppLocalization.text(\"放大\"))"))
     }
 
     @Test
@@ -353,8 +386,8 @@ struct ScreenshotLifecycleTests {
         let lightMaterial = try #require(recognition.range(of: "resultContainer.material = .sidebar"))
         let transparentScrollBackground = try #require(recognition.range(of: "scrollView.drawsBackground = false"))
         let scrollView = try #require(recognition.range(of: "scrollView.hasVerticalScroller = true"))
-        let copyButton = try #require(recognition.range(of: "alert.addButton(withTitle: \"复制\")"))
-        let closeButton = try #require(recognition.range(of: "alert.addButton(withTitle: \"关闭\")"))
+        let copyButton = try #require(recognition.range(of: "alert.addButton(withTitle: AppLocalization.text(\"复制\"))"))
+        let closeButton = try #require(recognition.range(of: "alert.addButton(withTitle: AppLocalization.text(\"关闭\"))"))
         let copyGuard = try #require(recognition.range(of: "guard response == .alertFirstButtonReturn else { return }"))
         let pasteboard = try #require(recognition.range(of: "let pasteboard = NSPasteboard.general"))
 

@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 
+@testable import ZislaCore
 @testable import ZislaKit
 
 @Suite(.serialized)
@@ -34,8 +35,21 @@ struct QuickNotesServiceTests {
 
     @Test
     func loadsWelcomeNoteTextFromBundledResource() {
-        #expect(QuickNotesService.welcomeNoteText.contains("从现在开始，你可以在记事本中写记事了。"))
-        #expect(QuickNotesService.welcomeNoteText.contains("愿你能愉快而轻松地使用这个小工具~"))
+        let chinese = QuickNotesService.welcomeNoteText(language: .simplifiedChinese)
+        #expect(chinese.contains("从现在开始，你可以在记事本中写记事了。"))
+        #expect(chinese.contains("愿你能愉快而轻松地使用这个小工具~"))
+    }
+
+    /// A missing `welcome-note-<language>.md` silently falls back to the Simplified Chinese source,
+    /// so matching that text is how an untranslated language shows up.
+    @Test
+    func loadsTranslatedWelcomeNoteForEveryLanguage() {
+        let chinese = QuickNotesService.welcomeNoteText(language: .simplifiedChinese)
+        for language in AppLanguage.allCases where language != .simplifiedChinese {
+            let text = QuickNotesService.welcomeNoteText(language: language)
+            #expect(!text.isEmpty, "\(language.rawValue) welcome note is empty")
+            #expect(text != chinese, "\(language.rawValue) welcome note is untranslated")
+        }
     }
 
     @Test

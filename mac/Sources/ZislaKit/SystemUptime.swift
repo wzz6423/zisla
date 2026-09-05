@@ -1,4 +1,5 @@
 import Foundation
+import ZislaCore
 
 public enum SystemUptime {
     public static func displayText(for uptime: TimeInterval) -> String {
@@ -6,6 +7,6 @@ public enum SystemUptime {
         let days = totalMinutes / 1_440
         let hours = totalMinutes % 1_440 / 60
         let minutes = totalMinutes % 60
-        return "开机时间： \(days)天 \(hours)小时 \(minutes)分钟"
+        return AppLocalization.text("开机时间： %ld天 %ld小时 %ld分钟", days, hours, minutes)
     }
 }

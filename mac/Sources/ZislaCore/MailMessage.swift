@@ -15,7 +15,7 @@ public struct MailAccount: Identifiable, Equatable, Sendable {
     }
 
     public var detail: String {
-        emailAddresses.dropFirst().joined(separator: "、")
+        emailAddresses.dropFirst().joined(separator: AppLocalization.text("、"))
     }
 
     public var primaryEmailAddress: String? {
@@ -62,7 +62,7 @@ public struct MailMessage: Identifiable, Equatable, Sendable {
         let normalized = body
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return normalized.isEmpty ? "没有可显示的正文" : normalized
+        return normalized.isEmpty ? AppLocalization.text("没有可显示的正文") : normalized
     }
 }
 

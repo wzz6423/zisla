@@ -1,4 +1,5 @@
 import AppKit
+import ZislaCore
 import ZislaKit
 import SwiftUI
 
@@ -31,7 +32,7 @@ struct ShelfModuleView: View {
 
             VStack(spacing: 0) {
                 HStack {
-                    Label("中转站", systemImage: "tray.full")
+                    Label(AppLocalization.text("中转站"), systemImage: "tray.full")
                         .font(.system(size: 12, weight: .semibold))
                     Spacer()
                     Text("\(filteredItems.count)")
@@ -44,12 +45,12 @@ struct ShelfModuleView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "doc.on.clipboard")
                                 .font(.system(size: 11, weight: .medium))
-                            Text("粘贴")
+                            Text(AppLocalization.text("粘贴"))
                                 .font(.system(size: 10, weight: .medium))
                         }
                     }
                     .buttonStyle(.plain)
-                    .help("粘贴文件到中转站")
+                    .help(AppLocalization.text("粘贴文件到中转站"))
                     .keyboardShortcut("v", modifiers: .command)
 
                     if !model.shelf.items.isEmpty {
@@ -59,12 +60,12 @@ struct ShelfModuleView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "note.text")
                                     .font(.system(size: 11, weight: .medium))
-                                Text("随记")
+                                Text(AppLocalization.text("随记"))
                                     .font(.system(size: 10, weight: .medium))
                             }
                         }
                         .buttonStyle(.plain)
-                        .help("全部发送到随记")
+                        .help(AppLocalization.text("全部发送到随记"))
 
                         Button {
                             model.copyShelfFiles(model.shelf.items.map(\.url))
@@ -72,23 +73,23 @@ struct ShelfModuleView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "doc.on.doc")
                                     .font(.system(size: 11, weight: .medium))
-                                Text("复制")
+                                Text(AppLocalization.text("复制"))
                                     .font(.system(size: 10, weight: .medium))
                             }
                         }
                         .buttonStyle(.plain)
-                        .help("复制全部文件")
+                        .help(AppLocalization.text("复制全部文件"))
 
                         ShareLink(items: model.shelf.items.map(\.url)) {
                             HStack(spacing: 4) {
                                 Image(systemName: "square.and.arrow.up")
                                     .font(.system(size: 11, weight: .medium))
-                                Text("分享")
+                                Text(AppLocalization.text("分享"))
                                     .font(.system(size: 10, weight: .medium))
                             }
                         }
                         .buttonStyle(.plain)
-                        .help("系统分享")
+                        .help(AppLocalization.text("系统分享"))
 
                         Button {
                             NSWorkspace.shared.activateFileViewerSelecting(
@@ -98,12 +99,12 @@ struct ShelfModuleView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "folder")
                                     .font(.system(size: 11, weight: .medium))
-                                Text("显示")
+                                Text(AppLocalization.text("显示"))
                                     .font(.system(size: 10, weight: .medium))
                             }
                         }
                         .buttonStyle(.plain)
-                        .help("在 Finder 中显示")
+                        .help(AppLocalization.text("在 Finder 中显示"))
                     }
                 }
                 .frame(height: 30)
@@ -119,7 +120,7 @@ struct ShelfModuleView: View {
                     if model.shelf.items.isEmpty {
                         EmptyState(
                             symbol: "tray.and.arrow.down",
-                            title: "中转站为空",
+                            title: AppLocalization.text("中转站为空"),
                             tint: dropState.shelfTargeted
                                 ? Color(red: 0.48, green: 0.9, blue: 0.62)
                                 : .secondary
@@ -127,7 +128,7 @@ struct ShelfModuleView: View {
                     } else if filteredItems.isEmpty {
                         EmptyState(
                             symbol: "line.3.horizontal.decrease.circle",
-                            title: "无符合条件的文件",
+                            title: AppLocalization.text("无符合条件的文件"),
                             tint: .secondary
                         )
                     } else {
@@ -179,7 +180,7 @@ struct ShelfModuleView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
-            TextField("搜索文件名", text: $searchText)
+            TextField(AppLocalization.text("搜索文件名"), text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 11))
             if !searchText.isEmpty {
@@ -209,7 +210,7 @@ struct ShelfModuleView: View {
                         HStack(spacing: 4) {
                             Image(systemName: category.symbol)
                                 .font(.system(size: 10, weight: .medium))
-                            Text(category.rawValue)
+                            Text(category.title)
                                 .font(.system(size: 10, weight: .medium))
                             if category != .all {
                                 Text("\(count)")
@@ -267,12 +268,12 @@ struct ShelfModuleView: View {
             Image(systemName: "square.and.arrow.up")
                 .font(.system(size: 20, weight: .medium))
                 .symbolRenderingMode(.hierarchical)
-            Text("共享")
+            Text(AppLocalization.text("共享"))
                 .font(.system(size: 11, weight: .semibold))
             Button {
                 model.shareFromPasteboard()
             } label: {
-                Label("粘贴", systemImage: "doc.on.clipboard")
+                Label(AppLocalization.text("粘贴"), systemImage: "doc.on.clipboard")
                     .font(.system(size: 10, weight: .medium))
                     .labelStyle(.titleAndIcon)
                     .frame(maxWidth: .infinity)
@@ -281,7 +282,7 @@ struct ShelfModuleView: View {
             .buttonStyle(.plain)
             .background(Color.fillCard)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .help("从剪贴板共享（文件或文字）")
+            .help(AppLocalization.text("从剪贴板共享（文件或文字）"))
         }
         .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -297,7 +298,7 @@ struct ShelfModuleView: View {
                     lineWidth: 1
                 )
         }
-        .help("拖入或粘贴后系统共享")
+        .help(AppLocalization.text("拖入或粘贴后系统共享"))
     }
 
     /// Relay and shared blocks use plain card fills because Liquid Glass competes with their file icons;
@@ -348,7 +349,7 @@ private struct ShelfItemView: View {
                 }
                 .buttonStyle(.plain)
                 .offset(x: 5, y: -5)
-                .help("移除")
+                .help(AppLocalization.text("移除"))
             }
             Text(item.url.lastPathComponent)
                 .font(.system(size: 9, weight: .medium))
@@ -362,14 +363,14 @@ private struct ShelfItemView: View {
             NSWorkspace.shared.open(item.url)
         }
         .contextMenu {
-            Button("打开") { NSWorkspace.shared.open(item.url) }
-            Button("在 Finder 中显示") {
+            Button(AppLocalization.text("打开")) { NSWorkspace.shared.open(item.url) }
+            Button(AppLocalization.text("在 Finder 中显示")) {
                 NSWorkspace.shared.activateFileViewerSelecting([item.url])
             }
-            Button("复制", action: onCopy)
-            Button("发送到随记", action: onSendToQuickNote)
+            Button(AppLocalization.text("复制"), action: onCopy)
+            Button(AppLocalization.text("发送到随记"), action: onSendToQuickNote)
             Divider()
-            Button("移除", role: .destructive, action: onRemove)
+            Button(AppLocalization.text("移除"), role: .destructive, action: onRemove)
         }
     }
 }

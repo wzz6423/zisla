@@ -1,5 +1,7 @@
 import AppKit
 import SwiftUI
+import ZislaCore
+import ZislaKit
 
 private struct TypingReportRequest: Hashable {
     let startDate: Date
@@ -102,7 +104,7 @@ struct TypingStatsHistoryView: View {
                             .opacity(model.isLoadingReport ? 0.62 : 1)
                             .overlay {
                                 if model.isLoadingReport {
-                                    ProgressView("正在更新年度统计…")
+                                    ProgressView(L10n.tr("正在更新年度统计…"))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 12)
                                         .background(.regularMaterial, in: Capsule())
@@ -117,9 +119,9 @@ struct TypingStatsHistoryView: View {
                     } else if model.isLoadingReport {
                         VStack(spacing: 12) {
                             ProgressView()
-                            Text("正在整理过去一年的统计")
+                            Text(AppLocalization.text("正在整理过去一年的统计"))
                                 .font(.subheadline.weight(.medium))
-                            Text("首次读取较长日期区间时可能需要一点时间。")
+                            Text(AppLocalization.text("首次读取较长日期区间时可能需要一点时间。"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -320,7 +322,7 @@ struct TypingStatsHistoryView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
-                Text("输入节律变化")
+                Text(AppLocalization.text("输入节律变化"))
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(KeyboardVisualStyle.instrumentPrimary)
 
@@ -338,7 +340,7 @@ struct TypingStatsHistoryView: View {
                 Spacer(minLength: 8)
 
                 Picker(
-                    "节律显示方式",
+                    AppLocalization.text("节律显示方式"),
                     selection: Binding(
                         get: { report.rhythmComparisonRange == nil ? .current : rhythmMode },
                         set: { rhythmMode = $0 }
@@ -386,7 +388,7 @@ struct TypingStatsHistoryView: View {
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.62)
-                Text("个字符")
+                Text(AppLocalization.text("个字符"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -453,7 +455,7 @@ struct TypingStatsHistoryView: View {
 
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("应用变化")
+                Text(AppLocalization.text("应用变化"))
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(KeyboardVisualStyle.instrumentPrimary)
 
@@ -465,7 +467,7 @@ struct TypingStatsHistoryView: View {
             }
 
             if report.applications.isEmpty {
-                Label("所选区间没有可显示的应用记录", systemImage: "app.dashed")
+                Label(AppLocalization.text("所选区间没有可显示的应用记录"), systemImage: "app.dashed")
                     .font(.caption)
                     .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
                     .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
@@ -560,7 +562,7 @@ struct TypingStatsHistoryView: View {
                 Text(app.application.displayName)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(KeyboardVisualStyle.instrumentPrimary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .truncationMode(.tail)
             }
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
@@ -587,7 +589,7 @@ struct TypingStatsHistoryView: View {
         VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("全部应用")
+                    Text(AppLocalization.text("全部应用"))
                         .font(.title2.weight(.semibold))
                     Text(
                         L10n.format(
@@ -600,7 +602,7 @@ struct TypingStatsHistoryView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("完成") {
+                Button(AppLocalization.text("完成")) {
                     showsAllApplicationsSheet = false
                 }
                 .keyboardShortcut(.defaultAction)
@@ -621,7 +623,7 @@ struct TypingStatsHistoryView: View {
             Text(L10n.tr(title))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
-                .lineLimit(1)
+                .fitsLines(2)
     }
 
     private func tableValue(_ value: String) -> some View {
@@ -674,10 +676,10 @@ struct TypingStatsHistoryView: View {
     private func insights(_ report: TypingRangeReportSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("年度亮点")
+                Text(AppLocalization.text("年度亮点"))
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(KeyboardVisualStyle.instrumentPrimary)
-                Text("过去 365 天的高峰与输入习惯")
+                Text(AppLocalization.text("过去 365 天的高峰与输入习惯"))
                     .font(.caption)
                     .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
             }
@@ -746,7 +748,7 @@ struct TypingStatsHistoryView: View {
                 Text(detail)
                     .font(.caption2)
                     .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
-                    .lineLimit(1)
+                    .fitsSingleLine()
             }
             Spacer(minLength: 0)
         }
@@ -762,7 +764,7 @@ struct TypingStatsHistoryView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 2) {
-                Text("这个区间暂时读取失败")
+                Text(AppLocalization.text("这个区间暂时读取失败"))
                     .font(.subheadline.weight(.semibold))
                 Text(message)
                     .font(.caption)
@@ -770,7 +772,7 @@ struct TypingStatsHistoryView: View {
                     .textSelection(.enabled)
             }
             Spacer()
-            Button("重试") {
+            Button(AppLocalization.text("重试")) {
                 Task {
                     await model.loadReport(
                         range: selectedRange,
@@ -789,9 +791,9 @@ struct TypingStatsHistoryView: View {
     private var emptyReport: some View {
         VStack(spacing: 12) {
             KeyboardIconTile(symbol: "calendar.badge.exclamationmark", tint: .secondary, size: 48, symbolSize: 20)
-            Text("还没有可显示的年度统计")
+            Text(AppLocalization.text("还没有可显示的年度统计"))
                 .font(.headline)
-            Text("先开启统计并输入一段文字，历史页面会在这里逐日积累。")
+            Text(AppLocalization.text("先开启统计并输入一段文字，历史页面会在这里逐日积累。"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

@@ -99,6 +99,12 @@ final class SideNoticePresenter {
         updateSuppression { $0.isVoiceRecording = recording }
     }
 
+    /// A transient message borrows the collapsed pill the way recording does, so the status wings
+    /// give way instead of crowding the row that just replaced them.
+    func setTransientNoticePresented(_ presented: Bool) {
+        updateSuppression { $0.isTransientNoticePresented = presented }
+    }
+
     /// The clipboard assistant takes over the notch row, so notices give way while it is up.
     func setClipboardAssistantVisible(_ visible: Bool) {
         updateSuppression { $0.isClipboardAssistantVisible = visible }

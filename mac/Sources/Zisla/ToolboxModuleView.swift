@@ -48,7 +48,7 @@ struct ToolboxModuleView: View {
     private var focusPanel: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(pomodoro.mode.title)
+                Text(AppLocalization.text(pomodoro.mode.title))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
@@ -77,7 +77,7 @@ struct ToolboxModuleView: View {
                 Button {
                     pomodoro.reset()
                 } label: {
-                    Text("重置")
+                    Text(AppLocalization.text("重置"))
                         .font(.system(size: 11, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .frame(height: Metrics.controlHeight)
@@ -86,7 +86,7 @@ struct ToolboxModuleView: View {
                 .buttonStyle(.plain)
                 .background(Color.fillControl)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .help("重置番茄钟")
+                .help(AppLocalization.text("重置番茄钟"))
             }
             .frame(maxWidth: .infinity)
         }
@@ -117,19 +117,19 @@ struct ToolboxModuleView: View {
                 }
             }
             .buttonStyle(.plain)
-            .help("设置时长")
+            .help(AppLocalization.text("设置时长"))
             .popover(isPresented: $isDurationPickerPresented, arrowEdge: .top) {
                 HStack(spacing: 8) {
                     durationInput("小时", value: durationHours)
-                    Text("小时")
+                    Text(AppLocalization.text("小时"))
                         .foregroundStyle(.secondary)
 
                     durationInput("分钟", value: durationMinutes)
-                    Text("分")
+                    Text(AppLocalization.text("分"))
                         .foregroundStyle(.secondary)
 
                     durationInput("秒", value: durationSeconds)
-                    Text("秒")
+                    Text(AppLocalization.text("秒"))
                         .foregroundStyle(.secondary)
                 }
                 .padding(12)
@@ -150,7 +150,7 @@ struct ToolboxModuleView: View {
                 Button {
                     model.startScreenCleaning()
                 } label: {
-                    Label("清理屏幕", systemImage: "rectangle.dashed")
+                    Label(AppLocalization.text("清理屏幕"), systemImage: "rectangle.dashed")
                         .font(.system(size: 11, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .frame(height: Metrics.controlHeight)
@@ -159,7 +159,7 @@ struct ToolboxModuleView: View {
                 .buttonStyle(.plain)
                 .background(Color.fillCard)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .help("全屏黑色遮罩；点击中央「退出清屏」按钮或任意处退出")
+                .help(AppLocalization.text("全屏黑色遮罩；点击中央「退出清屏」按钮或任意处退出"))
 
                 Button {
                     if model.screenCleaning.isKeyboardCleaning {
@@ -169,7 +169,7 @@ struct ToolboxModuleView: View {
                     }
                 } label: {
                     Label(
-                        model.screenCleaning.isKeyboardCleaning ? "结束清洁" : "清理键盘",
+                        model.screenCleaning.isKeyboardCleaning ? AppLocalization.text("结束清洁") : AppLocalization.text("清理键盘"),
                         systemImage: "keyboard"
                     )
                         .font(.system(size: 11, weight: .semibold))
@@ -182,14 +182,14 @@ struct ToolboxModuleView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .help(
                     model.screenCleaning.isKeyboardCleaning
-                        ? "恢复键盘输入"
-                        : "吞掉键盘输入；再次点击结束"
+                        ? AppLocalization.text("恢复键盘输入")
+                        : AppLocalization.text("吞掉键盘输入；再次点击结束")
                 )
 
                 ToolShortcutButton(
-                    title: "闹钟",
+                    title: AppLocalization.text("闹钟"),
                     symbol: "alarm",
-                    help: "管理闹钟"
+                    help: AppLocalization.text("管理闹钟")
                 ) {
                     onTransientInteractionChanged(true)
                     isAlarmEditorPresented = true
@@ -201,25 +201,25 @@ struct ToolboxModuleView: View {
 
             HStack(spacing: 8) {
                 ToolShortcutButton(
-                    title: "提词器",
+                    title: AppLocalization.text("提词器"),
                     symbol: "text.viewfinder",
-                    help: "打开提词器"
+                    help: AppLocalization.text("打开提词器")
                 ) {
                     model.presentTeleprompter()
                 }
 
                 ToolShortcutButton(
-                    title: "镜子",
+                    title: AppLocalization.text("镜子"),
                     symbol: "camera.viewfinder",
-                    help: "打开摄像头镜子"
+                    help: AppLocalization.text("打开摄像头镜子")
                 ) {
                     model.presentMirror()
                 }
 
                 ToolShortcutButton(
-                    title: "废纸篓",
+                    title: AppLocalization.text("废纸篓"),
                     symbol: "trash",
-                    help: "清空废纸篓（不可撤销，会先确认）",
+                    help: AppLocalization.text("清空废纸篓（不可撤销，会先确认）"),
                     bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
                 ) {
                     model.emptyTrash()
@@ -333,19 +333,19 @@ struct ToolboxModuleView: View {
     private var toolTogglesRow: some View {
         HStack(spacing: 8) {
             ToolToggleButton(
-                title: "保持亮屏",
+                title: AppLocalization.text("保持亮屏"),
                 symbol: "sun.max.fill",
                 isOn: model.powerAssertions.keepDisplayAwake,
-                help: "防止用户闲置导致显示器休眠"
+                help: AppLocalization.text("防止用户闲置导致显示器休眠")
             ) {
                 model.powerAssertions.setKeepDisplayAwake(!model.powerAssertions.keepDisplayAwake)
             }
 
             ToolToggleButton(
-                title: "防止空闲休眠",
+                title: AppLocalization.text("防止空闲休眠"),
                 symbol: "laptopcomputer",
                 isOn: model.powerAssertions.preventIdleSystemSleep,
-                help: "防止用户闲置导致系统休眠；合盖、低电量或用户主动休眠仍会让 Mac 进入睡眠"
+                help: AppLocalization.text("防止用户闲置导致系统休眠；合盖、低电量或用户主动休眠仍会让 Mac 进入睡眠")
             ) {
                 model.powerAssertions.setPreventIdleSystemSleep(!model.powerAssertions.preventIdleSystemSleep)
             }
@@ -386,7 +386,7 @@ struct ToolboxModuleView: View {
                             ? Color.secondary.opacity(0.5)
                             : (isOn ? Color.primary : Color.secondary)
                     )
-                    .lineLimit(1)
+                    .fitsSingleLine()
                     .frame(maxWidth: .infinity)
                     .frame(height: Metrics.controlHeight)
                     .background(isOn ? Color.accentColor.opacity(0.2) : Color.fillControl)

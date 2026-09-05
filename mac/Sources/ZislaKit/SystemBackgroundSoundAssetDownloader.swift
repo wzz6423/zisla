@@ -26,21 +26,21 @@ public actor SystemBackgroundSoundAssetDownloader {
             case .manifestNotFound:
                 "系统资源清单文件不存在"
             case .manifestReadFailed(let message):
-                "读取系统资源清单失败：\(message)"
+                AppLocalization.text("读取系统资源清单失败：%@", message)
             case .soundNotFoundInManifest(let name):
-                "声音资源 \(name) 未在清单中找到"
+                AppLocalization.text("声音资源 %@ 未在清单中找到", name)
             case .invalidURL:
                 "资源下载 URL 无效"
             case .invalidTargetDirectory:
                 "目标目录路径无效"
             case .httpError(let code):
-                "HTTP 下载失败（状态码 \(code)）"
+                AppLocalization.text("HTTP 下载失败（状态码 %ld）", code)
             case .checksumMismatch(let expected, let actual):
-                "文件校验失败（期望 \(expected)，实际 \(actual)）"
+                AppLocalization.text("文件校验失败（期望 %@，实际 %@）", expected, actual)
             case .unzipFailed(let message):
-                "解压失败：\(message)"
+                AppLocalization.text("解压失败：%@", message)
             case .downloadFailed(let message):
-                "下载失败：\(message)"
+                AppLocalization.text("下载失败：%@", message)
             }
         }
     }
@@ -97,7 +97,7 @@ public actor SystemBackgroundSoundAssetDownloader {
         self.loadData = { request in
             let (tempURL, response) = try await activeSession.download(for: request)
             guard let response = response as? HTTPURLResponse else {
-                throw DownloadError.downloadFailed("无效的 HTTP 响应")
+                throw DownloadError.downloadFailed(AppLocalization.text("无效的 HTTP 响应"))
             }
             return (tempURL, response)
         }
@@ -123,7 +123,7 @@ public actor SystemBackgroundSoundAssetDownloader {
             try task.run()
             task.waitUntilExit()
             guard task.terminationStatus == 0 else {
-                throw DownloadError.unzipFailed("unzip 退出码 \(task.terminationStatus)")
+                throw DownloadError.unzipFailed(AppLocalization.text("unzip 退出码 %ld", Int(task.terminationStatus)))
             }
         }
     }
@@ -158,7 +158,7 @@ public actor SystemBackgroundSoundAssetDownloader {
         let metadata = try readManifest(for: soundName)
         guard (metadata.downloadSize == 0 || metadata.downloadSize <= Self.maxDownloadSize),
               (metadata.unarchivedSize == 0 || metadata.unarchivedSize <= Self.maxUnarchivedSize) else {
-            throw DownloadError.downloadFailed("资源大小超出允许范围")
+            throw DownloadError.downloadFailed(AppLocalization.text("资源大小超出允许范围"))
         }
         let sanitizedTargetDirectory = targetDirectory.standardizedFileURL
 
@@ -180,7 +180,7 @@ public actor SystemBackgroundSoundAssetDownloader {
               attributes[.type] as? FileAttributeType == .typeRegular,
               let downloadedSize = (attributes[.size] as? NSNumber)?.int64Value,
               downloadedSize <= Int64(Self.maxDownloadSize) else {
-            throw DownloadError.downloadFailed("资源大小超出允许范围")
+            throw DownloadError.downloadFailed(AppLocalization.text("资源大小超出允许范围"))
         }
 
         let actualSHA1 = try computeSHA1(of: tempZipURL)
@@ -229,7 +229,7 @@ public actor SystemBackgroundSoundAssetDownloader {
         }
 
         guard let assets = manifest["Assets"] as? [[String: Any]] else {
-            throw DownloadError.manifestReadFailed("Assets 数组不存在")
+            throw DownloadError.manifestReadFailed(AppLocalization.text("Assets 数组不存在"))
         }
 
         let candidates = assets.filter { ($0["SoundName"] as? String) == soundName }
@@ -250,7 +250,7 @@ public actor SystemBackgroundSoundAssetDownloader {
         }
 
         guard let measurementData = asset["_Measurement"] as? Data else {
-            throw DownloadError.manifestReadFailed("_Measurement 字段缺失或格式错误")
+            throw DownloadError.manifestReadFailed(AppLocalization.text("_Measurement 字段缺失或格式错误"))
         }
 
         let downloadSize = (asset["_DownloadSize"] as? Int) ?? 0

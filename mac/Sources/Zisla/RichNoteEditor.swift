@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
+import ZislaCore
 import ZislaKit
 
 private final class TransparentWKWebView: WKWebView {
@@ -55,7 +56,7 @@ struct RichNoteEditor: NSViewRepresentable {
     let isEditable: Bool
     let onChange: (String, String) -> Void
 
-    static let newNoteHTML = "<h1>新随记</h1><div><br></div>"
+    static var newNoteHTML: String { "<h1>\(AppLocalization.text("新随记"))</h1><div><br></div>" }
 
     static func editableHTML(for content: NotesAppBridge.NoteContent?) -> String {
         guard let content, !content.bodyHTML.isEmpty else { return "<div><br></div>" }
@@ -269,6 +270,10 @@ struct RichNoteEditor: NSViewRepresentable {
         <div id="editor" contenteditable="\(isEditable)" spellcheck="\(isEditable)" role="textbox" aria-multiline="true"></div>
         <script nonce="\(scriptNonce)">
         (() => {
+          const l10n = {
+            tableHeader: \(javaScriptLiteral(AppLocalization.text("标题"))),
+            imageAlt: \(javaScriptLiteral(AppLocalization.text("图片"))),
+          };
           const editor = document.getElementById('editor');
           const caret = document.createElement('div');
           caret.id = 'caret';
@@ -407,7 +412,7 @@ struct RichNoteEditor: NSViewRepresentable {
               for (let row = 0; row < rowCount; row += 1) {
                 html += '<tr>';
                 for (let column = 0; column < columnCount; column += 1) {
-                  html += row === 0 ? `<th>标题 ${column + 1}</th>` : `<td><br></td>`;
+                  html += row === 0 ? `<th>${l10n.tableHeader} ${column + 1}</th>` : `<td><br></td>`;
                 }
                 html += '</tr>';
               }
@@ -476,7 +481,7 @@ struct RichNoteEditor: NSViewRepresentable {
                 reader.onload = () => resolve(reader.result);
                 reader.readAsDataURL(file);
               });
-              insertImage(dataURL, file.name || '图片');
+              insertImage(dataURL, file.name || l10n.imageAlt);
             }
           });
           editor.addEventListener('dragover', event => event.preventDefault());
@@ -491,7 +496,7 @@ struct RichNoteEditor: NSViewRepresentable {
                 reader.onload = () => resolve(reader.result);
                 reader.readAsDataURL(file);
               });
-              insertImage(dataURL, file.name || '图片');
+              insertImage(dataURL, file.name || l10n.imageAlt);
             }
           });
           window.zisla.setHTML(\(initial));
@@ -515,18 +520,18 @@ struct RichNoteToolbar: View {
             HStack(spacing: 9) {
                 formatMenu
                 separator
-                toolButton("bold", help: "粗体") { send(.bold) }
-                toolButton("italic", help: "斜体") { send(.italic) }
-                toolButton("underline", help: "下划线") { send(.underline) }
-                toolButton("strikethrough", help: "删除线") { send(.strikethrough) }
+                toolButton("bold", help: AppLocalization.text("粗体")) { send(.bold) }
+                toolButton("italic", help: AppLocalization.text("斜体")) { send(.italic) }
+                toolButton("underline", help: AppLocalization.text("下划线")) { send(.underline) }
+                toolButton("strikethrough", help: AppLocalization.text("删除线")) { send(.strikethrough) }
                 textColorButton
                 separator
                 listMenu
-                toolButton("increase.indent", help: "增加缩进") { send(.indent) }
-                toolButton("decrease.indent", help: "减少缩进") { send(.outdent) }
+                toolButton("increase.indent", help: AppLocalization.text("增加缩进")) { send(.indent) }
+                toolButton("decrease.indent", help: AppLocalization.text("减少缩进")) { send(.outdent) }
                 separator
-                toolButton("link", help: "添加链接", action: promptForLink)
-                toolButton("photo", help: "插入图片", action: chooseImage)
+                toolButton("link", help: AppLocalization.text("添加链接"), action: promptForLink)
+                toolButton("photo", help: AppLocalization.text("插入图片"), action: chooseImage)
                 tableMenu
             }
             .padding(.horizontal, 1)
@@ -535,52 +540,52 @@ struct RichNoteToolbar: View {
 
     private var formatMenu: some View {
         Menu {
-            Button("标题") { send(.heading(1)) }
-            Button("小标题") { send(.heading(2)) }
-            Button("小节标题") { send(.heading(3)) }
-            Button("正文") { send(.paragraph) }
-            Button("等宽") { send(.monospaced) }
-            Button("引用") { send(.quote) }
+            Button(AppLocalization.text("标题")) { send(.heading(1)) }
+            Button(AppLocalization.text("小标题")) { send(.heading(2)) }
+            Button(AppLocalization.text("小节标题")) { send(.heading(3)) }
+            Button(AppLocalization.text("正文")) { send(.paragraph) }
+            Button(AppLocalization.text("等宽")) { send(.monospaced) }
+            Button(AppLocalization.text("引用")) { send(.quote) }
             Divider()
-            Button("清除格式") { send(.clearFormatting) }
+            Button(AppLocalization.text("清除格式")) { send(.clearFormatting) }
         } label: {
             Image(systemName: "textformat.size")
                 .frame(width: 16, height: 16)
         }
         .menuStyle(.borderlessButton)
-        .help("文字样式")
+        .help(AppLocalization.text("文字样式"))
     }
 
     private var listMenu: some View {
         Menu {
-            Button("项目符号") { send(.bulletList) }
-            Button("编号列表") { send(.numberedList) }
-            Button("清单") { send(.checklist) }
+            Button(AppLocalization.text("项目符号")) { send(.bulletList) }
+            Button(AppLocalization.text("编号列表")) { send(.numberedList) }
+            Button(AppLocalization.text("清单")) { send(.checklist) }
         } label: {
             Image(systemName: "list.bullet")
                 .frame(width: 16, height: 16)
         }
         .menuStyle(.borderlessButton)
-        .help("列表")
+        .help(AppLocalization.text("列表"))
     }
 
     private var tableMenu: some View {
         Menu {
-            Button("插入 2 × 2 表格") { send(.insertTable(rows: 2, columns: 2)) }
-            Button("插入 3 × 3 表格") { send(.insertTable(rows: 3, columns: 3)) }
+            Button(AppLocalization.text("插入 2 × 2 表格")) { send(.insertTable(rows: 2, columns: 2)) }
+            Button(AppLocalization.text("插入 3 × 3 表格")) { send(.insertTable(rows: 3, columns: 3)) }
             Divider()
-            Button("在下方添加行") { send(.addTableRow) }
-            Button("删除当前行") { send(.removeTableRow) }
-            Button("在右侧添加列") { send(.addTableColumn) }
-            Button("删除当前列") { send(.removeTableColumn) }
+            Button(AppLocalization.text("在下方添加行")) { send(.addTableRow) }
+            Button(AppLocalization.text("删除当前行")) { send(.removeTableRow) }
+            Button(AppLocalization.text("在右侧添加列")) { send(.addTableColumn) }
+            Button(AppLocalization.text("删除当前列")) { send(.removeTableColumn) }
             Divider()
-            Button("删除表格", role: .destructive) { send(.removeTable) }
+            Button(AppLocalization.text("删除表格"), role: .destructive) { send(.removeTable) }
         } label: {
             Image(systemName: "tablecells")
                 .frame(width: 16, height: 16)
         }
         .menuStyle(.borderlessButton)
-        .help("表格")
+        .help(AppLocalization.text("表格"))
     }
 
     private var separator: some View {
@@ -597,7 +602,7 @@ struct RichNoteToolbar: View {
                 .frame(width: 16, height: 16)
         }
         .buttonStyle(.plain)
-        .help("文字颜色")
+        .help(AppLocalization.text("文字颜色"))
         .popover(isPresented: $isTextColorPickerPresented, arrowEdge: .bottom) {
             ColorPicker("文字颜色", selection: $textColor, supportsOpacity: false)
                 .labelsHidden()
@@ -623,10 +628,10 @@ struct RichNoteToolbar: View {
 
     private func promptForLink() {
         let alert = NSAlert()
-        alert.messageText = "添加链接"
-        alert.informativeText = "选中文本后会将其设为链接。"
-        alert.addButton(withTitle: "添加")
-        alert.addButton(withTitle: "取消")
+        alert.messageText = AppLocalization.text("添加链接")
+        alert.informativeText = AppLocalization.text("选中文本后会将其设为链接。")
+        alert.addButton(withTitle: AppLocalization.text("添加"))
+        alert.addButton(withTitle: AppLocalization.text("取消"))
 
         let field = NSTextField(string: NSPasteboard.general.string(forType: .string) ?? "")
         field.placeholderString = "https://example.com"
@@ -643,7 +648,7 @@ struct RichNoteToolbar: View {
         guard let url = URL(string: value), let scheme = url.scheme?.lowercased(),
               scheme == "https" || scheme == "http" || scheme == "mailto"
         else {
-            showError("链接地址无效")
+            showError(AppLocalization.text("链接地址无效"))
             return
         }
         send(.createLink(url.absoluteString))
@@ -651,7 +656,7 @@ struct RichNoteToolbar: View {
 
     private func chooseImage() {
         let panel = NSOpenPanel()
-        panel.title = "插入图片"
+        panel.title = AppLocalization.text("插入图片")
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
@@ -661,7 +666,7 @@ struct RichNoteToolbar: View {
         do {
             let data = try Data(contentsOf: url)
             guard data.count <= 12 * 1024 * 1024 else {
-                showError("图片不能超过 12 MB")
+                showError(AppLocalization.text("图片不能超过 12 MB"))
                 return
             }
             let type = UTType(filenameExtension: url.pathExtension) ?? .image
@@ -669,7 +674,7 @@ struct RichNoteToolbar: View {
             let dataURL = "data:\(mimeType);base64,\(data.base64EncodedString())"
             send(.insertImage(dataURL: dataURL, alt: url.deletingPathExtension().lastPathComponent))
         } catch {
-            showError("无法读取图片：\(error.localizedDescription)")
+            showError(AppLocalization.text("无法读取图片：%@", error.localizedDescription))
         }
     }
 
@@ -704,8 +709,8 @@ struct ReadOnlyNoteMetadata: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     if content.isPasswordProtected {
-                        IconButton(symbol: "lock.fill", help: "在备忘录中解锁", size: .compact, action: showNote)
-                        Text("已锁定")
+                        IconButton(symbol: "lock.fill", help: AppLocalization.text("在备忘录中解锁"), size: .compact, action: showNote)
+                        Text(AppLocalization.text("已锁定"))
                             .font(.islandMicro(weight: .semibold))
                             .foregroundStyle(.secondary)
                     }
@@ -724,7 +729,7 @@ struct ReadOnlyNoteMetadata: View {
                         } label: {
                             Label(attachment.displayName, systemImage: attachmentSymbol(for: attachment))
                                 .font(.islandMicro(weight: .medium))
-                                .lineLimit(1)
+                                .fitsSingleLine()
                                 .truncationMode(.middle)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 4)
@@ -732,7 +737,7 @@ struct ReadOnlyNoteMetadata: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                         }
                         .buttonStyle(.plain)
-                        .help("在备忘录中打开")
+                        .help(AppLocalization.text("在备忘录中打开"))
                     }
                 }
                 .padding(.horizontal, 1)
@@ -740,7 +745,7 @@ struct ReadOnlyNoteMetadata: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             if showsWordCount {
-                Text("\(wordCount) 字")
+                Text(AppLocalization.text("%ld 字", wordCount))
                     .font(.islandMicro())
                     .foregroundStyle(.tertiary)
                     .fixedSize()
@@ -776,9 +781,9 @@ struct LockedNotePlaceholder: View {
             Image(systemName: "lock.fill")
                 .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(.secondary)
-            Text("已锁定")
+            Text(AppLocalization.text("已锁定"))
                 .font(.system(size: 12, weight: .semibold))
-            IconButton(symbol: "arrow.up.right.square", help: "在备忘录中解锁", action: showNote)
+            IconButton(symbol: "arrow.up.right.square", help: AppLocalization.text("在备忘录中解锁"), action: showNote)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

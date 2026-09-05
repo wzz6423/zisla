@@ -1,4 +1,5 @@
 import Foundation
+import ZislaCore
 
 enum ManagedToolInstallationSource: Sendable, Equatable {
     case githubRelease(repository: String)
@@ -324,20 +325,20 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
 
     public var installDetail: String {
         usesHomebrew
-            ? "通过本机 Homebrew 安装和更新"
-            : "点击安装由 Zisla 自动完成"
+            ? AppLocalization.text("通过本机 Homebrew 安装和更新")
+            : AppLocalization.text("点击安装由 Zisla 自动完成")
     }
 
     public var installHelp: String {
         usesHomebrew
-            ? "通过本机 Homebrew 安装 \(displayName)"
-            : "从 GitHub 官方发布下载并安装 \(displayName)，无需终端"
+            ? AppLocalization.text("通过本机 Homebrew 安装 %@", displayName)
+            : AppLocalization.text("从 GitHub 官方发布下载并安装 %@，无需终端", displayName)
     }
 
     public var updateHelp: String {
         usesHomebrew
-            ? "通过本机 Homebrew 更新 \(displayName)"
-            : "下载最新版并替换当前使用的 \(displayName)"
+            ? AppLocalization.text("通过本机 Homebrew 更新 %@", displayName)
+            : AppLocalization.text("下载最新版并替换当前使用的 %@", displayName)
     }
 
     /// Arguments that print the installed version.
@@ -443,19 +444,19 @@ public enum ManagedToolError: Error, Sendable, Equatable {
     public var message: String {
         switch self {
         case .releaseUnavailable(let value):
-            "获取版本信息失败：\(value)"
+            AppLocalization.text("获取版本信息失败：%@", value)
         case .assetNotFound(let tool):
-            "\(tool) 没有可用下载"
+            AppLocalization.text("%@ 没有可用下载", tool)
         case .untrustedHost(let host):
-            "下载地址不可信：\(host)"
+            AppLocalization.text("下载地址不可信：%@", host)
         case .downloadFailed(let value):
-            "下载失败：\(value)"
+            AppLocalization.text("下载失败：%@", value)
         case .notExecutable(let value):
-            "安装后无法执行：\(value)"
+            AppLocalization.text("安装后无法执行：%@", value)
         case .homebrewUnavailable:
             "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具"
         case .homebrewFailed(let value):
-            "Homebrew 执行失败：\(value)"
+            AppLocalization.text("Homebrew 执行失败：%@", value)
         }
     }
 }

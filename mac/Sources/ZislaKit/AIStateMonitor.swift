@@ -198,7 +198,7 @@ public final class AIStateMonitor: ObservableObject {
             )
             descriptor = open(repository.directoryURL.path, O_EVTONLY)
             guard descriptor >= 0 else {
-                errorDescription = "无法监听 AI 状态目录"
+                errorDescription = AppLocalization.text("无法监听 AI 状态目录")
                 return
             }
 
@@ -398,8 +398,8 @@ public final class AIStateMonitor: ObservableObject {
             usageHistoryState = .loaded
             errorDescription = nil
         case .corruptedState:
-            usageHistoryState = .failed("AI 状态文件已损坏，已保留上一次有效数据")
-            errorDescription = "AI 状态文件已损坏，已保留上一次有效数据"
+            usageHistoryState = .failed(AppLocalization.text("AI 状态文件已损坏，已保留上一次有效数据"))
+            errorDescription = AppLocalization.text("AI 状态文件已损坏，已保留上一次有效数据")
         case let .failure(message):
             usageHistoryState = .failed(message)
             errorDescription = message
@@ -753,7 +753,7 @@ public final class AIStateMonitor: ObservableObject {
         case .unchanged:
             break
         case .corruptedState:
-            errorDescription = "AI 状态文件已损坏，已保留上一次有效数据"
+            errorDescription = AppLocalization.text("AI 状态文件已损坏，已保留上一次有效数据")
         case let .failure(message):
             errorDescription = message
         }
@@ -774,7 +774,7 @@ public final class AIStateMonitor: ObservableObject {
                 updatesPersistedTasks: false
             )
         case .corruptedState:
-            errorDescription = "AI 状态文件已损坏，已保留上一次有效数据"
+            errorDescription = AppLocalization.text("AI 状态文件已损坏，已保留上一次有效数据")
         case let .failure(message):
             errorDescription = message
         }
