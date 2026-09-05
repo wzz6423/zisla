@@ -262,6 +262,9 @@ export const zhHans: SiteContent = {
     primaryCtaAriaLabel: '下载',
     releaseCta: '查看 Release',
     releaseCtaAriaLabel: '在 GitHub 上查看发布详情',
+    brewMono: 'HOMEBREW / 一条命令',
+    brewNote: 'zisla 由 Sparkle 自行更新，因此 brew upgrade 只在已装应用确实旧于 tap 中的版本时才替换它——Homebrew 5.1.6 起会读取应用自身的版本号。显式指定 cask（brew upgrade --cask zisla）依据的是 Homebrew 自己的安装记录，在 Sparkle 更新过之后可能把应用退回 tap 的版本。tap 只提供正式版。该 tap 属于第三方，应用也未经公证，首次打开需在“系统设置 → 隐私与安全性”中选择“仍要打开”。',
+    copyBrewCommandAriaLabel: '复制 Homebrew 安装命令',
     notes: {
       system: { term: '系统', value: 'macOS 14 或更高版本 · 当前受支持配置为 Apple 芯片 Mac' },
       install: { term: '安装', value: '挂载 DMG 后拖入 Applications' },
@@ -367,5 +370,6 @@ export const zhHans: SiteContent = {
   toast: {
     runCommandCopied: '源码运行命令已复制',
     zislactlCopied: 'zislactl 命令已复制',
+    brewCommandCopied: 'Homebrew 安装命令已复制',
   },
 };

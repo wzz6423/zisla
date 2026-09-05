@@ -45,7 +45,29 @@ zisla 可监控 Codex、Claude Code、Pi、GitHub Copilot、Gemini、Grok、Kimi
 
 从 [GitHub Releases](https://github.com/wzz6423/zisla/releases) 或 [Gitee Releases](https://gitee.com/wzz6423/zisla/releases) 下载最新 DMG，挂载后将 `zisla.app` 拖入 `Applications`。
 
-启动后，将鼠标移到当前屏幕顶部中央即可展开；也可从菜单栏图标选择“显示灵动岛”。非公证的预览包首次打开时，可能需要在“系统设置 > 隐私与安全性”中选择“仍要打开”。
+也可以用 Homebrew 安装：
+
+```bash
+brew install --cask wzz6423/tap/zisla
+```
+
+Homebrew 会按你的芯片选择对应架构的包，Apple Silicon 与 Intel 各自只下载自己那一份。该 cask 来自第三方 tap `wzz6423/tap`，不在 Homebrew 官方 cask 仓库中，安装即意味着信任这个 tap。
+
+启动后，将鼠标移到当前屏幕顶部中央即可展开；也可从菜单栏图标选择“显示灵动岛”。所有发布包都是 ad-hoc 签名且未经公证，因此无论用哪种方式安装，首次打开都需要在“系统设置 > 隐私与安全性”中选择“仍要打开”，或自行清除隔离标记：
+
+```bash
+xattr -d com.apple.quarantine /Applications/zisla.app
+```
+
+### 更新应用
+
+无论用哪种方式安装，zisla 都通过 Sparkle 自行更新。用 Homebrew 安装的情况需要额外说明：`brew upgrade` 只在已装应用确实旧于 tap 中的版本时才替换它——Homebrew 5.1.6 起会读取应用包内的版本号，因此它既不与 Sparkle 相争，也不会放着落后的安装不管。显式指定 cask 依据的是 Homebrew 自己的安装记录，可能把 Sparkle 更新过的应用退回 tap 的版本：
+
+```bash
+brew upgrade --cask zisla
+```
+
+tap 只提供正式版，预览包仅发布在 Releases，`brew upgrade` 不会把你带到预发布版本；反过来，正在用预览版时显式指定 cask 会把它替换成当前正式版。Sparkle 自身从不降级，切回 Release 通道后会停在预览版本，直到正式版的构建号超过它。`brew uninstall --cask zisla` 卸载应用，`brew uninstall --zap --cask zisla` 会连同本地数据一起清除。
 
 ### 从源码运行
 

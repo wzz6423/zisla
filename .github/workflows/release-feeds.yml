@@ -1,0 +1,172 @@
+name: Release Feeds
+
+# Every release before 0.1.7 shipped without a complete set of Sparkle appcasts, so every
+# installed copy asked its feed and got a 404 on both the primary and the fallback site.
+# Nothing noticed until a user reported it. This workflow is that missing witness.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag the feeds must point at, for example v0.1.7.
+        required: true
+        type: string
+      channel:
+        description: Which feed pair to verify.
+        required: true
+        default: release
+        type: choice
+        options:
+          - release
+          - preview
+      attempts:
+        description: How many times to poll the feeds before failing.
+        required: false
+        default: 1
+        type: number
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  feeds:
+    name: Verify Sparkle Appcasts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve the tag and channel
+        id: target
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          set -euo pipefail
+
+          tag="${INPUT_TAG:-${RELEASE_TAG:-}}"
+          if [ -z "$tag" ]; then
+            echo "::error::No release tag to verify."
+            exit 1
+          fi
+
+          # preview and update-release host appcasts and carry no version of their own, so
+          # there is no tag to compare a feed against. The versioned publish covers them.
+          case "$tag" in
+            preview | update-release)
+              echo "::notice::$tag is a permanent feed release; its versioned publish verifies it."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+
+          # A path prefixed tag such as release/v1.2.3 moves every download URL the signed
+          # appcasts were generated against, which no later upload can repair.
+          case "$tag" in
+            v[0-9]*) ;;
+            *)
+              echo "::error::Release tags must look like vX.Y.Z; $tag carries no version an appcast can point at."
+              exit 1
+              ;;
+          esac
+
+          if [ -n "${INPUT_CHANNEL:-}" ]; then
+            channel="$INPUT_CHANNEL"
+          elif [ "${RELEASE_IS_PRERELEASE:-false}" = "true" ]; then
+            channel=preview
+          else
+            channel=release
+          fi
+
+          {
+            echo "skip=false"
+            echo "tag=$tag"
+            echo "channel=$channel"
+          } >> "$GITHUB_OUTPUT"
+          echo "Verifying the $channel feeds against $tag."
+
+      - name: Probe whether Gitee answers this runner
+        id: gitee
+        if: steps.target.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+
+          # Gitee rate limits and sometimes refuses cloud ranges outright. Failing the gate on
+          # that would train everyone to ignore it, so an unreachable primary degrades to a
+          # warning and the release operator verifies it by hand instead.
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 25 \
+            https://gitee.com/wzz6423/zisla || true)"
+          if [ "$code" = "200" ]; then
+            echo "hosts=gitee,github" >> "$GITHUB_OUTPUT"
+            echo "Gitee answered HTTP 200; verifying the primary feed too."
+          else
+            echo "hosts=github" >> "$GITHUB_OUTPUT"
+            echo "::warning::Gitee answered HTTP $code from this runner, so only the GitHub fallback feeds were verified. Verify the Gitee primary feeds by hand."
+          fi
+
+      - name: Verify the release assets and the live feeds
+        if: steps.target.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.target.outputs.tag }}
+          CHANNEL: ${{ steps.target.outputs.channel }}
+          HOSTS: ${{ steps.gitee.outputs.hosts }}
+          ATTEMPTS: ${{ inputs.attempts || 10 }}
+          INTERVAL: "60"
+        run: |
+          set -euo pipefail
+
+          names="$RUNNER_TEMP/release-assets.txt"
+          feed_names="$RUNNER_TEMP/preview-feed-assets.txt"
+
+          # The permanent feeds are uploaded in a later step of a hand driven release, so the
+          # first attempt is expected to fail; the poll is what makes the gate usable.
+          verify() {
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[].name' > "$names" || return 1
+            ruby .github/scripts/appcast-feeds.rb verify-assets --tag "$TAG" < "$names" || return 1
+
+            if [ "$CHANNEL" = "preview" ]; then
+              gh release view preview --repo "$GITHUB_REPOSITORY" --json assets \
+                --jq '.assets[].name' > "$feed_names" || return 1
+              ruby .github/scripts/appcast-feeds.rb verify-assets \
+                --tag preview --layout feed < "$feed_names" || return 1
+            fi
+
+            ruby .github/scripts/appcast-feeds.rb verify \
+              --tag "$TAG" --channel "$CHANNEL" --hosts "$HOSTS"
+          }
+
+          attempt=1
+          while [ "$attempt" -le "$ATTEMPTS" ]; do
+            echo "--- attempt $attempt of $ATTEMPTS"
+            if verify; then
+              printf 'Every %s appcast on %s points at %s.\n' \
+                "$CHANNEL" "$HOSTS" "$TAG" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            attempt=$((attempt + 1))
+            if [ "$attempt" -le "$ATTEMPTS" ]; then
+              sleep "$INTERVAL"
+            fi
+          done
+
+          echo "::error::The $CHANNEL feeds still do not serve $TAG after $ATTEMPTS attempts. Every install of a missing architecture gets a 404 on both sites until this is fixed."
+          printf 'The %s feeds do not serve %s; see the log for each failing URL.\n' \
+            "$CHANNEL" "$TAG" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Remove the downloaded asset listings
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release-assets.txt" "$RUNNER_TEMP/preview-feed-assets.txt"

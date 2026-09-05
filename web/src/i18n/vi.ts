@@ -144,6 +144,9 @@ export const vi = createCatalog({
     primaryCtaAriaLabel: 'Tải zisla',
     releaseCta: 'Xem bản phát hành',
     releaseCtaAriaLabel: 'Xem chi tiết bản phát hành trên GitHub',
+    brewMono: 'HOMEBREW / MỘT LỆNH',
+    brewNote: 'Sparkle tự cập nhật zisla, nên brew upgrade chỉ thay thế ứng dụng khi bản đã cài thực sự cũ hơn bản trong tap — từ Homebrew 5.1.6, lệnh này đọc chính phiên bản ghi trong ứng dụng. Việc nêu rõ cask, như brew upgrade --cask zisla, lại dựa vào bản ghi cài đặt của Homebrew và có thể đưa bạn về bản trong tap sau một lần cập nhật qua Sparkle. Tap chỉ phục vụ bản chính thức. Đây là tap của bên thứ ba và ứng dụng chưa được Apple công chứng, nên lần mở đầu tiên cần chọn "Vẫn mở" trong Cài đặt hệ thống → Quyền riêng tư & Bảo mật.',
+    copyBrewCommandAriaLabel: 'Sao chép lệnh cài đặt Homebrew',
     notes: {
       system: { term: 'Hệ thống', value: 'macOS 14 trở lên · Cấu hình được hỗ trợ: Mac Apple Silicon' },
       install: { term: 'Cài đặt', value: 'Gắn DMG rồi kéo vào Applications' },
@@ -219,5 +222,5 @@ export const vi = createCatalog({
     tagline: 'Mã nguồn mở, nguyên bản và nằm trong tầm kiểm soát của bạn.',
   },
   common: { copyCommandTitle: 'Sao chép lệnh', copiedAriaLabel: 'Đã sao chép' },
-  toast: { runCommandCopied: 'Đã sao chép lệnh chạy mã nguồn', zislactlCopied: 'Đã sao chép lệnh zislactl' },
+  toast: { runCommandCopied: 'Đã sao chép lệnh chạy mã nguồn', zislactlCopied: 'Đã sao chép lệnh zislactl', brewCommandCopied: 'Đã sao chép lệnh cài đặt Homebrew' },
 });

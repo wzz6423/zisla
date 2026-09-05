@@ -93,14 +93,20 @@ for architecture in arm64 x86_64 universal; do
   done
 done
 
-expect_equal \
-  "gitee universal" \
-  "$(<"$OUTPUT_DIRECTORY/appcast-gitee.xml")" \
-  "the published Gitee appcast comes from the universal package"
-expect_equal \
-  "github universal" \
-  "$(<"$OUTPUT_DIRECTORY/appcast-github.xml")" \
-  "the published GitHub appcast comes from the universal package"
+# The universal pair keeps the bare name because it becomes the appcast.xml that apps
+# released before per-architecture updates still request.
+for host in gitee github; do
+  expect_equal \
+    "$host universal" \
+    "$(<"$OUTPUT_DIRECTORY/appcast-${host}.xml")" \
+    "the published $host appcast comes from the universal package"
+  for architecture in arm64 x86_64; do
+    expect_equal \
+      "$host $architecture" \
+      "$(<"$OUTPUT_DIRECTORY/appcast-${host}-${architecture}.xml")" \
+      "the $architecture $host appcast comes from the $architecture package"
+  done
+done
 
 expect_absent \
   "$OUTPUT_DIRECTORY/zisla-v0.0.9-macOS-arm64.zip" \
@@ -116,10 +122,12 @@ for architecture in arm64 x86_64 universal; do
 done
 
 RESOLVED_OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:A}"
-expected_listing=(
-  "$RESOLVED_OUTPUT_DIRECTORY/appcast-gitee.xml"
-  "$RESOLVED_OUTPUT_DIRECTORY/appcast-github.xml"
-)
+expected_listing=()
+for host in gitee github; do
+  for suffix in -arm64 -x86_64 ''; do
+    expected_listing+=("$RESOLVED_OUTPUT_DIRECTORY/appcast-${host}${suffix}.xml")
+  done
+done
 for architecture in arm64 universal x86_64; do
   for extension in dmg dmg.sha256 zip zip.sha256; do
     expected_listing+=("$RESOLVED_OUTPUT_DIRECTORY/zisla-v0.1.3-macOS-${architecture}.${extension}")

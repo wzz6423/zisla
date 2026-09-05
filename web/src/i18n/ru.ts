@@ -213,6 +213,9 @@ export const ru = createCatalog({
     primaryCtaAriaLabel: 'Скачать zisla',
     releaseCta: 'Открыть релиз',
     releaseCtaAriaLabel: 'Открыть сведения о релизе на GitHub',
+    brewMono: 'HOMEBREW / ОДНА КОМАНДА',
+    brewNote: 'Sparkle обновляет zisla самостоятельно, поэтому brew upgrade заменяет приложение только тогда, когда установленная копия действительно старее версии в tap: начиная с Homebrew 5.1.6 читается версия самого приложения. Если указать cask явно — brew upgrade --cask zisla, — Homebrew опирается на свои записи об установке и после обновления через Sparkle может вернуть вас к версии из tap. Tap отдаёт только стабильные версии. Это сторонний tap, а приложение не нотаризовано, поэтому при первом запуске нужно выбрать «Всё равно открыть» в Системных настройках → Конфиденциальность и безопасность.',
+    copyBrewCommandAriaLabel: 'Скопировать команду установки Homebrew',
     notes: {
       system: { term: 'Система', value: 'macOS 14 или новее · Поддерживаемая конфигурация: Mac с Apple Silicon' },
       install: { term: 'Установка', value: 'Подключите DMG и перетащите приложение в «Программы»' },
@@ -288,5 +291,5 @@ export const ru = createCatalog({
     tagline: 'Открытый исходный код, нативное приложение и ваш контроль.',
   },
   common: { copyCommandTitle: 'Скопировать команду', copiedAriaLabel: 'Скопировано' },
-  toast: { runCommandCopied: 'Команда запуска скопирована', zislactlCopied: 'Команда zislactl скопирована' },
+  toast: { runCommandCopied: 'Команда запуска скопирована', zislactlCopied: 'Команда zislactl скопирована', brewCommandCopied: 'Команда установки Homebrew скопирована' },
 });

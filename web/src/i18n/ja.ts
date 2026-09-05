@@ -268,6 +268,9 @@ export const ja: SiteContent = {
     primaryCtaAriaLabel: 'ダウンロード',
     releaseCta: 'リリースを見る',
     releaseCtaAriaLabel: 'GitHub でリリースの詳細を見る',
+    brewMono: 'HOMEBREW / コマンド 1 行',
+    brewNote: 'zisla は Sparkle が自動更新するため、brew upgrade はインストール済みのアプリが tap のものより実際に古いときだけ置き換えます（Homebrew 5.1.6 以降はアプリ自身のバージョンを読み取ります）。brew upgrade --cask zisla のように cask を明示した場合は Homebrew 側のインストール記録が基準になり、Sparkle で更新した後は tap のバージョンに戻ることがあります。tap は正式版のみを配信します。tap はサードパーティ製で、アプリも公証を受けていないため、初回起動時は「システム設定 → プライバシーとセキュリティ」で「このまま開く」を選ぶ必要があります。',
+    copyBrewCommandAriaLabel: 'Homebrew のインストールコマンドをコピー',
     notes: {
       system: {
         term: 'システム',
@@ -386,5 +389,6 @@ export const ja: SiteContent = {
   toast: {
     runCommandCopied: 'ソース実行コマンドをコピーしました',
     zislactlCopied: 'zislactl コマンドをコピーしました',
+    brewCommandCopied: 'Homebrew のインストールコマンドをコピーしました',
   },
 };
