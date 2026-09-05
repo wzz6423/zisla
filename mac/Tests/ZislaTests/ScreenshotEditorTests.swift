@@ -2087,7 +2087,7 @@ struct ScreenshotEditorTests {
     @Test
     func obscureOptionsContainOnlyRectangleBrushPixelateAndBlur() {
         #expect(ScreenshotObscureShape.allCases.map(\.rawValue) == ["rectangle", "brush"])
-        #expect(ScreenshotObscureEffect.allCases.map(\.rawValue) == ["pixelate", "blur"])
+        #expect(ScreenshotObscureEffect.allCases.map(\.rawValue) == ["blur", "pixelate"])
         #expect(!ScreenshotTool.allCases.map(\.rawValue).contains { $0.localizedCaseInsensitiveContains("erase") })
     }
 

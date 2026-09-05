@@ -324,15 +324,15 @@ enum ScreenshotObscureShape: String, CaseIterable, Identifiable {
 }
 
 enum ScreenshotObscureEffect: String, CaseIterable, Identifiable {
-    case pixelate
     case blur
+    case pixelate
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .pixelate: "马赛克"
         case .blur: "模糊"
+        case .pixelate: "马赛克"
         }
     }
 }
@@ -518,7 +518,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
     var fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize
     var number = 1
     var obscureShape: ScreenshotObscureShape = .rectangle
-    var obscureEffect: ScreenshotObscureEffect = .pixelate
+    var obscureEffect: ScreenshotObscureEffect = .blur
     var rotation: CGFloat = 0
 
     init(
@@ -533,7 +533,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize,
         number: Int = 1,
         obscureShape: ScreenshotObscureShape = .rectangle,
-        obscureEffect: ScreenshotObscureEffect = .pixelate,
+        obscureEffect: ScreenshotObscureEffect = .blur,
         rotation: CGFloat = 0
     ) {
         self.id = id
@@ -1091,7 +1091,7 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize
     @Published var selectedEmoji = "⭐️"
     @Published var obscureShape: ScreenshotObscureShape = .rectangle
-    @Published var obscureEffect: ScreenshotObscureEffect = .pixelate
+    @Published var obscureEffect: ScreenshotObscureEffect = .blur
     @Published var statusMessage: String?
     @Published var isPinned = false
     @Published private(set) var isLongCapturePreviewing = false
