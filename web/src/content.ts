@@ -167,16 +167,16 @@ export const downloadLinks: readonly DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.6',
+  version: 'v0.1.7',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.6',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.6/zisla-v0.1.6-macOS-arm64.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.6/zisla-v0.1.6-macOS-arm64.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.6/zisla-v0.1.6-macOS-arm64.zip.sha256',
-  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.6/zisla-v0.1.6-macOS-universal.dmg',
-  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.6/zisla-v0.1.6-macOS-universal.zip',
-  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.6/zisla-v0.1.6-macOS-x86_64.dmg',
-  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.6/zisla-v0.1.6-macOS-x86_64.zip',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.7',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.7/zisla-v0.1.7-macOS-arm64.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.7/zisla-v0.1.7-macOS-arm64.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.7/zisla-v0.1.7-macOS-arm64.zip.sha256',
+  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.7/zisla-v0.1.7-macOS-universal.dmg',
+  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.7/zisla-v0.1.7-macOS-universal.zip',
+  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.7/zisla-v0.1.7-macOS-x86_64.dmg',
+  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.7/zisla-v0.1.7-macOS-x86_64.zip',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.3-preview.1',
 };
 
