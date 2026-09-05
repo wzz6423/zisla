@@ -40,9 +40,9 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 
 ```zsh
 gh auth status
-security find-generic-password -a 'wzz6423' -s 'gitee.com.zisla.release-token' >/dev/null
-# -p 只打印公钥，不输出私钥；generate_keys 与 generate_appcast 同目录。
-test "$("${SPARKLE_GENERATE_APPCAST:h}/generate_keys" -p)" = \
+security find-internet-password -s gitee.com -a wzz6423 >/dev/null
+# -p 只打印公钥，不输出私钥；--account 必须给，默认账户名 ed25519 下没有这把钥匙。
+test "$("${SPARKLE_GENERATE_APPCAST:h}/generate_keys" --account zisla-update-ed25519 -p)" = \
   "$(plutil -extract SUPublicEDKey raw -o - mac/Resources/Info.plist)"
 ```
 
@@ -90,6 +90,13 @@ if [[ "$UPDATE_CHANNEL" == preview ]]; then
   RELEASE_CREATE_OPTIONS+=(--prerelease)
 fi
 
+# gh 的 `文件#文字` 只设显示 label，资产名仍是 basename，而下载地址用的正是资产名，
+# 所以三份 appcast 必须先复制成远端要的名字，否则 latest/download/appcast.xml 会 404。
+GITHUB_FEED_DIRECTORY="$(mktemp -d)"
+cp "$RELEASE_OUTPUT_DIRECTORY/appcast-github.xml" "$GITHUB_FEED_DIRECTORY/appcast.xml"
+cp "$RELEASE_OUTPUT_DIRECTORY/appcast-github-arm64.xml" "$GITHUB_FEED_DIRECTORY/appcast-arm64.xml"
+cp "$RELEASE_OUTPUT_DIRECTORY/appcast-github-x86_64.xml" "$GITHUB_FEED_DIRECTORY/appcast-x86_64.xml"
+
 gh release create "v${VERSION}" \
   "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-arm64.dmg" \
   "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-arm64.dmg.sha256" \
@@ -103,9 +110,9 @@ gh release create "v${VERSION}" \
   "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-universal.dmg.sha256" \
   "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-universal.zip" \
   "$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-universal.zip.sha256" \
-  "$RELEASE_OUTPUT_DIRECTORY/appcast-github.xml#appcast.xml" \
-  "$RELEASE_OUTPUT_DIRECTORY/appcast-github-arm64.xml#appcast-arm64.xml" \
-  "$RELEASE_OUTPUT_DIRECTORY/appcast-github-x86_64.xml#appcast-x86_64.xml" \
+  "$GITHUB_FEED_DIRECTORY/appcast.xml" \
+  "$GITHUB_FEED_DIRECTORY/appcast-arm64.xml" \
+  "$GITHUB_FEED_DIRECTORY/appcast-x86_64.xml" \
   --repo wzz6423/zisla --title "zisla v${VERSION}" \
   "${RELEASE_CREATE_OPTIONS[@]}"
 ```
@@ -118,9 +125,9 @@ if [[ "$UPDATE_CHANNEL" == preview ]]; then
     gh release create preview --repo wzz6423/zisla \
       --title "zisla Preview update feed" --notes "Preview Sparkle feed" --prerelease
   gh release upload preview \
-    "$RELEASE_OUTPUT_DIRECTORY/appcast-github.xml#appcast.xml" \
-    "$RELEASE_OUTPUT_DIRECTORY/appcast-github-arm64.xml#appcast-arm64.xml" \
-    "$RELEASE_OUTPUT_DIRECTORY/appcast-github-x86_64.xml#appcast-x86_64.xml" \
+    "$GITHUB_FEED_DIRECTORY/appcast.xml" \
+    "$GITHUB_FEED_DIRECTORY/appcast-arm64.xml" \
+    "$GITHUB_FEED_DIRECTORY/appcast-x86_64.xml" \
     --repo wzz6423/zisla --clobber
 fi
 ```

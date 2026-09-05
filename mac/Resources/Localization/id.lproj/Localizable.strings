@@ -1181,7 +1181,6 @@
 "%@ 文件过大" = "%@ terlalu besar";
 "%@字符数曲线" = "Bagan karakter %@";
 "%@：%@ 次" = "%@: %@ ketukan";
-"一键更新并重启" = "Perbarui dan Mulai Ulang";
 "与 %@ 相比" = "Dibandingkan dengan %@";
 "今天还没有输入" = "Belum ada ketikan hari ini";
 "全年输入热力图" = "Peta Panas Ketikan Tahunan";
@@ -1266,7 +1265,6 @@
 "多个资源使用相同路径" = "Beberapa aset memakai jalur yang sama";
 "峰值 %@ 字符/秒" = "Puncak %@ karakter/dtk";
 "已选：%@ · %@" = "Dipilih: %@ · %@";
-"应用内更新源尚未配置" = "Umpan pembaruan dalam app belum dikonfigurasi";
 "当前离线，稍后可重试" = "Anda sedang offline. Coba lagi nanti.";
 "无法分配输入缓冲区。" = "Tidak dapat mengalokasikan buffer input.";
 "无法创建源音频缓冲区" = "Tidak dapat membuat buffer audio sumber";
@@ -1289,10 +1287,8 @@
 "上传完整击键并自动拆分" = "Unggah ketukan tombol utuh dan pisah otomatis";
 "保存当前修改后即可导出" = "Simpan perubahan untuk mengaktifkan ekspor";
 "启用鼠标与触控板点击音" = "Aktifkan suara klik mouse dan trackpad";
-"应用内更新签名配置无效" = "Konfigurasi penandatanganan pembaruan dalam app tidak valid";
 "当前音色有未保存的更改" = "Paket suara ini memiliki perubahan yang belum disimpan";
 "无法创建目标音频缓冲区" = "Tidak dapat membuat buffer audio tujuan";
-"更新服务启动失败：%@" = "Layanan pembaruan gagal dijalankan: %@";
 "正在整理过去一年的统计" = "Menyiapkan statistik setahun terakhir";
 "清晰了解每天的输入习惯" = "Gambaran lebih jelas tentang kebiasaan mengetik harian Anda";
 "移除这个自定义音色包？" = "Hapus paket suara kustom ini?";
@@ -1305,7 +1301,6 @@
 "前往 GitHub 下载" = "Unduh dari GitHub";
 "备用音频转换时长限制无效" = "Batas durasi konversi audio cadangan tidak valid";
 "导入结果不是自定义音色包" = "Hasil impor bukan paket suara kustom.";
-"开发构建不执行应用内更新" = "Pembaruan dalam app tidak tersedia pada build pengembangan";
 "无法创建导出音频缓冲区。" = "Tidak dapat membuat buffer audio ekspor.";
 "无法读取自定义音频：%@" = "Tidak dapat membaca audio kustom: %@";
 "未设置的位置会继承 %@" = "Slot yang belum ditetapkan akan mewarisi dari %@";
@@ -1332,7 +1327,6 @@
 "开始打字后，曲线会立即出现。" = "Mulai mengetik dan grafiknya akan langsung muncul.";
 "当前版本不支持键盘布局：%@" = "Versi ini tidak mendukung tata letak papan ketik: %@";
 "所选区间没有可显示的应用记录" = "Tidak ada catatan app untuk rentang yang dipilih";
-"改为 GitHub 手动下载" = "Unduh dari GitHub Saja";
 "无法启动备用音频转换器：%@" = "Tidak dapat menjalankan pengonversi audio cadangan: %@";
 "正在监听键盘 · 统计已开启" = "Memantau papan ketik · Statistik aktif";
 "正在监听键盘 · 统计已暂停" = "Memantau papan ketik · Statistik dijeda";
@@ -1629,8 +1623,6 @@
 "已创建空白草稿" = "Draf kosong dibuat";
 "最近输入 %@" = "Masukan terakhir %@";
 "未获得下载文件" = "Tidak ada file unduhan yang dihasilkan";
-"正在下载更新…" = "Mengunduh pembaruan…";
-"正在准备更新…" = "Menyiapkan pembaruan…";
 "正在准备试听…" = "Menyiapkan pratinjau…";
 "正在转换音频…" = "Mengonversi audio…";
 "移除当前音色包" = "Hapus paket suara saat ini";
@@ -1665,7 +1657,6 @@
 "正在导出音色包…" = "Mengekspor paket suara…";
 "正在打开音色包…" = "Membuka paket suara…";
 "正在移到废纸篓…" = "Memindahkan ke Tempat Sampah…";
-"正在验证并解压…" = "Memverifikasi dan mengekstrak…";
 "灵动岛与下载展示" = "Dynamic Island dan unduhan";
 "直接写入页面内容" = "Tulis langsung ke isi halaman";
 "设置页面裁剪区域" = "Atur area pangkas halaman";
@@ -1816,7 +1807,6 @@
 "可再生数据；下次使用时可能重新生成或下载" = "Data yang bisa dibuat ulang; mungkin dibangun atau diunduh lagi nanti";
 "左侧封面、歌名与歌手，右侧音浪与滚动歌词" = "Sampul, judul, dan artis di kiri; gelombang suara dan lirik bergulir di kanan";
 "按所选周期删除过期音频，文字记录继续保留" = "Hapus audio kedaluwarsa sesuai jadwal yang dipilih; transkrip tetap disimpan";
-"正在安装，Keyboard 将自动重启…" = "Memasang. Keyboard akan dibuka ulang otomatis…";
 "上传一组按下/回弹音，快速应用到整把键盘。" = "Unggah satu pasang suara tekan/lepas untuk menerapkannya ke seluruh papan ketik.";
 "发现新版本后下载，并在退出或重启时完成安装" = "Unduh versi baru dan selesaikan pemasangan saat keluar atau dinyalakan ulang";
 "无法连接代理主机和端口，请检查代理是否运行" = "Tidak bisa menghubungi host dan port proksi. Periksa apakah proksi sedang berjalan";

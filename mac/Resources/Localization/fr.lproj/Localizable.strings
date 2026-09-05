@@ -1177,7 +1177,6 @@
 "%@ 文件过大" = "%@ est trop volumineux";
 "%@字符数曲线" = "Courbe de caractères %@";
 "%@：%@ 次" = "%@ : %@ frappes";
-"一键更新并重启" = "Mettre à jour et redémarrer";
 "与 %@ 相比" = "Comparé à %@";
 "今天还没有输入" = "Aucune frappe aujourd’hui";
 "全年输入热力图" = "Carte thermique annuelle de frappe";
@@ -1262,7 +1261,6 @@
 "多个资源使用相同路径" = "Plusieurs ressources utilisent le même chemin";
 "峰值 %@ 字符/秒" = "Pic de %@ caractères/s";
 "已选：%@ · %@" = "Sélectionné : %@ · %@";
-"应用内更新源尚未配置" = "Le flux de mise à jour intégré n’est pas configuré";
 "当前离线，稍后可重试" = "Vous êtes hors ligne. Réessayez plus tard.";
 "无法分配输入缓冲区。" = "Impossible d’allouer la mémoire tampon de saisie.";
 "无法创建源音频缓冲区" = "Impossible de créer la mémoire tampon de l’audio source";
@@ -1285,10 +1283,8 @@
 "上传完整击键并自动拆分" = "Importer la frappe complète et séparer automatiquement";
 "保存当前修改后即可导出" = "Enregistrez vos modifications pour activer l’export";
 "启用鼠标与触控板点击音" = "Activer les sons de clic de la souris et du trackpad";
-"应用内更新签名配置无效" = "Configuration de signature des mises à jour intégrées non valide";
 "当前音色有未保存的更改" = "Ce pack de sons a des modifications non enregistrées";
 "无法创建目标音频缓冲区" = "Impossible de créer la mémoire tampon audio de destination";
-"更新服务启动失败：%@" = "Le service de mise à jour n’a pas pu démarrer : %@";
 "正在整理过去一年的统计" = "Préparation des statistiques de l’année passée";
 "清晰了解每天的输入习惯" = "Une vision plus claire de vos habitudes de frappe quotidiennes";
 "移除这个自定义音色包？" = "Supprimer ce pack de sons personnalisé ?";
@@ -1301,7 +1297,6 @@
 "前往 GitHub 下载" = "Télécharger depuis GitHub";
 "备用音频转换时长限制无效" = "La limite de durée de la conversion audio de secours n’est pas valide";
 "导入结果不是自定义音色包" = "Le résultat importé n’est pas un pack de sons personnalisé.";
-"开发构建不执行应用内更新" = "Les mises à jour intégrées sont indisponibles dans les builds de développement";
 "无法创建导出音频缓冲区。" = "Impossible de créer la mémoire tampon audio d’export.";
 "无法读取自定义音频：%@" = "Impossible de lire l’audio personnalisé : %@";
 "未设置的位置会继承 %@" = "Les emplacements non attribués hériteront de %@";
@@ -1328,7 +1323,6 @@
 "开始打字后，曲线会立即出现。" = "Commencez à taper et le graphique apparaîtra aussitôt.";
 "当前版本不支持键盘布局：%@" = "Cette version ne prend pas en charge la disposition de clavier : %@";
 "所选区间没有可显示的应用记录" = "Aucun enregistrement d’app n’est disponible pour la plage sélectionnée";
-"改为 GitHub 手动下载" = "Télécharger depuis GitHub à la place";
 "无法启动备用音频转换器：%@" = "Impossible de démarrer le convertisseur audio de secours : %@";
 "正在监听键盘 · 统计已开启" = "Surveillance du clavier · Stats activées";
 "正在监听键盘 · 统计已暂停" = "Surveillance du clavier · Stats suspendues";
@@ -1625,8 +1619,6 @@
 "已创建空白草稿" = "Brouillon vierge créé";
 "最近输入 %@" = "Dernière saisie %@";
 "未获得下载文件" = "Aucun fichier téléchargé n’a été produit";
-"正在下载更新…" = "Téléchargement de la mise à jour…";
-"正在准备更新…" = "Préparation de la mise à jour…";
 "正在准备试听…" = "Préparation de l’aperçu…";
 "正在转换音频…" = "Conversion de l’audio…";
 "移除当前音色包" = "Retirer le pack de sons actuel";
@@ -1661,7 +1653,6 @@
 "正在导出音色包…" = "Exportation du pack de sons…";
 "正在打开音色包…" = "Ouverture du pack de sons…";
 "正在移到废纸篓…" = "Déplacement vers la corbeille…";
-"正在验证并解压…" = "Vérification et extraction…";
 "灵动岛与下载展示" = "Dynamic Island et téléchargements";
 "直接写入页面内容" = "Écrire directement le contenu de la page";
 "设置页面裁剪区域" = "Définir la zone de rognage des pages";
@@ -1812,7 +1803,6 @@
 "可再生数据；下次使用时可能重新生成或下载" = "Données régénérables ; elles pourront être recréées ou retéléchargées à la prochaine utilisation";
 "左侧封面、歌名与歌手，右侧音浪与滚动歌词" = "Pochette, titre et artiste à gauche ; onde et paroles défilantes à droite";
 "按所选周期删除过期音频，文字记录继续保留" = "Supprimer l’audio expiré selon la période choisie ; les transcriptions sont conservées";
-"正在安装，Keyboard 将自动重启…" = "Installation en cours, Keyboard va redémarrer automatiquement…";
 "上传一组按下/回弹音，快速应用到整把键盘。" = "Importez une paire de sons appui/relâchement pour l’appliquer rapidement à tout le clavier.";
 "发现新版本后下载，并在退出或重启时完成安装" = "Télécharger les nouvelles versions et terminer l’installation à la fermeture ou au redémarrage";
 "无法连接代理主机和端口，请检查代理是否运行" = "Impossible de se connecter à l’hôte et au port du proxy. Vérifiez que le proxy fonctionne";

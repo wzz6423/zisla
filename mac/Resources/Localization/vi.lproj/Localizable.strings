@@ -1181,7 +1181,6 @@
 "%@ 文件过大" = "%@ quá lớn";
 "%@字符数曲线" = "Biểu đồ ký tự %@";
 "%@：%@ 次" = "%@: %@ lần nhấn";
-"一键更新并重启" = "Cập nhật và khởi động lại";
 "与 %@ 相比" = "So với %@";
 "今天还没有输入" = "Hôm nay chưa nhập gì";
 "全年输入热力图" = "Bản đồ nhiệt nhập theo năm";
@@ -1266,7 +1265,6 @@
 "多个资源使用相同路径" = "Nhiều tệp dùng cùng một đường dẫn";
 "峰值 %@ 字符/秒" = "Cao nhất %@ ký tự/giây";
 "已选：%@ · %@" = "Đã chọn: %@ · %@";
-"应用内更新源尚未配置" = "Chưa cấu hình nguồn cập nhật trong ứng dụng";
 "当前离线，稍后可重试" = "Bạn đang ngoại tuyến. Hãy thử lại sau.";
 "无法分配输入缓冲区。" = "Không cấp phát được bộ đệm nhập.";
 "无法创建源音频缓冲区" = "Không tạo được bộ đệm âm thanh gốc";
@@ -1289,10 +1287,8 @@
 "上传完整击键并自动拆分" = "Tải lên trọn tiếng nhấn phím và tự động tách";
 "保存当前修改后即可导出" = "Lưu thay đổi để bật chức năng xuất";
 "启用鼠标与触控板点击音" = "Bật âm nhấp chuột và bàn di chuột";
-"应用内更新签名配置无效" = "Cấu hình chữ ký cập nhật trong ứng dụng không hợp lệ";
 "当前音色有未保存的更改" = "Gói âm thanh này có thay đổi chưa lưu";
 "无法创建目标音频缓冲区" = "Không tạo được bộ đệm âm thanh đích";
-"更新服务启动失败：%@" = "Dịch vụ cập nhật không khởi động được: %@";
 "正在整理过去一年的统计" = "Đang chuẩn bị thống kê của năm qua";
 "清晰了解每天的输入习惯" = "Cái nhìn rõ hơn về thói quen nhập hằng ngày";
 "移除这个自定义音色包？" = "Xóa gói âm thanh tùy chỉnh này?";
@@ -1305,7 +1301,6 @@
 "前往 GitHub 下载" = "Tải về từ GitHub";
 "备用音频转换时长限制无效" = "Giới hạn thời lượng chuyển đổi âm thanh dự phòng không hợp lệ";
 "导入结果不是自定义音色包" = "Kết quả nhập vào không phải gói âm thanh tùy chỉnh.";
-"开发构建不执行应用内更新" = "Cập nhật trong ứng dụng không dùng được ở bản dựng phát triển";
 "无法创建导出音频缓冲区。" = "Không tạo được bộ đệm âm thanh để xuất.";
 "无法读取自定义音频：%@" = "Không đọc được âm thanh tùy chỉnh: %@";
 "未设置的位置会继承 %@" = "Các ô chưa gán sẽ kế thừa từ %@";
@@ -1332,7 +1327,6 @@
 "开始打字后，曲线会立即出现。" = "Bắt đầu nhập và đồ thị sẽ hiện ra ngay.";
 "当前版本不支持键盘布局：%@" = "Phiên bản này không hỗ trợ bố cục bàn phím: %@";
 "所选区间没有可显示的应用记录" = "Không có bản ghi ứng dụng nào cho phạm vi đã chọn";
-"改为 GitHub 手动下载" = "Tải về từ GitHub thay thế";
 "无法启动备用音频转换器：%@" = "Không khởi động được bộ chuyển đổi âm thanh dự phòng: %@";
 "正在监听键盘 · 统计已开启" = "Đang giám sát bàn phím · Thống kê bật";
 "正在监听键盘 · 统计已暂停" = "Đang giám sát bàn phím · Thống kê tạm dừng";
@@ -1629,8 +1623,6 @@
 "已创建空白草稿" = "Đã tạo bản nháp trống";
 "最近输入 %@" = "Lần nhập gần nhất %@";
 "未获得下载文件" = "Không có tệp tải về nào được tạo";
-"正在下载更新…" = "Đang tải bản cập nhật…";
-"正在准备更新…" = "Đang chuẩn bị cập nhật…";
 "正在准备试听…" = "Đang chuẩn bị nghe thử…";
 "正在转换音频…" = "Đang chuyển đổi âm thanh…";
 "移除当前音色包" = "Xóa gói âm hiện tại";
@@ -1665,7 +1657,6 @@
 "正在导出音色包…" = "Đang xuất gói âm…";
 "正在打开音色包…" = "Đang mở gói âm…";
 "正在移到废纸篓…" = "Đang chuyển vào Thùng rác…";
-"正在验证并解压…" = "Đang xác minh và giải nén…";
 "灵动岛与下载展示" = "Dynamic Island và mục tải về";
 "直接写入页面内容" = "Ghi trực tiếp vào nội dung trang";
 "设置页面裁剪区域" = "Đặt vùng cắt của trang";
@@ -1816,7 +1807,6 @@
 "可再生数据；下次使用时可能重新生成或下载" = "Dữ liệu có thể tạo lại; lần dùng sau có thể được tạo hoặc tải lại";
 "左侧封面、歌名与歌手，右侧音浪与滚动歌词" = "Ảnh bìa, tên bài và ca sĩ bên trái; sóng nhạc và lời chạy bên phải";
 "按所选周期删除过期音频，文字记录继续保留" = "Xóa âm thanh hết hạn theo chu kỳ đã chọn; bản chuyển lời vẫn được giữ";
-"正在安装，Keyboard 将自动重启…" = "Đang cài đặt, Keyboard sẽ tự khởi động lại…";
 "上传一组按下/回弹音，快速应用到整把键盘。" = "Tải lên một cặp âm nhấn/nhả để áp dụng cho toàn bộ bàn phím.";
 "发现新版本后下载，并在退出或重启时完成安装" = "Tải bản mới về và hoàn tất cài đặt khi thoát hoặc khởi động lại";
 "无法连接代理主机和端口，请检查代理是否运行" = "Không kết nối được tới máy chủ và cổng proxy, hãy kiểm tra xem proxy có đang chạy không";
