@@ -1490,7 +1490,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             onKeyDown: { [weak self] in self?.startScreenshot() },
             onKeyUp: {}
         )
-        reportScreenshotHotkeyRegistration(captureResult, actionName: "截图")
+        reportScreenshotHotkeyRegistration(captureResult, actionName: AppLocalization.text("截图"))
 
         guard !settings.screenshotHotkey.conflicts(with: settings.screenshotPinHotkey) else {
             AppModel.shared.transientMessage = AppLocalization.text("截图与钉图快捷键冲突，钉图快捷键未启用")
@@ -1501,7 +1501,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             onKeyDown: { [weak self] in self?.startPinnedScreenshot() },
             onKeyUp: {}
         )
-        reportScreenshotHotkeyRegistration(pinResult, actionName: "钉图")
+        reportScreenshotHotkeyRegistration(pinResult, actionName: AppLocalization.text("钉图"))
     }
 
     private func reportScreenshotHotkeyRegistration(
@@ -1512,9 +1512,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .registered:
             break
         case .inputMonitoringPermissionRequired:
-            AppModel.shared.transientMessage = "\(actionName)快捷键需要输入监控权限"
+            AppModel.shared.transientMessage = AppLocalization.text("%@快捷键需要输入监控权限", actionName)
         case .registrationFailed:
-            AppModel.shared.transientMessage = "\(actionName)快捷键与系统或其他应用冲突，未能启用"
+            AppModel.shared.transientMessage = AppLocalization.text("%@快捷键与系统或其他应用冲突，未能启用", actionName)
         }
     }
 

@@ -10,7 +10,7 @@ public enum AIChatClientError: LocalizedError, Equatable {
         switch self {
         case .invalidEndpoint: "端点地址无效"
         case .invalidResponse: "模型返回了无法识别的响应"
-        case let .http(statusCode): "模型请求失败（HTTP \(statusCode)）"
+        case let .http(statusCode): AppLocalization.text("模型请求失败（HTTP %ld）", statusCode)
         }
     }
 }

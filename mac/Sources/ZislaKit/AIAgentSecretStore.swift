@@ -17,7 +17,7 @@ public enum AIAgentSecretStoreError: LocalizedError, Sendable, Equatable {
         switch self {
         case .invalidReference: "密钥引用无效"
         case .invalidSecret: "API Key 不能为空"
-        case let .storageFailed(detail): "无法保存模型凭据：\(detail)"
+        case let .storageFailed(detail): AppLocalization.text("无法保存模型凭据：%@", detail)
         }
     }
 }

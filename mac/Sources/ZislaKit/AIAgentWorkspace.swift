@@ -353,7 +353,7 @@ public final class AIAgentWorkspace: ObservableObject {
             Task { [weak self] in await self?.refreshSkills() }
             return managedSkillsDirectory
         } catch {
-            lastError = "无法创建 Skills 受管库：\(error.localizedDescription)"
+            lastError = AppLocalization.text("无法创建 Skills 受管库：%@", error.localizedDescription)
             return nil
         }
     }
@@ -387,12 +387,12 @@ public final class AIAgentWorkspace: ObservableObject {
         let resolvedURL = skillURL.resolvingSymlinksInPath().standardizedFileURL
         if let installation = AgentSkillPackageInstallation.detect(at: resolvedURL) {
             guard let command = cliService.uninstallationCommand(for: installation) else {
-                lastError = "找不到 \(installation.manager.executableName) 命令"
+                lastError = AppLocalization.text("找不到 %@ 命令", installation.manager.executableName)
                 return false
             }
             guard let output = await runCLICommand(command), output.status == 0 else {
                 if lastError == nil {
-                    lastError = "\(installation.manager.rawValue) 卸载失败"
+                    lastError = AppLocalization.text("%@ 卸载失败", installation.manager.rawValue)
                 }
                 return false
             }
@@ -412,7 +412,7 @@ public final class AIAgentWorkspace: ObservableObject {
             lastError = nil
             return true
         } catch {
-            lastError = "无法卸载 Skill：\(error.localizedDescription)"
+            lastError = AppLocalization.text("无法卸载 Skill：%@", error.localizedDescription)
             return false
         }
     }
@@ -444,7 +444,7 @@ public final class AIAgentWorkspace: ObservableObject {
             }
             Task { [weak self] in await self?.refreshSkills() }
         } catch {
-            lastError = "Skills 同步失败：\(error.localizedDescription)"
+            lastError = AppLocalization.text("Skills 同步失败：%@", error.localizedDescription)
         }
     }
 
@@ -564,7 +564,7 @@ public final class AIAgentWorkspace: ObservableObject {
                     completedCount: completedCount,
                     totalCount: commands.count,
                     state: .running,
-                    detail: "正在并行执行 · \(completedCount)/\(commands.count) 已完成"
+                    detail: AppLocalization.text("正在并行执行 · %ld/%ld 已完成", completedCount, commands.count)
                 )
             }
         }
@@ -575,7 +575,7 @@ public final class AIAgentWorkspace: ObservableObject {
         } else if failures.count == 1, let failure = failures.first {
             failureDetail = failure
         } else {
-            failureDetail = "\(failures.count) 项命令失败：\(failures.joined(separator: "；"))"
+            failureDetail = AppLocalization.text("%ld 项命令失败：%@", failures.count, failures.joined(separator: AppLocalization.text("；")))
         }
         if failureDetail == nil, kinds.contains(.grok) {
             grokUpdateState = .upToDate
@@ -605,15 +605,15 @@ public final class AIAgentWorkspace: ObservableObject {
         output: AIAgentProcessOutput
     ) -> String {
         if output.didTimeout {
-            return "CLI 命令超时（超过 \(Int(command.timeout / 60)) 分钟），请检查网络后重试"
+            return AppLocalization.text("CLI 命令超时（超过 %ld 分钟），请检查网络后重试", Int(command.timeout / 60))
         }
         let detail = output.standardError.trimmingCharacters(in: .whitespacesAndNewlines)
         if detail.contains("untrusted tap"),
            let trustCommand = detail.components(separatedBy: "`").dropFirst().first,
            !trustCommand.isEmpty {
-            return "Homebrew 需要先信任该公式：\(trustCommand)"
+            return AppLocalization.text("Homebrew 需要先信任该公式：%@", trustCommand)
         }
-        return detail.isEmpty ? "CLI 命令执行失败（退出码 \(output.status)）" : detail
+        return detail.isEmpty ? AppLocalization.text("CLI 命令执行失败（退出码 %ld）", Int(output.status)) : detail
     }
 
     public func importCLIProfileFile(_ data: Data, for accountID: UUID, authentication: Bool) {

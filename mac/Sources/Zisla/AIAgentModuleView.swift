@@ -129,7 +129,7 @@ struct AIAgentModuleView: View {
 
     private func addProvider() {
         _ = agent.store.createRemoteProvider(
-            name: "远端模型 \(agent.store.state.channels.count + 1)"
+            name: AppLocalization.text("远端模型 %ld", agent.store.state.channels.count + 1)
         )
     }
 
@@ -363,8 +363,8 @@ struct AIAgentModuleView: View {
                             } else if let availableUpdate {
                                 Button {
                                     queueCLIAction(
-                                        title: "更新 \(kind.displayName)？",
-                                        message: "将 \(kind.displayName) 从 \(availableUpdate.installedVersion) 更新到 \(availableUpdate.latestVersion)",
+                                        title: AppLocalization.text("更新 %@？", kind.displayName),
+                                        message: AppLocalization.text("将 %@ 从 %@ 更新到 %@", kind.displayName, availableUpdate.installedVersion, availableUpdate.latestVersion),
                                         kinds: [kind],
                                         commands: update
                                     )
@@ -382,7 +382,7 @@ struct AIAgentModuleView: View {
                             } else {
                                 Button {
                                     queueCLIAction(
-                                        title: "更新 \(kind.displayName)？",
+                                        title: AppLocalization.text("更新 %@？", kind.displayName),
                                         message: cliActionMessage(AppLocalization.text("将更新"), kinds: [kind]),
                                         kinds: [kind],
                                         commands: update
@@ -398,7 +398,7 @@ struct AIAgentModuleView: View {
                             let uninstall = agent.commandsForCLIUninstallation([kind])
                             Button(role: .destructive) {
                                 queueCLIAction(
-                                    title: "卸载 \(kind.displayName)？",
+                                    title: AppLocalization.text("卸载 %@？", kind.displayName),
                                     message: cliActionMessage(AppLocalization.text("将卸载"), kinds: [kind], isUninstall: true),
                                     kinds: [kind],
                                     commands: uninstall
@@ -413,7 +413,7 @@ struct AIAgentModuleView: View {
                             let install = agent.commandsForCLIInstallation([kind], update: false)
                             Button {
                                 queueCLIAction(
-                                    title: "下载 \(kind.displayName)？",
+                                    title: AppLocalization.text("下载 %@？", kind.displayName),
                                     message: cliActionMessage(AppLocalization.text("将下载并安装"), kinds: [kind]),
                                     kinds: [kind],
                                     commands: install
@@ -510,11 +510,13 @@ struct AIAgentModuleView: View {
     }
 
     private func cliCommandProgressTitle(_ progress: AIAgentCLICommandProgress) -> String {
-        let action = progress.title.replacingOccurrences(of: "？", with: "")
+        let action = progress.title
+            .replacingOccurrences(of: "？", with: "")
+            .replacingOccurrences(of: "?", with: "")
         switch progress.state {
-        case .running: return "正在\(action)"
-        case .succeeded: return "\(action) 已完成"
-        case .failed: return "\(action) 失败"
+        case .running: return AppLocalization.text("正在%@", action)
+        case .succeeded: return AppLocalization.text("%@ 已完成", action)
+        case .failed: return AppLocalization.text("%@ 失败", action)
         }
     }
 

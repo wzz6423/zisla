@@ -250,7 +250,7 @@ public final class ManagedToolService: ObservableObject {
               let version = cask["version"] as? String,
               let normalized = tool.normalizedInstalledVersion(from: version)
         else {
-            throw ManagedToolError.homebrewFailed("无法读取 \(caskName) 的版本信息")
+            throw ManagedToolError.homebrewFailed(AppLocalization.text("无法读取 %@ 的版本信息", caskName))
         }
         return normalized
     }
@@ -267,7 +267,7 @@ public final class ManagedToolService: ObservableObject {
               let version = versions["stable"] as? String,
               let normalized = tool.normalizedInstalledVersion(from: version)
         else {
-            throw ManagedToolError.homebrewFailed("无法读取 \(formulaName) 的版本信息")
+            throw ManagedToolError.homebrewFailed(AppLocalization.text("无法读取 %@ 的版本信息", formulaName))
         }
         let revision = formula["revision"] as? Int ?? 0
         return revision > 0 ? "\(normalized)_\(revision)" : normalized
@@ -654,7 +654,7 @@ public final class ManagedToolService: ObservableObject {
                     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .first { !$0.isEmpty }
                 return .failure(.notExecutable(
-                    message ?? "\(executable.lastPathComponent) 退出码 \(output.status)"
+                    message ?? AppLocalization.text("%@ 退出码 %ld", executable.lastPathComponent, Int(output.status))
                 ))
             }
             return .success(String(decoding: output.standardOutput, as: UTF8.self))

@@ -1238,7 +1238,7 @@ private struct CompactAIWing: View {
         .contentShape(CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(
-            role == .identity ? AppLocalization.text("AI 任务图标") : "\(count) 个 AI 任务\(statusDescription)\(errorAccessibilityText)"
+            role == .identity ? AppLocalization.text("AI 任务图标") : AppLocalization.text("%ld 个 AI 任务%@%@", count, statusDescription, errorAccessibilityText)
         ))
     }
 
@@ -1273,9 +1273,9 @@ private struct CompactAIWing: View {
     }
 
     private var statusDescription: String {
-        if notices.contains(where: { $0.kind == .error }) { return "有错误" }
-        if notices.contains(where: { $0.kind == .warning }) { return "等待操作" }
-        return "正在运行"
+        if notices.contains(where: { $0.kind == .error }) { return AppLocalization.text("有错误") }
+        if notices.contains(where: { $0.kind == .warning }) { return AppLocalization.text("等待操作") }
+        return AppLocalization.text("正在运行")
     }
 
     private var errorCount: Int {
@@ -1283,7 +1283,7 @@ private struct CompactAIWing: View {
     }
 
     private var errorAccessibilityText: String {
-        errorCount > 0 ? "，其中 \(errorCount) 个错误" : ""
+        errorCount > 0 ? AppLocalization.text("，其中 %ld 个错误", errorCount) : ""
     }
 }
 
@@ -1852,7 +1852,7 @@ private struct DetailedMailBar: View {
         }
         .foregroundStyle(.white)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(AppLocalization.text("新邮件：%@，来自 %@，共 %@ 封", leftNotice.title, leftNotice.detail ?? "未知发件人", rightNotice.title)))
+        .accessibilityLabel(Text(AppLocalization.text("新邮件：%@，来自 %@，共 %@ 封", leftNotice.title, leftNotice.detail ?? AppLocalization.text("未知发件人"), rightNotice.title)))
     }
 }
 
@@ -2011,15 +2011,15 @@ private struct CompactBrowserDownloadWing: View {
     }
 
     private var accessibilityLabel: String {
-        let source = notice.appName ?? "浏览器"
+        let source = notice.appName ?? AppLocalization.text("浏览器")
         guard isFinished else {
             if downloadCount == 1 {
-                return "\(source) 下载中 \(notice.detail ?? "")：\(notice.title)"
+                return AppLocalization.text("%@ 下载中 %@：%@", source, notice.detail ?? "", notice.title)
             } else {
-                return "\(source) 正在下载 \(downloadCount) 个文件"
+                return AppLocalization.text("%@ 正在下载 %ld 个文件", source, downloadCount)
             }
         }
-        return "\(source) 下载完成：\(notice.title)"
+        return AppLocalization.text("%@ 下载完成：%@", source, notice.title)
     }
 }
 
@@ -2093,11 +2093,11 @@ private struct CompactVideoDownloadWing: View {
     }
 
     private var accessibilityLabel: String {
-        let source = notice.appName ?? "视频"
+        let source = notice.appName ?? AppLocalization.text("视频")
         guard isFinished else {
-            return "\(source) 下载中 \(notice.detail ?? "")：\(notice.title)"
+            return AppLocalization.text("%@ 下载中 %@：%@", source, notice.detail ?? "", notice.title)
         }
-        return "\(source) 下载完成：\(notice.title)"
+        return AppLocalization.text("%@ 下载完成：%@", source, notice.title)
     }
 }
 

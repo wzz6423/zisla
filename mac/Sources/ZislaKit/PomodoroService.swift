@@ -369,7 +369,7 @@ public final class PomodoroService: ObservableObject {
         case .focus:
             content.title = AppLocalization.text("专注结束")
             let restMinutes = max(1, Int(engine.restDuration / 60))
-            content.body = "休息 \(restMinutes) 分钟吧"
+            content.body = AppLocalization.text("休息 %ld 分钟吧", restMinutes)
         case .rest:
             content.title = AppLocalization.text("休息结束")
             content.body = AppLocalization.text("开始下一段专注")

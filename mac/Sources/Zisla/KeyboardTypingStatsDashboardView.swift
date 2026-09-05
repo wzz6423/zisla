@@ -48,7 +48,7 @@ struct KeyboardTypingStatsDashboardView: View {
                 title: AppLocalization.text("最多应用"),
                 value: summary.todayTopApplication ?? AppLocalization.text("暂无"),
                 detail: summary.applications.first.map {
-                    "\($0.characterCount.formatted(.number)) 字符"
+                    AppLocalization.text("%@ 字符", $0.characterCount.formatted(.number))
                 } ?? AppLocalization.text("暂无输入")
             )
             compactMetricCard(
@@ -62,7 +62,7 @@ struct KeyboardTypingStatsDashboardView: View {
                 symbol: "clock.fill",
                 title: AppLocalization.text("活跃时间"),
                 value: durationText(summary.todayActiveSeconds),
-                detail: "\(summary.todayActiveMinuteBuckets.formatted(.number)) 分钟"
+                detail: AppLocalization.text("%@ 分钟", summary.todayActiveMinuteBuckets.formatted(.number))
             )
         }
     }
@@ -501,14 +501,14 @@ struct KeyboardTypingStatsDashboardView: View {
     }
 
     private var lastInputText: String {
-        guard let date = summary.lastInputAt else { return "暂无输入" }
-        return "最近输入 \(date.formatted(date: .omitted, time: .shortened))"
+        guard let date = summary.lastInputAt else { return AppLocalization.text("暂无输入") }
+        return AppLocalization.text("最近输入 %@", date.formatted(date: .omitted, time: .shortened))
     }
 
     private func durationText(_ seconds: Int64) -> String {
         let minutes = max(0, seconds) / 60
-        if minutes >= 60 { return "\(minutes / 60) 小时 \(minutes % 60) 分" }
-        return "\(minutes) 分钟"
+        if minutes >= 60 { return AppLocalization.text("%ld 小时 %ld 分", Int(minutes / 60), Int(minutes % 60)) }
+        return AppLocalization.text("%ld 分钟", Int(minutes))
     }
 }
 

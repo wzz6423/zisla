@@ -98,11 +98,11 @@ struct AgendaModuleView: View {
             HStack(spacing: 7) {
                 weatherMetric(
                     symbol: "cloud.rain.fill",
-                    value: "当前 \(weather.currentPrecipitation.formatted(.number.precision(.fractionLength(1)))) mm"
+                    value: AppLocalization.text("当前 %@ mm", weather.currentPrecipitation.formatted(.number.precision(.fractionLength(1))))
                 )
                 weatherMetric(
                     symbol: "calendar",
-                    value: "今日 \(weather.precipitationProbability)% / \(weather.precipitationSum.formatted(.number.precision(.fractionLength(1)))) mm"
+                    value: AppLocalization.text("今日 %ld%% / %@ mm", weather.precipitationProbability, weather.precipitationSum.formatted(.number.precision(.fractionLength(1))))
                 )
             }
 
@@ -159,10 +159,10 @@ struct AgendaModuleView: View {
         var details = [
             alert.source,
             alert.region,
-            "更新 \(updatedAt)",
+            AppLocalization.text("更新于 %@", updatedAt),
         ]
         if let expiresAt = alert.expiresAt {
-            details.append("有效至 \(expiresAt.formatted(date: .omitted, time: .shortened))")
+            details.append(AppLocalization.text("有效至 %@", expiresAt.formatted(date: .omitted, time: .shortened)))
         }
         return details.compactMap { $0 }.joined(separator: " · ")
     }
@@ -394,7 +394,7 @@ struct AgendaModuleView: View {
         formatter.dateStyle = .full
         formatter.timeStyle = .none
         let base = formatter.string(from: day)
-        return isToday ? "\(base)，今天" : base
+        return isToday ? AppLocalization.text("%@，今天", base) : base
     }
 
     private var calendarAuthorizationView: some View {
@@ -446,9 +446,11 @@ struct AgendaModuleView: View {
             : event.startDate.formatted(date: .omitted, time: .shortened)
         if event.kind == .reminder {
             if event.isProjectedOccurrence {
-                return "重复提醒 · \(time)"
+                return AppLocalization.text("重复提醒 · %@", time)
             }
-            return event.isCompleted ? "提醒 · 已完成 · \(time)" : "提醒 · \(time)"
+            return event.isCompleted
+                ? AppLocalization.text("提醒 · 已完成 · %@", time)
+                : AppLocalization.text("提醒 · %@", time)
         }
         return time
     }

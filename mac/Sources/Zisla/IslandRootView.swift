@@ -677,12 +677,12 @@ private struct BackgroundSoundControl: View {
                 ForEach(service.availableSounds, id: \.self) { sound in
                     if service.downloadState(for: sound) == .queued {
                         Button {} label: {
-                            Label(AppLocalization.text("等待下载 %@…", sound.title), systemImage: "clock")
+                            Label(AppLocalization.text("等待下载 %@…", AppLocalization.text(sound.title)), systemImage: "clock")
                         }
                         .disabled(true)
                     } else if service.isDownloading(sound) {
                         Button {} label: {
-                            Label(AppLocalization.text("正在下载 %@…", sound.title), systemImage: "arrow.down.circle")
+                            Label(AppLocalization.text("正在下载 %@…", AppLocalization.text(sound.title)), systemImage: "arrow.down.circle")
                         }
                         .disabled(true)
                     } else if service.isInstalled(sound) {
@@ -699,8 +699,8 @@ private struct BackgroundSoundControl: View {
                             onSelect(sound)
                         } label: {
                             let title = service.downloadState(for: sound) == nil
-                                ? "\(sound.title)（下载）"
-                                : "\(sound.title)（重试下载）"
+                                ? AppLocalization.text("%@（下载）", AppLocalization.text(sound.title))
+                                : AppLocalization.text("%@（重试下载）", AppLocalization.text(sound.title))
                             Label(title, systemImage: "arrow.down.circle")
                         }
                     }
@@ -715,8 +715,8 @@ private struct BackgroundSoundControl: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help(AppLocalization.text("选择背景音：%@", selectedSound.title))
-            .accessibilityLabel(AppLocalization.text("选择背景音：%@", selectedSound.title))
+            .help(AppLocalization.text("选择背景音：%@", AppLocalization.text(selectedSound.title)))
+            .accessibilityLabel(AppLocalization.text("选择背景音：%@", AppLocalization.text(selectedSound.title)))
             .onHover { hovering in
                 if hovering { service.refresh() }
             }

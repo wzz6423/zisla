@@ -572,7 +572,7 @@ private struct ClipboardFilterSegmentedControl: View {
                     }
                 }
                 .buttonStyle(PressableStyle(hoverScale: 1.025, pressedScale: 0.95))
-                .help(AppLocalization.text("只看%@", filter.title))
+                .help(AppLocalization.text("只看%@", AppLocalization.text(filter.title)))
             }
         }
         .padding(2)

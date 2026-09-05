@@ -2,7 +2,6 @@
 
 /* Common */
 "取消" = "Annuler";
-"确定" = "OK";
 "好" = "OK";
 "继续" = "Continuer";
 "删除" = "Supprimer";
@@ -25,7 +24,6 @@
 "信息" = "Infos";
 "模型" = "Modèles";
 "宠物" = "Compagnon";
-"交互" = "Interaction";
 "下载" = "Téléchargements";
 "天气" = "Météo";
 "更新" = "Mises à jour";
@@ -34,7 +32,6 @@
 "调整语言、外观、启动与展开方式。" = "Ajuster la langue, l'apparence, le démarrage et la méthode d'expansion.";
 
 /* Settings - Privacy */
-"管理剪贴板访问与本机数据。" = "Gérer l'accès au presse-papiers et aux données locales.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Gérer les modules de flux de travail dans Dynamic Island.";
@@ -78,15 +75,12 @@
 "显示在系统时间上方，可与锁屏文字共存" = "Affiché au-dessus de l'heure système, peut coexister avec le texte de verrouillage";
 "侧翼通知" = "Notifications latérales";
 "在灵动岛肩部显示任务变化" = "Afficher les changements de tâches sur les épaules de Dynamic Island";
-"岛上倒计时" = "Compte à rebours sur l'île";
 "专注时在收起态灵动岛显示剩余时间" = "Afficher le temps restant dans Dynamic Island réduit en mode concentration";
 "活动展示" = "Affichage d'activité";
 "播放与 AI 任务的折叠时长" = "Durée de réduction pour la lecture et les tâches IA";
 "专注模式展示" = "Affichage mode concentration";
 "开启或切换专注模式时的显示时长" = "Durée d'affichage lors de l'activation ou du changement de mode concentration";
 "收起态展示优先级" = "Priorité d'affichage réduit";
-"上移" = "Monter";
-"下移" = "Descendre";
 "恢复默认顺序" = "Restaurer l'ordre par défaut";
 "通知显示器" = "Écrans de notification";
 "当前显示器" = "Écran actuel";
@@ -98,7 +92,6 @@
 "AI 进度与用量" = "Progression et utilisation IA";
 "汇总桌面端与 CLI 工具的运行状态" = "Résumer l'état d'exécution des outils bureau et CLI";
 "语音输入" = "Entrée vocale";
-"启用语音输入" = "Activer l'entrée vocale";
 "开启后可通过全局快捷键触发语音输入" = "Activer l'entrée vocale via raccourci global";
 "录音模式" = "Mode d'enregistrement";
 "快捷键" = "Raccourci";
@@ -109,34 +102,24 @@
 "已授权" = "Autorisé";
 
 /* Settings - Voice Models */
-"配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Configurer les modèles locaux, modèles distants et identifiants, et sélectionner le modèle pour l'organisation vocale.";
 "本地模型" = "Modèles locaux";
 "远端模型与凭据" = "Modèles distants et identifiants";
 "语音整理模型" = "Modèle d'organisation vocale";
 "使用模型" = "Utiliser le modèle";
 "从上方已启用的本地或远端模型中选择" = "Sélectionner parmi les modèles locaux ou distants activés ci-dessus";
 "不使用模型整理" = "Aucune organisation par modèle";
-"本地" = "Local";
-"远端" = "Distant";
 "尚未选择模型" = "Aucun modèle sélectionné";
 "在上方添加并启用本地或远端模型后即可选择" = "Ajouter et activer des modèles locaux ou distants ci-dessus pour sélectionner";
 "选择后会对语音转写进行整理" = "Organisera la transcription vocale après sélection";
 "测试连接" = "Tester la connexion";
 "尚未测试连接" = "Non testé";
 "正在连接…" = "Connexion…";
-"已发现" = "Trouvé";
-"个模型" = " modèles";
 
 /* Settings - Models - Hardware Profile */
-"设备档案与推荐模型" = "Profil de l'appareil et modèles recommandés";
 "设备" = "Appareil";
-"综合推荐" = "Recommandation globale";
-"检测" = "Détecter";
-"点击下方按钮检测硬件信息" = "Cliquer sur le bouton ci-dessous pour détecter les informations matérielles";
 
 /* Settings - Pet */
 "设置灵动岛内部的宠物形象。" = "Définir l'apparence du compagnon à l'intérieur de Dynamic Island.";
-"岛上宠物伙伴" = "Compagnon de l'île";
 "在灵动岛养一只小宠物" = "Élever un compagnon dans Dynamic Island";
 "当前宠物" = "Compagnon actuel";
 "选择内置的宠物形象" = "Sélectionner l'apparence du compagnon intégré";
@@ -146,7 +129,6 @@
 "右侧" = "Droite";
 
 /* Settings - Interaction */
-"调整外观、展开方式与隐私行为。" = "Ajuster l'apparence, la méthode d'expansion et le comportement de confidentialité.";
 "外观" = "Apparence";
 "界面外观" = "Apparence de l'interface";
 "灵动岛样式" = "Style Dynamic Island";
@@ -157,23 +139,17 @@
 "需要系统批准" = "Approbation système requise";
 "在登录项中允许 zisla 后即可生效" = "Prend effet après avoir autorisé zisla dans les éléments de connexion";
 "打开登录项…" = "Ouvrir Éléments de connexion…";
-"展开方式" = "Méthode d'expansion";
 "鼠标移入展开" = "Survol pour développer";
 "鼠标进入屏幕顶部感应区时显示" = "Afficher lorsque la souris entre dans la zone de détection en haut de l'écran";
-"隐私" = "Confidentialité";
-"记录剪贴板历史" = "Enregistrer l'historique du presse-papiers";
 "仅本机保存文本和图片" = "Enregistrer uniquement le texte et les images localement";
-"检测剪贴板链接" = "Détecter les liens du presse-papiers";
 "发现可下载链接时提示" = "Avertir lorsque des liens téléchargeables sont détectés";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Gérer le répertoire de téléchargement, les notifications de téléchargement et les composants requis.";
-"下载器" = "Téléchargeur";
 "链接下载" = "Téléchargement de liens";
 "下载视频或音频" = "Télécharger des vidéos ou de l'audio";
 "默认下载目录" = "Répertoire de téléchargement par défaut";
 "选择默认下载目录" = "Choisir le répertoire de téléchargement par défaut";
-"下载通知" = "Notifications de téléchargement";
 "浏览器下载进度" = "Progression téléchargement navigateur";
 "在灵动岛显示来源图标与百分比" = "Afficher l'icône source et le pourcentage dans Dynamic Island";
 "原生下载进度" = "Progression téléchargement natif";
@@ -184,18 +160,14 @@
 "安装" = "Installer";
 "正在查询最新版本…" = "Vérification de la dernière version…";
 "正在下载…" = "Téléchargement…";
-"正在下载" = "Téléchargement";
 "正在安装…" = "Installation…";
 
 /* Settings - Weather */
 "管理天气显示、地点和刷新。" = "Gérer l'affichage météo, les emplacements et l'actualisation.";
-"天气显示" = "Affichage météo";
 "显示当前或自选地区的天气" = "Afficher la météo de l'emplacement actuel ou personnalisé";
 "地点" = "Emplacements";
 "默认显示当前所在地" = "Afficher l'emplacement actuel par défaut";
 "等待刷新" = "En attente d'actualisation";
-"拖动调整" = "Glisser pour ajuster";
-"的展示顺序" = " l'ordre d'affichage";
 "天气数据" = "Données météo";
 "刷新当前位置与全部自选地区" = "Actualiser l'emplacement actuel et tous les emplacements personnalisés";
 "城市、区县或地区" = "Ville, district ou région";
@@ -204,18 +176,11 @@
 /* Settings - Updates */
 "管理版本检查与自动更新。" = "Gérer la vérification des versions et les mises à jour automatiques.";
 "更新策略" = "Stratégie de mise à jour";
-"手动检查通道" = "Canal de vérification manuelle";
-"不影响自动更新" = "N'affecte pas les mises à jour automatiques";
 "检查更新" = "Vérifier les mises à jour";
-"仅检查当前安装包所属的更新通道" = "Vérifier uniquement le canal de mise à jour du paquet d'installation actuel";
-"自动安装更新" = "Installer automatiquement les mises à jour";
-"仅自动安装当前安装包所属通道的新构建" = "Installer automatiquement uniquement les nouvelles versions du canal du paquet actuel";
 "版本" = "Version";
 "尚未检查更新" = "Pas encore vérifié les mises à jour";
 "正在检查更新" = "Vérification des mises à jour";
 "已是最新版本" = "Déjà la dernière version";
-"发现" = "Trouvé";
-"新版本" = " nouvelle version";
 
 /* Clipboard History Module */
 "剪贴板" = "Presse-papiers";
@@ -224,7 +189,6 @@
 "非常用" = "Non favoris";
 "添加常用信息" = "Ajouter un favori";
 "清空历史（保留常用）" = "Effacer l'historique (conserver les favoris)";
-"只看" = "Afficher uniquement ";
 "还没有剪贴板历史" = "Pas encore d'historique du presse-papiers";
 "复制内容后会自动记录" = "Enregistré automatiquement après la copie";
 "还没有常用项" = "Pas encore de favoris";
@@ -264,25 +228,6 @@
 "发送" = "Envoyer";
 
 /* Voice Models - Remote Providers */
-"远端 Provider" = "Fournisseur distant";
-"添加 Provider" = "Ajouter un fournisseur";
-"尚未配置远端 Provider" = "Aucun fournisseur distant configuré";
-"Provider 名称" = "Nom du fournisseur";
-"端点" = "Point de terminaison";
-"凭据" = "Identifiants";
-"高级路由" = "Routage avancé";
-"添加端点组" = "Ajouter un groupe de points de terminaison";
-"添加额外的 URL/Key 轮换组（高级）" = "Ajouter un groupe de rotation URL/clé supplémentaire (avancé)";
-"尚未关联凭据" = "Aucun identifiant associé";
-"关联凭据" = "Associer des identifiants";
-"选择已有凭据，或为此 Provider 新建 API Key 凭据" = "Sélectionner des identifiants existants ou créer un nouvel identifiant de clé API pour ce fournisseur";
-"新建 API Key 凭据" = "Nouvel identifiant de clé API";
-"配置文件路径" = "Chemin du fichier de configuration";
-"认证文件路径" = "Chemin du fichier d'authentification";
-"导入配置" = "Importer la configuration";
-"导入认证" = "Importer l'authentification";
-"配置" = "Configuration";
-"认证" = "Authentification";
 
 /* System Monitor */
 "正在识别芯片" = "Identification de la puce";
@@ -293,12 +238,9 @@
 "利用率" = "Utilisation";
 "渲染" = "Rendu";
 "内存" = "Mémoire";
-"压力" = "Pression";
 "可用" = "Disponible";
-"共" = "Total";
 "释放" = "Libérer";
 "整理系统内存，回收非活跃与压缩页面" = "Organiser la mémoire système, récupérer les pages inactives et compressées";
-"已整理系统内存" = "Mémoire système organisée";
 "磁盘" = "Disque";
 "清理" = "Nettoyage";
 "扫描可清理的缓存、日志与开发产物" = "Analyser les caches, journaux et artefacts de construction nettoyables";
@@ -313,11 +255,8 @@
 "正在识别" = "Identification";
 "正在获取" = "Récupération";
 "暂不可用" = "Non disponible";
-"建立基线" = "Établissement de la ligne de base";
 
 /* System Cleanup */
-"清理磁盘" = "Nettoyer le disque";
-"扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件" = "Analyser les caches d'applications, journaux, fichiers temporaires, artefacts de construction, caches de gestionnaires de paquets, images disque, fichiers volumineux et doublons";
 "取消全选" = "Tout désélectionner";
 "全选" = "Tout sélectionner";
 "选择全部候选项" = "Sélectionner tous les candidats";
@@ -330,18 +269,8 @@
 "未找到可清理项" = "Aucun élément à nettoyer trouvé";
 "可安全清理的缓存与日志当前为空" = "Les caches et journaux pouvant être nettoyés en toute sécurité sont actuellement vides";
 "展开" = "Développer";
-"折叠" = "Réduire";
-"取消选择" = "Désélectionner";
-"已选" = "Sélectionné";
-"项" = " éléments";
 "移入废纸篓" = "Déplacer vers la corbeille";
-"将" = "Déplacer ";
-" 项移入废纸篓？" = " éléments vers la corbeille ?";
 "zisla 不会永久删除这些内容。" = "zisla ne supprimera pas définitivement ces éléments.";
-"已移入废纸篓" = "Déplacé vers la corbeille";
-"清空废纸篓后可释放" = "Peut libérer après avoir vidé la corbeille";
-"已处理" = "Traité";
-"项未完成" = " éléments incomplets";
 
 /* Cleanup Categories */
 "应用缓存" = "Cache d'applications";
@@ -377,22 +306,12 @@
 "防止用户闲置导致显示器休眠" = "Empêcher la mise en veille de l'écran due à l'inactivité de l'utilisateur";
 "防止空闲休眠" = "Empêcher la mise en veille inactive";
 "防止用户闲置导致系统休眠；合盖、低电量或用户主动休眠仍会让 Mac 进入睡眠" = "Empêcher la mise en veille du système due à l'inactivité ; fermeture du couvercle, batterie faible ou mise en veille initiée par l'utilisateur fonctionnent toujours";
-"常驻提醒" = "Rappel persistant";
-"无媒体占用时，在折叠状态显示番茄钟、亮屏或清洁状态" = "Afficher Pomodoro, maintien actif ou état de nettoyage en état réduit lorsqu'aucun média n'est actif";
 "清理屏幕" = "Nettoyer l'écran";
 "全屏黑色遮罩；点击中央「退出清屏」按钮或任意处退出" = "Masque noir plein écran ; cliquer sur le bouton central 'Quitter le nettoyage' ou n'importe où pour quitter";
 "清理键盘" = "Nettoyer le clavier";
 "结束清洁" = "Terminer le nettoyage";
 "恢复键盘输入" = "Restaurer la saisie clavier";
 "吞掉键盘输入；再次点击结束" = "Absorber la saisie clavier ; cliquer à nouveau pour terminer";
-"收起置顶" = "Réduit au premier plan";
-"收起置底" = "Réduit en arrière-plan";
-"收起态压在其他窗口之上（置顶），或被其他窗口和菜单栏图标覆盖（置底）" = "État réduit au-dessus des autres fenêtres (premier plan), ou recouvert par d'autres fenêtres et icônes de la barre de menus (arrière-plan)";
-"屏蔽通知" = "Masquer les notifications";
-"临时不再推送 Zisla 的系统通知；关闭后恢复正常推送（闹钟不受影响）" = "Arrêter temporairement les notifications système de zisla ; rétablir la notification normale lorsque désactivé (les alarmes ne sont pas affectées)";
-"整理桌面" = "Organiser le bureau";
-"按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Aligner les icônes du bureau sur la grille ; ne déplace aucun fichier lorsque 'Piles' est activé";
-"App Store 应用" = "Applications App Store";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Aucune alarme, ajouter ci-dessous";
@@ -416,32 +335,21 @@
 "卸载 Skill？" = "Désinstaller le Skill ?";
 "卸载" = "Désinstaller";
 "普通 Skill 会移到废纸篓；由 npm、pnpm、yarn、bun 或 Homebrew 全局安装的 Skill 会调用对应包管理器卸载。" = "Les Skills normaux seront déplacés vers la corbeille ; les Skills installés globalement via npm, pnpm, yarn, bun ou Homebrew seront désinstallés via leur gestionnaire de paquets.";
-"已发现 Skills（" = "Skills trouvés (";
-"）" = ")";
 
 /* Side Notices */
 "已连接" = "Connecté";
 "耳机已连接：" = "Écouteurs connectés : ";
 "状态已更新" = "Statut mis à jour";
 "正在播放" = "En cours de lecture";
-"正在播放：" = "En cours de lecture : ";
 "AI 任务图标" = "Icône de tâche IA";
-"个 AI 任务" = " tâches IA";
 "有错误" = " avec erreurs";
 "等待操作" = " en attente d'action";
 "正在运行" = " en cours d'exécution";
-"小工具：" = "Boîte à outils : ";
 "工具" = "Outil";
-"专注倒计时：" = "Compte à rebours concentration : ";
-"专注模式：" = "Mode concentration : ";
-"下载中" = " en téléchargement";
 "浏览器" = "Navigateur";
-"下载完成：" = " téléchargement terminé : ";
 "视频" = "Vidéo";
 
 /* Empty States */
-"无" = "Aucun";
-"无可用内容" = "Aucun contenu disponible";
 
 /* Localization and AppKit chrome */
 "外观与语言" = "Apparence et langue";
@@ -501,7 +409,6 @@
 "单独修饰键或鼠标侧键需要监听全局事件" = "Les touches modificatrices seules ou les boutons latéraux nécessitent la surveillance globale";
 "应用黑名单" = "Liste noire d'applications";
 "这些应用中的复制不弹提示" = "Les copies depuis ces applications n'affichent pas le toast";
-"加入当前应用" = "Ajouter l'app actuelle";
 "移出黑名单" = "Retirer de la liste noire";
 "识别类型" = "Types reconnus";
 "控制哪些内容会触发提示" = "Choisissez les types de contenu qui déclenchent le toast";
@@ -512,7 +419,6 @@
 "颜色值" = "Couleur";
 "算式" = "Calcul";
 "日期时间" = "Date et heure";
-"中文文本" = "Texte chinois";
 "非当前系统语言文本" = "Texte dans une langue différente de celle du système";
 "代码" = "Code";
 "翻译" = "Traduire";
@@ -2286,3 +2192,192 @@
 "macOS 仍可能因合盖、低电量、用户主动休眠或硬件策略进入睡眠；外接显示器并接通电源时可获得系统原生 clamshell 支持。" = "macOS peut tout de même passer en veille : capot fermé, batterie faible, veille demandée par l'utilisateur ou politique matérielle. Avec un écran externe connecté et l'alimentation branchée, vous bénéficiez de la prise en charge clamshell native du système.";
 "B站返回 HTTP 412 风控拦截。请先在浏览器登录 B站并完成验证，稍后或更换网络重试；若仍被拦截，需要 Cookies 导入支持后再下载。" = "bilibili a bloqué la requête avec un HTTP 412. Connectez-vous d'abord à bilibili dans le navigateur et terminez la vérification, puis réessayez plus tard ou depuis un autre réseau ; si le blocage persiste, le téléchargement nécessitera l'import des cookies.";
 "需要授权 zisla 控制 Mail.app\n请打开「系统设置 → 隐私与安全性 → 自动化」，\n在列表中找到并开启 zisla 对 Mail 的访问权限" = "zisla a besoin de l'autorisation de contrôler Mail.app\nOuvrez « Réglages Système → Confidentialité et sécurité → Automatisation »,\ntrouvez zisla dans la liste et autorisez son accès à Mail";
+"远端模型 %ld" = "Modèle distant %ld";
+"更新 %@？" = "Mettre %@ à jour ?";
+"将 %@ 从 %@ 更新到 %@" = "Mettre %@ à jour de %@ vers %@";
+"卸载 %@？" = "Désinstaller %@ ?";
+"下载 %@？" = "Télécharger %@ ?";
+"正在%@" = "%@ en cours";
+"%@ 已完成" = "%@ terminé";
+"%@ 失败" = "%@ a échoué";
+"开始 %@" = "Démarrer %@";
+"运行 %@" = "Exécuter %@";
+"%ld天 %@" = "%ld jours %@";
+"%ld月" = "M%ld";
+"当前 %@ mm" = "Maintenant %@ mm";
+"今日 %ld%% / %@ mm" = "Aujourd’hui %ld %% / %@ mm";
+"更新 %@" = "Mettre %@ à jour";
+"有效至 %@" = "Valide jusqu’au %@";
+"%@，今天" = "%@, aujourd’hui";
+"重复提醒 · %@" = "Rappel récurrent · %@";
+"提醒 · 已完成 · %@" = "Rappel · Terminé · %@";
+"提醒 · %@" = "Rappel · %@";
+"已按网格整理 %ld 个项目" = "%ld éléments rangés en grille";
+"已清空废纸篓（%ld 个项目）" = "Corbeille vidée (%ld éléments)";
+"%ld 个地点" = "%ld lieux";
+"已加入 %ld 个项目" = "%ld éléments ajoutés";
+"已复制 %ld 个文件" = "%ld fichiers copiés";
+"%@；已输入当前文本框并复制" = "%@ ; saisi dans le champ de texte actuel et copié";
+"%@；已复制。请在系统设置的“隐私与安全性 > 辅助功能”中允许 zisla 后重试" = "%@ ; copié. Autorisez zisla dans Réglages Système › Confidentialité et sécurité › Accessibilité, puis réessayez";
+"%@；已复制，未能输入原文本框" = "%@ ; copié, mais impossible de le saisir dans le champ de texte d’origine";
+"无法打开语音记录目录：%@" = "Impossible d’ouvrir le dossier des enregistrements vocaux : %@";
+"%@（下载）" = "%@ (télécharger)";
+"%@（重试下载）" = "%@ (relancer le téléchargement)";
+"%@ 字符" = "%@ caractères";
+"%@ 分钟" = "%@ minutes";
+"%ld 小时 %ld 分" = "%ld h %ld min";
+"%ld 分钟" = "%ld minutes";
+"%ld年%ld月%ld日 %@" = "%ld-%ld-%ld %@";
+"附件：%@" = "Pièce jointe : %@";
+"%ld 度" = "%ld°";
+"已选择 %ld 个文件" = "%ld fichiers sélectionnés";
+"%ld 页 · %@" = "%ld pages · %@";
+"%ld 个文件" = "%ld fichiers";
+"合并-%@.pdf" = "fusion-%@.pdf";
+"已合并为 %@" = "Fusionné dans %@";
+"%@-第%ld页.pdf" = "%@-page%ld.pdf";
+"已拆分为 %ld 个 PDF" = "Divisé en %ld PDF";
+"已生成 %@" = "%@ créé";
+"已导出 %ld 张图片" = "%ld images exportées";
+"已导出 %@" = "%@ exporté";
+"%ld 分钟前" = "il y a %ld minutes";
+"%ld 小时前" = "il y a %ld heures";
+"无法读取图片：%@" = "Impossible de lire l’image : %@";
+"无法生成 XLSX：%@" = "Impossible de créer le fichier XLSX : %@";
+"识别表格" = "Reconnaître le tableau";
+"已保存：%@" = "Enregistré : %@";
+"保存失败：%@" = "Échec de l’enregistrement : %@";
+"识别失败：%@" = "Échec de la reconnaissance : %@";
+"表格已保存：%@" = "Tableau enregistré : %@";
+"%@，结果已复制" = "%@, résultat copié";
+"上移%@" = "Déplacer %@ vers le haut";
+"下移%@" = "Déplacer %@ vers le bas";
+"删除%@" = "Supprimer %@";
+"%ld 字词" = "%ld mots";
+"%ld 字词/分" = "%ld mots/min";
+"%ld 秒" = "%ld s";
+"已发现 %ld 个模型" = "%ld modèles trouvés";
+"%@（已导入）" = "%@ (importé)";
+"显示器 %ld" = "Écran %ld";
+"%@快捷键与%@冲突，未保存" = "Le raccourci %@ est en conflit avec %@ et n’a pas été enregistré";
+"%@快捷键与语音输入冲突，未保存" = "Le raccourci %@ est en conflit avec la saisie vocale et n’a pas été enregistré";
+"正在下载 %ld%%" = "Téléchargement %ld %%";
+"未安装 · %@ · %@" = "Non installé · %@ · %@";
+"%@ · %@ · 可更新到 %@" = "%@ · %@ · mise à jour possible vers %@";
+"%@；用于自动与手动更新" = "%@ ; utilisé pour les mises à jour automatiques et manuelles";
+"将通过官方安装来源下载并安装 %ld 项缺失工具。工具较多时可能需要一些时间。" = "%ld outils manquants seront téléchargés et installés depuis leurs sources officielles. Cela peut prendre du temps s’ils sont nombreux.";
+"将通过官方安装来源更新 %ld 项已安装工具。工具较多时可能需要一些时间。" = "%ld outils installés seront mis à jour depuis leurs sources officielles. Cela peut prendre du temps s’ils sont nombreux.";
+"%ld 个 AI 任务%@%@" = "%ld tâches d’IA%@%@";
+"，其中 %ld 个错误" = ", dont %ld erreurs";
+"%@ 下载中 %@：%@" = "%@ télécharge %@ : %@";
+"%@ 正在下载 %ld 个文件" = "%@ télécharge %ld fichiers";
+"%@ 下载完成：%@" = "%@ a fini de télécharger : %@";
+"%ld 性能" = "%ld performance";
+"%ld 能效" = "%ld efficacité";
+"%ld 核" = "%ld cœurs";
+"%ld 核 · " = "%ld cœurs · ";
+"已整理系统内存 %@" = "%@ de mémoire système libérés";
+"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "Dont %ld nécessitent une vérification manuelle. zisla ne supprime jamais définitivement.";
+"取消选择%@" = "Désélectionner %@";
+"全选%@" = "Tout sélectionner dans %@";
+"反选%@" = "Inverser la sélection dans %@";
+"已移入废纸篓 %ld 项；清空废纸篓后可释放 %@" = "%ld éléments placés dans la corbeille ; la vider libère %@";
+"已处理 %ld 项，%ld 项未完成" = "%ld éléments traités, %ld non terminés";
+"无法保存录音：%@" = "Impossible d’enregistrer l’enregistrement : %@";
+"%@快捷键需要输入监控权限" = "Le raccourci %@ nécessite l’accès à la surveillance des saisies";
+"%@快捷键与系统或其他应用冲突，未能启用" = "Le raccourci %@ est en conflit avec le système ou une autre app et n’a pas pu être activé";
+"无法保存模型凭据：%@" = "Impossible d’enregistrer les identifiants du modèle : %@";
+"余额脚本不可执行：%@" = "Le script de solde n’est pas exécutable : %@";
+"余额脚本执行失败（退出状态 %ld）" = "Le script de solde a échoué (état de sortie %ld)";
+"渠道请求失败（HTTP %ld）" = "La requête vers le canal a échoué (HTTP %ld)";
+"切换失败且无法恢复原文件：%@" = "Le basculement a échoué et le fichier d’origine n’a pas pu être restauré : %@";
+"%@ 暂不支持语音整理" = "%@ ne prend pas encore en charge la mise en forme des transcriptions";
+"未找到 %@ CLI" = "CLI %@ introuvable";
+"CLI 执行失败：%@" = "La CLI a échoué : %@";
+"退出状态 %ld" = "état de sortie %ld";
+"目标目录不是由 Zisla 管理，已保留原内容：%@" = "Le dossier cible n’est pas géré par Zisla, son contenu a été conservé : %@";
+"无法创建 Skills 受管库：%@" = "Impossible de créer la bibliothèque de Skills gérée : %@";
+"找不到 %@ 命令" = "Commande %@ introuvable";
+"%@ 卸载失败" = "Impossible de désinstaller %@";
+"无法卸载 Skill：%@" = "Impossible de désinstaller le Skill : %@";
+"Skills 同步失败：%@" = "Échec de la synchronisation des Skills : %@";
+"正在并行执行 · %ld/%ld 已完成" = "Exécution en parallèle · %ld/%ld terminés";
+"%ld 项命令失败：%@" = "%ld commandes ont échoué : %@";
+"CLI 命令超时（超过 %ld 分钟），请检查网络后重试" = "La commande CLI a expiré (plus de %ld minutes). Vérifiez votre réseau et réessayez";
+"Homebrew 需要先信任该公式：%@" = "Homebrew doit d’abord approuver cette formule : %@";
+"CLI 命令执行失败（退出码 %ld）" = "La commande CLI a échoué (code de sortie %ld)";
+"模型请求失败（HTTP %ld）" = "La requête vers le modèle a échoué (HTTP %ld)";
+"读取模型目录失败（HTTP %ld）" = "Impossible de lire le catalogue de modèles (HTTP %ld)";
+"无法创建 FFT" = "Impossible de créer la FFT";
+"B站接口返回异常：%@" = "L’API bilibili a renvoyé une erreur : %@";
+"B站媒体轨下载失败：%@" = "Impossible de télécharger les pistes média bilibili : %@";
+"%@ 返回 HTTP %ld" = "%@ a renvoyé HTTP %ld";
+"%ld 项下载" = "%ld téléchargements";
+"API 请求失败（HTTP %@）" = "La requête API a échoué (HTTP %@)";
+"文件不存在：%@" = "Fichier introuvable : %@";
+"%@\n原生备用下载失败：%@" = "%@\nLe téléchargement de secours intégré a échoué : %@";
+"系统原生媒体封装失败：%@" = "L’encapsulation média du système a échoué : %@";
+"文件夹" = "Dossier";
+"路径" = "Chemin";
+"文档" = "Document";
+"压缩包" = "Archive";
+"无法开启登录时启动，请稍后重试。" = "Impossible d’activer l’ouverture à la connexion. Réessayez plus tard.";
+"无法关闭登录时启动，请稍后重试。" = "Impossible de désactiver l’ouverture à la connexion. Réessayez plus tard.";
+"无法开启登录时启动：%@" = "Impossible d’activer l’ouverture à la connexion : %@";
+"不支持的 Office 文件：%@" = "Fichier Office non pris en charge : %@";
+"输出文件已存在，未覆盖：%@" = "Le fichier de sortie existe déjà et n’a pas été remplacé : %@";
+"无法创建转换目录：%@" = "Impossible de créer le dossier de conversion : %@";
+"无法启动 LibreOffice：%@" = "Impossible de démarrer LibreOffice : %@";
+"LibreOffice 转换失败：%@" = "La conversion LibreOffice a échoué : %@";
+"通过本机 Homebrew 安装 %@" = "Installer %@ avec Homebrew local";
+"从 GitHub 官方发布下载并安装 %@，无需终端" = "Télécharger et installer %@ depuis la version officielle sur GitHub — sans Terminal";
+"通过本机 Homebrew 更新 %@" = "Mettre %@ à jour avec Homebrew local";
+"下载最新版并替换当前使用的 %@" = "Télécharger la dernière version et remplacer le %@ utilisé";
+"获取版本信息失败：%@" = "Impossible d’obtenir les infos de version : %@";
+"%@ 没有可用下载" = "Aucun téléchargement disponible pour %@";
+"下载地址不可信：%@" = "URL de téléchargement non fiable : %@";
+"下载失败：%@" = "Échec du téléchargement : %@";
+"安装后无法执行：%@" = "Non exécutable après l’installation : %@";
+"Homebrew 执行失败：%@" = "Homebrew a échoué : %@";
+"无法读取 %@ 的版本信息" = "Impossible de lire les infos de version de %@";
+"%@ 退出码 %ld" = "%@ code de sortie %ld";
+"系统媒体封装失败：%@" = "L’encapsulation média du système a échoué : %@";
+"无法启动 osascript：%@" = "Impossible de démarrer osascript : %@";
+"不是可访问的本地 PDF 文件：%@" = "Ce n’est pas un fichier PDF local accessible : %@";
+"无法读取 PDF：%@" = "Impossible de lire le PDF : %@";
+"PDF 已加密且尚未解锁：%@" = "Le PDF est chiffré et toujours verrouillé : %@";
+"页码 %ld 超出文档范围" = "La page %ld est en dehors du document";
+"旋转角度必须是 90 度的整数倍：%ld" = "L’angle de rotation doit être un multiple de 90 degrés : %ld";
+"页码范围无效：%@" = "Plage de pages non valide : %@";
+"同一任务不能重复使用输出文件：%@" = "Une même tâche ne peut pas réutiliser un fichier de sortie : %@";
+"输出文件不能覆盖输入文件：%@" = "Le fichier de sortie ne peut pas remplacer le fichier d’entrée : %@";
+"无法创建输出目录：%@" = "Impossible de créer le dossier de sortie : %@";
+"无法写入 PDF：%@" = "Impossible d’écrire le PDF : %@";
+"无法渲染第 %ld 页" = "Impossible de rendre la page %ld";
+"裁剪区域无效：%@" = "Zone de recadrage non valide : %@";
+"水印缩放比例无效：%@" = "Échelle de filigrane non valide : %@";
+"休息 %ld 分钟吧" = "Prenez %ld minutes de pause";
+"读取系统资源清单失败：%@" = "Impossible de lire l’inventaire des ressources système : %@";
+"声音资源 %@ 未在清单中找到" = "La ressource sonore %@ est absente de l’inventaire";
+"HTTP 下载失败（状态码 %ld）" = "Échec du téléchargement HTTP (code d’état %ld)";
+"文件校验失败（期望 %@，实际 %@）" = "Échec de la vérification du fichier (attendu %@, obtenu %@)";
+"解压失败：%@" = "Échec de l’extraction : %@";
+"unzip 退出码 %ld" = "unzip code de sortie %ld";
+"%@ 缓存" = "Cache de %@";
+"%ld 天未修改" = "Non modifié depuis %ld jours";
+"Mail 附件下载 · %@" = "Téléchargement de pièces jointes Mail · %@";
+"iPhone/iPad 备份 · %@" = "Sauvegarde iPhone/iPad · %@";
+"AI 工具缓存 · %@" = "Cache d’outils d’IA · %@";
+"浏览器可再生缓存 · %@" = "Cache de navigateur régénérable · %@";
+"安装包/磁盘镜像 · %@" = "Programme d’installation / image disque · %@";
+"%ld 天前修改" = "Modifié il y a %ld jours";
+"与 %@ 重复 · 保留副本：%@" = "Doublon de %@ · copie conservée : %@";
+"未完成下载 · %ld 天未修改" = "Téléchargement inachevé · non modifié depuis %ld jours";
+"项目构建产物 · 项目根：%@" = "Artefacts de compilation · racine du projet : %@";
+"可能是已卸载应用残留 · bundle id：%@ · 需确认归属" = "Peut-être un reste d’une app désinstallée · identifiant de bundle : %@ · à confirmer";
+"开机时间： %ld天 %ld小时 %ld分钟" = "Temps de fonctionnement : %ld j %ld h %ld min";
+"无法读取官方天气预警：%@" = "Impossible de lire les alertes météo officielles : %@";
+"更新于 %@" = "Mis à jour %@";
+"、" = ", ";
+"；" = " ; ";
+"%@：%@。%@" = "%@ : %@. %@";

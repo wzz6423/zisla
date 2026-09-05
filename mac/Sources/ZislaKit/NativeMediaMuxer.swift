@@ -27,7 +27,7 @@ public enum NativeMediaMuxerError: LocalizedError, Equatable, Sendable {
         case .outputAlreadyExists:
             return "目标文件已存在，未执行覆盖"
         case let .exportFailed(message):
-            return "系统媒体封装失败：\(message)"
+            return AppLocalization.text("系统媒体封装失败：%@", message)
         }
     }
 }

@@ -26,21 +26,21 @@ public actor SystemBackgroundSoundAssetDownloader {
             case .manifestNotFound:
                 "系统资源清单文件不存在"
             case .manifestReadFailed(let message):
-                "读取系统资源清单失败：\(message)"
+                AppLocalization.text("读取系统资源清单失败：%@", message)
             case .soundNotFoundInManifest(let name):
-                "声音资源 \(name) 未在清单中找到"
+                AppLocalization.text("声音资源 %@ 未在清单中找到", name)
             case .invalidURL:
                 "资源下载 URL 无效"
             case .invalidTargetDirectory:
                 "目标目录路径无效"
             case .httpError(let code):
-                "HTTP 下载失败（状态码 \(code)）"
+                AppLocalization.text("HTTP 下载失败（状态码 %ld）", code)
             case .checksumMismatch(let expected, let actual):
-                "文件校验失败（期望 \(expected)，实际 \(actual)）"
+                AppLocalization.text("文件校验失败（期望 %@，实际 %@）", expected, actual)
             case .unzipFailed(let message):
-                "解压失败：\(message)"
+                AppLocalization.text("解压失败：%@", message)
             case .downloadFailed(let message):
-                "下载失败：\(message)"
+                AppLocalization.text("下载失败：%@", message)
             }
         }
     }
@@ -123,7 +123,7 @@ public actor SystemBackgroundSoundAssetDownloader {
             try task.run()
             task.waitUntilExit()
             guard task.terminationStatus == 0 else {
-                throw DownloadError.unzipFailed("unzip 退出码 \(task.terminationStatus)")
+                throw DownloadError.unzipFailed(AppLocalization.text("unzip 退出码 %ld", Int(task.terminationStatus)))
             }
         }
     }

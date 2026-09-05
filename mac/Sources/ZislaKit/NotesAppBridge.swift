@@ -367,7 +367,7 @@ public enum NotesAppBridge {
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return .success(text)
         } catch {
-            return .failure(.failed("无法启动 osascript：\(error.localizedDescription)"))
+            return .failure(.failed(AppLocalization.text("无法启动 osascript：%@", error.localizedDescription)))
         }
     }
 

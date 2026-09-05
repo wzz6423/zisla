@@ -167,7 +167,8 @@ struct IslandDashboardView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            activeMediaItem.map { "正在播放：\(MediaTextFormatting.titleArtistText($0))" } ?? "正在播放"
+            activeMediaItem.map { AppLocalization.text("正在播放：%@", MediaTextFormatting.titleArtistText($0)) }
+                ?? AppLocalization.text("正在播放")
         )
     }
 

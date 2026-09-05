@@ -333,7 +333,7 @@ final class VoiceInputController: ObservableObject {
             )
         } catch {
             session.cancel()
-            finishPendingStart(with: "无法保存录音：\(error.localizedDescription)")
+            finishPendingStart(with: AppLocalization.text("无法保存录音：%@", error.localizedDescription))
             return
         }
 
@@ -396,7 +396,7 @@ final class VoiceInputController: ObservableObject {
                 format: format
             )
         } catch {
-            finishPendingStart(with: "无法保存录音：\(error.localizedDescription)")
+            finishPendingStart(with: AppLocalization.text("无法保存录音：%@", error.localizedDescription))
             return
         }
         let task = recognizer?.recognitionTask(with: request) { [weak self] result, error in
@@ -570,7 +570,7 @@ final class VoiceInputController: ObservableObject {
 
     private func failRecordingWrite(recordingID: UUID, error: Error) {
         guard self.recordingID == recordingID else { return }
-        errorDescription = "无法保存录音：\(error.localizedDescription)"
+        errorDescription = AppLocalization.text("无法保存录音：%@", error.localizedDescription)
         clearRecordingResources(deleteAudioFile: true)
     }
 

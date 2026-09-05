@@ -130,7 +130,7 @@ struct SettingsView: View {
                                 )
                         }
                     }
-                    .accessibilityLabel(AppLocalization.text("%@设置", section.title))
+                    .accessibilityLabel(AppLocalization.text("%@设置", AppLocalization.text(section.title)))
                 }
             }
             .padding(.top, 20)
@@ -728,7 +728,7 @@ struct SettingsView: View {
                                     HStack(spacing: 4) {
                                         IconButton(
                                             symbol: "arrow.up",
-                                            help: "上移\(clipboardAssistantActionTitle(action))",
+                                            help: AppLocalization.text("上移%@", AppLocalization.text(clipboardAssistantActionTitle(action))),
                                             size: .compact
                                         ) {
                                             moveClipboardAssistantAction(action, for: kind, by: -1)
@@ -737,7 +737,7 @@ struct SettingsView: View {
 
                                         IconButton(
                                             symbol: "arrow.down",
-                                            help: "下移\(clipboardAssistantActionTitle(action))",
+                                            help: AppLocalization.text("下移%@", AppLocalization.text(clipboardAssistantActionTitle(action))),
                                             size: .compact
                                         ) {
                                             moveClipboardAssistantAction(action, for: kind, by: 1)
@@ -1098,7 +1098,7 @@ struct SettingsView: View {
                         HStack(spacing: 4) {
                             IconButton(
                                 symbol: "arrow.up",
-                                help: "上移\(priority.title)",
+                                help: AppLocalization.text("上移%@", AppLocalization.text(priority.title)),
                                 size: .compact
                             ) {
                                 moveCompactStatusPriority(priority, by: -1)
@@ -1107,7 +1107,7 @@ struct SettingsView: View {
 
                             IconButton(
                                 symbol: "arrow.down",
-                                help: "下移\(priority.title)",
+                                help: AppLocalization.text("下移%@", AppLocalization.text(priority.title)),
                                 size: .compact
                             ) {
                                 moveCompactStatusPriority(priority, by: 1)
@@ -1398,7 +1398,7 @@ struct SettingsView: View {
                         title: hotword,
                         detail: ""
                     ) {
-                        IconButton(symbol: "trash", help: "删除\(hotword)", size: .compact) {
+                        IconButton(symbol: "trash", help: AppLocalization.text("删除%@", hotword), size: .compact) {
                             removeCustomVoiceHotword(hotword)
                         }
                     }
@@ -1417,7 +1417,7 @@ struct SettingsView: View {
                 voiceStatistic(
                     symbol: "textformat",
                     title: "总识别字词",
-                    value: "\(statistics.totalWordCount) 字词"
+                    value: AppLocalization.text("%ld 字词", statistics.totalWordCount)
                 )
                 voiceStatistic(
                     symbol: "waveform",
@@ -1427,7 +1427,7 @@ struct SettingsView: View {
                 voiceStatistic(
                     symbol: "bolt.fill",
                     title: "输入速度",
-                    value: "\(Int(statistics.wordsPerMinute.rounded())) 字词/分"
+                    value: AppLocalization.text("%ld 字词/分", Int(statistics.wordsPerMinute.rounded()))
                 )
                 voiceStatistic(
                     symbol: "clock",
@@ -1614,7 +1614,7 @@ struct SettingsView: View {
     private func voiceDurationText(_ duration: TimeInterval) -> String {
         let duration = max(0, duration)
         if duration < 60 {
-            return "\(Int(duration.rounded())) 秒"
+            return AppLocalization.text("%ld 秒", Int(duration.rounded()))
         }
         if duration < 3_600 {
             return AppLocalization.text("%.1f 分钟", duration / 60)
@@ -1633,7 +1633,7 @@ struct SettingsView: View {
         switch model.voiceModelDiscoveryState {
         case .idle: "尚未测试连接"
         case .testing: "正在连接…"
-        case .success(let count): "已发现 \(count) 个模型"
+        case .success(let count): AppLocalization.text("已发现 %ld 个模型", count)
         case .failed(let message): message
         }
     }
@@ -1812,7 +1812,7 @@ struct SettingsView: View {
     private func petDisplayLabel(_ entry: PetLibrary.Entry) -> String {
         switch entry.origin {
         case .builtin: entry.manifest.displayName
-        case .imported: "\(entry.manifest.displayName)（已导入）"
+        case .imported: AppLocalization.text("%@（已导入）", entry.manifest.displayName)
         }
     }
 
@@ -1820,7 +1820,7 @@ struct SettingsView: View {
         NSScreen.screens.enumerated().compactMap { index, screen in
             let key = NSDeviceDescriptionKey("NSScreenNumber")
             guard let number = screen.deviceDescription[key] as? NSNumber else { return nil }
-            let name = screen.localizedName.isEmpty ? "显示器 \(index + 1)" : screen.localizedName
+            let name = screen.localizedName.isEmpty ? AppLocalization.text("显示器 %ld", index + 1) : screen.localizedName
             return ActivityNoticeDisplay(id: number.uint32Value, name: name)
         }
     }
@@ -1885,16 +1885,16 @@ struct SettingsView: View {
     ) {
         var settings = model.settingsStore.settings
         let other = action == .capture ? settings.screenshotPinHotkey : settings.screenshotHotkey
-        let actionName = action == .capture ? "截图" : "钉图"
-        let otherName = action == .capture ? "钉图" : "截图"
+        let actionName = AppLocalization.text(action == .capture ? "截图" : "钉图")
+        let otherName = AppLocalization.text(action == .capture ? "钉图" : "截图")
         guard !hotkey.conflicts(with: other) else {
-            screenshotHotkeyValidationMessage = "\(actionName)快捷键与\(otherName)冲突，未保存"
+            screenshotHotkeyValidationMessage = AppLocalization.text("%@快捷键与%@冲突，未保存", actionName, otherName)
             return
         }
         guard !settings.voiceInputEnabled
             || !hotkey.conflicts(with: settings.voiceInputHotkeyPreset)
         else {
-            screenshotHotkeyValidationMessage = "\(actionName)快捷键与语音输入冲突，未保存"
+            screenshotHotkeyValidationMessage = AppLocalization.text("%@快捷键与语音输入冲突，未保存", actionName)
             return
         }
         switch action {
@@ -2145,20 +2145,22 @@ struct SettingsView: View {
     private func managedToolDetail(_ tool: ManagedTool, state: ManagedToolState) -> String {
         if let errorMessage = state.errorMessage { return errorMessage }
         switch state.phase {
-        case .checking: return "正在查询最新版本…"
+        case .checking: return AppLocalization.text("正在查询最新版本…")
         case .downloading(let fraction):
-            return fraction > 0 ? "正在下载 \(Int(fraction * 100))%" : "正在下载…"
-        case .installing: return "正在安装…"
+            return fraction > 0
+                ? AppLocalization.text("正在下载 %ld%%", Int(fraction * 100))
+                : AppLocalization.text("正在下载…")
+        case .installing: return AppLocalization.text("正在安装…")
         case .idle: break
         }
         guard let location = state.location else {
-            return "未安装 · \(tool.purpose) · \(tool.installDetail)"
+            return AppLocalization.text("未安装 · %@ · %@", AppLocalization.text(tool.purpose), tool.installDetail)
         }
         let version = state.installedVersion ?? AppLocalization.text("版本未知")
         if state.hasUpdate, let latest = state.latestVersion {
-            return "\(version) · \(location.label) · 可更新到 \(latest)"
+            return AppLocalization.text("%@ · %@ · 可更新到 %@", version, AppLocalization.text(location.label), latest)
         }
-        return "\(version) · \(location.label) · \(tool.purpose)"
+        return "\(version) · \(AppLocalization.text(location.label)) · \(AppLocalization.text(tool.purpose))"
     }
 
     private var recommendationsContent: some View {
@@ -2269,7 +2271,9 @@ struct SettingsView: View {
 
                 recommendationActionButton(
                     symbol: state.isInstalled ? "arrow.up.circle" : "arrow.down.circle",
-                    help: state.isInstalled ? "更新 \(tool.displayName)" : "下载并安装 \(tool.displayName)",
+                    help: state.isInstalled
+                        ? AppLocalization.text("更新 %@", tool.displayName)
+                        : AppLocalization.text("下载并安装 %@", tool.displayName),
                     disabled: state.isBusy
                 ) {
                     Task { await model.managedTools.install(tool) }
@@ -2454,7 +2458,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "arrow.triangle.branch",
                     title: "更新通道",
-                    detail: "\(model.settingsStore.settings.updateChannel.detail)；用于自动与手动更新"
+                    detail: AppLocalization.text("%@；用于自动与手动更新", AppLocalization.text(model.settingsStore.settings.updateChannel.detail))
                 ) {
                     IslandOutlinedPicker(
                         selection: Binding(
@@ -3642,9 +3646,9 @@ private enum RecommendedToolAction {
     func message(itemCount: Int) -> String {
         switch self {
         case .install:
-            "将通过官方安装来源下载并安装 \(itemCount) 项缺失工具。工具较多时可能需要一些时间。"
+            AppLocalization.text("将通过官方安装来源下载并安装 %ld 项缺失工具。工具较多时可能需要一些时间。", itemCount)
         case .update:
-            "将通过官方安装来源更新 \(itemCount) 项已安装工具。工具较多时可能需要一些时间。"
+            AppLocalization.text("将通过官方安装来源更新 %ld 项已安装工具。工具较多时可能需要一些时间。", itemCount)
         }
     }
 }

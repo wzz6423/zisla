@@ -91,10 +91,10 @@ struct LockScreenModuleView: View {
 
     private func solarDateText(for date: Date) -> String {
         let components = Calendar.current.dateComponents([.year, .month, .day, .weekday], from: date)
-        let weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+        let weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"].map(AppLocalization.text)
         let weekday = components.weekday.flatMap { weekdays.indices.contains($0 - 1) ? weekdays[$0 - 1] : nil }
             ?? ""
-        return "\(components.year ?? 0)年\(components.month ?? 0)月\(components.day ?? 0)日 \(weekday)"
+        return AppLocalization.text("%ld年%ld月%ld日 %@", components.year ?? 0, components.month ?? 0, components.day ?? 0, weekday)
     }
 
     private func lunarDateText(for date: Date) -> String {

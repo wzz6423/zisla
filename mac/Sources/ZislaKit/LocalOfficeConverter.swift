@@ -12,12 +12,12 @@ public enum LocalOfficeConverterError: LocalizedError, Equatable, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case let .unsupportedInput(url): "不支持的 Office 文件：\(url.lastPathComponent)"
+        case let .unsupportedInput(url): AppLocalization.text("不支持的 Office 文件：%@", url.lastPathComponent)
         case .converterNotInstalled: "未找到 LibreOffice；请安装 LibreOffice 后重试"
-        case let .outputAlreadyExists(url): "输出文件已存在，未覆盖：\(url.lastPathComponent)"
-        case let .cannotPrepareDirectory(message): "无法创建转换目录：\(message)"
-        case let .launchFailed(message): "无法启动 LibreOffice：\(message)"
-        case let .conversionFailed(message): "LibreOffice 转换失败：\(message)"
+        case let .outputAlreadyExists(url): AppLocalization.text("输出文件已存在，未覆盖：%@", url.lastPathComponent)
+        case let .cannotPrepareDirectory(message): AppLocalization.text("无法创建转换目录：%@", message)
+        case let .launchFailed(message): AppLocalization.text("无法启动 LibreOffice：%@", message)
+        case let .conversionFailed(message): AppLocalization.text("LibreOffice 转换失败：%@", message)
         case .missingConvertedFile: "LibreOffice 没有生成 PDF 文件"
         }
     }

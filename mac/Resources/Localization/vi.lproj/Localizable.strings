@@ -2,7 +2,6 @@
 
 /* Common */
 "取消" = "Hủy";
-"确定" = "OK";
 "好" = "OK";
 "继续" = "Tiếp tục";
 "删除" = "Xóa";
@@ -25,7 +24,6 @@
 "信息" = "Thông tin";
 "模型" = "Mô hình";
 "宠物" = "Thú cưng";
-"交互" = "Tương tác";
 "下载" = "Tải xuống";
 "天气" = "Thời tiết";
 "更新" = "Cập nhật";
@@ -34,7 +32,6 @@
 "调整语言、外观、启动与展开方式。" = "Điều chỉnh ngôn ngữ, giao diện, khởi động và phương thức mở rộng.";
 
 /* Settings - Privacy */
-"管理剪贴板访问与本机数据。" = "Quản lý quyền truy cập clipboard và dữ liệu cục bộ.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Quản lý các mô-đun quy trình trong Dynamic Island.";
@@ -79,15 +76,12 @@
 "显示在系统时间上方，可与锁屏文字共存" = "Hiển thị phía trên thời gian hệ thống, có thể cùng tồn tại với văn bản màn hình khóa";
 "侧翼通知" = "Thông báo Bên";
 "在灵动岛肩部显示任务变化" = "Hiển thị thay đổi nhiệm vụ ở vai Dynamic Island";
-"岛上倒计时" = "Đếm ngược Island";
 "专注时在收起态灵动岛显示剩余时间" = "Hiển thị thời gian còn lại trong Dynamic Island thu gọn khi tập trung";
 "活动展示" = "Hiển thị Hoạt động";
 "播放与 AI 任务的折叠时长" = "Thời lượng thu gọn cho phát và nhiệm vụ AI";
 "专注模式展示" = "Hiển thị Chế độ Tập trung";
 "开启或切换专注模式时的显示时长" = "Thời lượng hiển thị khi bật hoặc chuyển chế độ tập trung";
 "收起态展示优先级" = "Ưu tiên Trạng thái Gọn";
-"上移" = "Di chuyển Lên";
-"下移" = "Di chuyển Xuống";
 "恢复默认顺序" = "Khôi phục Thứ tự Mặc định";
 "通知显示器" = "Màn hình Thông báo";
 "当前显示器" = "Màn hình Hiện tại";
@@ -99,7 +93,6 @@
 "AI 进度与用量" = "Tiến độ và Sử dụng AI";
 "汇总桌面端与 CLI 工具的运行状态" = "Tóm tắt trạng thái desktop và công cụ CLI đang chạy";
 "语音输入" = "Nhập Giọng nói";
-"启用语音输入" = "Bật Nhập Giọng nói";
 "开启后可通过全局快捷键触发语音输入" = "Bật nhập giọng nói qua phím tắt toàn cục";
 "录音模式" = "Chế độ Ghi âm";
 "快捷键" = "Phím tắt";
@@ -110,35 +103,25 @@
 "已授权" = "Đã Ủy quyền";
 
 /* Settings - Voice Models */
-"配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Cấu hình mô hình cục bộ, mô hình từ xa và thông tin xác thực, và chọn mô hình cho tổ chức giọng nói.";
 "本地模型" = "Mô hình Cục bộ";
 "远端模型与凭据" = "Mô hình Từ xa và Thông tin Xác thực";
 "语音整理模型" = "Mô hình Tổ chức Giọng nói";
 "使用模型" = "Sử dụng Mô hình";
 "从上方已启用的本地或远端模型中选择" = "Chọn từ các mô hình cục bộ hoặc từ xa đã bật ở trên";
 "不使用模型整理" = "Không Tổ chức Mô hình";
-"本地" = "Cục bộ";
-"远端" = "Từ xa";
 "尚未选择模型" = "Chưa Chọn Mô hình";
 "在上方添加并启用本地或远端模型后即可选择" = "Thêm và bật mô hình cục bộ hoặc từ xa ở trên để chọn";
 "选择后会对语音转写进行整理" = "Sẽ tổ chức phiên âm giọng nói sau khi chọn";
 "测试连接" = "Kiểm tra Kết nối";
 "尚未测试连接" = "Chưa được kiểm tra";
 "正在连接…" = "Đang kết nối…";
-"已发现" = "Đã tìm thấy";
-"个模型" = " mô hình";
 
 
 /* Settings - Models - Hardware Profile */
-"设备档案与推荐模型" = "Hồ sơ Thiết bị và Mô hình Được Đề xuất";
 "设备" = "Thiết bị";
-"综合推荐" = "Đề xuất Tổng thể";
-"检测" = "Phát hiện";
-"点击下方按钮检测硬件信息" = "Nhấp vào nút bên dưới để phát hiện thông tin phần cứng";
 
 /* Settings - Pet */
 "设置灵动岛内部的宠物形象。" = "Thiết lập ngoại hình thú cưng bên trong Dynamic Island.";
-"岛上宠物伙伴" = "Bạn đồng hành Thú cưng Island";
 "在灵动岛养一只小宠物" = "Nuôi một thú cưng trong Dynamic Island";
 "当前宠物" = "Thú cưng Hiện tại";
 "选择内置的宠物形象" = "Chọn ngoại hình thú cưng tích hợp";
@@ -148,7 +131,6 @@
 "右侧" = "Phải";
 
 /* Settings - Interaction */
-"调整外观、展开方式与隐私行为。" = "Điều chỉnh giao diện, phương pháp mở rộng và hành vi riêng tư.";
 "外观" = "Giao diện";
 "界面外观" = "Giao diện UI";
 "灵动岛样式" = "Kiểu Dynamic Island";
@@ -159,23 +141,17 @@
 "需要系统批准" = "Cần Phê duyệt Hệ thống";
 "在登录项中允许 zisla 后即可生效" = "Có hiệu lực sau khi cho phép zisla trong các mục đăng nhập";
 "打开登录项…" = "Mở Mục Đăng nhập…";
-"展开方式" = "Phương pháp Mở rộng";
 "鼠标移入展开" = "Di chuột để Mở rộng";
 "鼠标进入屏幕顶部感应区时显示" = "Hiển thị khi chuột vào vùng phát hiện ở đỉnh màn hình";
-"隐私" = "Quyền riêng tư";
-"记录剪贴板历史" = "Ghi Lịch sử Clipboard";
 "仅本机保存文本和图片" = "Chỉ lưu văn bản và hình ảnh cục bộ";
-"检测剪贴板链接" = "Phát hiện Liên kết Clipboard";
 "发现可下载链接时提示" = "Nhắc khi phát hiện liên kết có thể tải xuống";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Quản lý thư mục tải xuống, thông báo tải xuống và các thành phần cần thiết.";
-"下载器" = "Trình tải xuống";
 "链接下载" = "Tải xuống Liên kết";
 "下载视频或音频" = "Tải xuống video hoặc âm thanh";
 "默认下载目录" = "Thư mục Tải xuống Mặc định";
 "选择默认下载目录" = "Chọn Thư mục Tải xuống Mặc định";
-"下载通知" = "Thông báo Tải xuống";
 "浏览器下载进度" = "Tiến độ Tải xuống Trình duyệt";
 "在灵动岛显示来源图标与百分比" = "Hiển thị biểu tượng nguồn và phần trăm trong Dynamic Island";
 "原生下载进度" = "Tiến độ Tải xuống Gốc";
@@ -186,18 +162,14 @@
 "安装" = "Cài đặt";
 "正在查询最新版本…" = "Đang kiểm tra phiên bản mới nhất…";
 "正在下载…" = "Đang tải xuống…";
-"正在下载" = "Đang tải xuống";
 "正在安装…" = "Đang cài đặt…";
 
 /* Settings - Weather */
 "管理天气显示、地点和刷新。" = "Quản lý hiển thị thời tiết, vị trí và làm mới.";
-"天气显示" = "Hiển thị Thời tiết";
 "显示当前或自选地区的天气" = "Hiển thị thời tiết vị trí hiện tại hoặc tùy chỉnh";
 "地点" = "Vị trí";
 "默认显示当前所在地" = "Mặc định hiển thị vị trí hiện tại";
 "等待刷新" = "Đang chờ làm mới";
-"拖动调整" = "Kéo để điều chỉnh";
-"的展示顺序" = " thứ tự hiển thị";
 "天气数据" = "Dữ liệu Thời tiết";
 "刷新当前位置与全部自选地区" = "Làm mới vị trí hiện tại và tất cả vị trí tùy chỉnh";
 "城市、区县或地区" = "Thành phố, quận hoặc khu vực";
@@ -206,18 +178,11 @@
 /* Settings - Updates */
 "管理版本检查与自动更新。" = "Quản lý kiểm tra phiên bản và cập nhật tự động.";
 "更新策略" = "Chiến lược Cập nhật";
-"手动检查通道" = "Kênh Kiểm tra Thủ công";
-"不影响自动更新" = "Không ảnh hưởng đến cập nhật tự động";
 "检查更新" = "Kiểm tra Cập nhật";
-"仅检查当前安装包所属的更新通道" = "Chỉ kiểm tra kênh cập nhật của gói cài đặt hiện tại";
-"自动安装更新" = "Tự động Cài đặt Cập nhật";
-"仅自动安装当前安装包所属通道的新构建" = "Chỉ tự động cài đặt bản build mới từ kênh của gói cài đặt hiện tại";
 "版本" = "Phiên bản";
 "尚未检查更新" = "Chưa kiểm tra cập nhật";
 "正在检查更新" = "Đang kiểm tra cập nhật";
 "已是最新版本" = "Đã là phiên bản mới nhất";
-"发现" = "Đã tìm thấy";
-"新版本" = " phiên bản mới";
 
 
 /* Clipboard History Module */
@@ -227,7 +192,6 @@
 "非常用" = "Không yêu thích";
 "添加常用信息" = "Thêm Yêu thích";
 "清空历史（保留常用）" = "Xóa Lịch sử (Giữ Yêu thích)";
-"只看" = "Chỉ hiển thị ";
 "还没有剪贴板历史" = "Chưa có lịch sử clipboard";
 "复制内容后会自动记录" = "Tự động ghi lại sau khi sao chép";
 "还没有常用项" = "Chưa có mục yêu thích";
@@ -267,25 +231,6 @@
 "发送" = "Gửi";
 
 /* Voice Models - Remote Providers */
-"远端 Provider" = "Nhà cung cấp Từ xa";
-"添加 Provider" = "Thêm Nhà cung cấp";
-"尚未配置远端 Provider" = "Chưa có nhà cung cấp từ xa được cấu hình";
-"Provider 名称" = "Tên Nhà cung cấp";
-"端点" = "Endpoint";
-"凭据" = "Thông tin xác thực";
-"高级路由" = "Định tuyến Nâng cao";
-"添加端点组" = "Thêm Nhóm Endpoint";
-"添加额外的 URL/Key 轮换组（高级）" = "Thêm nhóm luân chuyển URL/Key bổ sung (nâng cao)";
-"尚未关联凭据" = "Chưa có thông tin xác thực được liên kết";
-"关联凭据" = "Liên kết Thông tin xác thực";
-"选择已有凭据，或为此 Provider 新建 API Key 凭据" = "Chọn thông tin xác thực hiện có hoặc tạo thông tin xác thực API Key mới cho nhà cung cấp này";
-"新建 API Key 凭据" = "Thông tin xác thực API Key Mới";
-"配置文件路径" = "Đường dẫn Tệp Cấu hình";
-"认证文件路径" = "Đường dẫn Tệp Auth";
-"导入配置" = "Nhập Cấu hình";
-"导入认证" = "Nhập Auth";
-"配置" = "Cấu hình";
-"认证" = "Auth";
 
 
 /* System Monitor */
@@ -297,12 +242,9 @@
 "利用率" = "Sử dụng";
 "渲染" = "Renderer";
 "内存" = "Bộ nhớ";
-"压力" = "Áp lực";
 "可用" = "Có sẵn";
-"共" = "Tổng";
 "释放" = "Giải phóng";
 "整理系统内存，回收非活跃与压缩页面" = "Sắp xếp bộ nhớ hệ thống, thu hồi các trang không hoạt động và nén";
-"已整理系统内存" = "Bộ nhớ hệ thống đã được sắp xếp";
 "磁盘" = "Đĩa";
 "清理" = "Dọn dẹp";
 "扫描可清理的缓存、日志与开发产物" = "Quét bộ nhớ cache, nhật ký và hiện vật xây dựng có thể dọn dẹp";
@@ -317,11 +259,8 @@
 "正在识别" = "Đang xác định";
 "正在获取" = "Đang lấy";
 "暂不可用" = "Không khả dụng";
-"建立基线" = "Thiết lập đường cơ sở";
 
 /* System Cleanup */
-"清理磁盘" = "Dọn dẹp ổ đĩa";
-"扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件" = "Quét bộ nhớ cache ứng dụng, nhật ký, tệp tạm thời, hiện vật xây dựng, bộ nhớ cache trình quản lý gói, hình ảnh đĩa, tệp lớn và bản sao";
 "取消全选" = "Bỏ chọn Tất cả";
 "全选" = "Chọn Tất cả";
 "选择全部候选项" = "Chọn tất cả ứng viên";
@@ -334,18 +273,8 @@
 "未找到可清理项" = "Không tìm thấy mục dọn dẹp";
 "可安全清理的缓存与日志当前为空" = "Bộ nhớ cache và nhật ký có thể dọn dẹp an toàn hiện đang trống";
 "展开" = "Mở rộng";
-"折叠" = "Thu gọn";
-"取消选择" = "Bỏ chọn";
-"已选" = "Đã chọn";
-"项" = " mục";
 "移入废纸篓" = "Di chuyển vào Thùng rác";
-"将" = "Di chuyển ";
-" 项移入废纸篓？" = " mục vào Thùng rác?";
 "zisla 不会永久删除这些内容。" = "zisla sẽ không xóa vĩnh viễn các mục này.";
-"已移入废纸篓" = "Đã di chuyển vào Thùng rác";
-"清空废纸篓后可释放" = "Có thể giải phóng sau khi làm trống Thùng rác";
-"已处理" = "Đã xử lý";
-"项未完成" = " mục chưa hoàn thành";
 
 /* Cleanup Categories */
 "应用缓存" = "Bộ nhớ Cache Ứng dụng";
@@ -381,22 +310,12 @@
 "防止用户闲置导致显示器休眠" = "Ngăn ngủ màn hình do không hoạt động của người dùng";
 "防止空闲休眠" = "Ngăn Ngủ Rảnh rỗi";
 "防止用户闲置导致系统休眠；合盖、低电量或用户主动休眠仍会让 Mac 进入睡眠" = "Ngăn ngủ hệ thống do không hoạt động của người dùng; đóng nắp, pin yếu hoặc ngủ do người dùng khởi xướng vẫn hoạt động";
-"常驻提醒" = "Nhắc nhở Liên tục";
-"无媒体占用时，在折叠状态显示番茄钟、亮屏或清洁状态" = "Hiển thị trạng thái Pomodoro, giữ sáng hoặc làm sạch trong trạng thái thu gọn khi không có phương tiện hoạt động";
 "清理屏幕" = "Làm sạch Màn hình";
 "全屏黑色遮罩；点击中央「退出清屏」按钮或任意处退出" = "Lớp phủ đen toàn màn hình; nhấp vào nút 'Thoát Làm sạch' ở giữa hoặc bất kỳ đâu để thoát";
 "清理键盘" = "Làm sạch Bàn phím";
 "结束清洁" = "Kết thúc Làm sạch";
 "恢复键盘输入" = "Khôi phục đầu vào bàn phím";
 "吞掉键盘输入；再次点击结束" = "Nuốt đầu vào bàn phím; nhấp lại để kết thúc";
-"收起置顶" = "Thu gọn Ở Trên";
-"收起置底" = "Thu gọn Ở Dưới";
-"收起态压在其他窗口之上（置顶），或被其他窗口和菜单栏图标覆盖（置底）" = "Trạng thái thu gọn ở trên các cửa sổ khác (ở trên), hoặc bị che bởi các cửa sổ khác và biểu tượng thanh menu (ở dưới)";
-"屏蔽通知" = "Tắt tiếng Thông báo";
-"临时不再推送 Zisla 的系统通知；关闭后恢复正常推送（闹钟不受影响）" = "Tạm dừng đẩy thông báo hệ thống Zisla; khôi phục đẩy bình thường khi tắt (báo thức không bị ảnh hưởng)";
-"整理桌面" = "Sắp xếp Desktop";
-"按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Căn chỉnh biểu tượng desktop theo lưới; không di chuyển bất kỳ tệp nào khi 'Stacks' được bật";
-"App Store 应用" = "Ứng dụng App Store";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Chưa có báo thức, thêm bên dưới";
@@ -420,32 +339,21 @@
 "卸载 Skill？" = "Gỡ cài đặt Skill?";
 "卸载" = "Gỡ cài đặt";
 "普通 Skill 会移到废纸篓；由 npm、pnpm、yarn、bun 或 Homebrew 全局安装的 Skill 会调用对应包管理器卸载。" = "Skill thông thường di chuyển vào Thùng rác; Skill được cài đặt toàn cục qua npm, pnpm, yarn, bun hoặc Homebrew được gỡ cài đặt qua trình quản lý gói của chúng.";
-"已发现 Skills（" = "Đã tìm thấy Skills (";
-"）" = ")";
 
 /* Side Notices */
 "已连接" = "Đã kết nối";
 "耳机已连接：" = "Tai nghe đã kết nối: ";
 "状态已更新" = "Trạng thái đã cập nhật";
 "正在播放" = "Đang phát";
-"正在播放：" = "Đang phát: ";
 "AI 任务图标" = "Biểu tượng Nhiệm vụ AI";
-"个 AI 任务" = " nhiệm vụ AI";
 "有错误" = " có lỗi";
 "等待操作" = " đang chờ hành động";
 "正在运行" = " đang chạy";
-"小工具：" = "Hộp công cụ: ";
 "工具" = "Công cụ";
-"专注倒计时：" = "Đếm ngược tập trung: ";
-"专注模式：" = "Chế độ tập trung: ";
-"下载中" = " đang tải xuống";
 "浏览器" = "Trình duyệt";
-"下载完成：" = " tải xuống hoàn tất: ";
 "视频" = "Video";
 
 /* Empty States */
-"无" = "Không có";
-"无可用内容" = "Không Có Nội dung Khả dụng";
 
 /* Localization and AppKit chrome */
 "外观与语言" = "Giao diện và Ngôn ngữ";
@@ -505,7 +413,6 @@
 "单独修饰键或鼠标侧键需要监听全局事件" = "Phím bổ trợ đơn lẻ hoặc nút bên chuột cần giám sát sự kiện toàn cục";
 "应用黑名单" = "Danh sách đen ứng dụng";
 "这些应用中的复制不弹提示" = "Sao chép từ các ứng dụng này không hiện thông báo";
-"加入当前应用" = "Thêm ứng dụng hiện tại";
 "移出黑名单" = "Xóa khỏi danh sách đen";
 "识别类型" = "Loại nhận dạng";
 "控制哪些内容会触发提示" = "Chọn loại nội dung nào sẽ hiện thông báo";
@@ -516,7 +423,6 @@
 "颜色值" = "Giá trị màu";
 "算式" = "Phép tính";
 "日期时间" = "Ngày và giờ";
-"中文文本" = "Văn bản tiếng Trung";
 "非当前系统语言文本" = "Văn bản không phải ngôn ngữ hệ thống";
 "代码" = "Mã";
 "翻译" = "Dịch";
@@ -2290,3 +2196,192 @@
 "macOS 仍可能因合盖、低电量、用户主动休眠或硬件策略进入睡眠；外接显示器并接通电源时可获得系统原生 clamshell 支持。" = "macOS vẫn có thể vào chế độ ngủ khi gập máy, pin yếu, người dùng chủ động cho ngủ hoặc do chính sách phần cứng; khi có màn hình ngoài và đang cắm nguồn thì được hệ thống hỗ trợ chế độ clamshell gốc.";
 "B站返回 HTTP 412 风控拦截。请先在浏览器登录 B站并完成验证，稍后或更换网络重试；若仍被拦截，需要 Cookies 导入支持后再下载。" = "Bilibili trả về chặn kiểm soát HTTP 412. Hãy đăng nhập Bilibili trên trình duyệt và hoàn tất xác minh, thử lại sau hoặc đổi mạng; nếu vẫn bị chặn thì cần hỗ trợ nhập Cookies mới tải được.";
 "需要授权 zisla 控制 Mail.app\n请打开「系统设置 → 隐私与安全性 → 自动化」，\n在列表中找到并开启 zisla 对 Mail 的访问权限" = "Cần cấp quyền cho zisla điều khiển Mail.app\nHãy mở «Cài đặt Hệ thống → Bảo mật & Quyền riêng tư → Tự động hoá»,\ntìm zisla trong danh sách và bật quyền truy cập Mail";
+"远端模型 %ld" = "Mô hình từ xa %ld";
+"更新 %@？" = "Cập nhật %@?";
+"将 %@ 从 %@ 更新到 %@" = "Cập nhật %@ từ %@ lên %@";
+"卸载 %@？" = "Gỡ cài đặt %@?";
+"下载 %@？" = "Tải %@?";
+"正在%@" = "Đang %@";
+"%@ 已完成" = "Đã hoàn tất %@";
+"%@ 失败" = "%@ thất bại";
+"开始 %@" = "Bắt đầu %@";
+"运行 %@" = "Chạy %@";
+"%ld天 %@" = "%ld ngày %@";
+"%ld月" = "Th%ld";
+"当前 %@ mm" = "Hiện tại %@ mm";
+"今日 %ld%% / %@ mm" = "Hôm nay %ld%% / %@ mm";
+"更新 %@" = "Cập nhật %@";
+"有效至 %@" = "Có hiệu lực đến %@";
+"%@，今天" = "%@, hôm nay";
+"重复提醒 · %@" = "Lời nhắc lặp lại · %@";
+"提醒 · 已完成 · %@" = "Lời nhắc · Đã hoàn tất · %@";
+"提醒 · %@" = "Lời nhắc · %@";
+"已按网格整理 %ld 个项目" = "Đã sắp xếp %ld mục theo lưới";
+"已清空废纸篓（%ld 个项目）" = "Đã dọn Thùng rác (%ld mục)";
+"%ld 个地点" = "%ld địa điểm";
+"已加入 %ld 个项目" = "Đã thêm %ld mục";
+"已复制 %ld 个文件" = "Đã sao chép %ld tệp";
+"%@；已输入当前文本框并复制" = "%@; đã nhập vào trường văn bản hiện tại và sao chép";
+"%@；已复制。请在系统设置的“隐私与安全性 > 辅助功能”中允许 zisla 后重试" = "%@; đã sao chép. Hãy cho phép zisla trong Cài đặt Hệ thống › Quyền riêng tư & Bảo mật › Trợ năng rồi thử lại";
+"%@；已复制，未能输入原文本框" = "%@; đã sao chép nhưng không nhập được vào trường văn bản ban đầu";
+"无法打开语音记录目录：%@" = "Không mở được thư mục ghi âm giọng nói: %@";
+"%@（下载）" = "%@ (tải về)";
+"%@（重试下载）" = "%@ (tải lại)";
+"%@ 字符" = "%@ ký tự";
+"%@ 分钟" = "%@ phút";
+"%ld 小时 %ld 分" = "%ld giờ %ld phút";
+"%ld 分钟" = "%ld phút";
+"%ld年%ld月%ld日 %@" = "%ld-%ld-%ld %@";
+"附件：%@" = "Tệp đính kèm: %@";
+"%ld 度" = "%ld°";
+"已选择 %ld 个文件" = "Đã chọn %ld tệp";
+"%ld 页 · %@" = "%ld trang · %@";
+"%ld 个文件" = "%ld tệp";
+"合并-%@.pdf" = "gop-%@.pdf";
+"已合并为 %@" = "Đã gộp vào %@";
+"%@-第%ld页.pdf" = "%@-trang%ld.pdf";
+"已拆分为 %ld 个 PDF" = "Đã tách thành %ld tệp PDF";
+"已生成 %@" = "Đã tạo %@";
+"已导出 %ld 张图片" = "Đã xuất %ld ảnh";
+"已导出 %@" = "Đã xuất %@";
+"%ld 分钟前" = "%ld phút trước";
+"%ld 小时前" = "%ld giờ trước";
+"无法读取图片：%@" = "Không đọc được ảnh: %@";
+"无法生成 XLSX：%@" = "Không tạo được tệp XLSX: %@";
+"识别表格" = "Nhận dạng bảng";
+"已保存：%@" = "Đã lưu: %@";
+"保存失败：%@" = "Lưu thất bại: %@";
+"识别失败：%@" = "Nhận dạng thất bại: %@";
+"表格已保存：%@" = "Đã lưu bảng: %@";
+"%@，结果已复制" = "%@, đã sao chép kết quả";
+"上移%@" = "Chuyển %@ lên";
+"下移%@" = "Chuyển %@ xuống";
+"删除%@" = "Xoá %@";
+"%ld 字词" = "%ld từ";
+"%ld 字词/分" = "%ld từ/phút";
+"%ld 秒" = "%ld giây";
+"已发现 %ld 个模型" = "Đã tìm thấy %ld mô hình";
+"%@（已导入）" = "%@ (đã nhập)";
+"显示器 %ld" = "Màn hình %ld";
+"%@快捷键与%@冲突，未保存" = "Phím tắt %@ xung đột với %@ nên chưa được lưu";
+"%@快捷键与语音输入冲突，未保存" = "Phím tắt %@ xung đột với nhập bằng giọng nói nên chưa được lưu";
+"正在下载 %ld%%" = "Đang tải %ld%%";
+"未安装 · %@ · %@" = "Chưa cài đặt · %@ · %@";
+"%@ · %@ · 可更新到 %@" = "%@ · %@ · có thể cập nhật lên %@";
+"%@；用于自动与手动更新" = "%@; dùng cho cả cập nhật tự động và thủ công";
+"将通过官方安装来源下载并安装 %ld 项缺失工具。工具较多时可能需要一些时间。" = "%ld công cụ còn thiếu sẽ được tải và cài đặt từ nguồn chính thức. Nếu có nhiều công cụ, quá trình này có thể mất một lúc.";
+"将通过官方安装来源更新 %ld 项已安装工具。工具较多时可能需要一些时间。" = "%ld công cụ đã cài sẽ được cập nhật từ nguồn chính thức. Nếu có nhiều công cụ, quá trình này có thể mất một lúc.";
+"%ld 个 AI 任务%@%@" = "%ld tác vụ AI%@%@";
+"，其中 %ld 个错误" = ", trong đó có %ld lỗi";
+"%@ 下载中 %@：%@" = "%@ đang tải %@: %@";
+"%@ 正在下载 %ld 个文件" = "%@ đang tải %ld tệp";
+"%@ 下载完成：%@" = "%@ đã tải xong: %@";
+"%ld 性能" = "%ld hiệu năng";
+"%ld 能效" = "%ld tiết kiệm điện";
+"%ld 核" = "%ld lõi";
+"%ld 核 · " = "%ld lõi · ";
+"已整理系统内存 %@" = "Đã dồn nén %@ bộ nhớ hệ thống";
+"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "Trong đó %ld mục cần bạn tự kiểm tra. zisla không bao giờ xoá vĩnh viễn.";
+"取消选择%@" = "Bỏ chọn %@";
+"全选%@" = "Chọn tất cả trong %@";
+"反选%@" = "Đảo lựa chọn trong %@";
+"已移入废纸篓 %ld 项；清空废纸篓后可释放 %@" = "Đã chuyển %ld mục vào Thùng rác; dọn Thùng rác sẽ giải phóng %@";
+"已处理 %ld 项，%ld 项未完成" = "Đã xử lý %ld mục, %ld mục chưa hoàn tất";
+"无法保存录音：%@" = "Không lưu được bản ghi âm: %@";
+"%@快捷键需要输入监控权限" = "Phím tắt %@ cần quyền Theo dõi đầu vào";
+"%@快捷键与系统或其他应用冲突，未能启用" = "Phím tắt %@ xung đột với hệ thống hoặc ứng dụng khác nên không bật được";
+"无法保存模型凭据：%@" = "Không lưu được thông tin xác thực của mô hình: %@";
+"余额脚本不可执行：%@" = "Script kiểm tra số dư không thể thực thi: %@";
+"余额脚本执行失败（退出状态 %ld）" = "Script kiểm tra số dư thất bại (trạng thái thoát %ld)";
+"渠道请求失败（HTTP %ld）" = "Yêu cầu tới kênh thất bại (HTTP %ld)";
+"切换失败且无法恢复原文件：%@" = "Chuyển đổi thất bại và không khôi phục được tệp gốc: %@";
+"%@ 暂不支持语音整理" = "%@ chưa hỗ trợ chỉnh sửa bản ghi lời nói";
+"未找到 %@ CLI" = "Không tìm thấy CLI của %@";
+"CLI 执行失败：%@" = "CLI thất bại: %@";
+"退出状态 %ld" = "trạng thái thoát %ld";
+"目标目录不是由 Zisla 管理，已保留原内容：%@" = "Thư mục đích không do Zisla quản lý nên nội dung đã được giữ lại: %@";
+"无法创建 Skills 受管库：%@" = "Không tạo được thư viện Skills được quản lý: %@";
+"找不到 %@ 命令" = "Không tìm thấy lệnh %@";
+"%@ 卸载失败" = "Không gỡ được %@";
+"无法卸载 Skill：%@" = "Không gỡ được Skill: %@";
+"Skills 同步失败：%@" = "Đồng bộ Skills thất bại: %@";
+"正在并行执行 · %ld/%ld 已完成" = "Đang chạy song song · %ld/%ld xong";
+"%ld 项命令失败：%@" = "%ld lệnh thất bại: %@";
+"CLI 命令超时（超过 %ld 分钟），请检查网络后重试" = "Lệnh CLI đã hết thời gian chờ (quá %ld phút). Hãy kiểm tra mạng rồi thử lại";
+"Homebrew 需要先信任该公式：%@" = "Homebrew cần tin cậy formula này trước: %@";
+"CLI 命令执行失败（退出码 %ld）" = "Lệnh CLI thất bại (mã thoát %ld)";
+"模型请求失败（HTTP %ld）" = "Yêu cầu tới mô hình thất bại (HTTP %ld)";
+"读取模型目录失败（HTTP %ld）" = "Không đọc được danh mục mô hình (HTTP %ld)";
+"无法创建 FFT" = "Không tạo được FFT";
+"B站接口返回异常：%@" = "API bilibili trả về lỗi: %@";
+"B站媒体轨下载失败：%@" = "Không tải được các track media của bilibili: %@";
+"%@ 返回 HTTP %ld" = "%@ trả về HTTP %ld";
+"%ld 项下载" = "%ld lượt tải";
+"API 请求失败（HTTP %@）" = "Yêu cầu API thất bại (HTTP %@)";
+"文件不存在：%@" = "Không tìm thấy tệp: %@";
+"%@\n原生备用下载失败：%@" = "%@\nBản tải dự phòng tích hợp đã thất bại: %@";
+"系统原生媒体封装失败：%@" = "Đóng gói media của hệ thống thất bại: %@";
+"文件夹" = "Thư mục";
+"路径" = "Đường dẫn";
+"文档" = "Tài liệu";
+"压缩包" = "Tệp nén";
+"无法开启登录时启动，请稍后重试。" = "Không bật được Mở khi đăng nhập. Hãy thử lại sau.";
+"无法关闭登录时启动，请稍后重试。" = "Không tắt được Mở khi đăng nhập. Hãy thử lại sau.";
+"无法开启登录时启动：%@" = "Không bật được Mở khi đăng nhập: %@";
+"不支持的 Office 文件：%@" = "Tệp Office không được hỗ trợ: %@";
+"输出文件已存在，未覆盖：%@" = "Tệp đầu ra đã tồn tại và không bị ghi đè: %@";
+"无法创建转换目录：%@" = "Không tạo được thư mục chuyển đổi: %@";
+"无法启动 LibreOffice：%@" = "Không khởi chạy được LibreOffice: %@";
+"LibreOffice 转换失败：%@" = "Chuyển đổi bằng LibreOffice thất bại: %@";
+"通过本机 Homebrew 安装 %@" = "Cài %@ bằng Homebrew trên máy";
+"从 GitHub 官方发布下载并安装 %@，无需终端" = "Tải và cài %@ từ bản phát hành chính thức trên GitHub — không cần Terminal";
+"通过本机 Homebrew 更新 %@" = "Cập nhật %@ bằng Homebrew trên máy";
+"下载最新版并替换当前使用的 %@" = "Tải phiên bản mới nhất và thay thế %@ đang dùng";
+"获取版本信息失败：%@" = "Không lấy được thông tin phiên bản: %@";
+"%@ 没有可用下载" = "Không có bản tải nào cho %@";
+"下载地址不可信：%@" = "URL tải không đáng tin cậy: %@";
+"下载失败：%@" = "Tải thất bại: %@";
+"安装后无法执行：%@" = "Không thể thực thi sau khi cài: %@";
+"Homebrew 执行失败：%@" = "Homebrew thất bại: %@";
+"无法读取 %@ 的版本信息" = "Không đọc được thông tin phiên bản của %@";
+"%@ 退出码 %ld" = "%@ mã thoát %ld";
+"系统媒体封装失败：%@" = "Đóng gói media của hệ thống thất bại: %@";
+"无法启动 osascript：%@" = "Không khởi chạy được osascript: %@";
+"不是可访问的本地 PDF 文件：%@" = "Không phải tệp PDF cục bộ có thể truy cập: %@";
+"无法读取 PDF：%@" = "Không đọc được tệp PDF: %@";
+"PDF 已加密且尚未解锁：%@" = "Tệp PDF đã mã hoá và vẫn đang bị khoá: %@";
+"页码 %ld 超出文档范围" = "Trang %ld nằm ngoài phạm vi tài liệu";
+"旋转角度必须是 90 度的整数倍：%ld" = "Góc quay phải là bội số của 90 độ: %ld";
+"页码范围无效：%@" = "Phạm vi trang không hợp lệ: %@";
+"同一任务不能重复使用输出文件：%@" = "Cùng một tác vụ không thể dùng lại tệp đầu ra: %@";
+"输出文件不能覆盖输入文件：%@" = "Tệp đầu ra không thể ghi đè tệp đầu vào: %@";
+"无法创建输出目录：%@" = "Không tạo được thư mục đầu ra: %@";
+"无法写入 PDF：%@" = "Không ghi được tệp PDF: %@";
+"无法渲染第 %ld 页" = "Không kết xuất được trang %ld";
+"裁剪区域无效：%@" = "Vùng cắt không hợp lệ: %@";
+"水印缩放比例无效：%@" = "Tỷ lệ hình mờ không hợp lệ: %@";
+"休息 %ld 分钟吧" = "Nghỉ %ld phút nhé";
+"读取系统资源清单失败：%@" = "Không đọc được danh mục tài nguyên hệ thống: %@";
+"声音资源 %@ 未在清单中找到" = "Không tìm thấy tài nguyên âm thanh %@ trong danh mục";
+"HTTP 下载失败（状态码 %ld）" = "Tải qua HTTP thất bại (mã trạng thái %ld)";
+"文件校验失败（期望 %@，实际 %@）" = "Xác minh tệp thất bại (mong đợi %@, nhận được %@)";
+"解压失败：%@" = "Giải nén thất bại: %@";
+"unzip 退出码 %ld" = "unzip mã thoát %ld";
+"%@ 缓存" = "Bộ đệm của %@";
+"%ld 天未修改" = "Không thay đổi trong %ld ngày";
+"Mail 附件下载 · %@" = "Tải tệp đính kèm Mail · %@";
+"iPhone/iPad 备份 · %@" = "Bản sao lưu iPhone/iPad · %@";
+"AI 工具缓存 · %@" = "Bộ đệm công cụ AI · %@";
+"浏览器可再生缓存 · %@" = "Bộ đệm trình duyệt có thể tạo lại · %@";
+"安装包/磁盘镜像 · %@" = "Trình cài đặt / ảnh đĩa · %@";
+"%ld 天前修改" = "Đã sửa %ld ngày trước";
+"与 %@ 重复 · 保留副本：%@" = "Trùng với %@ · bản giữ lại: %@";
+"未完成下载 · %ld 天未修改" = "Tải chưa xong · không thay đổi trong %ld ngày";
+"项目构建产物 · 项目根：%@" = "Sản phẩm build của dự án · gốc dự án: %@";
+"可能是已卸载应用残留 · bundle id：%@ · 需确认归属" = "Có thể là phần còn lại của ứng dụng đã gỡ · bundle id: %@ · cần xác nhận";
+"开机时间： %ld天 %ld小时 %ld分钟" = "Thời gian hoạt động: %ld ngày %ld giờ %ld phút";
+"无法读取官方天气预警：%@" = "Không đọc được cảnh báo thời tiết chính thức: %@";
+"更新于 %@" = "Cập nhật %@";
+"、" = ", ";
+"；" = "; ";
+"%@：%@。%@" = "%@: %@. %@";

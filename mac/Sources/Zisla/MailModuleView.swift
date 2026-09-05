@@ -776,7 +776,7 @@ private struct MailComposerView: View {
             // using text as a placeholder for now — can be upgraded to Mail.app's attachment API later)
             if !attachmentURLs.isEmpty {
                 let fileNames = attachmentURLs.map { $0.lastPathComponent }.joined(separator: ", ")
-                body += "\n\n---\n附件：\(fileNames)"
+                body += "\n\n---\n" + AppLocalization.text("附件：%@", fileNames)
             }
 
             let sent: Bool

@@ -2174,7 +2174,7 @@ public enum SystemDiskCleanup {
             url: url,
             kind: .appCache,
             byteSize: allocatedByteSize(of: url, fileManager: fileManager),
-            displayName: "\(identifier) 缓存",
+            displayName: AppLocalization.text("%@ 缓存", identifier),
             detail: "\(source.detailPrefix) · \(url.path)"
         )
     }
@@ -2339,7 +2339,7 @@ public enum SystemDiskCleanup {
         }
         let age = (referenceDate ?? Date()).timeIntervalSince(modificationDate)
         guard age >= temporaryFileMinAge else { return nil }
-        return "\(Int(age / 86400)) 天未修改"
+        return AppLocalization.text("%ld 天未修改", Int(age / 86400))
     }
 
     private static func directoryCandidateDetail(
@@ -2349,13 +2349,13 @@ public enum SystemDiskCleanup {
     ) -> String? {
         switch kind {
         case .mailDownloads:
-            return "Mail 附件下载 · \(url.path)"
+            return AppLocalization.text("Mail 附件下载 · %@", url.path)
         case .iosBackup:
-            return "iPhone/iPad 备份 · \(url.path)"
+            return AppLocalization.text("iPhone/iPad 备份 · %@", url.path)
         case .xcodeArchive:
             return "Xcode Archive · \(url.path)"
         case .aiToolCache:
-            return "AI 工具缓存 · \(url.path)"
+            return AppLocalization.text("AI 工具缓存 · %@", url.path)
         default:
             return fallback
         }
@@ -2383,7 +2383,7 @@ public enum SystemDiskCleanup {
                     kind: .browserCache,
                     byteSize: size,
                     displayName: root.lastPathComponent,
-                    detail: "浏览器可再生缓存 · \(root.path)",
+                    detail: AppLocalization.text("浏览器可再生缓存 · %@", root.path),
                     source: browserName(for: root)
                 )
             )
@@ -2474,7 +2474,7 @@ public enum SystemDiskCleanup {
                         kind: .diskImage,
                         byteSize: size,
                         displayName: standardized.lastPathComponent,
-                        detail: "安装包/磁盘镜像 · \(standardized.deletingLastPathComponent().path)"
+                        detail: AppLocalization.text("安装包/磁盘镜像 · %@", standardized.deletingLastPathComponent().path)
                     )
                 )
             }
@@ -2543,7 +2543,7 @@ public enum SystemDiskCleanup {
                             kind: .largeFile,
                             byteSize: size,
                             displayName: standardized.lastPathComponent,
-                            detail: "\(days) 天前修改"
+                            detail: AppLocalization.text("%ld 天前修改", days)
                         )
                     )
                 }
@@ -2602,7 +2602,7 @@ public enum SystemDiskCleanup {
                             kind: .duplicateFile,
                             byteSize: size,
                             displayName: standardized.lastPathComponent,
-                            detail: "与 \(original.url.lastPathComponent) 重复 · 保留副本：\(original.url.path)"
+                            detail: AppLocalization.text("与 %@ 重复 · 保留副本：%@", original.url.lastPathComponent, original.url.path)
                         )
                     )
                 } else {
@@ -2655,7 +2655,7 @@ public enum SystemDiskCleanup {
                         kind: .unfinishedDownload,
                         byteSize: size,
                         displayName: standardized.lastPathComponent,
-                        detail: "未完成下载 · \(days) 天未修改",
+                        detail: AppLocalization.text("未完成下载 · %ld 天未修改", days),
                         source: standardized.deletingLastPathComponent().lastPathComponent
                     )
                 )
@@ -2774,7 +2774,7 @@ public enum SystemDiskCleanup {
                         kind: .projectBuildArtifact,
                         byteSize: size,
                         displayName: name,
-                        detail: "项目构建产物 · 项目根：\(url.path)",
+                        detail: AppLocalization.text("项目构建产物 · 项目根：%@", url.path),
                         source: url.path
                     )
                 )
@@ -2864,7 +2864,7 @@ public enum SystemDiskCleanup {
                             kind: .applicationResidual,
                             byteSize: size,
                             displayName: child.lastPathComponent,
-                            detail: "可能是已卸载应用残留 · bundle id：\(identifier) · 需确认归属",
+                            detail: AppLocalization.text("可能是已卸载应用残留 · bundle id：%@ · 需确认归属", identifier),
                             source: identifier
                         )
                     )

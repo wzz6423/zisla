@@ -1,4 +1,5 @@
 import Foundation
+import ZislaCore
 
 public enum AIAgentSkillSynchronizationMode: Sendable {
     case symbolicLink
@@ -11,7 +12,7 @@ public enum AIAgentSkillSynchronizationError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case let .destinationIsNotManaged(path):
-            "目标目录不是由 Zisla 管理，已保留原内容：\(path)"
+            AppLocalization.text("目标目录不是由 Zisla 管理，已保留原内容：%@", path)
         }
     }
 }

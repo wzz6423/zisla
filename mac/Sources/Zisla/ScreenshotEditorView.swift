@@ -3143,7 +3143,7 @@ enum ScreenshotXLSXExporter {
         var errorDescription: String? {
             switch self {
             case let .archiveFailed(message):
-                "无法生成 XLSX：\(message)"
+                AppLocalization.text("无法生成 XLSX：%@", message)
             }
         }
     }
@@ -3328,12 +3328,22 @@ enum ScreenshotXLSXExporter {
     </Relationships>
     """
 
-    private static let workbookXML = """
-    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-    <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-      <sheets><sheet name="识别表格" sheetId="1" r:id="rId1"/></sheets>
-    </workbook>
-    """
+    private static var workbookXML: String {
+        """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <sheets><sheet name="\(xmlAttributeEscaped(AppLocalization.text("识别表格")))" sheetId="1" r:id="rId1"/></sheets>
+        </workbook>
+        """
+    }
+
+    private static func xmlAttributeEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+    }
 
     private static let workbookRelationshipsXML = """
     <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -3554,9 +3564,9 @@ enum ScreenshotImageExport {
             }
             do {
                 try data.write(to: url, options: .atomic)
-                Task { @MainActor in status("已保存：\(url.lastPathComponent)") }
+                Task { @MainActor in status(AppLocalization.text("已保存：%@", url.lastPathComponent)) }
             } catch {
-                Task { @MainActor in status("保存失败：\(error.localizedDescription)") }
+                Task { @MainActor in status(AppLocalization.text("保存失败：%@", error.localizedDescription)) }
             }
         }
         if let window = NSApp.keyWindow ?? NSApp.mainWindow, window.isVisible {
@@ -4907,7 +4917,7 @@ struct ScreenshotEditorView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 150)
-                .help(AppLocalization.text("箭头样式：%@", model.arrowStyle.title))
+                .help(AppLocalization.text("箭头样式：%@", AppLocalization.text(model.arrowStyle.title)))
                 Divider().frame(height: 24)
                 lineWidthSlider
             } else if tool == .number {
@@ -5275,7 +5285,7 @@ struct ScreenshotEditorView: View {
                     }
                 }
             } catch {
-                failureMessage = "识别失败：\(error.localizedDescription)"
+                failureMessage = AppLocalization.text("识别失败：%@", error.localizedDescription)
             }
             DispatchQueue.main.async {
                 if let failureMessage {
@@ -5287,7 +5297,7 @@ struct ScreenshotEditorView: View {
                     return
                 }
                 if case .table = mode, let tableURL {
-                    model.statusMessage = "表格已保存：\(tableURL.lastPathComponent)"
+                    model.statusMessage = AppLocalization.text("表格已保存：%@", tableURL.lastPathComponent)
                     return
                 }
                 let result = text
@@ -5349,7 +5359,7 @@ struct ScreenshotEditorView: View {
                     let pasteboard = NSPasteboard.general
                     pasteboard.clearContents()
                     pasteboard.setString(result, forType: .string)
-                    model.statusMessage = "\(mode.title)，结果已复制"
+                    model.statusMessage = AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title))
                 }
                 NSApp.activate(ignoringOtherApps: true)
                 if let window = NSApp.keyWindow, window.isVisible {

@@ -132,7 +132,7 @@ public actor DownloadService {
             } catch {
                 throw DownloadServiceError.processFailed(
                     exitCode: 0,
-                    diagnostic: "\(Self.resolverDiagnostic(resolverError))\n原生备用下载失败：\(error.localizedDescription)"
+                    diagnostic: AppLocalization.text("%@\n原生备用下载失败：%@", Self.resolverDiagnostic(resolverError), error.localizedDescription)
                 )
             }
         }
@@ -216,7 +216,7 @@ public actor DownloadService {
                     )
                     throw DownloadServiceError.processFailed(
                         exitCode: exitCode,
-                        diagnostic: "\(actionable)\n原生备用下载失败：\(error.localizedDescription)"
+                        diagnostic: AppLocalization.text("%@\n原生备用下载失败：%@", actionable, error.localizedDescription)
                     )
                 }
             }
@@ -369,7 +369,7 @@ public actor DownloadService {
             }
             throw DownloadServiceError.processFailed(
                 exitCode: 0,
-                diagnostic: "系统原生媒体封装失败：\(error.localizedDescription)"
+                diagnostic: AppLocalization.text("系统原生媒体封装失败：%@", error.localizedDescription)
             )
         }
         return try validatedResult(

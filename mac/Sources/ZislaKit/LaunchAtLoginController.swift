@@ -114,11 +114,10 @@ public final class LaunchAtLoginController: ObservableObject {
     }
 
     private static func chineseError(from error: Error, enabling: Bool) -> String {
-        let action = enabling ? "开启" : "关闭"
         let detail = (error as NSError).localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         if detail.isEmpty {
-            return "无法\(action)登录时启动，请稍后重试。"
+            return AppLocalization.text(enabling ? "无法开启登录时启动，请稍后重试。" : "无法关闭登录时启动，请稍后重试。")
         }
-        return "无法\(action)登录时启动：\(detail)"
+        return AppLocalization.text(enabling ? "无法开启登录时启动：%@" : "无法关闭登录时启动：%@", detail)
     }
 }

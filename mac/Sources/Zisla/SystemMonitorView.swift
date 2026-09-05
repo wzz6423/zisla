@@ -263,13 +263,13 @@ struct SystemMonitorView: View {
         guard let total = hardware?.cpuCoreCount else { return "-- 核" }
 
         let topology = [
-            hardware?.cpuPerformanceCoreCount.map { "\($0) 性能" },
-            hardware?.cpuEfficiencyCoreCount.map { "\($0) 能效" },
+            hardware?.cpuPerformanceCoreCount.map { AppLocalization.text("%ld 性能", $0) },
+            hardware?.cpuEfficiencyCoreCount.map { AppLocalization.text("%ld 能效", $0) },
         ]
         .compactMap { $0 }
 
-        guard !topology.isEmpty else { return "\(total) 核" }
-        return "\(total) 核 · " + topology.joined(separator: " · ")
+        guard !topology.isEmpty else { return AppLocalization.text("%ld 核", total) }
+        return AppLocalization.text("%ld 核 · ", total) + topology.joined(separator: " · ")
     }
 
     private var cpuCelsius: Double? {
@@ -294,7 +294,7 @@ struct SystemMonitorView: View {
 
     private var gpuCoreText: String {
         guard let count = service.snapshot?.hardware.gpuCoreCount else { return "-- 核" }
-        return "\(count) 核"
+        return AppLocalization.text("%ld 核", count)
     }
 
     private var gpuUsageText: String { percent(gpuUsage?.usage) }
@@ -365,7 +365,7 @@ struct SystemMonitorView: View {
 
     private var memoryDetail: String {
         if let releasedMemoryBytes {
-            return "已整理系统内存 \(memoryByteText(releasedMemoryBytes))"
+            return AppLocalization.text("已整理系统内存 %@", memoryByteText(releasedMemoryBytes))
         }
         return ""
     }
@@ -1059,7 +1059,7 @@ private struct SystemCleanupSheet: View {
         } message: {
             Text(
                 cachedManualReviewCount > 0
-                    ? "其中 \(cachedManualReviewCount) 项需人工复核。zisla 不会永久删除这些内容。"
+                    ? AppLocalization.text("其中 %ld 项需人工复核。zisla 不会永久删除这些内容。", cachedManualReviewCount)
                     : AppLocalization.text("zisla 不会永久删除这些内容。")
             )
         }
@@ -1110,15 +1110,17 @@ private struct SystemCleanupSheet: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(isSectionCollapsed(section) ? AppLocalization.text("展开%@", section.kind.title) : AppLocalization.text("折叠%@", section.kind.title))
-            .accessibilityLabel(isSectionCollapsed(section) ? AppLocalization.text("展开%@", section.kind.title) : AppLocalization.text("折叠%@", section.kind.title))
+            .help(isSectionCollapsed(section) ? AppLocalization.text("展开%@", AppLocalization.text(section.kind.title)) : AppLocalization.text("折叠%@", AppLocalization.text(section.kind.title)))
+            .accessibilityLabel(isSectionCollapsed(section) ? AppLocalization.text("展开%@", AppLocalization.text(section.kind.title)) : AppLocalization.text("折叠%@", AppLocalization.text(section.kind.title)))
             Spacer(minLength: 4)
             Text(byteText(section.totalBytes))
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(.secondary)
             IconButton(
                 symbol: section.allSelected(in: selectedURLs) ? "checkmark.square.fill" : "checkmark.square",
-                help: section.allSelected(in: selectedURLs) ? "取消选择\(section.kind.title)" : "全选\(section.kind.title)",
+                help: section.allSelected(in: selectedURLs)
+                    ? AppLocalization.text("取消选择%@", AppLocalization.text(section.kind.title))
+                    : AppLocalization.text("全选%@", AppLocalization.text(section.kind.title)),
                 isActive: section.allSelected(in: selectedURLs),
                 size: .compact
             ) {
@@ -1127,7 +1129,7 @@ private struct SystemCleanupSheet: View {
             .disabled(isCleaning || section.selectableItems.isEmpty)
             IconButton(
                 symbol: "arrow.left.arrow.right.square",
-                help: "反选\(section.kind.title)",
+                help: AppLocalization.text("反选%@", AppLocalization.text(section.kind.title)),
                 size: .compact
             ) {
                 invertSelection(in: section)
@@ -1255,9 +1257,9 @@ private struct SystemCleanupSheet: View {
 
     private func resultText(_ result: DiskCleanupResult) -> String {
         if result.failures.isEmpty {
-            return "已移入废纸篓 \(result.successCount) 项；清空废纸篓后可释放 \(byteText(result.freedBytes))"
+            return AppLocalization.text("已移入废纸篓 %ld 项；清空废纸篓后可释放 %@", result.successCount, byteText(result.freedBytes))
         }
-        return "已处理 \(result.successCount) 项，\(result.failures.count) 项未完成"
+        return AppLocalization.text("已处理 %ld 项，%ld 项未完成", result.successCount, result.failures.count)
     }
 
     private func byteText(_ bytes: UInt64) -> String {

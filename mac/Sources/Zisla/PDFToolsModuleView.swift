@@ -162,7 +162,7 @@ struct PDFToolsModuleView: View {
                     case 90: return "顺时针 90 度"
                     case 180: return "180 度"
                     case 270: return "逆时针 90 度"
-                    default: return "\(degrees) 度"
+                    default: return AppLocalization.text("%ld 度", degrees)
                     }
                 },
                 selectionID: "pdf-rotation-degrees",
@@ -252,7 +252,7 @@ struct PDFToolsModuleView: View {
 
     private var inputDescription: String {
         if inputURLs.count == 1 { return inputURLs[0].lastPathComponent }
-        return "已选择 \(inputURLs.count) 个文件"
+        return AppLocalization.text("已选择 %ld 个文件", inputURLs.count)
     }
 
     private var configurationIsValid: Bool {
@@ -304,9 +304,9 @@ struct PDFToolsModuleView: View {
     private func updateInputSummary() {
         guard let input = inputURLs.first else { return }
         if operation.expectsPDF, let summary = try? pdfService.inspect(input) {
-            inputSummary = "\(summary.pageCount) 页 · \(ByteCountFormatter.string(fromByteCount: Int64(summary.fileSize), countStyle: .file))"
+            inputSummary = AppLocalization.text("%ld 页 · %@", summary.pageCount, ByteCountFormatter.string(fromByteCount: Int64(summary.fileSize), countStyle: .file))
         } else {
-            inputSummary = "\(inputURLs.count) 个文件"
+            inputSummary = AppLocalization.text("%ld 个文件", inputURLs.count)
         }
     }
 
@@ -315,16 +315,16 @@ struct PDFToolsModuleView: View {
         let service = pdfService
         switch operation {
         case .merge:
-            guard let output = saveOutput(named: "合并-\(inputURLs[0].deletingPathExtension().lastPathComponent).pdf", type: .pdf) else { return }
+            guard let output = saveOutput(named: AppLocalization.text("合并-%@.pdf", inputURLs[0].deletingPathExtension().lastPathComponent), type: .pdf) else { return }
             let inputs = inputURLs
-            runTask { try service.merge(inputs, to: output); return "已合并为 \(output.lastPathComponent)" }
+            runTask { try service.merge(inputs, to: output); return AppLocalization.text("已合并为 %@", output.lastPathComponent) }
         case .split:
             guard let directory = chooseOutputDirectory(), let input = inputURLs.first else { return }
             do {
                 let indexes = try selectedPageIndexes(for: input)
                 let baseName = input.deletingPathExtension().lastPathComponent
-                let outputs = indexes.map { directory.appendingPathComponent("\(baseName)-第\($0 + 1)页.pdf") }
-                runTask { try service.split(input, pageGroups: indexes.map { [$0] }, outputURLs: outputs); return "已拆分为 \(outputs.count) 个 PDF" }
+                let outputs = indexes.map { directory.appendingPathComponent(AppLocalization.text("%@-第%ld页.pdf", baseName, $0 + 1)) }
+                runTask { try service.split(input, pageGroups: indexes.map { [$0] }, outputURLs: outputs); return AppLocalization.text("已拆分为 %ld 个 PDF", outputs.count) }
             } catch { presentFailure(error) }
         case .rotate:
             guard let input = inputURLs.first,
@@ -333,45 +333,45 @@ struct PDFToolsModuleView: View {
             do {
                 let indexes = try selectedPageIndexes(for: input)
                 let degrees = rotationDegrees
-                runTask { try service.rotate(input, pageIndexes: indexes, degrees: degrees, to: output); return "已保存 \(output.lastPathComponent)" }
+                runTask { try service.rotate(input, pageIndexes: indexes, degrees: degrees, to: output); return AppLocalization.text("已保存 %@", output.lastPathComponent) }
             } catch { presentFailure(error) }
         case .imagesToPDF:
             guard let output = saveOutput(named: AppLocalization.text("图片合成.pdf"), type: .pdf) else { return }
             let inputs = inputURLs
-            runTask { try service.convertImagesToPDF(inputs, to: output); return "已生成 \(output.lastPathComponent)" }
+            runTask { try service.convertImagesToPDF(inputs, to: output); return AppLocalization.text("已生成 %@", output.lastPathComponent) }
         case .officeToPDF:
             guard let input = inputURLs.first,
                   let output = saveOutput(for: input, suffix: AppLocalization.text("转换"), type: .pdf)
             else { return }
-            runTask { try LocalOfficeConverter().convertToPDF(input, outputURL: output); return "已生成 \(output.lastPathComponent)" }
+            runTask { try LocalOfficeConverter().convertToPDF(input, outputURL: output); return AppLocalization.text("已生成 %@", output.lastPathComponent) }
         case .render:
             guard let directory = chooseOutputDirectory(), let input = inputURLs.first else { return }
-            runTask { let outputs = try service.renderPages(from: input, to: directory); return "已导出 \(outputs.count) 张图片" }
+            runTask { let outputs = try service.renderPages(from: input, to: directory); return AppLocalization.text("已导出 %ld 张图片", outputs.count) }
         case .extractText:
             guard let input = inputURLs.first,
                   let output = saveOutput(for: input, suffix: AppLocalization.text("文字"), type: .plainText)
             else { return }
             do {
                 let indexes = try selectedPageIndexes(for: input)
-                runTask { try service.exportText(from: input, pageIndexes: indexes, outputURL: output); return "已导出 \(output.lastPathComponent)" }
+                runTask { try service.exportText(from: input, pageIndexes: indexes, outputURL: output); return AppLocalization.text("已导出 %@", output.lastPathComponent) }
             } catch { presentFailure(error) }
         case .textWatermark:
             guard let input = inputURLs.first,
                   let output = saveOutput(for: input, suffix: AppLocalization.text("水印"), type: .pdf)
             else { return }
             let text = watermarkText
-            runTask { try service.addTextWatermark(to: input, watermark: PDFTextWatermark(text: text), outputURL: output); return "已保存 \(output.lastPathComponent)" }
+            runTask { try service.addTextWatermark(to: input, watermark: PDFTextWatermark(text: text), outputURL: output); return AppLocalization.text("已保存 %@", output.lastPathComponent) }
         case .imageWatermark:
             guard let input = inputURLs.first, let image = watermarkImageURL,
                   let output = saveOutput(for: input, suffix: AppLocalization.text("图片水印"), type: .pdf)
             else { return }
-            runTask { try service.addImageWatermark(to: input, imageURL: image, outputURL: output); return "已保存 \(output.lastPathComponent)" }
+            runTask { try service.addImageWatermark(to: input, imageURL: image, outputURL: output); return AppLocalization.text("已保存 %@", output.lastPathComponent) }
         case .pageNumbers:
             guard let input = inputURLs.first,
                   let output = saveOutput(for: input, suffix: AppLocalization.text("页码"), type: .pdf)
             else { return }
             let style = PDFPageNumberStyle(prefix: pagePrefix, suffix: pageSuffix)
-            runTask { try service.addPageNumbers(to: input, style: style, outputURL: output); return "已保存 \(output.lastPathComponent)" }
+            runTask { try service.addPageNumbers(to: input, style: style, outputURL: output); return AppLocalization.text("已保存 %@", output.lastPathComponent) }
         case .crop:
             guard let input = inputURLs.first,
                   let x = Double(cropX), let y = Double(cropY), let width = Double(cropWidth), let height = Double(cropHeight),
@@ -380,26 +380,26 @@ struct PDFToolsModuleView: View {
             do {
                 let indexes = try selectedPageIndexes(for: input)
                 let cropBox = CGRect(x: x, y: y, width: width, height: height)
-                runTask { try service.crop(input, pageIndexes: indexes, to: cropBox, outputURL: output); return "已保存 \(output.lastPathComponent)" }
+                runTask { try service.crop(input, pageIndexes: indexes, to: cropBox, outputURL: output); return AppLocalization.text("已保存 %@", output.lastPathComponent) }
             } catch { presentFailure(error) }
         case .protect:
             guard let input = inputURLs.first,
                   let output = saveOutput(for: input, suffix: AppLocalization.text("已加密"), type: .pdf)
             else { return }
             let protection = PDFPasswordProtection(userPassword: password, ownerPassword: ownerPassword)
-            runTask { try service.protect(input, with: protection, outputURL: output); return "已保存 \(output.lastPathComponent)" }
+            runTask { try service.protect(input, with: protection, outputURL: output); return AppLocalization.text("已保存 %@", output.lastPathComponent) }
         case .unlock:
             guard let input = inputURLs.first,
                   let output = saveOutput(for: input, suffix: AppLocalization.text("已解锁"), type: .pdf)
             else { return }
             let value = password
-            runTask { try service.unlock(input, password: value, outputURL: output); return "已保存 \(output.lastPathComponent)" }
+            runTask { try service.unlock(input, password: value, outputURL: output); return AppLocalization.text("已保存 %@", output.lastPathComponent) }
         case .metadata:
             guard let input = inputURLs.first,
                   let output = saveOutput(for: input, suffix: AppLocalization.text("信息"), type: .pdf)
             else { return }
             let metadata = PDFDocumentMetadata(title: metadataTitle.nilIfEmpty, author: metadataAuthor.nilIfEmpty)
-            runTask { try service.updateMetadata(of: input, metadata: metadata, outputURL: output); return "已保存 \(output.lastPathComponent)" }
+            runTask { try service.updateMetadata(of: input, metadata: metadata, outputURL: output); return AppLocalization.text("已保存 %@", output.lastPathComponent) }
         }
     }
 

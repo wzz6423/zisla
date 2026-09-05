@@ -2,7 +2,6 @@
 
 /* Common */
 "取消" = "İptal";
-"确定" = "Tamam";
 "好" = "Tamam";
 "继续" = "Devam";
 "删除" = "Sil";
@@ -25,7 +24,6 @@
 "信息" = "Bilgi";
 "模型" = "Modeller";
 "宠物" = "Evcil Hayvan";
-"交互" = "Etkileşim";
 "下载" = "İndir";
 "天气" = "Hava Durumu";
 "更新" = "Güncellemeler";
@@ -34,7 +32,6 @@
 "调整语言、外观、启动与展开方式。" = "Dil, görünüm, başlangıç ve genişletme yöntemini ayarlayın.";
 
 /* Settings - Privacy */
-"管理剪贴板访问与本机数据。" = "Pano erişimini ve yerel verileri yönetin.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Dynamic Island'daki iş akışı modüllerini yönetin.";
@@ -79,15 +76,12 @@
 "显示在系统时间上方，可与锁屏文字共存" = "Sistem saatinin üzerinde gösterilir, kilit ekranı metniyle birlikte var olabilir";
 "侧翼通知" = "Yan Bildirimler";
 "在灵动岛肩部显示任务变化" = "Dynamic Island omuzlarında görev değişikliklerini göster";
-"岛上倒计时" = "Island Geri Sayımı";
 "专注时在收起态灵动岛显示剩余时间" = "Odaklanırken daraltılmış Dynamic Island'da kalan süreyi göster";
 "活动展示" = "Etkinlik Gösterimi";
 "播放与 AI 任务的折叠时长" = "Oynatma ve AI görevleri için daraltma süresi";
 "专注模式展示" = "Odak Modu Gösterimi";
 "开启或切换专注模式时的显示时长" = "Odak modunu etkinleştirme veya değiştirme sırasında gösterim süresi";
 "收起态展示优先级" = "Kompakt Durum Önceliği";
-"上移" = "Yukarı Taşı";
-"下移" = "Aşağı Taşı";
 "恢复默认顺序" = "Varsayılan Sırayı Geri Yükle";
 "通知显示器" = "Bildirim Ekranları";
 "当前显示器" = "Mevcut Ekran";
@@ -99,7 +93,6 @@
 "AI 进度与用量" = "AI İlerlemesi ve Kullanımı";
 "汇总桌面端与 CLI 工具的运行状态" = "Masaüstü ve CLI araç çalışma durumunu özetle";
 "语音输入" = "Sesli Giriş";
-"启用语音输入" = "Sesli Girişi Etkinleştir";
 "开启后可通过全局快捷键触发语音输入" = "Global kısayol tuşu ile sesli girişi etkinleştir";
 "录音模式" = "Kayıt Modu";
 "快捷键" = "Kısayol Tuşu";
@@ -110,35 +103,25 @@
 "已授权" = "Yetkilendirildi";
 
 /* Settings - Voice Models */
-"配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Yerel modelleri, uzak modelleri ve kimlik bilgilerini yapılandırın ve ses organizasyonu için model seçin.";
 "本地模型" = "Yerel Modeller";
 "远端模型与凭据" = "Uzak Modeller ve Kimlik Bilgileri";
 "语音整理模型" = "Ses Organizasyon Modeli";
 "使用模型" = "Model Kullan";
 "从上方已启用的本地或远端模型中选择" = "Yukarıda etkinleştirilen yerel veya uzak modellerden seçin";
 "不使用模型整理" = "Model Organizasyonu Yok";
-"本地" = "Yerel";
-"远端" = "Uzak";
 "尚未选择模型" = "Model Seçilmedi";
 "在上方添加并启用本地或远端模型后即可选择" = "Seçmek için yukarıda yerel veya uzak modelleri ekleyin ve etkinleştirin";
 "选择后会对语音转写进行整理" = "Seçimden sonra ses transkripsiyonunu organize eder";
 "测试连接" = "Bağlantıyı Test Et";
 "尚未测试连接" = "Test edilmedi";
 "正在连接…" = "Bağlanıyor…";
-"已发现" = "Bulundu";
-"个模型" = " model";
 
 
 /* Settings - Models - Hardware Profile */
-"设备档案与推荐模型" = "Cihaz Profili ve Önerilen Modeller";
 "设备" = "Cihaz";
-"综合推荐" = "Genel Öneri";
-"检测" = "Algıla";
-"点击下方按钮检测硬件信息" = "Donanım bilgilerini algılamak için aşağıdaki düğmeye tıklayın";
 
 /* Settings - Pet */
 "设置灵动岛内部的宠物形象。" = "Dynamic Island içindeki evcil hayvan görünümünü ayarlayın.";
-"岛上宠物伙伴" = "Island Evcil Hayvan Arkadaşı";
 "在灵动岛养一只小宠物" = "Dynamic Island'da bir evcil hayvan besle";
 "当前宠物" = "Mevcut Evcil Hayvan";
 "选择内置的宠物形象" = "Yerleşik evcil hayvan görünümünü seçin";
@@ -148,7 +131,6 @@
 "右侧" = "Sağ";
 
 /* Settings - Interaction */
-"调整外观、展开方式与隐私行为。" = "Görünüm, genişletme yöntemi ve gizlilik davranışını ayarlayın.";
 "外观" = "Görünüm";
 "界面外观" = "Arayüz Görünümü";
 "灵动岛样式" = "Dynamic Island Stili";
@@ -159,23 +141,17 @@
 "需要系统批准" = "Sistem Onayı Gerekli";
 "在登录项中允许 zisla 后即可生效" = "Oturum açma öğelerinde zisla'ya izin verdikten sonra geçerli olur";
 "打开登录项…" = "Oturum Açma Öğelerini Aç…";
-"展开方式" = "Genişletme Yöntemi";
 "鼠标移入展开" = "Üzerine Gelerek Genişlet";
 "鼠标进入屏幕顶部感应区时显示" = "Fare ekranın üst algılama bölgesine girdiğinde göster";
-"隐私" = "Gizlilik";
-"记录剪贴板历史" = "Pano Geçmişini Kaydet";
 "仅本机保存文本和图片" = "Sadece yerel olarak metin ve resimleri kaydet";
-"检测剪贴板链接" = "Pano Bağlantılarını Algıla";
 "发现可下载链接时提示" = "İndirilebilir bağlantılar algılandığında bildir";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "İndirme dizinini, indirme bildirimlerini ve gerekli bileşenleri yönetin.";
-"下载器" = "İndirici";
 "链接下载" = "Bağlantı İndirme";
 "下载视频或音频" = "Video veya ses indir";
 "默认下载目录" = "Varsayılan İndirme Dizini";
 "选择默认下载目录" = "Varsayılan indirme dizinini seç";
-"下载通知" = "İndirme Bildirimleri";
 "浏览器下载进度" = "Tarayıcı İndirme İlerlemesi";
 "在灵动岛显示来源图标与百分比" = "Dynamic Island'da kaynak simgesini ve yüzdeyi göster";
 "原生下载进度" = "Yerel İndirme İlerlemesi";
@@ -186,18 +162,14 @@
 "安装" = "Yükle";
 "正在查询最新版本…" = "En son sürüm kontrol ediliyor…";
 "正在下载…" = "İndiriliyor…";
-"正在下载" = "İndiriliyor";
 "正在安装…" = "Yükleniyor…";
 
 /* Settings - Weather */
 "管理天气显示、地点和刷新。" = "Hava durumu gösterimini, konumları ve yenilemeyi yönetin.";
-"天气显示" = "Hava Durumu Gösterimi";
 "显示当前或自选地区的天气" = "Mevcut veya özel konum hava durumunu göster";
 "地点" = "Konumlar";
 "默认显示当前所在地" = "Varsayılan olarak mevcut konumu göster";
 "等待刷新" = "Yenileme bekleniyor";
-"拖动调整" = "Ayarlamak için sürükle";
-"的展示顺序" = " gösterim sırası";
 "天气数据" = "Hava Durumu Verileri";
 "刷新当前位置与全部自选地区" = "Mevcut konumu ve tüm özel konumları yenile";
 "城市、区县或地区" = "Şehir, ilçe veya bölge";
@@ -206,18 +178,11 @@
 /* Settings - Updates */
 "管理版本检查与自动更新。" = "Sürüm kontrolünü ve otomatik güncellemeleri yönetin.";
 "更新策略" = "Güncelleme Stratejisi";
-"手动检查通道" = "Manuel Kontrol Kanalı";
-"不影响自动更新" = "Otomatik güncellemeleri etkilemez";
 "检查更新" = "Güncellemeleri Kontrol Et";
-"仅检查当前安装包所属的更新通道" = "Sadece mevcut kurulum paketinin güncelleme kanalını kontrol et";
-"自动安装更新" = "Güncellemeleri Otomatik Yükle";
-"仅自动安装当前安装包所属通道的新构建" = "Sadece mevcut kurulum paketinin kanalından yeni derlemeleri otomatik yükle";
 "版本" = "Sürüm";
 "尚未检查更新" = "Güncellemeler kontrol edilmedi";
 "正在检查更新" = "Güncellemeler kontrol ediliyor";
 "已是最新版本" = "Zaten en son sürüm";
-"发现" = "Bulundu";
-"新版本" = " yeni sürüm";
 
 
 /* Clipboard History Module */
@@ -227,7 +192,6 @@
 "非常用" = "Favori olmayanlar";
 "添加常用信息" = "Favori Ekle";
 "清空历史（保留常用）" = "Geçmişi Temizle (Favorileri Tut)";
-"只看" = "Sadece göster ";
 "还没有剪贴板历史" = "Henüz pano geçmişi yok";
 "复制内容后会自动记录" = "Kopyaladıktan sonra otomatik olarak kaydedilir";
 "还没有常用项" = "Henüz favori yok";
@@ -267,25 +231,6 @@
 "发送" = "Gönder";
 
 /* Voice Models - Remote Providers */
-"远端 Provider" = "Uzak Sağlayıcı";
-"添加 Provider" = "Sağlayıcı Ekle";
-"尚未配置远端 Provider" = "Henüz uzak sağlayıcı yapılandırılmadı";
-"Provider 名称" = "Sağlayıcı Adı";
-"端点" = "Uç Nokta";
-"凭据" = "Kimlik Bilgileri";
-"高级路由" = "Gelişmiş Yönlendirme";
-"添加端点组" = "Uç Nokta Grubu Ekle";
-"添加额外的 URL/Key 轮换组（高级）" = "Ek URL/Anahtar rotasyon grubu ekle (gelişmiş)";
-"尚未关联凭据" = "Henüz kimlik bilgileri bağlı değil";
-"关联凭据" = "Kimlik Bilgilerini Bağla";
-"选择已有凭据，或为此 Provider 新建 API Key 凭据" = "Mevcut kimlik bilgilerini seç veya bu sağlayıcı için yeni API Anahtarı kimlik bilgileri oluştur";
-"新建 API Key 凭据" = "Yeni API Anahtarı Kimlik Bilgileri";
-"配置文件路径" = "Yapılandırma Dosyası Yolu";
-"认证文件路径" = "Kimlik Doğrulama Dosyası Yolu";
-"导入配置" = "Yapılandırmayı İçe Aktar";
-"导入认证" = "Kimlik Doğrulamayı İçe Aktar";
-"配置" = "Yapılandırma";
-"认证" = "Kimlik Doğrulama";
 
 
 /* System Monitor */
@@ -297,12 +242,9 @@
 "利用率" = "Kullanım";
 "渲染" = "Renderer";
 "内存" = "Bellek";
-"压力" = "Basınç";
 "可用" = "Mevcut";
-"共" = "Toplam";
 "释放" = "Serbest Bırak";
 "整理系统内存，回收非活跃与压缩页面" = "Sistem belleğini düzenle, etkin olmayan ve sıkıştırılmış sayfaları geri kazan";
-"已整理系统内存" = "Sistem belleği düzenlendi";
 "磁盘" = "Disk";
 "清理" = "Temizlik";
 "扫描可清理的缓存、日志与开发产物" = "Temizlenebilir önbellekleri, günlükleri ve derleme yapılarını tara";
@@ -317,11 +259,8 @@
 "正在识别" = "Tanımlanıyor";
 "正在获取" = "Alınıyor";
 "暂不可用" = "Mevcut değil";
-"建立基线" = "Temel oluşturuluyor";
 
 /* System Cleanup */
-"清理磁盘" = "Diski Temizle";
-"扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件" = "Uygulama önbelleklerini, günlükleri, geçici dosyaları, derleme yapılarını, paket yöneticisi önbelleklerini, disk görüntülerini, büyük dosyaları ve kopyaları tara";
 "取消全选" = "Tümünün Seçimini Kaldır";
 "全选" = "Tümünü Seç";
 "选择全部候选项" = "Tüm adayları seç";
@@ -334,18 +273,8 @@
 "未找到可清理项" = "Temizlik öğesi bulunamadı";
 "可安全清理的缓存与日志当前为空" = "Güvenle temizlenebilir önbellekler ve günlükler şu anda boş";
 "展开" = "Genişlet";
-"折叠" = "Daralt";
-"取消选择" = "Seçimi Kaldır";
-"已选" = "Seçildi";
-"项" = " öğe";
 "移入废纸篓" = "Çöp Kutusuna Taşı";
-"将" = "Taşı ";
-" 项移入废纸篓？" = " öğeyi Çöp Kutusuna?";
 "zisla 不会永久删除这些内容。" = "zisla bu öğeleri kalıcı olarak silmeyecek.";
-"已移入废纸篓" = "Çöp Kutusuna Taşındı";
-"清空废纸篓后可释放" = "Çöp Kutusu boşaltıldıktan sonra boşaltılabilir";
-"已处理" = "İşlendi";
-"项未完成" = " öğe tamamlanmadı";
 
 /* Cleanup Categories */
 "应用缓存" = "Uygulama Önbelleği";
@@ -381,22 +310,12 @@
 "防止用户闲置导致显示器休眠" = "Kullanıcı hareketsizliği nedeniyle ekran uykusunu önle";
 "防止空闲休眠" = "Boşta Uykuyu Önle";
 "防止用户闲置导致系统休眠；合盖、低电量或用户主动休眠仍会让 Mac 进入睡眠" = "Kullanıcı hareketsizliği nedeniyle sistem uykusunu önle; kapağı kapatma, düşük pil veya kullanıcı tarafından başlatılan uyku hala çalışır";
-"常驻提醒" = "Kalıcı Hatırlatıcı";
-"无媒体占用时，在折叠状态显示番茄钟、亮屏或清洁状态" = "Medya aktif olmadığında daraltılmış durumda Pomodoro, uyanık tutma veya temizlik durumunu göster";
 "清理屏幕" = "Ekranı Temizle";
 "全屏黑色遮罩；点击中央「退出清屏」按钮或任意处退出" = "Tam ekran siyah kaplama; çıkmak için merkezdeki 'Temizlikten Çık' düğmesine veya herhangi bir yere tıklayın";
 "清理键盘" = "Klavyeyi Temizle";
 "结束清洁" = "Temizliği Bitir";
 "恢复键盘输入" = "Klavye girişini geri yükle";
 "吞掉键盘输入；再次点击结束" = "Klavye girişini yut; bitirmek için tekrar tıklayın";
-"收起置顶" = "Daraltıldığında Üstte";
-"收起置底" = "Daraltıldığında Altta";
-"收起态压在其他窗口之上（置顶），或被其他窗口和菜单栏图标覆盖（置底）" = "Daraltılmış durum diğer pencerelerin üzerinde (üstte) veya diğer pencereler ve menü çubuğu simgeleri tarafından kaplanır (altta)";
-"屏蔽通知" = "Bildirimleri Sessize Al";
-"临时不再推送 Zisla 的系统通知；关闭后恢复正常推送（闹钟不受影响）" = "Zisla sistem bildirimlerini geçici olarak durdur; kapatıldığında normal bildirimi geri yükle (alarmlar etkilenmez)";
-"整理桌面" = "Masaüstünü Düzenle";
-"按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Masaüstü simgelerini ızgaraya hizala; 'Yığınlar' etkinken hiçbir dosyayı taşımaz";
-"App Store 应用" = "App Store Uygulamaları";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Henüz alarm yok, aşağıdan ekle";
@@ -420,32 +339,21 @@
 "卸载 Skill？" = "Skill kaldırılsın mı?";
 "卸载" = "Kaldır";
 "普通 Skill 会移到废纸篓；由 npm、pnpm、yarn、bun 或 Homebrew 全局安装的 Skill 会调用对应包管理器卸载。" = "Normal Skill'ler Çöp Kutusuna taşınır; npm, pnpm, yarn, bun veya Homebrew üzerinden global olarak yüklenen Skill'ler paket yöneticileri aracılığıyla kaldırılır.";
-"已发现 Skills（" = "Skills Bulundu (";
-"）" = ")";
 
 /* Side Notices */
 "已连接" = "Bağlandı";
 "耳机已连接：" = "Kulaklık bağlandı: ";
 "状态已更新" = "Durum güncellendi";
 "正在播放" = "Şimdi Oynatılıyor";
-"正在播放：" = "Şimdi oynatılıyor: ";
 "AI 任务图标" = "AI Görevi Simgesi";
-"个 AI 任务" = " AI görevi";
 "有错误" = " hatalı";
 "等待操作" = " işlem bekliyor";
 "正在运行" = " çalışıyor";
-"小工具：" = "Araç kutusu: ";
 "工具" = "Araç";
-"专注倒计时：" = "Odak geri sayımı: ";
-"专注模式：" = "Odak modu: ";
-"下载中" = " indiriliyor";
 "浏览器" = "Tarayıcı";
-"下载完成：" = " indirme tamamlandı: ";
 "视频" = "Video";
 
 /* Empty States */
-"无" = "Yok";
-"无可用内容" = "Kullanılabilir İçerik Yok";
 
 /* Localization and AppKit chrome */
 "外观与语言" = "Görünüm ve Dil";
@@ -505,7 +413,6 @@
 "单独修饰键或鼠标侧键需要监听全局事件" = "Tek başına değiştirici tuşlar veya fare yan tuşları genel olay izleme gerektirir";
 "应用黑名单" = "Uygulama kara listesi";
 "这些应用中的复制不弹提示" = "Bu uygulamalardan yapılan kopyalamalar bildirim göstermez";
-"加入当前应用" = "Geçerli uygulamayı ekle";
 "移出黑名单" = "Kara listeden çıkar";
 "识别类型" = "Tanınan türler";
 "控制哪些内容会触发提示" = "Hangi içerik türlerinin bildirim çıkaracağını seçin";
@@ -516,7 +423,6 @@
 "颜色值" = "Renk değeri";
 "算式" = "Hesaplama";
 "日期时间" = "Tarih ve saat";
-"中文文本" = "Çince metin";
 "非当前系统语言文本" = "Sistem dilinden farklı metin";
 "代码" = "Kod";
 "翻译" = "Çevir";
@@ -2290,3 +2196,192 @@
 "macOS 仍可能因合盖、低电量、用户主动休眠或硬件策略进入睡眠；外接显示器并接通电源时可获得系统原生 clamshell 支持。" = "macOS kapak kapatma, düşük pil, kullanıcının uyku moduna geçirmesi veya donanım politikası nedeniyle yine uyku moduna girebilir; harici ekran bağlı ve güç takılıyken sistemin yerel clamshell desteği kullanılabilir.";
 "B站返回 HTTP 412 风控拦截。请先在浏览器登录 B站并完成验证，稍后或更换网络重试；若仍被拦截，需要 Cookies 导入支持后再下载。" = "Bilibili HTTP 412 güvenlik engeli döndürdü. Önce tarayıcıda Bilibili'ye giriş yapıp doğrulamayı tamamlayın, daha sonra veya farklı bir ağla tekrar deneyin; engel sürerse indirme için Cookies içe aktarma desteği gerekir.";
 "需要授权 zisla 控制 Mail.app\n请打开「系统设置 → 隐私与安全性 → 自动化」，\n在列表中找到并开启 zisla 对 Mail 的访问权限" = "zisla'nın Mail.app'i denetlemesine izin vermeniz gerekiyor\n«Sistem Ayarları → Gizlilik ve Güvenlik → Otomasyon» bölümünü açın,\nlistede zisla'yı bulup Mail erişimini etkinleştirin";
+"远端模型 %ld" = "Uzak model %ld";
+"更新 %@？" = "%@ güncellensin mi?";
+"将 %@ 从 %@ 更新到 %@" = "%@ sürümü %@ konumundan %@ konumuna güncellenecek";
+"卸载 %@？" = "%@ kaldırılsın mı?";
+"下载 %@？" = "%@ indirilsin mi?";
+"正在%@" = "%@ sürüyor";
+"%@ 已完成" = "%@ tamamlandı";
+"%@ 失败" = "%@ başarısız oldu";
+"开始 %@" = "%@ başlat";
+"运行 %@" = "%@ çalıştır";
+"%ld天 %@" = "%ld gün %@";
+"%ld月" = "%ld. ay";
+"当前 %@ mm" = "Şu an %@ mm";
+"今日 %ld%% / %@ mm" = "Bugün %ld%% / %@ mm";
+"更新 %@" = "%@ güncelle";
+"有效至 %@" = "%@ tarihine kadar geçerli";
+"%@，今天" = "%@, bugün";
+"重复提醒 · %@" = "Yinelenen anımsatıcı · %@";
+"提醒 · 已完成 · %@" = "Anımsatıcı · Tamamlandı · %@";
+"提醒 · %@" = "Anımsatıcı · %@";
+"已按网格整理 %ld 个项目" = "%ld öge ızgaraya göre düzenlendi";
+"已清空废纸篓（%ld 个项目）" = "Çöp Sepeti boşaltıldı (%ld öge)";
+"%ld 个地点" = "%ld konum";
+"已加入 %ld 个项目" = "%ld öge eklendi";
+"已复制 %ld 个文件" = "%ld dosya kopyalandı";
+"%@；已输入当前文本框并复制" = "%@; geçerli metin alanına yazıldı ve kopyalandı";
+"%@；已复制。请在系统设置的“隐私与安全性 > 辅助功能”中允许 zisla 后重试" = "%@; kopyalandı. Sistem Ayarları › Gizlilik ve Güvenlik › Erişilebilirlik bölümünde zisla'ya izin verip yeniden deneyin";
+"%@；已复制，未能输入原文本框" = "%@; kopyalandı ancak özgün metin alanına yazılamadı";
+"无法打开语音记录目录：%@" = "Ses kayıtları klasörü açılamadı: %@";
+"%@（下载）" = "%@ (indir)";
+"%@（重试下载）" = "%@ (yeniden indir)";
+"%@ 字符" = "%@ karakter";
+"%@ 分钟" = "%@ dakika";
+"%ld 小时 %ld 分" = "%ld sa %ld dk";
+"%ld 分钟" = "%ld dakika";
+"%ld年%ld月%ld日 %@" = "%ld-%ld-%ld %@";
+"附件：%@" = "Ek: %@";
+"%ld 度" = "%ld°";
+"已选择 %ld 个文件" = "%ld dosya seçildi";
+"%ld 页 · %@" = "%ld sayfa · %@";
+"%ld 个文件" = "%ld dosya";
+"合并-%@.pdf" = "birlesik-%@.pdf";
+"已合并为 %@" = "%@ içinde birleştirildi";
+"%@-第%ld页.pdf" = "%@-sayfa%ld.pdf";
+"已拆分为 %ld 个 PDF" = "%ld PDF olarak bölündü";
+"已生成 %@" = "%@ oluşturuldu";
+"已导出 %ld 张图片" = "%ld görüntü dışa aktarıldı";
+"已导出 %@" = "%@ dışa aktarıldı";
+"%ld 分钟前" = "%ld dakika önce";
+"%ld 小时前" = "%ld saat önce";
+"无法读取图片：%@" = "Görüntü okunamadı: %@";
+"无法生成 XLSX：%@" = "XLSX oluşturulamadı: %@";
+"识别表格" = "Tabloyu tanı";
+"已保存：%@" = "Kaydedildi: %@";
+"保存失败：%@" = "Kaydedilemedi: %@";
+"识别失败：%@" = "Tanıma başarısız: %@";
+"表格已保存：%@" = "Tablo kaydedildi: %@";
+"%@，结果已复制" = "%@, sonuç kopyalandı";
+"上移%@" = "%@ ögesini yukarı taşı";
+"下移%@" = "%@ ögesini aşağı taşı";
+"删除%@" = "%@ ögesini sil";
+"%ld 字词" = "%ld sözcük";
+"%ld 字词/分" = "%ld sözcük/dk";
+"%ld 秒" = "%ld sn";
+"已发现 %ld 个模型" = "%ld model bulundu";
+"%@（已导入）" = "%@ (içe aktarıldı)";
+"显示器 %ld" = "Ekran %ld";
+"%@快捷键与%@冲突，未保存" = "%@ kısayolu %@ ile çakıştığı için kaydedilmedi";
+"%@快捷键与语音输入冲突，未保存" = "%@ kısayolu sesli girişle çakıştığı için kaydedilmedi";
+"正在下载 %ld%%" = "İndiriliyor %ld%%";
+"未安装 · %@ · %@" = "Kurulu değil · %@ · %@";
+"%@ · %@ · 可更新到 %@" = "%@ · %@ · %@ sürümüne güncellenebilir";
+"%@；用于自动与手动更新" = "%@; otomatik ve el ile güncellemelerde kullanılır";
+"将通过官方安装来源下载并安装 %ld 项缺失工具。工具较多时可能需要一些时间。" = "Eksik %ld araç resmi kaynaklarından indirilip kurulacak. Araç sayısı fazlaysa bu işlem biraz zaman alabilir.";
+"将通过官方安装来源更新 %ld 项已安装工具。工具较多时可能需要一些时间。" = "Kurulu %ld araç resmi kaynaklarından güncellenecek. Araç sayısı fazlaysa bu işlem biraz zaman alabilir.";
+"%ld 个 AI 任务%@%@" = "%ld yapay zeka görevi%@%@";
+"，其中 %ld 个错误" = ", bunların %ld tanesi hatalı";
+"%@ 下载中 %@：%@" = "%@ şunu indiriyor %@: %@";
+"%@ 正在下载 %ld 个文件" = "%@ %ld dosya indiriyor";
+"%@ 下载完成：%@" = "%@ indirmeyi tamamladı: %@";
+"%ld 性能" = "%ld performans";
+"%ld 能效" = "%ld verimlilik";
+"%ld 核" = "%ld çekirdek";
+"%ld 核 · " = "%ld çekirdek · ";
+"已整理系统内存 %@" = "%@ sistem belleği sıkıştırıldı";
+"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "Bunlardan %ld tanesi el ile inceleme gerektiriyor. zisla hiçbir zaman kalıcı olarak silmez.";
+"取消选择%@" = "%@ seçimini kaldır";
+"全选%@" = "%@ içindeki her şeyi seç";
+"反选%@" = "%@ içindeki seçimi tersine çevir";
+"已移入废纸篓 %ld 项；清空废纸篓后可释放 %@" = "%ld öge Çöp Sepeti'ne taşındı; sepeti boşaltmak %@ kazandırır";
+"已处理 %ld 项，%ld 项未完成" = "%ld öge işlendi, %ld öge tamamlanmadı";
+"无法保存录音：%@" = "Kayıt kaydedilemedi: %@";
+"%@快捷键需要输入监控权限" = "%@ kısayolu için Giriş İzleme izni gerekiyor";
+"%@快捷键与系统或其他应用冲突，未能启用" = "%@ kısayolu sistemle veya başka bir uygulamayla çakıştığı için etkinleştirilemedi";
+"无法保存模型凭据：%@" = "Model kimlik bilgileri kaydedilemedi: %@";
+"余额脚本不可执行：%@" = "Bakiye betiği çalıştırılabilir değil: %@";
+"余额脚本执行失败（退出状态 %ld）" = "Bakiye betiği başarısız oldu (çıkış durumu %ld)";
+"渠道请求失败（HTTP %ld）" = "Kanal isteği başarısız oldu (HTTP %ld)";
+"切换失败且无法恢复原文件：%@" = "Geçiş başarısız oldu ve özgün dosya geri getirilemedi: %@";
+"%@ 暂不支持语音整理" = "%@ henüz döküm düzenlemeyi desteklemiyor";
+"未找到 %@ CLI" = "%@ CLI bulunamadı";
+"CLI 执行失败：%@" = "CLI başarısız oldu: %@";
+"退出状态 %ld" = "çıkış durumu %ld";
+"目标目录不是由 Zisla 管理，已保留原内容：%@" = "Hedef klasör Zisla tarafından yönetilmiyor, bu yüzden içeriği korundu: %@";
+"无法创建 Skills 受管库：%@" = "Yönetilen Skills kitaplığı oluşturulamadı: %@";
+"找不到 %@ 命令" = "%@ komutu bulunamadı";
+"%@ 卸载失败" = "%@ kaldırılamadı";
+"无法卸载 Skill：%@" = "Skill kaldırılamadı: %@";
+"Skills 同步失败：%@" = "Skills eşitlemesi başarısız oldu: %@";
+"正在并行执行 · %ld/%ld 已完成" = "Paralel çalışıyor · %ld/%ld tamamlandı";
+"%ld 项命令失败：%@" = "%ld komut başarısız oldu: %@";
+"CLI 命令超时（超过 %ld 分钟），请检查网络后重试" = "CLI komutu zaman aşımına uğradı (%ld dakikadan fazla). Ağınızı denetleyip yeniden deneyin";
+"Homebrew 需要先信任该公式：%@" = "Homebrew'un önce bu formüle güvenmesi gerekiyor: %@";
+"CLI 命令执行失败（退出码 %ld）" = "CLI komutu başarısız oldu (çıkış kodu %ld)";
+"模型请求失败（HTTP %ld）" = "Model isteği başarısız oldu (HTTP %ld)";
+"读取模型目录失败（HTTP %ld）" = "Model kataloğu okunamadı (HTTP %ld)";
+"无法创建 FFT" = "FFT oluşturulamadı";
+"B站接口返回异常：%@" = "bilibili API'si bir hata döndürdü: %@";
+"B站媒体轨下载失败：%@" = "bilibili medya izleri indirilemedi: %@";
+"%@ 返回 HTTP %ld" = "%@ HTTP %ld döndürdü";
+"%ld 项下载" = "%ld indirme";
+"API 请求失败（HTTP %@）" = "API isteği başarısız oldu (HTTP %@)";
+"文件不存在：%@" = "Dosya bulunamadı: %@";
+"%@\n原生备用下载失败：%@" = "%@\nYerleşik yedek indirme başarısız oldu: %@";
+"系统原生媒体封装失败：%@" = "Sistem medya paketlemesi başarısız oldu: %@";
+"文件夹" = "Klasör";
+"路径" = "Yol";
+"文档" = "Belge";
+"压缩包" = "Arşiv";
+"无法开启登录时启动，请稍后重试。" = "Girişte Aç açılamadı. Daha sonra yeniden deneyin.";
+"无法关闭登录时启动，请稍后重试。" = "Girişte Aç kapatılamadı. Daha sonra yeniden deneyin.";
+"无法开启登录时启动：%@" = "Girişte Aç açılamadı: %@";
+"不支持的 Office 文件：%@" = "Desteklenmeyen Office dosyası: %@";
+"输出文件已存在，未覆盖：%@" = "Çıktı dosyası zaten var, üzerine yazılmadı: %@";
+"无法创建转换目录：%@" = "Dönüştürme klasörü oluşturulamadı: %@";
+"无法启动 LibreOffice：%@" = "LibreOffice başlatılamadı: %@";
+"LibreOffice 转换失败：%@" = "LibreOffice dönüştürmesi başarısız oldu: %@";
+"通过本机 Homebrew 安装 %@" = "%@ yerel Homebrew ile kurulsun";
+"从 GitHub 官方发布下载并安装 %@，无需终端" = "%@ GitHub'daki resmi sürümden indirilip kurulur — Terminal gerekmez";
+"通过本机 Homebrew 更新 %@" = "%@ yerel Homebrew ile güncellensin";
+"下载最新版并替换当前使用的 %@" = "En son sürümü indirip kullandığınız %@ ögesinin yerine koyar";
+"获取版本信息失败：%@" = "Sürüm bilgileri alınamadı: %@";
+"%@ 没有可用下载" = "%@ için indirilebilir bir dosya yok";
+"下载地址不可信：%@" = "Güvenilmeyen indirme adresi: %@";
+"下载失败：%@" = "İndirme başarısız: %@";
+"安装后无法执行：%@" = "Kurulumdan sonra çalıştırılabilir değil: %@";
+"Homebrew 执行失败：%@" = "Homebrew başarısız oldu: %@";
+"无法读取 %@ 的版本信息" = "%@ için sürüm bilgileri okunamadı";
+"%@ 退出码 %ld" = "%@ çıkış kodu %ld";
+"系统媒体封装失败：%@" = "Sistem medya paketlemesi başarısız oldu: %@";
+"无法启动 osascript：%@" = "osascript başlatılamadı: %@";
+"不是可访问的本地 PDF 文件：%@" = "Erişilebilir bir yerel PDF dosyası değil: %@";
+"无法读取 PDF：%@" = "PDF okunamadı: %@";
+"PDF 已加密且尚未解锁：%@" = "PDF şifreli ve hâlâ kilitli: %@";
+"页码 %ld 超出文档范围" = "%ld. sayfa belge aralığının dışında";
+"旋转角度必须是 90 度的整数倍：%ld" = "Döndürme açısı 90 derecenin katı olmalı: %ld";
+"页码范围无效：%@" = "Geçersiz sayfa aralığı: %@";
+"同一任务不能重复使用输出文件：%@" = "Aynı görev bir çıktı dosyasını yeniden kullanamaz: %@";
+"输出文件不能覆盖输入文件：%@" = "Çıktı dosyası girdi dosyasının üzerine yazamaz: %@";
+"无法创建输出目录：%@" = "Çıktı klasörü oluşturulamadı: %@";
+"无法写入 PDF：%@" = "PDF yazılamadı: %@";
+"无法渲染第 %ld 页" = "%ld. sayfa işlenemedi";
+"裁剪区域无效：%@" = "Geçersiz kırpma alanı: %@";
+"水印缩放比例无效：%@" = "Geçersiz filigran ölçeği: %@";
+"休息 %ld 分钟吧" = "%ld dakika ara verin";
+"读取系统资源清单失败：%@" = "Sistem kaynak listesi okunamadı: %@";
+"声音资源 %@ 未在清单中找到" = "%@ ses kaynağı listede bulunamadı";
+"HTTP 下载失败（状态码 %ld）" = "HTTP indirmesi başarısız oldu (durum kodu %ld)";
+"文件校验失败（期望 %@，实际 %@）" = "Dosya doğrulaması başarısız oldu (beklenen %@, alınan %@)";
+"解压失败：%@" = "Ayıklama başarısız oldu: %@";
+"unzip 退出码 %ld" = "unzip çıkış kodu %ld";
+"%@ 缓存" = "%@ önbelleği";
+"%ld 天未修改" = "%ld gündür değiştirilmedi";
+"Mail 附件下载 · %@" = "Mail eki indirmesi · %@";
+"iPhone/iPad 备份 · %@" = "iPhone/iPad yedeklemesi · %@";
+"AI 工具缓存 · %@" = "Yapay zeka aracı önbelleği · %@";
+"浏览器可再生缓存 · %@" = "Yeniden oluşturulabilir tarayıcı önbelleği · %@";
+"安装包/磁盘镜像 · %@" = "Kurulum dosyası / disk kalıbı · %@";
+"%ld 天前修改" = "%ld gün önce değiştirildi";
+"与 %@ 重复 · 保留副本：%@" = "%@ ögesinin kopyası · saklanan kopya: %@";
+"未完成下载 · %ld 天未修改" = "Tamamlanmamış indirme · %ld gündür değiştirilmedi";
+"项目构建产物 · 项目根：%@" = "Proje derleme çıktıları · proje kökü: %@";
+"可能是已卸载应用残留 · bundle id：%@ · 需确认归属" = "Kaldırılmış bir uygulamadan kalmış olabilir · bundle kimliği: %@ · onay gerekiyor";
+"开机时间： %ld天 %ld小时 %ld分钟" = "Çalışma süresi: %ld g %ld sa %ld dk";
+"无法读取官方天气预警：%@" = "Resmi hava durumu uyarıları okunamadı: %@";
+"更新于 %@" = "%@ tarihinde güncellendi";
+"、" = ", ";
+"；" = "; ";
+"%@：%@。%@" = "%@: %@. %@";

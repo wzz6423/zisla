@@ -270,6 +270,10 @@ struct RichNoteEditor: NSViewRepresentable {
         <div id="editor" contenteditable="\(isEditable)" spellcheck="\(isEditable)" role="textbox" aria-multiline="true"></div>
         <script nonce="\(scriptNonce)">
         (() => {
+          const l10n = {
+            tableHeader: \(javaScriptLiteral(AppLocalization.text("标题"))),
+            imageAlt: \(javaScriptLiteral(AppLocalization.text("图片"))),
+          };
           const editor = document.getElementById('editor');
           const caret = document.createElement('div');
           caret.id = 'caret';
@@ -408,7 +412,7 @@ struct RichNoteEditor: NSViewRepresentable {
               for (let row = 0; row < rowCount; row += 1) {
                 html += '<tr>';
                 for (let column = 0; column < columnCount; column += 1) {
-                  html += row === 0 ? `<th>标题 ${column + 1}</th>` : `<td><br></td>`;
+                  html += row === 0 ? `<th>${l10n.tableHeader} ${column + 1}</th>` : `<td><br></td>`;
                 }
                 html += '</tr>';
               }
@@ -477,7 +481,7 @@ struct RichNoteEditor: NSViewRepresentable {
                 reader.onload = () => resolve(reader.result);
                 reader.readAsDataURL(file);
               });
-              insertImage(dataURL, file.name || '图片');
+              insertImage(dataURL, file.name || l10n.imageAlt);
             }
           });
           editor.addEventListener('dragover', event => event.preventDefault());
@@ -492,7 +496,7 @@ struct RichNoteEditor: NSViewRepresentable {
                 reader.onload = () => resolve(reader.result);
                 reader.readAsDataURL(file);
               });
-              insertImage(dataURL, file.name || '图片');
+              insertImage(dataURL, file.name || l10n.imageAlt);
             }
           });
           window.zisla.setHTML(\(initial));
@@ -670,7 +674,7 @@ struct RichNoteToolbar: View {
             let dataURL = "data:\(mimeType);base64,\(data.base64EncodedString())"
             send(.insertImage(dataURL: dataURL, alt: url.deletingPathExtension().lastPathComponent))
         } catch {
-            showError("无法读取图片：\(error.localizedDescription)")
+            showError(AppLocalization.text("无法读取图片：%@", error.localizedDescription))
         }
     }
 

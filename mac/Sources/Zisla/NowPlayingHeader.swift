@@ -564,7 +564,7 @@ struct PlaybackModeMenu: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(AppLocalization.text("播放模式：%@", mode.title))
+        .help(AppLocalization.text("播放模式：%@", AppLocalization.text(mode.title)))
     }
 }
 

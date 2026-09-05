@@ -2,7 +2,6 @@
 
 /* Common */
 "取消" = "Batal";
-"确定" = "OK";
 "好" = "OK";
 "继续" = "Lanjutkan";
 "删除" = "Hapus";
@@ -25,7 +24,6 @@
 "信息" = "Info";
 "模型" = "Model";
 "宠物" = "Pet";
-"交互" = "Interaksi";
 "下载" = "Unduh";
 "天气" = "Cuaca";
 "更新" = "Pembaruan";
@@ -34,7 +32,6 @@
 "调整语言、外观、启动与展开方式。" = "Sesuaikan bahasa, tampilan, startup, dan metode ekspansi.";
 
 /* Settings - Privacy */
-"管理剪贴板访问与本机数据。" = "Kelola akses clipboard dan data lokal.";
 
 /* Settings - Workflow */
 "管理灵动岛中的工作流模块。" = "Kelola modul alur kerja di Dynamic Island.";
@@ -79,15 +76,12 @@
 "显示在系统时间上方，可与锁屏文字共存" = "Ditampilkan di atas waktu sistem, dapat bersamaan dengan teks layar kunci";
 "侧翼通知" = "Notifikasi Samping";
 "在灵动岛肩部显示任务变化" = "Tampilkan perubahan tugas di bahu Dynamic Island";
-"岛上倒计时" = "Hitung Mundur Island";
 "专注时在收起态灵动岛显示剩余时间" = "Tampilkan waktu tersisa di Dynamic Island yang diciutkan saat fokus";
 "活动展示" = "Tampilan Aktivitas";
 "播放与 AI 任务的折叠时长" = "Durasi pelipatan untuk pemutaran dan tugas AI";
 "专注模式展示" = "Tampilan Mode Fokus";
 "开启或切换专注模式时的显示时长" = "Durasi tampilan saat mengaktifkan atau beralih mode fokus";
 "收起态展示优先级" = "Prioritas Status Ringkas";
-"上移" = "Pindah Atas";
-"下移" = "Pindah Bawah";
 "恢复默认顺序" = "Pulihkan Urutan Default";
 "通知显示器" = "Tampilan Notifikasi";
 "当前显示器" = "Tampilan Saat Ini";
@@ -99,7 +93,6 @@
 "AI 进度与用量" = "Kemajuan dan Penggunaan AI";
 "汇总桌面端与 CLI 工具的运行状态" = "Ringkas status desktop dan alat CLI yang berjalan";
 "语音输入" = "Input Suara";
-"启用语音输入" = "Aktifkan Input Suara";
 "开启后可通过全局快捷键触发语音输入" = "Aktifkan input suara melalui hotkey global";
 "录音模式" = "Mode Perekaman";
 "快捷键" = "Hotkey";
@@ -110,35 +103,25 @@
 "已授权" = "Diotorisasi";
 
 /* Settings - Voice Models */
-"配置本地模型、远端模型与凭据，并选择语音整理使用的模型。" = "Konfigurasi model lokal, model jarak jauh dan kredensial, dan pilih model untuk organisasi suara.";
 "本地模型" = "Model Lokal";
 "远端模型与凭据" = "Model Jarak Jauh dan Kredensial";
 "语音整理模型" = "Model Organisasi Suara";
 "使用模型" = "Gunakan Model";
 "从上方已启用的本地或远端模型中选择" = "Pilih dari model lokal atau jarak jauh yang diaktifkan di atas";
 "不使用模型整理" = "Tidak Ada Organisasi Model";
-"本地" = "Lokal";
-"远端" = "Jarak Jauh";
 "尚未选择模型" = "Belum Ada Model yang Dipilih";
 "在上方添加并启用本地或远端模型后即可选择" = "Tambahkan dan aktifkan model lokal atau jarak jauh di atas untuk memilih";
 "选择后会对语音转写进行整理" = "Akan mengorganisir transkripsi suara setelah pemilihan";
 "测试连接" = "Uji Koneksi";
 "尚未测试连接" = "Belum diuji";
 "正在连接…" = "Menghubungkan…";
-"已发现" = "Ditemukan";
-"个模型" = " model";
 
 
 /* Settings - Models - Hardware Profile */
-"设备档案与推荐模型" = "Profil Perangkat dan Model yang Direkomendasikan";
 "设备" = "Perangkat";
-"综合推荐" = "Rekomendasi Keseluruhan";
-"检测" = "Deteksi";
-"点击下方按钮检测硬件信息" = "Klik tombol di bawah untuk mendeteksi info perangkat keras";
 
 /* Settings - Pet */
 "设置灵动岛内部的宠物形象。" = "Atur tampilan pet di dalam Dynamic Island.";
-"岛上宠物伙伴" = "Teman Pet Island";
 "在灵动岛养一只小宠物" = "Pelihara pet di Dynamic Island";
 "当前宠物" = "Pet Saat Ini";
 "选择内置的宠物形象" = "Pilih tampilan pet bawaan";
@@ -148,7 +131,6 @@
 "右侧" = "Kanan";
 
 /* Settings - Interaction */
-"调整外观、展开方式与隐私行为。" = "Sesuaikan tampilan, metode ekspansi, dan perilaku privasi.";
 "外观" = "Tampilan";
 "界面外观" = "Tampilan UI";
 "灵动岛样式" = "Gaya Dynamic Island";
@@ -159,23 +141,17 @@
 "需要系统批准" = "Persetujuan Sistem Diperlukan";
 "在登录项中允许 zisla 后即可生效" = "Berlaku setelah mengizinkan zisla di item login";
 "打开登录项…" = "Buka Item Login…";
-"展开方式" = "Metode Ekspansi";
 "鼠标移入展开" = "Hover untuk Ekspansi";
 "鼠标进入屏幕顶部感应区时显示" = "Tampilkan saat mouse memasuki zona deteksi atas layar";
-"隐私" = "Privasi";
-"记录剪贴板历史" = "Rekam Riwayat Clipboard";
 "仅本机保存文本和图片" = "Hanya simpan teks dan gambar secara lokal";
-"检测剪贴板链接" = "Deteksi Tautan Clipboard";
 "发现可下载链接时提示" = "Beri tahu saat tautan yang dapat diunduh terdeteksi";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Kelola direktori unduhan, notifikasi unduhan, dan komponen yang diperlukan.";
-"下载器" = "Pengunduh";
 "链接下载" = "Unduhan Tautan";
 "下载视频或音频" = "Unduh video atau audio";
 "默认下载目录" = "Direktori Unduhan Default";
 "选择默认下载目录" = "Pilih Direktori Unduhan Default";
-"下载通知" = "Notifikasi Unduhan";
 "浏览器下载进度" = "Kemajuan Unduhan Browser";
 "在灵动岛显示来源图标与百分比" = "Tampilkan ikon sumber dan persentase di Dynamic Island";
 "原生下载进度" = "Kemajuan Unduhan Native";
@@ -186,18 +162,14 @@
 "安装" = "Pasang";
 "正在查询最新版本…" = "Memeriksa versi terbaru…";
 "正在下载…" = "Mengunduh…";
-"正在下载" = "Mengunduh";
 "正在安装…" = "Memasang…";
 
 /* Settings - Weather */
 "管理天气显示、地点和刷新。" = "Kelola tampilan cuaca, lokasi, dan refresh.";
-"天气显示" = "Tampilan Cuaca";
 "显示当前或自选地区的天气" = "Tampilkan cuaca lokasi saat ini atau kustom";
 "地点" = "Lokasi";
 "默认显示当前所在地" = "Default menampilkan lokasi saat ini";
 "等待刷新" = "Menunggu refresh";
-"拖动调整" = "Seret untuk sesuaikan";
-"的展示顺序" = " urutan tampilan";
 "天气数据" = "Data Cuaca";
 "刷新当前位置与全部自选地区" = "Refresh lokasi saat ini dan semua lokasi kustom";
 "城市、区县或地区" = "Kota, distrik, atau wilayah";
@@ -206,18 +178,11 @@
 /* Settings - Updates */
 "管理版本检查与自动更新。" = "Kelola pemeriksaan versi dan pembaruan otomatis.";
 "更新策略" = "Strategi Pembaruan";
-"手动检查通道" = "Saluran Pemeriksaan Manual";
-"不影响自动更新" = "Tidak memengaruhi pembaruan otomatis";
 "检查更新" = "Periksa Pembaruan";
-"仅检查当前安装包所属的更新通道" = "Hanya periksa saluran pembaruan paket instalasi saat ini";
-"自动安装更新" = "Pasang Pembaruan Otomatis";
-"仅自动安装当前安装包所属通道的新构建" = "Hanya pasang otomatis build baru dari saluran paket instalasi saat ini";
 "版本" = "Versi";
 "尚未检查更新" = "Belum diperiksa untuk pembaruan";
 "正在检查更新" = "Memeriksa pembaruan";
 "已是最新版本" = "Sudah versi terbaru";
-"发现" = "Ditemukan";
-"新版本" = " versi baru";
 
 
 /* Clipboard History Module */
@@ -227,7 +192,6 @@
 "非常用" = "Non-favorit";
 "添加常用信息" = "Tambah Favorit";
 "清空历史（保留常用）" = "Hapus Riwayat (Simpan Favorit)";
-"只看" = "Tampilkan hanya ";
 "还没有剪贴板历史" = "Belum ada riwayat clipboard";
 "复制内容后会自动记录" = "Terekam otomatis setelah menyalin";
 "还没有常用项" = "Belum ada favorit";
@@ -267,25 +231,6 @@
 "发送" = "Kirim";
 
 /* Voice Models - Remote Providers */
-"远端 Provider" = "Provider Jarak Jauh";
-"添加 Provider" = "Tambah Provider";
-"尚未配置远端 Provider" = "Belum ada provider jarak jauh dikonfigurasi";
-"Provider 名称" = "Nama Provider";
-"端点" = "Endpoint";
-"凭据" = "Kredensial";
-"高级路由" = "Routing Lanjutan";
-"添加端点组" = "Tambah Grup Endpoint";
-"添加额外的 URL/Key 轮换组（高级）" = "Tambah grup rotasi URL/Key tambahan (lanjutan)";
-"尚未关联凭据" = "Belum ada kredensial ditautkan";
-"关联凭据" = "Tautkan Kredensial";
-"选择已有凭据，或为此 Provider 新建 API Key 凭据" = "Pilih kredensial yang ada atau buat kredensial API Key baru untuk provider ini";
-"新建 API Key 凭据" = "Kredensial API Key Baru";
-"配置文件路径" = "Path File Konfigurasi";
-"认证文件路径" = "Path File Auth";
-"导入配置" = "Impor Konfigurasi";
-"导入认证" = "Impor Auth";
-"配置" = "Konfigurasi";
-"认证" = "Auth";
 
 
 /* System Monitor */
@@ -297,12 +242,9 @@
 "利用率" = "Penggunaan";
 "渲染" = "Renderer";
 "内存" = "Memori";
-"压力" = "Tekanan";
 "可用" = "Tersedia";
-"共" = "Total";
 "释放" = "Bebaskan";
 "整理系统内存，回收非活跃与压缩页面" = "Organisir memori sistem, pulihkan halaman tidak aktif dan terkompresi";
-"已整理系统内存" = "Memori sistem terorganisir";
 "磁盘" = "Disk";
 "清理" = "Pembersihan";
 "扫描可清理的缓存、日志与开发产物" = "Pindai cache, log, dan artefak build yang dapat dibersihkan";
@@ -317,11 +259,8 @@
 "正在识别" = "Mengidentifikasi";
 "正在获取" = "Mengambil";
 "暂不可用" = "Tidak tersedia";
-"建立基线" = "Membangun baseline";
 
 /* System Cleanup */
-"清理磁盘" = "Bersihkan Disk";
-"扫描应用缓存、日志、临时文件、开发产物、包管理缓存、磁盘镜像、大文件与重复文件" = "Pindai cache aplikasi, log, file sementara, artefak build, cache package manager, disk image, file besar, dan duplikat";
 "取消全选" = "Batalkan Pilih Semua";
 "全选" = "Pilih Semua";
 "选择全部候选项" = "Pilih semua kandidat";
@@ -334,18 +273,8 @@
 "未找到可清理项" = "Tidak ada item pembersihan ditemukan";
 "可安全清理的缓存与日志当前为空" = "Cache dan log yang dapat dibersihkan dengan aman saat ini kosong";
 "展开" = "Perluas";
-"折叠" = "Ciutkan";
-"取消选择" = "Batalkan Pilih";
-"已选" = "Terpilih";
-"项" = " item";
 "移入废纸篓" = "Pindah ke Sampah";
-"将" = "Pindahkan ";
-" 项移入废纸篓？" = " item ke Sampah?";
 "zisla 不会永久删除这些内容。" = "zisla tidak akan menghapus item ini secara permanen.";
-"已移入废纸篓" = "Dipindahkan ke Sampah";
-"清空废纸篓后可释放" = "Dapat dibebaskan setelah mengosongkan Sampah";
-"已处理" = "Diproses";
-"项未完成" = " item belum selesai";
 
 /* Cleanup Categories */
 "应用缓存" = "Cache Aplikasi";
@@ -381,22 +310,12 @@
 "防止用户闲置导致显示器休眠" = "Cegah tidur tampilan karena ketidakaktifan pengguna";
 "防止空闲休眠" = "Cegah Tidur Idle";
 "防止用户闲置导致系统休眠；合盖、低电量或用户主动休眠仍会让 Mac 进入睡眠" = "Cegah tidur sistem karena ketidakaktifan pengguna; penutupan lid, baterai rendah, atau tidur yang diprakarsai pengguna tetap berfungsi";
-"常驻提醒" = "Pengingat Persisten";
-"无媒体占用时，在折叠状态显示番茄钟、亮屏或清洁状态" = "Tampilkan status Pomodoro, tetap nyala, atau pembersihan dalam status diciutkan saat tidak ada media aktif";
 "清理屏幕" = "Bersihkan Layar";
 "全屏黑色遮罩；点击中央「退出清屏」按钮或任意处退出" = "Overlay hitam layar penuh; klik tombol 'Keluar Bersihkan' di tengah atau di mana saja untuk keluar";
 "清理键盘" = "Bersihkan Keyboard";
 "结束清洁" = "Akhiri Pembersihan";
 "恢复键盘输入" = "Pulihkan input keyboard";
 "吞掉键盘输入；再次点击结束" = "Telan input keyboard; klik lagi untuk akhiri";
-"收起置顶" = "Diciutkan di Atas";
-"收起置底" = "Diciutkan di Bawah";
-"收起态压在其他窗口之上（置顶），或被其他窗口和菜单栏图标覆盖（置底）" = "Status diciutkan di atas jendela lain (di atas), atau tertutup oleh jendela lain dan ikon menu bar (di bawah)";
-"屏蔽通知" = "Bisukan Notifikasi";
-"临时不再推送 Zisla 的系统通知；关闭后恢复正常推送（闹钟不受影响）" = "Hentikan sementara push notifikasi sistem Zisla; pulihkan push normal saat dinonaktifkan (alarm tidak terpengaruh)";
-"整理桌面" = "Organisir Desktop";
-"按网格对齐桌面图标；已开启「叠放」时不动任何文件" = "Sejajarkan ikon desktop ke grid; tidak memindahkan file apa pun saat 'Stacks' diaktifkan";
-"App Store 应用" = "Aplikasi App Store";
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Belum ada alarm, tambahkan di bawah";
@@ -420,32 +339,21 @@
 "卸载 Skill？" = "Copot Skill?";
 "卸载" = "Copot";
 "普通 Skill 会移到废纸篓；由 npm、pnpm、yarn、bun 或 Homebrew 全局安装的 Skill 会调用对应包管理器卸载。" = "Skill biasa dipindah ke Sampah; Skill yang dipasang global melalui npm, pnpm, yarn, bun, atau Homebrew dicopot melalui package manager mereka.";
-"已发现 Skills（" = "Skill Ditemukan (";
-"）" = ")";
 
 /* Side Notices */
 "已连接" = "Terhubung";
 "耳机已连接：" = "Headphone terhubung: ";
 "状态已更新" = "Status diperbarui";
 "正在播放" = "Sedang Memutar";
-"正在播放：" = "Sedang memutar: ";
 "AI 任务图标" = "Ikon Tugas AI";
-"个 AI 任务" = " tugas AI";
 "有错误" = " dengan kesalahan";
 "等待操作" = " menunggu tindakan";
 "正在运行" = " berjalan";
-"小工具：" = "Kotak alat: ";
 "工具" = "Alat";
-"专注倒计时：" = "Hitung mundur fokus: ";
-"专注模式：" = "Mode fokus: ";
-"下载中" = " mengunduh";
 "浏览器" = "Browser";
-"下载完成：" = " unduhan selesai: ";
 "视频" = "Video";
 
 /* Empty States */
-"无" = "Tidak ada";
-"无可用内容" = "Tidak Ada Konten Tersedia";
 
 /* Localization and AppKit chrome */
 "外观与语言" = "Tampilan dan Bahasa";
@@ -505,7 +413,6 @@
 "单独修饰键或鼠标侧键需要监听全局事件" = "Tombol modifikasi tunggal atau tombol samping mouse memerlukan pemantauan peristiwa global";
 "应用黑名单" = "Daftar hitam aplikasi";
 "这些应用中的复制不弹提示" = "Penyalinan dari aplikasi ini tidak menampilkan notifikasi";
-"加入当前应用" = "Tambahkan aplikasi saat ini";
 "移出黑名单" = "Hapus dari daftar hitam";
 "识别类型" = "Jenis yang dikenali";
 "控制哪些内容会触发提示" = "Pilih jenis konten yang memunculkan notifikasi";
@@ -516,7 +423,6 @@
 "颜色值" = "Nilai warna";
 "算式" = "Perhitungan";
 "日期时间" = "Tanggal dan waktu";
-"中文文本" = "Teks bahasa Mandarin";
 "非当前系统语言文本" = "Teks dalam bahasa selain bahasa sistem";
 "代码" = "Kode";
 "翻译" = "Terjemahkan";
@@ -2290,3 +2196,192 @@
 "macOS 仍可能因合盖、低电量、用户主动休眠或硬件策略进入睡眠；外接显示器并接通电源时可获得系统原生 clamshell 支持。" = "macOS masih bisa tidur karena layar ditutup, baterai lemah, pengguna menidurkannya sendiri, atau kebijakan perangkat keras; dengan layar eksternal dan daya tersambung, dukungan clamshell asli sistem tersedia.";
 "B站返回 HTTP 412 风控拦截。请先在浏览器登录 B站并完成验证，稍后或更换网络重试；若仍被拦截，需要 Cookies 导入支持后再下载。" = "Bilibili mengembalikan blokir keamanan HTTP 412. Masuk ke Bilibili di browser dan selesaikan verifikasi, coba lagi nanti atau ganti jaringan; jika tetap diblokir, unduhan memerlukan dukungan impor Cookies.";
 "需要授权 zisla 控制 Mail.app\n请打开「系统设置 → 隐私与安全性 → 自动化」，\n在列表中找到并开启 zisla 对 Mail 的访问权限" = "Perlu izin agar zisla dapat mengontrol Mail.app\nBuka «Pengaturan Sistem → Privasi & Keamanan → Otomatisasi»,\ntemukan zisla di daftar lalu aktifkan aksesnya ke Mail";
+"远端模型 %ld" = "Model jarak jauh %ld";
+"更新 %@？" = "Perbarui %@?";
+"将 %@ 从 %@ 更新到 %@" = "Perbarui %@ dari %@ ke %@";
+"卸载 %@？" = "Uninstal %@?";
+"下载 %@？" = "Unduh %@?";
+"正在%@" = "%@ sedang berlangsung";
+"%@ 已完成" = "%@ selesai";
+"%@ 失败" = "%@ gagal";
+"开始 %@" = "Mulai %@";
+"运行 %@" = "Jalankan %@";
+"%ld天 %@" = "%ld hari %@";
+"%ld月" = "B%ld";
+"当前 %@ mm" = "Sekarang %@ mm";
+"今日 %ld%% / %@ mm" = "Hari ini %ld%% / %@ mm";
+"更新 %@" = "Perbarui %@";
+"有效至 %@" = "Berlaku sampai %@";
+"%@，今天" = "%@, hari ini";
+"重复提醒 · %@" = "Pengingat berulang · %@";
+"提醒 · 已完成 · %@" = "Pengingat · Selesai · %@";
+"提醒 · %@" = "Pengingat · %@";
+"已按网格整理 %ld 个项目" = "%ld item dirapikan dalam kisi";
+"已清空废纸篓（%ld 个项目）" = "Tempat Sampah dikosongkan (%ld item)";
+"%ld 个地点" = "%ld lokasi";
+"已加入 %ld 个项目" = "%ld item ditambahkan";
+"已复制 %ld 个文件" = "%ld file disalin";
+"%@；已输入当前文本框并复制" = "%@; diketik ke kolom teks saat ini dan disalin";
+"%@；已复制。请在系统设置的“隐私与安全性 > 辅助功能”中允许 zisla 后重试" = "%@; disalin. Izinkan zisla di Pengaturan Sistem › Privasi & Keamanan › Aksesibilitas, lalu coba lagi";
+"%@；已复制，未能输入原文本框" = "%@; disalin, tetapi tidak dapat diketik ke kolom teks asli";
+"无法打开语音记录目录：%@" = "Tidak dapat membuka folder rekaman suara: %@";
+"%@（下载）" = "%@ (unduh)";
+"%@（重试下载）" = "%@ (unduh ulang)";
+"%@ 字符" = "%@ karakter";
+"%@ 分钟" = "%@ menit";
+"%ld 小时 %ld 分" = "%ld j %ld mnt";
+"%ld 分钟" = "%ld menit";
+"%ld年%ld月%ld日 %@" = "%ld-%ld-%ld %@";
+"附件：%@" = "Lampiran: %@";
+"%ld 度" = "%ld°";
+"已选择 %ld 个文件" = "%ld file dipilih";
+"%ld 页 · %@" = "%ld halaman · %@";
+"%ld 个文件" = "%ld file";
+"合并-%@.pdf" = "gabungan-%@.pdf";
+"已合并为 %@" = "Digabungkan menjadi %@";
+"%@-第%ld页.pdf" = "%@-halaman%ld.pdf";
+"已拆分为 %ld 个 PDF" = "Dipecah menjadi %ld PDF";
+"已生成 %@" = "%@ dibuat";
+"已导出 %ld 张图片" = "%ld gambar diekspor";
+"已导出 %@" = "%@ diekspor";
+"%ld 分钟前" = "%ld menit lalu";
+"%ld 小时前" = "%ld jam lalu";
+"无法读取图片：%@" = "Tidak dapat membaca gambar: %@";
+"无法生成 XLSX：%@" = "Tidak dapat membuat XLSX: %@";
+"识别表格" = "Kenali tabel";
+"已保存：%@" = "Disimpan: %@";
+"保存失败：%@" = "Gagal menyimpan: %@";
+"识别失败：%@" = "Pengenalan gagal: %@";
+"表格已保存：%@" = "Tabel disimpan: %@";
+"%@，结果已复制" = "%@, hasil disalin";
+"上移%@" = "Naikkan %@";
+"下移%@" = "Turunkan %@";
+"删除%@" = "Hapus %@";
+"%ld 字词" = "%ld kata";
+"%ld 字词/分" = "%ld kata/mnt";
+"%ld 秒" = "%ld dtk";
+"已发现 %ld 个模型" = "%ld model ditemukan";
+"%@（已导入）" = "%@ (diimpor)";
+"显示器 %ld" = "Layar %ld";
+"%@快捷键与%@冲突，未保存" = "Pintasan %@ berbenturan dengan %@ dan tidak disimpan";
+"%@快捷键与语音输入冲突，未保存" = "Pintasan %@ berbenturan dengan input suara dan tidak disimpan";
+"正在下载 %ld%%" = "Mengunduh %ld%%";
+"未安装 · %@ · %@" = "Belum diinstal · %@ · %@";
+"%@ · %@ · 可更新到 %@" = "%@ · %@ · dapat diperbarui ke %@";
+"%@；用于自动与手动更新" = "%@; digunakan untuk pembaruan otomatis dan manual";
+"将通过官方安装来源下载并安装 %ld 项缺失工具。工具较多时可能需要一些时间。" = "%ld alat yang belum ada akan diunduh dan diinstal dari sumber resminya. Jika jumlahnya banyak, ini bisa memakan waktu.";
+"将通过官方安装来源更新 %ld 项已安装工具。工具较多时可能需要一些时间。" = "%ld alat yang sudah diinstal akan diperbarui dari sumber resminya. Jika jumlahnya banyak, ini bisa memakan waktu.";
+"%ld 个 AI 任务%@%@" = "%ld tugas AI%@%@";
+"，其中 %ld 个错误" = ", termasuk %ld kesalahan";
+"%@ 下载中 %@：%@" = "%@ mengunduh %@: %@";
+"%@ 正在下载 %ld 个文件" = "%@ sedang mengunduh %ld file";
+"%@ 下载完成：%@" = "%@ selesai mengunduh: %@";
+"%ld 性能" = "%ld performa";
+"%ld 能效" = "%ld efisiensi";
+"%ld 核" = "%ld inti";
+"%ld 核 · " = "%ld inti · ";
+"已整理系统内存 %@" = "Memori sistem %@ dipadatkan";
+"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "%ld di antaranya perlu diperiksa manual. zisla tidak pernah menghapusnya secara permanen.";
+"取消选择%@" = "Batalkan pilihan %@";
+"全选%@" = "Pilih semua di %@";
+"反选%@" = "Balik pilihan di %@";
+"已移入废纸篓 %ld 项；清空废纸篓后可释放 %@" = "%ld item dipindahkan ke Tempat Sampah; mengosongkannya membebaskan %@";
+"已处理 %ld 项，%ld 项未完成" = "%ld item diproses, %ld belum selesai";
+"无法保存录音：%@" = "Tidak dapat menyimpan rekaman: %@";
+"%@快捷键需要输入监控权限" = "Pintasan %@ memerlukan akses Pemantauan Input";
+"%@快捷键与系统或其他应用冲突，未能启用" = "Pintasan %@ berbenturan dengan sistem atau aplikasi lain sehingga tidak dapat diaktifkan";
+"无法保存模型凭据：%@" = "Tidak dapat menyimpan kredensial model: %@";
+"余额脚本不可执行：%@" = "Skrip saldo tidak dapat dieksekusi: %@";
+"余额脚本执行失败（退出状态 %ld）" = "Skrip saldo gagal (status keluar %ld)";
+"渠道请求失败（HTTP %ld）" = "Permintaan ke kanal gagal (HTTP %ld)";
+"切换失败且无法恢复原文件：%@" = "Peralihan gagal dan file asli tidak dapat dipulihkan: %@";
+"%@ 暂不支持语音整理" = "%@ belum mendukung perapian transkrip";
+"未找到 %@ CLI" = "CLI %@ tidak ditemukan";
+"CLI 执行失败：%@" = "CLI gagal: %@";
+"退出状态 %ld" = "status keluar %ld";
+"目标目录不是由 Zisla 管理，已保留原内容：%@" = "Folder tujuan tidak dikelola Zisla, jadi isinya dipertahankan: %@";
+"无法创建 Skills 受管库：%@" = "Tidak dapat membuat pustaka Skills terkelola: %@";
+"找不到 %@ 命令" = "Perintah %@ tidak ditemukan";
+"%@ 卸载失败" = "Tidak dapat menguninstal %@";
+"无法卸载 Skill：%@" = "Tidak dapat menguninstal Skill: %@";
+"Skills 同步失败：%@" = "Sinkronisasi Skills gagal: %@";
+"正在并行执行 · %ld/%ld 已完成" = "Berjalan paralel · %ld/%ld selesai";
+"%ld 项命令失败：%@" = "%ld perintah gagal: %@";
+"CLI 命令超时（超过 %ld 分钟），请检查网络后重试" = "Perintah CLI melewati batas waktu (lebih dari %ld menit). Periksa jaringan lalu coba lagi";
+"Homebrew 需要先信任该公式：%@" = "Homebrew harus memercayai formula ini terlebih dahulu: %@";
+"CLI 命令执行失败（退出码 %ld）" = "Perintah CLI gagal (kode keluar %ld)";
+"模型请求失败（HTTP %ld）" = "Permintaan ke model gagal (HTTP %ld)";
+"读取模型目录失败（HTTP %ld）" = "Tidak dapat membaca katalog model (HTTP %ld)";
+"无法创建 FFT" = "Tidak dapat membuat FFT";
+"B站接口返回异常：%@" = "API bilibili mengembalikan kesalahan: %@";
+"B站媒体轨下载失败：%@" = "Tidak dapat mengunduh trek media bilibili: %@";
+"%@ 返回 HTTP %ld" = "%@ mengembalikan HTTP %ld";
+"%ld 项下载" = "%ld unduhan";
+"API 请求失败（HTTP %@）" = "Permintaan API gagal (HTTP %@)";
+"文件不存在：%@" = "File tidak ditemukan: %@";
+"%@\n原生备用下载失败：%@" = "%@\nUnduhan cadangan bawaan gagal: %@";
+"系统原生媒体封装失败：%@" = "Pengemasan media sistem gagal: %@";
+"文件夹" = "Folder";
+"路径" = "Jalur";
+"文档" = "Dokumen";
+"压缩包" = "Arsip";
+"无法开启登录时启动，请稍后重试。" = "Tidak dapat mengaktifkan Buka saat Masuk. Coba lagi nanti.";
+"无法关闭登录时启动，请稍后重试。" = "Tidak dapat menonaktifkan Buka saat Masuk. Coba lagi nanti.";
+"无法开启登录时启动：%@" = "Tidak dapat mengaktifkan Buka saat Masuk: %@";
+"不支持的 Office 文件：%@" = "File Office tidak didukung: %@";
+"输出文件已存在，未覆盖：%@" = "File keluaran sudah ada dan tidak ditimpa: %@";
+"无法创建转换目录：%@" = "Tidak dapat membuat folder konversi: %@";
+"无法启动 LibreOffice：%@" = "Tidak dapat menjalankan LibreOffice: %@";
+"LibreOffice 转换失败：%@" = "Konversi LibreOffice gagal: %@";
+"通过本机 Homebrew 安装 %@" = "Instal %@ dengan Homebrew lokal";
+"从 GitHub 官方发布下载并安装 %@，无需终端" = "Unduh dan instal %@ dari rilis resmi di GitHub — tanpa Terminal";
+"通过本机 Homebrew 更新 %@" = "Perbarui %@ dengan Homebrew lokal";
+"下载最新版并替换当前使用的 %@" = "Unduh versi terbaru dan gantikan %@ yang sedang digunakan";
+"获取版本信息失败：%@" = "Tidak dapat memperoleh info versi: %@";
+"%@ 没有可用下载" = "Tidak ada unduhan yang tersedia untuk %@";
+"下载地址不可信：%@" = "URL unduhan tidak tepercaya: %@";
+"下载失败：%@" = "Unduhan gagal: %@";
+"安装后无法执行：%@" = "Tidak dapat dieksekusi setelah diinstal: %@";
+"Homebrew 执行失败：%@" = "Homebrew gagal: %@";
+"无法读取 %@ 的版本信息" = "Tidak dapat membaca info versi %@";
+"%@ 退出码 %ld" = "%@ kode keluar %ld";
+"系统媒体封装失败：%@" = "Pengemasan media sistem gagal: %@";
+"无法启动 osascript：%@" = "Tidak dapat menjalankan osascript: %@";
+"不是可访问的本地 PDF 文件：%@" = "Bukan file PDF lokal yang dapat diakses: %@";
+"无法读取 PDF：%@" = "Tidak dapat membaca PDF: %@";
+"PDF 已加密且尚未解锁：%@" = "PDF terenkripsi dan masih terkunci: %@";
+"页码 %ld 超出文档范围" = "Halaman %ld di luar rentang dokumen";
+"旋转角度必须是 90 度的整数倍：%ld" = "Sudut rotasi harus kelipatan 90 derajat: %ld";
+"页码范围无效：%@" = "Rentang halaman tidak valid: %@";
+"同一任务不能重复使用输出文件：%@" = "Tugas yang sama tidak dapat memakai ulang file keluaran: %@";
+"输出文件不能覆盖输入文件：%@" = "File keluaran tidak boleh menimpa file masukan: %@";
+"无法创建输出目录：%@" = "Tidak dapat membuat folder keluaran: %@";
+"无法写入 PDF：%@" = "Tidak dapat menulis PDF: %@";
+"无法渲染第 %ld 页" = "Tidak dapat merender halaman %ld";
+"裁剪区域无效：%@" = "Area pemotongan tidak valid: %@";
+"水印缩放比例无效：%@" = "Skala tanda air tidak valid: %@";
+"休息 %ld 分钟吧" = "Istirahat %ld menit dulu";
+"读取系统资源清单失败：%@" = "Tidak dapat membaca daftar sumber daya sistem: %@";
+"声音资源 %@ 未在清单中找到" = "Aset suara %@ tidak ditemukan dalam daftar";
+"HTTP 下载失败（状态码 %ld）" = "Unduhan HTTP gagal (kode status %ld)";
+"文件校验失败（期望 %@，实际 %@）" = "Verifikasi file gagal (diharapkan %@, diperoleh %@)";
+"解压失败：%@" = "Ekstraksi gagal: %@";
+"unzip 退出码 %ld" = "unzip kode keluar %ld";
+"%@ 缓存" = "Cache %@";
+"%ld 天未修改" = "Tidak diubah selama %ld hari";
+"Mail 附件下载 · %@" = "Unduhan lampiran Mail · %@";
+"iPhone/iPad 备份 · %@" = "Backup iPhone/iPad · %@";
+"AI 工具缓存 · %@" = "Cache alat AI · %@";
+"浏览器可再生缓存 · %@" = "Cache peramban yang dapat dibuat ulang · %@";
+"安装包/磁盘镜像 · %@" = "Pemasang / image disk · %@";
+"%ld 天前修改" = "Diubah %ld hari lalu";
+"与 %@ 重复 · 保留副本：%@" = "Duplikat dari %@ · salinan yang disimpan: %@";
+"未完成下载 · %ld 天未修改" = "Unduhan belum selesai · tidak diubah selama %ld hari";
+"项目构建产物 · 项目根：%@" = "Artefak build proyek · akar proyek: %@";
+"可能是已卸载应用残留 · bundle id：%@ · 需确认归属" = "Mungkin sisa aplikasi yang sudah diuninstal · bundle id: %@ · perlu konfirmasi";
+"开机时间： %ld天 %ld小时 %ld分钟" = "Waktu aktif: %ld h %ld j %ld mnt";
+"无法读取官方天气预警：%@" = "Tidak dapat membaca peringatan cuaca resmi: %@";
+"更新于 %@" = "Diperbarui %@";
+"、" = ", ";
+"；" = "; ";
+"%@：%@。%@" = "%@: %@. %@";

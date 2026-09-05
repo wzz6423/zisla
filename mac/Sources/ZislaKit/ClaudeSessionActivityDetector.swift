@@ -489,8 +489,8 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
     }
 
     private static func apiFailureReason(from value: Any?) -> String {
-        if let status = value as? NSNumber { return "API 请求失败（HTTP \(status.intValue)）" }
-        if let status = value as? String, !status.isEmpty { return "API 请求失败（HTTP \(status)）" }
+        if let status = value as? NSNumber { return AppLocalization.text("API 请求失败（HTTP %@）", String(status.intValue)) }
+        if let status = value as? String, !status.isEmpty { return AppLocalization.text("API 请求失败（HTTP %@）", status) }
         return AppLocalization.text("API 请求失败，未提供详细原因")
     }
 

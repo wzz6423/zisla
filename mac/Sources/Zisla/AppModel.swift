@@ -1043,7 +1043,7 @@ final class AppModel: ObservableObject {
         } else if outcome.arrangedCount == 0 {
           transientMessage = AppLocalization.text("桌面没有需要整理的项目")
         } else {
-          transientMessage = "已按网格整理 \(outcome.arrangedCount) 个项目"
+          transientMessage = AppLocalization.text("已按网格整理 %ld 个项目", outcome.arrangedCount)
         }
       case .failure(let error):
         transientMessage = error.message
@@ -1080,7 +1080,7 @@ final class AppModel: ObservableObject {
 
       switch await DesktopOrganizer.emptyTrash() {
       case .success:
-        transientMessage = "已清空废纸篓（\(count) 个项目）"
+        transientMessage = AppLocalization.text("已清空废纸篓（%ld 个项目）", count)
       case .failure(let error):
         transientMessage = error.message
       }
@@ -1201,7 +1201,7 @@ final class AppModel: ObservableObject {
         weatherLocationState = .failed(message)
         transientMessage = message
       } else {
-        weatherLocationState = .ready("\(ordered.count) 个地点")
+        weatherLocationState = .ready(AppLocalization.text("%ld 个地点", ordered.count))
       }
     }
   }
@@ -1358,7 +1358,7 @@ final class AppModel: ObservableObject {
   func addToShelf(_ urls: [URL]) {
     let count = shelf.add(urls)
     guard count > 0 else { return }
-    transientMessage = "已加入 \(count) 个项目"
+    transientMessage = AppLocalization.text("已加入 %ld 个项目", count)
     selectModule(.shelf)
   }
 
@@ -1376,7 +1376,7 @@ final class AppModel: ObservableObject {
       transientMessage = AppLocalization.text("没有可复制的文件")
       return
     }
-    transientMessage = "已复制 \(urls.count) 个文件"
+    transientMessage = AppLocalization.text("已复制 %ld 个文件", urls.count)
   }
 
   func copyClipboardHistoryItem(_ item: ClipboardHistoryItem) {
@@ -2557,12 +2557,12 @@ final class AppModel: ObservableObject {
       target: target
     ) {
     case .copiedAndPasted:
-      transientMessage = "\(message)；已输入当前文本框并复制"
+      transientMessage = AppLocalization.text("%@；已输入当前文本框并复制", message)
     case .copiedOnly:
       if targetProcessIdentifier != nil, !CGPreflightPostEventAccess() {
-        transientMessage = "\(message)；已复制。请在系统设置的“隐私与安全性 > 辅助功能”中允许 zisla 后重试"
+        transientMessage = AppLocalization.text("%@；已复制。请在系统设置的“隐私与安全性 > 辅助功能”中允许 zisla 后重试", message)
       } else {
-        transientMessage = "\(message)；已复制，未能输入原文本框"
+        transientMessage = AppLocalization.text("%@；已复制，未能输入原文本框", message)
       }
     case .copyFailed:
       transientMessage = AppLocalization.text("无法复制语音转写结果")
@@ -2599,7 +2599,7 @@ final class AppModel: ObservableObject {
       )
       NSWorkspace.shared.open(AppPaths.voiceRecordings)
     } catch {
-      transientMessage = "无法打开语音记录目录：\(error.localizedDescription)"
+      transientMessage = AppLocalization.text("无法打开语音记录目录：%@", error.localizedDescription)
     }
   }
 
@@ -2726,14 +2726,15 @@ final class AppModel: ObservableObject {
     switch reference.source {
     case .local:
       guard let model = aiAgent.store.localModel(id: reference.id) else { return "" }
-      return "本地 · \(model.endpoint.baseURL)"
+      return AppLocalization.text("本地 · %@", "\(model.endpoint.baseURL)")
     case .channel:
       guard let channel = aiAgent.store.channel(id: reference.id) else { return "" }
       let credentialKinds = channel.endpointGroups
         .flatMap(\.accountIDs)
         .compactMap { aiAgent.store.account(id: $0)?.credentialKind.displayName }
+        .map(AppLocalization.text(_:))
       let credential = credentialKinds.first ?? AppLocalization.text("未配置凭据")
-      return "远端 · \(credential)"
+      return AppLocalization.text("远端 · %@", credential)
     }
   }
 

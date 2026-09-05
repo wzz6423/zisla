@@ -326,11 +326,11 @@ private struct TaskProgressRow: View {
 
     private func statusTimeText(_ startedAt: Date, _ now: Date) -> String {
         var parts: [String] = []
-        parts.append("开始 \(startTimeText(startedAt))")
+        parts.append(AppLocalization.text("开始 %@", startTimeText(startedAt)))
         if let processIdentifier = task.processIdentifier {
             parts.append("PID \(processIdentifier)")
         }
-        parts.append("运行 \(elapsedText(from: startedAt, to: now))")
+        parts.append(AppLocalization.text("运行 %@", elapsedText(from: startedAt, to: now)))
         return parts.joined(separator: " · ")
     }
 
@@ -357,7 +357,7 @@ private struct TaskProgressRow: View {
         let minutes = (totalSeconds / 60) % 60
         let seconds = totalSeconds % 60
         let clock = String(format: "%02d:%02d:%02d", hours, minutes, seconds)
-        return days > 0 ? "\(days)天 \(clock)" : clock
+        return days > 0 ? AppLocalization.text("%ld天 %@", days, clock) : clock
     }
 
     private var providerColor: Color {
@@ -494,7 +494,7 @@ private struct UsageHeatmap: View {
         guard let date = week.compactMap({ $0?.date }).first(where: {
             Calendar.current.component(.day, from: $0) == 1
         }) else { return nil }
-        return "\(Calendar.current.component(.month, from: date))月"
+        return AppLocalization.text("%ld月", Calendar.current.component(.month, from: date))
     }
 }
 
