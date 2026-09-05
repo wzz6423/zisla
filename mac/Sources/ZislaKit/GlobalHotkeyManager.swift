@@ -1,3 +1,4 @@
+import AppKit
 import ApplicationServices
 import Carbon.HIToolbox
 import Foundation
@@ -28,6 +29,11 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
 
     private var hotKeyRef: EventHotKeyRef?
     fileprivate private(set) var registeredCarbonHotkeyID: UInt32?
+    private var carbonHotkey: (keyCode: UInt32, modifiers: UInt32)?
+    private var carbonHotkeyIsPressed = false
+    private var menuTrackingPressConsumedAt: Date?
+    private var menuTrackingObservers: [NSObjectProtocol] = []
+    private var menuTrackingPollTimer: Timer?
     private var eventHandler: EventHandlerRef?
     private var eventTap: CFMachPort?
     private var eventTapRunLoopSource: CFRunLoopSource?
@@ -99,6 +105,10 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
 
     public func unregister() {
         releaseSideSpecificHotkey()
+        stopObservingMenuTracking()
+        carbonHotkey = nil
+        carbonHotkeyIsPressed = false
+        menuTrackingPressConsumedAt = nil
         if let hotKeyRef {
             UnregisterEventHotKey(hotKeyRef)
             self.hotKeyRef = nil
@@ -176,7 +186,96 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
             return .registrationFailed
         }
         registeredCarbonHotkeyID = hotKeyID.id
+        carbonHotkey = (keyCode: keyCode, modifiers: modifiers & 0xFFFF)
+        startObservingMenuTracking()
         return .registered
+    }
+
+    /// An NSMenu tracking session pre-empts the application event loop that dispatches Carbon hot
+    /// keys, so a press made while one of our own menus is open only arrives once the menu closes.
+    /// Sampling the hardware key state during tracking keeps the shortcut usable in that window.
+    private func startObservingMenuTracking() {
+        // A bare key belongs to the open menu (Esc closes it, letters type-select), so only modifier
+        // combinations — the ones meant to work globally — get the polling fallback.
+        guard let carbonHotkey, carbonHotkey.modifiers != 0 else { return }
+        guard menuTrackingObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        menuTrackingObservers = [
+            center.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: nil) {
+                [weak self] _ in
+                MainActor.assumeIsolated { self?.beginMenuTrackingPolling() }
+            },
+            center.addObserver(forName: NSMenu.didEndTrackingNotification, object: nil, queue: nil) {
+                [weak self] _ in
+                MainActor.assumeIsolated { self?.endMenuTrackingPolling() }
+            },
+        ]
+    }
+
+    private func stopObservingMenuTracking() {
+        for observer in menuTrackingObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        menuTrackingObservers.removeAll()
+        endMenuTrackingPolling()
+    }
+
+    private func beginMenuTrackingPolling() {
+        guard carbonHotkey != nil, menuTrackingPollTimer == nil else { return }
+        let timer = Timer(timeInterval: 0.025, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.pollCarbonHotkeyDuringMenuTracking() }
+        }
+        menuTrackingPollTimer = timer
+        // Event tracking mode belongs to the common modes, so the timer keeps firing while the menu
+        // owns the main run loop.
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func endMenuTrackingPolling() {
+        menuTrackingPollTimer?.invalidate()
+        menuTrackingPollTimer = nil
+    }
+
+    private func pollCarbonHotkeyDuringMenuTracking() {
+        guard let carbonHotkey else { return }
+        let isPressed = CGEventSource.keyState(
+            .combinedSessionState,
+            key: CGKeyCode(carbonHotkey.keyCode)
+        ) && Self.carbonModifiers(from: NSEvent.modifierFlags) == carbonHotkey.modifiers
+        guard isPressed != carbonHotkeyIsPressed else { return }
+        if isPressed {
+            handleCarbonHotkeyPressed()
+            menuTrackingPressConsumedAt = Date()
+        } else {
+            handleCarbonHotkeyReleased()
+        }
+    }
+
+    static func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
+        var modifiers: UInt32 = 0
+        if flags.contains(.command) { modifiers |= UInt32(cmdKey) }
+        if flags.contains(.shift) { modifiers |= UInt32(shiftKey) }
+        if flags.contains(.option) { modifiers |= UInt32(optionKey) }
+        if flags.contains(.control) { modifiers |= UInt32(controlKey) }
+        return modifiers
+    }
+
+    fileprivate func handleCarbonHotkeyPressed(replayedAfterMenuTracking: Bool = false) {
+        if replayedAfterMenuTracking, let consumedAt = menuTrackingPressConsumedAt {
+            menuTrackingPressConsumedAt = nil
+            // The queued press the tracking loop replays once the menu closes was already delivered
+            // by polling; anything older belongs to a later, genuine keystroke.
+            if Date().timeIntervalSince(consumedAt) < 1 { return }
+        }
+        guard !carbonHotkeyIsPressed else { return }
+        carbonHotkeyIsPressed = true
+        onKeyDown?()
+    }
+
+    fileprivate func handleCarbonHotkeyReleased() {
+        guard carbonHotkeyIsPressed else { return }
+        carbonHotkeyIsPressed = false
+        onKeyUp?()
     }
 
     private func registerSideSpecific(
@@ -401,9 +500,9 @@ private func globalHotkeyEventHandlerCallback(
     let kind = GetEventKind(event)
     MainActor.assumeIsolated {
         if kind == UInt32(kEventHotKeyPressed) {
-            manager.onKeyDown?()
+            manager.handleCarbonHotkeyPressed(replayedAfterMenuTracking: true)
         } else if kind == UInt32(kEventHotKeyReleased) {
-            manager.onKeyUp?()
+            manager.handleCarbonHotkeyReleased()
         }
     }
     return noErr

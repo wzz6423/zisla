@@ -457,12 +457,13 @@ struct ScreenshotEditorTests {
         }
 
         model.tool = .mosaic
-        for shape in ScreenshotObscureShape.allCases {
+        for (index, shape) in ScreenshotObscureShape.allCases.enumerated() {
             let previousCount = model.annotations.count
             model.obscureShape = shape
+            let originX = CGFloat(20 + index * 110)
             try sendMouseDrag(
-                from: CGPoint(x: 40, y: 40),
-                to: CGPoint(x: 130, y: 100),
+                from: CGPoint(x: originX, y: 30),
+                to: CGPoint(x: originX + 70, y: 100),
                 through: interactionView,
                 in: window
             )
@@ -1952,7 +1953,8 @@ struct ScreenshotEditorTests {
         model.add(ScreenshotAnnotation(
             kind: .mosaic,
             rect: selection,
-            lineWidth: 8
+            obscureEffect: .pixelate,
+            obscureStrength: 8
         ))
 
         let original = try #require(sourceImage.cgImage(forProposedRect: nil, context: nil, hints: nil))
@@ -2135,8 +2137,544 @@ struct ScreenshotEditorTests {
     @Test
     func obscureOptionsContainOnlyRectangleBrushPixelateAndBlur() {
         #expect(ScreenshotObscureShape.allCases.map(\.rawValue) == ["rectangle", "brush"])
-        #expect(ScreenshotObscureEffect.allCases.map(\.rawValue) == ["pixelate", "blur"])
+        #expect(ScreenshotObscureEffect.allCases.map(\.rawValue) == ["blur", "pixelate"])
         #expect(!ScreenshotTool.allCases.map(\.rawValue).contains { $0.localizedCaseInsensitiveContains("erase") })
+    }
+
+    @Test
+    func obscureStrengthDrivesTheEffectWithoutTheBrushWidth() throws {
+        let sourceImage = try #require(makeGradientImage(width: 96, height: 96))
+        let selection = CGRect(x: 24, y: 24, width: 48, height: 48)
+
+        func obscured(strength: CGFloat, lineWidth: CGFloat) throws -> CGImage {
+            let model = ScreenshotEditorModel(image: sourceImage)
+            model.add(ScreenshotAnnotation(
+                kind: .mosaic,
+                rect: selection,
+                lineWidth: lineWidth,
+                obscureEffect: .pixelate,
+                obscureStrength: strength
+            ))
+            return try #require(
+                model.imageApplyingMosaics().cgImage(forProposedRect: nil, context: nil, hints: nil)
+            )
+        }
+
+        let thinBrush = try obscured(strength: 4, lineWidth: 1)
+        let thickBrush = try obscured(strength: 4, lineWidth: 12)
+        #expect(rgbaPixels(in: thinBrush) == rgbaPixels(in: thickBrush), "画笔粗细不应影响处理强度")
+
+        let weak = try obscured(strength: 2, lineWidth: 3)
+        let strong = try obscured(strength: 12, lineWidth: 3)
+        #expect(rgbaPixels(in: weak) != rgbaPixels(in: strong), "强度滑块应改变处理效果")
+    }
+
+    @Test
+    func obscureBrushCoverageFollowsLineWidthNotStrength() throws {
+        let sourceImage = try #require(makeCheckerboardImage(width: 96, height: 96))
+        let original = try #require(sourceImage.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let stroke = [CGPoint(x: 20, y: 48), CGPoint(x: 76, y: 48)]
+        let offStroke = CGPoint(x: 48, y: 70)
+
+        func obscured(lineWidth: CGFloat, strength: CGFloat) throws -> CGImage {
+            let model = ScreenshotEditorModel(image: sourceImage)
+            model.add(ScreenshotAnnotation(
+                kind: .mosaic,
+                points: stroke,
+                lineWidth: lineWidth,
+                obscureShape: .brush,
+                obscureEffect: .pixelate,
+                obscureStrength: strength
+            ))
+            return try #require(
+                model.imageApplyingMosaics().cgImage(forProposedRect: nil, context: nil, hints: nil)
+            )
+        }
+
+        func changedOffStroke(in image: CGImage) throws -> Bool {
+            let before = try #require(pixelColor(in: original, at: offStroke))
+            let after = try #require(pixelColor(in: image, at: offStroke))
+            return colorDistance(before, after) > 8
+        }
+
+        #expect(try !changedOffStroke(in: try obscured(lineWidth: 1, strength: 6)))
+        #expect(try changedOffStroke(in: try obscured(lineWidth: 12, strength: 6)))
+        #expect(
+            try !changedOffStroke(in: try obscured(lineWidth: 1, strength: 12)),
+            "强度不应扩大涂抹范围"
+        )
+    }
+
+    @Test
+    func selectedObscureRegionAcceptsNewStrengthAndBrushWidth() throws {
+        let sourceImage = try #require(makeGradientImage(width: 96, height: 96))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let region = ScreenshotAnnotation(
+            kind: .mosaic,
+            rect: CGRect(x: 24, y: 24, width: 48, height: 48),
+            lineWidth: 3,
+            obscureEffect: .pixelate,
+            obscureStrength: 4
+        )
+        model.add(region)
+        let before = try #require(
+            model.imageApplyingMosaics().cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+
+        model.applySelectedStyle(to: region.id, obscureStrength: 12)
+
+        func stored() -> ScreenshotAnnotation? {
+            model.annotations.first(where: { $0.id == region.id })
+        }
+
+        #expect(stored()?.obscureStrength == 12)
+        let after = try #require(
+            model.imageApplyingMosaics().cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        #expect(rgbaPixels(in: before) != rgbaPixels(in: after), "重调强度应重新出图")
+
+        model.applySelectedStyle(to: region.id, lineWidth: 9)
+        #expect(stored()?.lineWidth == 9)
+        #expect(stored()?.obscureStrength == 12, "改粗细不应重置强度")
+
+        model.undo()
+        #expect(stored()?.lineWidth == 3)
+        model.undo()
+        #expect(stored()?.obscureStrength == 4)
+    }
+
+    @Test
+    func obscureToolSelectsAnExistingRegionInsteadOfStackingANewOne() async throws {
+        let size = CGSize(width: 400, height: 300)
+        let selection = CGRect(x: 60, y: 50, width: 220, height: 140)
+        let image = try #require(makeGradientImage(width: 400, height: 300))
+        let model = ScreenshotEditorModel(image: NSImage(size: selection.size))
+        let selectionState = ScreenshotAnnotationSelectionState()
+        model.tool = .mosaic
+        model.obscureShape = .rectangle
+        model.obscureStrength = 9
+        let hostingView = NSHostingView(rootView:
+            ScreenshotEditorView(
+                model: model,
+                selectionState: selectionState,
+                overlayConfiguration: ScreenshotEditorOverlayConfiguration(
+                    backgroundImage: image,
+                    initialSelection: selection,
+                    cropImage: { _ in image }
+                ),
+                onClose: {},
+                onCopy: {},
+                onPinToggle: { _ in },
+                onLongCapture: {}
+            )
+            .frame(width: size.width, height: size.height)
+        )
+        let window = NSWindow(
+            contentRect: CGRect(origin: .zero, size: size),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        window.contentView = hostingView
+        func settle() async {
+            for _ in 0..<3 {
+                hostingView.layoutSubtreeIfNeeded()
+                await Task.yield()
+            }
+        }
+        await settle()
+        let interactionView = try #require(
+            findSubview(ScreenshotPointerInteractionNSView.self, in: hostingView)
+        )
+
+        try sendMouseDrag(
+            from: CGPoint(x: 30, y: 30),
+            to: CGPoint(x: 130, y: 110),
+            through: interactionView,
+            in: window
+        )
+        #expect(model.annotations.count == 1)
+        let region = try #require(model.annotations.first)
+        #expect(region.kind == .mosaic)
+        #expect(region.obscureStrength == 9)
+
+        model.obscureStrength = 3
+        await settle()
+
+        try sendMouseDrag(
+            from: CGPoint(x: 70, y: 70),
+            to: CGPoint(x: 90, y: 90),
+            through: interactionView,
+            in: window
+        )
+        await settle()
+
+        #expect(model.annotations.count == 1, "起点落在已有区域内不应再叠一层")
+        #expect(selectionState.selectedAnnotationID == region.id)
+        #expect(model.obscureStrength == 9, "选中已有区域应把它的强度回填到工具栏")
+
+        model.obscureStrength = 12
+        await settle()
+        #expect(model.annotations.first?.obscureStrength == 12, "滑块应重调选中区域")
+    }
+
+    @Test
+    func obscureStrengthSliderOnlyRetunesARegionUsingThatEffect() async throws {
+        let size = CGSize(width: 400, height: 300)
+        let selection = CGRect(x: 60, y: 50, width: 220, height: 140)
+        let image = try #require(makeGradientImage(width: 400, height: 300))
+        let model = ScreenshotEditorModel(image: NSImage(size: selection.size))
+        let selectionState = ScreenshotAnnotationSelectionState()
+        model.tool = .mosaic
+        model.obscureShape = .rectangle
+        model.obscureEffect = .blur
+        model.blurStrength = 9
+        let hostingView = NSHostingView(rootView:
+            ScreenshotEditorView(
+                model: model,
+                selectionState: selectionState,
+                overlayConfiguration: ScreenshotEditorOverlayConfiguration(
+                    backgroundImage: image,
+                    initialSelection: selection,
+                    cropImage: { _ in image }
+                ),
+                onClose: {},
+                onCopy: {},
+                onPinToggle: { _ in },
+                onLongCapture: {}
+            )
+            .frame(width: size.width, height: size.height)
+        )
+        let window = NSWindow(
+            contentRect: CGRect(origin: .zero, size: size),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        window.contentView = hostingView
+        func settle() async {
+            for _ in 0..<3 {
+                hostingView.layoutSubtreeIfNeeded()
+                await Task.yield()
+            }
+        }
+        await settle()
+        let interactionView = try #require(
+            findSubview(ScreenshotPointerInteractionNSView.self, in: hostingView)
+        )
+
+        try sendMouseDrag(
+            from: CGPoint(x: 30, y: 30),
+            to: CGPoint(x: 130, y: 110),
+            through: interactionView,
+            in: window
+        )
+        let region = try #require(model.annotations.first)
+        #expect(region.obscureEffect == .blur)
+        #expect(region.obscureStrength == 9)
+
+        try sendMouseDrag(
+            from: CGPoint(x: 70, y: 70),
+            to: CGPoint(x: 90, y: 90),
+            through: interactionView,
+            in: window
+        )
+        await settle()
+        #expect(selectionState.selectedAnnotationID == region.id)
+        #expect(model.blurStrength == 9, "选中模糊区域应回填模糊度滑块")
+
+        model.pixelateStrength = 12
+        await settle()
+        #expect(model.annotations.first?.obscureStrength == 9, "格子滑块不应改动模糊区域")
+
+        model.blurStrength = 5
+        await settle()
+        #expect(model.annotations.first?.obscureStrength == 5, "模糊度滑块应重调模糊区域")
+    }
+
+    @Test
+    func mosaicBlurSliderRetunesTheSelectedMosaicWithoutTouchingItsBlocks() async throws {
+        let size = CGSize(width: 400, height: 300)
+        let selection = CGRect(x: 60, y: 50, width: 220, height: 140)
+        let image = try #require(makeGradientImage(width: 400, height: 300))
+        let model = ScreenshotEditorModel(image: NSImage(size: selection.size))
+        let selectionState = ScreenshotAnnotationSelectionState()
+        model.tool = .mosaic
+        model.obscureShape = .rectangle
+        model.obscureEffect = .pixelate
+        model.pixelateStrength = 7
+        let hostingView = NSHostingView(rootView:
+            ScreenshotEditorView(
+                model: model,
+                selectionState: selectionState,
+                overlayConfiguration: ScreenshotEditorOverlayConfiguration(
+                    backgroundImage: image,
+                    initialSelection: selection,
+                    cropImage: { _ in image }
+                ),
+                onClose: {},
+                onCopy: {},
+                onPinToggle: { _ in },
+                onLongCapture: {}
+            )
+            .frame(width: size.width, height: size.height)
+        )
+        let window = NSWindow(
+            contentRect: CGRect(origin: .zero, size: size),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        window.contentView = hostingView
+        func settle() async {
+            for _ in 0..<3 {
+                hostingView.layoutSubtreeIfNeeded()
+                await Task.yield()
+            }
+        }
+        await settle()
+        let interactionView = try #require(
+            findSubview(ScreenshotPointerInteractionNSView.self, in: hostingView)
+        )
+
+        try sendMouseDrag(
+            from: CGPoint(x: 30, y: 30),
+            to: CGPoint(x: 130, y: 110),
+            through: interactionView,
+            in: window
+        )
+        let region = try #require(model.annotations.first)
+        #expect(region.obscureEffect == .pixelate)
+        #expect(region.obscurePixelateStrength == 7)
+        #expect(region.obscureBlurStrength == 0)
+
+        try sendMouseDrag(
+            from: CGPoint(x: 70, y: 70),
+            to: CGPoint(x: 90, y: 90),
+            through: interactionView,
+            in: window
+        )
+        await settle()
+        #expect(selectionState.selectedAnnotationID == region.id)
+        #expect(model.pixelateStrength == 7, "选中马赛克应回填格子滑块")
+        #expect(model.mosaicBlurStrength == 0, "选中马赛克应回填它的模糊叠加值")
+
+        model.mosaicBlurStrength = 6
+        await settle()
+        #expect(model.annotations.first?.obscureBlurStrength == 6, "模糊滑块应给马赛克叠上模糊")
+        #expect(model.annotations.first?.obscurePixelateStrength == 7, "叠模糊不应改动格子大小")
+
+        model.blurStrength = 11
+        await settle()
+        #expect(
+            model.annotations.first?.obscureBlurStrength == 6,
+            "模糊效果自己的强度不应串到马赛克区域"
+        )
+    }
+
+    @Test
+    func mosaicBlurRefractsWhatEachBlockSamplesWhileTheGridStaysHard() throws {
+        let region = CGRect(x: 12, y: 12, width: 96, height: 96)
+        let blockSize = 12
+        func obscured(_ source: NSImage, blurStrength: CGFloat) throws -> CGImage {
+            let model = ScreenshotEditorModel(image: source)
+            model.add(ScreenshotAnnotation(
+                kind: .mosaic,
+                rect: region,
+                obscureShape: .rectangle,
+                obscureEffect: .pixelate,
+                obscureStrength: 4,
+                obscureBlurStrength: blurStrength
+            ))
+            return try #require(
+                model.imageApplyingMosaics().cgImage(forProposedRect: nil, context: nil, hints: nil)
+            )
+        }
+
+        // Coarse blocks of colour, the shape of a real screenshot's panels: what a mosaic has to keep
+        // looking like a mosaic on.
+        let coarse = try #require(
+            makeClusteredNoiseImage(width: 120, height: 120, clusterSize: 24)
+        )
+        let coarseOriginal = try #require(
+            coarse.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        let plainBlocks = try obscured(coarse, blurStrength: 0)
+        let refracted = try obscured(
+            coarse,
+            blurStrength: ScreenshotAnnotation.obscureStrengthUpperBound
+        )
+
+        // Blurring the source before the blocks sample it makes neighbours converge on each other,
+        // which reads as a blur however hard the geometry is; displacing the content must not.
+        let plainContrast = try #require(
+            adjacentBlockContrast(in: plainBlocks, blockSize: blockSize, within: region)
+        )
+        let refractedContrast = try #require(
+            adjacentBlockContrast(in: refracted, blockSize: blockSize, within: region)
+        )
+        #expect(
+            Double(refractedContrast) >= Double(plainContrast) * 0.7,
+            "相邻格子之间应仍然跳变，否则整片看起来就是模糊，实测 \(plainContrast) → \(refractedContrast)"
+        )
+        try expectPixelsOutside(region, unchangedFrom: coarseOriginal, to: refracted)
+        try expectPixelsOutside(region, unchangedFrom: coarseOriginal, to: plainBlocks)
+
+        // Fine detail, the shape of text: here the slider has to visibly bend what each block picks
+        // up, which a coarse panel cannot show because a displaced sample lands on the same colour.
+        let fine = try #require(makeClusteredNoiseImage(width: 120, height: 120, clusterSize: 8))
+        let finePlain = try obscured(fine, blurStrength: 0)
+        let fineRefracted = try obscured(
+            fine,
+            blurStrength: ScreenshotAnnotation.obscureStrengthUpperBound
+        )
+        // The grid has to survive the slider too, which only shows where neighbouring blocks differ:
+        // a pass that softens the blocks themselves leaves no flat centre and reads as a plain blur.
+        let blockRun = try #require(
+            longestFlatRun(in: fineRefracted, alongRow: 60, from: 24, through: 95)
+        )
+        #expect(
+            blockRun >= blockSize - 2,
+            "格子内部应仍是纯色、边界锐利，实测最长同色段 \(blockRun) 像素"
+        )
+        let finePlainPixels = try #require(rgbaPixels(in: finePlain))
+        let fineRefractedPixels = try #require(rgbaPixels(in: fineRefracted))
+        var movedBlocks = 0
+        var totalBlocks = 0
+        var y = Int(region.minY) + blockSize / 2
+        while y < Int(region.maxY) - blockSize / 2 {
+            var x = Int(region.minX) + blockSize / 2
+            while x < Int(region.maxX) - blockSize / 2 {
+                let offset = y * fineRefracted.width * 4 + x * 4
+                totalBlocks += 1
+                if abs(Int(finePlainPixels[offset]) - Int(fineRefractedPixels[offset])) > 8 {
+                    movedBlocks += 1
+                }
+                x += blockSize
+            }
+            y += blockSize
+        }
+        #expect(
+            movedBlocks * 3 >= totalBlocks,
+            "折射应改变多数格子取到的内容，实测 \(movedBlocks)/\(totalBlocks) 个格子变化"
+        )
+    }
+
+    @Test
+    func eachObscureEffectCarriesOnlyTheStrengthsItUses() throws {
+        let mosaic = ScreenshotAnnotation(
+            kind: .mosaic,
+            obscureEffect: .pixelate,
+            obscureStrength: 6
+        )
+        #expect(mosaic.obscurePixelateStrength == 6)
+        #expect(mosaic.obscureBlurStrength == 0, "马赛克默认不叠模糊，观感与拆分前一致")
+
+        let blurred = ScreenshotAnnotation(
+            kind: .mosaic,
+            obscureEffect: .blur,
+            obscureStrength: 6
+        )
+        #expect(blurred.obscureBlurStrength == 6, "模糊效果的主参数就是模糊程度")
+        #expect(blurred.obscureStrength == 6)
+
+        let model = ScreenshotEditorModel(image: try #require(makeGradientImage(width: 64, height: 64)))
+        #expect(model.mosaicBlurStrength == 0)
+        model.obscureEffect = .pixelate
+        model.pixelateStrength = 7
+        model.mosaicBlurStrength = 5
+        #expect(model.obscureStrength == 7)
+        #expect(model.obscureBlurStrength == 5)
+        model.obscureEffect = .blur
+        model.blurStrength = 9
+        #expect(model.obscureStrength == 9)
+        #expect(model.obscureBlurStrength == 9, "模糊效果下模糊滑块就是它的强度")
+    }
+
+    @Test
+    func obscurePopoverShowsEachSliderOnlyWhenItApplies() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zisla/ScreenshotEditorView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let obscureButton = try #require(source.range(of: "private func obscureButton"))
+        let strengthControl = try #require(source.range(
+            of: "private func obscureStrengthControl(",
+            range: obscureButton.upperBound..<source.endIndex
+        ))
+        let popover = source[obscureButton.lowerBound..<strengthControl.lowerBound]
+
+        // 粗细只属于画笔，格子只属于马赛克，模糊两种效果都要能调。
+        #expect(popover.contains("if model.obscureShape == .brush {"))
+        #expect(popover.contains("if model.obscureEffect == .pixelate {"))
+        #expect(popover.contains("title: ScreenshotObscureEffect.pixelate.strengthTitle"))
+        #expect(
+            popover.contains(
+                "\n                obscureStrengthControl(\n"
+                    + "                    title: ScreenshotObscureEffect.blur.strengthTitle"
+            ),
+            "模糊滑块的缩进说明它没有被效果门控包住"
+        )
+        #expect(popover.contains("? 0...ScreenshotAnnotation.obscureStrengthUpperBound"))
+        #expect(popover.contains(": 1...ScreenshotAnnotation.obscureStrengthUpperBound"))
+    }
+
+    @Test
+    func obscureDraftWithAnExistingIDReplacesTheStoredRegion() throws {
+        let sourceImage = try #require(makeGradientImage(width: 96, height: 96))
+        let original = try #require(
+            sourceImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        let region = ScreenshotAnnotation(
+            kind: .mosaic,
+            rect: CGRect(x: 8, y: 8, width: 32, height: 32),
+            lineWidth: 3,
+            obscureShape: .rectangle,
+            obscureEffect: .pixelate,
+            obscureStrength: 8
+        )
+        let model = ScreenshotEditorModel(image: sourceImage)
+        model.add(region)
+
+        var moved = region
+        moved.rect = CGRect(x: 56, y: 56, width: 32, height: 32)
+        let live = try #require(
+            model.imageApplyingMosaics(adding: moved)
+                .cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+
+        let reference = ScreenshotEditorModel(image: sourceImage)
+        reference.add(moved)
+        let committed = try #require(
+            reference.mosaicPreviewImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        #expect(rgbaPixels(in: live) == rgbaPixels(in: committed), "拖动中的打码应替换原位置而非叠加一层")
+
+        let vacated = CGPoint(x: 24, y: 24)
+        let before = try #require(pixelColor(in: original, at: vacated))
+        let after = try #require(pixelColor(in: live, at: vacated))
+        #expect(colorDistance(before, after) <= 8, "离开的位置应恢复原始像素")
+    }
+
+    @Test
+    func eachObscureEffectRemembersItsOwnStrength() {
+        let model = ScreenshotEditorModel(image: NSImage(size: CGSize(width: 32, height: 32)))
+        model.obscureEffect = .pixelate
+        model.obscureStrength = 10
+        #expect(model.pixelateStrength == 10)
+
+        model.obscureEffect = .blur
+        model.obscureStrength = 6
+        #expect(model.blurStrength == 6)
+        #expect(model.pixelateStrength == 10, "调模糊度不应覆盖格子大小")
+
+        model.obscureEffect = .pixelate
+        #expect(model.obscureStrength == 10)
     }
 
     @Test
@@ -2307,6 +2845,218 @@ struct ScreenshotEditorTests {
         #expect(model.pendingTextDraft == nil)
         #expect(model.annotations.isEmpty)
         #expect(!model.canUndo)
+    }
+
+    @Test
+    func imageExportCommitsPendingShapeDraft() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let rect = CGRect(x: 20, y: 30, width: 60, height: 40)
+        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .rectangle,
+            rect: rect,
+            lineWidth: 4
+        ))
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.count == 1)
+        #expect(model.annotations.first?.kind == .rectangle)
+        #expect(model.annotations.first?.rect == rect)
+        #expect(model.canUndo)
+    }
+
+    @Test
+    func imageExportCommitsPendingNumberDraftAndAdvancesCounter() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        model.updatePendingAnnotationDraft(model.numberAnnotation(at: CGPoint(x: 40, y: 50)))
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.map(\.number) == [1])
+
+        model.addNumber(at: CGPoint(x: 90, y: 50))
+        #expect(model.annotations.map(\.number) == [1, 2])
+    }
+
+    @Test
+    func imageExportCommitsPendingBrushAndArrowDrafts() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let brushModel = ScreenshotEditorModel(image: sourceImage)
+        brushModel.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .brush,
+            points: [CGPoint(x: 10, y: 10), CGPoint(x: 25, y: 40), CGPoint(x: 60, y: 70)],
+            lineWidth: 5
+        ))
+
+        _ = try #require(brushModel.pngData())
+
+        #expect(brushModel.pendingAnnotationDraft == nil)
+        #expect(brushModel.annotations.first?.kind == .brush)
+        #expect(brushModel.annotations.first?.points.count == 3)
+
+        let arrowModel = ScreenshotEditorModel(image: sourceImage)
+        arrowModel.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .arrow,
+            points: [CGPoint(x: 10, y: 10), CGPoint(x: 90, y: 80)],
+            arrowStyle: .tapered
+        ))
+
+        _ = try #require(arrowModel.pngData())
+
+        #expect(arrowModel.pendingAnnotationDraft == nil)
+        #expect(arrowModel.annotations.first?.kind == .arrow)
+        #expect(arrowModel.annotations.first?.arrowStyle == .tapered)
+    }
+
+    @Test
+    func imageExportCommitsPendingMosaicDraftAndRefreshesPreview() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        #expect(model.mosaicPreviewImage === sourceImage)
+
+        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .mosaic,
+            rect: CGRect(x: 20, y: 20, width: 80, height: 60),
+            obscureShape: .rectangle,
+            obscureEffect: .pixelate
+        ))
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.first?.kind == .mosaic)
+        #expect(model.mosaicPreviewImage !== sourceImage)
+    }
+
+    @Test
+    func pinnedRenderCommitsPendingEmojiDraft() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .emoji,
+            points: [CGPoint(x: 50, y: 60)],
+            text: "⭐️",
+            fontSize: ScreenshotAnnotationGeometry.defaultEmojiDiameter
+        ))
+
+        _ = model.renderedImage()
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.first?.kind == .emoji)
+        #expect(model.annotations.first?.text == "⭐️")
+    }
+
+    @Test
+    func imageExportCommitsPendingEditDraftWithoutDuplicatingAnnotation() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let annotationID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: annotationID,
+            kind: .ellipse,
+            rect: CGRect(x: 10, y: 10, width: 40, height: 40)
+        ), saveUndo: false)
+
+        var moved = try #require(model.annotations.first)
+        moved.rect = CGRect(x: 60, y: 70, width: 40, height: 40)
+        model.updatePendingAnnotationDraft(moved)
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.count == 1)
+        #expect(model.annotations.first?.id == annotationID)
+        #expect(model.annotations.first?.rect == CGRect(x: 60, y: 70, width: 40, height: 40))
+    }
+
+    @Test
+    func imageExportCommitsPendingTextAndShapeDraftsTogether() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let textID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: textID,
+            kind: .text,
+            points: [CGPoint(x: 80, y: 60)],
+            rect: CGRect(x: 80, y: 50, width: 80, height: 20)
+        ), saveUndo: false)
+        model.beginTextDraft(id: textID, text: "", isNew: true)
+        model.updateTextDraft(id: textID, text: "备注", isNew: true)
+        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .brush,
+            points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 40)]
+        ))
+
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingTextDraft == nil)
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.count == 2)
+        #expect(model.annotations.contains { $0.kind == .text && $0.text == "备注" })
+        #expect(model.annotations.contains { $0.kind == .brush })
+    }
+
+    @Test
+    func imageExportWithoutPendingAnnotationDraftLeavesAnnotationsUntouched() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        model.add(ScreenshotAnnotation(
+            kind: .rectangle,
+            rect: CGRect(x: 5, y: 5, width: 30, height: 30)
+        ), saveUndo: false)
+
+        #expect(!model.commitPendingAnnotationDraft())
+
+        _ = try #require(model.pngData())
+
+        #expect(model.annotations.count == 1)
+        #expect(!model.canUndo)
+    }
+
+    @Test
+    func undoDiscardsPendingAnnotationDraft() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        model.add(ScreenshotAnnotation(
+            kind: .rectangle,
+            rect: CGRect(x: 5, y: 5, width: 30, height: 30)
+        ))
+        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
+            kind: .arrow,
+            points: [CGPoint(x: 10, y: 10), CGPoint(x: 80, y: 80)]
+        ))
+
+        model.undo()
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.isEmpty)
+    }
+
+    @Test
+    func removingAnnotationDiscardsItsPendingDraft() throws {
+        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
+        let model = ScreenshotEditorModel(image: sourceImage)
+        let annotationID = UUID()
+        model.add(ScreenshotAnnotation(
+            id: annotationID,
+            kind: .rectangle,
+            rect: CGRect(x: 5, y: 5, width: 30, height: 30)
+        ), saveUndo: false)
+
+        var edited = try #require(model.annotations.first)
+        edited.rect = CGRect(x: 40, y: 40, width: 30, height: 30)
+        model.updatePendingAnnotationDraft(edited)
+
+        model.remove(id: annotationID)
+        _ = try #require(model.pngData())
+
+        #expect(model.pendingAnnotationDraft == nil)
+        #expect(model.annotations.isEmpty)
     }
 
     @Test
@@ -2905,6 +3655,112 @@ struct ScreenshotEditorTests {
         ) else { return nil }
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
         return pixels
+    }
+
+    /// White canvas carrying pseudo-random dark clusters, which behaves like text under a mosaic:
+    /// every block lands on a colour of its own, so blocks bleeding together shows up as lost
+    /// contrast between them.
+    private func makeClusteredNoiseImage(width: Int, height: Int, clusterSize: Int) -> NSImage? {
+        let bytesPerRow = width * 4
+        var pixels = [UInt8](repeating: 255, count: height * bytesPerRow)
+        var seed: UInt64 = 12345
+        func next() -> UInt64 {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return seed >> 33
+        }
+        for clusterY in 0..<(height / clusterSize) {
+            for clusterX in 0..<(width / clusterSize) where next() % 10 < 4 {
+                for y in (clusterY * clusterSize)..<((clusterY + 1) * clusterSize) {
+                    for x in (clusterX * clusterSize)..<((clusterX + 1) * clusterSize) {
+                        let offset = y * bytesPerRow + x * 4
+                        pixels[offset] = 0
+                        pixels[offset + 1] = 0
+                        pixels[offset + 2] = 0
+                    }
+                }
+            }
+        }
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ), let cgImage = context.makeImage() else {
+            return nil
+        }
+        return NSImage(cgImage: cgImage, size: CGSize(width: width, height: height))
+    }
+
+    /// Mean brightness jump between neighbouring blocks of a mosaic, sampled at block centres. This
+    /// is what separates a mosaic from a blur: blurring the source before the blocks sample it makes
+    /// neighbours converge on each other and drives the jump towards zero, while displacing the
+    /// content leaves neighbouring blocks as unrelated as they were.
+    private func adjacentBlockContrast(
+        in cgImage: CGImage,
+        blockSize: Int,
+        within bounds: CGRect
+    ) -> Int? {
+        guard let pixels = rgbaPixels(in: cgImage) else { return nil }
+        let bytesPerRow = cgImage.width * 4
+        var grid: [[Double]] = []
+        var y = Int(bounds.minY) + blockSize
+        while y < Int(bounds.maxY) - blockSize {
+            var row: [Double] = []
+            var x = Int(bounds.minX) + blockSize
+            while x < Int(bounds.maxX) - blockSize {
+                row.append(Double(pixels[y * bytesPerRow + x * 4]))
+                x += blockSize
+            }
+            grid.append(row)
+            y += blockSize
+        }
+        var jumps: [Double] = []
+        for (rowIndex, row) in grid.enumerated() {
+            for (columnIndex, value) in row.enumerated() {
+                if columnIndex + 1 < row.count {
+                    jumps.append(abs(value - row[columnIndex + 1]))
+                }
+                if rowIndex + 1 < grid.count, columnIndex < grid[rowIndex + 1].count {
+                    jumps.append(abs(value - grid[rowIndex + 1][columnIndex]))
+                }
+            }
+        }
+        guard !jumps.isEmpty else { return nil }
+        return Int(jumps.reduce(0, +) / Double(jumps.count))
+    }
+
+    /// Longest stretch of identically coloured pixels along one row, which is what tells a pixel
+    /// block apart from a gradient a blur would leave behind.
+    private func longestFlatRun(
+        in cgImage: CGImage,
+        alongRow row: Int,
+        from startX: Int,
+        through endX: Int
+    ) -> Int? {
+        guard let pixels = rgbaPixels(in: cgImage),
+              row >= 0, row < cgImage.height,
+              startX >= 0, endX < cgImage.width, startX <= endX
+        else { return nil }
+        let bytesPerRow = cgImage.width * 4
+        func pixel(at x: Int) -> ArraySlice<UInt8> {
+            let offset = row * bytesPerRow + x * 4
+            return pixels[offset..<(offset + 4)]
+        }
+
+        var longest = 1
+        var current = 1
+        for x in (startX + 1)...endX {
+            if pixel(at: x).elementsEqual(pixel(at: x - 1)) {
+                current += 1
+                longest = max(longest, current)
+            } else {
+                current = 1
+            }
+        }
+        return longest
     }
 
     private func colorDistance(
