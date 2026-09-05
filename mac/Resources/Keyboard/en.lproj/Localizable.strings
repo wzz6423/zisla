@@ -54,14 +54,12 @@
 "没有可安装的新版本。" = "No installable update is available.";
 "当前" = "Current";
 "键盘映射" = "Keyboard mapping";
-"改为 GitHub 手动下载" = "Download from GitHub Instead";
 "导航、功能、数字键盘与国际键" = "Navigation, Function, Keypad, and International Keys";
 "Z 行" = "Z row";
 "经典微动" = "Classic Click";
 "回车" = "Return";
 "发现新版本 %@" = "New version available: %@";
 "输入节律变化" = "Typing Rhythm";
-"应用内更新源尚未配置" = "In-app update feed is not configured";
 "静音鼠标" = "Silent Mouse";
 "取消" = "Cancel";
 "时间范围" = "Time Range";
@@ -72,7 +70,6 @@
 "Mac US ANSI 紧凑型" = "Mac US ANSI (Compact)";
 "静音" = "Mute";
 "R4 · Z 行" = "R4 · Z row";
-"正在下载更新…" = "Downloading update…";
 "过去 365 天的高峰与输入习惯" = "Peaks and patterns from the last 365 days";
 "已创建空白草稿" = "Created a blank draft";
 "饱满、集中" = "Full and Focused";
@@ -95,7 +92,6 @@
 "干净、通透" = "Clean and Airy";
 "正在统计输入 · 声音已暂停" = "Recording typing stats · Sounds paused";
 "输入时间线" = "Typing Timeline";
-"应用内更新签名配置无效" = "Invalid in-app update signing configuration";
 "这个阶段不播放声音。" = "No sound is played for this phase.";
 "点击一个键，再在右侧设置继承、静音或独立音频。" = "Click a key, then set it to inherit, mute, or use custom audio on the right.";
 "覆盖方式" = "Override mode";
@@ -113,7 +109,6 @@
 "数据截至 %@" = "Data through %@";
 "这个版本需要前往 GitHub 手动下载安装。" = "This version must be downloaded and installed manually from GitHub.";
 "历史" = "History";
-"开发构建不执行应用内更新" = "In-app updates are unavailable in development builds";
 "如果系统开关已经打开但这里仍显示等待，请选中旧的 Zisla 条目，点列表下方“−”删除，再重新添加 /Applications/Zisla.app。完成后退出并重新打开应用。" = "If Input Monitoring is already enabled but Zisla still shows waiting, remove the old Zisla entry with the “−” button, then add /Applications/Zisla.app again. After that, quit and reopen the app.";
 "自然音色变化（键盘轮换 / 点击音高）" = "Natural variation (keyboard rotation / click pitch)";
 "玻璃触控板" = "Glass Trackpad";
@@ -126,7 +121,6 @@
 "清除" = "Clear";
 "%@ 个输入分钟" = "%@ active typing minutes";
 "已是最新版 %@" = "You're up to date: %@";
-"正在验证并解压…" = "Verifying and extracting…";
 "R1 · 数字行" = "R1 · Number row";
 "监听启动失败" = "Monitoring Failed to Start";
 "更新失败：%@" = "Update failed: %@";
@@ -149,7 +143,6 @@
 "清晰了解每天的输入习惯" = "A clearer view of your daily typing habits";
 "声音与统计均已暂停" = "Sounds and stats paused";
 "更新服务需要升级，请稍后手动查看 GitHub" = "The update service needs an upgrade. Check GitHub manually for now.";
-"正在准备更新…" = "Preparing update…";
 "每格 5 分钟" = "5 minutes per bucket";
 "区间" = "Range";
 "周六" = "Sat";
@@ -176,7 +169,6 @@
 "输入监控正在运行" = "Input Monitoring Active";
 "应用时间线" = "App Timelines";
 "周一" = "Mon";
-"正在安装，Keyboard 将自动重启…" = "Installing. Keyboard will relaunch automatically…";
 "输入统计" = "Typing Stats";
 "日均" = "Daily Avg";
 "清晰、均衡" = "Clear and Balanced";
@@ -220,7 +212,6 @@
 "平滑趋势" = "Smoothed trend";
 "无法启用登录时启动：%@" = "Couldn't enable launch at login: %@";
 "干净、轻快" = "Clean and Light";
-"一键更新并重启" = "Update and Restart";
 "沉稳、硬朗" = "Steady and Firm";
 "周五" = "Fri";
 "读取于 %@" = "Read at %@";
@@ -296,7 +287,6 @@
 "启动" = "Launch";
 "锁定" = "Lock";
 "%@ 个应用" = "%@ apps";
-"更新服务启动失败：%@" = "Update service failed to start: %@";
 "单键" = "Per-key";
 "%@ · %@ 个字符" = "%@ · %@ characters";
 "本机从 %@ 起有可用记录" = "Records on this Mac are available starting %@";

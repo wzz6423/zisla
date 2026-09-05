@@ -1181,7 +1181,6 @@
 "%@ 文件过大" = "%@ è troppo grande";
 "%@字符数曲线" = "Curva dei caratteri di %@";
 "%@：%@ 次" = "%@: %@ battute";
-"一键更新并重启" = "Aggiorna e riavvia";
 "与 %@ 相比" = "Confrontato con %@";
 "今天还没有输入" = "Nessuna digitazione oggi";
 "全年输入热力图" = "Mappa di calore annuale della digitazione";
@@ -1266,7 +1265,6 @@
 "多个资源使用相同路径" = "Più risorse usano lo stesso percorso";
 "峰值 %@ 字符/秒" = "Picco di %@ caratteri/s";
 "已选：%@ · %@" = "Selezionato: %@ · %@";
-"应用内更新源尚未配置" = "Il feed degli aggiornamenti in-app non è configurato";
 "当前离线，稍后可重试" = "Sei offline. Riprova più tardi.";
 "无法分配输入缓冲区。" = "Impossibile allocare il buffer di input.";
 "无法创建源音频缓冲区" = "Impossibile creare il buffer dell’audio di origine";
@@ -1289,10 +1287,8 @@
 "上传完整击键并自动拆分" = "Carica la battuta completa e dividila automaticamente";
 "保存当前修改后即可导出" = "Salva le modifiche per abilitare l’esportazione";
 "启用鼠标与触控板点击音" = "Attiva i suoni del clic di mouse e trackpad";
-"应用内更新签名配置无效" = "Configurazione di firma non valida per gli aggiornamenti in-app";
 "当前音色有未保存的更改" = "Questo pacchetto di suoni ha modifiche non salvate";
 "无法创建目标音频缓冲区" = "Impossibile creare il buffer audio di destinazione";
-"更新服务启动失败：%@" = "Impossibile avviare il servizio di aggiornamento: %@";
 "正在整理过去一年的统计" = "Preparazione delle statistiche dell’ultimo anno";
 "清晰了解每天的输入习惯" = "Uno sguardo più chiaro sulle tue abitudini di digitazione quotidiane";
 "移除这个自定义音色包？" = "Rimuovere questo pacchetto di suoni personalizzato?";
@@ -1305,7 +1301,6 @@
 "前往 GitHub 下载" = "Scarica da GitHub";
 "备用音频转换时长限制无效" = "Il limite di durata della conversione audio di riserva non è valido";
 "导入结果不是自定义音色包" = "Il risultato importato non è un pacchetto di suoni personalizzato.";
-"开发构建不执行应用内更新" = "Gli aggiornamenti in-app non sono disponibili nelle build di sviluppo";
 "无法创建导出音频缓冲区。" = "Impossibile creare il buffer audio di esportazione.";
 "无法读取自定义音频：%@" = "Impossibile leggere l’audio personalizzato: %@";
 "未设置的位置会继承 %@" = "Le posizioni non assegnate erediteranno da %@";
@@ -1332,7 +1327,6 @@
 "开始打字后，曲线会立即出现。" = "Inizia a digitare e il grafico apparirà subito.";
 "当前版本不支持键盘布局：%@" = "Questa versione non supporta il layout di tastiera: %@";
 "所选区间没有可显示的应用记录" = "Nessuna registrazione di app disponibile per l’intervallo selezionato";
-"改为 GitHub 手动下载" = "Scarica da GitHub invece";
 "无法启动备用音频转换器：%@" = "Impossibile avviare il convertitore audio di riserva: %@";
 "正在监听键盘 · 统计已开启" = "Monitoraggio della tastiera · Statistiche attive";
 "正在监听键盘 · 统计已暂停" = "Monitoraggio della tastiera · Statistiche in pausa";
@@ -1629,8 +1623,6 @@
 "已创建空白草稿" = "Bozza vuota creata";
 "最近输入 %@" = "Ultima digitazione %@";
 "未获得下载文件" = "Nessun file è stato scaricato";
-"正在下载更新…" = "Download dell’aggiornamento…";
-"正在准备更新…" = "Preparazione dell’aggiornamento…";
 "正在准备试听…" = "Preparazione dell’anteprima…";
 "正在转换音频…" = "Conversione dell’audio…";
 "移除当前音色包" = "Rimuovi il pacchetto suoni attuale";
@@ -1665,7 +1657,6 @@
 "正在导出音色包…" = "Esportazione del pacchetto suoni…";
 "正在打开音色包…" = "Apertura del pacchetto suoni…";
 "正在移到废纸篓…" = "Spostamento nel Cestino…";
-"正在验证并解压…" = "Verifica ed estrazione…";
 "灵动岛与下载展示" = "Dynamic Island e download";
 "直接写入页面内容" = "Scrivi il contenuto direttamente nella pagina";
 "设置页面裁剪区域" = "Imposta l’area di ritaglio della pagina";
@@ -1816,7 +1807,6 @@
 "可再生数据；下次使用时可能重新生成或下载" = "Dati rigenerabili; potrebbero essere ricreati o scaricati di nuovo";
 "左侧封面、歌名与歌手，右侧音浪与滚动歌词" = "Copertina, titolo e artista a sinistra; onda e testo scorrevole a destra";
 "按所选周期删除过期音频，文字记录继续保留" = "Elimina l’audio scaduto secondo il periodo scelto; le trascrizioni restano";
-"正在安装，Keyboard 将自动重启…" = "Installazione in corso; Keyboard si riavvierà automaticamente…";
 "上传一组按下/回弹音，快速应用到整把键盘。" = "Carica una coppia di suoni di pressione e rilascio per applicarla a tutta la tastiera.";
 "发现新版本后下载，并在退出或重启时完成安装" = "Scarica le nuove versioni e completa l’installazione all’uscita o al riavvio";
 "无法连接代理主机和端口，请检查代理是否运行" = "Impossibile connettersi all’host e alla porta del proxy; verifica se il proxy è in esecuzione";

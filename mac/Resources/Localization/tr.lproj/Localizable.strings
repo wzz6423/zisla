@@ -1181,7 +1181,6 @@
 "%@ 文件过大" = "%@ çok büyük";
 "%@字符数曲线" = "%@ karakter grafiği";
 "%@：%@ 次" = "%@: %@ basış";
-"一键更新并重启" = "Güncelle ve Yeniden Başlat";
 "与 %@ 相比" = "%@ ile karşılaştırıldı";
 "今天还没有输入" = "Bugün henüz yazılmadı";
 "全年输入热力图" = "Yıllık Yazma Isı Haritası";
@@ -1266,7 +1265,6 @@
 "多个资源使用相同路径" = "Birden fazla dosya aynı yolu kullanıyor";
 "峰值 %@ 字符/秒" = "En yüksek %@ karakter/sn";
 "已选：%@ · %@" = "Seçili: %@ · %@";
-"应用内更新源尚未配置" = "Uygulama içi güncelleme akışı yapılandırılmadı";
 "当前离线，稍后可重试" = "Çevrimdışısınız. Daha sonra yeniden deneyin.";
 "无法分配输入缓冲区。" = "Girdi arabelleği ayrılamadı.";
 "无法创建源音频缓冲区" = "Kaynak ses arabelleği oluşturulamadı";
@@ -1289,10 +1287,8 @@
 "上传完整击键并自动拆分" = "Tam tuş vuruşunu yükle ve otomatik ayır";
 "保存当前修改后即可导出" = "Dışa aktarmayı etkinleştirmek için değişikliklerinizi kaydedin";
 "启用鼠标与触控板点击音" = "Fare ve izleme dörtgeni tık seslerini etkinleştir";
-"应用内更新签名配置无效" = "Geçersiz uygulama içi güncelleme imzalama yapılandırması";
 "当前音色有未保存的更改" = "Bu ses paketinde kaydedilmemiş değişiklikler var";
 "无法创建目标音频缓冲区" = "Hedef ses arabelleği oluşturulamadı";
-"更新服务启动失败：%@" = "Güncelleme servisi başlatılamadı: %@";
 "正在整理过去一年的统计" = "Son bir yılın istatistikleri hazırlanıyor";
 "清晰了解每天的输入习惯" = "Günlük yazma alışkanlıklarınıza daha net bir bakış";
 "移除这个自定义音色包？" = "Bu özel ses paketi kaldırılsın mı?";
@@ -1305,7 +1301,6 @@
 "前往 GitHub 下载" = "GitHub'dan indir";
 "备用音频转换时长限制无效" = "Yedek ses dönüştürme süre sınırı geçersiz";
 "导入结果不是自定义音色包" = "İçe aktarılan sonuç özel bir ses paketi değil.";
-"开发构建不执行应用内更新" = "Uygulama içi güncellemeler geliştirme derlemelerinde kullanılamaz";
 "无法创建导出音频缓冲区。" = "Dışa aktarma ses arabelleği oluşturulamadı.";
 "无法读取自定义音频：%@" = "Özel ses okunamadı: %@";
 "未设置的位置会继承 %@" = "Atanmamış yuvalar %@ değerini devralacak";
@@ -1332,7 +1327,6 @@
 "开始打字后，曲线会立即出现。" = "Yazmaya başlayın, grafik hemen görünecek.";
 "当前版本不支持键盘布局：%@" = "Bu sürüm şu klavye düzenini desteklemiyor: %@";
 "所选区间没有可显示的应用记录" = "Seçilen aralık için uygulama kaydı yok";
-"改为 GitHub 手动下载" = "Onun Yerine GitHub'dan İndir";
 "无法启动备用音频转换器：%@" = "Yedek ses dönüştürücü başlatılamadı: %@";
 "正在监听键盘 · 统计已开启" = "Klavye izleniyor · İstatistikler açık";
 "正在监听键盘 · 统计已暂停" = "Klavye izleniyor · İstatistikler duraklatıldı";
@@ -1629,8 +1623,6 @@
 "已创建空白草稿" = "Boş taslak oluşturuldu";
 "最近输入 %@" = "Son giriş %@";
 "未获得下载文件" = "İndirilen dosya oluşmadı";
-"正在下载更新…" = "Güncelleme indiriliyor…";
-"正在准备更新…" = "Güncelleme hazırlanıyor…";
 "正在准备试听…" = "Ön dinleme hazırlanıyor…";
 "正在转换音频…" = "Ses dönüştürülüyor…";
 "移除当前音色包" = "Geçerli ses paketini kaldır";
@@ -1665,7 +1657,6 @@
 "正在导出音色包…" = "Ses paketi dışa aktarılıyor…";
 "正在打开音色包…" = "Ses paketi açılıyor…";
 "正在移到废纸篓…" = "Çöp Sepeti'ne taşınıyor…";
-"正在验证并解压…" = "Doğrulanıyor ve çıkartılıyor…";
 "灵动岛与下载展示" = "Dynamic Island ve indirmeler";
 "直接写入页面内容" = "Doğrudan sayfa içeriğine yaz";
 "设置页面裁剪区域" = "Sayfa kırpma alanını ayarla";
@@ -1816,7 +1807,6 @@
 "可再生数据；下次使用时可能重新生成或下载" = "Yeniden üretilebilir veri; sonraki kullanımda yeniden oluşturulabilir ya da indirilebilir";
 "左侧封面、歌名与歌手，右侧音浪与滚动歌词" = "Solda kapak, şarkı adı ve sanatçı; sağda ses dalgası ve akan şarkı sözleri";
 "按所选周期删除过期音频，文字记录继续保留" = "Süresi geçen sesleri seçilen döneme göre sil; metin kayıtları saklanır";
-"正在安装，Keyboard 将自动重启…" = "Kuruluyor, Keyboard kendiliğinden yeniden başlatılacak…";
 "上传一组按下/回弹音，快速应用到整把键盘。" = "Tüm klavyeye uygulamak için tek bir basma/bırakma sesi çifti yükleyin.";
 "发现新版本后下载，并在退出或重启时完成安装" = "Yeni sürümleri indir ve kurulumu çıkışta ya da yeniden başlatmada tamamla";
 "无法连接代理主机和端口，请检查代理是否运行" = "Vekil sunucu adresine ve portuna bağlanılamadı, vekil sunucunun çalışıp çalışmadığını denetleyin";
