@@ -335,6 +335,13 @@ enum ScreenshotObscureEffect: String, CaseIterable, Identifiable {
         case .pixelate: "马赛克"
         }
     }
+
+    var strengthTitle: String {
+        switch self {
+        case .blur: "模糊度"
+        case .pixelate: "格子"
+        }
+    }
 }
 
 struct ScreenshotRGBA: Equatable {
@@ -519,6 +526,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
     var number = 1
     var obscureShape: ScreenshotObscureShape = .rectangle
     var obscureEffect: ScreenshotObscureEffect = .blur
+    var obscureStrength: CGFloat = 3
     var rotation: CGFloat = 0
 
     init(
@@ -534,6 +542,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         number: Int = 1,
         obscureShape: ScreenshotObscureShape = .rectangle,
         obscureEffect: ScreenshotObscureEffect = .blur,
+        obscureStrength: CGFloat = 3,
         rotation: CGFloat = 0
     ) {
         self.id = id
@@ -548,6 +557,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         self.number = number
         self.obscureShape = obscureShape
         self.obscureEffect = obscureEffect
+        self.obscureStrength = obscureStrength
         self.rotation = rotation
     }
 }
@@ -1092,6 +1102,7 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var selectedEmoji = "⭐️"
     @Published var obscureShape: ScreenshotObscureShape = .rectangle
     @Published var obscureEffect: ScreenshotObscureEffect = .blur
+    @Published var obscureStrength: CGFloat = 3
     @Published var statusMessage: String?
     @Published var isPinned = false
     @Published private(set) var isLongCapturePreviewing = false
@@ -1150,7 +1161,8 @@ final class ScreenshotEditorModel: ObservableObject {
         color: ScreenshotRGBA? = nil,
         lineWidth: CGFloat? = nil,
         arrowStyle: ScreenshotArrowStyle? = nil,
-        fontSize: CGFloat? = nil
+        fontSize: CGFloat? = nil,
+        obscureStrength: CGFloat? = nil
     ) {
         guard let annotation = annotations.first(where: { $0.id == annotationID }) else { return }
         var updated = annotation
@@ -1173,6 +1185,15 @@ final class ScreenshotEditorModel: ObservableObject {
         case .text, .emoji:
             if let fontSize, annotation.fontSize != fontSize {
                 updated.fontSize = fontSize
+                changed = true
+            }
+        case .mosaic:
+            if let lineWidth, annotation.lineWidth != lineWidth {
+                updated.lineWidth = lineWidth
+                changed = true
+            }
+            if let obscureStrength, annotation.obscureStrength != obscureStrength {
+                updated.obscureStrength = obscureStrength
                 changed = true
             }
         default:
@@ -1493,7 +1514,7 @@ final class ScreenshotEditorModel: ObservableObject {
                 let pixelate = CIFilter(name: "CIPixellate")
                 pixelate?.setValue(output, forKey: kCIInputImageKey)
                 pixelate?.setValue(
-                    max(8, annotation.lineWidth * 3) * max(scaleX, scaleY),
+                    max(8, annotation.obscureStrength * 3) * max(scaleX, scaleY),
                     forKey: kCIInputScaleKey
                 )
                 let pixelated = pixelate?.outputImage
@@ -1502,7 +1523,7 @@ final class ScreenshotEditorModel: ObservableObject {
                 let blur = CIFilter(name: "CIGaussianBlur")
                 blur?.setValue(output, forKey: kCIInputImageKey)
                 blur?.setValue(
-                    max(4, annotation.lineWidth * 1.5) * max(scaleX, scaleY),
+                    max(4, annotation.obscureStrength * 1.5) * max(scaleX, scaleY),
                     forKey: kCIInputRadiusKey
                 )
                 let blurred = blur?.outputImage
@@ -3501,6 +3522,9 @@ struct ScreenshotEditorView: View {
                 model.arrowStyle = annotation.arrowStyle
             case .text, .emoji:
                 model.fontSize = annotation.fontSize
+            case .mosaic:
+                model.lineWidth = annotation.lineWidth
+                model.obscureStrength = annotation.obscureStrength
             default:
                 break
             }
@@ -3520,6 +3544,10 @@ struct ScreenshotEditorView: View {
         .onChange(of: model.fontSize) { _, newValue in
             guard let annotationID = selectionState.selectedAnnotationID else { return }
             model.applySelectedStyle(to: annotationID, fontSize: newValue)
+        }
+        .onChange(of: model.obscureStrength) { _, newValue in
+            guard let annotationID = selectionState.selectedAnnotationID else { return }
+            model.applySelectedStyle(to: annotationID, obscureStrength: newValue)
         }
     }
 
@@ -4187,7 +4215,8 @@ struct ScreenshotEditorView: View {
                 rect: draftRect,
                 lineWidth: model.lineWidth,
                 obscureShape: .rectangle,
-                obscureEffect: model.obscureEffect
+                obscureEffect: model.obscureEffect,
+                obscureStrength: model.obscureStrength
             )
         case .brush:
             guard draftPoints.count > 1 else { return nil }
@@ -4196,7 +4225,8 @@ struct ScreenshotEditorView: View {
                 points: draftPoints,
                 lineWidth: model.lineWidth,
                 obscureShape: .brush,
-                obscureEffect: model.obscureEffect
+                obscureEffect: model.obscureEffect,
+                obscureStrength: model.obscureStrength
             )
         }
     }
@@ -4468,7 +4498,8 @@ struct ScreenshotEditorView: View {
                 color: model.color,
                 lineWidth: model.lineWidth,
                 obscureShape: model.obscureShape,
-                obscureEffect: model.obscureEffect
+                obscureEffect: model.obscureEffect,
+                obscureStrength: model.obscureStrength
             )
         case .brush:
             guard draftPoints.count > 1 else { return nil }
@@ -4512,7 +4543,7 @@ struct ScreenshotEditorView: View {
         case .number: [.number]
         case .text: [.text]
         case .emoji: [.emoji]
-        case .mosaic: []
+        case .mosaic: [.mosaic]
         }
         return model.annotations.reversed().first {
             guard expectedKinds.contains($0.kind) else { return false }
@@ -4852,10 +4883,27 @@ struct ScreenshotEditorView: View {
 
                 Divider().frame(height: 24)
 
-                Slider(value: $model.lineWidth, in: 1...12, step: 1)
-                    .frame(width: 110)
-                    .help("调整范围")
-                Text("\(Int(model.lineWidth.rounded()))")
+                if model.obscureShape == .brush {
+                    Text("粗细")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(width: 36, alignment: .leading)
+                    Slider(value: $model.lineWidth, in: 1...12, step: 1)
+                        .frame(width: 90)
+                        .help("画笔粗细")
+                    Text("\(Int(model.lineWidth.rounded()))")
+                        .font(.system(size: 11, design: .monospaced))
+                        .frame(width: 18, alignment: .trailing)
+
+                    Divider().frame(height: 24)
+                }
+
+                Text(model.obscureEffect.strengthTitle)
+                    .font(.system(size: 11, weight: .medium))
+                    .frame(width: 36, alignment: .leading)
+                Slider(value: $model.obscureStrength, in: 1...12, step: 1)
+                    .frame(width: 90)
+                    .help(model.obscureEffect.strengthTitle)
+                Text("\(Int(model.obscureStrength.rounded()))")
                     .font(.system(size: 11, design: .monospaced))
                     .frame(width: 18, alignment: .trailing)
             }
