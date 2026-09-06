@@ -86,8 +86,16 @@ struct QuickNoteModuleView: View {
                                     .overlay(Color.dividerSubtle)
                                     .padding(.vertical, 3)
                             }
-                            ForEach(service.regularNotes) { note in
-                                noteRow(note)
+                            ForEach(Array(service.regularNotes.enumerated()), id: \.element.id) { index, note in
+                                if index < 9 {
+                                    noteRow(note)
+                                        .keyboardShortcut(
+                                            KeyEquivalent(Character(String(index + 1))),
+                                            modifiers: .command
+                                        )
+                                } else {
+                                    noteRow(note)
+                                }
                             }
                         }
                     }
