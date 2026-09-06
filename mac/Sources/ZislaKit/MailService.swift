@@ -37,6 +37,46 @@ private enum MailScriptError: Error, Sendable {
     case failed(String)
 }
 
+@MainActor
+final class MailOperationQueue {
+    typealias Operation = @MainActor () async -> MailOperationResult
+    typealias ActivityHandler = @MainActor (Bool) -> Void
+
+    private struct PendingOperation {
+        let operation: Operation
+        let continuation: CheckedContinuation<MailOperationResult, Never>
+    }
+
+    private var pending: [PendingOperation] = []
+    private var workerTask: Task<Void, Never>?
+    var onActivityChange: ActivityHandler?
+
+    func enqueue(_ operation: @escaping Operation) async -> MailOperationResult {
+        await withCheckedContinuation { continuation in
+            pending.append(PendingOperation(operation: operation, continuation: continuation))
+            onActivityChange?(true)
+            startWorkerIfNeeded()
+        }
+    }
+
+    private func startWorkerIfNeeded() {
+        guard workerTask == nil else { return }
+        workerTask = Task { [weak self] in
+            await self?.drain()
+        }
+    }
+
+    private func drain() async {
+        while !pending.isEmpty {
+            let next = pending.removeFirst()
+            let result = await next.operation()
+            next.continuation.resume(returning: result)
+        }
+        workerTask = nil
+        onActivityChange?(false)
+    }
+}
+
 /// Reads multiple inboxes and performs mail operations via the user's configured Mail.app.
 ///
 /// Mail.app is the sole source of accounts and credentials; Zisla only stores the user-selected account names,
@@ -52,6 +92,7 @@ public final class MailService: ObservableObject {
 
     private let commandRunner: (String, Bool) async -> Result<MailScriptOutput, MailScriptError>
     private let indexReader: MailIndexReader
+    private let mutationQueue = MailOperationQueue()
     private var pollingTask: Task<Void, Never>?
     private var selectedAccountNames: Set<String> = []
 
@@ -65,6 +106,9 @@ public final class MailService: ObservableObject {
     ) {
         self.commandRunner = commandRunner
         self.indexReader = indexReader
+        mutationQueue.onActivityChange = { [weak self] isActive in
+            self?.isMutating = isActive
+        }
     }
 
     deinit {
@@ -403,19 +447,17 @@ public final class MailService: ObservableObject {
     }
 
     private func perform(_ script: String) async -> MailOperationResult {
-        guard !isMutating else { return .failed(AppLocalization.text("正在处理另一项邮件操作")) }
         guard Self.isMailRunning() else {
             return .failed(Self.mailUnavailableMessage(isRunning: false) ?? AppLocalization.text("Mail.app 当前未运行"))
         }
-        isMutating = true
-        defer { isMutating = false }
-
-        switch await commandRunner(script, false) {
-        case .success:
-            await refresh()
-            return .success
-        case let .failure(error):
-            return .failed(Self.message(for: error))
+        return await mutationQueue.enqueue { [self] in
+            switch await self.commandRunner(script, false) {
+            case .success:
+                await self.refresh()
+                return .success
+            case let .failure(error):
+                return .failed(Self.message(for: error))
+            }
         }
     }
 
