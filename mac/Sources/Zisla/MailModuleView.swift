@@ -166,6 +166,10 @@ struct MailModuleView: View {
                     LazyVStack(spacing: 0) {
                         ForEach(visibleMessages) { message in
                             messageRow(message)
+                                .onAppear {
+                                    guard message.id == visibleMessages.last?.id else { return }
+                                    Task { await mail.loadMore() }
+                                }
                         }
                     }
                 }

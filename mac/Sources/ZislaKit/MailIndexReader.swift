@@ -18,7 +18,7 @@ struct MailIndexReader: Sendable {
     let databaseURL: URL
     let maxMessages: Int
 
-    init(databaseURL: URL? = nil, maxMessages: Int = 30) {
+    init(databaseURL: URL? = nil, maxMessages: Int = 10) {
         self.databaseURL = databaseURL ?? Self.defaultDatabaseURL()
         self.maxMessages = min(max(1, maxMessages), 120)
     }
@@ -43,7 +43,7 @@ struct MailIndexReader: Sendable {
         return indexURL ?? mailDirectory.appendingPathComponent("V10/MailData/Envelope Index")
     }
 
-    func snapshot(accountNames: Set<String>) throws -> MailSnapshot {
+    func snapshot(accountNames: Set<String>, offset: Int = 0) throws -> MailSnapshot {
         guard FileManager.default.isReadableFile(atPath: databaseURL.path) else {
             throw MailIndexReaderError.unavailable
         }
@@ -75,7 +75,7 @@ struct MailIndexReader: Sendable {
             MailScriptAccount(name: name, emailAddresses: addresses.sorted())
         }
         guard !queriedMailboxes.isEmpty else {
-            return MailSnapshot(accounts: accounts, messages: [])
+            return MailSnapshot(accounts: accounts, messages: [], hasMore: false)
         }
 
         let mailboxPlaceholders = Array(repeating: "?", count: queriedMailboxes.count).joined(separator: ", ")
@@ -101,7 +101,7 @@ struct MailIndexReader: Sendable {
             LEFT JOIN summaries AS sm ON sm.ROWID = m.summary
             WHERE m.deleted = 0 AND m.mailbox IN (\(mailboxPlaceholders))
             ORDER BY COALESCE(m.display_date, m.date_received) DESC, m.message_id DESC, m.ROWID DESC
-            LIMIT ?
+            LIMIT ? OFFSET ?
             """
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
@@ -117,7 +117,14 @@ struct MailIndexReader: Sendable {
         guard sqlite3_bind_int(
             statement,
             Int32(queriedMailboxes.count + 1),
-            Int32(maxMessages)
+            Int32(maxMessages + 1)
+        ) == SQLITE_OK else {
+            throw MailIndexReaderError.queryFailed
+        }
+        guard sqlite3_bind_int(
+            statement,
+            Int32(queriedMailboxes.count + 2),
+            Int32(max(0, offset))
         ) == SQLITE_OK else {
             throw MailIndexReaderError.queryFailed
         }
@@ -148,9 +155,11 @@ struct MailIndexReader: Sendable {
             throw MailIndexReaderError.queryFailed
         }
 
+        let hasMore = rows.count > maxMessages
         return MailSnapshot(
             accounts: accounts,
-            messages: rows
+            messages: Array(rows.prefix(maxMessages)),
+            hasMore: hasMore
         )
     }
 
