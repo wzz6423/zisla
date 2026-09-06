@@ -178,6 +178,11 @@ public final class NowPlayingService: ObservableObject {
     var expiresAt: Date
   }
 
+  private struct PersistentControlOverride<Value: Equatable> {
+    var identity: ControlIdentity
+    var value: Value
+  }
+
   public enum Command: Int, Sendable {
     case play = 0
     case pause = 1
@@ -234,6 +239,7 @@ public final class NowPlayingService: ObservableObject {
   /// Full artist name resolved from the lyrics API (MediaRemote usually returns only the first artist).
   private var resolvedArtist: String?
   private var playbackModeOverride: TimedControlOverride<NowPlayingPlaybackMode>?
+  private var playbackModeCycleOverride: PersistentControlOverride<NowPlayingPlaybackMode>?
   private var playbackStateOverride: TimedControlOverride<Bool>?
   private var favoriteOverride: TimedControlOverride<Bool>?
   private var specialistFavoriteIdentity: ControlIdentity?
@@ -262,6 +268,7 @@ public final class NowPlayingService: ObservableObject {
     guard preferredSource != preference else { return }
     preferredSource = preference
     playbackModeOverride = nil
+    playbackModeCycleOverride = nil
     playbackStateOverride = nil
     favoriteOverride = nil
     specialistFavoriteIdentity = nil
@@ -447,6 +454,7 @@ public final class NowPlayingService: ObservableObject {
     resolvedLyrics = nil
     resolvedArtist = nil
     playbackModeOverride = nil
+    playbackModeCycleOverride = nil
     playbackStateOverride = nil
     favoriteOverride = nil
     specialistFavoriteIdentity = nil
@@ -539,6 +547,7 @@ public final class NowPlayingService: ObservableObject {
   @discardableResult
   public func setPlaybackMode(_ mode: NowPlayingPlaybackMode) -> Bool {
     guard let current = snapshot, current.supportsControls else { return false }
+    playbackModeCycleOverride = nil
     if usesAdapter {
       let commands = Self.playbackModeAdapterCommands(mode)
       playbackModeCommandGeneration &+= 1
@@ -589,12 +598,13 @@ public final class NowPlayingService: ObservableObject {
         currentMode: current.playbackMode ?? fallbackMode
       )
     {
-      playbackModeOverride = TimedControlOverride(
+      playbackModeCycleOverride = PersistentControlOverride(
         identity: ControlIdentity(current),
-        value: nextMode,
-        expiresAt: .now.addingTimeInterval(controlOverrideLifetime)
+        value: nextMode
       )
-      schedulePlaybackModeOverrideExpiration()
+      playbackModeOverride = nil
+      playbackModeOverrideExpirationTask?.cancel()
+      playbackModeOverrideExpirationTask = nil
       resolveSnapshot()
       return true
     }
@@ -1493,6 +1503,13 @@ public final class NowPlayingService: ObservableObject {
         playbackModeOverrideExpirationTask = nil
       } else {
         snapshot.playbackMode = playbackModeOverride.value
+      }
+    }
+    if let playbackModeCycleOverride {
+      if playbackModeCycleOverride.identity != identity {
+        self.playbackModeCycleOverride = nil
+      } else {
+        snapshot.playbackMode = playbackModeCycleOverride.value
       }
     }
     if let favoriteOverride {

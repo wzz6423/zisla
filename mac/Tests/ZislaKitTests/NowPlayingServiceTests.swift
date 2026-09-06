@@ -449,6 +449,17 @@ struct NowPlayingServiceTests {
     }
 
     @Test
+    func approximatePlaybackModeCycleKeepsTheExpectedOrder() {
+        let first = NowPlayingService.nextPlaybackMode(after: .sequential)
+        let second = NowPlayingService.nextPlaybackMode(after: first)
+        let third = NowPlayingService.nextPlaybackMode(after: second)
+
+        #expect(first == .repeatOne)
+        #expect(second == .random)
+        #expect(third == .sequential)
+    }
+
+    @Test
     func cachedPlaybackModeDoesNotInventControlCapability() {
         var snapshot = NowPlayingSnapshot(
             title: "Track",
