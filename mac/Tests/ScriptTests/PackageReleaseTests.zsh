@@ -392,8 +392,14 @@ function expect_version_failure() {
     print -u2 -r -- "actual:           $output"
     exit 1
   fi
+  [[ ! -e "$TEMPORARY_ROOT/invalid-version" ]] || {
+    print -u2 -r -- "FAIL: invalid VERSION '$version' created packaging output"
+    exit 1
+  }
 }
 
+expect_version_failure "" "VERSION is required"
+expect_version_failure unknow "VERSION must be a semantic version"
 expect_version_failure \
   "1.2.3/../../escape" \
   "VERSION must be a semantic version"

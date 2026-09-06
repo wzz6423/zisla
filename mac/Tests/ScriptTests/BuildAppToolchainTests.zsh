@@ -130,7 +130,7 @@ expect_architecture_failure \
   "duplicate architecture: arm64"
 
 (
-  unset DEVELOPER_DIR
+  unset DEVELOPER_DIR VERSION BUILD_NUMBER
   PATH="$FAKE_BIN:$PATH" \
     FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
     FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
@@ -151,6 +151,10 @@ expect_architecture_failure \
   exit 1
 }
 RELEASE_PLIST="$TEMPORARY_ROOT/output/zisla.app/Contents/Info.plist"
+[[ "$(plutil -extract CFBundleShortVersionString raw -o - "$RELEASE_PLIST")" == "unknow" ]] || {
+  print -u2 -r -- "FAIL: an unset VERSION did not render unknow"
+  exit 1
+}
 [[ "$(plutil -extract CFBundleIdentifier raw -o - "$RELEASE_PLIST")" == "dev.wzz.zisla" ]] || {
   print -u2 -r -- "FAIL: release Bundle ID was not rendered"
   exit 1
@@ -213,4 +217,70 @@ cmp -s "$DEBUG_APP/Contents/Resources/AppIcon.icns" "$DEBUG_APP/Contents/Resourc
   exit 1
 }
 
+function expect_version() {
+  local version="$1"
+  local expected_version="$2"
+  local channel="$3"
+  local plist="$TEMPORARY_ROOT/version-output/zisla.app/Contents/Info.plist"
+
+  PATH="$FAKE_BIN:$PATH" \
+    FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
+    FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
+    FAKE_XCODE_APP="$XCODE_APP" \
+    VERSION="$version" \
+    BUILD_NUMBER=42 \
+    UPDATE_CHANNEL="$channel" \
+    DEBUG_BUILD=false \
+    BUILD_ARCHITECTURES=arm64 \
+    CODE_SIGN_IDENTITY=- \
+    SIGNING_MODE=adhoc \
+    OUTPUT_DIRECTORY="$TEMPORARY_ROOT/version-output" \
+    "$TEST_ROOT/Scripts/build-app.sh" >/dev/null
+
+  [[ "$(plutil -extract CFBundleShortVersionString raw -o - "$plist")" == "$expected_version" && \
+    "$(plutil -extract CFBundleVersion raw -o - "$plist")" == "42" && \
+    "$(plutil -extract ZislaDefaultUpdateChannel raw -o - "$plist")" == "$channel" ]] || {
+    print -u2 -r -- "FAIL: VERSION '$version' did not render the expected version, build number, and channel"
+    exit 1
+  }
+}
+
+function expect_version_failure() {
+  local version="$1"
+  local output
+  local capture="$TEMPORARY_ROOT/invalid-version-build.txt"
+  local output_directory="$TEMPORARY_ROOT/invalid-version-output"
+
+  if output="$(
+    PATH="$FAKE_BIN:$PATH" \
+      FAKE_CAPTURE_FILE="$capture" \
+      FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
+      FAKE_XCODE_APP="$XCODE_APP" \
+      VERSION="$version" \
+      BUILD_ARCHITECTURES=arm64 \
+      CODE_SIGN_IDENTITY=- \
+      SIGNING_MODE=adhoc \
+      OUTPUT_DIRECTORY="$output_directory" \
+      "$TEST_ROOT/Scripts/build-app.sh" 2>&1
+  )"; then
+    print -u2 -r -- "FAIL: invalid VERSION '$version' was accepted"
+    exit 1
+  fi
+  [[ "$output" == *"VERSION must be unknow or a semantic version"* && \
+    ! -e "$capture" && ! -e "$output_directory" ]] || {
+    print -u2 -r -- "FAIL: invalid VERSION '$version' did not fail before building or writing output"
+    print -u2 -r -- "$output"
+    exit 1
+  }
+}
+
+expect_version "" unknow release
+expect_version unknow unknow release
+expect_version 1.2.3 1.2.3 release
+expect_version 1.2.3-preview.1 1.2.3-preview.1 preview
+expect_version_failure unknown
+expect_version_failure v1.2.3
+expect_version_failure "1.2.3/../../escape"
+
 print -r -- "PASS: build-app identity, data, icon, and architecture isolation"
+print -r -- "PASS: 8 build-app version cases"
