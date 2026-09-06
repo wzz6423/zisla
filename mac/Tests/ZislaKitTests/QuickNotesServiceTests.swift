@@ -34,6 +34,20 @@ struct QuickNotesServiceTests {
     }
 
     @Test
+    func commandNumberShortcutsUseOnlyRegularNotesAndStopAtNine() throws {
+        let source = try String(
+            contentsOf: sourceRoot.appendingPathComponent("Sources/Zisla/QuickNoteModuleView.swift"),
+            encoding: .utf8
+        )
+        let regularNotesStart = try #require(source.range(of: "ForEach(Array(service.regularNotes.enumerated())"))
+        let regularNotesBlock = source[regularNotesStart.lowerBound...]
+
+        #expect(!source[..<regularNotesStart.lowerBound].contains("keyboardShortcut"))
+        #expect(regularNotesBlock.contains("index < 9"))
+        #expect(regularNotesBlock.contains("KeyEquivalent(Character(String(index + 1)))"))
+    }
+
+    @Test
     func loadsWelcomeNoteTextFromBundledResource() {
         let chinese = QuickNotesService.welcomeNoteText(language: .simplifiedChinese)
         #expect(chinese.contains("从现在开始，你可以在记事本中写记事了。"))
