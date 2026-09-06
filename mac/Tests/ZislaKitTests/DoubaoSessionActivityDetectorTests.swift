@@ -9,7 +9,7 @@ struct DoubaoSessionActivityDetectorTests {
         let root = makeDoubaoTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        try Data("cache".utf8).write(to: root.appendingPathComponent("data.json"))
+        _ = try writeDoubaoChatActivity(in: root)
 
         let tasks = try DoubaoSessionActivityDetector(
             dataRoots: [root],
@@ -28,7 +28,7 @@ struct DoubaoSessionActivityDetectorTests {
         let root = makeDoubaoTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        try Data("bridge configuration".utf8).write(to: root.appendingPathComponent("bridge.json"))
+        _ = try writeDoubaoChatActivity(in: root)
 
         #expect(try DoubaoSessionActivityDetector(
             dataRoots: [root],
@@ -43,8 +43,7 @@ struct DoubaoSessionActivityDetectorTests {
         let root = makeDoubaoTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let fileURL = root.appendingPathComponent("old-data.json")
-        try Data("old".utf8).write(to: fileURL)
+        let fileURL = try writeDoubaoChatActivity(in: root, named: "old-data.log")
         let oldTime = Date().addingTimeInterval(-7200)
         try FileManager.default.setAttributes(
             [.modificationDate: oldTime],
@@ -76,15 +75,13 @@ struct DoubaoSessionActivityDetectorTests {
         let root = makeDoubaoTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let oldFile = root.appendingPathComponent("old.json")
-        try Data("old".utf8).write(to: oldFile)
+        let oldFile = try writeDoubaoChatActivity(in: root, named: "old.log")
         try FileManager.default.setAttributes(
             [.modificationDate: Date().addingTimeInterval(-300)],
             ofItemAtPath: oldFile.path
         )
 
-        let newFile = root.appendingPathComponent("new.json")
-        try Data("new".utf8).write(to: newFile)
+        _ = try writeDoubaoChatActivity(in: root, named: "new.log")
 
         let tasks = try DoubaoSessionActivityDetector(
             dataRoots: [root],
@@ -95,11 +92,117 @@ struct DoubaoSessionActivityDetectorTests {
         #expect(tasks.count == 1)
         #expect(tasks[0].updatedAt > Date().addingTimeInterval(-60))
     }
+
+    @Test
+    func ignoresRecentNonChatCacheFiles() throws {
+        let root = makeDoubaoTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cacheURL = root.appendingPathComponent("Default/GPUCache/data_1")
+        try FileManager.default.createDirectory(
+            at: cacheURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("cache".utf8).write(to: cacheURL)
+
+        let tasks = try DoubaoSessionActivityDetector(
+            dataRoots: [root],
+            recencyThreshold: 3600,
+            scanInterval: 0,
+            isDoubaoRunning: { true }
+        ).activeTasks()
+
+        #expect(tasks.isEmpty)
+    }
+
+    @Test
+    func expiresCachedActivityAtTheRecencyThreshold() throws {
+        let root = makeDoubaoTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var current = Date(timeIntervalSince1970: 1_900_000_000)
+        let activityURL = try writeDoubaoChatActivity(in: root)
+        try FileManager.default.setAttributes(
+            [.modificationDate: current.addingTimeInterval(-1)],
+            ofItemAtPath: activityURL.path
+        )
+        let detector = DoubaoSessionActivityDetector(
+            dataRoots: [root],
+            recencyThreshold: 60,
+            scanInterval: 120,
+            isDoubaoRunning: { true },
+            now: { current }
+        )
+
+        #expect(try detector.activeTasks().count == 1)
+
+        current = current.addingTimeInterval(60)
+
+        #expect(try detector.activeTasks().isEmpty)
+    }
+
+    @Test
+    func expiresCachedActivityAfterRescanWithUnchangedSignature() throws {
+        let root = makeDoubaoTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var current = Date(timeIntervalSince1970: 1_900_000_000)
+        let activityURL = try writeDoubaoChatActivity(in: root)
+        try FileManager.default.setAttributes(
+            [.modificationDate: current.addingTimeInterval(-1)],
+            ofItemAtPath: activityURL.path
+        )
+        let detector = DoubaoSessionActivityDetector(
+            dataRoots: [root],
+            recencyThreshold: 60,
+            scanInterval: 0,
+            isDoubaoRunning: { true },
+            now: { current }
+        )
+
+        #expect(try detector.activeTasks().count == 1)
+
+        current = current.addingTimeInterval(60)
+
+        #expect(try detector.activeTasks().isEmpty)
+    }
+
+    @Test
+    func defaultRecencyThresholdExpiresActivityAfterNinetySeconds() throws {
+        let root = makeDoubaoTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var current = Date(timeIntervalSince1970: 1_900_000_000)
+        let activityURL = try writeDoubaoChatActivity(in: root)
+        try FileManager.default.setAttributes(
+            [.modificationDate: current.addingTimeInterval(-89)],
+            ofItemAtPath: activityURL.path
+        )
+        let detector = DoubaoSessionActivityDetector(
+            dataRoots: [root],
+            scanInterval: 120,
+            isDoubaoRunning: { true },
+            now: { current }
+        )
+
+        #expect(try detector.activeTasks().count == 1)
+
+        current = current.addingTimeInterval(2)
+
+        #expect(try detector.activeTasks().isEmpty)
+    }
 }
 
 private func makeDoubaoTempRoot() -> URL {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("Zisla-doubao-\(UUID().uuidString)", isDirectory: true)
     try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    return url
+}
+
+private func writeDoubaoChatActivity(in root: URL, named: String = "000001.log") throws -> URL {
+    let directory = root.appendingPathComponent(
+        "Default/IndexedDB/chrome_doubao-chat_0.indexeddb.leveldb",
+        isDirectory: true
+    )
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let url = directory.appendingPathComponent(named)
+    try Data("chat activity".utf8).write(to: url)
     return url
 }

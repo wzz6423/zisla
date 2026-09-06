@@ -5,6 +5,7 @@ import ZislaCore
 
 public final class CodexSessionActivityDetector {
     public static let defaultMaximumRolloutAge: TimeInterval = 30 * 24 * 60 * 60
+    public static let defaultUnverifiedActivityLifetime: TimeInterval = 30
 
     private struct Candidate {
         var url: URL
@@ -140,9 +141,13 @@ public final class CodexSessionActivityDetector {
     private let jsonlReader: IncrementalJSONLReader
     private let now: () -> Date
     private let processIdentifiersForOpenFiles: ([URL]) -> [URL: Int32]
+    private let processStartDatesForProcessIdentifiers: (Set<Int32>) -> [Int32: Date]
     private let clientProvidersForProcessIdentifiers: (Set<Int32>) -> [Int32: AIProvider]
+    private let unverifiedActivityLifetime: TimeInterval
     private var cache: [URL: CachedRollout] = [:]
     private var sessionIndexCache: CachedSessionIndex?
+    private var confirmedActiveTurnIDs = Set<String>()
+    private var firstUnverifiedActivityAtByTurnID: [String: Date] = [:]
 
     static let incrementalVerificationBytes = 4 * 1_024
 
@@ -166,8 +171,11 @@ public final class CodexSessionActivityDetector {
         fileManager: FileManager = .default,
         processIdentifiersForOpenFiles: @escaping ([URL]) -> [URL: Int32]
             = CodexSessionActivityDetector.defaultProcessIdentifiersForOpenFiles,
+        processStartDatesForProcessIdentifiers: @escaping (Set<Int32>) -> [Int32: Date]
+            = CodexSessionActivityDetector.defaultProcessStartDatesForProcessIdentifiers,
         clientProvidersForProcessIdentifiers: @escaping (Set<Int32>) -> [Int32: AIProvider]
             = CodexSessionActivityDetector.defaultClientProvidersForProcessIdentifiers,
+        unverifiedActivityLifetime: TimeInterval = CodexSessionActivityDetector.defaultUnverifiedActivityLifetime,
         now: @escaping () -> Date = Date.init
     ) {
         self.sessionsDirectory = sessionsDirectory
@@ -179,7 +187,9 @@ public final class CodexSessionActivityDetector {
         jsonlReader = IncrementalJSONLReader(initialTailBytes: initialTailBytes)
         self.fileManager = fileManager
         self.processIdentifiersForOpenFiles = processIdentifiersForOpenFiles
+        self.processStartDatesForProcessIdentifiers = processStartDatesForProcessIdentifiers
         self.clientProvidersForProcessIdentifiers = clientProvidersForProcessIdentifiers
+        self.unverifiedActivityLifetime = max(0, unverifiedActivityLifetime)
         self.now = now
     }
 
@@ -281,14 +291,49 @@ public final class CodexSessionActivityDetector {
             }
         }
 
-        let activeTurnIDs = Set(active.keys)
         let processIdentifiersByURL = processIdentifiersForOpenFiles(
             Array(Set(active.values.map(\.rolloutURL)))
+        )
+        let processStartDatesByProcessIdentifier = processStartDatesForProcessIdentifiers(
+            Set(processIdentifiersByURL.values)
         )
         let clientProvidersByProcessIdentifier = clientProvidersForProcessIdentifiers(
             Set(processIdentifiersByURL.values)
         )
+        let observedAt = now()
+        var activeTurnIDs = Set<String>()
+
+        func permitsUnverifiedActivity(for turnID: String) -> Bool {
+            guard !confirmedActiveTurnIDs.contains(turnID) else { return false }
+            let firstObservedAt = firstUnverifiedActivityAtByTurnID[turnID] ?? observedAt
+            firstUnverifiedActivityAtByTurnID[turnID] = firstObservedAt
+            return observedAt.timeIntervalSince(firstObservedAt) <= unverifiedActivityLifetime
+        }
+
+        for (turnID, record) in active {
+            guard let processIdentifier = processIdentifiersByURL[record.rolloutURL] else {
+                if permitsUnverifiedActivity(for: turnID) {
+                    activeTurnIDs.insert(turnID)
+                }
+                continue
+            }
+            guard let processStartedAt = processStartDatesByProcessIdentifier[processIdentifier] else {
+                if permitsUnverifiedActivity(for: turnID) {
+                    activeTurnIDs.insert(turnID)
+                }
+                continue
+            }
+            guard processStartedAt <= record.event.timestamp else { continue }
+            confirmedActiveTurnIDs.insert(turnID)
+            firstUnverifiedActivityAtByTurnID.removeValue(forKey: turnID)
+            activeTurnIDs.insert(turnID)
+        }
+        confirmedActiveTurnIDs.formIntersection(activeTurnIDs)
+        firstUnverifiedActivityAtByTurnID = firstUnverifiedActivityAtByTurnID.filter {
+            activeTurnIDs.contains($0.key)
+        }
         let tasks = active.values
+            .filter { activeTurnIDs.contains($0.event.turnID) }
             .map { record in
                 let event = record.event
                 let processIdentifier = processIdentifiersByURL[record.rolloutURL]
@@ -356,6 +401,20 @@ public final class CodexSessionActivityDetector {
             fromProcessList: data,
             matching: processIdentifiers
         )
+    }
+
+    public static func defaultProcessStartDatesForProcessIdentifiers(
+        _ processIdentifiers: Set<Int32>
+    ) -> [Int32: Date] {
+        guard !processIdentifiers.isEmpty,
+              let data = runProcessOutput(
+                  executableURL: URL(fileURLWithPath: "/bin/ps"),
+                  arguments: ["-axo", "pid=,lstart="],
+                  timeout: 2
+              ) else {
+            return [:]
+        }
+        return parseProcessStartDates(fromProcessList: data, matching: processIdentifiers)
     }
 
     static func runProcessOutput(
@@ -483,6 +542,31 @@ public final class CodexSessionActivityDetector {
             }
         }
         return providers
+    }
+
+    static func parseProcessStartDates(
+        fromProcessList data: Data,
+        matching processIdentifiers: Set<Int32>
+    ) -> [Int32: Date] {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "EEE MMM d HH:mm:ss yyyy"
+
+        var startDates: [Int32: Date] = [:]
+        for line in String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline) {
+            let fields = line.split(whereSeparator: \.isWhitespace)
+            guard fields.count >= 6,
+                  let processIdentifier = Int32(fields[0]),
+                  processIdentifiers.contains(processIdentifier) else {
+                continue
+            }
+            let value = fields[1...5].map(String.init).joined(separator: " ")
+            if let startDate = formatter.date(from: value) {
+                startDates[processIdentifier] = startDate
+            }
+        }
+        return startDates
     }
 
     private static func sortOrder(for kind: Event.Kind) -> Int {
