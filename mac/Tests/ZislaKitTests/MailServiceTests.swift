@@ -97,6 +97,17 @@ struct MailServiceTests {
     }
 
     @Test @MainActor
+    func inboxScriptReadsRequestedPageAndSignalsOlderMessages() {
+        let script = MailService.inboxScript(accountNames: [], pageSize: 10, offset: 20)
+
+        #expect(script.contains("set startIndex to 20 + 1"))
+        #expect(script.contains("set endIndex to 20 + 10"))
+        #expect(script.contains("if startIndex <= endIndex then"))
+        #expect(script.contains("set hasMoreMessages to true"))
+        #expect(script.contains("return {accountRows, messageRows, hasMoreMessages}"))
+    }
+
+    @Test @MainActor
     func inboxScriptIsDefensiveAgainstUnreachableAccountsAndMessages() {
         let script = MailService.inboxScript(accountNames: [])
 
