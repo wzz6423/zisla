@@ -8,6 +8,8 @@ import ZislaCore
 /// Doubao is a PWA shell with no structured AI task log, so a running application and recent local-data
 /// activity are both required before reporting an active session.
 public final class DoubaoSessionActivityDetector: AIActivityDetecting {
+    public static let defaultRecencyThreshold: TimeInterval = 90
+
     private struct Candidate {
         var url: URL
         var modificationDate: Date
@@ -19,6 +21,7 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
 
     private let fileManager: FileManager
     private let isDoubaoRunning: () -> Bool
+    private let now: () -> Date
     private var cachedTask: AIProgressTask?
     private var cachedSignature: String?
     private var lastScanAt: Date = .distantPast
@@ -27,10 +30,11 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     public init(
         dataRoots: [URL]? = nil,
         maxFiles: Int = 32,
-        recencyThreshold: TimeInterval = 10 * 60,
+        recencyThreshold: TimeInterval = DoubaoSessionActivityDetector.defaultRecencyThreshold,
         scanInterval: TimeInterval = 5,
         fileManager: FileManager = .default,
-        isDoubaoRunning: (() -> Bool)? = nil
+        isDoubaoRunning: (() -> Bool)? = nil,
+        now: @escaping () -> Date = Date.init
     ) {
         if let dataRoots {
             self.dataRoots = dataRoots
@@ -41,10 +45,11 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
             )
         }
         self.maxFiles = max(1, maxFiles)
-        self.recencyThreshold = recencyThreshold
+        self.recencyThreshold = max(0, recencyThreshold)
         self.scanInterval = max(0, scanInterval)
         self.fileManager = fileManager
         self.isDoubaoRunning = isDoubaoRunning ?? Self.isDoubaoRunning
+        self.now = now
     }
 
     public func activeTasks() throws -> [AIProgressTask] {
@@ -54,22 +59,26 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
             return []
         }
 
-        let now = Date()
+        let now = now()
+        let cutoff = now.addingTimeInterval(-recencyThreshold)
         if now.timeIntervalSince(lastScanAt) < scanInterval,
-           let cached = cachedTask {
+           let cached = cachedTask,
+           cached.updatedAt > cutoff {
             return [cached]
         }
         lastScanAt = now
 
         let candidates = recentFiles()
         let signature = signature(for: candidates)
-        if signature == cachedSignature, let cached = cachedTask {
+        if signature == cachedSignature,
+           let cached = cachedTask,
+           cached.updatedAt > cutoff {
             return [cached]
         }
         cachedSignature = signature
 
         guard let latest = candidates.first,
-              latest.modificationDate > now.addingTimeInterval(-recencyThreshold) else {
+              latest.modificationDate > cutoff else {
             cachedTask = nil
             return []
         }
@@ -165,7 +174,8 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
                 guard let values = try? url.resourceValues(forKeys: [
                     .isRegularFileKey,
                     .contentModificationDateKey,
-                ]), values.isRegularFile == true else { continue }
+                ]), values.isRegularFile == true,
+                      Self.isChatActivityFile(url) else { continue }
                 candidates.append(Candidate(
                     url: url,
                     modificationDate: values.contentModificationDate ?? .distantPast
@@ -180,5 +190,11 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     private func signature(for candidates: [Candidate]) -> String {
         candidates.prefix(8).map { "\($0.url.lastPathComponent):\($0.modificationDate.timeIntervalSince1970)" }
             .joined(separator: "|")
+    }
+
+    private static func isChatActivityFile(_ url: URL) -> Bool {
+        let path = url.path.lowercased()
+        return path.contains("/indexeddb/")
+            && (path.contains("doubao-chat") || path.contains("doubao_chat"))
     }
 }
