@@ -224,6 +224,7 @@
 "移出常用" = "Xóa khỏi Yêu thích";
 "设为常用" = "Thêm vào Yêu thích";
 "文本" = "Văn bản";
+"拷贝于 %@" = "Đã sao chép lúc %@";
 
 /* Quick Notes Module */
 "备忘录暂无笔记" = "Không có ghi chú trong ứng dụng Notes";

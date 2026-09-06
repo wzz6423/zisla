@@ -1,6 +1,7 @@
 import AppKit
 import Testing
 import ZislaCore
+import ZislaKit
 
 @testable import Zisla
 
@@ -149,6 +150,40 @@ struct LocalizedTextFitTests {
                 #expect(!text.isEmpty, "\(language.rawValue) 的「\(key)」为空")
                 guard language != .simplifiedChinese, language != .traditionalChinese else { continue }
                 #expect(text != key, "\(language.rawValue) 缺「\(key)」的译文")
+            }
+        }
+    }
+
+    @Test
+    func clipboardRowSubtitleFitsEveryLanguage() {
+        let font = NSFont.systemFont(ofSize: 9, weight: .medium)
+        // 820pt 岛宽扣除模块、列表、缩略图和右侧操作区后的可用宽度。
+        let available: CGFloat = 386
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
+        let copiedAt = calendar.date(
+            from: DateComponents(year: 2025, month: 12, day: 31, hour: 23, minute: 59, second: 59)
+        )!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+        let timestamp = ClipboardHistoryItem(content: .text("剪贴板内容"), lastCopiedAt: copiedAt)
+            .lastCopiedAtText(now: now, calendar: calendar)
+
+        for language in AppLanguage.allCases {
+            for kind in ["文本", "图片", "文件"] {
+                let copiedAtText = AppLocalization.string("拷贝于 %@", language: language)
+                #expect(copiedAtText.contains("%@"), "\(language.rawValue) 的拷贝时间译文缺少占位符")
+                if language != .simplifiedChinese {
+                    #expect(copiedAtText != "拷贝于 %@", "\(language.rawValue) 缺少拷贝时间译文")
+                }
+                let subtitle = AppLocalization.string(kind, language: language)
+                    + " · "
+                    + AppLocalization.format("拷贝于 %@", locale: language.locale, [timestamp])
+                #expect(subtitle.contains(timestamp), "\(language.rawValue) 的时间戳未进入剪贴板副标题")
+                let width = Self.width(subtitle, font: font)
+                #expect(
+                    width <= available,
+                    "\(language.rawValue) 的「\(subtitle)」宽 \(Int(width))pt，超出 \(Int(available))pt"
+                )
             }
         }
     }

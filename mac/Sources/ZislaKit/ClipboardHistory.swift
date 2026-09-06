@@ -136,6 +136,22 @@ public struct ClipboardHistoryItem: Identifiable, Codable, Equatable, Sendable {
         self.isPinned = isPinned
     }
 
+    public func lastCopiedAtText(now: Date = Date(), calendar: Calendar = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = calendar.timeZone
+
+        if calendar.isDate(lastCopiedAt, inSameDayAs: now) {
+            formatter.dateFormat = "HH:mm:ss"
+        } else if calendar.component(.year, from: lastCopiedAt) == calendar.component(.year, from: now) {
+            formatter.dateFormat = "MM-dd HH:mm:ss"
+        } else {
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        }
+        return formatter.string(from: lastCopiedAt)
+    }
+
     public var category: FileShelfCategory {
         switch content {
         case .text(let value):
