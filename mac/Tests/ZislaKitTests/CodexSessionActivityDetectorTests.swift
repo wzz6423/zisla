@@ -179,6 +179,10 @@ struct CodexSessionActivityDetectorTests {
                 #expect(urls.contains(rolloutURL))
                 return [rolloutURL: 2468]
             },
+            processStartDatesForProcessIdentifiers: { identifiers in
+                #expect(identifiers == Set([Int32(2468)]))
+                return [2468: iso8601Date("2026-07-19T01:00:00.000Z")]
+            },
             clientProvidersForProcessIdentifiers: { identifiers in
                 #expect(identifiers == Set([Int32(2468)]))
                 return [2468: .gpt]
@@ -190,6 +194,112 @@ struct CodexSessionActivityDetectorTests {
         #expect(task.processIdentifier == 2468)
         #expect(task.provider == .gpt)
         #expect(task.title == "ChatGPT")
+    }
+
+    @Test
+    func removesPreviouslyVerifiedTurnWhenItsRolloutCloses() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-closed.jsonl"
+        let rolloutURL = root.appendingPathComponent(relativePath).standardizedFileURL
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-closed"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_000_126)
+        )
+        var rolloutIsOpen = true
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in
+                rolloutIsOpen ? [rolloutURL: 2468] : [:]
+            },
+            processStartDatesForProcessIdentifiers: { _ in
+                [2468: startedAt.addingTimeInterval(-1)]
+            },
+            clientProvidersForProcessIdentifiers: { _ in
+                [2468: .gpt]
+            }
+        )
+
+        #expect(try detector.activeTasks().map(\.id) == [
+            CodexSessionActivityDetector.taskID(forTurnID: "turn-closed"),
+        ])
+
+        rolloutIsOpen = false
+
+        #expect(try detector.activeTasks().isEmpty)
+    }
+
+    @Test
+    func rejectsOldTurnWhenAReplacementProcessOpensItsRollout() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-restarted.jsonl"
+        let rolloutURL = root.appendingPathComponent(relativePath).standardizedFileURL
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-restarted"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_000_127)
+        )
+
+        let tasks = try CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [rolloutURL: 2468] },
+            processStartDatesForProcessIdentifiers: { _ in
+                [2468: startedAt.addingTimeInterval(1)]
+            },
+            clientProvidersForProcessIdentifiers: { _ in [2468: .codex] }
+        ).activeTasks()
+
+        #expect(tasks.isEmpty)
+    }
+
+    @Test
+    func expiresUnverifiedTurnWhenNoProcessEverOwnsItsRollout() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-unverified.jsonl"
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                eventLine(
+                    timestamp: "2026-07-19T01:00:00.000Z",
+                    payloadType: "task_started",
+                    turnID: "turn-unverified"
+                ),
+            ],
+            modifiedAt: Date(timeIntervalSince1970: 1_800_000_128)
+        )
+        var current = Date(timeIntervalSince1970: 1_800_000_128)
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] },
+            unverifiedActivityLifetime: 5,
+            now: { current }
+        )
+
+        #expect(try detector.activeTasks().count == 1)
+
+        current = current.addingTimeInterval(6)
+
+        #expect(try detector.activeTasks().isEmpty)
     }
 
     @Test
@@ -1192,6 +1302,22 @@ struct CodexSessionActivityDetectorTests {
         #expect(providers[101] == .gpt)
         #expect(providers[201] == .codex)
         #expect(providers[300] == nil)
+    }
+
+    @Test
+    func parsesProcessStartDatesForRequestedProcesses() {
+        let data = Data("""
+        2468 Sun Sep  6 17:08:21 2026
+        9753 Mon Sep  7 08:15:42 2026
+        """.utf8)
+
+        let startDates = CodexSessionActivityDetector.parseProcessStartDates(
+            fromProcessList: data,
+            matching: [2468]
+        )
+
+        #expect(startDates.count == 1)
+        #expect(startDates[2468] != nil)
     }
 
     @Test
