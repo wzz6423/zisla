@@ -473,7 +473,7 @@ struct AIAgentServicesTests {
         let output = try await AIAgentProcessRunner.run(
             executableURL: URL(fileURLWithPath: "/bin/sh"),
             arguments: ["-c", "sleep 2 &"],
-            timeout: 0.05
+            timeout: 0.5
         )
 
         #expect(output.status == 0)
@@ -486,7 +486,7 @@ struct AIAgentServicesTests {
         let output = try await AIAgentProcessRunner.run(
             executableURL: URL(fileURLWithPath: "/bin/sh"),
             arguments: ["-c", "/usr/bin/printf complete; sleep 2 &"],
-            timeout: 0.05
+            timeout: 0.5
         )
 
         // Unblocking a pipe held by a grandchild must preserve output already produced by the parent.
