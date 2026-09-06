@@ -4,12 +4,12 @@
 
 项目的完整发布流程、双更新通道和 GitHub/Gitee 的资产同步由仓库根目录的 [`skills/zisla-release`](../../skills/zisla-release/SKILL.md) 统一维护。本页只说明签名、公证和更新包的设计约束；发布时以该技能为准。
 
-当前选择的两个更新通道都使用 Sparkle：先验签 ZIP 和 appcast，再替换并重启应用。每次检查先读取 Gitee；当 Gitee appcast 无法加载或更新包下载失败时，自动重试一次 GitHub。`package-release.sh` 要求通过 `SPARKLE_GENERATE_APPCAST` 指向 Sparkle 2.9.4 的 `generate_appcast`，并会在 ZIP、DMG 同目录写出 `appcast-gitee.xml` 和 `appcast-github.xml`。两份 appcast 都必须独立签名，且只能指向各自站点、本次构建那一套架构的 ZIP。`build-package.sh` 按架构各跑一次脚本，因此一次发布有三对：Universal 那对上传为 `appcast.xml`，也就是按架构更新之前发布的版本仍在请求的名字；单架构那两对上传为 `appcast-arm64.xml` 和 `appcast-x86_64.xml`。单架构安装会把 Info.plist 里的 feed 地址改写为运行 slice 对应的 appcast（Rosetta 下的 x86_64 slice 按 `arm64` 请求），因此始终更新到同一架构，不会在一次应用内更新后变成 Universal；Universal 安装按自身 slice 数判定，保留共享名字，更新后仍是 Universal。上传目标：Gitee 的 Release/Preview 永久 feed 分别为 `update-release` 和 `preview`；GitHub 的 Release 使用 `latest`，Preview 使用永久 prerelease `preview`。非交互发布时设置 `SPARKLE_ED_KEY_FILE` 指向私下保管的 EdDSA 私钥文件；不设置则读取登录钥匙串的 `zisla-update-ed25519` 账户。私钥绝不能进入仓库。Developer ID 发布包仍建议公证；免费 ad-hoc Preview 不能公证，首次打开可能需要在系统设置中选择“仍要打开”。
+当前选择的两个更新通道都使用 Sparkle：先验签 ZIP 和 appcast，再替换并重启应用。每次检查先读取 Gitee；当 Gitee appcast 无法加载或更新包下载失败时，自动重试一次 GitHub。`package-release.sh` 要求通过 `SPARKLE_GENERATE_APPCAST` 指向 Sparkle 2.9.4 的 `generate_appcast`，并会在 ZIP、DMG 同目录写出 `appcast-gitee.xml` 和 `appcast-github.xml`。两份 appcast 都必须独立签名，且只能指向各自站点、本次构建那一套架构的 ZIP。`build-package.sh` 按架构各跑一次脚本，因此一次发布有三对：Universal 那对上传为 `appcast.xml`，也就是按架构更新之前发布的版本仍在请求的名字；单架构那两对上传为 `appcast-arm64.xml` 和 `appcast-x86_64.xml`。单架构安装会把 Info.plist 里的 feed 地址改写为运行 slice 对应的 appcast（Rosetta 下的 x86_64 slice 按 `arm64` 请求），因此始终更新到同一架构，不会在一次应用内更新后变成 Universal；Universal 安装按自身 slice 数判定，保留共享名字，更新后仍是 Universal。上传目标：Gitee 的 Release/Preview 永久 feed 分别为 `update-release` 和 `preview`；GitHub 的 Release 使用 `latest`，Preview 使用永久 prerelease `preview`。非交互发布时设置 `SPARKLE_ED_KEY_FILE` 指向私下保管的 EdDSA 私钥文件；不设置则读取登录钥匙串的 `zisla-update-ed25519` 账户。私钥绝不能进入仓库。正式版默认使用同一张自签名证书，使指定要求稳定并在更新后保留 macOS 权限授予，但仍未公证。Developer ID 发布包应完成公证；免费 ad-hoc Preview 同样不能公证。
 
 ## 前提
 
-- Developer ID Application 证书
-- Apple 公证凭据
+- 独立发布钥匙串中的 `zisla Release Signing` 身份，或 Developer ID Application 证书
+- 使用 Developer ID 时所需的 Apple 公证凭据
 - 官方 `yt-dlp` Helper 已通过 `Scripts/fetch-yt-dlp.sh` 获取并校验
 
 ## 1. 构建签名应用
@@ -17,8 +17,18 @@
 ```bash
 export VERSION=1.0.0
 export BUILD_NUMBER=100
-export CODE_SIGN_IDENTITY='Developer ID Application: Example (TEAMID)'
+export UPDATE_CHANNEL=release
 Scripts/fetch-yt-dlp.sh
+Scripts/package-release.sh
+```
+
+正式版默认使用 `RELEASE_SIGNING_MODE=selfsigned`，从 `~/Library/Keychains/zisla-release-signing.keychain-db` 读取 `zisla Release Signing`，并通过登录钥匙串中的 `dev.wzz.zisla.release-signing-keychain` 项解锁。这不会消除 Gatekeeper 的首次打开提示，但指定要求会基于证书，而不是每次构建都变化的 cdhash。
+
+使用 Developer ID 证书时，必须显式选择可公证路径：
+
+```bash
+export RELEASE_SIGNING_MODE=release
+export CODE_SIGN_IDENTITY='Developer ID Application: Example (TEAMID)'
 Scripts/package-release.sh
 ```
 
@@ -40,6 +50,8 @@ dist/appcast-github.xml
 ```bash
 export VERSION=0.1.0
 export BUILD_NUMBER=1
+export UPDATE_CHANNEL=preview
+export RELEASE_SIGNING_MODE=adhoc
 export CODE_SIGN_IDENTITY=-
 Scripts/package-release.sh
 ```

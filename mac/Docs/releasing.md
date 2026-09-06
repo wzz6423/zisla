@@ -4,12 +4,12 @@
 
 The complete release process, dual update channels, and GitHub/Gitee asset synchronization are maintained by [`skills/zisla-release`](../../skills/zisla-release/SKILL.md). This page documents only the design constraints for signing, notarization, and update packages; follow the skill when publishing a release.
 
-Both selected update channels use Sparkle to verify a signed ZIP and appcast before replacing and relaunching the app. Each check reads Gitee first and retries GitHub exactly once when the Gitee appcast cannot load or its update package fails to download. `package-release.sh` requires `SPARKLE_GENERATE_APPCAST` to point to Sparkle 2.9.4's `generate_appcast` and writes `appcast-gitee.xml` and `appcast-github.xml` alongside the ZIP and DMG. Each appcast must be signed independently and point to the ZIP from that run, hosted by its own site. `build-package.sh` runs the script once per architecture, so a release carries three pairs: upload the universal pair as `appcast.xml`, the name apps released before per-architecture updates still request, and the single-architecture pairs as `appcast-arm64.xml` and `appcast-x86_64.xml`. A single-architecture install rewrites its Info.plist feed URL to the appcast for the running slice, a translated x86_64 slice asking for `arm64`, so it keeps updating to its own architecture instead of growing into the universal build; a universal install counts its own slices, keeps the shared name, and stays universal. Gitee keeps permanent `update-release` (Release) and `preview` (Preview) feeds; GitHub uses `latest` for Release and permanent prerelease `preview` for Preview. Set `SPARKLE_ED_KEY_FILE` to the privately stored EdDSA key file when publishing non-interactively, or leave it unset to use the `zisla-update-ed25519` login-keychain account. The private key must never enter the repository. Developer ID packages should still be notarized. Free ad-hoc previews cannot be notarized and may require **Open Anyway** in System Settings on first launch.
+Both selected update channels use Sparkle to verify a signed ZIP and appcast before replacing and relaunching the app. Each check reads Gitee first and retries GitHub exactly once when the Gitee appcast cannot load or its update package fails to download. `package-release.sh` requires `SPARKLE_GENERATE_APPCAST` to point to Sparkle 2.9.4's `generate_appcast` and writes `appcast-gitee.xml` and `appcast-github.xml` alongside the ZIP and DMG. Each appcast must be signed independently and point to the ZIP from that run, hosted by its own site. `build-package.sh` runs the script once per architecture, so a release carries three pairs: upload the universal pair as `appcast.xml`, the name apps released before per-architecture updates still request, and the single-architecture pairs as `appcast-arm64.xml` and `appcast-x86_64.xml`. A single-architecture install rewrites its Info.plist feed URL to the appcast for the running slice, a translated x86_64 slice asking for `arm64`, so it keeps updating to its own architecture instead of growing into the universal build; a universal install counts its own slices, keeps the shared name, and stays universal. Gitee keeps permanent `update-release` (Release) and `preview` (Preview) feeds; GitHub uses `latest` for Release and permanent prerelease `preview` for Preview. Set `SPARKLE_ED_KEY_FILE` to the privately stored EdDSA key file when publishing non-interactively, or leave it unset to use the `zisla-update-ed25519` login-keychain account. The private key must never enter the repository. Stable releases default to one self-signed certificate so their designated requirement remains stable and macOS permission grants survive updates. They are still not notarized. Developer ID packages should be notarized; free ad-hoc previews cannot be notarized either.
 
 ## Prerequisites
 
-- A Developer ID Application certificate
-- Apple notarization credentials
+- The `zisla Release Signing` identity in the dedicated release keychain, or a Developer ID Application certificate
+- Apple notarization credentials when using Developer ID
 - The official `yt-dlp` helper fetched and verified through `Scripts/fetch-yt-dlp.sh`
 
 ## 1. Build a signed app
@@ -17,8 +17,18 @@ Both selected update channels use Sparkle to verify a signed ZIP and appcast bef
 ```bash
 export VERSION=1.0.0
 export BUILD_NUMBER=100
-export CODE_SIGN_IDENTITY='Developer ID Application: Example (TEAMID)'
+export UPDATE_CHANNEL=release
 Scripts/fetch-yt-dlp.sh
+Scripts/package-release.sh
+```
+
+For a stable release, the script defaults to `RELEASE_SIGNING_MODE=selfsigned`, reads `zisla Release Signing` from `~/Library/Keychains/zisla-release-signing.keychain-db`, and unlocks that keychain through the `dev.wzz.zisla.release-signing-keychain` item in the login keychain. This does not remove Gatekeeper's first-launch warning, but it keeps a certificate-based designated requirement instead of a build-specific cdhash.
+
+With a Developer ID certificate, select the notarizable path explicitly:
+
+```bash
+export RELEASE_SIGNING_MODE=release
+export CODE_SIGN_IDENTITY='Developer ID Application: Example (TEAMID)'
 Scripts/package-release.sh
 ```
 
@@ -40,6 +50,8 @@ Without the Apple Developer Program, build an ad-hoc signed preview:
 ```bash
 export VERSION=0.1.0
 export BUILD_NUMBER=1
+export UPDATE_CHANNEL=preview
+export RELEASE_SIGNING_MODE=adhoc
 export CODE_SIGN_IDENTITY=-
 Scripts/package-release.sh
 ```
