@@ -24,6 +24,15 @@ enum IslandModule: String, CaseIterable, Identifiable {
 
   var id: Self { self }
 
+  var allowsIslandKeyboardFocus: Bool {
+    switch self {
+    case .shelf, .clipboard, .mail, .quickNotes:
+      true
+    default:
+      false
+    }
+  }
+
   var title: String {
     switch self {
     case .dashboard: "首页"
