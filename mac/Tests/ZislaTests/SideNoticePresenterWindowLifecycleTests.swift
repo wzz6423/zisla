@@ -8,15 +8,23 @@ struct SideNoticePresenterWindowLifecycleTests {
     func contentRefreshDoesNotRefrontVisibleNoticePanels() {
         #expect(!SideNoticePresenter.shouldOrderPanelFront(
             isVisible: true,
-            rejoiningActiveSpace: false
+            rejoiningActiveSpace: false,
+            presentsNewCompactStatus: false
         ))
         #expect(SideNoticePresenter.shouldOrderPanelFront(
             isVisible: false,
-            rejoiningActiveSpace: false
+            rejoiningActiveSpace: false,
+            presentsNewCompactStatus: false
         ))
         #expect(SideNoticePresenter.shouldOrderPanelFront(
             isVisible: true,
-            rejoiningActiveSpace: true
+            rejoiningActiveSpace: true,
+            presentsNewCompactStatus: false
+        ))
+        #expect(SideNoticePresenter.shouldOrderPanelFront(
+            isVisible: true,
+            rejoiningActiveSpace: false,
+            presentsNewCompactStatus: true
         ))
     }
 
