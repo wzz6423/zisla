@@ -201,6 +201,54 @@ struct RichNoteEditorTests {
     }
 
     @Test
+    func removesNotesDefaultFontSizeBeforeSavingEditedHTML() async throws {
+        let sourceHTML = "<div><span style=\"font-size: 11px; color: red\">正文</span></div>"
+        let changeCapture = HTMLChangeCapture()
+        let hostingView = NSHostingView(rootView:
+            RichNoteEditor(
+                html: sourceHTML,
+                command: nil,
+                isEditable: true,
+                onChange: { html, _ in changeCapture.html = html }
+            )
+            .frame(width: 320, height: 240)
+        )
+        let window = NSWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        window.contentView = hostingView
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+
+        let webView = try await waitForWebView(in: hostingView)
+        try await waitUntilEditorIsReady(in: webView)
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const editor = document.getElementById('editor');
+              const text = editor.querySelector('span').firstChild;
+              const range = document.createRange();
+              range.setStart(text, text.textContent.length);
+              range.collapse(true);
+              const selection = window.getSelection();
+              selection.removeAllRanges();
+              selection.addRange(range);
+              window.zisla.exec('insertText', '变更');
+            })();
+            """
+        )
+
+        let savedHTML = try await waitForCapturedHTML(in: changeCapture)
+        #expect(savedHTML.contains("font-size") == false)
+        #expect(savedHTML.contains("color: red") == true)
+        #expect(savedHTML.contains("正文变更") == true)
+    }
+
+    @Test
     func indentsOrderedListContinuationParagraphsUntilBlankLine() async throws {
         let sourceHTML = """
         <ol><li><span style="font-size: 11px">大数据技术基础</span></li></ol>
@@ -349,6 +397,14 @@ struct RichNoteEditorTests {
         try #require(await webView.evaluateJavaScript("document.getElementById('editor').innerText") as? String)
     }
 
+    private func waitForCapturedHTML(in capture: HTMLChangeCapture) async throws -> String {
+        for _ in 0..<100 {
+            if let html = capture.html { return html }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        throw RichNoteEditorTestError.changeNotCaptured
+    }
+
     private func keyEvent(
         characters: String,
         modifiers: NSEvent.ModifierFlags,
@@ -388,4 +444,9 @@ private enum RichNoteEditorTestError: Error {
     case webViewNotCreated
     case editorNotReady
     case keyEventNotCreated
+    case changeNotCaptured
+}
+
+private final class HTMLChangeCapture {
+    var html: String?
 }

@@ -284,7 +284,17 @@ struct RichNoteEditor: NSViewRepresentable {
           let sendTimer;
 
           const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-          const emit = () => window.webkit?.messageHandlers?.richNoteChanged?.postMessage({ html: editor.innerHTML, plainText: editor.innerText });
+          const normalizeDefaultFontSize = root => {
+            root.querySelectorAll('[style]').forEach(node => {
+              if (node.style.fontSize.trim().toLowerCase() !== '11px') return;
+              node.style.removeProperty('font-size');
+              if (!node.getAttribute('style')?.trim()) node.removeAttribute('style');
+            });
+          };
+          const emit = () => {
+            normalizeDefaultFontSize(editor);
+            window.webkit?.messageHandlers?.richNoteChanged?.postMessage({ html: editor.innerHTML, plainText: editor.innerText });
+          };
           const scheduleEmit = () => {
             updateListContinuationStyle();
             clearTimeout(sendTimer);
