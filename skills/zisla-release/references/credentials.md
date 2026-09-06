@@ -25,7 +25,7 @@ Gitee Release API 的 PATCH 必须提交 `tag_name`。附件是独立对象，�
 | 分发方式 | `CODE_SIGN_IDENTITY` | 成本 | 用户体验 |
 | --- | --- | --- | --- |
 | 免费 Preview | `-` | 免费 | ad-hoc，未公证，用户可能需要选择“仍要打开” |
-| 免费 Release | `zisla Release Signing` | 免费 | 稳定自签名证书，未公证；后续更新保留 TCC 权限 |
+| 免费 Release | `zisla Release Signing` | 免费 | 稳定自签名证书，未公证；ad-hoc 迁入时需重新授权一次，后续更新保留 TCC 权限 |
 | Developer ID | `Developer ID Application: ...` | Apple Developer Program | 可公证、可 stapling、普通用户安装更顺畅 |
 
 自签名和 ad-hoc 签名都不提供 Gatekeeper 公证信誉，也不能使用受限的 WeatherKit entitlement。首次安装可能需要用户选择“仍要打开”，但已安装的 Sparkle 版应用会验证 EdDSA 签名后自动替换与重启。

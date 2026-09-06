@@ -24,7 +24,7 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 - 发版构建严禁使用调试变体：必须显式使用 `DEBUG_BUILD=false`，产物必须是 `zisla.app`、Bundle ID `dev.wzz.zisla`；`zisla-debug.app` 或 `dev.wzz.zisla.debug` 只能用于本地调试，不能上传。
 - 发版资源必须来自正式资源目录：`AppIcon.icns` 必须作为主图标，`AppIconNight.icns` 只能作为深色模式备用图标；调试构建使用的黑底白字图标复制方式，以及 `zisla-debug.app` 中的任何资源，都不能用于正式包或通过改名后上传。
 - 发版不得把 `make run` 生成的 `dist/zisla-debug.app` 直接压缩、改名或复制资源；必须由 `Scripts/package-release.sh` 重新构建正式包并通过身份与图标校验。
-- Release 默认使用 `RELEASE_SIGNING_MODE=selfsigned` 和稳定的 `zisla Release Signing` 证书，使指定要求不再是随构建变化的 cdhash，避免每次 Sparkle 更新后重新请求 Accessibility、Screen Recording 等 TCC 权限。Preview 可显式使用 `RELEASE_SIGNING_MODE=adhoc CODE_SIGN_IDENTITY=-`。自签名与 ad-hoc 都不代表 Apple 公证，也不允许 WeatherKit 受限 entitlement。
+- Release 默认使用 `RELEASE_SIGNING_MODE=selfsigned` 和稳定的 `zisla Release Signing` 证书，使指定要求不再是随构建变化的 cdhash，避免每次 Sparkle 更新后重新请求 Accessibility、Screen Recording 等 TCC 权限。现有 ad-hoc 安装迁入首个此类 Release 时，旧 cdhash 授权无法继承，用户需重新授权一次；之后才会随后续 Release 保留。Preview 可显式使用 `RELEASE_SIGNING_MODE=adhoc CODE_SIGN_IDENTITY=-`。自签名与 ad-hoc 都不代表 Apple 公证，也不允许 WeatherKit 受限 entitlement。
 
 详细凭据和通道约束见 [references/credentials.md](references/credentials.md) 与 [references/update-channels.md](references/update-channels.md)。
 
