@@ -211,7 +211,7 @@ swift test \
 - A browser must publish macOS file progress or use recognizable temporary files in Downloads for zisla to show a percentage.
 - Battery health, temperature, live power, and accessory levels depend on hardware, connection method, and data exposed by macOS; missing fields are shown as unavailable.
 - Office-to-PDF conversion requires LibreOffice or OpenOffice; other PDF operations run locally.
-- Free ad-hoc packages are not notarized and may require **Open Anyway** on first launch. Afterwards, Sparkle verifies every update with the embedded EdDSA public key before extracting, replacing, and relaunching the app.
+- Packages are not notarized and may require **Open Anyway** on first launch. Stable releases use one self-signed certificate so macOS permission grants survive later updates; Sparkle separately verifies every update with the embedded EdDSA public key before extracting, replacing, and relaunching the app.
 
 ## License
 

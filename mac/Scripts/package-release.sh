@@ -16,6 +16,10 @@ SPARKLE_KEY_ACCOUNT="${SPARKLE_KEY_ACCOUNT:-zisla-update-ed25519}"
 SPARKLE_ED_KEY_FILE="${SPARKLE_ED_KEY_FILE:-}"
 SPARKLE_GITEE_DOWNLOAD_URL_PREFIX="${SPARKLE_GITEE_DOWNLOAD_URL_PREFIX:-https://gitee.com/wzz6423/zisla/releases/download/v${VERSION}/}"
 SPARKLE_GITHUB_DOWNLOAD_URL_PREFIX="${SPARKLE_GITHUB_DOWNLOAD_URL_PREFIX:-https://github.com/wzz6423/zisla/releases/download/v${VERSION}/}"
+RELEASE_SIGNING_MODE="${RELEASE_SIGNING_MODE:-}"
+ZISLA_RELEASE_SIGNING_IDENTITY="${ZISLA_RELEASE_SIGNING_IDENTITY:-zisla Release Signing}"
+ZISLA_RELEASE_SIGNING_KEYCHAIN="${ZISLA_RELEASE_SIGNING_KEYCHAIN:-$HOME/Library/Keychains/zisla-release-signing.keychain-db}"
+ZISLA_RELEASE_SIGNING_PASSWORD_SERVICE="${ZISLA_RELEASE_SIGNING_PASSWORD_SERVICE:-dev.wzz.zisla.release-signing-keychain}"
 
 [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]] || {
   echo "error: VERSION must be a semantic version (for example 1.2.3 or 1.2.3-preview.1)" >&2
@@ -68,13 +72,67 @@ GITHUB_APPCAST="$ARCHIVE_DIRECTORY/appcast-github.xml"
 if [[ "$SKIP_BUILD" == "true" ]]; then
   [[ -d "$APP" ]] || { echo "error: missing app bundle: $APP" >&2; exit 1; }
 else
-  if [[ "${CODE_SIGN_IDENTITY:--}" == "-" ]]; then
-    RELEASE_SIGNING_MODE=adhoc
-  else
-    RELEASE_SIGNING_MODE=release
+  if [[ -z "$RELEASE_SIGNING_MODE" ]]; then
+    if [[ "${CODE_SIGN_IDENTITY:-}" == "-" ]]; then
+      RELEASE_SIGNING_MODE=adhoc
+    elif [[ -n "${CODE_SIGN_IDENTITY:-}" && "$CODE_SIGN_IDENTITY" != "$ZISLA_RELEASE_SIGNING_IDENTITY" ]]; then
+      RELEASE_SIGNING_MODE=release
+    elif [[ "$UPDATE_CHANNEL" == "release" ]]; then
+      RELEASE_SIGNING_MODE=selfsigned
+    else
+      RELEASE_SIGNING_MODE=adhoc
+    fi
   fi
+
+  case "$RELEASE_SIGNING_MODE" in
+    adhoc)
+      [[ "$UPDATE_CHANNEL" != "release" ]] || {
+        echo "error: Release builds require a stable certificate identity; ad-hoc signing would invalidate TCC permissions" >&2
+        exit 1
+      }
+      RESOLVED_CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
+      RESOLVED_CODE_SIGN_KEYCHAIN=""
+      BUILD_SIGNING_MODE=adhoc
+      ;;
+    selfsigned)
+      RESOLVED_CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-$ZISLA_RELEASE_SIGNING_IDENTITY}"
+      RESOLVED_CODE_SIGN_KEYCHAIN="${CODE_SIGN_KEYCHAIN:-}"
+      if [[ "$RESOLVED_CODE_SIGN_IDENTITY" == "$ZISLA_RELEASE_SIGNING_IDENTITY" ]]; then
+        RESOLVED_CODE_SIGN_KEYCHAIN="${RESOLVED_CODE_SIGN_KEYCHAIN:-$ZISLA_RELEASE_SIGNING_KEYCHAIN}"
+        [[ -f "$RESOLVED_CODE_SIGN_KEYCHAIN" ]] || {
+          echo "error: missing zisla release signing keychain: $RESOLVED_CODE_SIGN_KEYCHAIN" >&2
+          exit 1
+        }
+        if ! security find-generic-password \
+          -a "$(id -un)" \
+          -s "$ZISLA_RELEASE_SIGNING_PASSWORD_SERVICE" \
+          -w \
+          | security unlock-keychain "$RESOLVED_CODE_SIGN_KEYCHAIN" >/dev/null 2>&1
+        then
+          echo "error: unable to unlock the zisla release signing keychain" >&2
+          exit 1
+        fi
+      fi
+      BUILD_SIGNING_MODE=dev
+      ;;
+    release)
+      RESOLVED_CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
+      RESOLVED_CODE_SIGN_KEYCHAIN="${CODE_SIGN_KEYCHAIN:-}"
+      [[ -n "$RESOLVED_CODE_SIGN_IDENTITY" && "$RESOLVED_CODE_SIGN_IDENTITY" != "-" ]] || {
+        echo "error: RELEASE_SIGNING_MODE=release requires CODE_SIGN_IDENTITY" >&2
+        exit 1
+      }
+      BUILD_SIGNING_MODE=release
+      ;;
+    *)
+      echo "error: RELEASE_SIGNING_MODE must be adhoc, selfsigned, or release" >&2
+      exit 1
+      ;;
+  esac
+
   DEBUG_BUILD=false VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" UPDATE_CHANNEL="$UPDATE_CHANNEL" \
-    SIGNING_MODE="$RELEASE_SIGNING_MODE" \
+    CODE_SIGN_IDENTITY="$RESOLVED_CODE_SIGN_IDENTITY" CODE_SIGN_KEYCHAIN="$RESOLVED_CODE_SIGN_KEYCHAIN" \
+    SIGNING_MODE="$BUILD_SIGNING_MODE" \
     OUTPUT_DIRECTORY="$ARCHIVE_DIRECTORY" BUILD_SCRATCH_DIRECTORY="$BUILD_SCRATCH_DIRECTORY" \
     BUILD_ARCHITECTURES="$BUILD_ARCHITECTURES" \
     "$ROOT/Scripts/build-app.sh"
@@ -111,6 +169,16 @@ codesign --verify --deep --strict --all-architectures --verbose=2 "$APP" || {
   echo "error: release package code signature verification failed" >&2
   exit 1
 }
+if [[ "$UPDATE_CHANNEL" == "release" ]]; then
+  RELEASE_SIGNATURE_DETAILS="$(codesign -dv --verbose=4 "$APP" 2>&1)"
+  RELEASE_DESIGNATED_REQUIREMENT="$(codesign -d -r- "$APP" 2>&1)"
+  [[ "$RELEASE_SIGNATURE_DETAILS" != *"Signature=adhoc"* && \
+    "$RELEASE_DESIGNATED_REQUIREMENT" == *"certificate"* && \
+    "$RELEASE_DESIGNATED_REQUIREMENT" != *"designated => cdhash"* ]] || {
+    echo "error: Release package is not signed by a stable certificate identity" >&2
+    exit 1
+  }
+fi
 
 mkdir -p "$ARCHIVE_DIRECTORY"
 PACKAGE_STAGING_DIRECTORY="$(mktemp -d "${ARCHIVE_DIRECTORY%/}/.zisla-package.XXXXXX")"

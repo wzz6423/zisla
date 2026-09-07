@@ -19,7 +19,7 @@ cp "$ROOT/Scripts/package-release.sh" "$TEST_ROOT/Scripts/package-release.sh"
 cat > "$TEST_ROOT/Scripts/build-app.sh" <<'SCRIPT'
 #!/bin/zsh
 set -euo pipefail
-print -r -- "$BUILD_ARCHITECTURES" > "$CAPTURE_FILE"
+print -r -- "$BUILD_ARCHITECTURES|$SIGNING_MODE|$CODE_SIGN_IDENTITY|${CODE_SIGN_KEYCHAIN:-}" > "$CAPTURE_FILE"
 mkdir -p "$OUTPUT_DIRECTORY/zisla.app/Contents/MacOS"
 touch "$OUTPUT_DIRECTORY/zisla.app/Contents/MacOS/zisla"
 plutil -create xml1 "$OUTPUT_DIRECTORY/zisla.app/Contents/Info.plist"
@@ -113,7 +113,36 @@ SCRIPT
 
 cat > "$FAKE_BIN/codesign" <<'SCRIPT'
 #!/bin/zsh
+if [[ "$*" == *"-dv"* ]]; then
+  if [[ "${FAKE_SIGNATURE_STYLE:-adhoc}" == certificate ]]; then
+    print -u2 -r -- "Authority=zisla Release Signing"
+    print -u2 -r -- "TeamIdentifier=not set"
+  else
+    print -u2 -r -- "Signature=adhoc"
+    print -u2 -r -- "TeamIdentifier=not set"
+  fi
+elif [[ "$*" == *"-d -r-"* ]]; then
+  if [[ "${FAKE_SIGNATURE_STYLE:-adhoc}" == certificate ]]; then
+    print -u2 -r -- 'designated => identifier "zisla" and certificate root = H"test"'
+  else
+    print -u2 -r -- 'designated => cdhash H"test"'
+  fi
+fi
 exit 0
+SCRIPT
+
+cat > "$FAKE_BIN/security" <<'SCRIPT'
+#!/bin/zsh
+set -euo pipefail
+case "$1" in
+  find-generic-password)
+    print -r -- password
+    ;;
+  unlock-keychain)
+    read -r password
+    [[ "$password" == password ]]
+    ;;
+esac
 SCRIPT
 
 chmod +x "$FAKE_BIN"/*
@@ -192,7 +221,7 @@ for architecture in arm64 x86_64 universal; do
   PATH="$FAKE_BIN:$PATH" \
     VERSION=0.1.3 \
     BUILD_NUMBER=5 \
-    UPDATE_CHANNEL=release \
+    UPDATE_CHANNEL=preview \
     SPARKLE_GENERATE_APPCAST="$FAKE_BIN/generate_appcast" \
     SPARKLE_ED_KEY_FILE="$FAKE_ED_KEY_FILE" \
     CODE_SIGN_IDENTITY=- \
@@ -207,9 +236,9 @@ for architecture in arm64 x86_64 universal; do
     "$TEST_ROOT/Scripts/package-release.sh" >/dev/null
 
   expect_equal \
-    "$build_architectures" \
+    "$build_architectures|adhoc|-|" \
     "$(<"$capture_file")" \
-    "$architecture build preserves BUILD_ARCHITECTURES"
+    "$architecture preview build preserves ad-hoc signing inputs"
   expect_file \
     "$case_directory/zisla-v0.1.3-macOS-${architecture}.zip" \
     "$architecture ZIP uses the architecture suffix"
@@ -262,7 +291,7 @@ function expect_conflicting_volume_uses_new_mount() {
   PATH="$FAKE_BIN:$PATH" \
     VERSION=0.1.3 \
     BUILD_NUMBER=5 \
-    UPDATE_CHANNEL=release \
+    UPDATE_CHANNEL=preview \
     SPARKLE_GENERATE_APPCAST="$FAKE_BIN/generate_appcast" \
     SPARKLE_ED_KEY_FILE="$FAKE_ED_KEY_FILE" \
     CODE_SIGN_IDENTITY=- \
@@ -295,6 +324,124 @@ function expect_conflicting_volume_uses_new_mount() {
 }
 
 expect_conflicting_volume_uses_new_mount
+
+function expect_release_uses_stable_certificate() {
+  local case_directory="$TEMPORARY_ROOT/stable-release-signing"
+  local capture_file="$case_directory/signing.txt"
+  local keychain="$case_directory/zisla-release-signing.keychain-db"
+
+  mkdir -p "$case_directory"
+  touch "$keychain"
+  PATH="$FAKE_BIN:$PATH" \
+    VERSION=0.1.3 \
+    BUILD_NUMBER=5 \
+    UPDATE_CHANNEL=release \
+    SPARKLE_GENERATE_APPCAST="$FAKE_BIN/generate_appcast" \
+    SPARKLE_ED_KEY_FILE="$FAKE_ED_KEY_FILE" \
+    ZISLA_RELEASE_SIGNING_KEYCHAIN="$keychain" \
+    ZISLA_RELEASE_SIGNING_PASSWORD_SERVICE=test-release-password \
+    BUILD_ARCHITECTURES=arm64 \
+    ARCHIVE_DIRECTORY="$case_directory" \
+    CAPTURE_FILE="$capture_file" \
+    HDIUTIL_VERIFY_CAPTURE="$case_directory/dmg-verified" \
+    FAKE_MOUNT_POINT="$case_directory/mounted-zisla" \
+    FAKE_MOUNT_DEVICE=/dev/disk1002s2 \
+    FAKE_EJECT_CAPTURE="$case_directory/ejected-device.txt" \
+    FAKE_OSASCRIPT_MOUNT_CAPTURE="$case_directory/osascript-mount-point.txt" \
+    FAKE_SIGNATURE_STYLE=certificate \
+    "$TEST_ROOT/Scripts/package-release.sh" >/dev/null
+
+  expect_equal \
+    "arm64|dev|zisla Release Signing|$keychain" \
+    "$(<"$capture_file")" \
+    "release build defaults to the stable certificate and dedicated keychain"
+}
+
+expect_release_uses_stable_certificate
+
+function expect_release_preserves_explicit_developer_id() {
+  local case_directory="$TEMPORARY_ROOT/developer-id-release-signing"
+  local capture_file="$case_directory/signing.txt"
+
+  mkdir -p "$case_directory"
+  PATH="$FAKE_BIN:$PATH" \
+    VERSION=0.1.3 \
+    BUILD_NUMBER=5 \
+    UPDATE_CHANNEL=release \
+    SPARKLE_GENERATE_APPCAST="$FAKE_BIN/generate_appcast" \
+    SPARKLE_ED_KEY_FILE="$FAKE_ED_KEY_FILE" \
+    CODE_SIGN_IDENTITY='Developer ID Application: Example (TEAMID)' \
+    BUILD_ARCHITECTURES=arm64 \
+    ARCHIVE_DIRECTORY="$case_directory" \
+    CAPTURE_FILE="$capture_file" \
+    HDIUTIL_VERIFY_CAPTURE="$case_directory/dmg-verified" \
+    FAKE_MOUNT_POINT="$case_directory/mounted-zisla" \
+    FAKE_MOUNT_DEVICE=/dev/disk1003s2 \
+    FAKE_EJECT_CAPTURE="$case_directory/ejected-device.txt" \
+    FAKE_OSASCRIPT_MOUNT_CAPTURE="$case_directory/osascript-mount-point.txt" \
+    FAKE_SIGNATURE_STYLE=certificate \
+    "$TEST_ROOT/Scripts/package-release.sh" >/dev/null
+
+  expect_equal \
+    "arm64|release|Developer ID Application: Example (TEAMID)|" \
+    "$(<"$capture_file")" \
+    "explicit Developer ID preserves the notarizable release signing path"
+}
+
+expect_release_preserves_explicit_developer_id
+
+function expect_release_adhoc_failure() {
+  local output
+
+  (( tests_run += 1 ))
+  if output="$(
+    PATH="$FAKE_BIN:$PATH" \
+      VERSION=0.1.3 \
+      BUILD_NUMBER=5 \
+      UPDATE_CHANNEL=release \
+      RELEASE_SIGNING_MODE=adhoc \
+      CODE_SIGN_IDENTITY=- \
+      BUILD_ARCHITECTURES=arm64 \
+      ARCHIVE_DIRECTORY="$TEMPORARY_ROOT/invalid-adhoc-release" \
+      "$TEST_ROOT/Scripts/package-release.sh" 2>&1
+  )"; then
+    print -u2 -r -- "FAIL: an ad-hoc release build was accepted"
+    exit 1
+  fi
+  if [[ "$output" != *"Release builds require a stable certificate identity"* ]]; then
+    print -u2 -r -- "FAIL: ad-hoc release reported the wrong error"
+    print -u2 -r -- "$output"
+    exit 1
+  fi
+}
+
+expect_release_adhoc_failure
+
+function expect_release_missing_keychain_failure() {
+  local output
+
+  (( tests_run += 1 ))
+  if output="$(
+    PATH="$FAKE_BIN:$PATH" \
+      VERSION=0.1.3 \
+      BUILD_NUMBER=5 \
+      UPDATE_CHANNEL=release \
+      ZISLA_RELEASE_SIGNING_KEYCHAIN="$TEMPORARY_ROOT/missing-release-keychain" \
+      BUILD_ARCHITECTURES=arm64 \
+      ARCHIVE_DIRECTORY="$TEMPORARY_ROOT/missing-keychain-release" \
+      "$TEST_ROOT/Scripts/package-release.sh" 2>&1
+  )"; then
+    print -u2 -r -- "FAIL: release build accepted a missing signing keychain"
+    exit 1
+  fi
+  if [[ "$output" != *"missing zisla release signing keychain"* ]]; then
+    print -u2 -r -- "FAIL: missing release keychain reported the wrong error"
+    print -u2 -r -- "$output"
+    exit 1
+  fi
+}
+
+expect_release_missing_keychain_failure
 
 function expect_debug_bundle_failure() {
   local case_directory="$TEMPORARY_ROOT/debug-bundle"

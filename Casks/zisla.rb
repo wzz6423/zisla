@@ -34,8 +34,8 @@ cask "zisla" do
   ]
 
   caveats <<~EOS
-    zisla ships with an ad-hoc signature and is not notarized, so macOS quarantines
-    it on first launch. Open it once from System Settings > Privacy & Security by
+    zisla is not notarized, so macOS quarantines it on first launch. Open it once
+    from System Settings > Privacy & Security by
     choosing "Open Anyway", or clear the quarantine attribute yourself:
 
       xattr -d com.apple.quarantine "#{appdir}/zisla.app"
