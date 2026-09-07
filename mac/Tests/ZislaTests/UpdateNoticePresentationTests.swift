@@ -64,6 +64,29 @@ struct UpdateNoticePresentationTests {
     }
 
     @Test
+    func skippedUpdateClearsTheCustomNoticeWhileManualChecksRemainUserInitiated() throws {
+        let appModelSource = try String(contentsOf: Self.appModelSourceURL, encoding: .utf8)
+        let controllerSource = try String(contentsOf: Self.sparkleUpdateControllerSourceURL, encoding: .utf8)
+        let callback = try sourceSlice(
+            in: appModelSource,
+            from: "controller?.onUpdateSkipped =",
+            to: "return controller"
+        )
+        let manualCheck = try sourceSlice(
+            in: controllerSource,
+            from: "func checkForUpdates(",
+            to: "private func retryCheck"
+        )
+
+        #expect(callback.contains("self.productUpdateAvailable = false"))
+        #expect(callback.contains("self.refreshUpdateNotices()"))
+        #expect(controllerSource.contains("userDidMake choice: SPUUserUpdateChoice"))
+        #expect(controllerSource.contains("updaterDelegate.onUpdateSkipped ="))
+        #expect(manualCheck.contains("updater.checkForUpdates()"))
+        #expect(!manualCheck.contains("updater.checkForUpdatesInBackground()"))
+    }
+
+    @Test
     func cancelledModelDiscoveryCannotPublishStaleState() throws {
         let source = try String(contentsOf: Self.appModelSourceURL, encoding: .utf8)
         let discovery = try sourceSlice(
@@ -101,6 +124,10 @@ struct UpdateNoticePresentationTests {
 
     private static var settingsViewSourceURL: URL {
         sourcesDirectoryURL.appendingPathComponent("Zisla/SettingsView.swift")
+    }
+
+    private static var sparkleUpdateControllerSourceURL: URL {
+        sourcesDirectoryURL.appendingPathComponent("Zisla/SparkleUpdateController.swift")
     }
 
     private static var sourcesDirectoryURL: URL {

@@ -10,12 +10,12 @@ struct CompactStatusPriorityTests {
             .videoDownload,
             .browserDownload,
             .mail,
-            .updateAvailable,
             .focusCountdown,
             .focusMode,
             .aiActivity,
             .media,
             .toolboxReminder,
+            .updateAvailable,
         ])
     }
 }

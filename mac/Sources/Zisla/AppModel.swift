@@ -491,6 +491,12 @@ final class AppModel: ObservableObject {
     controller?.onCheckFailed = { [weak self] error in
       self?.updateState = .failed(error.localizedDescription)
     }
+    controller?.onUpdateSkipped = { [weak self] in
+      guard let self else { return }
+      self.updateState = .idle
+      self.productUpdateAvailable = false
+      self.refreshUpdateNotices()
+    }
     return controller
   }()
   private let downloadService = DownloadService()

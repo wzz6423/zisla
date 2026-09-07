@@ -917,10 +917,10 @@ struct FeatureSettingsCompatibilityTests {
             .videoDownload,
             .browserDownload,
             .mail,
-            .updateAvailable,
             .focusCountdown,
             .focusMode,
             .toolboxReminder,
+            .updateAvailable,
         ])
     }
 
