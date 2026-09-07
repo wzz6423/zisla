@@ -286,11 +286,14 @@ struct RichNoteEditor: NSViewRepresentable {
           const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
           const normalizeDefaultFontSize = root => {
             root.querySelectorAll('[style]').forEach(node => {
-              if (node.style.fontSize.trim().toLowerCase() !== '11px') return;
-              if (node.closest('h1, h2, h3, h4, h5, h6')) {
+              const fontSize = node.style.fontSize.trim().toLowerCase();
+              const isHeading = Boolean(node.closest('h1, h2, h3, h4, h5, h6'));
+              if (isHeading && (fontSize === '11px' || fontSize === '14px')) {
                 node.style.removeProperty('font-size');
-              } else {
+              } else if (!isHeading && fontSize === '11px') {
                 node.style.setProperty('font-size', '14px');
+              } else {
+                return;
               }
               if (!node.getAttribute('style')?.trim()) node.removeAttribute('style');
             });

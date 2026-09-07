@@ -261,6 +261,72 @@ struct RichNoteEditorTests {
     }
 
     @Test
+    func removesBodyFontSizeWhenPromotingEditedTextToHeading() async throws {
+        let changeCapture = HTMLChangeCapture()
+        let hostingView = NSHostingView(rootView:
+            RichNoteEditor(
+                html: "<div><span style=\"font-size: 11px\">标题</span></div>",
+                command: nil,
+                isEditable: true,
+                onChange: { html, _ in changeCapture.html = html }
+            )
+            .frame(width: 320, height: 240)
+        )
+        let window = NSWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        window.contentView = hostingView
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+
+        let webView = try await waitForWebView(in: hostingView)
+        try await waitUntilEditorIsReady(in: webView)
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const text = document.querySelector('#editor > div span').firstChild;
+              const range = document.createRange();
+              range.selectNodeContents(text);
+              const selection = window.getSelection();
+              selection.removeAllRanges();
+              selection.addRange(range);
+              window.zisla.exec('insertText', '标题');
+            })();
+            """
+        )
+        let bodyHTML = try await waitForCapturedHTML(in: changeCapture)
+        #expect(bodyHTML.contains("font-size: 14px") == true)
+
+        changeCapture.html = nil
+        _ = try await webView.evaluateJavaScript(
+            """
+            (() => {
+              const text = document.querySelector('#editor > div span').firstChild;
+              const range = document.createRange();
+              range.selectNodeContents(text);
+              const selection = window.getSelection();
+              selection.removeAllRanges();
+              selection.addRange(range);
+              window.zisla.block('h1');
+            })();
+            """
+        )
+
+        let savedHTML = try await waitForCapturedHTML(in: changeCapture)
+        let headingSize = try #require(await webView.evaluateJavaScript(
+            "getComputedStyle(document.querySelector('#editor > h1 span')).fontSize"
+        ) as? String)
+
+        #expect(headingSize == "23px")
+        #expect(savedHTML.contains("<h1><span>标题</span></h1>") == true)
+        #expect(savedHTML.contains("font-size: 14px") == false)
+    }
+
+    @Test
     func indentsOrderedListContinuationParagraphsUntilBlankLine() async throws {
         let sourceHTML = """
         <ol><li><span style="font-size: 11px">大数据技术基础</span></li></ol>
