@@ -15,6 +15,9 @@ CLT_DEVELOPER="$TEMPORARY_ROOT/CommandLineTools"
 XCODE_APP="$TEMPORARY_ROOT/Xcode.app"
 XCODE_DEVELOPER="$XCODE_APP/Contents/Developer"
 CAPTURE_FILE="$TEMPORARY_ROOT/developer-directory.txt"
+CODESIGN_CAPTURE_FILE="$TEMPORARY_ROOT/codesign-arguments.txt"
+CODESIGN_STATE_FILE="$TEMPORARY_ROOT/codesign-state.txt"
+FAKE_KEYCHAIN="$TEMPORARY_ROOT/zisla-release-signing.keychain-db"
 
 mkdir -p "$TEST_ROOT/Scripts" "$TEST_ROOT/Resources" "$FAKE_BIN" \
   "$XCODE_DEVELOPER/Toolchains/XcodeDefault.xctoolchain/usr/bin" \
@@ -83,9 +86,25 @@ SCRIPT
 
 cat > "$FAKE_BIN/codesign" <<'SCRIPT'
 #!/bin/zsh
+set -euo pipefail
+if [[ "$*" == *"--sign"* ]]; then
+  print -r -- "$*" > "$FAKE_CODESIGN_CAPTURE_FILE"
+  if [[ "$*" == *"--sign -"* ]]; then
+    print -r -- adhoc > "$FAKE_CODESIGN_STATE_FILE"
+  else
+    print -r -- certificate > "$FAKE_CODESIGN_STATE_FILE"
+  fi
+fi
 if [[ "$*" == *"-dv"* ]]; then
-  print -u2 -r -- "Signature=adhoc"
-  print -u2 -r -- "TeamIdentifier=not set"
+  if [[ "$(<"$FAKE_CODESIGN_STATE_FILE")" == adhoc ]]; then
+    print -u2 -r -- "Signature=adhoc"
+    print -u2 -r -- "TeamIdentifier=not set"
+  else
+    print -u2 -r -- "Authority=zisla Release Signing"
+    print -u2 -r -- "TeamIdentifier=not set"
+  fi
+elif [[ "$*" == *"-d -r-"* ]]; then
+  print -u2 -r -- 'designated => identifier "zisla" and certificate root = H"test"'
 fi
 exit 0
 SCRIPT
@@ -133,6 +152,8 @@ expect_architecture_failure \
   unset DEVELOPER_DIR VERSION BUILD_NUMBER
   PATH="$FAKE_BIN:$PATH" \
     FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
+    FAKE_CODESIGN_CAPTURE_FILE="$CODESIGN_CAPTURE_FILE" \
+    FAKE_CODESIGN_STATE_FILE="$CODESIGN_STATE_FILE" \
     FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
     FAKE_XCODE_APP="$XCODE_APP" \
     BUILD_ARCHITECTURES='arm64 x86_64' \
@@ -177,6 +198,8 @@ done
 (
   PATH="$FAKE_BIN:$PATH" \
     FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
+    FAKE_CODESIGN_CAPTURE_FILE="$CODESIGN_CAPTURE_FILE" \
+    FAKE_CODESIGN_STATE_FILE="$CODESIGN_STATE_FILE" \
     FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
     FAKE_XCODE_APP="$XCODE_APP" \
     DEBUG_BUILD=true \
@@ -225,6 +248,8 @@ function expect_version() {
 
   PATH="$FAKE_BIN:$PATH" \
     FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
+    FAKE_CODESIGN_CAPTURE_FILE="$CODESIGN_CAPTURE_FILE" \
+    FAKE_CODESIGN_STATE_FILE="$CODESIGN_STATE_FILE" \
     FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
     FAKE_XCODE_APP="$XCODE_APP" \
     VERSION="$version" \
@@ -252,8 +277,10 @@ function expect_version_failure() {
   local output_directory="$TEMPORARY_ROOT/invalid-version-output"
 
   if output="$(
-    PATH="$FAKE_BIN:$PATH" \
-      FAKE_CAPTURE_FILE="$capture" \
+      PATH="$FAKE_BIN:$PATH" \
+        FAKE_CAPTURE_FILE="$capture" \
+      FAKE_CODESIGN_CAPTURE_FILE="$CODESIGN_CAPTURE_FILE" \
+      FAKE_CODESIGN_STATE_FILE="$CODESIGN_STATE_FILE" \
       FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
       FAKE_XCODE_APP="$XCODE_APP" \
       VERSION="$version" \
@@ -284,3 +311,30 @@ expect_version_failure "1.2.3/../../escape"
 
 print -r -- "PASS: build-app identity, data, icon, and architecture isolation"
 print -r -- "PASS: 8 build-app version cases"
+
+touch "$FAKE_KEYCHAIN"
+(
+  PATH="$FAKE_BIN:$PATH" \
+    FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
+    FAKE_CODESIGN_CAPTURE_FILE="$CODESIGN_CAPTURE_FILE" \
+    FAKE_CODESIGN_STATE_FILE="$CODESIGN_STATE_FILE" \
+    FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
+    FAKE_XCODE_APP="$XCODE_APP" \
+    BUILD_ARCHITECTURES=arm64 \
+    CODE_SIGN_IDENTITY='zisla Release Signing' \
+    CODE_SIGN_KEYCHAIN="$FAKE_KEYCHAIN" \
+    OUTPUT_DIRECTORY="$TEMPORARY_ROOT/certificate-output" \
+    SIGNING_MODE=dev \
+    "$TEST_ROOT/Scripts/build-app.sh" >/dev/null
+)
+
+[[ "$(<"$CODESIGN_CAPTURE_FILE")" == *"--sign zisla Release Signing"* ]] || {
+  print -u2 -r -- "FAIL: build-app did not pass the stable certificate identity to codesign"
+  exit 1
+}
+[[ "$(<"$CODESIGN_CAPTURE_FILE")" == *"--keychain $FAKE_KEYCHAIN"* ]] || {
+  print -u2 -r -- "FAIL: build-app did not pass the release keychain to codesign"
+  exit 1
+}
+
+print -r -- "PASS: build-app identity, signing, data, icon, and architecture isolation"

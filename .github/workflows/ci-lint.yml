@@ -113,6 +113,9 @@ jobs:
       - name: Test pull request metadata
         run: ruby .github/scripts/pr-metadata-test.rb
 
+      - name: Test project metadata
+        run: ruby .github/scripts/project-metadata-test.rb
+
       - name: Verify the issue automation contract
         run: ruby .github/scripts/issue-metadata.rb verify-manifest
 

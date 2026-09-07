@@ -5,10 +5,9 @@ import Testing
 
 @testable import Zisla
 
-// Downloading, verifying, extracting and swapping an ad-hoc signed build has never run
-// against a real release, because no appcast has been published yet. This suite drives the
-// whole chain against a throwaway EdDSA key and a loopback server, so the only part left
-// unproven before a release is whether the published feed URLs resolve.
+// This suite drives downloading, verifying, extracting and swapping signed builds against a
+// throwaway EdDSA key and a loopback server. Published feed availability remains a separate
+// release-time check.
 @Suite(
     .serialized,
     .enabled(if: ProcessInfo.processInfo.environment["ZISLA_RUN_LOCAL_INSTALL_TESTS"] == "1")
@@ -41,7 +40,70 @@ struct SparkleLocalInstallIntegrationTests {
         #expect(harness.installedBuildVersion == "15")
         // The swap must keep a valid ad-hoc signature, or macOS refuses to launch what
         // Sparkle just installed.
-        #expect(try harness.installedBundleIsAdHocSigned())
+        #expect(try harness.installedBundleSignatureIsValid())
+    }
+
+    // An ad-hoc signature makes TCC key its grants on a cdhash, so every update looks like a
+    // different program and the permission has to be granted again. Signing with one stable
+    // certificate fixes that, but the release that introduces it updates hosts that are still
+    // ad-hoc signed, and Sparkle compares the host's signature against the update's. If it
+    // refuses the mismatch, that one release has to be installed by hand.
+    @Test(.enabled(if: SparkleLocalInstallTestSigning.fromEnvironment != nil))
+    func realSparkleInstallsACertificateSignedUpdateOntoAnAdHocHost() async throws {
+        let signing = try #require(SparkleLocalInstallTestSigning.fromEnvironment)
+        let harness = try SparkleLocalInstallHarness(
+            installedVersion: "0.1.8",
+            installedBuild: "14",
+            updateVersion: "0.1.9",
+            updateBuild: "15",
+            updateSigning: signing
+        )
+        defer { harness.cleanup() }
+
+        try harness.checkForUpdates()
+        try await harness.waitUntil(timeout: .seconds(120)) {
+            harness.installedShortVersion == "0.1.9" || harness.userDriver.updaterErrors.isEmpty == false
+        }
+
+        #expect(
+            harness.userDriver.updaterErrors.isEmpty,
+            "\(harness.userDriver.stages) \(harness.userDriver.updaterErrors)"
+        )
+        #expect(harness.installedShortVersion == "0.1.9")
+        #expect(try harness.installedBundleSignatureIsValid())
+        // The whole point of the switch: what TCC keys on must stop being a cdhash.
+        let requirement = try harness.installedDesignatedRequirement()
+        #expect(requirement.contains("certificate"), "\(requirement)")
+        #expect(!requirement.contains("cdhash"), "\(requirement)")
+    }
+}
+
+// The transition starts from an ad-hoc host. The new release identity is supplied through
+// the environment so the certificate itself never has to live in the repository.
+private enum SparkleLocalInstallTestSigning {
+    case adHoc
+    case identity(name: String, keychain: String?)
+
+    static var fromEnvironment: SparkleLocalInstallTestSigning? {
+        let environment = ProcessInfo.processInfo.environment
+        guard let name = environment["ZISLA_TEST_SIGNING_IDENTITY"], !name.isEmpty else {
+            return nil
+        }
+        let keychain = environment["ZISLA_TEST_SIGNING_KEYCHAIN"]
+        return .identity(name: name, keychain: (keychain?.isEmpty ?? true) ? nil : keychain)
+    }
+
+    var codesignArguments: [String] {
+        switch self {
+        case .adHoc:
+            return ["--sign", "-"]
+        case let .identity(name, keychain):
+            var arguments = ["--sign", name]
+            if let keychain {
+                arguments += ["--keychain", keychain]
+            }
+            return arguments
+        }
     }
 }
 
@@ -58,7 +120,8 @@ private final class SparkleLocalInstallHarness {
         installedVersion: String,
         installedBuild: String,
         updateVersion: String,
-        updateBuild: String
+        updateBuild: String,
+        updateSigning: SparkleLocalInstallTestSigning = .adHoc
     ) throws {
         rootURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-sparkle-install-\(UUID().uuidString)", isDirectory: true)
@@ -72,13 +135,14 @@ private final class SparkleLocalInstallHarness {
         // `zisla.app` name a release archive does.
         let stagingURL = rootURL.appendingPathComponent("staging", isDirectory: true)
         try FileManager.default.createDirectory(at: stagingURL, withIntermediateDirectories: true)
-        let updateBundleURL = try Self.makeAdHocSignedBundle(
+        let updateBundleURL = try Self.makeSignedBundle(
             at: stagingURL.appendingPathComponent("zisla.app", isDirectory: true),
             shortVersion: updateVersion,
             build: updateBuild,
             bundleIdentifier: Self.bundleIdentifier,
             feedURL: nil,
-            publicKey: publicKey
+            publicKey: publicKey,
+            signing: updateSigning
         )
         let archiveName = "zisla-v\(updateVersion)-macOS-universal.zip"
         let archiveURL = servedURL.appendingPathComponent(archiveName)
@@ -97,13 +161,14 @@ private final class SparkleLocalInstallHarness {
             signature: archiveSignature
         ).write(to: servedURL.appendingPathComponent("appcast.xml"), atomically: true, encoding: .utf8)
 
-        installedBundleURL = try Self.makeAdHocSignedBundle(
+        installedBundleURL = try Self.makeSignedBundle(
             at: rootURL.appendingPathComponent("zisla.app", isDirectory: true),
             shortVersion: installedVersion,
             build: installedBuild,
             bundleIdentifier: Self.bundleIdentifier,
             feedURL: "http://127.0.0.1:\(port)/appcast.xml",
-            publicKey: publicKey
+            publicKey: publicKey,
+            signing: .adHoc
         )
 
         server = try Self.startServer(root: servedURL, port: port)
@@ -156,13 +221,18 @@ private final class SparkleLocalInstallHarness {
         return plist[key] as? String
     }
 
-    func installedBundleIsAdHocSigned() throws -> Bool {
+    func installedBundleSignatureIsValid() throws -> Bool {
         let verify = Process()
         verify.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
         verify.arguments = ["--verify", "--strict", installedBundleURL.path]
         try verify.run()
         verify.waitUntilExit()
         return verify.terminationStatus == 0
+    }
+
+    // TCC stores this string, not the path, which is why it decides whether a grant survives.
+    func installedDesignatedRequirement() throws -> String {
+        try Self.run("/usr/bin/codesign", ["-d", "-r-", installedBundleURL.path])
     }
 
     func cleanup() {
@@ -184,16 +254,17 @@ private final class SparkleLocalInstallHarness {
 
     private static let bundleIdentifier = "dev.wzz.zisla.sparkle-install-test"
 
-    // A real Mach-O executable, ad-hoc signed exactly the way `package-release.sh` signs a
-    // release: Sparkle compares the signatures of the running app and the update, and an
-    // unsigned bundle would take a different branch than a release ever does.
-    private static func makeAdHocSignedBundle(
+    // A real Mach-O executable, signed exactly the way `package-release.sh` signs a release:
+    // Sparkle compares the signatures of the running app and the update, and an unsigned
+    // bundle would take a different branch than a release ever does.
+    private static func makeSignedBundle(
         at bundleURL: URL,
         shortVersion: String,
         build: String,
         bundleIdentifier: String,
         feedURL: String?,
-        publicKey: String
+        publicKey: String,
+        signing: SparkleLocalInstallTestSigning
     ) throws -> URL {
         let macOSURL = bundleURL.appendingPathComponent("Contents/MacOS", isDirectory: true)
         try FileManager.default.createDirectory(at: macOSURL, withIntermediateDirectories: true)
@@ -226,7 +297,7 @@ private final class SparkleLocalInstallHarness {
         )
         try infoData.write(to: bundleURL.appendingPathComponent("Contents/Info.plist"))
 
-        try run("/usr/bin/codesign", ["--force", "--sign", "-", bundleURL.path])
+        try run("/usr/bin/codesign", ["--force"] + signing.codesignArguments + [bundleURL.path])
         return bundleURL
     }
 

@@ -45,13 +45,20 @@ module PullRequestMetadata
       @types.map { |entry| entry['type'] }
     end
 
+    def accepted_type_values
+      @types.flat_map { |entry| values_for(entry) }.uniq
+    end
+
     def project_name
       @project.fetch('name')
     end
 
-    def label_for(type)
-      entry = @types.find { |candidate| candidate['type'] == type }
-      entry && entry['label']
+    def canonical_type(value)
+      entry_for(value)&.fetch('type')
+    end
+
+    def label_for(value)
+      entry_for(value)&.fetch('label')
     end
 
     def type_labels
@@ -68,6 +75,25 @@ module PullRequestMetadata
 
     def managed_labels
       (@types + [@issue_label, @ai_label, @skip_label]).uniq { |entry| entry['label'] }
+    end
+
+    private
+
+    def entry_for(value)
+      normalized = normalize(value)
+      return nil if normalized.empty?
+
+      @types.find { |candidate| values_for(candidate).include?(normalized) }
+    end
+
+    def values_for(entry)
+      [entry.fetch('type'), entry.fetch('label'), *Array(entry['aliases'])]
+        .map { |value| normalize(value) }
+        .reject(&:empty?)
+    end
+
+    def normalize(value)
+      value.to_s.downcase.strip.gsub(/[[:space:]_-]+/, '-')
     end
   end
 
@@ -105,7 +131,7 @@ module PullRequestMetadata
 
   def self.parse(body, contract)
     parsed = sections(body)
-    type = field(parsed['PR Type'], 'Type')
+    type = contract.canonical_type(field(parsed['PR Type'], 'Type'))
     agent = field(parsed['AI Attribution'], 'Agent')
     agent = nil if agent.to_s.casecmp('none').zero?
     related = Array(parsed['Related Issue']).join("\n")
@@ -160,13 +186,14 @@ module PullRequestMetadata
     return ['PR Type must declare exactly one "- Type: <type>" entry.'] unless values.length == 1
 
     type = values.first
-    unless contract.type_names.include?(type)
-      return ["PR Type #{type.inspect} is not allowed. Use one of: #{contract.type_names.join(', ')}."]
+    canonical_type = contract.canonical_type(type)
+    unless canonical_type
+      return ["PR Type #{type.inspect} is not allowed. Use one of: #{contract.accepted_type_values.join(', ')}."]
     end
 
-    return [] if title_match.nil? || title_match[1] == type
+    return [] if title_match.nil? || title_match[1] == canonical_type
 
-    ["PR Type #{type.inspect} does not match the title type #{title_match[1].inspect}."]
+    ["PR Type #{type.inspect} resolves to #{canonical_type.inspect} and does not match the title type #{title_match[1].inspect}."]
   end
 
   def self.validate_project(metadata, contract)

@@ -224,6 +224,7 @@
 "移出常用" = "Remove from Favorites";
 "设为常用" = "Add to Favorites";
 "文本" = "Text";
+"拷贝于 %@" = "Copied at %@";
 
 /* Quick Notes Module */
 "备忘录暂无笔记" = "No notes in Notes app";

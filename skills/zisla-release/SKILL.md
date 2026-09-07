@@ -24,6 +24,7 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 - 发版构建严禁使用调试变体：必须显式使用 `DEBUG_BUILD=false`，产物必须是 `zisla.app`、Bundle ID `dev.wzz.zisla`；`zisla-debug.app` 或 `dev.wzz.zisla.debug` 只能用于本地调试，不能上传。
 - 发版资源必须来自正式资源目录：`AppIcon.icns` 必须作为主图标，`AppIconNight.icns` 只能作为深色模式备用图标；调试构建使用的黑底白字图标复制方式，以及 `zisla-debug.app` 中的任何资源，都不能用于正式包或通过改名后上传。
 - 发版不得把 `make run` 生成的 `dist/zisla-debug.app` 直接压缩、改名或复制资源；必须由 `Scripts/package-release.sh` 重新构建正式包并通过身份与图标校验。
+- Release 默认使用 `RELEASE_SIGNING_MODE=selfsigned` 和稳定的 `zisla Release Signing` 证书，使指定要求不再是随构建变化的 cdhash，避免每次 Sparkle 更新后重新请求 Accessibility、Screen Recording 等 TCC 权限。现有 ad-hoc 安装迁入首个此类 Release 时，旧 cdhash 授权无法继承，用户需重新授权一次；之后才会随后续 Release 保留。Preview 可显式使用 `RELEASE_SIGNING_MODE=adhoc CODE_SIGN_IDENTITY=-`。自签名与 ad-hoc 都不代表 Apple 公证，也不允许 WeatherKit 受限 entitlement。
 
 详细凭据和通道约束见 [references/credentials.md](references/credentials.md) 与 [references/update-channels.md](references/update-channels.md)。
 
@@ -36,11 +37,14 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 5. 核对资源身份：正式包的主图标必须与 `Resources/AppIcon.icns` 完全一致，不能是 `Resources/AppIconNight.icns` 的副本。
 6. 确认 Sparkle 2.9.4 的 `generate_appcast` 可执行，私钥位于钥匙串或已移动到受限的离线/加密位置；不得打印、提交或上传私钥。
 7. 核对签名密钥配对：私钥推导出的公钥必须与 `mac/Resources/Info.plist` 的 `SUPublicEDKey` 完全一致。签错密钥的表现是客户端发现更新、下载完成后静默不安装，而整套 appcast 必须重新生成，所以必须在构建前查。
-8. 正式版还要确认 `wzz6423/homebrew-tap` 已存在且当前凭据可向它推送；Preview 不涉及 tap。
+8. 正式版确认 `~/Library/Keychains/zisla-release-signing.keychain-db` 存在、登录钥匙串含 `dev.wzz.zisla.release-signing-keychain` 解锁项，并且 `security find-identity -v -p codesigning ~/Library/Keychains/zisla-release-signing.keychain-db` 能找到 `zisla Release Signing`。
+9. 正式版还要确认 `wzz6423/homebrew-tap` 已存在且当前凭据可向它推送；Preview 不涉及 tap。
 
 ```zsh
 gh auth status
 security find-internet-password -s gitee.com -a wzz6423 >/dev/null
+test -f "$HOME/Library/Keychains/zisla-release-signing.keychain-db"
+security find-generic-password -a "$(id -un)" -s dev.wzz.zisla.release-signing-keychain >/dev/null
 # -p 只打印公钥，不输出私钥；--account 必须给，默认账户名 ed25519 下没有这把钥匙。
 test "$("${SPARKLE_GENERATE_APPCAST:h}/generate_keys" --account zisla-update-ed25519 -p)" = \
   "$(plutil -extract SUPublicEDKey raw -o - mac/Resources/Info.plist)"
@@ -123,7 +127,7 @@ release_gate
 
 在仓库根目录执行 `make build-package` 完成打包。它按 `arm64`、`x86_64`、`arm64 x86_64` 顺序调用 `mac/Scripts/package-release.sh`，对每次调用强制 `DEBUG_BUILD=false`，把三套 DMG、ZIP 及其 SHA-256 平铺到仓库根 `outputs/`，并保留三对 appcast：Universal 的 `appcast-gitee.xml` 与 `appcast-github.xml`，以及 `appcast-gitee-arm64.xml`、`appcast-github-arm64.xml`、`appcast-gitee-x86_64.xml`、`appcast-github-x86_64.xml`。`outputs/` 每次重建，其内容即本次需要上传的全部资产；GitHub Release 自动生成的源码压缩包不属于它，不得手工构造或补传。三套 `zisla.app` 保留在 `outputs/.staging/<架构>/`，只用于下面的发布前验证，不上传。
 
-`CODE_SIGN_IDENTITY=-` 是免费 ad-hoc 分发；它不需要 Apple Developer Program，但未公证，首次启动可能需要用户在系统设置中选择“仍要打开”。后续更新仍由 Sparkle 的 EdDSA 签名保护。
+正式版不需要导出 `CODE_SIGN_IDENTITY`；脚本默认从专用钥匙串读取 `zisla Release Signing` 自签名证书。它不需要 Apple Developer Program，但未公证，首次启动可能需要用户在系统设置中选择“仍要打开”。后续更新仍由 Sparkle 的 EdDSA 签名独立保护。
 
 **必须构建三套包**：`arm64`、`x86_64`（X86）单架构包，以及同时包含两个架构的 `universal` 包；`make build-package` 一次生成三套，缺任一套即视为打包失败：
 
@@ -133,7 +137,6 @@ test -z "$(git status --porcelain)"
 export VERSION="${VERSION:?沿用 begin 记录的实际版本}"
 export BUILD_NUMBER="$(sed -n 's/^BUILD_NUMBER="${BUILD_NUMBER:-\([0-9][0-9]*\)}"$/\1/p' mac/Scripts/build-app.sh)"
 [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]
-export CODE_SIGN_IDENTITY=-
 export DEBUG_BUILD=false
 export SPARKLE_GENERATE_APPCAST='/安全位置/Sparkle/bin/generate_appcast'
 export SPARKLE_ED_KEY_FILE='/安全位置/zisla-sparkle-ed25519-private-key.txt'
@@ -155,7 +158,7 @@ DEBUG_BUILD=false ARCHIVE_DIRECTORY="$PWD/.release-v${VERSION}/arm64" \
 
 单架构构建不得生成 Universal 内容；Universal 构建不得只包含一个架构。若脚本的输出文件名与上述后缀不一致，停止本轮并按失败流程处理，不得在 begin 后修改源码继续发版；禁止仅修改文件名后上传未经架构验证的包。
 
-`SPARKLE_ED_KEY_FILE` 优先于钥匙串；无交互发布必须显式设置它。仅在本机交互发布时，才可不设置该变量并由 `zisla-update-ed25519` 登录钥匙串账户读取。拥有 Developer ID 证书和公证凭据后，将 `CODE_SIGN_IDENTITY` 替换为 `Developer ID Application: ...`，并在上传前完成 notarization 与 stapling。
+`SPARKLE_ED_KEY_FILE` 优先于钥匙串；无交互发布必须显式设置它。仅在本机交互发布时，才可不设置该变量并由 `zisla-update-ed25519` 登录钥匙串账户读取。拥有 Developer ID 证书和公证凭据后，设置 `RELEASE_SIGNING_MODE=release` 和 `CODE_SIGN_IDENTITY='Developer ID Application: ...'`，并在上传前完成 notarization 与 stapling。Preview 的 ad-hoc 构建必须同时设置 `UPDATE_CHANNEL=preview RELEASE_SIGNING_MODE=adhoc CODE_SIGN_IDENTITY=-`，正式通道会拒绝 ad-hoc 包。
 
 ## GitHub 与 Gitee 发布
 
