@@ -201,7 +201,7 @@ struct RichNoteEditorTests {
     }
 
     @Test
-    func removesNotesDefaultFontSizeBeforeSavingEditedHTML() async throws {
+    func preservesHeadingAndBodyFontSizesBeforeSavingEditedHTML() async throws {
         let sourceHTML = "<h1><span style=\"font-size: 11px\">标题</span></h1><div><span style=\"font-size: 11px; color: red\">正文</span></div>"
         let changeCapture = HTMLChangeCapture()
         let hostingView = NSHostingView(rootView:
