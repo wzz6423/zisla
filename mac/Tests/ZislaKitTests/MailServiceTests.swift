@@ -5,6 +5,37 @@ import Testing
 
 struct MailServiceTests {
     @Test @MainActor
+    func mailOperationsQueueInSubmissionOrderAndReturnIndividualResults() async {
+        let queue = MailOperationQueue()
+        let firstStarted = MailOperationQueueTestGate()
+        let releaseFirst = MailOperationQueueTestGate()
+        var events: [String] = []
+
+        let first = Task { @MainActor in
+            await queue.enqueue {
+                events.append("first-start")
+                await firstStarted.signal()
+                await releaseFirst.wait()
+                events.append("first-end")
+                return .success
+            }
+        }
+        await firstStarted.wait()
+
+        let second = Task { @MainActor in
+            await queue.enqueue {
+                events.append("second")
+                return .failed("second failed")
+            }
+        }
+
+        await releaseFirst.signal()
+        #expect(await first.value == .success)
+        #expect(await second.value == .failed("second failed"))
+        #expect(events == ["first-start", "first-end", "second"])
+    }
+
+    @Test @MainActor
     func messageRowsDiscardInvalidIdentifiersAndSortNewestFirst() {
         let messages = MailService.messages(from: [
             MailScriptRow(
@@ -188,5 +219,29 @@ struct MailServiceTests {
             "Mail.app 当前未运行。zisla 不会自动打开它；请在需要同步时自行启动 Mail.app 后重试。"
         )
         #expect(MailService.mailUnavailableMessage(isRunning: true) == nil)
+    }
+}
+
+private actor MailOperationQueueTestGate {
+    private var isSignaled = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        if isSignaled {
+            isSignaled = false
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func signal() {
+        if let waiter = waiters.first {
+            waiters.removeFirst()
+            waiter.resume()
+        } else {
+            isSignaled = true
+        }
     }
 }

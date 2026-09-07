@@ -349,7 +349,6 @@ struct MailModuleView: View {
             .fixedSize()
             .controlSize(.mini)
             .help(AppLocalization.text("标记为垃圾邮件或移到废纸篓"))
-            .disabled(mail.isMutating)
         }
     }
 
