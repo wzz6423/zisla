@@ -40,6 +40,7 @@ fi
 APP="$OUTPUT_DIRECTORY/$APP_NAME.app"
 CONTENTS="$APP/Contents"
 IDENTITY="${CODE_SIGN_IDENTITY:--}"
+SIGNING_KEYCHAIN="${CODE_SIGN_KEYCHAIN:-}"
 SIGNING_MODE="${SIGNING_MODE:-}"
 BUILD_ARCHITECTURES="${BUILD_ARCHITECTURES:-$(uname -m)}"
 ARCHITECTURES=(${=BUILD_ARCHITECTURES})
@@ -142,6 +143,11 @@ case "$SIGNING_MODE" in
     ;;
 esac
 
+if [[ -n "$SIGNING_KEYCHAIN" && ! -f "$SIGNING_KEYCHAIN" ]]; then
+  echo "error: CODE_SIGN_KEYCHAIN does not exist: $SIGNING_KEYCHAIN" >&2
+  exit 1
+fi
+
 case "$UPDATE_CHANNEL" in
   release|preview) ;;
   *)
@@ -228,7 +234,7 @@ if [[ -d "$ROOT/Vendor/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
   ditto \
     "$ROOT/Vendor/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" \
     "$CONTENTS/Frameworks/Sparkle.framework"
-  # Sparkle launches its installer through Updater.app. The ad-hoc re-sign below runs with
+  # Sparkle launches its installer through Updater.app. The final signature below runs with
   # --deep and regenerates the framework's CodeResources, so a missing Updater.app survives
   # every later codesign check and only surfaces as an update that refuses to install.
   if [[ ! -x "$CONTENTS/Frameworks/Sparkle.framework/Updater.app/Contents/MacOS/Updater" ]]; then
@@ -254,6 +260,8 @@ if [[ -x "$helper" ]]; then
 fi
 
 ENTITLEMENTS="$ROOT/Resources/Zisla.entitlements"
+CERTIFICATE_SIGNING_ARGUMENTS=(--sign "$IDENTITY")
+[[ -z "$SIGNING_KEYCHAIN" ]] || CERTIFICATE_SIGNING_ARGUMENTS+=(--keychain "$SIGNING_KEYCHAIN")
 if [[ "$SIGNING_MODE" == "adhoc" ]]; then
   # Ad-hoc signs cannot carry WeatherKit (or other restricted) entitlements.
   # Note: an ad hoc designated requirement is the build-specific cdhash,
@@ -261,10 +269,11 @@ if [[ "$SIGNING_MODE" == "adhoc" ]]; then
   echo "warning: ad-hoc code signature (TeamIdentifier empty); WeatherKit unavailable, mainland China uses China Weather alerts" >&2
   codesign --force --deep --sign - "$APP"
 elif [[ "$SIGNING_MODE" == "dev" ]]; then
-  # Development signing: a stable certificate identity keeps TCC permissions valid across builds.
+  # A stable certificate identity keeps TCC permissions valid across builds. This mode also
+  # signs self-signed releases, which cannot carry restricted Developer ID entitlements.
   # Do not include entitlements because restricted entitlements such as WeatherKit are rejected by AMFI without a provisioning profile,
-  # and do not enable the hardened runtime because local debugging does not require it.
-  codesign --force --deep --sign "$IDENTITY" "$APP"
+  # and do not enable the hardened runtime because this path is not notarized.
+  codesign --force --deep "${CERTIFICATE_SIGNING_ARGUMENTS[@]}" "$APP"
 else
   if [[ ! -f "$ENTITLEMENTS" ]]; then
     echo "error: missing entitlements file: $ENTITLEMENTS" >&2
@@ -272,17 +281,27 @@ else
   fi
   codesign --force --deep --options runtime --timestamp \
     --entitlements "$ENTITLEMENTS" \
-    --sign "$IDENTITY" "$APP"
+    "${CERTIFICATE_SIGNING_ARGUMENTS[@]}" "$APP"
 fi
 codesign --verify --deep --strict --all-architectures --verbose=2 "$APP"
+SIGNATURE_DETAILS="$(codesign -dv --verbose=4 "$APP" 2>&1)"
 if [[ "$SIGNING_MODE" == "adhoc" ]]; then
-  SIGNATURE_DETAILS="$(codesign -dv --verbose=4 "$APP" 2>&1)"
   [[ "$SIGNATURE_DETAILS" == *"Signature=adhoc"* ]] || {
     echo "error: expected an ad-hoc signature" >&2
     exit 1
   }
   [[ "$SIGNATURE_DETAILS" != *"Authority="* && "$SIGNATURE_DETAILS" == *"TeamIdentifier=not set"* ]] || {
     echo "error: ad-hoc build unexpectedly contains a certificate identity" >&2
+    exit 1
+  }
+else
+  [[ "$SIGNATURE_DETAILS" != *"Signature=adhoc"* && "$SIGNATURE_DETAILS" == *"Authority="* ]] || {
+    echo "error: expected a certificate-backed code signature" >&2
+    exit 1
+  }
+  DESIGNATED_REQUIREMENT="$(codesign -d -r- "$APP" 2>&1)"
+  [[ "$DESIGNATED_REQUIREMENT" == *"certificate"* && "$DESIGNATED_REQUIREMENT" != *"designated => cdhash"* ]] || {
+    echo "error: certificate signing did not produce a stable designated requirement" >&2
     exit 1
   }
 fi
