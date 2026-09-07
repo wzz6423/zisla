@@ -449,6 +449,31 @@ struct NowPlayingServiceTests {
     }
 
     @Test
+    func adapterPlaybackModeCacheOnlySurvivesForTheSameTrack() {
+        #expect(
+            NowPlayingService.resolvedAdapterPlaybackMode(
+                incoming: .random,
+                cached: .sequential,
+                cachedIdentityMatches: true
+            ) == .random
+        )
+        #expect(
+            NowPlayingService.resolvedAdapterPlaybackMode(
+                incoming: nil,
+                cached: .repeatOne,
+                cachedIdentityMatches: true
+            ) == .repeatOne
+        )
+        #expect(
+            NowPlayingService.resolvedAdapterPlaybackMode(
+                incoming: nil,
+                cached: .repeatOne,
+                cachedIdentityMatches: false
+            ) == nil
+        )
+    }
+
+    @Test
     func approximatePlaybackModeCycleKeepsTheExpectedOrder() {
         let first = NowPlayingService.nextPlaybackMode(after: .sequential)
         let second = NowPlayingService.nextPlaybackMode(after: first)

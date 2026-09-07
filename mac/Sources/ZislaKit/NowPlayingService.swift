@@ -133,8 +133,8 @@ public final class NowPlayingService: ObservableObject {
       artist = snapshot.artist
       duration = snapshot.duration
       source =
-        snapshot.sourcePID.map { "pid:\($0)" }
-        ?? snapshot.sourceBundleIdentifier.map { "bundle:\($0)" }
+        snapshot.sourceBundleIdentifier.map { "bundle:\($0)" }
+        ?? snapshot.sourcePID.map { "pid:\($0)" }
     }
   }
 
@@ -257,6 +257,7 @@ public final class NowPlayingService: ObservableObject {
   private var systemAudioIsAudible = false
   private var playbackRefreshGeneration: UInt64 = 0
   private var adapterPlaybackMode: NowPlayingPlaybackMode?
+  private var adapterPlaybackModeIdentity: ControlIdentity?
   private var playbackModeCommandGeneration: UInt64 = 0
   private var preferredSource: MediaSourcePreference = .automatic
 
@@ -281,6 +282,8 @@ public final class NowPlayingService: ObservableObject {
     favoriteOverrideExpirationTask = nil
     specialistFavoriteRefreshTask?.cancel()
     specialistFavoriteRefreshTask = nil
+    adapterPlaybackMode = nil
+    adapterPlaybackModeIdentity = nil
     activeProfile = nil
     resolveSnapshot()
   }
@@ -468,6 +471,7 @@ public final class NowPlayingService: ObservableObject {
     specialistFavoriteRefreshTask?.cancel()
     specialistFavoriteRefreshTask = nil
     adapterPlaybackMode = nil
+    adapterPlaybackModeIdentity = nil
     playbackModeCommandGeneration &+= 1
     activeProfile = nil
     snapshot = nil
@@ -558,11 +562,13 @@ public final class NowPlayingService: ObservableObject {
           !succeeded
         else { return }
         self.adapterPlaybackMode = nil
+        self.adapterPlaybackModeIdentity = nil
         self.playbackModeOverride = nil
         self.resolveSnapshot()
       }
       guard enqueued else { return false }
       adapterPlaybackMode = mode
+      adapterPlaybackModeIdentity = ControlIdentity(current)
     } else if let setRepeatModeFunction, let setShuffleModeFunction {
       setRepeatModeFunction(mode.mediaRemoteRepeatMode)
       setShuffleModeFunction(mode.mediaRemoteShuffleMode)
@@ -881,6 +887,14 @@ public final class NowPlayingService: ObservableObject {
     return nil
   }
 
+  nonisolated static func resolvedAdapterPlaybackMode(
+    incoming: NowPlayingPlaybackMode?,
+    cached: NowPlayingPlaybackMode?,
+    cachedIdentityMatches: Bool
+  ) -> NowPlayingPlaybackMode? {
+    incoming ?? (cachedIdentityMatches ? cached : nil)
+  }
+
   nonisolated static func favoriteCommand(
     isFavorite: Bool,
     control: NowPlayingFavoriteControl
@@ -1172,10 +1186,20 @@ public final class NowPlayingService: ObservableObject {
     audioMonitor.refresh()
     var value = snapshot
 
+    let identity = ControlIdentity(value)
+    let resolvedPlaybackMode = Self.resolvedAdapterPlaybackMode(
+      incoming: value.playbackMode,
+      cached: adapterPlaybackMode,
+      cachedIdentityMatches: adapterPlaybackModeIdentity == identity
+    )
     if let playbackMode = value.playbackMode {
       adapterPlaybackMode = playbackMode
+      adapterPlaybackModeIdentity = identity
+    } else if let resolvedPlaybackMode {
+      value.playbackMode = resolvedPlaybackMode
     } else {
-      value.playbackMode = adapterPlaybackMode
+      adapterPlaybackMode = nil
+      adapterPlaybackModeIdentity = nil
     }
     remoteInfoState = .available
     remotePlaybackState = value.isPlaying ? .playing : .paused
@@ -1383,6 +1407,7 @@ public final class NowPlayingService: ObservableObject {
         snapshot = resolvedAudioFallbackSnapshot(from: preferredSources)
         return
       }
+      applySpecialization(to: &remote)
       applyControlOverrides(to: &remote)
       if !remote.isPlaying,
         systemAudioIsAudible,
@@ -1405,7 +1430,6 @@ public final class NowPlayingService: ObservableObject {
         stored.isVideo = remote.isVideo
         remoteSnapshot = stored
       }
-      applySpecialization(to: &remote)
       applyLyrics(to: &remote)
       snapshot = remote
       return

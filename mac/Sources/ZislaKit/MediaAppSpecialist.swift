@@ -150,18 +150,12 @@ final class MediaAppSpecialist {
     func cyclePlaybackMode(
         pid: pid_t?,
         bundleIdentifier: String?,
-        currentMode: NowPlayingPlaybackMode
+        currentMode _: NowPlayingPlaybackMode
     ) -> Bool {
         guard bundleIdentifier == Self.qqMusicBundleIdentifier,
               let pid,
               hasQQMusicAccessibilityAccess()
         else { return false }
-        if Self.performQQMusicMenuCommand(
-            pid: pid,
-            matching: Self.qqMusicPlaybackModeMenuLabels(after: currentMode)
-        ) {
-            return true
-        }
         return Self.qqMusicControlRoots(pid: pid).contains {
             Self.searchAndClickPlayMode(in: $0, depth: 0, pid: pid)
         }
