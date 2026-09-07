@@ -471,9 +471,7 @@ struct IslandRootView: View {
     }
 
     private var enabledModules: [IslandModule] {
-        IslandModule.allCases.filter {
-            $0.isEnabled(in: model.settingsStore.settings) && $0 != .lockScreen
-        }
+        IslandModule.enabledOrder(model.settingsStore.settings)
     }
 
     private var activeModule: IslandModule? {
@@ -979,6 +977,6 @@ private struct ModuleSelector: View {
     }
 
     private var visibleModules: [IslandModule] {
-        IslandModule.allCases.filter { $0.isEnabled(in: model.settingsStore.settings) && $0 != .lockScreen }
+        IslandModule.enabledOrder(model.settingsStore.settings)
     }
 }

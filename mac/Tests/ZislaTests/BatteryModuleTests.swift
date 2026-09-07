@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ZislaCore
 import ZislaKit
 
 @testable import Zisla
@@ -16,6 +17,31 @@ struct BatteryModuleTests {
         )
         #expect(batteryModule == .battery)
         #expect(IslandModule.battery.layout == IslandModuleLayout.battery)
+    }
+
+    @Test
+    func configuredModuleOrderControlsVisibleNavigationOrder() {
+        var settings = FeatureSettings.default
+        settings.moduleOrder = [.mail, .dashboard, .battery]
+
+        #expect(Array(IslandModule.enabledOrder(settings).prefix(3)) == [
+            .mail,
+            .dashboard,
+            .battery,
+        ])
+    }
+
+    @Test
+    func groupedModuleLayoutsShareHeights() {
+        #expect(IslandModuleLayout.clipboard.islandSize.height == IslandModule.clipboard.layout.islandSize.height)
+        #expect(IslandModule.shelf.layout == IslandModule.clipboard.layout)
+        #expect(IslandModule.aiMonitor.layout == IslandModule.clipboard.layout)
+        #expect(IslandModule.keyboardSound.layout == IslandModule.clipboard.layout)
+        #expect(IslandModule.download.layout == IslandModule.agenda.layout)
+        #expect(IslandModule.agenda.layout == IslandModule.agenda.layout)
+        #expect(IslandModule.mail.layout == IslandModule.quickNotes.layout)
+        #expect(IslandModule.pdf.layout == IslandModule.quickNotes.layout)
+        #expect(IslandModule.system.layout == IslandModule.battery.layout)
     }
 
     @Test

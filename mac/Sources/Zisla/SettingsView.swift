@@ -14,6 +14,8 @@ struct SettingsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var searchFieldFocused: Bool
     @State private var draggedWeatherLocationID: String?
+    @State private var draggedModuleOrder: IslandModuleOrder?
+    @State private var draggedCompactStatusPriority: CompactStatusPriority?
     @State private var sectionSwitchDirection: CGFloat = 1
     @State private var pendingRecommendedToolAction: RecommendedToolAction?
     @State private var isVoiceHistoryClearConfirmationPresented = false
@@ -808,6 +810,43 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("键盘音效", detail: "全局播放键盘音效并记录输入统计", symbol: "keyboard.badge.ellipsis", keyPath: \.keyboardEnabled)
                 }
+
+                settingsGroup("工具") {
+                    let order = model.settingsStore.settings.moduleOrder
+                    ForEach(Array(order.enumerated()), id: \.element) { index, module in
+                        if index > 0 { rowDivider }
+                        reorderSettingRow(
+                            symbol: moduleOrderSymbol(for: module),
+                            title: module.title
+                        ) {
+                            draggedModuleOrder = module
+                            return NSItemProvider(object: module.rawValue as NSString)
+                        }
+                        .onDrop(
+                            of: ReorderDropDelegate<IslandModuleOrder>.supportedTypes,
+                            delegate: ReorderDropDelegate(
+                                destination: module,
+                                dragging: $draggedModuleOrder,
+                                move: moveModuleOrder
+                            )
+                        )
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "arrow.counterclockwise",
+                        title: "恢复默认顺序",
+                        detail: ""
+                    ) {
+                        IconButton(
+                            symbol: "arrow.counterclockwise",
+                            help: AppLocalization.text("恢复默认顺序"),
+                            size: .compact
+                        ) {
+                            model.settingsStore.settings.moduleOrder = IslandModuleOrder.defaultOrder
+                        }
+                        .disabled(order == IslandModuleOrder.defaultOrder)
+                    }
+                }
             }
 
             if input.selection == .features || input.selection == .screenshot {
@@ -1098,32 +1137,22 @@ struct SettingsView: View {
                 let priorities = model.settingsStore.settings.compactStatusPriority
                 ForEach(Array(priorities.enumerated()), id: \.element) { index, priority in
                     if index > 0 { rowDivider }
-                    settingRow(
+                    reorderSettingRow(
                         symbol: compactStatusPrioritySymbol(for: priority),
-                        title: priority.title,
-                        detail: ""
+                        title: priority.title
                     ) {
-                        HStack(spacing: 4) {
-                            IconButton(
-                                symbol: "arrow.up",
-                                help: AppLocalization.text("上移%@", AppLocalization.text(priority.title)),
-                                size: .compact
-                            ) {
-                                moveCompactStatusPriority(priority, by: -1)
-                            }
-                            .disabled(index == priorities.startIndex)
-
-                            IconButton(
-                                symbol: "arrow.down",
-                                help: AppLocalization.text("下移%@", AppLocalization.text(priority.title)),
-                                size: .compact
-                            ) {
-                                moveCompactStatusPriority(priority, by: 1)
-                            }
-                            .disabled(index == priorities.index(before: priorities.endIndex))
-                        }
+                        draggedCompactStatusPriority = priority
+                        return NSItemProvider(object: priority.rawValue as NSString)
                     }
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                    .onDrop(
+                        of: ReorderDropDelegate<CompactStatusPriority>.supportedTypes,
+                        delegate: ReorderDropDelegate(
+                            destination: priority,
+                            dragging: $draggedCompactStatusPriority,
+                            move: moveCompactStatusPriority(_:to:)
+                        )
+                    )
                 }
                 rowDivider
                 settingRow(
@@ -2375,12 +2404,12 @@ struct SettingsView: View {
                     if location.kind == .saved {
                         weatherLocationRow(location)
                             .onDrop(
-                                of: WeatherLocationReorderDropDelegate.supportedTypes,
-                                delegate: WeatherLocationReorderDropDelegate(
-                                    destinationID: location.id,
-                                    draggingID: $draggedWeatherLocationID
+                                of: ReorderDropDelegate<String>.supportedTypes,
+                                delegate: ReorderDropDelegate(
+                                    destination: location.id,
+                                    dragging: $draggedWeatherLocationID
                                 ) { sourceID, destinationID in
-                                    model.moveWeatherLocation(id: sourceID, to: destinationID)
+                                    _ = model.moveWeatherLocation(id: sourceID, to: destinationID)
                                 }
                             )
                     } else {
@@ -2940,13 +2969,26 @@ struct SettingsView: View {
         return selected.count == 1 && selected.contains(accountName)
     }
 
-    private func moveCompactStatusPriority(_ priority: CompactStatusPriority, by offset: Int) {
+    private func moveCompactStatusPriority(_ priority: CompactStatusPriority, to destination: CompactStatusPriority) {
         var priorities = model.settingsStore.settings.compactStatusPriority
-        guard let index = priorities.firstIndex(of: priority) else { return }
-        let destination = priorities.index(index, offsetBy: offset)
-        guard priorities.indices.contains(destination) else { return }
-        priorities.swapAt(index, destination)
+        guard priority != destination,
+              let sourceIndex = priorities.firstIndex(of: priority),
+              let destinationIndex = priorities.firstIndex(of: destination)
+        else { return }
+        let item = priorities.remove(at: sourceIndex)
+        priorities.insert(item, at: min(destinationIndex, priorities.count))
         model.settingsStore.settings.compactStatusPriority = priorities
+    }
+
+    private func moveModuleOrder(_ module: IslandModuleOrder, to destination: IslandModuleOrder) {
+        var order = model.settingsStore.settings.moduleOrder
+        guard module != destination,
+              let sourceIndex = order.firstIndex(of: module),
+              let destinationIndex = order.firstIndex(of: destination)
+        else { return }
+        let item = order.remove(at: sourceIndex)
+        order.insert(item, at: min(destinationIndex, order.count))
+        model.settingsStore.settings.moduleOrder = order
     }
 
     private func clipboardAssistantActionOrder(
@@ -3023,6 +3065,24 @@ struct SettingsView: View {
         }
     }
 
+    private func moduleOrderSymbol(for module: IslandModuleOrder) -> String {
+        switch module {
+        case .dashboard: "rectangle.grid.2x2.fill"
+        case .shelf: "tray.full.fill"
+        case .clipboard: "clipboard"
+        case .download: "arrow.down.circle.fill"
+        case .agenda: "calendar"
+        case .toolbox: "wrench.and.screwdriver.fill"
+        case .quickNotes: "note.text"
+        case .aiMonitor: "chart.xyaxis.line"
+        case .keyboardSound: "keyboard.badge.ellipsis"
+        case .mail: "envelope.fill"
+        case .system: "gauge.with.dots.needle.67percent"
+        case .battery: "battery.100percent"
+        case .pdf: "doc.viewfinder"
+        }
+    }
+
     private func settingRow<Trailing: View>(
         symbol: String,
         title: String,
@@ -3054,6 +3114,32 @@ struct SettingsView: View {
         }
         .padding(.leading, isNested ? 24 : 4)
         .padding(.trailing, 4)
+        .frame(maxWidth: .infinity, minHeight: 48)
+    }
+
+    private func reorderSettingRow(
+        symbol: String,
+        title: String,
+        onDrag: @escaping () -> NSItemProvider
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+                .onDrag(onDrag)
+                .help(AppLocalization.text("拖动调整 %@ 的展示顺序", AppLocalization.text(title)))
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 24)
+            AppLocalizedText(title)
+                .font(.system(size: 11, weight: .medium))
+                .fitsLines(2)
+            Spacer(minLength: 8)
+        }
+        .padding(.horizontal, 4)
         .frame(maxWidth: .infinity, minHeight: 48)
     }
 
@@ -3699,25 +3785,25 @@ private enum RecommendedToolAction {
     }
 }
 
-private struct WeatherLocationReorderDropDelegate: DropDelegate {
-    static let supportedTypes = [
+private struct ReorderDropDelegate<Item: Equatable>: DropDelegate {
+    static var supportedTypes: [String] { [
         UTType.utf8PlainText.identifier,
         UTType.plainText.identifier,
-    ]
+    ] }
 
-    let destinationID: String
-    @Binding var draggingID: String?
-    var move: @MainActor @Sendable (String, String) -> Bool
+    let destination: Item
+    @Binding var dragging: Item?
+    let move: @MainActor @Sendable (Item, Item) -> Void
 
     func validateDrop(info: DropInfo) -> Bool {
-        draggingID != nil
-            && draggingID != destinationID
+        dragging != nil
+            && dragging != destination
             && info.hasItemsConforming(to: Self.supportedTypes)
     }
 
     func dropEntered(info: DropInfo) {
-        guard let draggingID else { return }
-        _ = move(draggingID, destinationID)
+        guard let dragging else { return }
+        move(dragging, destination)
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
@@ -3725,7 +3811,7 @@ private struct WeatherLocationReorderDropDelegate: DropDelegate {
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        draggingID = nil
+        dragging = nil
         return true
     }
 }

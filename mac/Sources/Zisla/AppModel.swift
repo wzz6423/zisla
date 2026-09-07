@@ -36,19 +36,19 @@ enum IslandModule: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .dashboard: "首页"
-    case .shelf: "中转"
+    case .shelf: "中转站"
     case .clipboard: "剪贴板"
-    case .aiMonitor: "AI 监控"
+    case .aiMonitor: "AI 信息"
     case .download: "下载"
-    case .agenda: "日程"
+    case .agenda: "天气日程"
     case .mail: "邮件"
     case .quickNotes: "随记"
-    case .pdf: "PDF"
+    case .pdf: "PDF 工具"
     case .toolbox: "小工具"
-    case .system: "系统"
+    case .system: "CPU"
     case .battery: "电池"
     case .lockScreen: "锁屏"
-    case .keyboardSound: "键盘音效"
+    case .keyboardSound: "键盘信息"
     }
   }
 
@@ -75,37 +75,31 @@ enum IslandModule: String, CaseIterable, Identifiable {
     switch self {
     case .dashboard:
       .standard
-    case .aiMonitor:
-      .ai
-    case .system:
-      .system
-    case .battery:
-      .battery
-    case .clipboard:
+    case .aiMonitor, .clipboard, .shelf, .keyboardSound:
       .clipboard
-    case .shelf:
-      .shelf
+    case .system, .battery:
+      .system
+    case .download, .agenda:
+      .agenda
     case .toolbox:
       .toolbox
-    case .pdf:
-      .pdf
-    case .download:
-      .download
-    case .agenda:
-      .agenda
     case .lockScreen:
       .standard
-    case .mail:
-      .mail
-    case .quickNotes:
+    case .mail, .quickNotes, .pdf:
       .notes
-    case .keyboardSound:
-      .keyboardSound
     }
   }
 }
 
 extension IslandModule {
+  static func configuredOrder(_ settings: FeatureSettings) -> [Self] {
+    IslandModuleOrder.normalized(settings.moduleOrder).compactMap { Self(rawValue: $0.rawValue) }
+  }
+
+  static func enabledOrder(_ settings: FeatureSettings) -> [Self] {
+    configuredOrder(settings).filter { $0.isEnabled(in: settings) }
+  }
+
   /// Formerly a private IslandRootView extension; AppModel also needs it to fall back from a disabled selected module after settings changes.
   func isEnabled(in settings: FeatureSettings) -> Bool {
     switch self {
@@ -152,7 +146,7 @@ struct IslandModuleLayout: Equatable {
   private static let moduleVerticalInsets = IslandSurfaceGeometry.moduleInset * 2
   private static let panelHeightAllowance: CGFloat = 4
   static let batteryMinimumContentHeight: CGFloat = 0
-  static let batteryMaximumContentHeight: CGFloat = 430
+  static let batteryMaximumContentHeight: CGFloat = 401
 
   /// Fixed-height modules size the surface to their rendered content instead of inheriting
   /// the standard panel's unused vertical space.
@@ -240,10 +234,10 @@ struct IslandModuleLayout: Equatable {
         panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + 4)
       )
     }
-    if module == .battery, let dynamicHeight = batteryDynamicHeight {
+    if module == .battery, let batteryDynamicHeight {
       let contentHeight = min(
         batteryMaximumContentHeight,
-        max(batteryMinimumContentHeight, dynamicHeight)
+        max(batteryMinimumContentHeight, batteryDynamicHeight)
       )
       return compactModule(contentHeight: contentHeight)
     }
@@ -357,7 +351,7 @@ final class AppModel: ObservableObject {
   func selectModule(_ module: IslandModule) {
     let current = pendingModuleSelection ?? selectedModule
     guard module != current else { return }
-    let order = IslandModule.allCases
+    let order = IslandModule.configuredOrder(settingsStore.settings)
     if let from = order.firstIndex(of: current),
        let to = order.firstIndex(of: module) {
       moduleSwitchDirection = to > from ? 1 : -1

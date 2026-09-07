@@ -166,7 +166,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         if notices.contains(where: { $0.id.hasPrefix("focus-transition") }) {
             return .transient
         }
-        return settings.compactStatusPriority.first {
+        let priorities = CompactStatusPriority.normalized(settings.compactStatusPriority)
+        return priorities.first {
             compactStatusIsAvailable($0, notices: notices)
         }
     }
