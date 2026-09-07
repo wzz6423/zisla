@@ -135,7 +135,7 @@ struct MailIndexReader: Sendable {
             stepResult = sqlite3_step(statement)
             if stepResult == SQLITE_ROW {
                 let messageID = sqlite3_column_int64(statement, 0)
-                guard messageID > 0, let mailboxURL = stringColumn(statement, 6) else { continue }
+                guard let mailboxURL = stringColumn(statement, 6) else { continue }
                 let account = accountDetails(forMailboxURL: mailboxURL)
 
                 let subject = stringColumn(statement, 2) ?? ""

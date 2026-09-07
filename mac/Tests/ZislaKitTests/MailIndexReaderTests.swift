@@ -177,6 +177,35 @@ struct MailIndexReaderTests {
         #expect(older.messages.map(\.messageID) == ["3"])
         #expect(!older.hasMore)
     }
+
+    @Test
+    func preservesNegativeMessageIDsWhenPaging() throws {
+        let databaseURL = try makeMailIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+
+        let values = (0..<11).map { index in
+            let messageID = index.isMultiple(of: 2) ? -(index + 1) : index + 1
+            let timestamp = 11_000 - index
+            return "(\(messageID), 1, \(timestamp), \(timestamp), 1, 0, 0)"
+        }.joined(separator: ",\n")
+        try execute("""
+            INSERT INTO mailboxes (ROWID, url) VALUES
+                (1, 'imap://work%40example.com@mail.example.com/INBOX');
+            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+            VALUES
+                \(values);
+            """, at: databaseURL)
+
+        let reader = MailIndexReader(databaseURL: databaseURL, maxMessages: 10)
+        let first = try reader.snapshot(accountNames: [])
+        #expect(first.messages.count == 10)
+        #expect(first.messages.contains { $0.messageID.hasPrefix("-") })
+        #expect(first.hasMore)
+
+        let older = try reader.snapshot(accountNames: [], offset: 10)
+        #expect(older.messages.map(\.messageID) == ["-11"])
+        #expect(!older.hasMore)
+    }
 }
 
 private func makeMailIndex() throws -> URL {

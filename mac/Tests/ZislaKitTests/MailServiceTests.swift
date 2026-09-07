@@ -131,11 +131,131 @@ struct MailServiceTests {
     func inboxScriptReadsRequestedPageAndSignalsOlderMessages() {
         let script = MailService.inboxScript(accountNames: [], pageSize: 10, offset: 20)
 
-        #expect(script.contains("set startIndex to 20 + 1"))
-        #expect(script.contains("set endIndex to 20 + 10"))
+        #expect(script.contains("set remainingOffset to 20"))
+        #expect(script.contains("set remainingPageSize to 10"))
+        #expect(script.contains("set startIndex to remainingOffset + 1"))
+        #expect(script.contains("set endIndex to remainingOffset + remainingPageSize"))
+        #expect(script.contains("set remainingPageSize to remainingPageSize - (endIndex - startIndex + 1)"))
         #expect(script.contains("if startIndex <= endIndex then"))
         #expect(script.contains("set hasMoreMessages to true"))
         #expect(script.contains("return {accountRows, messageRows, hasMoreMessages}"))
+    }
+
+    @Test @MainActor
+    func refreshAndLoadMoreAppendPagesWithoutRepeatingTheLastPage() async {
+        var requestedScripts: [String] = []
+        let firstPage = (1...10).map { index in
+            MailScriptRow(
+                accountName: "工作邮箱",
+                messageID: String(index),
+                sender: "sender@example.com",
+                subject: "邮件 \(index)",
+                body: "正文 \(index)",
+                receivedAt: Date(timeIntervalSince1970: Double(1_000 - index)),
+                isRead: true
+            )
+        }
+        let secondPage = (10...20).map { index in
+            MailScriptRow(
+                accountName: "工作邮箱",
+                messageID: String(index),
+                sender: "sender@example.com",
+                subject: "邮件 \(index)",
+                body: "正文 \(index)",
+                receivedAt: Date(timeIntervalSince1970: Double(1_000 - index)),
+                isRead: true
+            )
+        }
+
+        let service = MailService(
+            commandRunner: { script, _ in
+                requestedScripts.append(script)
+                let isSecondPage = script.contains("set remainingOffset to 10")
+                return .success(.snapshot(MailSnapshot(
+                    accounts: [MailScriptAccount(name: "工作邮箱", emailAddresses: ["work@example.com"])],
+                    messages: isSecondPage ? secondPage : firstPage,
+                    hasMore: !isSecondPage
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+
+        await service.refresh()
+        #expect(service.messages.count == 10)
+        #expect(service.messages.first?.messageID == 1)
+        #expect(service.canLoadMore)
+        #expect(service.paginationGeneration == 1)
+
+        await service.loadMore()
+        #expect(service.messages.count == 20)
+        #expect(service.messages.map(\.messageID) == Array(1...20))
+        #expect(!service.canLoadMore)
+        #expect(service.paginationGeneration == 2)
+        #expect(requestedScripts.count == 2)
+        #expect(requestedScripts[1].contains("set remainingOffset to 10"))
+
+        await service.loadMore()
+        #expect(requestedScripts.count == 2)
+    }
+
+    @Test @MainActor
+    func loadMoreAdvancesAfterAResultAddsNoNewMessages() async {
+        var requestedScripts: [String] = []
+        let rows: (ClosedRange<Int>) -> [MailScriptRow] = { range in
+            range.map { index in
+                MailScriptRow(
+                    accountName: "工作邮箱",
+                    messageID: String(index),
+                    sender: "sender@example.com",
+                    subject: "邮件 \(index)",
+                    body: "正文 \(index)",
+                    receivedAt: Date(timeIntervalSince1970: Double(1_000 - index)),
+                    isRead: true
+                )
+            }
+        }
+
+        let service = MailService(
+            commandRunner: { script, _ in
+                requestedScripts.append(script)
+                switch requestedScripts.count {
+                case 1:
+                    return .success(.snapshot(MailSnapshot(
+                        accounts: [MailScriptAccount(name: "工作邮箱", emailAddresses: ["work@example.com"])],
+                        messages: rows(1...10),
+                        hasMore: true
+                    )))
+                case 2:
+                    return .success(.snapshot(MailSnapshot(
+                        accounts: [MailScriptAccount(name: "工作邮箱", emailAddresses: ["work@example.com"])],
+                        messages: rows(1...10),
+                        hasMore: true
+                    )))
+                default:
+                    return .success(.snapshot(MailSnapshot(
+                        accounts: [MailScriptAccount(name: "工作邮箱", emailAddresses: ["work@example.com"])],
+                        messages: rows(11...20),
+                        hasMore: false
+                    )))
+                }
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+
+        await service.refresh()
+        await service.loadMore()
+        #expect(service.messages.count == 10)
+        #expect(service.canLoadMore)
+        #expect(service.paginationGeneration == 2)
+
+        await service.loadMore()
+        #expect(service.messages.count == 20)
+        #expect(!service.canLoadMore)
+        #expect(requestedScripts.count == 3)
+        #expect(requestedScripts[1].contains("set remainingOffset to 10"))
+        #expect(requestedScripts[2].contains("set remainingOffset to 20"))
     }
 
     @Test @MainActor

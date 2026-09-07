@@ -35,12 +35,12 @@ struct MailSnapshot: Sendable {
     }
 }
 
-private enum MailScriptOutput: Sendable {
+enum MailScriptOutput: Sendable {
     case snapshot(MailSnapshot)
     case succeeded
 }
 
-private enum MailScriptError: Error, Sendable {
+enum MailScriptError: Error, Sendable {
     case failed(String)
 }
 
@@ -93,6 +93,8 @@ public final class MailService: ObservableObject {
     @Published public private(set) var accounts: [MailAccount] = []
     @Published public private(set) var messages: [MailMessage] = []
     @Published public private(set) var isLoading = false
+    @Published public private(set) var canLoadMore = true
+    @Published public private(set) var paginationGeneration = 0
     @Published public private(set) var isMutating = false
     @Published public private(set) var errorDescription: String?
     @Published public private(set) var needsMailIndexAccess = false
@@ -100,25 +102,27 @@ public final class MailService: ObservableObject {
     private let commandRunner: (String, Bool) async -> Result<MailScriptOutput, MailScriptError>
     private let indexReader: MailIndexReader
     private let mutationQueue = MailOperationQueue()
+    private let mailRunning: () -> Bool
     private var pollingTask: Task<Void, Never>?
     private var selectedAccountNames: Set<String> = []
     private var messageOffset = 0
-    private var hasMoreMessages = true
     private let pageSize = 10
 
     public convenience init() {
         self.init(commandRunner: Self.runAppleScript, indexReader: MailIndexReader())
     }
 
-    fileprivate init(
+    init(
         commandRunner: @escaping (String, Bool) async -> Result<MailScriptOutput, MailScriptError>,
-        indexReader: MailIndexReader
+        indexReader: MailIndexReader,
+        mailRunning: (() -> Bool)? = nil
     ) {
         self.commandRunner = commandRunner
         self.indexReader = indexReader
         mutationQueue.onActivityChange = { [weak self] isActive in
             self?.isMutating = isActive
         }
+        self.mailRunning = mailRunning ?? Self.isMailRunning
     }
 
     deinit {
@@ -165,12 +169,12 @@ public final class MailService: ObservableObject {
     public func refresh() async {
         guard !isLoading else { return }
         messageOffset = 0
-        hasMoreMessages = true
+        canLoadMore = true
         await fetchMessages(offset: 0, replacing: true)
     }
 
     public func loadMore() async {
-        guard !isLoading, hasMoreMessages else { return }
+        guard !isLoading, canLoadMore else { return }
         await fetchMessages(offset: messageOffset, replacing: false)
     }
 
@@ -179,7 +183,7 @@ public final class MailService: ObservableObject {
         defer { isLoading = false }
         needsMailIndexAccess = false
 
-        if Self.isMailRunning() {
+        if mailRunning() {
             switch await commandRunner(Self.inboxScript(accountNames: selectedAccountNames, pageSize: pageSize, offset: offset), true) {
             case let .success(.snapshot(snapshot)):
                 apply(snapshot, replacing: replacing)
@@ -339,6 +343,8 @@ public final class MailService: ObservableObject {
             set accountRows to {}
             set messageRows to {}
             set hasMoreMessages to false
+            set remainingOffset to \(safeOffset)
+            set remainingPageSize to \(safePageSize)
             set selectedAccountNames to {\(accountNames)}
             set accountList to every account
             set accountCount to count of accountList
@@ -370,21 +376,29 @@ public final class MailService: ObservableObject {
                     try
                         set inboxMessages to messages of \(accountInbox("mailAccount"))
                         set messageCount to count of inboxMessages
-                        set startIndex to \(safeOffset) + 1
-                        set endIndex to \(safeOffset) + \(safePageSize)
-                        if messageCount > endIndex then set hasMoreMessages to true
-                        if endIndex > messageCount then set endIndex to messageCount
-                        if startIndex <= endIndex then
-                            repeat with messageIndex from startIndex to endIndex
-                                try
-                                    set mailMessage to item messageIndex of inboxMessages
-                                    set messageBody to content of mailMessage
-                                    if (count of messageBody) > 1200 then set messageBody to text 1 thru 1200 of messageBody
-                                    set end of messageRows to {accountName, id of mailMessage as text, sender of mailMessage as text, subject of mailMessage as text, messageBody, date received of mailMessage, read status of mailMessage}
-                                on error
-                                    -- Skip unreadable individual messages (corrupt or excessively large).
-                                end try
-                            end repeat
+                        if remainingPageSize is 0 then
+                            if messageCount > 0 then set hasMoreMessages to true
+                        else if remainingOffset >= messageCount then
+                            set remainingOffset to remainingOffset - messageCount
+                        else
+                            set startIndex to remainingOffset + 1
+                            set endIndex to remainingOffset + remainingPageSize
+                            if endIndex > messageCount then set endIndex to messageCount
+                            if messageCount > endIndex then set hasMoreMessages to true
+                            if startIndex <= endIndex then
+                                repeat with messageIndex from startIndex to endIndex
+                                    try
+                                        set mailMessage to item messageIndex of inboxMessages
+                                        set messageBody to content of mailMessage
+                                        if (count of messageBody) > 1200 then set messageBody to text 1 thru 1200 of messageBody
+                                        set end of messageRows to {accountName, id of mailMessage as text, sender of mailMessage as text, subject of mailMessage as text, messageBody, date received of mailMessage, read status of mailMessage}
+                                    on error
+                                        -- Skip unreadable individual messages (corrupt or excessively large).
+                                    end try
+                                end repeat
+                                set remainingPageSize to remainingPageSize - (endIndex - startIndex + 1)
+                                set remainingOffset to 0
+                            end if
                         end if
                     on error
                         -- This account's inbox is currently unavailable (still loading, offline, or authenticating).
@@ -522,7 +536,8 @@ public final class MailService: ObservableObject {
             messages = merged.sorted { $0.receivedAt > $1.receivedAt }
             messageOffset += pageSize
         }
-        hasMoreMessages = snapshot.hasMore
+        canLoadMore = snapshot.hasMore
+        paginationGeneration += 1
         errorDescription = nil
         needsMailIndexAccess = false
     }
