@@ -202,7 +202,7 @@ struct RichNoteEditorTests {
 
     @Test
     func removesNotesDefaultFontSizeBeforeSavingEditedHTML() async throws {
-        let sourceHTML = "<div><span style=\"font-size: 11px; color: red\">正文</span></div>"
+        let sourceHTML = "<h1><span style=\"font-size: 11px\">标题</span></h1><div><span style=\"font-size: 11px; color: red\">正文</span></div>"
         let changeCapture = HTMLChangeCapture()
         let hostingView = NSHostingView(rootView:
             RichNoteEditor(
@@ -230,7 +230,7 @@ struct RichNoteEditorTests {
             """
             (() => {
               const editor = document.getElementById('editor');
-              const text = editor.querySelector('span').firstChild;
+              const text = editor.querySelector('#editor > div span').firstChild;
               const range = document.createRange();
               range.setStart(text, text.textContent.length);
               range.collapse(true);
@@ -243,7 +243,19 @@ struct RichNoteEditorTests {
         )
 
         let savedHTML = try await waitForCapturedHTML(in: changeCapture)
-        #expect(savedHTML.contains("font-size") == false)
+        let computedSizes = try #require(await webView.evaluateJavaScript(
+            """
+            (() => ({
+              heading: getComputedStyle(document.querySelector('#editor > h1 span')).fontSize,
+              body: getComputedStyle(document.querySelector('#editor > div span')).fontSize
+            }))()
+            """
+        ) as? [String: Any])
+
+        #expect(computedSizes["heading"] as? String == "23px")
+        #expect(computedSizes["body"] as? String == "14px")
+        #expect(savedHTML.contains("<h1><span>标题</span></h1>") == true)
+        #expect(savedHTML.contains("font-size: 14px") == true)
         #expect(savedHTML.contains("color: red") == true)
         #expect(savedHTML.contains("正文变更") == true)
     }

@@ -287,7 +287,11 @@ struct RichNoteEditor: NSViewRepresentable {
           const normalizeDefaultFontSize = root => {
             root.querySelectorAll('[style]').forEach(node => {
               if (node.style.fontSize.trim().toLowerCase() !== '11px') return;
-              node.style.removeProperty('font-size');
+              if (node.closest('h1, h2, h3, h4, h5, h6')) {
+                node.style.removeProperty('font-size');
+              } else {
+                node.style.setProperty('font-size', '14px');
+              }
               if (!node.getAttribute('style')?.trim()) node.removeAttribute('style');
             });
           };
