@@ -48,6 +48,13 @@ jobs:
           content_id="$(jq -r '.issue.node_id // .pull_request.node_id // empty' "$event")"
           state="$(jq -r '.issue.state // .pull_request.state // empty' "$event")"
           labels_json="$(jq -c '(.issue.labels // .pull_request.labels // []) | map(.name)' "$event")"
+          type_label=''
+
+          if jq -e '.pull_request' "$event" >/dev/null; then
+            jq -r '.pull_request.body // ""' "$event" > "$RUNNER_TEMP/pr-body.md"
+            type_label="$(ruby .github/scripts/pr-metadata.rb json \
+              --body-file "$RUNNER_TEMP/pr-body.md" | jq -r '.typeLabel // empty')"
+          fi
 
           if [ -z "$content_id" ]; then
             echo "::error::The event did not contain an Issue or pull request node id."
@@ -58,18 +65,11 @@ jobs:
           project_number="$(jq -r '.project.number' "$config")"
           expected_title="$(jq -r '.project.title' "$config")"
           status_field_name="$(jq -r '.statusField' "$config")"
-          desired_status="$(jq -r \
-            --arg state "$state" \
-            --argjson labels "$labels_json" \
-            'if $state == "closed" then
-               .closedStatus
-             else
-               (first(
-                 .labelStatus[] as $rule
-                 | select(($labels | index($rule.label)) != null)
-                 | $rule.status
-               ) // .defaultStatus)
-             end' "$config")"
+          desired_status="$(ruby .github/scripts/project-metadata.rb status \
+            --manifest "$config" \
+            --state "$state" \
+            --labels-json "$labels_json" \
+            --type-label "$type_label")"
 
           # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
           project_query='
@@ -258,5 +258,5 @@ jobs:
       - name: Remove project payloads
         if: always()
         run: |
-          rm -f "$RUNNER_TEMP/project.json" "$RUNNER_TEMP/project-add-error.txt" \
+          rm -f "$RUNNER_TEMP/pr-body.md" "$RUNNER_TEMP/project.json" "$RUNNER_TEMP/project-add-error.txt" \
             "$RUNNER_TEMP/project-update.json"
