@@ -119,10 +119,10 @@ public final class MailService: ObservableObject {
     ) {
         self.commandRunner = commandRunner
         self.indexReader = indexReader
+        self.mailRunning = mailRunning ?? Self.isMailRunning
         mutationQueue.onActivityChange = { [weak self] isActive in
             self?.isMutating = isActive
         }
-        self.mailRunning = mailRunning ?? Self.isMailRunning
     }
 
     deinit {
