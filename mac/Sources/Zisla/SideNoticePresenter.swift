@@ -166,7 +166,7 @@ final class SideNoticePresenter {
             displayState.compactWingsEnabled = false
             displayState.compactWingHeight = compactBarFrame.height
             displayState.reserveCompactWing = false
-            updateCompactBar(
+            let presentsNewCompactStatus = updateCompactBar(
                 screen: snapshot,
                 panels: panels,
                 rejoiningActiveSpace: rejoiningActiveSpace
@@ -176,14 +176,16 @@ final class SideNoticePresenter {
                 notices: queue.left,
                 screen: snapshot,
                 panels: panels,
-                rejoiningActiveSpace: rejoiningActiveSpace
+                rejoiningActiveSpace: rejoiningActiveSpace,
+                presentsNewCompactStatus: presentsNewCompactStatus
             )
             updatePanel(
                 side: .right,
                 notices: queue.right,
                 screen: snapshot,
                 panels: panels,
-                rejoiningActiveSpace: rejoiningActiveSpace
+                rejoiningActiveSpace: rejoiningActiveSpace,
+                presentsNewCompactStatus: presentsNewCompactStatus
             )
         }
     }
@@ -201,13 +203,14 @@ final class SideNoticePresenter {
         screen snapshot: ScreenSnapshot,
         panels: DisplayPanels,
         rejoiningActiveSpace: Bool
-    ) {
+    ) -> Bool {
         let displayState = panels.displayState
         var compactNotices = queue.left + queue.right
         if displayState.hidesVoiceProcessingIndicator {
             compactNotices = Self.noticesWithoutVoiceProcessing(compactNotices)
         }
         let compactStatusIDs = Set(compactNotices.filter(Self.isCompactNotice).map(\.id))
+        let presentsNewCompactStatus = !compactStatusIDs.isSubset(of: displayState.compactStatusIDs)
         if compactStatusIDs != displayState.compactStatusIDs {
             displayState.compactStatusIDs = compactStatusIDs
             displayState.compactStatusHidden = false
@@ -226,7 +229,7 @@ final class SideNoticePresenter {
                 displayState.compactStatusHidden = false
             }
             panels.compactBar?.orderOut(nil)
-            return
+            return presentsNewCompactStatus
         }
         guard let frame = layoutEngine.compactBarFrame(
             for: snapshot,
@@ -234,7 +237,7 @@ final class SideNoticePresenter {
             settings: settingsStore.settings
         ) else {
             panels.compactBar?.orderOut(nil)
-            return
+            return presentsNewCompactStatus
         }
         let topology = ScreenLayoutEngine().layout(for: snapshot).topology
         // Detailed mode left/right content must avoid the physical notch; simulated-island devices have no obstruction, so no center gap.
@@ -248,10 +251,12 @@ final class SideNoticePresenter {
         }
         if Self.shouldOrderPanelFront(
             isVisible: panel.isVisible,
-            rejoiningActiveSpace: rejoiningActiveSpace
+            rejoiningActiveSpace: rejoiningActiveSpace,
+            presentsNewCompactStatus: presentsNewCompactStatus
         ) {
             panel.orderFrontRegardless()
         }
+        return presentsNewCompactStatus
     }
 
     private func updatePanel(
@@ -259,7 +264,8 @@ final class SideNoticePresenter {
         notices: [IslandNotice],
         screen snapshot: ScreenSnapshot,
         panels: DisplayPanels,
-        rejoiningActiveSpace: Bool
+        rejoiningActiveSpace: Bool,
+        presentsNewCompactStatus: Bool
     ) {
         let displayState = panels.displayState
         let notices = displayState.hidesVoiceProcessingIndicator
@@ -287,7 +293,8 @@ final class SideNoticePresenter {
         }
         if Self.shouldOrderPanelFront(
             isVisible: panel.isVisible,
-            rejoiningActiveSpace: rejoiningActiveSpace
+            rejoiningActiveSpace: rejoiningActiveSpace,
+            presentsNewCompactStatus: presentsNewCompactStatus
         ) {
             panel.orderFrontRegardless()
         }
@@ -336,9 +343,10 @@ final class SideNoticePresenter {
 
     static func shouldOrderPanelFront(
         isVisible: Bool,
-        rejoiningActiveSpace: Bool
+        rejoiningActiveSpace: Bool,
+        presentsNewCompactStatus: Bool
     ) -> Bool {
-        !isVisible || rejoiningActiveSpace
+        !isVisible || rejoiningActiveSpace || presentsNewCompactStatus
     }
 
     private static func isCompactNotice(_ notice: IslandNotice) -> Bool {

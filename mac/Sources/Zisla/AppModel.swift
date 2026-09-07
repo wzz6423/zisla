@@ -2933,6 +2933,25 @@ final class AppModel: ObservableObject {
     mediaActivityPresented = true
   }
 
+  static func shouldMonitorSpectrum(
+    mediaEnabled: Bool,
+    sideNoticesEnabled: Bool,
+    voiceInputIsCapturing: Bool,
+    isIslandVisible: Bool,
+    isPlaying: Bool,
+    backgroundSoundsPlaying: Bool
+  ) -> Bool {
+    !voiceInputIsCapturing
+      && mediaEnabled
+      // Core Audio fallback needs audibility before it can publish the first playback snapshot.
+      && (
+        sideNoticesEnabled
+          || isIslandVisible
+          || isPlaying
+          || backgroundSoundsPlaying
+      )
+  }
+
   private func updateSpectrumMonitoring() {
     let settings = settingsStore.settings
     let voiceInputIsCapturing = voiceInput.isCapturingInput
@@ -2951,9 +2970,14 @@ final class AppModel: ObservableObject {
         && (isIslandVisible || hasVisiblePlaybackNotice)
     )
     media.setSpectrumMonitoringEnabled(
-      !voiceInputIsCapturing
-        && settings.mediaEnabled
-        && (isIslandVisible || isPlaying || backgroundSounds.isPlaying)
+      Self.shouldMonitorSpectrum(
+        mediaEnabled: settings.mediaEnabled,
+        sideNoticesEnabled: settings.sideNoticesEnabled,
+        voiceInputIsCapturing: voiceInputIsCapturing,
+        isIslandVisible: isIslandVisible,
+        isPlaying: isPlaying,
+        backgroundSoundsPlaying: backgroundSounds.isPlaying
+      )
     )
   }
 
