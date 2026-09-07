@@ -15,7 +15,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "Vendor/SkyLightWindow"),
-        .package(url: "https://github.com/awxkee/zstd.swift", exact: "1.0.2"),
+        .package(path: "Vendor/zstd.swift"),
     ],
     targets: [
         .target(
