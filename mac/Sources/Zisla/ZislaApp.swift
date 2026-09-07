@@ -721,9 +721,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 Task { @MainActor in
                     coordinator?.setAllowsKeyWindow(
                         visible && (
-                            module == .quickNotes
-                                || module == .mail
-                                || isTeleprompterPresented
+                            module.allowsIslandKeyboardFocus || isTeleprompterPresented
                         )
                     )
                 }
