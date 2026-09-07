@@ -652,7 +652,6 @@ public final class NowPlayingService: ObservableObject {
     )
     if activeProfile?.supportsFavoriteStateRead == true {
       specialistFavoriteIdentity = ControlIdentity(current)
-      specialistFavoriteState = current.isFavorite != true
       scheduleSpecialistFavoriteRefresh(for: current)
     }
     scheduleFavoriteOverrideExpiration()
@@ -900,6 +899,14 @@ public final class NowPlayingService: ObservableObject {
     case .wishList:
       return isFavorite ? .removeTrackFromWishList : .addTrackToWishList
     }
+  }
+
+  nonisolated static func favoriteStateConfirmsOverride(
+    observed: Bool?,
+    expected: Bool?
+  ) -> Bool {
+    guard let expected else { return true }
+    return observed == expected
   }
 
   nonisolated static func optimisticPlaybackValue(
@@ -1530,14 +1537,17 @@ public final class NowPlayingService: ObservableObject {
     } else {
       if profile.supportsFavoriteStateRead {
         let identity = ControlIdentity(snapshot)
-        if specialistFavoriteIdentity != identity {
+        let hasActiveFavoriteOverride = favoriteOverride.map {
+          $0.identity == identity && $0.expiresAt > .now
+        } == true
+        if !hasActiveFavoriteOverride, specialistFavoriteIdentity != identity {
           specialistFavoriteIdentity = identity
           specialistFavoriteState = specialist.favoriteState(
             pid: snapshot.sourcePID,
             bundleIdentifier: snapshot.sourceBundleIdentifier
           )
         }
-        if let specialistFavoriteState {
+        if !hasActiveFavoriteOverride, let specialistFavoriteState {
           snapshot.favoriteControl = profile.favoriteControl
           snapshot.isFavorite = specialistFavoriteState
         } else {
@@ -1561,18 +1571,43 @@ public final class NowPlayingService: ObservableObject {
   private func scheduleSpecialistFavoriteRefresh(for snapshot: NowPlayingSnapshot) {
     specialistFavoriteRefreshTask?.cancel()
     let identity = ControlIdentity(snapshot)
+    let expectedState = favoriteOverride.flatMap {
+      $0.identity == identity && $0.expiresAt > .now ? $0.value : nil
+    }
     specialistFavoriteRefreshTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .milliseconds(350))
-      guard !Task.isCancelled,
-        let self,
-        ControlIdentity(self.snapshot ?? snapshot) == identity,
-        self.activeProfile?.supportsFavoriteStateRead == true
-      else { return }
-      self.specialistFavoriteState = self.specialist.favoriteState(
-        pid: self.snapshot?.sourcePID,
-        bundleIdentifier: self.snapshot?.sourceBundleIdentifier
-      )
-      self.resolveSnapshot()
+      guard let expectedState else { return }
+      for delay in [
+        Duration.milliseconds(300),
+        .milliseconds(300),
+        .milliseconds(500),
+        .milliseconds(700),
+      ] {
+        try? await Task.sleep(for: delay)
+        guard !Task.isCancelled,
+          let self,
+          ControlIdentity(self.snapshot ?? snapshot) == identity,
+          self.activeProfile?.supportsFavoriteStateRead == true
+        else { return }
+
+        let observed = self.specialist.favoriteState(
+          pid: self.snapshot?.sourcePID,
+          bundleIdentifier: self.snapshot?.sourceBundleIdentifier
+        )
+        guard self.favoriteOverride.map({
+          $0.identity == identity && $0.expiresAt > .now && $0.value == expectedState
+        }) == true else { return }
+        guard Self.favoriteStateConfirmsOverride(observed: observed, expected: expectedState) else {
+          continue
+        }
+
+        self.specialistFavoriteState = observed
+        self.favoriteOverride = nil
+        self.favoriteOverrideExpirationTask?.cancel()
+        self.favoriteOverrideExpirationTask = nil
+        self.resolveSnapshot()
+        return
+      }
+      self?.resolveSnapshot()
     }
   }
 

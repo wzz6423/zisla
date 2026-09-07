@@ -571,6 +571,22 @@ struct NowPlayingServiceTests {
     }
 
     @Test
+    func staleFavoriteStateDoesNotConfirmAnOptimisticOverride() {
+        #expect(
+            !NowPlayingService.favoriteStateConfirmsOverride(observed: true, expected: false)
+        )
+        #expect(
+            NowPlayingService.favoriteStateConfirmsOverride(observed: false, expected: false)
+        )
+        #expect(
+            !NowPlayingService.favoriteStateConfirmsOverride(observed: nil, expected: false)
+        )
+        #expect(
+            NowPlayingService.favoriteStateConfirmsOverride(observed: true, expected: nil)
+        )
+    }
+
+    @Test
     func advertisedFavoriteCapabilityIsAvailableBeforeItsStateArrives() throws {
         let data = try #require(
             """
