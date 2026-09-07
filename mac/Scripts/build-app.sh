@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="${0:A:h:h}"
 CONFIGURATION="${CONFIGURATION:-release}"
-VERSION="${VERSION:-0.1.7}"
+VERSION="${VERSION:-unknow}"
 BUILD_NUMBER="${BUILD_NUMBER:-13}"
 UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
 DEBUG_BUILD="${DEBUG_BUILD:-false}"
@@ -48,8 +48,8 @@ BINARIES=()
 KEYBOARD_RESOURCE_BUNDLE=""
 HAND_BUILT_APP_SWIFT_FLAGS=(-Xswiftc -DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE)
 
-[[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]] || {
-  echo "error: VERSION must be a semantic version (for example 1.2.3 or 1.2.3-preview.1)" >&2
+[[ "$VERSION" == "unknow" || "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]] || {
+  echo "error: VERSION must be unknow or a semantic version (for example 1.2.3 or 1.2.3-preview.1)" >&2
   exit 1
 }
 [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]] || {

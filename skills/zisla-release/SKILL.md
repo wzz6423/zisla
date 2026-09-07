@@ -30,7 +30,7 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 
 ## 发行前检查
 
-1. 确认工作树中只有预期的源代码与文档变更，并确定实际发布 tag。
+1. 从两端一致的最新 `main` 和干净工作树开始；待发代码必须在冻结前合入，不带任何未提交修改发版。确定本次 `VERSION`，完成以下检查后再创建 begin commit。
 2. 确认 `UPDATE_CHANNEL` 与本次版本类型匹配，并确认两端实际版本 tag 使用 `v${VERSION}`；Release 同步 Gitee `update-release` 和 GitHub `latest`，Preview 同步两端永久 `preview` feed。
 3. 确认 GitHub CLI 已登录，Gitee Release API 令牌已安全保存。
 4. 清除调试构建状态：即使当前 shell 继承了 `DEBUG_BUILD=true`，也必须在每次发版构建前显式设置 `DEBUG_BUILD=false`，并在产物中核对正式 Bundle ID。
@@ -50,6 +50,79 @@ test "$("${SPARKLE_GENERATE_APPCAST:h}/generate_keys" --account zisla-update-ed2
   "$(plutil -extract SUPublicEDKey raw -o - mac/Resources/Info.plist)"
 ```
 
+## 开始发版：冻结与 begin commit
+
+从 begin 到 end 推送并验证完成期间，**不得合入任何 PR**，包括自动合并、merge queue、机器人与人工操作。开始前暂停这些入口并通知协作者冻结 `main`；确认冻结有效后才提交 begin。没有权限落实冻结时停止并说明阻塞。失败、超时或会话中断都不能自动解除冻结，也不能提交 end；恢复时沿用已记录的 `VERSION`、通道、构建号和同一个 begin SHA，不新建 begin、不移动版本 tag。若源代码必须修复或远端 `main` 已前进，停止本轮并报告，由用户明确决定如何结束失败发布和启动新一轮，不得悄悄重置分支或继续上传。
+
+版本号只通过环境变量 `VERSION` 传入打包脚本；应用构建脚本的 `VERSION` 默认值为 `unknow`（准确拼写），不在发版时改成实际版本。`mac/Resources/Info.plist` 保留 `@VERSION@` 模板并由构建替换；`unknow` 不能出现在发布包或 appcast 中。已发布的 cask、官网 `latestRelease` 和历史发布记录仍记录真实版本，不属于源码默认值。
+
+begin **只能修改 `mac/Scripts/build-app.sh` 中 `BUILD_NUMBER` 的默认值这一行**；它是唯一持久化构建号。先核对 GitHub/Gitee 两端 Release 与 Preview 已发布的最大构建号，新值必须超过所有已发布值；不能机械地把本地默认值加一。不要新增第二份构建号文件，也不要用独立环境值覆盖已提交的构建号。所有示例在同一个 `zsh` 会话执行，任何门禁失败即停止：
+
+```zsh
+set -euo pipefail
+export VERSION="${VERSION:?先设置本次实际版本}"
+export UPDATE_CHANNEL="${UPDATE_CHANNEL:?先设置 release 或 preview}"
+GITEE_REMOTE='git@gitee.com:wzz6423/zisla.git'
+remote_commit() {
+  git ls-remote --exit-code "$1" "$2" "${2}^{}" | awk '
+    /\^\{\}$/ { peeled = $1 }
+    !/\^\{\}$/ { direct = $1 }
+    END { print (peeled != "" ? peeled : direct) }
+  '
+}
+test -z "$(git status --porcelain)"
+test "$(git branch --show-current)" = main
+git pull --ff-only origin main
+test "$(git rev-parse HEAD)" = "$(remote_commit origin refs/heads/main)"
+test "$(git rev-parse HEAD)" = "$(remote_commit "$GITEE_REMOTE" refs/heads/main)"
+# Edit only the BUILD_NUMBER default in build-app.sh before continuing.
+```
+
+编辑完成后，核对差异并提交；不要 `git add .`：
+
+```zsh
+export BUILD_NUMBER="$(sed -n 's/^BUILD_NUMBER="${BUILD_NUMBER:-\([0-9][0-9]*\)}"$/\1/p' mac/Scripts/build-app.sh)"
+[[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]
+git diff -- mac/Scripts/build-app.sh
+git add mac/Scripts/build-app.sh
+test "$(git status --porcelain)" = 'M  mac/Scripts/build-app.sh'
+git diff --cached --check
+git diff --cached --unified=0 -- mac/Scripts/build-app.sh | ruby -e '
+  changes = STDIN.each_line.reject { |line| line.start_with?("+++", "---") }
+    .select { |line| line.start_with?("+", "-") }.map(&:strip)
+  abort "begin must change only the BUILD_NUMBER default" unless changes.length == 2 &&
+    changes[0].match?(/\A-BUILD_NUMBER="\$\{BUILD_NUMBER:-[0-9]+\}"\z/) &&
+    changes[1].match?(/\A\+BUILD_NUMBER="\$\{BUILD_NUMBER:-[0-9]+\}"\z/)
+'
+git commit -m "chore(release): prepare release[begin] - update build id to ${BUILD_NUMBER}"
+export RELEASE_BEGIN_SHA="$(git rev-parse HEAD)"
+test -z "$(git status --porcelain)"
+git push origin HEAD:refs/heads/main
+git push "$GITEE_REMOTE" HEAD:refs/heads/main
+```
+
+立即在发布记录中保存 begin SHA、版本、通道和构建号。两端实际版本 tag 都必须显式指向这个 SHA，Release 必须使用已有的这个 tag，禁止让 GitHub/Gitee 根据默认分支自动创建版本 tag。首次发布时：
+
+```zsh
+test "$(remote_commit origin refs/heads/main)" = "$RELEASE_BEGIN_SHA"
+test "$(remote_commit "$GITEE_REMOTE" refs/heads/main)" = "$RELEASE_BEGIN_SHA"
+git tag "v${VERSION}" "$RELEASE_BEGIN_SHA"
+git push origin "refs/tags/v${VERSION}"
+git push "$GITEE_REMOTE" "refs/tags/v${VERSION}"
+release_gate() {
+  test "$(git rev-parse HEAD)" = "${1:-$RELEASE_BEGIN_SHA}" || return 1
+  test "$(git rev-parse "v${VERSION}^{commit}")" = "$RELEASE_BEGIN_SHA" || return 1
+  local release_remote
+  for release_remote in origin "$GITEE_REMOTE"; do
+    test "$(remote_commit "$release_remote" refs/heads/main)" = "$RELEASE_BEGIN_SHA" || return 1
+    test "$(remote_commit "$release_remote" "refs/tags/v${VERSION}")" = "$RELEASE_BEGIN_SHA" || return 1
+  done
+}
+release_gate
+```
+
+中断恢复时，先从记录恢复变量和上述函数，核对已有 tag 的 commit，不重复执行 `git tag`，不 force push。**每次构建、上传/覆盖资产、更新永久 feed，以及提交 end 前都执行 `release_gate`**；构建和上传前还要求 `git status --porcelain` 为空。产物必须在 begin SHA 的干净源码上生成，任何门禁失败均保留冻结状态并停止。永久 `preview` / `update-release` 是 feed 标签，不替代实际版本 tag。
+
 ## 构建
 
 在仓库根目录执行 `make build-package` 完成打包。它按 `arm64`、`x86_64`、`arm64 x86_64` 顺序调用 `mac/Scripts/package-release.sh`，对每次调用强制 `DEBUG_BUILD=false`，把三套 DMG、ZIP 及其 SHA-256 平铺到仓库根 `outputs/`，并保留三对 appcast：Universal 的 `appcast-gitee.xml` 与 `appcast-github.xml`，以及 `appcast-gitee-arm64.xml`、`appcast-github-arm64.xml`、`appcast-gitee-x86_64.xml`、`appcast-github-x86_64.xml`。`outputs/` 每次重建，其内容即本次需要上传的全部资产；GitHub Release 自动生成的源码压缩包不属于它，不得手工构造或补传。三套 `zisla.app` 保留在 `outputs/.staging/<架构>/`，只用于下面的发布前验证，不上传。
@@ -59,9 +132,11 @@ test "$("${SPARKLE_GENERATE_APPCAST:h}/generate_keys" --account zisla-update-ed2
 **必须构建三套包**：`arm64`、`x86_64`（X86）单架构包，以及同时包含两个架构的 `universal` 包；`make build-package` 一次生成三套，缺任一套即视为打包失败：
 
 ```zsh
-export VERSION='0.1.1'
-export BUILD_NUMBER='2'
-export UPDATE_CHANNEL='release'
+release_gate
+test -z "$(git status --porcelain)"
+export VERSION="${VERSION:?沿用 begin 记录的实际版本}"
+export BUILD_NUMBER="$(sed -n 's/^BUILD_NUMBER="${BUILD_NUMBER:-\([0-9][0-9]*\)}"$/\1/p' mac/Scripts/build-app.sh)"
+[[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]
 export DEBUG_BUILD=false
 export SPARKLE_GENERATE_APPCAST='/安全位置/Sparkle/bin/generate_appcast'
 export SPARKLE_ED_KEY_FILE='/安全位置/zisla-sparkle-ed25519-private-key.txt'
@@ -75,11 +150,13 @@ make build-package
 只有需要单独重建某一套包时，才从 `mac/` 目录直接调用脚本并显式指定架构与归档目录，例如只重建 arm64：
 
 ```zsh
+release_gate
+test -z "$(git status --porcelain)"
 DEBUG_BUILD=false ARCHIVE_DIRECTORY="$PWD/.release-v${VERSION}/arm64" \
   BUILD_ARCHITECTURES=arm64 Scripts/package-release.sh
 ```
 
-单架构构建不得生成 Universal 内容；Universal 构建不得只包含一个架构。若脚本的输出文件名与上述后缀不一致，先调整脚本，再继续发版；禁止仅修改文件名后上传未经架构验证的包。
+单架构构建不得生成 Universal 内容；Universal 构建不得只包含一个架构。若脚本的输出文件名与上述后缀不一致，停止本轮并按失败流程处理，不得在 begin 后修改源码继续发版；禁止仅修改文件名后上传未经架构验证的包。
 
 `SPARKLE_ED_KEY_FILE` 优先于钥匙串；无交互发布必须显式设置它。仅在本机交互发布时，才可不设置该变量并由 `zisla-update-ed25519` 登录钥匙串账户读取。拥有 Developer ID 证书和公证凭据后，设置 `RELEASE_SIGNING_MODE=release` 和 `CODE_SIGN_IDENTITY='Developer ID Application: ...'`，并在上传前完成 notarization 与 stapling。Preview 的 ad-hoc 构建必须同时设置 `UPDATE_CHANNEL=preview RELEASE_SIGNING_MODE=adhoc CODE_SIGN_IDENTITY=-`，正式通道会拒绝 ad-hoc 包。
 
@@ -88,6 +165,8 @@ DEBUG_BUILD=false ARCHIVE_DIRECTORY="$PWD/.release-v${VERSION}/arm64" \
 为实际版本建立 GitHub Release。上传 `arm64`、`x86_64` 和 `universal` 三套 DMG、ZIP、各自 SHA-256，以及三份引用 GitHub 上对应架构 ZIP 的 appcast，远端分别命名为 `appcast.xml`（Universal）、`appcast-arm64.xml` 和 `appcast-x86_64.xml`。Release 版本由 GitHub `latest/download/` 提供这三个文件；Preview 版本还必须将同三份 appcast 覆盖上传到永久 `preview` prerelease。
 
 ```zsh
+release_gate
+test -z "$(git status --porcelain)"
 RELEASE_CREATE_OPTIONS=()
 if [[ "$UPDATE_CHANNEL" == preview ]]; then
   RELEASE_CREATE_OPTIONS+=(--prerelease)
@@ -116,17 +195,19 @@ gh release create "v${VERSION}" \
   "$GITHUB_FEED_DIRECTORY/appcast.xml" \
   "$GITHUB_FEED_DIRECTORY/appcast-arm64.xml" \
   "$GITHUB_FEED_DIRECTORY/appcast-x86_64.xml" \
-  --repo wzz6423/zisla --title "zisla v${VERSION}" \
+  --repo wzz6423/zisla --title "zisla v${VERSION}" --verify-tag --target "$RELEASE_BEGIN_SHA" \
   "${RELEASE_CREATE_OPTIONS[@]}"
 ```
 
 首次启用 Preview 自动更新时，先创建永久 feed Release；之后每次 Preview 发版只覆盖其 GitHub `appcast.xml`：
 
 ```zsh
+release_gate
 if [[ "$UPDATE_CHANNEL" == preview ]]; then
   gh release view preview --repo wzz6423/zisla >/dev/null 2>&1 || \
     gh release create preview --repo wzz6423/zisla \
-      --title "zisla Preview update feed" --notes "Preview Sparkle feed" --prerelease
+      --title "zisla Preview update feed" --notes "Preview Sparkle feed" --prerelease \
+      --target "$RELEASE_BEGIN_SHA"
   gh release upload preview \
     "$GITHUB_FEED_DIRECTORY/appcast.xml" \
     "$GITHUB_FEED_DIRECTORY/appcast-arm64.xml" \
@@ -136,6 +217,8 @@ fi
 ```
 
 对已存在实际版本 Release 使用 `gh release edit` 和 `gh release upload --clobber`，不要创建同 tag 的重复 Release。替换某份 appcast 时必须与它引用的那套 ZIP 同次上传。GitHub Release 不会自动同步到 Gitee；使用 Gitee API 创建或更新同 tag Release，并上传三套架构资产、校验文件和三份 Gitee appcast（远端命名为 `appcast.xml`、`appcast-arm64.xml`、`appcast-x86_64.xml`）。正式版本还要把这三份 Gitee appcast 复制到永久 `update-release`；Preview 要把同三份复制到两端永久 `preview`。所有永久 appcast 仍必须引用实际版本 tag 中本站、对应架构的 ZIP。
+
+Gitee 创建实际版本 Release 前先通过 `release_gate`，请求必须显式携带 `tag_name="v${VERSION}"` 与 `target_commitish="$RELEASE_BEGIN_SHA"`，且已存在的版本 tag 必须解析为 begin SHA；创建后再次核对两端实际版本 tag。已有 Release 的恢复上传同样受门禁约束，不得修改 tag 指向。
 
 Gitee API 的 PATCH 必须携带 `tag_name`，否则返回 `400: tag_name is missing`。上传新附件后再删除同名旧附件，避免 Release 出现空档。
 
@@ -153,6 +236,8 @@ test "$(plutil -extract CFBundleDisplayName raw -o - "$STAGING_DIRECTORY/arm64/z
 test "$(plutil -extract CFBundleIconFile raw -o - "$STAGING_DIRECTORY/arm64/zisla.app/Contents/Info.plist")" = "AppIcon"
 test ! -e "$STAGING_DIRECTORY/arm64/zisla-debug.app"
 for ARCHITECTURE in arm64 x86_64 universal; do
+  test "$(plutil -extract CFBundleShortVersionString raw -o - "$STAGING_DIRECTORY/$ARCHITECTURE/zisla.app/Contents/Info.plist")" = "$VERSION"
+  test "$(plutil -extract CFBundleVersion raw -o - "$STAGING_DIRECTORY/$ARCHITECTURE/zisla.app/Contents/Info.plist")" = "$BUILD_NUMBER"
   cmp -s "$STAGING_DIRECTORY/$ARCHITECTURE/zisla.app/Contents/Resources/AppIcon.icns" Resources/AppIcon.icns
   cmp -s "$STAGING_DIRECTORY/$ARCHITECTURE/zisla.app/Contents/Resources/AppIconNight.icns" Resources/AppIconNight.icns
   codesign --verify --deep --strict --verbose=4 "$STAGING_DIRECTORY/$ARCHITECTURE/zisla.app"
@@ -254,12 +339,13 @@ open "$TEST_ROOT/zisla.app"
 仅正式版执行，Preview 跳过本节。两端 Release 资产上传并通过上节验证后，在仓库根目录执行：
 
 ```zsh
+release_gate
 PUBLISH_TAP=true make sync-cask
 ```
 
 脚本沿用已导出的 `VERSION` 与 `RELEASE_OUTPUT_DIRECTORY`，改写 `Casks/zisla.rb` 的 `version` 与两个 `sha256`：优先读 `$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-arm64.zip.sha256` 与同目录的 `x86_64` 校验文件，缺失时从已发布的 GitHub 资产拉取。校验不通过的 cask 不会写回；通过后镜像到 `wzz6423/homebrew-tap`。不带 `PUBLISH_TAP` 即为试运行，只更新仓库内的 cask。
 
-改写后的 cask 必须与官网 `latestRelease` 的版本改动一起提交，随后确认 tap 真的可安装：
+改写官网 `web/src/content.ts` 的 `latestRelease` 和 `web/README.md` 的下载链接，与 cask 使用同一实际版本；这三项留到 end 一起提交。先确认 tap 真的可安装：
 
 ```zsh
 ruby .github/scripts/homebrew-cask.rb verify --version "$VERSION" --content web/src/content.ts
@@ -270,6 +356,34 @@ brew livecheck --cask wzz6423/tap/zisla
 ```
 
 `brew list --cask --versions` 必须报出本次版本，`brew livecheck` 必须解析到同一版本。cask 的下载地址必须同时保留 `#{version}` 与 `#{arch}` 插值：写死版本号会让 `brew upgrade` 在下一版拉到旧包，写死架构会把另一半用户带到错误的包。
+
+## 结束发版：end commit
+
+只有两端全部资产、六份永久 feed、截图与自动更新验证通过，且正式版的 tap/cask/官网同步及校验完成，才允许结束；任何跳过、失败或未完成的验证都不得用 end 标记成功。正式版仅暂存 `Casks/zisla.rb`、`web/src/content.ts` 和 `web/README.md` 的发布元数据；tap 仓库由 `sync-cask` 单独提交和推送，其远端版本、校验和也须确认。Preview 不更新正式 cask、tap 或官网，但仍提交相同格式的空 end commit。
+
+```zsh
+release_gate
+if [[ "$UPDATE_CHANNEL" == release ]]; then
+  ruby .github/scripts/homebrew-cask.rb verify --version "$VERSION" --content web/src/content.ts
+  git add Casks/zisla.rb web/src/content.ts web/README.md
+fi
+git diff --cached --check
+# The release executor must check that only release metadata is staged; Preview must be clean.
+git status --short
+git diff --cached
+git commit --allow-empty -m 'chore(release): finish release[end] - update tap, casks and web'
+RELEASE_END_SHA="$(git rev-parse HEAD)"
+test "$(git rev-parse HEAD^)" = "$RELEASE_BEGIN_SHA"
+release_gate "$RELEASE_END_SHA"
+git push origin HEAD:refs/heads/main
+git push "$GITEE_REMOTE" HEAD:refs/heads/main
+for RELEASE_REMOTE in origin "$GITEE_REMOTE"; do
+  test "$(remote_commit "$RELEASE_REMOTE" refs/heads/main)" = "$RELEASE_END_SHA"
+  test "$(remote_commit "$RELEASE_REMOTE" "refs/tags/v${VERSION}")" = "$RELEASE_BEGIN_SHA"
+done
+```
+
+版本 tag 和两端 Release **始终标记 begin**，不得移动到 end；end 只记录发布收尾。end 若只有一端推送成功，继续冻结，核对成功端为 end、另一端仍为 begin、两端版本 tag 均为 begin 后，仅补推同一个 end 到缺失端，不新建 commit。全部远端校验通过后，记录 end SHA、恢复此前暂停的合并入口，才允许后续 PR 合入。完成清理并确认工作树干净。
 
 ## 交付记录
 
