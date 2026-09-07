@@ -449,6 +449,42 @@ struct NowPlayingServiceTests {
     }
 
     @Test
+    func adapterPlaybackModeCacheOnlySurvivesForTheSameTrack() {
+        #expect(
+            NowPlayingService.resolvedAdapterPlaybackMode(
+                incoming: .random,
+                cached: .sequential,
+                cachedIdentityMatches: true
+            ) == .random
+        )
+        #expect(
+            NowPlayingService.resolvedAdapterPlaybackMode(
+                incoming: nil,
+                cached: .repeatOne,
+                cachedIdentityMatches: true
+            ) == .repeatOne
+        )
+        #expect(
+            NowPlayingService.resolvedAdapterPlaybackMode(
+                incoming: nil,
+                cached: .repeatOne,
+                cachedIdentityMatches: false
+            ) == nil
+        )
+    }
+
+    @Test
+    func approximatePlaybackModeCycleKeepsTheExpectedOrder() {
+        let first = NowPlayingService.nextPlaybackMode(after: .sequential)
+        let second = NowPlayingService.nextPlaybackMode(after: first)
+        let third = NowPlayingService.nextPlaybackMode(after: second)
+
+        #expect(first == .repeatOne)
+        #expect(second == .random)
+        #expect(third == .sequential)
+    }
+
+    @Test
     func cachedPlaybackModeDoesNotInventControlCapability() {
         var snapshot = NowPlayingSnapshot(
             title: "Track",
@@ -531,6 +567,22 @@ struct NowPlayingServiceTests {
         )
         #expect(
             NowPlayingService.favoriteCommand(isFavorite: true, control: .like) == .likeTrack
+        )
+    }
+
+    @Test
+    func staleFavoriteStateDoesNotConfirmAnOptimisticOverride() {
+        #expect(
+            !NowPlayingService.favoriteStateConfirmsOverride(observed: true, expected: false)
+        )
+        #expect(
+            NowPlayingService.favoriteStateConfirmsOverride(observed: false, expected: false)
+        )
+        #expect(
+            !NowPlayingService.favoriteStateConfirmsOverride(observed: nil, expected: false)
+        )
+        #expect(
+            NowPlayingService.favoriteStateConfirmsOverride(observed: true, expected: nil)
         )
     }
 
