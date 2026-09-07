@@ -436,7 +436,10 @@ struct NowPlayingHeader: View {
     @ViewBuilder
     private func artwork(_ item: NowPlayingSnapshot) -> some View {
         ZStack(alignment: .bottomTrailing) {
-            if let image = MediaArtworkImageCache.image(from: item.artworkData) {
+            if let image = MediaArtworkImageCache.image(
+                from: item.artworkData,
+                fallback: item.sourceIconData
+            ) {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
@@ -453,7 +456,8 @@ struct NowPlayingHeader: View {
                 .frame(width: 54, height: 54)
             }
 
-            if let icon = MediaArtworkImageCache.image(from: item.sourceIconData) {
+            if MediaArtworkImageCache.image(from: item.artworkData) != nil,
+               let icon = MediaArtworkImageCache.image(from: item.sourceIconData) {
                 Image(nsImage: icon)
                     .resizable()
                     .scaledToFill()
