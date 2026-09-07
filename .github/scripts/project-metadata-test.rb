@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
+require 'json'
 
 require_relative 'project-metadata'
 require_relative 'pr-metadata'
@@ -20,6 +21,21 @@ class ProjectMetadataTest < Minitest::Test
 
     assert_equal 'bug', metadata['typeLabel']
     assert_equal 'Bug Fix', status(labels: [], type_label: metadata['typeLabel'])
+  end
+
+  def test_every_type_label_and_alias_routes_without_event_labels
+    configured_types.each do |entry|
+      values = [entry.fetch('type'), entry.fetch('label')] + Array(entry['aliases'])
+      values << 'Bug Fix' if entry.fetch('type') == 'fix'
+      expected = status(labels: [entry.fetch('label')])
+
+      values.uniq.each do |value|
+        metadata = PullRequestMetadata.parse("## PR Type\n\n- Type: #{value}\n", @pr_contract)
+
+        assert_equal entry.fetch('label'), metadata['typeLabel'], value
+        assert_equal expected, status(labels: [], type_label: metadata['typeLabel']), value
+      end
+    end
   end
 
   def test_issue_area_label_keeps_its_existing_route
@@ -47,5 +63,9 @@ class ProjectMetadataTest < Minitest::Test
 
   def status(state: 'open', labels:, type_label: nil)
     @contract.status_for(state: state, labels: labels, type_label: type_label)
+  end
+
+  def configured_types
+    JSON.parse(File.read(PR_CONTRACT_PATH)).fetch('types')
   end
 end
