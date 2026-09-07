@@ -224,6 +224,7 @@
 "移出常用" = "Verwijder uit favorieten";
 "设为常用" = "Voeg toe aan favorieten";
 "文本" = "Tekst";
+"拷贝于 %@" = "Gekopieerd om %@";
 
 /* Quick Notes Module */
 "备忘录暂无笔记" = "Geen notities in Notities-app";

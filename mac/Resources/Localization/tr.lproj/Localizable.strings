@@ -224,6 +224,7 @@
 "移出常用" = "Favorilerden Kaldır";
 "设为常用" = "Favorilere Ekle";
 "文本" = "Metin";
+"拷贝于 %@" = "%@ tarihinde kopyalandı";
 
 /* Quick Notes Module */
 "备忘录暂无笔记" = "Notes uygulamasında not yok";

@@ -224,6 +224,7 @@
 "移出常用" = "Hapus dari Favorit";
 "设为常用" = "Tambah ke Favorit";
 "文本" = "Teks";
+"拷贝于 %@" = "Disalin pada %@";
 
 /* Quick Notes Module */
 "备忘录暂无笔记" = "Tidak ada catatan di aplikasi Notes";

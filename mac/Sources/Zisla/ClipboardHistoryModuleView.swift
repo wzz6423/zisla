@@ -608,9 +608,10 @@ private struct ClipboardHistoryItemRow: View, Equatable {
                             .font(.system(size: 11, weight: .medium))
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
-                        Text(contentTypeName)
+                        Text(subtitle)
                             .font(.islandMicro())
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -708,6 +709,12 @@ private struct ClipboardHistoryItemRow: View, Equatable {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var subtitle: String {
+        AppLocalization.text(contentTypeName)
+            + " · "
+            + AppLocalization.text("拷贝于 %@", item.lastCopiedAtText())
     }
 
     private var contentTypeName: String {
