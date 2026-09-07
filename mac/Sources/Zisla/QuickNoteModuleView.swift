@@ -88,7 +88,7 @@ struct QuickNoteModuleView: View {
                             }
                             ForEach(Array(service.regularNotes.enumerated()), id: \.element.id) { index, note in
                                 if index < 9 {
-                                    noteRow(note)
+                                    noteRow(note, shortcutNumber: index + 1)
                                         .keyboardShortcut(
                                             KeyEquivalent(Character(String(index + 1))),
                                             modifiers: .command
@@ -126,24 +126,33 @@ struct QuickNoteModuleView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func noteRow(_ note: NotesAppBridge.NoteSummary) -> some View {
+    private func noteRow(_ note: NotesAppBridge.NoteSummary, shortcutNumber: Int? = nil) -> some View {
         let selected = note.id == service.selectedID
         return Button {
             service.select(id: note.id)
         } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(note.title.isEmpty ? AppLocalization.text("无标题") : note.title)
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundStyle(selected ? Color.primary : Color.primary.opacity(0.86))
-                    .lineLimit(2)
-                HStack(spacing: 3) {
-                    if note.isPasswordProtected {
-                        Image(systemName: "lock.fill")
+            HStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(note.title.isEmpty ? AppLocalization.text("无标题") : note.title)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(selected ? Color.primary : Color.primary.opacity(0.86))
+                        .lineLimit(2)
+                    HStack(spacing: 3) {
+                        if note.isPasswordProtected {
+                            Image(systemName: "lock.fill")
+                        }
+                        Text(service.isBuiltInWelcomeNote(id: note.id) ? AppLocalization.text("内置说明") : note.modifiedAt.map { relativeTime($0) } ?? "—")
                     }
-                    Text(service.isBuiltInWelcomeNote(id: note.id) ? AppLocalization.text("内置说明") : note.modifiedAt.map { relativeTime($0) } ?? "—")
+                    .font(.islandMicro())
+                    .foregroundStyle(.tertiary)
                 }
-                .font(.islandMicro())
-                .foregroundStyle(.tertiary)
+                Spacer(minLength: 0)
+                if let shortcutNumber {
+                    Text("⌘\(shortcutNumber)")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .monospacedDigit()
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)

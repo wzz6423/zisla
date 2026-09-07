@@ -34,7 +34,7 @@ struct QuickNotesServiceTests {
     }
 
     @Test
-    func commandNumberShortcutsUseOnlyRegularNotesAndStopAtNine() throws {
+    func commandNumberShortcutsUseOnlyRegularNotesStopAtNineAndShowMatchingLabels() throws {
         let source = try String(
             contentsOf: sourceRoot.appendingPathComponent("Sources/Zisla/QuickNoteModuleView.swift"),
             encoding: .utf8
@@ -43,8 +43,12 @@ struct QuickNotesServiceTests {
         let regularNotesBlock = source[regularNotesStart.lowerBound...]
 
         #expect(!source[..<regularNotesStart.lowerBound].contains("keyboardShortcut"))
+        #expect(!source[..<regularNotesStart.lowerBound].contains("shortcutNumber:"))
         #expect(regularNotesBlock.contains("index < 9"))
+        #expect(regularNotesBlock.contains("noteRow(note, shortcutNumber: index + 1)"))
         #expect(regularNotesBlock.contains("KeyEquivalent(Character(String(index + 1)))"))
+        #expect(source.contains("if let shortcutNumber {"))
+        #expect(source.contains("Text(\"⌘\\(shortcutNumber)\")"))
     }
 
     @Test
