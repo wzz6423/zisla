@@ -14,12 +14,14 @@ TEST_ROOT="$TEMPORARY_ROOT/repository"
 SCRIPT="$TEST_ROOT/.github/scripts/check-repository-hygiene.sh"
 mkdir -p "$TEST_ROOT/.github/scripts" \
   "$TEST_ROOT/mac/Vendor/MediaRemoteAdapter.framework" \
-  "$TEST_ROOT/mac/Vendor/Sparkle.xcframework/macos/Sparkle.framework"
+  "$TEST_ROOT/mac/Vendor/Sparkle.xcframework/macos/Sparkle.framework" \
+  "$TEST_ROOT/mac/Vendor/zstd.swift/Sources/libzstd/libzstd.xcframework/macos-arm64_x86_64"
 cp "$REPOSITORY_ROOT/.github/scripts/check-repository-hygiene.sh" "$SCRIPT"
 chmod +x "$SCRIPT"
 
 print -r -- adapter > "$TEST_ROOT/mac/Vendor/MediaRemoteAdapter.framework/MediaRemoteAdapter"
 print -r -- sparkle > "$TEST_ROOT/mac/Vendor/Sparkle.xcframework/macos/Sparkle.framework/Sparkle"
+print -r -- zstd > "$TEST_ROOT/mac/Vendor/zstd.swift/Sources/libzstd/libzstd.xcframework/macos-arm64_x86_64/libzstd.a"
 
 git -C "$TEST_ROOT" init -q
 git -C "$TEST_ROOT" config user.email tests@zisla.local
@@ -30,7 +32,7 @@ tests_run=0
 
 (( tests_run += 1 ))
 if ! output="$(cd "$TEST_ROOT" && "$SCRIPT" 2>&1)"; then
-  print -u2 -r -- "FAIL: known vendored frameworks were rejected"
+  print -u2 -r -- "FAIL: known vendored binary dependencies were rejected"
   print -u2 -r -- "$output"
   exit 1
 fi

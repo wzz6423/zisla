@@ -25,3 +25,13 @@ The helper is vendored so packaged builds can read the system Now Playing sessio
 - License: MIT, copied to `SkyLightWindow/LICENSE`
 
 The package is local so SwiftPM does not fetch it during normal builds. To update it, manually replace `SkyLightWindow` with a verified upstream snapshot, retain its license, and update the version and commit recorded above.
+
+`zstd.swift` is vendored from its fixed upstream 1.0.2 source snapshot:
+
+- Source: `https://github.com/awxkee/zstd.swift`
+- Version: `1.0.2`
+- Commit: `475fe3175c1aacccf9f420add35bf55e69936936`
+- License: CC0, copied to `zstd.swift/LICENSE.md`
+- Bundled binary: upstream `libzstd.xcframework`, including its iOS, Mac Catalyst, simulator, and macOS universal slices
+
+The package is local so SwiftPM does not fetch it during normal builds. To update it, replace `zstd.swift` with a verified upstream snapshot, retain its license and binary slices, and update the version and commit recorded above. The bundled Zstandard library remains covered by `Resources/ThirdPartyLicenses/Zstandard-LICENSE.txt`.

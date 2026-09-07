@@ -17,7 +17,9 @@ report_violation() {
 is_allowed_binary_path() {
   case "$1" in
     mac/Vendor/MediaRemoteAdapter.framework | mac/Vendor/MediaRemoteAdapter.framework/* | \
-      mac/Vendor/Sparkle.xcframework | mac/Vendor/Sparkle.xcframework/*)
+      mac/Vendor/Sparkle.xcframework | mac/Vendor/Sparkle.xcframework/* | \
+      mac/Vendor/zstd.swift/Sources/libzstd/libzstd.xcframework | \
+      mac/Vendor/zstd.swift/Sources/libzstd/libzstd.xcframework/*)
       return 0
       ;;
     *)
