@@ -142,7 +142,10 @@ struct LockScreenOverlayView: View {
 
     private func artwork(for item: NowPlayingSnapshot) -> some View {
         Group {
-            if let image = MediaArtworkImageCache.image(from: item.artworkData) {
+            if let image = MediaArtworkImageCache.image(
+                from: item.artworkData,
+                fallback: item.sourceIconData
+            ) {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()

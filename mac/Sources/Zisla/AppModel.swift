@@ -2901,13 +2901,17 @@ final class AppModel: ObservableObject {
       snapshot.sourceApplication
       ?? snapshot.sourceBundleIdentifier
       ?? AppLocalization.text("媒体播放器")
+    let artworkData = MediaArtworkImageCache.displayData(
+      from: snapshot.artworkData,
+      fallback: snapshot.sourceIconData
+    )
     let leftNotice = IslandNotice(
       id: "media-active-left",
       title: source,
       detail: snapshot.title,
       kind: .info,
       side: .left,
-      artworkData: snapshot.artworkData
+      artworkData: artworkData
     )
     let rightNotice = IslandNotice(
       id: "media-active-right",
@@ -2917,7 +2921,7 @@ final class AppModel: ObservableObject {
         .joined(separator: " · "),
       kind: .info,
       side: .right,
-      artworkData: snapshot.artworkData
+      artworkData: artworkData
     )
 
     let leftVisible = notices.updateIfPresent(leftNotice)
