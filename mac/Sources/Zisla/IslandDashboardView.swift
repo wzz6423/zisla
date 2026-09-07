@@ -174,7 +174,10 @@ struct IslandDashboardView: View {
 
     @ViewBuilder
     private func mediaArtwork(_ item: NowPlayingSnapshot) -> some View {
-        if let image = MediaArtworkImageCache.image(from: item.artworkData) {
+        if let image = MediaArtworkImageCache.image(
+            from: item.artworkData,
+            fallback: item.sourceIconData
+        ) {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFill()

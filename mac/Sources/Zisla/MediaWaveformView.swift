@@ -23,6 +23,17 @@ enum MediaArtworkImageCache {
     cache.setObject(image, forKey: key, cost: decodedByteCost)
     return image
   }
+
+  static func displayData(from artworkData: Data?, fallback sourceIconData: Data?) -> Data? {
+    guard let artworkData, image(from: artworkData) != nil else {
+      return sourceIconData
+    }
+    return artworkData
+  }
+
+  static func image(from artworkData: Data?, fallback sourceIconData: Data?) -> NSImage? {
+    image(from: displayData(from: artworkData, fallback: sourceIconData))
+  }
 }
 
 @MainActor
