@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
+require 'json'
 
 require_relative 'pr-metadata'
 
@@ -38,9 +39,43 @@ class PullRequestMetadataTest < Minitest::Test
   end
 
   def test_rejects_an_unknown_type
-    errors = validate('ci: add automation', type: 'hotfix')
+    errors = validate('ci: add automation', type: 'emergency-fix')
 
     assert_includes errors.join("\n"), 'is not allowed'
+  end
+
+  def test_resolves_every_configured_type_label_and_alias
+    configured_types.each do |entry|
+      ([entry.fetch('type'), entry.fetch('label')] + Array(entry['aliases'])).uniq.each do |value|
+        metadata = parse(type: value)
+
+        assert_equal entry.fetch('type'), metadata['type'], value
+        assert_equal entry.fetch('label'), metadata['typeLabel'], value
+      end
+    end
+  end
+
+  def test_normalizes_fix_alias_spellings
+    ['bug', 'Bug Fix', 'bug_fix', 'BUG-FIX', 'bugfix', 'Hot Fix', 'hot_fix', 'HOT-FIX', 'hotfix'].each do |value|
+      metadata = parse(type: value)
+
+      assert_equal 'fix', metadata['type'], value
+      assert_equal 'bug', metadata['typeLabel'], value
+    end
+  end
+
+  def test_accepts_type_aliases_that_resolve_to_the_title_type
+    ['bug', 'Bug Fix', 'bugfix', 'hotfix'].each do |value|
+      assert_empty validate('fix: add automation', type: value), value
+    end
+  end
+
+  def test_rejects_a_type_alias_with_extra_untrusted_content
+    metadata = parse(type: 'bug; $(id)')
+
+    assert_nil metadata['type']
+    assert_nil metadata['typeLabel']
+    assert_includes validate('fix: add automation', type: 'bug; $(id)').join("\n"), 'is not allowed'
   end
 
   def test_rejects_more_than_one_type
@@ -164,6 +199,10 @@ class PullRequestMetadataTest < Minitest::Test
 
   def parse(**overrides)
     PullRequestMetadata.parse(build_body(**overrides), @contract)
+  end
+
+  def configured_types
+    JSON.parse(File.read(CONTRACT_PATH)).fetch('types')
   end
 
   def build_body(type: 'ci', project: 'zisla Development', validation: nil, related: 'None', attribution: '- Agent: None')

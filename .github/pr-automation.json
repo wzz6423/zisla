@@ -2,9 +2,9 @@
   "comment": "Pull request metadata contract shared by the PR Quality check and the PR Automation workflow. Labels missing from the repository are created with the color and description declared here.",
   "project": { "name": "zisla Development" },
   "types": [
-    { "type": "feat", "label": "enhancement", "color": "a2eeef", "description": "New feature or request" },
-    { "type": "fix", "label": "bug", "color": "d73a4a", "description": "Something isn't working" },
-    { "type": "docs", "label": "documentation", "color": "0075ca", "description": "Improvements or additions to documentation" },
+    { "type": "feat", "aliases": ["feature"], "label": "enhancement", "color": "a2eeef", "description": "New feature or request" },
+    { "type": "fix", "aliases": ["bug-fix", "bugfix", "hot-fix", "hotfix"], "label": "bug", "color": "d73a4a", "description": "Something isn't working" },
+    { "type": "docs", "aliases": ["doc"], "label": "documentation", "color": "0075ca", "description": "Improvements or additions to documentation" },
     { "type": "style", "label": "style", "color": "c5def5", "description": "Formatting only, no behavior change" },
     { "type": "refactor", "label": "refactor", "color": "fbca04", "description": "Restructuring without behavior change" },
     { "type": "perf", "label": "performance", "color": "0e8a16", "description": "Performance improvement" },

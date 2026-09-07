@@ -45,7 +45,7 @@ swift test
 
 - **PR 正文**必须使用英文，并包含 `.github/PULL_REQUEST_TEMPLATE.md` 提供的 `Summary`、`GitHub Project`、`PR Type`、`Validation`、`Risk and Rollback`、`Related Issue`、`AI Attribution` 七节。
   - `GitHub Project` 保留模板给出的 `- Project: zisla Development`。`Project Automation` 据此把 PR 放进共享看板。
-  - `PR Type` 只写一条 `- Type:`，且必须与标题中的类型一致。`PR Automation` 会据此打标签，例如 `fix` 对应 `bug`。
+  - `PR Type` 只写一条 `- Type:`，且必须能解析为标题中的类型。标题使用规范类型；正文同时接受类型标签名和已配置别名，因此 `fix`、`bug`、`bug fix`、`bugfix`、`hotfix` 都会解析为 `fix`。`PR Automation` 会根据解析后的类型打标签，例如 `fix` 对应 `bug`。
   - `Validation` 中每项都必须声明 `passed`、`failed` 或 `not run`：前两者需要 `Command` 与 `Result`，后者需要 `Reason`。
   - `Related Issue` 要么用 `Closes #123` 之类的关键字关联 Issue（同时自动打上 `development`），要么写成 `None`。
   - `AI Attribution` 必须声明 `- Agent:`。声明了具体 agent 时，必须补一条 `- Co-authored-by: Name <email>`，并且该 trailer 必须真实出现在至少一个 commit 上，同时会自动打上 `ai-assisted`。

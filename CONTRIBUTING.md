@@ -45,7 +45,7 @@ Thank you for opening a pull request. Check these requirements while it is await
 
 - The **PR body** must be in English and contain the `Summary`, `GitHub Project`, `PR Type`, `Validation`, `Risk and Rollback`, `Related Issue`, and `AI Attribution` sections that `.github/PULL_REQUEST_TEMPLATE.md` provides.
   - `GitHub Project` keeps the template value `- Project: zisla Development`. `Project Automation` reads it to place the pull request on the shared board.
-  - `PR Type` declares exactly one `- Type:` value, and it must match the type in the title. `PR Automation` turns it into a label, for example `fix` into `bug`.
+  - `PR Type` declares exactly one `- Type:` value, and it must resolve to the type in the title. Titles use canonical types; the body also accepts type-label names and configured aliases, so `fix`, `bug`, `bug fix`, `bugfix`, and `hotfix` all resolve to `fix`. `PR Automation` turns the resolved type into a label, for example `fix` into `bug`.
   - Every `Validation` block must declare `passed`, `failed`, or `not run`. `passed` and `failed` need `Command` and `Result`; `not run` needs `Reason`.
   - `Related Issue` must either close an issue with a keyword such as `Closes #123`, which also applies the `development` label, or be exactly `None`.
   - `AI Attribution` must declare `- Agent:`. Any agent other than `None` requires a matching `- Co-authored-by: Name <email>` line, which must also appear as a trailer on at least one commit, and applies the `ai-assisted` label.

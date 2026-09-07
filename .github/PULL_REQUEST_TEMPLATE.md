@@ -9,8 +9,9 @@
 
 ## PR Type
 
-<!-- Keep exactly one type. It must match the type in the PR title. -->
+<!-- Keep exactly one type. It must resolve to the type in the PR title. -->
 <!-- feat | fix | docs | style | refactor | perf | test | chore | build | ci | revert -->
+<!-- Body aliases include label names such as bug and configured aliases such as bug fix or hotfix. -->
 - Type:
 
 ## Validation
