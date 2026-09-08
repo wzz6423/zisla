@@ -189,7 +189,9 @@ struct MailServiceTests {
         #expect(script.contains("\"个人邮箱\""))
         #expect(script.contains("set accountList to every account"))
         #expect(script.contains("repeat with i from 1 to accountCount"))
-        #expect(script.contains("set accountProperties to properties of mailAccount"))
+        #expect(script.contains("set accountName to name of mailAccount as text"))
+        #expect(script.contains("set rawAddresses to email addresses of mailAccount"))
+        #expect(!script.contains("set accountProperties to properties of mailAccount"))
         #expect(script.contains("set end of accountRows to {accountName, accountAddresses}"))
         #expect(script.contains("accountName is in selectedAccountNames"))
     }

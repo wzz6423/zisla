@@ -369,10 +369,12 @@ public final class MailService: ObservableObject {
                 set accountName to ""
                 set accountAddresses to {}
                 try
-                    -- Read the account record once to avoid separate AppleEvent round trips.
-                    set accountProperties to properties of mailAccount
-                    set accountName to name of accountProperties as text
-                    set rawAddresses to email addresses of accountProperties
+                    set accountName to name of mailAccount as text
+                on error
+                    set accountName to ""
+                end try
+                try
+                    set rawAddresses to email addresses of mailAccount
                     if (count of rawAddresses) is 0 then
                         set accountAddresses to {}
                     else
