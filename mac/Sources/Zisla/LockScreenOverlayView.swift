@@ -160,15 +160,20 @@ struct LockScreenOverlayView: View {
 
     private func controls(for item: NowPlayingSnapshot) -> some View {
         HStack(spacing: 18) {
-            if item.supportsPlaybackModeControl, let playbackMode = item.playbackMode {
+            if item.supportsPlaybackModeControl {
                 if item.playbackModeIsApproximate {
+                    let playbackMode = item.playbackMode
                     controlButton(
-                        symbol: playbackMode.symbol,
-                        isActive: playbackMode != .sequential
+                        symbol: playbackMode?.symbol ?? "arrow.triangle.2.circlepath",
+                        isActive: playbackMode != nil && playbackMode != .sequential
                     ) {
                         _ = media.cyclePlaybackMode()
                     }
-                } else {
+                    .disabled(media.isCyclingPlaybackMode)
+                    .help(playbackMode.map {
+                        AppLocalization.text("切换播放模式：%@", AppLocalization.text($0.title))
+                    } ?? AppLocalization.text("检测并切换播放模式"))
+                } else if let playbackMode = item.playbackMode {
                     PlaybackModeMenu(mode: playbackMode) { mode in
                         _ = media.setPlaybackMode(mode)
                     }
