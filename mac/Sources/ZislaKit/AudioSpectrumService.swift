@@ -324,7 +324,10 @@ final class SystemAudioSpectrumCapture: AudioSpectrumCapturing, @unchecked Senda
     ) throws {
         guard #available(macOS 14.2, *) else { throw CaptureError.unsupported }
 
-        let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
+        // Excluding zisla prevents keyboard and pointer sounds from being reclassified as external media.
+        let description = CATapDescription(
+            stereoGlobalTapButExcludeProcesses: AudioPlaybackMonitor.currentProcessObjectIDs()
+        )
         description.name = "zisla 音频频谱"
         description.uuid = UUID()
         description.isPrivate = true

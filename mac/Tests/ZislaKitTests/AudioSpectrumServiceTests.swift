@@ -1,9 +1,26 @@
 import Foundation
+import CoreAudio
 import Testing
 
 @testable import ZislaKit
 
 struct AudioSpectrumServiceTests {
+    @Test
+    func spectrumTapExcludesOnlyZislasAudioProcess() {
+        let ownProcessObject = AudioObjectID(11)
+        let otherProcessObject = AudioObjectID(22)
+
+        let excluded = AudioPlaybackMonitor.processObjectIDs(
+            from: [ownProcessObject, otherProcessObject],
+            matching: 1_001,
+            processIdentifier: { object in
+                object == ownProcessObject ? 1_001 : 2_002
+            }
+        )
+
+        #expect(excluded == [ownProcessObject])
+    }
+
     @Test
     func audibilityOnlyModeSkipsFFTAndUsesLowerSamplingFrequency() {
         #expect(AudioSpectrumAnalysisMode.visualization.minimumInterval == 1.0 / 20.0)
