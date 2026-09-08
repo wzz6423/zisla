@@ -11,8 +11,6 @@ struct AIProgressModuleView: View {
     /// Both columns push their content this far below the header. The trend chart's topmost
     /// Y-axis tick is drawn above its plot frame, so a tighter gap lets it collide with the title.
     private static let sectionSpacing: CGFloat = 12
-    private static let usageTrendChartHeight: CGFloat = 168
-    private static let usageHeatmapWeeks = 36
 
     init(model: AppModel) {
         _model = ObservedObject(wrappedValue: model)
@@ -50,7 +48,7 @@ struct AIProgressModuleView: View {
         AIUsageAnalytics.contributionCalendar(
             samples: monitor.state.usageSamples,
             endingAt: date,
-            weeks: Self.usageHeatmapWeeks
+            weeks: 24
         )
     }
 
@@ -61,7 +59,7 @@ struct AIProgressModuleView: View {
                 .font(.system(size: 11, weight: .semibold))
 
             UsageTrendChart(series: series)
-                .frame(height: Self.usageTrendChartHeight)
+                .frame(height: 106)
             UsageHeatmap(weeks: usageCalendar(endingAt: date))
         }
     }
@@ -478,7 +476,7 @@ private struct UsageHeatmap: View {
             .foregroundStyle(.secondary)
             .frame(height: 13, alignment: .leading)
         }
-        .accessibilityLabel(AppLocalization.text("最近三十六周 AI token 用量热力图"))
+        .accessibilityLabel(AppLocalization.text("最近二十四周 AI token 用量热力图"))
     }
 
     private func isSelected(_ day: ContributionDay?) -> Bool {
