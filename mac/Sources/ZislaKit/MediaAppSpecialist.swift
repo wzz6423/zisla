@@ -201,8 +201,9 @@ final class MediaAppSpecialist {
             return nil
         }
 
-        guard performPlaybackModeToggle(
-            on: match.element,
+        guard selectQQMusicPlaybackMode(
+            after: sourceMode,
+            using: match.element,
             pid: pid,
             usesCoordinateClick: match.usesCoordinateClick
         ) else { return nil }
@@ -717,13 +718,49 @@ final class MediaAppSpecialist {
         return 2
     }
 
-    /// The menu bar is not among the application element's AX children; it is only reachable via kAXMenuBarAttribute.
-    nonisolated private static func qqMusicMenuItem(pid: pid_t, matching labels: [String]) -> AXUIElement? {
-        guard let menuBar = elementAttribute(
-            kAXMenuBarAttribute,
-            of: AXUIElementCreateApplication(pid)
-        ) else { return nil }
-        return findQQMusicMenuItem(in: menuBar, depth: 0, matching: labels)
+    nonisolated private static func qqMusicMenuItem(
+        pid: pid_t,
+        matching labels: [String]
+    ) -> AXUIElement? {
+        let application = AXUIElementCreateApplication(pid)
+        var roots = windows(of: application)
+        if let focusedWindow = elementAttribute(kAXFocusedWindowAttribute, of: application) {
+            roots.insert(focusedWindow, at: 0)
+        }
+        if let mainWindow = elementAttribute(kAXMainWindowAttribute, of: application) {
+            roots.insert(mainWindow, at: 0)
+        }
+        if let menuBar = elementAttribute(kAXMenuBarAttribute, of: application) {
+            roots.append(menuBar)
+        }
+        return roots.lazy.compactMap {
+            findQQMusicMenuItem(in: $0, depth: 0, matching: labels)
+        }.first
+    }
+
+    nonisolated private static func selectQQMusicPlaybackMode(
+        after sourceMode: NowPlayingPlaybackMode,
+        using control: AXUIElement,
+        pid: pid_t,
+        usesCoordinateClick: Bool
+    ) -> Bool {
+        let labels = qqMusicPlaybackModeMenuLabels(after: sourceMode)
+        if performQQMusicMenuCommand(pid: pid, matching: labels) {
+            return true
+        }
+        guard performPlaybackModeToggle(
+            on: control,
+            pid: pid,
+            usesCoordinateClick: usesCoordinateClick
+        ) else { return false }
+
+        for _ in 0..<4 {
+            if performQQMusicMenuCommand(pid: pid, matching: labels) {
+                return true
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        return false
     }
 
     nonisolated private static func role(of element: AXUIElement) -> String? {

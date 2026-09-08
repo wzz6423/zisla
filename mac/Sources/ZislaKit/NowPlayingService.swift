@@ -201,6 +201,7 @@ public final class NowPlayingService: ObservableObject {
 
   @Published public private(set) var snapshot: NowPlayingSnapshot?
   @Published public private(set) var isAvailable = false
+  public var isCyclingPlaybackMode: Bool { specialistPlaybackModeCycleTask != nil }
 
   private typealias InfoCallback = @convention(block) (NSDictionary?) -> Void
   private typealias BoolCallback = @convention(block) (Bool) -> Void
@@ -612,13 +613,15 @@ public final class NowPlayingService: ObservableObject {
     guard let current = snapshot, current.supportsControls else { return false }
     if let profile = activeProfile,
       profile.prefersAccessibilityControls,
-      profile.supportsPlaybackModeCycle,
-      specialistPlaybackModeCycleTask == nil,
-      specialist.prepareQQMusicPlaybackModeCycle(
-        pid: current.sourcePID,
-        bundleIdentifier: current.sourceBundleIdentifier
-      )
+      profile.supportsPlaybackModeCycle
     {
+      guard specialistPlaybackModeCycleTask == nil,
+        specialist.prepareQQMusicPlaybackModeCycle(
+          pid: current.sourcePID,
+          bundleIdentifier: current.sourceBundleIdentifier
+        )
+      else { return false }
+
       let identity = PlaybackModeSourceIdentity(current)
       let pid = current.sourcePID
       let bundleIdentifier = current.sourceBundleIdentifier
@@ -651,8 +654,8 @@ public final class NowPlayingService: ObservableObject {
       }
       return true
     }
-    let fallbackMode = activeProfile?.defaultPlaybackMode ?? .sequential
-    return setPlaybackMode(Self.nextPlaybackMode(after: current.playbackMode ?? fallbackMode))
+    guard let mode = current.playbackMode else { return false }
+    return setPlaybackMode(Self.nextPlaybackMode(after: mode))
   }
 
   @discardableResult
@@ -1634,7 +1637,9 @@ public final class NowPlayingService: ObservableObject {
         specialistPlaybackModeState = nil
         scheduleSpecialistPlaybackModeRefresh(for: snapshot)
       }
-      snapshot.playbackMode = specialistPlaybackModeState
+      if let specialistPlaybackModeState {
+        snapshot.playbackMode = specialistPlaybackModeState
+      }
       snapshot.supportsPlaybackModeControl = true
       snapshot.playbackModeIsApproximate = true
     }
