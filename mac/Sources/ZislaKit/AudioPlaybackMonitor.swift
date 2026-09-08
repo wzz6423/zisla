@@ -226,7 +226,7 @@ final class AudioPlaybackMonitor {
     }
 
     @available(macOS 14.4, *)
-    private static func processList() -> [AudioObjectID] {
+    nonisolated private static func processList() -> [AudioObjectID] {
         let system = AudioObjectID(kAudioObjectSystemObject)
         var address = Self.address(kAudioHardwarePropertyProcessObjectList)
         var size: UInt32 = 0
@@ -241,6 +241,23 @@ final class AudioPlaybackMonitor {
         return objects
     }
 
+    nonisolated static func currentProcessObjectIDs() -> [AudioObjectID] {
+        guard #available(macOS 14.4, *) else { return [] }
+        return processObjectIDs(
+            from: processList(),
+            matching: ProcessInfo.processInfo.processIdentifier,
+            processIdentifier: pid(of:)
+        )
+    }
+
+    nonisolated static func processObjectIDs(
+        from objects: [AudioObjectID],
+        matching targetProcessIdentifier: pid_t,
+        processIdentifier: (AudioObjectID) -> pid_t?
+    ) -> [AudioObjectID] {
+        objects.filter { processIdentifier($0) == targetProcessIdentifier }
+    }
+
     @available(macOS 14.4, *)
     private static func isRunningOutput(_ object: AudioObjectID) -> Bool {
         var address = Self.address(kAudioProcessPropertyIsRunningOutput)
@@ -252,7 +269,7 @@ final class AudioPlaybackMonitor {
     }
 
     @available(macOS 14.4, *)
-    private static func pid(of object: AudioObjectID) -> pid_t? {
+    nonisolated private static func pid(of object: AudioObjectID) -> pid_t? {
         var address = Self.address(kAudioProcessPropertyPID)
         var value: pid_t = -1
         var size = UInt32(MemoryLayout<pid_t>.size)
@@ -339,7 +356,7 @@ final class AudioPlaybackMonitor {
         return URL(fileURLWithPath: NSString.path(withComponents: Array(components[...index])))
     }
 
-    private static func address(
+    nonisolated private static func address(
         _ selector: AudioObjectPropertySelector
     ) -> AudioObjectPropertyAddress {
         AudioObjectPropertyAddress(

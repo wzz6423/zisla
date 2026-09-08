@@ -157,15 +157,34 @@ struct MailModuleView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if visibleMessages.isEmpty {
-                EmptyState(
-                    symbol: selectedAccount == nil ? "tray" : "envelope.badge",
-                    title: selectedAccount == nil ? AppLocalization.text("收件箱为空") : AppLocalization.text("此账户没有邮件")
-                )
+                if selectedAccount != nil && mail.canLoadMore {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .task(id: mail.paginationGeneration) {
+                            await mail.loadMore()
+                        }
+                } else {
+                    EmptyState(
+                        symbol: selectedAccount == nil ? "tray" : "envelope.badge",
+                        title: selectedAccount == nil ? AppLocalization.text("收件箱为空") : AppLocalization.text("此账户没有邮件")
+                    )
+                }
             } else {
                 ScrollView(.vertical) {
                     LazyVStack(spacing: 0) {
                         ForEach(visibleMessages) { message in
                             messageRow(message)
+                        }
+                        if mail.canLoadMore {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 24)
+                                .opacity(mail.isLoading ? 1 : 0)
+                                .task(id: mail.paginationGeneration) {
+                                    await mail.loadMore()
+                                }
                         }
                     }
                 }
