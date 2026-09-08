@@ -103,6 +103,42 @@ struct MailServiceTests {
     }
 
     @Test @MainActor
+    func fallsBackToMailAppWhenLocalIndexReturnsNoMessages() async throws {
+        let databaseURL = try makeMailServiceIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        try executeMailServiceSQL(
+            "INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');",
+            at: databaseURL
+        )
+
+        var appleScriptCalls = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                appleScriptCalls += 1
+                return .success(.snapshot(MailSnapshot(
+                    accounts: [MailScriptAccount(name: "work@example.com", emailAddresses: ["work@example.com"])],
+                    messages: [MailScriptRow(
+                        accountName: "work@example.com",
+                        messageID: "7",
+                        sender: "sender@example.com",
+                        subject: "来自 Mail.app",
+                        body: "正文",
+                        receivedAt: .now,
+                        isRead: false
+                    )]
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: databaseURL),
+            mailRunning: { true }
+        )
+
+        await service.refresh()
+
+        #expect(appleScriptCalls == 1)
+        #expect(service.messages.map(\.messageID) == [7])
+    }
+
+    @Test @MainActor
     func generatedScriptsUseAccountSpecificActionsAndSelectedSender() {
         let compose = MailService.composeScript(
             fromAddress: "work@example.com",

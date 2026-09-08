@@ -186,7 +186,8 @@ public final class MailService: ObservableObject {
         let isMailRunning = mailRunning()
         let indexResult = await readIndex(accountNames: selectedAccountNames, offset: offset)
         if case let .success(snapshot) = indexResult,
-           Self.canUseIndexSnapshot(snapshot, for: selectedAccountNames) {
+           Self.canUseIndexSnapshot(snapshot, for: selectedAccountNames),
+           !snapshot.messages.isEmpty {
             apply(snapshot, replacing: replacing)
             return
         }
