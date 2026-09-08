@@ -18,6 +18,11 @@ struct MediaAppProfile: Sendable {
     let favoriteControl: NowPlayingFavoriteControl
 }
 
+struct PlaybackModeCycleResult: Sendable, Equatable {
+    let observedMode: NowPlayingPlaybackMode?
+    let targetMode: NowPlayingPlaybackMode
+}
+
 /// Executes control commands targeting a specific player app.
 @MainActor
 final class MediaAppSpecialist {
@@ -131,9 +136,7 @@ final class MediaAppSpecialist {
               let pid,
               AXIsProcessTrusted()
         else { return nil }
-        return Self.qqMusicControlRoots(pid: pid).compactMap {
-            Self.findPlaybackMode(in: $0, depth: 0)?.mode
-        }.first
+        return Self.qqMusicPlaybackModeControl(pid: pid)?.mode
     }
 
     /// Apple Music and Spotify use their public scripting dictionaries; QQ Music prioritises pressable menu items.
@@ -169,18 +172,46 @@ final class MediaAppSpecialist {
         return Self.runAppleScript(Self.appleMusicModeScript(for: mode)) ? true : nil
     }
 
-    /// QQ Music selects the next playback mode directly from its Accessibility menu.
-    func cyclePlaybackMode(
+    func prepareQQMusicPlaybackModeCycle(
+        pid: pid_t?,
+        bundleIdentifier: String?
+    ) -> Bool {
+        guard bundleIdentifier == Self.qqMusicBundleIdentifier, pid != nil else { return false }
+        return hasQQMusicAccessibilityAccess()
+    }
+
+    nonisolated static func qqMusicPlaybackModeCycle(
         pid: pid_t?,
         bundleIdentifier: String?,
-        currentMode _: NowPlayingPlaybackMode
-    ) -> Bool {
+        currentMode: NowPlayingPlaybackMode?
+    ) -> PlaybackModeCycleResult? {
         guard bundleIdentifier == Self.qqMusicBundleIdentifier,
               let pid,
-              hasQQMusicAccessibilityAccess()
-        else { return false }
-        return Self.qqMusicControlRoots(pid: pid).contains {
-            Self.searchAndClickPlayMode(in: $0, depth: 0, pid: pid)
+              AXIsProcessTrusted()
+        else { return nil }
+
+        guard let match = qqMusicPlaybackModeControl(pid: pid) else { return nil }
+        let sourceMode = match.mode
+        guard let targetMode = cycleTargetMode(observedMode: sourceMode, fallback: currentMode) else {
+            return nil
+        }
+
+        guard performPlaybackModeToggle(on: match.element, pid: pid) else { return nil }
+        return PlaybackModeCycleResult(observedMode: sourceMode, targetMode: targetMode)
+    }
+
+    nonisolated static func cycleTargetMode(
+        observedMode: NowPlayingPlaybackMode?,
+        fallback: NowPlayingPlaybackMode?
+    ) -> NowPlayingPlaybackMode? {
+        guard let sourceMode = observedMode ?? fallback else { return nil }
+        switch sourceMode {
+        case .sequential:
+            return .repeatOne
+        case .repeatOne:
+            return .random
+        case .random:
+            return .sequential
         }
     }
 
@@ -417,7 +448,7 @@ final class MediaAppSpecialist {
         }
     }
 
-    static func qqMusicPlaybackModeMenuLabels(after mode: NowPlayingPlaybackMode) -> [String] {
+    nonisolated static func qqMusicPlaybackModeMenuLabels(after mode: NowPlayingPlaybackMode) -> [String] {
         switch mode {
         case .sequential:
             ["单曲循环"]
@@ -480,9 +511,10 @@ final class MediaAppSpecialist {
 
     nonisolated private static func findPlaybackMode(
         in element: AXUIElement,
-        depth: Int
+        depth: Int,
+        maximumDepth: Int = maximumAccessibilityDepth
     ) -> (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int)? {
-        guard depth < maximumAccessibilityDepth else { return nil }
+        guard depth < maximumDepth else { return nil }
         let labels = accessibilityLabels(of: element)
         var best: (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int)?
         if let mode = playbackMode(for: labels),
@@ -495,7 +527,11 @@ final class MediaAppSpecialist {
             if best?.rank == 3 { return best }
         }
         for child in children(of: element) {
-            if let candidate = findPlaybackMode(in: child, depth: depth + 1) {
+            if let candidate = findPlaybackMode(
+                in: child,
+                depth: depth + 1,
+                maximumDepth: maximumDepth
+            ) {
                 if best == nil || candidate.rank > best!.rank {
                     best = candidate
                 }
@@ -503,6 +539,14 @@ final class MediaAppSpecialist {
             }
         }
         return best
+    }
+
+    nonisolated private static func qqMusicPlaybackModeControl(
+        pid: pid_t
+    ) -> (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int)? {
+        qqMusicControlRoots(pid: pid)
+            .compactMap { findPlaybackMode(in: $0, depth: 0, maximumDepth: 4) }
+            .max(by: { $0.rank < $1.rank })
     }
 
     nonisolated private static func findButton(
@@ -725,14 +769,12 @@ final class MediaAppSpecialist {
         return clickCenter(of: element, pid: pid)
     }
 
-    nonisolated private static func searchAndClickPlayMode(
-        in element: AXUIElement,
-        depth: Int,
+    nonisolated private static func performPlaybackModeToggle(
+        on element: AXUIElement,
         pid: pid_t
     ) -> Bool {
-        guard depth < maximumAccessibilityDepth else { return false }
-        guard let match = findPlaybackMode(in: element, depth: depth) else { return false }
-        return performPress(on: match.element, pid: pid)
+        clickCenter(of: element, pid: pid)
+            || AXUIElementPerformAction(element, kAXPressAction as CFString) == .success
     }
 
     nonisolated private static func matchesControlLabels(

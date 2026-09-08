@@ -244,6 +244,7 @@ public final class NowPlayingService: ObservableObject {
   private var playbackStateOverrideExpirationTask: Task<Void, Never>?
   private var favoriteOverrideExpirationTask: Task<Void, Never>?
   private var specialistPlaybackModeRefreshTask: Task<Void, Never>?
+  private var specialistPlaybackModeCycleTask: Task<Void, Never>?
   private var specialistFavoriteRefreshTask: Task<Void, Never>?
   private var usesAdapter = false
   private var isRunning = false
@@ -280,6 +281,8 @@ public final class NowPlayingService: ObservableObject {
     favoriteOverrideExpirationTask = nil
     specialistPlaybackModeRefreshTask?.cancel()
     specialistPlaybackModeRefreshTask = nil
+    specialistPlaybackModeCycleTask?.cancel()
+    specialistPlaybackModeCycleTask = nil
     specialistFavoriteRefreshTask?.cancel()
     specialistFavoriteRefreshTask = nil
     adapterPlaybackMode = nil
@@ -471,6 +474,8 @@ public final class NowPlayingService: ObservableObject {
     favoriteOverrideExpirationTask = nil
     specialistPlaybackModeRefreshTask?.cancel()
     specialistPlaybackModeRefreshTask = nil
+    specialistPlaybackModeCycleTask?.cancel()
+    specialistPlaybackModeCycleTask = nil
     specialistFavoriteRefreshTask?.cancel()
     specialistFavoriteRefreshTask = nil
     adapterPlaybackMode = nil
@@ -595,27 +600,49 @@ public final class NowPlayingService: ObservableObject {
   @discardableResult
   public func cyclePlaybackMode() -> Bool {
     guard let current = snapshot, current.supportsControls else { return false }
-    let fallbackMode = activeProfile?.defaultPlaybackMode ?? .sequential
-    let nextMode = Self.nextPlaybackMode(after: current.playbackMode ?? fallbackMode)
     if let profile = activeProfile,
       profile.prefersAccessibilityControls,
       profile.supportsPlaybackModeCycle,
-      specialist.cyclePlaybackMode(
+      specialistPlaybackModeCycleTask == nil,
+      specialist.prepareQQMusicPlaybackModeCycle(
         pid: current.sourcePID,
-        bundleIdentifier: current.sourceBundleIdentifier,
-        currentMode: current.playbackMode ?? fallbackMode
+        bundleIdentifier: current.sourceBundleIdentifier
       )
     {
-      specialistPlaybackModeIdentity = ControlIdentity(current)
-      specialistPlaybackModeState = nextMode
-      scheduleSpecialistPlaybackModeRefresh(for: current, expectedMode: nextMode)
-      playbackModeOverride = nil
-      playbackModeOverrideExpirationTask?.cancel()
-      playbackModeOverrideExpirationTask = nil
-      resolveSnapshot()
+      let identity = ControlIdentity(current)
+      let pid = current.sourcePID
+      let bundleIdentifier = current.sourceBundleIdentifier
+      let currentMode = specialistPlaybackModeState
+      specialistPlaybackModeCycleTask = Task { @MainActor [weak self] in
+        let result = await Task.detached(priority: .userInitiated) {
+          MediaAppSpecialist.qqMusicPlaybackModeCycle(
+            pid: pid,
+            bundleIdentifier: bundleIdentifier,
+            currentMode: currentMode
+          )
+        }.value
+        guard let self else { return }
+        self.specialistPlaybackModeCycleTask = nil
+        guard self.isRunning,
+          self.specialistPlaybackModeIdentity == identity,
+          ControlIdentity(self.snapshot ?? current) == identity
+        else { return }
+        guard let result else {
+          self.scheduleSpecialistPlaybackModeRefresh(for: current)
+          self.resolveSnapshot()
+          return
+        }
+        self.specialistPlaybackModeState = result.observedMode
+        self.scheduleSpecialistPlaybackModeRefresh(
+          for: current,
+          expectedMode: result.targetMode
+        )
+        self.resolveSnapshot()
+      }
       return true
     }
-    return setPlaybackMode(nextMode)
+    let fallbackMode = activeProfile?.defaultPlaybackMode ?? .sequential
+    return setPlaybackMode(Self.nextPlaybackMode(after: current.playbackMode ?? fallbackMode))
   }
 
   @discardableResult
@@ -1597,7 +1624,7 @@ public final class NowPlayingService: ObservableObject {
         specialistPlaybackModeState = nil
         scheduleSpecialistPlaybackModeRefresh(for: snapshot)
       }
-      snapshot.playbackMode = specialistPlaybackModeState ?? profile.defaultPlaybackMode
+      snapshot.playbackMode = specialistPlaybackModeState
       snapshot.supportsPlaybackModeControl = true
       snapshot.playbackModeIsApproximate = true
     }
@@ -1633,11 +1660,16 @@ public final class NowPlayingService: ObservableObject {
         else { return }
         guard let observed else { continue }
         if let expectedMode, observed != expectedMode {
+          self.specialistPlaybackModeState = observed
+          self.resolveSnapshot()
           continue
         }
         self.specialistPlaybackModeState = observed
         self.resolveSnapshot()
         return
+      }
+      if !Task.isCancelled {
+        self?.resolveSnapshot()
       }
     }
   }

@@ -485,6 +485,21 @@ struct NowPlayingServiceTests {
     }
 
     @Test
+    func qqMusicCycleNeedsAnObservedOrCachedModeBeforeChoosingATarget() {
+        #expect(
+            MediaAppSpecialist.cycleTargetMode(observedMode: .repeatOne, fallback: .sequential)
+                == .random
+        )
+        #expect(
+            MediaAppSpecialist.cycleTargetMode(observedMode: nil, fallback: .random)
+                == .sequential
+        )
+        #expect(
+            MediaAppSpecialist.cycleTargetMode(observedMode: nil, fallback: nil) == nil
+        )
+    }
+
+    @Test
     func cachedPlaybackModeDoesNotInventControlCapability() {
         var snapshot = NowPlayingSnapshot(
             title: "Track",
