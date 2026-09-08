@@ -500,6 +500,19 @@ struct NowPlayingServiceTests {
     }
 
     @Test
+    func qqMusicModeControlFallsBackToCoordinatesWithoutAnAccessibilityPressAction() throws {
+        let resolution = try #require(
+            MediaAppSpecialist.playbackModeControlResolution(
+                for: ["播放模式（单曲循环）", "单曲循环"],
+                hasPressableTarget: false
+            )
+        )
+
+        #expect(resolution.mode == .repeatOne)
+        #expect(resolution.usesCoordinateClick)
+    }
+
+    @Test
     func cachedPlaybackModeDoesNotInventControlCapability() {
         var snapshot = NowPlayingSnapshot(
             title: "Track",

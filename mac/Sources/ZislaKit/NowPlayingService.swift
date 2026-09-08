@@ -138,6 +138,16 @@ public final class NowPlayingService: ObservableObject {
     }
   }
 
+  private struct PlaybackModeSourceIdentity: Equatable {
+    var source: String?
+
+    init(_ snapshot: NowPlayingSnapshot) {
+      source =
+        snapshot.sourcePID.map { "pid:\($0)" }
+        ?? snapshot.sourceBundleIdentifier.map { "bundle:\($0)" }
+    }
+  }
+
   private struct ArtworkRefreshIdentity: Equatable {
     var title: String
     var artist: String
@@ -236,7 +246,7 @@ public final class NowPlayingService: ObservableObject {
   private var playbackModeOverride: TimedControlOverride<NowPlayingPlaybackMode>?
   private var playbackStateOverride: TimedControlOverride<Bool>?
   private var favoriteOverride: TimedControlOverride<Bool>?
-  private var specialistPlaybackModeIdentity: ControlIdentity?
+  private var specialistPlaybackModeIdentity: PlaybackModeSourceIdentity?
   private var specialistPlaybackModeState: NowPlayingPlaybackMode?
   private var specialistFavoriteIdentity: ControlIdentity?
   private var specialistFavoriteState: Bool?
@@ -609,7 +619,7 @@ public final class NowPlayingService: ObservableObject {
         bundleIdentifier: current.sourceBundleIdentifier
       )
     {
-      let identity = ControlIdentity(current)
+      let identity = PlaybackModeSourceIdentity(current)
       let pid = current.sourcePID
       let bundleIdentifier = current.sourceBundleIdentifier
       let currentMode = specialistPlaybackModeState
@@ -625,7 +635,7 @@ public final class NowPlayingService: ObservableObject {
         self.specialistPlaybackModeCycleTask = nil
         guard self.isRunning,
           self.specialistPlaybackModeIdentity == identity,
-          ControlIdentity(self.snapshot ?? current) == identity
+          PlaybackModeSourceIdentity(self.snapshot ?? current) == identity
         else { return }
         guard let result else {
           self.scheduleSpecialistPlaybackModeRefresh(for: current)
@@ -1618,7 +1628,7 @@ public final class NowPlayingService: ObservableObject {
       snapshot.supportsPlaybackModeControl = true
     }
     if profile.supportsPlaybackModeCycle {
-      let identity = ControlIdentity(snapshot)
+      let identity = PlaybackModeSourceIdentity(snapshot)
       if specialistPlaybackModeIdentity != identity {
         specialistPlaybackModeIdentity = identity
         specialistPlaybackModeState = nil
@@ -1635,7 +1645,7 @@ public final class NowPlayingService: ObservableObject {
     expectedMode: NowPlayingPlaybackMode? = nil
   ) {
     specialistPlaybackModeRefreshTask?.cancel()
-    let identity = ControlIdentity(snapshot)
+    let identity = PlaybackModeSourceIdentity(snapshot)
     let pid = snapshot.sourcePID
     let bundleIdentifier = snapshot.sourceBundleIdentifier
     specialistPlaybackModeRefreshTask = Task { @MainActor [weak self] in
@@ -1656,6 +1666,7 @@ public final class NowPlayingService: ObservableObject {
           let self,
           self.isRunning,
           self.specialistPlaybackModeIdentity == identity,
+          PlaybackModeSourceIdentity(self.snapshot ?? snapshot) == identity,
           self.activeProfile?.supportsPlaybackModeCycle == true
         else { return }
         guard let observed else { continue }

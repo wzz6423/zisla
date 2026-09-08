@@ -23,6 +23,11 @@ struct PlaybackModeCycleResult: Sendable, Equatable {
     let targetMode: NowPlayingPlaybackMode
 }
 
+struct PlaybackModeControlResolution: Sendable, Equatable {
+    let mode: NowPlayingPlaybackMode
+    let usesCoordinateClick: Bool
+}
+
 /// Executes control commands targeting a specific player app.
 @MainActor
 final class MediaAppSpecialist {
@@ -196,7 +201,11 @@ final class MediaAppSpecialist {
             return nil
         }
 
-        guard performPlaybackModeToggle(on: match.element, pid: pid) else { return nil }
+        guard performPlaybackModeToggle(
+            on: match.element,
+            pid: pid,
+            usesCoordinateClick: match.usesCoordinateClick
+        ) else { return nil }
         return PlaybackModeCycleResult(observedMode: sourceMode, targetMode: targetMode)
     }
 
@@ -213,6 +222,17 @@ final class MediaAppSpecialist {
         case .random:
             return .sequential
         }
+    }
+
+    nonisolated static func playbackModeControlResolution(
+        for labels: [String],
+        hasPressableTarget: Bool
+    ) -> PlaybackModeControlResolution? {
+        guard let mode = playbackMode(for: labels) else { return nil }
+        return PlaybackModeControlResolution(
+            mode: mode,
+            usesCoordinateClick: !hasPressableTarget
+        )
     }
 
     // MARK: - CGEvent
@@ -486,6 +506,7 @@ final class MediaAppSpecialist {
         "循环", "随机", "顺序", "播放模式", "repeat", "shuffle",
     ]
     nonisolated private static let maximumAccessibilityDepth = 20
+    nonisolated private static let accessibilityTimeout: Float = 0.15
 
     nonisolated private static func findFavoriteButton(in element: AXUIElement, depth: Int) -> AXUIElement? {
         findFavoriteButtonMatch(in: element, depth: depth)?.element
@@ -513,18 +534,24 @@ final class MediaAppSpecialist {
         in element: AXUIElement,
         depth: Int,
         maximumDepth: Int = maximumAccessibilityDepth
-    ) -> (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int)? {
+    ) -> (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int, usesCoordinateClick: Bool)? {
         guard depth < maximumDepth else { return nil }
         let labels = accessibilityLabels(of: element)
-        var best: (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int)?
-        if let mode = playbackMode(for: labels),
-           let target = pressableAncestor(of: element) {
-            best = (
-                target,
-                mode,
-                playbackModeLabelRank(labels)
-            )
-            if best?.rank == 3 { return best }
+        var best: (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int, usesCoordinateClick: Bool)?
+        if playbackMode(for: labels) != nil {
+            let pressableTarget = pressableAncestor(of: element)
+            if let resolution = playbackModeControlResolution(
+                for: labels,
+                hasPressableTarget: pressableTarget != nil
+            ) {
+                best = (
+                    pressableTarget ?? element,
+                    resolution.mode,
+                    playbackModeLabelRank(labels),
+                    resolution.usesCoordinateClick
+                )
+                if best?.rank == 3 { return best }
+            }
         }
         for child in children(of: element) {
             if let candidate = findPlaybackMode(
@@ -543,7 +570,7 @@ final class MediaAppSpecialist {
 
     nonisolated private static func qqMusicPlaybackModeControl(
         pid: pid_t
-    ) -> (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int)? {
+    ) -> (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int, usesCoordinateClick: Bool)? {
         qqMusicControlRoots(pid: pid)
             .compactMap { findPlaybackMode(in: $0, depth: 0, maximumDepth: 4) }
             .max(by: { $0.rank < $1.rank })
@@ -568,6 +595,7 @@ final class MediaAppSpecialist {
     }
 
     nonisolated private static func children(of element: AXUIElement) -> [AXUIElement] {
+        configureAccessibilityTimeout(for: element)
         var childrenRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             element,
@@ -596,6 +624,7 @@ final class MediaAppSpecialist {
     }
 
     nonisolated private static func supportsPress(_ element: AXUIElement) -> Bool {
+        configureAccessibilityTimeout(for: element)
         var actionsRef: CFArray?
         guard AXUIElementCopyActionNames(element, &actionsRef) == .success,
               let actions = actionsRef as? [String]
@@ -698,6 +727,7 @@ final class MediaAppSpecialist {
     }
 
     nonisolated private static func role(of element: AXUIElement) -> String? {
+        configureAccessibilityTimeout(for: element)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             element,
@@ -709,16 +739,24 @@ final class MediaAppSpecialist {
 
     nonisolated private static func accessibilityLabels(of element: AXUIElement?) -> [String] {
         guard let element else { return [] }
-        let attributes = [
+        configureAccessibilityTimeout(for: element)
+        let attributes: [CFString] = [
             kAXTitleAttribute as CFString,
             kAXDescriptionAttribute as CFString,
             kAXHelpAttribute as CFString,
             kAXValueAttribute as CFString,
             kAXIdentifierAttribute as CFString,
         ]
-        return attributes.compactMap { attribute in
-            var value: CFTypeRef?
-            AXUIElementCopyAttributeValue(element, attribute, &value)
+        var valuesRef: CFArray?
+        guard AXUIElementCopyMultipleAttributeValues(
+            element,
+            attributes as CFArray,
+            [],
+            &valuesRef
+        ) == .success,
+            let values = valuesRef as? [Any]
+        else { return [] }
+        return values.compactMap { value in
             guard let text = value as? String else { return nil }
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
@@ -726,6 +764,7 @@ final class MediaAppSpecialist {
     }
 
     nonisolated private static func frame(of element: AXUIElement) -> (position: CGPoint, size: CGSize)? {
+        configureAccessibilityTimeout(for: element)
         var positionRef: CFTypeRef?
         var sizeRef: CFTypeRef?
         guard
@@ -771,10 +810,14 @@ final class MediaAppSpecialist {
 
     nonisolated private static func performPlaybackModeToggle(
         on element: AXUIElement,
-        pid: pid_t
+        pid: pid_t,
+        usesCoordinateClick: Bool
     ) -> Bool {
-        clickCenter(of: element, pid: pid)
-            || AXUIElementPerformAction(element, kAXPressAction as CFString) == .success
+        if usesCoordinateClick {
+            return clickCenter(of: element, pid: pid)
+        }
+        return AXUIElementPerformAction(element, kAXPressAction as CFString) == .success
+            || clickCenter(of: element, pid: pid)
     }
 
     nonisolated private static func matchesControlLabels(
@@ -804,7 +847,12 @@ final class MediaAppSpecialist {
             }
         }
         windows.append(contentsOf: self.windows(of: application))
-        return windows.compactMap { findControlBar(in: $0, depth: 0) }
+        return windows.reduce(into: [AXUIElement]()) { roots, window in
+            guard !roots.contains(where: { CFEqual($0, window) }) else { return }
+            if let controlBar = findControlBar(in: window, depth: 0) {
+                roots.append(controlBar)
+            }
+        }
     }
 
     nonisolated private static func findControlBar(in element: AXUIElement, depth: Int) -> AXUIElement? {
@@ -823,6 +871,7 @@ final class MediaAppSpecialist {
     }
 
     nonisolated private static func windows(of element: AXUIElement) -> [AXUIElement] {
+        configureAccessibilityTimeout(for: element)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             element,
@@ -836,6 +885,7 @@ final class MediaAppSpecialist {
         _ attribute: String,
         of element: AXUIElement
     ) -> AXUIElement? {
+        configureAccessibilityTimeout(for: element)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             element,
@@ -844,5 +894,9 @@ final class MediaAppSpecialist {
         ) == .success,
         let value else { return nil }
         return unsafeDowncast(value, to: AXUIElement.self)
+    }
+
+    nonisolated private static func configureAccessibilityTimeout(for element: AXUIElement) {
+        AXUIElementSetMessagingTimeout(element, accessibilityTimeout)
     }
 }
