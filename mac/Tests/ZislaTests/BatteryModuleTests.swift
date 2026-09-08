@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ZislaCore
 import ZislaKit
 
 @testable import Zisla
@@ -16,6 +17,43 @@ struct BatteryModuleTests {
         )
         #expect(batteryModule == .battery)
         #expect(IslandModule.battery.layout == IslandModuleLayout.battery)
+    }
+
+    @Test
+    func configuredModuleOrderControlsVisibleNavigationOrder() {
+        var settings = FeatureSettings.default
+        settings.moduleOrder = [.mail, .dashboard, .battery]
+
+        #expect(Array(IslandModule.enabledOrder(settings).prefix(3)) == [
+            .mail,
+            .dashboard,
+            .battery,
+        ])
+    }
+
+    @Test
+    func groupedTallModuleLayoutsShareHeights() {
+        let tallModules: [IslandModule] = [
+            .quickNotes, .keyboardSound, .mail, .system, .battery, .pdf,
+        ]
+
+        for module in tallModules {
+            #expect(module.layout == IslandModuleLayout.system)
+        }
+
+        #expect(IslandModuleLayout.system.islandSize.height == 546)
+        #expect(IslandModuleLayout.system.panelSize.height == 550)
+        #expect(IslandModuleLayout.resolved(for: .battery, dashboardCardCount: 0) == IslandModuleLayout.system)
+    }
+
+    @Test
+    func aiModuleUsesItsCompactHeightWithoutChangingCPUHeight() {
+        #expect(IslandModule.aiMonitor.layout == IslandModuleLayout.ai)
+        #expect(IslandModuleLayout.ai.islandSize.height == 495)
+        #expect(IslandModuleLayout.ai.panelSize.height == 499)
+        #expect(IslandModuleLayout.ai.islandSize.height < IslandModuleLayout.system.islandSize.height)
+        #expect(IslandModuleLayout.system.islandSize.height == 546)
+        #expect(IslandModuleLayout.system.panelSize.height == 550)
     }
 
     @Test

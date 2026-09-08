@@ -95,6 +95,18 @@ struct SettingsNavigationTests {
     }
 
     @Test
+    func toolAndStatusOrderSettingsUseTheSharedDragAndResetControls() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+
+        #expect(source.contains("settingsGroup(\"工具\")"))
+        #expect(source.contains("settingsGroup(\"收起态展示优先级\")"))
+        #expect(source.contains("ReorderDropDelegate<IslandModuleOrder>"))
+        #expect(source.contains("ReorderDropDelegate<CompactStatusPriority>"))
+        #expect(source.contains("moduleOrder = IslandModuleOrder.defaultOrder"))
+        #expect(source.contains("compactStatusPriority = CompactStatusPriority.defaultOrder"))
+    }
+
+    @Test
     func alwaysVisibleSections() {
         let settings = FeatureSettings()
         #expect(SettingsSection.general.isVisible(settings: settings))

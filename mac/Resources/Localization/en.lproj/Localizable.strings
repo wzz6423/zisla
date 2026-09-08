@@ -16,6 +16,10 @@
 "搜索" = "Search";
 "清除" = "Clear";
 "打开设置" = "Open Settings";
+"天气日程" = "Weather & Agenda";
+"AI 信息" = "AI Info";
+"键盘信息" = "Keyboard Info";
+"CPU" = "CPU";
 
 /* Settings */
 "设置" = "Settings";

@@ -36,19 +36,19 @@ enum IslandModule: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .dashboard: "首页"
-    case .shelf: "中转"
+    case .shelf: "中转站"
     case .clipboard: "剪贴板"
-    case .aiMonitor: "AI 监控"
+    case .aiMonitor: "AI 信息"
     case .download: "下载"
-    case .agenda: "日程"
+    case .agenda: "天气日程"
     case .mail: "邮件"
     case .quickNotes: "随记"
-    case .pdf: "PDF"
+    case .pdf: "PDF 工具"
     case .toolbox: "小工具"
-    case .system: "系统"
+    case .system: "CPU"
     case .battery: "电池"
     case .lockScreen: "锁屏"
-    case .keyboardSound: "键盘音效"
+    case .keyboardSound: "键盘信息"
     }
   }
 
@@ -75,37 +75,31 @@ enum IslandModule: String, CaseIterable, Identifiable {
     switch self {
     case .dashboard:
       .standard
+    case .clipboard, .shelf:
+      .clipboard
     case .aiMonitor:
       .ai
-    case .system:
-      .system
-    case .battery:
-      .battery
-    case .clipboard:
-      .clipboard
-    case .shelf:
-      .shelf
+    case .mail, .quickNotes, .pdf, .system, .battery, .keyboardSound:
+      .pdf
+    case .download, .agenda:
+      .agenda
     case .toolbox:
       .toolbox
-    case .pdf:
-      .pdf
-    case .download:
-      .download
-    case .agenda:
-      .agenda
     case .lockScreen:
       .standard
-    case .mail:
-      .mail
-    case .quickNotes:
-      .notes
-    case .keyboardSound:
-      .keyboardSound
     }
   }
 }
 
 extension IslandModule {
+  static func configuredOrder(_ settings: FeatureSettings) -> [Self] {
+    IslandModuleOrder.normalized(settings.moduleOrder).compactMap { Self(rawValue: $0.rawValue) }
+  }
+
+  static func enabledOrder(_ settings: FeatureSettings) -> [Self] {
+    configuredOrder(settings).filter { $0.isEnabled(in: settings) }
+  }
+
   /// Formerly a private IslandRootView extension; AppModel also needs it to fall back from a disabled selected module after settings changes.
   func isEnabled(in settings: FeatureSettings) -> Bool {
     switch self {
@@ -151,9 +145,6 @@ struct IslandModuleLayout: Equatable {
   private static let expandedChromeHeight: CGFloat = 121
   private static let moduleVerticalInsets = IslandSurfaceGeometry.moduleInset * 2
   private static let panelHeightAllowance: CGFloat = 4
-  static let batteryMinimumContentHeight: CGFloat = 0
-  static let batteryMaximumContentHeight: CGFloat = 430
-
   /// Fixed-height modules size the surface to their rendered content instead of inheriting
   /// the standard panel's unused vertical space.
   private static func compactModule(
@@ -170,11 +161,9 @@ struct IslandModuleLayout: Equatable {
   static let toolbox = compactModule(contentHeight: 136)
   static let download = compactModule(contentHeight: 138)
   static let agenda = compactModule(contentHeight: 160)
-  /// PDF tools need the full-width toolbar plus enough vertical room for the operation list.
-  static let pdf = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 600),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 604)
-  )
+  /// Tall modules share the former CPU monitor height to keep their panel geometry consistent.
+  static let system = compactModule(contentHeight: 401)
+  static let pdf = system
   /// Shelf content is fixed at 320pt and scrolls internally when it contains more files.
   static let shelf = compactModule(contentHeight: 320)
   /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
@@ -183,26 +172,11 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: unifiedIslandWidth, height: 500),
     panelSize: CGSize(width: unifiedPanelWidth, height: 504)
   )
-  static let ai = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 470),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 474)
-  )
-  static let system = compactModule(contentHeight: 401)
-  static let battery = compactModule(contentHeight: batteryMaximumContentHeight)
-  static let keyboardSound = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 560),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 564)
-  )
-  /// Quick Notes keeps its taller editing/preview area for rich content such as images and tables.
-  static let notes = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 560),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 564)
-  )
-  /// Mail keeps its taller content area; the list column remains 232pt wide for readable previews.
-  static let mail = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 520),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 524)
-  )
+  static let ai = compactModule(contentHeight: 350)
+  static let battery = system
+  static let keyboardSound = system
+  static let notes = system
+  static let mail = system
   /// Dashboard height follows the fixed crown chrome and rendered activity-card grid.
   /// The arithmetic lives in `IslandDashboardLayout` (ZislaKit) so it is unit-testable and
   /// stays clamped above the crown's black → glass transition.
@@ -224,8 +198,7 @@ struct IslandModuleLayout: Equatable {
   /// Resolves the current layout. Dashboard height follows its rendered activity-card rows.
   nonisolated static func resolved(
     for module: IslandModule,
-    dashboardCardCount: Int,
-    batteryDynamicHeight: CGFloat? = nil
+    dashboardCardCount: Int
   ) -> IslandModuleLayout {
     if module == .dashboard {
       // Empty and single-card dashboards are clamped to the crown floor instead of falling back
@@ -239,13 +212,6 @@ struct IslandModuleLayout: Equatable {
         islandSize: CGSize(width: unifiedIslandWidth, height: islandHeight),
         panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + 4)
       )
-    }
-    if module == .battery, let dynamicHeight = batteryDynamicHeight {
-      let contentHeight = min(
-        batteryMaximumContentHeight,
-        max(batteryMinimumContentHeight, dynamicHeight)
-      )
-      return compactModule(contentHeight: contentHeight)
     }
     return module.layout
   }
@@ -357,7 +323,7 @@ final class AppModel: ObservableObject {
   func selectModule(_ module: IslandModule) {
     let current = pendingModuleSelection ?? selectedModule
     guard module != current else { return }
-    let order = IslandModule.allCases
+    let order = IslandModule.configuredOrder(settingsStore.settings)
     if let from = order.firstIndex(of: current),
        let to = order.firstIndex(of: module) {
       moduleSwitchDirection = to > from ? 1 : -1
@@ -399,8 +365,6 @@ final class AppModel: ObservableObject {
   }
   /// Number of cards rendered below the dashboard summary.
   @Published private(set) var dashboardCardCount = 0
-  /// Dynamic content height for the battery module.
-  @Published private(set) var batteryModuleDynamicHeight = IslandModuleLayout.batteryMaximumContentHeight
   @Published private(set) var isMirrorPresented = false
   @Published private(set) var isTeleprompterPresented = false
   private(set) var teleprompterPresentationPoint: CGPoint?
@@ -828,15 +792,6 @@ final class AppModel: ObservableObject {
   func synchronizeDashboardCardCount(_ count: Int) {
     guard dashboardCardCount != count else { return }
     dashboardCardCount = count
-  }
-
-  func setBatteryModuleDynamicHeight(_ height: CGFloat) {
-    let constrained = min(
-      IslandModuleLayout.batteryMaximumContentHeight,
-      max(IslandModuleLayout.batteryMinimumContentHeight, height)
-    )
-    guard abs(batteryModuleDynamicHeight - constrained) > 1 else { return }
-    batteryModuleDynamicHeight = constrained
   }
 
   func start() {
