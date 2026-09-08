@@ -38,10 +38,12 @@ struct BatteryModuleTests {
         ]
 
         for module in tallModules {
-            #expect(module.layout == IslandModuleLayout.pdf)
+            #expect(module.layout == IslandModuleLayout.system)
         }
 
-        #expect(IslandModuleLayout.resolved(for: .battery, dashboardCardCount: 0) == IslandModuleLayout.pdf)
+        #expect(IslandModuleLayout.system.islandSize.height == 546)
+        #expect(IslandModuleLayout.system.panelSize.height == 550)
+        #expect(IslandModuleLayout.resolved(for: .battery, dashboardCardCount: 0) == IslandModuleLayout.system)
     }
 
     @Test

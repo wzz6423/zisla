@@ -159,11 +159,9 @@ struct IslandModuleLayout: Equatable {
   static let toolbox = compactModule(contentHeight: 136)
   static let download = compactModule(contentHeight: 138)
   static let agenda = compactModule(contentHeight: 160)
-  /// PDF tools need the full-width toolbar plus enough vertical room for the operation list.
-  static let pdf = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 600),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 604)
-  )
+  /// Tall modules share the former CPU monitor height to keep their panel geometry consistent.
+  static let system = compactModule(contentHeight: 401)
+  static let pdf = system
   /// Shelf content is fixed at 320pt and scrolls internally when it contains more files.
   static let shelf = compactModule(contentHeight: 320)
   /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
@@ -172,12 +170,11 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: unifiedIslandWidth, height: 500),
     panelSize: CGSize(width: unifiedPanelWidth, height: 504)
   )
-  static let ai = pdf
-  static let system = pdf
-  static let battery = pdf
-  static let keyboardSound = pdf
-  static let notes = pdf
-  static let mail = pdf
+  static let ai = system
+  static let battery = system
+  static let keyboardSound = system
+  static let notes = system
+  static let mail = system
   /// Dashboard height follows the fixed crown chrome and rendered activity-card grid.
   /// The arithmetic lives in `IslandDashboardLayout` (ZislaKit) so it is unit-testable and
   /// stays clamped above the crown's black → glass transition.
