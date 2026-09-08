@@ -1614,7 +1614,10 @@ private struct DetailedMediaBar: View {
 
     @ViewBuilder
     private var artwork: some View {
-        if let image = MediaArtworkImageCache.image(from: item.artworkData) {
+        if let image = MediaArtworkImageCache.image(
+            from: item.artworkData,
+            fallback: item.sourceIconData
+        ) {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFill()
