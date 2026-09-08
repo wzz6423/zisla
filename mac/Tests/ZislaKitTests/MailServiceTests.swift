@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 @testable import ZislaCore
 @testable import ZislaKit
@@ -73,6 +74,71 @@ struct MailServiceTests {
     }
 
     @Test @MainActor
+    func usesTheLocalIndexBeforeMailAppWhenMailIsRunning() async throws {
+        let databaseURL = try makeMailServiceIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        try executeMailServiceSQL("""
+            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
+            INSERT INTO subjects (ROWID, subject) VALUES (1, '快速主题');
+            INSERT INTO summaries (ROWID, summary) VALUES (1, '快速摘要');
+            INSERT INTO messages (message_id, subject, summary, date_received, display_date, mailbox, read, deleted)
+            VALUES (42, 1, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0);
+            """, at: databaseURL)
+
+        var appleScriptCalls = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                appleScriptCalls += 1
+                return .failure(.failed("AppleScript should not be used when the index is readable"))
+            },
+            indexReader: MailIndexReader(databaseURL: databaseURL),
+            mailRunning: { true }
+        )
+
+        await service.refresh()
+
+        #expect(service.messages.map(\.messageID) == [42])
+        #expect(service.messages.first?.body == "快速摘要")
+        #expect(appleScriptCalls == 0)
+    }
+
+    @Test @MainActor
+    func fallsBackToMailAppWhenLocalIndexReturnsNoMessages() async throws {
+        let databaseURL = try makeMailServiceIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        try executeMailServiceSQL(
+            "INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');",
+            at: databaseURL
+        )
+
+        var appleScriptCalls = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                appleScriptCalls += 1
+                return .success(.snapshot(MailSnapshot(
+                    accounts: [MailScriptAccount(name: "work@example.com", emailAddresses: ["work@example.com"])],
+                    messages: [MailScriptRow(
+                        accountName: "work@example.com",
+                        messageID: "7",
+                        sender: "sender@example.com",
+                        subject: "来自 Mail.app",
+                        body: "正文",
+                        receivedAt: .now,
+                        isRead: false
+                    )]
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: databaseURL),
+            mailRunning: { true }
+        )
+
+        await service.refresh()
+
+        #expect(appleScriptCalls == 1)
+        #expect(service.messages.map(\.messageID) == [7])
+    }
+
+    @Test @MainActor
     func generatedScriptsUseAccountSpecificActionsAndSelectedSender() {
         let compose = MailService.composeScript(
             fromAddress: "work@example.com",
@@ -123,8 +189,145 @@ struct MailServiceTests {
         #expect(script.contains("\"个人邮箱\""))
         #expect(script.contains("set accountList to every account"))
         #expect(script.contains("repeat with i from 1 to accountCount"))
+        #expect(script.contains("set accountName to name of mailAccount as text"))
+        #expect(script.contains("set rawAddresses to email addresses of mailAccount"))
+        #expect(!script.contains("set accountProperties to properties of mailAccount"))
         #expect(script.contains("set end of accountRows to {accountName, accountAddresses}"))
         #expect(script.contains("accountName is in selectedAccountNames"))
+    }
+
+    @Test @MainActor
+    func inboxScriptReadsRequestedPageAndSignalsOlderMessages() {
+        let script = MailService.inboxScript(accountNames: [], pageSize: 10, offset: 20)
+
+        #expect(script.contains("set remainingOffset to 20"))
+        #expect(script.contains("set remainingPageSize to 10"))
+        #expect(script.contains("set startIndex to remainingOffset + 1"))
+        #expect(script.contains("set endIndex to remainingOffset + remainingPageSize"))
+        #expect(script.contains("set messageProperties to properties of mailMessage"))
+        #expect(script.contains("id of messageProperties as text"))
+        #expect(script.contains("content of messageProperties"))
+        #expect(script.contains("set remainingPageSize to remainingPageSize - (endIndex - startIndex + 1)"))
+        #expect(script.contains("if startIndex <= endIndex then"))
+        #expect(script.contains("set hasMoreMessages to true"))
+        #expect(script.contains("return {accountRows, messageRows, hasMoreMessages}"))
+    }
+
+    @Test @MainActor
+    func refreshAndLoadMoreAppendPagesWithoutRepeatingTheLastPage() async {
+        var requestedScripts: [String] = []
+        let firstPage = (1...10).map { index in
+            MailScriptRow(
+                accountName: "工作邮箱",
+                messageID: String(index),
+                sender: "sender@example.com",
+                subject: "邮件 \(index)",
+                body: "正文 \(index)",
+                receivedAt: Date(timeIntervalSince1970: Double(1_000 - index)),
+                isRead: true
+            )
+        }
+        let secondPage = (10...20).map { index in
+            MailScriptRow(
+                accountName: "工作邮箱",
+                messageID: String(index),
+                sender: "sender@example.com",
+                subject: "邮件 \(index)",
+                body: "正文 \(index)",
+                receivedAt: Date(timeIntervalSince1970: Double(1_000 - index)),
+                isRead: true
+            )
+        }
+
+        let service = MailService(
+            commandRunner: { script, _ in
+                requestedScripts.append(script)
+                let isSecondPage = script.contains("set remainingOffset to 10")
+                return .success(.snapshot(MailSnapshot(
+                    accounts: [MailScriptAccount(name: "工作邮箱", emailAddresses: ["work@example.com"])],
+                    messages: isSecondPage ? secondPage : firstPage,
+                    hasMore: !isSecondPage
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+
+        await service.refresh()
+        #expect(service.messages.count == 10)
+        #expect(service.messages.first?.messageID == 1)
+        #expect(service.canLoadMore)
+        #expect(service.paginationGeneration == 1)
+
+        await service.loadMore()
+        #expect(service.messages.count == 20)
+        #expect(service.messages.map(\.messageID) == Array(1...20))
+        #expect(!service.canLoadMore)
+        #expect(service.paginationGeneration == 2)
+        #expect(requestedScripts.count == 2)
+        #expect(requestedScripts[1].contains("set remainingOffset to 10"))
+
+        await service.loadMore()
+        #expect(requestedScripts.count == 2)
+    }
+
+    @Test @MainActor
+    func loadMoreAdvancesAfterAResultAddsNoNewMessages() async {
+        var requestedScripts: [String] = []
+        let rows: (ClosedRange<Int>) -> [MailScriptRow] = { range in
+            range.map { index in
+                MailScriptRow(
+                    accountName: "工作邮箱",
+                    messageID: String(index),
+                    sender: "sender@example.com",
+                    subject: "邮件 \(index)",
+                    body: "正文 \(index)",
+                    receivedAt: Date(timeIntervalSince1970: Double(1_000 - index)),
+                    isRead: true
+                )
+            }
+        }
+
+        let service = MailService(
+            commandRunner: { script, _ in
+                requestedScripts.append(script)
+                switch requestedScripts.count {
+                case 1:
+                    return .success(.snapshot(MailSnapshot(
+                        accounts: [MailScriptAccount(name: "工作邮箱", emailAddresses: ["work@example.com"])],
+                        messages: rows(1...10),
+                        hasMore: true
+                    )))
+                case 2:
+                    return .success(.snapshot(MailSnapshot(
+                        accounts: [MailScriptAccount(name: "工作邮箱", emailAddresses: ["work@example.com"])],
+                        messages: rows(1...10),
+                        hasMore: true
+                    )))
+                default:
+                    return .success(.snapshot(MailSnapshot(
+                        accounts: [MailScriptAccount(name: "工作邮箱", emailAddresses: ["work@example.com"])],
+                        messages: rows(11...20),
+                        hasMore: false
+                    )))
+                }
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+
+        await service.refresh()
+        await service.loadMore()
+        #expect(service.messages.count == 10)
+        #expect(service.canLoadMore)
+        #expect(service.paginationGeneration == 2)
+
+        await service.loadMore()
+        #expect(service.messages.count == 20)
+        #expect(!service.canLoadMore)
+        #expect(requestedScripts.count == 3)
+        #expect(requestedScripts[1].contains("set remainingOffset to 10"))
+        #expect(requestedScripts[2].contains("set remainingOffset to 20"))
     }
 
     @Test @MainActor
@@ -244,4 +447,48 @@ private actor MailOperationQueueTestGate {
             isSignaled = true
         }
     }
+}
+
+private func makeMailServiceIndex() throws -> URL {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("Zisla-mail-service-index-\(UUID().uuidString).db")
+    try executeMailServiceSQL("""
+        CREATE TABLE mailboxes (url TEXT NOT NULL);
+        CREATE TABLE messages (
+            message_id INTEGER NOT NULL,
+            sender INTEGER,
+            subject INTEGER NOT NULL,
+            summary INTEGER,
+            date_received INTEGER,
+            display_date INTEGER,
+            mailbox INTEGER NOT NULL,
+            read INTEGER NOT NULL DEFAULT 0,
+            deleted INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE sender_addresses (address INTEGER PRIMARY KEY, sender INTEGER NOT NULL);
+        CREATE TABLE addresses (address TEXT NOT NULL, comment TEXT NOT NULL);
+        CREATE TABLE subjects (subject TEXT NOT NULL);
+        CREATE TABLE summaries (summary TEXT NOT NULL);
+        """, at: url)
+    return url
+}
+
+private func executeMailServiceSQL(_ sql: String, at url: URL) throws {
+    var database: OpaquePointer?
+    guard sqlite3_open(url.path, &database) == SQLITE_OK else {
+        sqlite3_close(database)
+        throw MailServiceTestError.openFailed
+    }
+    defer { sqlite3_close(database) }
+
+    var error: UnsafeMutablePointer<CChar>?
+    guard sqlite3_exec(database, sql, nil, nil, &error) == SQLITE_OK else {
+        sqlite3_free(error)
+        throw MailServiceTestError.queryFailed
+    }
+}
+
+private enum MailServiceTestError: Error {
+    case openFailed
+    case queryFailed
 }

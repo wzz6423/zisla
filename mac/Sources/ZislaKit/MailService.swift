@@ -26,14 +26,21 @@ struct MailScriptRow: Sendable {
 struct MailSnapshot: Sendable {
     let accounts: [MailScriptAccount]
     let messages: [MailScriptRow]
+    let hasMore: Bool
+
+    init(accounts: [MailScriptAccount], messages: [MailScriptRow], hasMore: Bool = false) {
+        self.accounts = accounts
+        self.messages = messages
+        self.hasMore = hasMore
+    }
 }
 
-private enum MailScriptOutput: Sendable {
+enum MailScriptOutput: Sendable {
     case snapshot(MailSnapshot)
     case succeeded
 }
 
-private enum MailScriptError: Error, Sendable {
+enum MailScriptError: Error, Sendable {
     case failed(String)
 }
 
@@ -86,6 +93,8 @@ public final class MailService: ObservableObject {
     @Published public private(set) var accounts: [MailAccount] = []
     @Published public private(set) var messages: [MailMessage] = []
     @Published public private(set) var isLoading = false
+    @Published public private(set) var canLoadMore = true
+    @Published public private(set) var paginationGeneration = 0
     @Published public private(set) var isMutating = false
     @Published public private(set) var errorDescription: String?
     @Published public private(set) var needsMailIndexAccess = false
@@ -93,19 +102,24 @@ public final class MailService: ObservableObject {
     private let commandRunner: (String, Bool) async -> Result<MailScriptOutput, MailScriptError>
     private let indexReader: MailIndexReader
     private let mutationQueue = MailOperationQueue()
+    private let mailRunning: () -> Bool
     private var pollingTask: Task<Void, Never>?
     private var selectedAccountNames: Set<String> = []
+    private var messageOffset = 0
+    private let pageSize = 10
 
     public convenience init() {
         self.init(commandRunner: Self.runAppleScript, indexReader: MailIndexReader())
     }
 
-    fileprivate init(
+    init(
         commandRunner: @escaping (String, Bool) async -> Result<MailScriptOutput, MailScriptError>,
-        indexReader: MailIndexReader
+        indexReader: MailIndexReader,
+        mailRunning: (() -> Bool)? = nil
     ) {
         self.commandRunner = commandRunner
         self.indexReader = indexReader
+        self.mailRunning = mailRunning ?? Self.isMailRunning
         mutationQueue.onActivityChange = { [weak self] isActive in
             self?.isMutating = isActive
         }
@@ -154,41 +168,61 @@ public final class MailService: ObservableObject {
 
     public func refresh() async {
         guard !isLoading else { return }
+        messageOffset = 0
+        canLoadMore = true
+        await fetchMessages(offset: 0, replacing: true)
+    }
+
+    public func loadMore() async {
+        guard !isLoading, canLoadMore else { return }
+        await fetchMessages(offset: messageOffset, replacing: false)
+    }
+
+    private func fetchMessages(offset: Int, replacing: Bool) async {
         isLoading = true
         defer { isLoading = false }
         needsMailIndexAccess = false
 
-        if Self.isMailRunning() {
-            switch await commandRunner(Self.inboxScript(accountNames: selectedAccountNames), true) {
+        let isMailRunning = mailRunning()
+        let indexResult = await readIndex(accountNames: selectedAccountNames, offset: offset)
+        if case let .success(snapshot) = indexResult,
+           Self.canUseIndexSnapshot(snapshot, for: selectedAccountNames),
+           !snapshot.messages.isEmpty {
+            apply(snapshot, replacing: replacing)
+            return
+        }
+
+        if isMailRunning {
+            switch await commandRunner(Self.inboxScript(accountNames: selectedAccountNames, pageSize: pageSize, offset: offset), true) {
             case let .success(.snapshot(snapshot)):
-                apply(snapshot)
+                apply(snapshot, replacing: replacing)
             case .success:
                 errorDescription = AppLocalization.text("邮件服务返回了无法识别的数据")
             case let .failure(error):
                 errorDescription = Self.message(for: error)
             }
         } else {
-            let reader = indexReader
-            let accountNames = selectedAccountNames
-            let result = await Task.detached(priority: .userInitiated) {
-                do {
-                    return Result<MailSnapshot, MailIndexReaderError>.success(
-                        try reader.snapshot(accountNames: accountNames)
-                    )
-                } catch let error as MailIndexReaderError {
-                    return .failure(error)
-                } catch {
-                    return .failure(.queryFailed)
-                }
-            }.value
-            switch result {
+            switch indexResult {
             case let .success(snapshot):
-                apply(snapshot)
+                apply(snapshot, replacing: replacing)
             case let .failure(error):
                 needsMailIndexAccess = error == .unavailable || error == .openFailed
                 errorDescription = Self.message(for: error)
             }
         }
+    }
+
+    private func readIndex(accountNames: Set<String>, offset: Int) async -> Result<MailSnapshot, MailIndexReaderError> {
+        let reader = indexReader
+        return await Task.detached(priority: .userInitiated) {
+            do {
+                return .success(try reader.snapshot(accountNames: accountNames, offset: offset))
+            } catch let error as MailIndexReaderError {
+                return .failure(error)
+            } catch {
+                return .failure(.queryFailed)
+            }
+        }.value
     }
 
     public func markRead(_ message: MailMessage) async -> MailOperationResult {
@@ -291,6 +325,13 @@ public final class MailService: ObservableObject {
         .sorted { $0.receivedAt > $1.receivedAt }
     }
 
+    static func canUseIndexSnapshot(_ snapshot: MailSnapshot, for accountNames: Set<String>) -> Bool {
+        guard !snapshot.accounts.isEmpty else { return false }
+        guard !accountNames.isEmpty else { return true }
+        let availableNames = Set(snapshot.accounts.map(\.name))
+        return accountNames.isSubset(of: availableNames)
+    }
+
     /// Mail's scripting dictionary exposes `inbox` on the application, not on `account`:
     /// `inbox of <account>` fails with "can't get inbox of account id …" (verified on Mail 16 /
     /// macOS 27), which silently emptied every fetch and made every write-back unreachable.
@@ -300,7 +341,9 @@ public final class MailService: ObservableObject {
         "mailbox \"INBOX\" of \(accountExpression)"
     }
 
-    static func inboxScript(accountNames: Set<String>) -> String {
+    static func inboxScript(accountNames: Set<String>, pageSize: Int = 10, offset: Int = 0) -> String {
+        let safePageSize = max(1, pageSize)
+        let safeOffset = max(0, offset)
         let accountNames = accountNames
             .sorted()
             .map(appleScriptString)
@@ -315,6 +358,9 @@ public final class MailService: ObservableObject {
         tell application "Mail"
             set accountRows to {}
             set messageRows to {}
+            set hasMoreMessages to false
+            set remainingOffset to \(safeOffset)
+            set remainingPageSize to \(safePageSize)
             set selectedAccountNames to {\(accountNames)}
             set accountList to every account
             set accountCount to count of accountList
@@ -346,19 +392,31 @@ public final class MailService: ObservableObject {
                     try
                         set inboxMessages to messages of \(accountInbox("mailAccount"))
                         set messageCount to count of inboxMessages
-                        set maximumCount to 30
-                        if messageCount > maximumCount then set messageCount to maximumCount
-                        if messageCount > 0 then
-                            repeat with messageIndex from 1 to messageCount
-                                try
-                                    set mailMessage to item messageIndex of inboxMessages
-                                    set messageBody to content of mailMessage
-                                    if (count of messageBody) > 1200 then set messageBody to text 1 thru 1200 of messageBody
-                                    set end of messageRows to {accountName, id of mailMessage as text, sender of mailMessage as text, subject of mailMessage as text, messageBody, date received of mailMessage, read status of mailMessage}
-                                on error
-                                    -- Skip unreadable individual messages (corrupt or excessively large).
-                                end try
-                            end repeat
+                        if remainingPageSize is 0 then
+                            if messageCount > 0 then set hasMoreMessages to true
+                        else if remainingOffset >= messageCount then
+                            set remainingOffset to remainingOffset - messageCount
+                        else
+                            set startIndex to remainingOffset + 1
+                            set endIndex to remainingOffset + remainingPageSize
+                            if endIndex > messageCount then set endIndex to messageCount
+                            if messageCount > endIndex then set hasMoreMessages to true
+                            if startIndex <= endIndex then
+                                repeat with messageIndex from startIndex to endIndex
+                                    try
+                                        set mailMessage to item messageIndex of inboxMessages
+                                        -- Mail.app is slow to resolve each property separately.
+                                        set messageProperties to properties of mailMessage
+                                        set messageBody to content of messageProperties
+                                        if (count of messageBody) > 1200 then set messageBody to text 1 thru 1200 of messageBody
+                                        set end of messageRows to {accountName, id of messageProperties as text, sender of messageProperties as text, subject of messageProperties as text, messageBody, date received of messageProperties, read status of messageProperties}
+                                    on error
+                                        -- Skip unreadable individual messages (corrupt or excessively large).
+                                    end try
+                                end repeat
+                                set remainingPageSize to remainingPageSize - (endIndex - startIndex + 1)
+                                set remainingOffset to 0
+                            end if
                         end if
                     on error
                         -- This account's inbox is currently unavailable (still loading, offline, or authenticating).
@@ -366,7 +424,7 @@ public final class MailService: ObservableObject {
                     end try
                 end if
             end repeat
-            return {accountRows, messageRows}
+            return {accountRows, messageRows, hasMoreMessages}
         end tell
         """
     }
@@ -481,9 +539,23 @@ public final class MailService: ObservableObject {
         }
     }
 
-    private func apply(_ snapshot: MailSnapshot) {
+    private func apply(_ snapshot: MailSnapshot, replacing: Bool) {
         accounts = Self.accounts(from: snapshot.accounts)
-        messages = Self.messages(from: snapshot.messages)
+        let incoming = Self.messages(from: snapshot.messages)
+        if replacing {
+            messages = incoming
+            messageOffset = snapshot.hasMore ? pageSize : incoming.count
+        } else {
+            var merged = messages
+            let existingIDs = Set(messages.map { "\($0.accountName)\u{1F}\($0.messageID)" })
+            merged.append(contentsOf: incoming.filter {
+                !existingIDs.contains("\($0.accountName)\u{1F}\($0.messageID)")
+            })
+            messages = merged.sorted { $0.receivedAt > $1.receivedAt }
+            messageOffset += pageSize
+        }
+        canLoadMore = snapshot.hasMore
+        paginationGeneration += 1
         errorDescription = nil
         needsMailIndexAccess = false
     }
@@ -564,7 +636,7 @@ public final class MailService: ObservableObject {
             let accountsDescriptor = descriptor.atIndex(1),
             let messagesDescriptor = descriptor.atIndex(2)
         else {
-            return MailSnapshot(accounts: [], messages: [])
+            return MailSnapshot(accounts: [], messages: [], hasMore: false)
         }
         let accounts = values(in: accountsDescriptor).compactMap { row -> MailScriptAccount? in
             guard row.numberOfItems >= 2, let name = row.atIndex(1)?.stringValue else { return nil }
@@ -589,7 +661,8 @@ public final class MailService: ObservableObject {
                 isRead: row.atIndex(7)?.booleanValue ?? false
             )
         }
-        return MailSnapshot(accounts: accounts, messages: messages)
+        let hasMore = descriptor.numberOfItems >= 3 && descriptor.atIndex(3)?.booleanValue == true
+        return MailSnapshot(accounts: accounts, messages: messages, hasMore: hasMore)
     }
 
     nonisolated private static func values(in descriptor: NSAppleEventDescriptor) -> [NSAppleEventDescriptor] {

@@ -151,6 +151,61 @@ struct MailIndexReaderTests {
 
         #expect(snapshot.messages.map(\.messageID) == ["20", "10"])
     }
+
+    @Test
+    func readsOlderPagesWithOffsetAndReportsWhetherMoreExist() throws {
+        let databaseURL = try makeMailIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+
+        try execute("""
+            INSERT INTO mailboxes (ROWID, url) VALUES
+                (1, 'imap://work%40example.com@mail.example.com/INBOX');
+            INSERT INTO subjects (ROWID, subject) VALUES (1, 'One'), (2, 'Two'), (3, 'Three');
+            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+            VALUES
+                (1, 1, 3_000, 3_000, 1, 0, 0),
+                (2, 2, 2_000, 2_000, 1, 0, 0),
+                (3, 3, 1_000, 1_000, 1, 0, 0);
+            """, at: databaseURL)
+
+        let reader = MailIndexReader(databaseURL: databaseURL, maxMessages: 2)
+        let first = try reader.snapshot(accountNames: [])
+        #expect(first.messages.map(\.messageID) == ["1", "2"])
+        #expect(first.hasMore)
+
+        let older = try reader.snapshot(accountNames: [], offset: 2)
+        #expect(older.messages.map(\.messageID) == ["3"])
+        #expect(!older.hasMore)
+    }
+
+    @Test
+    func preservesNegativeMessageIDsWhenPaging() throws {
+        let databaseURL = try makeMailIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+
+        let values = (0..<11).map { index in
+            let messageID = index.isMultiple(of: 2) ? -(index + 1) : index + 1
+            let timestamp = 11_000 - index
+            return "(\(messageID), 1, \(timestamp), \(timestamp), 1, 0, 0)"
+        }.joined(separator: ",\n")
+        try execute("""
+            INSERT INTO mailboxes (ROWID, url) VALUES
+                (1, 'imap://work%40example.com@mail.example.com/INBOX');
+            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+            VALUES
+                \(values);
+            """, at: databaseURL)
+
+        let reader = MailIndexReader(databaseURL: databaseURL, maxMessages: 10)
+        let first = try reader.snapshot(accountNames: [])
+        #expect(first.messages.count == 10)
+        #expect(first.messages.contains { $0.messageID.hasPrefix("-") })
+        #expect(first.hasMore)
+
+        let older = try reader.snapshot(accountNames: [], offset: 10)
+        #expect(older.messages.map(\.messageID) == ["-11"])
+        #expect(!older.hasMore)
+    }
 }
 
 private func makeMailIndex() throws -> URL {
