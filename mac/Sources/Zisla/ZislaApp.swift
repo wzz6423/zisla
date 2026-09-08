@@ -422,7 +422,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 isMirrorPresented: model.isMirrorPresented,
                 isTeleprompterPresented: model.isTeleprompterPresented,
                 dashboardCardCount: model.dashboardCardCount,
-                batteryDynamicHeight: model.batteryModuleDynamicHeight,
                 includesPet: model.settingsStore.settings.petEnabled
             ).panelSize,
             horizontalMargin: 12
@@ -484,7 +483,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         coordinator.onActiveDisplayHasPhysicalNotchChanged = { hasPhysicalNotch in
             model.isIslandOnPhysicalNotch = hasPhysicalNotch
         }
-        Publishers.CombineLatest3(
+        Publishers.CombineLatest(
             Publishers.CombineLatest4(
                 model.$selectedModule,
                 model.$isMirrorPresented,
@@ -494,16 +493,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             model.settingsStore.$settings
                 .map(\.petEnabled)
                 .removeDuplicates(),
-            model.$batteryModuleDynamicHeight
         )
-            .map { state, includesPet, batteryHeight -> CGSize in
+            .map { state, includesPet -> CGSize in
                 let (module, isMirrorPresented, isTeleprompterPresented, dashboardCardCount) = state
                 return Self.expandedPanelSize(
                     module: module,
                     isMirrorPresented: isMirrorPresented,
                     isTeleprompterPresented: isTeleprompterPresented,
                     dashboardCardCount: dashboardCardCount,
-                    batteryDynamicHeight: batteryHeight,
                     includesPet: includesPet
                 ).panelSize
             }
@@ -745,7 +742,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             isMirrorPresented: model.isMirrorPresented,
                             isTeleprompterPresented: model.isTeleprompterPresented,
                             dashboardCardCount: model.dashboardCardCount,
-                            batteryDynamicHeight: model.batteryModuleDynamicHeight,
                             includesPet: model.settingsStore.settings.petEnabled
                         ).panelSize
                         // Direct resize (no two-phase): recording swaps layout instantly by design.
@@ -924,15 +920,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         isMirrorPresented: Bool,
         isTeleprompterPresented: Bool,
         dashboardCardCount: Int,
-        batteryDynamicHeight: CGFloat,
         includesPet: Bool
     ) -> IslandModuleLayout {
         if isMirrorPresented { return .mirror }
         if isTeleprompterPresented { return .teleprompter }
         let layout = IslandModuleLayout.resolved(
             for: module,
-            dashboardCardCount: dashboardCardCount,
-            batteryDynamicHeight: batteryDynamicHeight
+            dashboardCardCount: dashboardCardCount
         )
         return IslandModuleLayout(
             islandSize: layout.islandSize,

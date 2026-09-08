@@ -75,18 +75,16 @@ enum IslandModule: String, CaseIterable, Identifiable {
     switch self {
     case .dashboard:
       .standard
-    case .aiMonitor, .clipboard, .shelf, .keyboardSound:
+    case .clipboard, .shelf:
       .clipboard
-    case .system, .battery:
-      .system
+    case .aiMonitor, .mail, .quickNotes, .pdf, .system, .battery, .keyboardSound:
+      .pdf
     case .download, .agenda:
       .agenda
     case .toolbox:
       .toolbox
     case .lockScreen:
       .standard
-    case .mail, .quickNotes, .pdf:
-      .notes
     }
   }
 }
@@ -145,9 +143,6 @@ struct IslandModuleLayout: Equatable {
   private static let expandedChromeHeight: CGFloat = 121
   private static let moduleVerticalInsets = IslandSurfaceGeometry.moduleInset * 2
   private static let panelHeightAllowance: CGFloat = 4
-  static let batteryMinimumContentHeight: CGFloat = 0
-  static let batteryMaximumContentHeight: CGFloat = 401
-
   /// Fixed-height modules size the surface to their rendered content instead of inheriting
   /// the standard panel's unused vertical space.
   private static func compactModule(
@@ -177,26 +172,12 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: unifiedIslandWidth, height: 500),
     panelSize: CGSize(width: unifiedPanelWidth, height: 504)
   )
-  static let ai = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 470),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 474)
-  )
-  static let system = compactModule(contentHeight: 401)
-  static let battery = compactModule(contentHeight: batteryMaximumContentHeight)
-  static let keyboardSound = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 560),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 564)
-  )
-  /// Quick Notes keeps its taller editing/preview area for rich content such as images and tables.
-  static let notes = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 560),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 564)
-  )
-  /// Mail keeps its taller content area; the list column remains 232pt wide for readable previews.
-  static let mail = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 520),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 524)
-  )
+  static let ai = pdf
+  static let system = pdf
+  static let battery = pdf
+  static let keyboardSound = pdf
+  static let notes = pdf
+  static let mail = pdf
   /// Dashboard height follows the fixed crown chrome and rendered activity-card grid.
   /// The arithmetic lives in `IslandDashboardLayout` (ZislaKit) so it is unit-testable and
   /// stays clamped above the crown's black → glass transition.
@@ -218,8 +199,7 @@ struct IslandModuleLayout: Equatable {
   /// Resolves the current layout. Dashboard height follows its rendered activity-card rows.
   nonisolated static func resolved(
     for module: IslandModule,
-    dashboardCardCount: Int,
-    batteryDynamicHeight: CGFloat? = nil
+    dashboardCardCount: Int
   ) -> IslandModuleLayout {
     if module == .dashboard {
       // Empty and single-card dashboards are clamped to the crown floor instead of falling back
@@ -233,13 +213,6 @@ struct IslandModuleLayout: Equatable {
         islandSize: CGSize(width: unifiedIslandWidth, height: islandHeight),
         panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + 4)
       )
-    }
-    if module == .battery, let batteryDynamicHeight {
-      let contentHeight = min(
-        batteryMaximumContentHeight,
-        max(batteryMinimumContentHeight, batteryDynamicHeight)
-      )
-      return compactModule(contentHeight: contentHeight)
     }
     return module.layout
   }
@@ -393,8 +366,6 @@ final class AppModel: ObservableObject {
   }
   /// Number of cards rendered below the dashboard summary.
   @Published private(set) var dashboardCardCount = 0
-  /// Dynamic content height for the battery module.
-  @Published private(set) var batteryModuleDynamicHeight = IslandModuleLayout.batteryMaximumContentHeight
   @Published private(set) var isMirrorPresented = false
   @Published private(set) var isTeleprompterPresented = false
   private(set) var teleprompterPresentationPoint: CGPoint?
@@ -816,15 +787,6 @@ final class AppModel: ObservableObject {
   func synchronizeDashboardCardCount(_ count: Int) {
     guard dashboardCardCount != count else { return }
     dashboardCardCount = count
-  }
-
-  func setBatteryModuleDynamicHeight(_ height: CGFloat) {
-    let constrained = min(
-      IslandModuleLayout.batteryMaximumContentHeight,
-      max(IslandModuleLayout.batteryMinimumContentHeight, height)
-    )
-    guard abs(batteryModuleDynamicHeight - constrained) > 1 else { return }
-    batteryModuleDynamicHeight = constrained
   }
 
   func start() {

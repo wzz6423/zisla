@@ -224,8 +224,7 @@ struct IslandRootView: View {
                                         case .battery:
                                             BatteryDetailView(
                                                 batteryMonitor: model.battery,
-                                                networkMonitor: model.networkBattery,
-                                                onContentHeightChange: model.setBatteryModuleDynamicHeight
+                                                networkMonitor: model.networkBattery
                                             )
                                         case .lockScreen:
                                             LockScreenModuleView(model: model)
@@ -493,8 +492,7 @@ struct IslandRootView: View {
         guard let activeModule else { return .standard }
         return IslandModuleLayout.resolved(
             for: activeModule,
-            dashboardCardCount: model.dashboardCardCount,
-            batteryDynamicHeight: model.batteryModuleDynamicHeight
+            dashboardCardCount: model.dashboardCardCount
         )
     }
 

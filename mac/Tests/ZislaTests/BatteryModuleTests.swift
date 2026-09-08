@@ -33,15 +33,15 @@ struct BatteryModuleTests {
 
     @Test
     func groupedModuleLayoutsShareHeights() {
-        #expect(IslandModuleLayout.clipboard.islandSize.height == IslandModule.clipboard.layout.islandSize.height)
-        #expect(IslandModule.shelf.layout == IslandModule.clipboard.layout)
-        #expect(IslandModule.aiMonitor.layout == IslandModule.clipboard.layout)
-        #expect(IslandModule.keyboardSound.layout == IslandModule.clipboard.layout)
-        #expect(IslandModule.download.layout == IslandModule.agenda.layout)
-        #expect(IslandModule.agenda.layout == IslandModule.agenda.layout)
-        #expect(IslandModule.mail.layout == IslandModule.quickNotes.layout)
-        #expect(IslandModule.pdf.layout == IslandModule.quickNotes.layout)
-        #expect(IslandModule.system.layout == IslandModule.battery.layout)
+        let tallModules: [IslandModule] = [
+            .quickNotes, .aiMonitor, .keyboardSound, .mail, .system, .battery, .pdf,
+        ]
+
+        for module in tallModules {
+            #expect(module.layout == IslandModuleLayout.pdf)
+        }
+
+        #expect(IslandModuleLayout.resolved(for: .battery, dashboardCardCount: 0) == IslandModuleLayout.pdf)
     }
 
     @Test
