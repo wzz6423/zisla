@@ -386,6 +386,44 @@ struct NotesAppBridgeTests {
     }
 
     @Test
+    func storesInlineAttachmentDataAlongsideMetadata() {
+        let attachment = NotesAppBridge.NoteAttachment(
+            id: "attachment-1",
+            name: "截图.png",
+            contentIdentifier: "cid:attachment-1",
+            url: "",
+            dataURL: "data:image/png;base64,AAAA"
+        )
+        let content = NotesAppBridge.NoteContent(
+            plainText: "正文\n￼",
+            bodyHTML: "<div><span style=\"font-size: 11px\">正文</span></div><div><span style=\"font-size: 11px\"><br></span></div>",
+            attachments: [attachment]
+        )
+
+        #expect(content.attachments.first?.dataURL == "data:image/png;base64,AAAA")
+    }
+
+    @Test
+    func convertsOnlyImageAttachmentsToDataURLs() throws {
+        let imageURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-notes-image-\(UUID().uuidString).png")
+        let textURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-notes-text-\(UUID().uuidString).txt")
+        defer {
+            try? FileManager.default.removeItem(at: imageURL)
+            try? FileManager.default.removeItem(at: textURL)
+        }
+        let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")!
+        try png.write(to: imageURL)
+        try Data("not an image".utf8).write(to: textURL)
+
+        let imageDataURL = NotesAppBridge.dataURL(for: imageURL.path, name: "")
+
+        #expect(imageDataURL?.hasPrefix("data:image/png;base64,") == true)
+        #expect(NotesAppBridge.dataURL(for: textURL.path, name: "") == nil)
+    }
+
+    @Test
     func preservesPlainNativeNoteHTML() {
         let content = NotesAppBridge.NoteContent(
             plainText: "普通备忘录",

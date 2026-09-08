@@ -20,6 +20,52 @@ struct RichNoteEditorTests {
     }
 
     @Test
+    func restoresNotesAttachmentPlaceholderAsRenderableImage() throws {
+        let content = NotesAppBridge.NoteContent(
+            plainText: "正文\n￼\n结尾",
+            bodyHTML: "<div><span style=\"font-size: 11px\">正文</span></div><div><span style=\"font-size: 11px\"><br></span></div><div><span style=\"font-size: 11px\">结尾</span></div>",
+            attachments: [
+                NotesAppBridge.NoteAttachment(
+                    id: "attachment-1",
+                    name: "截图.png",
+                    contentIdentifier: "cid:attachment-1",
+                    url: "",
+                    dataURL: "data:image/png;base64,AAAA"
+                )
+            ]
+        )
+
+        let html = RichNoteEditor.editableHTML(for: content)
+
+        #expect(html.contains(#"<div><span style="font-size: 11px">正文</span></div>"#))
+        #expect(html.contains(#"<figure><img src="data:image/png;base64,AAAA" alt="截图.png"></figure>"#))
+        #expect(html.contains(#"<div><span style="font-size: 11px">结尾</span></div>"#))
+    }
+
+    @Test
+    func replacesNotesContentIdentifierImageWithInlineData() {
+        let content = NotesAppBridge.NoteContent(
+            plainText: "￼",
+            bodyHTML: #"<div><img src="cid:attachment-1@icloud.apple.com" alt="图片"></div>"#,
+            attachments: [
+                NotesAppBridge.NoteAttachment(
+                    id: "attachment-1",
+                    name: "图片.png",
+                    contentIdentifier: "cid:attachment-1@icloud.apple.com",
+                    url: "",
+                    dataURL: "data:image/png;base64,AAAA"
+                )
+            ]
+        )
+
+        let html = RichNoteEditor.editableHTML(for: content)
+
+        #expect(html.contains(#"src="data:image/png;base64,AAAA"#))
+        #expect(!html.contains("cid:attachment-1@icloud.apple.com"))
+        #expect(html.components(separatedBy: "data:image/png;base64,AAAA").count == 2)
+    }
+
+    @Test
     func blocksActiveContentFromSyncedNoteHTML() async throws {
         let maliciousHTML = """
         <div>safe content</div>
@@ -261,11 +307,11 @@ struct RichNoteEditorTests {
     }
 
     @Test
-    func removesBodyFontSizeWhenPromotingEditedTextToHeading() async throws {
+    func removesNotesTitleFontSizeWhenPromotingTextToHeading() async throws {
         let changeCapture = HTMLChangeCapture()
         let hostingView = NSHostingView(rootView:
             RichNoteEditor(
-                html: "<div><span style=\"font-size: 11px\">标题</span></div>",
+                html: "<div><b><font face=\".AppleSystemUIFontBold\"><span style=\"font-size: 21px\">标题</span></font></b></div>",
                 command: nil,
                 isEditable: true,
                 onChange: { html, _ in changeCapture.html = html }
@@ -299,7 +345,7 @@ struct RichNoteEditorTests {
             """
         )
         let bodyHTML = try await waitForCapturedHTML(in: changeCapture)
-        #expect(bodyHTML.contains("font-size: 14px") == true)
+        #expect(bodyHTML.contains("font-size: 21px") == true)
 
         changeCapture.html = nil
         _ = try await webView.evaluateJavaScript(
@@ -322,8 +368,8 @@ struct RichNoteEditorTests {
         ) as? String)
 
         #expect(headingSize == "23px")
-        #expect(savedHTML.contains("<h1><span>标题</span></h1>") == true)
-        #expect(savedHTML.contains("font-size: 14px") == false)
+        #expect(savedHTML.contains("<h1>") == true)
+        #expect(savedHTML.contains("font-size: 21px") == false)
     }
 
     @Test

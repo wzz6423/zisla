@@ -60,7 +60,97 @@ struct RichNoteEditor: NSViewRepresentable {
 
     static func editableHTML(for content: NotesAppBridge.NoteContent?) -> String {
         guard let content, !content.bodyHTML.isEmpty else { return "<div><br></div>" }
-        return content.bodyHTML
+        return htmlWithInlineAttachments(
+            bodyHTML: content.bodyHTML,
+            plainText: content.plainText,
+            attachments: content.attachments
+        )
+    }
+
+    private static func htmlWithInlineAttachments(
+        bodyHTML: String,
+        plainText: String,
+        attachments: [NotesAppBridge.NoteAttachment]
+    ) -> String {
+        struct InlineAttachment {
+            let id: String
+            let dataURL: String
+            let alt: String
+        }
+        let inlineAttachments = attachments.compactMap { attachment -> InlineAttachment? in
+            guard let dataURL = attachment.dataURL else { return nil }
+            let alt = attachment.name.isEmpty ? AppLocalization.text("图片") : attachment.name
+            return InlineAttachment(id: attachment.id, dataURL: dataURL, alt: alt)
+        }
+        guard !inlineAttachments.isEmpty else { return bodyHTML }
+
+        var result = bodyHTML
+        var renderedAttachmentIDs = Set<String>()
+        for attachment in attachments {
+            guard let inlineAttachment = inlineAttachments.first(where: { $0.id == attachment.id }),
+                  !attachment.contentIdentifier.isEmpty else { continue }
+            let escapedIdentifier = NSRegularExpression.escapedPattern(for: attachment.contentIdentifier)
+            guard let expression = try? NSRegularExpression(
+                pattern: #"(?is)(<img\b[^>]*\bsrc\s*=\s*[\"'])"# + escapedIdentifier + #"([\"'][^>]*>)"#
+            ) else { continue }
+            let range = NSRange(result.startIndex..., in: result)
+            let replaced = expression.stringByReplacingMatches(
+                in: result,
+                range: range,
+                withTemplate: "$1\(htmlAttributeEscape(inlineAttachment.dataURL))$2"
+            )
+            if replaced != result { renderedAttachmentIDs.insert(attachment.id) }
+            result = replaced
+        }
+        if !plainText.contains("\u{FFFC}") {
+            return result
+        }
+
+        let placeholderAttachments = inlineAttachments.filter { !renderedAttachmentIDs.contains($0.id) }
+        guard !placeholderAttachments.isEmpty else { return result }
+
+        let blockExpression = try? NSRegularExpression(pattern: #"(?is)<div\b[^>]*>.*?</div>"#)
+        let blockMatches = blockExpression?.matches(
+            in: result,
+            range: NSRange(result.startIndex..., in: result)
+        ) ?? []
+        let lines = plainText.components(separatedBy: "\n")
+        var blockIndex = 0
+        var attachmentIndex = 0
+        var replacements: [(NSRange, String)] = []
+
+        for line in lines {
+            guard blockIndex < blockMatches.count else { break }
+            if line.contains("\u{FFFC}"), attachmentIndex < placeholderAttachments.count {
+                let attachment = placeholderAttachments[attachmentIndex]
+                replacements.append((blockMatches[blockIndex].range, imageHTML(dataURL: attachment.dataURL, alt: attachment.alt)))
+                attachmentIndex += 1
+            }
+            blockIndex += 1
+        }
+
+        for (range, replacement) in replacements.reversed() {
+            result = (result as NSString).replacingCharacters(in: range, with: replacement)
+        }
+        if attachmentIndex < placeholderAttachments.count {
+            let remaining = placeholderAttachments[attachmentIndex...]
+                .map { imageHTML(dataURL: $0.dataURL, alt: $0.alt) }
+                .joined()
+            result += remaining
+        }
+        return result
+    }
+
+    private static func imageHTML(dataURL: String, alt: String) -> String {
+        "<figure><img src=\"\(htmlAttributeEscape(dataURL))\" alt=\"\(htmlAttributeEscape(alt))\"></figure>"
+    }
+
+    private static func htmlAttributeEscape(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 
     func makeCoordinator() -> Coordinator {
@@ -298,7 +388,18 @@ struct RichNoteEditor: NSViewRepresentable {
               if (!node.getAttribute('style')?.trim()) node.removeAttribute('style');
             });
           };
+          const normalizeHeadings = root => {
+            root.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+              heading.style.removeProperty('font-size');
+              if (!heading.getAttribute('style')?.trim()) heading.removeAttribute('style');
+              heading.querySelectorAll('[style]').forEach(node => {
+                node.style.removeProperty('font-size');
+                if (!node.getAttribute('style')?.trim()) node.removeAttribute('style');
+              });
+            });
+          };
           const emit = () => {
+            normalizeHeadings(editor);
             normalizeDefaultFontSize(editor);
             window.webkit?.messageHandlers?.richNoteChanged?.postMessage({ html: editor.innerHTML, plainText: editor.innerText });
           };

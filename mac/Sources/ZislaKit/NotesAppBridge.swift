@@ -1,5 +1,7 @@
 import AppKit
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 import ZislaCore
 
 /// Integration with the system Notes app: the Quick Note module uses Notes as its data source,
@@ -46,18 +48,26 @@ public enum NotesAppBridge {
         }
     }
 
-    /// A native attachment from Notes. The scripting API only exposes metadata and the ability to “show” it, so Quick Note displays attachments read-only.
+    /// A native attachment from Notes, including inline data when Notes exposes a local file.
     public struct NoteAttachment: Identifiable, Sendable, Equatable, Hashable {
         public let id: String
         public let name: String
         public let contentIdentifier: String
         public let url: String
+        public let dataURL: String?
 
-        public init(id: String, name: String, contentIdentifier: String, url: String) {
+        public init(
+            id: String,
+            name: String,
+            contentIdentifier: String,
+            url: String,
+            dataURL: String? = nil
+        ) {
             self.id = id
             self.name = name
             self.contentIdentifier = contentIdentifier
             self.url = url
+            self.dataURL = dataURL
         }
     }
 
@@ -204,27 +214,53 @@ public enum NotesAppBridge {
         }
     }
 
-    /// Reads public attachment metadata; content and modification APIs are not used in Quick Note.
+    /// Reads attachment metadata and copies image attachments into data URLs for the editor.
     public static func readAttachments(noteID: String) async -> Result<[NoteAttachment], NotesAppError> {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-notes-attachments-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            return .failure(.failed(AppLocalization.text("无法准备备忘录附件")))
+        }
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let directoryPath = escapeForAppleScript(directory.path)
         let script = """
         tell application "Notes"
             set n to (note id \(escapeForAppleScript(noteID)))
             set resultList to {}
+            set attachmentIndex to 0
             repeat with a in (attachments of n)
+                set attachmentIndex to attachmentIndex + 1
                 set attachmentURL to ""
                 try
                     set attachmentURL to URL of a as text
                 end try
-                set end of resultList to {id of a as text, name of a as text, content identifier of a as text, attachmentURL}
+                set savedPath to ""
+                try
+                    set savedPath to \(directoryPath) & "/attachment-" & (attachmentIndex as text)
+                    save a in POSIX file savedPath
+                on error
+                    set savedPath to ""
+                end try
+                set end of resultList to {id of a as text, name of a as text, content identifier of a as text, attachmentURL, savedPath}
             end repeat
-            return resultList
+        return resultList
         end tell
         """
         switch await runAppleScriptReturningStringLists(script) {
         case .success(let values):
             return .success(values.compactMap { value in
-                guard value.count == 4, !value[0].isEmpty else { return nil }
-                return NoteAttachment(id: value[0], name: value[1], contentIdentifier: value[2], url: value[3])
+                guard value.count == 5, !value[0].isEmpty else { return nil }
+                let dataURL = Self.dataURL(for: value[4], name: value[1])
+                return NoteAttachment(
+                    id: value[0],
+                    name: value[1] == "missing value" ? "" : value[1],
+                    contentIdentifier: value[2] == "missing value" ? "" : value[2],
+                    url: value[3] == "missing value" ? "" : value[3],
+                    dataURL: dataURL
+                )
             })
         case .failure(let error):
             return .failure(error)
@@ -485,6 +521,24 @@ public enum NotesAppBridge {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         return "\"\(escaped)\""
+    }
+
+    static func dataURL(for path: String, name: String) -> String? {
+        guard !path.isEmpty,
+              let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              !data.isEmpty else { return nil }
+        let fileExtension = (name as NSString).pathExtension
+        let type = (!fileExtension.isEmpty ? UTType(filenameExtension: fileExtension) : nil)
+            ?? imageType(for: data)
+        guard type?.conforms(to: .image) == true else { return nil }
+        let mimeType = type?.preferredMIMEType ?? "application/octet-stream"
+        return "data:\(mimeType);base64,\(data.base64EncodedString())"
+    }
+
+    private static func imageType(for data: Data) -> UTType? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let identifier = CGImageSourceGetType(source) as String? else { return nil }
+        return UTType(identifier)
     }
 }
 
