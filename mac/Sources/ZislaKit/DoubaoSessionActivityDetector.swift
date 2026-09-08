@@ -9,6 +9,9 @@ import ZislaCore
 /// activity are both required before reporting an active session.
 public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     public static let defaultRecencyThreshold: TimeInterval = 90
+    static let syncTaskLifetime: TimeInterval = 5 * 60
+    static let asyncTaskLifetime: TimeInterval = 3 * 60 * 60
+    static let doubaoBundleIdentifier = "com.bot.pc.doubao"
 
     private struct Candidate {
         var url: URL
@@ -83,6 +86,11 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
             return []
         }
 
+        guard candidates.contains(where: { hasRecentIncompleteTask(at: $0.url, now: now) }) else {
+            cachedTask = nil
+            return []
+        }
+
         let task = AIProgressTask(
             id: Self.taskID,
             provider: .doubao,
@@ -104,21 +112,28 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     private static func isDoubaoRunning() -> Bool {
         NSWorkspace.shared.runningApplications.contains { application in
             guard !application.isTerminated else { return false }
+            return matchesDoubaoApplication(
+                bundleIdentifier: application.bundleIdentifier,
+                localizedName: application.localizedName,
+                executableName: application.executableURL?.deletingPathExtension().lastPathComponent
+            )
+        }
+    }
 
-            if let bundleIdentifier = application.bundleIdentifier?.lowercased(),
-               bundleIdentifier.hasSuffix(".doubao") || bundleIdentifier.contains(".doubao.") {
-                return true
-            }
+    static func matchesDoubaoApplication(
+        bundleIdentifier: String?,
+        localizedName: String?,
+        executableName: String?
+    ) -> Bool {
+        if let bundleIdentifier {
+            return bundleIdentifier.caseInsensitiveCompare(doubaoBundleIdentifier) == .orderedSame
+        }
 
-            return [
-                application.localizedName,
-                application.executableURL?.deletingPathExtension().lastPathComponent,
-            ]
+        return [localizedName, executableName]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .contains { name in
                 name == "豆包" || name.caseInsensitiveCompare("doubao") == .orderedSame
             }
-        }
     }
 
     public static func defaultDataRoots(
@@ -190,6 +205,85 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     private func signature(for candidates: [Candidate]) -> String {
         candidates.prefix(8).map { "\($0.url.lastPathComponent):\($0.modificationDate.timeIntervalSince1970)" }
             .joined(separator: "|")
+    }
+
+    private func hasRecentIncompleteTask(at url: URL, now: Date) -> Bool {
+        guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]) else { return false }
+        let bytes = [UInt8](data)
+        let taskMarker = Array("mainTaskDataMap".utf8)
+        let createTimeMarker = Array("createTime".utf8)
+        let requestMarker = Array("requestQ".utf8)
+        var taskStart = 0
+
+        while let markerOffset = Self.range(of: taskMarker, in: bytes, searchRange: taskStart..<bytes.count)?.lowerBound {
+            let nextTaskStart = Self.range(
+                of: taskMarker,
+                in: bytes,
+                searchRange: (markerOffset + taskMarker.count)..<bytes.count
+            )?.lowerBound ?? bytes.count
+            let taskEnd = min(nextTaskStart, markerOffset + 2_048)
+            guard let createOffset = Self.range(
+                of: createTimeMarker,
+                in: bytes,
+                searchRange: (markerOffset + taskMarker.count)..<taskEnd
+            )?.lowerBound else {
+                taskStart = markerOffset + taskMarker.count
+                continue
+            }
+            guard bytes.count >= createOffset + createTimeMarker.count + 9,
+                  bytes[createOffset + createTimeMarker.count] == 0x4e,
+                  let createTime = decodeSerializedDate(
+                      from: bytes,
+                      at: createOffset + createTimeMarker.count + 1
+                  ),
+                  Self.range(
+                      of: requestMarker,
+                      in: bytes,
+                      searchRange: (createOffset + createTimeMarker.count + 9)..<taskEnd
+                  ) != nil else {
+                taskStart = markerOffset + taskMarker.count
+                continue
+            }
+
+            let contextStart = max(markerOffset, createOffset - 256)
+            let context = String(decoding: bytes[contextStart..<createOffset], as: UTF8.self)
+            let lifetime = context.contains("async") ? Self.asyncTaskLifetime : Self.syncTaskLifetime
+            if createTime <= now, now.timeIntervalSince(createTime) <= lifetime {
+                return true
+            }
+            taskStart = markerOffset + taskMarker.count
+        }
+
+        return false
+    }
+
+    private static func range(
+        of needle: [UInt8],
+        in haystack: [UInt8],
+        searchRange: Range<Int>
+    ) -> Range<Int>? {
+        guard !needle.isEmpty,
+              searchRange.lowerBound >= 0,
+              searchRange.upperBound <= haystack.count,
+              searchRange.count >= needle.count else { return nil }
+
+        for start in searchRange.lowerBound...(searchRange.upperBound - needle.count) {
+            if haystack[start..<(start + needle.count)].elementsEqual(needle) {
+                return start..<(start + needle.count)
+            }
+        }
+        return nil
+    }
+
+    private func decodeSerializedDate(from bytes: [UInt8], at offset: Int) -> Date? {
+        guard offset >= 0, offset + MemoryLayout<Double>.size <= bytes.count else { return nil }
+        var value: UInt64 = 0
+        for index in 0..<MemoryLayout<Double>.size {
+            value |= UInt64(bytes[offset + index]) << UInt64(index * 8)
+        }
+        let timestamp = Double(bitPattern: value) / 1_000
+        guard timestamp.isFinite else { return nil }
+        return Date(timeIntervalSince1970: timestamp)
     }
 
     private static func isChatActivityFile(_ url: URL) -> Bool {
