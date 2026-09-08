@@ -372,6 +372,7 @@ struct RichNoteEditor: NSViewRepresentable {
           const continuationStyle = document.createElement('style');
           document.head.append(continuationStyle);
           let sendTimer;
+          let savedRange = null;
 
           const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
           const normalizeDefaultFontSize = root => {
@@ -427,6 +428,18 @@ struct RichNoteEditor: NSViewRepresentable {
             caret.classList.add('is-visible');
           };
           const scheduleCaretUpdate = () => requestAnimationFrame(updateCaret);
+          const saveSelection = () => {
+            const selection = window.getSelection();
+            if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) return;
+            savedRange = selection.getRangeAt(0).cloneRange();
+          };
+          const restoreSelection = () => {
+            if (!savedRange || !editor.contains(savedRange.startContainer) || !editor.contains(savedRange.endContainer)) return false;
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(savedRange);
+            return true;
+          };
           const isEmptyBlock = node => node?.matches?.('div, p') && !node.textContent.trim() && [...node.children].every(child => child.tagName === 'BR' || !child.textContent.trim());
           const sanitize = value => {
             const template = document.createElement('template');
@@ -506,6 +519,7 @@ struct RichNoteEditor: NSViewRepresentable {
             block: tag => {
               if (!editor.isContentEditable) return;
               editor.focus();
+              restoreSelection();
               document.execCommand('formatBlock', false, tag);
               scheduleEmit();
             },
@@ -583,7 +597,10 @@ struct RichNoteEditor: NSViewRepresentable {
           editor.addEventListener('focus', scheduleCaretUpdate);
           editor.addEventListener('blur', hideCaret);
           editor.addEventListener('keydown', scheduleCaretUpdate);
-          document.addEventListener('selectionchange', scheduleCaretUpdate);
+          document.addEventListener('selectionchange', () => {
+            saveSelection();
+            scheduleCaretUpdate();
+          });
           window.addEventListener('resize', scheduleCaretUpdate);
           window.addEventListener('scroll', scheduleCaretUpdate, true);
           editor.addEventListener('paste', async event => {

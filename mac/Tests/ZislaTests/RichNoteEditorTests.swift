@@ -357,6 +357,7 @@ struct RichNoteEditorTests {
               const selection = window.getSelection();
               selection.removeAllRanges();
               selection.addRange(range);
+              document.activeElement?.blur();
               window.zisla.block('h1');
             })();
             """

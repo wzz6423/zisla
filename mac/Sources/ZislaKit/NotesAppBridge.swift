@@ -273,12 +273,30 @@ public enum NotesAppBridge {
         await writeNote(id: id, html: bodyHTML(for: markdown))
     }
 
-    /// Writes back rich-text HTML. Images are inlined as data URLs, so no temporary file paths are needed.
+    /// Writes rich text and materializes data URL images through Notes' attachment API.
     public static func writeNote(id: String, html: String) async -> Result<Void, NotesAppError> {
+        let images = Self.extractDataImages(from: html)
+        // Notes stores inline attachments as object replacement characters in plaintext;
+        // preserve one marker per image so a later read can restore its position.
+        let body = Self.removingImageTags(from: html)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-note-write-\(UUID().uuidString)", isDirectory: true)
+        do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
+        catch { return .failure(.failed(AppLocalization.text("无法准备备忘录附件"))) }
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var paths: [String] = []
+        for (index, image) in images.enumerated() {
+            guard let data = Data(base64Encoded: image.base64) else { return .failure(.failed(AppLocalization.text("备忘录图片数据无效"))) }
+            let ext = image.mime.split(separator: "/").last.map(String.init) ?? "bin"
+            let url = directory.appendingPathComponent("image-\(index).\(ext)")
+            do { try data.write(to: url, options: .atomic); paths.append(url.path) }
+            catch { return .failure(.failed(AppLocalization.text("无法保存备忘录图片"))) }
+        }
+        let attachmentScript = paths.map { "make new attachment at end of attachments of n with data (POSIX file \(escapeForAppleScript($0)))" }.joined(separator: "\n            ")
         let script = """
         tell application "Notes"
             set n to (note id \(escapeForAppleScript(id)))
-            set body of n to \(escapeForAppleScript(html))
+            set body of n to \(escapeForAppleScript(body))
+            \(attachmentScript)
         end tell
         """
         return await runAppleScriptVoid(script)
@@ -533,6 +551,21 @@ public enum NotesAppBridge {
         guard type?.conforms(to: .image) == true else { return nil }
         let mimeType = type?.preferredMIMEType ?? "application/octet-stream"
         return "data:\(mimeType);base64,\(data.base64EncodedString())"
+    }
+
+    private struct DataImage { let mime: String; let base64: String }
+
+    private static func extractDataImages(from html: String) -> [DataImage] {
+        guard let regex = try? NSRegularExpression(pattern: #"(?is)<img\b[^>]*\bsrc\s*=\s*[\"']data:([^;\"']+);base64,([^\"']+)[\"'][^>]*>"#) else { return [] }
+        return regex.matches(in: html, range: NSRange(html.startIndex..., in: html)).compactMap {
+            guard let mime = Range($0.range(at: 1), in: html), let data = Range($0.range(at: 2), in: html) else { return nil }
+            return DataImage(mime: String(html[mime]), base64: String(html[data]))
+        }
+    }
+
+    private static func removingImageTags(from html: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: #"(?is)<img\b[^>]*\bsrc\s*=\s*[\"']data:[^\"']+[\"'][^>]*>"#) else { return html }
+        return regex.stringByReplacingMatches(in: html, range: NSRange(html.startIndex..., in: html), withTemplate: "\u{FFFC}")
     }
 
     private static func imageType(for data: Data) -> UTType? {
