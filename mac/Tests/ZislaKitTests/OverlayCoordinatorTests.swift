@@ -52,6 +52,41 @@ struct OverlayCoordinatorTests {
     }
 
     @Test @MainActor
+    func persistentContentWithoutAViewDoesNotCreatePanel() {
+        let coordinator = OverlayCoordinator(
+            contentView: NSView(),
+            collapseDelay: .zero,
+            persistentContentViewProvider: { _ in nil },
+            persistentPanelFrameProvider: { $0.collapsedFrame }
+        )
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+
+        #expect(coordinator.persistentPanelDisplayIDs.isEmpty)
+    }
+
+    @Test @MainActor
+    func persistentContentAppearsAfterItsViewBecomesAvailable() {
+        var contentView: NSView?
+        let coordinator = OverlayCoordinator(
+            contentView: NSView(),
+            collapseDelay: .zero,
+            persistentContentViewProvider: { _ in contentView },
+            persistentPanelFrameProvider: { $0.collapsedFrame }
+        )
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        #expect(coordinator.persistentPanelDisplayIDs.isEmpty)
+
+        contentView = NSView()
+        coordinator.refreshPersistentPanels()
+
+        #expect(coordinator.persistentPanelDisplayIDs == [Self.builtInID])
+    }
+
+    @Test @MainActor
     func persistentPetRemainsAboveAppsWhenIslandIsSetToBottom() throws {
         let probe = PersistentPetPanelProbe()
         let coordinator = OverlayCoordinator(

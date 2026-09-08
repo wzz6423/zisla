@@ -430,7 +430,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             contentView: hostingView,
             layoutEngine: engine,
             persistentContentViewProvider: { [weak petController] layout in
-                guard let petController else { return nil }
+                guard let petController, petController.sprite != nil else { return nil }
                 let persistentPetView = CollapsedPetView(
                     model: model,
                     petController: petController,
