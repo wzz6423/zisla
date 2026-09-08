@@ -8,9 +8,18 @@ import ZislaCore
 /// Doubao is a PWA shell with no structured AI task log, so a running application and recent local-data
 /// activity are both required before reporting an active session.
 public final class DoubaoSessionActivityDetector: AIActivityDetecting {
+    public static let defaultRecencyThreshold: TimeInterval = 90
+    static let doubaoBundleIdentifier = "com.bot.pc.doubao"
+
+    private enum ActivitySource {
+        case chat
+        case agentMode
+    }
+
     private struct Candidate {
         var url: URL
         var modificationDate: Date
+        var source: ActivitySource
     }
 
     public let dataRoots: [URL]
@@ -19,6 +28,7 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
 
     private let fileManager: FileManager
     private let isDoubaoRunning: () -> Bool
+    private let now: () -> Date
     private var cachedTask: AIProgressTask?
     private var cachedSignature: String?
     private var lastScanAt: Date = .distantPast
@@ -27,10 +37,11 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     public init(
         dataRoots: [URL]? = nil,
         maxFiles: Int = 32,
-        recencyThreshold: TimeInterval = 10 * 60,
+        recencyThreshold: TimeInterval = DoubaoSessionActivityDetector.defaultRecencyThreshold,
         scanInterval: TimeInterval = 5,
         fileManager: FileManager = .default,
-        isDoubaoRunning: (() -> Bool)? = nil
+        isDoubaoRunning: (() -> Bool)? = nil,
+        now: @escaping () -> Date = Date.init
     ) {
         if let dataRoots {
             self.dataRoots = dataRoots
@@ -41,10 +52,11 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
             )
         }
         self.maxFiles = max(1, maxFiles)
-        self.recencyThreshold = recencyThreshold
+        self.recencyThreshold = max(0, recencyThreshold)
         self.scanInterval = max(0, scanInterval)
         self.fileManager = fileManager
         self.isDoubaoRunning = isDoubaoRunning ?? Self.isDoubaoRunning
+        self.now = now
     }
 
     public func activeTasks() throws -> [AIProgressTask] {
@@ -54,31 +66,36 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
             return []
         }
 
-        let now = Date()
+        let now = now()
+        let cutoff = now.addingTimeInterval(-recencyThreshold)
         if now.timeIntervalSince(lastScanAt) < scanInterval,
-           let cached = cachedTask {
+           let cached = cachedTask,
+           cached.updatedAt > cutoff {
             return [cached]
         }
         lastScanAt = now
 
         let candidates = recentFiles()
         let signature = signature(for: candidates)
-        if signature == cachedSignature, let cached = cachedTask {
+        if signature == cachedSignature,
+           let cached = cachedTask,
+           cached.updatedAt > cutoff {
             return [cached]
         }
         cachedSignature = signature
 
         guard let latest = candidates.first,
-              latest.modificationDate > now.addingTimeInterval(-recencyThreshold) else {
+              latest.modificationDate > cutoff else {
             cachedTask = nil
             return []
         }
 
+        let isAgentMode = latest.source == .agentMode
         let task = AIProgressTask(
             id: Self.taskID,
             provider: .doubao,
-            title: "豆包",
-            detail: nil,
+            title: isAgentMode ? "豆包 Agent Mode" : "豆包",
+            detail: isAgentMode ? "最近活动（90 秒内）" : nil,
             progress: nil,
             status: .running,
             updatedAt: latest.modificationDate,
@@ -95,21 +112,28 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     private static func isDoubaoRunning() -> Bool {
         NSWorkspace.shared.runningApplications.contains { application in
             guard !application.isTerminated else { return false }
+            return matchesDoubaoApplication(
+                bundleIdentifier: application.bundleIdentifier,
+                localizedName: application.localizedName,
+                executableName: application.executableURL?.deletingPathExtension().lastPathComponent
+            )
+        }
+    }
 
-            if let bundleIdentifier = application.bundleIdentifier?.lowercased(),
-               bundleIdentifier.hasSuffix(".doubao") || bundleIdentifier.contains(".doubao.") {
-                return true
-            }
+    static func matchesDoubaoApplication(
+        bundleIdentifier: String?,
+        localizedName: String?,
+        executableName: String?
+    ) -> Bool {
+        if let bundleIdentifier {
+            return bundleIdentifier.caseInsensitiveCompare(doubaoBundleIdentifier) == .orderedSame
+        }
 
-            return [
-                application.localizedName,
-                application.executableURL?.deletingPathExtension().lastPathComponent,
-            ]
+        return [localizedName, executableName]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .contains { name in
                 name == "豆包" || name.caseInsensitiveCompare("doubao") == .orderedSame
             }
-        }
     }
 
     public static func defaultDataRoots(
@@ -152,33 +176,99 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     private func recentFiles() -> [Candidate] {
         var candidates: [Candidate] = []
         for root in dataRoots {
-            guard let enumerator = fileManager.enumerator(
-                at: root,
-                includingPropertiesForKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                ],
-                options: [.skipsHiddenFiles]
-            ) else { continue }
-
-            for case let url as URL in enumerator {
-                guard let values = try? url.resourceValues(forKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                ]), values.isRegularFile == true else { continue }
-                candidates.append(Candidate(
-                    url: url,
-                    modificationDate: values.contentModificationDate ?? .distantPast
-                ))
-                if candidates.count >= maxFiles { break }
-            }
+            candidates.append(contentsOf: chatCandidates(in: root))
+            candidates.append(contentsOf: agentModeCandidates(in: root))
         }
 
-        return candidates.sorted { $0.modificationDate > $1.modificationDate }
+        return Array(candidates.sorted {
+            if $0.modificationDate != $1.modificationDate {
+                return $0.modificationDate > $1.modificationDate
+            }
+            return $0.url.path < $1.url.path
+        }.prefix(maxFiles))
     }
 
+    private func chatCandidates(in root: URL) -> [Candidate] {
+        guard let enumerator = fileManager.enumerator(
+            at: root,
+            includingPropertiesForKeys: [
+                .isRegularFileKey,
+                .contentModificationDateKey,
+            ],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var candidates: [Candidate] = []
+        for case let url as URL in enumerator {
+            guard let values = try? url.resourceValues(forKeys: [
+                .isRegularFileKey,
+                .contentModificationDateKey,
+            ]), values.isRegularFile == true,
+                  Self.isChatActivityFile(url) else { continue }
+            candidates.append(Candidate(
+                url: url,
+                modificationDate: values.contentModificationDate ?? .distantPast,
+                source: .chat
+            ))
+        }
+        return candidates
+    }
+
+    private func agentModeCandidates(in root: URL) -> [Candidate] {
+        let sessionsDirectory = root.appendingPathComponent(
+            "Default/.doubao/agent_mode/workspace/.sessions",
+            isDirectory: true
+        )
+        guard let sessionDirectories = try? fileManager.contentsOfDirectory(
+            at: sessionsDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var candidates: [Candidate] = []
+        for sessionDirectory in sessionDirectories {
+            guard let values = try? sessionDirectory.resourceValues(forKeys: [.isDirectoryKey]),
+                  values.isDirectory == true,
+                  let enumerator = fileManager.enumerator(
+                      at: sessionDirectory,
+                      includingPropertiesForKeys: [
+                          .isRegularFileKey,
+                          .contentModificationDateKey,
+                      ],
+                      options: [.skipsHiddenFiles]
+                  ) else { continue }
+
+            for case let url as URL in enumerator {
+                guard Self.agentModeArtifactNames.contains(url.lastPathComponent),
+                      let values = try? url.resourceValues(forKeys: [
+                          .isRegularFileKey,
+                          .contentModificationDateKey,
+                      ]), values.isRegularFile == true else { continue }
+                candidates.append(Candidate(
+                    url: url,
+                    modificationDate: values.contentModificationDate ?? .distantPast,
+                    source: .agentMode
+                ))
+            }
+        }
+        return candidates
+    }
+
+    private static let agentModeArtifactNames = [
+        "trajectory.jsonl",
+        "findings.jsonl",
+        "board.md",
+        "assignment.md",
+    ]
+
     private func signature(for candidates: [Candidate]) -> String {
-        candidates.prefix(8).map { "\($0.url.lastPathComponent):\($0.modificationDate.timeIntervalSince1970)" }
+        candidates.prefix(8).map { "\($0.url.path):\($0.modificationDate.timeIntervalSince1970)" }
             .joined(separator: "|")
+    }
+
+    private static func isChatActivityFile(_ url: URL) -> Bool {
+        let path = url.path.lowercased()
+        return path.contains("/indexeddb/")
+            && (path.contains("doubao-chat") || path.contains("doubao_chat"))
     }
 }

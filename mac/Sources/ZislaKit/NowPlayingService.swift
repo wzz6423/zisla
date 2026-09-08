@@ -142,15 +142,15 @@ public final class NowPlayingService: ObservableObject {
     var title: String
     var artist: String
     var duration: Double?
-    var source: String?
+    var sourceBundleIdentifier: String?
+    var sourcePID: pid_t?
 
     init(_ snapshot: NowPlayingSnapshot) {
       title = LyricsService.normalized(snapshot.title)
       artist = LyricsService.normalized(snapshot.artist)
       duration = snapshot.duration
-      source =
-        snapshot.sourcePID.map { "pid:\($0)" }
-        ?? snapshot.sourceBundleIdentifier.map { "bundle:\($0)" }
+      sourceBundleIdentifier = snapshot.sourceBundleIdentifier
+      sourcePID = snapshot.sourcePID
     }
 
     func matches(_ snapshot: NowPlayingSnapshot) -> Bool {
@@ -158,10 +158,12 @@ public final class NowPlayingService: ObservableObject {
         artist == LyricsService.normalized(snapshot.artist),
         Self.durationsMatch(duration, snapshot.duration)
       else { return false }
-      let snapshotSource =
-        snapshot.sourcePID.map { "pid:\($0)" }
-        ?? snapshot.sourceBundleIdentifier.map { "bundle:\($0)" }
-      return source == nil || snapshotSource == nil || source == snapshotSource
+      guard sourceBundleIdentifier == nil || sourceBundleIdentifier == snapshot.sourceBundleIdentifier,
+        sourcePID == nil || sourcePID == snapshot.sourcePID
+      else { return false }
+      return sourceBundleIdentifier != nil || sourcePID != nil
+        ? snapshot.sourceBundleIdentifier != nil || snapshot.sourcePID != nil
+        : snapshot.sourceBundleIdentifier == nil && snapshot.sourcePID == nil
     }
 
     private static func durationsMatch(_ lhs: Double?, _ rhs: Double?) -> Bool {
@@ -226,6 +228,7 @@ public final class NowPlayingService: ObservableObject {
   private var lyricsTask: Task<Void, Never>?
   private var artworkRefreshTask: Task<Void, Never>?
   private var artworkRefreshIdentity: ArtworkRefreshIdentity?
+  private var artworkRefreshGeneration: UInt64 = 0
   private var lyricsIdentity: LyricsTrackIdentity?
   public private(set) var resolvedLyrics: SyncedLyrics?
   /// Full artist name resolved from the lyrics API (MediaRemote usually returns only the first artist).
@@ -439,6 +442,7 @@ public final class NowPlayingService: ObservableObject {
     artworkRefreshTask?.cancel()
     artworkRefreshTask = nil
     artworkRefreshIdentity = nil
+    artworkRefreshGeneration &+= 1
     lyricsIdentity = nil
     resolvedLyrics = nil
     resolvedArtist = nil
@@ -760,7 +764,8 @@ public final class NowPlayingService: ObservableObject {
   }
 
   nonisolated static func parseAdapter(
-    _ payload: MediaRemoteAdapterPayload
+    _ payload: MediaRemoteAdapterPayload,
+    fallbackIsPlaying: Bool = false
   ) -> NowPlayingSnapshot? {
     let title = text(payload.title)
     let album = text(payload.album)
@@ -802,7 +807,7 @@ public final class NowPlayingService: ObservableObject {
       duration: payload.duration,
       elapsedTime: payload.elapsedTime,
       timestamp: timestamp,
-      isPlaying: payload.playing ?? ((payload.playbackRate ?? 0) > 0),
+      isPlaying: payload.playing ?? payload.playbackRate.map { $0 > 0 } ?? fallbackIsPlaying,
       isVideo: isVideo,
       sourceBundleIdentifier: sourceBundleIdentifier,
       sourcePID: payload.processIdentifier,
@@ -827,16 +832,16 @@ public final class NowPlayingService: ObservableObject {
     else { return update }
 
     var merged = update
+    guard !sourceChanged(update, previous) else { return merged }
     merged.artworkData = update.artworkData ?? previous.artworkData
     merged.album = update.album ?? previous.album
-    if !sourceChanged(update, previous) {
-      merged.sourceIconData = update.sourceIconData ?? previous.sourceIconData
-      merged.isVideo = update.isVideo || previous.isVideo
-      merged.sourceApplication = update.sourceApplication ?? previous.sourceApplication
-      merged.sourceBundleIdentifier =
-        update.sourceBundleIdentifier
-        ?? previous.sourceBundleIdentifier
-    }
+    merged.sourceIconData = update.sourceIconData ?? previous.sourceIconData
+    merged.isVideo = update.isVideo || previous.isVideo
+    merged.sourceApplication = update.sourceApplication ?? previous.sourceApplication
+    merged.sourceBundleIdentifier =
+      update.sourceBundleIdentifier
+      ?? previous.sourceBundleIdentifier
+    merged.sourcePID = update.sourcePID ?? previous.sourcePID
     return merged
   }
 
@@ -927,10 +932,16 @@ public final class NowPlayingService: ObservableObject {
 
   nonisolated static func preferredSource(
     from sources: [AudioPlaybackSource],
-    remotePID: pid_t?
+    remotePID: pid_t?,
+    remoteBundleIdentifier: String? = nil
   ) -> AudioPlaybackSource? {
     if let remotePID,
       let matched = sources.first(where: { $0.processIdentifiers.contains(remotePID) })
+    {
+      return matched
+    }
+    if let remoteBundleIdentifier,
+      let matched = sources.first(where: { $0.bundleIdentifier == remoteBundleIdentifier })
     {
       return matched
     }
@@ -1130,7 +1141,11 @@ public final class NowPlayingService: ObservableObject {
     guard isRunning, usesAdapter else { return }
     playbackRefreshGeneration &+= 1
     remotePIDPending = false
-    guard let value = Self.parseAdapter(event.payload) else {
+    guard let value = Self.parseAdapter(
+      event.payload,
+      fallbackIsPlaying: remoteSnapshot?.isPlaying ?? false
+    ) else {
+      cancelArtworkRefresh()
       remoteInfoState = .empty
       remotePlaybackState = .paused
       remotePID = nil
@@ -1144,6 +1159,7 @@ public final class NowPlayingService: ObservableObject {
 
   private func consumeAdapterSnapshot(_ snapshot: NowPlayingSnapshot) {
     guard isRunning, usesAdapter else { return }
+    audioMonitor.refresh()
     var value = snapshot
 
     if let playbackMode = value.playbackMode {
@@ -1177,7 +1193,10 @@ public final class NowPlayingService: ObservableObject {
         !self.systemAudioIsAudible,
         self.snapshot?.isPlaying == true,
         let payload,
-        let value = Self.parseAdapter(payload)
+        let value = Self.parseAdapter(
+          payload,
+          fallbackIsPlaying: self.remoteSnapshot?.isPlaying ?? false
+        )
       else { return }
       self.consumeAdapterSnapshot(value)
     }
@@ -1186,9 +1205,7 @@ public final class NowPlayingService: ObservableObject {
   private func adapterDidTerminate() {
     guard usesAdapter else { return }
     playbackRefreshGeneration &+= 1
-    artworkRefreshTask?.cancel()
-    artworkRefreshTask = nil
-    artworkRefreshIdentity = nil
+    cancelArtworkRefresh()
     usesAdapter = false
     remotePlaybackState = getPlaying == nil ? .unavailable : .pending
     remoteInfoState = getInfo == nil ? .unavailable : .pending
@@ -1202,16 +1219,15 @@ public final class NowPlayingService: ObservableObject {
       let remoteSnapshot,
       remoteSnapshot.artworkData == nil
     else {
-      artworkRefreshTask?.cancel()
-      artworkRefreshTask = nil
-      artworkRefreshIdentity = nil
+      cancelArtworkRefresh()
       return
     }
 
     let identity = ArtworkRefreshIdentity(remoteSnapshot)
     guard artworkRefreshIdentity != identity else { return }
     let lifecycleGeneration = self.lifecycleGeneration
-    artworkRefreshTask?.cancel()
+    cancelArtworkRefresh()
+    let refreshGeneration = artworkRefreshGeneration
     artworkRefreshIdentity = identity
     artworkRefreshTask = Task { [weak self] in
       for delay in [Duration.milliseconds(250), .milliseconds(700), .seconds(1)] {
@@ -1219,6 +1235,7 @@ public final class NowPlayingService: ObservableObject {
         guard !Task.isCancelled, let self,
           self.isRunning,
           self.lifecycleGeneration == lifecycleGeneration,
+          self.artworkRefreshGeneration == refreshGeneration,
           self.usesAdapter,
           self.artworkRefreshIdentity == identity,
           let current = self.remoteSnapshot,
@@ -1228,36 +1245,48 @@ public final class NowPlayingService: ObservableObject {
         _ = self.adapterClient.fetchNowPlayingInfo { [weak self] payload in
           guard let self,
             self.isRunning,
-            self.lifecycleGeneration == lifecycleGeneration
+            self.lifecycleGeneration == lifecycleGeneration,
+            self.artworkRefreshGeneration == refreshGeneration
           else { return }
           self.consumeArtworkRefresh(
             payload,
             expectedIdentity: identity,
-            expectedLifecycleGeneration: lifecycleGeneration
+            expectedLifecycleGeneration: lifecycleGeneration,
+            expectedRefreshGeneration: refreshGeneration
           )
         }
       }
       guard let self,
         self.isRunning,
         self.lifecycleGeneration == lifecycleGeneration,
+        self.artworkRefreshGeneration == refreshGeneration,
         self.artworkRefreshIdentity == identity
       else { return }
-      self.artworkRefreshTask = nil
+      self.cancelArtworkRefresh()
     }
+  }
+
+  private func cancelArtworkRefresh() {
+    artworkRefreshGeneration &+= 1
+    artworkRefreshTask?.cancel()
+    artworkRefreshTask = nil
+    artworkRefreshIdentity = nil
   }
 
   private func consumeArtworkRefresh(
     _ payload: MediaRemoteAdapterPayload?,
     expectedIdentity: ArtworkRefreshIdentity,
-    expectedLifecycleGeneration: UInt64
+    expectedLifecycleGeneration: UInt64,
+    expectedRefreshGeneration: UInt64
   ) {
     guard isRunning,
       lifecycleGeneration == expectedLifecycleGeneration,
+      artworkRefreshGeneration == expectedRefreshGeneration,
       usesAdapter,
       let payload,
-      let update = Self.parseAdapter(payload),
-      expectedIdentity.matches(update),
       let previous = remoteSnapshot,
+      let update = Self.parseAdapter(payload, fallbackIsPlaying: previous.isPlaying),
+      expectedIdentity.matches(update),
       expectedIdentity.matches(previous)
     else { return }
     remoteSnapshot = Self.mergingMetadata(update, previous: previous)
@@ -1293,7 +1322,11 @@ public final class NowPlayingService: ObservableObject {
 
   private func resolveSnapshot() {
     let sources = audioMonitor.sources
-    let remoteSource = Self.preferredSource(from: sources, remotePID: remotePID)
+    let remoteSource = Self.preferredSource(
+      from: sources,
+      remotePID: remotePID,
+      remoteBundleIdentifier: remoteSnapshot?.sourceBundleIdentifier
+    )
     let preferredSources = sources.filter {
       Self.matchesPreferredSource($0.bundleIdentifier, preference: preferredSource)
     }
@@ -1650,16 +1683,18 @@ public final class NowPlayingService: ObservableObject {
     _ previous: NowPlayingSnapshot
   ) -> Bool {
     if let updateBundleIdentifier = update.sourceBundleIdentifier,
-      let previousBundleIdentifier = previous.sourceBundleIdentifier
+      let previousBundleIdentifier = previous.sourceBundleIdentifier,
+      updateBundleIdentifier != previousBundleIdentifier
     {
-      return updateBundleIdentifier != previousBundleIdentifier
+      return true
     }
-    guard update.sourceBundleIdentifier == nil,
-      previous.sourceBundleIdentifier == nil,
-      let updatePID = update.sourcePID,
-      let previousPID = previous.sourcePID
-    else { return false }
-    return updatePID != previousPID
+    if let updatePID = update.sourcePID,
+      let previousPID = previous.sourcePID,
+      updatePID != previousPID
+    {
+      return true
+    }
+    return false
   }
 
   private func loadSymbol<T>(_ name: String, from handle: UnsafeMutableRawPointer) -> T? {
