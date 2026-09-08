@@ -77,6 +77,20 @@ struct NowPlayingServiceTests {
     }
 
     @Test
+    func mediaRemoteDictionaryWithoutPlaybackRateKeepsTheFallbackState() throws {
+        let dictionary: NSDictionary = [
+            "kMRMediaRemoteNowPlayingInfoTitle": "Track",
+            "kMRMediaRemoteNowPlayingInfoArtist": "Artist",
+        ]
+
+        let snapshot = try #require(
+            NowPlayingService.parse(dictionary, fallbackIsPlaying: true)
+        )
+
+        #expect(snapshot.isPlaying)
+    }
+
+    @Test
     func adapterPayloadParsesSystemNowPlayingMetadata() throws {
         let artwork = Data([0x01, 0x02, 0x03])
         let data = try #require(
@@ -113,6 +127,89 @@ struct NowPlayingServiceTests {
         #expect(snapshot.sourceBundleIdentifier == "com.tencent.QQMusicMac")
         #expect(snapshot.playbackMode == .repeatOne)
         #expect(snapshot.supportsPlaybackModeControl)
+    }
+
+    @Test
+    func adapterPayloadTreatsBlankSourceIdentityAsMissing() throws {
+        let data = try #require(
+            """
+            {
+              "title": "Track",
+              "artist": "Artist",
+              "bundleIdentifier": "   "
+            }
+            """.data(using: .utf8)
+        )
+
+        let payload = try #require(MediaRemoteAdapterClient.decodeNowPlayingInfo(data))
+
+        #expect(payload.bundleIdentifier == "   ")
+        #expect(NowPlayingService.parseAdapter(payload)?.sourceBundleIdentifier == nil)
+    }
+
+    @Test
+    func adapterPayloadWithoutPlaybackFieldsKeepsThePreviousPlaybackState() throws {
+        let payload = MediaRemoteAdapterPayload(
+            title: "Track",
+            artist: "Artist",
+            album: nil,
+            artworkData: nil,
+            duration: 180,
+            elapsedTime: 30,
+            timestamp: nil,
+            playing: nil,
+            playbackRate: nil,
+            processIdentifier: 1339,
+            bundleIdentifier: "com.tencent.QQMusicMac",
+            parentApplicationBundleIdentifier: nil,
+            mediaType: nil,
+            isVideosApp: nil,
+            repeatMode: nil,
+            shuffleMode: nil,
+            isInWishList: nil,
+            isLiked: nil,
+            supportsWishlisting: nil,
+            supportsIsLiked: nil
+        )
+
+        let snapshot = try #require(
+            NowPlayingService.parseAdapter(payload, fallbackIsPlaying: true)
+        )
+
+        #expect(snapshot.isPlaying)
+    }
+
+    @Test
+    func adapterPlaybackRateOverridesFallbackPlaybackState() throws {
+        let payload = MediaRemoteAdapterPayload(
+            title: "Track",
+            artist: "Artist",
+            album: nil,
+            artworkData: nil,
+            duration: 180,
+            elapsedTime: 30,
+            timestamp: nil,
+            playing: nil,
+            playbackRate: 0,
+            processIdentifier: 1339,
+            bundleIdentifier: "com.tencent.QQMusicMac",
+            parentApplicationBundleIdentifier: nil,
+            mediaType: nil,
+            isVideosApp: nil,
+            repeatMode: nil,
+            shuffleMode: nil,
+            isInWishList: nil,
+            isLiked: nil,
+            supportsWishlisting: nil,
+            supportsIsLiked: nil
+        )
+
+        let snapshot = NowPlayingService.parseAdapter(
+            payload,
+            fallbackIsPlaying: true
+        )
+
+        #expect(snapshot?.isPlaying == false)
     }
 
     @Test
@@ -899,6 +996,22 @@ struct NowPlayingServiceTests {
         )
 
         #expect(selected.id == "remote")
+    }
+
+    @Test
+    func remoteBundleIdentifierSelectsTheMatchingSourceWhenPIDIsMissing() throws {
+        let stale = source(id: "stale", pid: 10, isFrontmost: true)
+        let current = source(id: "current", pid: 20, isFrontmost: false)
+
+        let selected = try #require(
+            NowPlayingService.preferredSource(
+                from: [stale, current],
+                remotePID: nil,
+                remoteBundleIdentifier: "test.current"
+            )
+        )
+
+        #expect(selected.id == "current")
     }
 
     @Test
