@@ -9,13 +9,17 @@ import ZislaCore
 /// activity are both required before reporting an active session.
 public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     public static let defaultRecencyThreshold: TimeInterval = 90
-    static let syncTaskLifetime: TimeInterval = 5 * 60
-    static let asyncTaskLifetime: TimeInterval = 3 * 60 * 60
     static let doubaoBundleIdentifier = "com.bot.pc.doubao"
+
+    private enum ActivitySource {
+        case chat
+        case agentMode
+    }
 
     private struct Candidate {
         var url: URL
         var modificationDate: Date
+        var source: ActivitySource
     }
 
     public let dataRoots: [URL]
@@ -86,16 +90,12 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
             return []
         }
 
-        guard candidates.contains(where: { hasRecentIncompleteTask(at: $0.url, now: now) }) else {
-            cachedTask = nil
-            return []
-        }
-
+        let isAgentMode = latest.source == .agentMode
         let task = AIProgressTask(
             id: Self.taskID,
             provider: .doubao,
-            title: "豆包",
-            detail: nil,
+            title: isAgentMode ? "豆包 Agent Mode" : "豆包",
+            detail: isAgentMode ? "最近活动（90 秒内）" : nil,
             progress: nil,
             status: .running,
             updatedAt: latest.modificationDate,
@@ -176,114 +176,94 @@ public final class DoubaoSessionActivityDetector: AIActivityDetecting {
     private func recentFiles() -> [Candidate] {
         var candidates: [Candidate] = []
         for root in dataRoots {
-            guard let enumerator = fileManager.enumerator(
-                at: root,
-                includingPropertiesForKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                ],
-                options: [.skipsHiddenFiles]
-            ) else { continue }
+            candidates.append(contentsOf: chatCandidates(in: root))
+            candidates.append(contentsOf: agentModeCandidates(in: root))
+        }
+
+        return Array(candidates.sorted {
+            if $0.modificationDate != $1.modificationDate {
+                return $0.modificationDate > $1.modificationDate
+            }
+            return $0.url.path < $1.url.path
+        }.prefix(maxFiles))
+    }
+
+    private func chatCandidates(in root: URL) -> [Candidate] {
+        guard let enumerator = fileManager.enumerator(
+            at: root,
+            includingPropertiesForKeys: [
+                .isRegularFileKey,
+                .contentModificationDateKey,
+            ],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var candidates: [Candidate] = []
+        for case let url as URL in enumerator {
+            guard let values = try? url.resourceValues(forKeys: [
+                .isRegularFileKey,
+                .contentModificationDateKey,
+            ]), values.isRegularFile == true,
+                  Self.isChatActivityFile(url) else { continue }
+            candidates.append(Candidate(
+                url: url,
+                modificationDate: values.contentModificationDate ?? .distantPast,
+                source: .chat
+            ))
+        }
+        return candidates
+    }
+
+    private func agentModeCandidates(in root: URL) -> [Candidate] {
+        let sessionsDirectory = root.appendingPathComponent(
+            "Default/.doubao/agent_mode/workspace/.sessions",
+            isDirectory: true
+        )
+        guard let sessionDirectories = try? fileManager.contentsOfDirectory(
+            at: sessionsDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var candidates: [Candidate] = []
+        for sessionDirectory in sessionDirectories {
+            guard let values = try? sessionDirectory.resourceValues(forKeys: [.isDirectoryKey]),
+                  values.isDirectory == true,
+                  let enumerator = fileManager.enumerator(
+                      at: sessionDirectory,
+                      includingPropertiesForKeys: [
+                          .isRegularFileKey,
+                          .contentModificationDateKey,
+                      ],
+                      options: [.skipsHiddenFiles]
+                  ) else { continue }
 
             for case let url as URL in enumerator {
-                guard let values = try? url.resourceValues(forKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                ]), values.isRegularFile == true,
-                      Self.isChatActivityFile(url) else { continue }
+                guard Self.agentModeArtifactNames.contains(url.lastPathComponent),
+                      let values = try? url.resourceValues(forKeys: [
+                          .isRegularFileKey,
+                          .contentModificationDateKey,
+                      ]), values.isRegularFile == true else { continue }
                 candidates.append(Candidate(
                     url: url,
-                    modificationDate: values.contentModificationDate ?? .distantPast
+                    modificationDate: values.contentModificationDate ?? .distantPast,
+                    source: .agentMode
                 ))
-                if candidates.count >= maxFiles { break }
             }
         }
-
-        return candidates.sorted { $0.modificationDate > $1.modificationDate }
+        return candidates
     }
+
+    private static let agentModeArtifactNames = [
+        "trajectory.jsonl",
+        "findings.jsonl",
+        "board.md",
+        "assignment.md",
+    ]
 
     private func signature(for candidates: [Candidate]) -> String {
-        candidates.prefix(8).map { "\($0.url.lastPathComponent):\($0.modificationDate.timeIntervalSince1970)" }
+        candidates.prefix(8).map { "\($0.url.path):\($0.modificationDate.timeIntervalSince1970)" }
             .joined(separator: "|")
-    }
-
-    private func hasRecentIncompleteTask(at url: URL, now: Date) -> Bool {
-        guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]) else { return false }
-        let bytes = [UInt8](data)
-        let taskMarker = Array("mainTaskDataMap".utf8)
-        let createTimeMarker = Array("createTime".utf8)
-        let requestMarker = Array("requestQ".utf8)
-        var taskStart = 0
-
-        while let markerOffset = Self.range(of: taskMarker, in: bytes, searchRange: taskStart..<bytes.count)?.lowerBound {
-            let nextTaskStart = Self.range(
-                of: taskMarker,
-                in: bytes,
-                searchRange: (markerOffset + taskMarker.count)..<bytes.count
-            )?.lowerBound ?? bytes.count
-            let taskEnd = min(nextTaskStart, markerOffset + 2_048)
-            guard let createOffset = Self.range(
-                of: createTimeMarker,
-                in: bytes,
-                searchRange: (markerOffset + taskMarker.count)..<taskEnd
-            )?.lowerBound else {
-                taskStart = markerOffset + taskMarker.count
-                continue
-            }
-            guard bytes.count >= createOffset + createTimeMarker.count + 9,
-                  bytes[createOffset + createTimeMarker.count] == 0x4e,
-                  let createTime = decodeSerializedDate(
-                      from: bytes,
-                      at: createOffset + createTimeMarker.count + 1
-                  ),
-                  Self.range(
-                      of: requestMarker,
-                      in: bytes,
-                      searchRange: (createOffset + createTimeMarker.count + 9)..<taskEnd
-                  ) != nil else {
-                taskStart = markerOffset + taskMarker.count
-                continue
-            }
-
-            let contextStart = max(markerOffset, createOffset - 256)
-            let context = String(decoding: bytes[contextStart..<createOffset], as: UTF8.self)
-            let lifetime = context.contains("async") ? Self.asyncTaskLifetime : Self.syncTaskLifetime
-            if createTime <= now, now.timeIntervalSince(createTime) <= lifetime {
-                return true
-            }
-            taskStart = markerOffset + taskMarker.count
-        }
-
-        return false
-    }
-
-    private static func range(
-        of needle: [UInt8],
-        in haystack: [UInt8],
-        searchRange: Range<Int>
-    ) -> Range<Int>? {
-        guard !needle.isEmpty,
-              searchRange.lowerBound >= 0,
-              searchRange.upperBound <= haystack.count,
-              searchRange.count >= needle.count else { return nil }
-
-        for start in searchRange.lowerBound...(searchRange.upperBound - needle.count) {
-            if haystack[start..<(start + needle.count)].elementsEqual(needle) {
-                return start..<(start + needle.count)
-            }
-        }
-        return nil
-    }
-
-    private func decodeSerializedDate(from bytes: [UInt8], at offset: Int) -> Date? {
-        guard offset >= 0, offset + MemoryLayout<Double>.size <= bytes.count else { return nil }
-        var value: UInt64 = 0
-        for index in 0..<MemoryLayout<Double>.size {
-            value |= UInt64(bytes[offset + index]) << UInt64(index * 8)
-        }
-        let timestamp = Double(bitPattern: value) / 1_000
-        guard timestamp.isFinite else { return nil }
-        return Date(timeIntervalSince1970: timestamp)
     }
 
     private static func isChatActivityFile(_ url: URL) -> Bool {

@@ -39,41 +39,20 @@ struct DoubaoSessionActivityDetectorTests {
     }
 
     @Test
-    func ignoresRecentChatFilesWithoutAnActiveTask() throws {
+    func detectsRecentAgentModeActivityWithoutReadingItsContent() throws {
         let root = makeDoubaoTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        _ = try writeDoubaoChatActivity(in: root, includeTask: false)
+        _ = try writeDoubaoAgentActivity(in: root)
 
-        #expect(try DoubaoSessionActivityDetector(
+        let task = try #require(DoubaoSessionActivityDetector(
             dataRoots: [root],
             recencyThreshold: 3600,
             scanInterval: 0,
             isDoubaoRunning: { true }
-        ).activeTasks().isEmpty)
-    }
-
-    @Test
-    func ignoresExpiredIncompleteTasks() throws {
-        let root = makeDoubaoTempRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let current = Date(timeIntervalSince1970: 1_900_000_000)
-        let activityURL = try writeDoubaoChatActivity(
-            in: root,
-            taskCreatedAt: current.addingTimeInterval(-DoubaoSessionActivityDetector.syncTaskLifetime - 1)
-        )
-        try FileManager.default.setAttributes(
-            [.modificationDate: current.addingTimeInterval(-1)],
-            ofItemAtPath: activityURL.path
-        )
-
-        #expect(try DoubaoSessionActivityDetector(
-            dataRoots: [root],
-            recencyThreshold: 60,
-            scanInterval: 0,
-            isDoubaoRunning: { true },
-            now: { current }
-        ).activeTasks().isEmpty)
+        ).activeTasks().first)
+        #expect(task.title == "豆包 Agent Mode")
+        #expect(task.detail == "最近活动（90 秒内）")
     }
 
     @Test
@@ -123,6 +102,44 @@ struct DoubaoSessionActivityDetectorTests {
     }
 
     @Test
+    func scansTheMostRecentCandidatesAfterSorting() throws {
+        let root = makeDoubaoTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let current = Date(timeIntervalSince1970: 1_900_000_000)
+
+        let staleURL = try writeDoubaoChatActivity(
+            in: root,
+            named: "000001-stale.log",
+            includeTask: false
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: current.addingTimeInterval(-2)],
+            ofItemAtPath: staleURL.path
+        )
+        let activeURL = try writeDoubaoChatActivity(
+            in: root,
+            named: "000002-active.log",
+            taskCreatedAt: current.addingTimeInterval(-1)
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: current.addingTimeInterval(-1)],
+            ofItemAtPath: activeURL.path
+        )
+
+        let tasks = try DoubaoSessionActivityDetector(
+            dataRoots: [root],
+            maxFiles: 1,
+            recencyThreshold: 60,
+            scanInterval: 0,
+            isDoubaoRunning: { true },
+            now: { current }
+        ).activeTasks()
+
+        #expect(tasks.count == 1)
+        #expect(tasks[0].updatedAt == current.addingTimeInterval(-1))
+    }
+
+    @Test
     func usesMostRecentFileTimestamp() throws {
         let root = makeDoubaoTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -143,6 +160,77 @@ struct DoubaoSessionActivityDetectorTests {
         ).activeTasks()
         #expect(tasks.count == 1)
         #expect(tasks[0].updatedAt > Date().addingTimeInterval(-60))
+    }
+
+    @Test
+    func ignoresUnknownAgentModeArtifacts() throws {
+        let root = makeDoubaoTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fileURL = root.appendingPathComponent(
+            "Default/.doubao/agent_mode/workspace/.sessions/test/unknown.jsonl"
+        )
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("ignored".utf8).write(to: fileURL)
+
+        #expect(try DoubaoSessionActivityDetector(
+            dataRoots: [root],
+            recencyThreshold: 3600,
+            scanInterval: 0,
+            isDoubaoRunning: { true }
+        ).activeTasks().isEmpty)
+    }
+
+    @Test
+    func prefersTheMostRecentActivitySource() throws {
+        let root = makeDoubaoTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let current = Date(timeIntervalSince1970: 1_900_000_000)
+        let chatURL = try writeDoubaoChatActivity(in: root)
+        let agentURL = try writeDoubaoAgentActivity(in: root)
+        try FileManager.default.setAttributes(
+            [.modificationDate: current.addingTimeInterval(-2)],
+            ofItemAtPath: chatURL.path
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: current.addingTimeInterval(-1)],
+            ofItemAtPath: agentURL.path
+        )
+
+        let task = try #require(DoubaoSessionActivityDetector(
+            dataRoots: [root],
+            recencyThreshold: 60,
+            scanInterval: 0,
+            isDoubaoRunning: { true },
+            now: { current }
+        ).activeTasks().first)
+        #expect(task.title == "豆包 Agent Mode")
+        #expect(task.updatedAt == current.addingTimeInterval(-1))
+    }
+
+    @Test
+    func expiresRecentAgentModeActivityAtTheRecencyThreshold() throws {
+        let root = makeDoubaoTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var current = Date(timeIntervalSince1970: 1_900_000_000)
+        let activityURL = try writeDoubaoAgentActivity(in: root)
+        try FileManager.default.setAttributes(
+            [.modificationDate: current.addingTimeInterval(-1)],
+            ofItemAtPath: activityURL.path
+        )
+        let detector = DoubaoSessionActivityDetector(
+            dataRoots: [root],
+            recencyThreshold: 60,
+            scanInterval: 120,
+            isDoubaoRunning: { true },
+            now: { current }
+        )
+
+        #expect(try detector.activeTasks().count == 1)
+        current = current.addingTimeInterval(60)
+        #expect(try detector.activeTasks().isEmpty)
     }
 
     @Test
@@ -254,6 +342,20 @@ private func makeDoubaoTempRoot() -> URL {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("Zisla-doubao-\(UUID().uuidString)", isDirectory: true)
     try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    return url
+}
+
+private func writeDoubaoAgentActivity(
+    in root: URL,
+    named: String = "trajectory.jsonl"
+) throws -> URL {
+    let directory = root.appendingPathComponent(
+        "Default/.doubao/agent_mode/workspace/.sessions/test/agents/agent/system",
+        isDirectory: true
+    )
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let url = directory.appendingPathComponent(named)
+    try Data().write(to: url)
     return url
 }
 
