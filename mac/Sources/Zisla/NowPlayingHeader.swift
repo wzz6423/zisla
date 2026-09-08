@@ -256,17 +256,21 @@ struct NowPlayingHeader: View {
 
     private func controls(_ item: NowPlayingSnapshot) -> some View {
         HStack(spacing: 2) {
-            if item.supportsPlaybackModeControl, let playbackMode = item.playbackMode {
+            if item.supportsPlaybackModeControl {
                 if item.playbackModeIsApproximate {
+                    let playbackMode = item.playbackMode
                     IconButton(
-                        symbol: playbackMode.symbol,
-                        help: AppLocalization.text("切换播放模式"),
-                        isActive: playbackMode != .sequential,
+                        symbol: playbackMode?.symbol ?? "arrow.triangle.2.circlepath",
+                        help: playbackMode.map {
+                            AppLocalization.text("切换播放模式：%@", AppLocalization.text($0.title))
+                        } ?? AppLocalization.text("检测并切换播放模式"),
+                        isActive: playbackMode != nil && playbackMode != .sequential,
                         size: .compact
                     ) {
                         _ = media.cyclePlaybackMode()
                     }
-                } else {
+                    .disabled(media.isCyclingPlaybackMode)
+                } else if let playbackMode = item.playbackMode {
                     PlaybackModeMenu(mode: playbackMode) { mode in
                         _ = media.setPlaybackMode(mode)
                     }

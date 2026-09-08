@@ -133,6 +133,16 @@ public final class NowPlayingService: ObservableObject {
       artist = snapshot.artist
       duration = snapshot.duration
       source =
+        snapshot.sourceBundleIdentifier.map { "bundle:\($0)" }
+        ?? snapshot.sourcePID.map { "pid:\($0)" }
+    }
+  }
+
+  private struct PlaybackModeSourceIdentity: Equatable {
+    var source: String?
+
+    init(_ snapshot: NowPlayingSnapshot) {
+      source =
         snapshot.sourcePID.map { "pid:\($0)" }
         ?? snapshot.sourceBundleIdentifier.map { "bundle:\($0)" }
     }
@@ -191,6 +201,7 @@ public final class NowPlayingService: ObservableObject {
 
   @Published public private(set) var snapshot: NowPlayingSnapshot?
   @Published public private(set) var isAvailable = false
+  public var isCyclingPlaybackMode: Bool { specialistPlaybackModeCycleTask != nil }
 
   private typealias InfoCallback = @convention(block) (NSDictionary?) -> Void
   private typealias BoolCallback = @convention(block) (Bool) -> Void
@@ -236,11 +247,15 @@ public final class NowPlayingService: ObservableObject {
   private var playbackModeOverride: TimedControlOverride<NowPlayingPlaybackMode>?
   private var playbackStateOverride: TimedControlOverride<Bool>?
   private var favoriteOverride: TimedControlOverride<Bool>?
+  private var specialistPlaybackModeIdentity: PlaybackModeSourceIdentity?
+  private var specialistPlaybackModeState: NowPlayingPlaybackMode?
   private var specialistFavoriteIdentity: ControlIdentity?
   private var specialistFavoriteState: Bool?
   private var playbackModeOverrideExpirationTask: Task<Void, Never>?
   private var playbackStateOverrideExpirationTask: Task<Void, Never>?
   private var favoriteOverrideExpirationTask: Task<Void, Never>?
+  private var specialistPlaybackModeRefreshTask: Task<Void, Never>?
+  private var specialistPlaybackModeCycleTask: Task<Void, Never>?
   private var specialistFavoriteRefreshTask: Task<Void, Never>?
   private var usesAdapter = false
   private var isRunning = false
@@ -251,6 +266,7 @@ public final class NowPlayingService: ObservableObject {
   private var systemAudioIsAudible = false
   private var playbackRefreshGeneration: UInt64 = 0
   private var adapterPlaybackMode: NowPlayingPlaybackMode?
+  private var adapterPlaybackModeIdentity: ControlIdentity?
   private var playbackModeCommandGeneration: UInt64 = 0
   private var preferredSource: MediaSourcePreference = .automatic
 
@@ -264,6 +280,8 @@ public final class NowPlayingService: ObservableObject {
     playbackModeOverride = nil
     playbackStateOverride = nil
     favoriteOverride = nil
+    specialistPlaybackModeIdentity = nil
+    specialistPlaybackModeState = nil
     specialistFavoriteIdentity = nil
     specialistFavoriteState = nil
     playbackModeOverrideExpirationTask?.cancel()
@@ -272,8 +290,14 @@ public final class NowPlayingService: ObservableObject {
     playbackStateOverrideExpirationTask = nil
     favoriteOverrideExpirationTask?.cancel()
     favoriteOverrideExpirationTask = nil
+    specialistPlaybackModeRefreshTask?.cancel()
+    specialistPlaybackModeRefreshTask = nil
+    specialistPlaybackModeCycleTask?.cancel()
+    specialistPlaybackModeCycleTask = nil
     specialistFavoriteRefreshTask?.cancel()
     specialistFavoriteRefreshTask = nil
+    adapterPlaybackMode = nil
+    adapterPlaybackModeIdentity = nil
     activeProfile = nil
     resolveSnapshot()
   }
@@ -449,6 +473,8 @@ public final class NowPlayingService: ObservableObject {
     playbackModeOverride = nil
     playbackStateOverride = nil
     favoriteOverride = nil
+    specialistPlaybackModeIdentity = nil
+    specialistPlaybackModeState = nil
     specialistFavoriteIdentity = nil
     specialistFavoriteState = nil
     playbackModeOverrideExpirationTask?.cancel()
@@ -457,9 +483,14 @@ public final class NowPlayingService: ObservableObject {
     playbackStateOverrideExpirationTask = nil
     favoriteOverrideExpirationTask?.cancel()
     favoriteOverrideExpirationTask = nil
+    specialistPlaybackModeRefreshTask?.cancel()
+    specialistPlaybackModeRefreshTask = nil
+    specialistPlaybackModeCycleTask?.cancel()
+    specialistPlaybackModeCycleTask = nil
     specialistFavoriteRefreshTask?.cancel()
     specialistFavoriteRefreshTask = nil
     adapterPlaybackMode = nil
+    adapterPlaybackModeIdentity = nil
     playbackModeCommandGeneration &+= 1
     activeProfile = nil
     snapshot = nil
@@ -549,11 +580,13 @@ public final class NowPlayingService: ObservableObject {
           !succeeded
         else { return }
         self.adapterPlaybackMode = nil
+        self.adapterPlaybackModeIdentity = nil
         self.playbackModeOverride = nil
         self.resolveSnapshot()
       }
       guard enqueued else { return false }
       adapterPlaybackMode = mode
+      adapterPlaybackModeIdentity = ControlIdentity(current)
     } else if let setRepeatModeFunction, let setShuffleModeFunction {
       setRepeatModeFunction(mode.mediaRemoteRepeatMode)
       setShuffleModeFunction(mode.mediaRemoteShuffleMode)
@@ -578,27 +611,51 @@ public final class NowPlayingService: ObservableObject {
   @discardableResult
   public func cyclePlaybackMode() -> Bool {
     guard let current = snapshot, current.supportsControls else { return false }
-    let fallbackMode = activeProfile?.defaultPlaybackMode ?? .sequential
-    let nextMode = Self.nextPlaybackMode(after: current.playbackMode ?? fallbackMode)
     if let profile = activeProfile,
       profile.prefersAccessibilityControls,
-      profile.supportsPlaybackModeCycle,
-      specialist.cyclePlaybackMode(
-        pid: current.sourcePID,
-        bundleIdentifier: current.sourceBundleIdentifier,
-        currentMode: current.playbackMode ?? fallbackMode
-      )
+      profile.supportsPlaybackModeCycle
     {
-      playbackModeOverride = TimedControlOverride(
-        identity: ControlIdentity(current),
-        value: nextMode,
-        expiresAt: .now.addingTimeInterval(controlOverrideLifetime)
-      )
-      schedulePlaybackModeOverrideExpiration()
-      resolveSnapshot()
+      guard specialistPlaybackModeCycleTask == nil,
+        specialist.prepareQQMusicPlaybackModeCycle(
+          pid: current.sourcePID,
+          bundleIdentifier: current.sourceBundleIdentifier
+        )
+      else { return false }
+
+      let identity = PlaybackModeSourceIdentity(current)
+      let pid = current.sourcePID
+      let bundleIdentifier = current.sourceBundleIdentifier
+      let currentMode = specialistPlaybackModeState
+      specialistPlaybackModeCycleTask = Task { @MainActor [weak self] in
+        let result = await Task.detached(priority: .userInitiated) {
+          MediaAppSpecialist.qqMusicPlaybackModeCycle(
+            pid: pid,
+            bundleIdentifier: bundleIdentifier,
+            currentMode: currentMode
+          )
+        }.value
+        guard let self else { return }
+        self.specialistPlaybackModeCycleTask = nil
+        guard self.isRunning,
+          self.specialistPlaybackModeIdentity == identity,
+          PlaybackModeSourceIdentity(self.snapshot ?? current) == identity
+        else { return }
+        guard let result else {
+          self.scheduleSpecialistPlaybackModeRefresh(for: current)
+          self.resolveSnapshot()
+          return
+        }
+        self.specialistPlaybackModeState = result.observedMode
+        self.scheduleSpecialistPlaybackModeRefresh(
+          for: current,
+          expectedMode: result.targetMode
+        )
+        self.resolveSnapshot()
+      }
       return true
     }
-    return setPlaybackMode(nextMode)
+    guard let mode = current.playbackMode else { return false }
+    return setPlaybackMode(Self.nextPlaybackMode(after: mode))
   }
 
   @discardableResult
@@ -641,7 +698,10 @@ public final class NowPlayingService: ObservableObject {
     if activeProfile?.supportsFavoriteStateRead == true {
       specialistFavoriteIdentity = ControlIdentity(current)
       specialistFavoriteState = current.isFavorite != true
-      scheduleSpecialistFavoriteRefresh(for: current)
+      scheduleSpecialistFavoriteRefresh(
+        for: current,
+        expectedState: current.isFavorite != true
+      )
     }
     scheduleFavoriteOverrideExpiration()
     resolveSnapshot()
@@ -722,10 +782,10 @@ public final class NowPlayingService: ObservableObject {
     )
     let supportsLike = boolean(dictionary["kMRMediaRemoteNowPlayingInfoSupportsIsLiked"])
     let favoriteControl: NowPlayingFavoriteControl? =
-      if isInWishList != nil {
-        .wishList
-      } else if isLiked != nil {
+      if isLiked != nil {
         .like
+      } else if isInWishList != nil {
+        .wishList
       } else if supportsWishList == true {
         .wishList
       } else if supportsLike == true {
@@ -779,12 +839,12 @@ public final class NowPlayingService: ObservableObject {
     let artist = text(payload.artist) ?? (isVideo ? nil : album)
     guard title != nil || artist != nil else { return nil }
     let favoriteControl: NowPlayingFavoriteControl? =
-      if payload.isInWishList != nil
+      if payload.isLiked != nil || payload.supportsIsLiked == true {
+        .like
+      } else if payload.isInWishList != nil
         || payload.supportsWishlisting == true
       {
         .wishList
-      } else if payload.isLiked != nil || payload.supportsIsLiked == true {
-        .like
       } else {
         nil
       }
@@ -871,6 +931,14 @@ public final class NowPlayingService: ObservableObject {
     return nil
   }
 
+  nonisolated static func resolvedAdapterPlaybackMode(
+    incoming: NowPlayingPlaybackMode?,
+    cached: NowPlayingPlaybackMode?,
+    cachedIdentityMatches: Bool
+  ) -> NowPlayingPlaybackMode? {
+    incoming ?? (cachedIdentityMatches ? cached : nil)
+  }
+
   nonisolated static func favoriteCommand(
     isFavorite: Bool,
     control: NowPlayingFavoriteControl
@@ -881,6 +949,14 @@ public final class NowPlayingService: ObservableObject {
     case .wishList:
       return isFavorite ? .removeTrackFromWishList : .addTrackToWishList
     }
+  }
+
+  nonisolated static func favoriteStateConfirmsOverride(
+    observed: Bool?,
+    expected: Bool?
+  ) -> Bool {
+    guard let expected else { return true }
+    return observed == expected
   }
 
   nonisolated static func optimisticPlaybackValue(
@@ -1162,10 +1238,20 @@ public final class NowPlayingService: ObservableObject {
     audioMonitor.refresh()
     var value = snapshot
 
+    let identity = ControlIdentity(value)
+    let resolvedPlaybackMode = Self.resolvedAdapterPlaybackMode(
+      incoming: value.playbackMode,
+      cached: adapterPlaybackMode,
+      cachedIdentityMatches: adapterPlaybackModeIdentity == identity
+    )
     if let playbackMode = value.playbackMode {
       adapterPlaybackMode = playbackMode
+      adapterPlaybackModeIdentity = identity
+    } else if let resolvedPlaybackMode {
+      value.playbackMode = resolvedPlaybackMode
     } else {
-      value.playbackMode = adapterPlaybackMode
+      adapterPlaybackMode = nil
+      adapterPlaybackModeIdentity = nil
     }
     remoteInfoState = .available
     remotePlaybackState = value.isPlaying ? .playing : .paused
@@ -1373,6 +1459,7 @@ public final class NowPlayingService: ObservableObject {
         snapshot = resolvedAudioFallbackSnapshot(from: preferredSources)
         return
       }
+      applySpecialization(to: &remote)
       applyControlOverrides(to: &remote)
       if !remote.isPlaying,
         systemAudioIsAudible,
@@ -1395,7 +1482,6 @@ public final class NowPlayingService: ObservableObject {
         stored.isVideo = remote.isVideo
         remoteSnapshot = stored
       }
-      applySpecialization(to: &remote)
       applyLyrics(to: &remote)
       snapshot = remote
       return
@@ -1522,14 +1608,15 @@ public final class NowPlayingService: ObservableObject {
     } else {
       if profile.supportsFavoriteStateRead {
         let identity = ControlIdentity(snapshot)
-        if specialistFavoriteIdentity != identity {
+        let hasActiveFavoriteOverride = favoriteOverride.map {
+          $0.identity == identity && $0.expiresAt > .now
+        } == true
+        if !hasActiveFavoriteOverride, specialistFavoriteIdentity != identity {
           specialistFavoriteIdentity = identity
-          specialistFavoriteState = specialist.favoriteState(
-            pid: snapshot.sourcePID,
-            bundleIdentifier: snapshot.sourceBundleIdentifier
-          )
+          specialistFavoriteState = nil
+          scheduleSpecialistFavoriteRefresh(for: snapshot)
         }
-        if let specialistFavoriteState {
+        if !hasActiveFavoriteOverride, let specialistFavoriteState {
           snapshot.favoriteControl = profile.favoriteControl
           snapshot.isFavorite = specialistFavoriteState
         } else {
@@ -1544,27 +1631,119 @@ public final class NowPlayingService: ObservableObject {
       snapshot.supportsPlaybackModeControl = true
     }
     if profile.supportsPlaybackModeCycle {
-      snapshot.playbackMode = snapshot.playbackMode ?? profile.defaultPlaybackMode
+      let identity = PlaybackModeSourceIdentity(snapshot)
+      if specialistPlaybackModeIdentity != identity {
+        specialistPlaybackModeIdentity = identity
+        specialistPlaybackModeState = nil
+        scheduleSpecialistPlaybackModeRefresh(for: snapshot)
+      }
+      if let specialistPlaybackModeState {
+        snapshot.playbackMode = specialistPlaybackModeState
+      }
       snapshot.supportsPlaybackModeControl = true
       snapshot.playbackModeIsApproximate = true
     }
   }
 
-  private func scheduleSpecialistFavoriteRefresh(for snapshot: NowPlayingSnapshot) {
+  private func scheduleSpecialistPlaybackModeRefresh(
+    for snapshot: NowPlayingSnapshot,
+    expectedMode: NowPlayingPlaybackMode? = nil
+  ) {
+    specialistPlaybackModeRefreshTask?.cancel()
+    let identity = PlaybackModeSourceIdentity(snapshot)
+    let pid = snapshot.sourcePID
+    let bundleIdentifier = snapshot.sourceBundleIdentifier
+    specialistPlaybackModeRefreshTask = Task { @MainActor [weak self] in
+      for delay in [
+        Duration.milliseconds(150),
+        .milliseconds(350),
+        .milliseconds(700),
+      ] {
+        try? await Task.sleep(for: delay)
+        guard !Task.isCancelled else { return }
+        let observed = await Task.detached(priority: .userInitiated) {
+          MediaAppSpecialist.qqMusicPlaybackMode(
+            pid: pid,
+            bundleIdentifier: bundleIdentifier
+          )
+        }.value
+        guard !Task.isCancelled,
+          let self,
+          self.isRunning,
+          self.specialistPlaybackModeIdentity == identity,
+          PlaybackModeSourceIdentity(self.snapshot ?? snapshot) == identity,
+          self.activeProfile?.supportsPlaybackModeCycle == true
+        else { return }
+        guard let observed else { continue }
+        if let expectedMode, observed != expectedMode {
+          self.specialistPlaybackModeState = observed
+          self.resolveSnapshot()
+          continue
+        }
+        self.specialistPlaybackModeState = observed
+        self.resolveSnapshot()
+        return
+      }
+      if !Task.isCancelled {
+        self?.resolveSnapshot()
+      }
+    }
+  }
+
+  private func scheduleSpecialistFavoriteRefresh(
+    for snapshot: NowPlayingSnapshot,
+    expectedState: Bool? = nil
+  ) {
     specialistFavoriteRefreshTask?.cancel()
     let identity = ControlIdentity(snapshot)
+    let pid = snapshot.sourcePID
+    let bundleIdentifier = snapshot.sourceBundleIdentifier
     specialistFavoriteRefreshTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .milliseconds(350))
-      guard !Task.isCancelled,
-        let self,
-        ControlIdentity(self.snapshot ?? snapshot) == identity,
-        self.activeProfile?.supportsFavoriteStateRead == true
-      else { return }
-      self.specialistFavoriteState = self.specialist.favoriteState(
-        pid: self.snapshot?.sourcePID,
-        bundleIdentifier: self.snapshot?.sourceBundleIdentifier
-      )
-      self.resolveSnapshot()
+      for delay in [
+        Duration.milliseconds(120),
+        .milliseconds(350),
+        .milliseconds(700),
+        .milliseconds(1_200),
+      ] {
+        try? await Task.sleep(for: delay)
+        guard !Task.isCancelled else { return }
+        let observed = await Task.detached(priority: .userInitiated) {
+          MediaAppSpecialist.qqMusicFavoriteState(
+            pid: pid,
+            bundleIdentifier: bundleIdentifier
+          )
+        }.value
+        guard !Task.isCancelled,
+          let self,
+          self.isRunning,
+          ControlIdentity(self.snapshot ?? snapshot) == identity,
+          self.activeProfile?.supportsFavoriteStateRead == true
+        else { return }
+        guard let observed else { continue }
+
+        if let expectedState {
+          guard self.favoriteOverride.map({
+            $0.identity == identity && $0.expiresAt > .now && $0.value == expectedState
+          }) == true else { return }
+          guard Self.favoriteStateConfirmsOverride(observed: observed, expected: expectedState) else {
+            continue
+          }
+
+          self.specialistFavoriteState = observed
+          self.favoriteOverride = nil
+          self.favoriteOverrideExpirationTask?.cancel()
+          self.favoriteOverrideExpirationTask = nil
+          self.resolveSnapshot()
+          return
+        }
+
+        self.specialistFavoriteState = observed
+        self.resolveSnapshot()
+        return
+      }
+      if expectedState != nil {
+        self?.resolveSnapshot()
+      }
     }
   }
 

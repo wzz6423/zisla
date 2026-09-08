@@ -449,6 +449,70 @@ struct NowPlayingServiceTests {
     }
 
     @Test
+    func adapterPlaybackModeCacheOnlySurvivesForTheSameTrack() {
+        #expect(
+            NowPlayingService.resolvedAdapterPlaybackMode(
+                incoming: .random,
+                cached: .sequential,
+                cachedIdentityMatches: true
+            ) == .random
+        )
+        #expect(
+            NowPlayingService.resolvedAdapterPlaybackMode(
+                incoming: nil,
+                cached: .repeatOne,
+                cachedIdentityMatches: true
+            ) == .repeatOne
+        )
+        #expect(
+            NowPlayingService.resolvedAdapterPlaybackMode(
+                incoming: nil,
+                cached: .repeatOne,
+                cachedIdentityMatches: false
+            ) == nil
+        )
+    }
+
+    @Test
+    func approximatePlaybackModeCycleKeepsTheExpectedOrder() {
+        let first = NowPlayingService.nextPlaybackMode(after: .sequential)
+        let second = NowPlayingService.nextPlaybackMode(after: first)
+        let third = NowPlayingService.nextPlaybackMode(after: second)
+
+        #expect(first == .repeatOne)
+        #expect(second == .random)
+        #expect(third == .sequential)
+    }
+
+    @Test
+    func qqMusicCycleNeedsAnObservedOrCachedModeBeforeChoosingATarget() {
+        #expect(
+            MediaAppSpecialist.cycleTargetMode(observedMode: .repeatOne, fallback: .sequential)
+                == .random
+        )
+        #expect(
+            MediaAppSpecialist.cycleTargetMode(observedMode: nil, fallback: .random)
+                == .sequential
+        )
+        #expect(
+            MediaAppSpecialist.cycleTargetMode(observedMode: nil, fallback: nil) == nil
+        )
+    }
+
+    @Test
+    func qqMusicModeControlFallsBackToCoordinatesWithoutAnAccessibilityPressAction() throws {
+        let resolution = try #require(
+            MediaAppSpecialist.playbackModeControlResolution(
+                for: ["播放模式（单曲循环）", "单曲循环"],
+                hasPressableTarget: false
+            )
+        )
+
+        #expect(resolution.mode == .repeatOne)
+        #expect(resolution.usesCoordinateClick)
+    }
+
+    @Test
     func cachedPlaybackModeDoesNotInventControlCapability() {
         var snapshot = NowPlayingSnapshot(
             title: "Track",
@@ -531,6 +595,22 @@ struct NowPlayingServiceTests {
         )
         #expect(
             NowPlayingService.favoriteCommand(isFavorite: true, control: .like) == .likeTrack
+        )
+    }
+
+    @Test
+    func staleFavoriteStateDoesNotConfirmAnOptimisticOverride() {
+        #expect(
+            !NowPlayingService.favoriteStateConfirmsOverride(observed: true, expected: false)
+        )
+        #expect(
+            NowPlayingService.favoriteStateConfirmsOverride(observed: false, expected: false)
+        )
+        #expect(
+            !NowPlayingService.favoriteStateConfirmsOverride(observed: nil, expected: false)
+        )
+        #expect(
+            NowPlayingService.favoriteStateConfirmsOverride(observed: true, expected: nil)
         )
     }
 
@@ -631,6 +711,8 @@ struct NowPlayingServiceTests {
 
         #expect(MediaAppSpecialist.matchesFavoriteLabels(["从我喜欢删除"]))
         #expect(MediaAppSpecialist.matchesFavoriteLabels(["添加到我喜欢"]))
+        #expect(MediaAppSpecialist.favoriteState(for: ["喜欢歌曲", "从我喜欢删除"]) == true)
+        #expect(MediaAppSpecialist.favoriteState(for: ["喜欢歌曲", "添加到我喜欢"]) == false)
         #expect(!MediaAppSpecialist.matchesFavoriteLabels(["播放模式（顺序播放）"]))
         #expect(!MediaAppSpecialist.matchesFavoriteLabels(["播放", "暂停"]))
     }
@@ -693,8 +775,15 @@ struct NowPlayingServiceTests {
             "kMRMediaRemoteNowPlayingInfoIsLiked": NSNumber(value: true),
         ]
         let wishList = try #require(NowPlayingService.parse(wishListDictionary))
-        #expect(wishList.favoriteControl == .wishList)
-        #expect(wishList.isFavorite == false)
+        #expect(wishList.favoriteControl == .like)
+        #expect(wishList.isFavorite == true)
+
+        #expect(
+            MediaAppSpecialist.playbackMode(for: ["播放模式（单曲循环）"]) == .repeatOne
+        )
+        #expect(MediaAppSpecialist.playbackMode(for: ["播放模式（随机播放）"]) == .random)
+        #expect(MediaAppSpecialist.playbackMode(for: ["播放模式（顺序播放）"]) == .sequential)
+        #expect(MediaAppSpecialist.playbackMode(for: ["播放模式"]) == nil)
     }
 
     @Test

@@ -18,6 +18,16 @@ struct MediaAppProfile: Sendable {
     let favoriteControl: NowPlayingFavoriteControl
 }
 
+struct PlaybackModeCycleResult: Sendable, Equatable {
+    let observedMode: NowPlayingPlaybackMode?
+    let targetMode: NowPlayingPlaybackMode
+}
+
+struct PlaybackModeControlResolution: Sendable, Equatable {
+    let mode: NowPlayingPlaybackMode
+    let usesCoordinateClick: Bool
+}
+
 /// Executes control commands targeting a specific player app.
 @MainActor
 final class MediaAppSpecialist {
@@ -77,10 +87,9 @@ final class MediaAppSpecialist {
               let pid,
               hasQQMusicAccessibilityAccess()
         else { return false }
-        if Self.performQQMusicMenuCommand(
-            pid: pid,
-            matching: Self.qqMusicFavoriteMenuLabels
-        ) {
+        if let item = Self.qqMusicFavoriteMenuItem(pid: pid),
+           Self.performPress(on: item, pid: pid)
+        {
             return true
         }
         if let button = Self.qqMusicControlRoots(pid: pid).lazy.compactMap({
@@ -97,11 +106,18 @@ final class MediaAppSpecialist {
         if bundleIdentifier == Self.appleMusicBundleIdentifier {
             return Self.appleMusicFavoriteState()
         }
+        return Self.qqMusicFavoriteState(pid: pid, bundleIdentifier: bundleIdentifier)
+    }
+
+    nonisolated static func qqMusicFavoriteState(
+        pid: pid_t?,
+        bundleIdentifier: String?
+    ) -> Bool? {
         guard bundleIdentifier == Self.qqMusicBundleIdentifier,
               let pid,
               AXIsProcessTrusted()
         else { return nil }
-        if let item = Self.qqMusicMenuItem(pid: pid, matching: Self.qqMusicFavoriteMenuLabels),
+        if let item = Self.qqMusicFavoriteMenuItem(pid: pid),
            let state = Self.favoriteState(for: Self.accessibilityLabels(of: item))
         {
             return state
@@ -111,6 +127,21 @@ final class MediaAppSpecialist {
                 for: Self.accessibilityLabels(of: Self.findFavoriteButton(in: $0, depth: 0))
             )
         }.first
+    }
+
+    func playbackMode(pid: pid_t?, bundleIdentifier: String?) -> NowPlayingPlaybackMode? {
+        Self.qqMusicPlaybackMode(pid: pid, bundleIdentifier: bundleIdentifier)
+    }
+
+    nonisolated static func qqMusicPlaybackMode(
+        pid: pid_t?,
+        bundleIdentifier: String?
+    ) -> NowPlayingPlaybackMode? {
+        guard bundleIdentifier == Self.qqMusicBundleIdentifier,
+              let pid,
+              AXIsProcessTrusted()
+        else { return nil }
+        return Self.qqMusicPlaybackModeControl(pid: pid)?.mode
     }
 
     /// Apple Music and Spotify use their public scripting dictionaries; QQ Music prioritises pressable menu items.
@@ -146,30 +177,68 @@ final class MediaAppSpecialist {
         return Self.runAppleScript(Self.appleMusicModeScript(for: mode)) ? true : nil
     }
 
-    /// QQ Music selects the next playback mode directly from its Accessibility menu.
-    func cyclePlaybackMode(
+    func prepareQQMusicPlaybackModeCycle(
+        pid: pid_t?,
+        bundleIdentifier: String?
+    ) -> Bool {
+        guard bundleIdentifier == Self.qqMusicBundleIdentifier, pid != nil else { return false }
+        return hasQQMusicAccessibilityAccess()
+    }
+
+    nonisolated static func qqMusicPlaybackModeCycle(
         pid: pid_t?,
         bundleIdentifier: String?,
-        currentMode: NowPlayingPlaybackMode
-    ) -> Bool {
+        currentMode: NowPlayingPlaybackMode?
+    ) -> PlaybackModeCycleResult? {
         guard bundleIdentifier == Self.qqMusicBundleIdentifier,
               let pid,
-              hasQQMusicAccessibilityAccess()
-        else { return false }
-        if Self.performQQMusicMenuCommand(
-            pid: pid,
-            matching: Self.qqMusicPlaybackModeMenuLabels(after: currentMode)
-        ) {
-            return true
+              AXIsProcessTrusted()
+        else { return nil }
+
+        guard let match = qqMusicPlaybackModeControl(pid: pid) else { return nil }
+        let sourceMode = match.mode
+        guard let targetMode = cycleTargetMode(observedMode: sourceMode, fallback: currentMode) else {
+            return nil
         }
-        return Self.qqMusicControlRoots(pid: pid).contains {
-            Self.searchAndClickPlayMode(in: $0, depth: 0, pid: pid)
+
+        guard selectQQMusicPlaybackMode(
+            after: sourceMode,
+            using: match.element,
+            pid: pid,
+            usesCoordinateClick: match.usesCoordinateClick
+        ) else { return nil }
+        return PlaybackModeCycleResult(observedMode: sourceMode, targetMode: targetMode)
+    }
+
+    nonisolated static func cycleTargetMode(
+        observedMode: NowPlayingPlaybackMode?,
+        fallback: NowPlayingPlaybackMode?
+    ) -> NowPlayingPlaybackMode? {
+        guard let sourceMode = observedMode ?? fallback else { return nil }
+        switch sourceMode {
+        case .sequential:
+            return .repeatOne
+        case .repeatOne:
+            return .random
+        case .random:
+            return .sequential
         }
     }
 
+    nonisolated static func playbackModeControlResolution(
+        for labels: [String],
+        hasPressableTarget: Bool
+    ) -> PlaybackModeControlResolution? {
+        guard let mode = playbackMode(for: labels) else { return nil }
+        return PlaybackModeControlResolution(
+            mode: mode,
+            usesCoordinateClick: !hasPressableTarget
+        )
+    }
+
     // MARK: - CGEvent
-    private static let appleMusicBundleIdentifier = "com.apple.Music"
-    private static let qqMusicBundleIdentifier = "com.tencent.QQMusicMac"
+    nonisolated private static let appleMusicBundleIdentifier = "com.apple.Music"
+    nonisolated private static let qqMusicBundleIdentifier = "com.tencent.QQMusicMac"
 
     private func hasQQMusicAccessibilityAccess() -> Bool {
         let trusted = AXIsProcessTrusted()
@@ -200,17 +269,20 @@ final class MediaAppSpecialist {
         !isTrusted && !hasRequestedInCurrentLaunch
     }
 
-    private static let favoriteEnabledLabels = [
+    nonisolated private static let favoriteEnabledLabels = [
         "从我喜欢删除", "取消喜欢", "取消收藏", "移除收藏",
     ]
-    private static let favoriteDisabledLabels = [
-        "添加到我喜欢", "添加到喜欢", "添加收藏", "收藏", "喜欢歌曲",
+    nonisolated private static let favoriteDisabledLabels = [
+        "添加到我喜欢", "添加到喜欢", "添加收藏",
+    ]
+    nonisolated private static let favoriteGenericDisabledLabels = [
+        "收藏", "喜欢歌曲", "喜欢",
     ]
     static let qqMusicFavoriteMenuLabels = [
         "喜欢歌曲", "取消喜欢", "添加到我喜欢", "从我喜欢删除", "喜欢",
     ]
 
-    static func favoriteState(for labels: [String]) -> Bool? {
+    nonisolated static func favoriteState(for labels: [String]) -> Bool? {
         let normalized = labels.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         if normalized.contains(where: {
             favoriteEnabledLabels.contains($0)
@@ -224,11 +296,33 @@ final class MediaAppSpecialist {
         }) {
             return false
         }
+        if normalized.contains(where: { favoriteGenericDisabledLabels.contains($0) }) {
+            return false
+        }
         return nil
     }
 
+    nonisolated static func playbackMode(for labels: [String]) -> NowPlayingPlaybackMode? {
+        labels
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .compactMap { label -> (NowPlayingPlaybackMode, Int)? in
+                if label.contains("单曲循环") || label.contains("single repeat") || label.contains("repeat one") {
+                    return (.repeatOne, label.contains("播放模式") ? 3 : 2)
+                }
+                if label.contains("随机") || label.contains("shuffle") || label.contains("random") {
+                    return (.random, label.contains("播放模式") ? 3 : 2)
+                }
+                if label.contains("顺序") || label.contains("列表循环") || label.contains("sequential") || label.contains("order") {
+                    return (.sequential, label.contains("播放模式") ? 3 : 2)
+                }
+                return nil
+            }
+            .max(by: { $0.1 < $1.1 })?
+            .0
+    }
+
     /// Pure coordinate logic: returns the center point of a valid frame; shared by unit tests and click handling.
-    static func clickPoint(position: CGPoint, size: CGSize) -> CGPoint? {
+    nonisolated static func clickPoint(position: CGPoint, size: CGSize) -> CGPoint? {
         guard size.width > 0, size.height > 0,
               position.x.isFinite, position.y.isFinite,
               size.width.isFinite, size.height.isFinite
@@ -241,7 +335,7 @@ final class MediaAppSpecialist {
     }
 
     /// Pure label matching: determines whether accessibility labels point to the playback mode control.
-    static func matchesPlayModeLabels(_ labels: [String]) -> Bool {
+    nonisolated static func matchesPlayModeLabels(_ labels: [String]) -> Bool {
         labels.contains { label in
             let text = label.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return false }
@@ -375,7 +469,7 @@ final class MediaAppSpecialist {
         }
     }
 
-    static func qqMusicPlaybackModeMenuLabels(after mode: NowPlayingPlaybackMode) -> [String] {
+    nonisolated static func qqMusicPlaybackModeMenuLabels(after mode: NowPlayingPlaybackMode) -> [String] {
         switch mode {
         case .sequential:
             ["单曲循环"]
@@ -386,7 +480,7 @@ final class MediaAppSpecialist {
         }
     }
 
-    private static func postLeftClick(at point: CGPoint, pid: pid_t) -> Bool {
+    nonisolated private static func postLeftClick(at point: CGPoint, pid: pid_t) -> Bool {
         let source = CGEventSource(stateID: .privateState)
         guard
             let down = CGEvent(
@@ -409,26 +503,81 @@ final class MediaAppSpecialist {
 
     // MARK: - Accessibility
 
-    private static let playModeKeywords = [
+    nonisolated private static let playModeKeywords = [
         "循环", "随机", "顺序", "播放模式", "repeat", "shuffle",
     ]
-    private static let maximumAccessibilityDepth = 20
+    nonisolated private static let maximumAccessibilityDepth = 20
+    nonisolated private static let accessibilityTimeout: Float = 0.15
 
-    private static func findFavoriteButton(in element: AXUIElement, depth: Int) -> AXUIElement? {
-        guard depth < maximumAccessibilityDepth else { return nil }
-        if favoriteState(for: accessibilityLabels(of: element)) != nil {
-            return pressableAncestor(of: element) ?? element
-        }
-
-        for child in children(of: element) {
-            if let match = findFavoriteButton(in: child, depth: depth + 1) {
-                return match
-            }
-        }
-        return nil
+    nonisolated private static func findFavoriteButton(in element: AXUIElement, depth: Int) -> AXUIElement? {
+        findFavoriteButtonMatch(in: element, depth: depth)?.element
     }
 
-    private static func findButton(
+    nonisolated private static func findFavoriteButtonMatch(
+        in element: AXUIElement,
+        depth: Int
+    ) -> (element: AXUIElement, rank: Int)? {
+        guard depth < maximumAccessibilityDepth else { return nil }
+        let labels = accessibilityLabels(of: element)
+        let currentRank = favoriteLabelRank(labels)
+        var best = currentRank > 0 ? (pressableAncestor(of: element) ?? element, currentRank) : nil
+        for child in children(of: element) {
+            if let match = findFavoriteButtonMatch(in: child, depth: depth + 1) {
+                if best == nil || match.rank > best!.1 {
+                    best = match
+                }
+            }
+        }
+        return best
+    }
+
+    nonisolated private static func findPlaybackMode(
+        in element: AXUIElement,
+        depth: Int,
+        maximumDepth: Int = maximumAccessibilityDepth
+    ) -> (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int, usesCoordinateClick: Bool)? {
+        guard depth < maximumDepth else { return nil }
+        let labels = accessibilityLabels(of: element)
+        var best: (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int, usesCoordinateClick: Bool)?
+        if playbackMode(for: labels) != nil {
+            let pressableTarget = pressableAncestor(of: element)
+            if let resolution = playbackModeControlResolution(
+                for: labels,
+                hasPressableTarget: pressableTarget != nil
+            ) {
+                best = (
+                    pressableTarget ?? element,
+                    resolution.mode,
+                    playbackModeLabelRank(labels),
+                    resolution.usesCoordinateClick
+                )
+                if best?.rank == 3 { return best }
+            }
+        }
+        for child in children(of: element) {
+            if let candidate = findPlaybackMode(
+                in: child,
+                depth: depth + 1,
+                maximumDepth: maximumDepth
+            ) {
+                if best == nil || candidate.rank > best!.rank {
+                    best = candidate
+                }
+                if best?.rank == 3 { break }
+            }
+        }
+        return best
+    }
+
+    nonisolated private static func qqMusicPlaybackModeControl(
+        pid: pid_t
+    ) -> (element: AXUIElement, mode: NowPlayingPlaybackMode, rank: Int, usesCoordinateClick: Bool)? {
+        qqMusicControlRoots(pid: pid)
+            .compactMap { findPlaybackMode(in: $0, depth: 0, maximumDepth: 4) }
+            .max(by: { $0.rank < $1.rank })
+    }
+
+    nonisolated private static func findButton(
         in element: AXUIElement,
         depth: Int,
         matching labels: [String]
@@ -446,7 +595,8 @@ final class MediaAppSpecialist {
         return nil
     }
 
-    private static func children(of element: AXUIElement) -> [AXUIElement] {
+    nonisolated private static func children(of element: AXUIElement) -> [AXUIElement] {
+        configureAccessibilityTimeout(for: element)
         var childrenRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             element,
@@ -456,7 +606,7 @@ final class MediaAppSpecialist {
         return childrenRef as? [AXUIElement] ?? []
     }
 
-    private static func pressableAncestor(of element: AXUIElement) -> AXUIElement? {
+    nonisolated private static func pressableAncestor(of element: AXUIElement) -> AXUIElement? {
         var candidate = element
         for _ in 0..<4 {
             if supportsPress(candidate) { return candidate }
@@ -474,7 +624,8 @@ final class MediaAppSpecialist {
         return nil
     }
 
-    private static func supportsPress(_ element: AXUIElement) -> Bool {
+    nonisolated private static func supportsPress(_ element: AXUIElement) -> Bool {
+        configureAccessibilityTimeout(for: element)
         var actionsRef: CFArray?
         guard AXUIElementCopyActionNames(element, &actionsRef) == .success,
               let actions = actionsRef as? [String]
@@ -482,7 +633,7 @@ final class MediaAppSpecialist {
         return actions.contains(kAXPressAction as String)
     }
 
-    private static func findQQMusicMenuItem(
+    nonisolated private static func findQQMusicMenuItem(
         in element: AXUIElement,
         depth: Int,
         matching labels: [String]
@@ -502,21 +653,118 @@ final class MediaAppSpecialist {
         return nil
     }
 
-    private static func performQQMusicMenuCommand(pid: pid_t, matching labels: [String]) -> Bool {
+    nonisolated private static func findQQMusicFavoriteMenuItem(
+        in element: AXUIElement,
+        depth: Int
+    ) -> (element: AXUIElement, rank: Int)? {
+        guard depth < maximumAccessibilityDepth else { return nil }
+        var best: (element: AXUIElement, rank: Int)?
+        if role(of: element) == kAXMenuItemRole as String,
+           supportsPress(element) {
+            let rank = favoriteLabelRank(accessibilityLabels(of: element))
+            if rank > 0 {
+                best = (element, rank)
+            }
+        }
+        for child in children(of: element) {
+            if let match = findQQMusicFavoriteMenuItem(in: child, depth: depth + 1),
+               best == nil || match.rank > best!.rank
+            {
+                best = match
+            }
+        }
+        return best
+    }
+
+    nonisolated private static func performQQMusicMenuCommand(pid: pid_t, matching labels: [String]) -> Bool {
         guard let item = qqMusicMenuItem(pid: pid, matching: labels) else { return false }
         return performPress(on: item, pid: pid)
     }
 
-    /// The menu bar is not among the application element's AX children; it is only reachable via kAXMenuBarAttribute.
-    private static func qqMusicMenuItem(pid: pid_t, matching labels: [String]) -> AXUIElement? {
+    nonisolated private static func qqMusicFavoriteMenuItem(pid: pid_t) -> AXUIElement? {
         guard let menuBar = elementAttribute(
             kAXMenuBarAttribute,
             of: AXUIElementCreateApplication(pid)
         ) else { return nil }
-        return findQQMusicMenuItem(in: menuBar, depth: 0, matching: labels)
+        return findQQMusicFavoriteMenuItem(in: menuBar, depth: 0)?.element
     }
 
-    private static func role(of element: AXUIElement) -> String? {
+    nonisolated private static func favoriteLabelRank(_ labels: [String]) -> Int {
+        let normalized = labels.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        if normalized.contains(where: {
+            favoriteEnabledLabels.contains($0)
+                || ($0.contains("取消") && ($0.contains("喜欢") || $0.contains("收藏")))
+        }) {
+            return 3
+        }
+        if normalized.contains(where: {
+            favoriteDisabledLabels.contains($0)
+                || ($0.contains("添加") && ($0.contains("喜欢") || $0.contains("收藏")))
+        }) {
+            return 2
+        }
+        return normalized.contains(where: { favoriteGenericDisabledLabels.contains($0) }) ? 1 : 0
+    }
+
+    nonisolated private static func playbackModeLabelRank(_ labels: [String]) -> Int {
+        let normalized = labels.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        guard playbackMode(for: labels) != nil else { return 0 }
+        if normalized.contains(where: { $0.contains("播放模式") && $0 != "播放模式" }) {
+            return 3
+        }
+        if normalized.contains(where: { $0.contains("播放模式") }) {
+            return 1
+        }
+        return 2
+    }
+
+    nonisolated private static func qqMusicMenuItem(
+        pid: pid_t,
+        matching labels: [String]
+    ) -> AXUIElement? {
+        let application = AXUIElementCreateApplication(pid)
+        var roots = windows(of: application)
+        if let focusedWindow = elementAttribute(kAXFocusedWindowAttribute, of: application) {
+            roots.insert(focusedWindow, at: 0)
+        }
+        if let mainWindow = elementAttribute(kAXMainWindowAttribute, of: application) {
+            roots.insert(mainWindow, at: 0)
+        }
+        if let menuBar = elementAttribute(kAXMenuBarAttribute, of: application) {
+            roots.append(menuBar)
+        }
+        return roots.lazy.compactMap {
+            findQQMusicMenuItem(in: $0, depth: 0, matching: labels)
+        }.first
+    }
+
+    nonisolated private static func selectQQMusicPlaybackMode(
+        after sourceMode: NowPlayingPlaybackMode,
+        using control: AXUIElement,
+        pid: pid_t,
+        usesCoordinateClick: Bool
+    ) -> Bool {
+        let labels = qqMusicPlaybackModeMenuLabels(after: sourceMode)
+        if performQQMusicMenuCommand(pid: pid, matching: labels) {
+            return true
+        }
+        guard performPlaybackModeToggle(
+            on: control,
+            pid: pid,
+            usesCoordinateClick: usesCoordinateClick
+        ) else { return false }
+
+        for _ in 0..<4 {
+            if performQQMusicMenuCommand(pid: pid, matching: labels) {
+                return true
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        return false
+    }
+
+    nonisolated private static func role(of element: AXUIElement) -> String? {
+        configureAccessibilityTimeout(for: element)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             element,
@@ -526,25 +774,34 @@ final class MediaAppSpecialist {
         return value as? String
     }
 
-    private static func accessibilityLabels(of element: AXUIElement?) -> [String] {
+    nonisolated private static func accessibilityLabels(of element: AXUIElement?) -> [String] {
         guard let element else { return [] }
-        let attributes = [
+        configureAccessibilityTimeout(for: element)
+        let attributes: [CFString] = [
             kAXTitleAttribute as CFString,
             kAXDescriptionAttribute as CFString,
             kAXHelpAttribute as CFString,
             kAXValueAttribute as CFString,
             kAXIdentifierAttribute as CFString,
         ]
-        return attributes.compactMap { attribute in
-            var value: CFTypeRef?
-            AXUIElementCopyAttributeValue(element, attribute, &value)
+        var valuesRef: CFArray?
+        guard AXUIElementCopyMultipleAttributeValues(
+            element,
+            attributes as CFArray,
+            [],
+            &valuesRef
+        ) == .success,
+            let values = valuesRef as? [Any]
+        else { return [] }
+        return values.compactMap { value in
             guard let text = value as? String else { return nil }
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
         }
     }
 
-    private static func frame(of element: AXUIElement) -> (position: CGPoint, size: CGSize)? {
+    nonisolated private static func frame(of element: AXUIElement) -> (position: CGPoint, size: CGSize)? {
+        configureAccessibilityTimeout(for: element)
         var positionRef: CFTypeRef?
         var sizeRef: CFTypeRef?
         guard
@@ -574,41 +831,33 @@ final class MediaAppSpecialist {
         return (position, size)
     }
 
-    private static func clickCenter(of element: AXUIElement, pid: pid_t) -> Bool {
+    nonisolated private static func clickCenter(of element: AXUIElement, pid: pid_t) -> Bool {
         guard let frame = frame(of: element),
               let point = clickPoint(position: frame.position, size: frame.size)
         else { return false }
         return postLeftClick(at: point, pid: pid)
     }
 
-    private static func performPress(on element: AXUIElement, pid: pid_t) -> Bool {
+    nonisolated private static func performPress(on element: AXUIElement, pid: pid_t) -> Bool {
         if AXUIElementPerformAction(element, kAXPressAction as CFString) == .success {
             return true
         }
         return clickCenter(of: element, pid: pid)
     }
 
-    private static func searchAndClickPlayMode(
-        in element: AXUIElement,
-        depth: Int,
-        pid: pid_t
+    nonisolated private static func performPlaybackModeToggle(
+        on element: AXUIElement,
+        pid: pid_t,
+        usesCoordinateClick: Bool
     ) -> Bool {
-        guard depth < maximumAccessibilityDepth else { return false }
-
-        if matchesPlayModeLabels(accessibilityLabels(of: element)),
-           performPress(on: pressableAncestor(of: element) ?? element, pid: pid) {
-            return true
+        if usesCoordinateClick {
+            return clickCenter(of: element, pid: pid)
         }
-
-        for child in children(of: element) {
-            if searchAndClickPlayMode(in: child, depth: depth + 1, pid: pid) {
-                return true
-            }
-        }
-        return false
+        return AXUIElementPerformAction(element, kAXPressAction as CFString) == .success
+            || clickCenter(of: element, pid: pid)
     }
 
-    private static func matchesControlLabels(
+    nonisolated private static func matchesControlLabels(
         _ labels: [String],
         expected: [String]
     ) -> Bool {
@@ -619,11 +868,11 @@ final class MediaAppSpecialist {
         }
     }
 
-    private static let qqMusicControlBarLabel = "播放控制栏"
+    nonisolated private static let qqMusicControlBarLabel = "播放控制栏"
 
     /// The window content area exposes links sharing the player controls' labels, which depth-first search reaches earlier;
     /// only the playback-controls container is a safe search root.
-    private static func qqMusicControlRoots(pid: pid_t) -> [AXUIElement] {
+    nonisolated private static func qqMusicControlRoots(pid: pid_t) -> [AXUIElement] {
         let application = AXUIElementCreateApplication(pid)
         var windows: [AXUIElement] = []
         for attribute in [
@@ -635,10 +884,15 @@ final class MediaAppSpecialist {
             }
         }
         windows.append(contentsOf: self.windows(of: application))
-        return windows.compactMap { findControlBar(in: $0, depth: 0) }
+        return windows.reduce(into: [AXUIElement]()) { roots, window in
+            guard !roots.contains(where: { CFEqual($0, window) }) else { return }
+            if let controlBar = findControlBar(in: window, depth: 0) {
+                roots.append(controlBar)
+            }
+        }
     }
 
-    private static func findControlBar(in element: AXUIElement, depth: Int) -> AXUIElement? {
+    nonisolated private static func findControlBar(in element: AXUIElement, depth: Int) -> AXUIElement? {
         guard depth < 6 else { return nil }
         if accessibilityLabels(of: element).contains(where: {
             $0.contains(qqMusicControlBarLabel)
@@ -653,7 +907,8 @@ final class MediaAppSpecialist {
         return nil
     }
 
-    private static func windows(of element: AXUIElement) -> [AXUIElement] {
+    nonisolated private static func windows(of element: AXUIElement) -> [AXUIElement] {
+        configureAccessibilityTimeout(for: element)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             element,
@@ -663,10 +918,11 @@ final class MediaAppSpecialist {
         return value as? [AXUIElement] ?? []
     }
 
-    private static func elementAttribute(
+    nonisolated private static func elementAttribute(
         _ attribute: String,
         of element: AXUIElement
     ) -> AXUIElement? {
+        configureAccessibilityTimeout(for: element)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             element,
@@ -675,5 +931,9 @@ final class MediaAppSpecialist {
         ) == .success,
         let value else { return nil }
         return unsafeDowncast(value, to: AXUIElement.self)
+    }
+
+    nonisolated private static func configureAccessibilityTimeout(for element: AXUIElement) {
+        AXUIElementSetMessagingTimeout(element, accessibilityTimeout)
     }
 }
