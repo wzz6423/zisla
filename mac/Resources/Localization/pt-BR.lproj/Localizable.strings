@@ -995,7 +995,7 @@
 "CLI 档案必须同时配置两个不同的绝对路径" = "Um perfil de CLI precisa de dois caminhos absolutos diferentes";
 "OpenAI 兼容 / LM Studio" = "Compatível com OpenAI / LM Studio";
 "定位权限被拒绝，请在系统设置中允许访问位置" = "Permissão de localização negada, autorize o acesso à localização nos Ajustes do Sistema";
-"最近二十四周 AI token 用量热力图" = "Mapa de calor do uso de tokens de IA das últimas vinte e quatro semanas";
+"最近三十六周 AI token 用量热力图" = "Mapa de calor do uso de tokens de IA das últimas trinta e seis semanas";
 "将永久删除 %ld 个项目，此操作无法撤销。" = "%ld itens serão apagados permanentemente e não será possível desfazer.";
 "LibreOffice 没有生成 PDF 文件" = "O LibreOffice não gerou nenhum arquivo PDF";
 "一键下载和更新精选效率、网络、开发与桌面工具。" = "Baixe e atualize com um toque uma seleção de ferramentas de produtividade, rede, desenvolvimento e mesa.";

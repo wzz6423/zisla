@@ -995,7 +995,7 @@
 "CLI 档案必须同时配置两个不同的绝对路径" = "Hồ sơ CLI cần hai đường dẫn tuyệt đối khác nhau";
 "OpenAI 兼容 / LM Studio" = "Tương thích OpenAI / LM Studio";
 "定位权限被拒绝，请在系统设置中允许访问位置" = "Quyền vị trí bị từ chối. Hãy cho phép truy cập vị trí trong Cài đặt hệ thống";
-"最近二十四周 AI token 用量热力图" = "Bản đồ nhiệt mức dùng token AI trong hai mươi bốn tuần qua";
+"最近三十六周 AI token 用量热力图" = "Bản đồ nhiệt mức dùng token AI trong ba mươi sáu tuần qua";
 "将永久删除 %ld 个项目，此操作无法撤销。" = "Thao tác này xóa vĩnh viễn %ld mục và không thể hoàn tác.";
 "LibreOffice 没有生成 PDF 文件" = "LibreOffice không tạo ra tệp PDF";
 "一键下载和更新精选效率、网络、开发与桌面工具。" = "Tải và cập nhật các công cụ hiệu suất, mạng, phát triển và máy tính được tuyển chọn chỉ với một lần bấm.";

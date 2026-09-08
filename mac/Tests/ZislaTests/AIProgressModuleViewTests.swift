@@ -23,6 +23,11 @@ struct AIProgressModuleViewTests {
         #expect(!viewSource.contains("monitor.refreshActiveTasks()"))
         #expect(!viewSource.contains("monitor.loadUsageHistory()"))
         #expect(!viewSource.contains("await Task.yield()"))
+        #expect(viewSource.contains("private static let usageTrendChartHeight: CGFloat = 168"))
+        #expect(viewSource.contains("private static let usageHeatmapWeeks = 36"))
+        #expect(viewSource.contains(".frame(height: Self.usageTrendChartHeight)"))
+        #expect(viewSource.contains("weeks: Self.usageHeatmapWeeks"))
+        #expect(viewSource.contains("最近三十六周 AI token 用量热力图"))
 
         guard let selectedModule = modelSource.range(of: "@Published var selectedModule") else {
             Issue.record("Could not find selectedModule in AppModel")
