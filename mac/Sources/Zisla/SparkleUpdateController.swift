@@ -133,6 +133,7 @@ struct SparkleUpdateConfiguration: Equatable {
 final class SparkleFeedDelegate: NSObject, SPUUpdaterDelegate {
     var onFallbackRequested: ((SPUUpdateCheck) -> Void)?
     var onCheckFailed: ((Error) -> Void)?
+    var onUpdateSkipped: (() -> Void)?
 
     private var feeds: SparkleFeedPair
     private var fallbackState = UpdateFeedFallbackState()
@@ -182,6 +183,21 @@ final class SparkleFeedDelegate: NSObject, SPUUpdaterDelegate {
         error: Error
     ) {
         fallbackState.didFailDownloadingUpdate()
+    }
+
+    func updater(
+        _ updater: SPUUpdater,
+        userDidMake choice: SPUUserUpdateChoice,
+        forUpdate updateItem: SUAppcastItem,
+        state: SPUUserUpdateState
+    ) {
+        handleUserChoice(choice)
+    }
+
+    func handleUserChoice(_ choice: SPUUserUpdateChoice) {
+        if choice == .skip {
+            onUpdateSkipped?()
+        }
     }
 
     func updater(
@@ -237,6 +253,7 @@ final class SparkleUpdateController {
     var onUpdateFound: (() -> Void)?
     var onNoUpdateFound: (() -> Void)?
     var onCheckFailed: ((Error) -> Void)?
+    var onUpdateSkipped: (() -> Void)?
 
     private let configuration: SparkleUpdateConfiguration
     private let updaterDelegate: SparkleFeedDelegate
@@ -276,6 +293,9 @@ final class SparkleUpdateController {
         }
         updaterDelegate.onCheckFailed = { [weak self] error in
             self?.onCheckFailed?(error)
+        }
+        updaterDelegate.onUpdateSkipped = { [weak self] in
+            self?.onUpdateSkipped?()
         }
 
         notificationObservers = [

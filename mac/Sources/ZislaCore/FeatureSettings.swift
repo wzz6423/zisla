@@ -415,12 +415,12 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
         .videoDownload,
         .browserDownload,
         .mail,
-        .updateAvailable,
         .focusCountdown,
         .focusMode,
         .aiActivity,
         .media,
         .toolboxReminder,
+        .updateAvailable,
     ]
 
     public var title: String {
