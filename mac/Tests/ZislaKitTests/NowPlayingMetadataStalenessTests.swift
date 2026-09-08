@@ -51,6 +51,32 @@ struct NowPlayingMetadataStalenessTests {
     }
 
     @Test
+    func updateWithoutSourceIdentityDoesNotReusePreviousArtwork() {
+        let previous = snapshot(
+            sourceBundleIdentifier: "com.tencent.QQMusicMac",
+            sourcePID: 1,
+            sourceIconData: Data([0x01])
+        )
+        let update = NowPlayingSnapshot(
+            title: previous.title,
+            artist: previous.artist,
+            album: nil,
+            artworkData: nil,
+            duration: previous.duration,
+            elapsedTime: 10,
+            isPlaying: true,
+            sourceBundleIdentifier: nil,
+            sourcePID: nil,
+            sourceIconData: nil
+        )
+
+        let merged = NowPlayingService.mergingMetadata(update, previous: previous)
+
+        #expect(merged.artworkData == nil)
+        #expect(merged.sourceIconData == nil)
+    }
+
+    @Test
     func sameApplicationWithReplacementProcessDoesNotReuseMetadata() {
         let previous = snapshot(
             sourceBundleIdentifier: "com.tencent.QQMusicMac",
@@ -74,6 +100,62 @@ struct NowPlayingMetadataStalenessTests {
 
         #expect(merged.artworkData == nil)
         #expect(merged.sourceIconData == nil)
+    }
+
+    @Test
+    func artworkRefreshRejectsAResponseWithAStaleOrMissingSource() {
+        let expected = NowPlayingService.ArtworkRefreshIdentity(
+            snapshot(
+                sourceBundleIdentifier: "com.tencent.QQMusicMac",
+                sourcePID: 1,
+                sourceIconData: nil
+            )
+        )
+        let missingSource = NowPlayingService.ArtworkRefreshIdentity(
+            snapshot(
+                sourceBundleIdentifier: nil,
+                sourcePID: nil,
+                sourceIconData: nil
+            )
+        )
+
+        #expect(!expected.matches(
+            NowPlayingSnapshot(
+                title: "同一首歌",
+                artist: "同一位歌手",
+                album: nil,
+                artworkData: Data([0x03]),
+                duration: 180,
+                elapsedTime: 10,
+                isPlaying: true,
+                sourceBundleIdentifier: nil,
+                sourcePID: nil
+            )
+        ))
+        #expect(!expected.matches(
+            NowPlayingSnapshot(
+                title: "同一首歌",
+                artist: "同一位歌手",
+                album: nil,
+                artworkData: Data([0x03]),
+                duration: 180,
+                elapsedTime: 10,
+                isPlaying: true,
+                sourceBundleIdentifier: "com.apple.Music",
+                sourcePID: 2
+            )
+        ))
+        #expect(missingSource.matches(
+            NowPlayingSnapshot(
+                title: "同一首歌",
+                artist: "同一位歌手",
+                album: nil,
+                artworkData: Data([0x03]),
+                duration: 180,
+                elapsedTime: 10,
+                isPlaying: true
+            )
+        ))
     }
 
     @Test

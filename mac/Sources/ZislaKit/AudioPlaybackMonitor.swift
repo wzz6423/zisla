@@ -122,8 +122,8 @@ final class AudioPlaybackMonitor {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                let application = NSWorkspace.shared.frontmostApplication
-                self.prioritizeSource(for: application)
+                self.refresh()
+                self.prioritizeSource(for: NSWorkspace.shared.frontmostApplication)
             }
         }
         refresh()
@@ -170,16 +170,34 @@ final class AudioPlaybackMonitor {
     }
 
     private func prioritizeSource(for application: NSRunningApplication?) {
-        guard let application,
-              let activatedSource = sources.first(where: {
-                  $0.processIdentifiers.contains(application.processIdentifier)
-                      || ($0.bundleIdentifier != nil
-                          && $0.bundleIdentifier == application.bundleIdentifier)
-              }) else { return }
-        preferredSourceID = activatedSource.id
+        preferredSourceID = Self.sourceID(
+            processIdentifier: application?.processIdentifier,
+            bundleIdentifier: application?.bundleIdentifier,
+            sources: sources
+        )
         var resolved = sources
         applyPreferredSource(to: &resolved)
         updateSources(resolved)
+    }
+
+    nonisolated static func sourceID(
+        processIdentifier: pid_t?,
+        bundleIdentifier: String?,
+        sources: [AudioPlaybackSource]
+    ) -> String? {
+        if let processIdentifier,
+           let source = sources.first(where: {
+               $0.processIdentifiers.contains(processIdentifier)
+           })
+        {
+            return source.id
+        }
+        if let bundleIdentifier,
+           let source = sources.first(where: { $0.bundleIdentifier == bundleIdentifier })
+        {
+            return source.id
+        }
+        return nil
     }
 
     private func applyPreferredSource(to resolved: inout [AudioPlaybackSource]) {

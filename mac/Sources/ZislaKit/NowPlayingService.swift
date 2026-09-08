@@ -148,7 +148,7 @@ public final class NowPlayingService: ObservableObject {
     }
   }
 
-  private struct ArtworkRefreshIdentity: Equatable {
+  struct ArtworkRefreshIdentity: Equatable {
     var title: String
     var artist: String
     var duration: Double?
@@ -168,12 +168,12 @@ public final class NowPlayingService: ObservableObject {
         artist == LyricsService.normalized(snapshot.artist),
         Self.durationsMatch(duration, snapshot.duration)
       else { return false }
-      guard sourceBundleIdentifier == nil || sourceBundleIdentifier == snapshot.sourceBundleIdentifier,
-        sourcePID == nil || sourcePID == snapshot.sourcePID
-      else { return false }
-      return sourceBundleIdentifier != nil || sourcePID != nil
-        ? snapshot.sourceBundleIdentifier != nil || snapshot.sourcePID != nil
-        : snapshot.sourceBundleIdentifier == nil && snapshot.sourcePID == nil
+      return NowPlayingService.sourceIdentityMatches(
+        expectedBundleIdentifier: sourceBundleIdentifier,
+        expectedPID: sourcePID,
+        actualBundleIdentifier: snapshot.sourceBundleIdentifier,
+        actualPID: snapshot.sourcePID
+      )
     }
 
     private static func durationsMatch(_ lhs: Double?, _ rhs: Double?) -> Bool {
@@ -757,7 +757,10 @@ public final class NowPlayingService: ObservableObject {
     return true
   }
 
-  nonisolated static func parse(_ dictionary: NSDictionary?) -> NowPlayingSnapshot? {
+  nonisolated static func parse(
+    _ dictionary: NSDictionary?,
+    fallbackIsPlaying: Bool = false
+  ) -> NowPlayingSnapshot? {
     guard let dictionary else { return nil }
     let title = text(dictionary["kMRMediaRemoteNowPlayingInfoTitle"])
     let album = text(dictionary["kMRMediaRemoteNowPlayingInfoAlbum"])
@@ -807,7 +810,7 @@ public final class NowPlayingService: ObservableObject {
       duration: number(dictionary["kMRMediaRemoteNowPlayingInfoDuration"]),
       elapsedTime: number(dictionary["kMRMediaRemoteNowPlayingInfoElapsedTime"]),
       timestamp: dictionary["kMRMediaRemoteNowPlayingInfoTimestamp"] as? Date,
-      isPlaying: (rate ?? 0) > 0,
+      isPlaying: rate.map { $0 > 0 } ?? fallbackIsPlaying,
       isVideo: isVideo,
       sourceBundleIdentifier: sourceBundleIdentifier,
       supportsControls: true,
@@ -825,13 +828,13 @@ public final class NowPlayingService: ObservableObject {
 
   nonisolated static func parseAdapter(
     _ payload: MediaRemoteAdapterPayload,
-    fallbackIsPlaying: Bool = false
+    fallbackIsPlaying: Bool? = nil
   ) -> NowPlayingSnapshot? {
     let title = text(payload.title)
     let album = text(payload.album)
     let sourceBundleIdentifier =
-      payload.parentApplicationBundleIdentifier
-      ?? payload.bundleIdentifier
+      text(payload.parentApplicationBundleIdentifier)
+      ?? text(payload.bundleIdentifier)
     let isVideo = isVideoMedia(
       mediaType: payload.mediaType,
       isVideosApp: payload.isVideosApp
@@ -857,6 +860,7 @@ public final class NowPlayingService: ObservableObject {
     let timestamp = payload.timestamp.flatMap {
       ISO8601DateFormatter().date(from: $0)
     }
+    let isPlaying = payload.playing ?? payload.playbackRate.map { $0 > 0 } ?? fallbackIsPlaying ?? false
     return NowPlayingSnapshot(
       title: title ?? AppLocalization.text("未知媒体"),
       artist: artist ?? "",
@@ -867,7 +871,7 @@ public final class NowPlayingService: ObservableObject {
       duration: payload.duration,
       elapsedTime: payload.elapsedTime,
       timestamp: timestamp,
-      isPlaying: payload.playing ?? payload.playbackRate.map { $0 > 0 } ?? fallbackIsPlaying,
+      isPlaying: isPlaying,
       isVideo: isVideo,
       sourceBundleIdentifier: sourceBundleIdentifier,
       sourcePID: payload.processIdentifier,
@@ -1158,8 +1162,12 @@ public final class NowPlayingService: ObservableObject {
     remotePIDPending = getPID != nil
 
     if let getInfo {
+      let fallbackIsPlaying = remoteSnapshot?.isPlaying ?? false
       let callback: InfoCallback = { [weak self] dictionary in
-        let value = Self.parse(dictionary)
+        let value = Self.parse(
+          dictionary,
+          fallbackIsPlaying: fallbackIsPlaying
+        )
         Task { @MainActor [weak self] in
           guard let self,
             self.isRunning,
@@ -1217,9 +1225,11 @@ public final class NowPlayingService: ObservableObject {
     guard isRunning, usesAdapter else { return }
     playbackRefreshGeneration &+= 1
     remotePIDPending = false
+    let fallbackIsPlaying = remoteSnapshot?.isPlaying
+      ?? (remotePlaybackState == .playing ? true : nil)
     guard let value = Self.parseAdapter(
       event.payload,
-      fallbackIsPlaying: remoteSnapshot?.isPlaying ?? false
+      fallbackIsPlaying: fallbackIsPlaying
     ) else {
       cancelArtworkRefresh()
       remoteInfoState = .empty
@@ -1270,6 +1280,8 @@ public final class NowPlayingService: ObservableObject {
     playbackRefreshGeneration &+= 1
     let generation = playbackRefreshGeneration
     let lifecycleGeneration = self.lifecycleGeneration
+    let fallbackIsPlaying = remoteSnapshot?.isPlaying
+      ?? (remotePlaybackState == .playing ? true : nil)
     _ = adapterClient.fetchNowPlayingInfo { [weak self] payload in
       guard let self,
         self.playbackRefreshGeneration == generation,
@@ -1281,7 +1293,7 @@ public final class NowPlayingService: ObservableObject {
         let payload,
         let value = Self.parseAdapter(
           payload,
-          fallbackIsPlaying: self.remoteSnapshot?.isPlaying ?? false
+          fallbackIsPlaying: fallbackIsPlaying
         )
       else { return }
       self.consumeAdapterSnapshot(value)
@@ -1861,19 +1873,35 @@ public final class NowPlayingService: ObservableObject {
     _ update: NowPlayingSnapshot,
     _ previous: NowPlayingSnapshot
   ) -> Bool {
-    if let updateBundleIdentifier = update.sourceBundleIdentifier,
-      let previousBundleIdentifier = previous.sourceBundleIdentifier,
-      updateBundleIdentifier != previousBundleIdentifier
+    !sourceIdentityMatches(
+      expectedBundleIdentifier: previous.sourceBundleIdentifier,
+      expectedPID: previous.sourcePID,
+      actualBundleIdentifier: update.sourceBundleIdentifier,
+      actualPID: update.sourcePID
+    )
+  }
+
+  nonisolated private static func sourceIdentityMatches(
+    expectedBundleIdentifier: String?,
+    expectedPID: pid_t?,
+    actualBundleIdentifier: String?,
+    actualPID: pid_t?
+  ) -> Bool {
+    let expectedHasIdentity = expectedBundleIdentifier != nil || expectedPID != nil
+    let actualHasIdentity = actualBundleIdentifier != nil || actualPID != nil
+    guard expectedHasIdentity == actualHasIdentity else { return false }
+    guard expectedHasIdentity else { return true }
+    if let expectedBundleIdentifier,
+      let actualBundleIdentifier,
+      expectedBundleIdentifier != actualBundleIdentifier
     {
-      return true
+      return false
     }
-    if let updatePID = update.sourcePID,
-      let previousPID = previous.sourcePID,
-      updatePID != previousPID
-    {
-      return true
+    if let expectedPID, let actualPID, expectedPID != actualPID {
+      return false
     }
-    return false
+    return (expectedBundleIdentifier != nil && actualBundleIdentifier != nil)
+      || (expectedPID != nil && actualPID != nil)
   }
 
   private func loadSymbol<T>(_ name: String, from handle: UnsafeMutableRawPointer) -> T? {
