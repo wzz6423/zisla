@@ -564,9 +564,7 @@ private struct PowerBranchLaneShape: Shape {
 struct BatteryDetailView: View {
     @ObservedObject var batteryMonitor: BatteryMonitor
     @ObservedObject var networkMonitor: NetworkBatteryMonitor
-    var onContentHeightChange: (CGFloat) -> Void = { _ in }
 
-    @State private var contentHeight = IslandModuleLayout.batteryMaximumContentHeight
     @Environment(\.locale) private var locale
 
     private var deviceCardShape: UnevenRoundedRectangle {
@@ -586,40 +584,18 @@ struct BatteryDetailView: View {
                     noLocalBatterySection
                 }
                 deviceSection
-                    .background {
-                        GeometryReader { geometry in
-                            Color.clear.preference(
-                                key: ContentHeightPreferenceKey.self,
-                                value: geometry.frame(in: .named("batteryContent")).maxY
-                            )
-                        }
-                    }
             }
             .padding(.top, 12)
             .padding(.horizontal, 12)
-            .coordinateSpace(name: "batteryContent")
         }
         .scrollIndicators(.hidden)
-        .frame(maxHeight: min(contentHeight, IslandModuleLayout.batteryMaximumContentHeight))
-        .onPreferenceChange(ContentHeightPreferenceKey.self) { height in
-            guard height > 0 else { return }
-            contentHeight = height
-            onContentHeightChange(height)
-        }
+        .frame(maxHeight: .infinity)
         .onAppear {
             batteryMonitor.refresh()
             networkMonitor.start()
         }
         .onDisappear {
             networkMonitor.stop()
-        }
-    }
-
-    private struct ContentHeightPreferenceKey: PreferenceKey {
-        static let defaultValue: CGFloat = 0
-
-        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-            value = nextValue()
         }
     }
 

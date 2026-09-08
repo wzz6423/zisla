@@ -445,6 +445,56 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
     }
 }
 
+/// User-facing order of the expandable Dynamic Island modules.
+public enum IslandModuleOrder: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
+    case dashboard
+    case shelf
+    case clipboard
+    case download
+    case agenda
+    case toolbox
+    case quickNotes
+    case aiMonitor
+    case keyboardSound
+    case mail
+    case system
+    case battery
+    case pdf
+
+    public static let defaultOrder: [Self] = [
+        .dashboard, .shelf, .clipboard, .download, .agenda, .toolbox,
+        .quickNotes, .aiMonitor, .keyboardSound, .mail, .system, .battery, .pdf,
+    ]
+
+    public static func normalized(_ order: [Self]) -> [Self] {
+        var seen: Set<Self> = []
+        return order.filter { seen.insert($0).inserted }
+            + defaultOrder.filter { !seen.contains($0) }
+    }
+
+    public static func normalized(rawValues: [String]) -> [Self] {
+        normalized(rawValues.compactMap(Self.init(rawValue:)))
+    }
+
+    public var title: String {
+        switch self {
+        case .dashboard: "首页"
+        case .shelf: "中转站"
+        case .clipboard: "剪贴板"
+        case .download: "下载"
+        case .agenda: "天气日程"
+        case .toolbox: "小工具"
+        case .quickNotes: "随记"
+        case .aiMonitor: "AI 信息"
+        case .keyboardSound: "键盘信息"
+        case .mail: "邮件"
+        case .system: "CPU"
+        case .battery: "电池"
+        case .pdf: "PDF 工具"
+        }
+    }
+}
+
 /// Feature module toggles default to on.
 public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mediaEnabled: Bool
@@ -528,6 +578,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var clipboardAssistantMouseGestureEnabled: Bool
     public var sideNoticesEnabled: Bool
     public var compactStatusPriority: [CompactStatusPriority]
+    public var moduleOrder: [IslandModuleOrder]
     /// Temporarily suppresses system notifications pushed by Zisla itself (Pomodoro, etc.); alarms are unaffected.
     public var notificationsMuted: Bool
     public var hoverActivationEnabled: Bool
@@ -631,6 +682,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardAssistantMouseGestureEnabled: Bool = false,
         sideNoticesEnabled: Bool = true,
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
+        moduleOrder: [IslandModuleOrder] = IslandModuleOrder.defaultOrder,
         notificationsMuted: Bool = false,
         hoverActivationEnabled: Bool = true,
         activityNoticeDisplayDuration: ActivityNoticeDisplayDuration = .threeSeconds,
@@ -719,6 +771,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.clipboardAssistantMouseGestureEnabled = clipboardAssistantMouseGestureEnabled
         self.sideNoticesEnabled = sideNoticesEnabled
         self.compactStatusPriority = CompactStatusPriority.normalized(compactStatusPriority)
+        self.moduleOrder = IslandModuleOrder.normalized(moduleOrder)
         self.notificationsMuted = notificationsMuted
         self.hoverActivationEnabled = hoverActivationEnabled
         self.activityNoticeDisplayDuration = activityNoticeDisplayDuration
@@ -820,6 +873,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantMouseGestureEnabled
         case sideNoticesEnabled
         case compactStatusPriority
+        case moduleOrder
         case notificationsMuted
         case hoverActivationEnabled
         case activityNoticeDisplayDuration
@@ -989,6 +1043,11 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             try container.decodeIfPresent([CompactStatusPriority].self, forKey: .compactStatusPriority)
                 ?? defaults.compactStatusPriority
         )
+        if let rawValues = try container.decodeIfPresent([String].self, forKey: .moduleOrder) {
+            moduleOrder = IslandModuleOrder.normalized(rawValues: rawValues)
+        } else {
+            moduleOrder = defaults.moduleOrder
+        }
         notificationsMuted = try container.decodeIfPresent(Bool.self, forKey: .notificationsMuted) ?? defaults.notificationsMuted
         hoverActivationEnabled = try container.decodeIfPresent(Bool.self, forKey: .hoverActivationEnabled) ?? defaults.hoverActivationEnabled
         activityNoticeDisplayDuration = try container.decodeIfPresent(

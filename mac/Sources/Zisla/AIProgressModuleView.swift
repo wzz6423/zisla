@@ -59,7 +59,7 @@ struct AIProgressModuleView: View {
                 .font(.system(size: 11, weight: .semibold))
 
             UsageTrendChart(series: series)
-                .frame(height: 106)
+                .frame(height: 128)
             UsageHeatmap(weeks: usageCalendar(endingAt: date))
         }
     }

@@ -925,6 +925,56 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
+    func moduleOrderDefaultsAndNormalizesLegacyValues() throws {
+        let legacy = Data(#"{"moduleOrder":["clipboard","clipboard","unknown","mail"]}"#.utf8)
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+
+        #expect(decoded.moduleOrder == [
+            .clipboard,
+            .mail,
+            .dashboard,
+            .shelf,
+            .download,
+            .agenda,
+            .toolbox,
+            .quickNotes,
+            .aiMonitor,
+            .keyboardSound,
+            .system,
+            .battery,
+            .pdf,
+        ])
+        #expect(FeatureSettings.default.moduleOrder == IslandModuleOrder.defaultOrder)
+    }
+
+    @Test
+    func moduleOrderRoundTripsAndExcludesLockScreen() throws {
+        var settings = FeatureSettings.default
+        settings.moduleOrder = [.pdf, .dashboard, .pdf]
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+
+        #expect(decoded.moduleOrder == [
+            .pdf,
+            .dashboard,
+            .shelf,
+            .clipboard,
+            .download,
+            .agenda,
+            .toolbox,
+            .quickNotes,
+            .aiMonitor,
+            .keyboardSound,
+            .mail,
+            .system,
+            .battery,
+        ])
+        #expect(!decoded.moduleOrder.contains { $0.rawValue == "lockScreen" })
+    }
+
+    @Test
     func screenshotHotkeysDefaultToCtrl1AndCtrl2ForLegacySettings() throws {
         let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
