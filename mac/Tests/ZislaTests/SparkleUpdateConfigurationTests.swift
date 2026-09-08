@@ -5,6 +5,24 @@ import Testing
 
 struct SparkleUpdateConfigurationTests {
     @Test @MainActor
+    func onlySkippingAnUpdateNotifiesTheClient() throws {
+        let primaryURL = try #require(URL(string: "https://gitee.example.com/appcast.xml"))
+        let fallbackURL = try #require(URL(string: "https://github.example.com/appcast.xml"))
+        let delegate = SparkleFeedDelegate(
+            feeds: SparkleFeedPair(gitee: primaryURL, github: fallbackURL)
+        )
+        var skippedCount = 0
+        delegate.onUpdateSkipped = { skippedCount += 1 }
+
+        delegate.handleUserChoice(.dismiss)
+        delegate.handleUserChoice(.install)
+        #expect(skippedCount == 0)
+
+        delegate.handleUserChoice(.skip)
+        #expect(skippedCount == 1)
+    }
+
+    @Test @MainActor
     func primaryFeedErrorIsAcknowledgedWithoutShowingWhenFallbackCanRetry() {
         let driver = SparkleStandardUserDriver(
             hostBundle: Bundle.main,
