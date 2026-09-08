@@ -48,6 +48,7 @@ struct BatteryModuleTests {
 
     @Test
     func aiModuleUsesItsCompactHeightWithoutChangingCPUHeight() {
+        #expect(IslandModule.aiMonitor.layout == IslandModuleLayout.ai)
         #expect(IslandModuleLayout.ai.islandSize.height == 495)
         #expect(IslandModuleLayout.ai.panelSize.height == 499)
         #expect(IslandModuleLayout.ai.islandSize.height < IslandModuleLayout.system.islandSize.height)

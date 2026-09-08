@@ -77,7 +77,9 @@ enum IslandModule: String, CaseIterable, Identifiable {
       .standard
     case .clipboard, .shelf:
       .clipboard
-    case .aiMonitor, .mail, .quickNotes, .pdf, .system, .battery, .keyboardSound:
+    case .aiMonitor:
+      .ai
+    case .mail, .quickNotes, .pdf, .system, .battery, .keyboardSound:
       .pdf
     case .download, .agenda:
       .agenda
