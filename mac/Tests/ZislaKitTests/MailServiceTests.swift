@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 @testable import ZislaCore
 @testable import ZislaKit
@@ -70,6 +71,35 @@ struct MailServiceTests {
         #expect(messages.map(\.messageID) == [13, 12])
         #expect(messages.map(\.accountName) == ["工作邮箱", "个人邮箱"])
         #expect(messages.map(\.isRead) == [false, true])
+    }
+
+    @Test @MainActor
+    func usesTheLocalIndexBeforeMailAppWhenMailIsRunning() async throws {
+        let databaseURL = try makeMailServiceIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        try executeMailServiceSQL("""
+            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
+            INSERT INTO subjects (ROWID, subject) VALUES (1, '快速主题');
+            INSERT INTO summaries (ROWID, summary) VALUES (1, '快速摘要');
+            INSERT INTO messages (message_id, subject, summary, date_received, display_date, mailbox, read, deleted)
+            VALUES (42, 1, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0);
+            """, at: databaseURL)
+
+        var appleScriptCalls = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                appleScriptCalls += 1
+                return .failure(.failed("AppleScript should not be used when the index is readable"))
+            },
+            indexReader: MailIndexReader(databaseURL: databaseURL),
+            mailRunning: { true }
+        )
+
+        await service.refresh()
+
+        #expect(service.messages.map(\.messageID) == [42])
+        #expect(service.messages.first?.body == "快速摘要")
+        #expect(appleScriptCalls == 0)
     }
 
     @Test @MainActor
@@ -379,4 +409,48 @@ private actor MailOperationQueueTestGate {
             isSignaled = true
         }
     }
+}
+
+private func makeMailServiceIndex() throws -> URL {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("Zisla-mail-service-index-\(UUID().uuidString).db")
+    try executeMailServiceSQL("""
+        CREATE TABLE mailboxes (url TEXT NOT NULL);
+        CREATE TABLE messages (
+            message_id INTEGER NOT NULL,
+            sender INTEGER,
+            subject INTEGER NOT NULL,
+            summary INTEGER,
+            date_received INTEGER,
+            display_date INTEGER,
+            mailbox INTEGER NOT NULL,
+            read INTEGER NOT NULL DEFAULT 0,
+            deleted INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE sender_addresses (address INTEGER PRIMARY KEY, sender INTEGER NOT NULL);
+        CREATE TABLE addresses (address TEXT NOT NULL, comment TEXT NOT NULL);
+        CREATE TABLE subjects (subject TEXT NOT NULL);
+        CREATE TABLE summaries (summary TEXT NOT NULL);
+        """, at: url)
+    return url
+}
+
+private func executeMailServiceSQL(_ sql: String, at url: URL) throws {
+    var database: OpaquePointer?
+    guard sqlite3_open(url.path, &database) == SQLITE_OK else {
+        sqlite3_close(database)
+        throw MailServiceTestError.openFailed
+    }
+    defer { sqlite3_close(database) }
+
+    var error: UnsafeMutablePointer<CChar>?
+    guard sqlite3_exec(database, sql, nil, nil, &error) == SQLITE_OK else {
+        sqlite3_free(error)
+        throw MailServiceTestError.queryFailed
+    }
+}
+
+private enum MailServiceTestError: Error {
+    case openFailed
+    case queryFailed
 }

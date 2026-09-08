@@ -183,7 +183,15 @@ public final class MailService: ObservableObject {
         defer { isLoading = false }
         needsMailIndexAccess = false
 
-        if mailRunning() {
+        let isMailRunning = mailRunning()
+        let indexResult = await readIndex(accountNames: selectedAccountNames, offset: offset)
+        if case let .success(snapshot) = indexResult,
+           Self.canUseIndexSnapshot(snapshot, for: selectedAccountNames) {
+            apply(snapshot, replacing: replacing)
+            return
+        }
+
+        if isMailRunning {
             switch await commandRunner(Self.inboxScript(accountNames: selectedAccountNames, pageSize: pageSize, offset: offset), true) {
             case let .success(.snapshot(snapshot)):
                 apply(snapshot, replacing: replacing)
@@ -193,20 +201,7 @@ public final class MailService: ObservableObject {
                 errorDescription = Self.message(for: error)
             }
         } else {
-            let reader = indexReader
-            let accountNames = selectedAccountNames
-            let result = await Task.detached(priority: .userInitiated) {
-                do {
-                    return Result<MailSnapshot, MailIndexReaderError>.success(
-                        try reader.snapshot(accountNames: accountNames, offset: offset)
-                    )
-                } catch let error as MailIndexReaderError {
-                    return .failure(error)
-                } catch {
-                    return .failure(.queryFailed)
-                }
-            }.value
-            switch result {
+            switch indexResult {
             case let .success(snapshot):
                 apply(snapshot, replacing: replacing)
             case let .failure(error):
@@ -214,6 +209,19 @@ public final class MailService: ObservableObject {
                 errorDescription = Self.message(for: error)
             }
         }
+    }
+
+    private func readIndex(accountNames: Set<String>, offset: Int) async -> Result<MailSnapshot, MailIndexReaderError> {
+        let reader = indexReader
+        return await Task.detached(priority: .userInitiated) {
+            do {
+                return .success(try reader.snapshot(accountNames: accountNames, offset: offset))
+            } catch let error as MailIndexReaderError {
+                return .failure(error)
+            } catch {
+                return .failure(.queryFailed)
+            }
+        }.value
     }
 
     public func markRead(_ message: MailMessage) async -> MailOperationResult {
@@ -314,6 +322,13 @@ public final class MailService: ObservableObject {
             )
         }
         .sorted { $0.receivedAt > $1.receivedAt }
+    }
+
+    static func canUseIndexSnapshot(_ snapshot: MailSnapshot, for accountNames: Set<String>) -> Bool {
+        guard !snapshot.accounts.isEmpty else { return false }
+        guard !accountNames.isEmpty else { return true }
+        let availableNames = Set(snapshot.accounts.map(\.name))
+        return accountNames.isSubset(of: availableNames)
     }
 
     /// Mail's scripting dictionary exposes `inbox` on the application, not on `account`:
