@@ -23,7 +23,7 @@ struct AIProgressModuleViewTests {
         #expect(!viewSource.contains("monitor.refreshActiveTasks()"))
         #expect(!viewSource.contains("monitor.loadUsageHistory()"))
         #expect(!viewSource.contains("await Task.yield()"))
-        #expect(viewSource.contains(".frame(height: 106)"))
+        #expect(viewSource.contains(".frame(height: 128)"))
         #expect(viewSource.contains("weeks: 24"))
         #expect(viewSource.contains("最近二十四周 AI token 用量热力图"))
         #expect(!viewSource.contains("usageTrendChartHeight"))
