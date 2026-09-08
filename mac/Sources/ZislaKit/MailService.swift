@@ -353,12 +353,10 @@ public final class MailService: ObservableObject {
                 set accountName to ""
                 set accountAddresses to {}
                 try
-                    set accountName to name of mailAccount as text
-                on error
-                    set accountName to ""
-                end try
-                try
-                    set rawAddresses to email addresses of mailAccount
+                    -- Read the account record once to avoid separate AppleEvent round trips.
+                    set accountProperties to properties of mailAccount
+                    set accountName to name of accountProperties as text
+                    set rawAddresses to email addresses of accountProperties
                     if (count of rawAddresses) is 0 then
                         set accountAddresses to {}
                     else
@@ -389,9 +387,11 @@ public final class MailService: ObservableObject {
                                 repeat with messageIndex from startIndex to endIndex
                                     try
                                         set mailMessage to item messageIndex of inboxMessages
-                                        set messageBody to content of mailMessage
+                                        -- Mail.app is slow to resolve each property separately.
+                                        set messageProperties to properties of mailMessage
+                                        set messageBody to content of messageProperties
                                         if (count of messageBody) > 1200 then set messageBody to text 1 thru 1200 of messageBody
-                                        set end of messageRows to {accountName, id of mailMessage as text, sender of mailMessage as text, subject of mailMessage as text, messageBody, date received of mailMessage, read status of mailMessage}
+                                        set end of messageRows to {accountName, id of messageProperties as text, sender of messageProperties as text, subject of messageProperties as text, messageBody, date received of messageProperties, read status of messageProperties}
                                     on error
                                         -- Skip unreadable individual messages (corrupt or excessively large).
                                     end try

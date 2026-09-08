@@ -123,6 +123,7 @@ struct MailServiceTests {
         #expect(script.contains("\"个人邮箱\""))
         #expect(script.contains("set accountList to every account"))
         #expect(script.contains("repeat with i from 1 to accountCount"))
+        #expect(script.contains("set accountProperties to properties of mailAccount"))
         #expect(script.contains("set end of accountRows to {accountName, accountAddresses}"))
         #expect(script.contains("accountName is in selectedAccountNames"))
     }
@@ -135,6 +136,9 @@ struct MailServiceTests {
         #expect(script.contains("set remainingPageSize to 10"))
         #expect(script.contains("set startIndex to remainingOffset + 1"))
         #expect(script.contains("set endIndex to remainingOffset + remainingPageSize"))
+        #expect(script.contains("set messageProperties to properties of mailMessage"))
+        #expect(script.contains("id of messageProperties as text"))
+        #expect(script.contains("content of messageProperties"))
         #expect(script.contains("set remainingPageSize to remainingPageSize - (endIndex - startIndex + 1)"))
         #expect(script.contains("if startIndex <= endIndex then"))
         #expect(script.contains("set hasMoreMessages to true"))
