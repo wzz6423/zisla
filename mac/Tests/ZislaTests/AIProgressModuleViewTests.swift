@@ -28,6 +28,8 @@ struct AIProgressModuleViewTests {
         #expect(viewSource.contains(".frame(height: Self.usageTrendChartHeight)"))
         #expect(viewSource.contains("weeks: Self.usageHeatmapWeeks"))
         #expect(viewSource.contains("最近三十六周 AI token 用量热力图"))
+        #expect(modelSource.contains("static let ai = compactModule(contentHeight: 350)"))
+        #expect(modelSource.contains("static let system = compactModule(contentHeight: 401)"))
 
         guard let selectedModule = modelSource.range(of: "@Published var selectedModule") else {
             Issue.record("Could not find selectedModule in AppModel")

@@ -32,9 +32,9 @@ struct BatteryModuleTests {
     }
 
     @Test
-    func groupedModuleLayoutsShareHeights() {
+    func groupedTallModuleLayoutsShareHeights() {
         let tallModules: [IslandModule] = [
-            .quickNotes, .aiMonitor, .keyboardSound, .mail, .system, .battery, .pdf,
+            .quickNotes, .keyboardSound, .mail, .system, .battery, .pdf,
         ]
 
         for module in tallModules {
@@ -44,6 +44,15 @@ struct BatteryModuleTests {
         #expect(IslandModuleLayout.system.islandSize.height == 546)
         #expect(IslandModuleLayout.system.panelSize.height == 550)
         #expect(IslandModuleLayout.resolved(for: .battery, dashboardCardCount: 0) == IslandModuleLayout.system)
+    }
+
+    @Test
+    func aiModuleUsesItsCompactHeightWithoutChangingCPUHeight() {
+        #expect(IslandModuleLayout.ai.islandSize.height == 495)
+        #expect(IslandModuleLayout.ai.panelSize.height == 499)
+        #expect(IslandModuleLayout.ai.islandSize.height < IslandModuleLayout.system.islandSize.height)
+        #expect(IslandModuleLayout.system.islandSize.height == 546)
+        #expect(IslandModuleLayout.system.panelSize.height == 550)
     }
 
     @Test

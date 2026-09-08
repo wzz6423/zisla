@@ -170,7 +170,7 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: unifiedIslandWidth, height: 500),
     panelSize: CGSize(width: unifiedPanelWidth, height: 504)
   )
-  static let ai = system
+  static let ai = compactModule(contentHeight: 350)
   static let battery = system
   static let keyboardSound = system
   static let notes = system
