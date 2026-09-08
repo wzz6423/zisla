@@ -25,6 +25,58 @@ struct NowPlayingMetadataStalenessTests {
     }
 
     @Test
+    func sameTrackFromAnotherApplicationDoesNotReusePreviousArtwork() {
+        let previous = snapshot(
+            sourceBundleIdentifier: "com.tencent.QQMusicMac",
+            sourcePID: 1,
+            sourceIconData: Data([0x01])
+        )
+        let update = NowPlayingSnapshot(
+            title: previous.title,
+            artist: previous.artist,
+            album: nil,
+            artworkData: nil,
+            duration: previous.duration,
+            elapsedTime: 10,
+            isPlaying: true,
+            sourceBundleIdentifier: "com.apple.Music",
+            sourcePID: 2,
+            sourceIconData: nil
+        )
+
+        let merged = NowPlayingService.mergingMetadata(update, previous: previous)
+
+        #expect(merged.artworkData == nil)
+        #expect(merged.sourceIconData == nil)
+    }
+
+    @Test
+    func sameApplicationWithReplacementProcessDoesNotReuseMetadata() {
+        let previous = snapshot(
+            sourceBundleIdentifier: "com.tencent.QQMusicMac",
+            sourcePID: 1,
+            sourceIconData: Data([0x01])
+        )
+        let update = NowPlayingSnapshot(
+            title: previous.title,
+            artist: previous.artist,
+            album: nil,
+            artworkData: nil,
+            duration: previous.duration,
+            elapsedTime: 10,
+            isPlaying: true,
+            sourceBundleIdentifier: "com.tencent.QQMusicMac",
+            sourcePID: 2,
+            sourceIconData: nil
+        )
+
+        let merged = NowPlayingService.mergingMetadata(update, previous: previous)
+
+        #expect(merged.artworkData == nil)
+        #expect(merged.sourceIconData == nil)
+    }
+
+    @Test
     func sameTrackRefreshFromSameApplicationKeepsPreviousIcon() {
         let icon = Data([0x01])
         let previous = snapshot(

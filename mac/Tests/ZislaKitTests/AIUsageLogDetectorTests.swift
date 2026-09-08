@@ -23,6 +23,33 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
+    func ignoresHiddenDoubaoAgentModeArtifacts() throws {
+        let root = temporaryDirectory(named: "usage-log-doubao-agent-mode")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let empty = root.appendingPathComponent("empty", isDirectory: true)
+        let artifact = root.appendingPathComponent(
+            "Default/.doubao/agent_mode/workspace/.sessions/test/agents/agent/system/trajectory.jsonl"
+        )
+        try writeJSONL([
+            "{\"timestamp\":\"2026-09-08T00:00:00.000Z\",\"usage\":{\"input_tokens\":10,\"output_tokens\":2}}",
+        ], to: artifact)
+
+        let detector = AIUsageLogDetector(
+            codexSessionsDirectory: empty,
+            claudeProjectsDirectory: empty,
+            geminiSessionsDirectory: empty,
+            grokSessionsDirectory: empty,
+            qwenProjectsDirectory: empty,
+            piSessionsDirectory: empty,
+            qoderRoots: [],
+            doubaoRoots: [root],
+            copilotUsageLogRoots: []
+        )
+
+        #expect(try detector.usageSamples().isEmpty)
+    }
+
+    @Test
     func defaultScanReadsStructuredJSONLargerThanFormerLimit() throws {
         let root = temporaryDirectory(named: "usage-log-large-json")
         defer { try? FileManager.default.removeItem(at: root) }
