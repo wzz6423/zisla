@@ -236,6 +236,7 @@ struct CodexSessionActivityDetectorTests {
         rolloutIsOpen = false
 
         #expect(try detector.activeTasks().isEmpty)
+        #expect(try detector.activeTasks().isEmpty)
     }
 
     @Test
@@ -299,6 +300,7 @@ struct CodexSessionActivityDetectorTests {
 
         current = current.addingTimeInterval(6)
 
+        #expect(try detector.activeTasks().isEmpty)
         #expect(try detector.activeTasks().isEmpty)
     }
 

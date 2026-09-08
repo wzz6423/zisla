@@ -825,6 +825,22 @@ struct NowPlayingServiceTests {
     }
 
     @Test
+    func mediaRemoteBundleWinsWhenPIDIsUnavailable() throws {
+        let frontmost = source(id: "front", pid: 10, isFrontmost: true)
+        let remote = source(id: "remote", pid: 20, isFrontmost: false)
+
+        let selected = try #require(
+            NowPlayingService.preferredSource(
+                from: [frontmost, remote],
+                remotePID: nil,
+                remoteBundleIdentifier: "test.remote"
+            )
+        )
+
+        #expect(selected.id == "remote")
+    }
+
+    @Test
     func soleCoreAudioSourceCorrectsConflictingMediaRemoteAttribution() throws {
         let bilibili = source(id: "bilibili", pid: 42, isFrontmost: true)
 
@@ -1102,6 +1118,48 @@ struct NowPlayingServiceTests {
             iconData: nil,
             isFrontmost: isFrontmost
         )
+    }
+
+    @Test
+    func adapterMetadataWithoutPlaybackFieldsRetainsKnownPlayingState() throws {
+        let data = try #require(
+            """
+            {
+              "title": "Track",
+              "artist": "Artist",
+              "duration": 180
+            }
+            """.data(using: .utf8)
+        )
+        let payload = try #require(MediaRemoteAdapterClient.decodeNowPlayingInfo(data))
+
+        let snapshot = try #require(
+            NowPlayingService.parseAdapter(payload, fallbackIsPlaying: true)
+        )
+
+        #expect(snapshot.isPlaying)
+    }
+
+    @Test
+    func explicitAdapterPlaybackStateOverridesKnownPlayingState() throws {
+        let data = try #require(
+            """
+            {
+              "title": "Track",
+              "artist": "Artist",
+              "duration": 180,
+              "playing": false,
+              "playbackRate": 1
+            }
+            """.data(using: .utf8)
+        )
+        let payload = try #require(MediaRemoteAdapterClient.decodeNowPlayingInfo(data))
+
+        let snapshot = try #require(
+            NowPlayingService.parseAdapter(payload, fallbackIsPlaying: true)
+        )
+
+        #expect(!snapshot.isPlaying)
     }
 
     @Test

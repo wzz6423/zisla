@@ -147,6 +147,7 @@ public final class CodexSessionActivityDetector {
     private var cache: [URL: CachedRollout] = [:]
     private var sessionIndexCache: CachedSessionIndex?
     private var confirmedActiveTurnIDs = Set<String>()
+    private var retiredTurnIDs = Set<String>()
     private var firstUnverifiedActivityAtByTurnID: [String: Date] = [:]
 
     static let incrementalVerificationBytes = 4 * 1_024
@@ -301,36 +302,55 @@ public final class CodexSessionActivityDetector {
             Set(processIdentifiersByURL.values)
         )
         let observedAt = now()
+        let candidateTurnIDs = Set(active.keys)
+        retiredTurnIDs.formIntersection(candidateTurnIDs)
+        confirmedActiveTurnIDs.formIntersection(candidateTurnIDs)
+        firstUnverifiedActivityAtByTurnID = firstUnverifiedActivityAtByTurnID.filter {
+            candidateTurnIDs.contains($0.key)
+        }
         var activeTurnIDs = Set<String>()
 
         func permitsUnverifiedActivity(for turnID: String) -> Bool {
-            guard !confirmedActiveTurnIDs.contains(turnID) else { return false }
+            guard !confirmedActiveTurnIDs.contains(turnID), !retiredTurnIDs.contains(turnID) else {
+                return false
+            }
             let firstObservedAt = firstUnverifiedActivityAtByTurnID[turnID] ?? observedAt
             firstUnverifiedActivityAtByTurnID[turnID] = firstObservedAt
-            return observedAt.timeIntervalSince(firstObservedAt) <= unverifiedActivityLifetime
+            guard observedAt.timeIntervalSince(firstObservedAt) <= unverifiedActivityLifetime else {
+                firstUnverifiedActivityAtByTurnID.removeValue(forKey: turnID)
+                retiredTurnIDs.insert(turnID)
+                return false
+            }
+            return true
         }
 
         for (turnID, record) in active {
+            guard !retiredTurnIDs.contains(turnID) else { continue }
             guard let processIdentifier = processIdentifiersByURL[record.rolloutURL] else {
-                if permitsUnverifiedActivity(for: turnID) {
+                if confirmedActiveTurnIDs.contains(turnID) {
+                    confirmedActiveTurnIDs.remove(turnID)
+                    retiredTurnIDs.insert(turnID)
+                } else if permitsUnverifiedActivity(for: turnID) {
                     activeTurnIDs.insert(turnID)
                 }
                 continue
             }
             guard let processStartedAt = processStartDatesByProcessIdentifier[processIdentifier] else {
-                if permitsUnverifiedActivity(for: turnID) {
+                if confirmedActiveTurnIDs.contains(turnID) {
+                    confirmedActiveTurnIDs.remove(turnID)
+                    retiredTurnIDs.insert(turnID)
+                } else if permitsUnverifiedActivity(for: turnID) {
                     activeTurnIDs.insert(turnID)
                 }
                 continue
             }
-            guard processStartedAt <= record.event.timestamp else { continue }
+            guard processStartedAt <= record.event.timestamp else {
+                retiredTurnIDs.insert(turnID)
+                continue
+            }
             confirmedActiveTurnIDs.insert(turnID)
             firstUnverifiedActivityAtByTurnID.removeValue(forKey: turnID)
             activeTurnIDs.insert(turnID)
-        }
-        confirmedActiveTurnIDs.formIntersection(activeTurnIDs)
-        firstUnverifiedActivityAtByTurnID = firstUnverifiedActivityAtByTurnID.filter {
-            activeTurnIDs.contains($0.key)
         }
         let tasks = active.values
             .filter { activeTurnIDs.contains($0.event.turnID) }
