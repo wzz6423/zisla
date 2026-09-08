@@ -683,6 +683,8 @@ struct NowPlayingServiceTests {
 
         #expect(MediaAppSpecialist.matchesFavoriteLabels(["从我喜欢删除"]))
         #expect(MediaAppSpecialist.matchesFavoriteLabels(["添加到我喜欢"]))
+        #expect(MediaAppSpecialist.favoriteState(for: ["喜欢歌曲", "从我喜欢删除"]) == true)
+        #expect(MediaAppSpecialist.favoriteState(for: ["喜欢歌曲", "添加到我喜欢"]) == false)
         #expect(!MediaAppSpecialist.matchesFavoriteLabels(["播放模式（顺序播放）"]))
         #expect(!MediaAppSpecialist.matchesFavoriteLabels(["播放", "暂停"]))
     }
@@ -745,8 +747,15 @@ struct NowPlayingServiceTests {
             "kMRMediaRemoteNowPlayingInfoIsLiked": NSNumber(value: true),
         ]
         let wishList = try #require(NowPlayingService.parse(wishListDictionary))
-        #expect(wishList.favoriteControl == .wishList)
-        #expect(wishList.isFavorite == false)
+        #expect(wishList.favoriteControl == .like)
+        #expect(wishList.isFavorite == true)
+
+        #expect(
+            MediaAppSpecialist.playbackMode(for: ["播放模式（单曲循环）"]) == .repeatOne
+        )
+        #expect(MediaAppSpecialist.playbackMode(for: ["播放模式（随机播放）"]) == .random)
+        #expect(MediaAppSpecialist.playbackMode(for: ["播放模式（顺序播放）"]) == .sequential)
+        #expect(MediaAppSpecialist.playbackMode(for: ["播放模式"]) == nil)
     }
 
     @Test
