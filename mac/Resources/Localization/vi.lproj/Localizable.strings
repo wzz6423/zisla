@@ -1575,6 +1575,7 @@
 "监听已停止" = "Đã Dừng Theo Dõi";
 "目录树展示" = "Trình xem cây thư mục";
 "终端工作区" = "Không gian làm việc terminal";
+"原生 macOS 终端工作区" = "Không gian làm việc terminal macOS gốc";
 "统计与权限" = "Thống kê và quyền";
 "统计已暂停" = "Đã tạm dừng thống kê";
 "自定义热词" = "Từ khóa tùy chỉnh";
