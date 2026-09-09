@@ -96,53 +96,31 @@ struct CollapsedProgressGlowTests {
     }
 
     @Test
-    func progressSegmentsSkipThePhysicalNotchWithoutPausingAtTheCenter() {
-        let halfway = CollapsedProgress.segmentWidths(
+    func progressGlowUsesAContinuousTrackAcrossThePhysicalNotch() {
+        #expect(CollapsedProgress.filledWidth(
             progress: 0.5,
-            totalWidth: 500,
-            centerInset: 200
-        )
-        #expect(halfway.leading == 150)
-        #expect(halfway.trailing == 0)
-        #expect(halfway.side == 150)
-        #expect(halfway.centerInset == 200)
-
-        let pastCenter = CollapsedProgress.segmentWidths(
+            totalWidth: 500
+        ) == 250)
+        #expect(CollapsedProgress.filledWidth(
             progress: 0.75,
-            totalWidth: 500,
-            centerInset: 200
-        )
-        #expect(pastCenter.leading == 150)
-        #expect(pastCenter.trailing == 75)
-
-        let continuous = CollapsedProgress.segmentWidths(
-            progress: 0.25,
-            totalWidth: 500,
-            centerInset: 0
-        )
-        #expect(continuous.leading == 125)
-        #expect(continuous.trailing == 0)
-        #expect(continuous.side == 500)
-
-        let clamped = CollapsedProgress.segmentWidths(
+            totalWidth: 500
+        ) == 375)
+        #expect(CollapsedProgress.filledWidth(
             progress: 2,
-            totalWidth: 100,
-            centerInset: 200
-        )
-        #expect(clamped.leading == 0)
-        #expect(clamped.trailing == 0)
-        #expect(clamped.side == 0)
-        #expect(clamped.centerInset == 100)
-
-        let negative = CollapsedProgress.segmentWidths(
+            totalWidth: 100
+        ) == 100)
+        #expect(CollapsedProgress.filledWidth(
             progress: -1,
-            totalWidth: 100,
-            centerInset: -20
-        )
-        #expect(negative.leading == 0)
-        #expect(negative.trailing == 0)
-        #expect(negative.side == 100)
-        #expect(negative.centerInset == 0)
+            totalWidth: 100
+        ) == 0)
+        #expect(CollapsedProgress.filledWidth(
+            progress: .infinity,
+            totalWidth: 100
+        ) == 0)
+        #expect(CollapsedProgress.filledWidth(
+            progress: 0.5,
+            totalWidth: -100
+        ) == 0)
     }
 
     @Test
@@ -190,10 +168,16 @@ struct CollapsedProgressGlowTests {
         #expect(source.contains("videoDownloadNotice?.progress"))
         #expect(source.contains("settingsStore.settings.collapsedProgressGlowEnabled"))
         #expect(source.contains("CollapsedProgressGlow("))
-        #expect(source.contains("centerInset: displayState.compactBarCenterInset"))
         #expect(source.contains("MediaWaveformView.tintColor(for: artworkData)"))
         #expect(source.contains("compactStatusBackgroundFill"))
         #expect(source.contains("Color.clear\n                        .frame(width: centerInset)"))
+
+        let glowSource = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/CollapsedProgressGlow.swift"),
+            encoding: .utf8
+        )
+        #expect(glowSource.contains("CollapsedProgress.filledWidth"))
+        #expect(glowSource.contains("glowSegment(width: filledWidth)"))
 
         let waveformSource = try String(
             contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/MediaWaveformView.swift"),

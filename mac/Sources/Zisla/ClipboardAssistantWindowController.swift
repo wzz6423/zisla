@@ -535,10 +535,7 @@ struct ClipboardAssistantToastView: View {
                         if !isExpanded,
                            presentation.progressGlowEnabled,
                            let progress = controller.dismissalProgress(at: context.date) {
-                            CollapsedProgressGlow(
-                                progress: progress,
-                                centerInset: presentation.physicalNotchWidth
-                            )
+                            CollapsedProgressGlow(progress: progress)
                         }
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))

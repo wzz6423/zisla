@@ -2,13 +2,6 @@ import SwiftUI
 import ZislaKit
 
 enum CollapsedProgress {
-    struct SegmentWidths: Equatable {
-        let leading: CGFloat
-        let trailing: CGFloat
-        let side: CGFloat
-        let centerInset: CGFloat
-    }
-
     static func playbackFraction(
         for snapshot: NowPlayingSnapshot,
         at date: Date
@@ -35,33 +28,13 @@ enum CollapsedProgress {
         normalized(1 - remaining)
     }
 
-    static func segmentWidths(
+    static func filledWidth(
         progress: Double,
-        totalWidth: CGFloat,
-        centerInset: CGFloat
-    ) -> SegmentWidths {
+        totalWidth: CGFloat
+    ) -> CGFloat {
         let width = max(0, totalWidth)
-        let gap = min(max(0, centerInset), width)
-        let visibleWidth = width - gap
         let fraction = min(max(progress.isFinite ? progress : 0, 0), 1)
-
-        guard gap > 0 else {
-            return SegmentWidths(
-                leading: visibleWidth * fraction,
-                trailing: 0,
-                side: visibleWidth,
-                centerInset: 0
-            )
-        }
-
-        let sideWidth = visibleWidth / 2
-        let filledWidth = visibleWidth * fraction
-        return SegmentWidths(
-            leading: min(filledWidth, sideWidth),
-            trailing: min(max(filledWidth - sideWidth, 0), sideWidth),
-            side: sideWidth,
-            centerInset: gap
-        )
+        return width * fraction
     }
 
     private static func normalized(_ value: Double) -> Double? {
@@ -72,29 +45,17 @@ enum CollapsedProgress {
 
 struct CollapsedProgressGlow: View {
     var progress: Double
-    var centerInset: CGFloat = 0
     var tint: Color = .green
 
     var body: some View {
         GeometryReader { geometry in
             let trackWidth = max(0, geometry.size.width - 2)
-            let segments = CollapsedProgress.segmentWidths(
+            let filledWidth = CollapsedProgress.filledWidth(
                 progress: progress,
-                totalWidth: trackWidth,
-                centerInset: centerInset
+                totalWidth: trackWidth
             )
             ZStack(alignment: .bottomLeading) {
-                if segments.centerInset > 0 {
-                    glowSegment(width: segments.leading)
-                        .frame(width: segments.side, alignment: .leading)
-                        .clipped()
-                    glowSegment(width: segments.trailing)
-                        .frame(width: segments.side, alignment: .leading)
-                        .clipped()
-                        .offset(x: segments.side + segments.centerInset)
-                } else {
-                    glowSegment(width: segments.leading)
-                }
+                glowSegment(width: filledWidth)
             }
             .frame(width: trackWidth, height: geometry.size.height, alignment: .bottomLeading)
             .padding(.horizontal, 1)

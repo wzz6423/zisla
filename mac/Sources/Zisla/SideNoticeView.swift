@@ -195,7 +195,6 @@ struct CompactStatusBarView: View {
                    let progress = compactProgress(at: date) {
                     CollapsedProgressGlow(
                         progress: progress,
-                        centerInset: displayState.compactBarCenterInset,
                         tint: compactProgressTint
                     )
                 }
