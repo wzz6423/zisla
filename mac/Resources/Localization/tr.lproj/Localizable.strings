@@ -1575,6 +1575,7 @@
 "监听已停止" = "İzleme Durduruldu";
 "目录树展示" = "Dizin ağacı görüntüleyicisi";
 "终端工作区" = "Terminal çalışma alanı";
+"原生 macOS 终端工作区" = "Yerel macOS terminal çalışma alanı";
 "统计与权限" = "İstatistikler ve izinler";
 "统计已暂停" = "İstatistikler duraklatıldı";
 "自定义热词" = "Özel terimler";

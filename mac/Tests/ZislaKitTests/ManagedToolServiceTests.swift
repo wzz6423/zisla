@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ZislaCore
 
 @testable import ZislaKit
 
@@ -69,6 +70,35 @@ struct ManagedToolServiceTests {
     }
 
     @Test
+    func zshellUsesTheHomebrewCaskAndExpectedExecutablePath() {
+        #expect(ManagedTool.zshell.installationSource == .homebrewCask(name: "wzz6423/tap/zshell"))
+        #expect(ManagedTool.zshell.requiredHomebrewTap == "wzz6423/tap")
+        #expect(ManagedTool.zshell.executableName == "zshell")
+        #expect(ManagedTool.zshell.usesNativeApplicationVersion)
+        #expect(ManagedToolService.externalPaths(for: .zshell).contains(
+            "/Applications/zshell.app/Contents/MacOS/zshell"
+        ))
+    }
+
+    @Test
+    func zshellPurposeHasATranslationInEveryLanguage() throws {
+        let key = ManagedTool.zshell.purpose
+
+        for language in AppLanguage.allCases {
+            let tableURL = Self.localizationURL
+                .appendingPathComponent("\(language.rawValue).lproj", isDirectory: true)
+                .appendingPathComponent("Localizable.strings")
+            let table = try #require(
+                NSDictionary(contentsOf: tableURL) as? [String: String],
+                "无法解析 \(language.rawValue) 的 Localizable.strings"
+            )
+            let expected = try #require(table[key], "\(language.rawValue) 缺少「\(key)」")
+
+            #expect(AppLocalization.string(key, language: language) == expected)
+        }
+    }
+
+    @Test
     func recommendedCatalogIncludesEveryVerifiedHomebrewTool() {
         let expected: [(ManagedTool, ManagedToolInstallationSource, String)] = [
             (.delta, .homebrewFormula(name: "git-delta"), "delta"),
@@ -104,7 +134,7 @@ struct ManagedToolServiceTests {
             (.kero, .homebrewCask(name: "egoist/tap/kero"), "kero"),
         ]
 
-        #expect(ManagedTool.allCases.count == 45)
+        #expect(ManagedTool.allCases.count == 46)
         for (tool, source, executableName) in expected {
             #expect(tool.installationSource == source)
             #expect(tool.executableName == executableName)
@@ -123,7 +153,7 @@ struct ManagedToolServiceTests {
         #expect(count(.networkAndData) == 7)
         #expect(count(.developmentToolchain) == 21)
         #expect(count(.utility) == 3)
-        #expect(count(.desktopApplication) == 3)
+        #expect(count(.desktopApplication) == 4)
     }
 
     @Test
@@ -137,6 +167,14 @@ struct ManagedToolServiceTests {
         #expect(ManagedToolService.externalPaths(for: .gcc).contains(
             "/opt/homebrew/bin/gcc-16"
         ))
+    }
+
+    private static var localizationURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources/Localization", isDirectory: true)
     }
 
     @Test

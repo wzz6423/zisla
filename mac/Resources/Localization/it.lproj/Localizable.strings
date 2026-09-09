@@ -1575,6 +1575,7 @@
 "监听已停止" = "Monitoraggio interrotto";
 "目录树展示" = "Visualizzatore ad albero delle cartelle";
 "终端工作区" = "Area di lavoro nel Terminale";
+"原生 macOS 终端工作区" = "Area di lavoro terminale nativa per macOS";
 "统计与权限" = "Statistiche e permessi";
 "统计已暂停" = "Statistiche in pausa";
 "自定义热词" = "Termini personalizzati";

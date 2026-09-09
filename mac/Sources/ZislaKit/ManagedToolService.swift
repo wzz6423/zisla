@@ -120,6 +120,9 @@ public final class ManagedToolService: ObservableObject {
         if tool == .kero {
             return ["/Applications/Kero.app/Contents/MacOS/kero"]
         }
+        if tool == .zshell {
+            return ["/Applications/zshell.app/Contents/MacOS/zshell"]
+        }
         if tool == .markdownPreview {
             return [
                 "/opt/homebrew/bin/mdp",
