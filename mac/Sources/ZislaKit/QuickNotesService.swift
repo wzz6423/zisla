@@ -12,10 +12,27 @@ import ZislaCore
 public final class QuickNotesService: ObservableObject {
     struct Operations {
         let listNotes: () async -> Result<[NotesAppBridge.NoteSummary], NotesAppError>
-        let isPasswordProtected: (String) async -> Result<Bool, NotesAppError>
         let readNote: (String) async -> Result<NotesAppBridge.NoteContent, NotesAppError>
+        let readAttachments: (String) async -> Result<[NotesAppBridge.NoteAttachment], NotesAppError>
         let writeNote: (String, String) async -> Result<Void, NotesAppError>
+        let createNote: (String, String) async -> Result<String, NotesAppError>
         let deleteNote: (String) async -> Result<Void, NotesAppError>
+
+        init(
+            listNotes: @escaping () async -> Result<[NotesAppBridge.NoteSummary], NotesAppError>,
+            readNote: @escaping (String) async -> Result<NotesAppBridge.NoteContent, NotesAppError>,
+            readAttachments: @escaping (String) async -> Result<[NotesAppBridge.NoteAttachment], NotesAppError> = { _ in .success([]) },
+            writeNote: @escaping (String, String) async -> Result<Void, NotesAppError>,
+            createNote: @escaping (String, String) async -> Result<String, NotesAppError>,
+            deleteNote: @escaping (String) async -> Result<Void, NotesAppError>
+        ) {
+            self.listNotes = listNotes
+            self.readNote = readNote
+            self.readAttachments = readAttachments
+            self.writeNote = writeNote
+            self.createNote = createNote
+            self.deleteNote = deleteNote
+        }
     }
 
     public static var welcomeNoteTitle: String { AppLocalization.text("朋友，看这里。") }
@@ -35,6 +52,7 @@ public final class QuickNotesService: ObservableObject {
     @Published public var selectedID: String? {
         didSet {
             guard oldValue != selectedID else { return }
+            cancelAttachmentLoads(except: selectedID)
             noteLoadID = nil
             noteLoadGeneration &+= 1
             isLoadingNote = false
@@ -43,13 +61,59 @@ public final class QuickNotesService: ObservableObject {
     @Published public private(set) var isLoadingList = false
     @Published public private(set) var isLoadingNote = false
     @Published public private(set) var isSaving = false
+    @Published public private(set) var attachmentHydrationGeneration = 0
     @Published public var errorMessage: String?
 
+    private struct NoteRevision: Equatable {
+        let modifiedAt: Date?
+        let isPasswordProtected: Bool
+        let unknownRevisionGeneration: Int?
+
+        init(summary: NotesAppBridge.NoteSummary, unknownRevisionGeneration: Int) {
+            modifiedAt = summary.modifiedAt
+            isPasswordProtected = summary.isPasswordProtected
+            self.unknownRevisionGeneration = summary.modifiedAt == nil ? unknownRevisionGeneration : nil
+        }
+
+        var canCache: Bool { modifiedAt != nil }
+    }
+
+    private struct CachedNoteContent {
+        let content: NotesAppBridge.NoteContent
+        let revision: NoteRevision
+    }
+
+    private struct InFlightNoteLoad {
+        let token = UUID()
+        let revision: NoteRevision
+        let task: Task<Result<NotesAppBridge.NoteContent, NotesAppError>, Never>
+    }
+
+    private struct CachedAttachments {
+        let attachments: [NotesAppBridge.NoteAttachment]
+        let revision: NoteRevision
+    }
+
+    private struct InFlightAttachmentLoad {
+        let token = UUID()
+        let revision: NoteRevision
+        let task: Task<Result<[NotesAppBridge.NoteAttachment], NotesAppError>, Never>
+    }
+
     private var saveTasksByID: [String: Task<Void, Never>] = [:]
+    private var refreshTask: Task<Void, Never>?
+    private var lastSuccessfulRefreshAt = Date.distantPast
+    private var refreshGeneration = 0
+    private var inFlightRefreshGeneration: Int?
+    private var noteSummaryGeneration = 0
+    private var cachedNoteContents: [String: CachedNoteContent] = [:]
+    private var cachedAttachments: [String: CachedAttachments] = [:]
+    private var pendingCreatedNotes: [String: NotesAppBridge.NoteSummary] = [:]
+    private var inFlightNoteLoads: [String: InFlightNoteLoad] = [:]
+    private var inFlightAttachmentLoads: [String: InFlightAttachmentLoad] = [:]
     private let welcomeDismissalDefaults: UserDefaults
     private let operations: Operations
     private let saveDelay: Duration
-    private var refreshGeneration = 0
     private var noteLoadGeneration = 0
     private var noteLoadID: String?
     private var activeNoteLoadsByGeneration: [Int: Int] = [:]
@@ -62,9 +126,10 @@ public final class QuickNotesService: ObservableObject {
     public init(welcomeDismissalDefaults: UserDefaults = .standard) {
         operations = Operations(
             listNotes: { await NotesAppBridge.listNotes() },
-            isPasswordProtected: { await NotesAppBridge.isPasswordProtected(noteID: $0) },
             readNote: { await NotesAppBridge.readNote(id: $0) },
+            readAttachments: { await NotesAppBridge.readAttachments(noteID: $0) },
             writeNote: { id, html in await NotesAppBridge.writeNote(id: id, html: html) },
+            createNote: { title, html in await NotesAppBridge.createNote(title: title, html: html) },
             deleteNote: { await NotesAppBridge.deleteNote(id: $0) }
         )
         self.welcomeDismissalDefaults = welcomeDismissalDefaults
@@ -110,6 +175,14 @@ public final class QuickNotesService: ObservableObject {
         id == Self.builtInWelcomeNoteID
     }
 
+    public func cachedContent(for id: String) -> NotesAppBridge.NoteContent? {
+        guard let summary = notes.first(where: { $0.id == id }),
+              let cached = cachedNoteContents[id],
+              cached.revision == noteRevision(for: summary)
+        else { return nil }
+        return cached.content
+    }
+
     static var welcomeNoteText: String {
         welcomeNoteText(language: AppLocalization.currentLanguage)
     }
@@ -136,21 +209,70 @@ public final class QuickNotesService: ObservableObject {
         return fallbackWelcomeNoteText
     }
 
-    /// Re-fetches the Notes note list; falls back to the first note if the currently selected item no longer exists.
+    /// Re-fetches the Notes note list; concurrent callers share one current list query.
     public func refresh() async {
-        refreshGeneration &+= 1
-        let generation = refreshGeneration
-        isLoadingList = true
-        errorMessage = nil
-        let result = await operations.listNotes()
-        guard refreshGeneration == generation else { return }
+        await refresh(force: true)
+    }
+
+    /// Refreshes automatically only while a list query is already in flight or when the last
+    /// successful list snapshot is stale, avoiding back-to-back activation/key-window queries.
+    public func refreshIfNeeded() async {
+        if refreshTask != nil {
+            await refresh(force: false)
+            return
+        }
+        guard Date().timeIntervalSince(lastSuccessfulRefreshAt) >= 2 else { return }
+        await refresh(force: false)
+    }
+
+    private func refresh(force: Bool) async {
+        if !force, refreshTask == nil,
+           Date().timeIntervalSince(lastSuccessfulRefreshAt) < 2 {
+            return
+        }
+        while true {
+            if let refreshTask {
+                let taskGeneration = inFlightRefreshGeneration
+                await refreshTask.value
+                if refreshGeneration == taskGeneration { return }
+                continue
+            }
+
+            let generation = refreshGeneration
+            isLoadingList = true
+            errorMessage = nil
+            inFlightRefreshGeneration = generation
+            let task = Task { [weak self] in
+                guard let self else { return }
+                let result = await self.operations.listNotes()
+                self.finishRefresh(result, generation: generation)
+            }
+            refreshTask = task
+            await task.value
+            if refreshGeneration == generation { return }
+        }
+    }
+
+    private func finishRefresh(
+        _ result: Result<[NotesAppBridge.NoteSummary], NotesAppError>,
+        generation: Int
+    ) {
+        guard inFlightRefreshGeneration == generation else { return }
+        refreshTask = nil
+        inFlightRefreshGeneration = nil
         isLoadingList = false
+        guard refreshGeneration == generation else { return }
         switch result {
         case .success(let fetched):
+            lastSuccessfulRefreshAt = Date()
             applyFetchedNotes(fetched)
         case .failure(let error):
             errorMessage = error.message
         }
+    }
+
+    private func invalidateRefresh() {
+        refreshGeneration &+= 1
     }
 
     /// Updates local state with an external list result (shared by tests and `refresh`).
@@ -158,9 +280,39 @@ public final class QuickNotesService: ObservableObject {
     func applyFetchedNotes(_ fetched: [NotesAppBridge.NoteSummary]) {
         // Earlier versions used this reserved title for a generated system note. Leave the
         // system record untouched, but do not show it alongside the local replacement.
-        notes = fetched
+        let updatedNotes = fetched
             .filter { $0.title != Self.welcomeNoteTitle }
             .sorted { ($0.modifiedAt ?? .distantPast) > ($1.modifiedAt ?? .distantPast) }
+        let fetchedIDs = Set(updatedNotes.map(\.id))
+        pendingCreatedNotes = pendingCreatedNotes.filter { !fetchedIDs.contains($0.key) }
+        let displayedNotes = (updatedNotes + pendingCreatedNotes.values)
+            .sorted { ($0.modifiedAt ?? .distantPast) > ($1.modifiedAt ?? .distantPast) }
+        noteSummaryGeneration &+= 1
+        let summariesByID = Dictionary(uniqueKeysWithValues: displayedNotes.map { ($0.id, $0) })
+        cachedNoteContents = cachedNoteContents.filter { id, cached in
+            guard let summary = summariesByID[id] else { return false }
+            return cached.revision == noteRevision(for: summary)
+        }
+        cachedAttachments = cachedAttachments.filter { id, cached in
+            guard let summary = summariesByID[id] else { return false }
+            return cached.revision == noteRevision(for: summary)
+        }
+        inFlightNoteLoads = inFlightNoteLoads.filter { id, inFlight in
+            guard let summary = summariesByID[id] else { return false }
+            return inFlight.revision == noteRevision(for: summary)
+        }
+        let staleAttachmentLoadIDs = inFlightAttachmentLoads.keys.filter { id in
+            guard let summary = summariesByID[id] else { return true }
+            return inFlightAttachmentLoads[id]?.revision != noteRevision(for: summary)
+        }
+        for id in staleAttachmentLoadIDs {
+            inFlightAttachmentLoads[id]?.task.cancel()
+            inFlightAttachmentLoads[id] = nil
+        }
+        inFlightAttachmentLoads = inFlightAttachmentLoads.filter { id, _ in
+            summariesByID[id] != nil
+        }
+        notes = displayedNotes
         guard let selectedID else {
             self.selectedID = welcomeNote?.id ?? notes.first?.id
             return
@@ -192,19 +344,24 @@ public final class QuickNotesService: ObservableObject {
                 bodyHTML: NotesAppBridge.bodyHTML(for: Self.welcomeNoteText)
             )
         }
-        let protectionResult = await operations.isPasswordProtected(id)
-        guard isCurrentNoteLoad(generation, id: id) else { return nil }
-        if case .success(true) = protectionResult {
-            return NotesAppBridge.NoteContent(
-                plainText: "",
-                bodyHTML: "",
-                isPasswordProtected: true
-            )
+        guard let summary = notes.first(where: { $0.id == id }) else { return nil }
+        let revision = noteRevision(for: summary)
+        if let cached = cachedNoteContents[id], cached.revision == revision {
+            scheduleAttachmentLoad(for: id, revision: revision, content: cached.content)
+            return cached.content
         }
-        let result = await operations.readNote(id)
-        guard isCurrentNoteLoad(generation, id: id) else { return nil }
+        let result = await noteLoadResult(for: id, revision: revision)
+        guard isCurrentNoteLoad(generation, id: id), currentNoteRevision(for: id) == revision else {
+            return nil
+        }
         switch result {
         case .success(let content):
+            guard content.isPasswordProtected == revision.isPasswordProtected else { return nil }
+            let content = contentWithCachedAttachments(for: id, revision: revision, content: content)
+            if revision.canCache {
+                cachedNoteContents[id] = CachedNoteContent(content: content, revision: revision)
+            }
+            scheduleAttachmentLoad(for: id, revision: revision, content: content)
             return content
         case .failure(let error):
             errorMessage = error.message
@@ -250,6 +407,99 @@ public final class QuickNotesService: ObservableObject {
             task.cancel()
         }
         pendingSaveByID.removeValue(forKey: id)
+    }
+
+    private func noteRevision(for summary: NotesAppBridge.NoteSummary) -> NoteRevision {
+        NoteRevision(summary: summary, unknownRevisionGeneration: noteSummaryGeneration)
+    }
+
+    private func currentNoteRevision(for id: String) -> NoteRevision? {
+        notes.first(where: { $0.id == id }).map(noteRevision(for:))
+    }
+
+    private func noteLoadResult(
+        for id: String,
+        revision: NoteRevision
+    ) async -> Result<NotesAppBridge.NoteContent, NotesAppError> {
+        if let inFlight = inFlightNoteLoads[id], inFlight.revision == revision {
+            return await inFlight.task.value
+        }
+        let task = Task { [operations] in
+            await operations.readNote(id)
+        }
+        let inFlight = InFlightNoteLoad(revision: revision, task: task)
+        inFlightNoteLoads[id] = inFlight
+        let result = await task.value
+        if inFlightNoteLoads[id]?.token == inFlight.token {
+            inFlightNoteLoads[id] = nil
+        }
+        return result
+    }
+
+    private func contentWithCachedAttachments(
+        for id: String,
+        revision: NoteRevision,
+        content: NotesAppBridge.NoteContent
+    ) -> NotesAppBridge.NoteContent {
+        guard let cached = cachedAttachments[id], cached.revision == revision else { return content }
+        return NotesAppBridge.NoteContent(
+            plainText: content.plainText,
+            bodyHTML: content.bodyHTML,
+            isPasswordProtected: content.isPasswordProtected,
+            attachments: cached.attachments
+        )
+    }
+
+    private func scheduleAttachmentLoad(
+        for id: String,
+        revision: NoteRevision,
+        content: NotesAppBridge.NoteContent
+    ) {
+        guard !content.isPasswordProtected,
+              cachedAttachments[id]?.revision != revision,
+              inFlightAttachmentLoads[id]?.revision != revision
+        else { return }
+        let task = Task { [operations] in
+            await operations.readAttachments(id)
+        }
+        let inFlight = InFlightAttachmentLoad(revision: revision, task: task)
+        inFlightAttachmentLoads[id] = inFlight
+        Task { [weak self] in
+            let result = await task.value
+            self?.finishAttachmentLoad(for: id, revision: revision, token: inFlight.token, result: result)
+        }
+    }
+
+    private func finishAttachmentLoad(
+        for id: String,
+        revision: NoteRevision,
+        token: UUID,
+        result: Result<[NotesAppBridge.NoteAttachment], NotesAppError>
+    ) {
+        guard inFlightAttachmentLoads[id]?.token == token else { return }
+        inFlightAttachmentLoads[id] = nil
+        guard currentNoteRevision(for: id) == revision else { return }
+        guard case .success(let attachments) = result else { return }
+        cachedAttachments[id] = CachedAttachments(attachments: attachments, revision: revision)
+        guard let cached = cachedNoteContents[id], cached.revision == revision else { return }
+        cachedNoteContents[id] = CachedNoteContent(
+            content: NotesAppBridge.NoteContent(
+                plainText: cached.content.plainText,
+                bodyHTML: cached.content.bodyHTML,
+                isPasswordProtected: cached.content.isPasswordProtected,
+                attachments: attachments
+            ),
+            revision: revision
+        )
+        attachmentHydrationGeneration &+= 1
+    }
+
+    private func cancelAttachmentLoads(except selectedID: String?) {
+        let inactiveIDs = inFlightAttachmentLoads.keys.filter { $0 != selectedID }
+        for id in inactiveIDs {
+            inFlightAttachmentLoads[id]?.task.cancel()
+            inFlightAttachmentLoads[id] = nil
+        }
     }
 
     private func isCurrentNoteLoad(_ generation: Int, id: String) -> Bool {
@@ -308,11 +558,14 @@ public final class QuickNotesService: ObservableObject {
         if saveGenerationByID[id] == generation {
             switch result {
             case .success:
+                cachedNoteContents[id] = nil
+                invalidateRefresh()
                 if let index = notes.firstIndex(where: { $0.id == id }) {
                     notes[index] = NotesAppBridge.NoteSummary(
                         id: id,
                         title: notes[index].title,
-                        modifiedAt: Date()
+                        modifiedAt: Date(),
+                        isPasswordProtected: notes[index].isPasswordProtected
                     )
                 }
             case .failure(let error):
@@ -333,18 +586,7 @@ public final class QuickNotesService: ObservableObject {
     @discardableResult
     public func create(markdown: String? = nil) async -> Bool {
         let markdown = markdown ?? "# \(AppLocalization.text("新随记"))\n"
-        let title = Self.title(for: markdown)
-        isSaving = true
-        let result = await NotesAppBridge.createNote(title: title, markdown: markdown)
-        isSaving = false
-        switch result {
-        case .success:
-            await refresh()
-            return true
-        case .failure(let error):
-            errorMessage = error.message
-            return false
-        }
+        return await create(html: NotesAppBridge.bodyHTML(for: markdown), title: Self.title(for: markdown))
     }
 
     /// Creates a rich-text note, then refreshes the list and selects it.
@@ -352,10 +594,20 @@ public final class QuickNotesService: ObservableObject {
     public func create(html: String, title: String? = nil) async -> Bool {
         let title = title ?? AppLocalization.text("新随记")
         isSaving = true
-        let result = await NotesAppBridge.createNote(title: title, html: html)
+        let result = await operations.createNote(title, html)
         isSaving = false
         switch result {
-        case .success:
+        case .success(let id):
+            invalidateRefresh()
+            let summary = NotesAppBridge.NoteSummary(
+                id: id,
+                title: title,
+                modifiedAt: Date()
+            )
+            pendingCreatedNotes[id] = summary
+            notes.removeAll { $0.id == id }
+            notes.insert(summary, at: 0)
+            selectedID = id
             await refresh()
             return true
         case .failure(let error):
@@ -375,6 +627,7 @@ public final class QuickNotesService: ObservableObject {
         }
         guard deletingNoteIDs.insert(id).inserted else { return }
         defer { deletingNoteIDs.remove(id) }
+        cachedNoteContents[id] = nil
         invalidatePendingSave(for: id)
         if let activeSave = activeSaveTasksByID[id] {
             await activeSave.value
@@ -382,6 +635,8 @@ public final class QuickNotesService: ObservableObject {
         let result = await operations.deleteNote(id)
         if case .failure(let error) = result {
             errorMessage = error.message
+        } else {
+            invalidateRefresh()
         }
         await refresh()
     }

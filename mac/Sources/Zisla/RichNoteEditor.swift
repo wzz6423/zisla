@@ -52,11 +52,41 @@ struct RichNoteEditorCommand: Identifiable, Equatable {
 
 struct RichNoteEditor: NSViewRepresentable {
     let html: String
+    let noteID: String?
     let command: RichNoteEditorCommand?
     let isEditable: Bool
-    let onChange: (String, String) -> Void
+    let onChange: (String?, String, String) -> Void
 
-    static var newNoteHTML: String { "<h1>\(AppLocalization.text("新随记"))</h1><div><br></div>" }
+    static var newNoteHTML: String { "<h1>\(AppLocalization.text("新随记"))</h1><div><span style=\"font-size: 14px\"><br></span></div>" }
+
+    init(
+        html: String,
+        noteID: String? = nil,
+        command: RichNoteEditorCommand?,
+        isEditable: Bool,
+        onChange: @escaping (String?, String, String) -> Void
+    ) {
+        self.html = html
+        self.noteID = noteID
+        self.command = command
+        self.isEditable = isEditable
+        self.onChange = onChange
+    }
+
+    init(
+        html: String,
+        command: RichNoteEditorCommand?,
+        isEditable: Bool,
+        onChange: @escaping (String, String) -> Void
+    ) {
+        self.init(
+            html: html,
+            command: command,
+            isEditable: isEditable
+        ) { _, html, plainText in
+            onChange(html, plainText)
+        }
+    }
 
     static func editableHTML(for content: NotesAppBridge.NoteContent?) -> String {
         guard let content, !content.bodyHTML.isEmpty else { return "<div><br></div>" }
@@ -67,7 +97,7 @@ struct RichNoteEditor: NSViewRepresentable {
         )
     }
 
-    private static func htmlWithInlineAttachments(
+    static func htmlWithInlineAttachments(
         bodyHTML: String,
         plainText: String,
         attachments: [NotesAppBridge.NoteAttachment]
@@ -174,12 +204,12 @@ struct RichNoteEditor: NSViewRepresentable {
         webView.setValue(false, forKey: "drawsBackground")
 
         context.coordinator.attach(webView)
-        context.coordinator.setHTML(html)
+        context.coordinator.setDocument(noteID: noteID, html: html)
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        context.coordinator.setHTML(html)
+        context.coordinator.setDocument(noteID: noteID, html: html)
         context.coordinator.setEditable(isEditable)
         if let command {
             context.coordinator.perform(command)
@@ -191,14 +221,36 @@ struct RichNoteEditor: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
-        private let onChange: (String, String) -> Void
+        private struct Document: Equatable {
+            let noteID: String?
+            let html: String
+            let token: Int
+        }
+
+        private struct DocumentIdentity {
+            let noteID: String?
+        }
+
+        private let onChange: (String?, String, String) -> Void
         private weak var webView: WKWebView?
-        private var loadedHTML: String?
+        private var desiredDocument: Document?
+        private var appliedDocument: Document?
+        private var initialNavigationDocument: Document?
+        private var documentIdentities: [Int: DocumentIdentity] = [:]
+        private var documentIdentityOrder: [Int] = []
+        private var nextDocumentToken = 0
+        private var applyingDocumentToken: Int?
+        private var applyRetryCount = 0
+        private var applyRetryWorkItem: DispatchWorkItem?
+        private var hasStartedInitialNavigation = false
         private var isReady = false
         private var lastCommandID: UUID?
         private var isEditable: Bool
 
-        init(onChange: @escaping (String, String) -> Void, isEditable: Bool) {
+        init(
+            onChange: @escaping (String?, String, String) -> Void,
+            isEditable: Bool
+        ) {
             self.onChange = onChange
             self.isEditable = isEditable
         }
@@ -207,21 +259,87 @@ struct RichNoteEditor: NSViewRepresentable {
             self.webView = webView
         }
 
-        func setHTML(_ html: String) {
-            guard loadedHTML != html else { return }
-            loadedHTML = html
+        func setDocument(noteID: String?, html: String) {
+            if let desiredDocument, desiredDocument.noteID == noteID, desiredDocument.html == html {
+                return
+            }
+            let document = Document(noteID: noteID, html: html, token: nextToken())
+            desiredDocument = document
+            rememberIdentity(for: document)
+            cancelPendingDocumentApply()
             guard let webView else { return }
             if isReady {
-                webView.evaluateJavaScript("window.zisla.setHTML(\(RichNoteEditor.javaScriptLiteral(html)));") { _, error in
-                    if let error {
-                        print("Failed to set HTML: \(error)")
-                    }
-                }
-            } else {
+                applyDesiredDocument(in: webView)
+            } else if !hasStartedInitialNavigation {
+                hasStartedInitialNavigation = true
+                initialNavigationDocument = document
                 webView.loadHTMLString(
-                    RichNoteEditor.document(initialHTML: html, isEditable: isEditable),
+                    RichNoteEditor.document(initialHTML: html, initialToken: document.token, isEditable: isEditable),
                     baseURL: nil
                 )
+            }
+        }
+
+        private func applyDesiredDocument(in webView: WKWebView) {
+            guard let document = desiredDocument, appliedDocument?.token != document.token else { return }
+            guard applyingDocumentToken != document.token else { return }
+            applyRetryWorkItem?.cancel()
+            applyRetryWorkItem = nil
+            applyingDocumentToken = document.token
+            webView.evaluateJavaScript(
+                "window.zisla.setHTML(\(RichNoteEditor.javaScriptLiteral(document.html)), \(document.token));"
+            ) { [weak self, weak webView] _, error in
+                guard let self, let webView else { return }
+                guard self.applyingDocumentToken == document.token else { return }
+                self.applyingDocumentToken = nil
+                if let error {
+                    self.scheduleDocumentApplyRetry(for: document, in: webView, error: error)
+                    return
+                }
+                guard self.desiredDocument?.token == document.token else {
+                    self.applyRetryCount = 0
+                    self.applyDesiredDocument(in: webView)
+                    return
+                }
+                self.applyRetryCount = 0
+                self.appliedDocument = document
+            }
+        }
+
+        private func scheduleDocumentApplyRetry(
+            for document: Document,
+            in webView: WKWebView,
+            error: Error
+        ) {
+            guard desiredDocument?.token == document.token, applyRetryCount < 2 else {
+                print("Failed to set HTML: \(error)")
+                return
+            }
+            applyRetryCount += 1
+            let workItem = DispatchWorkItem { [weak self, weak webView] in
+                guard let self, let webView, self.desiredDocument?.token == document.token else { return }
+                self.applyDesiredDocument(in: webView)
+            }
+            applyRetryWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
+        }
+
+        private func cancelPendingDocumentApply() {
+            applyRetryWorkItem?.cancel()
+            applyRetryWorkItem = nil
+            applyRetryCount = 0
+        }
+
+        private func nextToken() -> Int {
+            nextDocumentToken &+= 1
+            return nextDocumentToken
+        }
+
+        private func rememberIdentity(for document: Document) {
+            documentIdentities[document.token] = DocumentIdentity(noteID: document.noteID)
+            documentIdentityOrder.append(document.token)
+            while documentIdentityOrder.count > 8 {
+                documentIdentities.removeValue(forKey: documentIdentityOrder.removeFirst())
             }
         }
 
@@ -250,22 +368,25 @@ struct RichNoteEditor: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             isReady = true
-            if let loadedHTML {
-                webView.evaluateJavaScript("window.zisla.setHTML(\(RichNoteEditor.javaScriptLiteral(loadedHTML)));") { _, error in
-                    if let error {
-                        print("Failed to set initial HTML: \(error)")
-                    }
-                }
+            if initialNavigationDocument?.token == desiredDocument?.token {
+                appliedDocument = desiredDocument
             }
+            applyDesiredDocument(in: webView)
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard message.name == "richNoteChanged",
                   let payload = message.body as? [String: Any],
-                  let html = payload["html"] as? String
+                  let html = payload["html"] as? String,
+                  let token = payload["token"] as? Int,
+                  let identity = documentIdentities[token]
             else { return }
-            loadedHTML = html
-            onChange(html, payload["plainText"] as? String ?? "")
+            let document = Document(noteID: identity.noteID, html: html, token: token)
+            if desiredDocument?.token == token {
+                desiredDocument = document
+                appliedDocument = document
+            }
+            onChange(identity.noteID, html, payload["plainText"] as? String ?? "")
         }
 
         private func javaScript(for operation: RichNoteEditorCommand.Operation) -> String {
@@ -306,7 +427,7 @@ struct RichNoteEditor: NSViewRepresentable {
         return result
     }
 
-    private static func document(initialHTML: String, isEditable: Bool) -> String {
+    private static func document(initialHTML: String, initialToken: Int, isEditable: Bool) -> String {
         let initial = javaScriptLiteral(initialHTML)
         let scriptNonce = UUID().uuidString
         return """
@@ -326,17 +447,16 @@ struct RichNoteEditor: NSViewRepresentable {
           }
           #editor { box-sizing: border-box; min-height: 100vh; outline: none; padding: 4px 14px 20px; background: transparent !important; caret-color: transparent; }
           #editor > div, #editor > p, #editor li, #editor blockquote, #editor td, #editor th { white-space: pre-wrap; }
-          #editor [style*="font-size: 11px"] { font-size: inherit !important; }
           #caret { background: rgba(255,255,255,0.92); border-radius: 0.5px; display: none; height: 14px; left: 0; pointer-events: none; position: fixed; top: 0; transform: translate3d(-9999px, -9999px, 0); width: 1px; z-index: 1; }
           #caret.is-visible { animation: caret-blink 1s steps(1, end) infinite; display: block; }
           @keyframes caret-blink { 50% { opacity: 0; } }
           @media (prefers-reduced-motion: reduce) { #caret.is-visible { animation: none; } }
           #editor > :first-child { margin-top: 0; }
-          h1 { font-size: 23px; margin: 4px 0; }
+          h1 { font-size: 23px !important; margin: 4px 0; }
           h1 + div, h1 + p { margin-top: 3px; }
-          h2 { font-size: 19px; margin: 11px 0 6px; }
-          h3 { font-size: 16px; margin: 10px 0 5px; }
-          h4, h5, h6 { font-size: 14px; margin: 8px 0 4px; }
+          h2 { font-size: 19px !important; margin: 11px 0 6px; }
+          h3 { font-size: 16px !important; margin: 10px 0 5px; }
+          h4, h5, h6 { font-size: 14px !important; margin: 8px 0 4px; }
           div, p { margin: 5px 0; }
           a { color: #4aa3ff; text-decoration: none; }
           a:hover { text-decoration: underline; }
@@ -369,24 +489,35 @@ struct RichNoteEditor: NSViewRepresentable {
           caret.id = 'caret';
           caret.setAttribute('aria-hidden', 'true');
           document.body.append(caret);
-          const continuationStyle = document.createElement('style');
+          let continuationStyle = document.createElement('style');
           document.head.append(continuationStyle);
-          let sendTimer;
+          const initialDocumentToken = \(initialToken);
+          let documentToken = initialDocumentToken;
+          const sendTimers = new Map();
           let savedRange = null;
 
           const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+          const normalizedBodyTextSelector = 'div, p, li, blockquote, td, th, span, font, b, strong, i, em, u, s, strike, a';
+          const isBodyTextNode = node =>
+            !node.closest('h1, h2, h3, h4, h5, h6, pre, code, kbd, samp') &&
+            !node.matches('figure, img, video, audio, svg, canvas, input, button, select, textarea');
           const normalizeDefaultFontSize = root => {
-            root.querySelectorAll('[style]').forEach(node => {
-              const fontSize = node.style.fontSize.trim().toLowerCase();
-              const isHeading = Boolean(node.closest('h1, h2, h3, h4, h5, h6'));
-              if (isHeading && (fontSize === '11px' || fontSize === '14px')) {
+            root.querySelectorAll(normalizedBodyTextSelector).forEach(node => {
+              if (!isBodyTextNode(node)) return;
+              const size = Number.parseFloat(getComputedStyle(node).fontSize);
+              if (!Number.isFinite(size) || size < 10.5 || size > 12.5) return;
+              // Native Notes' default body style can arrive through a class, a stylesheet,
+              // inherited font, or an inline declaration. An inline important value wins over
+              // imported stylesheet rules without changing intentionally larger text.
+              node.style.setProperty('font-size', '14px', 'important');
+            });
+            root.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+              heading.style.removeProperty('font-size');
+              if (!heading.getAttribute('style')?.trim()) heading.removeAttribute('style');
+              heading.querySelectorAll('[style]').forEach(node => {
                 node.style.removeProperty('font-size');
-              } else if (!isHeading && fontSize === '11px') {
-                node.style.setProperty('font-size', '14px');
-              } else {
-                return;
-              }
-              if (!node.getAttribute('style')?.trim()) node.removeAttribute('style');
+                if (!node.getAttribute('style')?.trim()) node.removeAttribute('style');
+              });
             });
           };
           const normalizeHeadings = root => {
@@ -399,15 +530,72 @@ struct RichNoteEditor: NSViewRepresentable {
               });
             });
           };
-          const emit = () => {
-            normalizeHeadings(editor);
-            normalizeDefaultFontSize(editor);
-            window.webkit?.messageHandlers?.richNoteChanged?.postMessage({ html: editor.innerHTML, plainText: editor.innerText });
+          const notesHeadingLevel = block => {
+            if (!block.matches('div') || block.children.length !== 1 || [...block.children].some(child => child.matches('div, p, ul, ol, li, blockquote, pre, table, figure, hr'))) return null;
+            const bold = block.firstElementChild;
+            const font = bold?.matches('b') && bold.children.length === 1 ? bold.firstElementChild : null;
+            const span = font?.matches('font') && font.children.length === 1 ? font.firstElementChild : null;
+            const text = block.textContent.trim();
+            if (!text || !font?.getAttribute('face')?.includes('AppleSystemUIFontBold') || !span?.matches('span[style]') || span.textContent.trim() !== text) return null;
+            const size = Number.parseFloat(span.style.fontSize);
+            if (size >= 20 && size <= 22) return 1;
+            if (size >= 17 && size < 20) return 2;
+            if (size >= 15 && size < 17) return 3;
+            return null;
+          };
+          const normalizeNotesHeadings = root => {
+            [...root.children].forEach(block => {
+              const level = notesHeadingLevel(block);
+              if (!level) return;
+              const heading = document.createElement(`h${level}`);
+              heading.innerHTML = block.innerHTML;
+              block.replaceWith(heading);
+            });
+            normalizeHeadings(root);
+          };
+          const normalizeUnstyledBodyText = root => {
+            const blockSelector = 'div, p, li, blockquote, td, th';
+            const blockChildrenSelector = 'div, p, ul, ol, li, blockquote, pre, table, thead, tbody, tfoot, tr, td, th, figure, hr';
+            root.querySelectorAll(blockSelector).forEach(block => {
+              if (block.closest('h1, h2, h3, h4, h5, h6, pre')) return;
+              const inlineChildren = [...block.childNodes].filter(node => {
+                if (node.nodeType === Node.TEXT_NODE) return Boolean(node.textContent.trim());
+                return node.nodeType === Node.ELEMENT_NODE && !node.matches(blockChildrenSelector);
+              });
+              if (!inlineChildren.length) return;
+              if (inlineChildren.length === 1 && inlineChildren[0].nodeType === Node.ELEMENT_NODE) {
+                const child = inlineChildren[0];
+                if (!child.style.fontSize) child.style.setProperty('font-size', '14px');
+                return;
+              }
+              const wrapper = document.createElement('span');
+              wrapper.style.setProperty('font-size', '14px');
+              block.insertBefore(wrapper, inlineChildren[0]);
+              inlineChildren.forEach(node => wrapper.append(node));
+            });
+          };
+          const normalizeContent = root => {
+            normalizeNotesHeadings(root);
+            normalizeDefaultFontSize(root);
+            normalizeUnstyledBodyText(root);
+          };
+          const emit = snapshot => {
+            if (!snapshot) return;
+            window.webkit?.messageHandlers?.richNoteChanged?.postMessage(snapshot);
           };
           const scheduleEmit = () => {
             updateListContinuationStyle();
-            clearTimeout(sendTimer);
-            sendTimer = setTimeout(emit, 80);
+            normalizeContent(editor);
+            const snapshot = {
+              html: editor.innerHTML,
+              plainText: editor.innerText,
+              token: documentToken
+            };
+            clearTimeout(sendTimers.get(snapshot.token));
+            sendTimers.set(snapshot.token, setTimeout(() => {
+              sendTimers.delete(snapshot.token);
+              emit(snapshot);
+            }, 80));
           };
           const hideCaret = () => caret.classList.remove('is-visible');
           const updateCaret = () => {
@@ -499,8 +687,11 @@ struct RichNoteEditor: NSViewRepresentable {
           const insertImage = (dataURL, alt) => insertHTML(`<figure><img src="${escapeHTML(dataURL)}" alt="${escapeHTML(alt)}"></figure><div><br></div>`);
 
           window.zisla = {
-            setHTML: value => {
+            documentToken: () => documentToken,
+            setHTML: (value, token = documentToken) => {
+              documentToken = Number(token);
               editor.innerHTML = sanitize(value);
+              normalizeContent(editor);
               if (!editor.innerHTML.trim()) editor.innerHTML = '<div><br></div>';
               updateListContinuationStyle();
               scheduleCaretUpdate();

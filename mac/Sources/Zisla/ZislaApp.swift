@@ -1594,9 +1594,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        guard notification.object as? SettingsWindow != nil else { return }
-        settingsWindowController = nil
-        settingsWindowScreen = nil
+        if notification.object as? SettingsWindow != nil {
+            settingsWindowController = nil
+            settingsWindowScreen = nil
+        } else if let window = notification.object as? QuickNotesEditorWindow {
+            window.contentView = nil
+            quickNotesEditorController = nil
+        }
     }
 
     @objc private func checkUpdates() {
@@ -1631,6 +1635,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             hostingView.wantsLayer = true
             hostingView.layer?.backgroundColor = NSColor.clear.cgColor
             window.contentView = hostingView
+            window.delegate = self
             quickNotesEditorController = NSWindowController(window: window)
         }
         if let window = quickNotesEditorController?.window {

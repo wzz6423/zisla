@@ -170,7 +170,10 @@ public enum NotesAppBridge {
         let script = """
         tell application "Notes"
             set n to (note id \(escapeForAppleScript(id)))
-            return {plaintext of n, body of n, password protected of n}
+            if password protected of n then
+                return {"", "", "true"}
+            end if
+            return {plaintext of n, body of n, "false"}
         end tell
         """
         switch await runAppleScriptReturningStrings(script) {
@@ -178,17 +181,18 @@ public enum NotesAppBridge {
             guard values.count == 3 else {
                 return .failure(.failed(AppLocalization.text("读取备忘录内容失败")))
             }
-            let attachmentResult = await readAttachments(noteID: id)
-            let attachments: [NoteAttachment]
-            switch attachmentResult {
-            case .success(let value): attachments = value
-            case .failure: attachments = []
+            let isPasswordProtected = values[2].lowercased() == "true"
+            guard !isPasswordProtected else {
+                return .success(NoteContent(
+                    plainText: "",
+                    bodyHTML: "",
+                    isPasswordProtected: true
+                ))
             }
             return .success(NoteContent(
                 plainText: values[0],
                 bodyHTML: values[1],
-                isPasswordProtected: values[2].lowercased() == "true",
-                attachments: attachments
+                isPasswordProtected: isPasswordProtected
             ))
         case .failure(let error):
             return .failure(error)
@@ -216,6 +220,7 @@ public enum NotesAppBridge {
 
     /// Reads attachment metadata and copies image attachments into data URLs for the editor.
     public static func readAttachments(noteID: String) async -> Result<[NoteAttachment], NotesAppError> {
+        guard !Task.isCancelled else { return .success([]) }
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-notes-attachments-\(UUID().uuidString)", isDirectory: true)
         do {
@@ -251,17 +256,21 @@ public enum NotesAppBridge {
         """
         switch await runAppleScriptReturningStringLists(script) {
         case .success(let values):
-            return .success(values.compactMap { value in
-                guard value.count == 5, !value[0].isEmpty else { return nil }
-                let dataURL = Self.dataURL(for: value[4], name: value[1])
-                return NoteAttachment(
-                    id: value[0],
-                    name: value[1] == "missing value" ? "" : value[1],
-                    contentIdentifier: value[2] == "missing value" ? "" : value[2],
-                    url: value[3] == "missing value" ? "" : value[3],
-                    dataURL: dataURL
-                )
-            })
+            let attachmentValues = values
+            return await Task.detached(priority: .utility) {
+                guard !Task.isCancelled else { return .success([]) }
+                return .success(attachmentValues.compactMap { value in
+                    guard value.count == 5, !value[0].isEmpty else { return nil }
+                    let dataURL = Self.dataURL(for: value[4], name: value[1])
+                    return NoteAttachment(
+                        id: value[0],
+                        name: value[1] == "missing value" ? "" : value[1],
+                        contentIdentifier: value[2] == "missing value" ? "" : value[2],
+                        url: value[3] == "missing value" ? "" : value[3],
+                        dataURL: dataURL
+                    )
+                })
+            }.value
         case .failure(let error):
             return .failure(error)
         }
@@ -300,18 +309,27 @@ public enum NotesAppBridge {
 
     // MARK: - Create
 
-    public static func createNote(title: String, markdown: String) async -> Result<Void, NotesAppError> {
+    public static func createNote(title: String, markdown: String) async -> Result<String, NotesAppError> {
         await createNote(title: title, html: bodyHTML(for: markdown))
     }
 
-    /// Creates a note with a rich-text HTML body.
-    public static func createNote(title: String, html: String) async -> Result<Void, NotesAppError> {
+    /// Creates a note with a rich-text HTML body and returns Notes' stable note ID.
+    public static func createNote(title: String, html: String) async -> Result<String, NotesAppError> {
         let script = """
         tell application "Notes"
-            make new note with properties {name:\(escapeForAppleScript(title)), body:\(escapeForAppleScript(html))}
+            set createdNote to make new note with properties {name:\(escapeForAppleScript(title)), body:\(escapeForAppleScript(html))}
+            return {id of createdNote}
         end tell
         """
-        return await runAppleScriptVoid(script)
+        switch await runAppleScriptReturningStrings(script) {
+        case .success(let values):
+            guard let id = values.first, !id.isEmpty else {
+                return .failure(.failed(AppLocalization.text("新建备忘录未返回 ID")))
+            }
+            return .success(id)
+        case .failure(let error):
+            return .failure(error)
+        }
     }
 
     // MARK: - Delete
@@ -537,15 +555,23 @@ public enum NotesAppBridge {
         return "\"\(escaped)\""
     }
 
-    static func dataURL(for path: String, name: String) -> String? {
-        guard !path.isEmpty,
-              let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-              !data.isEmpty else { return nil }
+    nonisolated static func dataURL(for path: String, name: String) -> String? {
+        guard !path.isEmpty else { return nil }
         let fileExtension = (name as NSString).pathExtension
-        let type = (!fileExtension.isEmpty ? UTType(filenameExtension: fileExtension) : nil)
-            ?? imageType(for: data)
-        guard type?.conforms(to: .image) == true else { return nil }
-        let mimeType = type?.preferredMIMEType ?? "application/octet-stream"
+        if !fileExtension.isEmpty {
+            guard let declaredType = UTType(filenameExtension: fileExtension),
+                  declaredType.conforms(to: .image)
+            else { return nil }
+            guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)), !data.isEmpty else {
+                return nil
+            }
+            let mimeType = declaredType.preferredMIMEType ?? "application/octet-stream"
+            return "data:\(mimeType);base64,\(data.base64EncodedString())"
+        }
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)), !data.isEmpty,
+              let type = imageType(for: data), type.conforms(to: .image)
+        else { return nil }
+        let mimeType = type.preferredMIMEType ?? "application/octet-stream"
         return "data:\(mimeType);base64,\(data.base64EncodedString())"
     }
 
@@ -561,7 +587,7 @@ public enum NotesAppBridge {
         }
     }
 
-    private static func imageType(for data: Data) -> UTType? {
+    private nonisolated static func imageType(for data: Data) -> UTType? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let identifier = CGImageSourceGetType(source) as String? else { return nil }
         return UTType(identifier)
