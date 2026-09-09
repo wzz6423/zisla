@@ -309,6 +309,26 @@ struct NotesAppBridgeTests {
     }
 
     @Test
+    func preservesEditorHeadingsForNotesToImportNatively() {
+        let html = "<h1><span style=\"color: red\">一级</span></h1><div><span style=\"font-size: 14px\">正文</span></div><h2>二级</h2><h3><em>三级</em></h3>"
+
+        #expect(NotesAppBridge.notesStorageHTML(for: html) == html)
+    }
+
+    @Test
+    func leavesNonHeadingHTMLUntouchedWhenPreparingNotesStorage() {
+        let html = "<div><strong>正文</strong></div><ul><li>项目</li></ul><table><tr><td>单元格</td></tr></table>"
+
+        #expect(NotesAppBridge.notesStorageHTML(for: html) == html)
+    }
+
+    @Test
+    func leavesEmptyHTMLUntouchedWhenPreparingNotesStorage() {
+        #expect(NotesAppBridge.notesStorageHTML(for: "") == "")
+        #expect(NotesAppBridge.notesStorageHTML(for: "<div><br></div>") == "<div><br></div>")
+    }
+
+    @Test
     func storesMarkdownAsPlainDivLinesNotPre() {
         let markdown = "# 随记\n\n正文 & 代码 <tag>"
         let body = NotesAppBridge.bodyHTML(for: markdown)

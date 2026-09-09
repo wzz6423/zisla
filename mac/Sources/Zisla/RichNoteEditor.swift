@@ -57,7 +57,7 @@ struct RichNoteEditor: NSViewRepresentable {
     let isEditable: Bool
     let onChange: (String?, String, String) -> Void
 
-    static var newNoteHTML: String { "<h1>\(AppLocalization.text("新随记"))</h1><div><span style=\"font-size: 14px\"><br></span></div>" }
+    static var newNoteHTML: String { "<h1>\(AppLocalization.text("新随记"))</h1><div><span style=\"font-size: 11px\"><br></span></div>" }
 
     init(
         html: String,
@@ -442,10 +442,11 @@ struct RichNoteEditor: NSViewRepresentable {
           html, body { margin: 0; min-height: 100%; background: transparent !important; }
           body {
             color: rgba(255,255,255,0.92);
-            font: 14px -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+            font: 13px -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
             line-height: 1.55;
           }
           #editor { box-sizing: border-box; min-height: 100vh; outline: none; padding: 4px 14px 20px; background: transparent !important; caret-color: transparent; }
+          #editor [data-zisla-default-font-size], #editor [data-zisla-unstyled-body] { font-size: 13px !important; }
           #editor > div, #editor > p, #editor li, #editor blockquote, #editor td, #editor th { white-space: pre-wrap; }
           #caret { background: rgba(255,255,255,0.92); border-radius: 0.5px; display: none; height: 14px; left: 0; pointer-events: none; position: fixed; top: 0; transform: translate3d(-9999px, -9999px, 0); width: 1px; z-index: 1; }
           #caret.is-visible { animation: caret-blink 1s steps(1, end) infinite; display: block; }
@@ -506,10 +507,9 @@ struct RichNoteEditor: NSViewRepresentable {
               if (!isBodyTextNode(node)) return;
               const size = Number.parseFloat(getComputedStyle(node).fontSize);
               if (!Number.isFinite(size) || size < 10.5 || size > 12.5) return;
-              // Native Notes' default body style can arrive through a class, a stylesheet,
-              // inherited font, or an inline declaration. An inline important value wins over
-              // imported stylesheet rules without changing intentionally larger text.
-              node.style.setProperty('font-size', '14px', 'important');
+              // Native Notes persists its 13-point body font as 11 CSS pixels. Mark it for
+              // display at the native visual size without changing the HTML written back.
+              node.dataset.zislaDefaultFontSize = 'true';
             });
             root.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
               heading.style.removeProperty('font-size');
@@ -563,16 +563,29 @@ struct RichNoteEditor: NSViewRepresentable {
                 return node.nodeType === Node.ELEMENT_NODE && !node.matches(blockChildrenSelector);
               });
               if (!inlineChildren.length) return;
+              const hasExplicitFontSize = node => {
+                if (node.nodeType !== Node.ELEMENT_NODE) return false;
+                if (node.style.fontSize) return true;
+                return Boolean(node.querySelector('[style*="font-size" i], font[size]'));
+              };
               if (inlineChildren.length === 1 && inlineChildren[0].nodeType === Node.ELEMENT_NODE) {
-                const child = inlineChildren[0];
-                if (!child.style.fontSize) child.style.setProperty('font-size', '14px');
+                if (!hasExplicitFontSize(inlineChildren[0])) inlineChildren[0].dataset.zislaUnstyledBody = 'true';
                 return;
               }
+              if (inlineChildren.some(hasExplicitFontSize)) return;
               const wrapper = document.createElement('span');
-              wrapper.style.setProperty('font-size', '14px');
+              wrapper.dataset.zislaUnstyledBody = 'true';
               block.insertBefore(wrapper, inlineChildren[0]);
               inlineChildren.forEach(node => wrapper.append(node));
             });
+          };
+          const storedHTML = () => {
+            const clone = editor.cloneNode(true);
+            clone.querySelectorAll('[data-zisla-default-font-size], [data-zisla-unstyled-body]').forEach(node => {
+              node.removeAttribute('data-zisla-default-font-size');
+              node.removeAttribute('data-zisla-unstyled-body');
+            });
+            return clone.innerHTML;
           };
           const normalizeContent = root => {
             normalizeNotesHeadings(root);
@@ -587,7 +600,7 @@ struct RichNoteEditor: NSViewRepresentable {
             updateListContinuationStyle();
             normalizeContent(editor);
             const snapshot = {
-              html: editor.innerHTML,
+              html: storedHTML(),
               plainText: editor.innerText,
               token: documentToken
             };

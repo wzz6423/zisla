@@ -111,6 +111,52 @@ struct QuickNotesServiceTests {
     }
 
     @Test
+    func keepsRegularNotesUnselectedOnInitialRefreshWithoutWelcome() async throws {
+        let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let service = QuickNotesService(welcomeDismissalDefaults: defaults)
+        if let welcome = service.welcomeNote {
+            await service.delete(id: welcome.id)
+        }
+        let regular = NotesAppBridge.NoteSummary(id: "regular", title: "普通备忘录", modifiedAt: .now)
+
+        service.applyFetchedNotes([regular])
+
+        #expect(service.notes == [regular])
+        #expect(service.selectedID == nil)
+        #expect(service.selectedNote == nil)
+    }
+
+    @Test
+    func refreshListsSummariesWithoutReadingRegularNoteBodies() async throws {
+        let loads = ControlledImmediateNoteLoads()
+        let regular = NotesAppBridge.NoteSummary(id: "regular", title: "普通备忘录", modifiedAt: .now)
+        let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let service = QuickNotesService(
+            welcomeDismissalDefaults: defaults,
+            operations: QuickNotesService.Operations(
+                listNotes: { .success([regular]) },
+                readNote: { id in await loads.readNote(id: id) },
+                writeNote: { _, _ in .success(()) },
+                createNote: { _, _ in .success("created") },
+                deleteNote: { _ in .success(()) }
+            )
+        )
+        if let welcome = service.welcomeNote {
+            await service.delete(id: welcome.id)
+        }
+
+        await service.refresh()
+
+        #expect(service.notes == [regular])
+        #expect(service.selectedID == nil)
+        #expect(await loads.callCount == 0)
+    }
+
+    @Test
     func savesSeparateNotesWithoutCancellingTheirDebounce() async throws {
         let writes = ControlledNoteWrites()
         let service = makeService(writes: writes, saveDelay: .milliseconds(1))
@@ -161,6 +207,8 @@ struct QuickNotesServiceTests {
         #expect(!moduleSource.contains("cancelPendingSave()"))
         #expect(moduleSource.contains("@State private var draftLoadGeneration = 0"))
         #expect(moduleSource.contains("guard generation == draftLoadGeneration, selectedID == service.selectedID else { return }"))
+        #expect(expandedSource.contains(".task {\n            await service.refresh()\n            if service.selectedID != nil"))
+        #expect(moduleSource.contains(".task {\n            await service.refresh()\n            if service.selectedID != nil"))
     }
 
     @Test

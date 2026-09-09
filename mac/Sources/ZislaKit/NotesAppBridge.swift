@@ -140,15 +140,39 @@ public enum NotesAppBridge {
         (() => {
           const Notes = Application('Notes');
           const out = [];
-          const notes = Notes.notes();
-          for (const n of notes) {
-            var modified = null;
-            var passwordProtected = false;
-            var container = null;
-            try { const d = n.modificationDate(); if (d) modified = d.getTime(); } catch (e) {}
-            try { passwordProtected = Boolean(n.passwordProtected()); } catch (e) {}
-            try { container = n.container().name(); } catch (e) {}
-            out.push({ id: String(n.id()), title: String(n.name()), modified: modified, passwordProtected: passwordProtected, container: container });
+          const recentlyDeleted = new Set([
+            'Recently Deleted', '最近删除', '最近刪除', 'Kürzlich gelöscht',
+            'Supprimés récemment', 'Eliminados recientemente', 'Eliminati di recente',
+            'Recentelijk verwijderd', 'Nyligen raderade', 'Недавно удалённые',
+            '最近削除した項目', '최근 삭제된 항목'
+          ]);
+          const seenIDs = new Set();
+          const appendFolderNotes = folder => {
+            let notes = [];
+            try { notes = folder.notes(); } catch (e) { return; }
+            for (const n of notes) {
+              var id = null;
+              try { id = String(n.id()); } catch (e) {}
+              if (!id || seenIDs.has(id)) continue;
+              seenIDs.add(id);
+              var modified = null;
+              var passwordProtected = false;
+              try { const d = n.modificationDate(); if (d) modified = d.getTime(); } catch (e) {}
+              try { passwordProtected = Boolean(n.passwordProtected()); } catch (e) {}
+              out.push({ id: id, title: String(n.name()), modified: modified, passwordProtected: passwordProtected });
+            }
+          };
+          function walkFolders(folders) {
+            for (const folder of folders) {
+              let folderName = null;
+              try { folderName = String(folder.name()); } catch (e) {}
+              if (folderName && recentlyDeleted.has(folderName)) continue;
+              appendFolderNotes(folder);
+              try { walkFolders(folder.folders()); } catch (e) {}
+            }
+          }
+          for (const account of Notes.accounts()) {
+            try { walkFolders(account.folders()); } catch (e) {}
           }
           return JSON.stringify(out);
         })()
@@ -289,7 +313,7 @@ public enum NotesAppBridge {
         do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
         catch { return .failure(.failed(AppLocalization.text("无法准备备忘录附件"))) }
         defer { try? FileManager.default.removeItem(at: directory) }
-        var body = html
+        var body = notesStorageHTML(for: html)
         for (index, image) in images.enumerated() {
             guard let data = Data(base64Encoded: image.base64) else { return .failure(.failed(AppLocalization.text("备忘录图片数据无效"))) }
             let ext = image.mime == "image/jpeg" ? "jpg" : (image.mime.split(separator: "/").last.map(String.init) ?? "bin")
@@ -315,6 +339,7 @@ public enum NotesAppBridge {
 
     /// Creates a note with a rich-text HTML body and returns Notes' stable note ID.
     public static func createNote(title: String, html: String) async -> Result<String, NotesAppError> {
+        let html = notesStorageHTML(for: html)
         let script = """
         tell application "Notes"
             set createdNote to make new note with properties {name:\(escapeForAppleScript(title)), body:\(escapeForAppleScript(html))}
@@ -377,6 +402,11 @@ public enum NotesAppBridge {
     }
 
     // MARK: - Storage format
+
+    /// Leaves editor headings intact so Notes imports them as native heading styles.
+    static func notesStorageHTML(for html: String) -> String {
+        html
+    }
 
     /// Converts Markdown source to the HTML format used for a Notes body: splits into plain `<div>` paragraphs and escapes `&<>`.
     /// Matches the format of native plain-text notes in Notes, avoiding the monospaced preformatted style of `<pre>`;

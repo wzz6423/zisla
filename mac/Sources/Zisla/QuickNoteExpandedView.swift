@@ -51,11 +51,8 @@ struct QuickNoteExpandedView: View {
         .preferredColorScheme(.dark)
         .frame(minWidth: 760, minHeight: 540)
         .task {
-            if service.selectedID != nil {
-                await loadDraft()
-            }
             await service.refresh()
-            if service.selectedID != nil, noteContent == nil {
+            if service.selectedID != nil {
                 await loadDraft()
             }
         }

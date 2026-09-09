@@ -241,13 +241,13 @@ struct RichNoteEditorTests {
 
         #expect(result["editorWhiteSpace"] as? String == "normal")
         #expect(result["blockWhiteSpace"] as? String == "pre-wrap")
-        #expect(result["fontSize"] as? String == "14px")
+        #expect(result["fontSize"] as? String == "13px")
         #expect((result["horizontalDelta"] as? Double ?? 0) > 0)
         #expect((result["blockGap"] as? Double ?? .infinity) < 20)
     }
 
     @Test
-    func preservesHeadingAndBodyFontSizesBeforeSavingEditedHTML() async throws {
+    func rendersNativeNotesBodySizeWithoutChangingStoredFontSize() async throws {
         let sourceHTML = "<h1><span style=\"font-size: 11px\">标题</span></h1><div><span style=\"font-size: 11px; color: red\">正文</span></div>"
         let changeCapture = HTMLChangeCapture()
         let hostingView = NSHostingView(rootView:
@@ -291,17 +291,29 @@ struct RichNoteEditorTests {
         let savedHTML = try await waitForCapturedHTML(in: changeCapture)
         let computedSizes = try #require(await webView.evaluateJavaScript(
             """
-            (() => ({
-              heading: getComputedStyle(document.querySelector('#editor > h1 span')).fontSize,
-              body: getComputedStyle(document.querySelector('#editor > div span')).fontSize
-            }))()
+            (() => {
+              const body = document.querySelector('#editor > div span');
+              const bodyRange = document.createRange();
+              bodyRange.setStart(body.firstChild, 0);
+              bodyRange.setEnd(body.firstChild, 2);
+              const bodyRect = bodyRange.getBoundingClientRect();
+              return {
+                heading: getComputedStyle(document.querySelector('#editor > h1 span')).fontSize,
+                body: getComputedStyle(body).fontSize,
+                bodyTextWidth: bodyRect.width,
+                bodyTextHeight: bodyRect.height
+              };
+            })()
             """
         ) as? [String: Any])
 
         #expect(computedSizes["heading"] as? String == "23px")
-        #expect(computedSizes["body"] as? String == "14px")
+        #expect(computedSizes["body"] as? String == "13px")
+        #expect(abs((computedSizes["bodyTextWidth"] as? Double ?? 0) - 25.7977) < 0.25)
+        #expect(abs((computedSizes["bodyTextHeight"] as? Double ?? 0) - 15.3105) < 0.25)
         #expect(savedHTML.contains("<h1><span>标题</span></h1>") == true)
-        #expect(savedHTML.contains("font-size: 14px") == true)
+        #expect(savedHTML.contains("font-size: 11px") == true)
+        #expect(savedHTML.contains("font-size: 13px") == false)
         #expect(savedHTML.contains("color: red") == true)
         #expect(savedHTML.contains("正文变更") == true)
     }
@@ -346,10 +358,10 @@ struct RichNoteEditorTests {
         ) as? [String: Any])
 
         #expect(result["heading"] as? String == "23px")
-        #expect(result["firstBody"] as? String == "14px")
-        #expect(result["firstBodyInline"] as? String == "14px")
-        #expect(result["secondBody"] as? String == "14px")
-        #expect(result["secondBodyInline"] as? String == "14px")
+        #expect(result["firstBody"] as? String == "13px")
+        #expect(result["firstBodyInline"] as? String == "11px")
+        #expect(result["secondBody"] as? String == "13px")
+        #expect(result["secondBodyInline"] as? String == "11px")
     }
 
     @Test
@@ -380,7 +392,7 @@ struct RichNoteEditorTests {
             "(() => [...document.querySelectorAll('#editor h1, #editor .pt, #editor .inherited span, #editor font, #editor .inline-important, #editor code span, #editor div:last-child span')].map(node => getComputedStyle(node).fontSize))()"
         ) as? [String])
 
-        #expect(sizes == ["23px", "14px", "14px", "14px", "14px", "11px", "9px"])
+        #expect(sizes == ["23px", "13px", "13px", "11px", "11px", "11px", "9px"])
     }
 
     @Test
@@ -472,11 +484,11 @@ struct RichNoteEditorTests {
     @Test
     func createsNewNoteWithExplicitBodyFontSize() {
         #expect(RichNoteEditor.newNoteHTML.contains("<h1>"))
-        #expect(RichNoteEditor.newNoteHTML.contains("font-size: 14px"))
+        #expect(RichNoteEditor.newNoteHTML.contains("font-size: 11px"))
     }
 
     @Test
-    func writesAnExplicitBodyFontSizeForUnstyledText() async throws {
+    func preservesUnstyledBodyTextWithoutPersistingEditorDisplaySize() async throws {
         let changeCapture = HTMLChangeCapture()
         let hostingView = NSHostingView(rootView:
             RichNoteEditor(
@@ -524,8 +536,10 @@ struct RichNoteEditorTests {
                 headingSize: getComputedStyle(editor.querySelector('h1')).fontSize,
                 firstBodySize: getComputedStyle(editor.children[1].firstElementChild).fontSize,
                 firstBodyInlineFontSize: editor.children[1].firstElementChild.style.fontSize,
+                firstBodyUsesEditorDisplayMarker: editor.children[1].firstElementChild.hasAttribute('data-zisla-unstyled-body'),
                 coloredBodySize: getComputedStyle(editor.children[2].firstElementChild).fontSize,
                 coloredBodyInlineFontSize: editor.children[2].firstElementChild.style.fontSize,
+                coloredBodyUsesEditorDisplayMarker: editor.children[2].firstElementChild.hasAttribute('data-zisla-unstyled-body'),
                 coloredBodyColor: editor.children[2].firstElementChild.style.color,
                 html: editor.innerHTML
               };
@@ -534,14 +548,16 @@ struct RichNoteEditorTests {
         ) as? [String: Any])
 
         #expect(result["headingSize"] as? String == "23px")
-        #expect(result["firstBodySize"] as? String == "14px")
-        #expect(result["firstBodyInlineFontSize"] as? String == "14px")
-        #expect(result["coloredBodySize"] as? String == "14px")
-        #expect(result["coloredBodyInlineFontSize"] as? String == "14px")
+        #expect(result["firstBodySize"] as? String == "13px")
+        #expect(result["firstBodyInlineFontSize"] as? String == "")
+        #expect(result["firstBodyUsesEditorDisplayMarker"] as? Bool == true)
+        #expect(result["coloredBodySize"] as? String == "13px")
+        #expect(result["coloredBodyInlineFontSize"] as? String == "")
+        #expect(result["coloredBodyUsesEditorDisplayMarker"] as? Bool == true)
         #expect(result["coloredBodyColor"] as? String == "red")
         #expect(savedHTML.contains("<h1>标题</h1>") == true)
         #expect(savedHTML.contains("原正文变更") == true)
-        #expect(savedHTML.contains("font-size: 14px") == true)
+        #expect(savedHTML.contains("font-size") == false)
         #expect(savedHTML.contains("color: red") == true)
     }
 
@@ -789,7 +805,7 @@ struct RichNoteEditorTests {
         #expect(result["blankLine"] as? String == "0px")
         #expect(result["separatedHeading"] as? String == "0px")
         #expect(result["nextDetail"] as? String == "16px")
-        #expect((result["html"] as? String)?.contains("font-size: 14px") == true)
+        #expect((result["html"] as? String)?.contains("font-size: 11px") == true)
     }
 
     @Test

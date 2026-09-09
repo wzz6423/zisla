@@ -147,7 +147,7 @@ public final class QuickNotesService: ObservableObject {
     }
 
     public var selectedNote: NotesAppBridge.NoteSummary? {
-        guard let selectedID else { return notes.first }
+        guard let selectedID else { return nil }
         if isBuiltInWelcomeNote(id: selectedID) {
             return welcomeNote
         }
@@ -276,7 +276,8 @@ public final class QuickNotesService: ObservableObject {
     }
 
     /// Updates local state with an external list result (shared by tests and `refresh`).
-    /// If the currently selected item is no longer in the list (e.g. deleted in the Notes app), falls back to the first item or clears selection.
+    /// Keep an empty initial selection for regular notes so loading their bodies remains explicit.
+    /// If an existing selection is no longer in the list (e.g. deleted in Notes), falls back to the first item or clears selection.
     func applyFetchedNotes(_ fetched: [NotesAppBridge.NoteSummary]) {
         // Earlier versions used this reserved title for a generated system note. Leave the
         // system record untouched, but do not show it alongside the local replacement.
@@ -314,7 +315,7 @@ public final class QuickNotesService: ObservableObject {
         }
         notes = displayedNotes
         guard let selectedID else {
-            self.selectedID = welcomeNote?.id ?? notes.first?.id
+            self.selectedID = welcomeNote?.id
             return
         }
         if isBuiltInWelcomeNote(id: selectedID) {

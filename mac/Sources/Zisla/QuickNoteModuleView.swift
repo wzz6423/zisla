@@ -29,11 +29,8 @@ struct QuickNoteModuleView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .task {
-            if service.selectedID != nil {
-                cancelAndLoadDraft()
-            }
             await service.refresh()
-            if service.selectedID != nil, noteContent == nil {
+            if service.selectedID != nil {
                 cancelAndLoadDraft()
             }
         }
@@ -129,6 +126,9 @@ struct QuickNoteModuleView: View {
         let selected = note.id == service.selectedID
         return Button {
             service.select(id: note.id)
+            if selected && noteContent == nil {
+                cancelAndLoadDraft()
+            }
         } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(note.title.isEmpty ? AppLocalization.text("无标题") : note.title)
