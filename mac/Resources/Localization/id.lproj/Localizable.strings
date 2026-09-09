@@ -2394,3 +2394,5 @@
 "模糊度" = "Keburaman";
 "格子" = "Kisi";
 "画笔粗细" = "Ketebalan kuas";
+"提示条进度光效" = "Pijar progres bilah pemberitahuan";
+"在收起态提示条边沿显示播放、下载和自动关闭进度" = "Tampilkan progres pemutaran, unduhan, dan penutupan otomatis di tepi bilah pemberitahuan yang diciutkan";

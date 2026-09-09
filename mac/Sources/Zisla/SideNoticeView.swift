@@ -175,6 +175,13 @@ struct CompactStatusBarView: View {
     private var height: CGFloat { displayState.compactWingHeight }
 
     var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isPlaybackProgressActive)) { context in
+            statusBarContent(at: context.date)
+        }
+    }
+
+    @ViewBuilder
+    private func statusBarContent(at date: Date) -> some View {
         GeometryReader { geometry in
             ZStack {
                 if !displayState.compactStatusHidden {
@@ -183,6 +190,12 @@ struct CompactStatusBarView: View {
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .background(compactStatusBackground)
+            .overlay {
+                if settingsStore.settings.collapsedProgressGlowEnabled,
+                   let progress = compactProgress(at: date) {
+                    CollapsedProgressGlow(progress: progress)
+                }
+            }
             .clipShape(SimulatedIslandShape())
             .contentShape(SimulatedIslandShape())
             // NSHostingView's safe area can push the SwiftUI content down by a few
@@ -203,6 +216,30 @@ struct CompactStatusBarView: View {
                         onStatusHidden()
                     }
             )
+        }
+    }
+
+    private var isPlaybackProgressActive: Bool {
+        guard settingsStore.settings.collapsedProgressGlowEnabled,
+              selectedCompactStatusPriority == .media,
+              let snapshot = media.snapshot else {
+            return false
+        }
+        return CollapsedProgress.playbackFraction(for: snapshot, at: .now) != nil
+    }
+
+    private func compactProgress(at date: Date) -> Double? {
+        guard settingsStore.settings.collapsedProgressGlowEnabled else { return nil }
+        switch selectedCompactStatusPriority {
+        case .media:
+            guard let snapshot = media.snapshot else { return nil }
+            return CollapsedProgress.playbackFraction(for: snapshot, at: date)
+        case .browserDownload:
+            return browserDownloadNotice?.progress
+        case .videoDownload:
+            return videoDownloadNotice?.progress
+        default:
+            return nil
         }
     }
 

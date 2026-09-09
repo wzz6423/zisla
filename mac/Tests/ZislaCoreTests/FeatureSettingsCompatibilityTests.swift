@@ -99,6 +99,23 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
+    func collapsedProgressGlowDefaultsEnabledForNewAndLegacySettingsAndRoundTrips() throws {
+        #expect(FeatureSettings.default.collapsedProgressGlowEnabled)
+
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let decodedLegacy = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(decodedLegacy.collapsedProgressGlowEnabled)
+
+        var settings = FeatureSettings.default
+        settings.collapsedProgressGlowEnabled = false
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(!decoded.collapsedProgressGlowEnabled)
+    }
+
+    @Test
     func settingsMissingActivityDurationUsesDefaultAndPreservesExistingValues() throws {
         let data = Data(#"{"appearanceMode":"light","mediaEnabled":false,"fileShelfEnabled":true,"aiProgressEnabled":true,"downloaderEnabled":true,"updateChecksEnabled":true,"clipboardDetectionEnabled":false,"sideNoticesEnabled":true}"#.utf8)
 

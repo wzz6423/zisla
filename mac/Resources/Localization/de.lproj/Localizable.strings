@@ -2395,3 +2395,5 @@
 "模糊度" = "Weichzeichnung";
 "格子" = "Raster";
 "画笔粗细" = "Pinselstärke";
+"提示条进度光效" = "Fortschrittsleuchten der Hinweisleiste";
+"在收起态提示条边沿显示播放、下载和自动关闭进度" = "Wiedergabe-, Download- und Schließfortschritt am Rand der eingeklappten Hinweisleiste anzeigen";

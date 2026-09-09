@@ -2394,3 +2394,5 @@
 "模糊度" = "Vervaging";
 "格子" = "Raster";
 "画笔粗细" = "Penseeldikte";
+"提示条进度光效" = "Voortgangsgloed van meldingsbalk";
+"在收起态提示条边沿显示播放、下载和自动关闭进度" = "Toon de voortgang van afspelen, downloaden en automatisch sluiten langs de rand van de ingeklapte meldingsbalk";

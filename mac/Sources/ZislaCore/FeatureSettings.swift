@@ -577,6 +577,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Requires input monitoring and accessibility permissions.
     public var clipboardAssistantMouseGestureEnabled: Bool
     public var sideNoticesEnabled: Bool
+    /// Whether collapsed notice bars show their playback, download, or dismissal progress glow.
+    public var collapsedProgressGlowEnabled: Bool
     public var compactStatusPriority: [CompactStatusPriority]
     public var moduleOrder: [IslandModuleOrder]
     /// Temporarily suppresses system notifications pushed by Zisla itself (Pomodoro, etc.); alarms are unaffected.
@@ -681,6 +683,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardAssistantPromptsForImageSaveLocation: Bool = false,
         clipboardAssistantMouseGestureEnabled: Bool = false,
         sideNoticesEnabled: Bool = true,
+        collapsedProgressGlowEnabled: Bool = true,
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
         moduleOrder: [IslandModuleOrder] = IslandModuleOrder.defaultOrder,
         notificationsMuted: Bool = false,
@@ -770,6 +773,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.clipboardAssistantPromptsForImageSaveLocation = clipboardAssistantPromptsForImageSaveLocation
         self.clipboardAssistantMouseGestureEnabled = clipboardAssistantMouseGestureEnabled
         self.sideNoticesEnabled = sideNoticesEnabled
+        self.collapsedProgressGlowEnabled = collapsedProgressGlowEnabled
         self.compactStatusPriority = CompactStatusPriority.normalized(compactStatusPriority)
         self.moduleOrder = IslandModuleOrder.normalized(moduleOrder)
         self.notificationsMuted = notificationsMuted
@@ -872,6 +876,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantPromptsForImageSaveLocation
         case clipboardAssistantMouseGestureEnabled
         case sideNoticesEnabled
+        case collapsedProgressGlowEnabled
         case compactStatusPriority
         case moduleOrder
         case notificationsMuted
@@ -1039,6 +1044,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             forKey: .clipboardAssistantMouseGestureEnabled
         ) ?? defaults.clipboardAssistantMouseGestureEnabled
         sideNoticesEnabled = try container.decodeIfPresent(Bool.self, forKey: .sideNoticesEnabled) ?? defaults.sideNoticesEnabled
+        collapsedProgressGlowEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .collapsedProgressGlowEnabled
+        ) ?? defaults.collapsedProgressGlowEnabled
         compactStatusPriority = CompactStatusPriority.normalized(
             try container.decodeIfPresent([CompactStatusPriority].self, forKey: .compactStatusPriority)
                 ?? defaults.compactStatusPriority

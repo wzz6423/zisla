@@ -100,6 +100,18 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(source.contains("guard !isSharingAnchorHeld else { return }"))
     }
 
+    @Test
+    func collapsedToastUsesTheConfiguredProgressGlowAndLiveDismissalClock() throws {
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let viewStart = try #require(source.range(of: "struct ClipboardAssistantToastView"))
+        let viewSource = source[viewStart.lowerBound...]
+
+        #expect(viewSource.contains("TimelineView("))
+        #expect(viewSource.contains("controller.dismissalProgress(at: context.date)"))
+        #expect(viewSource.contains("presentation.progressGlowEnabled"))
+        #expect(viewSource.contains("if !isExpanded"))
+    }
+
     @MainActor
     @Test
     func sharingKeepsTheClipboardAssistantAnchorAlive() {

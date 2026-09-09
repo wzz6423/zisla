@@ -2394,3 +2394,5 @@
 "模糊度" = "Bulanıklık";
 "格子" = "Izgara";
 "画笔粗细" = "Fırça kalınlığı";
+"提示条进度光效" = "Bildirim çubuğu ilerleme parıltısı";
+"在收起态提示条边沿显示播放、下载和自动关闭进度" = "Daraltılmış bildirim çubuğunun kenarında oynatma, indirme ve otomatik kapanma ilerlemesini göster";
