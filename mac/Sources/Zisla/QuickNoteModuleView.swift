@@ -13,6 +13,7 @@ struct QuickNoteModuleView: View {
     @State private var draftHTML: String = "<div><br></div>"
     @State private var draftPlainText: String = ""
     @State private var noteContent: NotesAppBridge.NoteContent?
+    @State private var loadedNoteID: String?
     @State private var draftLoadGeneration = 0
     @State private var editorCommand: RichNoteEditorCommand?
     @State private var isTransferTarget = false
@@ -29,19 +30,22 @@ struct QuickNoteModuleView: View {
         }
         .task {
             await service.refresh()
-            cancelAndLoadDraft()
+            if service.selectedID != nil {
+                cancelAndLoadDraft()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            // Sync the list when returning from an external app such as Notes (removes stale entries after external deletions).
-            Task { await service.refresh() }
+            Task { await service.refreshIfNeeded() }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            // When a menu-bar accessory app returns from Notes or another external app the app may not become active again,
-            // but the panel/window becomes the key window — do an extra refresh here to keep the list in sync.
-            Task { await service.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
+            guard notification.object as? IslandPanel != nil else { return }
+            Task { await service.refreshIfNeeded() }
         }
         .onChange(of: service.selectedID) { _, _ in
             cancelAndLoadDraft()
+        }
+        .onChange(of: service.attachmentHydrationGeneration) { _, _ in
+            refreshHydratedAttachments()
         }
     }
 
@@ -130,6 +134,9 @@ struct QuickNoteModuleView: View {
         let selected = note.id == service.selectedID
         return Button {
             service.select(id: note.id)
+            if selected && noteContent == nil {
+                cancelAndLoadDraft()
+            }
         } label: {
             HStack(spacing: 4) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -247,14 +254,16 @@ struct QuickNoteModuleView: View {
             } else {
                 RichNoteEditor(
                     html: draftHTML,
+                    noteID: loadedNoteID,
                     command: service.isBuiltInWelcomeNoteSelected ? nil : editorCommand,
                     isEditable: !service.isBuiltInWelcomeNoteSelected
-                ) { html, plainText in
-                    draftHTML = html
-                    draftPlainText = plainText
-                    if let id = service.selectedID, !service.isBuiltInWelcomeNote(id: id) {
+                ) { id, html, plainText in
+                    if let id, !service.isBuiltInWelcomeNote(id: id) {
                         service.scheduleSave(id: id, html: html)
                     }
+                    guard id == loadedNoteID, id == service.selectedID else { return }
+                    draftHTML = html
+                    draftPlainText = plainText
                 }
             }
         }
@@ -283,9 +292,23 @@ struct QuickNoteModuleView: View {
             let content = await service.loadNote()
             guard generation == draftLoadGeneration, selectedID == service.selectedID else { return }
             noteContent = content
+            loadedNoteID = selectedID
             draftHTML = RichNoteEditor.editableHTML(for: content)
             draftPlainText = content?.plainText ?? ""
         }
+    }
+
+    private func refreshHydratedAttachments() {
+        guard let selectedID = service.selectedID, selectedID == loadedNoteID,
+              let content = service.cachedContent(for: selectedID),
+              content.attachments != (noteContent?.attachments ?? [])
+        else { return }
+        noteContent = content
+        draftHTML = RichNoteEditor.htmlWithInlineAttachments(
+            bodyHTML: draftHTML,
+            plainText: draftPlainText,
+            attachments: content.attachments
+        )
     }
 
     private func createNew() async {

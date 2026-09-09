@@ -309,6 +309,26 @@ struct NotesAppBridgeTests {
     }
 
     @Test
+    func preservesEditorHeadingsForNotesToImportNatively() {
+        let html = "<h1><span style=\"color: red\">一级</span></h1><div><span style=\"font-size: 14px\">正文</span></div><h2>二级</h2><h3><em>三级</em></h3>"
+
+        #expect(NotesAppBridge.notesStorageHTML(for: html) == html)
+    }
+
+    @Test
+    func leavesNonHeadingHTMLUntouchedWhenPreparingNotesStorage() {
+        let html = "<div><strong>正文</strong></div><ul><li>项目</li></ul><table><tr><td>单元格</td></tr></table>"
+
+        #expect(NotesAppBridge.notesStorageHTML(for: html) == html)
+    }
+
+    @Test
+    func leavesEmptyHTMLUntouchedWhenPreparingNotesStorage() {
+        #expect(NotesAppBridge.notesStorageHTML(for: "") == "")
+        #expect(NotesAppBridge.notesStorageHTML(for: "<div><br></div>") == "<div><br></div>")
+    }
+
+    @Test
     func storesMarkdownAsPlainDivLinesNotPre() {
         let markdown = "# 随记\n\n正文 & 代码 <tag>"
         let body = NotesAppBridge.bodyHTML(for: markdown)
@@ -383,6 +403,44 @@ struct NotesAppBridgeTests {
         #expect(content.usesNativeHTML)
         #expect(html.contains("<table>"))
         #expect(html.contains("<img src='file:///tmp/note.png'>"))
+    }
+
+    @Test
+    func storesInlineAttachmentDataAlongsideMetadata() {
+        let attachment = NotesAppBridge.NoteAttachment(
+            id: "attachment-1",
+            name: "截图.png",
+            contentIdentifier: "cid:attachment-1",
+            url: "",
+            dataURL: "data:image/png;base64,AAAA"
+        )
+        let content = NotesAppBridge.NoteContent(
+            plainText: "正文\n￼",
+            bodyHTML: "<div><span style=\"font-size: 11px\">正文</span></div><div><span style=\"font-size: 11px\"><br></span></div>",
+            attachments: [attachment]
+        )
+
+        #expect(content.attachments.first?.dataURL == "data:image/png;base64,AAAA")
+    }
+
+    @Test
+    func convertsOnlyImageAttachmentsToDataURLs() throws {
+        let imageURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-notes-image-\(UUID().uuidString).png")
+        let textURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-notes-text-\(UUID().uuidString).txt")
+        defer {
+            try? FileManager.default.removeItem(at: imageURL)
+            try? FileManager.default.removeItem(at: textURL)
+        }
+        let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")!
+        try png.write(to: imageURL)
+        try Data("not an image".utf8).write(to: textURL)
+
+        let imageDataURL = NotesAppBridge.dataURL(for: imageURL.path, name: "")
+
+        #expect(imageDataURL?.hasPrefix("data:image/png;base64,") == true)
+        #expect(NotesAppBridge.dataURL(for: textURL.path, name: "") == nil)
     }
 
     @Test
