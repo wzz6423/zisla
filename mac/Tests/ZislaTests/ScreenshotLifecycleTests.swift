@@ -358,6 +358,21 @@ struct ScreenshotLifecycleTests {
     }
 
     @Test
+    func quickNotesEditorCloseReleasesTheHostingView() throws {
+        let source = try String(contentsOf: Self.appSourceURL, encoding: .utf8)
+        let willClose = try #require(source.range(of: "func windowWillClose(_ notification: Notification)"))
+        let checkUpdates = try #require(source.range(
+            of: "@objc private func checkUpdates()",
+            range: willClose.upperBound..<source.endIndex
+        ))
+        let closeLifecycle = source[willClose.lowerBound..<checkUpdates.lowerBound]
+        let clearsContent = try #require(closeLifecycle.range(of: "window.contentView = nil"))
+        let releasesController = try #require(closeLifecycle.range(of: "quickNotesEditorController = nil"))
+
+        #expect(clearsContent.lowerBound < releasesController.lowerBound)
+    }
+
+    @Test
     func completedLongCaptureRendersTheCombinedImageInTheEditorCanvas() throws {
         let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)
 

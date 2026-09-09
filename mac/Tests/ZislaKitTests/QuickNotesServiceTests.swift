@@ -129,6 +129,52 @@ struct QuickNotesServiceTests {
     }
 
     @Test
+    func keepsRegularNotesUnselectedOnInitialRefreshWithoutWelcome() async throws {
+        let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let service = QuickNotesService(welcomeDismissalDefaults: defaults)
+        if let welcome = service.welcomeNote {
+            await service.delete(id: welcome.id)
+        }
+        let regular = NotesAppBridge.NoteSummary(id: "regular", title: "普通备忘录", modifiedAt: .now)
+
+        service.applyFetchedNotes([regular])
+
+        #expect(service.notes == [regular])
+        #expect(service.selectedID == nil)
+        #expect(service.selectedNote == nil)
+    }
+
+    @Test
+    func refreshListsSummariesWithoutReadingRegularNoteBodies() async throws {
+        let loads = ControlledImmediateNoteLoads()
+        let regular = NotesAppBridge.NoteSummary(id: "regular", title: "普通备忘录", modifiedAt: .now)
+        let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let service = QuickNotesService(
+            welcomeDismissalDefaults: defaults,
+            operations: QuickNotesService.Operations(
+                listNotes: { .success([regular]) },
+                readNote: { id in await loads.readNote(id: id) },
+                writeNote: { _, _ in .success(()) },
+                createNote: { _, _ in .success("created") },
+                deleteNote: { _ in .success(()) }
+            )
+        )
+        if let welcome = service.welcomeNote {
+            await service.delete(id: welcome.id)
+        }
+
+        await service.refresh()
+
+        #expect(service.notes == [regular])
+        #expect(service.selectedID == nil)
+        #expect(await loads.callCount == 0)
+    }
+
+    @Test
     func savesSeparateNotesWithoutCancellingTheirDebounce() async throws {
         let writes = ControlledNoteWrites()
         let service = makeService(writes: writes, saveDelay: .milliseconds(1))
@@ -179,6 +225,8 @@ struct QuickNotesServiceTests {
         #expect(!moduleSource.contains("cancelPendingSave()"))
         #expect(moduleSource.contains("@State private var draftLoadGeneration = 0"))
         #expect(moduleSource.contains("guard generation == draftLoadGeneration, selectedID == service.selectedID else { return }"))
+        #expect(expandedSource.contains(".task {\n            await service.refresh()\n            if service.selectedID != nil"))
+        #expect(moduleSource.contains(".task {\n            await service.refresh()\n            if service.selectedID != nil"))
     }
 
     @Test
@@ -285,8 +333,8 @@ struct QuickNotesServiceTests {
         let firstLoadStarted = await loads.waitForCallCount(1)
         #expect(firstLoadStarted)
         let secondLoad = Task { await service.loadNote() }
-        let secondLoadStarted = await loads.waitForCallCount(2)
-        #expect(secondLoadStarted)
+        try await Task.sleep(for: .milliseconds(5))
+        #expect(await loads.callCount == 1)
 
         await loads.resolveAll()
         let firstContent = await firstLoad.value
@@ -312,12 +360,262 @@ struct QuickNotesServiceTests {
         service.select(id: second.id)
         service.select(id: first.id)
         let currentLoad = Task { await service.loadNote() }
-        #expect(await loads.waitForCallCount(2))
+        #expect(await loads.waitForCallCount(1))
 
         await loads.resolveAll()
         #expect(await earlierLoad.value == nil)
         #expect(await currentLoad.value != nil)
         #expect(!service.isLoadingNote)
+    }
+
+    @Test
+    func refreshesConcurrentlyWithOneListQuery() async throws {
+        let lists = ControlledNoteLists()
+        let service = QuickNotesService(
+            welcomeDismissalDefaults: UserDefaults(suiteName: "Zisla.QuickNotesServiceTests.\(UUID().uuidString)")!,
+            operations: QuickNotesService.Operations(
+                listNotes: { await lists.listNotes() },
+                readNote: { _ in .success(NotesAppBridge.NoteContent(plainText: "", bodyHTML: "")) },
+                writeNote: { _, _ in .success(()) },
+                createNote: { _, _ in .success("created") },
+                deleteNote: { _ in .success(()) }
+            )
+        )
+
+        let firstRefresh = Task { await service.refresh() }
+        #expect(await lists.waitForCallCount(1))
+        let secondRefresh = Task { await service.refresh() }
+        await lists.resolveNext(with: [])
+        await firstRefresh.value
+        await secondRefresh.value
+
+        #expect(await lists.callCount == 1)
+        #expect(!service.isLoadingList)
+    }
+
+    @Test
+    func refreshesAgainAfterDeletingDuringAnInFlightRefresh() async throws {
+        let lists = ControlledNoteLists()
+        let service = QuickNotesService(
+            welcomeDismissalDefaults: UserDefaults(suiteName: "Zisla.QuickNotesServiceTests.\(UUID().uuidString)")!,
+            operations: QuickNotesService.Operations(
+                listNotes: { await lists.listNotes() },
+                readNote: { _ in .success(NotesAppBridge.NoteContent(plainText: "", bodyHTML: "")) },
+                writeNote: { _, _ in .success(()) },
+                createNote: { _, _ in .success("created") },
+                deleteNote: { _ in .success(()) }
+            )
+        )
+        let note = NotesAppBridge.NoteSummary(id: "note", title: "随记", modifiedAt: .now)
+        service.applyFetchedNotes([note])
+        service.select(id: note.id)
+
+        let firstRefresh = Task { await service.refresh() }
+        #expect(await lists.waitForCallCount(1))
+        let deletion = Task { await service.delete(id: note.id) }
+        await lists.resolveNext(with: [note])
+        #expect(await lists.waitForCallCount(2))
+        await lists.resolveNext(with: [])
+        await firstRefresh.value
+        await deletion.value
+
+        #expect(service.notes.isEmpty)
+        #expect(service.selectedID == service.welcomeNote?.id)
+    }
+
+    @Test
+    func invalidatesCachedContentWhenPasswordProtectionChanges() async throws {
+        let loads = ControlledImmediateNoteLoads()
+        let service = QuickNotesService(
+            welcomeDismissalDefaults: UserDefaults(suiteName: "Zisla.QuickNotesServiceTests.\(UUID().uuidString)")!,
+            operations: QuickNotesService.Operations(
+                listNotes: { .success([]) },
+                readNote: { id in await loads.readNote(id: id) },
+                writeNote: { _, _ in .success(()) },
+                createNote: { _, _ in .success("created") },
+                deleteNote: { _ in .success(()) }
+            )
+        )
+        let modifiedAt = Date(timeIntervalSinceReferenceDate: 1)
+        let unlocked = NotesAppBridge.NoteSummary(id: "note", title: "随记", modifiedAt: modifiedAt)
+        service.applyFetchedNotes([unlocked])
+        service.select(id: unlocked.id)
+
+        _ = await service.loadNote()
+        #expect(await loads.callCount == 1)
+
+        let locked = NotesAppBridge.NoteSummary(
+            id: unlocked.id,
+            title: unlocked.title,
+            modifiedAt: modifiedAt,
+            isPasswordProtected: true
+        )
+        service.applyFetchedNotes([locked])
+        let content = await service.loadNote()
+
+        #expect(content == nil)
+        #expect(await loads.callCount == 2)
+    }
+
+    @Test
+    func doesNotReuseAnInFlightLoadAfterItsSummaryChanges() async throws {
+        let writes = ControlledNoteWrites()
+        let loads = ControlledNoteLoads()
+        let service = makeService(writes: writes, loads: loads, saveDelay: .milliseconds(1))
+        let old = NotesAppBridge.NoteSummary(
+            id: "note",
+            title: "随记",
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 1)
+        )
+        let updated = NotesAppBridge.NoteSummary(
+            id: old.id,
+            title: old.title,
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 2)
+        )
+        service.applyFetchedNotes([old])
+        service.select(id: old.id)
+
+        let oldLoad = Task { await service.loadNote() }
+        #expect(await loads.waitForCallCount(1))
+
+        service.applyFetchedNotes([updated])
+        let currentLoad = Task { await service.loadNote() }
+        #expect(await loads.waitForCallCount(2))
+
+        await loads.resolveNext(with: .init(plainText: "旧内容", bodyHTML: "<div>旧内容</div>"))
+        #expect(await oldLoad.value == nil)
+        await loads.resolveNext(with: .init(plainText: "新内容", bodyHTML: "<div>新内容</div>"))
+        #expect(await currentLoad.value?.plainText == "新内容")
+
+        _ = await service.loadNote()
+        #expect(await loads.callCount == 2)
+    }
+
+    @Test
+    func reusesCachedContentUntilItsSummaryChanges() async throws {
+        let loads = ControlledImmediateNoteLoads()
+        let service = QuickNotesService(
+            welcomeDismissalDefaults: UserDefaults(suiteName: "Zisla.QuickNotesServiceTests.\(UUID().uuidString)")!,
+            operations: QuickNotesService.Operations(
+                listNotes: { .success([]) },
+                readNote: { id in await loads.readNote(id: id) },
+                writeNote: { _, _ in .success(()) },
+                createNote: { _, _ in .success("created") },
+                deleteNote: { _ in .success(()) }
+            )
+        )
+        let first = NotesAppBridge.NoteSummary(id: "note", title: "随记", modifiedAt: .distantPast)
+        service.applyFetchedNotes([first])
+        service.select(id: first.id)
+
+        _ = await service.loadNote()
+        _ = await service.loadNote()
+        #expect(await loads.callCount == 1)
+
+        service.applyFetchedNotes([
+            NotesAppBridge.NoteSummary(id: first.id, title: first.title, modifiedAt: .now)
+        ])
+        _ = await service.loadNote()
+        #expect(await loads.callCount == 2)
+    }
+
+    @Test
+    func returnsBodyBeforeAsynchronouslyHydratingAttachments() async throws {
+        let hydrator = ControlledNoteAttachments()
+        let note = NotesAppBridge.NoteSummary(id: "note", title: "随记", modifiedAt: .now)
+        let service = QuickNotesService(
+            welcomeDismissalDefaults: UserDefaults(suiteName: "Zisla.QuickNotesServiceTests.\(UUID().uuidString)")!,
+            operations: QuickNotesService.Operations(
+                listNotes: { .success([]) },
+                readNote: { _ in .success(.init(plainText: "正文", bodyHTML: "<div>正文</div>")) },
+                readAttachments: { id in await hydrator.readAttachments(noteID: id) },
+                writeNote: { _, _ in .success(()) },
+                createNote: { _, _ in .success("created") },
+                deleteNote: { _ in .success(()) }
+            )
+        )
+        service.applyFetchedNotes([note])
+        service.select(id: note.id)
+
+        let initial = try #require(await service.loadNote())
+        #expect(initial.attachments.isEmpty)
+        #expect(await hydrator.waitForCallCount(1))
+
+        let attachment = NotesAppBridge.NoteAttachment(id: "image", name: "image.png", contentIdentifier: "cid", url: "")
+        await hydrator.resolveNext(with: [attachment])
+        #expect(await waitForCachedAttachments(service, id: note.id, expected: [attachment]))
+    }
+
+    @Test
+    func cancelsAnOutdatedAttachmentHydrationAfterSelectionChanges() async throws {
+        let hydrator = ControlledNoteAttachments()
+        let first = NotesAppBridge.NoteSummary(id: "first", title: "第一条", modifiedAt: .now)
+        let second = NotesAppBridge.NoteSummary(id: "second", title: "第二条", modifiedAt: .distantPast)
+        let service = QuickNotesService(
+            welcomeDismissalDefaults: UserDefaults(suiteName: "Zisla.QuickNotesServiceTests.\(UUID().uuidString)")!,
+            operations: QuickNotesService.Operations(
+                listNotes: { .success([]) },
+                readNote: { id in .success(.init(plainText: id, bodyHTML: "<div>\(id)</div>")) },
+                readAttachments: { id in await hydrator.readAttachments(noteID: id) },
+                writeNote: { _, _ in .success(()) },
+                createNote: { _, _ in .success("created") },
+                deleteNote: { _ in .success(()) }
+            )
+        )
+        service.applyFetchedNotes([first, second])
+        service.select(id: first.id)
+        _ = await service.loadNote()
+        #expect(await hydrator.waitForCallCount(1))
+
+        service.select(id: second.id)
+        _ = await service.loadNote()
+        #expect(await hydrator.waitForCallCount(2))
+        #expect(await hydrator.waitForCancellation(of: first.id))
+        await hydrator.resolveAll()
+    }
+
+    @Test
+    func createsAndSelectsTheStableNotesIDBeforeTheListConverges() async throws {
+        let createdID = "created-note"
+        let existing = NotesAppBridge.NoteSummary(id: "existing", title: "新随记", modifiedAt: .now)
+        let service = QuickNotesService(
+            welcomeDismissalDefaults: UserDefaults(suiteName: "Zisla.QuickNotesServiceTests.\(UUID().uuidString)")!,
+            operations: QuickNotesService.Operations(
+                listNotes: { .success([existing]) },
+                readNote: { id in .success(NotesAppBridge.NoteContent(plainText: id, bodyHTML: "<div>\(id)</div>")) },
+                writeNote: { _, _ in .success(()) },
+                createNote: { _, _ in .success(createdID) },
+                deleteNote: { _ in .success(()) }
+            )
+        )
+        service.applyFetchedNotes([existing])
+        service.select(id: existing.id)
+
+        #expect(await service.create(html: "<div><br></div>", title: existing.title))
+        #expect(service.selectedID == createdID)
+        #expect(service.notes.first?.id == createdID)
+        #expect(await service.loadNote()?.plainText == createdID)
+    }
+
+    @Test
+    func leavesTheCurrentSelectionWhenCreationFails() async throws {
+        let existing = NotesAppBridge.NoteSummary(id: "existing", title: "旧随记", modifiedAt: .now)
+        let service = QuickNotesService(
+            welcomeDismissalDefaults: UserDefaults(suiteName: "Zisla.QuickNotesServiceTests.\(UUID().uuidString)")!,
+            operations: QuickNotesService.Operations(
+                listNotes: { .success([existing]) },
+                readNote: { _ in .success(NotesAppBridge.NoteContent(plainText: "", bodyHTML: "")) },
+                writeNote: { _, _ in .success(()) },
+                createNote: { _, _ in .failure(.failed("创建失败")) },
+                deleteNote: { _ in .success(()) }
+            )
+        )
+        service.applyFetchedNotes([existing])
+        service.select(id: existing.id)
+
+        #expect(!(await service.create(html: "<div><br></div>")))
+        #expect(service.selectedID == existing.id)
+        #expect(service.notes.map(\.id) == [existing.id])
     }
 
     private func makeService(
@@ -330,14 +628,14 @@ struct QuickNotesServiceTests {
             welcomeDismissalDefaults: UserDefaults(suiteName: "Zisla.QuickNotesServiceTests.\(UUID().uuidString)")!,
             operations: QuickNotesService.Operations(
                 listNotes: { .success([]) },
-                isPasswordProtected: { id in
+                readNote: { id in
                     if let loads {
-                        return await loads.isPasswordProtected(id: id)
+                        return await loads.readNote(id: id)
                     }
-                    return .success(false)
+                    return .success(NotesAppBridge.NoteContent(plainText: "", bodyHTML: ""))
                 },
-                readNote: { _ in .success(NotesAppBridge.NoteContent(plainText: "", bodyHTML: "")) },
                 writeNote: { id, html in await writes.write(id: id, html: html) },
+                createNote: { _, _ in .success("created") },
                 deleteNote: { id in
                     if let deletes {
                         return await deletes.delete(id: id)
@@ -349,11 +647,114 @@ struct QuickNotesServiceTests {
         )
     }
 
+    private func waitForCachedAttachments(
+        _ service: QuickNotesService,
+        id: String,
+        expected: [NotesAppBridge.NoteAttachment]
+    ) async -> Bool {
+        for _ in 0..<100 {
+            if service.cachedContent(for: id)?.attachments == expected { return true }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        return false
+    }
+
     private var sourceRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+    }
+}
+
+private actor ControlledNoteAttachments {
+    private struct Pending {
+        let id: String
+        let continuation: CheckedContinuation<Result<[NotesAppBridge.NoteAttachment], NotesAppError>, Never>
+    }
+
+    private var pending: [Pending] = []
+    private(set) var callCount = 0
+    private(set) var cancelledIDs: Set<String> = []
+
+    func readAttachments(noteID: String) async -> Result<[NotesAppBridge.NoteAttachment], NotesAppError> {
+        callCount += 1
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                pending.append(Pending(id: noteID, continuation: continuation))
+            }
+        } onCancel: {
+            Task { await self.cancel(noteID: noteID) }
+        }
+    }
+
+    func waitForCallCount(_ count: Int) async -> Bool {
+        for _ in 0..<100 {
+            if callCount >= count { return true }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        return false
+    }
+
+    func waitForCancellation(of id: String) async -> Bool {
+        for _ in 0..<100 {
+            if cancelledIDs.contains(id) { return true }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        return false
+    }
+
+    func resolveNext(with attachments: [NotesAppBridge.NoteAttachment]) {
+        guard !pending.isEmpty else { return }
+        pending.removeFirst().continuation.resume(returning: .success(attachments))
+    }
+
+    func resolveAll() {
+        let unresolved = pending
+        pending.removeAll()
+        for value in unresolved {
+            value.continuation.resume(returning: .success([]))
+        }
+    }
+
+    private func cancel(noteID: String) {
+        cancelledIDs.insert(noteID)
+        guard let index = pending.firstIndex(where: { $0.id == noteID }) else { return }
+        pending.remove(at: index).continuation.resume(returning: .success([]))
+    }
+}
+
+private actor ControlledNoteLists {
+    private var continuations: [CheckedContinuation<Result<[NotesAppBridge.NoteSummary], NotesAppError>, Never>] = []
+    private(set) var callCount = 0
+
+    func listNotes() async -> Result<[NotesAppBridge.NoteSummary], NotesAppError> {
+        callCount += 1
+        return await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    func waitForCallCount(_ count: Int) async -> Bool {
+        for _ in 0..<100 {
+            if callCount >= count { return true }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        return false
+    }
+
+    func resolveNext(with notes: [NotesAppBridge.NoteSummary]) {
+        guard !continuations.isEmpty else { return }
+        continuations.removeFirst().resume(returning: .success(notes))
+    }
+}
+
+private actor ControlledImmediateNoteLoads {
+    private(set) var callCount = 0
+
+    func readNote(id: String) -> Result<NotesAppBridge.NoteContent, NotesAppError> {
+        callCount += 1
+        return .success(NotesAppBridge.NoteContent(plainText: id, bodyHTML: "<div>\(id)</div>"))
     }
 }
 
@@ -420,10 +821,10 @@ private actor ControlledNoteDeletes {
 }
 
 private actor ControlledNoteLoads {
-    private var continuations: [CheckedContinuation<Result<Bool, NotesAppError>, Never>] = []
-    private var callCount = 0
+    private var continuations: [CheckedContinuation<Result<NotesAppBridge.NoteContent, NotesAppError>, Never>] = []
+    private(set) var callCount = 0
 
-    func isPasswordProtected(id _: String) async -> Result<Bool, NotesAppError> {
+    func readNote(id _: String) async -> Result<NotesAppBridge.NoteContent, NotesAppError> {
         callCount += 1
         return await withCheckedContinuation { continuation in
             continuations.append(continuation)
@@ -438,11 +839,16 @@ private actor ControlledNoteLoads {
         return false
     }
 
+    func resolveNext(with content: NotesAppBridge.NoteContent) {
+        guard !continuations.isEmpty else { return }
+        continuations.removeFirst().resume(returning: .success(content))
+    }
+
     func resolveAll() {
         let pending = continuations
         continuations.removeAll()
         for continuation in pending {
-            continuation.resume(returning: .success(false))
+            continuation.resume(returning: .success(NotesAppBridge.NoteContent(plainText: "", bodyHTML: "")))
         }
     }
 }

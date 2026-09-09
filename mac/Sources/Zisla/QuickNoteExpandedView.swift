@@ -15,6 +15,7 @@ struct QuickNoteExpandedView: View {
     @State private var draftHTML: String = "<div><br></div>"
     @State private var draftPlainText: String = ""
     @State private var noteContent: NotesAppBridge.NoteContent?
+    @State private var loadedNoteID: String?
     @State private var draftLoadGeneration = 0
     @State private var editorCommand: RichNoteEditorCommand?
 
@@ -51,19 +52,22 @@ struct QuickNoteExpandedView: View {
         .frame(minWidth: 760, minHeight: 540)
         .task {
             await service.refresh()
-            await loadDraft()
+            if service.selectedID != nil {
+                await loadDraft()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            Task { await service.refresh() }
+            Task { await service.refreshIfNeeded() }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            // Menu-bar accessory apps don't always re-activate when switching back from Notes or
-            // another external app, but the window will become key — do an extra refresh here to
-            // keep the list in sync.
-            Task { await service.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
+            guard notification.object as? QuickNotesEditorWindow != nil else { return }
+            Task { await service.refreshIfNeeded() }
         }
         .onChange(of: service.selectedID) { _, _ in
             Task { await loadDraft() }
+        }
+        .onChange(of: service.attachmentHydrationGeneration) { _, _ in
+            refreshHydratedAttachments()
         }
     }
 
@@ -120,14 +124,16 @@ struct QuickNoteExpandedView: View {
             } else {
                 RichNoteEditor(
                     html: draftHTML,
+                    noteID: loadedNoteID,
                     command: service.isBuiltInWelcomeNoteSelected ? nil : editorCommand,
                     isEditable: !service.isBuiltInWelcomeNoteSelected
-                ) { html, plainText in
-                    draftHTML = html
-                    draftPlainText = plainText
-                    if let id = service.selectedID, !service.isBuiltInWelcomeNote(id: id) {
+                ) { id, html, plainText in
+                    if let id, !service.isBuiltInWelcomeNote(id: id) {
                         service.scheduleSave(id: id, html: html)
                     }
+                    guard id == loadedNoteID, id == service.selectedID else { return }
+                    draftHTML = html
+                    draftPlainText = plainText
                 }
             }
         }
@@ -162,8 +168,22 @@ struct QuickNoteExpandedView: View {
         let content = await service.loadNote()
         guard generation == draftLoadGeneration, selectedID == service.selectedID else { return }
         noteContent = content
+        loadedNoteID = selectedID
         draftHTML = RichNoteEditor.editableHTML(for: content)
         draftPlainText = content?.plainText ?? ""
+    }
+
+    private func refreshHydratedAttachments() {
+        guard let selectedID = service.selectedID, selectedID == loadedNoteID,
+              let content = service.cachedContent(for: selectedID),
+              content.attachments != (noteContent?.attachments ?? [])
+        else { return }
+        noteContent = content
+        draftHTML = RichNoteEditor.htmlWithInlineAttachments(
+            bodyHTML: draftHTML,
+            plainText: draftPlainText,
+            attachments: content.attachments
+        )
     }
 
 }

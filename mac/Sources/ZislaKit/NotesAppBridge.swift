@@ -1,5 +1,7 @@
 import AppKit
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 import ZislaCore
 
 /// Integration with the system Notes app: the Quick Note module uses Notes as its data source,
@@ -46,18 +48,26 @@ public enum NotesAppBridge {
         }
     }
 
-    /// A native attachment from Notes. The scripting API only exposes metadata and the ability to “show” it, so Quick Note displays attachments read-only.
+    /// A native attachment from Notes, including inline data when Notes exposes a local file.
     public struct NoteAttachment: Identifiable, Sendable, Equatable, Hashable {
         public let id: String
         public let name: String
         public let contentIdentifier: String
         public let url: String
+        public let dataURL: String?
 
-        public init(id: String, name: String, contentIdentifier: String, url: String) {
+        public init(
+            id: String,
+            name: String,
+            contentIdentifier: String,
+            url: String,
+            dataURL: String? = nil
+        ) {
             self.id = id
             self.name = name
             self.contentIdentifier = contentIdentifier
             self.url = url
+            self.dataURL = dataURL
         }
     }
 
@@ -130,15 +140,39 @@ public enum NotesAppBridge {
         (() => {
           const Notes = Application('Notes');
           const out = [];
-          const notes = Notes.notes();
-          for (const n of notes) {
-            var modified = null;
-            var passwordProtected = false;
-            var container = null;
-            try { const d = n.modificationDate(); if (d) modified = d.getTime(); } catch (e) {}
-            try { passwordProtected = Boolean(n.passwordProtected()); } catch (e) {}
-            try { container = n.container().name(); } catch (e) {}
-            out.push({ id: String(n.id()), title: String(n.name()), modified: modified, passwordProtected: passwordProtected, container: container });
+          const recentlyDeleted = new Set([
+            'Recently Deleted', '最近删除', '最近刪除', 'Kürzlich gelöscht',
+            'Supprimés récemment', 'Eliminados recientemente', 'Eliminati di recente',
+            'Recentelijk verwijderd', 'Nyligen raderade', 'Недавно удалённые',
+            '最近削除した項目', '최근 삭제된 항목'
+          ]);
+          const seenIDs = new Set();
+          const appendFolderNotes = folder => {
+            let notes = [];
+            try { notes = folder.notes(); } catch (e) { return; }
+            for (const n of notes) {
+              var id = null;
+              try { id = String(n.id()); } catch (e) {}
+              if (!id || seenIDs.has(id)) continue;
+              seenIDs.add(id);
+              var modified = null;
+              var passwordProtected = false;
+              try { const d = n.modificationDate(); if (d) modified = d.getTime(); } catch (e) {}
+              try { passwordProtected = Boolean(n.passwordProtected()); } catch (e) {}
+              out.push({ id: id, title: String(n.name()), modified: modified, passwordProtected: passwordProtected });
+            }
+          };
+          function walkFolders(folders) {
+            for (const folder of folders) {
+              let folderName = null;
+              try { folderName = String(folder.name()); } catch (e) {}
+              if (folderName && recentlyDeleted.has(folderName)) continue;
+              appendFolderNotes(folder);
+              try { walkFolders(folder.folders()); } catch (e) {}
+            }
+          }
+          for (const account of Notes.accounts()) {
+            try { walkFolders(account.folders()); } catch (e) {}
           }
           return JSON.stringify(out);
         })()
@@ -160,7 +194,10 @@ public enum NotesAppBridge {
         let script = """
         tell application "Notes"
             set n to (note id \(escapeForAppleScript(id)))
-            return {plaintext of n, body of n, password protected of n}
+            if password protected of n then
+                return {"", "", "true"}
+            end if
+            return {plaintext of n, body of n, "false"}
         end tell
         """
         switch await runAppleScriptReturningStrings(script) {
@@ -168,17 +205,18 @@ public enum NotesAppBridge {
             guard values.count == 3 else {
                 return .failure(.failed(AppLocalization.text("读取备忘录内容失败")))
             }
-            let attachmentResult = await readAttachments(noteID: id)
-            let attachments: [NoteAttachment]
-            switch attachmentResult {
-            case .success(let value): attachments = value
-            case .failure: attachments = []
+            let isPasswordProtected = values[2].lowercased() == "true"
+            guard !isPasswordProtected else {
+                return .success(NoteContent(
+                    plainText: "",
+                    bodyHTML: "",
+                    isPasswordProtected: true
+                ))
             }
             return .success(NoteContent(
                 plainText: values[0],
                 bodyHTML: values[1],
-                isPasswordProtected: values[2].lowercased() == "true",
-                attachments: attachments
+                isPasswordProtected: isPasswordProtected
             ))
         case .failure(let error):
             return .failure(error)
@@ -204,28 +242,59 @@ public enum NotesAppBridge {
         }
     }
 
-    /// Reads public attachment metadata; content and modification APIs are not used in Quick Note.
+    /// Reads attachment metadata and copies image attachments into data URLs for the editor.
     public static func readAttachments(noteID: String) async -> Result<[NoteAttachment], NotesAppError> {
+        guard !Task.isCancelled else { return .success([]) }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-notes-attachments-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            return .failure(.failed(AppLocalization.text("无法准备备忘录附件")))
+        }
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let directoryPath = escapeForAppleScript(directory.path)
         let script = """
         tell application "Notes"
             set n to (note id \(escapeForAppleScript(noteID)))
             set resultList to {}
+            set attachmentIndex to 0
             repeat with a in (attachments of n)
+                set attachmentIndex to attachmentIndex + 1
                 set attachmentURL to ""
                 try
                     set attachmentURL to URL of a as text
                 end try
-                set end of resultList to {id of a as text, name of a as text, content identifier of a as text, attachmentURL}
+                set savedPath to ""
+                try
+                    set savedPath to \(directoryPath) & "/attachment-" & (attachmentIndex as text)
+                    save a in POSIX file savedPath
+                on error
+                    set savedPath to ""
+                end try
+                set end of resultList to {id of a as text, name of a as text, content identifier of a as text, attachmentURL, savedPath}
             end repeat
-            return resultList
+        return resultList
         end tell
         """
         switch await runAppleScriptReturningStringLists(script) {
         case .success(let values):
-            return .success(values.compactMap { value in
-                guard value.count == 4, !value[0].isEmpty else { return nil }
-                return NoteAttachment(id: value[0], name: value[1], contentIdentifier: value[2], url: value[3])
-            })
+            let attachmentValues = values
+            return await Task.detached(priority: .utility) {
+                guard !Task.isCancelled else { return .success([]) }
+                return .success(attachmentValues.compactMap { value in
+                    guard value.count == 5, !value[0].isEmpty else { return nil }
+                    let dataURL = Self.dataURL(for: value[4], name: value[1])
+                    return NoteAttachment(
+                        id: value[0],
+                        name: value[1] == "missing value" ? "" : value[1],
+                        contentIdentifier: value[2] == "missing value" ? "" : value[2],
+                        url: value[3] == "missing value" ? "" : value[3],
+                        dataURL: dataURL
+                    )
+                })
+            }.value
         case .failure(let error):
             return .failure(error)
         }
@@ -237,12 +306,26 @@ public enum NotesAppBridge {
         await writeNote(id: id, html: bodyHTML(for: markdown))
     }
 
-    /// Writes back rich-text HTML. Images are inlined as data URLs, so no temporary file paths are needed.
+    /// Writes rich text and materializes data URL images through Notes' attachment API.
     public static func writeNote(id: String, html: String) async -> Result<Void, NotesAppError> {
+        let images = Self.extractDataImages(from: html)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-note-write-\(UUID().uuidString)", isDirectory: true)
+        do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
+        catch { return .failure(.failed(AppLocalization.text("无法准备备忘录附件"))) }
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var body = notesStorageHTML(for: html)
+        for (index, image) in images.enumerated() {
+            guard let data = Data(base64Encoded: image.base64) else { return .failure(.failed(AppLocalization.text("备忘录图片数据无效"))) }
+            let ext = image.mime == "image/jpeg" ? "jpg" : (image.mime.split(separator: "/").last.map(String.init) ?? "bin")
+            let url = directory.appendingPathComponent("image-\(index).\(ext)")
+            do { try data.write(to: url, options: .atomic) }
+            catch { return .failure(.failed(AppLocalization.text("无法保存备忘录图片"))) }
+            body = body.replacingOccurrences(of: image.source, with: url.absoluteString)
+        }
         let script = """
         tell application "Notes"
             set n to (note id \(escapeForAppleScript(id)))
-            set body of n to \(escapeForAppleScript(html))
+            set body of n to \(escapeForAppleScript(body))
         end tell
         """
         return await runAppleScriptVoid(script)
@@ -250,18 +333,28 @@ public enum NotesAppBridge {
 
     // MARK: - Create
 
-    public static func createNote(title: String, markdown: String) async -> Result<Void, NotesAppError> {
+    public static func createNote(title: String, markdown: String) async -> Result<String, NotesAppError> {
         await createNote(title: title, html: bodyHTML(for: markdown))
     }
 
-    /// Creates a note with a rich-text HTML body.
-    public static func createNote(title: String, html: String) async -> Result<Void, NotesAppError> {
+    /// Creates a note with a rich-text HTML body and returns Notes' stable note ID.
+    public static func createNote(title: String, html: String) async -> Result<String, NotesAppError> {
+        let html = notesStorageHTML(for: html)
         let script = """
         tell application "Notes"
-            make new note with properties {name:\(escapeForAppleScript(title)), body:\(escapeForAppleScript(html))}
+            set createdNote to make new note with properties {name:\(escapeForAppleScript(title)), body:\(escapeForAppleScript(html))}
+            return {id of createdNote}
         end tell
         """
-        return await runAppleScriptVoid(script)
+        switch await runAppleScriptReturningStrings(script) {
+        case .success(let values):
+            guard let id = values.first, !id.isEmpty else {
+                return .failure(.failed(AppLocalization.text("新建备忘录未返回 ID")))
+            }
+            return .success(id)
+        case .failure(let error):
+            return .failure(error)
+        }
     }
 
     // MARK: - Delete
@@ -309,6 +402,11 @@ public enum NotesAppBridge {
     }
 
     // MARK: - Storage format
+
+    /// Leaves editor headings intact so Notes imports them as native heading styles.
+    static func notesStorageHTML(for html: String) -> String {
+        html
+    }
 
     /// Converts Markdown source to the HTML format used for a Notes body: splits into plain `<div>` paragraphs and escapes `&<>`.
     /// Matches the format of native plain-text notes in Notes, avoiding the monospaced preformatted style of `<pre>`;
@@ -485,6 +583,44 @@ public enum NotesAppBridge {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         return "\"\(escaped)\""
+    }
+
+    nonisolated static func dataURL(for path: String, name: String) -> String? {
+        guard !path.isEmpty else { return nil }
+        let fileExtension = (name as NSString).pathExtension
+        if !fileExtension.isEmpty {
+            guard let declaredType = UTType(filenameExtension: fileExtension),
+                  declaredType.conforms(to: .image)
+            else { return nil }
+            guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)), !data.isEmpty else {
+                return nil
+            }
+            let mimeType = declaredType.preferredMIMEType ?? "application/octet-stream"
+            return "data:\(mimeType);base64,\(data.base64EncodedString())"
+        }
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)), !data.isEmpty,
+              let type = imageType(for: data), type.conforms(to: .image)
+        else { return nil }
+        let mimeType = type.preferredMIMEType ?? "application/octet-stream"
+        return "data:\(mimeType);base64,\(data.base64EncodedString())"
+    }
+
+    private struct DataImage { let mime: String; let base64: String; let source: String }
+
+    private static func extractDataImages(from html: String) -> [DataImage] {
+        guard let regex = try? NSRegularExpression(pattern: #"(?is)<img\b[^>]*\bsrc\s*=\s*[\"']data:([^;\"']+);base64,([^\"']+)[\"'][^>]*>"#) else { return [] }
+        return regex.matches(in: html, range: NSRange(html.startIndex..., in: html)).compactMap {
+            guard let mime = Range($0.range(at: 1), in: html), let data = Range($0.range(at: 2), in: html) else { return nil }
+            let mimeValue = String(html[mime])
+            let base64Value = String(html[data])
+            return DataImage(mime: mimeValue, base64: base64Value, source: "data:\(mimeValue);base64,\(base64Value)")
+        }
+    }
+
+    private nonisolated static func imageType(for data: Data) -> UTType? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let identifier = CGImageSourceGetType(source) as String? else { return nil }
+        return UTType(identifier)
     }
 }
 
