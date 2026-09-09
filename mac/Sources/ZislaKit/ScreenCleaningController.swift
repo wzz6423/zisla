@@ -107,6 +107,13 @@ public final class ScreenCleaningController: ObservableObject {
         return .started
     }
 
+    static func overlayWindowIndicesToUpdate(
+        existingCount: Int,
+        screenCount: Int
+    ) -> Range<Int> {
+        0..<min(existingCount, screenCount)
+    }
+
     public func endKeyboardCleaning() {
         endKeyboardCleaning(notify: true)
     }
@@ -124,24 +131,14 @@ public final class ScreenCleaningController: ObservableObject {
     }
 
     private func presentBlackOverlays() {
-        tearDownOverlays()
-        // Hide the Dock so it doesn't float above the overlay when the cursor moves to the bottom.
-        savedPresentationOptions = NSApp.presentationOptions
-        NSApp.presentationOptions.insert(.hideDock)
-        let screens = NSScreen.screens
-        for (index, screen) in screens.enumerated() {
-            let window = makeOverlayWindow(for: screen)
-            overlayWindows.append(window)
-            if index == 0 {
-                // The primary-screen window becomes the key window so it can receive mouse clicks
-                // (borderless windows have canBecomeKey=false by default; CleaningOverlayWindow
-                // overrides it to true, and acceptsFirstMouse=true lets the first click while the
-                // app is inactive dispatch mouseDown directly rather than just activating the window).
-                window.makeKeyAndOrderFront(nil)
-            } else {
-                window.orderFrontRegardless()
-            }
+        if savedPresentationOptions == nil {
+            // Hide the Dock so it doesn't float above the overlay when the cursor moves to the bottom.
+            savedPresentationOptions = NSApp.presentationOptions
+            NSApp.presentationOptions.insert(.hideDock)
         }
+
+        updateOverlayWindows(for: NSScreen.screens)
+        overlayWindows.first?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         startObservingScreenChanges()
     }
@@ -161,8 +158,31 @@ public final class ScreenCleaningController: ObservableObject {
     }
 
     private func handleScreenChange() {
-        if isScreenCleaning {
-            presentBlackOverlays()
+        guard isScreenCleaning else { return }
+        updateOverlayWindows(for: NSScreen.screens)
+    }
+
+    private func updateOverlayWindows(for screens: [NSScreen]) {
+        for index in Self.overlayWindowIndicesToUpdate(
+            existingCount: overlayWindows.count,
+            screenCount: screens.count
+        ) {
+            let window = overlayWindows[index]
+            window.setFrame(screens[index].frame, display: true)
+            window.orderFrontRegardless()
+        }
+
+        while overlayWindows.count > screens.count {
+            let window = overlayWindows.removeLast()
+            window.orderOut(nil)
+            window.contentView = nil
+        }
+
+        while overlayWindows.count < screens.count {
+            let index = overlayWindows.count
+            let window = makeOverlayWindow(for: screens[index])
+            overlayWindows.append(window)
+            window.orderFrontRegardless()
         }
     }
 
