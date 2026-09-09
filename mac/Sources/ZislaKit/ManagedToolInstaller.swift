@@ -72,6 +72,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     case kaku
     case kero
     case markdownPreview
+    case zshell
 
     public var id: String { rawValue }
 
@@ -122,6 +123,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kaku: "Kaku"
         case .kero: "Kero"
         case .markdownPreview: "Markdown Preview"
+        case .zshell: "Zshell"
         }
     }
 
@@ -172,6 +174,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kaku: "面向 AI 编码的终端"
         case .kero: "终端工作区"
         case .markdownPreview: "Markdown 预览"
+        case .zshell: "原生 macOS 终端工作区"
         }
     }
 
@@ -223,6 +226,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kaku: "kaku"
         case .kero: "kero"
         case .markdownPreview: "mdp"
+        case .zshell: "zshell"
         }
     }
 
@@ -273,6 +277,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kaku: .homebrewCask(name: "tw93/tap/kakuku")
         case .kero: .homebrewCask(name: "egoist/tap/kero")
         case .markdownPreview: .homebrewCask(name: "markdown-preview")
+        case .zshell: .homebrewCask(name: "wzz6423/tap/zshell")
         }
     }
 
@@ -281,6 +286,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kaku: "tw93/tap"
         case .kero: "egoist/tap"
         case .packer: "hashicorp/tap"
+        case .zshell: "wzz6423/tap"
         default: nil
         }
     }
@@ -297,14 +303,14 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
             .developmentToolchain
         case .ytDLP, .libreOffice, .keka:
             .utility
-        case .kaku, .kero, .markdownPreview:
+        case .kaku, .kero, .markdownPreview, .zshell:
             .desktopApplication
         }
     }
 
     var usesNativeApplicationVersion: Bool {
         switch self {
-        case .kaku, .kero, .markdownPreview, .keka: true
+        case .kaku, .kero, .markdownPreview, .keka, .zshell: true
         default: false
         }
     }

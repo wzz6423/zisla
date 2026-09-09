@@ -1575,6 +1575,7 @@
 "监听已停止" = "Monitorización detenida";
 "目录树展示" = "Vista del árbol de directorios";
 "终端工作区" = "Espacio de trabajo del terminal";
+"原生 macOS 终端工作区" = "Espacio de trabajo de terminal nativo para macOS";
 "统计与权限" = "Estadísticas y permisos";
 "统计已暂停" = "Estadísticas en pausa";
 "自定义热词" = "Términos personalizados";

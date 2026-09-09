@@ -1574,6 +1574,7 @@
 "监听已停止" = "Monitoring Stopped";
 "目录树展示" = "Directory tree viewer";
 "终端工作区" = "Terminal workspace";
+"原生 macOS 终端工作区" = "Native macOS terminal workspace";
 "统计与权限" = "Stats and permissions";
 "统计已暂停" = "Statistics paused";
 "自定义热词" = "Custom terms";
