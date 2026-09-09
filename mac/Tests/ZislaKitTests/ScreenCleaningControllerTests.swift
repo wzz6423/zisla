@@ -6,6 +6,34 @@ import Testing
 @MainActor
 struct ScreenCleaningControllerTests {
     @Test
+    func refreshesExistingOverlayWindowsBeforeAddingOrRemovingScreens() {
+        #expect(
+            Array(
+                ScreenCleaningController.overlayWindowIndicesToUpdate(
+                    existingCount: 2,
+                    screenCount: 2
+                )
+            ) == [0, 1]
+        )
+        #expect(
+            Array(
+                ScreenCleaningController.overlayWindowIndicesToUpdate(
+                    existingCount: 2,
+                    screenCount: 3
+                )
+            ) == [0, 1]
+        )
+        #expect(
+            Array(
+                ScreenCleaningController.overlayWindowIndicesToUpdate(
+                    existingCount: 3,
+                    screenCount: 1
+                )
+            ) == [0]
+        )
+    }
+
+    @Test
     func startsWhenEventTapWasInstalledEvenIfAccessibilityPreflightIsStale() {
         let result = ScreenCleaningController.keyboardCleaningStartResult(
             eventTapInstalled: true,
