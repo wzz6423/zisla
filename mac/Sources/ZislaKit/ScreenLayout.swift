@@ -284,8 +284,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
     }
 
     private func physicalNotchFrame(for screen: ScreenSnapshot) -> CGRect? {
-        guard screen.safeAreaInsets.top > 0,
-            let leftArea = screen.auxiliaryTopLeftArea,
+        guard let leftArea = screen.auxiliaryTopLeftArea,
             let rightArea = screen.auxiliaryTopRightArea
         else {
             return nil

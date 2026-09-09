@@ -44,6 +44,22 @@ struct SideNoticePresenterWindowLifecycleTests {
         #expect(!source.contains("panel.orderFront(nil)"))
     }
 
+    @Test
+    func noticePanelsUseTheSharedFullscreenWindowBridge() throws {
+        let source = try Self.presenterSource()
+
+        #expect(source.contains("SkyLightOperator.shared.delegateWindow(panel)"))
+    }
+
+    @Test
+    func compactBarKeepsTheLastKnownNotchInsetDuringTopologyGaps() throws {
+        let source = try Self.presenterSource()
+
+        #expect(source.contains("if topology.hasPhysicalNotch {"))
+        #expect(source.contains("displayState.compactBarCenterInset = topology.anchorFrame.width"))
+        #expect(!source.contains("topology.hasPhysicalNotch\n            ? topology.anchorFrame.width\n            : 0"))
+    }
+
     private static func presenterSource() throws -> String {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

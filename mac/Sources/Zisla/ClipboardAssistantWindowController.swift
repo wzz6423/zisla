@@ -94,7 +94,7 @@ final class ClipboardAssistantController: ObservableObject {
             pauseDismissal()
             if displayDuration.expiresAfter == nil {
                 dismissalTotalDuration = nil
-                pausedDismissalProgress = nil
+                pausedDismissalRemainingFraction = nil
                 cancelDismissTask()
             } else if presentation.isHovered {
                 cancelDismissTask()
@@ -140,7 +140,7 @@ final class ClipboardAssistantController: ObservableObject {
     private var dismissalGeneration = 0
     private var dismissalDeadline: Date?
     private var dismissalTotalDuration: Double?
-    private var pausedDismissalProgress: Double?
+    private var pausedDismissalRemainingFraction: Double?
     private let triggerMonitor = ClipboardAssistantTriggerMonitor()
     private let gestureMonitor = ClipboardAssistantMouseGestureMonitor()
     @Published private(set) var isMoreActionsPresented = false
@@ -174,15 +174,10 @@ final class ClipboardAssistantController: ObservableObject {
 
     var isMouseGestureActive: Bool { gestureMonitor.isActive }
 
+    /// Returns the elapsed dismissal fraction so the collapsed glow fills from left to right.
     func dismissalProgress(at date: Date = .now) -> Double? {
-        if let deadline = dismissalDeadline {
-            return CollapsedProgress.remainingFraction(
-                until: deadline,
-                totalDuration: dismissalTotalDuration,
-                at: date
-            )
-        }
-        return pausedDismissalProgress
+        guard let remaining = dismissalRemainingFraction(at: date) else { return nil }
+        return CollapsedProgress.elapsedFraction(fromRemaining: remaining)
     }
 
     /// Window accessor used by the toast view to animate expansion.
@@ -266,7 +261,7 @@ final class ClipboardAssistantController: ObservableObject {
         isSharingAnchorHeld = false
         cancelDismissTask()
         dismissalTotalDuration = displayDuration.expiresAfter
-        pausedDismissalProgress = displayDuration.expiresAfter.map { _ in 1 }
+        pausedDismissalRemainingFraction = displayDuration.expiresAfter.map { _ in 1 }
         presentationGeneration &+= 1
         presentation.isHovered = false
         presentation.visualStyle = visualStyle
@@ -283,7 +278,7 @@ final class ClipboardAssistantController: ObservableObject {
         cancelDismissTask()
         dismissalDeadline = nil
         dismissalTotalDuration = nil
-        pausedDismissalProgress = nil
+        pausedDismissalRemainingFraction = nil
         presentationGeneration &+= 1
         let generation = presentationGeneration
         guard let window, window.isVisible else {
@@ -353,18 +348,18 @@ final class ClipboardAssistantController: ObservableObject {
         guard !isSharingAnchorHeld else { return }
         guard let seconds = displayDuration.expiresAfter else {
             dismissalTotalDuration = nil
-            pausedDismissalProgress = nil
+            pausedDismissalRemainingFraction = nil
             dismissTask = nil
             return
         }
         dismissalTotalDuration = seconds
-        let progress = pausedDismissalProgress ?? 1
-        let remaining = seconds * progress
+        let remainingFraction = pausedDismissalRemainingFraction ?? 1
+        let remaining = seconds * remainingFraction
         guard remaining > 0 else {
             dismiss()
             return
         }
-        pausedDismissalProgress = nil
+        pausedDismissalRemainingFraction = nil
         dismissalDeadline = Date().addingTimeInterval(remaining)
         let presentationGeneration = self.presentationGeneration
         let dismissalGeneration = self.dismissalGeneration
@@ -393,8 +388,19 @@ final class ClipboardAssistantController: ObservableObject {
 
     private func pauseDismissal() {
         guard dismissalDeadline != nil else { return }
-        pausedDismissalProgress = dismissalProgress()
+        pausedDismissalRemainingFraction = dismissalRemainingFraction()
         dismissalDeadline = nil
+    }
+
+    private func dismissalRemainingFraction(at date: Date = .now) -> Double? {
+        if let deadline = dismissalDeadline {
+            return CollapsedProgress.remainingFraction(
+                until: deadline,
+                totalDuration: dismissalTotalDuration,
+                at: date
+            )
+        }
+        return pausedDismissalRemainingFraction
     }
 
     static func thumbnail(for detection: ClipboardAssistantDetection) -> NSImage? {
@@ -529,7 +535,10 @@ struct ClipboardAssistantToastView: View {
                         if !isExpanded,
                            presentation.progressGlowEnabled,
                            let progress = controller.dismissalProgress(at: context.date) {
-                            CollapsedProgressGlow(progress: progress)
+                            CollapsedProgressGlow(
+                                progress: progress,
+                                centerInset: presentation.physicalNotchWidth
+                            )
                         }
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))

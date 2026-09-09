@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SkyLightWindow
 import ZislaCore
 import ZislaKit
 import SwiftUI
@@ -241,9 +242,9 @@ final class SideNoticePresenter {
         }
         let topology = ScreenLayoutEngine().layout(for: snapshot).topology
         // Detailed mode left/right content must avoid the physical notch; simulated-island devices have no obstruction, so no center gap.
-        displayState.compactBarCenterInset = topology.hasPhysicalNotch
-            ? topology.anchorFrame.width
-            : 0
+        if topology.hasPhysicalNotch {
+            displayState.compactBarCenterInset = topology.anchorFrame.width
+        }
         let panel = ensureCompactBarPanel(in: panels)
         panel.level = isScreenshotActive ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
         if panel.frame != frame {
@@ -337,6 +338,7 @@ final class SideNoticePresenter {
             contentView: hostingView,
             frame: CGRect(x: 0, y: 0, width: 240, height: 34)
         )
+        SkyLightOperator.shared.delegateWindow(panel)
         panels.compactBar = panel
         return panel
     }

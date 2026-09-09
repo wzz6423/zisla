@@ -109,7 +109,9 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(viewSource.contains("TimelineView("))
         #expect(viewSource.contains("controller.dismissalProgress(at: context.date)"))
         #expect(viewSource.contains("presentation.progressGlowEnabled"))
+        #expect(viewSource.contains("centerInset: presentation.physicalNotchWidth"))
         #expect(viewSource.contains("if !isExpanded"))
+        #expect(source.contains("CollapsedProgress.elapsedFraction(fromRemaining: remaining)"))
     }
 
     @MainActor

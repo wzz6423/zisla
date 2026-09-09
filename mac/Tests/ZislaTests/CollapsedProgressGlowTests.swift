@@ -96,6 +96,56 @@ struct CollapsedProgressGlowTests {
     }
 
     @Test
+    func progressSegmentsSkipThePhysicalNotchWithoutPausingAtTheCenter() {
+        let halfway = CollapsedProgress.segmentWidths(
+            progress: 0.5,
+            totalWidth: 500,
+            centerInset: 200
+        )
+        #expect(halfway.leading == 150)
+        #expect(halfway.trailing == 0)
+        #expect(halfway.side == 150)
+        #expect(halfway.centerInset == 200)
+
+        let pastCenter = CollapsedProgress.segmentWidths(
+            progress: 0.75,
+            totalWidth: 500,
+            centerInset: 200
+        )
+        #expect(pastCenter.leading == 150)
+        #expect(pastCenter.trailing == 75)
+
+        let continuous = CollapsedProgress.segmentWidths(
+            progress: 0.25,
+            totalWidth: 500,
+            centerInset: 0
+        )
+        #expect(continuous.leading == 125)
+        #expect(continuous.trailing == 0)
+        #expect(continuous.side == 500)
+
+        let clamped = CollapsedProgress.segmentWidths(
+            progress: 2,
+            totalWidth: 100,
+            centerInset: 200
+        )
+        #expect(clamped.leading == 0)
+        #expect(clamped.trailing == 0)
+        #expect(clamped.side == 0)
+        #expect(clamped.centerInset == 100)
+
+        let negative = CollapsedProgress.segmentWidths(
+            progress: -1,
+            totalWidth: 100,
+            centerInset: -20
+        )
+        #expect(negative.leading == 0)
+        #expect(negative.trailing == 0)
+        #expect(negative.side == 100)
+        #expect(negative.centerInset == 0)
+    }
+
+    @Test
     func progressGlowLocalizationKeysExistForEveryLanguage() throws {
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -139,6 +189,17 @@ struct CollapsedProgressGlowTests {
         #expect(source.contains("browserDownloadNotice?.progress"))
         #expect(source.contains("videoDownloadNotice?.progress"))
         #expect(source.contains("settingsStore.settings.collapsedProgressGlowEnabled"))
-        #expect(source.contains("CollapsedProgressGlow(progress: progress)"))
+        #expect(source.contains("CollapsedProgressGlow("))
+        #expect(source.contains("centerInset: displayState.compactBarCenterInset"))
+        #expect(source.contains("MediaWaveformView.tintColor(for: artworkData)"))
+        #expect(source.contains("compactStatusBackgroundFill"))
+        #expect(source.contains("Color.clear\n                        .frame(width: centerInset)"))
+
+        let waveformSource = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/MediaWaveformView.swift"),
+            encoding: .utf8
+        )
+        #expect(waveformSource.contains("tint = Self.tintColor(for: artworkData)"))
+        #expect(waveformSource.contains("ArtworkWaveformColor.color(from: artworkData)"))
     }
 }

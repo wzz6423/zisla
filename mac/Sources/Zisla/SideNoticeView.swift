@@ -193,7 +193,11 @@ struct CompactStatusBarView: View {
             .overlay {
                 if settingsStore.settings.collapsedProgressGlowEnabled,
                    let progress = compactProgress(at: date) {
-                    CollapsedProgressGlow(progress: progress)
+                    CollapsedProgressGlow(
+                        progress: progress,
+                        centerInset: displayState.compactBarCenterInset,
+                        tint: compactProgressTint
+                    )
                 }
             }
             .clipShape(SimulatedIslandShape())
@@ -243,8 +247,39 @@ struct CompactStatusBarView: View {
         }
     }
 
+    private var compactProgressTint: Color {
+        guard selectedCompactStatusPriority == .media else { return .green }
+        let artworkData = detailedMediaItem?.artworkData ?? mediaNotice?.artworkData
+        return MediaWaveformView.tintColor(for: artworkData)
+    }
+
     @ViewBuilder
     private var compactStatusBackground: some View {
+        GeometryReader { geometry in
+            let centerInset = min(
+                max(0, displayState.compactBarCenterInset),
+                max(0, geometry.size.width)
+            )
+            let sideWidth = max(0, (geometry.size.width - centerInset) / 2)
+
+            if centerInset > 0 {
+                HStack(spacing: 0) {
+                    compactStatusBackgroundFill
+                        .frame(width: sideWidth)
+                    Color.clear
+                        .frame(width: centerInset)
+                    compactStatusBackgroundFill
+                        .frame(width: sideWidth)
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height)
+            } else {
+                compactStatusBackgroundFill
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var compactStatusBackgroundFill: some View {
         if reduceTransparency {
             Color.black
         } else {
