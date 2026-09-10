@@ -226,7 +226,19 @@ struct QuickNotesServiceTests {
         #expect(moduleSource.contains("@State private var draftLoadGeneration = 0"))
         #expect(moduleSource.contains("guard generation == draftLoadGeneration, selectedID == service.selectedID else { return }"))
         #expect(expandedSource.contains(".task {\n            await service.refresh()\n            if service.selectedID != nil"))
-        #expect(moduleSource.contains(".task {\n            await service.refresh()\n            if service.selectedID != nil"))
+    }
+
+    @Test
+    func reloadsQuickNoteDraftWhenTheIslandBecomesVisibleAgain() throws {
+        let source = try String(
+            contentsOf: sourceRoot.appendingPathComponent("Sources/Zisla/QuickNoteModuleView.swift"),
+            encoding: .utf8
+        )
+
+        #expect(source.contains(".task(id: model.isIslandVisible) {"))
+        #expect(source.contains("guard model.isIslandVisible else { return }"))
+        #expect(source.contains("reloadDraftIfNeeded()"))
+        #expect(source.contains("guard let selectedID = service.selectedID,\n              noteContent == nil || loadedNoteID != selectedID\n        else { return }"))
     }
 
     @Test
