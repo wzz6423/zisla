@@ -181,19 +181,18 @@ enum ScreenshotLongCaptureMatcher {
     private static let minimumNewContentFraction = 0.02
     private static let minimumNewContentPixels = 4
 
-    private static let unchangedMaximumMeanDifference = 0.75
     private static let unchangedSignificantDifference = 4
     private static let unchangedMaximumPatchDimensionFraction = 0.3
     private static let unchangedMaximumPatchAreaFraction = 0.08
+    private static let unchangedScatteredMeanDifference = 2.5
     /// A still page still repaints: durations tick, clocks advance, spinners spin, a list streams new
     /// rows. Those changes are scattered across the whole frame rather than confined to one patch, so the
     /// patch test above misses them and the frame reaches the matcher — which, on a page whose rows are
     /// alike, reads the stillness as another scroll and stitches the same rows again and again.
     ///
-    /// Treating a repaint this small as "no scroll" is safe even when it is wrong: a frame reported as
+    /// Treating a low-energy repaint as "no scroll" is safe even when it is wrong: a frame reported as
     /// unchanged does not advance `lastLongCaptureFrame`, so a scroll that is skipped here is measured
-    /// against the composite's end on the very next capture instead of being lost. A real scroll moves
-    /// every text row, and text rows are most of the frame, so it lands far above this budget.
+    /// against the composite's end on the very next capture instead of being lost.
     private static let unchangedScatteredAreaFraction = 0.04
 
     private struct CoarseMatch {
@@ -217,7 +216,6 @@ enum ScreenshotLongCaptureMatcher {
         let width = Int(sampleSize.width)
         let height = max(previousPixels.count / max(width, 1), 1)
         var totalDifference = 0
-        var significantDifferenceCount = 0
         var changedCount = 0
         var changedMinX = width
         var changedMaxX = -1
@@ -227,7 +225,6 @@ enum ScreenshotLongCaptureMatcher {
             let difference = abs(Int(previousPixels[index]) - Int(nextPixels[index]))
             totalDifference += difference
             guard difference > unchangedSignificantDifference else { continue }
-            significantDifferenceCount += 1
             changedCount += 1
             let x = index % width
             let y = index / width
@@ -236,18 +233,18 @@ enum ScreenshotLongCaptureMatcher {
             changedMinY = min(changedMinY, y)
             changedMaxY = max(changedMaxY, y)
         }
-        if Double(totalDifference) / Double(previousPixels.count) <= unchangedMaximumMeanDifference,
-           significantDifferenceCount <= max(8, previousPixels.count / 200) {
-            return true
-        }
+        let meanDifference = Double(totalDifference) / Double(previousPixels.count)
+        let patchArea = Double(changedCount) / Double(previousPixels.count)
         // An untouched page still repaints a caret, a clock or a spinner. Those patches are small and
         // confined, so treat them as "no scroll" instead of stitching a duplicated screen.
         guard changedCount > 0 else { return true }
-        let patchArea = Double(changedCount) / Double(previousPixels.count)
         // Scattered repaints — several counters ticking at once, a streaming row indicator — have a
         // bounding box as large as the frame, so they fail the patch test below even though the page did
         // not move. Judge them by how much of the frame they touch instead of where it is.
-        if patchArea <= unchangedScatteredAreaFraction { return true }
+        if patchArea <= unchangedScatteredAreaFraction,
+           meanDifference <= unchangedScatteredMeanDifference {
+            return true
+        }
         let patchWidth = Double(changedMaxX - changedMinX + 1) / Double(width)
         let patchHeight = Double(changedMaxY - changedMinY + 1) / Double(height)
         return patchWidth <= unchangedMaximumPatchDimensionFraction
@@ -1723,9 +1720,8 @@ final class ScreenshotEditorModel: ObservableObject {
         let next = nextImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
         if let previous, let next,
            ScreenshotLongCaptureMatcher.isVisuallyUnchanged(previous: previous, next: next) {
-            // Deliberately keep `lastLongCaptureFrame` where it is. It is the frame the composite already
-            // ends with, and an overlap measured against any other frame would be applied to the wrong
-            // pixels — that mismatch is what left a duplicated strip at the seam.
+            // Keep `lastLongCaptureFrame` where the composite already ends. Measuring the next frame
+            // against a skipped repaint would apply an overlap to the wrong pixels.
             statusMessage = AppLocalization.text("等待页面滚动")
             return false
         }

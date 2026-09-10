@@ -540,6 +540,44 @@ struct LongCaptureRealWorldTests {
     }
 
     @Test
+    func realWorldRepeatingListWithChangingScrollStepsKeepsExactAlignment() throws {
+        let pageWidth = 360
+        let frameHeight = 700
+        let page = try #require(makeListPageImage(width: pageWidth, height: 6_000, pitch: 130))
+        let offsets = [0, 260, 760, 1_020, 1_570]
+        let first = try #require(frame(from: page, offset: offsets[0], height: frameHeight))
+        let model = ScreenshotEditorModel(
+            image: NSImage(cgImage: first, size: CGSize(width: pageWidth, height: frameHeight))
+        )
+        model.beginLongCapturePreview()
+
+        for offset in offsets.dropFirst() {
+            let frameImage = try #require(frame(from: page, offset: offset, height: frameHeight))
+            let didAppend = model.append(
+                image: NSImage(
+                    cgImage: frameImage,
+                    size: CGSize(width: pageWidth, height: frameHeight)
+                ),
+                direction: .vertical
+            )
+            #expect(didAppend, "offset \(offset) should still produce a reliable overlap")
+        }
+
+        let lastOffset = try #require(offsets.last)
+        let expected = try #require(page.cropping(
+            to: CGRect(x: 0, y: 0, width: pageWidth, height: lastOffset + frameHeight)
+        ))
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let report = describeMismatch(
+            actual: rgbaPixels(combined),
+            expected: rgbaPixels(expected),
+            width: pageWidth
+        )
+        #expect(combined.height == expected.height, "height \(combined.height) vs \(expected.height)")
+        #expect(report == "identical", "changing scroll steps shifted the seam: \(report)")
+    }
+
+    @Test
     func realWorldStationaryRepeatingListIsNeverAppended() throws {
         let pageWidth = 360
         let frameHeight = 700
