@@ -175,21 +175,14 @@ struct IslandSurface<Content: View>: View {
             if !reduceTransparency {
                 // Bottom transmissive frosted glass (smoked, refracts the desktop, no white bloom).
                 glassBody
-                // Ambient light field sits between the glass and the crown so the solid
-                // crown keeps covering it where text legibility matters.
-                IslandLightField(visualStyle: .frosted)
-                // Solid-black crown on top + smoked transition.
+                // Solid-black crown on top + smoked transition. Deliberately no ambient light
+                // overlays: their additive plusLighter white reads as blurry line-shaped patches
+                // on the smoked glass rather than ambience, so the surface stays a smooth gradient.
                 if renderingPolicy.showsCrown {
                     crown
                 } else if usesCompactGlassSurface {
                     compactCrown
                 }
-                IslandSheenSweep(visualStyle: .frosted)
-                    .id(visualStyle)
-                IslandRimLight(
-                    visualStyle: .frosted,
-                    bottomCornerRadius: rimBottomCornerRadius
-                )
             } else {
                 // Accessibility: opaque black → smoked gradient.
                 surfaceGradient
@@ -207,18 +200,12 @@ struct IslandSurface<Content: View>: View {
         } else {
             ZStack(alignment: .top) {
                 transparentLiquidGlassShell
-                IslandLightField(visualStyle: .transparent)
+                // Same reasoning as `frostedSurface`: no additive white overlays on the glass.
                 if renderingPolicy.showsCrown {
                     transparentCrown
                 } else if usesCompactGlassSurface {
                     compactCrown
                 }
-                IslandSheenSweep(visualStyle: .transparent)
-                    .id(visualStyle)
-                IslandRimLight(
-                    visualStyle: .transparent,
-                    bottomCornerRadius: rimBottomCornerRadius
-                )
             }
         }
     }
