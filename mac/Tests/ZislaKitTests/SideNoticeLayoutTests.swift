@@ -53,6 +53,11 @@ struct SideNoticeLayoutTests {
         #expect(suppression.hidesNotices)
         suppression.isTransientNoticePresented = false
         #expect(!suppression.hidesNotices)
+
+        suppression.isScreenLocked = true
+        #expect(suppression.hidesNotices)
+        suppression.isScreenLocked = false
+        #expect(!suppression.hidesNotices)
     }
 
     @Test
@@ -332,7 +337,7 @@ struct SideNoticeLayoutTests {
         #expect(frame == CGRect(x: 636, y: anchor.minY, width: 240, height: anchor.height))
         #expect(frame.maxY == screen.frame.maxY)
         #expect(frame.minY == screen.frame.maxY - frame.height)
-        #expect(frame.height == ScreenLayoutEngine().layout(for: screen).topology.anchorFrame.height)
+        #expect(frame.height == anchor.height)
     }
 
     @Test
@@ -615,6 +620,118 @@ struct SideNoticeLayoutTests {
         )
 
         #expect(frame.width == 380)
+    }
+
+    @Test
+    func progressGlowClearanceRequiresEnabledSelectedProgressStatus() throws {
+        let screen = physicalNotchScreen()
+        let baselineHeight = engine.compactBarFrame(for: screen).height
+        let media = IslandNotice(id: "media-active-left", title: "QQ音乐", side: .left)
+        let browser = IslandNotice(id: "browser-download-left", title: "report.pdf", side: .left)
+        let video = IslandNotice(id: "video-download-left", title: "YouTube", side: .left)
+        var settings = FeatureSettings()
+        settings.collapsedProgressGlowEnabled = false
+
+        for notice in [media, browser, video] {
+            let frame = try #require(engine.compactBarFrame(
+                for: screen,
+                notices: [notice],
+                settings: settings
+            ))
+            #expect(frame.height == baselineHeight)
+        }
+
+        settings.collapsedProgressGlowEnabled = true
+        for notice in [media, browser, video] {
+            let frame = try #require(engine.compactBarFrame(
+                for: screen,
+                notices: [notice],
+                settings: settings
+            ))
+            #expect(frame.height == baselineHeight + SideNoticeLayoutEngine.compactProgressClearance)
+        }
+    }
+
+    @Test
+    func nonProgressStatusesDoNotReceiveGlowClearance() throws {
+        let screen = physicalNotchScreen()
+        let baselineHeight = engine.compactBarFrame(for: screen).height
+        let notices = [
+            IslandNotice(id: "background-sound-left", title: "棕色噪声", side: .left),
+            IslandNotice(id: "ai-active-codex", title: "Codex", side: .left),
+            IslandNotice(id: "mail-notification-left", title: "邮件", side: .left),
+            IslandNotice(id: "focus-countdown-left", title: "专注倒计时", side: .left),
+            IslandNotice(id: "focus-mode-left", title: "专注", side: .left),
+            IslandNotice(id: "toolbox-reminder-left", title: "提醒", side: .left),
+            IslandNotice(id: "update-available-left", title: "更新", side: .left),
+            IslandNotice(id: "voice-processing-left", title: "正在整理语音", side: .left),
+            IslandNotice(id: "focus-transition", title: "工作", side: .left),
+            IslandNotice(id: "headphone-connection", title: "AirPods", side: .left, style: .headphone),
+        ]
+        var settings = FeatureSettings()
+        settings.collapsedProgressGlowEnabled = true
+
+        for notice in notices {
+            let frame = try #require(engine.compactBarFrame(
+                for: screen,
+                notices: [notice],
+                settings: settings
+            ))
+            #expect(frame.height == baselineHeight)
+        }
+    }
+
+    @Test
+    func higherPriorityNonProgressStatusPreventsQueuedMediaClearance() throws {
+        let screen = physicalNotchScreen()
+        let baselineHeight = engine.compactBarFrame(for: screen).height
+        let media = IslandNotice(id: "media-active-left", title: "QQ音乐", side: .left)
+        let ai = IslandNotice(id: "ai-active-codex", title: "Codex", side: .left)
+        var settings = FeatureSettings()
+        settings.collapsedProgressGlowEnabled = true
+
+        let frame = try #require(engine.compactBarFrame(
+            for: screen,
+            notices: [media, ai],
+            settings: settings
+        ))
+
+        #expect(frame.height == baselineHeight)
+    }
+
+    @Test
+    func snapshotAndOverlayLayoutApplyTheSameProgressClearance() throws {
+        let screen = physicalNotchScreen()
+        let layout = ScreenLayoutEngine().layout(for: screen)
+        let media = IslandNotice(id: "media-active-left", title: "QQ音乐", side: .left)
+        var settings = FeatureSettings()
+        settings.collapsedProgressGlowEnabled = true
+
+        let snapshotFrame = try #require(engine.compactBarFrame(
+            for: screen,
+            notices: [media],
+            settings: settings
+        ))
+        let layoutFrame = try #require(engine.compactBarFrame(
+            for: layout,
+            notices: [media],
+            settings: settings
+        ))
+
+        #expect(snapshotFrame == layoutFrame)
+        #expect(engine.compactWingHeight(for: screen) + SideNoticeLayoutEngine.compactProgressClearance
+            == engine.compactWingHeight(for: screen, progressGlowEnabled: true))
+    }
+
+    private func physicalNotchScreen() -> ScreenSnapshot {
+        ScreenSnapshot(
+            displayID: 42,
+            frame: CGRect(x: 0, y: 0, width: 1_512, height: 982),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1_512, height: 950),
+            safeAreaInsets: ScreenInsets(top: 32),
+            auxiliaryTopLeftArea: CGRect(x: 0, y: 950, width: 716, height: 32),
+            auxiliaryTopRightArea: CGRect(x: 796, y: 950, width: 716, height: 32)
+        )
     }
 
     @Test

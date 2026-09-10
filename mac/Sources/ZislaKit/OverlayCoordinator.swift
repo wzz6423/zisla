@@ -59,6 +59,7 @@ public final class OverlayCoordinator: NSObject {
     private var isHoverActivationSuspended = false
     private var isScreenshotCaptureInProgress = false
     private var isScreenshotActive = false
+    private var isScreenLocked = false
     private var collapsedOnTop = true
     private var isPersistentContentVisible = true
     internal var applicationActivationHandler: () -> Void = {
@@ -249,6 +250,7 @@ public final class OverlayCoordinator: NSObject {
 
     public func handlePointer(at point: CGPoint) {
         guard isRunning,
+              !isScreenLocked,
               !isVoiceRecording,
               !isHoverActivationSuspended,
               !isScreenshotCaptureInProgress
@@ -286,7 +288,7 @@ public final class OverlayCoordinator: NSObject {
     }
 
     public func setPinned(_ pinned: Bool) {
-        guard !pinned || !isVoiceRecording else { return }
+        guard !pinned || (!isScreenLocked && !isVoiceRecording) else { return }
         isPinned = pinned
         if pinned {
             stopsAfterTransientReveal = false
@@ -308,7 +310,7 @@ public final class OverlayCoordinator: NSObject {
     /// Expands the panel on the screen containing the given point; used for cross-screen entry
     /// points such as the menu bar.
     public func showExpanded(at point: CGPoint) {
-        guard !isVoiceRecording else { return }
+        guard !isScreenLocked, !isVoiceRecording else { return }
         if !isRunning {
             start()
             stopsAfterTransientReveal = true
@@ -329,7 +331,7 @@ public final class OverlayCoordinator: NSObject {
     }
 
     public func setDragging(_ dragging: Bool) {
-        guard !isVoiceRecording || !dragging else { return }
+        guard !dragging || (!isScreenLocked && !isVoiceRecording) else { return }
         guard dragging != isExternalDragging else { return }
         isExternalDragging = dragging
         onDraggingChanged?(dragging)
@@ -337,7 +339,7 @@ public final class OverlayCoordinator: NSObject {
     }
 
     public func setTransientInteractionVisible(_ visible: Bool) {
-        guard !isVoiceRecording || !visible else { return }
+        guard !visible || (!isScreenLocked && !isVoiceRecording) else { return }
         guard visible != isTransientInteractionVisible else { return }
         isTransientInteractionVisible = visible
         updateInteractionHold()
@@ -362,12 +364,45 @@ public final class OverlayCoordinator: NSObject {
         }
     }
 
-    /// Keeps every island window below screenshot selection and editor windows.
+    /// Hides live island windows after screen capture has produced its frozen frame.
     public func setScreenshotActive(_ active: Bool) {
         guard isScreenshotActive != active else { return }
         isScreenshotActive = active
-        applyPanelLevel()
-        applyPersistentPanelLevels()
+        if active {
+            cancelScheduledCollapse()
+            cancelPendingPanelCollapse()
+            cancelPointerRevalidation()
+            panel?.orderOut(nil)
+            hidePersistentPanels()
+        } else if isVisible {
+            presentCurrentLayout()
+        } else {
+            updatePersistentPanels()
+        }
+    }
+
+    public func setScreenLocked(_ locked: Bool) {
+        guard isScreenLocked != locked else { return }
+        isScreenLocked = locked
+        if locked {
+            cancelScheduledCollapse()
+            cancelPendingPanelCollapse()
+            cancelPointerRevalidation()
+            endPointerEntryGrace()
+            isPointerInside = false
+            awaitsPointerEntry = false
+            stopsAfterTransientReveal = false
+            panel?.orderOut(nil)
+            hidePersistentPanels()
+            if isVisible { onVisibilityChanged?(false) }
+        } else if isRunning {
+            if isVisible {
+                presentCurrentLayout()
+                onVisibilityChanged?(true)
+            } else {
+                updatePersistentPanels()
+            }
+        }
     }
 
     /// Holds the current island presentation until the screen capture has produced its frozen frame.
@@ -398,6 +433,7 @@ public final class OverlayCoordinator: NSObject {
     }
 
     public func setVoiceRecording(_ recording: Bool, at point: CGPoint) {
+        guard !recording || !isScreenLocked else { return }
         guard recording != isVoiceRecording else { return }
         let wasRecording = isVoiceRecording
         isVoiceRecording = recording
@@ -542,7 +578,7 @@ public final class OverlayCoordinator: NSObject {
         at point: CGPoint,
         interaction: PointerEdgeMonitor.Interaction
     ) {
-        guard !isVoiceRecording else { return }
+        guard !isScreenLocked, !isVoiceRecording else { return }
         switch interaction {
         case .dragging(let hasSupportedPayload):
             guard hasSupportedPayload else {
@@ -580,6 +616,7 @@ public final class OverlayCoordinator: NSObject {
         for effect in effects {
             switch effect {
             case .show:
+                guard !isScreenLocked else { continue }
                 cancelPendingPanelCollapse()
                 presentCurrentLayout()
                 onVisibilityChanged?(true)
@@ -736,7 +773,10 @@ public final class OverlayCoordinator: NSObject {
     }
 
     private func presentCurrentLayout() {
-        guard let layout = layout(for: activeDisplayID) else { return }
+        guard !isScreenLocked,
+            !isScreenshotActive,
+            let layout = layout(for: activeDisplayID)
+        else { return }
         // After repositioning to a different screen, don't let a pending collapse task on the old screen prematurely hide the shared panel.
         cancelPendingPanelCollapse()
         onCollapsedSizeChanged?(layout.collapsedFrame.size)
@@ -766,7 +806,9 @@ public final class OverlayCoordinator: NSObject {
     }
 
     private func updatePersistentPanels(forcePresent: Bool = false) {
-        guard !isVoiceRecording,
+        guard !isScreenLocked,
+            !isScreenshotActive,
+            !isVoiceRecording,
             !isTransientNoticePresented,
             isPersistentContentVisible,
             let persistentContentViewProvider,

@@ -382,9 +382,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         configureApplicationIconUpdates(model: model)
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
         self.lockScreenOverlayController = lockScreenOverlayController
-        if model.settingsStore.settings.lockScreenInfoEnabled {
-            lockScreenOverlayController.start()
-        }
 
         let petController = IslandPetController(model: model)
         self.petController = petController
@@ -526,6 +523,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
         overlayCoordinator = coordinator
+        lockScreenOverlayController.onScreenLockedChanged = { [weak self, weak coordinator] locked in
+            coordinator?.setScreenLocked(locked)
+            self?.noticePresenter?.setScreenLocked(locked)
+            model.clipboardAssistant.setScreenLocked(locked)
+        }
+        lockScreenOverlayController.start()
         model.onVoiceInputWillStart = { [weak coordinator] in
             guard let coordinator, coordinator.isRunning else { return }
             coordinator.setVoiceRecording(true, at: NSEvent.mouseLocation)
@@ -553,7 +556,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             browserDownloads: model.browserDownloads,
             settingsStore: model.settingsStore,
             languageStore: model.languageStore,
-            displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs
+            displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs,
+            isScreenLocked: lockScreenOverlayController.isScreenLocked
         )
         configureMainMenu()
         registerScreenshotHotkeys()
@@ -638,21 +642,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.registerScreenshotHotkeys()
-                }
-            }
-            .store(in: &cancellables)
-
-        model.settingsStore.$settings
-            .map(\.lockScreenInfoEnabled)
-            .removeDuplicates()
-            .sink { [weak self] enabled in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    if enabled {
-                        self.lockScreenOverlayController?.start()
-                    } else {
-                        self.lockScreenOverlayController?.stop()
-                    }
                 }
             }
             .store(in: &cancellables)
@@ -1397,20 +1386,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         modalWindowSnapshot?.restoreAfterModalDismissal()
         setScreenshotSessionActive(true)
         setScreenshotLiveCaptureActive(true)
+        let clipboardAssistantSnapshot = ScreenshotModalWindowSnapshot.capture(
+            from: AppModel.shared.clipboardAssistant.windowForFrameUpdate
+        )
 
         let controller = ScreenshotSelectionController(
             capturedProcessIdentifier: capturedProcessIdentifier,
             captureScreen: { screen in
                 let capture = try await ScreenshotCaptureService.capture(screen: screen)
-                return modalWindowSnapshot?.composited(over: capture, on: screen) ?? capture
+                let captureWithAssistant = clipboardAssistantSnapshot?.composited(
+                    over: capture,
+                    on: screen
+                ) ?? capture
+                return modalWindowSnapshot?.composited(over: captureWithAssistant, on: screen)
+                    ?? captureWithAssistant
             }
         )
         screenshotSelectionController = controller
         controller.onSelectionWillPresent = { [weak self, weak controller] in
             guard let self, let controller, self.screenshotSelectionController === controller else { return }
-            self.setScreenshotLiveCaptureActive(false)
-            AppModel.shared.clipboardAssistant.setScreenshotSelectionActive(true)
             self.setScreenshotFrozenPresentationActive(true)
+            AppModel.shared.clipboardAssistant.setScreenshotSelectionActive(true)
+            self.setScreenshotLiveCaptureActive(false)
             await Task.yield()
         }
         controller.onCaptured = { [weak self] result in

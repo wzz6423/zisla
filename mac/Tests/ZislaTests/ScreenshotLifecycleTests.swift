@@ -65,6 +65,31 @@ struct ScreenshotLifecycleTests {
     }
 
     @Test
+    func clipboardAssistantSnapshotIsCompositedAtRetinaScale() throws {
+        let background = try #require(Self.solidImage(width: 16, height: 16, color: (0, 0, 0)))
+        let assistant = try #require(Self.solidImage(width: 2, height: 1, color: (0, 255, 0)))
+        let image = try #require(ScreenshotModalWindowSnapshot.composite(
+            assistant,
+            in: CGRect(x: 2, y: 3, width: 2, height: 1),
+            over: background,
+            screenSize: CGSize(width: 8, height: 8)
+        ))
+
+        let progressPixel = try #require(ScreenshotCaptureService.pixelColor(
+            at: CGPoint(x: 2, y: 3),
+            in: image,
+            screenSize: CGSize(width: 8, height: 8)
+        ))
+        let below = try #require(ScreenshotCaptureService.pixelColor(
+            at: CGPoint(x: 2, y: 4),
+            in: image,
+            screenSize: CGSize(width: 8, height: 8)
+        ))
+        #expect(progressPixel.hex == "#00FF00")
+        #expect(below.hex == "#000000")
+    }
+
+    @Test
     func screenshotCapturePreservesCurrentIslandPresentation() throws {
         let source = try String(contentsOf: Self.appSourceURL, encoding: .utf8)
         let beginScreenshot = try #require(source.range(of: "private func beginScreenshot"))
@@ -92,6 +117,9 @@ struct ScreenshotLifecycleTests {
         let liveCaptureStart = try #require(captureLifecycle.range(
             of: "setScreenshotLiveCaptureActive(true)"
         ))
+        let assistantSnapshot = try #require(captureLifecycle.range(
+            of: "let clipboardAssistantSnapshot = ScreenshotModalWindowSnapshot.capture("
+        ))
         let captured = try #require(captureLifecycle.range(
             of: "controller.onCaptured",
             range: selectionWillPresent.upperBound..<captureLifecycle.endIndex
@@ -102,6 +130,9 @@ struct ScreenshotLifecycleTests {
         ))
         let frozenPresentation = try #require(selectionPresentation.range(
             of: "self.setScreenshotFrozenPresentationActive(true)"
+        ))
+        let assistantSelection = try #require(selectionPresentation.range(
+            of: "clipboardAssistant.setScreenshotSelectionActive(true)"
         ))
         #expect(selectionPresentation.contains("self.setScreenshotFrozenPresentationActive(true)"))
         #expect(selectionPresentation.contains("clipboardAssistant.setScreenshotSelectionActive(true)"))
@@ -117,11 +148,16 @@ struct ScreenshotLifecycleTests {
         #expect(source.contains("window?.close()"))
         #expect(source.contains("modalWindow.level = WindowPlacement.modalWindowLevel"))
         #expect(source.contains("modalWindow.makeKeyAndOrderFront(nil)"))
-        #expect(liveCaptureStart.lowerBound < controllerCreation.lowerBound)
-        #expect(liveCaptureEnd.lowerBound < frozenPresentation.lowerBound)
+        #expect(liveCaptureStart.lowerBound < assistantSnapshot.lowerBound)
+        #expect(assistantSnapshot.lowerBound < controllerCreation.lowerBound)
+        #expect(frozenPresentation.lowerBound < assistantSelection.lowerBound)
+        #expect(assistantSelection.lowerBound < liveCaptureEnd.lowerBound)
         #expect(selectionPresentation.contains("await Task.yield()"))
         #expect(captureLifecycle.contains("captureScreen: { screen in"))
-        #expect(captureLifecycle.contains("modalWindowSnapshot?.composited(over: capture, on: screen) ?? capture"))
+        #expect(captureLifecycle.contains("let captureWithAssistant = clipboardAssistantSnapshot?.composited("))
+        #expect(captureLifecycle.contains(
+            "modalWindowSnapshot?.composited(over: captureWithAssistant, on: screen)\n                    ?? captureWithAssistant"
+        ))
         #expect(source.contains("CGFloat(captureImage.height) - modalFrame.maxY * scaleY"))
 
         let captureSource = try String(contentsOf: Self.captureSourceURL, encoding: .utf8)

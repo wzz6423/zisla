@@ -958,6 +958,8 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle(AppLocalization.text("始终置顶"), detail: "收起时保持在其他窗口和菜单栏图标上方", symbol: "rectangle.topthird.inset.filled", keyPath: \.islandCollapsedOnTop)
                     rowDivider
+                    featureToggle(AppLocalization.text("提示条进度光效"), detail: AppLocalization.text("在收起态提示条边沿显示播放、下载和自动关闭进度"), symbol: "chart.bar.fill", keyPath: \.collapsedProgressGlowEnabled)
+                    rowDivider
                     featureToggle("浏览器下载进度", detail: "在灵动岛显示来源图标与百分比", symbol: "arrow.down.circle.fill", keyPath: \.browserDownloadIslandEnabled)
                         .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                     rowDivider

@@ -131,6 +131,7 @@ public struct CompactBarContourMetrics: Equatable, Sendable {
 
 public struct SideNoticeLayoutEngine: Equatable, Sendable {
     public static let compactStatusWingWidth: CGFloat = 40
+    static let compactProgressClearance: CGFloat = 2
 
     private enum Layout {
         static let compactWingWidth = SideNoticeLayoutEngine.compactStatusWingWidth
@@ -288,10 +289,17 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         ScreenLayoutEngine().layout(for: screen).topology.hasPhysicalNotch
     }
 
-    public func compactWingHeight(for screen: ScreenSnapshot) -> CGFloat {
+    public func compactWingHeight(
+        for screen: ScreenSnapshot,
+        progressGlowEnabled: Bool = false
+    ) -> CGFloat {
         let layout = ScreenLayoutEngine().layout(for: screen)
         guard layout.topology.hasPhysicalNotch else { return 0 }
-        return compactBarHeight(for: screen, anchor: layout.topology.anchorFrame)
+        return compactBarHeight(
+            for: screen,
+            anchor: layout.topology.anchorFrame,
+            progressGlowEnabled: progressGlowEnabled
+        )
     }
 
     public func compactBarFrame(
@@ -302,14 +310,16 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         compactBarFrame(
             for: screen,
             sideExtension: extendsForFocusCountdown ? Layout.compactBarSideExtension : 0,
-            expandsForDetailedMedia: expandsForDetailedMedia
+            expandsForDetailedMedia: expandsForDetailedMedia,
+            progressGlowEnabled: false
         )
     }
 
     private func compactBarFrame(
         for screen: ScreenSnapshot,
         sideExtension: CGFloat,
-        expandsForDetailedMedia: Bool
+        expandsForDetailedMedia: Bool,
+        progressGlowEnabled: Bool
     ) -> CGRect {
         let topology = ScreenLayoutEngine().layout(for: screen).topology
         let anchor = topology.anchorFrame
@@ -325,7 +335,11 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                     - Layout.compactOverlap
             }
             baseWidth = anchor.width + visibleWingWidth * 2
-            height = compactBarHeight(for: screen, anchor: anchor)
+            height = compactBarHeight(
+                for: screen,
+                anchor: anchor,
+                progressGlowEnabled: progressGlowEnabled
+            )
         } else {
             baseWidth = expandsForDetailedMedia
                 ? Layout.compactBarMediaDetailSimulatedWidth
@@ -353,7 +367,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         return compactBarFrame(
             for: screen,
             sideExtension: sizing.sideExtension,
-            expandsForDetailedMedia: sizing.expandsForDetailedStatus
+            expandsForDetailedMedia: sizing.expandsForDetailedStatus,
+            progressGlowEnabled: sizing.progressGlowEnabled
         )
     }
 
@@ -366,14 +381,16 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         compactBarFrame(
             for: layout,
             sideExtension: extendsForFocusCountdown ? Layout.compactBarSideExtension : 0,
-            expandsForDetailedMedia: expandsForDetailedMedia
+            expandsForDetailedMedia: expandsForDetailedMedia,
+            progressGlowEnabled: false
         )
     }
 
     private func compactBarFrame(
         for layout: ScreenOverlayLayout,
         sideExtension: CGFloat,
-        expandsForDetailedMedia: Bool
+        expandsForDetailedMedia: Bool,
+        progressGlowEnabled: Bool
     ) -> CGRect {
         let anchor = layout.topology.anchorFrame
         let baseWidth: CGFloat
@@ -395,11 +412,19 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             layout.screenFrame.maxX - width
         )
         let topEdge = layout.topology.hasPhysicalNotch ? layout.screenFrame.maxY : anchor.maxY
+        let height = layout.topology.hasPhysicalNotch
+            ? compactBarHeight(
+                topBarHeight: layout.topBarHeight,
+                anchor: anchor,
+                screenHeight: layout.screenFrame.height,
+                progressGlowEnabled: progressGlowEnabled
+            )
+            : anchor.height
         return CGRect(
             x: x,
-            y: topEdge - anchor.height,
+            y: topEdge - height,
             width: width,
-            height: anchor.height
+            height: height
         )
     }
 
@@ -412,16 +437,21 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         return compactBarFrame(
             for: layout,
             sideExtension: sizing.sideExtension,
-            expandsForDetailedMedia: sizing.expandsForDetailedStatus
+            expandsForDetailedMedia: sizing.expandsForDetailedStatus,
+            progressGlowEnabled: sizing.progressGlowEnabled
         )
     }
 
     private func compactBarSizing(
         for notices: [IslandNotice],
         settings: FeatureSettings
-    ) -> (sideExtension: CGFloat, expandsForDetailedStatus: Bool)? {
+    ) -> (
+        sideExtension: CGFloat,
+        expandsForDetailedStatus: Bool,
+        progressGlowEnabled: Bool
+    )? {
         if notices.contains(where: { $0.id.hasPrefix("voice-processing-") }) {
-            return (0, false)
+            return (0, false, false)
         }
         let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }
@@ -449,9 +479,20 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         } else {
             sideExtension = 0
         }
+        let selectedStatusSupportsProgressGlow = switch selectedPriority {
+        case .media:
+            notices.contains { $0.id.hasPrefix("media-active-") }
+        case .browserDownload, .videoDownload:
+            true
+        default:
+            false
+        }
+        let progressGlowEnabled = settings.collapsedProgressGlowEnabled
+            && selectedStatusSupportsProgressGlow
         return (
             sideExtension,
-            expandsForDetailedStatus
+            expandsForDetailedStatus,
+            progressGlowEnabled
         )
     }
 
@@ -485,13 +526,31 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
     }
 
-    private func compactBarHeight(for screen: ScreenSnapshot, anchor: CGRect) -> CGFloat {
-        let navigationBarHeight = max(0, screen.topBarHeight)
-        let desiredHeight = max(
-            anchor.height,
-            navigationBarHeight - Layout.compactBarNavigationInset
+    private func compactBarHeight(
+        for screen: ScreenSnapshot,
+        anchor: CGRect,
+        progressGlowEnabled: Bool
+    ) -> CGFloat {
+        compactBarHeight(
+            topBarHeight: screen.topBarHeight,
+            anchor: anchor,
+            screenHeight: screen.frame.height,
+            progressGlowEnabled: progressGlowEnabled
         )
-        return min(screen.frame.height, desiredHeight)
+    }
+
+    private func compactBarHeight(
+        topBarHeight: CGFloat,
+        anchor: CGRect,
+        screenHeight: CGFloat,
+        progressGlowEnabled: Bool
+    ) -> CGFloat {
+        let progressClearance = progressGlowEnabled ? Self.compactProgressClearance : 0
+        let baseHeight = max(
+            anchor.height,
+            max(0, topBarHeight) - Layout.compactBarNavigationInset
+        )
+        return min(max(0, screenHeight), baseHeight + progressClearance)
     }
 
     public func frame(

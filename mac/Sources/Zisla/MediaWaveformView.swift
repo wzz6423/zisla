@@ -51,7 +51,11 @@ struct MediaWaveformView: View {
     self.width = width
     self.height = height
     self.isActive = isActive
-    tint = ArtworkWaveformColor.color(from: artworkData)
+    tint = Self.tintColor(for: artworkData)
+  }
+
+  static func tintColor(for artworkData: Data?) -> Color {
+    ArtworkWaveformColor.color(from: artworkData)
   }
 
   var body: some View {

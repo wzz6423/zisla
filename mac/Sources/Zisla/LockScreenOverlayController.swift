@@ -32,7 +32,8 @@ final class LockScreenOverlayController {
     private var settingsCancellable: AnyCancellable?
     private var mediaCancellable: AnyCancellable?
     private var sessionPoller: Timer?
-    private var isScreenLocked = false
+    private(set) var isScreenLocked = false
+    var onScreenLockedChanged: (@MainActor (Bool) -> Void)?
 
     init(model: AppModel) {
         self.model = model
@@ -78,21 +79,21 @@ final class LockScreenOverlayController {
                     self?.updateLockScreenFeature(enabled: enabled)
                 }
             }
+        startSessionPolling()
         mediaCancellable = model.media.$snapshot
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.updatePlayerVisibility()
                 }
             }
+        refreshSessionLockState()
     }
 
     private func updateLockScreenFeature(enabled: Bool) {
         guard enabled else {
-            stopSessionPolling()
             updateVisibility(enabled: false)
             return
         }
-        startSessionPolling()
         refreshSessionLockState()
     }
 
@@ -138,6 +139,7 @@ final class LockScreenOverlayController {
     private func setScreenLocked(_ locked: Bool) {
         guard isScreenLocked != locked else { return }
         isScreenLocked = locked
+        onScreenLockedChanged?(locked)
         updateVisibility(enabled: model.settingsStore.settings.lockScreenInfoEnabled)
     }
 

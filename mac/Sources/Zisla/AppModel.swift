@@ -1460,6 +1460,7 @@ final class AppModel: ObservableObject {
       for: detection.kind,
       using: settings.clipboardAssistantActionOrders
     )
+    clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
     clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle)
     guard clipboardAssistant.presentation.detection == detection else { return .unavailable }
     clipboardAssistantContent = content
@@ -2161,6 +2162,7 @@ final class AppModel: ObservableObject {
       )
       clipboardAssistant.isLightweightMode = settings.clipboardAssistantLightweightMode
       clipboardAssistant.displayDuration = settings.clipboardAssistantDisplayDuration
+      clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
     } else {
       clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil)
       clipboardAssistant.dismiss()
