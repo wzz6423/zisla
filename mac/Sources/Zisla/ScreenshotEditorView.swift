@@ -142,12 +142,48 @@ enum ScreenshotLongCapturePlacement: Equatable {
 
 struct ScreenshotLongCaptureMatch: Equatable {
     let placement: ScreenshotLongCapturePlacement
+    /// Overlap shared by both frames, measured in pixels along the scrolling axis.
+    let overlapPixels: Int
+    /// `overlapPixels` relative to the incoming frame, so the point-space layout stays in step with
+    /// the pixel-space canvas on Retina captures.
     let overlapFraction: CGFloat
 }
 
 enum ScreenshotLongCaptureMatcher {
-    private static let maximumSampleLength = 360
-    private static let maximumCrossLength = 160
+    /// Coarse budget. The scrolling axis is sampled down to this many rows (and the cross axis to this
+    /// many columns) so the exhaustive overlap search stays cheap.
+    private static let coarseMaximumSampleLength = 360
+    private static let coarseMaximumCrossLength = 160
+    private static let coarseMaximumScore = 18.0
+    /// Coarse overlaps further apart than this belong to different alignments; closer ones are part of
+    /// the same run and only their best member is refined.
+    private static let coarseRunGap = 3
+    private static let coarseRunTieTolerance = 0.5
+    private static let maximumRefinedCandidates = 8
+
+    /// Refinement budget. The coarse winner is re-scored at native resolution over a narrow window:
+    /// sampling down to a few hundred rows used to round the overlap to the nearest screen pixel or
+    /// two, and that leftover strip is what users saw as a white line in long screenshots.
+    private static let refinedProfileLength = 96
+    private static let refinedMaximumSampleCount = 320
+    private static let refinedMaximumScore = 12.0
+    private static let refinedTieTolerance = 0.05
+
+    /// A frame overlapping everything but a few pixels only contributes a duplicated strip, so those
+    /// matches are dropped. This is what keeps a stationary page from repeating itself.
+    private static let minimumNewContentFraction = 0.02
+    private static let minimumNewContentPixels = 4
+
+    private static let unchangedMaximumMeanDifference = 0.75
+    private static let unchangedSignificantDifference = 4
+    private static let unchangedMaximumPatchDimensionFraction = 0.3
+    private static let unchangedMaximumPatchAreaFraction = 0.08
+
+    private struct CoarseMatch {
+        let placement: ScreenshotLongCapturePlacement
+        let overlap: Int
+        let axisLength: Int
+    }
 
     static func isVisuallyUnchanged(previous: CGImage, next: CGImage) -> Bool {
         guard previous.width == next.width, previous.height == next.height else { return false }
@@ -161,15 +197,41 @@ enum ScreenshotLongCaptureMatcher {
               !previousPixels.isEmpty
         else { return false }
 
+        let width = Int(sampleSize.width)
+        let height = max(previousPixels.count / max(width, 1), 1)
         var totalDifference = 0
         var significantDifferenceCount = 0
+        var changedCount = 0
+        var changedMinX = width
+        var changedMaxX = -1
+        var changedMinY = height
+        var changedMaxY = -1
         for index in previousPixels.indices {
             let difference = abs(Int(previousPixels[index]) - Int(nextPixels[index]))
             totalDifference += difference
-            if difference > 4 { significantDifferenceCount += 1 }
+            guard difference > unchangedSignificantDifference else { continue }
+            significantDifferenceCount += 1
+            changedCount += 1
+            let x = index % width
+            let y = index / width
+            changedMinX = min(changedMinX, x)
+            changedMaxX = max(changedMaxX, x)
+            changedMinY = min(changedMinY, y)
+            changedMaxY = max(changedMaxY, y)
         }
-        return Double(totalDifference) / Double(previousPixels.count) <= 0.75
-            && significantDifferenceCount <= max(8, previousPixels.count / 200)
+        if Double(totalDifference) / Double(previousPixels.count) <= unchangedMaximumMeanDifference,
+           significantDifferenceCount <= max(8, previousPixels.count / 200) {
+            return true
+        }
+        // An untouched page still repaints a caret, a clock or a spinner. Those patches are small and
+        // confined, so treat them as "no scroll" instead of stitching a duplicated screen.
+        guard changedCount > 0 else { return true }
+        let patchWidth = Double(changedMaxX - changedMinX + 1) / Double(width)
+        let patchHeight = Double(changedMaxY - changedMinY + 1) / Double(height)
+        let patchArea = Double(changedCount) / Double(previousPixels.count)
+        return patchWidth <= unchangedMaximumPatchDimensionFraction
+            && patchHeight <= unchangedMaximumPatchDimensionFraction
+            && patchArea <= unchangedMaximumPatchAreaFraction
     }
 
     static func match(
@@ -177,16 +239,68 @@ enum ScreenshotLongCaptureMatcher {
         next: CGImage,
         direction: ScreenshotLongCaptureDirection
     ) -> ScreenshotLongCaptureMatch? {
+        guard let search = coarseSearch(previous: previous, next: next, direction: direction),
+              let primary = search.primary
+        else { return nil }
+        let incomingAxisLength = direction == .vertical ? next.height : next.width
+        guard incomingAxisLength > 1 else { return nil }
+
+        // The coarse pass only proposes candidates: pages with repeating rows offer several offsets that
+        // look alike once they are blurred down, so each proposal is confirmed on native-resolution rows
+        // before it is trusted.
+        var best: (placement: ScreenshotLongCapturePlacement, overlap: Int, score: Double)?
+        for candidate in search.candidates {
+            guard let refined = refinedCandidate(
+                candidate,
+                previous: previous,
+                next: next,
+                direction: direction
+            ) else { continue }
+            if best == nil
+                || refined.score < best!.score - refinedTieTolerance
+                || (abs(refined.score - best!.score) <= refinedTieTolerance
+                    && refined.overlap > best!.overlap) {
+                best = (candidate.placement, refined.overlap, refined.score)
+            }
+        }
+        let placement = best?.placement ?? primary.placement
+        let overlap = best?.overlap
+            ?? scaledOverlap(previous: previous, next: next, direction: direction, coarse: primary)
+        let minimumNewContent = max(
+            minimumNewContentPixels,
+            Int((Double(incomingAxisLength) * minimumNewContentFraction).rounded(.up))
+        )
+        guard incomingAxisLength - overlap >= minimumNewContent else { return nil }
+        return ScreenshotLongCaptureMatch(
+            placement: placement,
+            overlapPixels: overlap,
+            overlapFraction: CGFloat(overlap) / CGFloat(incomingAxisLength)
+        )
+    }
+
+    private struct CoarseSearch {
+        let primary: CoarseMatch?
+        let candidates: [CoarseMatch]
+    }
+
+    /// Exhaustive overlap search over the downsampled frames. Besides the winner it keeps every
+    /// candidate that is close enough to be worth a second look, collapsed into one candidate per
+    /// contiguous run of overlaps.
+    private static func coarseSearch(
+        previous: CGImage,
+        next: CGImage,
+        direction: ScreenshotLongCaptureDirection
+    ) -> CoarseSearch? {
         let sampleSize = switch direction {
         case .vertical:
             CGSize(
-                width: CGFloat(min(maximumCrossLength, min(previous.width, next.width))),
-                height: CGFloat(min(maximumSampleLength, min(previous.height, next.height)))
+                width: CGFloat(min(coarseMaximumCrossLength, min(previous.width, next.width))),
+                height: CGFloat(min(coarseMaximumSampleLength, min(previous.height, next.height)))
             )
         case .horizontal:
             CGSize(
-                width: CGFloat(min(maximumSampleLength, min(previous.width, next.width))),
-                height: CGFloat(min(maximumCrossLength, min(previous.height, next.height)))
+                width: CGFloat(min(coarseMaximumSampleLength, min(previous.width, next.width))),
+                height: CGFloat(min(coarseMaximumCrossLength, min(previous.height, next.height)))
             )
         }
         guard sampleSize.width >= 16, sampleSize.height >= 16,
@@ -201,10 +315,11 @@ enum ScreenshotLongCaptureMatcher {
         let maximumOverlap = axisLength - 4
         guard minimumOverlap <= maximumOverlap else { return nil }
 
-        var best: (match: ScreenshotLongCaptureMatch, score: Double)?
+        var primary: (match: CoarseMatch, score: Double)?
+        var scored: [(candidate: CoarseMatch, score: Double)] = []
         for placement in [ScreenshotLongCapturePlacement.append, .prepend] {
             for overlap in minimumOverlap...maximumOverlap {
-                guard let score = score(
+                guard let score = coarseScore(
                     previous: previousPixels,
                     next: nextPixels,
                     width: width,
@@ -213,20 +328,204 @@ enum ScreenshotLongCaptureMatcher {
                     placement: placement,
                     overlap: overlap
                 ) else { continue }
-                let match = ScreenshotLongCaptureMatch(
+                let match = CoarseMatch(
                     placement: placement,
-                    overlapFraction: CGFloat(overlap) / CGFloat(axisLength)
+                    overlap: overlap,
+                    axisLength: axisLength
                 )
-                if best == nil
-                    || score < best!.score - 0.5
-                    || (abs(score - best!.score) <= 0.5
-                        && match.overlapFraction > best!.match.overlapFraction) {
-                    best = (match, score)
+                if score <= coarseMaximumScore {
+                    scored.append((match, score))
+                }
+                if primary == nil
+                    || score < primary!.score - 0.5
+                    || (abs(score - primary!.score) <= 0.5 && overlap > primary!.match.overlap) {
+                    primary = (match, score)
                 }
             }
         }
-        guard let best, best.score <= 18 else { return nil }
-        return best.match
+        guard let primary, primary.score <= coarseMaximumScore else {
+            return CoarseSearch(primary: nil, candidates: [])
+        }
+        return CoarseSearch(primary: primary.match, candidates: distinctCandidates(in: scored))
+    }
+
+    /// Collapses the scored overlaps into one candidate per contiguous run: neighbouring overlaps
+    /// describe the same alignment, and only the best of each run is worth refining.
+    private static func distinctCandidates(
+        in scored: [(candidate: CoarseMatch, score: Double)]
+    ) -> [CoarseMatch] {
+        var runs: [(candidate: CoarseMatch, score: Double)] = []
+        for placement in [ScreenshotLongCapturePlacement.append, .prepend] {
+            let entries = scored
+                .filter { $0.candidate.placement == placement }
+                .sorted { $0.candidate.overlap < $1.candidate.overlap }
+            var runBest: (candidate: CoarseMatch, score: Double)?
+            var previousOverlap: Int?
+            for entry in entries {
+                if let previousOverlap, entry.candidate.overlap - previousOverlap > coarseRunGap {
+                    if let runBest { runs.append(runBest) }
+                    runBest = nil
+                }
+                if runBest == nil
+                    || entry.score < runBest!.score - coarseRunTieTolerance
+                    || (abs(entry.score - runBest!.score) <= coarseRunTieTolerance
+                        && entry.candidate.overlap > runBest!.candidate.overlap) {
+                    runBest = entry
+                }
+                previousOverlap = entry.candidate.overlap
+            }
+            if let runBest { runs.append(runBest) }
+        }
+        return runs
+            .sorted { $0.score < $1.score }
+            .prefix(maximumRefinedCandidates)
+            .map(\.candidate)
+    }
+
+    /// Re-scores one coarse proposal around its estimate using native-resolution rows, so the reported
+    /// overlap is exact instead of rounded to the coarse sample grid. Returns `nil` when no overlap in
+    /// the window is convincing enough — a page scrolled by a fraction of a pixel still matches best
+    /// when the frames are blurred together, so the coarse estimate is kept in that case.
+    private static func refinedCandidate(
+        _ coarse: CoarseMatch,
+        previous: CGImage,
+        next: CGImage,
+        direction: ScreenshotLongCaptureDirection
+    ) -> (overlap: Int, score: Double)? {
+        let previousAxisLength = direction == .vertical ? previous.height : previous.width
+        let nextAxisLength = direction == .vertical ? next.height : next.width
+        let axisLength = min(previousAxisLength, nextAxisLength)
+        guard axisLength > 0 else { return nil }
+        let scale = Double(axisLength) / Double(max(coarse.axisLength, 1))
+        guard scale > 1.01 else { return nil }
+        let approximate = Int((Double(coarse.overlap) * scale).rounded())
+        let radius = max(3, Int(scale.rounded(.up)) + 2)
+        let lower = max(1, approximate - radius)
+        let upper = min(axisLength - 1, approximate + radius)
+        guard lower <= upper else { return nil }
+
+        let profileLength = refinedProfileLength
+        guard let previousProfile = axisProfile(
+            in: previous,
+            direction: direction,
+            profileLength: profileLength
+        ), let nextProfile = axisProfile(
+            in: next,
+            direction: direction,
+            profileLength: profileLength
+        ) else { return nil }
+
+        var best: (overlap: Int, score: Double)?
+        for overlap in lower...upper {
+            guard let score = refinedScore(
+                previous: previousProfile,
+                next: nextProfile,
+                previousAxisLength: previousAxisLength,
+                nextAxisLength: nextAxisLength,
+                profileLength: profileLength,
+                placement: coarse.placement,
+                overlap: overlap
+            ) else { continue }
+            if best == nil
+                || score < best!.score - refinedTieTolerance
+                || (abs(score - best!.score) <= refinedTieTolerance && overlap > best!.overlap) {
+                best = (overlap, score)
+            }
+        }
+        guard let best, best.score <= refinedMaximumScore else { return nil }
+        return best
+    }
+
+    private static func scaledOverlap(
+        previous: CGImage,
+        next: CGImage,
+        direction: ScreenshotLongCaptureDirection,
+        coarse: CoarseMatch
+    ) -> Int {
+        let axisLength = min(
+            direction == .vertical ? previous.height : previous.width,
+            direction == .vertical ? next.height : next.width
+        )
+        guard axisLength > 0 else { return coarse.overlap }
+        let scale = Double(axisLength) / Double(max(coarse.axisLength, 1))
+        return min(max(Int((Double(coarse.overlap) * scale).rounded()), 1), axisLength)
+    }
+
+    /// Grayscale signature of every row (or column) along the scrolling axis, sampled across the cross
+    /// axis. The scrolling axis keeps its native resolution so overlaps can be compared exactly, while
+    /// the outer tenth of the cross axis is dropped to stay clear of scrollbars and window borders.
+    private static func axisProfile(
+        in image: CGImage,
+        direction: ScreenshotLongCaptureDirection,
+        profileLength: Int
+    ) -> [UInt8]? {
+        let axisLength = direction == .vertical ? image.height : image.width
+        let crossLength = direction == .vertical ? image.width : image.height
+        let inset = max(1, crossLength / 10)
+        let usableCross = crossLength - 2 * inset
+        guard axisLength >= 16, usableCross >= 16 else { return nil }
+        let samples = min(profileLength, usableCross)
+        let cropRect = switch direction {
+        case .vertical: CGRect(x: inset, y: 0, width: usableCross, height: axisLength)
+        case .horizontal: CGRect(x: 0, y: inset, width: axisLength, height: usableCross)
+        }
+        guard let cropped = image.cropping(to: cropRect) else { return nil }
+
+        let width = direction == .vertical ? samples : axisLength
+        let height = direction == .vertical ? axisLength : samples
+        var pixels = [UInt8](repeating: 0, count: width * height)
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ) else { return nil }
+        context.interpolationQuality = .medium
+        context.draw(cropped, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return pixels
+    }
+
+    private static func refinedScore(
+        previous: [UInt8],
+        next: [UInt8],
+        previousAxisLength: Int,
+        nextAxisLength: Int,
+        profileLength: Int,
+        placement: ScreenshotLongCapturePlacement,
+        overlap: Int
+    ) -> Double? {
+        guard overlap > 0 else { return nil }
+        let step = max(1, overlap / refinedMaximumSampleCount)
+        var difference = 0
+        var count = 0
+        var axis = step
+        while axis < overlap {
+            let previousAxis: Int
+            let nextAxis: Int
+            switch placement {
+            case .append:
+                previousAxis = previousAxisLength - overlap + axis
+                nextAxis = axis
+            case .prepend:
+                previousAxis = axis
+                nextAxis = nextAxisLength - overlap + axis
+            }
+            guard previousAxis >= 0, previousAxis < previousAxisLength,
+                  nextAxis >= 0, nextAxis < nextAxisLength
+            else { return nil }
+            let previousRow = previousAxis * profileLength
+            let nextRow = nextAxis * profileLength
+            for cross in 0..<profileLength {
+                difference += abs(Int(previous[previousRow + cross]) - Int(next[nextRow + cross]))
+            }
+            count += profileLength
+            axis += step
+        }
+        guard count > 0 else { return nil }
+        return Double(difference) / Double(count)
     }
 
     private static func grayscalePixels(in image: CGImage, size: CGSize) -> [UInt8]? {
@@ -247,7 +546,9 @@ enum ScreenshotLongCaptureMatcher {
         return pixels
     }
 
-    private static func score(
+    /// Coarse comparison over the downsampled frames: cheap enough to score every candidate overlap,
+    /// and strict enough to reject frames that do not belong to the same page.
+    private static func coarseScore(
         previous: [UInt8],
         next: [UInt8],
         width: Int,
@@ -1937,115 +2238,122 @@ final class ScreenshotEditorModel: ObservableObject {
         guard size.width > 0, size.height > 0 else { return nil }
 
         if let firstCGImage = first.cgImage(forProposedRect: nil, context: nil, hints: nil),
-           let secondCGImage = second.cgImage(forProposedRect: nil, context: nil, hints: nil),
-           let overlap = Optional(min(
-               direction == .vertical
-                   ? min(firstCGImage.height, secondCGImage.height)
-                   : min(firstCGImage.width, secondCGImage.width),
-               Int((CGFloat(
-                   direction == .vertical ? secondCGImage.height : secondCGImage.width
-               ) * overlapFraction).rounded())
-           )),
-           let output = CGContext(
-               data: nil,
-               width: direction == .vertical
-                   ? max(firstCGImage.width, secondCGImage.width)
-                   : firstCGImage.width + secondCGImage.width - overlap,
-               height: direction == .vertical
-                   ? firstCGImage.height + secondCGImage.height - overlap
-                   : max(firstCGImage.height, secondCGImage.height),
-               bitsPerComponent: 8,
-               bytesPerRow: 0,
-               space: CGColorSpaceCreateDeviceRGB(),
-               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-           ) {
-            output.interpolationQuality = .none
-            output.setFillColor(NSColor.white.cgColor)
-            output.fill(CGRect(x: 0, y: 0, width: output.width, height: output.height))
-            switch direction {
-            case .vertical:
-                if placement == .append {
-                    output.draw(
-                        firstCGImage,
-                        in: CGRect(
-                            x: CGFloat(output.width - firstCGImage.width) / 2,
-                            y: CGFloat(secondCGImage.height - overlap),
-                            width: CGFloat(firstCGImage.width),
-                            height: CGFloat(firstCGImage.height)
+           let secondCGImage = second.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            // The matcher reports an exact pixel overlap. Rounding it again here (or scaling a fraction)
+            // is what left a duplicated strip at the seam of long screenshots.
+            let overlap = min(
+                match?.overlapPixels ?? 0,
+                direction == .vertical
+                    ? min(firstCGImage.height, secondCGImage.height)
+                    : min(firstCGImage.width, secondCGImage.width)
+            )
+            if let output = CGContext(
+                data: nil,
+                width: direction == .vertical
+                    ? max(firstCGImage.width, secondCGImage.width)
+                    : firstCGImage.width + secondCGImage.width - overlap,
+                height: direction == .vertical
+                    ? firstCGImage.height + secondCGImage.height - overlap
+                    : max(firstCGImage.height, secondCGImage.height),
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) {
+                output.interpolationQuality = .none
+                output.setFillColor(NSColor.white.cgColor)
+                output.fill(CGRect(x: 0, y: 0, width: output.width, height: output.height))
+                // Centring is snapped to whole pixels: a half-pixel origin mixed with `.none`
+                // interpolation smears the edge column of the shorter frame into a pale hairline.
+                let verticalOrigin = (CGFloat(output.width - firstCGImage.width) / 2).rounded(.down)
+                let secondVerticalOrigin = (CGFloat(output.width - secondCGImage.width) / 2).rounded(.down)
+                let horizontalOrigin = (CGFloat(output.height - firstCGImage.height) / 2).rounded(.down)
+                let secondHorizontalOrigin = (CGFloat(output.height - secondCGImage.height) / 2).rounded(.down)
+                switch direction {
+                case .vertical:
+                    if placement == .append {
+                        output.draw(
+                            firstCGImage,
+                            in: CGRect(
+                                x: verticalOrigin,
+                                y: CGFloat(secondCGImage.height - overlap),
+                                width: CGFloat(firstCGImage.width),
+                                height: CGFloat(firstCGImage.height)
+                            )
                         )
-                    )
-                    output.draw(
-                        secondCGImage,
-                        in: CGRect(
-                            x: CGFloat(output.width - secondCGImage.width) / 2,
-                            y: 0,
-                            width: CGFloat(secondCGImage.width),
-                            height: CGFloat(secondCGImage.height)
+                        output.draw(
+                            secondCGImage,
+                            in: CGRect(
+                                x: secondVerticalOrigin,
+                                y: 0,
+                                width: CGFloat(secondCGImage.width),
+                                height: CGFloat(secondCGImage.height)
+                            )
                         )
-                    )
-                } else {
-                    output.draw(
-                        firstCGImage,
-                        in: CGRect(
-                            x: CGFloat(output.width - firstCGImage.width) / 2,
-                            y: 0,
-                            width: CGFloat(firstCGImage.width),
-                            height: CGFloat(firstCGImage.height)
+                    } else {
+                        output.draw(
+                            firstCGImage,
+                            in: CGRect(
+                                x: verticalOrigin,
+                                y: 0,
+                                width: CGFloat(firstCGImage.width),
+                                height: CGFloat(firstCGImage.height)
+                            )
                         )
-                    )
-                    output.draw(
-                        secondCGImage,
-                        in: CGRect(
-                            x: CGFloat(output.width - secondCGImage.width) / 2,
-                            y: CGFloat(firstCGImage.height - overlap),
-                            width: CGFloat(secondCGImage.width),
-                            height: CGFloat(secondCGImage.height)
+                        output.draw(
+                            secondCGImage,
+                            in: CGRect(
+                                x: secondVerticalOrigin,
+                                y: CGFloat(firstCGImage.height - overlap),
+                                width: CGFloat(secondCGImage.width),
+                                height: CGFloat(secondCGImage.height)
+                            )
                         )
-                    )
+                    }
+                case .horizontal:
+                    if placement == .append {
+                        output.draw(
+                            firstCGImage,
+                            in: CGRect(
+                                x: 0,
+                                y: horizontalOrigin,
+                                width: CGFloat(firstCGImage.width),
+                                height: CGFloat(firstCGImage.height)
+                            )
+                        )
+                        output.draw(
+                            secondCGImage,
+                            in: CGRect(
+                                x: CGFloat(firstCGImage.width - overlap),
+                                y: secondHorizontalOrigin,
+                                width: CGFloat(secondCGImage.width),
+                                height: CGFloat(secondCGImage.height)
+                            )
+                        )
+                    } else {
+                        output.draw(
+                            firstCGImage,
+                            in: CGRect(
+                                x: CGFloat(secondCGImage.width - overlap),
+                                y: horizontalOrigin,
+                                width: CGFloat(firstCGImage.width),
+                                height: CGFloat(firstCGImage.height)
+                            )
+                        )
+                        output.draw(
+                            secondCGImage,
+                            in: CGRect(
+                                x: 0,
+                                y: secondHorizontalOrigin,
+                                width: CGFloat(secondCGImage.width),
+                                height: CGFloat(secondCGImage.height)
+                            )
+                        )
+                    }
                 }
-            case .horizontal:
-                if placement == .append {
-                    output.draw(
-                        firstCGImage,
-                        in: CGRect(
-                            x: 0,
-                            y: CGFloat(output.height - firstCGImage.height) / 2,
-                            width: CGFloat(firstCGImage.width),
-                            height: CGFloat(firstCGImage.height)
-                        )
-                    )
-                    output.draw(
-                        secondCGImage,
-                        in: CGRect(
-                            x: CGFloat(firstCGImage.width - overlap),
-                            y: CGFloat(output.height - secondCGImage.height) / 2,
-                            width: CGFloat(secondCGImage.width),
-                            height: CGFloat(secondCGImage.height)
-                        )
-                    )
-                } else {
-                    output.draw(
-                        firstCGImage,
-                        in: CGRect(
-                            x: CGFloat(secondCGImage.width - overlap),
-                            y: CGFloat(output.height - firstCGImage.height) / 2,
-                            width: CGFloat(firstCGImage.width),
-                            height: CGFloat(firstCGImage.height)
-                        )
-                    )
-                    output.draw(
-                        secondCGImage,
-                        in: CGRect(
-                            x: 0,
-                            y: CGFloat(output.height - secondCGImage.height) / 2,
-                            width: CGFloat(secondCGImage.width),
-                            height: CGFloat(secondCGImage.height)
-                        )
-                    )
+                if let combined = output.makeImage() {
+                    return NSImage(cgImage: combined, size: size)
                 }
-            }
-            if let combined = output.makeImage() {
-                return NSImage(cgImage: combined, size: size)
             }
         }
 
