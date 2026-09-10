@@ -397,8 +397,13 @@ public final class OverlayCoordinator: NSObject {
             if isVisible { onVisibilityChanged?(false) }
         } else if isRunning {
             if isVisible {
+                // Locking reported the island as folded; restore that signal only when the reducer
+                // still holds it unfolded. Coming back from the lock screen is not a reason to
+                // unfold an island the user never opened — the collapsed pill simply returns.
+                let isExpanded = reducer.state.visibility == .expanded
+                    || reducer.state.visibility == .pinned
                 presentCurrentLayout()
-                onVisibilityChanged?(true)
+                if isExpanded { onVisibilityChanged?(true) }
             } else {
                 updatePersistentPanels()
             }

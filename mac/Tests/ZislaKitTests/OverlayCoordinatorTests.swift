@@ -264,6 +264,57 @@ struct OverlayCoordinatorTests {
     }
 
     @Test @MainActor
+    func screenUnlockRestoresCollapsedIslandWithoutExpandingIt() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        var visibilityEvents: [Bool] = []
+        coordinator.onVisibilityChanged = { visibilityEvents.append($0) }
+        defer { coordinator.stop() }
+
+        coordinator.start()
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.showExpanded(at: CGPoint(x: 720, y: 450))
+        coordinator.collapseImmediately()
+        let panel = try #require(contentView.window as? IslandPanel)
+        #expect(panel.isVisible)
+        #expect(panel.ignoresMouseEvents)
+        visibilityEvents.removeAll()
+
+        coordinator.setScreenLocked(true)
+        #expect(!panel.isVisible)
+        #expect(visibilityEvents == [false])
+
+        coordinator.setScreenLocked(false)
+        #expect(panel.isVisible)
+        #expect(panel.ignoresMouseEvents)
+        #expect(visibilityEvents == [false])
+    }
+
+    @Test @MainActor
+    func screenUnlockRestoresAnIslandTheUserLeftUnfolded() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        var visibilityEvents: [Bool] = []
+        coordinator.onVisibilityChanged = { visibilityEvents.append($0) }
+        defer { coordinator.stop() }
+
+        coordinator.start()
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setPinned(true)
+        let panel = try #require(contentView.window as? IslandPanel)
+        visibilityEvents.removeAll()
+
+        coordinator.setScreenLocked(true)
+        #expect(!panel.isVisible)
+
+        coordinator.setScreenLocked(false)
+        #expect(panel.isVisible)
+        #expect(!panel.ignoresMouseEvents)
+        #expect(visibilityEvents == [false, true])
+    }
+
+    @Test @MainActor
     func screenLockRejectsNewInteractivePresentationState() {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
