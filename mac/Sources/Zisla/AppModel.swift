@@ -164,8 +164,9 @@ struct IslandModuleLayout: Equatable {
   /// Tall modules share the former CPU monitor height to keep their panel geometry consistent.
   static let system = compactModule(contentHeight: 401)
   static let pdf = system
-  /// Shelf content is fixed at 320pt and scrolls internally when it contains more files.
-  static let shelf = compactModule(contentHeight: 320)
+  /// Shelf content fills the shared 500pt outer surface and scrolls internally when it contains more files.
+  static let shelfContentHeight: CGFloat = 355
+  static let shelf = compactModule(contentHeight: shelfContentHeight)
   /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
   /// Width matches standard; only the island body is taller.
   static let clipboard = IslandModuleLayout(
