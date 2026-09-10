@@ -2,6 +2,10 @@ import SwiftUI
 import ZislaKit
 
 enum CollapsedProgress {
+    static let glowHeight: CGFloat = 1.5
+    static let glowBottomInset: CGFloat = 0.5
+    static var requiredGlowClearance: CGFloat { glowHeight + glowBottomInset }
+
     static func playbackFraction(
         for snapshot: NowPlayingSnapshot,
         at date: Date
@@ -59,7 +63,7 @@ struct CollapsedProgressGlow: View {
             }
             .frame(width: trackWidth, height: geometry.size.height, alignment: .bottomLeading)
             .padding(.horizontal, 1)
-            .padding(.bottom, 0.5)
+            .padding(.bottom, CollapsedProgress.glowBottomInset)
         }
         .allowsHitTesting(false)
     }
@@ -68,7 +72,7 @@ struct CollapsedProgressGlow: View {
         ZStack(alignment: .leading) {
             Capsule()
                 .fill(tint.opacity(0.52))
-                .frame(width: width, height: 1.5)
+                .frame(width: width, height: CollapsedProgress.glowHeight)
                 .blur(radius: 3)
             Capsule()
                 .fill(

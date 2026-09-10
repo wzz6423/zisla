@@ -216,7 +216,7 @@ struct OverlayCoordinatorTests {
     }
 
     @Test @MainActor
-    func screenshotActiveDropsInteractiveAndPersistentIslandsBelowNormalWindows() throws {
+    func screenLockHidesAndRestoresInteractiveAndPersistentIslands() throws {
         let probe = PersistentPetPanelProbe()
         let contentView = NSView()
         let coordinator = OverlayCoordinator(
@@ -226,17 +226,123 @@ struct OverlayCoordinatorTests {
         )
         defer { coordinator.stop() }
 
-        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.start()
+        coordinator.updateScreens(
+            [Self.builtInScreen, Self.externalWindowedScreen],
+            repositionVisiblePanel: false
+        )
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
         coordinator.setPinned(true)
         let panel = try #require(contentView.window as? IslandPanel)
-        let petPanel = try #require(probe.panel(for: Self.builtInID))
+        let petPanel = try #require(probe.panel(for: Self.externalID))
+        #expect(panel.isVisible)
+        #expect(petPanel.isVisible)
+
+        coordinator.setScreenLocked(true)
+        #expect(!panel.isVisible)
+        #expect(!petPanel.isVisible)
+        #expect(coordinator.persistentPanelDisplayIDs.isEmpty)
+        #expect(coordinator.isRunning)
+
+        coordinator.showExpanded(at: CGPoint(x: 21_000, y: 540))
+        coordinator.refreshPersistentPanels()
+        #expect(!panel.isVisible)
+        #expect(!petPanel.isVisible)
+        #expect(coordinator.activeDisplayID == Self.builtInID)
+
+        coordinator.setScreenLocked(false)
+        #expect(panel.isVisible)
+        #expect(petPanel.isVisible)
+        #expect(coordinator.persistentPanelDisplayIDs == [Self.externalID])
+
+        coordinator.setScreenLocked(true)
+        coordinator.setPersistentContentVisible(false)
+        coordinator.setScreenLocked(false)
+        #expect(panel.isVisible)
+        #expect(!petPanel.isVisible)
+        #expect(coordinator.persistentPanelDisplayIDs.isEmpty)
+    }
+
+    @Test @MainActor
+    func screenLockRejectsNewInteractivePresentationState() {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        var visibilityEvents: [Bool] = []
+        var draggingEvents: [Bool] = []
+        coordinator.onVisibilityChanged = { visibilityEvents.append($0) }
+        coordinator.onDraggingChanged = { draggingEvents.append($0) }
+        defer { coordinator.stop() }
+
+        coordinator.start()
+        coordinator.updateScreens(
+            [Self.builtInScreen, Self.externalWindowedScreen],
+            repositionVisiblePanel: false
+        )
+        let activeDisplayID = coordinator.activeDisplayID
+        coordinator.setScreenLocked(true)
+
+        coordinator.setPinned(true)
+        coordinator.setDragging(true)
+        coordinator.setTransientInteractionVisible(true)
+        coordinator.setVoiceRecording(true, at: CGPoint(x: 21_000, y: 540))
+        coordinator.showExpanded(at: CGPoint(x: 21_000, y: 540))
+
+        #expect(!coordinator.isVisible)
+        #expect(coordinator.activeDisplayID == activeDisplayID)
+        #expect(!visibilityEvents.contains(true))
+        #expect(draggingEvents.isEmpty)
+        #expect(contentView.window?.isVisible != true)
+
+        coordinator.setScreenLocked(false)
+        #expect(!coordinator.isVisible)
+        #expect(!visibilityEvents.contains(true))
+
+        coordinator.setPinned(true)
+        #expect(coordinator.isVisible)
+        #expect(visibilityEvents.contains(true))
+
+        coordinator.setDragging(true)
+        #expect(draggingEvents == [true])
+        coordinator.setDragging(false)
+        #expect(draggingEvents == [true, false])
+    }
+
+    @Test @MainActor
+    func screenshotFrozenPresentationHidesAndRestoresLiveIslandWindows() throws {
+        let probe = PersistentPetPanelProbe()
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(
+            contentView: contentView,
+            persistentContentViewProvider: { probe.contentView(for: $0) },
+            persistentPanelFrameProvider: { $0.collapsedFrame }
+        )
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens(
+            [Self.builtInScreen, Self.externalWindowedScreen],
+            repositionVisiblePanel: false
+        )
+        let petPanel = try #require(probe.panel(for: Self.externalID))
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setPinned(true)
+        let panel = try #require(contentView.window as? IslandPanel)
 
         coordinator.setScreenshotActive(true)
-        #expect(panel.level == IslandPanel.onBottomLevel)
-        #expect(petPanel.level == IslandPanel.onBottomLevel)
+        #expect(!panel.isVisible)
+        #expect(!petPanel.isVisible)
+        #expect(coordinator.persistentPanelDisplayIDs.isEmpty)
+
+        coordinator.refreshPersistentPanels()
+        coordinator.updateScreens(
+            [Self.builtInScreen, Self.externalWindowedScreen],
+            repositionVisiblePanel: true
+        )
+        #expect(!panel.isVisible)
+        #expect(!petPanel.isVisible)
 
         coordinator.setScreenshotActive(false)
+        #expect(panel.isVisible)
+        #expect(petPanel.isVisible)
         #expect(panel.level == IslandPanel.onTopLevel)
         #expect(petPanel.level == IslandPanel.onTopLevel)
     }

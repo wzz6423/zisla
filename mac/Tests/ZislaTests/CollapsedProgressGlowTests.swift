@@ -97,6 +97,7 @@ struct CollapsedProgressGlowTests {
 
     @Test
     func progressGlowUsesAContinuousTrackAcrossThePhysicalNotch() {
+        #expect(CollapsedProgress.requiredGlowClearance == 2)
         #expect(CollapsedProgress.filledWidth(
             progress: 0.5,
             totalWidth: 500
@@ -167,10 +168,12 @@ struct CollapsedProgressGlowTests {
         #expect(source.contains("browserDownloadNotice?.progress"))
         #expect(source.contains("videoDownloadNotice?.progress"))
         #expect(source.contains("settingsStore.settings.collapsedProgressGlowEnabled"))
+        #expect(source.contains("selectedCompactStatusPriority == .media,\n              mediaNotice != nil,"))
+        #expect(source.contains("case .media:\n            guard mediaNotice != nil, let snapshot = media.snapshot else { return nil }"))
         #expect(source.contains("CollapsedProgressGlow("))
         #expect(source.contains("MediaWaveformView.tintColor(for: artworkData)"))
         #expect(source.contains("compactStatusBackgroundFill"))
-        #expect(source.contains("Color.clear\n                        .frame(width: centerInset)"))
+        #expect(!source.contains("Color.clear\n                        .frame(width: centerInset)"))
 
         let glowSource = try String(
             contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/CollapsedProgressGlow.swift"),

@@ -129,6 +129,7 @@ final class ClipboardAssistantController: ObservableObject {
 
     private var screenshotPhase = ScreenshotPhase.inactive
     private var isSystemScreenshotActive = false
+    private var isScreenLocked = false
     private var isScreenshotActive: Bool {
         screenshotPhase != .inactive || isSystemScreenshotActive
     }
@@ -189,6 +190,14 @@ final class ClipboardAssistantController: ObservableObject {
     func setMoreActionsPresented(_ presented: Bool) {
         guard isMoreActionsPresented != presented else { return }
         isMoreActionsPresented = presented
+    }
+
+    func setScreenLocked(_ locked: Bool) {
+        guard isScreenLocked != locked else { return }
+        isScreenLocked = locked
+        if locked {
+            dismiss(animated: false)
+        }
     }
 
     /// A screenshot session keeps the prompt long enough for the frozen capture, then restores it
@@ -257,7 +266,7 @@ final class ClipboardAssistantController: ObservableObject {
 
     func present(_ detection: ClipboardAssistantDetection, visualStyle: IslandVisualStyle) {
         setMoreActionsPresented(false)
-        guard !isScreenshotActive else { return }
+        guard !isScreenshotActive, !isScreenLocked else { return }
         isSharingAnchorHeld = false
         cancelDismissTask()
         dismissalTotalDuration = displayDuration.expiresAfter
@@ -438,12 +447,21 @@ final class ClipboardAssistantController: ObservableObject {
                 isLightweightMode: isLightweightMode
             )
         )
-        presentation.islandTopHeight = collapsedFrame.height
+        let rowHeight: CGFloat
+        if let screenSnapshot, layout?.topology.hasPhysicalNotch == true {
+            rowHeight = SideNoticeLayoutEngine().compactWingHeight(
+                for: screenSnapshot,
+                progressGlowEnabled: presentation.progressGlowEnabled
+            )
+        } else {
+            rowHeight = collapsedFrame.height
+        }
+        presentation.islandTopHeight = rowHeight
         let frame = CGRect(
             x: collapsedFrame.midX - width / 2,
-            y: collapsedFrame.minY,
+            y: collapsedFrame.maxY - rowHeight,
             width: width,
-            height: collapsedFrame.height
+            height: rowHeight
         )
         let window: ClipboardAssistantWindow
         if let existing = self.window {
@@ -536,6 +554,10 @@ struct ClipboardAssistantToastView: View {
                            presentation.progressGlowEnabled,
                            let progress = controller.dismissalProgress(at: context.date) {
                             CollapsedProgressGlow(progress: progress)
+                                .clipShape(IslandSilhouette(
+                                    topCornerRadius: 0,
+                                    bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
+                                ))
                         }
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))

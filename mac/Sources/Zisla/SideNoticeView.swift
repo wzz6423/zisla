@@ -225,6 +225,7 @@ struct CompactStatusBarView: View {
     private var isPlaybackProgressActive: Bool {
         guard settingsStore.settings.collapsedProgressGlowEnabled,
               selectedCompactStatusPriority == .media,
+              mediaNotice != nil,
               let snapshot = media.snapshot else {
             return false
         }
@@ -235,7 +236,7 @@ struct CompactStatusBarView: View {
         guard settingsStore.settings.collapsedProgressGlowEnabled else { return nil }
         switch selectedCompactStatusPriority {
         case .media:
-            guard let snapshot = media.snapshot else { return nil }
+            guard mediaNotice != nil, let snapshot = media.snapshot else { return nil }
             return CollapsedProgress.playbackFraction(for: snapshot, at: date)
         case .browserDownload:
             return browserDownloadNotice?.progress
@@ -254,27 +255,7 @@ struct CompactStatusBarView: View {
 
     @ViewBuilder
     private var compactStatusBackground: some View {
-        GeometryReader { geometry in
-            let centerInset = min(
-                max(0, displayState.compactBarCenterInset),
-                max(0, geometry.size.width)
-            )
-            let sideWidth = max(0, (geometry.size.width - centerInset) / 2)
-
-            if centerInset > 0 {
-                HStack(spacing: 0) {
-                    compactStatusBackgroundFill
-                        .frame(width: sideWidth)
-                    Color.clear
-                        .frame(width: centerInset)
-                    compactStatusBackgroundFill
-                        .frame(width: sideWidth)
-                }
-                .frame(width: geometry.size.width, height: geometry.size.height)
-            } else {
-                compactStatusBackgroundFill
-            }
-        }
+        compactStatusBackgroundFill
     }
 
     @ViewBuilder

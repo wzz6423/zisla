@@ -27,7 +27,8 @@ final class SideNoticePresenter {
         browserDownloads: BrowserDownloadMonitor,
         settingsStore: FeatureSettingsStore,
         languageStore: AppLanguageStore,
-        displayIDs: Set<UInt32> = []
+        displayIDs: Set<UInt32> = [],
+        isScreenLocked: Bool = false
     ) {
         self.queue = queue
         self.media = media
@@ -35,6 +36,7 @@ final class SideNoticePresenter {
         self.settingsStore = settingsStore
         self.languageStore = languageStore
         configuredDisplayIDs = displayIDs
+        suppression.isScreenLocked = isScreenLocked
         queue.$left
             .combineLatest(queue.$right)
             .sink { [weak self] _, _ in
@@ -111,6 +113,10 @@ final class SideNoticePresenter {
         updateSuppression { $0.isClipboardAssistantVisible = visible }
     }
 
+    func setScreenLocked(_ locked: Bool) {
+        updateSuppression { $0.isScreenLocked = locked }
+    }
+
     private func updateSuppression(_ mutate: (inout SideNoticeSuppression) -> Void) {
         var updated = suppression
         mutate(&updated)
@@ -126,15 +132,15 @@ final class SideNoticePresenter {
     func setScreenshotActive(_ active: Bool) {
         guard isScreenshotActive != active else { return }
         isScreenshotActive = active
-        for panels in panelsByDisplayID.values {
-            panels.left?.level = active ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
-            panels.right?.level = active ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
-            panels.compactBar?.level = active ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
+        if active {
+            hideAllPanels()
+        } else {
+            updatePanels()
         }
     }
 
     private func updatePanels(rejoiningActiveSpace: Bool = false) {
-        guard !suppression.hidesNotices else {
+        guard !isScreenshotActive, !suppression.hidesNotices else {
             hideAllPanels()
             return
         }
@@ -149,8 +155,12 @@ final class SideNoticePresenter {
         let displayIDs = resolvedDisplayIDs(from: connectedDisplayIDs)
         removePanels(except: displayIDs)
 
-        for snapshot in snapshots where displayIDs.contains(UInt32(snapshot.displayID)) {
-            let panels = panels(for: snapshot.displayID)
+        for currentSnapshot in snapshots where displayIDs.contains(UInt32(currentSnapshot.displayID)) {
+            let panels = panels(for: currentSnapshot.displayID)
+            let snapshot = Self.snapshotPreservingPhysicalNotch(
+                currentSnapshot,
+                lastPhysicalSnapshot: &panels.lastPhysicalSnapshot
+            )
             let displayState = panels.displayState
             displayState.hidesVoiceProcessingIndicator = hidesVoiceProcessingIndicator(
                 on: snapshot.displayID
@@ -189,6 +199,27 @@ final class SideNoticePresenter {
                 presentsNewCompactStatus: presentsNewCompactStatus
             )
         }
+    }
+
+    static func snapshotPreservingPhysicalNotch(
+        _ snapshot: ScreenSnapshot,
+        lastPhysicalSnapshot: inout ScreenSnapshot?
+    ) -> ScreenSnapshot {
+        if ScreenLayoutEngine().layout(for: snapshot).topology.hasPhysicalNotch {
+            lastPhysicalSnapshot = snapshot
+            return snapshot
+        }
+        guard snapshot.auxiliaryTopLeftArea == nil || snapshot.auxiliaryTopRightArea == nil,
+              let lastPhysicalSnapshot,
+              lastPhysicalSnapshot.displayID == snapshot.displayID,
+              lastPhysicalSnapshot.frame == snapshot.frame
+        else {
+            return snapshot
+        }
+        var resolved = snapshot
+        resolved.auxiliaryTopLeftArea = lastPhysicalSnapshot.auxiliaryTopLeftArea
+        resolved.auxiliaryTopRightArea = lastPhysicalSnapshot.auxiliaryTopRightArea
+        return resolved
     }
 
     private func hidesVoiceProcessingIndicator(on displayID: CGDirectDisplayID) -> Bool {
@@ -232,7 +263,7 @@ final class SideNoticePresenter {
             panels.compactBar?.orderOut(nil)
             return presentsNewCompactStatus
         }
-        guard let frame = layoutEngine.compactBarFrame(
+        guard let currentFrame = layoutEngine.compactBarFrame(
             for: snapshot,
             notices: compactNotices,
             settings: settingsStore.settings
@@ -240,8 +271,8 @@ final class SideNoticePresenter {
             panels.compactBar?.orderOut(nil)
             return presentsNewCompactStatus
         }
+        let frame = currentFrame
         let topology = ScreenLayoutEngine().layout(for: snapshot).topology
-        // Detailed mode left/right content must avoid the physical notch; simulated-island devices have no obstruction, so no center gap.
         if topology.hasPhysicalNotch {
             displayState.compactBarCenterInset = topology.anchorFrame.width
         }
@@ -411,6 +442,7 @@ final class SideNoticePresenter {
 @MainActor
 private final class DisplayPanels {
     let displayState = SideNoticeDisplayState()
+    var lastPhysicalSnapshot: ScreenSnapshot?
     var left: IslandPanel?
     var right: IslandPanel?
     var compactBar: IslandPanel?
