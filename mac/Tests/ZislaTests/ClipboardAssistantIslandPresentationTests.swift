@@ -100,6 +100,20 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(source.contains("guard !isSharingAnchorHeld else { return }"))
     }
 
+    @Test
+    func collapsedToastUsesTheConfiguredProgressGlowAndLiveDismissalClock() throws {
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let viewStart = try #require(source.range(of: "struct ClipboardAssistantToastView"))
+        let viewSource = source[viewStart.lowerBound...]
+
+        #expect(viewSource.contains("TimelineView("))
+        #expect(viewSource.contains("controller.dismissalProgress(at: context.date)"))
+        #expect(viewSource.contains("presentation.progressGlowEnabled"))
+        #expect(viewSource.contains("CollapsedProgressGlow(progress: progress)"))
+        #expect(viewSource.contains("if !isExpanded"))
+        #expect(source.contains("CollapsedProgress.elapsedFraction(fromRemaining: remaining)"))
+    }
+
     @MainActor
     @Test
     func sharingKeepsTheClipboardAssistantAnchorAlive() {
@@ -436,6 +450,7 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(toastSource.contains("visualStyle: presentation.visualStyle"))
         #expect(toastSource.contains("collapsedTopCornerRadius: 0"))
         #expect(toastSource.contains("bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius"))
+        #expect(toastSource.contains(".clipShape(IslandSilhouette(\n                                    topCornerRadius: 0,\n                                    bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius"))
         #expect(!toastSource.contains("usesCompactGlassSurface: true"))
         #expect(!toastSource.contains("Color.black.opacity(0.86)"))
         #expect(toastSource.contains(".popover(isPresented: Binding("))
@@ -462,8 +477,12 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(source.contains("hostingView.layer?.backgroundColor = NSColor.clear.cgColor"))
         #expect(source.contains("let layout = screenSnapshot.map { ScreenLayoutEngine().layout(for: $0) }"))
         #expect(source.contains("let collapsedFrame = layout?.collapsedFrame"))
-        #expect(source.contains("presentation.islandTopHeight = collapsedFrame.height"))
-        #expect(source.contains("y: collapsedFrame.minY"))
+        #expect(source.contains("let rowHeight: CGFloat"))
+        #expect(source.contains("rowHeight = SideNoticeLayoutEngine().compactWingHeight("))
+        #expect(source.contains("progressGlowEnabled: presentation.progressGlowEnabled"))
+        #expect(source.contains("presentation.islandTopHeight = rowHeight"))
+        #expect(source.contains("y: collapsedFrame.maxY - rowHeight"))
+        #expect(source.contains("height: rowHeight"))
         #expect(source.contains("ClipboardAssistantToastView.requiredRowWidth("))
         #expect(toastSource.contains(".fixedSize(horizontal: true, vertical: false)"))
         #expect(!source.contains("SideNoticeLayoutEngine().compactBarFrame"))
@@ -472,7 +491,7 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(toastSource.contains("Spacer(minLength: 0)"))
         #expect(source.contains("onPresentationChanged?(true)"))
         #expect(source.contains("onPresentationChanged?(false)"))
-        #expect(source.contains("guard !isScreenshotActive else { return }"))
+        #expect(source.contains("guard !isScreenshotActive, !isScreenLocked else { return }"))
         #expect(source.contains("setScreenshotActive(_ active: Bool)"))
         #expect(source.contains("setScreenshotSelectionActive(_ active: Bool)"))
         #expect(source.contains("guard presentationGeneration == generation else { return }"))
@@ -480,6 +499,8 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(source.contains("guard self.presentationGeneration == generation else { return }"))
         #expect(source.contains("self.dismissalGeneration == dismissalGeneration"))
         let appModelSource = try String(contentsOf: appModelSourceURL, encoding: .utf8)
+        let progressGlowSync = "clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled"
+        #expect(appModelSource.components(separatedBy: progressGlowSync).count == 3)
         #expect(appModelSource.contains("clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle)"))
         #expect(appModelSource.contains("detection.actions.append(.addToQuickNote)"))
         #expect(appModelSource.contains("detection.actions.append(.sendToTeleprompter)"))
@@ -615,7 +636,18 @@ struct ClipboardAssistantIslandPresentationTests {
 
         let presenterSource = try String(contentsOf: presenterSourceURL, encoding: .utf8)
         #expect(presenterSource.contains("func setClipboardAssistantVisible(_ visible: Bool)"))
-        #expect(presenterSource.contains("guard !suppression.hidesNotices else {"))
+        #expect(presenterSource.contains("guard !isScreenshotActive, !suppression.hidesNotices else {"))
+    }
+
+    @Test
+    func screenLockDismissesTheAssistantWithoutRestoringItOnUnlock() throws {
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let appSource = try String(contentsOf: appSourceURL, encoding: .utf8)
+
+        #expect(source.contains("func setScreenLocked(_ locked: Bool)"))
+        #expect(source.contains("if locked {\n            dismiss(animated: false)\n        }"))
+        #expect(source.contains("guard !isScreenshotActive, !isScreenLocked else { return }"))
+        #expect(appSource.contains("model.clipboardAssistant.setScreenLocked(locked)"))
     }
 
     private var sourceURL: URL {

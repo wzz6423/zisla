@@ -74,6 +74,7 @@ final class ClipboardAssistantPresentation: ObservableObject {
     /// The crown remains the same height as the notch the prompt expands from.
     @Published var islandTopHeight: CGFloat = ScreenLayoutConfiguration().simulatedIslandSize.height
     @Published var physicalNotchWidth: CGFloat = 0
+    @Published var progressGlowEnabled = true
     /// Toggled from the view so the countdown pauses while the pointer rests on the toast.
     var isHovered = false
 }
@@ -89,7 +90,13 @@ final class ClipboardAssistantController: ObservableObject {
     var displayDuration: ClipboardAssistantDisplayDuration = .fiveSeconds {
         didSet {
             guard displayDuration != oldValue, presentation.detection != nil else { return }
-            if displayDuration.expiresAfter == nil || presentation.isHovered {
+            presentation.objectWillChange.send()
+            pauseDismissal()
+            if displayDuration.expiresAfter == nil {
+                dismissalTotalDuration = nil
+                pausedDismissalRemainingFraction = nil
+                cancelDismissTask()
+            } else if presentation.isHovered {
                 cancelDismissTask()
             } else {
                 scheduleDismiss()
@@ -122,6 +129,7 @@ final class ClipboardAssistantController: ObservableObject {
 
     private var screenshotPhase = ScreenshotPhase.inactive
     private var isSystemScreenshotActive = false
+    private var isScreenLocked = false
     private var isScreenshotActive: Bool {
         screenshotPhase != .inactive || isSystemScreenshotActive
     }
@@ -131,6 +139,9 @@ final class ClipboardAssistantController: ObservableObject {
     private var dismissTask: Task<Void, Never>?
     private var presentationGeneration = 0
     private var dismissalGeneration = 0
+    private var dismissalDeadline: Date?
+    private var dismissalTotalDuration: Double?
+    private var pausedDismissalRemainingFraction: Double?
     private let triggerMonitor = ClipboardAssistantTriggerMonitor()
     private let gestureMonitor = ClipboardAssistantMouseGestureMonitor()
     @Published private(set) var isMoreActionsPresented = false
@@ -164,6 +175,12 @@ final class ClipboardAssistantController: ObservableObject {
 
     var isMouseGestureActive: Bool { gestureMonitor.isActive }
 
+    /// Returns the elapsed dismissal fraction so the collapsed glow fills from left to right.
+    func dismissalProgress(at date: Date = .now) -> Double? {
+        guard let remaining = dismissalRemainingFraction(at: date) else { return nil }
+        return CollapsedProgress.elapsedFraction(fromRemaining: remaining)
+    }
+
     /// Window accessor used by the toast view to animate expansion.
     var windowForFrameUpdate: NSWindow? { window }
 
@@ -173,6 +190,14 @@ final class ClipboardAssistantController: ObservableObject {
     func setMoreActionsPresented(_ presented: Bool) {
         guard isMoreActionsPresented != presented else { return }
         isMoreActionsPresented = presented
+    }
+
+    func setScreenLocked(_ locked: Bool) {
+        guard isScreenLocked != locked else { return }
+        isScreenLocked = locked
+        if locked {
+            dismiss(animated: false)
+        }
     }
 
     /// A screenshot session keeps the prompt long enough for the frozen capture, then restores it
@@ -241,9 +266,11 @@ final class ClipboardAssistantController: ObservableObject {
 
     func present(_ detection: ClipboardAssistantDetection, visualStyle: IslandVisualStyle) {
         setMoreActionsPresented(false)
-        guard !isScreenshotActive else { return }
+        guard !isScreenshotActive, !isScreenLocked else { return }
         isSharingAnchorHeld = false
         cancelDismissTask()
+        dismissalTotalDuration = displayDuration.expiresAfter
+        pausedDismissalRemainingFraction = displayDuration.expiresAfter.map { _ in 1 }
         presentationGeneration &+= 1
         presentation.isHovered = false
         presentation.visualStyle = visualStyle
@@ -258,6 +285,9 @@ final class ClipboardAssistantController: ObservableObject {
         setMoreActionsPresented(false)
         isSharingAnchorHeld = false
         cancelDismissTask()
+        dismissalDeadline = nil
+        dismissalTotalDuration = nil
+        pausedDismissalRemainingFraction = nil
         presentationGeneration &+= 1
         let generation = presentationGeneration
         guard let window, window.isVisible else {
@@ -294,6 +324,7 @@ final class ClipboardAssistantController: ObservableObject {
         let generation = presentationGeneration
         if case .share = action {
             isSharingAnchorHeld = true
+            pauseDismissal()
             cancelDismissTask()
         }
         onPerformAction?(action)
@@ -312,6 +343,7 @@ final class ClipboardAssistantController: ObservableObject {
         guard presentation.isHovered != hovered else { return }
         presentation.isHovered = hovered
         if hovered {
+            pauseDismissal()
             cancelDismissTask()
         } else {
             scheduleDismiss()
@@ -324,14 +356,25 @@ final class ClipboardAssistantController: ObservableObject {
         guard !isScreenshotActive else { return }
         guard !isSharingAnchorHeld else { return }
         guard let seconds = displayDuration.expiresAfter else {
+            dismissalTotalDuration = nil
+            pausedDismissalRemainingFraction = nil
             dismissTask = nil
             return
         }
+        dismissalTotalDuration = seconds
+        let remainingFraction = pausedDismissalRemainingFraction ?? 1
+        let remaining = seconds * remainingFraction
+        guard remaining > 0 else {
+            dismiss()
+            return
+        }
+        pausedDismissalRemainingFraction = nil
+        dismissalDeadline = Date().addingTimeInterval(remaining)
         let presentationGeneration = self.presentationGeneration
         let dismissalGeneration = self.dismissalGeneration
         dismissTask = Task { [weak self] in
             do {
-                try await Task.sleep(for: .seconds(seconds))
+                try await Task.sleep(for: .seconds(remaining))
             } catch {
                 return
             }
@@ -348,7 +391,25 @@ final class ClipboardAssistantController: ObservableObject {
     private func cancelDismissTask() {
         dismissTask?.cancel()
         dismissTask = nil
+        dismissalDeadline = nil
         dismissalGeneration &+= 1
+    }
+
+    private func pauseDismissal() {
+        guard dismissalDeadline != nil else { return }
+        pausedDismissalRemainingFraction = dismissalRemainingFraction()
+        dismissalDeadline = nil
+    }
+
+    private func dismissalRemainingFraction(at date: Date = .now) -> Double? {
+        if let deadline = dismissalDeadline {
+            return CollapsedProgress.remainingFraction(
+                until: deadline,
+                totalDuration: dismissalTotalDuration,
+                at: date
+            )
+        }
+        return pausedDismissalRemainingFraction
     }
 
     static func thumbnail(for detection: ClipboardAssistantDetection) -> NSImage? {
@@ -386,12 +447,21 @@ final class ClipboardAssistantController: ObservableObject {
                 isLightweightMode: isLightweightMode
             )
         )
-        presentation.islandTopHeight = collapsedFrame.height
+        let rowHeight: CGFloat
+        if let screenSnapshot, layout?.topology.hasPhysicalNotch == true {
+            rowHeight = SideNoticeLayoutEngine().compactWingHeight(
+                for: screenSnapshot,
+                progressGlowEnabled: presentation.progressGlowEnabled
+            )
+        } else {
+            rowHeight = collapsedFrame.height
+        }
+        presentation.islandTopHeight = rowHeight
         let frame = CGRect(
             x: collapsedFrame.midX - width / 2,
-            y: collapsedFrame.minY,
+            y: collapsedFrame.maxY - rowHeight,
             width: width,
-            height: collapsedFrame.height
+            height: rowHeight
         )
         let window: ClipboardAssistantWindow
         if let existing = self.window {
@@ -448,41 +518,65 @@ struct ClipboardAssistantToastView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            if let detection = presentation.detection {
-                IslandSurface(
-                    isCollapsed: !isExpanded,
-                    collapsedSize: CGSize(
-                        width: geometry.size.width,
-                        height: min(geometry.size.height, presentation.islandTopHeight)
-                    ),
-                    expandedSize: geometry.size,
-                    visualStyle: presentation.visualStyle,
-                    collapsedTopCornerRadius: 0,
-                    bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
-                ) {
-                    VStack(spacing: 0) {
-                        toastHeader(detection)
-                        if isExpanded, let content = expandableContent(detection) {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.08))
-                                .frame(height: 0.5)
-                                .padding(.horizontal, 14)
-                            expandedContentView(content)
+        TimelineView(
+            .animation(
+                minimumInterval: 1.0 / 30.0,
+                paused: !isDismissalProgressActive
+            )
+        ) { context in
+            GeometryReader { geometry in
+                if let detection = presentation.detection {
+                    IslandSurface(
+                        isCollapsed: !isExpanded,
+                        collapsedSize: CGSize(
+                            width: geometry.size.width,
+                            height: min(geometry.size.height, presentation.islandTopHeight)
+                        ),
+                        expandedSize: geometry.size,
+                        visualStyle: presentation.visualStyle,
+                        collapsedTopCornerRadius: 0,
+                        bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
+                    ) {
+                        VStack(spacing: 0) {
+                            toastHeader(detection)
+                            if isExpanded, let content = expandableContent(detection) {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.08))
+                                    .frame(height: 0.5)
+                                    .padding(.horizontal, 14)
+                                expandedContentView(content)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    }
+                    .overlay {
+                        if !isExpanded,
+                           presentation.progressGlowEnabled,
+                           let progress = controller.dismissalProgress(at: context.date) {
+                            CollapsedProgressGlow(progress: progress)
+                                .clipShape(IslandSilhouette(
+                                    topCornerRadius: 0,
+                                    bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
+                                ))
                         }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: presentation.detection)
-                .onChange(of: presentation.detection) {
-                    // A new copy collapses any previously expanded preview.
-                    if isExpanded { isExpanded = false }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .animation(.spring(response: 0.3, dampingFraction: 0.85), value: presentation.detection)
+                    .onChange(of: presentation.detection) {
+                        // A new copy collapses any previously expanded preview.
+                        if isExpanded { isExpanded = false }
+                    }
                 }
             }
         }
         .ignoresSafeArea(edges: .top)
         .environment(\.colorScheme, .dark)
+    }
+
+    private var isDismissalProgressActive: Bool {
+        presentation.progressGlowEnabled
+            && !isExpanded
+            && controller.dismissalProgress(at: .now) != nil
     }
 
     // MARK: Header row

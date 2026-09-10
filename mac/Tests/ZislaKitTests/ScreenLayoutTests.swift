@@ -66,6 +66,22 @@ struct ScreenLayoutTests {
     }
 
     @Test
+    func physicalNotchRemainsDetectedWhenFullscreenClearsSafeAreaInset() {
+        let screen = ScreenSnapshot(
+            displayID: 42,
+            frame: CGRect(x: 0, y: 0, width: 1_512, height: 982),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1_512, height: 982),
+            auxiliaryTopLeftArea: CGRect(x: 0, y: 950, width: 716, height: 32),
+            auxiliaryTopRightArea: CGRect(x: 796, y: 950, width: 716, height: 32)
+        )
+
+        #expect(
+            engine.layout(for: screen).topology
+                == .physicalNotch(frame: CGRect(x: 716, y: 950, width: 80, height: 32))
+        )
+    }
+
+    @Test
     func physicalNotchStaysCenteredWhenAuxiliaryAreasAreAsymmetric() {
         let screen = ScreenSnapshot(
             displayID: 43,

@@ -2391,3 +2391,5 @@
 "模糊度" = "Flou";
 "格子" = "Grille";
 "画笔粗细" = "Épaisseur du pinceau";
+"提示条进度光效" = "Lueur de progression de la barre de notification";
+"在收起态提示条边沿显示播放、下载和自动关闭进度" = "Afficher la progression de la lecture, du téléchargement et de la fermeture automatique sur le bord de la barre réduite";

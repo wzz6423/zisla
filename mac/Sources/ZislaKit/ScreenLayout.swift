@@ -141,6 +141,7 @@ public struct ScreenLayoutConfiguration: Equatable, Sendable {
 public struct ScreenOverlayLayout: Equatable, Identifiable, Sendable {
     public let displayID: CGDirectDisplayID
     public let screenFrame: CGRect
+    public let topBarHeight: CGFloat
     public let topology: TopTopology
     public let triggerFrame: CGRect
     public let transferDragTriggerFrame: CGRect
@@ -224,6 +225,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         return ScreenOverlayLayout(
             displayID: screen.displayID,
             screenFrame: screen.frame,
+            topBarHeight: screen.topBarHeight,
             topology: topology,
             triggerFrame: triggerFrame,
             transferDragTriggerFrame: transferDragTriggerFrame,
@@ -284,8 +286,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
     }
 
     private func physicalNotchFrame(for screen: ScreenSnapshot) -> CGRect? {
-        guard screen.safeAreaInsets.top > 0,
-            let leftArea = screen.auxiliaryTopLeftArea,
+        guard let leftArea = screen.auxiliaryTopLeftArea,
             let rightArea = screen.auxiliaryTopRightArea
         else {
             return nil

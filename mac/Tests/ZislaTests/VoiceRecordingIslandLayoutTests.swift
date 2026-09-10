@@ -73,7 +73,7 @@ struct VoiceRecordingIslandLayoutTests {
         #expect(presenterSource.contains("private var suppression = SideNoticeSuppression()"))
         #expect(presenterSource.contains("func setVoiceRecording(_ recording: Bool)"))
         #expect(presenterSource.contains("updateSuppression { $0.isVoiceRecording = recording }"))
-        #expect(presenterSource.contains("guard !suppression.hidesNotices else"))
+        #expect(presenterSource.contains("guard !isScreenshotActive, !suppression.hidesNotices else"))
         #expect(appSource.contains("noticePresenter?.setVoiceRecording(true)"))
         #expect(appSource.contains("noticePresenter?.setVoiceRecording(false)"))
     }
@@ -178,7 +178,7 @@ struct VoiceRecordingIslandLayoutTests {
         )
 
         #expect(presenterSource.contains("updateSuppression { $0.isTransientNoticePresented = presented }"))
-        #expect(coordinatorSource.contains("guard !isVoiceRecording,\n            !isTransientNoticePresented,"))
+        #expect(coordinatorSource.contains("guard !isScreenLocked,\n            !isScreenshotActive,\n            !isVoiceRecording,\n            !isTransientNoticePresented,"))
         #expect(appSource.contains("noticePresenter?.setTransientNoticePresented(presented)"))
         #expect(appSource.contains("coordinator?.setTransientNoticePresented(presented)"))
         #expect(
