@@ -175,21 +175,14 @@ struct IslandSurface<Content: View>: View {
             if !reduceTransparency {
                 // Bottom transmissive frosted glass (smoked, refracts the desktop, no white bloom).
                 glassBody
-                // Ambient light field sits between the glass and the crown so the solid
-                // crown keeps covering it where text legibility matters.
-                IslandLightField(visualStyle: .frosted)
-                // Solid-black crown on top + smoked transition.
+                // Solid-black crown on top + smoked transition. Deliberately no ambient light
+                // overlays: their additive plusLighter white reads as blurry line-shaped patches
+                // on the smoked glass rather than ambience, so the surface stays a smooth gradient.
                 if renderingPolicy.showsCrown {
                     crown
                 } else if usesCompactGlassSurface {
                     compactCrown
                 }
-                IslandSheenSweep(visualStyle: .frosted)
-                    .id(visualStyle)
-                IslandRimLight(
-                    visualStyle: .frosted,
-                    bottomCornerRadius: rimBottomCornerRadius
-                )
             } else {
                 // Accessibility: opaque black → smoked gradient.
                 surfaceGradient
@@ -207,18 +200,12 @@ struct IslandSurface<Content: View>: View {
         } else {
             ZStack(alignment: .top) {
                 transparentLiquidGlassShell
-                IslandLightField(visualStyle: .transparent)
+                // Same reasoning as `frostedSurface`: no additive white overlays on the glass.
                 if renderingPolicy.showsCrown {
                     transparentCrown
                 } else if usesCompactGlassSurface {
                     compactCrown
                 }
-                IslandSheenSweep(visualStyle: .transparent)
-                    .id(visualStyle)
-                IslandRimLight(
-                    visualStyle: .transparent,
-                    bottomCornerRadius: rimBottomCornerRadius
-                )
             }
         }
     }
@@ -243,7 +230,7 @@ struct IslandSurface<Content: View>: View {
 
     /// Solid-black crown on top + smooth downward transition.
     /// The solid-black section covers NowPlayingHeader + toolbar (white text); below it an eased gradient fades black into the smoked frosted glass.
-    /// Gradient stops decrease evenly to avoid a density jump ("sunken" feel) in the middle.
+    /// The blend follows `IslandCrownFade`'s smoothstep curve so it meets the solid crown above and the flat glass below with zero slope, rather than ending a straight ramp on a slope break the eye renders as a white edge.
     /// Crown adapts to the expanded surface height: full size above the floor, compressed below.
     private var crown: some View {
         let metrics = IslandCrownGeometry.crownMetrics(
@@ -255,12 +242,7 @@ struct IslandSurface<Content: View>: View {
                 .fill(Color.black.opacity(crownOpacity))
                 .frame(height: metrics.solidHeight)
             LinearGradient(
-                stops: [
-                    .init(color: .black.opacity(crownOpacity), location: 0),
-                    .init(color: .black.opacity(crownOpacity * 0.70), location: 0.3),
-                    .init(color: .black.opacity(crownOpacity * 0.35), location: 0.65),
-                    .init(color: .black.opacity(0.0), location: 1),
-                ],
+                stops: crownFadeStops(peakOpacity: crownOpacity),
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -268,6 +250,14 @@ struct IslandSurface<Content: View>: View {
             Spacer(minLength: 0)
         }
         .allowsHitTesting(false)
+    }
+
+    /// Builds the crown → glass blend stops from the shared eased curve, scaled to `peakOpacity`.
+    /// See `IslandCrownFade` for why the blend is a smoothstep rather than a straight ramp.
+    private func crownFadeStops(peakOpacity: CGFloat) -> [Gradient.Stop] {
+        IslandCrownFade.curve.map {
+            .init(color: .black.opacity(peakOpacity * $0.alpha), location: $0.location)
+        }
     }
 
     /// Visually stays black while allowing the transparent panel to retain a very faint translucency.
@@ -287,8 +277,14 @@ struct IslandSurface<Content: View>: View {
             Rectangle()
                 .fill(Color.black.opacity(compactCrownOpacity))
                 .frame(height: solidHeight)
-            LinearGradient(stops: compactCrownStops, startPoint: .top, endPoint: .bottom)
-                .frame(height: blendHeight)
+            // Both styles share the expanded crowns' eased blend, only the peak opacity differs, so the
+            // one-row recording transition can't reintroduce the slope break the expanded crown avoids.
+            LinearGradient(
+                stops: crownFadeStops(peakOpacity: compactCrownOpacity),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: blendHeight)
             Spacer(minLength: 0)
         }
         .allowsHitTesting(false)
@@ -298,25 +294,6 @@ struct IslandSurface<Content: View>: View {
     /// crown; frosted retains its faint translucency.
     private var compactCrownOpacity: CGFloat {
         visualStyle == .transparent ? 1 : crownOpacity
-    }
-
-    private var compactCrownStops: [Gradient.Stop] {
-        if visualStyle == .transparent {
-            // Liquid Glass uses the same gradient parameters as the expanded `transparentCrown`.
-            [
-                .init(color: .black, location: 0),
-                .init(color: .black.opacity(0.78), location: 0.35),
-                .init(color: .black.opacity(0.34), location: 0.72),
-                .init(color: .black.opacity(0.0), location: 1),
-            ]
-        } else {
-            [
-                .init(color: .black.opacity(crownOpacity), location: 0),
-                .init(color: .black.opacity(crownOpacity * 0.62), location: 0.4),
-                .init(color: .black.opacity(crownOpacity * 0.28), location: 0.72),
-                .init(color: .black.opacity(0.0), location: 1),
-            ]
-        }
     }
 
     /// Island surface base: transmissive smoked frosted glass.
@@ -415,12 +392,7 @@ struct IslandSurface<Content: View>: View {
                 .fill(Color.black)
                 .frame(height: metrics.solidHeight)
             LinearGradient(
-                stops: [
-                    .init(color: .black, location: 0),
-                    .init(color: .black.opacity(0.78), location: 0.35),
-                    .init(color: .black.opacity(0.34), location: 0.72),
-                    .init(color: .black.opacity(0.0), location: 1),
-                ],
+                stops: crownFadeStops(peakOpacity: 1),
                 startPoint: .top,
                 endPoint: .bottom
             )

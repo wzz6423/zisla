@@ -45,6 +45,28 @@ public enum IslandCrownGeometry: Sendable {
     }
 }
 
+/// Alpha curve of the crown's black → glass fade.
+///
+/// The blend used to be a straight linear ramp. Where such a ramp meets the flat glass its slope
+/// drops from a constant straight to zero, and the eye promotes that slope break to a soft bright
+/// Mach band — which reads as a blurry white line across the top of the glass on every page, no
+/// matter which module is showing. Sampling a smoothstep (`1 - t²(3 - 2t)`) eases *both* ends to
+/// zero slope, so the fade leaves the solid black crown and rejoins the glass without an edge,
+/// while still landing on the same endpoints (and therefore the same overall darkness).
+public enum IslandCrownFade: Sendable {
+    /// `(location, alpha)` samples of the fade, normalised so the head is 1 and the tail is 0.
+    /// Callers scale `alpha` by the peak opacity of their own crown variant.
+    public static let curve: [(location: CGFloat, alpha: CGFloat)] = [
+        (0.00, 1.000),
+        (0.15, 0.939),
+        (0.30, 0.784),
+        (0.50, 0.500),
+        (0.70, 0.216),
+        (0.85, 0.061),
+        (1.00, 0.000),
+    ]
+}
+
 /// Derives the dashboard's expanded height from what `IslandDashboardView` actually renders.
 ///
 /// Kept next to the crown geometry (rather than inline in the view layer) so the height
