@@ -28,11 +28,10 @@ struct QuickNoteModuleView: View {
             editorColumn
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .task {
+        .task(id: model.isIslandVisible) {
+            guard model.isIslandVisible else { return }
             await service.refresh()
-            if service.selectedID != nil {
-                cancelAndLoadDraft()
-            }
+            reloadDraftIfNeeded()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await service.refreshIfNeeded() }
@@ -283,6 +282,13 @@ struct QuickNoteModuleView: View {
     }
 
     // MARK: - Actions
+
+    private func reloadDraftIfNeeded() {
+        guard let selectedID = service.selectedID,
+              noteContent == nil || loadedNoteID != selectedID
+        else { return }
+        cancelAndLoadDraft()
+    }
 
     private func cancelAndLoadDraft() {
         draftLoadGeneration &+= 1
