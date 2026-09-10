@@ -172,7 +172,7 @@ struct ShelfModuleView: View {
                     )
             }
         }
-        .frame(height: 320)
+        .frame(height: IslandModuleLayout.shelfContentHeight)
     }
 
     private var searchBar: some View {

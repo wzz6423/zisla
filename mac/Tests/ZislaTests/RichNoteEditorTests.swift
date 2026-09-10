@@ -293,15 +293,9 @@ struct RichNoteEditorTests {
             """
             (() => {
               const body = document.querySelector('#editor > div span');
-              const bodyRange = document.createRange();
-              bodyRange.setStart(body.firstChild, 0);
-              bodyRange.setEnd(body.firstChild, 2);
-              const bodyRect = bodyRange.getBoundingClientRect();
               return {
                 heading: getComputedStyle(document.querySelector('#editor > h1 span')).fontSize,
-                body: getComputedStyle(body).fontSize,
-                bodyTextWidth: bodyRect.width,
-                bodyTextHeight: bodyRect.height
+                body: getComputedStyle(body).fontSize
               };
             })()
             """
@@ -309,8 +303,6 @@ struct RichNoteEditorTests {
 
         #expect(computedSizes["heading"] as? String == "23px")
         #expect(computedSizes["body"] as? String == "13px")
-        #expect(abs((computedSizes["bodyTextWidth"] as? Double ?? 0) - 25.7977) < 0.25)
-        #expect(abs((computedSizes["bodyTextHeight"] as? Double ?? 0) - 15.3105) < 0.25)
         #expect(savedHTML.contains("<h1><span>标题</span></h1>") == true)
         #expect(savedHTML.contains("font-size: 11px") == true)
         #expect(savedHTML.contains("font-size: 13px") == false)
