@@ -319,6 +319,38 @@ struct SystemMetricsHistoryExportTests {
         #expect(sheet.contains(">network_sent_bytes<"))
     }
 
+    /// Counters this machine never reported would only produce empty columns, so the header row
+    /// shrinks to what actually exists — gpu_usage stays, renderer/tiler/temperatures go.
+    @Test
+    func workbookOmitsColumnsTheMachineNeverReported() throws {
+        let workbook = SystemMetricsHistoryExport.workbookData(
+            records: [
+                record(at: now.timeIntervalSince1970 - 60, gpuUsage: 0.42, fanRPMs: [1_200]),
+                record(at: now.timeIntervalSince1970, gpuUsage: 0.55, fanRPMs: [1_300]),
+            ],
+            timeZone: .gmt,
+            modificationDate: now
+        )
+
+        let sheet = try #require(try Self.extract(workbook)["xl/worksheets/sheet1.xml"])
+        #expect(sheet.contains(">gpu_usage<"))
+        #expect(!sheet.contains("gpu_renderer"))
+        #expect(!sheet.contains("gpu_tiler"))
+        #expect(!sheet.contains("temperature"))
+    }
+
+    @Test
+    func workbookOmitsEveryGpuColumnWhenGpuIsUnavailable() throws {
+        let workbook = SystemMetricsHistoryExport.workbookData(
+            records: [record(at: now.timeIntervalSince1970)],
+            timeZone: .gmt,
+            modificationDate: now
+        )
+
+        let sheet = try #require(try Self.extract(workbook)["xl/worksheets/sheet1.xml"])
+        #expect(!sheet.contains("gpu_"))
+    }
+
     private static func extract(_ workbook: Data) throws -> [String: String] {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("zisla-history-\(UUID().uuidString)", isDirectory: true)

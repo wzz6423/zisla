@@ -49,28 +49,68 @@ public enum SystemMetricsHistoryExport {
 
         init(records: [SystemMetricsRecord]) {
             let fanCount = records.map(\.fanRPMs.count).max() ?? 0
+
+            // A counter the machine never reported would only produce an empty column, so it is left
+            // out entirely — the same rule the fan columns already follow.
+            func reported(_ value: @escaping (SystemMetricsRecord) -> Double?) -> Bool {
+                records.contains { record in
+                    guard let value = value(record) else { return false }
+                    return value.isFinite
+                }
+            }
+
             var columns: [Column] = [
                 Column(header: "timestamp") { .dateSerial($0.timestamp) },
                 Column(header: "cpu_usage") { .number($0.cpuUsage) },
                 Column(header: "cpu_user") { .number($0.cpuUser) },
                 Column(header: "cpu_system") { .number($0.cpuSystem) },
                 Column(header: "cpu_idle") { .number($0.cpuIdle) },
-                Column(header: "cpu_temperature_celsius") { .optionalNumber($0.cpuTemperatureCelsius) },
-                Column(header: "gpu_usage") { .optionalNumber($0.gpuUsage) },
-                Column(header: "gpu_renderer") { .optionalNumber($0.gpuRenderer) },
-                Column(header: "gpu_tiler") { .optionalNumber($0.gpuTiler) },
-                Column(header: "gpu_temperature_celsius") { .optionalNumber($0.gpuTemperatureCelsius) },
-                Column(header: "memory_used_bytes") { .number(Double($0.memoryUsedBytes)) },
-                Column(header: "memory_total_bytes") { .number(Double($0.memoryTotalBytes)) },
-                Column(header: "memory_usage_ratio") { .number($0.memoryUsageRatio) },
-                Column(header: "memory_pressure_ratio") { .number($0.memoryPressureRatio) },
-                Column(header: "disk_used_bytes") { .number(Double($0.diskUsedBytes)) },
-                Column(header: "disk_total_bytes") { .number(Double($0.diskTotalBytes)) },
-                Column(header: "disk_usage_ratio") { .number($0.diskUsageRatio) },
-                Column(header: "disk_read_bytes_per_second") { .optionalNumber($0.diskReadBytesPerSecond) },
-                Column(header: "disk_write_bytes_per_second") { .optionalNumber($0.diskWriteBytesPerSecond) },
-                Column(header: "disk_temperature_celsius") { .optionalNumber($0.diskTemperatureCelsius) },
             ]
+            if reported({ $0.cpuTemperatureCelsius }) {
+                columns.append(Column(header: "cpu_temperature_celsius") {
+                    .optionalNumber($0.cpuTemperatureCelsius)
+                })
+            }
+            if reported({ $0.gpuUsage }) {
+                columns.append(Column(header: "gpu_usage") { .optionalNumber($0.gpuUsage) })
+            }
+            if reported({ $0.gpuRenderer }) {
+                columns.append(Column(header: "gpu_renderer") { .optionalNumber($0.gpuRenderer) })
+            }
+            if reported({ $0.gpuTiler }) {
+                columns.append(Column(header: "gpu_tiler") { .optionalNumber($0.gpuTiler) })
+            }
+            if reported({ $0.gpuTemperatureCelsius }) {
+                columns.append(Column(header: "gpu_temperature_celsius") {
+                    .optionalNumber($0.gpuTemperatureCelsius)
+                })
+            }
+            columns.append(
+                contentsOf: [
+                    Column(header: "memory_used_bytes") { .number(Double($0.memoryUsedBytes)) },
+                    Column(header: "memory_total_bytes") { .number(Double($0.memoryTotalBytes)) },
+                    Column(header: "memory_usage_ratio") { .number($0.memoryUsageRatio) },
+                    Column(header: "memory_pressure_ratio") { .number($0.memoryPressureRatio) },
+                    Column(header: "disk_used_bytes") { .number(Double($0.diskUsedBytes)) },
+                    Column(header: "disk_total_bytes") { .number(Double($0.diskTotalBytes)) },
+                    Column(header: "disk_usage_ratio") { .number($0.diskUsageRatio) },
+                ]
+            )
+            if reported({ $0.diskReadBytesPerSecond }) {
+                columns.append(Column(header: "disk_read_bytes_per_second") {
+                    .optionalNumber($0.diskReadBytesPerSecond)
+                })
+            }
+            if reported({ $0.diskWriteBytesPerSecond }) {
+                columns.append(Column(header: "disk_write_bytes_per_second") {
+                    .optionalNumber($0.diskWriteBytesPerSecond)
+                })
+            }
+            if reported({ $0.diskTemperatureCelsius }) {
+                columns.append(Column(header: "disk_temperature_celsius") {
+                    .optionalNumber($0.diskTemperatureCelsius)
+                })
+            }
             columns.append(
                 contentsOf: (0..<fanCount).map { index in
                     Column(header: "fan_\(index + 1)_rpm") { record in
