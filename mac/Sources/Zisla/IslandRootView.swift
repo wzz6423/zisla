@@ -220,8 +220,7 @@ struct IslandRootView: View {
                                         case .system:
                                             SystemMonitorView(
                                                 service: model.systemMonitor,
-                                                onCleanupRequested: cleanupPanelPresentation.present,
-                                                onHistoryRequested: historyPanelPresentation.present
+                                                onCleanupRequested: cleanupPanelPresentation.present
                                             )
                                         case .battery:
                                             BatteryDetailView(
@@ -363,6 +362,9 @@ struct IslandRootView: View {
         HStack(spacing: 8) {
             ModuleSelector(model: model)
             Spacer(minLength: 8)
+            if activeModule == .system {
+                historyButton
+            }
             if settingsStore.settings.systemMonitorEnabled {
                 NavMonitorStrip(monitor: model.systemMonitor) {
                     model.selectModule(.system)
@@ -387,6 +389,26 @@ struct IslandRootView: View {
             }
         }
         .frame(height: 30)
+    }
+
+    /// Opens the metrics history window while the system page is active, sitting just left of the
+    /// thumbnail monitor strip in the shared top rail.
+    private var historyButton: some View {
+        Button(action: historyPanelPresentation.present) {
+            HStack(spacing: 5) {
+                Image(systemName: "chart.xyaxis.line")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(AppLocalization.text("查看历史记录"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Color.fillControl, in: Capsule())
+        }
+        .buttonStyle(PressableStyle())
+        .help(AppLocalization.text("按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势"))
     }
 
     private var isIslandCollapsed: Bool {

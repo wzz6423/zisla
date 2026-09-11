@@ -25,7 +25,6 @@ final class SystemCleanupPanelPresentationState: ObservableObject {
 struct SystemMonitorView: View {
     @ObservedObject var service: SystemMonitorService
     let onCleanupRequested: () -> Void
-    let onHistoryRequested: () -> Void
     @State private var releasedMemoryBytes: UInt64?
     @State private var systemColumnHeight: CGFloat = 0
     @Environment(\.locale) private var locale
@@ -66,13 +65,9 @@ struct SystemMonitorView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// Right column: a compact history action on top, then memory / disk / fan / network readings.
+    /// Right column: compact readings for memory / disk / fan / network.
     private var systemColumn: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Spacer(minLength: 0)
-                historyButton
-            }
             memoryCard
             diskCard
             fanCard
@@ -86,24 +81,6 @@ struct SystemMonitorView: View {
                 )
             }
         }
-    }
-
-    private var historyButton: some View {
-        Button(action: onHistoryRequested) {
-            HStack(spacing: 5) {
-                Image(systemName: "chart.xyaxis.line")
-                    .font(.system(size: 10, weight: .semibold))
-                Text(AppLocalization.text("查看历史记录"))
-                    .font(.system(size: 10, weight: .semibold))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(Color.fillControl, in: Capsule())
-        }
-        .buttonStyle(PressableStyle())
-        .help(AppLocalization.text("按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势"))
     }
 
     // MARK: - Cards

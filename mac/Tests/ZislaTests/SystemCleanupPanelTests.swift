@@ -68,23 +68,16 @@ struct SystemCleanupPanelTests {
     @Test @MainActor
     func cleanupPresentationStateOutlivesTheRequestingModule() {
         let state = SystemCleanupPanelPresentationState()
-        let historyState = SystemMetricsHistoryPanelPresentationState()
         var systemModule: SystemMonitorView? = SystemMonitorView(
             service: SystemMonitorService(samplingInterval: 1),
-            onCleanupRequested: state.present,
-            onHistoryRequested: historyState.present
+            onCleanupRequested: state.present
         )
 
         systemModule?.onCleanupRequested()
-        systemModule?.onHistoryRequested()
         systemModule = nil
 
         #expect(state.isPresented)
-        #expect(historyState.isPresented)
-
         state.dismiss()
-        historyState.dismiss()
         #expect(!state.isPresented)
-        #expect(!historyState.isPresented)
     }
 }
