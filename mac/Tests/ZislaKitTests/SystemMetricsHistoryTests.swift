@@ -3,12 +3,13 @@ import Testing
 
 @testable import ZislaKit
 
-/// In-memory stand-in for the history log so the store logic can be exercised without touching disk.
+/// In-memory stand-in for the history archive so the store logic can be exercised without touching disk.
 private final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked Sendable {
     private let lock = NSLock()
     private var stored: [SystemMetricsRecord] = []
     private(set) var appendCount = 0
-    private(set) var replaceCount = 0
+    private(set) var appendedCapacities: [Int] = []
+    private(set) var removeAllCount = 0
 
     init(seed: [SystemMetricsRecord] = []) {
         stored = seed
@@ -20,18 +21,23 @@ private final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @u
         return stored
     }
 
-    func appendRecord(_ record: SystemMetricsRecord) {
+    func appendRecord(_ record: SystemMetricsRecord, capacity: Int) {
         lock.lock()
         defer { lock.unlock() }
         stored.append(record)
         appendCount += 1
+        appendedCapacities.append(capacity)
+        let overflow = stored.count - max(1, capacity)
+        if overflow > 0 {
+            stored.removeFirst(overflow)
+        }
     }
 
-    func replaceRecords(_ records: [SystemMetricsRecord]) {
+    func removeAll() {
         lock.lock()
         defer { lock.unlock() }
-        stored = records
-        replaceCount += 1
+        stored = []
+        removeAllCount += 1
     }
 }
 
@@ -65,7 +71,7 @@ private func record(
 
 struct SystemMetricsHistoryStoreTests {
     @Test
-    func appendKeepsTheLogAppendOnlyUntilCapacity() {
+    func appendWritesOneSampleAtATimeUntilCapacity() {
         let persistence = MemoryHistoryPersistence()
         let store = SystemMetricsHistoryStore(persistence: persistence, capacity: 3)
 
@@ -74,12 +80,12 @@ struct SystemMetricsHistoryStoreTests {
         }
 
         #expect(persistence.appendCount == 3)
-        #expect(persistence.replaceCount == 0)
+        #expect(persistence.appendedCapacities == [3, 3, 3])
         #expect(store.records.map(\.timestamp.timeIntervalSince1970) == [0, 1, 2])
     }
 
     @Test
-    func overflowDropsOldestSamplesAndRewritesTheLog() {
+    func overflowDropsTheOldestSamplesFromMemoryAndTheArchive() {
         let persistence = MemoryHistoryPersistence()
         let store = SystemMetricsHistoryStore(persistence: persistence, capacity: 2)
 
@@ -87,9 +93,10 @@ struct SystemMetricsHistoryStoreTests {
             store.append(record(at: TimeInterval(index)))
         }
 
-        #expect(persistence.appendCount == 2)
-        #expect(persistence.replaceCount == 2)
+        // The archive is trimmed by the append itself; nothing rewrites the whole table.
+        #expect(persistence.appendCount == 4)
         #expect(store.records.map(\.timestamp.timeIntervalSince1970) == [2, 3])
+        #expect(persistence.loadRecords().map(\.timestamp.timeIntervalSince1970) == [2, 3])
         #expect(store.stats.count == 2)
         #expect(store.stats.oldest?.timeIntervalSince1970 == 2)
         #expect(store.stats.newest?.timeIntervalSince1970 == 3)
@@ -97,7 +104,7 @@ struct SystemMetricsHistoryStoreTests {
     }
 
     @Test
-    func loadTrimsOversizedLogsAndSortsByTime() {
+    func loadTrimsOversizedArchivesAndSortsByTime() {
         let seed = [record(at: 5), record(at: 1), record(at: 3)]
         let store = SystemMetricsHistoryStore(persistence: MemoryHistoryPersistence(seed: seed), capacity: 2)
 
@@ -105,7 +112,7 @@ struct SystemMetricsHistoryStoreTests {
     }
 
     @Test
-    func removeAllEmptiesTheLog() {
+    func removeAllEmptiesTheArchive() {
         let persistence = MemoryHistoryPersistence(seed: [record(at: 1)])
         let store = SystemMetricsHistoryStore(persistence: persistence, capacity: 8)
         #expect(store.stats.count == 1)
@@ -115,6 +122,7 @@ struct SystemMetricsHistoryStoreTests {
         #expect(store.records.isEmpty)
         #expect(store.stats == .empty)
         #expect(persistence.loadRecords().isEmpty)
+        #expect(persistence.removeAllCount == 1)
     }
 }
 
@@ -340,56 +348,157 @@ struct SystemMetricsHistoryExportTests {
     }
 }
 
-struct SystemMetricsFileHistoryPersistenceTests {
+struct SystemMetricsHistoryDatabaseTests {
     @Test
-    func appendAndLoadRoundTripThroughJSONLines() throws {
-        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("zisla-history-file-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let url = directory.appendingPathComponent("history.jsonl")
+    func samplesRoundTripThroughSQLite() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        database.appendRecord(
+            record(at: 1_000, gpuUsage: 0.5, fanRPMs: [1_200, 1_400], memoryUsed: 8_000, memoryTotal: 16_000),
+            capacity: 10
+        )
+        database.appendRecord(record(at: 1_060), capacity: 10)
 
-        let persistence = SystemMetricsFileHistoryPersistence(fileURL: url)
-        persistence.appendRecord(record(at: 10, gpuUsage: 0.5))
-        persistence.appendRecord(record(at: 20, fanRPMs: [900]))
-
-        let reloaded = SystemMetricsFileHistoryPersistence(fileURL: url).loadRecords()
+        let reloaded = SystemMetricsHistoryDatabase(databaseURL: url).loadRecords()
 
         #expect(reloaded.count == 2)
+        #expect(reloaded.map(\.timestamp.timeIntervalSince1970) == [1_000, 1_060])
+        #expect(reloaded[0].cpuUsage == 0.25)
+        #expect(reloaded[0].cpuUser == 0.2)
         #expect(reloaded[0].gpuUsage == 0.5)
-        #expect(reloaded[1].fanRPMs == [900])
+        #expect(reloaded[0].memoryUsedBytes == 8_000)
+        #expect(reloaded[0].memoryTotalBytes == 16_000)
+        #expect(reloaded[0].fanRPMs == [1_200, 1_400])
+        #expect(reloaded[0].diskReadBytesPerSecond == 1_024)
+        #expect(reloaded[0].networkSendBytesPerSecond == 20)
     }
 
     @Test
-    func corruptLinesAreSkippedInsteadOfFailingTheLoad() throws {
-        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("zisla-history-corrupt-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let url = directory.appendingPathComponent("history.jsonl")
+    func unavailableCountersStayUnsetInsteadOfBecomingZero() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        database.appendRecord(record(at: 1_000), capacity: 10)
 
-        let persistence = SystemMetricsFileHistoryPersistence(fileURL: url)
-        persistence.appendRecord(record(at: 10))
-        let handle = try FileHandle(forWritingTo: url)
-        try handle.seekToEnd()
-        try handle.write(contentsOf: Data("{ not json }\n".utf8))
-        try handle.close()
-        persistence.appendRecord(record(at: 20))
+        let reloaded = database.loadRecords()
 
-        #expect(persistence.loadRecords().map(\.timestamp.timeIntervalSince1970) == [10, 20])
+        #expect(reloaded.count == 1)
+        #expect(reloaded[0].gpuUsage == nil)
+        #expect(reloaded[0].gpuRenderer == nil)
+        #expect(reloaded[0].gpuTiler == nil)
+        #expect(reloaded[0].cpuTemperatureCelsius == nil)
+        #expect(reloaded[0].diskTemperatureCelsius == nil)
+        #expect(reloaded[0].fanRPMs.isEmpty)
     }
 
     @Test
-    func replaceRecordsTruncatesTheLog() {
+    func samplesAreReadOldestFirstRegardlessOfInsertOrder() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        for timestamp in [300.0, 60, 180, 120] {
+            database.appendRecord(record(at: timestamp), capacity: 10)
+        }
+
+        #expect(database.loadRecords().map(\.timestamp.timeIntervalSince1970) == [60, 120, 180, 300])
+    }
+
+    @Test
+    func capacityDropsTheOldestSamplesFromTheArchive() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+
+        for index in 0..<5 {
+            database.appendRecord(record(at: Double(index) * 60), capacity: 3)
+        }
+
+        #expect(database.loadRecords().map(\.timestamp.timeIntervalSince1970) == [120, 180, 240])
+    }
+
+    @Test
+    func recordingTheSameTimestampReplacesItsFanReadings() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        database.appendRecord(record(at: 60, fanRPMs: [1_000, 1_100]), capacity: 10)
+        database.appendRecord(record(at: 60, fanRPMs: [2_000]), capacity: 10)
+
+        let reloaded = database.loadRecords()
+
+        #expect(reloaded.count == 1)
+        #expect(reloaded[0].fanRPMs == [2_000])
+    }
+
+    @Test
+    func pruningRemovesTheFanRowsOfDroppedSamples() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        database.appendRecord(record(at: 60, fanRPMs: [1_000, 1_100]), capacity: 1)
+        database.appendRecord(record(at: 120, fanRPMs: [2_000, 2_100]), capacity: 1)
+
+        let reloaded = database.loadRecords()
+
+        #expect(reloaded.count == 1)
+        #expect(reloaded[0].timestamp.timeIntervalSince1970 == 120)
+        #expect(reloaded[0].fanRPMs == [2_000, 2_100])
+    }
+
+    @Test
+    func removingEverythingLeavesAnEmptyArchive() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        database.appendRecord(record(at: 60, fanRPMs: [900]), capacity: 10)
+
+        database.removeAll()
+
+        #expect(database.loadRecords().isEmpty)
+        // A later sample still records, so clearing is not a one-way door.
+        database.appendRecord(record(at: 120), capacity: 10)
+        #expect(database.loadRecords().map(\.timestamp.timeIntervalSince1970) == [120])
+    }
+
+    /// A truncated or foreign file used to be skipped line by line; the archive must recover the same
+    /// way rather than disabling recording for the rest of the process.
+    @Test
+    func aFileThatIsNotADatabaseIsReplacedInsteadOfDisablingRecording() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        try Data("this is not a sqlite database".utf8).write(to: url)
+
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        database.appendRecord(record(at: 60, fanRPMs: [1_500]), capacity: 10)
+
+        #expect(database.loadRecords().map(\.timestamp.timeIntervalSince1970) == [60])
+        // The replacement is a real archive, not an in-memory fallback.
+        #expect(
+            SystemMetricsHistoryDatabase(databaseURL: url).loadRecords().map(\.timestamp.timeIntervalSince1970)
+                == [60]
+        )
+    }
+
+    @Test
+    func theArchiveIsOnlyReadableByItsOwner() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        SystemMetricsHistoryDatabase(databaseURL: url).appendRecord(record(at: 60), capacity: 10)
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0
+        #expect(permissions & 0o777 == 0o600)
+    }
+
+    private func temporaryDatabaseURL() throws -> URL {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("zisla-history-replace-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let url = directory.appendingPathComponent("history.jsonl")
+            .appendingPathComponent("zisla-history-database-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent("history.sqlite")
+    }
 
-        let persistence = SystemMetricsFileHistoryPersistence(fileURL: url)
-        persistence.appendRecord(record(at: 10))
-        persistence.replaceRecords([record(at: 20)])
-
-        #expect(persistence.loadRecords().map(\.timestamp.timeIntervalSince1970) == [20])
-        persistence.replaceRecords([])
-        #expect(persistence.loadRecords().isEmpty)
+    private func removeDatabase(at url: URL) {
+        try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
     }
 }

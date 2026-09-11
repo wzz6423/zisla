@@ -3502,7 +3502,7 @@ public final class SystemMonitorService: ObservableObject {
             ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
             ?? fileManager.homeDirectoryForCurrentUser()
         self.historyStore = SystemMetricsHistoryStore(
-            persistence: historyPersistence ?? LazySystemMetricsFileHistoryPersistence(),
+            persistence: historyPersistence ?? LazySystemMetricsHistoryPersistence(),
             capacity: historyCapacity
         )
         self.historyRecorder = SystemMetricsHistoryRecorder(recordingInterval: historyRecordingInterval)

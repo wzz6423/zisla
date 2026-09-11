@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import ZislaCore
 
 // MARK: - Record
@@ -7,8 +8,8 @@ import ZislaCore
 ///
 /// Optional fields stay `nil` when the machine cannot report them (GPU counters, fan speeds,
 /// AppleSMC temperatures) so an exported sheet keeps the "unavailable" distinction instead of
-/// fabricating zeros. `Double?` also survives a JSON round trip, which is what the on-disk
-/// history relies on.
+/// fabricating zeros. `Double?` maps to a nullable column in the history database, which is what
+/// keeps that distinction across a restart.
 public struct SystemMetricsRecord: Codable, Equatable, Sendable {
     public var timestamp: Date
     public var cpuUsage: Double
@@ -166,95 +167,541 @@ public struct SystemMetricsHistoryStats: Equatable, Sendable {
 
 // MARK: - Persistence
 
-/// Storage seam for the history file, so tests never touch the real filesystem.
+/// Storage seam for the history archive, so tests never touch Application Support.
 public protocol SystemMetricsHistoryPersisting: Sendable {
+    /// Every stored sample, oldest first.
     func loadRecords() -> [SystemMetricsRecord]
-    func appendRecord(_ record: SystemMetricsRecord)
-    func replaceRecords(_ records: [SystemMetricsRecord])
+    /// Stores one sample and drops the oldest ones beyond `capacity`.
+    func appendRecord(_ record: SystemMetricsRecord, capacity: Int)
+    func removeAll()
 }
 
-/// Append-only JSON Lines file: each sample is one line, so recording stays a cheap append and the
-/// file is only rewritten when the ring buffer drops old samples.
-public final class SystemMetricsFileHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked Sendable {
-    private let fileURL: URL
-    private let fileManager: FileManager
+private struct SystemMetricsHistoryDatabaseError: LocalizedError {
+    let message: String
+    var isNotADatabase = false
 
-    public init(fileURL: URL, fileManager: FileManager = .default) {
-        self.fileURL = fileURL
+    var errorDescription: String? { message }
+}
+
+/// SQLite archive of the recorded samples.
+///
+/// One row per sample in `metrics`, keyed by its timestamp, with the per-fan readings in a child
+/// table so the schema does not bake in a fan count. Recording is a single-row `INSERT` and the ring
+/// buffer is enforced in SQL, so nothing rewrites the whole archive the way an append-only text log
+/// has to once it overflows.
+public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting, @unchecked Sendable {
+    private let databaseURL: URL
+    private let fileManager: FileManager
+    private let queue = DispatchQueue(
+        label: "com.zisla.system-metrics-history.database",
+        qos: .utility
+    )
+    private let queueKey = DispatchSpecificKey<UInt8>()
+    private var connection: OpaquePointer?
+    private var isUnavailable = false
+
+    public init(databaseURL: URL, fileManager: FileManager = .default) {
+        self.databaseURL = databaseURL
         self.fileManager = fileManager
+        queue.setSpecific(key: queueKey, value: 1)
+    }
+
+    deinit {
+        if DispatchQueue.getSpecific(key: queueKey) != nil {
+            closeConnection()
+        } else {
+            queue.sync { closeConnection() }
+        }
     }
 
     public func loadRecords() -> [SystemMetricsRecord] {
-        guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else { return [] }
-        let decoder = JSONDecoder()
-        return data
-            .split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true)
-            .compactMap { try? decoder.decode(SystemMetricsRecord.self, from: Data($0)) }
-    }
-
-    public func appendRecord(_ record: SystemMetricsRecord) {
-        guard let encoded = try? JSONEncoder().encode(record) else { return }
-        createParentDirectoryIfNeeded()
-        var line = encoded
-        line.append(UInt8(ascii: "\n"))
-        if let handle = try? FileHandle(forWritingTo: fileURL) {
-            defer { try? handle.close() }
-            _ = try? handle.seekToEnd()
-            try? handle.write(contentsOf: line)
-        } else {
-            try? line.write(to: fileURL, options: .atomic)
+        queue.sync {
+            guard let database = connectionOrNil() else { return [] }
+            return (try? readRecords(from: database)) ?? []
         }
     }
 
-    public func replaceRecords(_ records: [SystemMetricsRecord]) {
-        let encoder = JSONEncoder()
-        var payload = Data()
-        for record in records {
-            guard let encoded = try? encoder.encode(record) else { continue }
-            payload.append(encoded)
-            payload.append(UInt8(ascii: "\n"))
+    public func appendRecord(_ record: SystemMetricsRecord, capacity: Int) {
+        queue.sync {
+            guard let database = connectionOrNil() else { return }
+            // Recording is best effort: a full disk must never disturb the sampler.
+            try? write(record, capacity: max(1, capacity), to: database)
         }
-        createParentDirectoryIfNeeded()
-        try? payload.write(to: fileURL, options: .atomic)
     }
 
-    private func createParentDirectoryIfNeeded() {
-        let directory = fileURL.deletingLastPathComponent()
-        guard !fileManager.fileExists(atPath: directory.path) else { return }
-        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    public func removeAll() {
+        queue.sync {
+            guard let database = connectionOrNil() else { return }
+            try? execute("DELETE FROM metrics", on: database)
+            try? execute("DELETE FROM metric_fans", on: database)
+        }
+    }
+
+    // MARK: Connection
+
+    private func connectionOrNil() -> OpaquePointer? {
+        if let connection { return connection }
+        guard !isUnavailable else { return nil }
+        do {
+            connection = try openDatabase()
+            return connection
+        } catch let error as SystemMetricsHistoryDatabaseError where error.isNotADatabase {
+            // `sqlite3_open_v2` succeeds for a file that is not a database and only the first
+            // statement fails, so a truncated or foreign file would otherwise disable recording for
+            // the rest of the process. Drop it and start an empty archive instead.
+            discardDatabaseFiles()
+            if let recovered = try? openDatabase() {
+                connection = recovered
+                return recovered
+            }
+            isUnavailable = true
+            return nil
+        } catch {
+            isUnavailable = true
+            return nil
+        }
+    }
+
+    private func openDatabase() throws -> OpaquePointer {
+        try fileManager.createDirectory(
+            at: databaseURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        var opened: OpaquePointer?
+        let result = sqlite3_open_v2(
+            databaseURL.path,
+            &opened,
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX,
+            nil
+        )
+        guard result == SQLITE_OK, let opened else {
+            let message = sqliteMessage(opened, fallback: "system metrics history database could not be opened")
+            sqlite3_close(opened)
+            throw SystemMetricsHistoryDatabaseError(message: message)
+        }
+        do {
+            guard sqlite3_busy_timeout(opened, 1_000) == SQLITE_OK else {
+                throw SystemMetricsHistoryDatabaseError(
+                    message: sqliteMessage(opened, fallback: "system metrics history database could not be configured")
+                )
+            }
+            try verifyDatabaseFile(of: opened)
+            try execute("PRAGMA journal_mode = WAL", on: opened)
+            try execute("PRAGMA synchronous = NORMAL", on: opened)
+            try execute("PRAGMA foreign_keys = ON", on: opened)
+            try createSchema(on: opened)
+            try restrictFilePermissions()
+            return opened
+        } catch {
+            sqlite3_close(opened)
+            throw error
+        }
+    }
+
+    /// The cheapest statement that proves the file really is a database. Preparing it is not enough:
+    /// SQLite compiles a statement without touching the file, so the header is only validated on the
+    /// first `sqlite3_step`.
+    private func verifyDatabaseFile(of database: OpaquePointer) throws {
+        var statement: OpaquePointer?
+        let prepared = sqlite3_prepare_v2(database, "PRAGMA schema_version", -1, &statement, nil)
+        guard prepared == SQLITE_OK, let statement else {
+            sqlite3_finalize(statement)
+            throw SystemMetricsHistoryDatabaseError(
+                message: sqliteMessage(database, fallback: "system metrics history file is not a database")
+            )
+        }
+        defer { sqlite3_finalize(statement) }
+
+        let stepped = sqlite3_step(statement)
+        guard stepped == SQLITE_ROW || stepped == SQLITE_DONE else {
+            let code = sqlite3_errcode(database)
+            throw SystemMetricsHistoryDatabaseError(
+                message: sqliteMessage(database, fallback: "system metrics history file is not a database"),
+                isNotADatabase: code == SQLITE_NOTADB || code == SQLITE_CORRUPT
+            )
+        }
+    }
+
+    private func createSchema(on database: OpaquePointer) throws {
+        try execute(
+            """
+            CREATE TABLE IF NOT EXISTS metrics (
+                timestamp REAL PRIMARY KEY,
+                cpu_usage REAL NOT NULL,
+                cpu_user REAL NOT NULL,
+                cpu_system REAL NOT NULL,
+                cpu_idle REAL NOT NULL,
+                cpu_temperature REAL,
+                gpu_usage REAL,
+                gpu_renderer REAL,
+                gpu_tiler REAL,
+                gpu_temperature REAL,
+                memory_used_bytes INTEGER NOT NULL,
+                memory_total_bytes INTEGER NOT NULL,
+                memory_pressure_ratio REAL NOT NULL,
+                disk_used_bytes INTEGER NOT NULL,
+                disk_total_bytes INTEGER NOT NULL,
+                disk_read_bytes_per_second REAL,
+                disk_write_bytes_per_second REAL,
+                disk_temperature REAL,
+                network_receive_bytes_per_second REAL NOT NULL,
+                network_send_bytes_per_second REAL NOT NULL,
+                network_received_bytes INTEGER NOT NULL,
+                network_sent_bytes INTEGER NOT NULL
+            )
+            """,
+            on: database
+        )
+        // The fan rows cascade with their sample, so pruning never leaves readings behind.
+        try execute(
+            """
+            CREATE TABLE IF NOT EXISTS metric_fans (
+                timestamp REAL NOT NULL REFERENCES metrics(timestamp) ON DELETE CASCADE,
+                fan_index INTEGER NOT NULL,
+                rpm REAL NOT NULL,
+                PRIMARY KEY (timestamp, fan_index)
+            )
+            """,
+            on: database
+        )
+    }
+
+    private func discardDatabaseFiles() {
+        for path in databaseFilePaths() {
+            try? fileManager.removeItem(atPath: path)
+        }
+    }
+
+    private func restrictFilePermissions() throws {
+        for path in databaseFilePaths() where fileManager.fileExists(atPath: path) {
+            try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
+        }
+    }
+
+    private func databaseFilePaths() -> [String] {
+        [
+            databaseURL.path,
+            "\(databaseURL.path)-wal",
+            "\(databaseURL.path)-shm",
+        ]
+    }
+
+    // MARK: Reading
+
+    private func readRecords(from database: OpaquePointer) throws -> [SystemMetricsRecord] {
+        let fans = try readFans(from: database)
+        let statement = try prepare(
+            """
+            SELECT timestamp, cpu_usage, cpu_user, cpu_system, cpu_idle, cpu_temperature,
+                   gpu_usage, gpu_renderer, gpu_tiler, gpu_temperature,
+                   memory_used_bytes, memory_total_bytes, memory_pressure_ratio,
+                   disk_used_bytes, disk_total_bytes, disk_read_bytes_per_second,
+                   disk_write_bytes_per_second, disk_temperature,
+                   network_receive_bytes_per_second, network_send_bytes_per_second,
+                   network_received_bytes, network_sent_bytes
+            FROM metrics
+            ORDER BY timestamp ASC
+            """,
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+
+        var records: [SystemMetricsRecord] = []
+        rows: while true {
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                let timestamp = sqlite3_column_double(statement, 0)
+                records.append(
+                    SystemMetricsRecord(
+                        timestamp: Date(timeIntervalSince1970: timestamp),
+                        cpuUsage: sqlite3_column_double(statement, 1),
+                        cpuUser: sqlite3_column_double(statement, 2),
+                        cpuSystem: sqlite3_column_double(statement, 3),
+                        cpuIdle: sqlite3_column_double(statement, 4),
+                        cpuTemperatureCelsius: optionalDouble(statement, index: 5),
+                        gpuUsage: optionalDouble(statement, index: 6),
+                        gpuRenderer: optionalDouble(statement, index: 7),
+                        gpuTiler: optionalDouble(statement, index: 8),
+                        gpuTemperatureCelsius: optionalDouble(statement, index: 9),
+                        memoryUsedBytes: unsignedValue(statement, index: 10),
+                        memoryTotalBytes: unsignedValue(statement, index: 11),
+                        memoryPressureRatio: sqlite3_column_double(statement, 12),
+                        diskUsedBytes: unsignedValue(statement, index: 13),
+                        diskTotalBytes: unsignedValue(statement, index: 14),
+                        diskReadBytesPerSecond: optionalDouble(statement, index: 15),
+                        diskWriteBytesPerSecond: optionalDouble(statement, index: 16),
+                        diskTemperatureCelsius: optionalDouble(statement, index: 17),
+                        fanRPMs: fans[timestamp] ?? [],
+                        networkReceiveBytesPerSecond: sqlite3_column_double(statement, 18),
+                        networkSendBytesPerSecond: sqlite3_column_double(statement, 19),
+                        networkReceivedBytes: unsignedValue(statement, index: 20),
+                        networkSentBytes: unsignedValue(statement, index: 21)
+                    )
+                )
+            case SQLITE_DONE:
+                break rows
+            default:
+                throw SystemMetricsHistoryDatabaseError(
+                    message: sqliteMessage(database, fallback: "system metrics history could not be read")
+                )
+            }
+        }
+        return records
+    }
+
+    private func readFans(from database: OpaquePointer) throws -> [Double: [Double]] {
+        let statement = try prepare(
+            "SELECT timestamp, fan_index, rpm FROM metric_fans ORDER BY timestamp ASC, fan_index ASC",
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+
+        var fans: [Double: [Double]] = [:]
+        rows: while true {
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                let timestamp = sqlite3_column_double(statement, 0)
+                let index = Int(sqlite3_column_int64(statement, 1))
+                guard index >= 0 else { continue }
+                var readings = fans[timestamp] ?? []
+                if index == readings.count {
+                    readings.append(sqlite3_column_double(statement, 2))
+                } else if index < readings.count {
+                    readings[index] = sqlite3_column_double(statement, 2)
+                }
+                fans[timestamp] = readings
+            case SQLITE_DONE:
+                break rows
+            default:
+                throw SystemMetricsHistoryDatabaseError(
+                    message: sqliteMessage(database, fallback: "system metrics fan readings could not be read")
+                )
+            }
+        }
+        return fans
+    }
+
+    // MARK: Writing
+
+    private func write(_ record: SystemMetricsRecord, capacity: Int, to database: OpaquePointer) throws {
+        try execute("BEGIN IMMEDIATE TRANSACTION", on: database)
+        do {
+            try insert(record, into: database)
+            try prune(to: capacity, in: database)
+            try execute("COMMIT", on: database)
+        } catch {
+            try? execute("ROLLBACK", on: database)
+            throw error
+        }
+        try? restrictFilePermissions()
+    }
+
+    private func insert(_ record: SystemMetricsRecord, into database: OpaquePointer) throws {
+        let statement = try prepare(
+            """
+            INSERT OR REPLACE INTO metrics (
+                timestamp, cpu_usage, cpu_user, cpu_system, cpu_idle, cpu_temperature,
+                gpu_usage, gpu_renderer, gpu_tiler, gpu_temperature,
+                memory_used_bytes, memory_total_bytes, memory_pressure_ratio,
+                disk_used_bytes, disk_total_bytes, disk_read_bytes_per_second,
+                disk_write_bytes_per_second, disk_temperature,
+                network_receive_bytes_per_second, network_send_bytes_per_second,
+                network_received_bytes, network_sent_bytes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+
+        try bind(record.timestamp.timeIntervalSince1970, to: statement, index: 1, database: database)
+        try bind(record.cpuUsage, to: statement, index: 2, database: database)
+        try bind(record.cpuUser, to: statement, index: 3, database: database)
+        try bind(record.cpuSystem, to: statement, index: 4, database: database)
+        try bind(record.cpuIdle, to: statement, index: 5, database: database)
+        try bind(record.cpuTemperatureCelsius, to: statement, index: 6, database: database)
+        try bind(record.gpuUsage, to: statement, index: 7, database: database)
+        try bind(record.gpuRenderer, to: statement, index: 8, database: database)
+        try bind(record.gpuTiler, to: statement, index: 9, database: database)
+        try bind(record.gpuTemperatureCelsius, to: statement, index: 10, database: database)
+        try bind(record.memoryUsedBytes, to: statement, index: 11, database: database)
+        try bind(record.memoryTotalBytes, to: statement, index: 12, database: database)
+        try bind(record.memoryPressureRatio, to: statement, index: 13, database: database)
+        try bind(record.diskUsedBytes, to: statement, index: 14, database: database)
+        try bind(record.diskTotalBytes, to: statement, index: 15, database: database)
+        try bind(record.diskReadBytesPerSecond, to: statement, index: 16, database: database)
+        try bind(record.diskWriteBytesPerSecond, to: statement, index: 17, database: database)
+        try bind(record.diskTemperatureCelsius, to: statement, index: 18, database: database)
+        try bind(record.networkReceiveBytesPerSecond, to: statement, index: 19, database: database)
+        try bind(record.networkSendBytesPerSecond, to: statement, index: 20, database: database)
+        try bind(record.networkReceivedBytes, to: statement, index: 21, database: database)
+        try bind(record.networkSentBytes, to: statement, index: 22, database: database)
+        try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
+
+        try replaceFans(record, in: database)
+    }
+
+    private func replaceFans(_ record: SystemMetricsRecord, in database: OpaquePointer) throws {
+        let timestamp = record.timestamp.timeIntervalSince1970
+        let deletion = try prepare("DELETE FROM metric_fans WHERE timestamp = ?", on: database)
+        defer { sqlite3_finalize(deletion) }
+        try bind(timestamp, to: deletion, index: 1, database: database)
+        try check(sqlite3_step(deletion), expected: SQLITE_DONE, database: database)
+
+        guard !record.fanRPMs.isEmpty else { return }
+        let insertion = try prepare(
+            "INSERT INTO metric_fans (timestamp, fan_index, rpm) VALUES (?, ?, ?)",
+            on: database
+        )
+        defer { sqlite3_finalize(insertion) }
+        for (index, rpm) in record.fanRPMs.enumerated() {
+            sqlite3_reset(insertion)
+            sqlite3_clear_bindings(insertion)
+            try bind(timestamp, to: insertion, index: 1, database: database)
+            try check(sqlite3_bind_int64(insertion, 2, sqlite3_int64(index)), database: database)
+            try bind(rpm, to: insertion, index: 3, database: database)
+            try check(sqlite3_step(insertion), expected: SQLITE_DONE, database: database)
+        }
+    }
+
+    /// Keeps the newest `capacity` samples. A subquery that has no row (the archive is still smaller
+    /// than the ring buffer) yields NULL, and `timestamp < NULL` matches nothing.
+    private func prune(to capacity: Int, in database: OpaquePointer) throws {
+        let statement = try prepare(
+            """
+            DELETE FROM metrics
+            WHERE timestamp < (
+                SELECT timestamp FROM metrics ORDER BY timestamp DESC LIMIT 1 OFFSET ?
+            )
+            """,
+            on: database
+        )
+        defer { sqlite3_finalize(statement) }
+        try check(
+            sqlite3_bind_int64(statement, 1, sqlite3_int64(max(0, capacity - 1))),
+            database: database
+        )
+        try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
+    }
+
+    // MARK: SQLite plumbing
+
+    private func prepare(_ sql: String, on database: OpaquePointer) throws -> OpaquePointer {
+        var statement: OpaquePointer?
+        let result = sqlite3_prepare_v2(database, sql, -1, &statement, nil)
+        guard result == SQLITE_OK, let statement else {
+            sqlite3_finalize(statement)
+            throw SystemMetricsHistoryDatabaseError(
+                message: sqliteMessage(database, fallback: "system metrics history statement could not be prepared")
+            )
+        }
+        return statement
+    }
+
+    private func execute(_ sql: String, on database: OpaquePointer) throws {
+        var errorMessage: UnsafeMutablePointer<CChar>?
+        let result = sqlite3_exec(database, sql, nil, nil, &errorMessage)
+        defer { sqlite3_free(errorMessage) }
+        guard result == SQLITE_OK else {
+            let message = errorMessage.map { String(cString: $0) }
+                ?? sqliteMessage(database, fallback: "system metrics history database operation failed")
+            throw SystemMetricsHistoryDatabaseError(message: message)
+        }
+    }
+
+    private func bind(
+        _ value: Double,
+        to statement: OpaquePointer,
+        index: Int32,
+        database: OpaquePointer
+    ) throws {
+        try check(sqlite3_bind_double(statement, index, value), database: database)
+    }
+
+    private func bind(
+        _ value: Double?,
+        to statement: OpaquePointer,
+        index: Int32,
+        database: OpaquePointer
+    ) throws {
+        guard let value else {
+            try check(sqlite3_bind_null(statement, index), database: database)
+            return
+        }
+        try check(sqlite3_bind_double(statement, index, value), database: database)
+    }
+
+    private func bind(
+        _ value: UInt64,
+        to statement: OpaquePointer,
+        index: Int32,
+        database: OpaquePointer
+    ) throws {
+        try check(sqlite3_bind_int64(statement, index, sqlite3_int64(clamping: value)), database: database)
+    }
+
+    private func check(
+        _ result: Int32,
+        expected: Int32 = SQLITE_OK,
+        database: OpaquePointer
+    ) throws {
+        guard result == expected else {
+            throw SystemMetricsHistoryDatabaseError(
+                message: sqliteMessage(database, fallback: "system metrics history database operation failed")
+            )
+        }
+    }
+
+    private func optionalDouble(_ statement: OpaquePointer, index: Int32) -> Double? {
+        guard sqlite3_column_type(statement, index) != SQLITE_NULL else { return nil }
+        return sqlite3_column_double(statement, index)
+    }
+
+    private func unsignedValue(_ statement: OpaquePointer, index: Int32) -> UInt64 {
+        UInt64(clamping: sqlite3_column_int64(statement, index))
+    }
+
+    private func sqliteMessage(_ database: OpaquePointer?, fallback: String) -> String {
+        guard let database, let message = sqlite3_errmsg(database) else { return fallback }
+        return String(cString: message)
+    }
+
+    private func closeConnection() {
+        guard let connection else { return }
+        sqlite3_close_v2(connection)
+        self.connection = nil
     }
 }
 
 /// Resolves `AppPaths.systemMetricsHistory` on first use: constructing a `SystemMonitorService`
 /// must not read or write Application Support, which is also part of the package smoke contract.
-public final class LazySystemMetricsFileHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked Sendable {
-    private let makePersistence: @Sendable () -> SystemMetricsFileHistoryPersistence
+public final class LazySystemMetricsHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked Sendable {
+    private let makeDatabase: @Sendable () -> SystemMetricsHistoryDatabase
     private let lock = NSLock()
-    private var resolved: SystemMetricsFileHistoryPersistence?
+    private var resolved: SystemMetricsHistoryDatabase?
 
-    public init(makePersistence: @escaping @Sendable () -> SystemMetricsFileHistoryPersistence = {
-        SystemMetricsFileHistoryPersistence(fileURL: AppPaths.systemMetricsHistory)
+    public init(makeDatabase: @escaping @Sendable () -> SystemMetricsHistoryDatabase = {
+        SystemMetricsHistoryDatabase(databaseURL: AppPaths.systemMetricsHistory)
     }) {
-        self.makePersistence = makePersistence
+        self.makeDatabase = makeDatabase
     }
 
     public func loadRecords() -> [SystemMetricsRecord] {
-        persistence().loadRecords()
+        database().loadRecords()
     }
 
-    public func appendRecord(_ record: SystemMetricsRecord) {
-        persistence().appendRecord(record)
+    public func appendRecord(_ record: SystemMetricsRecord, capacity: Int) {
+        database().appendRecord(record, capacity: capacity)
     }
 
-    public func replaceRecords(_ records: [SystemMetricsRecord]) {
-        persistence().replaceRecords(records)
+    public func removeAll() {
+        database().removeAll()
     }
 
-    private func persistence() -> SystemMetricsFileHistoryPersistence {
+    private func database() -> SystemMetricsHistoryDatabase {
         lock.lock()
         defer { lock.unlock() }
         if let resolved { return resolved }
-        let created = makePersistence()
+        let created = makeDatabase()
         resolved = created
         return created
     }
@@ -262,9 +709,8 @@ public final class LazySystemMetricsFileHistoryPersistence: SystemMetricsHistory
 
 // MARK: - Store
 
-/// Ring buffer of samples with an append-only backing store: samples are appended one line at a
-/// time and the file is rewritten only when the buffer overflows, which keeps a long recording
-/// window affordable on SSD.
+/// Ring buffer of samples over the SQLite archive: recording writes a single row and the archive
+/// trims itself in SQL, which keeps a long recording window affordable on SSD.
 public final class SystemMetricsHistoryStore: @unchecked Sendable {
     public let capacity: Int
     private let persistence: any SystemMetricsHistoryPersisting
@@ -300,12 +746,11 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
         defer { lock.unlock() }
         loadIfNeededLocked()
         stored.append(record)
-        guard stored.count > capacity else {
-            persistence.appendRecord(record)
-            return
+        let overflow = stored.count - capacity
+        if overflow > 0 {
+            stored.removeFirst(overflow)
         }
-        stored.removeFirst(stored.count - capacity)
-        persistence.replaceRecords(stored)
+        persistence.appendRecord(record, capacity: capacity)
     }
 
     public func removeAll() {
@@ -313,7 +758,7 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
         defer { lock.unlock() }
         isLoaded = true
         stored = []
-        persistence.replaceRecords([])
+        persistence.removeAll()
     }
 
     private func loadIfNeededLocked() {

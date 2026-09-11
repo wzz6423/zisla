@@ -57,9 +57,9 @@ public enum AppPaths {
         applicationSupport.appendingPathComponent("favicons", isDirectory: true)
     }
 
-    /// Append-only JSON Lines log of the system monitor samples kept for the history charts.
+    /// SQLite archive of the system monitor samples kept for the history charts.
     public static var systemMetricsHistory: URL {
-        applicationSupport.appendingPathComponent("system-metrics-history.jsonl", isDirectory: false)
+        applicationSupport.appendingPathComponent("system-metrics-history.sqlite", isDirectory: false)
     }
 
     public static var downloads: URL {
