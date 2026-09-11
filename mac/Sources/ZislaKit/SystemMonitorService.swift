@@ -3437,8 +3437,16 @@ public final class SystemMonitorService: ObservableObject {
     @Published public private(set) var isSampling: Bool = false
     @Published public private(set) var publicIPAddress: String?
     @Published public private(set) var isRefreshingPublicIPAddress = false
+    /// Summary of the persisted samples shown in the history card.
+    @Published public private(set) var historyStats = SystemMetricsHistoryStats.empty
+    /// Whether new samples are appended to the persisted history.
+    @Published public private(set) var isRecordingHistory: Bool
 
     public let samplingInterval: TimeInterval
+    /// Minimum distance between two persisted samples; sampling itself keeps running faster for the live waveforms.
+    public var historyRecordingInterval: TimeInterval { historyRecorder.recordingInterval }
+    /// One minute apart for a week: dense enough to see a trend, small enough to stay a few megabytes.
+    public static let defaultHistoryCapacity = 7 * 24 * 60
 
     private static let publicIPRefreshInterval: TimeInterval = 10 * 60
     private let fileManager: any SystemMonitorFileManaging
@@ -3465,6 +3473,8 @@ public final class SystemMonitorService: ObservableObject {
     private var lastSlowMetricsSample: Date?
     private var cachedGPUMetrics: GPUMetrics?
     private var cachedSensorSample: AppleSMCSensorSample?
+    private let historyStore: SystemMetricsHistoryStore
+    private var historyRecorder: SystemMetricsHistoryRecorder
 
     public init(
         samplingInterval: TimeInterval = 1.5,
@@ -3474,7 +3484,11 @@ public final class SystemMonitorService: ObservableObject {
         publicIPProvider: (any PublicIPProviding)? = nil,
         hardwareInfoProvider: (@Sendable () -> SystemHardwareInfo)? = nil,
         postCleanupDiskRefreshDelay: Duration = .seconds(30),
-        diskCapacityRefreshInterval: TimeInterval = 20
+        diskCapacityRefreshInterval: TimeInterval = 20,
+        historyPersistence: (any SystemMetricsHistoryPersisting)? = nil,
+        historyCapacity: Int = SystemMonitorService.defaultHistoryCapacity,
+        historyRecordingInterval: TimeInterval = 60,
+        isRecordingHistory: Bool = false
     ) {
         let fileManager = fileManager ?? DefaultSystemMonitorFileManager()
         self.samplingInterval = max(0.2, samplingInterval)
@@ -3487,11 +3501,20 @@ public final class SystemMonitorService: ObservableObject {
         self.volumeURL = volumeURL
             ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
             ?? fileManager.homeDirectoryForCurrentUser()
+        self.historyStore = SystemMetricsHistoryStore(
+            persistence: historyPersistence ?? LazySystemMetricsHistoryPersistence(),
+            capacity: historyCapacity
+        )
+        self.historyRecorder = SystemMetricsHistoryRecorder(recordingInterval: historyRecordingInterval)
+        self.isRecordingHistory = isRecordingHistory
     }
 
     public func start() {
         guard timer == nil else { return }
         isSampling = true
+        if isRecordingHistory {
+            Task { await loadHistoryStats() }
+        }
         // Sample immediately, then continue at the configured interval.
         Task { await self.sampleOnce() }
         timer = Timer.publish(every: samplingInterval, tolerance: samplingInterval * 0.1, on: .main, in: .common)
@@ -3794,11 +3817,70 @@ public final class SystemMonitorService: ObservableObject {
         )
         snapshot = snap
         history.append(cpu: cpu, gpu: gpu, network: payload.network)
+        recordHistoryIfNeeded(snapshot: snap, now: now)
         Task { [weak self] in
             await Task.yield()
             await self?.refreshPublicIPAddressIfNeeded()
         }
         return snap
+    }
+
+    // MARK: - Persisted history
+
+    /// Appends the sample to the persisted history once the recording interval has elapsed; the
+    /// live waveforms keep sampling at `samplingInterval` regardless.
+    private func recordHistoryIfNeeded(snapshot: SystemMetricsSnapshot, now: Date) {
+        guard isRecordingHistory, historyRecorder.shouldRecord(at: now) else { return }
+        historyStore.append(SystemMetricsRecord(snapshot: snapshot))
+        historyRecorder.markRecorded(at: now)
+        historyStats = historyStore.stats
+    }
+
+    public func setHistoryRecordingEnabled(_ enabled: Bool) {
+        guard enabled != isRecordingHistory else { return }
+        isRecordingHistory = enabled
+        // Reset the gate so the next sample is recorded immediately after enabling.
+        historyRecorder.reset()
+        Task { await loadHistoryStats() }
+    }
+
+    /// Parses the history log off the main thread; the card and the history window only need the summary.
+    public func loadHistoryStats() async {
+        let store = historyStore
+        let stats = await Task.detached(priority: .utility) { store.stats }.value
+        historyStats = stats
+    }
+
+    public func historySections(
+        range: SystemMetricsHistoryRange = .default,
+        maximumPoints: Int = SystemMetricsHistorySeriesBuilder.maximumPoints
+    ) async -> [SystemMetricsChartSection] {
+        let store = historyStore
+        let now = dateProvider()
+        return await Task.detached(priority: .utility) {
+            SystemMetricsHistorySeriesBuilder.sections(
+                records: store.records,
+                range: range,
+                now: now,
+                maximumPoints: maximumPoints
+            )
+        }.value
+    }
+
+    public func exportHistoryWorkbook(now: Date = Date()) async -> Data {
+        let store = historyStore
+        return await Task.detached(priority: .utility) {
+            SystemMetricsHistoryExport.workbookData(
+                records: store.records,
+                modificationDate: now
+            )
+        }.value
+    }
+
+    public func clearHistory() {
+        historyStore.removeAll()
+        historyRecorder.reset()
+        historyStats = .empty
     }
 
     public func scanCleanupCandidates(

@@ -57,6 +57,11 @@ public enum AppPaths {
         applicationSupport.appendingPathComponent("favicons", isDirectory: true)
     }
 
+    /// SQLite archive of the system monitor samples kept for the history charts.
+    public static var systemMetricsHistory: URL {
+        applicationSupport.appendingPathComponent("system-metrics-history.sqlite", isDirectory: false)
+    }
+
     public static var downloads: URL {
         FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true)

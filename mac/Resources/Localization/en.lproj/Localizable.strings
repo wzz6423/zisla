@@ -2396,6 +2396,36 @@
 "画笔粗细" = "Brush thickness";
 "提示条进度光效" = "Progress Glow for Notice Bar";
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Show playback, download, and dismissal progress along collapsed notice bars";
+
+
+/* System Monitor - History */
+"导出" = "Export";
+"把全部历史读数导出为 xlsx 表格" = "Export the full history as an xlsx spreadsheet";
+"暂无历史记录" = "No history yet";
+"系统历史" = "System History";
+"清空历史记录？" = "Clear the history?";
+"删除本机保存的全部历史读数，无法恢复。" = "This deletes every reading stored on this Mac and cannot be undone.";
+"已清空历史记录" = "History cleared";
+"正在读取历史记录" = "Loading history";
+"在设置中开启「记录历史」后即可查看趋势" = "Turn on “Record history” in Settings to see trends here";
+"导出失败：%@" = "Export failed: %@";
+"24 小时" = "24 hours";
+"记录历史" = "Record history";
+"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络，可随时查看趋势并导出表格" = "Records CPU, GPU, memory, disk, fan and network once a minute; view trends and export a spreadsheet anytime";
+"CPU 利用率" = "CPU usage";
+"GPU 利用率" = "GPU usage";
+"内存使用率" = "Memory usage";
+"磁盘读写" = "Disk read / write";
+"风扇转速" = "Fan speed";
+"网络速率" = "Network rate";
+"读" = "Read";
+"写" = "Write";
+"上传" = "Upload";
+"风扇 %ld" = "Fan %ld";
+"Tiler" = "Tiler";
+
+"按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "View CPU, GPU, memory, disk, fan and network trends over a time range";
+"查看历史记录" = "View History";
 "合盖动画" = "Lid Close Animation";
 "合上兼容 MacBook 屏幕时显示景深过渡动画" = "Show a depth transition when closing the lid of a compatible MacBook";
 "预览动画" = "Preview Animation";

@@ -371,6 +371,23 @@ struct SettingsView: View {
                                 .controlSize(.small)
                         }
                     }
+                    rowDivider
+                    settingRow(
+                        symbol: "chart.xyaxis.line",
+                        title: "记录历史",
+                        detail: "按分钟记录 CPU、GPU、内存、硬盘、风扇与网络，可随时查看趋势并导出表格"
+                    ) {
+                        Toggle(
+                            "",
+                            isOn: Binding(
+                                get: { model.settingsStore.settings.systemMetricsHistoryEnabled },
+                                set: { model.settingsStore.settings.systemMetricsHistoryEnabled = $0 }
+                            )
+                        )
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                    }
                 }
             }
         }
