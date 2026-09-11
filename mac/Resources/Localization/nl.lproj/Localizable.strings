@@ -2397,3 +2397,36 @@
 "画笔粗细" = "Penseeldikte";
 "提示条进度光效" = "Voortgangsgloed van meldingsbalk";
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Toon de voortgang van afspelen, downloaden en automatisch sluiten langs de rand van de ingeklapte meldingsbalk";
+
+/* System Monitor - History */
+"历史记录" = "Geschiedenis";
+"查看历史图表" = "Grafieken bekijken";
+"导出" = "Exporteer";
+"把全部历史读数导出为 xlsx 表格" = "De volledige geschiedenis als xlsx-bestand exporteren";
+"暂无历史记录" = "Nog geen geschiedenis";
+"已记录 %ld 点 · %@" = "%ld punten · %@";
+"系统历史" = "Systeemgeschiedenis";
+"清空历史记录？" = "Geschiedenis wissen?";
+"删除本机保存的全部历史读数，无法恢复。" = "Verwijdert alle op deze Mac opgeslagen metingen; dit kan niet ongedaan worden gemaakt.";
+"已清空历史记录" = "Geschiedenis gewist";
+"正在读取历史记录" = "Geschiedenis laden";
+"在设置中开启「记录历史」后即可查看趋势" = "Zet ‘Geschiedenis vastleggen’ aan in Instellingen om trends te zien";
+"导出失败：%@" = "Exporteren mislukt: %@";
+"24 小时" = "24 uur";
+"记录历史" = "Geschiedenis vastleggen";
+"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络，可随时查看趋势并导出表格" = "Legt CPU, GPU, geheugen, schijf, ventilatoren en netwerk elke minuut vast; bekijk trends en exporteer wanneer je wilt";
+"CPU 利用率" = "CPU-gebruik";
+"GPU 利用率" = "GPU-gebruik";
+"内存使用率" = "Geheugengebruik";
+"磁盘读写" = "Schijf lezen / schrijven";
+"风扇转速" = "Ventilatorsnelheid";
+"网络速率" = "Netwerksnelheid";
+"读" = "Lezen";
+"写" = "Schrijven";
+"上传" = "Upload";
+"风扇 %ld" = "Ventilator %ld";
+"Tiler" = "Tiler";
+
+"按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "Bekijk trends van CPU, GPU, geheugen, schijf, ventilatoren en netwerk per periode";
+"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络" = "Legt CPU, GPU, geheugen, schijf, ventilatoren en netwerk elke minuut vast";
+"记录已暂停，可在设置中重新开启" = "Vastleggen is gepauzeerd; zet het weer aan in Instellingen";

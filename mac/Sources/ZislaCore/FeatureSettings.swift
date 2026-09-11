@@ -513,6 +513,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether to show the source platform logo and percentage in the collapsed Dynamic Island while the native downloader is active.
     public var videoDownloadIslandEnabled: Bool
     public var systemMonitorEnabled: Bool
+    /// When enabled, System Monitor appends one sample per minute to a local history that the history window charts and can export as a spreadsheet.
+    public var systemMetricsHistoryEnabled: Bool
     /// Whether zisla should play the selected macOS background sound locally.
     public var systemBackgroundSoundEnabled: Bool
     /// The macOS background sound selected for local playback.
@@ -648,6 +650,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         browserDownloadIslandEnabled: Bool = true,
         videoDownloadIslandEnabled: Bool = true,
         systemMonitorEnabled: Bool = true,
+        systemMetricsHistoryEnabled: Bool = true,
         systemBackgroundSoundEnabled: Bool = false,
         systemBackgroundSound: SystemBackgroundSound = .rain,
         systemBackgroundSoundStopsWhenUnused: Bool = true,
@@ -733,6 +736,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.browserDownloadIslandEnabled = browserDownloadIslandEnabled
         self.videoDownloadIslandEnabled = videoDownloadIslandEnabled
         self.systemMonitorEnabled = systemMonitorEnabled
+        self.systemMetricsHistoryEnabled = systemMetricsHistoryEnabled
         self.systemBackgroundSoundEnabled = systemBackgroundSoundEnabled
         self.systemBackgroundSound = systemBackgroundSound
         self.systemBackgroundSoundStopsWhenUnused = systemBackgroundSoundStopsWhenUnused
@@ -841,6 +845,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case browserDownloadIslandEnabled
         case videoDownloadIslandEnabled
         case systemMonitorEnabled
+        case systemMetricsHistoryEnabled
         case systemBackgroundSoundEnabled
         case systemBackgroundSound
         case systemBackgroundSoundStopsWhenUnused
@@ -943,6 +948,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             forKey: .videoDownloadIslandEnabled
         ) ?? defaults.videoDownloadIslandEnabled
         systemMonitorEnabled = try container.decodeIfPresent(Bool.self, forKey: .systemMonitorEnabled) ?? defaults.systemMonitorEnabled
+        systemMetricsHistoryEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .systemMetricsHistoryEnabled
+        ) ?? defaults.systemMetricsHistoryEnabled
         systemBackgroundSoundEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .systemBackgroundSoundEnabled

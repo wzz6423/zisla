@@ -2397,3 +2397,36 @@
 "画笔粗细" = "Fırça kalınlığı";
 "提示条进度光效" = "Bildirim çubuğu ilerleme parıltısı";
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Daraltılmış bildirim çubuğunun kenarında oynatma, indirme ve otomatik kapanma ilerlemesini göster";
+
+/* System Monitor - History */
+"历史记录" = "Geçmiş";
+"查看历史图表" = "Grafikleri görüntüle";
+"导出" = "Dışa Aktar";
+"把全部历史读数导出为 xlsx 表格" = "Tüm geçmişi xlsx tablosu olarak dışa aktar";
+"暂无历史记录" = "Henüz geçmiş yok";
+"已记录 %ld 点 · %@" = "%ld nokta · %@";
+"系统历史" = "Sistem Geçmişi";
+"清空历史记录？" = "Geçmiş temizlensin mi?";
+"删除本机保存的全部历史读数，无法恢复。" = "Bu Mac'te saklanan tüm ölçümleri siler ve geri alınamaz.";
+"已清空历史记录" = "Geçmiş temizlendi";
+"正在读取历史记录" = "Geçmiş yükleniyor";
+"在设置中开启「记录历史」后即可查看趋势" = "Eğilimleri görmek için Ayarlar'da “Geçmişi kaydet”i açın";
+"导出失败：%@" = "Dışa aktarma başarısız: %@";
+"24 小时" = "24 saat";
+"记录历史" = "Geçmişi kaydet";
+"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络，可随时查看趋势并导出表格" = "CPU, GPU, bellek, disk, fan ve ağı dakikada bir kaydeder; eğilimleri görün ve dilediğinizde tablo dışa aktarın";
+"CPU 利用率" = "CPU kullanımı";
+"GPU 利用率" = "GPU kullanımı";
+"内存使用率" = "Bellek kullanımı";
+"磁盘读写" = "Disk okuma / yazma";
+"风扇转速" = "Fan hızı";
+"网络速率" = "Ağ hızı";
+"读" = "Okuma";
+"写" = "Yazma";
+"上传" = "Yükleme";
+"风扇 %ld" = "Fan %ld";
+"Tiler" = "Tiler";
+
+"按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "CPU, GPU, bellek, disk, fan ve ağ eğilimlerini zaman aralığına göre görüntüle";
+"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络" = "CPU, GPU, bellek, disk, fan ve ağı dakikada bir kaydeder";
+"记录已暂停，可在设置中重新开启" = "Kayıt duraklatıldı; Ayarlar'dan yeniden açabilirsiniz";

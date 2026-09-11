@@ -2397,3 +2397,36 @@
 "画笔粗细" = "Grosor del pincel";
 "提示条进度光效" = "Brillo de progreso de la barra de avisos";
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Mostrar el progreso de reproducción, descarga y cierre automático en el borde de la barra de avisos contraída";
+
+/* System Monitor - History */
+"历史记录" = "Historial";
+"查看历史图表" = "Ver gráficos";
+"导出" = "Exportar";
+"把全部历史读数导出为 xlsx 表格" = "Exportar todo el historial a una hoja xlsx";
+"暂无历史记录" = "Aún no hay historial";
+"已记录 %ld 点 · %@" = "%ld puntos · %@";
+"系统历史" = "Historial del sistema";
+"清空历史记录？" = "¿Borrar el historial?";
+"删除本机保存的全部历史读数，无法恢复。" = "Elimina todas las lecturas guardadas en este Mac y no se puede deshacer.";
+"已清空历史记录" = "Historial borrado";
+"正在读取历史记录" = "Cargando historial";
+"在设置中开启「记录历史」后即可查看趋势" = "Activa «Registrar historial» en Ajustes para ver tendencias";
+"导出失败：%@" = "Error al exportar: %@";
+"24 小时" = "24 horas";
+"记录历史" = "Registrar historial";
+"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络，可随时查看趋势并导出表格" = "Registra CPU, GPU, memoria, disco, ventiladores y red cada minuto; consulta tendencias y exporta una hoja cuando quieras";
+"CPU 利用率" = "Uso de CPU";
+"GPU 利用率" = "Uso de GPU";
+"内存使用率" = "Uso de memoria";
+"磁盘读写" = "Lectura / escritura de disco";
+"风扇转速" = "Velocidad del ventilador";
+"网络速率" = "Velocidad de red";
+"读" = "Lectura";
+"写" = "Escritura";
+"上传" = "Subida";
+"风扇 %ld" = "Ventilador %ld";
+"Tiler" = "Tiler";
+
+"按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "Ver las tendencias de CPU, GPU, memoria, disco, ventiladores y red por periodo";
+"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络" = "Registra CPU, GPU, memoria, disco, ventiladores y red cada minuto";
+"记录已暂停，可在设置中重新开启" = "El registro está en pausa; reactívalo en Ajustes";

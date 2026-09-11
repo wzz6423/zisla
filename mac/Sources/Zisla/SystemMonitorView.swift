@@ -25,8 +25,11 @@ final class SystemCleanupPanelPresentationState: ObservableObject {
 struct SystemMonitorView: View {
     @ObservedObject var service: SystemMonitorService
     let onCleanupRequested: () -> Void
+    let onHistoryRequested: () -> Void
     @State private var releasedMemoryBytes: UInt64?
     @State private var systemColumnHeight: CGFloat = 0
+    @State private var isExportingHistory = false
+    @State private var historyStatus: String?
     @Environment(\.locale) private var locale
 
     var body: some View {
@@ -48,7 +51,10 @@ struct SystemMonitorView: View {
             guard systemColumnHeight != height else { return }
             systemColumnHeight = height
         }
-        .task { await service.sampleOnce() }
+        .task {
+            await service.sampleOnce()
+            await service.loadHistoryStats()
+        }
     }
 
     // MARK: - Columns
@@ -69,6 +75,7 @@ struct SystemMonitorView: View {
             diskCard
             fanCard
             networkCard
+            historyCard
         }
         .background {
             GeometryReader { proxy in
@@ -243,6 +250,65 @@ struct SystemMonitorView: View {
                     placeholder: service.isRefreshingPublicIPAddress ? "正在获取" : "暂不可用"
                 )
             }
+        }
+    }
+
+    private var historyCard: some View {
+        MonitorCard {
+            VStack(alignment: .leading, spacing: 7) {
+                CardHeader(symbol: "chart.xyaxis.line", title: AppLocalization.text("历史记录")) {
+                    Text(historySummary)
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Text(historyStatus ?? historyDetail)
+                    .font(.islandMicro())
+                    .foregroundStyle(.secondary)
+                    .fitsSingleLine()
+                HStack(spacing: 6) {
+                    Spacer(minLength: 0)
+                    miniActionButton(
+                        AppLocalization.text("查看历史图表"),
+                        help: AppLocalization.text("按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势")
+                    ) {
+                        onHistoryRequested()
+                    }
+                    miniActionButton(
+                        AppLocalization.text("导出"),
+                        help: AppLocalization.text("把全部历史读数导出为 xlsx 表格")
+                    ) {
+                        exportHistory()
+                    }
+                    .disabled(isExportingHistory || service.historyStats.count == 0)
+                }
+            }
+        }
+    }
+
+    private var historySummary: String {
+        let stats = service.historyStats
+        guard stats.count > 0 else { return AppLocalization.text("暂无历史记录") }
+        return AppLocalization.text(
+            "已记录 %ld 点 · %@",
+            stats.count,
+            SystemMetricsHistoryPresentation.spanText(stats.span)
+        )
+    }
+
+    private var historyDetail: String {
+        service.isRecordingHistory
+            ? AppLocalization.text("按分钟记录 CPU、GPU、内存、硬盘、风扇与网络")
+            : AppLocalization.text("记录已暂停，可在设置中重新开启")
+    }
+
+    private func exportHistory() {
+        guard let destination = SystemMetricsHistoryExporter.chooseDestination() else { return }
+        isExportingHistory = true
+        historyStatus = nil
+        Task { @MainActor in
+            historyStatus = await SystemMetricsHistoryExporter.write(service: service, to: destination)
+            isExportingHistory = false
         }
     }
 
@@ -791,11 +857,17 @@ private struct CapacityBar: View {
 
 // MARK: - Waveforms
 
-private enum WaveformPalette {
+/// Shared series colors for the live waveforms and the history charts, so one metric keeps the
+/// same color in both places.
+enum WaveformPalette {
     static let blue = Color(red: 0.31, green: 0.64, blue: 0.87)
     static let red = Color(red: 0.93, green: 0.31, blue: 0.37)
     static let teal = Color(red: 0.25, green: 0.78, blue: 0.78)
     static let idle = Color(red: 0.88, green: 0.88, blue: 0.88)
+    static let purple = Color(red: 0.62, green: 0.48, blue: 0.92)
+    static let amber = Color(red: 0.95, green: 0.71, blue: 0.30)
+
+    static var palette: [Color] { [blue, red, teal, purple, amber] }
 }
 
 private struct WaveSeries {

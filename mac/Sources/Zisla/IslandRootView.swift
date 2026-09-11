@@ -18,6 +18,7 @@ struct IslandRootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var dropState = IslandDropState()
     @StateObject private var cleanupPanelPresentation = SystemCleanupPanelPresentationState()
+    @StateObject private var historyPanelPresentation = SystemMetricsHistoryPanelPresentationState()
 
     init(
         model: AppModel,
@@ -219,7 +220,8 @@ struct IslandRootView: View {
                                         case .system:
                                             SystemMonitorView(
                                                 service: model.systemMonitor,
-                                                onCleanupRequested: cleanupPanelPresentation.present
+                                                onCleanupRequested: cleanupPanelPresentation.present,
+                                                onHistoryRequested: historyPanelPresentation.present
                                             )
                                         case .battery:
                                             BatteryDetailView(
@@ -343,6 +345,12 @@ struct IslandRootView: View {
         .background(
             SystemCleanupPanelPresenter(
                 presentationState: cleanupPanelPresentation,
+                service: model.systemMonitor
+            )
+        )
+        .background(
+            SystemMetricsHistoryPanelPresenter(
+                presentationState: historyPanelPresentation,
                 service: model.systemMonitor
             )
         )

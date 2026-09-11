@@ -2397,3 +2397,36 @@
 "画笔粗细" = "Độ dày bút vẽ";
 "提示条进度光效" = "Hiệu ứng phát sáng tiến trình thanh thông báo";
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Hiển thị tiến trình phát, tải xuống và tự động đóng ở mép thanh thông báo thu gọn";
+
+/* System Monitor - History */
+"历史记录" = "Lịch sử";
+"查看历史图表" = "Xem biểu đồ";
+"导出" = "Xuất";
+"把全部历史读数导出为 xlsx 表格" = "Xuất toàn bộ lịch sử ra bảng tính xlsx";
+"暂无历史记录" = "Chưa có lịch sử";
+"已记录 %ld 点 · %@" = "%ld điểm · %@";
+"系统历史" = "Lịch sử hệ thống";
+"清空历史记录？" = "Xóa lịch sử?";
+"删除本机保存的全部历史读数，无法恢复。" = "Xóa toàn bộ dữ liệu đã lưu trên Mac này và không thể khôi phục.";
+"已清空历史记录" = "Đã xóa lịch sử";
+"正在读取历史记录" = "Đang tải lịch sử";
+"在设置中开启「记录历史」后即可查看趋势" = "Bật “Ghi lịch sử” trong Cài đặt để xem xu hướng";
+"导出失败：%@" = "Xuất thất bại: %@";
+"24 小时" = "24 giờ";
+"记录历史" = "Ghi lịch sử";
+"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络，可随时查看趋势并导出表格" = "Ghi CPU, GPU, bộ nhớ, đĩa, quạt và mạng mỗi phút; xem xu hướng và xuất bảng bất cứ lúc nào";
+"CPU 利用率" = "Mức dùng CPU";
+"GPU 利用率" = "Mức dùng GPU";
+"内存使用率" = "Mức dùng bộ nhớ";
+"磁盘读写" = "Đọc / ghi đĩa";
+"风扇转速" = "Tốc độ quạt";
+"网络速率" = "Tốc độ mạng";
+"读" = "Đọc";
+"写" = "Ghi";
+"上传" = "Tải lên";
+"风扇 %ld" = "Quạt %ld";
+"Tiler" = "Tiler";
+
+"按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "Xem xu hướng CPU, GPU, bộ nhớ, đĩa, quạt và mạng theo khoảng thời gian";
+"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络" = "Ghi CPU, GPU, bộ nhớ, đĩa, quạt và mạng mỗi phút";
+"记录已暂停，可在设置中重新开启" = "Đã tạm dừng ghi; bật lại trong Cài đặt";
