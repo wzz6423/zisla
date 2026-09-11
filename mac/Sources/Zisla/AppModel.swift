@@ -2094,6 +2094,9 @@ final class AppModel: ObservableObject {
       weatherTask?.cancel()
       weatherSnapshotsByLocationID = [:]
     }
+    systemMonitor.setHistoryRecordingEnabled(
+      settings.systemMonitorEnabled && settings.systemMetricsHistoryEnabled
+    )
     if settings.systemMonitorEnabled {
       systemMonitor.start()
     } else {
