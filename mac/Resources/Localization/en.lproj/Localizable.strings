@@ -2396,3 +2396,7 @@
 "画笔粗细" = "Brush thickness";
 "提示条进度光效" = "Progress Glow for Notice Bar";
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Show playback, download, and dismissal progress along collapsed notice bars";
+"合盖动画" = "Lid Close Animation";
+"合上兼容 MacBook 屏幕时显示景深过渡动画" = "Show a depth transition when closing the lid of a compatible MacBook";
+"预览动画" = "Preview Animation";
+"不用合盖，在当前屏幕内容上播放一次" = "Play the effect once on the current screen contents without closing the lid";

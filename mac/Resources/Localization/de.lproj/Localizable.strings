@@ -2398,3 +2398,7 @@
 "画笔粗细" = "Pinselstärke";
 "提示条进度光效" = "Fortschrittsleuchten der Hinweisleiste";
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Wiedergabe-, Download- und Schließfortschritt am Rand der eingeklappten Hinweisleiste anzeigen";
+"合盖动画" = "Animation beim Schließen des Deckels";
+"合上兼容 MacBook 屏幕时显示景深过渡动画" = "Beim Schließen des Deckels eines kompatiblen MacBook einen Tiefenübergang anzeigen";
+"预览动画" = "Animation vorspielen";
+"不用合盖，在当前屏幕内容上播放一次" = "Spielt den Effekt einmal auf dem aktuellen Bildschirminhalt ab, ohne den Deckel zu schließen";

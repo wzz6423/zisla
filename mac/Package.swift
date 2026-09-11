@@ -96,6 +96,8 @@ let package = Package(
                 .linkedFramework("WebKit"),
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("ScreenCaptureKit"),
+                .linkedFramework("IOKit"),
+                .linkedFramework("QuartzCore"),
             ]
         ),
         .executableTarget(

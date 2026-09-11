@@ -633,6 +633,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var keyboardPlaysReleaseSound: Bool
     public var keyboardUsesPitchVariation: Bool
     public var keyboardTypingStatsEnabled: Bool
+    /// Whether closing a compatible MacBook lid plays the screen depth animation.
+    public var lidCloseAnimationEnabled: Bool
 
     public init(
         mediaEnabled: Bool = true,
@@ -718,7 +720,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         keyboardVolume: Double = 0.75,
         keyboardPlaysReleaseSound: Bool = true,
         keyboardUsesPitchVariation: Bool = true,
-        keyboardTypingStatsEnabled: Bool = true
+        keyboardTypingStatsEnabled: Bool = true,
+        lidCloseAnimationEnabled: Bool = true
     ) {
         self.mediaEnabled = mediaEnabled
         self.mediaSource = mediaSource
@@ -809,6 +812,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.keyboardPlaysReleaseSound = keyboardPlaysReleaseSound
         self.keyboardUsesPitchVariation = keyboardUsesPitchVariation
         self.keyboardTypingStatsEnabled = keyboardTypingStatsEnabled
+        self.lidCloseAnimationEnabled = lidCloseAnimationEnabled
     }
 
     /// Falls back to all current displays when all selected displays are disconnected, so activity notices remain visible.
@@ -912,6 +916,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case keyboardPlaysReleaseSound
         case keyboardUsesPitchVariation
         case keyboardTypingStatsEnabled
+        case lidCloseAnimationEnabled
     }
 
     private enum LegacyCodingKeys: String, CodingKey {
@@ -1144,6 +1149,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         keyboardPlaysReleaseSound = try container.decodeIfPresent(Bool.self, forKey: .keyboardPlaysReleaseSound) ?? defaults.keyboardPlaysReleaseSound
         keyboardUsesPitchVariation = try container.decodeIfPresent(Bool.self, forKey: .keyboardUsesPitchVariation) ?? defaults.keyboardUsesPitchVariation
         keyboardTypingStatsEnabled = try container.decodeIfPresent(Bool.self, forKey: .keyboardTypingStatsEnabled) ?? defaults.keyboardTypingStatsEnabled
+        lidCloseAnimationEnabled = try container.decodeIfPresent(Bool.self, forKey: .lidCloseAnimationEnabled) ?? defaults.lidCloseAnimationEnabled
     }
 }
 
