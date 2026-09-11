@@ -338,6 +338,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var noticePresenter: SideNoticePresenter?
     private var petController: IslandPetController?
     private var lidCloseController: LidCloseController?
+    /// Set once the screenshot session's frame has been captured with the lid
+    /// close overlay in it and the overlay has stepped off the screen; the
+    /// overlay returns when the session ends.
+    private var isLidOverlaySuspendedForScreenshotSession = false
     private var statusItem: NSStatusItem?
     private var monitorStatusItems: [SystemMonitorMenuBarMetric: NSStatusItem] = [:]
     private var monitorStatusItemStyles: [SystemMonitorMenuBarMetric: SystemMonitorMenuBarDisplayStyle] = [:]
@@ -1408,6 +1412,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     over: capture,
                     on: screen
                 ) ?? capture
+                // The frame keeps the fold; with it taken, the overlay steps
+                // off the screen so the selection panels can present at once
+                // instead of waiting underneath it for the effect to end. It
+                // returns when the session ends.
+                if !self.isLidOverlaySuspendedForScreenshotSession {
+                    self.lidCloseController?.setOverlayHiddenForScreenshotSession(true)
+                    self.isLidOverlaySuspendedForScreenshotSession = true
+                }
                 return modalWindowSnapshot?.composited(over: captureWithAssistant, on: screen)
                     ?? captureWithAssistant
             }
@@ -1497,6 +1509,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
               additionalScreenshotEditors.isEmpty
         else { return }
         setScreenshotSessionActive(false)
+        if isLidOverlaySuspendedForScreenshotSession {
+            isLidOverlaySuspendedForScreenshotSession = false
+            lidCloseController?.setOverlayHiddenForScreenshotSession(false)
+        }
     }
 
     private func registerScreenshotHotkeys() {

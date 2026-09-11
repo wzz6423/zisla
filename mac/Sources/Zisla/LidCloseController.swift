@@ -222,6 +222,17 @@ final class LidCloseController: NSObject {
         beginEffect()
     }
 
+    /// Whether the overlay is on screen right now.
+    var isOverlayVisible: Bool { overlay.isVisible }
+
+    /// Hides the overlay once the screenshot frame is in, so the selection
+    /// panels can present at once instead of waiting underneath it for the
+    /// effect to end. The effect keeps running and the overlay returns when
+    /// the screenshot session ends.
+    func setOverlayHiddenForScreenshotSession(_ hidden: Bool) {
+        overlay.setHiddenForScreenshotSession(hidden)
+    }
+
     private func beginEffect() {
         guard !isEffectActive else { return }
         isEffectActive = true

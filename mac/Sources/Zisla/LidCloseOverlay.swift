@@ -185,6 +185,19 @@ final class LidCloseOverlay {
         fadingWindow.orderOut(nil)
         fadingWindow.close()
     }
+
+    /// Takes the overlay off the screen while keeping the effect alive, so a
+    /// screenshot session can present over it. The session's frame is
+    /// captured before this, so it keeps the fold; the overlay returns when
+    /// the session ends. No-op without a window.
+    func setHiddenForScreenshotSession(_ hidden: Bool) {
+        guard let window else { return }
+        if hidden {
+            window.orderOut(nil)
+        } else {
+            window.orderFrontRegardless()
+        }
+    }
 }
 
 /// A view whose backing layer is the one the renderer draws into, so the
