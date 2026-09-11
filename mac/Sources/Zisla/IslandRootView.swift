@@ -397,14 +397,14 @@ struct IslandRootView: View {
         Button(action: historyPanelPresentation.present) {
             HStack(spacing: 5) {
                 Image(systemName: "chart.xyaxis.line")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                 Text(AppLocalization.text("查看历史记录"))
                     .font(.system(size: 10, weight: .semibold))
                     .lineLimit(1)
             }
             .foregroundStyle(.primary)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
             .background(Color.fillControl, in: Capsule())
         }
         .buttonStyle(PressableStyle())
