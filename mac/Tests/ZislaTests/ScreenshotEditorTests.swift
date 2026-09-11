@@ -1843,6 +1843,67 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func longCaptureIgnoresStationaryFramesWithLocalizedChanges() throws {
+        let frame = try #require(makeLongCapturePatternImage(width: 720, height: 720))
+        let frameCGImage = try #require(frame.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        guard let context = CGContext(
+            data: nil,
+            width: frameCGImage.width,
+            height: frameCGImage.height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            Issue.record("Could not create changed-frame context")
+            return
+        }
+        context.draw(frameCGImage, in: CGRect(x: 0, y: 0, width: 720, height: 720))
+        context.setFillColor(NSColor.black.cgColor)
+        context.fill(CGRect(x: 260, y: 260, width: 120, height: 120))
+        let changedCGImage = try #require(context.makeImage())
+        let changed = NSImage(cgImage: changedCGImage, size: frame.size)
+        let model = ScreenshotEditorModel(image: frame)
+
+        model.beginLongCapturePreview()
+        let didAppend = model.append(image: changed, direction: .vertical)
+
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        #expect(!didAppend)
+        #expect(combined.width == frameCGImage.width)
+        #expect(combined.height == frameCGImage.height)
+        #expect(rgbaPixels(in: combined) == rgbaPixels(in: frameCGImage))
+        #expect(!model.canUndo)
+    }
+
+    @Test
+    func longCapturePreservesEveryPixelAtProductionScale() throws {
+        let source = try #require(makeLongCapturePatternImage(width: 192, height: 1_339))
+        let sourceCGImage = try #require(source.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let firstCGImage = try #require(sourceCGImage.cropping(
+            to: CGRect(x: 0, y: 0, width: 192, height: 1_001)
+        ))
+        let secondCGImage = try #require(sourceCGImage.cropping(
+            to: CGRect(x: 0, y: 338, width: 192, height: 1_001)
+        ))
+        let model = ScreenshotEditorModel(
+            image: NSImage(cgImage: firstCGImage, size: CGSize(width: 192, height: 1_001))
+        )
+
+        model.beginLongCapturePreview()
+        let didAppend = model.append(
+            image: NSImage(cgImage: secondCGImage, size: CGSize(width: 192, height: 1_001)),
+            direction: .vertical
+        )
+
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        #expect(didAppend)
+        #expect(combined.width == sourceCGImage.width)
+        #expect(combined.height == sourceCGImage.height)
+        #expect(rgbaPixels(in: combined) == rgbaPixels(in: sourceCGImage))
+    }
+
+    @Test
     func completingLongCaptureKeepsTheCombinedImageVisible() throws {
         let source = try #require(makeGradientImage(width: 64, height: 96))
         let sourceCGImage = try #require(source.cgImage(forProposedRect: nil, context: nil, hints: nil))
@@ -1859,6 +1920,57 @@ struct ScreenshotEditorTests {
         #expect(!model.isLongCapturePreviewing)
         #expect(model.hasLongCaptureResult)
         #expect(model.image.size.height > first.size.height)
+    }
+
+    @Test
+    func startingNewLongCaptureAllowsAnotherDirection() throws {
+        let firstSource = try #require(makeGradientImage(width: 64, height: 96))
+        let firstSourceCGImage = try #require(
+            firstSource.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        let appendFirstCGImage = try #require(firstSourceCGImage.cropping(
+            to: CGRect(x: 0, y: 0, width: 64, height: 64)
+        ))
+        let appendSecondCGImage = try #require(firstSourceCGImage.cropping(
+            to: CGRect(x: 0, y: 32, width: 64, height: 64)
+        ))
+        let secondSource = try #require(makeGradientImage(width: 64, height: 96))
+        let secondSourceCGImage = try #require(
+            secondSource.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        let prependFirstCGImage = try #require(secondSourceCGImage.cropping(
+            to: CGRect(x: 0, y: 32, width: 64, height: 64)
+        ))
+        let prependSecondCGImage = try #require(secondSourceCGImage.cropping(
+            to: CGRect(x: 0, y: 0, width: 64, height: 64)
+        ))
+        let model = ScreenshotEditorModel(
+            image: NSImage(cgImage: appendFirstCGImage, size: CGSize(width: 64, height: 64))
+        )
+
+        model.beginLongCapturePreview()
+        #expect(model.append(
+            image: NSImage(cgImage: appendSecondCGImage, size: CGSize(width: 64, height: 64)),
+            direction: .vertical
+        ))
+        model.completeLongCapturePreview()
+
+        model.image = NSImage(cgImage: prependFirstCGImage, size: CGSize(width: 64, height: 64))
+        model.beginLongCapturePreview()
+        let didPrepend = model.append(
+            image: NSImage(cgImage: prependSecondCGImage, size: CGSize(width: 64, height: 64)),
+            direction: .vertical
+        )
+
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let combinedPixels = try #require(rgbaPixels(in: combined))
+        let expected = try #require(secondSourceCGImage.cropping(
+            to: CGRect(x: 0, y: 0, width: 64, height: 96)
+        ))
+        let expectedPixels = try #require(rgbaPixels(in: expected))
+        #expect(didPrepend)
+        #expect(combined.height == expected.height)
+        #expect(combinedPixels == expectedPixels)
     }
 
     @Test
@@ -3528,6 +3640,33 @@ struct ScreenshotEditorTests {
         }
         context.strokePath()
         return context.makeImage()
+    }
+
+    private func makeLongCapturePatternImage(width: Int, height: Int) -> NSImage? {
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+        for y in 0..<height {
+            for x in 0..<width {
+                let offset = y * bytesPerRow + x * bytesPerPixel
+                pixels[offset] = UInt8((x * 3 + y) % 251)
+                pixels[offset + 1] = UInt8((x + y * 2) % 253)
+                pixels[offset + 2] = UInt8((x * 2 + y * 3) % 255)
+                pixels[offset + 3] = 255
+            }
+        }
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ), let cgImage = context.makeImage() else {
+            return nil
+        }
+        return NSImage(cgImage: cgImage, size: CGSize(width: width, height: height))
     }
 
     private func makeGradientImage(width: Int, height: Int) -> NSImage? {
