@@ -809,6 +809,8 @@ struct SettingsView: View {
                     featureToggle("电池监控", detail: "显示电池详细信息与健康状态", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
                     rowDivider
                     featureToggle("键盘音效", detail: "全局播放键盘音效并记录输入统计", symbol: "keyboard.badge.ellipsis", keyPath: \.keyboardEnabled)
+                    rowDivider
+                    featureToggle("合盖动画", detail: "合上兼容 MacBook 屏幕时显示景深过渡动画", symbol: "laptopcomputer.and.iphone", keyPath: \.lidCloseAnimationEnabled)
                 }
 
                 settingsGroup("工具") {

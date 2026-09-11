@@ -337,6 +337,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var lockScreenOverlayController: LockScreenOverlayController?
     private var noticePresenter: SideNoticePresenter?
     private var petController: IslandPetController?
+    private var lidCloseController: LidCloseController?
     private var statusItem: NSStatusItem?
     private var monitorStatusItems: [SystemMonitorMenuBarMetric: NSStatusItem] = [:]
     private var monitorStatusItemStyles: [SystemMonitorMenuBarMetric: SystemMonitorMenuBarDisplayStyle] = [:]
@@ -382,6 +383,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         configureApplicationIconUpdates(model: model)
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
         self.lockScreenOverlayController = lockScreenOverlayController
+        let lidCloseController = LidCloseController(settingsStore: model.settingsStore)
+        self.lidCloseController = lidCloseController
+        lidCloseController.start()
 
         let petController = IslandPetController(model: model)
         self.petController = petController
@@ -527,6 +531,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             coordinator?.setScreenLocked(locked)
             self?.noticePresenter?.setScreenLocked(locked)
             model.clipboardAssistant.setScreenLocked(locked)
+            if locked {
+                self?.lidCloseController?.stop()
+            } else {
+                self?.lidCloseController?.start()
+            }
         }
         lockScreenOverlayController.start()
         model.onVoiceInputWillStart = { [weak coordinator] in
@@ -824,6 +833,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         expandedSizeUpdateTask?.cancel()
         lockScreenOverlayController?.stop()
+        lidCloseController?.stop()
         systemScreenshotMonitor?.stop()
         systemScreenshotMonitor = nil
         AppModel.shared.stop()

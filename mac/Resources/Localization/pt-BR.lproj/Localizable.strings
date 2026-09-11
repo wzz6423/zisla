@@ -2397,3 +2397,5 @@
 "画笔粗细" = "Espessura do pincel";
 "提示条进度光效" = "Brilho de progresso da barra de aviso";
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Mostrar o progresso de reprodução, download e fechamento automático na borda da barra recolhida";
+"合盖动画" = "Animação ao fechar a tampa";
+"合上兼容 MacBook 屏幕时显示景深过渡动画" = "Mostrar uma transição de profundidade ao fechar a tampa de um MacBook compatível";
