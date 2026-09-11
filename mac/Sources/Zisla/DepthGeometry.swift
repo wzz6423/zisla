@@ -52,16 +52,20 @@ struct DepthGeometry {
 
 /// The settings that shape one frame.
 ///
-/// The geometry pair is Mac Duo's hand-tuned `DepthTuning` default, not its
-/// `Preferences.factory` pair (6 and 1): with those the far edge leaves the
-/// screen almost immediately, so the picture reads as sliding up and away
-/// instead of folding back into the glass. zisla exposes no depth controls, so
-/// whatever is here is the look.
+/// The tuning is Mac Duo's hand-tuned `DepthTuning` default as one coherent
+/// set, not its `Preferences.factory` values: with the factory geometry
+/// (6 and 1) the far edge leaves the screen almost immediately, and with the
+/// factory dim (maxDim 1, blur 135) the upper half of the sheet is crushed to
+/// the same black as the picture's padding, so on a screen whose bright
+/// content sits off-centre the fold reads as leaning to that side - only the
+/// bright part stays visible. The defaults keep the whole sheet visible while
+/// it folds, which is what reads as glass turning away. zisla exposes no
+/// depth controls, so whatever is here is the look.
 struct DepthTuning {
     var viewingDistance: Double = 2.7
     var recession: Double = 2
-    var blurEvenness: Double = 0
-    var dimReach: Double = 0.5
-    var maxBlurRadius: Double = 135
-    var maxDim: Double = 1
+    var blurEvenness: Double = 0.4
+    var dimReach: Double = 0.7
+    var maxBlurRadius: Double = 55
+    var maxDim: Double = 0.4
 }
