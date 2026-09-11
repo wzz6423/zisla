@@ -15,3 +15,11 @@ https://github.com/ggbond268/MacTools
 
 Copyright 2026 MacTools contributors. Licensed under the Apache License 2.0.
 See `MacTools-LICENSE.txt` in this directory.
+
+The lid angle reader and the lid-close depth effect are adapted from Mac Duo at
+commit `88cb939b6f286487887b32e7c8f529604d340c6c`:
+
+https://github.com/sumimakito/Mac-Duo
+
+Copyright 2026 Makito. Licensed under the Apache License 2.0. See
+`MacDuo-LICENSE.txt` in this directory.

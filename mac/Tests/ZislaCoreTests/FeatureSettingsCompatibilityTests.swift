@@ -90,6 +90,23 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
+    func lidCloseAnimationDefaultsEnabledForNewAndLegacySettingsAndRoundTrips() throws {
+        #expect(FeatureSettings.default.lidCloseAnimationEnabled)
+
+        let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
+        let legacySettings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(legacySettings.lidCloseAnimationEnabled)
+
+        var settings = FeatureSettings.default
+        settings.lidCloseAnimationEnabled = false
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(!decoded.lidCloseAnimationEnabled)
+    }
+
+    @Test
     func aiProgressDefaultsEnabledForNewAndLegacySettings() throws {
         #expect(FeatureSettings.default.aiProgressEnabled)
 

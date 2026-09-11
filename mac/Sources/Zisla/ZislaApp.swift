@@ -337,6 +337,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var lockScreenOverlayController: LockScreenOverlayController?
     private var noticePresenter: SideNoticePresenter?
     private var petController: IslandPetController?
+    private var lidCloseController: LidCloseController?
+    /// Set once the screenshot session's frame has been captured with the lid
+    /// close overlay in it and the overlay has stepped off the screen; the
+    /// overlay returns when the session ends.
+    private var isLidOverlaySuspendedForScreenshotSession = false
     private var statusItem: NSStatusItem?
     private var monitorStatusItems: [SystemMonitorMenuBarMetric: NSStatusItem] = [:]
     private var monitorStatusItemStyles: [SystemMonitorMenuBarMetric: SystemMonitorMenuBarDisplayStyle] = [:]
@@ -382,6 +387,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         configureApplicationIconUpdates(model: model)
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
         self.lockScreenOverlayController = lockScreenOverlayController
+        let lidCloseController = LidCloseController(settingsStore: model.settingsStore)
+        self.lidCloseController = lidCloseController
+        lidCloseController.start()
 
         let petController = IslandPetController(model: model)
         self.petController = petController
@@ -527,6 +535,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             coordinator?.setScreenLocked(locked)
             self?.noticePresenter?.setScreenLocked(locked)
             model.clipboardAssistant.setScreenLocked(locked)
+            if locked {
+                self?.lidCloseController?.stop()
+            } else {
+                self?.lidCloseController?.start()
+            }
         }
         lockScreenOverlayController.start()
         model.onVoiceInputWillStart = { [weak coordinator] in
@@ -824,6 +837,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         expandedSizeUpdateTask?.cancel()
         lockScreenOverlayController?.stop()
+        lidCloseController?.stop()
         systemScreenshotMonitor?.stop()
         systemScreenshotMonitor = nil
         AppModel.shared.stop()
@@ -1398,6 +1412,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     over: capture,
                     on: screen
                 ) ?? capture
+                // The frame keeps the fold; with it taken, the overlay steps
+                // off the screen so the selection panels can present at once
+                // instead of waiting underneath it for the effect to end. It
+                // returns when the session ends.
+                if !self.isLidOverlaySuspendedForScreenshotSession {
+                    self.lidCloseController?.setOverlayHiddenForScreenshotSession(true)
+                    self.isLidOverlaySuspendedForScreenshotSession = true
+                }
                 return modalWindowSnapshot?.composited(over: captureWithAssistant, on: screen)
                     ?? captureWithAssistant
             }
@@ -1487,6 +1509,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
               additionalScreenshotEditors.isEmpty
         else { return }
         setScreenshotSessionActive(false)
+        if isLidOverlaySuspendedForScreenshotSession {
+            isLidOverlaySuspendedForScreenshotSession = false
+            lidCloseController?.setOverlayHiddenForScreenshotSession(false)
+        }
     }
 
     private func registerScreenshotHotkeys() {

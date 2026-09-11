@@ -136,6 +136,7 @@ struct SettingsNavigationTests {
         #expect(!content.contains("keyboardTypingStatsContent"))
         #expect(!content.contains("refreshTypingStats()"))
         #expect(source.contains("featureToggle(\"键盘音效\", detail: \"全局播放键盘音效并记录输入统计\""))
+        #expect(source.contains("featureToggle(\"合盖动画\", detail: \"合上兼容 MacBook 屏幕时显示景深过渡动画\""))
     }
 
     @Test
