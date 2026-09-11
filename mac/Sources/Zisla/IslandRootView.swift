@@ -18,6 +18,7 @@ struct IslandRootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var dropState = IslandDropState()
     @StateObject private var cleanupPanelPresentation = SystemCleanupPanelPresentationState()
+    @StateObject private var historyPanelPresentation = SystemMetricsHistoryPanelPresentationState()
 
     init(
         model: AppModel,
@@ -346,6 +347,12 @@ struct IslandRootView: View {
                 service: model.systemMonitor
             )
         )
+        .background(
+            SystemMetricsHistoryPanelPresenter(
+                presentationState: historyPanelPresentation,
+                service: model.systemMonitor
+            )
+        )
         .clipped()
         .ignoresSafeArea(edges: .top)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: showsTransferHints)
@@ -355,6 +362,9 @@ struct IslandRootView: View {
         HStack(spacing: 8) {
             ModuleSelector(model: model)
             Spacer(minLength: 8)
+            if activeModule == .system {
+                historyButton
+            }
             if settingsStore.settings.systemMonitorEnabled {
                 NavMonitorStrip(monitor: model.systemMonitor) {
                     model.selectModule(.system)
@@ -379,6 +389,27 @@ struct IslandRootView: View {
             }
         }
         .frame(height: 30)
+    }
+
+    /// Opens the metrics history window while the system page is active, sitting just left of the
+    /// thumbnail monitor strip in the shared top rail. The label shrinks with the shared single-line
+    /// fit rather than ellipsizing when the rail runs tight, so glyph and full copy coexist.
+    private var historyButton: some View {
+        Button(action: historyPanelPresentation.present) {
+            HStack(spacing: 5) {
+                Image(systemName: "chart.xyaxis.line")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(AppLocalization.text("查看历史记录"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .fitsSingleLine(0.7)
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .background(Color.fillControl, in: Capsule())
+        }
+        .buttonStyle(PressableStyle())
+        .help(AppLocalization.text("按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势"))
     }
 
     private var isIslandCollapsed: Bool {

@@ -77,7 +77,6 @@ struct SystemCleanupPanelTests {
         systemModule = nil
 
         #expect(state.isPresented)
-
         state.dismiss()
         #expect(!state.isPresented)
     }

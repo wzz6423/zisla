@@ -48,7 +48,10 @@ struct SystemMonitorView: View {
             guard systemColumnHeight != height else { return }
             systemColumnHeight = height
         }
-        .task { await service.sampleOnce() }
+        .task {
+            await service.sampleOnce()
+            await service.loadHistoryStats()
+        }
     }
 
     // MARK: - Columns
@@ -791,11 +794,17 @@ private struct CapacityBar: View {
 
 // MARK: - Waveforms
 
-private enum WaveformPalette {
+/// Shared series colors for the live waveforms and the history charts, so one metric keeps the
+/// same color in both places.
+enum WaveformPalette {
     static let blue = Color(red: 0.31, green: 0.64, blue: 0.87)
     static let red = Color(red: 0.93, green: 0.31, blue: 0.37)
     static let teal = Color(red: 0.25, green: 0.78, blue: 0.78)
     static let idle = Color(red: 0.88, green: 0.88, blue: 0.88)
+    static let purple = Color(red: 0.62, green: 0.48, blue: 0.92)
+    static let amber = Color(red: 0.95, green: 0.71, blue: 0.30)
+
+    static var palette: [Color] { [blue, red, teal, purple, amber] }
 }
 
 private struct WaveSeries {
