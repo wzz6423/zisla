@@ -2398,6 +2398,7 @@
 "提示条进度光效" = "Hiệu ứng phát sáng tiến trình thanh thông báo";
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Hiển thị tiến trình phát, tải xuống và tự động đóng ở mép thanh thông báo thu gọn";
 
+
 /* System Monitor - History */
 "导出" = "Xuất";
 "把全部历史读数导出为 xlsx 表格" = "Xuất toàn bộ lịch sử ra bảng tính xlsx";
@@ -2426,3 +2427,7 @@
 
 "按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "Xem xu hướng CPU, GPU, bộ nhớ, đĩa, quạt và mạng theo khoảng thời gian";
 "查看历史记录" = "Xem lịch sử";
+"合盖动画" = "Hiệu ứng đóng nắp";
+"合上兼容 MacBook 屏幕时显示景深过渡动画" = "Hiển thị hiệu ứng chuyển độ sâu khi đóng nắp MacBook tương thích";
+"预览动画" = "Xem trước hoạt ảnh";
+"不用合盖，在当前屏幕内容上播放一次" = "Chạy hiệu ứng một lần trên nội dung màn hình hiện tại mà không cần đóng nắp";

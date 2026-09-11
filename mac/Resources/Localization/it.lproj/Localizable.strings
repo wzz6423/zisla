@@ -2398,6 +2398,7 @@
 "提示条进度光效" = "Bagliore di avanzamento della barra di avviso";
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Mostra l'avanzamento della riproduzione, del download e della chiusura automatica sul bordo della barra compressa";
 
+
 /* System Monitor - History */
 "导出" = "Esporta";
 "把全部历史读数导出为 xlsx 表格" = "Esporta tutta la cronologia in un foglio xlsx";
@@ -2426,3 +2427,7 @@
 
 "按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "Mostra gli andamenti di CPU, GPU, memoria, disco, ventole e rete per periodo";
 "查看历史记录" = "Visualizza cronologia";
+"合盖动画" = "Animazione alla chiusura del coperchio";
+"合上兼容 MacBook 屏幕时显示景深过渡动画" = "Mostra una transizione di profondità quando si chiude il coperchio di un MacBook compatibile";
+"预览动画" = "Anteprima animazione";
+"不用合盖，在当前屏幕内容上播放一次" = "Riproduce l’effetto una volta sul contenuto attuale dello schermo, senza chiudere il coperchio";
