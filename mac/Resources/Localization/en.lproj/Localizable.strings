@@ -2401,7 +2401,6 @@
 "导出" = "Export";
 "把全部历史读数导出为 xlsx 表格" = "Export the full history as an xlsx spreadsheet";
 "暂无历史记录" = "No history yet";
-"已记录 %ld 点 · %@" = "%ld points · %@";
 "系统历史" = "System History";
 "清空历史记录？" = "Clear the history?";
 "删除本机保存的全部历史读数，无法恢复。" = "This deletes every reading stored on this Mac and cannot be undone.";

@@ -234,11 +234,7 @@ struct SystemMetricsHistoryContent: View {
     private var historySummary: String {
         let stats = service.historyStats
         guard stats.count > 0 else { return AppLocalization.text("暂无历史记录") }
-        return AppLocalization.text(
-            "已记录 %ld 点 · %@",
-            stats.count,
-            SystemMetricsHistoryPresentation.spanText(stats.span)
-        )
+        return SystemMetricsHistoryPresentation.spanText(stats.span)
     }
 
     // MARK: - Charts
