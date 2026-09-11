@@ -1923,6 +1923,57 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func startingNewLongCaptureAllowsAnotherDirection() throws {
+        let firstSource = try #require(makeGradientImage(width: 64, height: 96))
+        let firstSourceCGImage = try #require(
+            firstSource.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        let appendFirstCGImage = try #require(firstSourceCGImage.cropping(
+            to: CGRect(x: 0, y: 0, width: 64, height: 64)
+        ))
+        let appendSecondCGImage = try #require(firstSourceCGImage.cropping(
+            to: CGRect(x: 0, y: 32, width: 64, height: 64)
+        ))
+        let secondSource = try #require(makeGradientImage(width: 64, height: 96))
+        let secondSourceCGImage = try #require(
+            secondSource.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        let prependFirstCGImage = try #require(secondSourceCGImage.cropping(
+            to: CGRect(x: 0, y: 32, width: 64, height: 64)
+        ))
+        let prependSecondCGImage = try #require(secondSourceCGImage.cropping(
+            to: CGRect(x: 0, y: 0, width: 64, height: 64)
+        ))
+        let model = ScreenshotEditorModel(
+            image: NSImage(cgImage: appendFirstCGImage, size: CGSize(width: 64, height: 64))
+        )
+
+        model.beginLongCapturePreview()
+        #expect(model.append(
+            image: NSImage(cgImage: appendSecondCGImage, size: CGSize(width: 64, height: 64)),
+            direction: .vertical
+        ))
+        model.completeLongCapturePreview()
+
+        model.image = NSImage(cgImage: prependFirstCGImage, size: CGSize(width: 64, height: 64))
+        model.beginLongCapturePreview()
+        let didPrepend = model.append(
+            image: NSImage(cgImage: prependSecondCGImage, size: CGSize(width: 64, height: 64)),
+            direction: .vertical
+        )
+
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let combinedPixels = try #require(rgbaPixels(in: combined))
+        let expected = try #require(secondSourceCGImage.cropping(
+            to: CGRect(x: 0, y: 0, width: 64, height: 96)
+        ))
+        let expectedPixels = try #require(rgbaPixels(in: expected))
+        #expect(didPrepend)
+        #expect(combined.height == expected.height)
+        #expect(combinedPixels == expectedPixels)
+    }
+
+    @Test
     func longCaptureRejectsFramesWithoutReliableOverlap() throws {
         let first = try #require(makeGradientImage(width: 64, height: 64))
         let unrelated = try #require(makeCheckerboardImage(width: 64, height: 64))

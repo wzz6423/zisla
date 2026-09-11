@@ -185,6 +185,12 @@ enum ScreenshotLongCaptureMatcher {
     private static let unchangedMaximumPatchDimensionFraction = 0.3
     private static let unchangedMaximumPatchAreaFraction = 0.08
     private static let unchangedScatteredMeanDifference = 2.5
+    /// A small scroll is allowed through the cheap stillness filter only when its aligned overlap is
+    /// measurably better than comparing both frames at the same screen position. This distinguishes a
+    /// translated sparse bubble from a stationary page that happens to contain a repeated blank row.
+    private static let unchangedMotionMinimumImprovement = 0.25
+    private static let unchangedMotionRelativeImprovement = 0.1
+    private static let unchangedMotionMinimumOverlapFraction = 0.5
     /// A still page still repaints: durations tick, clocks advance, spinners spin, a list streams new
     /// rows. Those changes are scattered across the whole frame rather than confined to one patch, so the
     /// patch test above misses them and the frame reaches the matcher — which, on a page whose rows are
@@ -250,6 +256,56 @@ enum ScreenshotLongCaptureMatcher {
         return patchWidth <= unchangedMaximumPatchDimensionFraction
             && patchHeight <= unchangedMaximumPatchDimensionFraction
             && patchArea <= unchangedMaximumPatchAreaFraction
+    }
+
+    static func isReliableMotion(
+        previous: CGImage,
+        next: CGImage,
+        direction: ScreenshotLongCaptureDirection,
+        match: ScreenshotLongCaptureMatch
+    ) -> Bool {
+        let previousAxisLength = direction == .vertical ? previous.height : previous.width
+        let nextAxisLength = direction == .vertical ? next.height : next.width
+        guard previousAxisLength >= 16, nextAxisLength >= 16,
+              let previousProfile = axisProfile(
+                  in: previous,
+                  direction: direction,
+                  profileLength: refinedProfileLength
+              ),
+              let nextProfile = axisProfile(
+                  in: next,
+                  direction: direction,
+                  profileLength: refinedProfileLength
+              )
+        else { return false }
+
+        let profileLength = previousProfile.count / previousAxisLength
+        guard profileLength > 0,
+              previousProfile.count == profileLength * previousAxisLength,
+              nextProfile.count == profileLength * nextAxisLength,
+              let alignedScore = refinedScore(
+                  previous: previousProfile,
+                  next: nextProfile,
+                  previousAxisLength: previousAxisLength,
+                  nextAxisLength: nextAxisLength,
+                  profileLength: profileLength,
+                  placement: match.placement,
+                  overlap: match.overlapPixels
+              ),
+              let stationaryScore = samePositionScore(
+                  previous: previousProfile,
+                  next: nextProfile,
+                  previousAxisLength: previousAxisLength,
+                  nextAxisLength: nextAxisLength,
+                  profileLength: profileLength
+              )
+        else { return false }
+
+        let improvement = stationaryScore - alignedScore
+        let overlapFraction = CGFloat(match.overlapPixels) / CGFloat(nextAxisLength)
+        return overlapFraction >= unchangedMotionMinimumOverlapFraction
+            && improvement >= unchangedMotionMinimumImprovement
+            && improvement >= stationaryScore * unchangedMotionRelativeImprovement
     }
 
     static func match(
@@ -599,6 +655,34 @@ enum ScreenshotLongCaptureMatcher {
             else { return nil }
             let previousRow = previousAxis * profileLength
             let nextRow = nextAxis * profileLength
+            for cross in 0..<profileLength {
+                difference += abs(Int(previous[previousRow + cross]) - Int(next[nextRow + cross]))
+            }
+            count += profileLength
+            axis += step
+        }
+        guard count > 0 else { return nil }
+        return Double(difference) / Double(count)
+    }
+
+    private static func samePositionScore(
+        previous: [UInt8],
+        next: [UInt8],
+        previousAxisLength: Int,
+        nextAxisLength: Int,
+        profileLength: Int
+    ) -> Double? {
+        let overlap = min(previousAxisLength, nextAxisLength)
+        guard overlap > 0 else { return nil }
+        let previousOffset = previousAxisLength - overlap
+        let nextOffset = nextAxisLength - overlap
+        let step = max(1, overlap / refinedMaximumSampleCount)
+        var difference = 0
+        var count = 0
+        var axis = step
+        while axis < overlap {
+            let previousRow = (previousOffset + axis) * profileLength
+            let nextRow = (nextOffset + axis) * profileLength
             for cross in 0..<profileLength {
                 difference += abs(Int(previous[previousRow + cross]) - Int(next[nextRow + cross]))
             }
@@ -1551,6 +1635,7 @@ final class ScreenshotEditorModel: ObservableObject {
     private var redoStack: [Snapshot] = []
     private var nextNumber = 1
     private var lastLongCaptureFrame: NSImage?
+    private var lastLongCapturePlacement: ScreenshotLongCapturePlacement?
     /// Pixels the most recently stitched frame added below the composite. Repeating pages score a whole
     /// row away just as well as the truth, so the previous step is what tells the two apart.
     private var lastLongCaptureNewContent: Int?
@@ -1718,13 +1803,10 @@ final class ScreenshotEditorModel: ObservableObject {
     ) -> Bool {
         let previous = lastLongCaptureFrame?.cgImage(forProposedRect: nil, context: nil, hints: nil)
         let next = nextImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
-        if let previous, let next,
-           ScreenshotLongCaptureMatcher.isVisuallyUnchanged(previous: previous, next: next) {
-            // Keep `lastLongCaptureFrame` where the composite already ends. Measuring the next frame
-            // against a skipped repaint would apply an overlap to the wrong pixels.
-            statusMessage = AppLocalization.text("等待页面滚动")
-            return false
-        }
+        let isVisuallyUnchanged: Bool = {
+            guard let previous, let next else { return false }
+            return ScreenshotLongCaptureMatcher.isVisuallyUnchanged(previous: previous, next: next)
+        }()
         let match: ScreenshotLongCaptureMatch? = {
             guard let previous, let next else { return nil }
             return ScreenshotLongCaptureMatcher.match(
@@ -1734,6 +1816,26 @@ final class ScreenshotEditorModel: ObservableObject {
                 expectedNewContent: lastLongCaptureNewContent
             )
         }()
+        if isVisuallyUnchanged {
+            guard let previous, let next, let match,
+                  ScreenshotLongCaptureMatcher.isReliableMotion(
+                      previous: previous,
+                      next: next,
+                      direction: direction,
+                      match: match
+                  )
+            else {
+                // Keep `lastLongCaptureFrame` where the composite already ends. Measuring a skipped
+                // repaint against a later frame would apply an overlap to the wrong pixels.
+                statusMessage = AppLocalization.text("等待页面滚动")
+                return false
+            }
+        }
+        if let lastLongCapturePlacement, let match,
+           match.placement != lastLongCapturePlacement {
+            statusMessage = AppLocalization.text("等待页面滚动")
+            return false
+        }
         if isLongCapturePreviewing, match == nil {
             statusMessage = AppLocalization.text("未检测到可拼接区域，请放慢滚动")
             return false
@@ -1764,6 +1866,9 @@ final class ScreenshotEditorModel: ObservableObject {
             )
         }
         lastLongCaptureFrame = nextImage
+        if let placement = match?.placement {
+            lastLongCapturePlacement = placement
+        }
         // Remember how much this frame actually added. The next match uses it to tell the true alignment
         // apart from the one a whole row away that repeating content scores just as well.
         if let match {
@@ -1781,6 +1886,7 @@ final class ScreenshotEditorModel: ObservableObject {
         isLongCapturePreviewing = true
         hasLongCaptureResult = false
         lastLongCaptureFrame = image
+        lastLongCapturePlacement = nil
         lastLongCaptureNewContent = nil
     }
 
@@ -1788,6 +1894,7 @@ final class ScreenshotEditorModel: ObservableObject {
         isLongCapturePreviewing = false
         hasLongCaptureResult = true
         lastLongCaptureFrame = nil
+        lastLongCapturePlacement = nil
         lastLongCaptureNewContent = nil
     }
 
@@ -1795,6 +1902,7 @@ final class ScreenshotEditorModel: ObservableObject {
         isLongCapturePreviewing = false
         hasLongCaptureResult = false
         lastLongCaptureFrame = nil
+        lastLongCapturePlacement = nil
         lastLongCaptureNewContent = nil
     }
 

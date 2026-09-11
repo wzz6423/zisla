@@ -370,6 +370,36 @@ struct LongCaptureRealWorldTests {
         )
     }
 
+    private func makeSingleBubblePageImage(width: Int, height: Int) -> CGImage? {
+        let bytesPerRow = width * 4
+        var pixels = [UInt8](repeating: 250, count: height * bytesPerRow)
+        for index in stride(from: 3, to: pixels.count, by: 4) { pixels[index] = 255 }
+
+        for y in 420..<540 where y < height {
+            for x in 120..<500 where x < width {
+                let offset = y * bytesPerRow + x * 4
+                pixels[offset] = 170
+                pixels[offset + 1] = 235
+                pixels[offset + 2] = 175
+            }
+        }
+
+        guard let provider = CGDataProvider(data: Data(pixels) as CFData) else { return nil }
+        return CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        )
+    }
+
     /// Pixels of a `CGImage` laid out as RGBA rows, top row first in the returned array.
     private func rgbaPixels(_ image: CGImage) -> [UInt8] {
         let bytesPerRow = image.width * 4
@@ -578,6 +608,61 @@ struct LongCaptureRealWorldTests {
     }
 
     @Test
+    func realWorldTableIgnoresReverseScrollJitter() throws {
+        let pageWidth = 360
+        let frameHeight = 700
+        let page = try #require(makeListPageImage(width: pageWidth, height: 2_400))
+        let first = try #require(frame(from: page, offset: 0, height: frameHeight))
+        let model = ScreenshotEditorModel(
+            image: NSImage(cgImage: first, size: CGSize(width: pageWidth, height: frameHeight))
+        )
+        model.beginLongCapturePreview()
+
+        for offset in [300, 600] {
+            let frameImage = try #require(frame(from: page, offset: offset, height: frameHeight))
+            let didAppend = model.append(
+                image: NSImage(cgImage: frameImage, size: CGSize(width: pageWidth, height: frameHeight)),
+                direction: .vertical
+            )
+            #expect(didAppend, "offset \(offset) should establish downward scrolling")
+        }
+
+        let settled = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let jitter = try #require(frame(from: page, offset: 540, height: frameHeight))
+        let didAppendJitter = model.append(
+            image: NSImage(cgImage: jitter, size: CGSize(width: pageWidth, height: frameHeight)),
+            direction: .vertical
+        )
+        let afterJitter = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let jitterReport = describeMismatch(
+            actual: rgbaPixels(afterJitter),
+            expected: rgbaPixels(settled),
+            width: pageWidth
+        )
+        #expect(!didAppendJitter, "reverse scroll jitter should not prepend content to the top")
+        #expect(jitterReport == "identical", "reverse jitter changed the composite: \(jitterReport)")
+
+        let forward = try #require(frame(from: page, offset: 900, height: frameHeight))
+        let didAppendForward = model.append(
+            image: NSImage(cgImage: forward, size: CGSize(width: pageWidth, height: frameHeight)),
+            direction: .vertical
+        )
+        #expect(didAppendForward, "forward scrolling should continue after ignored jitter")
+
+        let expected = try #require(page.cropping(
+            to: CGRect(x: 0, y: 0, width: pageWidth, height: 900 + frameHeight)
+        ))
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let report = describeMismatch(
+            actual: rgbaPixels(combined),
+            expected: rgbaPixels(expected),
+            width: pageWidth
+        )
+        #expect(combined.height == expected.height, "height \(combined.height) vs \(expected.height)")
+        #expect(report == "identical", "reverse jitter moved tail content to the top: \(report)")
+    }
+
+    @Test
     func realWorldStationaryRepeatingListIsNeverAppended() throws {
         let pageWidth = 360
         let frameHeight = 700
@@ -693,4 +778,102 @@ struct LongCaptureRealWorldTests {
         #expect(combined.height == expected.height, "height \(combined.height) vs \(expected.height)")
         #expect(report == "identical", "sparse chat page differs: \(report)")
     }
+
+    @Test
+    func realWorldChatSmallScrollIsNotDiscardedAsUnchanged() throws {
+        let pageWidth = 620
+        let frameHeight = 900
+        let scroll = 20
+        let page = try #require(makeSingleBubblePageImage(width: pageWidth, height: 2_000))
+        let first = try #require(frame(from: page, offset: 0, height: frameHeight))
+        let next = try #require(frame(from: page, offset: scroll, height: frameHeight))
+        let frameSize = CGSize(width: pageWidth, height: frameHeight)
+        let model = ScreenshotEditorModel(image: NSImage(cgImage: first, size: frameSize))
+        model.beginLongCapturePreview()
+
+        let didAppend = model.append(
+            image: NSImage(cgImage: next, size: frameSize),
+            direction: .vertical
+        )
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let expected = try #require(page.cropping(
+            to: CGRect(x: 0, y: 0, width: pageWidth, height: frameHeight + scroll)
+        ))
+
+        #expect(didAppend, "a small real chat scroll must not be discarded as an unchanged repaint")
+        #expect(combined.height == expected.height, "height \(combined.height) vs \(expected.height)")
+        #expect(rgbaPixels(combined) == rgbaPixels(expected), "small chat scroll was stitched incorrectly")
+    }
+
+    @Test
+    func realWorldStationarySparseChatFrameIsNotAppended() throws {
+        let pageWidth = 620
+        let frameHeight = 900
+        let page = try #require(makeSingleBubblePageImage(width: pageWidth, height: 2_000))
+        let frame = try #require(frame(from: page, offset: 0, height: frameHeight))
+        let frameSize = CGSize(width: pageWidth, height: frameHeight)
+        let model = ScreenshotEditorModel(image: NSImage(cgImage: frame, size: frameSize))
+        model.beginLongCapturePreview()
+
+        let didAppend = model.append(
+            image: NSImage(cgImage: frame, size: frameSize),
+            direction: .vertical
+        )
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+
+        #expect(!didAppend, "a stationary sparse chat frame must not be treated as a scroll")
+        #expect(combined.height == frameHeight)
+        #expect(rgbaPixels(combined) == rgbaPixels(frame))
+    }
+
+    @Test
+    func realWorldRetinaSparseChatPageStitchesExactly() throws {
+        let scale = 2
+        let pageWidth = 620
+        let frameHeight = 900
+        let offsets = [0, 320, 700, 1_010, 1_430, 1_760, 2_140]
+        let page = try #require(makeChatPageImage(
+            width: pageWidth * scale,
+            height: 5_200 * scale
+        ))
+        let first = try #require(frame(
+            from: page,
+            offset: offsets[0] * scale,
+            height: frameHeight * scale
+        ))
+        let logicalFrameSize = CGSize(width: pageWidth, height: frameHeight)
+        let model = ScreenshotEditorModel(
+            image: NSImage(cgImage: first, size: logicalFrameSize)
+        )
+        model.beginLongCapturePreview()
+
+        for offset in offsets.dropFirst() {
+            let frameImage = try #require(frame(
+                from: page,
+                offset: offset * scale,
+                height: frameHeight * scale
+            ))
+            _ = model.append(
+                image: NSImage(cgImage: frameImage, size: logicalFrameSize),
+                direction: .vertical
+            )
+        }
+
+        let lastOffset = try #require(offsets.last)
+        let expected = try #require(page.cropping(to: CGRect(
+            x: 0,
+            y: 0,
+            width: pageWidth * scale,
+            height: (lastOffset + frameHeight) * scale
+        )))
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let report = describeMismatch(
+            actual: rgbaPixels(combined),
+            expected: rgbaPixels(expected),
+            width: pageWidth * scale
+        )
+        #expect(combined.height == expected.height, "height \(combined.height) vs \(expected.height)")
+        #expect(report == "identical", "Retina sparse chat page differs: \(report)")
+    }
+
 }
