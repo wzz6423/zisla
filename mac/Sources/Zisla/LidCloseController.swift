@@ -222,6 +222,17 @@ final class LidCloseController: NSObject {
         beginEffect()
     }
 
+    /// Whether the overlay is on screen right now.
+    var isOverlayVisible: Bool { overlay.isVisible }
+
+    /// Steps the overlay aside so a screenshot taken while the effect shows
+    /// captures the contents behind it instead of the folded picture, and the
+    /// frozen selection frame is not covered by the live overlay. Mac Duo
+    /// keeps its overlay out of captures for the same reason.
+    func dismissOverlayForScreenshot() {
+        endEffect(animated: false)
+    }
+
     private func beginEffect() {
         guard !isEffectActive else { return }
         isEffectActive = true

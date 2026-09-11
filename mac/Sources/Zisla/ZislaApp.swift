@@ -1396,6 +1396,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         modalWindowSnapshot?.restoreAfterModalDismissal()
         setScreenshotSessionActive(true)
         setScreenshotLiveCaptureActive(true)
+        // The lid close overlay sits above every window, so a screenshot taken
+        // while it shows would bake the folded picture into the frame and hide
+        // the frozen selection UI behind the live overlay. It steps aside
+        // first; Mac Duo keeps its overlay out of captures for the same
+        // reason.
+        lidCloseController?.dismissOverlayForScreenshot()
         let clipboardAssistantSnapshot = ScreenshotModalWindowSnapshot.capture(
             from: AppModel.shared.clipboardAssistant.windowForFrameUpdate
         )
