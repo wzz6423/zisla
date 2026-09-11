@@ -48,7 +48,7 @@ struct SystemMetricsHistoryLocalizationTests {
     @Test
     func historyCopyIsActuallyTranslated() throws {
         let english = try #require(Self.stringsTable(for: .english))
-        #expect(english["历史记录"] == "History")
+        #expect(english["查看历史记录"] == "View History")
         #expect(english["导出"] == "Export")
         #expect(english["24 小时"] == "24 hours")
         #expect(english["读"] == "Read")
@@ -56,7 +56,7 @@ struct SystemMetricsHistoryLocalizationTests {
         #expect(english["上传"] == "Upload")
 
         let japanese = try #require(Self.stringsTable(for: .japanese))
-        #expect(japanese["历史记录"] == "履歴")
+        #expect(japanese["查看历史记录"] == "履歴を表示")
         #expect(japanese["系统历史"] == "システム履歴")
         #expect(japanese["风扇 %ld"] == "ファン %ld")
     }
@@ -88,6 +88,7 @@ struct SystemMetricsHistoryLocalizationTests {
     }
 
     private static let localizedSourceFiles = [
+        "IslandRootView.swift",
         "SystemMonitorView.swift",
         "SystemMetricsHistoryView.swift",
     ]

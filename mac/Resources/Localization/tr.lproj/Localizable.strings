@@ -2399,8 +2399,6 @@
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Daraltılmış bildirim çubuğunun kenarında oynatma, indirme ve otomatik kapanma ilerlemesini göster";
 
 /* System Monitor - History */
-"历史记录" = "Geçmiş";
-"查看历史图表" = "Grafikleri görüntüle";
 "导出" = "Dışa Aktar";
 "把全部历史读数导出为 xlsx 表格" = "Tüm geçmişi xlsx tablosu olarak dışa aktar";
 "暂无历史记录" = "Henüz geçmiş yok";
@@ -2428,5 +2426,4 @@
 "Tiler" = "Tiler";
 
 "按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "CPU, GPU, bellek, disk, fan ve ağ eğilimlerini zaman aralığına göre görüntüle";
-"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络" = "CPU, GPU, bellek, disk, fan ve ağı dakikada bir kaydeder";
-"记录已暂停，可在设置中重新开启" = "Kayıt duraklatıldı; Ayarlar'dan yeniden açabilirsiniz";
+"查看历史记录" = "Geçmişi Görüntüle";

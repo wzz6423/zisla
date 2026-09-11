@@ -2399,8 +2399,6 @@
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Tampilkan progres pemutaran, unduhan, dan penutupan otomatis di tepi bilah pemberitahuan yang diciutkan";
 
 /* System Monitor - History */
-"历史记录" = "Riwayat";
-"查看历史图表" = "Lihat grafik";
 "导出" = "Ekspor";
 "把全部历史读数导出为 xlsx 表格" = "Ekspor seluruh riwayat ke lembar xlsx";
 "暂无历史记录" = "Belum ada riwayat";
@@ -2428,5 +2426,4 @@
 "Tiler" = "Tiler";
 
 "按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "Lihat tren CPU, GPU, memori, disk, kipas, dan jaringan menurut rentang waktu";
-"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络" = "Merekam CPU, GPU, memori, disk, kipas, dan jaringan tiap menit";
-"记录已暂停，可在设置中重新开启" = "Perekaman dijeda; aktifkan lagi di Pengaturan";
+"查看历史记录" = "Lihat Riwayat";

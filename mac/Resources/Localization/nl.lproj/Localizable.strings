@@ -2399,8 +2399,6 @@
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Toon de voortgang van afspelen, downloaden en automatisch sluiten langs de rand van de ingeklapte meldingsbalk";
 
 /* System Monitor - History */
-"历史记录" = "Geschiedenis";
-"查看历史图表" = "Grafieken bekijken";
 "导出" = "Exporteer";
 "把全部历史读数导出为 xlsx 表格" = "De volledige geschiedenis als xlsx-bestand exporteren";
 "暂无历史记录" = "Nog geen geschiedenis";
@@ -2428,5 +2426,4 @@
 "Tiler" = "Tiler";
 
 "按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "Bekijk trends van CPU, GPU, geheugen, schijf, ventilatoren en netwerk per periode";
-"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络" = "Legt CPU, GPU, geheugen, schijf, ventilatoren en netwerk elke minuut vast";
-"记录已暂停，可在设置中重新开启" = "Vastleggen is gepauzeerd; zet het weer aan in Instellingen";
+"查看历史记录" = "Geschiedenis bekijken";

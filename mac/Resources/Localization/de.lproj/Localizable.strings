@@ -2400,8 +2400,6 @@
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Wiedergabe-, Download- und Schließfortschritt am Rand der eingeklappten Hinweisleiste anzeigen";
 
 /* System Monitor - History */
-"历史记录" = "Verlauf";
-"查看历史图表" = "Diagramme anzeigen";
 "导出" = "Exportieren";
 "把全部历史读数导出为 xlsx 表格" = "Den gesamten Verlauf als xlsx-Tabelle exportieren";
 "暂无历史记录" = "Noch kein Verlauf";
@@ -2429,5 +2427,4 @@
 "Tiler" = "Tiler";
 
 "按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "Trends von CPU, GPU, Speicher, Festplatte, Lüfter und Netzwerk über einen Zeitraum anzeigen";
-"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络" = "Zeichnet CPU, GPU, Speicher, Festplatte, Lüfter und Netzwerk minütlich auf";
-"记录已暂停，可在设置中重新开启" = "Aufzeichnung pausiert; in den Einstellungen wieder aktivieren";
+"查看历史记录" = "Verlauf anzeigen";

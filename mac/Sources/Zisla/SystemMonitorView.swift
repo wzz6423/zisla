@@ -28,8 +28,6 @@ struct SystemMonitorView: View {
     let onHistoryRequested: () -> Void
     @State private var releasedMemoryBytes: UInt64?
     @State private var systemColumnHeight: CGFloat = 0
-    @State private var isExportingHistory = false
-    @State private var historyStatus: String?
     @Environment(\.locale) private var locale
 
     var body: some View {
@@ -68,14 +66,17 @@ struct SystemMonitorView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// Right column: compact readings for memory / disk / fan / network.
+    /// Right column: a compact history action on top, then memory / disk / fan / network readings.
     private var systemColumn: some View {
         VStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Spacer(minLength: 0)
+                historyButton
+            }
             memoryCard
             diskCard
             fanCard
             networkCard
-            historyCard
         }
         .background {
             GeometryReader { proxy in
@@ -85,6 +86,24 @@ struct SystemMonitorView: View {
                 )
             }
         }
+    }
+
+    private var historyButton: some View {
+        Button(action: onHistoryRequested) {
+            HStack(spacing: 5) {
+                Image(systemName: "chart.xyaxis.line")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(AppLocalization.text("查看历史记录"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Color.fillControl, in: Capsule())
+        }
+        .buttonStyle(PressableStyle())
+        .help(AppLocalization.text("按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势"))
     }
 
     // MARK: - Cards
@@ -250,65 +269,6 @@ struct SystemMonitorView: View {
                     placeholder: service.isRefreshingPublicIPAddress ? "正在获取" : "暂不可用"
                 )
             }
-        }
-    }
-
-    private var historyCard: some View {
-        MonitorCard {
-            VStack(alignment: .leading, spacing: 7) {
-                CardHeader(symbol: "chart.xyaxis.line", title: AppLocalization.text("历史记录")) {
-                    Text(historySummary)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Text(historyStatus ?? historyDetail)
-                    .font(.islandMicro())
-                    .foregroundStyle(.secondary)
-                    .fitsSingleLine()
-                HStack(spacing: 6) {
-                    Spacer(minLength: 0)
-                    miniActionButton(
-                        AppLocalization.text("查看历史图表"),
-                        help: AppLocalization.text("按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势")
-                    ) {
-                        onHistoryRequested()
-                    }
-                    miniActionButton(
-                        AppLocalization.text("导出"),
-                        help: AppLocalization.text("把全部历史读数导出为 xlsx 表格")
-                    ) {
-                        exportHistory()
-                    }
-                    .disabled(isExportingHistory || service.historyStats.count == 0)
-                }
-            }
-        }
-    }
-
-    private var historySummary: String {
-        let stats = service.historyStats
-        guard stats.count > 0 else { return AppLocalization.text("暂无历史记录") }
-        return AppLocalization.text(
-            "已记录 %ld 点 · %@",
-            stats.count,
-            SystemMetricsHistoryPresentation.spanText(stats.span)
-        )
-    }
-
-    private var historyDetail: String {
-        service.isRecordingHistory
-            ? AppLocalization.text("按分钟记录 CPU、GPU、内存、硬盘、风扇与网络")
-            : AppLocalization.text("记录已暂停，可在设置中重新开启")
-    }
-
-    private func exportHistory() {
-        guard let destination = SystemMetricsHistoryExporter.chooseDestination() else { return }
-        isExportingHistory = true
-        historyStatus = nil
-        Task { @MainActor in
-            historyStatus = await SystemMetricsHistoryExporter.write(service: service, to: destination)
-            isExportingHistory = false
         }
     }
 

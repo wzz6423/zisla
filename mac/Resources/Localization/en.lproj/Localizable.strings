@@ -2398,8 +2398,6 @@
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Show playback, download, and dismissal progress along collapsed notice bars";
 
 /* System Monitor - History */
-"历史记录" = "History";
-"查看历史图表" = "View charts";
 "导出" = "Export";
 "把全部历史读数导出为 xlsx 表格" = "Export the full history as an xlsx spreadsheet";
 "暂无历史记录" = "No history yet";
@@ -2427,5 +2425,4 @@
 "Tiler" = "Tiler";
 
 "按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势" = "View CPU, GPU, memory, disk, fan and network trends over a time range";
-"按分钟记录 CPU、GPU、内存、硬盘、风扇与网络" = "Records CPU, GPU, memory, disk, fan and network once a minute";
-"记录已暂停，可在设置中重新开启" = "Recording is paused; turn it back on in Settings";
+"查看历史记录" = "View History";
