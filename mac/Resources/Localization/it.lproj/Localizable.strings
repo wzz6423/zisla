@@ -2399,3 +2399,5 @@
 "在收起态提示条边沿显示播放、下载和自动关闭进度" = "Mostra l'avanzamento della riproduzione, del download e della chiusura automatica sul bordo della barra compressa";
 "合盖动画" = "Animazione alla chiusura del coperchio";
 "合上兼容 MacBook 屏幕时显示景深过渡动画" = "Mostra una transizione di profondità quando si chiude il coperchio di un MacBook compatibile";
+"预览动画" = "Anteprima animazione";
+"不用合盖，在当前屏幕内容上播放一次" = "Riproduce l’effetto una volta sul contenuto attuale dello schermo, senza chiudere il coperchio";

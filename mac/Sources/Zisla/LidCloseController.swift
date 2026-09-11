@@ -4,6 +4,12 @@ import Foundation
 import QuartzCore
 import ZislaKit
 
+extension Notification.Name {
+    /// Asks `LidCloseController` to play the effect once on the current screen
+    /// contents, so Settings can preview it without closing the lid.
+    static let lidCloseAnimationPreview = Notification.Name("dev.wzz.zisla.lidCloseAnimationPreview")
+}
+
 /// Translates lid-angle samples into the Mac Duo inspired close animation.
 ///
 /// The controller deliberately requires recent downward movement before it
@@ -20,6 +26,30 @@ final class LidCloseController: NSObject {
         static let activePollInterval: TimeInterval = 1.0 / 30
         /// Failed reads in a row after which a running effect is torn down.
         static let failedReadLimit = 8
+    }
+
+    /// A scripted angle sweep, so Settings can show the effect without the lid
+    /// moving. It feeds the same path the sensor feeds.
+    private struct PreviewRun {
+        /// Reset when the picture is actually up, so the capture latency does
+        /// not eat into the sweep.
+        var startedAt: CFTimeInterval
+        let open: Double
+        let shut: Double
+        let closing: CFTimeInterval = 1.4
+        let hold: CFTimeInterval = 0.8
+        let opening: CFTimeInterval = 0.6
+
+        /// `nil` once the run is over.
+        func angle(at now: CFTimeInterval) -> Double? {
+            let elapsed = now - startedAt
+            if elapsed < closing { return open + (shut - open) * (elapsed / closing) }
+            if elapsed < closing + hold { return shut }
+            if elapsed < closing + hold + opening {
+                return shut + (open - shut) * ((elapsed - closing - hold) / opening)
+            }
+            return nil
+        }
     }
 
     private let settingsStore: FeatureSettingsStore
@@ -40,6 +70,7 @@ final class LidCloseController: NSObject {
     private var isSuspended = false
     private var isStarted = false
     private var consecutiveFailedReads = 0
+    private var preview: PreviewRun?
 
     init(settingsStore: FeatureSettingsStore) {
         self.settingsStore = settingsStore
@@ -53,7 +84,19 @@ final class LidCloseController: NSObject {
         resetMotionState()
         observeSettings()
         observeSystemEvents()
+        applicationNotificationObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: .lidCloseAnimationPreview, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.runPreview() }
+            }
+        )
         guard sensor.isAvailable else { return }
+        // Compiling the fragment shader at the trigger angle would delay the
+        // first frame, so the pipeline is built while the lid is still open.
+        if settingsStore.settings.lidCloseAnimationEnabled {
+            overlay.warmUp()
+        }
         poll()
         schedulePolling(interval: Tuning.idlePollInterval)
     }
@@ -143,6 +186,9 @@ final class LidCloseController: NSObject {
             return
         }
         consecutiveFailedReads = 0
+        // A scripted sweep owns the effect while it runs; the open lid must
+        // not release it through the ordinary rules.
+        guard preview == nil else { return }
 
         let now = CACurrentMediaTime()
         motion.record(angle: angle, at: now)
@@ -162,10 +208,24 @@ final class LidCloseController: NSObject {
         }
     }
 
+    /// Plays the effect once on the current screen contents, so the animation
+    /// can be checked from Settings without closing the lid.
+    func runPreview() {
+        guard isStarted, !isEffectActive, !isSuspended else { return }
+        guard settingsStore.settings.lidCloseAnimationEnabled else { return }
+        let threshold = motion.tuning.thresholdAngle
+        preview = PreviewRun(
+            startedAt: CACurrentMediaTime(),
+            open: min(threshold + 35, 130),
+            shut: max(threshold - Tuning.fullEffectSpan * 1.15, 5)
+        )
+        beginEffect()
+    }
+
     private func beginEffect() {
         guard !isEffectActive else { return }
         isEffectActive = true
-        visualAngle = motion.rawAngle
+        visualAngle = preview?.open ?? motion.rawAngle
         captureTask?.cancel()
         captureTask = Task { [weak self] in
             guard let self, let screen = self.builtInScreen else {
@@ -178,7 +238,14 @@ final class LidCloseController: NSObject {
                     excludingApplicationWithProcessIdentifier: ProcessInfo.processInfo.processIdentifier
                 )
                 guard !Task.isCancelled, self.isEffectActive else { return }
-                self.overlay.present(image: frame.cgImage, on: screen)
+                // The sweep starts once the picture is up, so the capture
+                // latency does not eat into it.
+                self.preview?.startedAt = CACurrentMediaTime()
+                self.overlay.present(
+                    image: frame.cgImage,
+                    on: screen,
+                    startAngle: self.motion.tuning.thresholdAngle
+                )
                 self.startDisplayLink()
             } catch {
                 self.endEffect(animated: false)
@@ -215,16 +282,28 @@ final class LidCloseController: NSObject {
         let now = CACurrentMediaTime()
         let elapsed = min(max(now - lastFrameTime, 1.0 / 240), 1.0 / 20)
         lastFrameTime = now
-        visualAngle += (motion.rawAngle - visualAngle) * min(elapsed * 14, 1)
+        let targetAngle: Double
+        if let preview {
+            guard let scripted = preview.angle(at: now) else {
+                self.preview = nil
+                endEffect(animated: true)
+                return
+            }
+            targetAngle = scripted
+        } else {
+            targetAngle = motion.rawAngle
+        }
+        visualAngle += (targetAngle - visualAngle) * min(elapsed * 14, 1)
         let threshold = motion.tuning.thresholdAngle
         let progress = min(max((threshold - visualAngle) / Tuning.fullEffectSpan, 0), 1)
-        let travel = max(threshold - visualAngle, 0)
-        overlay.update(progress: progress, lidTravelDegrees: travel)
+        // The geometry takes the lid angle itself, so only the blur saturates.
+        overlay.update(progress: progress, currentAngle: visualAngle)
     }
 
     private func endEffect(animated: Bool) {
         guard isEffectActive || overlay.isVisible else { return }
         isEffectActive = false
+        preview = nil
         captureTask?.cancel()
         captureTask = nil
         stopDisplayLink()

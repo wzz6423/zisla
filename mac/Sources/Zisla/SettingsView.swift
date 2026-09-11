@@ -811,6 +811,8 @@ struct SettingsView: View {
                     featureToggle("键盘音效", detail: "全局播放键盘音效并记录输入统计", symbol: "keyboard.badge.ellipsis", keyPath: \.keyboardEnabled)
                     rowDivider
                     featureToggle("合盖动画", detail: "合上兼容 MacBook 屏幕时显示景深过渡动画", symbol: "laptopcomputer.and.iphone", keyPath: \.lidCloseAnimationEnabled)
+                    rowDivider
+                    lidClosePreviewRow()
                 }
 
                 settingsGroup("工具") {
@@ -2709,6 +2711,35 @@ struct SettingsView: View {
             .labelsHidden()
             .toggleStyle(.switch)
             .controlSize(.small)
+        }
+    }
+
+    /// 合盖动画的预览权：不合盖，在当前屏幕内容上把动画播放一次。
+    private func lidClosePreviewRow() -> some View {
+        settingRow(symbol: "play.circle", title: "预览动画", detail: "不用合盖，在当前屏幕内容上播放一次") {
+            Button {
+                NotificationCenter.default.post(name: .lidCloseAnimationPreview, object: nil)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 8, weight: .bold))
+                    Text(loc("预览动画"))
+                        .font(.system(size: 10, weight: .semibold))
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 10)
+            .frame(height: 24)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+            )
+            .help(loc("预览动画"))
+            .disabled(!model.settingsStore.settings.lidCloseAnimationEnabled)
         }
     }
 

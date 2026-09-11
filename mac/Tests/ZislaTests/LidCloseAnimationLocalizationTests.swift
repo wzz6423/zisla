@@ -11,7 +11,7 @@ struct LidCloseAnimationLocalizationTests {
     @Test
     func everyLanguageTranslatesTheLidCloseAnimationKeys() throws {
         let keys = try Self.lidCloseAnimationKeys()
-        #expect(keys.count == 2, "key 扫描失效，只找到 \(keys.count) 个")
+        #expect(keys.count == 4, "key 扫描失效，只找到 \(keys.count) 个")
 
         for language in AppLanguage.allCases {
             let table = try #require(
@@ -47,20 +47,30 @@ struct LidCloseAnimationLocalizationTests {
         #expect(AppLocalization.string("合盖动画", language: .simplifiedChinese) == "合盖动画")
     }
 
-    /// The keys the running settings row queries, read out of its source line so
-    /// the test follows the view instead of restating it.
+    /// The keys the running settings rows query, read out of their source so
+    /// the test follows the view instead of restating it: the lid-close toggle
+    /// and the preview row beneath it.
     private static func lidCloseAnimationKeys() throws -> [String] {
         let source = try String(contentsOf: settingsViewSourceURL, encoding: .utf8)
-        let call = try NSRegularExpression(
+        let toggle = try NSRegularExpression(
             pattern: #"featureToggle\(\s*"([^"]*)"\s*,\s*detail:\s*"([^"]*)"\s*,\s*symbol:\s*"[^"]*"\s*,\s*keyPath:\s*\\\.lidCloseAnimationEnabled\s*\)"#
         )
-        let match = try #require(
-            call.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)),
-            "SettingsView 中找不到 lidCloseAnimationEnabled 的 featureToggle 调用"
+        let previewRow = try NSRegularExpression(
+            pattern: #"lidClosePreviewRow\(\) -> some View \{\s*settingRow\(symbol:\s*"[^"]*",\s*title:\s*"([^"]*)",\s*detail:\s*"([^"]*)"\)"#
         )
-        return [1, 2].compactMap { index in
-            Range(match.range(at: index), in: source).map { String(source[$0]) }
+        var keys: [String] = []
+        for regex in [toggle, previewRow] {
+            let matches = regex.matches(in: source, range: NSRange(source.startIndex..., in: source))
+            guard let match = matches.first else {
+                continue
+            }
+            for index in [1, 2] {
+                if let range = Range(match.range(at: index), in: source) {
+                    keys.append(String(source[range]))
+                }
+            }
         }
+        return keys
     }
 
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {
