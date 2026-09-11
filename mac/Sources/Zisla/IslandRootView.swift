@@ -392,17 +392,21 @@ struct IslandRootView: View {
     }
 
     /// Opens the metrics history window while the system page is active, sitting just left of the
-    /// thumbnail monitor strip in the shared top rail. The label is the whole pill — no glyph — so
-    /// the copy gets the full width the rail can spare, shrinking rather than ellipsizing first.
+    /// thumbnail monitor strip in the shared top rail. The label shrinks with the shared single-line
+    /// fit rather than ellipsizing when the rail runs tight, so glyph and full copy coexist.
     private var historyButton: some View {
         Button(action: historyPanelPresentation.present) {
-            Text(AppLocalization.text("查看历史记录"))
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.primary)
-                .fitsSingleLine(0.7)
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .background(Color.fillControl, in: Capsule())
+            HStack(spacing: 5) {
+                Image(systemName: "chart.xyaxis.line")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(AppLocalization.text("查看历史记录"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .fitsSingleLine(0.7)
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .background(Color.fillControl, in: Capsule())
         }
         .buttonStyle(PressableStyle())
         .help(AppLocalization.text("按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势"))
