@@ -52,12 +52,14 @@ struct DepthGeometry {
 
 /// The settings that shape one frame.
 ///
-/// These are Mac Duo's shipped `Preferences` values rather than its struct
-/// defaults, because zisla exposes no depth controls: whatever is here is the
-/// look.
+/// The geometry pair is Mac Duo's hand-tuned `DepthTuning` default, not its
+/// `Preferences.factory` pair (6 and 1): with those the far edge leaves the
+/// screen almost immediately, so the picture reads as sliding up and away
+/// instead of folding back into the glass. zisla exposes no depth controls, so
+/// whatever is here is the look.
 struct DepthTuning {
-    var viewingDistance: Double = 6
-    var recession: Double = 1
+    var viewingDistance: Double = 2.7
+    var recession: Double = 2
     var blurEvenness: Double = 0
     var dimReach: Double = 0.5
     var maxBlurRadius: Double = 135
