@@ -116,7 +116,7 @@ public final class AIStateMonitor: ObservableObject {
         self.init(
             directoryURL: directoryURL,
             activityDetectors: Self.defaultActivityDetectors(),
-            usageDetectors: [AIUsageLogDetector(), ZedUsageLogDetector()],
+            usageDetectors: Self.defaultUsageDetectors(),
             activeTaskTTL: activeTaskTTL,
             now: now
         )
@@ -186,6 +186,14 @@ public final class AIStateMonitor: ObservableObject {
             ),
             WorkBuddySessionActivityDetector(),
             DoubaoSessionActivityDetector(maxFiles: 4),
+        ]
+    }
+
+    static func defaultUsageDetectors() -> [any AIUsageDetecting] {
+        [
+            AIUsageLogDetector(),
+            ZedUsageLogDetector(),
+            ZCodeUsageDetector(),
         ]
     }
 
