@@ -8,6 +8,7 @@ struct MediaSpectrumMonitoringPolicyTests {
         #expect(AppModel.shouldMonitorSpectrum(
             mediaEnabled: true,
             sideNoticesEnabled: true,
+            voiceInputIsCapturing: false,
             isIslandVisible: false,
             isPlaying: false,
             backgroundSoundsPlaying: false
@@ -15,10 +16,19 @@ struct MediaSpectrumMonitoringPolicyTests {
     }
 
     @Test @MainActor
-    func monitoringRespectsMediaGate() {
+    func monitoringRespectsMediaAndVoiceInputGates() {
         #expect(!AppModel.shouldMonitorSpectrum(
             mediaEnabled: false,
             sideNoticesEnabled: true,
+            voiceInputIsCapturing: false,
+            isIslandVisible: false,
+            isPlaying: false,
+            backgroundSoundsPlaying: false
+        ))
+        #expect(!AppModel.shouldMonitorSpectrum(
+            mediaEnabled: true,
+            sideNoticesEnabled: true,
+            voiceInputIsCapturing: true,
             isIslandVisible: false,
             isPlaying: false,
             backgroundSoundsPlaying: false
@@ -30,6 +40,7 @@ struct MediaSpectrumMonitoringPolicyTests {
         #expect(AppModel.shouldMonitorSpectrum(
             mediaEnabled: true,
             sideNoticesEnabled: false,
+            voiceInputIsCapturing: false,
             isIslandVisible: true,
             isPlaying: false,
             backgroundSoundsPlaying: false
