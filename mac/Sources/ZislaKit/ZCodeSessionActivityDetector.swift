@@ -43,35 +43,72 @@ public final class ZCodeSessionActivityDetector: AIActivityDetecting {
         defer { sqlite3_close(database) }
         sqlite3_busy_timeout(database, 500)
 
+        // ZCode persists the turn_usage row only once a turn finishes, so an
+        // in-flight turn must be inferred from model_usage rows that have no
+        // matching turn_usage row yet.
         let sql = """
-            SELECT t.session_id,
-                   t.turn_id,
-                   LOWER(t.status),
-                   t.started_at,
-                   t.completed_at,
-                   t.error_code,
-                   (
-                       SELECT m.model_id
-                       FROM model_usage m
-                       WHERE m.session_id = t.session_id
-                         AND m.turn_id = t.turn_id
-                       ORDER BY m.started_at DESC
-                       LIMIT 1
-                   ),
-                   s.time_updated
-            FROM turn_usage t
-            LEFT JOIN session s ON s.id = t.session_id
-            WHERE LOWER(t.status) IN ('running', 'error')
-              AND (
-                  CASE LOWER(t.status)
-                      WHEN 'running' THEN COALESCE(s.time_updated, t.started_at)
-                      ELSE COALESCE(t.completed_at, t.started_at, s.time_updated)
-                  END
-              ) >= ?
-            ORDER BY CASE LOWER(t.status)
-                         WHEN 'running' THEN COALESCE(s.time_updated, t.started_at)
-                         ELSE COALESCE(t.completed_at, t.started_at, s.time_updated)
-                     END DESC
+            WITH live AS (
+                SELECT mu.session_id AS session_id,
+                       mu.turn_id AS turn_id,
+                       MIN(mu.started_at) AS started_at,
+                       MAX(mu.started_at) AS last_activity_at
+                FROM model_usage mu
+                LEFT JOIN turn_usage t
+                    ON t.session_id = mu.session_id AND t.turn_id = mu.turn_id
+                WHERE mu.turn_id IS NOT NULL AND t.turn_id IS NULL
+                GROUP BY mu.session_id, mu.turn_id
+            )
+            SELECT * FROM (
+                SELECT t.session_id,
+                       t.turn_id,
+                       LOWER(t.status) AS status,
+                       t.started_at,
+                       t.completed_at,
+                       t.error_code,
+                       (
+                           SELECT m.model_id
+                           FROM model_usage m
+                           WHERE m.session_id = t.session_id
+                             AND m.turn_id = t.turn_id
+                           ORDER BY m.started_at DESC
+                           LIMIT 1
+                       ) AS model_id,
+                       s.time_updated
+                FROM turn_usage t
+                LEFT JOIN session s ON s.id = t.session_id
+                WHERE LOWER(t.status) IN ('running', 'error')
+                  AND (
+                      CASE LOWER(t.status)
+                          WHEN 'running' THEN COALESCE(s.time_updated, t.started_at)
+                          ELSE COALESCE(t.completed_at, t.started_at, s.time_updated)
+                      END
+                  ) >= ?
+
+                UNION ALL
+
+                SELECT l.session_id,
+                       l.turn_id,
+                       'running' AS status,
+                       l.started_at,
+                       NULL AS completed_at,
+                       NULL AS error_code,
+                       (
+                           SELECT m.model_id
+                           FROM model_usage m
+                           WHERE m.session_id = l.session_id
+                             AND m.turn_id = l.turn_id
+                           ORDER BY m.started_at DESC
+                           LIMIT 1
+                       ) AS model_id,
+                       s.time_updated
+                FROM live l
+                LEFT JOIN session s ON s.id = l.session_id
+                WHERE l.last_activity_at >= ?
+            )
+            ORDER BY CASE status
+                        WHEN 'running' THEN COALESCE(time_updated, started_at)
+                        ELSE COALESCE(completed_at, started_at, time_updated)
+                    END DESC
             """
 
         var statement: OpaquePointer?
@@ -86,7 +123,8 @@ public final class ZCodeSessionActivityDetector: AIActivityDetecting {
         let cutoff = Self.clampedMilliseconds(
             now().timeIntervalSince1970 - recencyThreshold
         )
-        guard sqlite3_bind_int64(statement, 1, cutoff) == SQLITE_OK else {
+        guard sqlite3_bind_int64(statement, 1, cutoff) == SQLITE_OK,
+              sqlite3_bind_int64(statement, 2, cutoff) == SQLITE_OK else {
             throw AIStateRepositoryError.storageFailure(
                 sqliteMessage(database, fallback: AppLocalization.text("无法设置 ZCode 会话查询范围"))
             )
