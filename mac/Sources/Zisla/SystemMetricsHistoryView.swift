@@ -147,10 +147,19 @@ struct SystemMetricsHistoryContent: View {
 
     @State private var range: SystemMetricsHistoryRange = .default
     @State private var sections: [SystemMetricsChartSection] = []
+    @State private var loadedRange: SystemMetricsHistoryRange?
+    @State private var loadedHistoryStats = SystemMetricsHistoryStats.empty
+    @State private var sectionsLoadedAt = Date()
+    @State private var reloadGeneration = 0
     @State private var isLoading = true
     @State private var isExporting = false
     @State private var statusMessage: String?
     @State private var clearConfirmationPresented = false
+
+    private struct HistoryLoadRequest: Equatable {
+        let range: SystemMetricsHistoryRange
+        let generation: Int
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -162,7 +171,9 @@ struct SystemMetricsHistoryContent: View {
         .padding(18)
         .frame(minWidth: 620, minHeight: 420)
         .background(Color(nsColor: .windowBackgroundColor))
-        .task(id: range) { await loadSections() }
+        .task(id: HistoryLoadRequest(range: range, generation: reloadGeneration)) { [range] in
+            await loadSections(for: range)
+        }
         .confirmationDialog(
             AppLocalization.text("清空历史记录？"),
             isPresented: $clearConfirmationPresented,
@@ -170,9 +181,12 @@ struct SystemMetricsHistoryContent: View {
         ) {
             Button(AppLocalization.text("清空"), role: .destructive) {
                 service.clearHistory()
+                sections = []
+                loadedRange = nil
+                isLoading = true
                 statusMessage = AppLocalization.text("已清空历史记录")
                 onHistoryCleared?()
-                Task { await loadSections() }
+                reloadGeneration += 1
             }
         } message: {
             Text(AppLocalization.text("删除本机保存的全部历史读数，无法恢复。"))
@@ -224,7 +238,7 @@ struct SystemMetricsHistoryContent: View {
                     help: AppLocalization.text("刷新"),
                     size: .compact
                 ) {
-                    Task { await loadSections() }
+                    reloadGeneration += 1
                 }
                 .disabled(isLoading || isExporting)
             }
@@ -253,8 +267,14 @@ struct SystemMetricsHistoryContent: View {
         } else {
             ScrollView {
                 VStack(spacing: 12) {
+                    let xDomain = SystemMetricsHistoryChartDomain.domain(
+                        for: loadedRange ?? range,
+                        historyStats: loadedHistoryStats,
+                        sections: sections,
+                        now: sectionsLoadedAt
+                    )
                     ForEach(sections) { section in
-                        SystemMetricsChartCard(section: section)
+                        SystemMetricsChartCard(section: section, xDomain: xDomain)
                     }
                 }
                 .padding(.bottom, 4)
@@ -280,10 +300,18 @@ struct SystemMetricsHistoryContent: View {
 
     // MARK: - Actions
 
-    private func loadSections() async {
+    private func loadSections(for selectedRange: SystemMetricsHistoryRange) async {
         isLoading = true
         await service.loadHistoryStats()
-        sections = await service.historySections(range: range)
+        guard !Task.isCancelled else { return }
+        let historyStats = service.historyStats
+        let rangeEnd = Date()
+        let loadedSections = await service.historySections(range: selectedRange)
+        guard !Task.isCancelled else { return }
+        sections = loadedSections
+        loadedRange = selectedRange
+        loadedHistoryStats = historyStats
+        sectionsLoadedAt = rangeEnd
         isLoading = false
     }
 
@@ -301,7 +329,7 @@ struct SystemMetricsHistoryContent: View {
 // MARK: - Export
 
 /// Shared save flow for the history card and the history window: ask for a destination, then write
-/// the workbook off the main thread because a week of samples is a few megabytes of XML.
+/// the workbook off the main thread because a month of samples is a few megabytes of XML.
 @MainActor
 enum SystemMetricsHistoryExporter {
     static func chooseDestination(now: Date = Date()) -> URL? {
@@ -333,8 +361,36 @@ enum SystemMetricsHistoryExporter {
 
 // MARK: - Chart card
 
+enum SystemMetricsHistoryChartDomain {
+    static func domain(
+        for range: SystemMetricsHistoryRange,
+        historyStats: SystemMetricsHistoryStats,
+        sections: [SystemMetricsChartSection],
+        now: Date
+    ) -> ClosedRange<Date>? {
+        let dates = sections
+            .flatMap { $0.series }
+            .flatMap(\.points)
+            .map(\.date)
+        guard let first = dates.min(), let last = dates.max() else { return nil }
+
+        if let start = range.startDate(relativeTo: now) {
+            return start...max(now, last)
+        }
+        let lowerBound = min(historyStats.oldest ?? first, first)
+        let archiveUpperBound = min(historyStats.newest ?? last, now)
+        let upperBound = max(archiveUpperBound, last)
+        guard lowerBound < upperBound else {
+            let padding = 60.0
+            return lowerBound.addingTimeInterval(-padding)...upperBound.addingTimeInterval(padding)
+        }
+        return lowerBound...upperBound
+    }
+}
+
 private struct SystemMetricsChartCard: View {
     let section: SystemMetricsChartSection
+    let xDomain: ClosedRange<Date>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -346,16 +402,11 @@ private struct SystemMetricsChartCard: View {
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
             }
-            Chart {
-                ForEach(section.series) { series in
-                    ForEach(series.points, id: \.date) { point in
-                        LineMark(
-                            x: .value("Time", point.date),
-                            y: .value("Value", point.value)
-                        )
-                        .foregroundStyle(by: .value("Series", label(for: series)))
-                        .interpolationMethod(.monotone)
-                    }
+            Group {
+                if let xDomain {
+                    chart.chartXScale(domain: xDomain)
+                } else {
+                    chart
                 }
             }
             .chartForegroundStyleScale(
@@ -401,6 +452,21 @@ private struct SystemMetricsChartCard: View {
 
     private func label(for series: SystemMetricsChartSeries) -> String {
         AppLocalization.text(series.titleKey)
+    }
+
+    private var chart: some View {
+        Chart {
+            ForEach(section.series) { series in
+                ForEach(series.points, id: \.date) { point in
+                    LineMark(
+                        x: .value("Time", point.date),
+                        y: .value("Value", point.value)
+                    )
+                    .foregroundStyle(by: .value("Series", label(for: series)))
+                    .interpolationMethod(.monotone)
+                }
+            }
+        }
     }
 
     private var symbol: String {
