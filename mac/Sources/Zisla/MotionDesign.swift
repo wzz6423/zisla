@@ -31,7 +31,9 @@ enum ZislaMotion {
     /// Content swap inside the settings window.
     static let settingsPageSwitch: Animation = .smooth(duration: 0.28)
     /// Island reveal: the surface grows out of the collapsed pill, with a hint of bounce at the end.
-    static let islandReveal: Animation = .snappy(duration: 0.28, extraBounce: 0.05)
+    /// Duration matches `islandRecycle` so growing and shrinking take the same time; only the
+    /// curve differs (spring with bounce vs. bounce-free ease).
+    static let islandReveal: Animation = .snappy(duration: 0.22, extraBounce: 0.05)
     /// Island recycle: the pointer left, so the surface folds straight back into the pill it grew
     /// from. No bounce — a fold that overshoots reads as the island hesitating to leave.
     static let islandRecycle: Animation = .smooth(duration: 0.22)
