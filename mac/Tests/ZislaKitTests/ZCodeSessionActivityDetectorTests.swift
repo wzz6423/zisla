@@ -66,8 +66,65 @@ struct ZCodeSessionActivityDetectorTests {
         #expect(tasks[0].detail == "glm-5")
         #expect(tasks[0].status == .running)
         #expect(tasks[0].updatedAt == Date(timeIntervalSince1970: Double(nowMilliseconds - 1_000) / 1_000))
+        // ZCode Desktop only registers a workspace-level deep link, so no jump is offered.
+        #expect(tasks[0].sessionURL == nil)
         #expect(tasks[1].status == .error)
         #expect(tasks[1].failureReason == "MODEL_UNAVAILABLE")
+    }
+
+    @Test
+    func reportsInFlightTurnsFromLiveModelUsage() throws {
+        // ZCode only persists the turn_usage row once a turn finishes, so an
+        // in-flight turn must be inferred from model_usage rows that have no
+        // matching turn_usage row yet.
+        let databaseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Zisla-zcode-live-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let nowMilliseconds = Int64(now.timeIntervalSince1970 * 1_000)
+        try execute(
+            """
+            CREATE TABLE session (id TEXT PRIMARY KEY, time_updated INTEGER NOT NULL);
+            CREATE TABLE turn_usage (
+                session_id TEXT NOT NULL, turn_id TEXT NOT NULL, status TEXT NOT NULL,
+                started_at INTEGER NOT NULL, first_token_at INTEGER, completed_at INTEGER,
+                error_code TEXT, PRIMARY KEY (session_id, turn_id)
+            );
+            CREATE TABLE model_usage (
+                id TEXT PRIMARY KEY, session_id TEXT NOT NULL, turn_id TEXT,
+                model_id TEXT NOT NULL, started_at INTEGER NOT NULL
+            );
+            INSERT INTO session VALUES ('live-session', \(nowMilliseconds - 1_000));
+            INSERT INTO session VALUES ('finished-session', \(nowMilliseconds - 80_000));
+            INSERT INTO session VALUES ('abandoned-session', \(nowMilliseconds - 7_200_000));
+            INSERT INTO turn_usage VALUES (
+                'finished-session', 'done-turn', 'completed', \(nowMilliseconds - 90_000), NULL,
+                \(nowMilliseconds - 80_000), NULL
+            );
+            INSERT INTO model_usage VALUES ('live-1', 'live-session', 'live-turn', 'glm-5.3', \(nowMilliseconds - 4_000));
+            INSERT INTO model_usage VALUES ('live-2', 'live-session', 'live-turn', 'glm-5.3', \(nowMilliseconds - 500));
+            INSERT INTO model_usage VALUES ('done-1', 'finished-session', 'done-turn', 'glm-5.3', \(nowMilliseconds - 89_000));
+            INSERT INTO model_usage VALUES ('stale-1', 'abandoned-session', 'stale-turn', 'glm-5.3', \(nowMilliseconds - 7_300_000));
+            """,
+            at: databaseURL
+        )
+
+        let tasks = try ZCodeSessionActivityDetector(
+            databaseURL: databaseURL,
+            recencyThreshold: 3_600,
+            now: { now }
+        ).activeTasks()
+
+        #expect(tasks.count == 1)
+        #expect(tasks[0].id == ZCodeSessionActivityDetector.taskID(
+            forSessionID: "live-session",
+            turnID: "live-turn"
+        ))
+        #expect(tasks[0].status == .running)
+        #expect(tasks[0].detail == "glm-5.3")
+        #expect(tasks[0].startedAt == Date(timeIntervalSince1970: Double(nowMilliseconds - 4_000) / 1_000))
+        #expect(tasks[0].updatedAt == Date(timeIntervalSince1970: Double(nowMilliseconds - 1_000) / 1_000))
+        #expect(tasks[0].sessionURL == nil)
     }
 
     @Test
