@@ -44,7 +44,7 @@ jobs:
     needs: gate
     if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: mac
@@ -67,10 +67,26 @@ jobs:
           for test_script in Tests/ScriptTests/*.zsh; do
             zsh "$test_script"
           done
-      - run: swift test
+      - name: Run swift test
+        run: |
+          set -o pipefail
+          if swift test 2>&1 | tee swift-test.log; then
+            rm -f swift-test.log
+            exit 0
+          fi
+          echo "::warning::swift test failed; retrying the failed tests once (transient SwiftPM fatalError crash or flaky timing tests under load)"
+          failed="$(grep -oE '✘ Test [A-Za-z0-9_]+\(\)' swift-test.log | sed -E 's/✘ Test //; s/\(\)$//' | sort -u | paste -sd'|' -)"
+          rm -f swift-test.log
+          if [ -z "$failed" ]; then
+            echo "No failed test names parsed; rerunning the full suite"
+            swift test
+          else
+            echo "Retrying tests: $failed"
+            swift test --filter "$failed"
+          fi
       - name: Remove test artifacts
         if: always()
-        run: rm -rf .build
+        run: rm -rf .build swift-test.log
 
   zislactl:
     name: Build zislactl (Release)

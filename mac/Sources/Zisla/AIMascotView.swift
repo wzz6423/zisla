@@ -4,14 +4,15 @@ import ZislaKit
 import SwiftUI
 
 @MainActor
-private final class AIMascotImageCache {
+final class AIMascotImageCache {
     static let shared = AIMascotImageCache()
 
-    private var values: [String: NSImage?] = [:]
+    // Resource and application lookups can be transient; never turn a failed first read into a permanent miss.
+    private var values: [String: NSImage] = [:]
 
     func image(for key: String, load: () -> NSImage?) -> NSImage? {
-        if let value = values[key] { return value }
-        let image = load()
+        if let image = values[key] { return image }
+        guard let image = load() ?? load() else { return nil }
         values[key] = image
         return image
     }

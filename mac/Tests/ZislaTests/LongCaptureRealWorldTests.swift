@@ -810,20 +810,20 @@ struct LongCaptureRealWorldTests {
         let pageWidth = 620
         let frameHeight = 900
         let page = try #require(makeSingleBubblePageImage(width: pageWidth, height: 2_000))
-        let frame = try #require(frame(from: page, offset: 0, height: frameHeight))
+        let stationaryFrame = try #require(frame(from: page, offset: 0, height: frameHeight))
         let frameSize = CGSize(width: pageWidth, height: frameHeight)
-        let model = ScreenshotEditorModel(image: NSImage(cgImage: frame, size: frameSize))
+        let model = ScreenshotEditorModel(image: NSImage(cgImage: stationaryFrame, size: frameSize))
         model.beginLongCapturePreview()
 
         let didAppend = model.append(
-            image: NSImage(cgImage: frame, size: frameSize),
+            image: NSImage(cgImage: stationaryFrame, size: frameSize),
             direction: .vertical
         )
         let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
 
         #expect(!didAppend, "a stationary sparse chat frame must not be treated as a scroll")
         #expect(combined.height == frameHeight)
-        #expect(rgbaPixels(combined) == rgbaPixels(frame))
+        #expect(rgbaPixels(combined) == rgbaPixels(stationaryFrame))
     }
 
     @Test
