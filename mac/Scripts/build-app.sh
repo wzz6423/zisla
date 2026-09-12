@@ -116,6 +116,8 @@ function resolve_developer_directory() {
 
 export DEVELOPER_DIR="$(resolve_developer_directory)"
 
+SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
+
 if [[ -z "$SIGNING_MODE" ]]; then
   if [[ "$IDENTITY" == "-" ]]; then
     SIGNING_MODE="adhoc"
@@ -180,6 +182,16 @@ else
   lipo -create "${BINARIES[@]}" -output "$CONTENTS/MacOS/zisla"
   chmod 0755 "$CONTENTS/MacOS/zisla"
 fi
+
+# Xcode 27's SwiftPM links executables with the deployment target recorded as the SDK version;
+# macOS 26+ then renders the app with legacy window chrome in compatibility mode instead of
+# native Liquid Glass controls. Package.swift pins the real platform versions, so fail loudly
+# if a toolchain drops them again.
+LINKED_SDK_VERSION="$(vtool -show-build "$CONTENTS/MacOS/zisla" | awk '$1 == "sdk" { print $2; exit }')"
+[[ "$LINKED_SDK_VERSION" == "$SDK_VERSION" ]] || {
+  echo "error: linked SDK version is $LINKED_SDK_VERSION, expected $SDK_VERSION; the app would run with legacy window chrome" >&2
+  exit 1
+}
 
 sed \
   -e "s/@VERSION@/$VERSION/g" \
