@@ -85,7 +85,7 @@ export const de: SiteContent = {
       clipboard: {
         name: 'Zwischenablage',
         caption:
-          'Sieh den Verlauf der Zwischenablage in der Dynamic Island und filtere nach Bild, URL, Pfad und Dateityp. Einträge lassen sich an die Kurznotizen senden, als Favorit anheften oder löschen.',
+          'Sieh den Verlauf der Zwischenablage in der Dynamic Island und filtere nach Bild, URL, Pfad und Dateityp und sieh, wann jeder Eintrag kopiert wurde. Einträge lassen sich an die Kurznotizen senden, als Favorit anheften oder löschen.',
         points: ['Verlauf in der Island', 'Filter nach Typ', 'Kurznotizen und Favoriten'],
       },
       aiMonitor: {
@@ -133,7 +133,7 @@ export const de: SiteContent = {
       quickNotes: {
         name: 'Kurznotizen',
         caption:
-          'Basiert auf der System-App Notizen: Notizen ansehen, bearbeiten, neu anlegen und löschen, mit Markdown-Vorschau in Echtzeit. Entwürfe werden automatisch nach Notizen zurückgeschrieben.',
+          'Basiert auf der System-App Notizen: Notizen ansehen, bearbeiten, neu anlegen und löschen, mit Markdown-Vorschau in Echtzeit – und mit Command+1 bis 9 direkt zu den ersten neun Notizen springen. Entwürfe werden automatisch nach Notizen zurückgeschrieben.',
         points: ['Daten liegen in Notizen', 'Markdown-Editor', 'Entwürfe automatisch gesichert'],
       },
       pdf: {
@@ -155,10 +155,10 @@ export const de: SiteContent = {
       system: {
         name: 'Systemstatus',
         caption:
-          'Sieh den Status von CPU, GPU, Speicher, Datenträger, Netzwerk und Lüftern, lies die NVMe-SMART-Temperatur, wo die Hardware sie meldet, und räume Caches und Protokolle auf, die sicher gelöscht werden können.',
+          'Sieh den Status von CPU, GPU, Speicher, Datenträger, Netzwerk und Lüftern, lies die NVMe-SMART-Temperatur, wo die Hardware sie meldet, zeichne einen minütlichen Verlauf auf, der sich für jeden Zeitraum als Diagramm zeigen und als .xlsx exportieren lässt, und räume Caches und Protokolle auf, die sicher gelöscht werden können.',
         points: [
           'Überwachung bis zum Chip',
-          'NVMe-Temperatur, wo unterstützt',
+          'Verlaufsdiagramme und .xlsx-Export',
           'Caches in einem Schritt leeren',
         ],
       },
@@ -286,7 +286,7 @@ export const de: SiteContent = {
   download: {
     eyebrow: 'JEDERZEIT EINSATZBEREIT',
     title: 'zisla laden',
-    copy: 'Für Macs mit Apple Silicon. Versionen, weitere Architekturen und Prüfsummen stehen auf der Release-Seite. Nach der Installation prüft zisla im gewählten Update-Kanal auf neue Versionen: Sparkle verifiziert zuerst die Signatur und lädt, installiert und startet dann je nach Einstellung manuell oder automatisch neu.',
+    copy: 'Für Macs mit Apple Silicon. Versionen, weitere Architekturen und Prüfsummen stehen auf der Release-Seite. Nach der Installation prüft zisla im gewählten Update-Kanal auf neue Versionen: Sparkle verifiziert zuerst die Signatur und lädt, installiert und startet dann je nach Einstellung manuell oder automatisch neu; Updates behalten die bereits erteilten Berechtigungen. Ein Release, der dich nicht betrifft, lässt sich überspringen und wird nicht mehr gemeldet.',
     primaryCta: 'Laden',
     primaryCtaAriaLabel: 'Laden',
     releaseCta: 'Release ansehen',

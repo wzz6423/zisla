@@ -84,7 +84,7 @@ export const zhHans: SiteContent = {
       clipboard: {
         name: '剪贴板',
         caption:
-          '在灵动岛内查看剪贴板历史，并按图片、URL、路径与文件类型筛选；可将历史项发送到随记、设为常用或删除。',
+          '在灵动岛内查看剪贴板历史，按图片、URL、路径与文件类型筛选，并显示每条记录的复制时间；可将历史项发送到随记、设为常用或删除。',
         points: ['岛内历史记录', '按类型筛选', '随记与常用'],
       },
       aiMonitor: {
@@ -120,7 +120,7 @@ export const zhHans: SiteContent = {
       quickNotes: {
         name: '随记',
         caption:
-          '以系统「备忘录」为数据源，支持查看、编辑、新建和删除笔记，以及 Markdown 实时预览；草稿会自动写回备忘录。',
+          '以系统「备忘录」为数据源，支持查看、编辑、新建和删除笔记，以及 Markdown 实时预览，并可用 Command+1 到 9 直接切换前九条笔记；草稿会自动写回备忘录。',
         points: ['数据来自备忘录', 'Markdown 编辑器', '草稿自动写回'],
       },
       pdf: {
@@ -138,8 +138,8 @@ export const zhHans: SiteContent = {
       system: {
         name: '系统状态',
         caption:
-          '查看 CPU、GPU、内存、磁盘、网络和风扇等状态，在设备支持时读取 NVMe SMART 温度，并清理可安全删除的缓存与日志。',
-        points: ['芯片级监控', 'NVMe 温度（设备支持时）', '一键清理缓存'],
+          '查看 CPU、GPU、内存、磁盘、网络和风扇等状态，在设备支持时读取 NVMe SMART 温度，持续记录分钟级历史，可按任意时间范围绘制图表并导出 .xlsx，还能清理可安全删除的缓存与日志。',
+        points: ['芯片级监控', '历史图表与 .xlsx 导出', '一键清理缓存'],
       },
       battery: {
         name: '电池',
@@ -257,7 +257,7 @@ export const zhHans: SiteContent = {
   download: {
     eyebrow: '随时可用',
     title: '下载 zisla',
-    copy: '适用于 Apple 芯片 Mac；版本、其他架构与校验信息均在 Release 页面。安装后可按更新通道检查新版本，Sparkle 会先验证签名，再按设置手动或自动下载、安装并重启。',
+    copy: '适用于 Apple 芯片 Mac；版本、其他架构与校验信息均在 Release 页面。安装后可按更新通道检查新版本，Sparkle 会先验证签名，再按设置手动或自动下载、安装并重启，更新会保留已授予的权限。若对某个版本不感兴趣，可以跳过，zisla 不会再提醒。',
     primaryCta: '下载',
     primaryCtaAriaLabel: '下载',
     releaseCta: '查看 Release',

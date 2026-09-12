@@ -84,7 +84,7 @@ export const zhHant: SiteContent = {
       clipboard: {
         name: '剪貼簿',
         caption:
-          '在靈動島內檢視剪貼簿歷史，並依圖片、URL、路徑與檔案類型篩選；可將項目傳送到隨記、設為常用或刪除。',
+          '在靈動島內檢視剪貼簿歷史，依圖片、URL、路徑與檔案類型篩選，並顯示每筆記錄的複製時間；可將項目傳送到隨記、設為常用或刪除。',
         points: ['島內歷史記錄', '依類型篩選', '隨記與常用'],
       },
       aiMonitor: {
@@ -120,7 +120,7 @@ export const zhHant: SiteContent = {
       quickNotes: {
         name: '隨記',
         caption:
-          '以系統「備忘錄」為資料來源，支援檢視、編輯、新增與刪除筆記，以及 Markdown 即時預覽；草稿會自動寫回備忘錄。',
+          '以系統「備忘錄」為資料來源，支援檢視、編輯、新增與刪除筆記，以及 Markdown 即時預覽，並可用 Command+1 到 9 直接切換前九則筆記；草稿會自動寫回備忘錄。',
         points: ['資料來自備忘錄', 'Markdown 編輯器', '草稿自動寫回'],
       },
       pdf: {
@@ -138,8 +138,8 @@ export const zhHant: SiteContent = {
       system: {
         name: '系統狀態',
         caption:
-          '檢視 CPU、GPU、記憶體、磁碟、網路與風扇等狀態，在裝置支援時讀取 NVMe SMART 溫度，並清理可安全刪除的快取與記錄檔。',
-        points: ['晶片級監控', 'NVMe 溫度（裝置支援時）', '一鍵清理快取'],
+          '檢視 CPU、GPU、記憶體、磁碟、網路與風扇等狀態，在裝置支援時讀取 NVMe SMART 溫度，持續記錄分鐘級歷史，可依任意時間範圍繪製圖表並匯出 .xlsx，還能清理可安全刪除的快取與記錄檔。',
+        points: ['晶片級監控', '歷史圖表與 .xlsx 匯出', '一鍵清理快取'],
       },
       battery: {
         name: '電池',
@@ -258,7 +258,7 @@ export const zhHant: SiteContent = {
   download: {
     eyebrow: '隨時可用',
     title: '下載 zisla',
-    copy: '適用於 Apple 晶片 Mac；版本、其他架構與校驗資訊都在 Release 頁面。安裝後可依更新通道檢查新版本，Sparkle 會先驗證簽章，再依設定手動或自動下載、安裝並重新啟動。',
+    copy: '適用於 Apple 晶片 Mac；版本、其他架構與校驗資訊都在 Release 頁面。安裝後可依更新通道檢查新版本，Sparkle 會先驗證簽章，再依設定手動或自動下載、安裝並重新啟動，更新會保留已授予的權限。若對某個版本不感興趣，可以跳過，zisla 不會再提醒。',
     primaryCta: '下載',
     primaryCtaAriaLabel: '下載',
     releaseCta: '查看 Release',
