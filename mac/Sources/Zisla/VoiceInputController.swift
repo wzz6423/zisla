@@ -49,7 +49,10 @@ final class VoiceInputController: ObservableObject {
     private var systemDictationSegments: [DictationTranscriptSegment] = []
     private var systemDictationSession: (any DictationSession)?
 
-    var onRecordingWillStart: (() -> Void)?
+    /// Called on the main actor before the microphone opens. The engine only starts once the
+    /// awaited hook returns, which lets the app quiesce its audio graph (spectrum tap teardown)
+    /// first.
+    var onRecordingWillStart: (() async -> Void)?
     var onTranscriptCompleted: ((VoiceRecordingResult) -> Void)?
 
     func setContextualStrings(_ strings: [String]) {
@@ -74,8 +77,16 @@ final class VoiceInputController: ObservableObject {
         let startID = UUID()
         pendingStartID = startID
         isPreparing = true
-        onRecordingWillStart?()
-        requestPermissionsAndStart(startID: startID)
+        Task { [weak self] in
+            guard let self else { return }
+            await self.onRecordingWillStart?()
+            // The hook awaited the spectrum tap's teardown, so the microphone never opens while
+            // the global process tap is still being created or destroyed. Overlapping the two
+            // double-renders the playing stream (~2x loudness) and starves the other audio
+            // engines. `requestPermissionsAndStart` re-checks `pendingStartID`, so a stop during
+            // the await is honored without a second check here.
+            self.requestPermissionsAndStart(startID: startID)
+        }
     }
 
     func stop() {

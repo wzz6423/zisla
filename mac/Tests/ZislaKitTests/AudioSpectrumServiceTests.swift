@@ -83,6 +83,31 @@ struct AudioSpectrumServiceTests {
         service.stop()
     }
 
+    /// The dictation engine must only open the microphone after the tap's teardown finished, so the
+    /// wait has to resume strictly after the pending capture work drained, in enqueue order.
+    @Test @MainActor
+    func captureTeardownWaitResumesAfterPendingCaptureWorkDrains() async {
+        let capture = OrderedAudioSpectrumCapture()
+        let service = AudioSpectrumService(capture: capture)
+
+        service.startMonitoring()
+        service.stop()
+        await service.waitForCaptureTeardown()
+
+        #expect(capture.events == ["start", "stop", "barrier"])
+    }
+
+    /// Dictation must not hang when monitoring was never running: the wait still has to resume.
+    @Test @MainActor
+    func captureTeardownWaitResumesWithoutPendingCaptureWork() async {
+        let capture = OrderedAudioSpectrumCapture()
+        let service = AudioSpectrumService(capture: capture)
+
+        await service.waitForCaptureTeardown()
+
+        #expect(capture.events == ["barrier"])
+    }
+
     /// The focus thief: every automatic graph rebuild anchored a permission prompt, and anchoring
     /// activates the app. A granted tap never fails, so it must never anchor.
     @Test
@@ -129,6 +154,25 @@ struct AudioSpectrumServiceTests {
         #expect(!graphBody.contains("CGPreflightScreenCaptureAccess()"))
     }
 
+    /// `AudioHardwareCreateProcessTap` cannot be injected, so the production barrier must be read
+    /// from source: it only preserves create/teardown ordering while it runs on the control queue.
+    @Test
+    func captureTeardownBarrierRunsOnTheControlQueue() throws {
+        let source = try String(
+            contentsOf: Self.sourcesDirectoryURL.appendingPathComponent("ZislaKit/AudioSpectrumService.swift"),
+            encoding: .utf8
+        )
+        let capture = try #require(source.range(of: "final class SystemAudioSpectrumCapture"))
+        let captureBody = source[capture.lowerBound...]
+        let barrier = try #require(
+            captureBody.range(of: "func performAfterPendingWork(_ block: @escaping @Sendable () -> Void) {")
+        )
+        let barrierEnd = try #require(captureBody[barrier.upperBound...].range(of: "\n    }"))
+        let barrierBody = captureBody[barrier.lowerBound..<barrierEnd.upperBound]
+
+        #expect(barrierBody.contains("controlQueue.async"))
+    }
+
     @MainActor
     private func drainMainActor() async {
         for _ in 0..<10 {
@@ -161,7 +205,51 @@ private final class FakeAudioSpectrumCapture: AudioSpectrumCapturing, @unchecked
 
     func stop() {}
 
+    func performAfterPendingWork(_ block: @escaping @Sendable () -> Void) {
+        block()
+    }
+
     func fail(at index: Int) {
         failures[index]()
+    }
+}
+
+/// Mirrors the production capture's serial control queue so ordering between capture work and a
+/// teardown barrier is observable.
+private final class OrderedAudioSpectrumCapture: AudioSpectrumCapturing, @unchecked Sendable {
+    private let queue = DispatchQueue(label: "test.ordered-audio-spectrum-capture")
+    private let lock = NSLock()
+    private var recordedEvents: [String] = []
+
+    var events: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedEvents
+    }
+
+    private func record(_ event: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        recordedEvents.append(event)
+    }
+
+    func setAnalysisMode(_ mode: AudioSpectrumAnalysisMode) {}
+
+    func start(
+        onFrame: @escaping @Sendable (AudioSpectrumFrame) -> Void,
+        onFailure: @escaping @Sendable () -> Void
+    ) {
+        queue.async { self.record("start") }
+    }
+
+    func stop() {
+        queue.async { self.record("stop") }
+    }
+
+    func performAfterPendingWork(_ block: @escaping @Sendable () -> Void) {
+        queue.async {
+            self.record("barrier")
+            block()
+        }
     }
 }

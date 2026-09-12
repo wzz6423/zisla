@@ -582,6 +582,11 @@ final class AppModel: ObservableObject {
       self.updateSpectrumMonitoring()
       self.onVoiceInputWillStart?()
       self.clipboardAssistant.dismiss(animated: false)
+      // The dictation engine opens the microphone only after this hook returns, and the global
+      // spectrum tap must be fully gone by then. Opening the microphone while the tap's create or
+      // teardown work is still running double-renders the playing stream (~2x loudness) and
+      // starves the keyboard sound engine.
+      await AudioSpectrumService.shared.waitForCaptureTeardown()
     }
     voiceInput.onTranscriptCompleted = { [weak self] recording in
       self?.deliverVoiceRecording(recording)

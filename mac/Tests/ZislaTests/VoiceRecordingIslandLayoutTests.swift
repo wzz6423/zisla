@@ -142,6 +142,35 @@ struct VoiceRecordingIslandLayoutTests {
         #expect(stopSpectrum.lowerBound < overlayHook.lowerBound)
     }
 
+    /// The dictation engine must not open the microphone while the spectrum tap is still being
+    /// created or destroyed: overlapping the two double-renders the playing stream (~2x loudness)
+    /// and starves the keyboard sound engine. The start hook is the only seam that orders them.
+    @Test
+    func recordingStartWaitsForTheSpectrumTapToFinishTearingDown() throws {
+        let controllerSource = try Self.source(of: "Zisla/VoiceInputController.swift")
+        #expect(controllerSource.contains("var onRecordingWillStart: (() async -> Void)?"))
+        let startFunction = try #require(controllerSource.range(of: "func start() {"))
+        let nextFunction = try #require(controllerSource[startFunction.upperBound...].range(of: "func stop()"))
+        let startBody = controllerSource[startFunction.lowerBound..<nextFunction.lowerBound]
+        let awaitHook = try #require(startBody.range(of: "await self.onRecordingWillStart?()"))
+        let requestStart = try #require(
+            startBody.range(of: "self.requestPermissionsAndStart(startID: startID)")
+        )
+        #expect(awaitHook.upperBound < requestStart.lowerBound)
+
+        let appModelSource = try Self.source(of: "Zisla/AppModel.swift")
+        let handlerStart = try #require(appModelSource.range(of: "voiceInput.onRecordingWillStart = {"))
+        let handlerEnd = try #require(
+            appModelSource[handlerStart.upperBound...].range(of: "voiceInput.onTranscriptCompleted = {")
+        )
+        let handler = appModelSource[handlerStart.lowerBound..<handlerEnd.lowerBound]
+        let spectrumUpdate = try #require(handler.range(of: "self.updateSpectrumMonitoring()"))
+        let teardownWait = try #require(
+            handler.range(of: "await AudioSpectrumService.shared.waitForCaptureTeardown()")
+        )
+        #expect(spectrumUpdate.lowerBound < teardownWait.lowerBound)
+    }
+
     @Test
     func thePanelReturnsToItsModuleSizeOnlyAfterTheFoldHasRun() throws {
         let appSource = try Self.source(of: "Zisla/ZislaApp.swift")

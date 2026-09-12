@@ -224,6 +224,14 @@ public final class AudioSpectrumService: ObservableObject {
         lastAudibleTime = nil
     }
 
+    /// Resumes once the capture finished every work item enqueued before this call, so a microphone
+    /// capture can start without overlapping the tap's create or teardown work on the control queue.
+    public func waitForCaptureTeardown() async {
+        await withCheckedContinuation { continuation in
+            capture.performAfterPendingWork(continuation.resume)
+        }
+    }
+
     private func consume(_ frame: AudioSpectrumFrame) {
         if analysisMode == .visualization, let frequencyLevels = frame.levels {
             levels = Self.smoothed(previous: levels, target: frequencyLevels)
@@ -258,6 +266,9 @@ protocol AudioSpectrumCapturing: AnyObject {
         onFailure: @escaping @Sendable () -> Void
     )
     func stop()
+    /// Runs the block only after every work item enqueued before it finished, on the capture's
+    /// serial control queue.
+    func performAfterPendingWork(_ block: @escaping @Sendable () -> Void)
 }
 
 final class SystemAudioSpectrumCapture: AudioSpectrumCapturing, @unchecked Sendable {
@@ -317,6 +328,10 @@ final class SystemAudioSpectrumCapture: AudioSpectrumCapturing, @unchecked Senda
         controlQueue.async { [weak self] in
             self?.teardown()
         }
+    }
+
+    func performAfterPendingWork(_ block: @escaping @Sendable () -> Void) {
+        controlQueue.async(execute: block)
     }
 
     private func createGraph(
