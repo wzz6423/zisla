@@ -19,7 +19,7 @@ npm run build
 当前官网使用的链接：
 
 - 源码：https://github.com/wzz6423/zisla
-- Release v0.1.8：https://github.com/wzz6423/zisla/releases/tag/v0.1.8
-- Apple 芯片 DMG：https://github.com/wzz6423/zisla/releases/download/v0.1.8/zisla-v0.1.8-macOS-arm64.dmg
-- Apple 芯片 ZIP：https://github.com/wzz6423/zisla/releases/download/v0.1.8/zisla-v0.1.8-macOS-arm64.zip
-- Universal 与 Intel 安装包：https://github.com/wzz6423/zisla/releases/tag/v0.1.8
+- Release v0.1.9：https://github.com/wzz6423/zisla/releases/tag/v0.1.9
+- Apple 芯片 DMG：https://github.com/wzz6423/zisla/releases/download/v0.1.9/zisla-v0.1.9-macOS-arm64.dmg
+- Apple 芯片 ZIP：https://github.com/wzz6423/zisla/releases/download/v0.1.9/zisla-v0.1.9-macOS-arm64.zip
+- Universal 与 Intel 安装包：https://github.com/wzz6423/zisla/releases/tag/v0.1.9
