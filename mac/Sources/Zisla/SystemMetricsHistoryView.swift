@@ -96,7 +96,9 @@ struct SystemMetricsHistoryPanelPresenter: NSViewRepresentable {
             panel.isReleasedWhenClosed = false
             panel.hidesOnDeactivate = false
             panel.level = .normal
-            panel.collectionBehavior = [.moveToActiveSpace, .transient, .ignoresCycle]
+            // Without .transient: that flag hides the window whenever the app deactivates, so
+            // clicking any other window would dismiss the panel.
+            panel.collectionBehavior = [.moveToActiveSpace, .ignoresCycle]
             panel.minSize = CGSize(width: 620, height: 420)
             let dismissPresentation = self.dismissPresentation
             let dismissPanel = { [weak self, weak panel] in

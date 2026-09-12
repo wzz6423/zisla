@@ -233,6 +233,14 @@ struct SystemMetricsHistoryPanelTests {
         #expect(source.contains("AxisMarks(values: xAxisDates)"))
     }
 
+    @Test
+    func historyPanelKeepsVisibleThroughAppDeactivation() throws {
+        let source = try String(contentsOf: Self.historyViewSourceURL, encoding: .utf8)
+
+        #expect(source.contains("panel.hidesOnDeactivate = false"))
+        #expect(source.contains("panel.collectionBehavior = [.moveToActiveSpace, .ignoresCycle]"))
+    }
+
     private static let historyViewSourceURL = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()

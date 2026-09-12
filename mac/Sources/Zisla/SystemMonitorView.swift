@@ -654,7 +654,9 @@ struct SystemCleanupPanelPresenter: NSViewRepresentable {
             // System authorization temporarily deactivates the app; keep the panel so scanning can resume immediately after authorization.
             panel.hidesOnDeactivate = false
             panel.level = .normal
-            panel.collectionBehavior = [.moveToActiveSpace, .transient, .ignoresCycle]
+            // Without .transient: that flag hides the window whenever the app deactivates, so
+            // clicking any other window would dismiss the panel.
+            panel.collectionBehavior = [.moveToActiveSpace, .ignoresCycle]
             let dismissPresentation = self.dismissPresentation
             let dismissPanel = { [weak self, weak panel] in
                 guard let self else {
