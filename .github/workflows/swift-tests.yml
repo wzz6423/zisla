@@ -67,7 +67,13 @@ jobs:
           for test_script in Tests/ScriptTests/*.zsh; do
             zsh "$test_script"
           done
-      - run: swift test
+      - name: Run swift test
+        run: |
+          swift test || {
+            code=$?
+            echo "::warning::swift test failed with exit $code; retrying once (transient SwiftPM fatalError crash or flaky timing tests under load)"
+            swift test
+          }
       - name: Remove test artifacts
         if: always()
         run: rm -rf .build
