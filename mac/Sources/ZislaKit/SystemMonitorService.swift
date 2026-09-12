@@ -3445,8 +3445,8 @@ public final class SystemMonitorService: ObservableObject {
     public let samplingInterval: TimeInterval
     /// Minimum distance between two persisted samples; sampling itself keeps running faster for the live waveforms.
     public var historyRecordingInterval: TimeInterval { historyRecorder.recordingInterval }
-    /// One minute apart for a week: dense enough to see a trend, small enough to stay a few megabytes.
-    public static let defaultHistoryCapacity = 7 * 24 * 60
+    /// One minute apart for a month: dense enough to see a trend, small enough to stay bounded.
+    public static let defaultHistoryCapacity = SystemMetricsHistoryStore.defaultCapacity
 
     private static let publicIPRefreshInterval: TimeInterval = 10 * 60
     private let fileManager: any SystemMonitorFileManaging
@@ -3848,6 +3848,7 @@ public final class SystemMonitorService: ObservableObject {
     public func loadHistoryStats() async {
         let store = historyStore
         let stats = await Task.detached(priority: .utility) { store.stats }.value
+        guard !Task.isCancelled else { return }
         historyStats = stats
     }
 

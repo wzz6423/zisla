@@ -712,13 +712,18 @@ public final class LazySystemMetricsHistoryPersistence: SystemMetricsHistoryPers
 /// Ring buffer of samples over the SQLite archive: recording writes a single row and the archive
 /// trims itself in SQL, which keeps a long recording window affordable on SSD.
 public final class SystemMetricsHistoryStore: @unchecked Sendable {
+    public static let defaultCapacity = 30 * 24 * 60
+
     public let capacity: Int
     private let persistence: any SystemMetricsHistoryPersisting
     private let lock = NSLock()
     private var stored: [SystemMetricsRecord] = []
     private var isLoaded = false
 
-    public init(persistence: any SystemMetricsHistoryPersisting, capacity: Int = 10_080) {
+    public init(
+        persistence: any SystemMetricsHistoryPersisting,
+        capacity: Int = SystemMetricsHistoryStore.defaultCapacity
+    ) {
         self.persistence = persistence
         self.capacity = max(1, capacity)
     }
@@ -902,8 +907,9 @@ public enum SystemMetricsHistorySeriesBuilder {
         let start = range.startDate(relativeTo: now)
         let relevant = records
             .filter { record in
+                guard record.timestamp <= now else { return false }
                 guard let start else { return true }
-                return record.timestamp >= start && record.timestamp <= now
+                return record.timestamp >= start
             }
             .sorted { $0.timestamp < $1.timestamp }
         guard !relevant.isEmpty else { return [] }

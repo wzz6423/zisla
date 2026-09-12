@@ -41,6 +41,57 @@ private final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @u
     }
 }
 
+private final class BlockingHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked Sendable {
+    private let condition = NSCondition()
+    private var stored: [SystemMetricsRecord]
+    private var loadStarted = false
+    private var loadCanFinish = false
+
+    init(seed: [SystemMetricsRecord]) {
+        stored = seed
+    }
+
+    func loadRecords() -> [SystemMetricsRecord] {
+        condition.lock()
+        loadStarted = true
+        condition.broadcast()
+        while !loadCanFinish {
+            condition.wait()
+        }
+        let records = stored
+        condition.unlock()
+        return records
+    }
+
+    func appendRecord(_ record: SystemMetricsRecord, capacity: Int) {
+        condition.lock()
+        stored.append(record)
+        stored = Array(stored.suffix(max(1, capacity)))
+        condition.unlock()
+    }
+
+    func removeAll() {
+        condition.lock()
+        stored = []
+        condition.unlock()
+    }
+
+    func waitUntilLoadStarts() {
+        condition.lock()
+        while !loadStarted {
+            condition.wait()
+        }
+        condition.unlock()
+    }
+
+    func releaseLoad() {
+        condition.lock()
+        loadCanFinish = true
+        condition.broadcast()
+        condition.unlock()
+    }
+}
+
 private func record(
     at seconds: TimeInterval,
     cpuUsage: Double = 0.25,
@@ -202,6 +253,41 @@ struct SystemMetricsHistorySeriesBuilderTests {
 
         #expect(week.first?.series.first?.points.count == 1)
         #expect(all.first?.series.first?.points.count == 2)
+    }
+
+    @Test
+    func allRangeExcludesSamplesAfterTheRequestedEnd() {
+        let records = [
+            record(at: now.timeIntervalSince1970 - 60),
+            record(at: now.timeIntervalSince1970 + 60),
+        ]
+
+        let all = SystemMetricsHistorySeriesBuilder.sections(records: records, range: .all, now: now)
+
+        #expect(all.first?.series.first?.points.map(\.date) == [now.addingTimeInterval(-60)])
+    }
+
+    @Test @MainActor
+    func defaultArchiveCapacityCoversThirtyDaysOfMinuteSamples() {
+        let service = SystemMonitorService(historyPersistence: MemoryHistoryPersistence())
+
+        #expect(SystemMetricsHistoryStore.defaultCapacity == 30 * 24 * 60)
+        #expect(SystemMonitorService.defaultHistoryCapacity == 30 * 24 * 60)
+        #expect(service.historyRecordingInterval == 60)
+    }
+
+    @Test @MainActor
+    func cancellingAStatsLoadDoesNotPublishItsResult() async {
+        let persistence = BlockingHistoryPersistence(seed: [record(at: 60)])
+        let service = SystemMonitorService(historyPersistence: persistence)
+        let load = Task { await service.loadHistoryStats() }
+
+        await Task.detached { persistence.waitUntilLoadStarts() }.value
+        load.cancel()
+        persistence.releaseLoad()
+        await load.value
+
+        #expect(service.historyStats == .empty)
     }
 
     @Test
