@@ -388,6 +388,58 @@ enum SystemMetricsHistoryChartDomain {
     }
 }
 
+/// Start-anchored x-axis ticks: Swift Charts' automatic and stride strategies align marks to
+/// calendar boundaries, which leaves the leading edge of the plot without a time label.
+enum SystemMetricsChartAxis {
+    /// Dates from the domain start with the smallest calendar-friendly step that still keeps
+    /// about five labels, so the first tick always sits on the left edge of the chart.
+    static func dates(in domain: ClosedRange<Date>, calendar: Calendar = .current) -> [Date] {
+        let desiredCount = 5
+        let minute = 60.0
+        let hour = 60 * minute
+        let day = 24 * hour
+        let month = 30 * day
+        let year = 365 * day
+        // Intervals only drive step selection; ticks are added with calendar components so
+        // wall-clock labels stay stable across DST shifts.
+        let steps: [(interval: TimeInterval, component: Calendar.Component, count: Int)] = [
+            (minute, .minute, 1),
+            (2 * minute, .minute, 2),
+            (5 * minute, .minute, 5),
+            (10 * minute, .minute, 10),
+            (15 * minute, .minute, 15),
+            (30 * minute, .minute, 30),
+            (hour, .hour, 1),
+            (2 * hour, .hour, 2),
+            (3 * hour, .hour, 3),
+            (4 * hour, .hour, 4),
+            (6 * hour, .hour, 6),
+            (12 * hour, .hour, 12),
+            (day, .day, 1),
+            (2 * day, .day, 2),
+            (7 * day, .day, 7),
+            (14 * day, .day, 14),
+            (month, .month, 1),
+            (3 * month, .month, 3),
+            (6 * month, .month, 6),
+            (year, .year, 1),
+            (2 * year, .year, 2),
+            (5 * year, .year, 5),
+            (10 * year, .year, 10),
+        ]
+        let step = steps.first { $0.interval >= domain.upperBound.timeIntervalSince(domain.lowerBound) / Double(desiredCount) }
+            ?? steps[steps.count - 1]
+        var dates: [Date] = []
+        var date = domain.lowerBound
+        while date <= domain.upperBound {
+            dates.append(date)
+            guard let next = calendar.date(byAdding: step.component, value: step.count, to: date) else { break }
+            date = next
+        }
+        return dates
+    }
+}
+
 private struct SystemMetricsChartCard: View {
     let section: SystemMetricsChartSection
     let xDomain: ClosedRange<Date>?
@@ -427,7 +479,7 @@ private struct SystemMetricsChartCard: View {
                 }
             }
             .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: 5)) { value in
+                AxisMarks(values: xAxisDates) { value in
                     AxisGridLine()
                     AxisValueLabel {
                         if let date = value.as(Date.self) {
@@ -452,6 +504,13 @@ private struct SystemMetricsChartCard: View {
 
     private func label(for series: SystemMetricsChartSeries) -> String {
         AppLocalization.text(series.titleKey)
+    }
+
+    /// An empty list keeps the degenerate no-data chart label-free; the domain is nil only
+    /// when no series carries any point.
+    private var xAxisDates: [Date] {
+        guard let xDomain else { return [] }
+        return SystemMetricsChartAxis.dates(in: xDomain)
     }
 
     private var chart: some View {
