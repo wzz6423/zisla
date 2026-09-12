@@ -30,6 +30,20 @@ cp "$ROOT/Resources/Info.plist" "$TEST_ROOT/Resources/Info.plist"
 print -r -- day > "$TEST_ROOT/Resources/AppIcon.icns"
 print -r -- night > "$TEST_ROOT/Resources/AppIconNight.icns"
 
+cat > "$FAKE_BIN/xcrun" <<'SCRIPT'
+#!/bin/zsh
+print -r -- 27.0
+SCRIPT
+
+cat > "$FAKE_BIN/vtool" <<'SCRIPT'
+#!/bin/zsh
+if [[ "${FAKE_VTOOL_LINKED_SDK:-27.0}" == "27.0" ]]; then
+  print -r -- "      sdk 27.0"
+else
+  print -r -- "      sdk 14.0"
+fi
+SCRIPT
+
 cat > "$FAKE_BIN/xcode-select" <<'SCRIPT'
 #!/bin/zsh
 print -r -- "$FAKE_CLT_DEVELOPER"
@@ -194,6 +208,29 @@ for architecture in arm64 x86_64; do
     exit 1
   }
 done
+
+if output="$(
+  PATH="$FAKE_BIN:$PATH" \
+    FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
+    FAKE_CODESIGN_CAPTURE_FILE="$CODESIGN_CAPTURE_FILE" \
+    FAKE_CODESIGN_STATE_FILE="$CODESIGN_STATE_FILE" \
+    FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
+    FAKE_XCODE_APP="$XCODE_APP" \
+    FAKE_VTOOL_LINKED_SDK=14.0 \
+    BUILD_ARCHITECTURES=arm64 \
+    CODE_SIGN_IDENTITY=- \
+    SIGNING_MODE=adhoc \
+    OUTPUT_DIRECTORY="$TEMPORARY_ROOT/stale-sdk-output" \
+    "$TEST_ROOT/Scripts/build-app.sh" 2>&1
+)"; then
+  print -u2 -r -- "FAIL: build-app accepted a binary linked against the wrong SDK version"
+  exit 1
+fi
+[[ "$output" == *"the app would run with legacy window chrome"* ]] || {
+  print -u2 -r -- "FAIL: wrong linked SDK version did not report the compatibility-mode error"
+  print -u2 -r -- "$output"
+  exit 1
+}
 
 (
   PATH="$FAKE_BIN:$PATH" \
