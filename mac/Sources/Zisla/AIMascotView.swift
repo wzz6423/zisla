@@ -7,8 +7,17 @@ import SwiftUI
 final class AIMascotImageCache {
     static let shared = AIMascotImageCache()
 
+    private struct FileSignature: Equatable {
+        var modificationDate: Date
+        var size: Int
+    }
+
     // Resource and application lookups can be transient; never turn a failed first read into a permanent miss.
     private var values: [String: NSImage] = [:]
+    // Dev builds re-copy resource bundles while the app runs, which invalidates already
+    // decoded NSImage objects behind their file paths. Track the backing asset so a
+    // changed file reloads and a vanished file keeps serving the last good image.
+    private var signatures: [String: FileSignature] = [:]
 
     func image(for key: String, load: () -> NSImage?) -> NSImage? {
         if let image = values[key] { return image }
@@ -18,7 +27,32 @@ final class AIMascotImageCache {
     }
 
     func image(for key: String, url: URL) -> NSImage? {
-        image(for: key) { NSImage(contentsOf: url) }
+        let signature = fileSignature(at: url)
+        if let signature, signatures[key] != signature, let image = load(from: url) {
+            values[key] = image
+            signatures[key] = signature
+        }
+        if let image = values[key] { return image }
+        guard let signature, let image = load(from: url) else { return nil }
+        values[key] = image
+        signatures[key] = signature
+        return image
+    }
+
+    private func load(from url: URL) -> NSImage? {
+        NSImage(contentsOf: url) ?? NSImage(contentsOf: url)
+    }
+
+    private func fileSignature(at url: URL) -> FileSignature? {
+        // A fresh URL object bypasses the per-URL resource-value cache, which would
+        // otherwise keep serving the pre-rebuild modification date and file size.
+        let values = try? URL(fileURLWithPath: url.path)
+            .resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+        guard let modificationDate = values?.contentModificationDate,
+              let size = values?.fileSize else {
+            return nil
+        }
+        return FileSignature(modificationDate: modificationDate, size: size)
     }
 }
 

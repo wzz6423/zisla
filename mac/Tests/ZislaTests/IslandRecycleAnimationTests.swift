@@ -10,10 +10,12 @@ struct IslandRecycleAnimationTests {
     @Test
     func theFoldAndTheDissolveShareOneClock() {
         // Equal durations are the whole point: a dissolve that outruns the fold reads as a blink,
-        // one that lags leaves a ghost pill sitting on the notch.
+        // one that lags leaves a ghost pill sitting on the notch. The expand reveal shares the
+        // same duration as the fold so growing and shrinking feel symmetric; only the fold keeps
+        // its bounce-free ease.
         #expect(ZislaMotion.islandRecycle == .smooth(duration: 0.22))
         #expect(ZislaMotion.islandRecycleFade == .easeIn(duration: 0.22))
-        #expect(ZislaMotion.islandReveal == .snappy(duration: 0.28, extraBounce: 0.05))
+        #expect(ZislaMotion.islandReveal == .snappy(duration: 0.22, extraBounce: 0.05))
     }
 
     @Test
