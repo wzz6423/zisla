@@ -1,3 +1,4 @@
+import AppKit
 import Testing
 
 @testable import Zisla
@@ -45,5 +46,39 @@ struct AIMascotIdentityTests {
             noticeID: "ai-active-gemini-gemini-desktop-chat-c1"
         ) == .geminiDesktop)
         #expect(AIMascotIdentity(noticeID: "ai-active-gemini-gemini-session-s1") == .gemini)
+    }
+}
+
+@MainActor
+struct AIMascotImageCacheTests {
+    @Test
+    func recoversFromTransientLoadFailureBeforeReturning() throws {
+        let cache = AIMascotImageCache()
+        let expected = NSImage(size: NSSize(width: 12, height: 12))
+        var loadCount = 0
+
+        let loaded = try #require(cache.image(for: "transient") {
+            loadCount += 1
+            return loadCount == 1 ? nil : expected
+        })
+        #expect(loaded === expected)
+
+        let cached = cache.image(for: "transient") {
+            loadCount += 1
+            return nil
+        }
+        #expect(cached === expected)
+        #expect(loadCount == 2)
+    }
+
+    @Test
+    func persistentFailureDoesNotPoisonFutureLoads() throws {
+        let cache = AIMascotImageCache()
+        let expected = NSImage(size: NSSize(width: 12, height: 12))
+
+        #expect(cache.image(for: "persistent") { nil } == nil)
+        let loaded = try #require(cache.image(for: "persistent") { expected })
+
+        #expect(loaded === expected)
     }
 }
