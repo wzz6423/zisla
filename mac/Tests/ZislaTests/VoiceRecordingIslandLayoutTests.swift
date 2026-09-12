@@ -125,8 +125,11 @@ struct VoiceRecordingIslandLayoutTests {
         #expect(!appSource.contains("AppModel.shared.restoreVoiceInputTargetFocus()"))
     }
 
+    /// Voice capture freezes the spectrum waveform (visualization gate) but must never toggle the
+    /// tap itself: creating or destroying the process tap while the microphone opens or closes races
+    /// the output device's reroute and can double the playing stream's loudness.
     @Test
-    func voiceCaptureSuppressesSystemSpectrumMonitoring() throws {
+    func voiceCaptureOnlyFreezesSpectrumVisualization() throws {
         let appModelSource = try Self.source(of: "Zisla/AppModel.swift")
         let updateStart = try #require(appModelSource.range(of: "private func updateSpectrumMonitoring()"))
         let updateBody = appModelSource[updateStart.lowerBound...]
@@ -134,6 +137,13 @@ struct VoiceRecordingIslandLayoutTests {
         #expect(appModelSource.contains("voiceInput.isCapturingInputPublisher"))
         #expect(updateBody.contains("let voiceInputIsCapturing = voiceInput.isCapturingInput"))
         #expect(updateBody.contains("!voiceInputIsCapturing"))
+        // The monitoring decision must not consume the capture state, so the tap lifecycle stays
+        // independent of the microphone. The block spans the monitoring call through the end of
+        // the function, which is where a capture-state gate could reappear.
+        let monitoringStart = try #require(updateBody.range(of: "media.setSpectrumMonitoringEnabled("))
+        let nextFunction = try #require(updateBody.range(of: "private func clearMediaNotices()"))
+        let monitoringBlock = updateBody[monitoringStart.lowerBound..<nextFunction.lowerBound]
+        #expect(!monitoringBlock.contains("voiceInput"))
 
         let startHandler = try #require(appModelSource.range(of: "voiceInput.onRecordingWillStart = {"))
         let handler = appModelSource[startHandler.lowerBound..<updateStart.lowerBound]

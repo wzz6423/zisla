@@ -2904,16 +2904,19 @@ final class AppModel: ObservableObject {
     mediaActivityPresented = true
   }
 
+  // Spectrum monitoring must not toggle with voice-input state: creating or destroying the global
+  // process tap while the capture engine opens or closes the microphone races the output device's
+  // reroute (Bluetooth headsets swap profiles on mic activation), which can render the playing
+  // stream twice and double its loudness until the audio graph settles. The visualization gate
+  // below still freezes the waveform during a take; only the tap's lifecycle must stay independent.
   static func shouldMonitorSpectrum(
     mediaEnabled: Bool,
     sideNoticesEnabled: Bool,
-    voiceInputIsCapturing: Bool,
     isIslandVisible: Bool,
     isPlaying: Bool,
     backgroundSoundsPlaying: Bool
   ) -> Bool {
-    !voiceInputIsCapturing
-      && mediaEnabled
+    mediaEnabled
       // Core Audio fallback needs audibility before it can publish the first playback snapshot.
       && (
         sideNoticesEnabled
@@ -2944,7 +2947,6 @@ final class AppModel: ObservableObject {
       Self.shouldMonitorSpectrum(
         mediaEnabled: settings.mediaEnabled,
         sideNoticesEnabled: settings.sideNoticesEnabled,
-        voiceInputIsCapturing: voiceInputIsCapturing,
         isIslandVisible: isIslandVisible,
         isPlaying: isPlaying,
         backgroundSoundsPlaying: backgroundSounds.isPlaying
