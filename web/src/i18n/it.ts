@@ -87,7 +87,7 @@ export const it = createCatalog({
       clipboard: {
         name: 'Appunti',
         caption:
-          'Sfoglia la cronologia degli appunti nell’isola e filtra per immagine, URL, percorso o tipo di file. Invia un elemento a Note rapide, fissalo tra i preferiti o eliminalo.',
+          'Sfoglia la cronologia degli appunti nell’isola e filtra per immagine, URL, percorso o tipo di file e guarda quando ogni elemento è stato copiato. Invia un elemento a Note rapide, fissalo tra i preferiti o eliminalo.',
         points: ['Cronologia nell’isola', 'Filtro per tipo', 'Note rapide e preferiti'],
       },
       aiMonitor: {
@@ -123,7 +123,7 @@ export const it = createCatalog({
       quickNotes: {
         name: 'Note rapide',
         caption:
-          'Usa l’app Note di sistema per visualizzare, modificare, creare ed eliminare note con anteprima Markdown dal vivo. Le bozze vengono riscritte automaticamente in Note.',
+          'Usa l’app Note di sistema per visualizzare, modificare, creare ed eliminare note con anteprima Markdown dal vivo, e passare direttamente alle prime nove note con Command+1 a 9. Le bozze vengono riscritte automaticamente in Note.',
         points: ['Dati nelle Note', 'Editor Markdown', 'Bozze salvate automaticamente'],
       },
       pdf: {
@@ -141,8 +141,8 @@ export const it = createCatalog({
       system: {
         name: 'Stato del sistema',
         caption:
-          'Controlla CPU, GPU, memoria, disco, rete e ventole; leggi la temperatura SMART NVMe quando l’hardware la espone e cancella cache e log sicuri da rimuovere.',
-        points: ['Monitoraggio a livello di chip', 'Temperatura NVMe quando supportata', 'Pulisci la cache con un tocco'],
+          'Controlla CPU, GPU, memoria, disco, rete e ventole; leggi la temperatura SMART NVMe quando l’hardware la espone, registra uno storico al minuto che puoi graficare per qualsiasi intervallo ed esportare in .xlsx, e cancella cache e log sicuri da rimuovere.',
+        points: ['Monitoraggio a livello di chip', 'Grafici dello storico ed export .xlsx', 'Pulisci la cache con un tocco'],
       },
       battery: {
         name: 'Batteria',
@@ -265,7 +265,7 @@ export const it = createCatalog({
     eyebrow: 'PRONTO QUANDO LO SEI TU',
     title: 'Scarica zisla',
     copy:
-      'Per Mac con Apple Silicon. Versioni, altre architetture e checksum sono nella pagina delle release. Dopo l’installazione, Sparkle verifica prima la firma e poi scarica, installa e riavvia manualmente o automaticamente in base alle impostazioni.',
+      'Per Mac con Apple Silicon. Versioni, altre architetture e checksum sono nella pagina delle release. Dopo l’installazione, Sparkle verifica prima la firma e poi scarica, installa e riavvia manualmente o automaticamente in base alle impostazioni, e gli aggiornamenti conservano i permessi già concessi. Se una release non ti riguarda, saltala e non verrà più segnalata.',
     primaryCta: 'Scarica',
     primaryCtaAriaLabel: 'Scarica zisla',
     releaseCta: 'Vedi release',

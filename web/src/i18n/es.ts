@@ -87,7 +87,7 @@ export const es = createCatalog({
       clipboard: {
         name: 'Portapapeles',
         caption:
-          'Consulta el historial del portapapeles dentro de la isla y filtra por imagen, URL, ruta o tipo de archivo. Envía una entrada a Notas rápidas, márcala como favorita o elimínala.',
+          'Consulta el historial del portapapeles dentro de la isla y filtra por imagen, URL, ruta o tipo de archivo y mira cuándo se copió cada entrada. Envía una entrada a Notas rápidas, márcala como favorita o elimínala.',
         points: ['Historial dentro de la isla', 'Filtrado por tipo', 'Notas rápidas y favoritos'],
       },
       aiMonitor: {
@@ -123,7 +123,7 @@ export const es = createCatalog({
       quickNotes: {
         name: 'Notas rápidas',
         caption:
-          'Usa la app Notas del sistema para ver, editar, crear y eliminar notas con vista previa Markdown en vivo. Los borradores se escriben de nuevo en Notas automáticamente.',
+          'Usa la app Notas del sistema para ver, editar, crear y eliminar notas con vista previa Markdown en vivo, y saltar directamente a las primeras nueve notas con Command+1 a 9. Los borradores se escriben de nuevo en Notas automáticamente.',
         points: ['Datos en Notas', 'Editor Markdown', 'Borradores guardados automáticamente'],
       },
       pdf: {
@@ -141,8 +141,8 @@ export const es = createCatalog({
       system: {
         name: 'Estado del sistema',
         caption:
-          'Consulta CPU, GPU, memoria, disco, red y ventiladores; lee la temperatura SMART de NVMe cuando el hardware la ofrece y limpia cachés y registros seguros de eliminar.',
-        points: ['Monitorización a nivel de chip', 'Temperatura NVMe cuando es compatible', 'Limpia cachés con un toque'],
+          'Consulta CPU, GPU, memoria, disco, red y ventiladores; lee la temperatura SMART de NVMe cuando el hardware la ofrece, guarda un historial por minuto que puedes graficar para cualquier periodo y exportar a .xlsx, y limpia cachés y registros seguros de eliminar.',
+        points: ['Monitorización a nivel de chip', 'Gráficas de historial y exportación .xlsx', 'Limpia cachés con un toque'],
       },
       battery: {
         name: 'Batería',
@@ -265,7 +265,7 @@ export const es = createCatalog({
     eyebrow: 'LISTO CUANDO TÚ LO ESTÉS',
     title: 'Descargar zisla',
     copy:
-      'Para Mac con Apple Silicon. Las versiones, otras arquitecturas y las sumas de comprobación están en la página de versiones. Tras instalar, Sparkle verifica primero la firma y luego descarga, instala y reinicia manual o automáticamente según tus ajustes.',
+      'Para Mac con Apple Silicon. Las versiones, otras arquitecturas y las sumas de comprobación están en la página de versiones. Tras instalar, Sparkle verifica primero la firma y luego descarga, instala y reinicia manual o automáticamente según tus ajustes, y las actualizaciones conservan los permisos ya concedidos. Si una versión no te interesa, puedes omitirla y no volverá a avisar.',
     primaryCta: 'Descargar',
     primaryCtaAriaLabel: 'Descargar zisla',
     releaseCta: 'Ver versión',

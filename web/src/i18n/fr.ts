@@ -90,7 +90,7 @@ export const fr: SiteContent = {
       clipboard: {
         name: 'Presse-papiers',
         caption:
-          'Consultez l’historique du presse-papiers dans la Dynamic Island et filtrez par image, URL, chemin et type de fichier. Envoyez un élément vers les notes rapides, épinglez-le en favori ou supprimez-le.',
+          'Consultez l’historique du presse-papiers dans la Dynamic Island et filtrez par image, URL, chemin et type de fichier, et voyez quand chaque élément a été copié. Envoyez un élément vers les notes rapides, épinglez-le en favori ou supprimez-le.',
         points: ['Historique dans l’île', 'Filtre par type', 'Notes rapides et favoris'],
       },
       aiMonitor: {
@@ -142,7 +142,7 @@ export const fr: SiteContent = {
       quickNotes: {
         name: 'Notes rapides',
         caption:
-          'Adossé à l’app Notes du système : consultez, modifiez, créez et supprimez des notes avec un aperçu Markdown en direct. Les brouillons sont réécrits dans Notes automatiquement.',
+          'Adossé à l’app Notes du système : consultez, modifiez, créez et supprimez des notes avec un aperçu Markdown en direct, et rejoignez d’un geste les neuf premières notes avec Command+1 à 9. Les brouillons sont réécrits dans Notes automatiquement.',
         points: [
           'Les données restent dans Notes',
           'Éditeur Markdown',
@@ -168,10 +168,10 @@ export const fr: SiteContent = {
       system: {
         name: 'État du système',
         caption:
-          'Consultez l’état du processeur, du GPU, de la mémoire, du disque, du réseau et des ventilateurs, lisez la température NVMe SMART quand le matériel la publie, et videz les caches et journaux qu’il est sûr de supprimer.',
+          'Consultez l’état du processeur, du GPU, de la mémoire, du disque, du réseau et des ventilateurs, lisez la température NVMe SMART quand le matériel la publie, conservez un historique à la minute consultable sur n’importe quelle période et exportable en .xlsx, et videz les caches et journaux qu’il est sûr de supprimer.',
         points: [
           'Surveillance au niveau de la puce',
-          'Température NVMe si prise en charge',
+          'Graphiques d’historique et export .xlsx',
           'Vider les caches en un geste',
         ],
       },
@@ -299,7 +299,7 @@ export const fr: SiteContent = {
   download: {
     eyebrow: 'DISPONIBLE QUAND VOUS VOULEZ',
     title: 'Télécharger zisla',
-    copy: 'Pour les Mac Apple silicon. Versions, autres architectures et sommes de contrôle sont sur la page de publication. Après installation, zisla peut chercher les nouvelles versions sur le canal choisi : Sparkle vérifie d’abord la signature, puis télécharge, installe et redémarre manuellement ou automatiquement selon vos réglages.',
+    copy: 'Pour les Mac Apple silicon. Versions, autres architectures et sommes de contrôle sont sur la page de publication. Après installation, zisla peut chercher les nouvelles versions sur le canal choisi : Sparkle vérifie d’abord la signature, puis télécharge, installe et redémarre manuellement ou automatiquement selon vos réglages, et les mises à jour conservent les permissions déjà accordées. Si une version ne vous concerne pas, ignorez-la : zisla ne la rappellera plus.',
     primaryCta: 'Télécharger',
     primaryCtaAriaLabel: 'Télécharger',
     releaseCta: 'Voir la publication',
