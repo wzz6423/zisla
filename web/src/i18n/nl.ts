@@ -87,7 +87,7 @@ export const nl = createCatalog({
       clipboard: {
         name: 'Klembord',
         caption:
-          'Bekijk de klembordgeschiedenis in het eiland en filter op afbeelding, URL, pad of bestandstype. Stuur een item naar Snelle notities, maak het favoriet of verwijder het.',
+          'Bekijk de klembordgeschiedenis in het eiland en filter op afbeelding, URL, pad of bestandstype en zie wanneer elk item is gekopieerd. Stuur een item naar Snelle notities, maak het favoriet of verwijder het.',
         points: ['Geschiedenis in het eiland', 'Filteren op type', 'Snelle notities en favorieten'],
       },
       aiMonitor: {
@@ -123,7 +123,7 @@ export const nl = createCatalog({
       quickNotes: {
         name: 'Snelle notities',
         caption:
-          'Gebruikt de systeemapp Notities om notities te bekijken, bewerken, maken en verwijderen met live Markdown-voorbeeld. Concepten worden automatisch teruggeschreven.',
+          'Gebruikt de systeemapp Notities om notities te bekijken, bewerken, maken en verwijderen met live Markdown-voorbeeld, en met Command+1 tot 9 meteen naar de eerste negen notities te springen. Concepten worden automatisch teruggeschreven.',
         points: ['Gegevens in Notities', 'Markdown-editor', 'Concepten automatisch opgeslagen'],
       },
       pdf: {
@@ -141,8 +141,8 @@ export const nl = createCatalog({
       system: {
         name: 'Systeemstatus',
         caption:
-          'Controleer CPU, GPU, geheugen, schijf, netwerk en ventilatoren; lees de NVMe-SMART-temperatuur wanneer de hardware die aanbiedt en ruim veilige caches en logboeken op.',
-        points: ['Monitoring op chipniveau', 'NVMe-temperatuur indien ondersteund', 'Caches met één tik opruimen'],
+          'Controleer CPU, GPU, geheugen, schijf, netwerk en ventilatoren; lees de NVMe-SMART-temperatuur wanneer de hardware die aanbiedt, houd een minuutsgewijze geschiedenis bij die je voor elke periode als grafiek bekijkt en als .xlsx exporteert, en ruim veilige caches en logboeken op.',
+        points: ['Monitoring op chipniveau', 'Geschiedenisgrafieken en .xlsx-export', 'Caches met één tik opruimen'],
       },
       battery: {
         name: 'Batterij',
@@ -252,7 +252,7 @@ export const nl = createCatalog({
     eyebrow: 'KLAAR WANNEER JIJ KLAAR BENT',
     title: 'zisla downloaden',
     copy:
-      'Voor Macs met Apple Silicon. Versies, andere architecturen en checksums staan op de releasepagina. Na installatie controleert Sparkle eerst de handtekening en downloadt, installeert en herstart het handmatig of automatisch volgens je instellingen.',
+      'Voor Macs met Apple Silicon. Versies, andere architecturen en checksums staan op de releasepagina. Na installatie controleert Sparkle eerst de handtekening en downloadt, installeert en herstart het handmatig of automatisch volgens je instellingen; updates behouden de al verleende machtigingen. Sla je een versie over, dan wordt die niet meer gemeld.',
     primaryCta: 'Download',
     primaryCtaAriaLabel: 'zisla downloaden',
     releaseCta: 'Release bekijken',

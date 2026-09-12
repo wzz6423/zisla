@@ -86,7 +86,7 @@ export const en: SiteContent = {
       clipboard: {
         name: 'Clipboard',
         caption:
-          'Browse clipboard history inside the island and filter by image, URL, path and file type. Send an entry to Quick Notes, pin it as a favourite, or delete it.',
+          'Browse clipboard history inside the island, filter by image, URL, path and file type, and see when each entry was copied. Send an entry to Quick Notes, pin it as a favourite, or delete it.',
         points: ['History inside the island', 'Filter by type', 'Quick Notes and favourites'],
       },
       aiMonitor: {
@@ -126,7 +126,7 @@ export const en: SiteContent = {
       quickNotes: {
         name: 'Quick Notes',
         caption:
-          'Backed by the system Notes app: view, edit, create and delete notes with live Markdown preview. Drafts are written back to Notes automatically.',
+          'Backed by the system Notes app: view, edit, create and delete notes with live Markdown preview, and jump straight to the first nine notes with Command+1 through 9. Drafts are written back to Notes automatically.',
         points: ['Data lives in Notes', 'Markdown editor', 'Drafts saved back automatically'],
       },
       pdf: {
@@ -144,8 +144,8 @@ export const en: SiteContent = {
       system: {
         name: 'System status',
         caption:
-          'Check CPU, GPU, memory, disk, network and fan status, read NVMe SMART temperature where the hardware reports it, and clear caches and logs that are safe to delete.',
-        points: ['Chip-level monitoring', 'NVMe temperature where supported', 'Clear caches in one tap'],
+          'Check CPU, GPU, memory, disk, network and fan status, read NVMe SMART temperature where the hardware reports it, keep a minute-level history you can chart for any time range and export as .xlsx, and clear caches and logs that are safe to delete.',
+        points: ['Chip-level monitoring', 'History charts and .xlsx export', 'Clear caches in one tap'],
       },
       battery: {
         name: 'Battery',
@@ -270,7 +270,7 @@ export const en: SiteContent = {
   download: {
     eyebrow: 'READY WHEN YOU ARE',
     title: 'Download zisla',
-    copy: 'For Apple silicon Macs. Versions, other architectures and checksums are on the release page. After installing, zisla can check for new versions on your chosen update channel: Sparkle verifies the signature first, then downloads, installs and restarts manually or automatically according to your settings.',
+    copy: 'For Apple silicon Macs. Versions, other architectures and checksums are on the release page. After installing, zisla can check for new versions on your chosen update channel: Sparkle verifies the signature first, then downloads, installs and restarts manually or automatically according to your settings, and updates keep the permissions you have already granted. If a release does not concern you, skip it and zisla will not bring it up again.',
     primaryCta: 'Download',
     primaryCtaAriaLabel: 'Download',
     releaseCta: 'View release',
