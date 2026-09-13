@@ -202,11 +202,23 @@ mkdir -p "$FAKE_BIN"
 cat > "$FAKE_BIN/mv" <<'SCRIPT'
 #!/bin/zsh
 set -euo pipefail
-if (( $# == 2 )); then
-  if [[ "$FAIL_MOVE_STAGE" == backup && "$1" == "$PACKAGE_TEST_OUTPUT" ]]; then
+move_arguments=("$@")
+[[ "$1" != -n ]] || move_arguments=("${@:2}")
+if (( ${#move_arguments} == 2 )); then
+  move_source="$move_arguments[1]"
+  move_target="$move_arguments[2]"
+  if [[ "$move_target" == "${PACKAGE_TEST_OUTPUT:h}" ]]; then
+    move_target="$move_target/${move_source:t}"
+  fi
+  if [[ "$FAIL_MOVE_STAGE" == collision* && "$move_target" == "$PACKAGE_TEST_OUTPUT" && ! -e "$MOVE_FAILURE_MARKER" ]]; then
+    : > "$MOVE_FAILURE_MARKER"
+    cp -RP "$COLLISION_FIXTURE" "$PACKAGE_TEST_OUTPUT"
+    [[ "$FAIL_MOVE_STAGE" != collision-restore ]] || exit 43
+  fi
+  if [[ "$FAIL_MOVE_STAGE" == backup && "$move_source" == "$PACKAGE_TEST_OUTPUT" ]]; then
     print -u2 -r -- "injected package backup failure"
     exit 43
-  elif [[ "$FAIL_MOVE_STAGE" != backup && "$2" == "$PACKAGE_TEST_OUTPUT" ]]; then
+  elif [[ "$FAIL_MOVE_STAGE" != backup && "$move_target" == "$PACKAGE_TEST_OUTPUT" ]]; then
     if [[ "$FAIL_MOVE_STAGE" == rollback || ! -e "$MOVE_FAILURE_MARKER" ]]; then
       : > "$MOVE_FAILURE_MARKER"
       print -u2 -r -- "injected package $FAIL_MOVE_STAGE failure"
@@ -230,6 +242,73 @@ for failed_move in publish backup; do
   expect_equal 0 "${#temporary_directories}" "a $failed_move failure cleans up temporary packages"
 done
 
+COLLISION_ROOT="$TEMPORARY_ROOT/collisions"
+mkdir -p "$COLLISION_ROOT/empty-directory" "$COLLISION_ROOT/nonempty-directory" "$COLLISION_ROOT/link-target"
+print -r -- concurrent > "$COLLISION_ROOT/nonempty-directory/marker.txt"
+print -r -- concurrent > "$COLLISION_ROOT/regular-file"
+print -r -- linked > "$COLLISION_ROOT/link-target/marker.txt"
+ln -s "$COLLISION_ROOT/link-target" "$COLLISION_ROOT/directory-link"
+ln -s "$COLLISION_ROOT/missing-target" "$COLLISION_ROOT/dangling-link"
+cp -R "$COLLISION_ROOT/link-target" "$COLLISION_ROOT/original-link-target"
+
+for collision in empty-directory nonempty-directory regular-file directory-link dangling-link restore-directory; do
+  collision_fixture="$COLLISION_ROOT/$collision"
+  failure_stage=collision
+  expected_status=1
+  if [[ "$collision" == restore-directory ]]; then
+    collision_fixture="$COLLISION_ROOT/nonempty-directory"
+    failure_stage=collision-restore
+    expected_status=43
+  fi
+  command_status=0
+  CAPTURE_FILE="$CAPTURE_FILE" PATH="$FAKE_BIN:$PATH" PACKAGE_TEST_OUTPUT="$RESOLVED_OUTPUT_DIRECTORY" \
+    FAIL_MOVE_STAGE="$failure_stage" COLLISION_FIXTURE="$collision_fixture" \
+    MOVE_FAILURE_MARKER="$TEMPORARY_ROOT/$collision-collision" "$SCRIPT" \
+    > "$TEMPORARY_ROOT/failure-output.txt" 2>&1 || command_status=$?
+  if [[ -L "$collision_fixture" ]]; then
+    expect_equal "$(readlink "$collision_fixture")" "$(readlink "$OUTPUT_DIRECTORY")" \
+      "a $collision collision preserves the new output symlink"
+  else
+    expect_directory_equal "$collision_fixture" "$OUTPUT_DIRECTORY" \
+      "a $collision collision does not nest or overwrite files in the new destination"
+  fi
+  expect_directory_equal "$COLLISION_ROOT/original-link-target" "$COLLISION_ROOT/link-target" \
+    "a $collision collision does not write through an output symlink"
+  temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+  expect_equal 1 "${#temporary_directories}" "a $collision collision keeps its recovery directory"
+  RECOVERY_DIRECTORY="${temporary_directories[1]:A}/previous-outputs/outputs"
+  expect_directory_equal "$PREVIOUS_OUTPUT_DIRECTORY" "$RECOVERY_DIRECTORY" \
+    "a $collision collision preserves the complete previous release"
+  expect_equal "$expected_status" "$command_status" "a $collision collision reports failure"
+  (( tests_run += 1 ))
+  if [[ "$(<"$TEMPORARY_ROOT/failure-output.txt")" != *"previous release remains at $RECOVERY_DIRECTORY"* ]]; then
+    print -u2 -r -- "FAIL: a $collision collision does not report its recovery directory"
+    exit 1
+  fi
+  /bin/mv "$OUTPUT_DIRECTORY" "$TEMPORARY_ROOT/observed-$collision"
+  /bin/mv "$RECOVERY_DIRECTORY" "$OUTPUT_DIRECTORY"
+  rm -rf "$temporary_directories[1]"
+done
+
+mv "$OUTPUT_DIRECTORY" "$TEMPORARY_ROOT/before-first-collision"
+command_status=0
+CAPTURE_FILE="$CAPTURE_FILE" PATH="$FAKE_BIN:$PATH" PACKAGE_TEST_OUTPUT="$RESOLVED_OUTPUT_DIRECTORY" \
+  FAIL_MOVE_STAGE=collision COLLISION_FIXTURE="$COLLISION_ROOT/nonempty-directory" \
+  MOVE_FAILURE_MARKER="$TEMPORARY_ROOT/first-collision" "$SCRIPT" \
+  > "$TEMPORARY_ROOT/failure-output.txt" 2>&1 || command_status=$?
+expect_directory_equal "$COLLISION_ROOT/nonempty-directory" "$OUTPUT_DIRECTORY" \
+  "a first publication collision preserves the new destination"
+expect_equal 1 "$command_status" "a first publication collision reports failure"
+(( tests_run += 1 ))
+if [[ "$(<"$TEMPORARY_ROOT/failure-output.txt")" != *"output destination already exists: $RESOLVED_OUTPUT_DIRECTORY"* ]]; then
+  print -u2 -r -- "FAIL: a first publication collision does not identify the occupied destination"
+  exit 1
+fi
+temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+expect_equal 0 "${#temporary_directories}" "a first publication collision cleans up unneeded packages"
+mv "$OUTPUT_DIRECTORY" "$TEMPORARY_ROOT/observed-first-collision"
+mv "$TEMPORARY_ROOT/before-first-collision" "$OUTPUT_DIRECTORY"
+
 mv "$OUTPUT_DIRECTORY" "$TEMPORARY_ROOT/saved-output"
 ln -s "$TEMPORARY_ROOT/missing-output" "$OUTPUT_DIRECTORY"
 command_status=0
@@ -241,6 +320,23 @@ expect_equal "$TEMPORARY_ROOT/missing-output" "$(readlink "$OUTPUT_DIRECTORY")" 
   "a publication failure restores an existing dangling output symlink"
 temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
 expect_equal 0 "${#temporary_directories}" "restoring an output symlink cleans up temporary packages"
+
+command_status=0
+CAPTURE_FILE="$CAPTURE_FILE" PATH="$FAKE_BIN:$PATH" PACKAGE_TEST_OUTPUT="$RESOLVED_OUTPUT_DIRECTORY" \
+  FAIL_MOVE_STAGE=collision COLLISION_FIXTURE="$COLLISION_ROOT/empty-directory" \
+  MOVE_FAILURE_MARKER="$TEMPORARY_ROOT/symlink-collision" "$SCRIPT" \
+  > "$TEMPORARY_ROOT/failure-output.txt" 2>&1 || command_status=$?
+expect_directory_equal "$COLLISION_ROOT/empty-directory" "$OUTPUT_DIRECTORY" \
+  "a collision while restoring a dangling symlink preserves the new destination"
+temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+expect_equal 1 "${#temporary_directories}" "a skipped symlink restore keeps its recovery directory"
+RECOVERY_DIRECTORY="${temporary_directories[1]:A}/previous-outputs/outputs"
+expect_equal "$TEMPORARY_ROOT/missing-output" "$(readlink "$RECOVERY_DIRECTORY")" \
+  "a skipped symlink restore preserves the previous dangling output symlink"
+expect_equal 1 "$command_status" "a skipped symlink restore reports failure"
+/bin/mv "$OUTPUT_DIRECTORY" "$TEMPORARY_ROOT/observed-symlink-collision"
+/bin/mv "$RECOVERY_DIRECTORY" "$OUTPUT_DIRECTORY"
+rm -rf "$temporary_directories[1]"
 
 CAPTURE_FILE="$CAPTURE_FILE" "$SCRIPT" >/dev/null
 expect_directory_equal "$PREVIOUS_OUTPUT_DIRECTORY" "$OUTPUT_DIRECTORY" \
@@ -262,10 +358,10 @@ CAPTURE_FILE="$CAPTURE_FILE" PATH="$FAKE_BIN:$PATH" PACKAGE_TEST_OUTPUT="$RESOLV
   > "$TEMPORARY_ROOT/failure-output.txt" 2>&1 || command_status=$?
 temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
 expect_equal 1 "${#temporary_directories}" "a failed rollback keeps its recovery directory"
-RECOVERY_DIRECTORY="${temporary_directories[1]:A}/previous-outputs"
+RECOVERY_DIRECTORY="${temporary_directories[1]:A}/previous-outputs/outputs"
 expect_directory_equal "$PREVIOUS_OUTPUT_DIRECTORY" "$RECOVERY_DIRECTORY" \
   "a failed rollback leaves the previous release available for recovery"
-expect_equal 1 "$command_status" "a failed rollback reports failure"
+expect_equal 43 "$command_status" "a failed rollback preserves the publication failure status"
 (( tests_run += 1 ))
 if [[ "$(<"$TEMPORARY_ROOT/failure-output.txt")" != *"previous release remains at $RECOVERY_DIRECTORY"* ]]; then
   print -u2 -r -- "FAIL: a failed rollback does not report the recovery directory"

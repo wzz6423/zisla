@@ -80,21 +80,24 @@ struct VoicePostProcessingQueueTests {
     }
 
     @Test
-    func cancelAllCancelsCurrentWorkAndDropsPendingWork() async throws {
+    func cancelAllCancelsCurrentWorkAndDropsPendingWork() async {
         let queue = VoicePostProcessingQueue()
         let cancellationGate = VoicePostProcessingQueueTestGate()
+        let releaseGate = VoicePostProcessingQueueTestGate()
+        let completedGate = VoicePostProcessingQueueTestGate()
         var cancellationObserved = false
         var pendingOperationRan = false
 
         await withCheckedContinuation { started in
             queue.enqueue {
                 started.resume()
-                do {
-                    try await Task.sleep(for: .seconds(5))
-                } catch is CancellationError {
-                    cancellationObserved = true
-                    await cancellationGate.signal()
-                } catch {}
+                await withTaskCancellationHandler {
+                    await releaseGate.wait()
+                } onCancel: {
+                    Task { await cancellationGate.signal() }
+                }
+                cancellationObserved = Task.isCancelled
+                await completedGate.signal()
             }
             queue.enqueue {
                 pendingOperationRan = true
@@ -103,6 +106,8 @@ struct VoicePostProcessingQueueTests {
 
         queue.cancelAll()
         await cancellationGate.wait()
+        await releaseGate.signal()
+        await completedGate.wait()
 
         #expect(cancellationObserved)
         #expect(!pendingOperationRan)
@@ -119,12 +124,11 @@ struct VoicePostProcessingQueueTests {
         await withCheckedContinuation { started in
             queue.enqueue {
                 started.resume()
-                do {
-                    try await Task.sleep(for: .seconds(5))
-                } catch is CancellationError {
-                    await cancellationGate.signal()
+                await withTaskCancellationHandler {
                     await releaseGate.wait()
-                } catch {}
+                } onCancel: {
+                    Task { await cancellationGate.signal() }
+                }
             }
         }
 

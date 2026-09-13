@@ -1,13 +1,15 @@
 import Foundation
+import Darwin
 import SQLite3
 
 private let voiceSQLiteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
 final class VoiceHistoryDatabase {
     private var connection: OpaquePointer?
+    private var accessDescriptor: Int32 = -1
     private var persistedEntries: [UUID: VoiceHistoryEntry] = [:]
     private var persistedStatistics: VoiceHistoryPersistentState.CumulativeStatistics?
-    private var revision: String?
+    private(set) var revision: String?
 
     init(storageURL: URL, fileManager: FileManager) throws {
         try fileManager.createDirectory(
@@ -21,6 +23,10 @@ final class VoiceHistoryDatabase {
             nil
         )
         try check(result)
+        accessDescriptor = open(storageURL.appendingPathExtension("lock").path, O_RDWR | O_CREAT, 0o600)
+        guard accessDescriptor >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        try lock()
+        defer { unlock() }
         let version = try schemaVersion()
         guard version == 0 || version == 1 else { throw CocoaError(.fileReadCorruptFile) }
         try execute("PRAGMA journal_mode = WAL")
@@ -41,6 +47,27 @@ final class VoiceHistoryDatabase {
 
     deinit {
         sqlite3_close_v2(connection)
+        if accessDescriptor >= 0 { close(accessDescriptor) }
+    }
+
+    func lock() throws {
+        guard flock(accessDescriptor, LOCK_EX | LOCK_NB) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+    }
+
+    func unlock() {
+        flock(accessDescriptor, LOCK_UN)
+    }
+
+    func validateRevision() throws {
+        let statement = try prepare("SELECT revision FROM voice_history_state WHERE id = 1")
+        defer { sqlite3_finalize(statement) }
+        try check(sqlite3_step(statement), expected: SQLITE_ROW)
+        guard let currentRevision = sqlite3_column_text(statement, 0),
+              String(cString: currentRevision) == revision else {
+            throw CocoaError(.fileWriteUnknown)
+        }
     }
 
     func load() throws -> VoiceHistoryPersistentState? {
@@ -89,7 +116,7 @@ final class VoiceHistoryDatabase {
         return state
     }
 
-    func save(_ state: VoiceHistoryPersistentState) throws {
+    func save(_ state: VoiceHistoryPersistentState, commitRevision: UUID? = nil) throws {
         var candidate: [UUID: VoiceHistoryEntry] = [:]
         for entry in state.entries {
             guard candidate.updateValue(entry, forKey: entry.id) == nil else {
@@ -102,19 +129,12 @@ final class VoiceHistoryDatabase {
             return (entry.id, try JSONEncoder().encode(entry))
         }
         guard !removedIDs.isEmpty || !changedEntries.isEmpty
-            || persistedStatistics != state.cumulativeStatistics else {
-            // A no-op save can still precede deletion of audio discovered on disk.
-            let statement = try prepare("SELECT revision FROM voice_history_state WHERE id = 1")
-            defer { sqlite3_finalize(statement) }
-            try check(sqlite3_step(statement), expected: SQLITE_ROW)
-            guard let currentRevision = sqlite3_column_text(statement, 0),
-                  String(cString: currentRevision) == revision else {
-                throw CocoaError(.fileWriteUnknown)
-            }
+            || persistedStatistics != state.cumulativeStatistics || commitRevision != nil else {
+            try validateRevision()
             return
         }
 
-        let nextRevision = UUID().uuidString
+        let nextRevision = (commitRevision ?? UUID()).uuidString
         let statisticsData = try JSONEncoder().encode(state.cumulativeStatistics)
         try transaction(begin: "BEGIN IMMEDIATE") {
             if !removedIDs.isEmpty {

@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SQLite3
 import Testing
@@ -204,6 +205,79 @@ struct MailServiceTests {
         await second.value
         #expect(service.messages.map(\.messageID) == [2])
         #expect(!service.isLoading)
+    }
+
+    @Test(arguments: [false, true], [false, true]) @MainActor
+    func restartedPollingDiscardsLateManualRefreshResults(fails: Bool, oldCompletesFirst: Bool) async {
+        let firstStarted = MailOperationQueueTestGate()
+        let releaseFirst = MailOperationQueueTestGate()
+        let secondStarted = MailOperationQueueTestGate()
+        let releaseSecond = MailOperationQueueTestGate()
+        var scripts: [String] = []
+        let service = MailService(
+            commandRunner: { script, _ in
+                scripts.append(script)
+                switch scripts.count {
+                case 1:
+                    await firstStarted.signal()
+                    await releaseFirst.wait()
+                    return fails
+                        ? .failure(.failed("Late failure"))
+                        : .success(.snapshot(makeMailServiceSnapshot(account: "old", messageID: 1)))
+                case 2:
+                    await secondStarted.signal()
+                    await releaseSecond.wait()
+                    return .success(.snapshot(makeMailServiceSnapshot(account: "new", messageID: 2, hasMore: true)))
+                default:
+                    return .success(.snapshot(makeMailServiceSnapshot(account: "new", messageID: 3)))
+                }
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        defer { service.stop() }
+        let first = Task { await service.refresh() }
+        await firstStarted.wait()
+        service.stop()
+        service.start(accountNames: ["new"])
+        await secondStarted.wait()
+
+        let completed = AsyncStream<Void>.makeStream()
+        let observation = service.$isLoading.filter { !$0 }.prefix(1).sink { _ in
+            completed.continuation.yield()
+        }
+        defer {
+            observation.cancel()
+            completed.continuation.finish()
+        }
+        if oldCompletesFirst {
+            await releaseFirst.signal()
+            await first.value
+            #expect(service.isLoading)
+            #expect(service.messages.isEmpty)
+            #expect(service.errorDescription == nil)
+        }
+        await releaseSecond.signal()
+        for await _ in completed.stream { break }
+        if !oldCompletesFirst {
+            await releaseFirst.signal()
+            await first.value
+        }
+
+        #expect(service.messages.map(\.messageID) == [2])
+        #expect(service.accounts.map(\.id) == ["new"])
+        #expect(service.paginationGeneration == 1)
+        #expect(service.canLoadMore)
+        #expect(service.errorDescription == nil)
+        #expect(!service.needsMailIndexAccess)
+        #expect(!service.isLoading)
+        await service.loadMore()
+        #expect(scripts.count == 3)
+        #expect(scripts.last?.contains("set remainingOffset to 10") == true)
+        #expect(scripts.last?.contains("set selectedAccountNames to {\"new\"}") == true)
+        #expect(service.messages.map(\.messageID).sorted() == [2, 3])
+        #expect(service.paginationGeneration == 2)
+        #expect(!service.canLoadMore)
     }
 
     @Test @MainActor
