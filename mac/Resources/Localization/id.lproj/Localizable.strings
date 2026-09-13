@@ -2437,8 +2437,8 @@
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Notifikasi alarm belum diizinkan. Aktifkan notifikasi di Pengaturan Sistem.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Suara notifikasi alarm dinonaktifkan. Aktifkan suara di Pengaturan Sistem.";
 "无法设置闹钟通知：%@" = "Tidak dapat menjadwalkan notifikasi alarm: %@";
-
-
 "应用程序" = "Aplikasi";
 "打开应用" = "Buka aplikasi";
 "无法打开应用" = "Tidak dapat membuka aplikasi";
+"Emoji 名称" = "Nama emoji";
+"复制 Emoji" = "Salin emoji";
