@@ -4,10 +4,8 @@ import SwiftUI
 
 struct ToolboxModuleView: View {
     @ObservedObject var model: AppModel
-    @ObservedObject private var pomodoro: PomodoroService
     @ObservedObject private var settingsStore: FeatureSettingsStore
     private let onTransientInteractionChanged: (Bool) -> Void
-    @State private var isDurationPickerPresented = false
     @State private var isAlarmEditorPresented = false
 
     private enum Metrics {
@@ -20,7 +18,6 @@ struct ToolboxModuleView: View {
         onTransientInteractionChanged: @escaping (Bool) -> Void = { _ in }
     ) {
         _model = ObservedObject(wrappedValue: model)
-        _pomodoro = ObservedObject(wrappedValue: model.pomodoro)
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
         self.onTransientInteractionChanged = onTransientInteractionChanged
     }
@@ -39,7 +36,7 @@ struct ToolboxModuleView: View {
         )
     }
 
-    private var startPauseButtonShape: UnevenRoundedRectangle {
+    private var openClockButtonShape: UnevenRoundedRectangle {
         IslandSurfaceGeometry.moduleContentShape(
             bottomLeadingRadius: IslandSurfaceGeometry.nestedBottomCornerRadius(inset: 10)
         )
@@ -48,47 +45,39 @@ struct ToolboxModuleView: View {
     private var focusPanel: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(AppLocalization.text(pomodoro.mode.title))
+                Text(AppLocalization.text("专注倒计时"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
 
             Spacer(minLength: 0)
-            durationDisplay
+            Image(systemName: "timer")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
                 .frame(maxWidth: .infinity, alignment: .center)
             Spacer(minLength: 0)
 
-            HStack(spacing: 8) {
-                Button {
-                    pomodoro.toggleStartPause()
-                } label: {
-                    Text(startPauseTitle)
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Metrics.controlHeight)
-                        .contentShape(startPauseButtonShape)
+            Button {
+                Task {
+                    do {
+                        try await SystemClockService.open(.timer)
+                    } catch {
+                        model.transientMessage = error.localizedDescription
+                    }
                 }
-                .buttonStyle(.plain)
-                .background(Color.fillCard)
-                .clipShape(startPauseButtonShape)
-                .help(startPauseTitle)
-
-                Button {
-                    pomodoro.reset()
-                } label: {
-                    Text(AppLocalization.text("重置"))
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Metrics.controlHeight)
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .background(Color.fillControl)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .help(AppLocalization.text("重置番茄钟"))
+            } label: {
+                Text(AppLocalization.text("打开时钟"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Metrics.controlHeight)
+                    .contentShape(openClockButtonShape)
             }
-            .frame(maxWidth: .infinity)
+            .buttonStyle(.plain)
+            .background(Color.fillCard)
+            .clipShape(openClockButtonShape)
+            .help(AppLocalization.text("打开系统「时钟」App"))
         }
         .padding(10)
         .frame(width: 236, height: Metrics.toolContentHeight)
@@ -97,48 +86,6 @@ struct ToolboxModuleView: View {
         .overlay {
             focusPanelShape
                 .strokeBorder(Color.strokeCard, lineWidth: 1)
-        }
-    }
-
-    @ViewBuilder
-    private var durationDisplay: some View {
-        if pomodoro.phase == .idle {
-            Button {
-                isDurationPickerPresented.toggle()
-            } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text(pomodoro.displayClock)
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.primary)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .buttonStyle(.plain)
-            .help(AppLocalization.text("设置时长"))
-            .popover(isPresented: $isDurationPickerPresented, arrowEdge: .top) {
-                HStack(spacing: 8) {
-                    durationInput("小时", value: durationHours)
-                    Text(AppLocalization.text("小时"))
-                        .foregroundStyle(.secondary)
-
-                    durationInput("分钟", value: durationMinutes)
-                    Text(AppLocalization.text("分"))
-                        .foregroundStyle(.secondary)
-
-                    durationInput("秒", value: durationSeconds)
-                    Text(AppLocalization.text("秒"))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(12)
-            }
-        } else {
-            Text(pomodoro.displayClock)
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.primary)
         }
     }
 
@@ -234,99 +181,6 @@ struct ToolboxModuleView: View {
         }
         .onDisappear {
             onTransientInteractionChanged(false)
-        }
-    }
-
-    private var currentDuration: TimeInterval {
-        let seconds = pomodoro.mode == .focus
-            ? pomodoro.focusDuration
-            : pomodoro.restDuration
-        return max(1, seconds)
-    }
-
-    private var durationHours: Binding<Int> {
-        Binding(
-            get: { Int(currentDuration) / 3_600 },
-            set: {
-                setDuration(
-                    hours: $0,
-                    minutes: durationMinutes.wrappedValue,
-                    seconds: durationSeconds.wrappedValue
-                )
-            }
-        )
-    }
-
-    private var durationMinutes: Binding<Int> {
-        Binding(
-            get: { Int(currentDuration / 60) % 60 },
-            set: {
-                setDuration(
-                    hours: durationHours.wrappedValue,
-                    minutes: $0,
-                    seconds: durationSeconds.wrappedValue
-                )
-            }
-        )
-    }
-
-    private var durationSeconds: Binding<Int> {
-        Binding(
-            get: { Int(currentDuration) % 60 },
-            set: {
-                setDuration(
-                    hours: durationHours.wrappedValue,
-                    minutes: durationMinutes.wrappedValue,
-                    seconds: $0
-                )
-            }
-        )
-    }
-
-    private func durationInput(_ title: String, value: Binding<Int>) -> some View {
-        TextField(title, value: value, format: .number)
-            .textFieldStyle(.roundedBorder)
-            .multilineTextAlignment(.trailing)
-            .frame(width: 44)
-    }
-
-    private func setDuration(hours: Int, minutes: Int, seconds: Int) {
-        let duration = TimeInterval(Self.durationSeconds(
-            hours: hours,
-            minutes: minutes,
-            seconds: seconds
-        ))
-        if pomodoro.mode == .focus {
-            pomodoro.setFocusDuration(duration)
-        } else {
-            pomodoro.setRestDuration(duration)
-        }
-    }
-
-    static let maximumDurationSeconds = Int.max / 2
-
-    static func durationSeconds(hours: Int, minutes: Int, seconds: Int) -> Int {
-        let (hourSeconds, hourOverflow) = max(0, hours).multipliedReportingOverflow(by: 3_600)
-        let (minuteSeconds, minuteOverflow) = max(0, minutes).multipliedReportingOverflow(by: 60)
-        let (hourAndMinutes, hourAndMinutesOverflow) = hourSeconds.addingReportingOverflow(minuteSeconds)
-        let (totalSeconds, totalOverflow) = hourAndMinutes.addingReportingOverflow(max(0, seconds))
-        guard !hourOverflow, !minuteOverflow, !hourAndMinutesOverflow, !totalOverflow else {
-            return maximumDurationSeconds
-        }
-        return min(maximumDurationSeconds, max(1, totalSeconds))
-    }
-
-    private var startPauseTitle: String {
-        switch pomodoro.phase {
-        case .running: "暂停"
-        case .idle, .paused: "开始"
-        }
-    }
-
-    private var startPauseSymbol: String {
-        switch pomodoro.phase {
-        case .running: "pause.fill"
-        case .idle, .paused: "play.fill"
         }
     }
 

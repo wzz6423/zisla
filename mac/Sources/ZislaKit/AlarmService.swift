@@ -198,7 +198,14 @@ public final class AlarmService: ObservableObject {
             errorMessage = AppLocalization.text("未找到系统「时钟」App")
             return
         }
-        NSWorkspace.shared.open(clock)
+        Task {
+            do {
+                try await SystemClockService.open(.alarm)
+                errorMessage = nil
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     // MARK: - Notification registration
