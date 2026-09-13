@@ -45,11 +45,11 @@ public struct VoiceHistoryStatistics: Equatable, Sendable {
     public var savedTime: TimeInterval
 }
 
-private struct VoiceHistoryPersistentState: Codable {
+struct VoiceHistoryPersistentState: Codable {
     var entries: [VoiceHistoryEntry]
     var cumulativeStatistics: CumulativeStatistics
 
-    struct CumulativeStatistics: Codable {
+    struct CumulativeStatistics: Codable, Equatable {
         var totalWordCount: Int
         var totalDuration: TimeInterval
     }
@@ -103,9 +103,10 @@ public final class VoiceHistoryStore: ObservableObject {
     @Published public private(set) var entries: [VoiceHistoryEntry] = []
     @Published public private(set) var errorDescription: String?
 
-    private let storageURL: URL
+    private let legacyStorageURL: URL
     private let recordingsDirectory: URL
     private let fileManager: FileManager
+    private var database: VoiceHistoryDatabase?
     private var cumulativeWordCount: Int = 0
     private var cumulativeDuration: TimeInterval = 0
 
@@ -114,7 +115,7 @@ public final class VoiceHistoryStore: ObservableObject {
         recordingsDirectory: URL = AppPaths.voiceRecordings,
         fileManager: FileManager = .default
     ) {
-        self.storageURL = storageURL
+        self.legacyStorageURL = storageURL
         self.recordingsDirectory = recordingsDirectory.standardizedFileURL
         self.fileManager = fileManager
         load()
@@ -122,7 +123,7 @@ public final class VoiceHistoryStore: ObservableObject {
 
     public var statistics: VoiceHistoryStatistics {
         let wordsPerMinute = cumulativeDuration > 0
-            ? Double(cumulativeWordCount) / (cumulativeDuration / 60)
+            ? min(Double(Int.max).nextDown, Double(cumulativeWordCount) * 60 / cumulativeDuration)
             : 0
         let estimatedTypingDuration = Double(cumulativeWordCount)
             / VoiceTranscriptMetrics.assumedTypingWordsPerMinute * 60
@@ -381,59 +382,52 @@ public final class VoiceHistoryStore: ObservableObject {
     }
 
     private func load() {
-        guard fileManager.fileExists(atPath: storageURL.path) else { return }
         do {
-            let data = try Data(contentsOf: storageURL)
-
-            // Try the current format.
-            if let state = try? JSONDecoder().decode(VoiceHistoryPersistentState.self, from: data) {
-                entries = state.entries.compactMap(normalizedEntry(_:))
-                sortEntries()
-                let visibleWordCount = entries.reduce(0) { $0 + $1.wordCount }
-                let visibleDuration = entries.reduce(0) {
-                    addingCumulativeDuration($0, $1.duration)
+            let database = try VoiceHistoryDatabase(
+                storageURL: legacyStorageURL.deletingPathExtension().appendingPathExtension("sqlite"),
+                fileManager: fileManager
+            )
+            let state: VoiceHistoryPersistentState
+            if let stored = try database.load() {
+                state = stored
+            } else if fileManager.fileExists(atPath: legacyStorageURL.path) {
+                let data = try Data(contentsOf: legacyStorageURL)
+                if let stored = try? JSONDecoder().decode(VoiceHistoryPersistentState.self, from: data) {
+                    state = stored
+                } else {
+                    state = VoiceHistoryPersistentState(
+                        entries: try JSONDecoder().decode([VoiceHistoryEntry].self, from: data),
+                        cumulativeStatistics: .init(totalWordCount: 0, totalDuration: 0)
+                    )
                 }
-                cumulativeWordCount = max(
-                    0,
-                    visibleWordCount,
-                    state.cumulativeStatistics.totalWordCount
+            } else {
+                state = VoiceHistoryPersistentState(
+                    entries: [],
+                    cumulativeStatistics: .init(totalWordCount: 0, totalDuration: 0)
                 )
-                cumulativeDuration = max(
-                    0,
-                    visibleDuration,
-                    state.cumulativeStatistics.totalDuration.isFinite
-                        ? state.cumulativeStatistics.totalDuration
-                        : 0
-                )
-                errorDescription = nil
-                if entries != state.entries
-                    || cumulativeWordCount != state.cumulativeStatistics.totalWordCount
-                    || cumulativeDuration != state.cumulativeStatistics.totalDuration
-                {
-                    _ = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
-                }
-                return
             }
-
-            // Fall back to the legacy format for migration.
-            let legacyEntries = try JSONDecoder().decode([VoiceHistoryEntry].self, from: data)
-            entries = legacyEntries.compactMap(normalizedEntry(_:))
-            sortEntries()
-
-            // Use existing records as the migration baseline for cumulative values.
-            cumulativeWordCount = entries.reduce(0) { $0 + $1.wordCount }
-            cumulativeDuration = entries.reduce(0) {
+            let loadedEntries = state.entries.map(normalizedEntry(_:))
+            let visibleWordCount = loadedEntries.reduce(0) { $0 + $1.wordCount }
+            let visibleDuration = loadedEntries.reduce(0) {
                 addingCumulativeDuration($0, $1.duration)
             }
-
+            let loadedWordCount = max(0, visibleWordCount, state.cumulativeStatistics.totalWordCount)
+            let loadedDuration = max(visibleDuration, normalizedDuration(state.cumulativeStatistics.totalDuration))
+            try database.save(VoiceHistoryPersistentState(
+                entries: loadedEntries,
+                cumulativeStatistics: .init(
+                    totalWordCount: loadedWordCount,
+                    totalDuration: loadedDuration
+                )
+            ))
+            // Enable writes only after loading and migration have both succeeded.
+            self.database = database
+            entries = loadedEntries
+            sortEntries()
+            cumulativeWordCount = loadedWordCount
+            cumulativeDuration = loadedDuration
             errorDescription = nil
-
-            // Persist the migrated state in the current format.
-            _ = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
         } catch {
-            entries = []
-            cumulativeWordCount = 0
-            cumulativeDuration = 0
             errorDescription = error.localizedDescription
         }
     }
@@ -495,11 +489,8 @@ public final class VoiceHistoryStore: ObservableObject {
 
     @discardableResult
     private func persistCandidate(_ candidate: [VoiceHistoryEntry], cumulativeWordCount: Int, cumulativeDuration: TimeInterval) -> Bool {
+        guard let database else { return false }
         do {
-            try fileManager.createDirectory(
-                at: storageURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
             try fileManager.createDirectory(
                 at: recordingsDirectory,
                 withIntermediateDirectories: true
@@ -511,8 +502,7 @@ public final class VoiceHistoryStore: ObservableObject {
                     totalDuration: cumulativeDuration
                 )
             )
-            let data = try JSONEncoder().encode(state)
-            try data.write(to: storageURL, options: .atomic)
+            try database.save(state)
             errorDescription = nil
             return true
         } catch {
@@ -576,7 +566,7 @@ public final class VoiceHistoryStore: ObservableObject {
         }
     }
 
-    private func normalizedEntry(_ entry: VoiceHistoryEntry) -> VoiceHistoryEntry? {
+    private func normalizedEntry(_ entry: VoiceHistoryEntry) -> VoiceHistoryEntry {
         var normalized = entry
         if entry.audioFileName != nil, audioURL(for: entry) == nil {
             normalized.audioFileName = nil
