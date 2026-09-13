@@ -9,7 +9,7 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-TEST_ROOT="$TEMPORARY_ROOT/repository"
+TEST_ROOT="$TEMPORARY_ROOT/repository with spaces"
 SCRIPT="$TEST_ROOT/mac/Scripts/build-package.sh"
 OUTPUT_DIRECTORY="$TEST_ROOT/outputs"
 CAPTURE_FILE="$TEMPORARY_ROOT/package-release-invocations.txt"
@@ -25,11 +25,18 @@ case "$BUILD_ARCHITECTURES" in
   *) suffix="$BUILD_ARCHITECTURES" ;;
 esac
 mkdir -p "$ARCHIVE_DIRECTORY/zisla.app/Contents"
+if [[ "${FAIL_ARCHITECTURE:-}" == "$suffix" ]]; then
+  print -u2 -r -- "injected $suffix package failure"
+  exit 42
+fi
 for extension in zip zip.sha256 dmg dmg.sha256; do
   print -r -- "$suffix" > "$ARCHIVE_DIRECTORY/zisla-v0.1.3-macOS-${suffix}.${extension}"
 done
 print -r -- "gitee $suffix" > "$ARCHIVE_DIRECTORY/appcast-gitee.xml"
 print -r -- "github $suffix" > "$ARCHIVE_DIRECTORY/appcast-github.xml"
+if [[ "${OMIT_APPCAST_ARCHITECTURE:-}" == "$suffix" ]]; then
+  rm "$ARCHIVE_DIRECTORY/appcast-github.xml"
+fi
 SCRIPT
 chmod +x "$SCRIPT" "$TEST_ROOT/mac/Scripts/package-release.sh"
 
@@ -73,6 +80,27 @@ function expect_absent() {
   fi
 }
 
+function expect_directory_equal() {
+  local expected="$1"
+  local actual="$2"
+  local description="$3"
+
+  (( tests_run += 1 ))
+  if ! diff -qr "$expected" "$actual" >/dev/null; then
+    print -u2 -r -- "FAIL: $description"
+    exit 1
+  fi
+}
+
+command_status=0
+CAPTURE_FILE="$CAPTURE_FILE" FAIL_ARCHITECTURE=arm64 "$SCRIPT" \
+  > "$TEMPORARY_ROOT/failure-output.txt" 2>&1 || command_status=$?
+expect_equal 42 "$command_status" "a first package failure is reported"
+expect_absent "$OUTPUT_DIRECTORY" "a first package failure does not publish partial outputs"
+temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+expect_equal 0 "${#temporary_directories}" "a first package failure cleans up temporary packages"
+: > "$CAPTURE_FILE"
+
 mkdir -p "$OUTPUT_DIRECTORY"
 print -r -- stale > "$OUTPUT_DIRECTORY/zisla-v0.0.9-macOS-arm64.zip"
 
@@ -110,7 +138,7 @@ done
 
 expect_absent \
   "$OUTPUT_DIRECTORY/zisla-v0.0.9-macOS-arm64.zip" \
-  "assets from an earlier version are removed before packaging"
+  "assets from an earlier version are removed after successful packaging"
 expect_absent "$OUTPUT_DIRECTORY/zisla.app" "the app bundle is not published as a release asset"
 
 for architecture in arm64 x86_64 universal; do
@@ -137,5 +165,111 @@ expect_equal \
   "${(F)expected_listing}" \
   "$(print -rl -- ${(f)SCRIPT_OUTPUT} | LC_ALL=C sort)" \
   "the printed listing names every uploadable asset and nothing else"
+expect_equal \
+  "$(print -rl -- "$RESOLVED_OUTPUT_DIRECTORY/.staging" "${expected_listing[@]}" | LC_ALL=C sort)" \
+  "$(print -rl -- "$RESOLVED_OUTPUT_DIRECTORY"/*(D) | LC_ALL=C sort)" \
+  "outputs contain only the release assets and retained app bundles"
+
+temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+expect_equal 0 "${#temporary_directories}" "a successful package cleans up its temporary directory"
+
+PREVIOUS_OUTPUT_DIRECTORY="$TEMPORARY_ROOT/previous-output"
+cp -R "$OUTPUT_DIRECTORY" "$PREVIOUS_OUTPUT_DIRECTORY"
+for failed_architecture in arm64 x86_64 universal; do
+  command_status=0
+  CAPTURE_FILE="$CAPTURE_FILE" FAIL_ARCHITECTURE="$failed_architecture" "$SCRIPT" \
+    > "$TEMPORARY_ROOT/failure-output.txt" 2>&1 || command_status=$?
+  expect_equal 42 "$command_status" "a $failed_architecture package failure is reported"
+
+  expect_directory_equal "$PREVIOUS_OUTPUT_DIRECTORY" "$OUTPUT_DIRECTORY" \
+    "a $failed_architecture package failure preserves the previous release output"
+
+  temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+  expect_equal 0 "${#temporary_directories}" "a $failed_architecture failure cleans up temporary packages"
+done
+
+command_status=0
+CAPTURE_FILE="$CAPTURE_FILE" OMIT_APPCAST_ARCHITECTURE=universal "$SCRIPT" \
+  > "$TEMPORARY_ROOT/failure-output.txt" 2>&1 || command_status=$?
+expect_equal 1 "$command_status" "a missing appcast prevents publication"
+expect_directory_equal "$PREVIOUS_OUTPUT_DIRECTORY" "$OUTPUT_DIRECTORY" \
+  "an asset collection failure preserves the previous release output"
+temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+expect_equal 0 "${#temporary_directories}" "an asset collection failure cleans up temporary packages"
+
+FAKE_BIN="$TEMPORARY_ROOT/bin"
+mkdir -p "$FAKE_BIN"
+cat > "$FAKE_BIN/mv" <<'SCRIPT'
+#!/bin/zsh
+set -euo pipefail
+if (( $# == 2 )); then
+  if [[ "$FAIL_MOVE_STAGE" == backup && "$1" == "$PACKAGE_TEST_OUTPUT" ]]; then
+    print -u2 -r -- "injected package backup failure"
+    exit 43
+  elif [[ "$FAIL_MOVE_STAGE" != backup && "$2" == "$PACKAGE_TEST_OUTPUT" ]]; then
+    if [[ "$FAIL_MOVE_STAGE" == rollback || ! -e "$MOVE_FAILURE_MARKER" ]]; then
+      : > "$MOVE_FAILURE_MARKER"
+      print -u2 -r -- "injected package $FAIL_MOVE_STAGE failure"
+      exit 43
+    fi
+  fi
+fi
+exec /bin/mv "$@"
+SCRIPT
+chmod +x "$FAKE_BIN/mv"
+
+for failed_move in publish backup; do
+  command_status=0
+  CAPTURE_FILE="$CAPTURE_FILE" PATH="$FAKE_BIN:$PATH" PACKAGE_TEST_OUTPUT="$RESOLVED_OUTPUT_DIRECTORY" \
+    FAIL_MOVE_STAGE="$failed_move" MOVE_FAILURE_MARKER="$TEMPORARY_ROOT/$failed_move-failed" "$SCRIPT" \
+    > "$TEMPORARY_ROOT/failure-output.txt" 2>&1 || command_status=$?
+  expect_equal 43 "$command_status" "a $failed_move failure is reported"
+  expect_directory_equal "$PREVIOUS_OUTPUT_DIRECTORY" "$OUTPUT_DIRECTORY" \
+    "a $failed_move failure preserves the previous release output"
+  temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+  expect_equal 0 "${#temporary_directories}" "a $failed_move failure cleans up temporary packages"
+done
+
+mv "$OUTPUT_DIRECTORY" "$TEMPORARY_ROOT/saved-output"
+ln -s "$TEMPORARY_ROOT/missing-output" "$OUTPUT_DIRECTORY"
+command_status=0
+CAPTURE_FILE="$CAPTURE_FILE" PATH="$FAKE_BIN:$PATH" PACKAGE_TEST_OUTPUT="$RESOLVED_OUTPUT_DIRECTORY" \
+  FAIL_MOVE_STAGE=publish MOVE_FAILURE_MARKER="$TEMPORARY_ROOT/symlink-publish-failed" "$SCRIPT" \
+  > "$TEMPORARY_ROOT/failure-output.txt" 2>&1 || command_status=$?
+expect_equal 43 "$command_status" "a publication failure with an existing dangling symlink is reported"
+expect_equal "$TEMPORARY_ROOT/missing-output" "$(readlink "$OUTPUT_DIRECTORY")" \
+  "a publication failure restores an existing dangling output symlink"
+temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+expect_equal 0 "${#temporary_directories}" "restoring an output symlink cleans up temporary packages"
+
+CAPTURE_FILE="$CAPTURE_FILE" "$SCRIPT" >/dev/null
+expect_directory_equal "$PREVIOUS_OUTPUT_DIRECTORY" "$OUTPUT_DIRECTORY" \
+  "successful publication replaces a dangling output symlink with the new release"
+expect_absent "$TEMPORARY_ROOT/missing-output" "publication does not write through the old output symlink"
+temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+expect_equal 0 "${#temporary_directories}" "replacing an output symlink cleans up temporary packages"
+
+mv "$OUTPUT_DIRECTORY" "$TEMPORARY_ROOT/saved-symlink-output"
+CAPTURE_FILE="$CAPTURE_FILE" "$SCRIPT" >/dev/null
+expect_directory_equal "$PREVIOUS_OUTPUT_DIRECTORY" "$OUTPUT_DIRECTORY" \
+  "a first successful package publishes the complete release"
+temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+expect_equal 0 "${#temporary_directories}" "a first successful package cleans up temporary packages"
+
+command_status=0
+CAPTURE_FILE="$CAPTURE_FILE" PATH="$FAKE_BIN:$PATH" PACKAGE_TEST_OUTPUT="$RESOLVED_OUTPUT_DIRECTORY" \
+  FAIL_MOVE_STAGE=rollback MOVE_FAILURE_MARKER="$TEMPORARY_ROOT/rollback-failed" "$SCRIPT" \
+  > "$TEMPORARY_ROOT/failure-output.txt" 2>&1 || command_status=$?
+temporary_directories=("$TEST_ROOT"/.zisla-build-package.*(N))
+expect_equal 1 "${#temporary_directories}" "a failed rollback keeps its recovery directory"
+RECOVERY_DIRECTORY="${temporary_directories[1]:A}/previous-outputs"
+expect_directory_equal "$PREVIOUS_OUTPUT_DIRECTORY" "$RECOVERY_DIRECTORY" \
+  "a failed rollback leaves the previous release available for recovery"
+expect_equal 1 "$command_status" "a failed rollback reports failure"
+(( tests_run += 1 ))
+if [[ "$(<"$TEMPORARY_ROOT/failure-output.txt")" != *"previous release remains at $RECOVERY_DIRECTORY"* ]]; then
+  print -u2 -r -- "FAIL: a failed rollback does not report the recovery directory"
+  exit 1
+fi
 
 print -r -- "PASS: $tests_run build-package tests"
