@@ -9,7 +9,7 @@ struct FeatureSettingsCompatibilityTests {
 
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
 
-        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .conversion])
+        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .conversion, .app])
         let payload = try #require(
             JSONSerialization.jsonObject(
                 with: JSONEncoder().encode(decoded)
@@ -22,7 +22,7 @@ struct FeatureSettingsCompatibilityTests {
     func legacyCurrencyEnabledStateMigratesToConversionAndOptOutPersistsAfterRestart() throws {
         let legacy = Data(#"{"clipboardAssistantCurrencyDefaultApplied":true,"clipboardAssistantEnabledKinds":["text","currency"]}"#.utf8)
         var settings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
-        #expect(settings.clipboardAssistantEnabledKinds == [.text, .conversion])
+        #expect(settings.clipboardAssistantEnabledKinds == [.text, .conversion, .app])
         settings.clipboardAssistantEnabledKinds.remove(.conversion)
 
         let decoded = try JSONDecoder().decode(
@@ -59,6 +59,51 @@ struct FeatureSettingsCompatibilityTests {
             ) as? [String: Any]
         )
         #expect(payload["clipboardAssistantConversionDefaultApplied"] as? Bool == true)
+    }
+
+    @Test
+    func clipboardAssistantAppDetectionIsEnabledByDefault() throws {
+        #expect(FeatureSettings.default.clipboardAssistantEnabled)
+        #expect(
+            FeatureSettings.default.clipboardAssistantEnabledKinds
+                == Set(ClipboardAssistantKind.allCases)
+        )
+        let payload = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(FeatureSettings.default)
+            ) as? [String: Any]
+        )
+        #expect(payload["clipboardAssistantAppDefaultApplied"] as? Bool == true)
+    }
+
+    @Test
+    func clipboardAssistantAppDetectionDefaultsOnForLegacyEnabledKinds() throws {
+        let legacy = Data(#"{"clipboardAssistantConversionDefaultApplied":true,"clipboardAssistantEnabledKinds":["text"]}"#.utf8)
+
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+
+        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .app])
+        let payload = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(decoded)
+            ) as? [String: Any]
+        )
+        #expect(payload["clipboardAssistantAppDefaultApplied"] as? Bool == true)
+    }
+
+    @Test
+    func clipboardAssistantAppDetectionOptOutPersistsAfterRestart() throws {
+        let legacy = Data(#"{"clipboardAssistantConversionDefaultApplied":true,"clipboardAssistantEnabledKinds":["text"]}"#.utf8)
+        var settings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(settings.clipboardAssistantEnabledKinds.contains(.app))
+        settings.clipboardAssistantEnabledKinds.remove(.app)
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+
+        #expect(decoded.clipboardAssistantEnabledKinds == [.text])
     }
 
     @Test

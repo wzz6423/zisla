@@ -118,6 +118,32 @@ struct ClipboardAssistantBehaviorContractTests {
         #expect(!postCommandC.contains("usleep("))
     }
 
+    @Test
+    func openAppActionLaunchesThroughTheWorkspaceAPI() throws {
+        let source = try String(contentsOf: appModelSourceURL, encoding: .utf8)
+
+        let action = try sourceSlice(
+            in: source,
+            from: "case .openApp(let bundleIdentifier, _):",
+            to: "case .revealInFinder"
+        )
+        #expect(action.contains("openInstalledApplication(bundleIdentifier: bundleIdentifier)"))
+
+        let launcher = try sourceSlice(
+            in: source,
+            from: "private func openInstalledApplication(bundleIdentifier: String)",
+            to: "private func openSystemMail"
+        )
+        #expect(launcher.contains("NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)"))
+        #expect(launcher.contains("NSWorkspace.shared.openApplication(at: applicationURL, configuration: configuration)"))
+        #expect(launcher.contains(#"transientMessage = clipboardAssistantMessage("无法打开应用")"#))
+
+        // The detector only matches names against a published snapshot, so a cold
+        // start without the catalog yet must never crash or misclassify.
+        #expect(source.contains("installedApplications: installedApplications"))
+        #expect(source.contains("startInstalledApplicationCatalog()"))
+    }
+
     private func sourceSlice(in source: String, from start: String, to end: String) throws -> Substring {
         let startRange = try #require(source.range(of: start))
         let endRange = try #require(source[startRange.upperBound...].range(of: end))

@@ -2437,3 +2437,8 @@
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Las notificaciones de alarma no están permitidas. Actívalas en Ajustes del Sistema.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Los sonidos de las notificaciones de alarma están desactivados. Actívalos en Ajustes del Sistema.";
 "无法设置闹钟通知：%@" = "No se pudo programar la notificación de alarma: %@";
+
+
+"应用程序" = "Aplicaciones";
+"打开应用" = "Abrir app";
+"无法打开应用" = "No se pudo abrir la app";
