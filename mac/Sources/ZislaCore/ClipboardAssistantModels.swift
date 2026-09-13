@@ -9,6 +9,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
     case color
     case math
     case dateTime
+    case emojiName
     case code
     case nonSystemLanguageText = "chineseText"
     case text
@@ -25,6 +26,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
         case .color: "paintpalette"
         case .math: "equal.square"
         case .dateTime: "calendar"
+        case .emojiName: "smiley"
         case .nonSystemLanguageText: "character.book.closed"
         case .code: "chevron.left.forwardslash.chevron.right"
         case .text: "text.quote"
@@ -215,6 +217,7 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
     case composeMail
     case copyText
     case copyFullExpression
+    case copyEmoji
     case compress
     case share
     case callPhone
@@ -234,6 +237,7 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
         case .composeMail: "envelope"
         case .copyText: "doc.on.doc"
         case .copyFullExpression: "doc.on.doc"
+        case .copyEmoji: "smiley"
         case .compress: "archivebox"
         case .share: "square.and.arrow.up"
         case .callPhone: "phone"
@@ -257,6 +261,7 @@ public enum ClipboardAssistantActionOrder {
         case .color: [.copyText, .addToQuickNote, .share]
         case .math: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
         case .dateTime: [.createCalendarEvent, .copyText, .addToQuickNote, .share]
+        case .emojiName: [.copyEmoji, .addToQuickNote, .share]
         case .nonSystemLanguageText: [.translate, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .code: [.saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .text: [.search, .saveText, .translate, .addToQuickNote, .sendToTeleprompter, .share]
@@ -324,6 +329,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     case composeMail(String)
     case copyText(String)
     case copyFullExpression(String)
+    case copyEmoji(String)
     case compress(URL)
     case share
     case callPhone(String)
@@ -345,6 +351,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .composeMail: "composeMail"
         case .copyText: "copyText"
         case .copyFullExpression: "copyFullExpression"
+        case .copyEmoji: "copyEmoji"
         case .compress: "compress"
         case .share: "share"
         case .callPhone: "callPhone"
@@ -367,6 +374,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .composeMail: .composeMail
         case .copyText: .copyText
         case .copyFullExpression: .copyFullExpression
+        case .copyEmoji: .copyEmoji
         case .compress: .compress
         case .share: .share
         case .callPhone: .callPhone
@@ -405,6 +413,8 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
     public var actions: [ClipboardAssistantAction]
     /// Fill color preview for CSS color values (sRGB components).
     public var colorComponents: ColorComponents?
+    /// Emoji character preview for emoji-name detections; `nil` otherwise.
+    public var emoji: String?
     /// Full content available through the expandable preview; `nil` when there is nothing more
     /// to show than the one-line title.
     public var fullContent: String?
@@ -427,7 +437,8 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
         detail: ClipboardAssistantDetail? = nil,
         actions: [ClipboardAssistantAction] = [],
         colorComponents: ColorComponents? = nil,
-        fullContent: String? = nil
+        fullContent: String? = nil,
+        emoji: String? = nil
     ) {
         self.kind = kind
         self.title = title
@@ -435,6 +446,7 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
         self.actions = actions
         self.colorComponents = colorComponents
         self.fullContent = fullContent
+        self.emoji = emoji
     }
 
     /// The primary action fired by the action button or the quick trigger.
