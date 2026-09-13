@@ -2427,3 +2427,8 @@
 "合上兼容 MacBook 屏幕时显示景深过渡动画" = "Afficher une transition de profondeur à la fermeture du capot d'un MacBook compatible";
 "预览动画" = "Aperçu de l’animation";
 "不用合盖，在当前屏幕内容上播放一次" = "Joue l’effet une fois sur le contenu actuel de l’écran, sans fermer le capot";
+
+
+"应用程序" = "Applications";
+"打开应用" = "Ouvrir l'app";
+"无法打开应用" = "Impossible d'ouvrir l'app";

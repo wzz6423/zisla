@@ -975,6 +975,7 @@ struct ClipboardAssistantToastView: View {
         case .saveImage: "保存图片"
         case .saveText: "保存文本"
         case .createCalendarEvent: "新建日程"
+        case .openApp: "打开应用"
         }
     }
 

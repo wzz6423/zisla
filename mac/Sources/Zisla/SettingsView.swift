@@ -2778,6 +2778,7 @@ struct SettingsView: View {
         case .math: "算式"
         case .dateTime: "日期时间"
         case .code: "代码"
+        case .app: "应用程序"
         case .nonSystemLanguageText: "非当前系统语言文本"
         case .text: "文本"
         case .image: "图片"
@@ -3100,6 +3101,7 @@ struct SettingsView: View {
         case .saveImage: "保存图片"
         case .saveText: "保存文本"
         case .createCalendarEvent: "新建日程"
+        case .openApp: "打开应用"
         }
     }
 
