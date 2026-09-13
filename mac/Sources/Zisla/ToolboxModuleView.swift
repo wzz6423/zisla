@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ToolboxModuleView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject private var pomodoro: PomodoroService
     @ObservedObject private var settingsStore: FeatureSettingsStore
     private let onTransientInteractionChanged: (Bool) -> Void
     @State private var isAlarmEditorPresented = false
@@ -18,6 +19,7 @@ struct ToolboxModuleView: View {
         onTransientInteractionChanged: @escaping (Bool) -> Void = { _ in }
     ) {
         _model = ObservedObject(wrappedValue: model)
+        _pomodoro = ObservedObject(wrappedValue: model.pomodoro)
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
         self.onTransientInteractionChanged = onTransientInteractionChanged
     }
@@ -52,11 +54,19 @@ struct ToolboxModuleView: View {
             }
 
             Spacer(minLength: 0)
-            Image(systemName: "timer")
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-                .frame(maxWidth: .infinity, alignment: .center)
+            Group {
+                if pomodoro.phase == .idle {
+                    Image(systemName: "timer")
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                } else {
+                    Text(pomodoro.displayClock)
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                }
+            }
+            .font(.system(size: 26, weight: .semibold, design: .rounded))
+            .frame(maxWidth: .infinity, alignment: .center)
             Spacer(minLength: 0)
 
             Button {
