@@ -2437,3 +2437,8 @@
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Le notifiche della sveglia non sono consentite. Attivale in Impostazioni di Sistema.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "I suoni delle notifiche della sveglia sono disattivati. Attivali in Impostazioni di Sistema.";
 "无法设置闹钟通知：%@" = "Impossibile programmare la notifica della sveglia: %@";
+
+
+"应用程序" = "Applicazioni";
+"打开应用" = "Apri app";
+"无法打开应用" = "Impossibile aprire l'app";
