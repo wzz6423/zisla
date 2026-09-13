@@ -5,14 +5,14 @@ import ZislaKit
 
 @testable import Zisla
 
-/// 系统监控历史链路的文案统一走 `AppLocalization`：缺 key 只会静默回落中文原文，构建和 `tsc`
-/// 都不报错，因此这里从源码扫出运行时真正查询的 key，再逐语言核对资源，让漏翻译在测试里先失败。
+/// Missing history keys silently fall back to Chinese, so check the runtime keys
+/// against every language table instead of relying on a successful build.
 struct SystemMetricsHistoryLocalizationTests {
     @Test
     func spanTextIsLocalizedAndClamped() {
         #expect(SystemMetricsHistoryPresentation.spanText(5_400, language: .english) == "1h 30m")
         #expect(SystemMetricsHistoryPresentation.spanText(7 * 24 * 3600, language: .english) == "7d")
-        // 少于一分钟的区间按一分钟显示，避免出现 0。
+        // Sub-minute spans display one minute rather than zero.
         #expect(SystemMetricsHistoryPresentation.spanText(0, language: .english) == "1m")
         #expect(SystemMetricsHistoryPresentation.spanText(120, language: .simplifiedChinese).contains("分钟"))
     }
@@ -44,7 +44,7 @@ struct SystemMetricsHistoryLocalizationTests {
         }
     }
 
-    /// 抽查具体译文：只校验 key 存在无法发现「整块照抄中文」的漏翻。
+    /// Key existence alone cannot detect untranslated copies of the Chinese table.
     @Test
     func historyCopyIsActuallyTranslated() throws {
         let english = try #require(Self.stringsTable(for: .english))
@@ -61,7 +61,7 @@ struct SystemMetricsHistoryLocalizationTests {
         #expect(japanese["风扇 %ld"] == "ファン %ld")
     }
 
-    /// 这些 key 由 `ZislaKit` 的枚举与图表模型间接传入，无法从视图调用点直接扫出。
+    /// Enums and chart models supply these keys indirectly, outside the scanned view call sites.
     private static func modelKeys() -> [String] {
         var keys = SystemMetricsHistoryRange.allCases.map(\.titleKey)
         keys += ["记录历史", "按分钟记录 CPU、GPU、内存、硬盘、风扇与网络，可随时查看趋势并导出表格"]

@@ -17,10 +17,8 @@ struct ScreenshotEditorWindowVisibilityTests {
         window.contentView = view
         window.alphaValue = 0
 
-        // 窗口初始不可见
         #expect(!window.isVisible)
 
-        // 模拟鼠标事件
         let event = try #require(mouseEvent(
             type: .leftMouseDown,
             location: CGPoint(x: 80, y: 50),
@@ -30,7 +28,6 @@ struct ScreenshotEditorWindowVisibilityTests {
 
         view.mouseDown(with: event)
 
-        // 验证隐藏窗口不会被激活
         #expect(!window.isVisible)
         #expect(!window.isKeyWindow)
     }
@@ -48,7 +45,6 @@ struct ScreenshotEditorWindowVisibilityTests {
         window.alphaValue = 0
         window.orderFront(nil)
 
-        // 窗口现在可见
         #expect(window.isVisible)
 
         let event = try #require(mouseEvent(
@@ -60,7 +56,6 @@ struct ScreenshotEditorWindowVisibilityTests {
 
         view.mouseDown(with: event)
 
-        // 可见窗口可以被激活
         #expect(window.isVisible)
     }
 }
