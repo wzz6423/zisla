@@ -2776,6 +2776,7 @@ struct SettingsView: View {
         case .phone: "电话号码"
         case .color: "颜色值"
         case .math: "算式"
+        case .currency: "汇率换算"
         case .dateTime: "日期时间"
         case .code: "代码"
         case .nonSystemLanguageText: "非当前系统语言文本"

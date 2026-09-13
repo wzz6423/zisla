@@ -422,7 +422,48 @@ final class ClipboardAssistantController: ObservableObject {
     }
 
     private func showWindow(_ detection: ClipboardAssistantDetection) {
-        guard let screen = WindowPlacement.screenUnderMouse() ?? NSScreen.main else { return }
+        guard let layout = rowLayout(for: detection) else { return }
+        presentation.islandTopHeight = layout.rowHeight
+        let frame = layout.frame
+        let window: ClipboardAssistantWindow
+        if let existing = self.window {
+            window = existing
+        } else {
+            let hostingView = NSHostingView(
+                rootView: AppLanguageEnvironment(
+                    languageStore: AppModel.shared.languageStore,
+                    content: ClipboardAssistantToastView(
+                        presentation: presentation,
+                        controller: self
+                    )
+                )
+            )
+            hostingView.sizingOptions = []
+            hostingView.wantsLayer = true
+            hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+            window = ClipboardAssistantWindow(contentView: hostingView, frame: frame)
+            self.window = window
+        }
+        window.setFrame(frame, display: false)
+        window.alphaValue = 0
+        window.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.22
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            window.animator().alphaValue = 1
+        }
+    }
+
+    private struct RowLayout {
+        let frame: CGRect
+        let rowHeight: CGFloat
+    }
+
+    /// Computes the row frame for a detection: centered on the screen's island anchor, sized
+    /// to the content. Shared by the initial presentation and async refreshes so a refreshed
+    /// detection (e.g. a currency result arriving after the live quote) keeps the same anchor.
+    private func rowLayout(for detection: ClipboardAssistantDetection) -> RowLayout? {
+        guard let screen = WindowPlacement.screenUnderMouse() ?? NSScreen.main else { return nil }
         let screenSnapshot = ScreenSnapshot(screen: screen)
         let layout = screenSnapshot.map { ScreenLayoutEngine().layout(for: $0) }
         let collapsedFrame = layout?.collapsedFrame
@@ -456,39 +497,26 @@ final class ClipboardAssistantController: ObservableObject {
         } else {
             rowHeight = collapsedFrame.height
         }
-        presentation.islandTopHeight = rowHeight
         let frame = CGRect(
             x: collapsedFrame.midX - width / 2,
             y: collapsedFrame.maxY - rowHeight,
             width: width,
             height: rowHeight
         )
-        let window: ClipboardAssistantWindow
-        if let existing = self.window {
-            window = existing
-        } else {
-            let hostingView = NSHostingView(
-                rootView: AppLanguageEnvironment(
-                    languageStore: AppModel.shared.languageStore,
-                    content: ClipboardAssistantToastView(
-                        presentation: presentation,
-                        controller: self
-                    )
-                )
-            )
-            hostingView.sizingOptions = []
-            hostingView.wantsLayer = true
-            hostingView.layer?.backgroundColor = NSColor.clear.cgColor
-            window = ClipboardAssistantWindow(contentView: hostingView, frame: frame)
-            self.window = window
-        }
-        window.setFrame(frame, display: false)
-        window.alphaValue = 0
-        window.orderFrontRegardless()
+        return RowLayout(frame: frame, rowHeight: rowHeight)
+    }
+
+    /// Replaces the presented detection after an async refinement (live currency conversion),
+    /// animating the row to the refreshed content's width. The dismissal timeline is untouched.
+    func updateDetection(_ detection: ClipboardAssistantDetection) {
+        guard let current = presentation.detection, current != detection else { return }
+        presentation.detection = detection
+        guard let window, window.isVisible, let layout = rowLayout(for: detection) else { return }
+        presentation.islandTopHeight = layout.rowHeight
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.22
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            window.animator().alphaValue = 1
+            context.duration = 0.18
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().setFrame(layout.frame, display: false)
         }
     }
 
@@ -862,7 +890,7 @@ struct ClipboardAssistantToastView: View {
     // MARK: Expanded content
 
     private func canExpand(_ detection: ClipboardAssistantDetection) -> Bool {
-        guard ![.url, .text, .nonSystemLanguageText, .code, .math].contains(detection.kind) else {
+        guard ![.url, .text, .nonSystemLanguageText, .code, .math, .currency].contains(detection.kind) else {
             return false
         }
         guard !controller.isLightweightMode, let content = detection.fullContent else { return false }
@@ -942,6 +970,10 @@ struct ClipboardAssistantToastView: View {
             byteCountText(bytes)
         case .mathExpression(let expression):
             expression + " ="
+        case .currencyExpression(_, let amountText, let source, let target):
+            "\(amountText) \(source) → \(target)"
+        case .currencyRate(let source, let target, let rate):
+            "1 \(source) = \(ClipboardAssistantDetector.formatNumber(rate)) \(target)"
         case .rgb(let red, let green, let blue, let hex):
             String(format: "R%.0f G%.0f B%.0f · #%@", red * 255, green * 255, blue * 255, hex)
         case .path(let path):
