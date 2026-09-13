@@ -138,6 +138,346 @@ struct MailServiceTests {
         #expect(service.messages.map(\.messageID) == [7])
     }
 
+    @Test(arguments: [false, true]) @MainActor
+    func stoppingDiscardsLateRefreshResults(fails: Bool) async {
+        let started = MailOperationQueueTestGate()
+        let release = MailOperationQueueTestGate()
+        let service = MailService(
+            commandRunner: { _, _ in
+                await started.signal()
+                await release.wait()
+                return fails
+                    ? .failure(.failed("Late failure"))
+                    : .success(.snapshot(makeMailServiceSnapshot(account: "old", messageID: 1)))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        let refresh = Task { await service.refresh() }
+        await started.wait()
+
+        service.stop()
+        await release.signal()
+        await refresh.value
+
+        #expect(service.messages.isEmpty)
+        #expect(service.accounts.isEmpty)
+        #expect(service.errorDescription == nil)
+        #expect(service.paginationGeneration == 0)
+        #expect(!service.isLoading)
+    }
+
+    @Test @MainActor
+    func staleRefreshCannotClearNewRefreshLoadingState() async {
+        let firstStarted = MailOperationQueueTestGate()
+        let releaseFirst = MailOperationQueueTestGate()
+        let secondStarted = MailOperationQueueTestGate()
+        let releaseSecond = MailOperationQueueTestGate()
+        var requestCount = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                requestCount += 1
+                if requestCount == 1 {
+                    await firstStarted.signal()
+                    await releaseFirst.wait()
+                    return .failure(.failed("Superseded failure"))
+                }
+                await secondStarted.signal()
+                await releaseSecond.wait()
+                return .success(.snapshot(makeMailServiceSnapshot(account: "new", messageID: 2)))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        let first = Task { await service.refresh() }
+        await firstStarted.wait()
+        service.stop()
+        let second = Task { await service.refresh() }
+        await secondStarted.wait()
+
+        await releaseFirst.signal()
+        await first.value
+        #expect(service.isLoading)
+        #expect(service.errorDescription == nil)
+
+        await releaseSecond.signal()
+        await second.value
+        #expect(service.messages.map(\.messageID) == [2])
+        #expect(!service.isLoading)
+    }
+
+    @Test @MainActor
+    func selectingAccountRefreshesWhilePreviousSelectionIsStillLoading() async {
+        let firstStarted = MailOperationQueueTestGate()
+        let releaseFirst = MailOperationQueueTestGate()
+        var scripts: [String] = []
+        let service = MailService(
+            commandRunner: { script, _ in
+                scripts.append(script)
+                if scripts.count == 1 {
+                    await firstStarted.signal()
+                    await releaseFirst.wait()
+                    return .success(.snapshot(makeMailServiceSnapshot(account: "old", messageID: 1)))
+                }
+                return .success(.snapshot(makeMailServiceSnapshot(account: "new", messageID: 2)))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        let first = Task {
+            service.start(accountNames: ["old"])
+            await service.refresh()
+        }
+        await firstStarted.wait()
+
+        service.start(accountNames: ["new"])
+        await service.refresh()
+        #expect(service.messages.map(\.accountName) == ["new"])
+        #expect(scripts.last?.contains("set selectedAccountNames to {\"new\"}") == true)
+
+        service.stop()
+        await releaseFirst.signal()
+        await first.value
+        #expect(service.messages.map(\.messageID) == [2])
+    }
+
+    @Test @MainActor
+    func cancelledRefreshDoesNotFallBackToMail() async {
+        var scriptRequests = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                scriptRequests += 1
+                return .failure(.failed("Cancelled request must not reach Mail"))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        let refresh = Task { await service.refresh() }
+        refresh.cancel()
+        await refresh.value
+
+        #expect(scriptRequests == 0)
+        #expect(service.errorDescription == nil)
+        #expect(!service.isLoading)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func cancellingRefreshPreservesLoadedMessagesAndPagination(fails: Bool) async {
+        let started = MailOperationQueueTestGate()
+        let release = MailOperationQueueTestGate()
+        var requestCount = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                requestCount += 1
+                if requestCount == 1 {
+                    return .success(.snapshot(makeMailServiceSnapshot(account: "current", messageID: 1)))
+                }
+                await started.signal()
+                await release.wait()
+                return fails
+                    ? .failure(.failed("Cancelled failure"))
+                    : .success(.snapshot(makeMailServiceSnapshot(account: "old", messageID: 2)))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        await service.refresh()
+        let messages = service.messages
+        let accounts = service.accounts
+        let refresh = Task { await service.refresh() }
+        await started.wait()
+        refresh.cancel()
+        await release.signal()
+        await refresh.value
+
+        #expect(service.messages == messages)
+        #expect(service.accounts == accounts)
+        #expect(service.paginationGeneration == 1)
+        #expect(!service.canLoadMore)
+        #expect(service.errorDescription == nil)
+        #expect(!service.isLoading)
+    }
+
+    @Test @MainActor
+    func failedRefreshRetainsPaginationUntilRetrySucceeds() async {
+        var scripts: [String] = []
+        let service = MailService(
+            commandRunner: { script, _ in
+                scripts.append(script)
+                if scripts.count == 1 {
+                    return .success(.snapshot(makeMailServiceSnapshot(account: "current", messageID: 1, hasMore: true)))
+                }
+                if scripts.count == 2 {
+                    return .failure(.failed("Refresh failed"))
+                }
+                return .success(.snapshot(makeMailServiceSnapshot(account: "current", messageID: 2)))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        service.start(accountNames: ["current"])
+        await service.refresh()
+        let messages = service.messages
+        let accounts = service.accounts
+        service.stop()
+        service.start(accountNames: ["current"])
+        await service.refresh()
+
+        #expect(service.messages == messages)
+        #expect(service.accounts == accounts)
+        #expect(service.paginationGeneration == 1)
+        #expect(service.canLoadMore)
+        #expect(service.errorDescription == "Refresh failed")
+        #expect(!service.isLoading)
+
+        await service.loadMore()
+        #expect(scripts.last?.contains("set remainingOffset to 10") == true)
+        #expect(service.messages.map(\.messageID).sorted() == [1, 2])
+        #expect(service.paginationGeneration == 2)
+        #expect(!service.canLoadMore)
+        #expect(service.errorDescription == nil)
+        service.stop()
+    }
+
+    @Test @MainActor
+    func changingAccountsPausesPaginationUntilTheFirstPageSucceeds() async {
+        var scripts: [String] = []
+        let service = MailService(
+            commandRunner: { script, _ in
+                scripts.append(script)
+                if scripts.count == 1 {
+                    return .success(.snapshot(makeMailServiceSnapshot(account: "old", messageID: 1, hasMore: true)))
+                }
+                if scripts.count == 2 {
+                    return .failure(.failed("New account unavailable"))
+                }
+                return .success(.snapshot(makeMailServiceSnapshot(account: "new", messageID: 2)))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        service.start(accountNames: ["old"])
+        await service.refresh()
+        #expect(service.canLoadMore)
+
+        service.start(accountNames: ["new"])
+        await service.refresh()
+        #expect(service.errorDescription == "New account unavailable")
+        #expect(!service.canLoadMore)
+        await service.loadMore()
+        #expect(scripts.count == 2)
+
+        await service.refresh()
+        #expect(scripts.last?.contains("set selectedAccountNames to {\"new\"}") == true)
+        #expect(scripts.last?.contains("set remainingOffset to 0") == true)
+        #expect(service.messages.map(\.accountName) == ["new"])
+        #expect(service.errorDescription == nil)
+        #expect(!service.isLoading)
+        service.stop()
+    }
+
+    @Test @MainActor
+    func cancelledRefreshKeepsIndexErrorAndSubsequentRefreshCanRecover() async {
+        let started = MailOperationQueueTestGate()
+        let release = MailOperationQueueTestGate()
+        var isMailRunning = false
+        var requestCount = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                requestCount += 1
+                if requestCount == 1 {
+                    await started.signal()
+                    await release.wait()
+                    return .failure(.failed("Cancelled failure"))
+                }
+                if requestCount == 2 {
+                    return .failure(.failed("Mail fetch failed"))
+                }
+                return .success(.snapshot(makeMailServiceSnapshot(account: "current", messageID: 1)))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { isMailRunning }
+        )
+        await service.refresh()
+        let indexError = service.errorDescription
+        #expect(indexError != nil)
+        #expect(service.needsMailIndexAccess)
+
+        isMailRunning = true
+        let refresh = Task { await service.refresh() }
+        await started.wait()
+        refresh.cancel()
+        await release.signal()
+        await refresh.value
+
+        #expect(service.errorDescription == indexError)
+        #expect(service.needsMailIndexAccess)
+        #expect(service.messages.isEmpty)
+        #expect(service.paginationGeneration == 0)
+        #expect(!service.isLoading)
+
+        await service.refresh()
+        #expect(service.errorDescription == "Mail fetch failed")
+        #expect(!service.needsMailIndexAccess)
+        await service.refresh()
+        #expect(service.errorDescription == nil)
+        #expect(!service.needsMailIndexAccess)
+        #expect(service.messages.map(\.messageID) == [1])
+    }
+
+    @Test @MainActor
+    func reselectingTheSameAccountsKeepsTheCurrentRefresh() async {
+        let started = MailOperationQueueTestGate()
+        let release = MailOperationQueueTestGate()
+        var requestCount = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                requestCount += 1
+                if requestCount == 1 {
+                    await started.signal()
+                    await release.wait()
+                }
+                return .success(.snapshot(makeMailServiceSnapshot(account: "current", messageID: requestCount)))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        let refresh = Task {
+            service.start(accountNames: ["current"])
+            await service.refresh()
+        }
+        await started.wait()
+        service.start(accountNames: ["current"])
+        #expect(service.isLoading)
+        await service.refresh()
+        #expect(requestCount == 1)
+
+        await release.signal()
+        await refresh.value
+        service.stop()
+        #expect(service.messages.map(\.messageID) == [1])
+        #expect(!service.isLoading)
+    }
+
+    @Test @MainActor
+    func stoppingBeforeIndexResponseDiscardsItsFailure() async {
+        weak var activeService: MailService?
+        let service = MailService(
+            commandRunner: { _, _ in .failure(.failed("Mail is unavailable")) },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: {
+                activeService?.stop()
+                return false
+            }
+        )
+        activeService = service
+        await service.refresh()
+
+        #expect(service.errorDescription == nil)
+        #expect(!service.needsMailIndexAccess)
+        #expect(!service.isLoading)
+    }
+
     @Test @MainActor
     func generatedScriptsUseAccountSpecificActionsAndSelectedSender() {
         let compose = MailService.composeScript(
@@ -447,6 +787,22 @@ private actor MailOperationQueueTestGate {
             isSignaled = true
         }
     }
+}
+
+private func makeMailServiceSnapshot(account: String, messageID: Int, hasMore: Bool = false) -> MailSnapshot {
+    MailSnapshot(
+        accounts: [MailScriptAccount(name: account, emailAddresses: ["\(account)@example.com"])],
+        messages: [MailScriptRow(
+            accountName: account,
+            messageID: String(messageID),
+            sender: "sender@example.com",
+            subject: "Message",
+            body: "Body",
+            receivedAt: Date(timeIntervalSince1970: 1_000),
+            isRead: false
+        )],
+        hasMore: hasMore
+    )
 }
 
 private func makeMailServiceIndex() throws -> URL {

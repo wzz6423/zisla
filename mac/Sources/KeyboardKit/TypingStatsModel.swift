@@ -152,6 +152,7 @@ final class TypingStatsModel: ObservableObject {
                 flushWaiters.append(continuation)
             }
         }
+        guard !isClearing else { return false }
 
         isFlushing = true
         var succeeded = true
@@ -325,9 +326,6 @@ final class TypingStatsModel: ObservableObject {
         _ = await flushPending()
         scheduledFlushTask?.cancel()
         scheduledFlushTask = nil
-        pendingCharacters.removeAll(keepingCapacity: true)
-        pendingKeyPresses.removeAll(keepingCapacity: true)
-        retryBatch = nil
 
         let previousReportRange = reportSnapshot?.range
         let previousComparisonRange = reportSnapshot?.comparisonRange
@@ -336,6 +334,9 @@ final class TypingStatsModel: ObservableObject {
 
         do {
             try await persistence.clearAll()
+            pendingCharacters.removeAll(keepingCapacity: true)
+            pendingKeyPresses.removeAll(keepingCapacity: true)
+            retryBatch = nil
             consecutiveWriteFailures = 0
             lastWriteError = nil
             isRecordingSuspended = false

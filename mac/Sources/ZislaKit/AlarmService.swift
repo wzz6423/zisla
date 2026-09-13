@@ -32,6 +32,18 @@ public struct AlarmItem: Identifiable, Codable, Equatable, Sendable {
         self.isEnabled = isEnabled
     }
 
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(UUID.self, forKey: .id),
+            hour: try container.decode(Int.self, forKey: .hour),
+            minute: try container.decode(Int.self, forKey: .minute),
+            label: try container.decode(String.self, forKey: .label),
+            weekdays: try container.decode(Set<Int>.self, forKey: .weekdays),
+            isEnabled: try container.decode(Bool.self, forKey: .isEnabled)
+        )
+    }
+
     public var isRepeating: Bool { !weekdays.isEmpty }
 
     public var timeText: String {
