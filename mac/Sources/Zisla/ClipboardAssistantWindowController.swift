@@ -775,6 +775,10 @@ struct ClipboardAssistantToastView: View {
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .strokeBorder(Color.white.opacity(0.25), lineWidth: 0.5)
                 )
+        } else if let emoji = detection.emoji {
+            Text(emoji)
+                .font(.system(size: max(16, min(22, rowHeight - 8))))
+                .frame(width: 26, height: max(16, min(26, rowHeight - 6)))
         } else {
             Image(systemName: detection.kind.symbolName)
                 .font(.system(size: 13, weight: .medium))
@@ -1023,6 +1027,7 @@ struct ClipboardAssistantToastView: View {
         case .composeMail: "写邮件"
         case .copyText: "复制结果"
         case .copyFullExpression: "复制完整算式"
+        case .copyEmoji: "复制 Emoji"
         case .compress: "压缩为 ZIP"
         case .share: "系统共享"
         case .callPhone: "拨打电话"
