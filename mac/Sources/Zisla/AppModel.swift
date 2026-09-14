@@ -1549,7 +1549,7 @@ final class AppModel: ObservableObject {
       } else {
         openSystemMail(to: address)
       }
-    case .copyText(let text), .copyFullExpression(let text):
+    case .copyText(let text), .copyFullExpression(let text), .copyEmoji(let text):
       guard ClipboardHistoryPasteboard.write(.text(text)) else {
         transientMessage = clipboardAssistantMessage("无法完成操作")
         return

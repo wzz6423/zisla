@@ -316,13 +316,28 @@ struct ClipboardAssistantDetectorTests {
 
     @Test
     func shortEnglishWordsRemainPlainTextForEnglishInterface() {
-        for text in ["OK", "no", "gift", "copy", "test"] {
+        for text in ["no", "copy", "test", "run", "walk"] {
             let detection = ClipboardAssistantDetector.detect(
                 text: text,
                 enabledKinds: allKinds,
                 systemLanguageIdentifier: "en"
             )
             #expect(detection?.kind == .text, "\(text) should not be treated as foreign text")
+        }
+    }
+
+    @Test
+    func englishEmojiNamesResolveInsteadOfPlainText() {
+        // Emoji names are intentionally matched before plain text: a copied
+        // "gift" or "OK" offers the emoji action instead of search/translate.
+        for (text, emoji) in ["OK": "👌", "gift": "🎁", ":fire:": "🔥"] {
+            let detection = ClipboardAssistantDetector.detect(
+                text: text,
+                enabledKinds: allKinds,
+                systemLanguageIdentifier: "en"
+            )
+            #expect(detection?.kind == .emojiName, "\(text) is a known emoji name")
+            #expect(detection?.emoji == emoji, "\(text) should resolve to \(emoji)")
         }
     }
 
