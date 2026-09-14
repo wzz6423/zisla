@@ -20,10 +20,13 @@ struct IslandDashboardView: View {
     var body: some View {
         Group {
             if activeCardCount > 0 {
-                dynamicCards
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 7)
-                    .frame(maxWidth: .infinity)
+                ScrollView(.vertical) {
+                    dynamicCards
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 7)
+                        .frame(maxWidth: .infinity)
+                }
+                .scrollIndicators(.visible)
             }
         }
         .onChange(of: activeCardCount, initial: true) { _, count in
@@ -203,7 +206,11 @@ struct IslandDashboardView: View {
     }
 
     private func browserDownloadCard(_ snapshot: BrowserDownloadSnapshot) -> some View {
-        dashboardCard(symbol: "arrow.down.circle", title: AppLocalization.text("浏览器下载"), tint: Color.zislaInfo) {
+        dashboardCard(
+            symbol: snapshot.agent?.symbolName ?? "arrow.down.circle",
+            title: snapshot.agent == .airDrop ? "AirDrop" : AppLocalization.text("浏览器下载"),
+            tint: Color.zislaInfo
+        ) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 5) {
                     Text(snapshot.agent?.displayName ?? AppLocalization.text("未知浏览器"))
@@ -234,7 +241,9 @@ struct IslandDashboardView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            AppLocalization.text("浏览器下载：%@，%@，%@", snapshot.agent?.displayName ?? AppLocalization.text("未知浏览器"), snapshot.fileName, snapshot.progressText)
+            snapshot.agent == .airDrop
+                ? AppLocalization.text("%@ 下载中 %@：%@", "AirDrop", snapshot.progressText, snapshot.fileName)
+                : AppLocalization.text("浏览器下载：%@，%@，%@", snapshot.agent?.displayName ?? AppLocalization.text("未知浏览器"), snapshot.fileName, snapshot.progressText)
         )
     }
 

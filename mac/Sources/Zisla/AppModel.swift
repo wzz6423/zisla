@@ -206,8 +206,9 @@ struct IslandModuleLayout: Equatable {
       // to `.standard`: a fixed 340pt left a large black gap under the toolbar, while shrinking to
       // pure content height (~129pt for one card) sank the whole island inside the 132pt black
       // crown, hiding the frosted glass and the bottom corner radius.
-      let islandHeight = IslandDashboardLayout.contentHeight(
-        cardCount: dashboardCardCount
+      let islandHeight = min(
+        IslandDashboardLayout.contentHeight(cardCount: dashboardCardCount),
+        IslandModuleLayout.keyboardSound.islandSize.height
       )
       return IslandModuleLayout(
         islandSize: CGSize(width: unifiedIslandWidth, height: islandHeight),
@@ -3208,7 +3209,7 @@ final class AppModel: ObservableObject {
         progress: snapshot.fraction,
         appName: snapshot.agent?.displayName,
         appBundleIdentifier: snapshot.agent?.bundleIdentifier,
-        symbolName: "arrow.down.circle.fill"
+        symbolName: snapshot.agent?.symbolName ?? "arrow.down.circle.fill"
       )
     }
     for notice in updates where !notices.updateIfPresent(notice) {
