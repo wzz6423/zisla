@@ -9,7 +9,8 @@ public enum ClipboardAssistantDetector {
     public static func detect(
         content: ClipboardHistoryContent,
         enabledKinds: Set<ClipboardAssistantKind>,
-        offersDownload: Bool = false
+        offersDownload: Bool = false,
+        installedApplications: [InstalledApplication] = []
     ) -> ClipboardAssistantDetection? {
         switch content {
         case .image(let data):
@@ -19,7 +20,12 @@ public enum ClipboardAssistantDetector {
             guard enabledKinds.contains(.file) else { return nil }
             return fileDetection(reference)
         case .text(let value):
-            return detect(text: value, enabledKinds: enabledKinds, offersDownload: offersDownload)
+            return detect(
+                text: value,
+                enabledKinds: enabledKinds,
+                offersDownload: offersDownload,
+                installedApplications: installedApplications
+            )
         }
     }
 
@@ -27,7 +33,8 @@ public enum ClipboardAssistantDetector {
         text rawText: String,
         enabledKinds: Set<ClipboardAssistantKind>,
         offersDownload: Bool = false,
-        systemLanguageIdentifier: String? = Locale.preferredLanguages.first
+        systemLanguageIdentifier: String? = Locale.preferredLanguages.first,
+        installedApplications: [InstalledApplication] = []
     ) -> ClipboardAssistantDetection? {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
@@ -100,6 +107,23 @@ public enum ClipboardAssistantDetector {
         }
         if enabledKinds.contains(.code), let code = codeDetection(text) {
             return code
+        }
+        // Installed-application names must run before the foreign-language branch:
+        // on a Chinese system "Safari" is English text, but the user copied it to
+        // launch the app, and an exact name match against a locally installed
+        // application is a far stronger signal than a language guess.
+        if enabledKinds.contains(.app),
+           let application = InstalledApplicationCatalog.application(
+            named: text, in: installedApplications
+           ) {
+            return ClipboardAssistantDetection(
+                kind: .app,
+                title: application.displayName,
+                actions: [.openApp(
+                    bundleIdentifier: application.bundleIdentifier,
+                    appName: application.displayName
+                )]
+            )
         }
         if enabledKinds.contains(.nonSystemLanguageText),
            isNonCurrentSystemLanguageText(text, systemLanguageIdentifier: systemLanguageIdentifier) {
