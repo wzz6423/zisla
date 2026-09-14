@@ -8,6 +8,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
     case phone
     case color
     case math
+    case currency
     case dateTime
     case code
     case nonSystemLanguageText = "chineseText"
@@ -24,6 +25,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
         case .phone: "phone"
         case .color: "paintpalette"
         case .math: "equal.square"
+        case .currency: "dollarsign"
         case .dateTime: "calendar"
         case .nonSystemLanguageText: "character.book.closed"
         case .code: "chevron.left.forwardslash.chevron.right"
@@ -256,7 +258,8 @@ public enum ClipboardAssistantActionOrder {
         case .phone: [.callPhone, .addToQuickNote, .share]
         case .color: [.copyText, .addToQuickNote, .share]
         case .math: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
-        case .dateTime: [.createCalendarEvent, .copyText, .addToQuickNote, .share]
+        case .currency: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
+        case .dateTime: [.createCalendarEvent, .copyText, .copyFullExpression, .addToQuickNote, .share]
         case .nonSystemLanguageText: [.translate, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .code: [.saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .text: [.search, .saveText, .translate, .addToQuickNote, .sendToTeleprompter, .share]
@@ -390,6 +393,12 @@ public enum ClipboardAssistantDetail: Equatable, Sendable {
     case imageSize(pixelsWide: Int, pixelsHigh: Int, byteCount: Int)
     case fileSize(bytes: Int)
     case mathExpression(String)
+    /// Currency conversion preview while the live rate is still being fetched:
+    /// "100 USD → CNY". Carries the numeric amount so callers can finish the math once the
+    /// quote arrives without re-parsing user input.
+    case currencyExpression(amount: Double, amountText: String, sourceCurrencyCode: String, targetCurrencyCode: String)
+    /// Fetched live rate backing a completed conversion: "1 USD = 7.2340 CNY".
+    case currencyRate(sourceCurrencyCode: String, targetCurrencyCode: String, rate: Double)
     case rgb(red: Double, green: Double, blue: Double, hex: String)
     case path(String)
 }

@@ -9,7 +9,8 @@ public enum ClipboardAssistantDetector {
     public static func detect(
         content: ClipboardHistoryContent,
         enabledKinds: Set<ClipboardAssistantKind>,
-        offersDownload: Bool = false
+        offersDownload: Bool = false,
+        preferredCurrencyCode: String? = nil
     ) -> ClipboardAssistantDetection? {
         switch content {
         case .image(let data):
@@ -19,7 +20,12 @@ public enum ClipboardAssistantDetector {
             guard enabledKinds.contains(.file) else { return nil }
             return fileDetection(reference)
         case .text(let value):
-            return detect(text: value, enabledKinds: enabledKinds, offersDownload: offersDownload)
+            return detect(
+                text: value,
+                enabledKinds: enabledKinds,
+                offersDownload: offersDownload,
+                preferredCurrencyCode: preferredCurrencyCode
+            )
         }
     }
 
@@ -27,7 +33,11 @@ public enum ClipboardAssistantDetector {
         text rawText: String,
         enabledKinds: Set<ClipboardAssistantKind>,
         offersDownload: Bool = false,
-        systemLanguageIdentifier: String? = Locale.preferredLanguages.first
+        systemLanguageIdentifier: String? = Locale.preferredLanguages.first,
+        preferredCurrencyCode: String? = nil,
+        now: Date = Date(),
+        timeZone: TimeZone = .current,
+        locale: Locale = AppLocalization.currentLanguage.locale
     ) -> ClipboardAssistantDetection? {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
@@ -61,6 +71,9 @@ public enum ClipboardAssistantDetector {
         if enabledKinds.contains(.color), let color = parseColor(text) {
             return color
         }
+        if let conversion = conversionDetection(text, enabledKinds: enabledKinds, now: now, timeZone: timeZone, locale: locale) {
+            return conversion
+        }
         // Date/time runs before math and phone: dashed digit groups like "2024-03-05" parse as
         // both arithmetic and a phone shape, but the date reading is the one users mean.
         if enabledKinds.contains(.dateTime), let parsed = parseDateTime(text) {
@@ -75,6 +88,27 @@ public enum ClipboardAssistantDetector {
                 kind: .dateTime,
                 title: text,
                 actions: actions
+            )
+        }
+        // Currency runs before math: values like "100$=" or "100dollar=cny" carry a currency
+        // token the arithmetic parser cannot consume, but keep the order explicit anyway so
+        // future overlaps resolve predictably. The live rate is fetched afterwards by the
+        // presentation layer; this branch only recognizes the shape and defers the numbers.
+        if enabledKinds.contains(.currency),
+           let conversion = parseCurrencyConversion(text, preferredCurrencyCode: preferredCurrencyCode),
+           conversion.sourceCurrencyCode
+              != (conversion.targetCurrencyCode ?? resolvedPreferredCurrencyCode(preferredCurrencyCode)) {
+            let target = conversion.targetCurrencyCode ?? resolvedPreferredCurrencyCode(preferredCurrencyCode)
+            return ClipboardAssistantDetection(
+                kind: .currency,
+                title: text,
+                detail: .currencyExpression(
+                    amount: conversion.amount,
+                    amountText: conversion.amountText,
+                    sourceCurrencyCode: conversion.sourceCurrencyCode,
+                    targetCurrencyCode: target
+                ),
+                actions: []
             )
         }
         if enabledKinds.contains(.math),
@@ -357,6 +391,305 @@ public enum ClipboardAssistantDetector {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
         return formatter.string(from: date)
+    }
+
+    // MARK: - Currency conversion
+
+    /// A copied value that reads as a currency conversion request: "100$", "100$=",
+    /// "100dollar", "100dollar=", "100$=¥", "100$=CNY", "$100", "¥100=€" and friends.
+    public struct ParsedCurrencyConversion: Equatable, Sendable {
+        public var amount: Double
+        /// Amount spelled exactly as copied (grouping separators preserved for display).
+        public var amountText: String
+        public var sourceCurrencyCode: String
+        /// `nil` converts to the preferred currency of the current language.
+        public var targetCurrencyCode: String?
+    }
+
+    /// Parses whole-string currency conversion requests. A trailing bare `=` (as in "100$=")
+    /// asks for the default target; `=<token>` names the target explicitly. Symbols are
+    /// resolved against the preferred currency when they are ambiguous (`$`, `¥`).
+    static func parseCurrencyConversion(
+        _ rawText: String,
+        preferredCurrencyCode: String?
+    ) -> ParsedCurrencyConversion? {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (1...40).contains(text.count) else { return nil }
+        let preferred = (preferredCurrencyCode ?? currentPreferredCurrencyCode()).uppercased()
+
+        // Natural-language exchange requests use the same operand grammar as unit conversion.
+        let naturalText = text.hasSuffix("=")
+            ? String(text.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines) : text
+        if !naturalText.contains("="), let operands = conversionOperands(naturalText) {
+            if let prefixed = parsePrefixedCurrencyAmount(operands[0], preferred: preferred) {
+                return completedConversion(prefixed, targetToken: operands[1], preferred: preferred)
+            }
+            guard let amount = conversionCaptures("(" + conversionAmountPattern + #")\s*(.+)"#, in: operands[0]),
+                  let value = Double(amount[0].replacingOccurrences(of: ",", with: "")),
+                  let source = resolveCurrencyToken(amount[1], preferred: preferred),
+                  let target = resolveCurrencyToken(operands[1], preferred: preferred), source != target else { return nil }
+            return ParsedCurrencyConversion(amount: value, amountText: amount[0], sourceCurrencyCode: source, targetCurrencyCode: target)
+        }
+
+        // Split off an optional "=target" suffix. A second "=" means arithmetic, not a
+        // conversion; an "=" followed by nothing must be trailing (i.e. "100$=", not "=100").
+        var head = text
+        var targetToken: String?
+        if let equals = text.firstIndex(of: "=") {
+            let target = text[text.index(after: equals)...].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !target.contains("=") else { return nil }
+            if target.isEmpty {
+                guard equals == text.index(before: text.endIndex) else { return nil }
+            } else {
+                targetToken = target
+            }
+            head = String(text[..<equals])
+        }
+
+        // Prefix symbol form first: "$100", "¥100.5", "US$1,000".
+        if let prefixed = parsePrefixedCurrencyAmount(head, preferred: preferred) {
+            return completedConversion(prefixed, targetToken: targetToken, preferred: preferred)
+        }
+
+        // Suffix token form: "100$", "100 dollar", "100dollar", "100CNY", "100元".
+        guard let (amount, amountText, token) = parseSuffixedCurrencyAmount(head),
+              let source = resolveCurrencyToken(token, preferred: preferred) else {
+            return nil
+        }
+        return completedConversion(
+            ParsedCurrencyConversion(
+                amount: amount,
+                amountText: amountText,
+                sourceCurrencyCode: source,
+                targetCurrencyCode: nil
+            ),
+            targetToken: targetToken,
+            preferred: preferred
+        )
+    }
+
+    /// Applies the optional target token to an already-parsed amount+source pair.
+    private static func completedConversion(
+        _ base: ParsedCurrencyConversion,
+        targetToken: String?,
+        preferred: String
+    ) -> ParsedCurrencyConversion? {
+        guard let targetToken else {
+            return ParsedCurrencyConversion(
+                amount: base.amount,
+                amountText: base.amountText,
+                sourceCurrencyCode: base.sourceCurrencyCode,
+                targetCurrencyCode: nil
+            )
+        }
+        guard let target = resolveCurrencyToken(targetToken, preferred: preferred),
+              target != base.sourceCurrencyCode else {
+            return nil
+        }
+        return ParsedCurrencyConversion(
+            amount: base.amount,
+            amountText: base.amountText,
+            sourceCurrencyCode: base.sourceCurrencyCode,
+            targetCurrencyCode: target
+        )
+    }
+
+    /// The currency the current interface language maps to (zh-Hans → CNY, en → USD, …),
+    /// falling back to the system region's currency, then USD.
+    public static func currentPreferredCurrencyCode(
+        language: AppLanguage = AppLocalization.currentLanguage
+    ) -> String {
+        let languageLocale = language.locale
+        let languageRegion = Locale(identifier: languageLocale.language.maximalIdentifier)
+        return languageRegion.currency?.identifier
+            ?? languageLocale.currency?.identifier
+            ?? Locale.current.currency?.identifier
+            ?? "USD"
+    }
+
+    private static func resolvedPreferredCurrencyCode(_ injected: String?) -> String {
+        (injected ?? currentPreferredCurrencyCode()).uppercased()
+    }
+
+    /// "<symbol><amount>" for bare and prefixed symbols. Longest symbol first so "US$" wins
+    /// over a bare "$".
+    private static func parsePrefixedCurrencyAmount(
+        _ head: String,
+        preferred: String
+    ) -> ParsedCurrencyConversion? {
+        for symbol in currencySymbols.sorted(by: { $0.count > $1.count }) where head.hasPrefix(symbol) {
+            let rest = String(head.dropFirst(symbol.count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let amountText = leadingAmount(in: rest),
+                  rest.dropFirst(amountText.count).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let amount = normalizedAmount(amountText) else {
+                return nil
+            }
+            return ParsedCurrencyConversion(
+                amount: amount,
+                amountText: amountText,
+                sourceCurrencyCode: currencySymbolCode(symbol, preferred: preferred),
+                targetCurrencyCode: nil
+            )
+        }
+        return nil
+    }
+
+    /// "<amount><token>" with optional whitespace between: (100, "100", "dollar").
+    private static func parseSuffixedCurrencyAmount(_ head: String) -> (Double, String, String)? {
+        guard let amountText = leadingAmount(in: head) else { return nil }
+        let token = head.dropFirst(amountText.count).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty, let amount = normalizedAmount(amountText) else { return nil }
+        return (amount, amountText, token)
+    }
+
+    /// Leading run of amount characters (digits, separators), validated afterwards.
+    private static func leadingAmount(in text: String) -> String? {
+        var end = text.startIndex
+        while end < text.endIndex, "0123456789.,".contains(text[end]) {
+            end = text.index(after: end)
+        }
+        guard end > text.startIndex else { return nil }
+        return String(text[..<end])
+    }
+
+    /// Validates an amount's shape (`1,000` / `100.50` / `100`) and parses it.
+    private static func normalizedAmount(_ text: String) -> Double? {
+        guard text.range(
+            of: #"^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$"#,
+            options: .regularExpression
+        ) != nil else { return nil }
+        return Double(text.replacingOccurrences(of: ",", with: ""))
+    }
+
+    /// Currency symbols recognized at the start or right after an amount. Bare `$`/`¥` are
+    /// ambiguous across currency families, so the preferred currency resolves them.
+    private static let currencySymbols = [
+        "US$", "HK$", "NZ$", "MX$", "A$", "C$", "NT$", "R$", "$",
+        "¥", "￥", "€", "£", "₩", "₽", "₹", "₫", "฿", "₺", "₱",
+    ]
+
+    private static let dollarFamilyCodes: Set<String> = [
+        "USD", "CAD", "AUD", "NZD", "SGD", "HKD", "MXN", "TWD", "ARS", "CLP", "COP",
+    ]
+
+    /// Resolves a currency symbol, consulting the preferred currency for the ambiguous ones.
+    static func currencySymbolCode(_ symbol: String, preferred: String) -> String {
+        switch symbol {
+        case "$":
+            dollarFamilyCodes.contains(preferred) ? preferred : "USD"
+        case "US$": "USD"
+        case "NT$": "TWD"
+        case "HK$": "HKD"
+        case "NZ$": "NZD"
+        case "MX$": "MXN"
+        case "A$": "AUD"
+        case "C$": "CAD"
+        case "R$": "BRL"
+        case "¥", "￥":
+            ["CNY", "JPY"].contains(preferred) ? preferred : "CNY"
+        case "€": "EUR"
+        case "£": "GBP"
+        case "₩": "KRW"
+        case "₽": "RUB"
+        case "₹": "INR"
+        case "₫": "VND"
+        case "฿": "THB"
+        case "₺": "TRY"
+        case "₱": "PHP"
+        default: "USD"
+        }
+    }
+
+    /// ISO 4217 codes and aliases recognized after uppercasing.
+    private static let currencyAliases: [String: String] = {
+        var table: [String: String] = [
+            "RMB": "CNY", "NTD": "TWD", "CNH": "CNY", "STERLING": "GBP",
+        ]
+        for code in [
+            "USD", "EUR", "GBP", "JPY", "CNY", "HKD", "TWD", "MOP", "KRW", "AUD", "CAD",
+            "NZD", "CHF", "SEK", "NOK", "DKK", "RUB", "INR", "THB", "VND", "IDR", "MYR",
+            "SGD", "PHP", "TRY", "BRL", "MXN", "ZAR", "SAR", "AED", "ILS", "PLN", "CZK",
+            "HUF", "RON", "BGN", "UAH", "KZT", "PEN", "CLP", "COP", "ARS", "EGP", "NGN",
+            "KES", "PKR", "BDT", "LKR", "MMK", "KHR", "LAK", "GEL", "AZN", "AMD", "JOD",
+            "QAR", "KWD", "BHD", "OMR", "TND", "DZD", "MAD", "IQD", "BYN", "RSD", "ISK",
+            "XOF", "XAF", "GHS", "TZS", "UGX", "MUR", "NPR", "BTN", "XCD", "DOP", "GTQ",
+            "PYG", "UYU", "BOB", "CRC", "HRK",
+        ] {
+            table[code] = code
+        }
+        return table
+    }()
+
+    /// Common English currency names (lowercased) → ISO code. "dollar(s)" is handled
+    /// separately because it resolves against the preferred currency.
+    private static let currencyNames: [String: String] = [
+        "euro": "EUR", "euros": "EUR",
+        "yen": "JPY",
+        "yuan": "CNY", "rmb": "CNY", "kuai": "CNY", "renminbi": "CNY",
+        "pound": "GBP", "pounds": "GBP", "quid": "GBP", "sterling": "GBP",
+        "won": "KRW",
+        "rupee": "INR", "rupees": "INR",
+        "ruble": "RUB", "rouble": "RUB", "rubles": "RUB",
+        "baht": "THB",
+        "dong": "VND",
+        "rupiah": "IDR",
+        "ringgit": "MYR",
+        "peso": "MXN", "pesos": "MXN",
+        "franc": "CHF", "francs": "CHF",
+        "krona": "SEK", "krone": "DKK", "kroner": "DKK",
+        "zloty": "PLN",
+        "forint": "HUF",
+        "leu": "RON",
+        "lira": "TRY",
+        "dirham": "AED", "dirhams": "AED",
+        "riyal": "SAR", "riyals": "SAR",
+        "shekel": "ILS", "shekels": "ILS",
+        "hryvnia": "UAH",
+        "rand": "ZAR",
+        "naira": "NGN",
+        "kip": "LAK",
+        "shilling": "KES",
+    ]
+
+    /// CJK currency spellings matched verbatim.
+    private static let cjkCurrencyNames: [String: String] = [
+        "元": "CNY", "块": "CNY", "圆": "CNY", "人民币": "CNY",
+        "美元": "USD", "美金": "USD",
+        "日元": "JPY", "円": "JPY",
+        "欧元": "EUR",
+        "英镑": "GBP",
+        "韩元": "KRW", "港币": "HKD", "港元": "HKD", "台币": "TWD",
+        "澳元": "AUD", "加元": "CAD",
+        "卢布": "RUB", "泰铢": "THB", "卢比": "INR",
+        "ドル": "USD", "원": "KRW", "달러": "USD", "엔": "JPY", "루피": "INR",
+    ]
+
+    /// Maps a currency token — symbol, ISO code, alias or common name — to an ISO 4217 code.
+    static func resolveCurrencyToken(_ rawToken: String, preferred: String) -> String? {
+        let token = rawToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { return nil }
+
+        if let code = currencySymbolCodeIfWholeToken(token, preferred: preferred) {
+            return code
+        }
+        if let code = currencyAliases[token.uppercased()] {
+            return code
+        }
+        let lower = token.lowercased()
+        if lower == "dollar" || lower == "dollars" {
+            return dollarFamilyCodes.contains(preferred) ? preferred : "USD"
+        }
+        if let code = currencyNames[lower] {
+            return code
+        }
+        return cjkCurrencyNames[token]
+    }
+
+    /// Full-token symbol match (single-character symbols or prefixed ones like "US$").
+    private static func currencySymbolCodeIfWholeToken(_ token: String, preferred: String) -> String? {
+        guard currencySymbols.contains(token) else { return nil }
+        return currencySymbolCode(token, preferred: preferred)
     }
 
     // MARK: - Non-current-system-language text
@@ -694,9 +1027,10 @@ public enum ClipboardAssistantDetector {
         return expression
     }
 
-    public static func formatNumber(_ value: Double) -> String {
+    public static func formatNumber(_ value: Double, locale: Locale = .current) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
+        formatter.locale = locale
         formatter.groupingSeparator = ""
         formatter.maximumFractionDigits = abs(value.rounded() - value) < 1e-9 ? 0 : 6
         return formatter.string(from: NSNumber(value: value)) ?? String(value)
