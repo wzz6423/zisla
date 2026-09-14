@@ -34,7 +34,10 @@ public enum ClipboardAssistantDetector {
         enabledKinds: Set<ClipboardAssistantKind>,
         offersDownload: Bool = false,
         systemLanguageIdentifier: String? = Locale.preferredLanguages.first,
-        preferredCurrencyCode: String? = nil
+        preferredCurrencyCode: String? = nil,
+        now: Date = Date(),
+        timeZone: TimeZone = .current,
+        locale: Locale = AppLocalization.currentLanguage.locale
     ) -> ClipboardAssistantDetection? {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
@@ -67,6 +70,9 @@ public enum ClipboardAssistantDetector {
         }
         if enabledKinds.contains(.color), let color = parseColor(text) {
             return color
+        }
+        if let conversion = conversionDetection(text, enabledKinds: enabledKinds, now: now, timeZone: timeZone, locale: locale) {
+            return conversion
         }
         // Date/time runs before math and phone: dashed digit groups like "2024-03-05" parse as
         // both arithmetic and a phone shape, but the date reading is the one users mean.
@@ -410,6 +416,15 @@ public enum ClipboardAssistantDetector {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (1...40).contains(text.count) else { return nil }
         let preferred = (preferredCurrencyCode ?? currentPreferredCurrencyCode()).uppercased()
+
+        // Natural-language exchange requests use the same operand grammar as unit conversion.
+        if !text.contains("="), let operands = conversionOperands(text),
+           let amount = conversionCaptures("(" + conversionAmountPattern + #")\s*(.+)"#, in: operands[0]),
+           let value = Double(amount[0].replacingOccurrences(of: ",", with: "")),
+           let source = resolveCurrencyToken(amount[1], preferred: preferred),
+           let target = resolveCurrencyToken(operands[1], preferred: preferred), source != target {
+            return ParsedCurrencyConversion(amount: value, amountText: amount[0], sourceCurrencyCode: source, targetCurrencyCode: target)
+        }
 
         // Split off an optional "=target" suffix. A second "=" means arithmetic, not a
         // conversion; an "=" followed by nothing must be trailing (i.e. "100$=", not "=100").
@@ -1007,9 +1022,10 @@ public enum ClipboardAssistantDetector {
         return expression
     }
 
-    public static func formatNumber(_ value: Double) -> String {
+    public static func formatNumber(_ value: Double, locale: Locale = .current) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
+        formatter.locale = locale
         formatter.groupingSeparator = ""
         formatter.maximumFractionDigits = abs(value.rounded() - value) < 1e-9 ? 0 : 6
         return formatter.string(from: NSNumber(value: value)) ?? String(value)

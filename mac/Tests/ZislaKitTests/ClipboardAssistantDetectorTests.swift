@@ -7,6 +7,52 @@ struct ClipboardAssistantDetectorTests {
     private let allKinds = Set(ClipboardAssistantKind.allCases)
 
     @Test
+    func convertsUnitsAndRejectsMismatchedDimensions() throws {
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: "10 ft in m", enabledKinds: allKinds, systemLanguageIdentifier: "en",
+            now: Date(timeIntervalSince1970: 0), timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: "en")
+        ))
+        #expect(detection.kind == .math)
+        #expect(detection.title.contains("3.048"))
+        #expect(detection.fullContent?.contains("ft") == true)
+        #expect(ClipboardAssistantDetector.parseUnitConversion("10 kg in lb")?.result ?? 0 > 22.04)
+        #expect(ClipboardAssistantDetector.parseUnitConversion("10 ft in kg") == nil)
+        #expect(ClipboardAssistantDetector.parseUnitConversion("10 ft in m of prose") == nil)
+    }
+
+    @Test
+    func supportsCurrencyInSyntaxAlongsideExistingRobustForms() throws {
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: "100 USD in CNY", enabledKinds: allKinds, preferredCurrencyCode: "CNY"
+        ))
+        guard case .currencyExpression(let amount, "100", "USD", "CNY")? = detection.detail else {
+            Issue.record("expected the natural-language currency request")
+            return
+        }
+        #expect(amount == 100)
+    }
+
+    @Test
+    func computesDateIntervalsAgainstAnInjectedDay() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 14, hour: 12)))
+        let interval = try #require(ClipboardAssistantDetector.parseDateInterval("how many days until 2026-09-20?", now: now, timeZone: calendar.timeZone))
+        #expect(interval.days == 6)
+        #expect(ClipboardAssistantDetector.parseDateInterval("ordinary text", now: now, timeZone: calendar.timeZone) == nil)
+        #expect(ClipboardAssistantDetector.parseDateInterval("until 2026-02-30", now: now, timeZone: calendar.timeZone) == nil)
+    }
+
+    @Test
+    func convertsAZoneAwareTimestampAndRejectsAmbiguousZoneAbbreviations() throws {
+        let conversion = try #require(ClipboardAssistantDetector.parseTimeZoneConversion(
+            "2026-01-01 12:00 Asia/Shanghai to America/New_York"
+        ))
+        #expect(conversion.targetText.contains("2025-12-31 23:00:00"))
+        #expect(ClipboardAssistantDetector.parseTimeZoneConversion("12:00 CST to UTC") == nil)
+    }
+
+    @Test
     func detectsPlainHTTPAndHTTPSURLs() {
         let detection = ClipboardAssistantDetector.detect(
             text: "https://example.com/path?q=1",
