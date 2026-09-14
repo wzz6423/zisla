@@ -491,7 +491,7 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(toastSource.contains("Spacer(minLength: 0)"))
         #expect(source.contains("onPresentationChanged?(true)"))
         #expect(source.contains("onPresentationChanged?(false)"))
-        #expect(source.contains("guard !isScreenshotActive, !isScreenLocked else { return }"))
+        #expect(source.contains("guard !isScreenshotActive, !isScreenLocked else { return nil }"))
         #expect(source.contains("setScreenshotActive(_ active: Bool)"))
         #expect(source.contains("setScreenshotSelectionActive(_ active: Bool)"))
         #expect(source.contains("guard presentationGeneration == generation else { return }"))
@@ -646,7 +646,7 @@ struct ClipboardAssistantIslandPresentationTests {
 
         #expect(source.contains("func setScreenLocked(_ locked: Bool)"))
         #expect(source.contains("if locked {\n            dismiss(animated: false)\n        }"))
-        #expect(source.contains("guard !isScreenshotActive, !isScreenLocked else { return }"))
+        #expect(source.contains("guard !isScreenshotActive, !isScreenLocked else { return nil }"))
         #expect(appSource.contains("model.clipboardAssistant.setScreenLocked(locked)"))
     }
 

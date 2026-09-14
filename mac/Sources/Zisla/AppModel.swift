@@ -1454,14 +1454,15 @@ final class AppModel: ObservableObject {
       orders: settings.clipboardAssistantActionOrders
     )
     clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
-    clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle)
-    guard clipboardAssistant.presentation.detection == detection else { return .unavailable }
+    guard let presentationGeneration = clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle),
+          clipboardAssistant.presentation.detection == detection else { return .unavailable }
     clipboardAssistantContent = content
     scheduleCurrencyConversionUpdate(
       for: detection,
       content: content,
       sourceApplication: sourceApplication,
-      orders: settings.clipboardAssistantActionOrders
+      orders: settings.clipboardAssistantActionOrders,
+      presentationGeneration: presentationGeneration
     )
     return .presented
   }
@@ -1506,7 +1507,8 @@ final class AppModel: ObservableObject {
     for detection: ClipboardAssistantDetection,
     content: ClipboardHistoryContent,
     sourceApplication: NSRunningApplication?,
-    orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
+    orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]],
+    presentationGeneration: Int
   ) {
     currencyConversionTask?.cancel()
     guard detection.kind == .currency,
@@ -1525,7 +1527,8 @@ final class AppModel: ObservableObject {
             quote: quote,
             content: content,
             sourceApplication: sourceApplication,
-            orders: orders
+            orders: orders,
+            presentationGeneration: presentationGeneration
           )
         }
       } catch {
@@ -1534,7 +1537,8 @@ final class AppModel: ObservableObject {
           self?.presentCurrencyConversionFailure(
             amountText: amountText,
             sourceCurrencyCode: source,
-            targetCurrencyCode: target
+            targetCurrencyCode: target,
+            presentationGeneration: presentationGeneration
           )
         }
       }
@@ -1551,16 +1555,9 @@ final class AppModel: ObservableObject {
     quote: ExchangeRateQuote,
     content: ClipboardHistoryContent,
     sourceApplication: NSRunningApplication?,
-    orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
+    orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]],
+    presentationGeneration: Int
   ) {
-    // The presentation may have been replaced (or dismissed) while the quote was in flight.
-    guard let current = clipboardAssistant.presentation.detection,
-          current.kind == .currency,
-          case .currencyExpression(_, _, let pendingSource, let pendingTarget)? = current.detail,
-          pendingSource == sourceCurrencyCode,
-          pendingTarget == targetCurrencyCode else {
-      return
-    }
     let converted = amount * quote.rate
     let title = Self.currencyConversionTitle(for: converted, currencyCode: targetCurrencyCode)
     let rateText = ClipboardAssistantDetector.formatNumber(quote.rate)
@@ -1583,7 +1580,7 @@ final class AppModel: ObservableObject {
       sourceApplication: sourceApplication,
       orders: orders
     )
-    clipboardAssistant.updateDetection(detection)
+    clipboardAssistant.updateDetection(detection, for: presentationGeneration)
   }
 
   /// Network failure keeps the toast on screen with the copied expression, but without actions:
@@ -1592,15 +1589,9 @@ final class AppModel: ObservableObject {
   private func presentCurrencyConversionFailure(
     amountText: String,
     sourceCurrencyCode: String,
-    targetCurrencyCode: String
+    targetCurrencyCode: String,
+    presentationGeneration: Int
   ) {
-    guard let current = clipboardAssistant.presentation.detection,
-          current.kind == .currency,
-          case .currencyExpression(_, _, let pendingSource, let pendingTarget)? = current.detail,
-          pendingSource == sourceCurrencyCode,
-          pendingTarget == targetCurrencyCode else {
-      return
-    }
     let detection = ClipboardAssistantDetection(
       kind: .currency,
       title: clipboardAssistantMessage("汇率获取失败"),
@@ -1612,7 +1603,7 @@ final class AppModel: ObservableObject {
       ),
       actions: []
     )
-    clipboardAssistant.updateDetection(detection)
+    clipboardAssistant.updateDetection(detection, for: presentationGeneration)
   }
 
   /// Formats a converted amount with the current language's currency conventions
