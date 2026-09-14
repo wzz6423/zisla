@@ -1371,6 +1371,10 @@ final class AppModel: ObservableObject {
   private var suppressedAssistantChangeCount: Int?
   private var clipboardAssistantContent: ClipboardHistoryContent?
   private var lastClipboardAssistantRoutingChangeCount: Int?
+  /// Live exchange-rate fetching for the assistant's currency conversion; quotes are fetched
+  /// fresh on every conversion and never cached.
+  private let exchangeRateService = ExchangeRateService.live()
+  private var currencyConversionTask: Task<Void, Never>?
 
   private enum ClipboardAssistantPresentationResult {
     case presented
@@ -1440,12 +1444,45 @@ final class AppModel: ObservableObject {
       enabledKinds: settings.clipboardAssistantEnabledKinds.isEmpty
         ? Set(ClipboardAssistantKind.allCases)
         : settings.clipboardAssistantEnabledKinds,
-      offersDownload: settings.downloaderEnabled
+      offersDownload: settings.downloaderEnabled,
+      preferredCurrencyCode: ClipboardAssistantDetector.currentPreferredCurrencyCode(
+        language: languageStore.language
+      )
     ) else { return .unavailable }
+    detection = augmentedClipboardAssistantDetection(
+      detection,
+      content: content,
+      sourceApplication: sourceApplication,
+      orders: settings.clipboardAssistantActionOrders
+    )
+    clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
+    guard let presentationGeneration = clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle),
+          clipboardAssistant.presentation.detection == detection else { return .unavailable }
+    clipboardAssistantContent = content
+    scheduleCurrencyConversionUpdate(
+      for: detection,
+      content: content,
+      sourceApplication: sourceApplication,
+      orders: settings.clipboardAssistantActionOrders,
+      presentationGeneration: presentationGeneration
+    )
+    return .presented
+  }
+
+  /// Appends the universal actions every detection offers (quick note, sharing, blocking the
+  /// source app) and applies the user-configured action order. Kept in one place so the async
+  /// currency-conversion refresh can rebuild the detection identically.
+  private func augmentedClipboardAssistantDetection(
+    _ detection: ClipboardAssistantDetection,
+    content: ClipboardHistoryContent,
+    sourceApplication: NSRunningApplication?,
+    orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
+  ) -> ClipboardAssistantDetection {
+    var detection = detection
     detection.actions.append(.addToQuickNote)
     detection.actions.append(.share)
     if case .text = content,
-       [.text, .nonSystemLanguageText, .code, .math].contains(detection.kind) {
+       [.text, .nonSystemLanguageText, .code, .math, .currency].contains(detection.kind) {
       detection.actions.append(.sendToTeleprompter)
     }
     if let bundleIdentifier = sourceApplication?.bundleIdentifier,
@@ -1459,13 +1496,127 @@ final class AppModel: ObservableObject {
     detection.actions = ClipboardAssistantActionOrder.ordered(
       detection.actions,
       for: detection.kind,
-      using: settings.clipboardAssistantActionOrders
+      using: orders
     )
-    clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
-    clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle)
-    guard clipboardAssistant.presentation.detection == detection else { return .unavailable }
-    clipboardAssistantContent = content
-    return .presented
+    return detection
+  }
+
+  /// Currency conversions resolve in two steps: the detector recognizes the shape synchronously
+  /// and the toast shows the copied text, then the live rate is fetched here and the detection
+  /// is refreshed with the converted amount. The quote is always fetched at conversion time —
+  /// never cached — so the result reflects the market at the moment of the copy.
+  private func scheduleCurrencyConversionUpdate(
+    for detection: ClipboardAssistantDetection,
+    content: ClipboardHistoryContent,
+    sourceApplication: NSRunningApplication?,
+    orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]],
+    presentationGeneration: Int
+  ) {
+    currencyConversionTask?.cancel()
+    guard detection.kind == .currency,
+          case .currencyExpression(let amount, let amountText, let source, let target)? = detection.detail
+    else { return }
+    currencyConversionTask = Task { [weak self, exchangeRateService] in
+      do {
+        let quote = try await exchangeRateService.fetchRate(source, target)
+        guard !Task.isCancelled else { return }
+        await MainActor.run { [weak self] in
+          self?.presentCurrencyConversionResult(
+            amount: amount,
+            amountText: amountText,
+            sourceCurrencyCode: source,
+            targetCurrencyCode: target,
+            quote: quote,
+            content: content,
+            sourceApplication: sourceApplication,
+            orders: orders,
+            presentationGeneration: presentationGeneration
+          )
+        }
+      } catch {
+        guard !Task.isCancelled else { return }
+        await MainActor.run { [weak self] in
+          self?.presentCurrencyConversionFailure(
+            amountText: amountText,
+            sourceCurrencyCode: source,
+            targetCurrencyCode: target,
+            presentationGeneration: presentationGeneration
+          )
+        }
+      }
+    }
+  }
+
+  /// Replaces the pending conversion toast with the converted amount, rebuilding the universal
+  /// actions the same way the synchronous presentation did.
+  private func presentCurrencyConversionResult(
+    amount: Double,
+    amountText: String,
+    sourceCurrencyCode: String,
+    targetCurrencyCode: String,
+    quote: ExchangeRateQuote,
+    content: ClipboardHistoryContent,
+    sourceApplication: NSRunningApplication?,
+    orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]],
+    presentationGeneration: Int
+  ) {
+    let converted = amount * quote.rate
+    let title = Self.currencyConversionTitle(for: converted, currencyCode: targetCurrencyCode)
+    let rateText = ClipboardAssistantDetector.formatNumber(quote.rate)
+    let fullExpression =
+      "\(amountText) \(sourceCurrencyCode) = \(title) · 1 \(sourceCurrencyCode) = \(rateText) \(targetCurrencyCode)"
+    var detection = ClipboardAssistantDetection(
+      kind: .currency,
+      title: title,
+      detail: .currencyRate(
+        sourceCurrencyCode: sourceCurrencyCode,
+        targetCurrencyCode: targetCurrencyCode,
+        rate: quote.rate
+      ),
+      actions: [.copyText(title), .copyFullExpression(fullExpression)],
+      fullContent: fullExpression
+    )
+    detection = augmentedClipboardAssistantDetection(
+      detection,
+      content: content,
+      sourceApplication: sourceApplication,
+      orders: orders
+    )
+    clipboardAssistant.updateDetection(detection, for: presentationGeneration)
+  }
+
+  /// Network failure keeps the toast on screen with the copied expression, but without actions:
+  /// there is no converted amount to copy and silently falling back to plain text would hide
+  /// that a conversion was attempted.
+  private func presentCurrencyConversionFailure(
+    amountText: String,
+    sourceCurrencyCode: String,
+    targetCurrencyCode: String,
+    presentationGeneration: Int
+  ) {
+    let detection = ClipboardAssistantDetection(
+      kind: .currency,
+      title: clipboardAssistantMessage("汇率获取失败"),
+      detail: .currencyExpression(
+        amount: 0,
+        amountText: amountText,
+        sourceCurrencyCode: sourceCurrencyCode,
+        targetCurrencyCode: targetCurrencyCode
+      ),
+      actions: []
+    )
+    clipboardAssistant.updateDetection(detection, for: presentationGeneration)
+  }
+
+  /// Formats a converted amount with the current language's currency conventions
+  /// (e.g. "¥723.40" under zh-Hans, "$723.40" under en).
+  static func currencyConversionTitle(for value: Double, currencyCode: String) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .currency
+    formatter.currencyCode = currencyCode
+    formatter.locale = AppLocalization.currentLanguage.locale
+    return formatter.string(from: NSNumber(value: value))
+      ?? String(format: "%.2f %@", value, currencyCode)
   }
 
   private func presentDetectedLink(_ url: URL) {
