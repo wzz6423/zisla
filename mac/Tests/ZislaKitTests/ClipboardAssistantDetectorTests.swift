@@ -698,7 +698,17 @@ struct ClipboardAssistantCurrencyDetectionTests {
             .indonesian: "IDR", .vietnamese: "VND", .turkish: "TRY",
         ]
         let expected = try #require(expectedCurrencies[language])
-        #expect(ClipboardAssistantDetector.currentPreferredCurrencyCode(language: language) == expected)
+        let preferred = ClipboardAssistantDetector.currentPreferredCurrencyCode(language: language)
+        #expect(preferred == expected)
+        let source = expected == "USD" ? "EUR" : "USD"
+        let detection = ClipboardAssistantDetector.detect(
+            content: .text("100\(source)"),
+            enabledKinds: allKinds,
+            preferredCurrencyCode: preferred
+        )
+        #expect(detection?.detail == .currencyExpression(
+            amount: 100, amountText: "100", sourceCurrencyCode: source, targetCurrencyCode: expected
+        ))
     }
 
     private func detection(_ text: String) -> ClipboardAssistantDetection? {
