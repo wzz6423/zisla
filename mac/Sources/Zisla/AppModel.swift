@@ -1445,7 +1445,9 @@ final class AppModel: ObservableObject {
         ? Set(ClipboardAssistantKind.allCases)
         : settings.clipboardAssistantEnabledKinds,
       offersDownload: settings.downloaderEnabled,
-      preferredCurrencyCode: languageStore.language.locale.currency?.identifier
+      preferredCurrencyCode: ClipboardAssistantDetector.currentPreferredCurrencyCode(
+        language: languageStore.language
+      )
     ) else { return .unavailable }
     detection = augmentedClipboardAssistantDetection(
       detection,
