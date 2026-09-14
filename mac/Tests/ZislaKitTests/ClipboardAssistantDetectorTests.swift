@@ -688,6 +688,19 @@ struct ClipboardAssistantCurrencyDetectionTests {
     /// Detaches the tests from the machine's interface language: zh users convert to CNY.
     private let preferred = "CNY"
 
+    @Test(arguments: AppLanguage.allCases)
+    func defaultTargetCurrencyTracksInterfaceLanguage(language: AppLanguage) throws {
+        let expectedCurrencies: [AppLanguage: String] = [
+            .simplifiedChinese: "CNY", .traditionalChinese: "TWD", .english: "USD",
+            .japanese: "JPY", .korean: "KRW", .french: "EUR", .german: "EUR",
+            .spanish: "EUR", .brazilianPortuguese: "BRL", .italian: "EUR",
+            .dutch: "EUR", .russian: "RUB", .arabic: "EGP", .thai: "THB",
+            .indonesian: "IDR", .vietnamese: "VND", .turkish: "TRY",
+        ]
+        let expected = try #require(expectedCurrencies[language])
+        #expect(ClipboardAssistantDetector.currentPreferredCurrencyCode(language: language) == expected)
+    }
+
     private func detection(_ text: String) -> ClipboardAssistantDetection? {
         ClipboardAssistantDetector.detect(
             text: text,

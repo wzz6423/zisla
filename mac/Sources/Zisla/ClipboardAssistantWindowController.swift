@@ -142,9 +142,24 @@ final class ClipboardAssistantController: ObservableObject {
     private var dismissalDeadline: Date?
     private var dismissalTotalDuration: Double?
     private var pausedDismissalRemainingFraction: Double?
+    private var isAwaitingCurrencyConversion = false
+    private let windowPresenter: @MainActor (ClipboardAssistantController, ClipboardAssistantDetection) -> Void
+    private let dismissSleeper: @Sendable (Duration) async throws -> Void
     private let triggerMonitor = ClipboardAssistantTriggerMonitor()
     private let gestureMonitor = ClipboardAssistantMouseGestureMonitor()
     @Published private(set) var isMoreActionsPresented = false
+
+    init(
+        windowPresenter: @escaping @MainActor (ClipboardAssistantController, ClipboardAssistantDetection) -> Void = {
+            $0.showWindow($1)
+        },
+        dismissSleeper: @escaping @Sendable (Duration) async throws -> Void = {
+            try await Task.sleep(for: $0)
+        }
+    ) {
+        self.windowPresenter = windowPresenter
+        self.dismissSleeper = dismissSleeper
+    }
 
     /// Applies the user-configured quick triggers (hotkey + mouse side button).
     /// Returns `false` when a configured trigger needs the input-monitoring permission
@@ -264,21 +279,25 @@ final class ClipboardAssistantController: ObservableObject {
         }
     }
 
-    func present(_ detection: ClipboardAssistantDetection, visualStyle: IslandVisualStyle) {
+    @discardableResult
+    func present(_ detection: ClipboardAssistantDetection, visualStyle: IslandVisualStyle) -> Int? {
         setMoreActionsPresented(false)
-        guard !isScreenshotActive, !isScreenLocked else { return }
+        guard !isScreenshotActive, !isScreenLocked else { return nil }
         isSharingAnchorHeld = false
         cancelDismissTask()
-        dismissalTotalDuration = displayDuration.expiresAfter
-        pausedDismissalRemainingFraction = displayDuration.expiresAfter.map { _ in 1 }
+        isAwaitingCurrencyConversion = if case .currencyExpression? = detection.detail { true } else { false }
+        dismissalTotalDuration = isAwaitingCurrencyConversion ? nil : displayDuration.expiresAfter
+        pausedDismissalRemainingFraction = dismissalTotalDuration.map { _ in 1 }
         presentationGeneration &+= 1
+        let generation = presentationGeneration
         presentation.isHovered = false
         presentation.visualStyle = visualStyle
         presentation.detection = detection
         presentation.imageThumbnail = Self.thumbnail(for: detection)
-        showWindow(detection)
+        windowPresenter(self, detection)
         onPresentationChanged?(true)
         scheduleDismiss()
+        return generation
     }
 
     func dismiss(animated: Bool = true) {
@@ -355,6 +374,7 @@ final class ClipboardAssistantController: ObservableObject {
         guard presentation.detection != nil else { return }
         guard !isScreenshotActive else { return }
         guard !isSharingAnchorHeld else { return }
+        guard !isAwaitingCurrencyConversion else { return }
         guard let seconds = displayDuration.expiresAfter else {
             dismissalTotalDuration = nil
             pausedDismissalRemainingFraction = nil
@@ -372,9 +392,10 @@ final class ClipboardAssistantController: ObservableObject {
         dismissalDeadline = Date().addingTimeInterval(remaining)
         let presentationGeneration = self.presentationGeneration
         let dismissalGeneration = self.dismissalGeneration
+        let dismissSleeper = self.dismissSleeper
         dismissTask = Task { [weak self] in
             do {
-                try await Task.sleep(for: .seconds(remaining))
+                try await dismissSleeper(.seconds(remaining))
             } catch {
                 return
             }
@@ -506,11 +527,15 @@ final class ClipboardAssistantController: ObservableObject {
         return RowLayout(frame: frame, rowHeight: rowHeight)
     }
 
-    /// Replaces the presented detection after an async refinement (live currency conversion),
-    /// animating the row to the refreshed content's width. The dismissal timeline is untouched.
-    func updateDetection(_ detection: ClipboardAssistantDetection) {
-        guard let current = presentation.detection, current != detection else { return }
+    /// The result gets the full reading duration; obsolete requests cannot replace a newer prompt.
+    func updateDetection(_ detection: ClipboardAssistantDetection, for generation: Int) {
+        guard presentationGeneration == generation,
+              let current = presentation.detection, current != detection else { return }
+        isAwaitingCurrencyConversion = false
+        dismissalTotalDuration = displayDuration.expiresAfter
+        pausedDismissalRemainingFraction = dismissalTotalDuration.map { _ in 1 }
         presentation.detection = detection
+        if !presentation.isHovered { scheduleDismiss() }
         guard let window, window.isVisible, let layout = rowLayout(for: detection) else { return }
         presentation.islandTopHeight = layout.rowHeight
         NSAnimationContext.runAnimationGroup { context in
