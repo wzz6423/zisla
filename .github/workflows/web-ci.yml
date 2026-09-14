@@ -180,14 +180,14 @@ jobs:
             echo "web directory not present in this revision."
           fi
 
-      - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+      - uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         if: steps.check-web.outputs.exists == 'true'
         with:
           languages: javascript-typescript
           build-mode: none
           queries: security-and-quality
 
-      - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+      - uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         if: steps.check-web.outputs.exists == 'true'
         with:
           category: /language:javascript-typescript
