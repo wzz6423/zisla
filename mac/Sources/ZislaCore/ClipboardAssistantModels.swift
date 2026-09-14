@@ -259,7 +259,7 @@ public enum ClipboardAssistantActionOrder {
         case .color: [.copyText, .addToQuickNote, .share]
         case .math: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
         case .currency: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
-        case .dateTime: [.createCalendarEvent, .copyText, .addToQuickNote, .share]
+        case .dateTime: [.createCalendarEvent, .copyText, .copyFullExpression, .addToQuickNote, .share]
         case .nonSystemLanguageText: [.translate, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .code: [.saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .text: [.search, .saveText, .translate, .addToQuickNote, .sendToTeleprompter, .share]
