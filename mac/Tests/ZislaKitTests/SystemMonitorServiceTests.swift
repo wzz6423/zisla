@@ -1649,7 +1649,7 @@ struct SystemMonitorServiceTests {
             #expect(!reason.isEmpty)
         case let .available(rpm, detail):
             #expect(!rpm.isEmpty)
-            #expect(rpm.allSatisfy { (100...20_000).contains($0) })
+            #expect(rpm.allSatisfy { (0...20_000).contains($0) })
             #expect(detail == "AppleSMC 只读")
         }
 

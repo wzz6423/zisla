@@ -19,6 +19,10 @@ struct AlarmEditorView: View {
         VStack(alignment: .leading, spacing: 10) {
             header
 
+            Text(AppLocalization.text("此处的闹钟不会同步到系统「时钟」。"))
+                .font(.islandMicro())
+                .foregroundStyle(.secondary)
+
             if service.alarms.isEmpty {
                 Text(AppLocalization.text("还没有闹钟，在下方添加"))
                     .font(.system(size: 11))
@@ -41,6 +45,18 @@ struct AlarmEditorView: View {
 
             editor
 
+            if let warning = service.notificationPermissionWarning {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(warning)
+                        .foregroundStyle(.orange)
+                    Link(
+                        AppLocalization.text("打开系统设置"),
+                        destination: URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!
+                    )
+                }
+                .font(.islandMicro())
+            }
+
             if let message = service.errorMessage {
                 Text(message)
                     .font(.islandMicro())
@@ -51,6 +67,10 @@ struct AlarmEditorView: View {
         .padding(12)
         .frame(width: 320)
         .environment(\.colorScheme, .dark)
+        .task { await service.refreshNotificationStatus() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await service.refreshNotificationStatus() }
+        }
     }
 
     private var header: some View {

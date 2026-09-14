@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import ObjectiveC.runtime
+import UserNotifications
 import ZislaCore
 import ZislaKit
 import SwiftUI
@@ -332,7 +333,7 @@ enum PersistentPetNoticePolicy {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUserNotificationCenterDelegate {
     private var overlayCoordinator: OverlayCoordinator?
     private var lockScreenOverlayController: LockScreenOverlayController?
     private var noticePresenter: SideNoticePresenter?
@@ -381,6 +382,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         NSApp.setActivationPolicy(.accessory)
+        UNUserNotificationCenter.current().delegate = self
         WindowPlacement.installTransientWindowPromotion()
         let model = AppModel.shared
         model.start()
@@ -823,6 +825,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
     }
 
     /// Typing statistics buffer in memory for up to 750ms, so the last keystrokes only survive

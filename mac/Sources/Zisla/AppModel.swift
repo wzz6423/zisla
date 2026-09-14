@@ -2144,6 +2144,7 @@ final class AppModel: ObservableObject {
     }
     if settings.toolboxEnabled {
       alarms.resume()
+      pomodoro.startSystemClockMonitoring()
     } else {
       alarms.suspend()
       pomodoro.stop()
@@ -3142,7 +3143,7 @@ final class AppModel: ObservableObject {
 
   private var isFocusCountdownActive: Bool {
     pomodoro.mode == .focus
-      && pomodoro.phase == .running
+      && pomodoro.phase != .idle
       && !screenCleaning.isScreenCleaning
       && !screenCleaning.isKeyboardCleaning
   }

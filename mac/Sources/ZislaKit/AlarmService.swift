@@ -105,25 +105,35 @@ public struct AlarmItem: Identifiable, Codable, Equatable, Sendable {
 public final class AlarmService: ObservableObject {
     @Published public private(set) var alarms: [AlarmItem] = []
     @Published public var errorMessage: String?
+    @Published public private(set) var notificationPermissionWarning: String?
 
     private let storageURL: URL
     private var notificationCenter: UNUserNotificationCenter?
-    private let notificationRequestHandler: ((UNNotificationRequest) -> Void)?
+    private let notificationRequestHandler: ((UNNotificationRequest) throws -> Void)?
+    private var notificationRequestTokens: [String: UUID] = [:]
     private let cancelHandler: (([String]) -> Void)?
+    private let notificationSettingsProvider: (() async -> (UNAuthorizationStatus, UNNotificationSetting))?
+    private let notificationAuthorizationRequester: (() async throws -> Bool)?
     private var schedulingEnabled = true
-    /// Alarm notifications are always delivered regardless of Do Not Disturb — a time explicitly set by the user must not be silenced.
     private var authorizationPromptHost: NSWindow?
+    private var isRequestingAuthorization = false
+    private var notificationStatusGeneration: UInt64 = 0
+    private var appliedNotificationStatusGeneration: UInt64 = 0
 
     public init(
         storageURL: URL = AppPaths.alarms,
         notificationCenter: UNUserNotificationCenter? = nil,
-        notificationRequestHandler: ((UNNotificationRequest) -> Void)? = nil,
-        cancelHandler: (([String]) -> Void)? = nil
+        notificationRequestHandler: ((UNNotificationRequest) throws -> Void)? = nil,
+        cancelHandler: (([String]) -> Void)? = nil,
+        notificationSettingsProvider: (() async -> (UNAuthorizationStatus, UNNotificationSetting))? = nil,
+        notificationAuthorizationRequester: (() async throws -> Bool)? = nil
     ) {
         self.storageURL = storageURL
         self.notificationCenter = notificationCenter
         self.notificationRequestHandler = notificationRequestHandler
         self.cancelHandler = cancelHandler
+        self.notificationSettingsProvider = notificationSettingsProvider
+        self.notificationAuthorizationRequester = notificationAuthorizationRequester
         load()
     }
 
@@ -210,7 +220,14 @@ public final class AlarmService: ObservableObject {
             errorMessage = AppLocalization.text("未找到系统「时钟」App")
             return
         }
-        NSWorkspace.shared.open(clock)
+        Task {
+            do {
+                try await SystemClockService.open(.alarm)
+                errorMessage = nil
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     // MARK: - Notification registration
@@ -271,15 +288,35 @@ public final class AlarmService: ObservableObject {
     }
 
     private func addNotification(_ request: UNNotificationRequest) {
+        let identifier = request.identifier
+        let token = UUID()
+        notificationRequestTokens[identifier] = token
         if let notificationRequestHandler {
-            notificationRequestHandler(request)
+            do {
+                try notificationRequestHandler(request)
+            } catch {
+                reportNotificationFailure(error, for: identifier, token: token)
+            }
         } else {
-            resolvedNotificationCenter().add(request, withCompletionHandler: nil)
+            resolvedNotificationCenter().add(request) { [weak self] error in
+                guard let error else { return }
+                Task { @MainActor [weak self] in
+                    self?.reportNotificationFailure(error, for: identifier, token: token)
+                }
+            }
         }
+    }
+
+    private func reportNotificationFailure(_ error: Error, for identifier: String, token: UUID) {
+        guard notificationRequestTokens[identifier] == token else { return }
+        errorMessage = AppLocalization.text("无法设置闹钟通知：%@", error.localizedDescription)
     }
 
     private func removePendingNotifications(_ identifiers: [String]) {
         guard !identifiers.isEmpty else { return }
+        for identifier in identifiers {
+            notificationRequestTokens.removeValue(forKey: identifier)
+        }
         if let cancelHandler {
             cancelHandler(identifiers)
         } else {
@@ -288,16 +325,55 @@ public final class AlarmService: ObservableObject {
     }
 
     private func requestAuthorizationIfNeeded() {
-        resolvedNotificationCenter().getNotificationSettings { [weak self] settings in
-            guard settings.authorizationStatus == .notDetermined else { return }
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.dismissAuthorizationPromptHost()
-                self.authorizationPromptHost = WindowPlacement.authorizationPromptHost()
-                _ = try? await self.resolvedNotificationCenter().requestAuthorization(options: [.alert, .sound])
-                self.dismissAuthorizationPromptHost()
-            }
+        Task { [weak self] in
+            await self?.refreshNotificationStatus(requestAuthorization: true)
         }
+    }
+
+    public func refreshNotificationStatus(requestAuthorization: Bool = false) async {
+        notificationStatusGeneration &+= 1
+        let generation = notificationStatusGeneration
+        let (authorization, sound) = await notificationSettings()
+
+        if authorization == .notDetermined, requestAuthorization {
+            guard !isRequestingAuthorization else { return }
+            isRequestingAuthorization = true
+            defer {
+                dismissAuthorizationPromptHost()
+                isRequestingAuthorization = false
+            }
+            do {
+                if let notificationAuthorizationRequester {
+                    _ = try await notificationAuthorizationRequester()
+                } else {
+                    authorizationPromptHost = WindowPlacement.authorizationPromptHost()
+                    _ = try await resolvedNotificationCenter().requestAuthorization(options: [.alert, .sound])
+                }
+            } catch {
+                if generation >= appliedNotificationStatusGeneration {
+                    notificationPermissionWarning = AppLocalization.text("无法设置闹钟通知：%@", error.localizedDescription)
+                }
+                return
+            }
+            await refreshNotificationStatus()
+            return
+        }
+
+        guard generation == notificationStatusGeneration else { return }
+        appliedNotificationStatusGeneration = generation
+        if authorization != .authorized {
+            notificationPermissionWarning = AppLocalization.text("闹钟通知未获允许，请在系统设置中开启通知。")
+        } else if sound != .enabled {
+            notificationPermissionWarning = AppLocalization.text("闹钟通知声音已关闭，请在系统设置中开启声音。")
+        } else {
+            notificationPermissionWarning = nil
+        }
+    }
+
+    private func notificationSettings() async -> (UNAuthorizationStatus, UNNotificationSetting) {
+        if let notificationSettingsProvider { return await notificationSettingsProvider() }
+        let settings = await resolvedNotificationCenter().notificationSettings()
+        return (settings.authorizationStatus, settings.soundSetting)
     }
 
     private func dismissAuthorizationPromptHost() {
