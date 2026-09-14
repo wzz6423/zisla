@@ -212,6 +212,132 @@ struct AlarmNotificationTests {
         }
     }
 
+    @Test(arguments: [false, true])
+    func successfulReschedulingClearsThePreviousRegistrationFailure(resume: Bool) async throws {
+        var fails = true
+        var registrations = 0
+        try await withService(register: { _ in
+            registrations += 1
+            if fails { throw NotificationFailure() }
+        }) { service in
+            let alarm = service.add(hour: 12, minute: 46)
+            #expect(service.errorMessage != nil)
+            fails = false
+
+            if resume { service.resume() } else { service.rescheduleAll() }
+            await service.refreshNotificationStatus()
+
+            #expect(registrations == 2)
+            #expect(service.alarms == [alarm])
+            #expect(service.errorMessage == nil)
+            #expect(service.notificationPermissionWarning == nil)
+        }
+    }
+
+    @Test(arguments: ["remove", "disable", "suspend"])
+    func cancellingFailedAlarmsClearsTheirRegistrationFailure(operation: String) async throws {
+        try await withService(register: { _ in throw NotificationFailure() }) { service in
+            let alarm = service.add(hour: 12, minute: 46, weekdays: [2, 3])
+            #expect(service.errorMessage != nil)
+
+            switch operation {
+            case "remove": service.remove(id: alarm.id)
+            case "disable": service.toggle(id: alarm.id)
+            default: service.suspend()
+            }
+
+            #expect(service.errorMessage == nil)
+        }
+    }
+
+    @Test(arguments: ["add", "update", "remove"])
+    func successfulChangesToOtherAlarmsPreserveRegistrationFailures(operation: String) async throws {
+        try await withService(register: { request in
+            if request.content.title == "failed" { throw NotificationFailure() }
+        }) { service in
+            var healthy = service.add(hour: 12, minute: 45, label: "healthy")
+            service.add(hour: 12, minute: 46, label: "failed")
+            let failure = try #require(service.errorMessage)
+
+            switch operation {
+            case "add": service.add(hour: 12, minute: 47, label: "another healthy alarm")
+            case "update":
+                healthy.minute = 48
+                service.update(healthy)
+            default: service.remove(id: healthy.id)
+            }
+
+            #expect(service.errorMessage == failure)
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func removingOneFailedAlarmPreservesTheOtherFailure(removeFirst: Bool) async throws {
+        try await withService(register: { request in
+            throw NotificationFailure(errorDescription: request.content.title)
+        }) { service in
+            let first = service.add(hour: 12, minute: 45, label: "first failure")
+            let second = service.add(hour: 12, minute: 46, label: "second failure")
+            let removed = removeFirst ? first : second
+            let remaining = removeFirst ? second : first
+
+            service.remove(id: removed.id)
+
+            #expect(service.alarms == [remaining])
+            #expect(service.errorMessage == AppLocalization.text(
+                "无法设置闹钟通知：%@", remaining.label
+            ))
+            service.suspend()
+            #expect(service.errorMessage == nil)
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func cancellingNotificationsPreservesAnErrorFromAnotherOperation(sameText: Bool) async throws {
+        try await withService(register: { _ in throw NotificationFailure() }) { service in
+            service.add(hour: 12, minute: 46)
+            let notificationError = try #require(service.errorMessage)
+            let otherError = sameText ? notificationError : "another operation failed"
+            service.errorMessage = otherError
+
+            service.suspend()
+
+            #expect(service.errorMessage == otherError)
+        }
+    }
+
+    @Test
+    func cancellingNotificationsPreservesALaterPersistenceFailure() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Zisla-alarm-persistence-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("alarms.json")
+        let service = AlarmService(
+            storageURL: storageURL,
+            notificationRequestHandler: { request in
+                if request.content.title == "failed" { throw NotificationFailure() }
+            },
+            cancelHandler: { _ in },
+            notificationSettingsProvider: { (.authorized, .enabled) },
+            notificationAuthorizationRequester: { false }
+        )
+        service.add(hour: 12, minute: 46, label: "failed")
+        let notificationError = try #require(service.errorMessage)
+        try FileManager.default.removeItem(at: storageURL)
+        try FileManager.default.createDirectory(at: storageURL, withIntermediateDirectories: true)
+        service.add(hour: 12, minute: 47, label: "healthy")
+        let persistenceError = try #require(service.errorMessage)
+        #expect(persistenceError != notificationError)
+
+        service.suspend()
+
+        #expect(service.errorMessage == persistenceError)
+        try FileManager.default.removeItem(at: storageURL)
+        service.update(try #require(service.alarms.first))
+        #expect(service.errorMessage == nil)
+    }
+
     @Test(arguments: [true, false])
     func errorsFromReplacedRegistrationsDoNotReappear(_ editAlarm: Bool) async throws {
         weak var target: AlarmService?
@@ -297,7 +423,7 @@ struct AlarmNotificationTests {
 }
 
 private struct NotificationFailure: LocalizedError {
-    var errorDescription: String? { "notification test failure" }
+    var errorDescription: String? = "notification test failure"
 }
 
 @MainActor

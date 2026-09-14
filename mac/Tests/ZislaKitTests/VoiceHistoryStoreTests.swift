@@ -531,10 +531,16 @@ struct VoiceHistoryStoreTests {
         var disappearedFileName: String?
         fileManager.stagedRemovalFailureIndex = 1
         fileManager.beforeStagedRemovalFailure = { failedURL in
-            let other = try #require(FileManager.default.contentsOfDirectory(at: fixture.recordingsDirectory, includingPropertiesForKeys: nil)
-                .first { $0.lastPathComponent.hasPrefix(".zisla-deleting-") && $0 != failedURL })
+            var stagedURLs = try FileManager.default.contentsOfDirectory(at: fixture.recordingsDirectory, includingPropertiesForKeys: nil)
+            let failedIndex = try #require(stagedURLs.firstIndex { $0.lastPathComponent == failedURL.lastPathComponent })
+            // Keep a URL-identity regression from passing by directory enumeration order.
+            stagedURLs.swapAt(0, failedIndex)
+            let other = try #require(stagedURLs.first {
+                $0.lastPathComponent.hasPrefix(".zisla-deleting-") && $0.lastPathComponent != failedURL.lastPathComponent
+            })
             disappearedFileName = String(other.lastPathComponent.dropFirst(".zisla-deleting-".count + 37))
             try FileManager.default.removeItem(at: other)
+            #expect(FileManager.default.fileExists(atPath: failedURL.path))
         }
 
         store.removeAll()

@@ -104,13 +104,18 @@ public struct AlarmItem: Identifiable, Codable, Equatable, Sendable {
 @MainActor
 public final class AlarmService: ObservableObject {
     @Published public private(set) var alarms: [AlarmItem] = []
-    @Published public var errorMessage: String?
+    @Published public var errorMessage: String? {
+        // Other operations can replace the error without sharing a notification's lifecycle.
+        didSet { isShowingNotificationError = false }
+    }
     @Published public private(set) var notificationPermissionWarning: String?
 
     private let storageURL: URL
     private var notificationCenter: UNUserNotificationCenter?
     private let notificationRequestHandler: ((UNNotificationRequest) throws -> Void)?
     private var notificationRequestTokens: [String: UUID] = [:]
+    private var notificationRequestErrors: [String: String] = [:]
+    private var isShowingNotificationError = false
     private let cancelHandler: (([String]) -> Void)?
     private let notificationSettingsProvider: (() async -> (UNAuthorizationStatus, UNNotificationSetting))?
     private let notificationAuthorizationRequester: (() async throws -> Bool)?
@@ -309,14 +314,23 @@ public final class AlarmService: ObservableObject {
 
     private func reportNotificationFailure(_ error: Error, for identifier: String, token: UUID) {
         guard notificationRequestTokens[identifier] == token else { return }
-        errorMessage = AppLocalization.text("无法设置闹钟通知：%@", error.localizedDescription)
+        notificationRequestErrors[identifier] = AppLocalization.text("无法设置闹钟通知：%@", error.localizedDescription)
+        showNotificationError()
+    }
+
+    private func showNotificationError() {
+        errorMessage = notificationRequestErrors.values.first
+        isShowingNotificationError = errorMessage != nil
     }
 
     private func removePendingNotifications(_ identifiers: [String]) {
         guard !identifiers.isEmpty else { return }
+        let hadNotificationError = isShowingNotificationError
         for identifier in identifiers {
             notificationRequestTokens.removeValue(forKey: identifier)
+            notificationRequestErrors.removeValue(forKey: identifier)
         }
+        if hadNotificationError { showNotificationError() }
         if let cancelHandler {
             cancelHandler(identifiers)
         } else {
@@ -406,7 +420,7 @@ public final class AlarmService: ObservableObject {
             )
             let data = try JSONEncoder().encode(alarms)
             try data.write(to: storageURL, options: .atomic)
-            errorMessage = nil
+            showNotificationError()
         } catch {
             errorMessage = error.localizedDescription
         }
