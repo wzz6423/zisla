@@ -27,7 +27,7 @@ struct ToolboxClockLocalizationTests {
             "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
         )
         let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
-        for key in keys {
+        for key in keys + ["闹钟", "打开系统「时钟」App"] {
             let translation = try #require(table[key], "\(language.rawValue) 缺少「\(key)」")
             #expect(!translation.isEmpty)
             #expect(AppLocalization.string(key, language: language) == translation)

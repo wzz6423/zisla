@@ -6,22 +6,16 @@ struct ToolboxModuleView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var pomodoro: PomodoroService
     @ObservedObject private var settingsStore: FeatureSettingsStore
-    private let onTransientInteractionChanged: (Bool) -> Void
-    @State private var isAlarmEditorPresented = false
 
     private enum Metrics {
         static let controlHeight: CGFloat = 40
         static let toolContentHeight: CGFloat = 136
     }
 
-    init(
-        model: AppModel,
-        onTransientInteractionChanged: @escaping (Bool) -> Void = { _ in }
-    ) {
+    init(model: AppModel) {
         _model = ObservedObject(wrappedValue: model)
         _pomodoro = ObservedObject(wrappedValue: model.pomodoro)
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
-        self.onTransientInteractionChanged = onTransientInteractionChanged
     }
 
     var body: some View {
@@ -146,13 +140,15 @@ struct ToolboxModuleView: View {
                 ToolShortcutButton(
                     title: AppLocalization.text("闹钟"),
                     symbol: "alarm",
-                    help: AppLocalization.text("管理闹钟")
+                    help: AppLocalization.text("打开系统「时钟」App")
                 ) {
-                    onTransientInteractionChanged(true)
-                    isAlarmEditorPresented = true
-                }
-                .popover(isPresented: $isAlarmEditorPresented, arrowEdge: .bottom) {
-                    AlarmEditorView(service: model.alarms)
+                    Task {
+                        do {
+                            try await SystemClockService.open(.alarm)
+                        } catch {
+                            model.transientMessage = error.localizedDescription
+                        }
+                    }
                 }
             }
 
@@ -184,14 +180,6 @@ struct ToolboxModuleView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .top)
-        .onChange(of: isAlarmEditorPresented) { _, presented in
-            if !presented {
-                onTransientInteractionChanged(false)
-            }
-        }
-        .onDisappear {
-            onTransientInteractionChanged(false)
-        }
     }
 
     private var toolTogglesRow: some View {

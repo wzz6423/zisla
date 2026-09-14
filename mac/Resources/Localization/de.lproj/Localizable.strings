@@ -2432,8 +2432,3 @@
 "合上兼容 MacBook 屏幕时显示景深过渡动画" = "Beim Schließen des Deckels eines kompatiblen MacBook einen Tiefenübergang anzeigen";
 "预览动画" = "Animation vorspielen";
 "不用合盖，在当前屏幕内容上播放一次" = "Spielt den Effekt einmal auf dem aktuellen Bildschirminhalt ab, ohne den Deckel zu schließen";
-
-"闹钟通知未获允许，请在系统设置中开启通知。" = "Mitteilungen für Wecker sind nicht erlaubt. Aktiviere Mitteilungen in den Systemeinstellungen.";
-"闹钟通知声音已关闭，请在系统设置中开启声音。" = "Töne für Wecker-Mitteilungen sind deaktiviert. Aktiviere Töne in den Systemeinstellungen.";
-"无法设置闹钟通知：%@" = "Die Wecker-Mitteilung konnte nicht geplant werden: %@";
-"此处的闹钟不会同步到系统「时钟」。" = "Hier erstellte Wecker werden nicht mit der System-App „Uhr“ synchronisiert.";

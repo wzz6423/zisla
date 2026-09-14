@@ -2431,8 +2431,3 @@
 "合上兼容 MacBook 屏幕时显示景深过渡动画" = "Mostra una transizione di profondità quando si chiude il coperchio di un MacBook compatibile";
 "预览动画" = "Anteprima animazione";
 "不用合盖，在当前屏幕内容上播放一次" = "Riproduce l’effetto una volta sul contenuto attuale dello schermo, senza chiudere il coperchio";
-
-"闹钟通知未获允许，请在系统设置中开启通知。" = "Le notifiche della sveglia non sono consentite. Attivale in Impostazioni di Sistema.";
-"闹钟通知声音已关闭，请在系统设置中开启声音。" = "I suoni delle notifiche della sveglia sono disattivati. Attivali in Impostazioni di Sistema.";
-"无法设置闹钟通知：%@" = "Impossibile programmare la notifica della sveglia: %@";
-"此处的闹钟不会同步到系统「时钟」。" = "Le sveglie create qui non vengono sincronizzate con l’app Orologio di sistema.";
