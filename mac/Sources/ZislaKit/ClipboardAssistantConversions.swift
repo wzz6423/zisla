@@ -50,7 +50,8 @@ extension ClipboardAssistantDetector {
     }
 
     static func conversionOperands(_ text: String) -> [String]? {
-        conversionCaptures(#"(.+?)\s*(?:\s+(?:in|to)\s+|=|->|→|换算成|转)\s*(.+?)\s*=?"#, in: text)
+        conversionCaptures(#"(.+)\s*(?:\s+(?:in|to)\s+|=|->|→|换算成|转)\s*(.+?)\s*=?"#, in: text)?
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
     }
 
     static let conversionAmountPattern = #"[+-]?(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)"#
@@ -223,11 +224,17 @@ extension ClipboardAssistantDetector {
         components.hour = hour
         components.minute = minute
         components.second = second
-        // Strict matching rejects skipped DST hours; requiring the same first/last match also rejects repeated hours.
         let before = day.addingTimeInterval(-1)
-        guard let first = calendar.nextDate(after: before, matching: components, matchingPolicy: .strict, repeatedTimePolicy: .first),
-              let last = calendar.nextDate(after: before, matching: components, matchingPolicy: .strict, repeatedTimePolicy: .last),
-              first == last else { return nil }
+        guard let first = calendar.nextDate(after: before, matching: components, matchingPolicy: .strict, repeatedTimePolicy: .first) else { return nil }
+        // Foundation's repeated-time policy misses sub-hour rollbacks. Test the following
+        // day's actual offset against the requested wall time instead of assuming a one-hour fold.
+        let offset = timeZone.secondsFromGMT(for: first)
+        let followingDayOffset = timeZone.secondsFromGMT(for: first.addingTimeInterval(86_400))
+        let alternate = first.addingTimeInterval(TimeInterval(offset - followingDayOffset))
+        if alternate != first,
+           calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: alternate) == components {
+            return nil
+        }
         return first
     }
 }

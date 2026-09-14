@@ -418,11 +418,16 @@ public enum ClipboardAssistantDetector {
         let preferred = (preferredCurrencyCode ?? currentPreferredCurrencyCode()).uppercased()
 
         // Natural-language exchange requests use the same operand grammar as unit conversion.
-        if !text.contains("="), let operands = conversionOperands(text),
-           let amount = conversionCaptures("(" + conversionAmountPattern + #")\s*(.+)"#, in: operands[0]),
-           let value = Double(amount[0].replacingOccurrences(of: ",", with: "")),
-           let source = resolveCurrencyToken(amount[1], preferred: preferred),
-           let target = resolveCurrencyToken(operands[1], preferred: preferred), source != target {
+        let naturalText = text.hasSuffix("=")
+            ? String(text.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines) : text
+        if !naturalText.contains("="), let operands = conversionOperands(naturalText) {
+            if let prefixed = parsePrefixedCurrencyAmount(operands[0], preferred: preferred) {
+                return completedConversion(prefixed, targetToken: operands[1], preferred: preferred)
+            }
+            guard let amount = conversionCaptures("(" + conversionAmountPattern + #")\s*(.+)"#, in: operands[0]),
+                  let value = Double(amount[0].replacingOccurrences(of: ",", with: "")),
+                  let source = resolveCurrencyToken(amount[1], preferred: preferred),
+                  let target = resolveCurrencyToken(operands[1], preferred: preferred), source != target else { return nil }
             return ParsedCurrencyConversion(amount: value, amountText: amount[0], sourceCurrencyCode: source, targetCurrencyCode: target)
         }
 
