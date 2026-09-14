@@ -67,7 +67,13 @@ public struct ExchangeRateService: Sendable {
 /// open.er-api.com payload: {"result":"success","base_code":"USD","rates":{"CNY":7.2,…}}
 private struct ExchangeRateAPIPayload: Decodable {
     let result: String
+    let baseCode: String
     let rates: [String: Double]?
+
+    private enum CodingKeys: String, CodingKey {
+        case result, rates
+        case baseCode = "base_code"
+    }
 }
 
 private func fetchFromExchangeRateAPI(
@@ -94,8 +100,9 @@ private func fetchFromExchangeRateAPI(
     }
     guard let payload = try? JSONDecoder().decode(ExchangeRateAPIPayload.self, from: data),
           payload.result == "success",
+          payload.baseCode == source,
           let rates = payload.rates,
-          let rate = rates[target] else {
+          let rate = rates[target], rate > 0 else {
         throw ExchangeRateError.malformedPayload
     }
     return ExchangeRateQuote(
@@ -141,7 +148,7 @@ private func fetchFromFrankfurter(
     }
     guard let payload = try? JSONDecoder().decode(FrankfurterPayload.self, from: data),
           payload.base == source,
-          let rate = payload.rates[target] else {
+          let rate = payload.rates[target], rate > 0 else {
         throw ExchangeRateError.rateUnavailable(
             sourceCurrencyCode: source,
             targetCurrencyCode: target

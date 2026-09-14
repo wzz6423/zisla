@@ -476,8 +476,13 @@ public enum ClipboardAssistantDetector {
 
     /// The currency the current interface language maps to (zh-Hans → CNY, en → USD, …),
     /// falling back to the system region's currency, then USD.
-    static func currentPreferredCurrencyCode() -> String {
-        AppLocalization.currentLanguage.locale.currency?.identifier
+    static func currentPreferredCurrencyCode(
+        language: AppLanguage = AppLocalization.currentLanguage
+    ) -> String {
+        let languageLocale = language.locale
+        let languageRegion = Locale(identifier: languageLocale.language.maximalIdentifier)
+        return languageRegion.currency?.identifier
+            ?? languageLocale.currency?.identifier
             ?? Locale.current.currency?.identifier
             ?? "USD"
     }
