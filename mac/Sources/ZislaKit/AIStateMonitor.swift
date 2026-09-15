@@ -237,7 +237,7 @@ public final class AIStateMonitor: ObservableObject {
                 eventMask: [.warning, .critical],
                 queue: pressureQueue
             )
-            memoryPressure.setEventHandler {
+            memoryPressure.setEventHandler { @Sendable in
                 Self.scheduleAllocatorRelief(on: pressureQueue)
             }
             memoryPressureSource = memoryPressure

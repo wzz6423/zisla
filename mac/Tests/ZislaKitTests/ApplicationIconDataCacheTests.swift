@@ -14,10 +14,11 @@ struct ApplicationIconDataCacheTests {
         let second = try #require(ApplicationIconDataCache.data(for: image, cacheKey: cacheKey))
         let representation = try #require(NSBitmapImageRep(data: first))
 
-        #expect(representation.pixelsWide == 64)
-        #expect(representation.pixelsHigh == 64)
+        #expect(representation.pixelsWide == 128)
+        #expect(representation.pixelsHigh == 128)
+        #expect(representation.size == NSSize(width: 64, height: 64))
         #expect(first == second)
-        #expect(first.count < 64 * 64 * 4)
+        #expect(first.count < 128 * 128 * 4)
     }
 
     private func makeImage(pixelSize: Int) -> NSImage? {
