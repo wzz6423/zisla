@@ -1707,6 +1707,18 @@ struct DownloadCoreTests {
     }
 
     @Test
+    func clipboardClassifierRecognizesPlainPagesWithEmbeddedMedia() {
+        // cy.ncss.cn serves promo/course videos as direct <video src="…mp4">
+        // embeds; the bare domain entry covers every subdomain and page path.
+        #expect(DownloadURLClassifier.isLikelyDownloadable("https://cy.ncss.cn/"))
+        #expect(DownloadURLClassifier.isLikelyDownloadable("https://cy.ncss.cn/information/2c93f4c6a05c38d9"))
+        #expect(DownloadURLClassifier.isLikelyDownloadable("https://www.ncss.cn/"))
+        // Look-alike hosts must not leak through the suffix match.
+        #expect(!DownloadURLClassifier.isLikelyDownloadable("https://ncss.cn.example.com/"))
+        #expect(!DownloadURLClassifier.isLikelyDownloadable("https://xncss.cn/"))
+    }
+
+    @Test
     func clipboardDetectorRequiresAChangeAndDeduplicatesLinks() {
         var detector = ClipboardLinkDetector(recentCapacity: 4)
         detector.begin(atChangeCount: 10)
