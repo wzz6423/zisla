@@ -402,7 +402,6 @@ final class AppModel: ObservableObject {
   /// Copy assistant: recognizes copied content and shows a toast with a next-step action.
   let clipboardAssistant = ClipboardAssistantController()
   let pomodoro = PomodoroService()
-  let alarms = AlarmService()
   let managedTools = ManagedToolService()
   let powerAssertions = PowerAssertionController()
   let screenCleaning = ScreenCleaningController()
@@ -798,7 +797,7 @@ final class AppModel: ObservableObject {
   func start() {
     backgroundSounds.startLifecycleMonitoring()
     apply(settings: settingsStore.settings)
-    alarms.rescheduleAll()
+    Task { await SystemClockService.cancelLegacyAlarmNotifications() }
   }
 
   func toggleBackgroundSound() {
@@ -958,7 +957,6 @@ final class AppModel: ObservableObject {
     audioOutput.stop()
     calendar.stop()
     pomodoro.stop()
-    alarms.suspend()
     screenCleaning.stopAll()
     cleaningPowerState = nil
     powerAssertions.releaseAll()
@@ -2143,9 +2141,8 @@ final class AppModel: ObservableObject {
       knownMailMessageIDs.removeAll()
     }
     if settings.toolboxEnabled {
-      alarms.resume()
+      pomodoro.startSystemClockMonitoring()
     } else {
-      alarms.suspend()
       pomodoro.stop()
       screenCleaning.stopAll()
       cleaningPowerState = nil
@@ -3142,7 +3139,7 @@ final class AppModel: ObservableObject {
 
   private var isFocusCountdownActive: Bool {
     pomodoro.mode == .focus
-      && pomodoro.phase == .running
+      && pomodoro.phase != .idle
       && !screenCleaning.isScreenCleaning
       && !screenCleaning.isKeyboardCleaning
   }

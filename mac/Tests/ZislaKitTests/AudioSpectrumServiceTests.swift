@@ -59,26 +59,73 @@ struct AudioSpectrumServiceTests {
     }
 
     @Test @MainActor
+    func idleStartupAndVisualizationChangesNeverOpenAudioCapture() {
+        let capture = FakeAudioSpectrumCapture()
+        let service = AudioSpectrumService(capture: capture)
+
+        service.startMonitoring(hasActivePlayback: false)
+        service.setVisualizationEnabled(false)
+        service.setVisualizationEnabled(true)
+        service.startMonitoring(hasActivePlayback: false)
+
+        #expect(capture.startCount == 0)
+        #expect(!capture.isCapturing)
+        #expect(!service.isAudible)
+        #expect(service.levels.allSatisfy { $0 == 0 })
+    }
+
+    @Test @MainActor
+    func playbackStartsCaptureAndIdleReleasesItWithoutAcceptingLateFrames() async {
+        let capture = FakeAudioSpectrumCapture()
+        let service = AudioSpectrumService(capture: capture)
+
+        service.startMonitoring(hasActivePlayback: true)
+        capture.emitAudibleFrame(at: 0)
+        await drainMainActor()
+        #expect(capture.isCapturing)
+        #expect(service.isAudible)
+        #expect(service.levels.contains { $0 > 0 })
+
+        service.startMonitoring(hasActivePlayback: false)
+        #expect(!capture.isCapturing)
+        #expect(!service.isAudible)
+        #expect(service.levels.allSatisfy { $0 == 0 })
+
+        capture.emitAudibleFrame(at: 0)
+        await drainMainActor()
+        #expect(!service.isAudible)
+        #expect(service.levels.allSatisfy { $0 == 0 })
+
+        service.startMonitoring(hasActivePlayback: true)
+        capture.emitAudibleFrame(at: 1)
+        await drainMainActor()
+        #expect(capture.isCapturing)
+        #expect(service.isAudible)
+        service.stop()
+        #expect(!capture.isCapturing)
+    }
+
+    @Test @MainActor
     func currentCaptureFailureAllowsRetryWhileStaleFailureCannotStopNewGeneration() async {
         let capture = FakeAudioSpectrumCapture()
         let service = AudioSpectrumService(capture: capture)
 
-        service.startMonitoring()
+        service.startMonitoring(hasActivePlayback: true)
         #expect(capture.startCount == 1)
 
         capture.fail(at: 0)
         await drainMainActor()
-        service.startMonitoring()
+        service.startMonitoring(hasActivePlayback: true)
         #expect(capture.startCount == 2)
 
         capture.fail(at: 0)
         await drainMainActor()
-        service.startMonitoring()
+        service.startMonitoring(hasActivePlayback: true)
         #expect(capture.startCount == 2)
 
         capture.fail(at: 1)
         await drainMainActor()
-        service.startMonitoring()
+        service.startMonitoring(hasActivePlayback: true)
         #expect(capture.startCount == 3)
         service.stop()
     }
@@ -147,7 +194,9 @@ struct AudioSpectrumServiceTests {
 
 private final class FakeAudioSpectrumCapture: AudioSpectrumCapturing, @unchecked Sendable {
     private var failures: [@Sendable () -> Void] = []
+    private var frames: [@Sendable (AudioSpectrumFrame) -> Void] = []
     private(set) var startCount = 0
+    private(set) var isCapturing = false
 
     func setAnalysisMode(_ mode: AudioSpectrumAnalysisMode) {}
 
@@ -156,12 +205,19 @@ private final class FakeAudioSpectrumCapture: AudioSpectrumCapturing, @unchecked
         onFailure: @escaping @Sendable () -> Void
     ) {
         startCount += 1
+        isCapturing = true
         failures.append(onFailure)
+        frames.append(onFrame)
     }
 
-    func stop() {}
+    func stop() { isCapturing = false }
+
+    func emitAudibleFrame(at index: Int) {
+        frames[index](AudioSpectrumFrame(levels: Array(repeating: 0.5, count: 7), rootMeanSquare: 0.1))
+    }
 
     func fail(at index: Int) {
+        if index == failures.count - 1 { isCapturing = false }
         failures[index]()
     }
 }

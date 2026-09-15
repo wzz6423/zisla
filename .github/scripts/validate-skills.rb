@@ -146,7 +146,7 @@ class SkillValidator
 
   def validate_release_download_urls(skill_file, body)
     body.scan(RELEASE_DOWNLOAD_URL_PATTERN).each do |(path)|
-      # GitHub 和 Gitee 的 Release 资产路径应为 <tag>/<file>；多出的路径段表示 tag 带了前缀。
+      # Release asset paths must be <tag>/<file>; extra segments indicate a prefixed tag.
       next if path.split('/').reject(&:empty?).length <= 2
 
       add_error(skill_file, "release download URL must use an unprefixed tag: #{path}")

@@ -41,11 +41,12 @@ module AppcastFeeds
     def call(url)
       remaining = @redirect_limit
       current = url
-      while remaining.positive?
+      loop do
         response = get(current)
         return [response.code.to_i, response.body.to_s] unless response.is_a?(Net::HTTPRedirection)
+        break unless remaining.positive?
 
-        current = response['location']
+        current = URI.join(current, response['location']).to_s
         remaining -= 1
       end
       [0, "exceeded #{@redirect_limit} redirects starting at #{url}"]

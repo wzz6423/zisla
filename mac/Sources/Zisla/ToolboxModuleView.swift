@@ -6,23 +6,17 @@ struct ToolboxModuleView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var pomodoro: PomodoroService
     @ObservedObject private var settingsStore: FeatureSettingsStore
-    private let onTransientInteractionChanged: (Bool) -> Void
     @State private var isDurationPickerPresented = false
-    @State private var isAlarmEditorPresented = false
 
     private enum Metrics {
         static let controlHeight: CGFloat = 40
         static let toolContentHeight: CGFloat = 136
     }
 
-    init(
-        model: AppModel,
-        onTransientInteractionChanged: @escaping (Bool) -> Void = { _ in }
-    ) {
+    init(model: AppModel) {
         _model = ObservedObject(wrappedValue: model)
         _pomodoro = ObservedObject(wrappedValue: model.pomodoro)
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
-        self.onTransientInteractionChanged = onTransientInteractionChanged
     }
 
     var body: some View {
@@ -48,7 +42,7 @@ struct ToolboxModuleView: View {
     private var focusPanel: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(AppLocalization.text(pomodoro.mode.title))
+                Text(AppLocalization.text("专注倒计时"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
@@ -60,9 +54,7 @@ struct ToolboxModuleView: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 8) {
-                Button {
-                    pomodoro.toggleStartPause()
-                } label: {
+                Button(action: sendTimerAction) {
                     Text(startPauseTitle)
                         .font(.system(size: 11, weight: .semibold))
                         .frame(maxWidth: .infinity)
@@ -74,19 +66,19 @@ struct ToolboxModuleView: View {
                 .clipShape(startPauseButtonShape)
                 .help(startPauseTitle)
 
-                Button {
-                    pomodoro.reset()
-                } label: {
-                    Text(AppLocalization.text("重置"))
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Metrics.controlHeight)
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                if pomodoro.phase != .idle {
+                    Button(action: cancelSystemTimer) {
+                        Text(AppLocalization.text("取消"))
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: Metrics.controlHeight)
+                            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .background(Color.fillControl)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .help(AppLocalization.text("取消"))
                 }
-                .buttonStyle(.plain)
-                .background(Color.fillControl)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .help(AppLocalization.text("重置番茄钟"))
             }
             .frame(maxWidth: .infinity)
         }
@@ -189,13 +181,15 @@ struct ToolboxModuleView: View {
                 ToolShortcutButton(
                     title: AppLocalization.text("闹钟"),
                     symbol: "alarm",
-                    help: AppLocalization.text("管理闹钟")
+                    help: AppLocalization.text("打开系统「时钟」App")
                 ) {
-                    onTransientInteractionChanged(true)
-                    isAlarmEditorPresented = true
-                }
-                .popover(isPresented: $isAlarmEditorPresented, arrowEdge: .bottom) {
-                    AlarmEditorView(service: model.alarms)
+                    Task {
+                        do {
+                            try await SystemClockService.open(.alarm)
+                        } catch {
+                            model.transientMessage = error.localizedDescription
+                        }
+                    }
                 }
             }
 
@@ -227,21 +221,10 @@ struct ToolboxModuleView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .top)
-        .onChange(of: isAlarmEditorPresented) { _, presented in
-            if !presented {
-                onTransientInteractionChanged(false)
-            }
-        }
-        .onDisappear {
-            onTransientInteractionChanged(false)
-        }
     }
 
     private var currentDuration: TimeInterval {
-        let seconds = pomodoro.mode == .focus
-            ? pomodoro.focusDuration
-            : pomodoro.restDuration
-        return max(1, seconds)
+        max(1, pomodoro.focusDuration)
     }
 
     private var durationHours: Binding<Int> {
@@ -284,22 +267,42 @@ struct ToolboxModuleView: View {
     }
 
     private func durationInput(_ title: String, value: Binding<Int>) -> some View {
-        TextField(title, value: value, format: .number)
+        TextField(AppLocalization.text(title), value: value, format: .number)
             .textFieldStyle(.roundedBorder)
             .multilineTextAlignment(.trailing)
             .frame(width: 44)
     }
 
     private func setDuration(hours: Int, minutes: Int, seconds: Int) {
-        let duration = TimeInterval(Self.durationSeconds(
+        pomodoro.setFocusDuration(TimeInterval(Self.durationSeconds(
             hours: hours,
             minutes: minutes,
             seconds: seconds
-        ))
-        if pomodoro.mode == .focus {
-            pomodoro.setFocusDuration(duration)
-        } else {
-            pomodoro.setRestDuration(duration)
+        )))
+    }
+
+    private func sendTimerAction() {
+        do {
+            switch pomodoro.phase {
+            case .idle:
+                try SystemClockService.requestTimer(.start(duration: pomodoro.focusDuration))
+            case .running:
+                try SystemClockService.requestTimer(.pause)
+            case .paused:
+                try SystemClockService.requestTimer(.resume)
+            }
+            pomodoro.tick()
+        } catch {
+            model.transientMessage = error.localizedDescription
+        }
+    }
+
+    private func cancelSystemTimer() {
+        do {
+            try SystemClockService.requestTimer(.cancel)
+            pomodoro.tick()
+        } catch {
+            model.transientMessage = error.localizedDescription
         }
     }
 
@@ -318,15 +321,12 @@ struct ToolboxModuleView: View {
 
     private var startPauseTitle: String {
         switch pomodoro.phase {
-        case .running: "暂停"
-        case .idle, .paused: "开始"
-        }
-    }
-
-    private var startPauseSymbol: String {
-        switch pomodoro.phase {
-        case .running: "pause.fill"
-        case .idle, .paused: "play.fill"
+        case .running:
+            AppLocalization.text("暂停")
+        case .idle:
+            AppLocalization.text("开始")
+        case .paused:
+            AppLocalization.text("继续")
         }
     }
 

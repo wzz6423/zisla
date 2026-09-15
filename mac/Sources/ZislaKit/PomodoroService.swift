@@ -202,15 +202,22 @@ public final class PomodoroService: ObservableObject {
     private let focusDurationKey = "zisla.pomodoro.focusDuration"
     private let restDurationKey = "zisla.pomodoro.restDuration"
     private var authorizationPromptHost: NSWindow?
+    private let systemClockTimerReader: () -> SystemClockTimerSnapshot?
+    private let now: () -> Date
+    private var isMonitoringSystemClock = false
 
     public init(
         notificationCenter: UNUserNotificationCenter? = nil,
         notificationRequestHandler: ((UNNotificationRequest) -> Void)? = nil,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        systemClockTimerReader: (() -> SystemClockTimerSnapshot?)? = nil,
+        now: @escaping () -> Date = Date.init
     ) {
         self.notificationCenter = notificationCenter
         self.defaults = defaults
         self.notificationRequestHandler = notificationRequestHandler
+        self.systemClockTimerReader = systemClockTimerReader ?? SystemClockTimerStore.readSnapshot
+        self.now = now
         let savedFocus = defaults.object(forKey: focusDurationKey) as? TimeInterval
         let savedRest = defaults.object(forKey: restDurationKey) as? TimeInterval
         let focusDuration = PomodoroEngine.normalizedDuration(
@@ -239,7 +246,14 @@ public final class PomodoroService: ObservableObject {
     public var phase: PomodoroPhase { engine.phase }
     public var focusDuration: TimeInterval { engine.focusDuration }
     public var restDuration: TimeInterval { engine.restDuration }
-    public var displayClockWithHours: String { PomodoroEngine.formatHHMMSS(engine: engine) }
+    public var displayClockWithHours: String { PomodoroEngine.formatHHMMSS(at: now(), engine: engine) }
+
+    public func startSystemClockMonitoring() {
+        guard !isMonitoringSystemClock else { return }
+        isMonitoringSystemClock = true
+        tick()
+        ensureTimer()
+    }
 
     public func setFocusDuration(_ duration: TimeInterval) {
         let normalized = PomodoroEngine.normalizedDuration(
@@ -250,7 +264,9 @@ public final class PomodoroService: ObservableObject {
         defaults.set(normalized, forKey: focusDurationKey)
         if engine.mode == .focus {
             engine.reset()
-            stopTimer()
+            if !isMonitoringSystemClock {
+                stopTimer()
+            }
         }
         refreshDisplay()
     }
@@ -271,13 +287,13 @@ public final class PomodoroService: ObservableObject {
 
     public func start() {
         requestNotificationAuthorizationIfNeeded()
-        engine.start()
+        engine.start(at: now())
         ensureTimer()
         refreshDisplay()
     }
 
     public func pause() {
-        engine.pause()
+        engine.pause(at: now())
         stopTimer()
         refreshDisplay()
     }
@@ -298,6 +314,7 @@ public final class PomodoroService: ObservableObject {
     }
 
     public func stop() {
+        isMonitoringSystemClock = false
         engine.reset()
         stopTimer()
         refreshDisplay()
@@ -305,7 +322,7 @@ public final class PomodoroService: ObservableObject {
 
     private func ensureTimer() {
         guard timer == nil else { return }
-        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: isMonitoringSystemClock ? 0.5 : 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.tick()
             }
@@ -326,9 +343,14 @@ public final class PomodoroService: ObservableObject {
         return center
     }
 
-    private func tick() {
+    public func tick() {
+        if isMonitoringSystemClock {
+            synchronizeSystemClockTimer(systemClockTimerReader())
+            refreshDisplay()
+            return
+        }
         let completedMode = engine.mode
-        if engine.completeIfNeeded() {
+        if engine.completeIfNeeded(at: now()) {
             stopTimer()
             notifyCompletion(of: completedMode)
             refreshDisplay()
@@ -338,9 +360,24 @@ public final class PomodoroService: ObservableObject {
     }
 
     func refreshDisplay() {
-        let clock = PomodoroEngine.formatMMSS(engine: engine)
+        let clock = PomodoroEngine.formatMMSS(at: now(), engine: engine)
         guard displayClock != clock else { return }
         displayClock = clock
+    }
+
+    private func synchronizeSystemClockTimer(_ snapshot: SystemClockTimerSnapshot?) {
+        var updated = PomodoroEngine(focusDuration: focusDuration, restDuration: restDuration)
+        switch snapshot?.state {
+        case .running(let deadline):
+            updated.phase = .running
+            updated.deadline = deadline
+        case .paused(let remaining):
+            updated.phase = .paused
+            updated.remainingWhenPaused = remaining
+        case nil:
+            break
+        }
+        if updated != engine { engine = updated }
     }
 
     private func requestNotificationAuthorizationIfNeeded() {

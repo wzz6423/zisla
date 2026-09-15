@@ -503,7 +503,11 @@ public final class NowPlayingService: ObservableObject {
     else { return }
     AudioSpectrumService.shared.setVisualizationEnabled(spectrumVisualizationEnabled)
     if spectrumMonitoringEnabled {
-      AudioSpectrumService.shared.startMonitoring()
+      // Read-only process observation must find playback before the tap opens audio I/O.
+      let hasActivePlayback = audioMonitor.isSupported
+        ? !audioMonitor.sources.isEmpty
+        : snapshot?.isPlaying == true
+      AudioSpectrumService.shared.startMonitoring(hasActivePlayback: hasActivePlayback)
     } else {
       AudioSpectrumService.shared.stop()
     }
@@ -1419,6 +1423,7 @@ public final class NowPlayingService: ObservableObject {
   }
 
   private func resolveSnapshot() {
+    defer { updateSpectrumMonitoring() }
     let sources = audioMonitor.sources
     let remoteSource = Self.preferredSource(
       from: sources,

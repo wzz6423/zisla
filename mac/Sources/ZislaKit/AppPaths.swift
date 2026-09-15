@@ -26,6 +26,7 @@ public enum AppPaths {
         applicationSupport.appendingPathComponent("alarms.json", isDirectory: false)
     }
 
+    /// Legacy JSON import path; VoiceHistoryStore writes to the adjacent SQLite database.
     public static var voiceHistory: URL {
         applicationSupport.appendingPathComponent("voice-history.json", isDirectory: false)
     }

@@ -30,7 +30,8 @@ public struct AudioPlaybackSource: Equatable, Identifiable, Sendable {
 
 @MainActor
 enum ApplicationIconDataCache {
-    private static let pixelSize = 64
+    private static let pixelSize = 128
+    private static let pointSize = 64
     private static let cache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
         cache.countLimit = 64
@@ -63,7 +64,7 @@ enum ApplicationIconDataCache {
             bitsPerPixel: 0
         ), let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return nil }
 
-        let targetRect = NSRect(x: 0, y: 0, width: pixelSize, height: pixelSize)
+        let targetRect = NSRect(x: 0, y: 0, width: pointSize, height: pointSize)
         bitmap.size = targetRect.size
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
