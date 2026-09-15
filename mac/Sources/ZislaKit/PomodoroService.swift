@@ -264,7 +264,9 @@ public final class PomodoroService: ObservableObject {
         defaults.set(normalized, forKey: focusDurationKey)
         if engine.mode == .focus {
             engine.reset()
-            stopTimer()
+            if !isMonitoringSystemClock {
+                stopTimer()
+            }
         }
         refreshDisplay()
     }
@@ -341,7 +343,7 @@ public final class PomodoroService: ObservableObject {
         return center
     }
 
-    func tick() {
+    public func tick() {
         if isMonitoringSystemClock {
             synchronizeSystemClockTimer(systemClockTimerReader())
             refreshDisplay()

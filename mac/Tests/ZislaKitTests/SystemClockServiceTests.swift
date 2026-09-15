@@ -50,6 +50,86 @@ struct SystemClockServiceTests {
         }
     }
 
+    @Test(arguments: [
+        SystemClockService.TimerAction.start(duration: 1),
+        .start(duration: 1_500.5),
+        .pause,
+        .resume,
+        .cancel,
+    ])
+    func timerActionsAreForwardedToTheSystemClock(
+        action: SystemClockService.TimerAction
+    ) throws {
+        let manager = ClockTimerManagerStub()
+
+        try SystemClockService.requestTimer(action) {
+            NativeClockTimerRequester.request($0, manager: manager)
+        }
+
+        #expect(manager.actions == [action])
+    }
+
+    @Test
+    func rejectedTimerRequestReachesCaller() {
+        let manager = ClockTimerManagerStub()
+        manager.acceptsRequest = false
+        do {
+            try SystemClockService.requestTimer(.start(duration: 1_500)) {
+                NativeClockTimerRequester.request($0, manager: manager)
+            }
+            Issue.record("系统时钟拒绝请求时应将错误交给调用方显示")
+        } catch {
+            #expect(error as? SystemClockServiceError == .requestFailed)
+        }
+        #expect(manager.actions == [.start(duration: 1_500)])
+    }
+
+    @Test(arguments: [0.0, -1, .nan, .infinity, -.infinity])
+    func invalidTimerDurationsAreRejectedBeforeCallingTheRequester(duration: TimeInterval) {
+        var requested = false
+
+        do {
+            try SystemClockService.requestTimer(.start(duration: duration)) { _ in
+                requested = true
+                return true
+            }
+            Issue.record("无效计时器时长不得交给系统执行")
+        } catch {
+            #expect(error as? SystemClockServiceError == .requestFailed)
+        }
+
+        #expect(!requested)
+    }
+
+    @Test(arguments: [
+        SystemClockService.TimerAction.start(duration: 60),
+        .pause,
+        .resume,
+        .cancel,
+    ])
+    func missingSystemTimerMethodReachesCaller(action: SystemClockService.TimerAction) {
+        do {
+            try SystemClockService.requestTimer(action) {
+                NativeClockTimerRequester.request($0, manager: NSObject())
+            }
+            Issue.record("系统计时器接口缺失时应报告失败")
+        } catch {
+            #expect(error as? SystemClockServiceError == .requestFailed)
+        }
+    }
+
+    @Test
+    func requesterFailureReachesCallerWithoutBeingRewritten() {
+        do {
+            try SystemClockService.requestTimer(.pause) { _ in
+                throw SystemClockServiceError.unavailable
+            }
+            Issue.record("系统时钟接口不可用时应保留具体错误")
+        } catch {
+            #expect(error as? SystemClockServiceError == .unavailable)
+        }
+    }
+
     @Test
     func retirementRemovesOneShotAndRepeatingAlarmsWithoutTouchingOtherNotifications() async {
         let oldAlarmID = "00000000-0000-0000-0000-000000000001"
@@ -98,5 +178,36 @@ struct SystemClockServiceTests {
                 #expect(identifiers.isEmpty)
             }
         )
+    }
+}
+
+@MainActor
+private final class ClockTimerManagerStub: NSObject {
+    var actions: [SystemClockService.TimerAction] = []
+    var acceptsRequest = true
+
+    @objc(startCurrentTimerWithDurationSync:)
+    func start(duration: TimeInterval) -> Bool {
+        record(.start(duration: duration))
+    }
+
+    @objc(pauseCurrentTimerSync)
+    func pause() -> Bool {
+        record(.pause)
+    }
+
+    @objc(resumeCurrentTimerSync)
+    func resume() -> Bool {
+        record(.resume)
+    }
+
+    @objc(stopCurrentTimerSync)
+    func cancel() -> Bool {
+        record(.cancel)
+    }
+
+    private func record(_ action: SystemClockService.TimerAction) -> Bool {
+        actions.append(action)
+        return acceptsRequest
     }
 }

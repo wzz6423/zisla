@@ -177,13 +177,17 @@ struct SystemClockSynchronizationTests {
         service.stop()
     }
 
-    @Test
-    func monitoringDetectsNewTimerWithoutManualRefresh() async {
+    @Test(arguments: [false, true])
+    func monitoringDetectsNewTimerWithoutManualRefresh(changesDuration: Bool) async {
         let fixture = Fixture()
         let service = fixture.service
         defer { service.stop() }
         service.startSystemClockMonitoring()
         #expect(service.phase == .idle)
+        if changesDuration {
+            service.setFocusDuration(90)
+            #expect(service.displayClock == "01:30")
+        }
 
         let nextRead = XCTestExpectation(description: "Monitoring refreshes the system timer automatically")
         fixture.onNextRead = { nextRead.fulfill() }
@@ -193,6 +197,24 @@ struct SystemClockSynchronizationTests {
         #expect(result == .completed)
         #expect(service.phase == .running)
         #expect(service.displayClock == "01:00")
+    }
+
+    @Test
+    func focusDurationChangesStayLocalWhenSystemMonitoringIsDisabled() {
+        let fixture = Fixture()
+        let service = fixture.service
+        defer { service.stop() }
+        fixture.snapshot = .init(identifier: "system", state: .running(deadline: fixture.now.addingTimeInterval(60)))
+
+        service.setFocusDuration(90)
+        service.tick()
+
+        #expect(service.phase == .idle)
+        #expect(service.focusDuration == 90)
+        #expect(service.displayClock == "01:30")
+        #expect(fixture.defaults.double(forKey: "zisla.pomodoro.focusDuration") == 90)
+        #expect(fixture.reads == 0)
+        #expect(fixture.notifications.isEmpty)
     }
 
     @Test
