@@ -200,6 +200,11 @@ public enum DownloadURLClassifier {
         "youku.com", "mgtv.com", "iqiyi.com",
         "music.apple.com", "itunes.apple.com", "y.qq.com",
         "music.163.com", "kugou.com", "kuwo.cn",
+        // Plain pages that embed direct media (e.g. cy.ncss.cn, the National
+        // College Student Innovation site, serves its promo/course videos as
+        // <video src="...mp4">). yt-dlp's generic extractor resolves those
+        // embeds, so the bare domain — not per-page paths — is allow-listed.
+        "ncss.cn",
     ]
 
     private static let mediaExtensions: Set<String> = [
