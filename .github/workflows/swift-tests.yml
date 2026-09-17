@@ -130,6 +130,7 @@ jobs:
           test -f "$APP_PATH/Contents/MacOS/zisla" || { echo "zisla binary not found"; exit 1; }
           test -x "$APP_PATH/Contents/MacOS/zisla" || { echo "zisla binary not executable"; exit 1; }
           test -f "$APP_PATH/Contents/Info.plist" || { echo "Info.plist not found"; exit 1; }
+          test -f "$APP_PATH/Contents/Resources/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro/pomodoro-complete.m4a" || { echo "Pomodoro completion sound not found"; exit 1; }
           /usr/bin/plutil -lint "$APP_PATH/Contents/Info.plist"
           /usr/bin/codesign --verify --deep --strict --all-architectures --verbose=2 "$APP_PATH"
       - name: Remove build artifacts

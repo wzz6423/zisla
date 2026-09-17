@@ -509,10 +509,7 @@ final class AppModel: ObservableObject {
     "toolbox-reminder-left",
     "toolbox-reminder-right",
   ]
-  private let focusCountdownNoticeIDs: Set<String> = [
-    "focus-countdown-left",
-    "focus-countdown-right",
-  ]
+  private let focusCountdownNoticePrefix = PomodoroService.focusCountdownNoticeIDPrefix
   private let focusModeNoticeIDs: Set<String> = [
     "focus-mode-left",
     "focus-mode-right",
@@ -3086,7 +3083,7 @@ final class AppModel: ObservableObject {
 
   private func refreshToolboxReminderNotice() {
     let settings = settingsStore.settings
-    guard !isFocusCountdownActive else {
+    guard !isPomodoroCountdownActive else {
       clearToolboxReminderNotices()
       return
     }
@@ -3135,17 +3132,36 @@ final class AppModel: ObservableObject {
     }
   }
 
-  private var isFocusCountdownActive: Bool {
-    pomodoro.mode == .focus
-      && pomodoro.phase == .running
-      && !screenCleaning.isScreenCleaning
-      && !screenCleaning.isKeyboardCleaning
+  static func shouldPresentPomodoroCountdown(
+    mode: PomodoroMode,
+    phase: PomodoroPhase,
+    isScreenCleaning: Bool,
+    isKeyboardCleaning: Bool
+  ) -> Bool {
+    guard phase == .running,
+      !isScreenCleaning,
+      !isKeyboardCleaning
+    else { return false }
+
+    switch mode {
+    case .focus, .rest:
+      return true
+    }
+  }
+
+  private var isPomodoroCountdownActive: Bool {
+    Self.shouldPresentPomodoroCountdown(
+      mode: pomodoro.mode,
+      phase: pomodoro.phase,
+      isScreenCleaning: screenCleaning.isScreenCleaning,
+      isKeyboardCleaning: screenCleaning.isKeyboardCleaning
+    )
   }
 
   private func refreshFocusCountdownNotice() {
     guard settingsStore.settings.sideNoticesEnabled,
       settingsStore.settings.focusCountdownIslandEnabled,
-      isFocusCountdownActive
+      isPomodoroCountdownActive
     else {
       clearFocusCountdownNotices()
       return
@@ -3153,20 +3169,24 @@ final class AppModel: ObservableObject {
 
     let notices = [
       IslandNotice(
-        id: "focus-countdown-left",
-        title: "专注倒计时",
+        id: pomodoro.focusCountdownNoticeID(for: .left),
+        title: AppLocalization.text(pomodoro.mode.title),
         detail: pomodoro.displayClockWithHours,
         kind: .info,
         side: .left
       ),
       IslandNotice(
-        id: "focus-countdown-right",
-        title: "专注倒计时",
+        id: pomodoro.focusCountdownNoticeID(for: .right),
+        title: AppLocalization.text(pomodoro.mode.title),
         detail: pomodoro.displayClockWithHours,
         kind: .info,
         side: .right
       ),
     ]
+    self.notices.removeAll(
+      withIDPrefix: focusCountdownNoticePrefix,
+      except: Set(notices.map(\.id))
+    )
     for notice in notices {
       let existing = (notice.side == .left ? self.notices.left : self.notices.right)
         .first { $0.id == notice.id }
@@ -3178,9 +3198,7 @@ final class AppModel: ObservableObject {
   }
 
   private func clearFocusCountdownNotices() {
-    for id in focusCountdownNoticeIDs where noticeExists(id: id) {
-      notices.remove(id: id)
-    }
+    notices.removeAll(withIDPrefix: focusCountdownNoticePrefix)
   }
 
   /// The 3-second linger after completion is timed by `BrowserDownloadMonitor`; here we enqueue a persistent notice that clears together with it.

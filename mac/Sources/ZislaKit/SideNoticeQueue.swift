@@ -91,6 +91,14 @@ public final class SideNoticeQueue: ObservableObject {
         for id in Array(ids) { remove(id: id) }
     }
 
+    public func removeAll(withIDPrefix prefix: String, except ids: Set<String>) {
+        let staleIDs = (left + right)
+            .lazy
+            .map(\.id)
+            .filter { $0.hasPrefix(prefix) && !ids.contains($0) }
+        for id in Array(staleIDs) { remove(id: id) }
+    }
+
     private func trimOrdinaryOverflow(on side: NoticeSide) {
         let notices: [IslandNotice]
         switch side {

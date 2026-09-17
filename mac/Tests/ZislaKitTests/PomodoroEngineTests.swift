@@ -1,3 +1,4 @@
+import AVFoundation
 import Combine
 import Foundation
 import IOKit.pwr_mgt
@@ -127,6 +128,44 @@ struct PomodoroEngineTests {
 
 @MainActor
 struct PomodoroServiceTests {
+    @Test
+    func restartedFocusSessionUsesNewCountdownPresentationIDs() {
+        let suiteName = "PomodoroServiceTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let service = PomodoroService(
+            notificationRequestHandler: { _ in },
+            defaults: defaults
+        )
+
+        service.start()
+        let firstLeftID = service.focusCountdownNoticeID(for: .left)
+        let firstRightID = service.focusCountdownNoticeID(for: .right)
+
+        service.start()
+        #expect(service.focusCountdownNoticeID(for: .left) == firstLeftID)
+        #expect(service.focusCountdownNoticeID(for: .right) == firstRightID)
+
+        service.reset()
+        service.start()
+        let secondLeftID = service.focusCountdownNoticeID(for: .left)
+        let secondRightID = service.focusCountdownNoticeID(for: .right)
+
+        #expect(firstLeftID.hasPrefix(PomodoroService.focusCountdownNoticeIDPrefix))
+        #expect(firstRightID.hasPrefix(PomodoroService.focusCountdownNoticeIDPrefix))
+        #expect(firstLeftID != secondLeftID)
+        #expect(firstRightID != secondRightID)
+    }
+
+    @Test
+    func bundledCompletionMelodyLastsFiveToSixSeconds() throws {
+        let url = try #require(PomodoroCompletionSound.resourceURL())
+        let player = try AVAudioPlayer(contentsOf: url)
+
+        #expect(player.numberOfChannels == 2)
+        #expect((5...6).contains(player.duration))
+    }
+
     @Test
     func completionSoundsOnceForEachModeWithoutASecondNotificationSound() {
         let suiteName = "PomodoroServiceTests.\(UUID().uuidString)"
