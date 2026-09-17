@@ -86,6 +86,7 @@ final class TypingStatsModel: ObservableObject {
     private var cachedDateKey: String?
     private var cachedTimeZoneIdentifier: String?
     private var reportRequestID = 0
+    private var readGeneration: UInt64 = 0
 
     init(persistence: any TypingStatsPersistence = TypingStatsStore()) {
         self.persistence = persistence
@@ -152,6 +153,7 @@ final class TypingStatsModel: ObservableObject {
                 flushWaiters.append(continuation)
             }
         }
+        guard !isClearing else { return false }
 
         isFlushing = true
         var succeeded = true
@@ -239,12 +241,13 @@ final class TypingStatsModel: ObservableObject {
             }
         }
 
+        let generation = readGeneration
         let didFlush = await flushPending()
         while !Task.isCancelled {
             let request = snapshotRequest(for: target)
             do {
                 let loadedSnapshot = try await persistence.loadSnapshot(request: request)
-                guard !Task.isCancelled else { return }
+                guard generation == readGeneration, !Task.isCancelled else { return }
                 guard request.timelineRange == timelineRange else { continue }
                 readStatus.markRead(at: loadedSnapshot.generatedAt)
                 let mergedSnapshot = mergeSnapshot(loadedSnapshot, request: request)
@@ -262,7 +265,7 @@ final class TypingStatsModel: ObservableObject {
             } catch is CancellationError {
                 return
             } catch {
-                guard !Task.isCancelled else { return }
+                guard generation == readGeneration, !Task.isCancelled else { return }
                 guard request.timelineRange == timelineRange else { continue }
                 setSourceStatus(.failed(L10n.tr(error.localizedDescription)))
                 return
@@ -276,6 +279,7 @@ final class TypingStatsModel: ObservableObject {
         rhythmRange: TypingDateRange? = nil,
         rhythmComparisonRange: TypingDateRange? = nil
     ) async {
+        let generation = readGeneration
         reportRequestID += 1
         let requestID = reportRequestID
         isLoadingReport = true
@@ -293,7 +297,7 @@ final class TypingStatsModel: ObservableObject {
                 rhythmRange: rhythmRange,
                 rhythmComparisonRange: rhythmComparisonRange
             )
-            guard requestID == reportRequestID, !Task.isCancelled else { return }
+            guard generation == readGeneration, requestID == reportRequestID, !Task.isCancelled else { return }
             if reportSnapshot?.hasSameVisibleContent(as: report) != true {
                 reportSnapshot = report
             }
@@ -301,7 +305,7 @@ final class TypingStatsModel: ObservableObject {
         } catch is CancellationError {
             return
         } catch {
-            guard requestID == reportRequestID else { return }
+            guard generation == readGeneration, requestID == reportRequestID else { return }
             reportErrorMessage = L10n.tr(error.localizedDescription)
         }
     }
@@ -325,9 +329,6 @@ final class TypingStatsModel: ObservableObject {
         _ = await flushPending()
         scheduledFlushTask?.cancel()
         scheduledFlushTask = nil
-        pendingCharacters.removeAll(keepingCapacity: true)
-        pendingKeyPresses.removeAll(keepingCapacity: true)
-        retryBatch = nil
 
         let previousReportRange = reportSnapshot?.range
         let previousComparisonRange = reportSnapshot?.comparisonRange
@@ -336,6 +337,10 @@ final class TypingStatsModel: ObservableObject {
 
         do {
             try await persistence.clearAll()
+            readGeneration &+= 1
+            pendingCharacters.removeAll(keepingCapacity: true)
+            pendingKeyPresses.removeAll(keepingCapacity: true)
+            retryBatch = nil
             consecutiveWriteFailures = 0
             lastWriteError = nil
             isRecordingSuspended = false
@@ -356,6 +361,7 @@ final class TypingStatsModel: ObservableObject {
             sourceStatus = .available
             return true
         } catch {
+            readGeneration &+= 1
             lastWriteError = L10n.tr(error.localizedDescription)
             sourceStatus = .failed(L10n.tr(error.localizedDescription))
             return false

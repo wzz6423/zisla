@@ -136,7 +136,6 @@ final class KeyboardAppModel: ObservableObject {
     func startServicesIfNeeded() {
         guard !servicesStarted else { return }
         servicesStarted = true
-        audioEngine.warmUp()
 
         NSWorkspace.shared.notificationCenter.publisher(
             for: NSWorkspace.didActivateApplicationNotification

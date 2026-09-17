@@ -237,27 +237,12 @@ struct IslandSurface<Content: View>: View {
             forSurfaceHeight: expandedSize.height,
             blendHeight: crownBlend
         )
-        return VStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.black.opacity(crownOpacity))
-                .frame(height: metrics.solidHeight)
-            LinearGradient(
-                stops: crownFadeStops(peakOpacity: crownOpacity),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: metrics.blendHeight)
-            Spacer(minLength: 0)
-        }
+        return IslandCrownSurface(
+            solidHeight: metrics.solidHeight,
+            blendHeight: metrics.blendHeight,
+            peakOpacity: crownOpacity
+        )
         .allowsHitTesting(false)
-    }
-
-    /// Builds the crown → glass blend stops from the shared eased curve, scaled to `peakOpacity`.
-    /// See `IslandCrownFade` for why the blend is a smoothstep rather than a straight ramp.
-    private func crownFadeStops(peakOpacity: CGFloat) -> [Gradient.Stop] {
-        IslandCrownFade.curve.map {
-            .init(color: .black.opacity(peakOpacity * $0.alpha), location: $0.location)
-        }
     }
 
     /// Visually stays black while allowing the transparent panel to retain a very faint translucency.
@@ -273,20 +258,11 @@ struct IslandSurface<Content: View>: View {
     private var compactCrown: some View {
         let solidHeight = min(max(0, collapsedSize.height), max(0, expandedSize.height))
         let blendHeight = max(0, expandedSize.height - solidHeight)
-        return VStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.black.opacity(compactCrownOpacity))
-                .frame(height: solidHeight)
-            // Both styles share the expanded crowns' eased blend, only the peak opacity differs, so the
-            // one-row recording transition can't reintroduce the slope break the expanded crown avoids.
-            LinearGradient(
-                stops: crownFadeStops(peakOpacity: compactCrownOpacity),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: blendHeight)
-            Spacer(minLength: 0)
-        }
+        return IslandCrownSurface(
+            solidHeight: solidHeight,
+            blendHeight: blendHeight,
+            peakOpacity: compactCrownOpacity
+        )
         .allowsHitTesting(false)
     }
 
@@ -387,18 +363,11 @@ struct IslandSurface<Content: View>: View {
             forSurfaceHeight: expandedSize.height,
             blendHeight: transparentCrownBlend
         )
-        return VStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.black)
-                .frame(height: metrics.solidHeight)
-            LinearGradient(
-                stops: crownFadeStops(peakOpacity: 1),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: metrics.blendHeight)
-            Spacer(minLength: 0)
-        }
+        return IslandCrownSurface(
+            solidHeight: metrics.solidHeight,
+            blendHeight: metrics.blendHeight,
+            peakOpacity: 1
+        )
         .allowsHitTesting(false)
     }
 
@@ -419,6 +388,39 @@ struct IslandSurface<Content: View>: View {
             startPoint: .top,
             endPoint: .bottom
         )
+    }
+}
+
+/// One drawing primitive prevents independently antialiased edges from exposing the glass
+/// when the crown and its parent frame are animating together.
+struct IslandCrownSurface: View, Animatable {
+    var solidHeight: CGFloat
+    var blendHeight: CGFloat
+    let peakOpacity: CGFloat
+
+    // Resolve the gradient against the interpolated lengths, not the destination layout.
+    nonisolated var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { .init(solidHeight, blendHeight) }
+        set {
+            solidHeight = newValue.first
+            blendHeight = newValue.second
+        }
+    }
+
+    var gradientStops: [Gradient.Stop] {
+        let height = solidHeight + blendHeight
+        let denominator = height == 0 ? 1 : height
+        return IslandCrownFade.curve.map {
+            .init(
+                color: .black.opacity(peakOpacity * $0.alpha),
+                location: (solidHeight + blendHeight * $0.location) / denominator
+            )
+        }
+    }
+
+    var body: some View {
+        LinearGradient(stops: gradientStops, startPoint: .top, endPoint: .bottom)
+            .frame(height: solidHeight + blendHeight)
     }
 }
 

@@ -336,8 +336,6 @@
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Nog geen wekkers, voeg hieronder toe";
-"打开时钟" = "Open klok";
-"打开系统「时钟」App" = "Open systeem Klok-app";
 "停用" = "Uitschakelen";
 "启用" = "Inschakelen";
 "编辑" = "Bewerk";
@@ -2105,7 +2103,6 @@
 "无法读取 AI 用量基线" = "Kan de basislijn van het AI-gebruik niet lezen";
 "无法读取 AI 用量游标" = "Kan de cursor van het AI-gebruik niet lezen";
 "无法读取 AI 用量记录" = "Kan de AI-gebruiksvermeldingen niet lezen";
-"未找到系统「时钟」App" = "De systeem-app 'Klok' is niet gevonden";
 "未检测到可用的麦克风输入" = "Er is geen beschikbare microfooningang gevonden";
 "正在下载背景音，点击取消" = "Achtergrondgeluid wordt gedownload, tik om te annuleren";
 "此 Mac 没有可读风扇" = "Deze Mac heeft geen leesbare ventilator";
@@ -2433,3 +2430,6 @@
 "不用合盖，在当前屏幕内容上播放一次" = "Speelt het effect één keer af op de huidige scherminhoud, zonder het deksel te sluiten";
 "汇率换算" = "Valutaconversie";
 "汇率获取失败" = "Wisselkoers ophalen mislukt";
+"闹钟通知未获允许，请在系统设置中开启通知。" = "Meldingen voor wekkers zijn niet toegestaan. Schakel meldingen in via Systeeminstellingen.";
+"闹钟通知声音已关闭，请在系统设置中开启声音。" = "Geluiden voor wekkermeldingen zijn uitgeschakeld. Schakel geluiden in via Systeeminstellingen.";
+"无法设置闹钟通知：%@" = "De wekkermelding kon niet worden ingepland: %@";

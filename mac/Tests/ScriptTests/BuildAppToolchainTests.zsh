@@ -80,7 +80,10 @@ else
   print -r -- "$DEVELOPER_DIR" > "$FAKE_CAPTURE_FILE"
   mkdir -p "$bin_directory"
   touch "$bin_directory/zisla"
-  mkdir -p "$bin_directory/zisla_KeyboardKit.bundle"
+  mkdir -p "$bin_directory/zisla_KeyboardKit.bundle" \
+    "$bin_directory/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro"
+  print -r -- pomodoro-complete > \
+    "$bin_directory/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro/pomodoro-complete.m4a"
 fi
 SCRIPT
 
@@ -276,6 +279,14 @@ cmp -s "$DEBUG_APP/Contents/Resources/AppIcon.icns" "$DEBUG_APP/Contents/Resourc
   print -u2 -r -- "FAIL: debug icon resources are inconsistent"
   exit 1
 }
+for app in "$TEMPORARY_ROOT/output/zisla.app" "$DEBUG_APP"; do
+  cmp -s \
+    "$TEST_ROOT/.build/arm64/out/Products/Release/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro/pomodoro-complete.m4a" \
+    "$app/Contents/Resources/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro/pomodoro-complete.m4a" || {
+      print -u2 -r -- "FAIL: build-app did not package the Pomodoro completion sound"
+      exit 1
+    }
+done
 
 function expect_version() {
   local version="$1"

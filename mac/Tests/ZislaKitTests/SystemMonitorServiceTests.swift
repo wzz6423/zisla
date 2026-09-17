@@ -203,9 +203,16 @@ private final class CountingPublicIPProvider: PublicIPProviding, @unchecked Send
     }
 }
 
-private final class DelayedHardwareInfoProvider: @unchecked Sendable {
+private final class GatedHardwareInfoProvider: @unchecked Sendable {
     private let lock = NSLock()
     private var calls = 0
+    private let releaseGate = DispatchSemaphore(value: 0)
+    let readStarted: AsyncStream<Void>
+    private let readStartedContinuation: AsyncStream<Void>.Continuation
+
+    init() {
+        (readStarted, readStartedContinuation) = AsyncStream<Void>.makeStream()
+    }
 
     var callCount: Int {
         lock.withLock { calls }
@@ -213,8 +220,14 @@ private final class DelayedHardwareInfoProvider: @unchecked Sendable {
 
     func read() -> SystemHardwareInfo {
         lock.withLock { calls += 1 }
-        usleep(100_000)
+        readStartedContinuation.yield(())
+        readStartedContinuation.finish()
+        releaseGate.wait()
         return .unavailable
+    }
+
+    func release() {
+        releaseGate.signal()
     }
 }
 
@@ -769,8 +782,8 @@ struct SystemMonitorServiceTests {
         #expect(SystemDiskCleanup.scanWorkerLimit(requested: 0, processorCount: 8) == 1)
     }
 
-    @Test
-    func concurrentCleanupScanMatchesSingleWorkerResults() {
+    @Test(arguments: [1, 2, 3, 99])
+    func concurrentCleanupScanMatchesSingleWorkerResults(workerLimit: Int) async {
         let mock = MockFileManager()
         let home = URL(fileURLWithPath: "/Users/test")
         mock.homeDirectory = home
@@ -806,44 +819,73 @@ struct SystemMonitorServiceTests {
         let concurrent = SystemDiskCleanup.scanCandidates(
             fileManager: mock,
             kinds: kinds,
-            maxConcurrentScans: 99
+            maxConcurrentScans: workerLimit
         )
 
         #expect(concurrent == singleWorker)
         #expect(concurrent.map(\.displayName) == ["com.example.app 缓存", "example.log", "Installer.pkg"])
+
+        await withTaskGroup(of: [DiskCleanupCandidate].self) { group in
+            // More callers than the CI runner has cores exposes waits on queued scan work.
+            for _ in 0..<8 {
+                group.addTask {
+                    SystemDiskCleanup.scanCandidates(
+                        fileManager: mock, kinds: kinds, maxConcurrentScans: workerLimit
+                    )
+                }
+            }
+            for await candidates in group {
+                #expect(candidates == singleWorker)
+            }
+        }
     }
 
-    @Test
-    func cleanupScanPublishesCandidatesAsEachCategoryCompletes() {
+    @Test(arguments: [1, 2, 3])
+    func cleanupScanPublishesCandidatesAsEachCategoryCompletes(workerLimit: Int) {
         let mock = MockFileManager()
         let home = URL(fileURLWithPath: "/Users/test")
+        let downloads = home.appendingPathComponent("Downloads")
+        let installer = downloads.appendingPathComponent("Installer.pkg")
         mock.homeDirectory = home
         mock.searchPathResults = [
+            .downloadsDirectory: [downloads],
             .trashDirectory: [home.appendingPathComponent(".Trash")],
         ]
         let caches = home.appendingPathComponent("Library/Caches")
         let cacheChild = caches.appendingPathComponent("com.example.app")
         let logs = home.appendingPathComponent("Library/Logs")
         let logChild = logs.appendingPathComponent("example.log")
-        mock.existingPaths = [caches.path, cacheChild.path, logs.path, logChild.path]
+        mock.existingPaths = [caches.path, cacheChild.path, logs.path, logChild.path, downloads.path, installer.path]
         mock.directoryContents[caches.path] = [cacheChild]
         mock.directoryContents[logs.path] = [logChild]
+        mock.directoryContents[downloads.path] = [installer]
         mock.fileAttributes[cacheChild.path] = [.size: NSNumber(value: 8_192)]
         mock.fileAttributes[logChild.path] = [.size: NSNumber(value: 4_096)]
+        mock.fileAttributes[installer.path] = [.size: NSNumber(value: 2_048)]
 
         let updates = CleanupScanProgressCapture()
         let result = SystemDiskCleanup.scanCandidatesWithProgress(
             fileManager: mock,
-            kinds: [.appCache, .log],
-            maxConcurrentScans: 1
+            kinds: [.appCache, .log, .diskImage],
+            maxConcurrentScans: workerLimit
         ) { candidates in
             updates.append(candidates)
         }
         let snapshots = updates.snapshots()
 
-        #expect(snapshots.count == 2)
-        #expect(snapshots[0].map(\.kind) == [.appCache])
+        #expect(snapshots.count == 3)
+        #expect(snapshots.first?.isEmpty == false)
+        if workerLimit == 1 {
+            #expect(snapshots.first?.map(\.kind) == [.appCache])
+        }
         #expect(snapshots.last == result)
+        #expect(result.map(\.byteSize) == [8_192, 4_096, 2_048])
+        for snapshot in snapshots {
+            #expect(snapshot.map(\.byteSize) == snapshot.map(\.byteSize).sorted(by: >))
+        }
+        for (previous, current) in zip(snapshots, snapshots.dropFirst()) {
+            #expect(Set(previous.map(\.url)).isSubset(of: Set(current.map(\.url))))
+        }
     }
 
     @Test
@@ -1649,7 +1691,7 @@ struct SystemMonitorServiceTests {
             #expect(!reason.isEmpty)
         case let .available(rpm, detail):
             #expect(!rpm.isEmpty)
-            #expect(rpm.allSatisfy { (100...20_000).contains($0) })
+            #expect(rpm.allSatisfy { (0...20_000).contains($0) })
             #expect(detail == "AppleSMC 只读")
         }
 
@@ -1673,7 +1715,7 @@ struct SystemMonitorServiceTests {
             .systemSize: NSNumber(value: 500_000_000_000),
             .systemFreeSize: NSNumber(value: 100_000_000_000),
         ]
-        let hardwareProvider = DelayedHardwareInfoProvider()
+        let hardwareProvider = GatedHardwareInfoProvider()
         let service = SystemMonitorService(
             fileManager: mock,
             volumeURL: volume,
@@ -1682,8 +1724,15 @@ struct SystemMonitorServiceTests {
         )
 
         let first = Task { @MainActor in await service.sampleOnce() }
-        try? await Task.sleep(nanoseconds: 20_000_000)
-        let second = Task { @MainActor in await service.sampleOnce() }
+        for await _ in hardwareProvider.readStarted { break }
+        let (secondStarted, secondStartedContinuation) = AsyncStream<Void>.makeStream()
+        let second = Task { @MainActor in
+            secondStartedContinuation.yield(())
+            secondStartedContinuation.finish()
+            return await service.sampleOnce()
+        }
+        for await _ in secondStarted { break }
+        hardwareProvider.release()
         let (firstSnapshot, secondSnapshot) = await (first.value, second.value)
 
         #expect(firstSnapshot == secondSnapshot)

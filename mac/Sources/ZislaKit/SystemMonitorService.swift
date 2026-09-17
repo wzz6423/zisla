@@ -1904,18 +1904,13 @@ public enum SystemDiskCleanup {
         }
 
         let results = CleanupScanResults(count: tasks.count)
-        let queue = OperationQueue()
-        queue.name = "dev.wzz.zisla.disk-cleanup-scan"
-        queue.qualityOfService = .utility
-        queue.maxConcurrentOperationCount = workerLimit
-
-        for (index, task) in tasks.enumerated() {
-            queue.addOperation {
-                let candidates = autoreleasepool { task.run() }
+        // The caller must participate instead of blocking a cooperative thread on queued work.
+        DispatchQueue.concurrentPerform(iterations: workerLimit) { worker in
+            for index in stride(from: worker, to: tasks.count, by: workerLimit) {
+                let candidates = autoreleasepool { tasks[index].run() }
                 results.store(candidates, at: index)
             }
         }
-        queue.waitUntilAllOperationsAreFinished()
         return results.flattened()
     }
 
@@ -1934,15 +1929,11 @@ public enum SystemDiskCleanup {
         }
 
         let results = CleanupScanResults(count: tasks.count)
-        let queue = OperationQueue()
-        queue.name = "dev.wzz.zisla.disk-cleanup-scan"
-        queue.qualityOfService = .utility
-        queue.maxConcurrentOperationCount = workerLimit
         let progressLock = NSLock()
 
-        for (index, task) in tasks.enumerated() {
-            queue.addOperation {
-                let candidates = autoreleasepool { task.run() }
+        DispatchQueue.concurrentPerform(iterations: workerLimit) { worker in
+            for index in stride(from: worker, to: tasks.count, by: workerLimit) {
+                let candidates = autoreleasepool { tasks[index].run() }
                 results.store(candidates, at: index)
 
                 // Serialize updates so a later completion never publishes an older snapshot.
@@ -1951,7 +1942,6 @@ public enum SystemDiskCleanup {
                 progressLock.unlock()
             }
         }
-        queue.waitUntilAllOperationsAreFinished()
         return results.flattened()
     }
 

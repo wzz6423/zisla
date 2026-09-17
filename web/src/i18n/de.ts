@@ -145,7 +145,7 @@ export const de: SiteContent = {
       toolbox: {
         name: 'Kleine Werkzeuge',
         caption:
-          'Fokus-Timer, Display wach halten, Bildschirmreinigung, Tastaturreinigung (blockiert währenddessen Tastendrücke einschließlich F1-F12), Weckzeiten, Teleprompter, Spiegel und Papierkorb auf einer Seite.',
+          'Fokus-Timer, Display wach halten, Bildschirmreinigung, Tastaturreinigung (blockiert währenddessen Tastendrücke einschließlich F1-F12), Teleprompter, Spiegel und Papierkorb auf einer Seite.',
         points: [
           'Fokus-Timer',
           'Blockiert F1-F12 beim Reinigen',
@@ -340,7 +340,7 @@ export const de: SiteContent = {
         <li><strong>Bluetooth:</strong> wird nur genutzt, solange das Batteriemodul geöffnet ist, um den von verbundenen oder gekoppelten Geräten veröffentlichten Ladestand zu lesen.</li>
         <li><strong>Automation:</strong> bei der ersten Nutzung von Kurznotizen, Mail, Schreibtisch-Aufräumen oder direkter Steuerung eines unterstützten Players fragt macOS einzeln, ob zisla Notizen, Mail, den Finder oder die jeweilige App steuern darf. Kurznotizen lesen und schreiben in Notizen; Mail kann Nachrichten lesen, verfassen, beantworten, markieren und löschen.</li>
         <li><strong>Festplattenvollzugriff:</strong> nur nötig, wenn Mail nicht läuft und zisla dennoch den lokalen Mail-Index lesen soll, um Accounts, Absender, Betreff, Auszug, Zeit und Lesestatus anzuzeigen.</li>
-        <li><strong>Mitteilungen:</strong> werden beim Aktivieren von Pomodoro-Timer oder Weckzeiten abgefragt und nur genutzt, um eine lokale Mitteilung anzuzeigen, wenn ein Timer endet oder eine Weckzeit fällig ist.</li>
+        <li><strong>Mitteilungen:</strong> werden beim Aktivieren des Pomodoro-Timers abgefragt und nur verwendet, um bei dessen Ende eine lokale Mitteilung anzuzeigen und einen einzelnen Hinweiston abzuspielen.</li>
       </ul>
       <p><strong>Ein Ordner ist kein Festplattenvollzugriff:</strong> Für Ablage-, Import-/Export- oder Downloadordner, die du im Dateiauswahl-Dialog des Systems bestimmst, erhält zisla nur Zugriff auf diesen Ordner, nie Leserechte für den gesamten Datenträger.</p>
       <p><strong>Tastaturklänge und Tippstatistik:</strong> Beide sind standardmäßig aus, und globale Tastaturereignisse werden erst beobachtet, sobald eine davon an ist. Bei Tastaturklängen dienen Tastenereignisse allein der Klangausgabe; bei der Tippstatistik werden nur aggregierte Daten gespeichert – Zeichenanzahl, physische Tastencodes, Zeit und vorderste App – niemals der Inhalt. Du kannst beide getrennt in den Einstellungen abschalten, danach wird nichts mehr aufgezeichnet. Bereits gespeicherte Daten bleiben in einer lokalen Datenbankdatei, die du selbst löschen kannst.</p>

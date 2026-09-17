@@ -74,6 +74,9 @@ let package = Package(
                 "ZislaNVMe",
                 .product(name: "zstd", package: "zstd.swift"),
             ],
+            resources: [
+                .copy("../../Resources/Pomodoro"),
+            ],
             linkerSettings: [
                 .linkedFramework("WeatherKit"),
                 .linkedFramework("Network"),

@@ -336,8 +336,6 @@
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Henüz alarm yok, aşağıdan ekle";
-"打开时钟" = "Saati Aç";
-"打开系统「时钟」App" = "Sistem Saat uygulamasını aç";
 "停用" = "Devre Dışı Bırak";
 "启用" = "Etkinleştir";
 "编辑" = "Düzenle";
@@ -2105,7 +2103,6 @@
 "无法读取 AI 用量基线" = "AI kullanım temel çizgisi okunamadı";
 "无法读取 AI 用量游标" = "AI kullanım imleci okunamadı";
 "无法读取 AI 用量记录" = "AI kullanım kayıtları okunamadı";
-"未找到系统「时钟」App" = "Sistemdeki «Saat» uygulaması bulunamadı";
 "未检测到可用的麦克风输入" = "Kullanılabilir mikrofon girişi algılanmadı";
 "正在下载背景音，点击取消" = "Arka plan sesi indiriliyor, iptal için tıklayın";
 "此 Mac 没有可读风扇" = "Bu Mac'te okunabilir fan yok";
@@ -2433,3 +2430,6 @@
 "不用合盖，在当前屏幕内容上播放一次" = "Kapağı kapatmadan efekti geçerli ekran içeriğinde bir kez oynatır";
 "汇率换算" = "Döviz Çevirisi";
 "汇率获取失败" = "Döviz kuru alınamadı";
+"闹钟通知未获允许，请在系统设置中开启通知。" = "Alarm bildirimlerine izin verilmemiş. Sistem Ayarları’ndan bildirimleri açın.";
+"闹钟通知声音已关闭，请在系统设置中开启声音。" = "Alarm bildirim sesleri kapalı. Sistem Ayarları’ndan sesleri açın.";
+"无法设置闹钟通知：%@" = "Alarm bildirimi zamanlanamadı: %@";

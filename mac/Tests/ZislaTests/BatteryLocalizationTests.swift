@@ -5,8 +5,8 @@ import ZislaKit
 
 @testable import Zisla
 
-/// 电池链路文案统一走 `BatteryLocalization`：任一语言缺 key 都会让界面静默退回中文原文，
-/// 因此这里从源码扫出运行时真正查询的 key，再逐语言核对资源，让新增文案漏翻译时测试先失败。
+/// Missing battery keys silently fall back to Chinese, so check the runtime keys
+/// against every language table instead of relying on a successful build.
 struct BatteryLocalizationTests {
     @Test
     func historyTextUsesRequestedLanguage() {
@@ -70,7 +70,7 @@ struct BatteryLocalizationTests {
         }
     }
 
-    /// 这些 key 由 `ZislaKit` 枚举的 `displayName` 和设置项文案间接传入，无法从调用点扫出。
+    /// Enum display names and settings supply these keys indirectly, outside the scanned call sites.
     private static let indirectKeys = [
         "蓝牙", "已授权设备", "鼠标", "键盘", "触控板", "配件", "未知设备",
         "设备", "左", "右", "盒",

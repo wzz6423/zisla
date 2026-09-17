@@ -171,7 +171,11 @@ public final class AudioSpectrumService: ObservableObject {
         self.capture = capture
     }
 
-    public func startMonitoring() {
+    public func startMonitoring(hasActivePlayback: Bool) {
+        guard hasActivePlayback else {
+            stop()
+            return
+        }
         guard !isRequested else { return }
 
         isRequested = true
