@@ -213,10 +213,7 @@ struct IslandRootView: View {
                                         case .pdf:
                                             PDFToolsModuleView(model: model)
                                         case .toolbox:
-                                            ToolboxModuleView(
-                                                model: model,
-                                                onTransientInteractionChanged: onTransientInteractionChanged
-                                            )
+                                            ToolboxModuleView(model: model)
                                         case .system:
                                             SystemMonitorView(
                                                 service: model.systemMonitor,

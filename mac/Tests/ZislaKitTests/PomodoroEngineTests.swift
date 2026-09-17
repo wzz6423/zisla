@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import IOKit.pwr_mgt
 import Testing
+import UserNotifications
 @testable import ZislaKit
 
 struct PomodoroEngineTests {
@@ -126,6 +127,103 @@ struct PomodoroEngineTests {
 
 @MainActor
 struct PomodoroServiceTests {
+    @Test
+    func completionSoundsOnceForEachModeWithoutASecondNotificationSound() {
+        let suiteName = "PomodoroServiceTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var now = Date(timeIntervalSince1970: 10_000_000)
+        var sounds = 0
+        var requests: [UNNotificationRequest] = []
+        let service = PomodoroService(
+            notificationRequestHandler: { requests.append($0) },
+            defaults: defaults,
+            completionSoundHandler: { sounds += 1 },
+            now: { now }
+        )
+        service.setFocusDuration(1)
+        service.setRestDuration(1)
+        service.start()
+
+        now = now.addingTimeInterval(1)
+        service.tick()
+
+        #expect(service.phase == .idle)
+        #expect(service.mode == .rest)
+        #expect(requests.count == 1)
+        #expect(requests[0].content.sound == nil)
+        #expect(sounds == 1)
+
+        service.tick()
+        #expect(sounds == 1)
+        #expect(requests.count == 1)
+
+        service.start()
+        now = now.addingTimeInterval(1)
+        service.tick()
+        #expect(service.mode == .focus)
+        #expect(sounds == 2)
+        #expect(requests.count == 2)
+    }
+
+    @Test
+    func mutedCompletionDoesNotSoundOrSendANotification() {
+        let suiteName = "PomodoroServiceTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var now = Date(timeIntervalSince1970: 10_000_000)
+        var sounds = 0
+        var notifications = 0
+        let service = PomodoroService(
+            notificationRequestHandler: { _ in notifications += 1 },
+            defaults: defaults,
+            completionSoundHandler: { sounds += 1 },
+            now: { now }
+        )
+        service.notificationsMuted = true
+        service.setFocusDuration(1)
+        service.start()
+
+        now = now.addingTimeInterval(1)
+        service.tick()
+
+        #expect(service.phase == .idle)
+        #expect(sounds == 0)
+        #expect(notifications == 0)
+    }
+
+    @Test
+    func pauseResetAndStopDoNotSound() {
+        let suiteName = "PomodoroServiceTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var now = Date(timeIntervalSince1970: 10_000_000)
+        var sounds = 0
+        let service = PomodoroService(
+            notificationRequestHandler: { _ in },
+            defaults: defaults,
+            completionSoundHandler: { sounds += 1 },
+            now: { now }
+        )
+        service.setFocusDuration(1)
+
+        service.start()
+        service.pause()
+        now = now.addingTimeInterval(2)
+        service.tick()
+        #expect(sounds == 0)
+
+        service.start()
+        service.reset()
+        service.tick()
+        #expect(sounds == 0)
+
+        service.start()
+        service.stop()
+        service.tick()
+        #expect(sounds == 0)
+    }
+
     @Test
     func refreshDisplayPublishesOnlyWhenClockTextChanges() {
         let suiteName = "PomodoroServiceTests.\(UUID().uuidString)"

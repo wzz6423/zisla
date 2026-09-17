@@ -62,10 +62,10 @@ enum ApplicationIconDataCache {
             colorSpaceName: .deviceRGB,
             bytesPerRow: 0,
             bitsPerPixel: 0
-        ), let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return nil }
-
+        ) else { return nil }
         let targetRect = NSRect(x: 0, y: 0, width: pointSize, height: pointSize)
         bitmap.size = targetRect.size
+        guard let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return nil }
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSGraphicsContext.current = context

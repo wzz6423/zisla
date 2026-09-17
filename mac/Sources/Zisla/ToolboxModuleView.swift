@@ -6,23 +6,17 @@ struct ToolboxModuleView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var pomodoro: PomodoroService
     @ObservedObject private var settingsStore: FeatureSettingsStore
-    private let onTransientInteractionChanged: (Bool) -> Void
     @State private var isDurationPickerPresented = false
-    @State private var isAlarmEditorPresented = false
 
     private enum Metrics {
         static let controlHeight: CGFloat = 40
         static let toolContentHeight: CGFloat = 136
     }
 
-    init(
-        model: AppModel,
-        onTransientInteractionChanged: @escaping (Bool) -> Void = { _ in }
-    ) {
+    init(model: AppModel) {
         _model = ObservedObject(wrappedValue: model)
         _pomodoro = ObservedObject(wrappedValue: model.pomodoro)
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
-        self.onTransientInteractionChanged = onTransientInteractionChanged
     }
 
     var body: some View {
@@ -186,17 +180,6 @@ struct ToolboxModuleView: View {
                         : AppLocalization.text("吞掉键盘输入；再次点击结束")
                 )
 
-                ToolShortcutButton(
-                    title: AppLocalization.text("闹钟"),
-                    symbol: "alarm",
-                    help: AppLocalization.text("管理闹钟")
-                ) {
-                    onTransientInteractionChanged(true)
-                    isAlarmEditorPresented = true
-                }
-                .popover(isPresented: $isAlarmEditorPresented, arrowEdge: .bottom) {
-                    AlarmEditorView(service: model.alarms)
-                }
             }
 
             HStack(spacing: 8) {
@@ -227,14 +210,6 @@ struct ToolboxModuleView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .top)
-        .onChange(of: isAlarmEditorPresented) { _, presented in
-            if !presented {
-                onTransientInteractionChanged(false)
-            }
-        }
-        .onDisappear {
-            onTransientInteractionChanged(false)
-        }
     }
 
     private var currentDuration: TimeInterval {
