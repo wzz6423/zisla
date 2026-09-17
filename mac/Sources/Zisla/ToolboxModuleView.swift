@@ -284,7 +284,7 @@ struct ToolboxModuleView: View {
     }
 
     private func durationInput(_ title: String, value: Binding<Int>) -> some View {
-        TextField(title, value: value, format: .number)
+        TextField(AppLocalization.text(title), value: value, format: .number)
             .textFieldStyle(.roundedBorder)
             .multilineTextAlignment(.trailing)
             .frame(width: 44)
@@ -318,8 +318,8 @@ struct ToolboxModuleView: View {
 
     private var startPauseTitle: String {
         switch pomodoro.phase {
-        case .running: "暂停"
-        case .idle, .paused: "开始"
+        case .running: AppLocalization.text("暂停")
+        case .idle, .paused: AppLocalization.text("开始")
         }
     }
 
