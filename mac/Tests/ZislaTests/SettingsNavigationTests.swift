@@ -179,6 +179,7 @@ struct SettingsNavigationTests {
         #expect(source.contains("case .conversion: \"换算\""))
         #expect(examples.contains(".textSelection(.enabled)"))
         #expect(examples.contains("copyClipboardAssistantConversionExample(example)"))
+        #expect(examples.contains(".padding(.leading, 12)"))
         for example in [
             "10 ft = m", "100 kg = lb", "5 km = mi",
             "100 USD = CNY", "100$ = ¥", "100dollar = CNY",
