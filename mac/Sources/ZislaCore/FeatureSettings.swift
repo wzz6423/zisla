@@ -564,6 +564,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var clipboardAssistantBlacklist: Set<String>
     /// Recognized content kinds; an empty set falls back to all kinds.
     public var clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind>
+    private var clipboardAssistantCurrencyDefaultApplied: Bool
     /// Primary action and expanded-menu order for each recognized content kind.
     public var clipboardAssistantActionOrders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
     /// Engine used by the assistant's "search" action for copied text.
@@ -770,6 +771,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             clipboardAssistantEnabledKinds.isEmpty
             ? Set(ClipboardAssistantKind.allCases)
             : clipboardAssistantEnabledKinds
+        self.clipboardAssistantCurrencyDefaultApplied = true
         self.clipboardAssistantActionOrders = ClipboardAssistantActionOrder.normalized(
             clipboardAssistantActionOrders
         )
@@ -877,6 +879,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantMouseButton
         case clipboardAssistantBlacklist
         case clipboardAssistantEnabledKinds
+        case clipboardAssistantCurrencyDefaultApplied
         case clipboardAssistantActionOrders
         case clipboardAssistantSearchEngine
         case clipboardAssistantCustomSearchURL
@@ -1023,10 +1026,19 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Set<String>.self,
             forKey: .clipboardAssistantBlacklist
         ) ?? defaults.clipboardAssistantBlacklist
-        clipboardAssistantEnabledKinds = try container.decodeIfPresent(
+        let hasAppliedCurrencyDefault = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .clipboardAssistantCurrencyDefaultApplied
+        ) ?? false
+        var enabledKinds = try container.decodeIfPresent(
             Set<ClipboardAssistantKind>.self,
             forKey: .clipboardAssistantEnabledKinds
         ) ?? defaults.clipboardAssistantEnabledKinds
+        if !hasAppliedCurrencyDefault, !enabledKinds.isEmpty {
+            enabledKinds.insert(.currency)
+        }
+        clipboardAssistantEnabledKinds = enabledKinds
+        clipboardAssistantCurrencyDefaultApplied = true
         clipboardAssistantActionOrders = ClipboardAssistantActionOrder.normalized(
             try container.decodeIfPresent(
                 [ClipboardAssistantKind: [ClipboardAssistantActionKind]].self,
