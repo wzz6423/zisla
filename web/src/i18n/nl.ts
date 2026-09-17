@@ -135,7 +135,7 @@ export const nl = createCatalog({
       toolbox: {
         name: 'Hulpprogramma’s',
         caption:
-          'Focusafteller, scherm wakker houden, scherm- en toetsenbordreiniging (blokkeert ook F1-F12), alarmen, teleprompter, spiegel en prullenmand op één pagina.',
+          'Focusafteller, scherm wakker houden, scherm- en toetsenbordreiniging (blokkeert ook F1-F12), teleprompter, spiegel en prullenmand op één pagina.',
         points: ['Focusafteller', 'Blokkeert F1-F12 tijdens reinigen', 'Teleprompter en spiegel'],
       },
       system: {
@@ -291,7 +291,7 @@ export const nl = createCatalog({
         <li><strong>Bluetooth:</strong> alleen gebruikt zolang de batterijmodule open is, om het batterijniveau te lezen dat verbonden of gekoppelde apparaten publiceren.</li>
         <li><strong>Automatisering:</strong> wanneer je Snelle notities, Mail, het opruimen van het bureaublad of directe bediening van een ondersteunde speler voor het eerst gebruikt, vraagt macOS afzonderlijk of zisla Notities, Mail, Finder of die app mag bedienen. Snelle notities leest en schrijft in Notities; Mail kan berichten lezen, opstellen, beantwoorden, markeren en verwijderen.</li>
         <li><strong>Volledige schijftoegang:</strong> alleen nodig wanneer Mail niet actief is en zisla toch de lokale mailindex moet lezen om accounts, afzenders, onderwerpen, voorbeelden, tijdstippen en leesstatus te tonen.</li>
-        <li><strong>Meldingen:</strong> gevraagd wanneer je de Pomodoro-timer of alarmen inschakelt, uitsluitend om een lokale melding te tonen wanneer een timer afloopt of een alarm afgaat.</li>
+        <li><strong>Meldingen:</strong> gevraagd wanneer je de Pomodoro-timer inschakelt, uitsluitend om een lokale melding te tonen en één waarschuwingsgeluid af te spelen wanneer die afloopt.</li>
       </ul>
       <p><strong>Mappen zijn geen volledige schijftoegang:</strong> voor de opslag-, import/export- of downloadmappen die je in de systeemkiezer selecteert, krijgt zisla alleen toegang tot die map, nooit leesrechten voor de hele schijf.</p>
       <p><strong>Toetsenbordgeluiden en typestatistieken:</strong> beide staan standaard uit en globale toetsenbordgebeurtenissen worden pas gevolgd wanneer één van beide is ingeschakeld. Met toetsenbordgeluiden worden toetsaanslagen uitsluitend gebruikt om geluid af te spelen; met typestatistieken worden alleen geaggregeerde gegevens opgeslagen — tekentaantallen, fysieke toetscodes, tijdstippen en de app op de voorgrond — nooit wat je hebt getypt. Je kunt beide opties afzonderlijk uitschakelen in Instellingen; daarna wordt niets meer vastgelegd. Eerder opgeslagen gegevens blijven in een lokaal databasebestand staan dat je zelf kunt verwijderen.</p>

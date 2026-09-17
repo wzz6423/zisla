@@ -69,24 +69,13 @@ jobs:
           done
       - name: Run swift test
         run: |
-          set -o pipefail
-          if swift test 2>&1 | tee swift-test.log; then
-            rm -f swift-test.log
-            exit 0
-          fi
-          echo "::warning::swift test failed; retrying the failed tests once (transient SwiftPM fatalError crash or flaky timing tests under load)"
-          failed="$(grep -oE '✘ Test [A-Za-z0-9_]+\(\)' swift-test.log | sed -E 's/✘ Test //; s/\(\)$//' | sort -u | paste -sd'|' -)"
-          rm -f swift-test.log
-          if [ -z "$failed" ]; then
-            echo "No failed test names parsed; rerunning the full suite"
-            swift test
-          else
-            echo "Retrying tests: $failed"
-            swift test --filter "$failed"
-          fi
+          # AppKit-heavy app tests can starve service timers in SwiftPM's shared test process.
+          for target in ZislaCoreTests ZislaKitTests ZislaTests; do
+            swift test --filter "^${target}\."
+          done
       - name: Remove test artifacts
         if: always()
-        run: rm -rf .build swift-test.log
+        run: rm -rf .build
 
   zislactl:
     name: Build zislactl (Release)
@@ -141,6 +130,10 @@ jobs:
           test -f "$APP_PATH/Contents/MacOS/zisla" || { echo "zisla binary not found"; exit 1; }
           test -x "$APP_PATH/Contents/MacOS/zisla" || { echo "zisla binary not executable"; exit 1; }
           test -f "$APP_PATH/Contents/Info.plist" || { echo "Info.plist not found"; exit 1; }
+          ZISLAKIT_BUNDLE="$APP_PATH/Contents/Resources/zisla_ZislaKit.bundle"
+          test -d "$ZISLAKIT_BUNDLE" || { echo "ZislaKit resource bundle not found"; exit 1; }
+          SOUND_COUNT="$(find "$ZISLAKIT_BUNDLE" -type f -name 'pomodoro-complete.m4a' -size +0c | wc -l | tr -d ' ')"
+          test "$SOUND_COUNT" = 1 || { echo "Pomodoro completion sound not found uniquely in ZislaKit bundle"; exit 1; }
           /usr/bin/plutil -lint "$APP_PATH/Contents/Info.plist"
           /usr/bin/codesign --verify --deep --strict --all-architectures --verbose=2 "$APP_PATH"
       - name: Remove build artifacts

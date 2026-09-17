@@ -170,6 +170,51 @@ struct SideNoticeQueueTests {
         #expect(queue.left.map(\.id) == ["focus-mode-left"])
         #expect(queue.right.isEmpty)
     }
+
+    @Test @MainActor
+    func removingStaleCountdownNoticesKeepsTheCurrentRunVisible() {
+        let queue = SideNoticeQueue()
+        let firstLeft = IslandNotice(
+            id: "focus-countdown-first-left",
+            title: "专注倒计时",
+            detail: "00:25:00",
+            side: .left
+        )
+        let currentLeft = IslandNotice(
+            id: "focus-countdown-current-left",
+            title: "专注倒计时",
+            detail: "00:25:00",
+            side: .left
+        )
+        let firstRight = IslandNotice(
+            id: "focus-countdown-first-right",
+            title: "专注倒计时",
+            detail: "00:25:00",
+            side: .right
+        )
+        let currentRight = IslandNotice(
+            id: "focus-countdown-current-right",
+            title: "专注倒计时",
+            detail: "00:25:00",
+            side: .right
+        )
+
+        for notice in [firstLeft, currentLeft, firstRight, currentRight] {
+            queue.enqueue(notice, expiresAfter: nil)
+        }
+
+        queue.removeAll(
+            withIDPrefix: "focus-countdown-",
+            except: [currentLeft.id, currentRight.id]
+        )
+
+        #expect(queue.left.map(\.id) == [currentLeft.id])
+        #expect(queue.right.map(\.id) == [currentRight.id])
+        #expect(
+            SideNoticeLayoutEngine().presentation(for: queue.left).activeFocusCountdownNotice?.id
+                == currentLeft.id
+        )
+    }
 }
 
 private actor ExpiryGate {

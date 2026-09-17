@@ -20,6 +20,140 @@ class AppcastFeedsTest < Minitest::Test
     end
   end
 
+  class StubHTTPFetcher < AppcastFeeds::HTTPFetcher
+    attr_reader :requested_urls
+
+    def initialize(responses, **options)
+      super(**options)
+      @responses = responses
+      @requested_urls = []
+    end
+
+    private
+
+    def get(url)
+      @requested_urls << url
+      response = @responses.fetch(url)
+      raise response if response.is_a?(Exception)
+
+      response
+    end
+  end
+
+  def http_response(code, body: '', location: nil)
+    response = Net::HTTPResponse::CODE_TO_OBJ.fetch(code).new('1.1', code, '')
+    response.define_singleton_method(:body) { body }
+    response['location'] = location if location
+    response
+  end
+
+  def test_relative_http_redirects_resolve_against_the_current_url
+    initial = 'https://example.test/releases/latest/appcast.xml'
+    {
+      '../v1/appcast.xml' => 'https://example.test/releases/v1/appcast.xml',
+      '/assets/appcast.xml' => 'https://example.test/assets/appcast.xml',
+      '//mirror.test/appcast.xml' => 'https://mirror.test/appcast.xml'
+    }.each do |location, destination|
+      fetcher = StubHTTPFetcher.new({
+        initial => http_response('302', location: location),
+        destination => http_response('200', body: 'feed')
+      })
+
+      assert_equal [200, 'feed'], fetcher.call(initial), location
+      assert_equal [initial, destination], fetcher.requested_urls, location
+    end
+  end
+
+  def test_http_response_after_the_last_allowed_redirect_is_read
+    initial = 'https://example.test/appcast.xml'
+    destination = 'https://mirror.test/appcast.xml'
+    fetcher = StubHTTPFetcher.new({
+      initial => http_response('302', location: destination),
+      destination => http_response('200', body: 'feed')
+    }, redirect_limit: 1)
+
+    assert_equal [200, 'feed'], fetcher.call(initial)
+    assert_equal [initial, destination], fetcher.requested_urls
+  end
+
+  def test_relative_redirects_use_the_most_recent_origin_and_path
+    initial = 'https://example.test/appcast.xml'
+    intermediate = 'https://mirror.test/releases/v1/appcast.xml'
+    destination = 'https://mirror.test/releases/v2/appcast.xml'
+    fetcher = StubHTTPFetcher.new({
+      initial => http_response('302', location: intermediate),
+      intermediate => http_response('307', location: '../v2/appcast.xml'),
+      destination => http_response('200', body: 'feed')
+    })
+
+    assert_equal [200, 'feed'], fetcher.call(initial)
+    assert_equal [initial, intermediate, destination], fetcher.requested_urls
+  end
+
+  def test_zero_redirect_budget_still_reads_a_direct_response
+    initial = 'https://example.test/appcast.xml'
+    fetcher = StubHTTPFetcher.new({initial => http_response('404', body: 'missing')}, redirect_limit: 0)
+
+    assert_equal [404, 'missing'], fetcher.call(initial)
+    assert_equal [initial], fetcher.requested_urls
+  end
+
+  def test_http_redirect_cycle_stops_at_the_budget
+    initial = 'https://example.test/appcast.xml'
+    [initial, ''].each do |location|
+      fetcher = StubHTTPFetcher.new({initial => http_response('302', location: location)}, redirect_limit: 1)
+
+      assert_equal [0, "exceeded 1 redirects starting at #{initial}"], fetcher.call(initial)
+      assert_equal [initial, initial], fetcher.requested_urls
+    end
+  end
+
+  def test_zero_redirect_budget_does_not_follow_a_redirect
+    initial = 'https://example.test/appcast.xml'
+    destination = 'https://mirror.test/appcast.xml'
+    fetcher = StubHTTPFetcher.new({
+      initial => http_response('302', location: destination),
+      destination => http_response('200', body: 'feed')
+    }, redirect_limit: 0)
+
+    assert_equal [0, "exceeded 0 redirects starting at #{initial}"], fetcher.call(initial)
+    assert_equal [initial], fetcher.requested_urls
+  end
+
+  def test_http_redirects_beyond_the_budget_are_not_followed
+    initial = 'https://example.test/appcast.xml'
+    intermediate = 'https://mirror.test/appcast.xml'
+    destination = 'https://cdn.test/appcast.xml'
+    fetcher = StubHTTPFetcher.new({
+      initial => http_response('302', location: intermediate),
+      intermediate => http_response('302', location: destination),
+      destination => http_response('200', body: 'feed')
+    }, redirect_limit: 1)
+
+    assert_equal [0, "exceeded 1 redirects starting at #{initial}"], fetcher.call(initial)
+    assert_equal [initial, intermediate], fetcher.requested_urls
+  end
+
+  def test_http_failure_reports_the_reason_without_retrying
+    initial = 'https://example.test/appcast.xml'
+    fetcher = StubHTTPFetcher.new({initial => IOError.new('connection closed')})
+
+    assert_equal [0, 'IOError: connection closed'], fetcher.call(initial)
+    assert_equal [initial], fetcher.requested_urls
+  end
+
+  def test_missing_or_malformed_redirect_locations_report_failure
+    initial = 'https://example.test/appcast.xml'
+    [nil, 'https://[invalid'].each do |location|
+      fetcher = StubHTTPFetcher.new({initial => http_response('302', location: location)})
+      status, reason = fetcher.call(initial)
+
+      assert_equal 0, status
+      refute_empty reason
+      assert_equal [initial], fetcher.requested_urls
+    end
+  end
+
   def feed(host:, architecture:, tag: TAG, signature: 'c2lnbmF0dXJl', build: '15')
     <<~XML
       <?xml version="1.0" encoding="utf-8"?>

@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 import ZislaCore
 
-/// 从 Zed 的本地线程索引推断最近活动的 Agent；仅查询标识和时间戳，不读取摘要或压缩会话正文。
+/// Infers recent Zed activity from IDs and timestamps without reading summaries or compressed sessions.
 public final class ZedSessionActivityDetector: AIActivityDetecting {
     public let databaseURL: URL
     public let maxThreads: Int

@@ -213,10 +213,7 @@ struct IslandRootView: View {
                                         case .pdf:
                                             PDFToolsModuleView(model: model)
                                         case .toolbox:
-                                            ToolboxModuleView(
-                                                model: model,
-                                                onTransientInteractionChanged: onTransientInteractionChanged
-                                            )
+                                            ToolboxModuleView(model: model)
                                         case .system:
                                             SystemMonitorView(
                                                 service: model.systemMonitor,
@@ -314,6 +311,12 @@ struct IslandRootView: View {
                 if hovering { onPointerEntered() } else { onPointerExited() }
             }
             .opacity(hidesIslandSurface ? 0 : 1)
+            // Keep the dissolve on the surface so sibling overlays do not participate in the
+            // recycle fade. The parent transaction below only suppresses structural layout motion.
+            .animation(
+                reduceMotion || !hidesIslandSurface ? nil : ZislaMotion.islandRecycleFade,
+                value: hidesIslandSurface
+            )
             .zIndex(1)
 
             if petSlotWidth == ExpandedPetLayout.sideSlotWidth, !isIslandCollapsed {
@@ -327,13 +330,14 @@ struct IslandRootView: View {
             }
 
             }
-            // Only the recycle is animated: the surface and everything mounted inside it dissolve
-            // while the mask folds back into the notch, instead of blinking out the moment the
-            // pointer leaves. Reveals keep snapping to full opacity so the pill never ghosts.
-            .animation(
-                reduceMotion || !hidesIslandSurface ? nil : ZislaMotion.islandRecycleFade,
-                value: hidesIslandSurface
-            )
+            // A collapse removes the expanded content in the same transaction that starts the
+            // fold. Keep that structural change synchronous; otherwise SwiftUI also interpolates
+            // the parent stack's layout and the whole island drifts while the mask folds.
+            .transaction { transaction in
+                if isIslandCollapsed {
+                    transaction.animation = nil
+                }
+            }
             .frame(
                 width: panelSize.width,
                 height: surfaceSize.height,

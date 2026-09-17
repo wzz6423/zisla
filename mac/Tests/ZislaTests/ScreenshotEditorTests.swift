@@ -2721,7 +2721,7 @@ struct ScreenshotEditorTests {
         ))
         let popover = source[obscureButton.lowerBound..<strengthControl.lowerBound]
 
-        // 粗细只属于画笔，格子只属于马赛克，模糊两种效果都要能调。
+        // Brush width and pixel size are conditional; blur remains available for either effect.
         #expect(popover.contains("if model.obscureShape == .brush {"))
         #expect(popover.contains("if model.obscureEffect == .pixelate {"))
         #expect(popover.contains("title: ScreenshotObscureEffect.pixelate.strengthTitle"))

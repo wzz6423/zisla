@@ -46,6 +46,7 @@ BUILD_ARCHITECTURES="${BUILD_ARCHITECTURES:-$(uname -m)}"
 ARCHITECTURES=(${=BUILD_ARCHITECTURES})
 BINARIES=()
 KEYBOARD_RESOURCE_BUNDLE=""
+ZISLAKIT_RESOURCE_BUNDLE=""
 HAND_BUILT_APP_SWIFT_FLAGS=(-Xswiftc -DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE)
 
 [[ "$VERSION" == "unknow" || "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]] || {
@@ -167,6 +168,9 @@ for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
   if [[ -z "$KEYBOARD_RESOURCE_BUNDLE" ]]; then
     KEYBOARD_RESOURCE_BUNDLE="$BIN_DIRECTORY/zisla_KeyboardKit.bundle"
   fi
+  if [[ -z "$ZISLAKIT_RESOURCE_BUNDLE" ]]; then
+    ZISLAKIT_RESOURCE_BUNDLE="$BIN_DIRECTORY/zisla_ZislaKit.bundle"
+  fi
 done
 
 rm -rf "$APP"
@@ -175,7 +179,12 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Frameworks" "$CONTEN
   echo "error: missing KeyboardKit resource bundle: $KEYBOARD_RESOURCE_BUNDLE" >&2
   exit 1
 }
+[[ -d "$ZISLAKIT_RESOURCE_BUNDLE" ]] || {
+  echo "error: missing ZislaKit resource bundle: $ZISLAKIT_RESOURCE_BUNDLE" >&2
+  exit 1
+}
 ditto "$KEYBOARD_RESOURCE_BUNDLE" "$CONTENTS/Resources/zisla_KeyboardKit.bundle"
+ditto "$ZISLAKIT_RESOURCE_BUNDLE" "$CONTENTS/Resources/zisla_ZislaKit.bundle"
 if (( ${#BINARIES[@]} == 1 )); then
   install -m 0755 "$BINARIES[1]" "$CONTENTS/MacOS/zisla"
 else
