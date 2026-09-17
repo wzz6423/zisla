@@ -4,6 +4,46 @@ import Testing
 
 struct FeatureSettingsCompatibilityTests {
     @Test
+    func clipboardAssistantCurrencyDefaultsOnForLegacyEnabledKinds() throws {
+        let legacy = Data(#"{"clipboardAssistantEnabledKinds":["text"]}"#.utf8)
+
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+
+        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .currency])
+        let payload = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(decoded)
+            ) as? [String: Any]
+        )
+        #expect(payload["clipboardAssistantCurrencyDefaultApplied"] as? Bool == true)
+    }
+
+    @Test
+    func clipboardAssistantCurrencyOptOutPersistsAfterRestart() throws {
+        let legacy = Data(#"{"clipboardAssistantEnabledKinds":["text"]}"#.utf8)
+        var settings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        settings.clipboardAssistantEnabledKinds.remove(.currency)
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+
+        #expect(!decoded.clipboardAssistantEnabledKinds.contains(.currency))
+    }
+
+    @Test
+    func clipboardAssistantCurrencyIsEnabledForNewSettings() throws {
+        #expect(FeatureSettings.default.clipboardAssistantEnabledKinds.contains(.currency))
+        let payload = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(FeatureSettings.default)
+            ) as? [String: Any]
+        )
+        #expect(payload["clipboardAssistantCurrencyDefaultApplied"] as? Bool == true)
+    }
+
+    @Test
     func clipboardAssistantActionOrdersDefaultAndRoundTrip() throws {
         let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
         let legacySettings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)

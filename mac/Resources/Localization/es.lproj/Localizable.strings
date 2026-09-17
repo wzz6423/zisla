@@ -2428,6 +2428,8 @@
 "合上兼容 MacBook 屏幕时显示景深过渡动画" = "Mostrar una transición de profundidad al cerrar la tapa de un MacBook compatible";
 "预览动画" = "Previsualizar animación";
 "不用合盖，在当前屏幕内容上播放一次" = "Reproduce el efecto una vez sobre el contenido actual de la pantalla, sin cerrar la tapa";
+"汇率换算" = "Conversión de divisa";
+"汇率获取失败" = "No se pudo obtener el tipo de cambio";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Las notificaciones de alarma no están permitidas. Actívalas en Ajustes del Sistema.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Los sonidos de las notificaciones de alarma están desactivados. Actívalos en Ajustes del Sistema.";
 "无法设置闹钟通知：%@" = "No se pudo programar la notificación de alarma: %@";

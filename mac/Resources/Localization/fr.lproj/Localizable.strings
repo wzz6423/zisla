@@ -2424,6 +2424,8 @@
 "合上兼容 MacBook 屏幕时显示景深过渡动画" = "Afficher une transition de profondeur à la fermeture du capot d'un MacBook compatible";
 "预览动画" = "Aperçu de l’animation";
 "不用合盖，在当前屏幕内容上播放一次" = "Joue l’effet une fois sur le contenu actuel de l’écran, sans fermer le capot";
+"汇率换算" = "Conversion de devise";
+"汇率获取失败" = "Impossible de récupérer le taux de change";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Les notifications d’alarme ne sont pas autorisées. Activez-les dans Réglages Système.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Les sons des notifications d’alarme sont désactivés. Activez-les dans Réglages Système.";
 "无法设置闹钟通知：%@" = "Impossible de programmer la notification d’alarme : %@";
