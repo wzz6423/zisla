@@ -464,7 +464,7 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(toastSource.contains("if case .blockSourceApp = action"))
         #expect(toastSource.contains("Image(systemName: \"chevron.down.circle\")"))
         #expect(!toastSource.contains("Image(systemName: \"ellipsis.circle\")"))
-        #expect(toastSource.contains("guard ![.url, .text, .nonSystemLanguageText, .code, .math].contains(detection.kind)"))
+        #expect(toastSource.contains("guard ![.url, .text, .nonSystemLanguageText, .code, .math, .currency].contains(detection.kind)"))
         #expect(toastSource.contains(".onDrag { NSItemProvider(object: dragText as NSString) }"))
         #expect(toastSource.contains("private func dragText(for detection"))
         let headerContentStart = try #require(toastSource.range(of: "private func headerContent"))
@@ -480,7 +480,7 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(source.contains("let rowHeight: CGFloat"))
         #expect(source.contains("rowHeight = SideNoticeLayoutEngine().compactWingHeight("))
         #expect(source.contains("progressGlowEnabled: presentation.progressGlowEnabled"))
-        #expect(source.contains("presentation.islandTopHeight = rowHeight"))
+        #expect(source.contains("presentation.islandTopHeight = layout.rowHeight"))
         #expect(source.contains("y: collapsedFrame.maxY - rowHeight"))
         #expect(source.contains("height: rowHeight"))
         #expect(source.contains("ClipboardAssistantToastView.requiredRowWidth("))
@@ -491,7 +491,7 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(toastSource.contains("Spacer(minLength: 0)"))
         #expect(source.contains("onPresentationChanged?(true)"))
         #expect(source.contains("onPresentationChanged?(false)"))
-        #expect(source.contains("guard !isScreenshotActive, !isScreenLocked else { return }"))
+        #expect(source.contains("guard !isScreenshotActive, !isScreenLocked else { return nil }"))
         #expect(source.contains("setScreenshotActive(_ active: Bool)"))
         #expect(source.contains("setScreenshotSelectionActive(_ active: Bool)"))
         #expect(source.contains("guard presentationGeneration == generation else { return }"))
@@ -646,7 +646,7 @@ struct ClipboardAssistantIslandPresentationTests {
 
         #expect(source.contains("func setScreenLocked(_ locked: Bool)"))
         #expect(source.contains("if locked {\n            dismiss(animated: false)\n        }"))
-        #expect(source.contains("guard !isScreenshotActive, !isScreenLocked else { return }"))
+        #expect(source.contains("guard !isScreenshotActive, !isScreenLocked else { return nil }"))
         #expect(appSource.contains("model.clipboardAssistant.setScreenLocked(locked)"))
     }
 

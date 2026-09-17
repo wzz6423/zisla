@@ -2427,6 +2427,8 @@
 "合上兼容 MacBook 屏幕时显示景深过渡动画" = "Show a depth transition when closing the lid of a compatible MacBook";
 "预览动画" = "Preview Animation";
 "不用合盖，在当前屏幕内容上播放一次" = "Play the effect once on the current screen contents without closing the lid";
+"汇率换算" = "Currency Conversion";
+"汇率获取失败" = "Couldn't fetch the exchange rate";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Alarm notifications are not allowed. Enable notifications in System Settings.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Alarm notification sounds are turned off. Enable sounds in System Settings.";
 "无法设置闹钟通知：%@" = "Could not schedule the alarm notification: %@";

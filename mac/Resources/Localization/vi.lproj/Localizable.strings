@@ -2428,6 +2428,8 @@
 "合上兼容 MacBook 屏幕时显示景深过渡动画" = "Hiển thị hiệu ứng chuyển độ sâu khi đóng nắp MacBook tương thích";
 "预览动画" = "Xem trước hoạt ảnh";
 "不用合盖，在当前屏幕内容上播放一次" = "Chạy hiệu ứng một lần trên nội dung màn hình hiện tại mà không cần đóng nắp";
+"汇率换算" = "Quy đổi tiền tệ";
+"汇率获取失败" = "Không thể lấy tỷ giá";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Thông báo báo thức chưa được cho phép. Hãy bật thông báo trong Cài đặt hệ thống.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Âm thanh thông báo báo thức đang tắt. Hãy bật âm thanh trong Cài đặt hệ thống.";
 "无法设置闹钟通知：%@" = "Không thể lên lịch thông báo báo thức: %@";
