@@ -202,9 +202,9 @@ struct ClipboardAssistantCurrencyPresentationTests {
 
     private static func completed(failed: Bool) -> ClipboardAssistantDetection {
         failed
-            ? ClipboardAssistantDetection(kind: .currency, title: "fixture failure", detail: pending.detail)
+            ? ClipboardAssistantDetection(kind: .conversion, title: "fixture failure", detail: pending.detail)
             : ClipboardAssistantDetection(
-                kind: .currency,
+                kind: .conversion,
                 title: "CNY 700",
                 detail: .currencyRate(sourceCurrencyCode: "USD", targetCurrencyCode: "CNY", rate: 7),
                 actions: [.copyText("CNY 700")]
@@ -212,7 +212,7 @@ struct ClipboardAssistantCurrencyPresentationTests {
     }
 
     private static let pending = ClipboardAssistantDetection(
-        kind: .currency,
+        kind: .conversion,
         title: "100 USD",
         detail: .currencyExpression(
             amount: 100,

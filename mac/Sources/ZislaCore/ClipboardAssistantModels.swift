@@ -8,13 +8,32 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
     case phone
     case color
     case math
+    /// Legacy raw value retained so persisted settings from the former currency-only control decode.
     case currency
+    case conversion
     case dateTime
     case code
     case nonSystemLanguageText = "chineseText"
     case text
     case image
     case file
+
+    /// `currency` is migrated to `conversion` by `FeatureSettings` and is never shown as a separate control.
+    public static let allCases: [Self] = [
+        .url,
+        .filePath,
+        .email,
+        .phone,
+        .color,
+        .math,
+        .conversion,
+        .dateTime,
+        .code,
+        .nonSystemLanguageText,
+        .text,
+        .image,
+        .file,
+    ]
 
     /// SF Symbol shown in the toast and Settings; language-neutral on purpose.
     public var symbolName: String {
@@ -26,6 +45,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
         case .color: "paintpalette"
         case .math: "equal.square"
         case .currency: "dollarsign"
+        case .conversion: "arrow.left.arrow.right"
         case .dateTime: "calendar"
         case .nonSystemLanguageText: "character.book.closed"
         case .code: "chevron.left.forwardslash.chevron.right"
@@ -258,7 +278,7 @@ public enum ClipboardAssistantActionOrder {
         case .phone: [.callPhone, .addToQuickNote, .share]
         case .color: [.copyText, .addToQuickNote, .share]
         case .math: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
-        case .currency: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
+        case .currency, .conversion: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
         case .dateTime: [.createCalendarEvent, .copyText, .copyFullExpression, .addToQuickNote, .share]
         case .nonSystemLanguageText: [.translate, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .code: [.saveText, .addToQuickNote, .sendToTeleprompter, .share]

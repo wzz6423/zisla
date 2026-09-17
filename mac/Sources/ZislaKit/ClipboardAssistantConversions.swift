@@ -122,16 +122,15 @@ extension ClipboardAssistantDetector {
     }
 
     static func parseDateInterval(_ text: String, now: Date = Date(), timeZone: TimeZone = .current) -> ParsedDateInterval? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let startText: String
         let endText: String
-        if let parts = conversionCaptures(#"(?:how many days\s+)?(?:days\s+)?(?:until|till)\s+(.+?)\??"#, in: text)
-            ?? conversionCaptures(#"(?:距离|距|离|到)\s*(.+?)\s*(?:还有|还剩|剩余)?\s*(?:多少天|几天)[？?]?"#, in: text) {
-            startText = "today"
-            endText = parts[0]
-        } else if let parts = conversionCaptures(#"(?:days\s+)?between\s+(.+?)\s+and\s+(.+?)\??"#, in: text)
-            ?? conversionCaptures(#"(.+?)\s*(?:\s+to\s+|\s+-\s+|到|至)\s*(.+?)(?:\s*(?:相差|间隔)?\s*(?:多少天|几天)[？?]?)?"#, in: text) {
+        if let parts = firstConversionCaptures(dateIntervalBetweenPatterns, in: text) {
             startText = parts[0]
             endText = parts[1]
+        } else if let parts = firstConversionCaptures(dateIntervalUntilPatterns, in: text) {
+            startText = "today"
+            endText = parts[0]
         } else {
             return nil
         }
@@ -143,18 +142,72 @@ extension ClipboardAssistantDetector {
         return ParsedDateInterval(days: days, startDate: start, targetDate: end)
     }
 
+    private static let dateIntervalUntilPatterns = [
+        #"(?:how many days\s+)?(?:days\s+)?(?:until|till)\s+(.+?)\??"#,
+        #"(?:距离|距離|距|离|離|到)\s*(.+?)\s*(?:还有|还剩|剩余|還有|還剩|剩餘)?\s*(?:多少天|几天|幾天)[？?]?"#,
+        #"(.+?)\s*まで\s*(?:あと\s*)?何日(?:ですか)?[？?]?"#,
+        #"(.+?)\s*까지\s*(?:몇\s*일|며칠)(?:\s+남았(?:어|나요|습니까)?)?[？?]?"#,
+        #"combien\s+de\s+jours\s+(?:jusqu(?:'|’)au|avant)\s+(.+?)\??"#,
+        #"wie\s+viele\s+tage\s+bis\s+(.+?)\??"#,
+        #"cu[aá]ntos\s+d[ií]as\s+(?:hasta|para)\s+(.+?)\??"#,
+        #"quantos\s+dias\s+at[eé]\s+(.+?)\??"#,
+        #"quanti\s+giorni\s+fino\s+(?:al|alla)\s+(.+?)\??"#,
+        #"hoeveel\s+dagen\s+tot\s+(.+?)\??"#,
+        #"сколько\s+дней\s+до\s+(.+?)\??"#,
+        #"كم\s+يوم(?:ً?ا)?\s+(?:حتى|إلى|الى)\s+(.+?)[؟?]?"#,
+        #"อีก\s*กี่วัน\s*(?:จะ\s*)?ถึง\s*(.+?)[？?]?"#,
+        #"berapa\s+hari\s+(?:sampai|hingga)\s+(.+?)\??"#,
+        #"c[oò]n\s+bao\s+nhi[eê]u\s+ng[aà]y\s+(?:đ[eế]n|tới)\s+(.+?)\??"#,
+        #"(.+?)\s+tarih(?:ine|e)\s+ka[cç]\s+g[uü]n\s+kald[ıi]\??"#,
+    ]
+
+    private static let dateIntervalBetweenPatterns = [
+        #"(?:how\s+many\s+)?(?:days\s+)?between\s+(.+?)\s+and\s+(.+?)\??"#,
+        #"(.+?)\s*(?:\s+to\s+|\s+-\s+|到|至)\s*(.+?)(?:\s*(?:相差|间隔|間隔)?\s*(?:多少天|几天|幾天)[？?]?)?"#,
+        #"(.+?)\s*から\s*(.+?)\s*まで(?:\s*(?:の間)?\s*(?:何日(?:間)?|何日ですか)?)?[？?]?"#,
+        #"(.+?)\s*(?:부터|에서)\s*(.+?)\s*(?:까지|사이)(?:\s*(?:며칠|몇\s*일))?[？?]?"#,
+        #"combien\s+de\s+jours\s+entre\s+(.+?)\s+et\s+(.+?)\??"#,
+        #"wie\s+viele\s+tage\s+zwischen\s+(.+?)\s+und\s+(.+?)\??"#,
+        #"cu[aá]ntos\s+d[ií]as\s+entre\s+(.+?)\s+y\s+(.+?)\??"#,
+        #"quantos\s+dias\s+entre\s+(.+?)\s+e\s+(.+?)\??"#,
+        #"quanti\s+giorni\s+tra\s+(.+?)\s+e\s+(.+?)\??"#,
+        #"hoeveel\s+dagen\s+tussen\s+(.+?)\s+en\s+(.+?)\??"#,
+        #"сколько\s+дней\s+между\s+(.+?)\s+и\s+(.+?)\??"#,
+        #"كم\s+يوم(?:ً?ا)?\s+بين\s+(.+?)\s+و\s+(.+?)[؟?]?"#,
+        #"ระหว่าง\s+(.+?)\s+(?:ถึง|และ)\s+(.+?)\s+กี่วัน[？?]?"#,
+        #"berapa\s+hari\s+antara\s+(.+?)\s+dan\s+(.+?)\??"#,
+        #"bao\s+nhi[eê]u\s+ng[aà]y\s+gi(?:ữ|u)a\s+(.+?)\s+v[aà]\s+(.+?)\??"#,
+        #"(.+?)\s+ile\s+(.+?)\s+aras[ıi]nda\s+ka[cç]\s+g[uü]n\??"#,
+    ]
+
+    private static func firstConversionCaptures(_ patterns: [String], in text: String) -> [String]? {
+        patterns.lazy.compactMap { conversionCaptures($0, in: text) }.first
+    }
+
     private static func intervalDate(_ text: String, now: Date, calendar: Calendar) -> Date? {
-        let offsets = ["today": 0, "今天": 0, "tomorrow": 1, "明天": 1, "yesterday": -1, "昨天": -1]
-        if let offset = offsets[text.lowercased()] {
+        if let offset = intervalDateOffsets[text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()] {
             return calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: now))
         }
         guard let parts = conversionCaptures(#"(\d{4})-(\d{1,2})-(\d{1,2})"#, in: text)
             ?? conversionCaptures(#"(\d{4})/(\d{1,2})/(\d{1,2})"#, in: text)
-            ?? conversionCaptures(#"(\d{4})年(\d{1,2})月(\d{1,2})日"#, in: text) else { return nil }
+            ?? conversionCaptures(#"(\d{4})\.(\d{1,2})\.(\d{1,2})"#, in: text)
+            ?? conversionCaptures(#"(\d{4})\s*(?:年|년)\s*(\d{1,2})\s*(?:月|월)\s*(\d{1,2})\s*(?:日|일)"#, in: text) else { return nil }
         let components = DateComponents(year: Int(parts[0]), month: Int(parts[1]), day: Int(parts[2]))
         guard components.isValidDate(in: calendar) else { return nil }
         return calendar.date(from: components)
     }
+
+    private static let intervalDateOffsets = [
+        "today": 0, "今天": 0, "今日": 0, "오늘": 0, "aujourd'hui": 0, "aujourd’hui": 0,
+        "heute": 0, "hoy": 0, "hoje": 0, "oggi": 0, "vandaag": 0, "сегодня": 0,
+        "اليوم": 0, "วันนี้": 0, "hari ini": 0, "hôm nay": 0, "hom nay": 0, "bugün": 0, "bugun": 0,
+        "tomorrow": 1, "明天": 1, "明日": 1, "내일": 1, "demain": 1, "morgen": 1,
+        "mañana": 1, "amanhã": 1, "domani": 1, "завтра": 1, "غدًا": 1, "غدا": 1,
+        "พรุ่งนี้": 1, "besok": 1, "ngày mai": 1, "ngay mai": 1, "yarın": 1, "yarin": 1,
+        "yesterday": -1, "昨天": -1, "昨日": -1, "어제": -1, "hier": -1, "gestern": -1,
+        "ayer": -1, "ontem": -1, "ieri": -1, "gisteren": -1, "вчера": -1, "أمس": -1,
+        "امس": -1, "เมื่อวาน": -1, "kemarin": -1, "hôm qua": -1, "hom qua": -1, "dün": -1, "dun": -1,
+    ]
 
     private static func dateText(_ date: Date, timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
@@ -171,11 +224,10 @@ extension ClipboardAssistantDetector {
     }
 
     static func parseTimeZoneConversion(_ text: String, now: Date = Date()) -> ParsedTimeZoneConversion? {
-        guard let operands = conversionOperands(text),
-              let source = conversionCaptures(#"(.+?)\s+([^\s]+)"#, in: operands[0]),
-              let sourceZone = conversionTimeZone(source[1]),
+        guard let operands = timeZoneConversionOperands(text),
+              let source = timeZoneSource(operands[0]),
               let targetZone = conversionTimeZone(operands[1]),
-              let date = zonedDate(source[0], now: now, timeZone: sourceZone) else { return nil }
+              let date = zonedDate(source.dateText, now: now, timeZone: source.zone) else { return nil }
         func render(_ zone: TimeZone) -> String {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -184,19 +236,96 @@ extension ClipboardAssistantDetector {
             formatter.dateFormat = "yyyy-MM-dd HH:mm:ss XXX"
             return "\(formatter.string(from: date)) [\(zone.identifier)]"
         }
-        return ParsedTimeZoneConversion(sourceText: render(sourceZone), targetText: render(targetZone))
+        return ParsedTimeZoneConversion(sourceText: render(source.zone), targetText: render(targetZone))
     }
+
+    private static func timeZoneConversionOperands(_ text: String) -> [String]? {
+        if let operands = conversionOperands(text) { return operands }
+        return firstConversionCaptures(timeZoneConversionOperandPatterns, in: text)?
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+    }
+
+    private static let timeZoneConversionOperandPatterns = [
+        #"(.+?)\s*(?:換算(?:成|為)?|轉換(?:成|為)?|轉)\s*(.+?)"#,
+        #"(.+?)\s+(?:から|より)\s+(.+?)\s*(?:に|へ)(?:\s*変換)?"#,
+        #"(.+?)\s+を\s+(.+?)\s+に(?:\s*変換)?"#,
+        #"(.+?)(?:에서|부터)\s+(.+?)(?:으?로)(?:\s*변환)?"#,
+        #"(.+?)\s+(?:vers|en)\s+(.+?)"#,
+        #"(.+?)\s+(?:nach|zu)\s+(.+?)"#,
+        #"(.+?)\s+(?:a|hacia)\s+(.+?)"#,
+        #"(.+?)\s+(?:para|em)\s+(.+?)"#,
+        #"(.+?)\s+(?:a|in)\s+(.+?)"#,
+        #"(.+?)\s+(?:naar|in)\s+(.+?)"#,
+        #"(.+?)\s+(?:в|во)\s+(.+?)"#,
+        #"(.+?)\s+(?:إلى|الى)\s+(.+?)"#,
+        #"(.+?)\s+(?:เป็น|ไป(?:ยัง)?)\s+(.+?)"#,
+        #"(.+?)\s+(?:ke|menjadi)\s+(.+?)"#,
+        #"(.+?)\s+(?:sang|đến)\s+(.+?)"#,
+        #"(.+?)(?:'?(?:den|dan|ten|tan))\s+(.+?)(?:'?(?:e|a|ye|ya))(?:\s+[çc]evir)?"#,
+    ]
 
     private static let timeZoneIdentifiers = Dictionary(
         uniqueKeysWithValues: TimeZone.knownTimeZoneIdentifiers.map { ($0.lowercased(), $0) }
     )
 
+    private static let timeZoneAliases: [String: String] = {
+        var aliases: [String: String] = [:]
+        func add(_ names: [String], _ identifier: String) {
+            for name in names {
+                aliases[name.lowercased()] = identifier
+            }
+        }
+        add([
+            "beijing", "beijing time", "shanghai", "shanghai time", "北京时间", "中国时间", "北京", "上海时间", "上海",
+            "北京時間", "中國時間", "上海時間", "ペキン", "베이징", "베이징 시간", "상하이", "상하이 시간",
+            "pékin", "heure de pékin", "pekin", "heure de pekin", "peking", "schanghai", "pekín", "hora de pekín",
+            "shanghái", "pequim", "horário de pequim", "xangai", "pechino", "ora di pechino", "tijd van peking",
+            "пекин", "время пекина", "шанхай", "بكين", "توقيت بكين", "شنغهاي", "توقيت شنغهاي",
+            "ปักกิ่ง", "เวลาปักกิ่ง", "เซี่ยงไฮ้", "เวลาเซี่ยงไฮ้", "bắc kinh", "giờ bắc kinh", "thượng hải",
+            "giờ thượng hải", "pekin saati", "şanghay", "şanghay saati",
+        ], "Asia/Shanghai")
+        add([
+            "tokyo", "tokyo time", "东京", "东京时间", "東京", "東京時間", "도쿄", "도쿄 시간", "tokio", "tóquio",
+            "токио", "طوكيو", "โตเกียว", "tokyo saati",
+        ], "Asia/Tokyo")
+        add([
+            "new york", "new york time", "纽约", "纽约时间", "紐約", "紐約時間", "ニューヨーク", "ニューヨーク時間",
+            "뉴욕", "뉴욕 시간", "nueva york", "hora de nueva york", "nova york", "horário de nova york",
+            "ora di new york", "tijd van new york", "нью-йорк", "время нью-йорка", "نيويورك", "توقيت نيويورك",
+            "นิวยอร์ก", "เวลานิวยอร์ก", "new york saati",
+        ], "America/New_York")
+        add([
+            "london", "london time", "伦敦", "倫敦", "ロンドン", "ロンドン時間", "런던", "런던 시간", "londres",
+            "heure de londres", "londra", "ora di londra", "londen", "tijd van londen", "лондон", "время лондона",
+            "لندن", "توقيت لندن", "ลอนดอน", "เวลาลอนดอน", "luân đôn", "giờ luân đôn", "londra saati",
+        ], "Europe/London")
+        return aliases
+    }()
+
+    private static let timeZoneAliasNames = timeZoneAliases.keys.sorted {
+        $0.count == $1.count ? $0 > $1 : $0.count > $1.count
+    }
+
+    private static func timeZoneSource(_ text: String) -> (dateText: String, zone: TimeZone)? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let source = conversionCaptures(#"(.+?)\s+([^\s]+)"#, in: text),
+           let zone = conversionTimeZone(source[1]) {
+            return (source[0], zone)
+        }
+        let lowercasedText = text.lowercased()
+        for alias in timeZoneAliasNames where lowercasedText.hasSuffix(alias) {
+            let end = text.index(text.endIndex, offsetBy: -alias.count)
+            let dateText = String(text[..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !dateText.isEmpty, let zone = conversionTimeZone(alias) {
+                return (dateText, zone)
+            }
+        }
+        return nil
+    }
+
     private static func conversionTimeZone(_ text: String) -> TimeZone? {
-        let key = text.lowercased()
-        let aliases = ["北京时间": "Asia/Shanghai", "中国时间": "Asia/Shanghai", "北京": "Asia/Shanghai",
-                       "东京时间": "Asia/Tokyo", "东京": "Asia/Tokyo", "纽约时间": "America/New_York", "纽约": "America/New_York",
-                       "london": "Europe/London", "伦敦": "Europe/London", "shanghai": "Asia/Shanghai", "tokyo": "Asia/Tokyo"]
-        if let identifier = aliases[key] ?? timeZoneIdentifiers[key] { return TimeZone(identifier: identifier) }
+        let key = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if let identifier = timeZoneAliases[key] ?? timeZoneIdentifiers[key] { return TimeZone(identifier: identifier) }
         // Ambiguous abbreviations such as CST and IST deliberately require an IANA zone or offset.
         let offsets = ["utc": 0, "gmt": 0, "z": 0, "est": -5, "edt": -4, "pst": -8, "pdt": -7, "jst": 9]
         if let hours = offsets[key] { return TimeZone(secondsFromGMT: hours * 3600) }
@@ -208,8 +337,9 @@ extension ClipboardAssistantDetector {
     }
 
     private static func zonedDate(_ text: String, now: Date, timeZone: TimeZone) -> Date? {
-        if ["now", "现在"].contains(text.lowercased()) { return now }
-        guard let parts = conversionCaptures(#"(?:(\d{4}-\d{1,2}-\d{1,2})[T ]+)?(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(am|pm))?"#, in: text),
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if timeZoneNowWords.contains(text.lowercased()) { return now }
+        guard let parts = conversionCaptures(#"(?:(.+?)[T ]+)?(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(am|pm))?"#, in: text),
               var hour = Int(parts[1]), let minute = Int(parts[2]), minute < 60 else { return nil }
         if !parts[4].isEmpty {
             guard (1...12).contains(hour) else { return nil }
@@ -237,4 +367,9 @@ extension ClipboardAssistantDetector {
         }
         return first
     }
+
+    private static let timeZoneNowWords: Set<String> = [
+        "now", "现在", "此刻", "今", "지금", "maintenant", "jetzt", "ahora", "agora", "adesso", "ora", "nu",
+        "сейчас", "الآن", "الان", "ตอนนี้", "sekarang", "bây giờ", "bay gio", "şimdi", "simdi",
+    ]
 }
