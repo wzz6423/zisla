@@ -2429,6 +2429,10 @@
 "预览动画" = "Animasyonu önizle";
 "不用合盖，在当前屏幕内容上播放一次" = "Kapağı kapatmadan efekti geçerli ekran içeriğinde bir kez oynatır";
 "汇率换算" = "Döviz Çevirisi";
+"换算" = "Dönüşümler";
+"单位换算" = "Birim Dönüşümü";
+"日期间隔" = "Tarih Aralığı";
+"跨时区时间" = "Saat Dilimleri Arası Zaman";
 "汇率获取失败" = "Döviz kuru alınamadı";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Alarm bildirimlerine izin verilmemiş. Sistem Ayarları’ndan bildirimleri açın.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Alarm bildirim sesleri kapalı. Sistem Ayarları’ndan sesleri açın.";

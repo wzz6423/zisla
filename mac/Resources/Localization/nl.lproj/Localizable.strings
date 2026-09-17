@@ -2429,6 +2429,10 @@
 "预览动画" = "Animatie voorvertonen";
 "不用合盖，在当前屏幕内容上播放一次" = "Speelt het effect één keer af op de huidige scherminhoud, zonder het deksel te sluiten";
 "汇率换算" = "Valutaconversie";
+"换算" = "Conversies";
+"单位换算" = "Eenhedenconversie";
+"日期间隔" = "Datuminterval";
+"跨时区时间" = "Tijd tussen tijdzones";
 "汇率获取失败" = "Wisselkoers ophalen mislukt";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Meldingen voor wekkers zijn niet toegestaan. Schakel meldingen in via Systeeminstellingen.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Geluiden voor wekkermeldingen zijn uitgeschakeld. Schakel geluiden in via Systeeminstellingen.";

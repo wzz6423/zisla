@@ -464,7 +464,7 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(toastSource.contains("if case .blockSourceApp = action"))
         #expect(toastSource.contains("Image(systemName: \"chevron.down.circle\")"))
         #expect(!toastSource.contains("Image(systemName: \"ellipsis.circle\")"))
-        #expect(toastSource.contains("guard ![.url, .text, .nonSystemLanguageText, .code, .math, .currency].contains(detection.kind)"))
+        #expect(toastSource.contains("guard ![.url, .text, .nonSystemLanguageText, .code, .math, .conversion].contains(detection.kind)"))
         #expect(toastSource.contains(".onDrag { NSItemProvider(object: dragText as NSString) }"))
         #expect(toastSource.contains("private func dragText(for detection"))
         let headerContentStart = try #require(toastSource.range(of: "private func headerContent"))

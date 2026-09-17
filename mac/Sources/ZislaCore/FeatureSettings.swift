@@ -565,6 +565,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Recognized content kinds; an empty set falls back to all kinds.
     public var clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind>
     private var clipboardAssistantCurrencyDefaultApplied: Bool
+    private var clipboardAssistantConversionDefaultApplied: Bool
     /// Primary action and expanded-menu order for each recognized content kind.
     public var clipboardAssistantActionOrders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
     /// Engine used by the assistant's "search" action for copied text.
@@ -767,13 +768,22 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.clipboardAssistantTriggerConfiguration = clipboardAssistantTriggerConfiguration
         self.clipboardAssistantMouseButton = clipboardAssistantMouseButton
         self.clipboardAssistantBlacklist = clipboardAssistantBlacklist
+        var enabledKinds = clipboardAssistantEnabledKinds
+        if enabledKinds.remove(.currency) != nil {
+            enabledKinds.insert(.conversion)
+        }
         self.clipboardAssistantEnabledKinds =
-            clipboardAssistantEnabledKinds.isEmpty
+            enabledKinds.isEmpty
             ? Set(ClipboardAssistantKind.allCases)
-            : clipboardAssistantEnabledKinds
+            : enabledKinds
         self.clipboardAssistantCurrencyDefaultApplied = true
+        self.clipboardAssistantConversionDefaultApplied = true
+        var actionOrders = clipboardAssistantActionOrders
+        if let legacyCurrencyOrder = actionOrders.removeValue(forKey: .currency), actionOrders[.conversion] == nil {
+            actionOrders[.conversion] = legacyCurrencyOrder
+        }
         self.clipboardAssistantActionOrders = ClipboardAssistantActionOrder.normalized(
-            clipboardAssistantActionOrders
+            actionOrders
         )
         self.clipboardAssistantSearchEngine = clipboardAssistantSearchEngine
         self.clipboardAssistantCustomSearchURL = clipboardAssistantCustomSearchURL
@@ -880,6 +890,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantBlacklist
         case clipboardAssistantEnabledKinds
         case clipboardAssistantCurrencyDefaultApplied
+        case clipboardAssistantConversionDefaultApplied
         case clipboardAssistantActionOrders
         case clipboardAssistantSearchEngine
         case clipboardAssistantCustomSearchURL
@@ -1030,20 +1041,31 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .clipboardAssistantCurrencyDefaultApplied
         ) ?? false
+        let hasAppliedConversionDefault = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .clipboardAssistantConversionDefaultApplied
+        ) ?? false
         var enabledKinds = try container.decodeIfPresent(
             Set<ClipboardAssistantKind>.self,
             forKey: .clipboardAssistantEnabledKinds
         ) ?? defaults.clipboardAssistantEnabledKinds
-        if !hasAppliedCurrencyDefault, !enabledKinds.isEmpty {
-            enabledKinds.insert(.currency)
+        if enabledKinds.remove(.currency) != nil {
+            enabledKinds.insert(.conversion)
+        } else if !hasAppliedConversionDefault, !hasAppliedCurrencyDefault, !enabledKinds.isEmpty {
+            enabledKinds.insert(.conversion)
         }
         clipboardAssistantEnabledKinds = enabledKinds
         clipboardAssistantCurrencyDefaultApplied = true
+        clipboardAssistantConversionDefaultApplied = true
+        var actionOrders = try container.decodeIfPresent(
+            [ClipboardAssistantKind: [ClipboardAssistantActionKind]].self,
+            forKey: .clipboardAssistantActionOrders
+        ) ?? defaults.clipboardAssistantActionOrders
+        if let legacyCurrencyOrder = actionOrders.removeValue(forKey: .currency), actionOrders[.conversion] == nil {
+            actionOrders[.conversion] = legacyCurrencyOrder
+        }
         clipboardAssistantActionOrders = ClipboardAssistantActionOrder.normalized(
-            try container.decodeIfPresent(
-                [ClipboardAssistantKind: [ClipboardAssistantActionKind]].self,
-                forKey: .clipboardAssistantActionOrders
-            ) ?? defaults.clipboardAssistantActionOrders
+            actionOrders
         )
         clipboardAssistantSearchEngine = try container.decodeIfPresent(
             ClipboardAssistantSearchEngine.self,

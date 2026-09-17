@@ -169,6 +169,40 @@ struct SettingsNavigationTests {
     }
 
     @Test
+    func clipboardAssistantConversionSettingShowsCopyableExamplesInEveryLanguage() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        let examplesStart = try #require(source.range(of: "private var clipboardAssistantConversionExamples"))
+        let examplesEnd = try #require(source[examplesStart.upperBound...].range(of: "private struct AssistantBlacklistEntry"))
+        let examples = source[examplesStart.lowerBound..<examplesEnd.lowerBound]
+
+        #expect(source.contains("if kind == .conversion"))
+        #expect(source.contains("case .conversion: \"换算\""))
+        #expect(examples.contains(".textSelection(.enabled)"))
+        #expect(examples.contains("copyClipboardAssistantConversionExample(example)"))
+        #expect(examples.contains(".padding(.leading, 12)"))
+        for example in [
+            "10 ft = m", "100 kg = lb", "5 km = mi",
+            "100 USD = CNY", "100$ = ¥", "100dollar = CNY",
+            "2026-09-17 - 2026-10-01", "2026/09/17 - 2026/10/01", "2026.09.17 - 2026.10.01",
+            "2026-09-17 09:30 Asia/Shanghai = America/New_York",
+            "09:30 UTC+08:00 = UTC",
+            "2026-09-17 09:30 America/New_York = Europe/London",
+        ] {
+            #expect(examples.contains(example))
+        }
+
+        for key in ["换算", "单位换算", "汇率换算", "日期间隔", "跨时区时间"] {
+            for language in AppLanguage.allCases {
+                let translation = AppLocalization.string(key, language: language)
+                #expect(!translation.isEmpty, "\(language.rawValue) missing \(key)")
+                if language != .simplifiedChinese {
+                    #expect(translation != key, "\(language.rawValue) did not translate \(key)")
+                }
+            }
+        }
+    }
+
+    @Test
     func infoVisibilityDependsOnMailOrLockScreenOrSideNotices() {
         var settings = FeatureSettings(lockScreenInfoEnabled: false, mailEnabled: false, sideNoticesEnabled: false)
         #expect(!SettingsSection.info.isVisible(settings: settings))
