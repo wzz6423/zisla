@@ -4,43 +4,61 @@ import Testing
 
 struct FeatureSettingsCompatibilityTests {
     @Test
-    func clipboardAssistantCurrencyDefaultsOnForLegacyEnabledKinds() throws {
+    func clipboardAssistantConversionDefaultsOnForLegacyEnabledKinds() throws {
         let legacy = Data(#"{"clipboardAssistantEnabledKinds":["text"]}"#.utf8)
 
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
 
-        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .currency])
+        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .conversion])
         let payload = try #require(
             JSONSerialization.jsonObject(
                 with: JSONEncoder().encode(decoded)
             ) as? [String: Any]
         )
-        #expect(payload["clipboardAssistantCurrencyDefaultApplied"] as? Bool == true)
+        #expect(payload["clipboardAssistantConversionDefaultApplied"] as? Bool == true)
     }
 
     @Test
-    func clipboardAssistantCurrencyOptOutPersistsAfterRestart() throws {
-        let legacy = Data(#"{"clipboardAssistantEnabledKinds":["text"]}"#.utf8)
+    func legacyCurrencyEnabledStateMigratesToConversionAndOptOutPersistsAfterRestart() throws {
+        let legacy = Data(#"{"clipboardAssistantCurrencyDefaultApplied":true,"clipboardAssistantEnabledKinds":["text","currency"]}"#.utf8)
         var settings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
-        settings.clipboardAssistantEnabledKinds.remove(.currency)
+        #expect(settings.clipboardAssistantEnabledKinds == [.text, .conversion])
+        settings.clipboardAssistantEnabledKinds.remove(.conversion)
 
         let decoded = try JSONDecoder().decode(
             FeatureSettings.self,
             from: JSONEncoder().encode(settings)
         )
 
-        #expect(!decoded.clipboardAssistantEnabledKinds.contains(.currency))
+        #expect(!decoded.clipboardAssistantEnabledKinds.contains(.conversion))
     }
 
     @Test
-    func clipboardAssistantCurrencyIsEnabledForNewSettings() throws {
-        #expect(FeatureSettings.default.clipboardAssistantEnabledKinds.contains(.currency))
+    func legacyCurrencyActionOrderMigratesToConversion() throws {
+        let legacy = try JSONEncoder().encode(
+            LegacySettings(clipboardAssistantActionOrders: [
+                .currency: [.copyFullExpression, .copyText, .addToQuickNote, .sendToTeleprompter, .share],
+            ])
+        )
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+
+        #expect(decoded.clipboardAssistantActionOrders[.conversion] == [
+            .copyFullExpression, .copyText, .addToQuickNote, .sendToTeleprompter, .share,
+        ])
+    }
+
+    @Test
+    func clipboardAssistantConversionIsEnabledForNewSettings() throws {
+        #expect(FeatureSettings.default.clipboardAssistantEnabledKinds.contains(.conversion))
+        #expect(!FeatureSettings.default.clipboardAssistantEnabledKinds.contains(.currency))
+        #expect(!ClipboardAssistantKind.allCases.contains(.currency))
+        #expect(ClipboardAssistantKind.allCases.contains(.conversion))
         let payload = try #require(
             JSONSerialization.jsonObject(
                 with: JSONEncoder().encode(FeatureSettings.default)
             ) as? [String: Any]
         )
-        #expect(payload["clipboardAssistantCurrencyDefaultApplied"] as? Bool == true)
+        #expect(payload["clipboardAssistantConversionDefaultApplied"] as? Bool == true)
     }
 
     @Test

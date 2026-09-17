@@ -2429,6 +2429,10 @@
 "预览动画" = "Pratinjau animasi";
 "不用合盖，在当前屏幕内容上播放一次" = "Memutar efek sekali pada isi layar saat ini tanpa menutup layar";
 "汇率换算" = "Konversi Mata Uang";
+"换算" = "Konversi";
+"单位换算" = "Konversi Satuan";
+"日期间隔" = "Rentang Tanggal";
+"跨时区时间" = "Waktu Lintas Zona Waktu";
 "汇率获取失败" = "Gagal mengambil kurs";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Notifikasi alarm belum diizinkan. Aktifkan notifikasi di Pengaturan Sistem.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Suara notifikasi alarm dinonaktifkan. Aktifkan suara di Pengaturan Sistem.";

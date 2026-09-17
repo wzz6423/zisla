@@ -2429,6 +2429,10 @@
 "预览动画" = "Xem trước hoạt ảnh";
 "不用合盖，在当前屏幕内容上播放一次" = "Chạy hiệu ứng một lần trên nội dung màn hình hiện tại mà không cần đóng nắp";
 "汇率换算" = "Quy đổi tiền tệ";
+"换算" = "Chuyển đổi";
+"单位换算" = "Chuyển đổi đơn vị";
+"日期间隔" = "Khoảng ngày";
+"跨时区时间" = "Thời gian giữa các múi giờ";
 "汇率获取失败" = "Không thể lấy tỷ giá";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Thông báo báo thức chưa được cho phép. Hãy bật thông báo trong Cài đặt hệ thống.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Âm thanh thông báo báo thức đang tắt. Hãy bật âm thanh trong Cài đặt hệ thống.";
