@@ -25,8 +25,8 @@ public enum ExchangeRateError: Error, Equatable, Sendable {
 
 /// Fetches up-to-date exchange rates for the clipboard assistant. Every conversion hits the
 /// network — quotes are deliberately never cached, because a copied amount must convert at the
-/// live rate of the moment it is copied. The primary source is open.er-api.com (160+ currencies,
-/// no key); frankfurter.dev (ECB reference rates, ~30 currencies) serves as the fallback.
+/// live rate of the moment it is copied. exchangerate.dev supplies the primary intraday quote;
+/// frankfurter.dev and open.er-api.com preserve a broad no-key fallback chain.
 public struct ExchangeRateService: Sendable {
     public var fetchRate: @Sendable (
         _ sourceCurrencyCode: String,
@@ -48,9 +48,13 @@ public struct ExchangeRateService: Sendable {
             let source = source.uppercased()
             let target = target.uppercased()
             do {
-                return try await fetchFromExchangeRateAPI(session: session, source: source, target: target)
+                return try await fetchFromExchangeRateDev(session: session, source: source, target: target)
             } catch {
-                return try await fetchFromFrankfurter(session: session, source: source, target: target)
+                do {
+                    return try await fetchFromFrankfurter(session: session, source: source, target: target)
+                } catch {
+                    return try await fetchFromExchangeRateAPI(session: session, source: source, target: target)
+                }
             }
         }
     }
@@ -62,6 +66,51 @@ public struct ExchangeRateService: Sendable {
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         return URLSession(configuration: configuration)
     }
+}
+
+/// api.exchangerate.dev payload: {"result":"success","base":"USD","rates":{"CNY":7.2,…}}
+private struct ExchangeRateDevPayload: Decodable {
+    let result: String
+    let base: String
+    let rates: [String: Double]
+}
+
+private func fetchFromExchangeRateDev(
+    session: URLSession,
+    source: String,
+    target: String
+) async throws -> ExchangeRateQuote {
+    var components = URLComponents(string: "https://api.exchangerate.dev/v1/latest/\(source)")
+    components?.queryItems = [URLQueryItem(name: "symbols", value: target)]
+    guard let endpoint = components?.url else {
+        throw ExchangeRateError.invalidResponse
+    }
+    var request = URLRequest(url: endpoint)
+    request.httpMethod = "GET"
+    request.timeoutInterval = 8
+    request.cachePolicy = .reloadIgnoringLocalCacheData
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    request.setValue("zisla-macOS", forHTTPHeaderField: "User-Agent")
+
+    let (data, response) = try await session.data(for: request)
+    guard let http = response as? HTTPURLResponse else {
+        throw ExchangeRateError.invalidResponse
+    }
+    guard http.statusCode == 200 else {
+        throw ExchangeRateError.httpStatus(http.statusCode)
+    }
+    guard let payload = try? JSONDecoder().decode(ExchangeRateDevPayload.self, from: data),
+          payload.result == "success",
+          payload.base == source,
+          let rate = payload.rates[target], rate > 0 else {
+        throw ExchangeRateError.malformedPayload
+    }
+    return ExchangeRateQuote(
+        sourceCurrencyCode: source,
+        targetCurrencyCode: target,
+        rate: rate,
+        fetchedAt: Date()
+    )
 }
 
 /// open.er-api.com payload: {"result":"success","base_code":"USD","rates":{"CNY":7.2,…}}
@@ -113,10 +162,11 @@ private func fetchFromExchangeRateAPI(
     )
 }
 
-/// frankfurter.dev payload: {"base":"USD","date":"2026-09-11","rates":{"CNY":7.2}}
+/// frankfurter.dev payload: {"date":"2026-09-17","base":"USD","quote":"CNY","rate":7.2}
 private struct FrankfurterPayload: Decodable {
     let base: String
-    let rates: [String: Double]
+    let quote: String
+    let rate: Double
 }
 
 private func fetchFromFrankfurter(
@@ -124,12 +174,7 @@ private func fetchFromFrankfurter(
     source: String,
     target: String
 ) async throws -> ExchangeRateQuote {
-    var components = URLComponents(string: "https://api.frankfurter.dev/v1/latest")
-    components?.queryItems = [
-        URLQueryItem(name: "base", value: source),
-        URLQueryItem(name: "symbols", value: target),
-    ]
-    guard let endpoint = components?.url else {
+    guard let endpoint = URL(string: "https://api.frankfurter.dev/v2/rate/\(source)/\(target)") else {
         throw ExchangeRateError.invalidResponse
     }
     var request = URLRequest(url: endpoint)
@@ -148,7 +193,8 @@ private func fetchFromFrankfurter(
     }
     guard let payload = try? JSONDecoder().decode(FrankfurterPayload.self, from: data),
           payload.base == source,
-          let rate = payload.rates[target], rate > 0 else {
+          payload.quote == target,
+          payload.rate > 0 else {
         throw ExchangeRateError.rateUnavailable(
             sourceCurrencyCode: source,
             targetCurrencyCode: target
@@ -157,7 +203,7 @@ private func fetchFromFrankfurter(
     return ExchangeRateQuote(
         sourceCurrencyCode: source,
         targetCurrencyCode: target,
-        rate: rate,
+        rate: payload.rate,
         fetchedAt: Date()
     )
 }

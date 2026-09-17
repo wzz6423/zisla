@@ -3,52 +3,77 @@ import Testing
 @testable import ZislaKit
 
 /// The clipboard assistant must always convert at the live rate, so every request goes to the
-/// network with cache reading disabled and falls back to the secondary source on failure.
+/// network with cache reading disabled and falls back through independent sources on failure.
 /// Serialized: the stub protocol answers from a shared response queue.
 @Suite(.serialized)
 struct ExchangeRateServiceTests {
     @Test
-    func fetchesRateFromPrimarySourceWithoutCaching() async throws {
+    func fetchesRateFromLiveSourceWithoutCaching() async throws {
         ExchangeRateStubURLProtocol.reset()
         ExchangeRateStubURLProtocol.enqueue(
             status: 200,
-            body: #"{"result":"success","base_code":"USD","rates":{"CNY":7.23}}"#
+            body: #"{"result":"success","base":"USD","source":"live","rates":{"CNY":6.70735}}"#
         )
         let service = ExchangeRateService.live(session: Self.stubbedSession())
 
         let quote = try await service.fetchRate("USD", "CNY")
 
-        #expect(quote.rate == 7.23)
+        #expect(quote.rate == 6.70735)
         #expect(quote.sourceCurrencyCode == "USD")
         #expect(quote.targetCurrencyCode == "CNY")
         let request = try #require(ExchangeRateStubURLProtocol.lastRequest)
-        #expect(request.url?.absoluteString == "https://open.er-api.com/v6/latest/USD")
+        #expect(request.url?.host == "api.exchangerate.dev")
+        #expect(request.url?.path == "/v1/latest/USD")
+        #expect(request.url?.query == "symbols=CNY")
         #expect(request.cachePolicy == .reloadIgnoringLocalCacheData)
     }
 
     @Test
-    func fallsBackToFrankfurterWhenPrimaryFails() async throws {
+    func fallsBackToFrankfurterWhenLiveSourceFails() async throws {
         ExchangeRateStubURLProtocol.reset()
         ExchangeRateStubURLProtocol.enqueue(status: 500, body: "{}")
         ExchangeRateStubURLProtocol.enqueue(
             status: 200,
-            body: #"{"base":"USD","date":"2026-09-11","rates":{"CNY":7.2}}"#
+            body: #"{"date":"2026-09-17","base":"USD","quote":"CNY","rate":6.7072}"#
         )
         let service = ExchangeRateService.live(session: Self.stubbedSession())
 
         let quote = try await service.fetchRate("usd", "cny")
 
-        #expect(quote.rate == 7.2)
+        #expect(quote.rate == 6.7072)
         #expect(quote.sourceCurrencyCode == "USD")
         let request = try #require(ExchangeRateStubURLProtocol.lastRequest)
         #expect(request.url?.host == "api.frankfurter.dev")
-        #expect(request.url?.query?.contains("base=USD") == true)
-        #expect(request.url?.query?.contains("symbols=CNY") == true)
+        #expect(request.url?.path == "/v2/rate/USD/CNY")
+        #expect(ExchangeRateStubURLProtocol.requests.map(\.url?.host) == [
+            "api.exchangerate.dev", "api.frankfurter.dev",
+        ])
     }
 
     @Test
-    func surfacesFailureWhenBothSourcesFail() async {
+    func fallsBackToOpenExchangeRateAPIWhenEarlierSourcesFail() async throws {
         ExchangeRateStubURLProtocol.reset()
+        ExchangeRateStubURLProtocol.enqueue(status: 503, body: "{}")
+        ExchangeRateStubURLProtocol.enqueue(status: 503, body: "{}")
+        ExchangeRateStubURLProtocol.enqueue(
+            status: 200,
+            body: #"{"result":"success","base_code":"USD","rates":{"CNY":6.71}}"#
+        )
+        let service = ExchangeRateService.live(session: Self.stubbedSession())
+
+        let quote = try await service.fetchRate("USD", "CNY")
+
+        #expect(quote.rate == 6.71)
+        #expect(ExchangeRateStubURLProtocol.requests.map(\.url?.host) == [
+            "api.exchangerate.dev", "api.frankfurter.dev", "open.er-api.com",
+        ])
+        #expect(ExchangeRateStubURLProtocol.lastRequest?.url?.path == "/v6/latest/USD")
+    }
+
+    @Test
+    func surfacesFailureWhenAllSourcesFail() async {
+        ExchangeRateStubURLProtocol.reset()
+        ExchangeRateStubURLProtocol.enqueue(status: 503, body: "{}")
         ExchangeRateStubURLProtocol.enqueue(status: 503, body: "{}")
         ExchangeRateStubURLProtocol.enqueue(status: 503, body: "{}")
         let service = ExchangeRateService.live(session: Self.stubbedSession())
@@ -59,13 +84,13 @@ struct ExchangeRateServiceTests {
     }
 
     @Test
-    func rejectsMalformedPrimaryPayloadInsteadOfGuessingARate() async {
+    func rejectsMalformedLivePayloadInsteadOfGuessingARate() async {
         ExchangeRateStubURLProtocol.reset()
         // The primary payload lacks the target rate; the stub's default empty response then
-        // makes the fallback fail too, so no quote may surface at all.
+        // makes the remaining fallbacks fail too, so no quote may surface at all.
         ExchangeRateStubURLProtocol.enqueue(
             status: 200,
-            body: #"{"result":"success","base_code":"USD","rates":{"EUR":0.9}}"#
+            body: #"{"result":"success","base":"USD","rates":{"EUR":0.9}}"#
         )
         let service = ExchangeRateService.live(session: Self.stubbedSession())
 
@@ -78,17 +103,17 @@ struct ExchangeRateServiceTests {
     }
 
     @Test(arguments: [
-        #"{"result":"success","base_code":"EUR","rates":{"CNY":7.23}}"#,
+        #"{"result":"success","base":"EUR","rates":{"CNY":7.23}}"#,
         #"{"result":"success","rates":{"CNY":7.23}}"#,
-        #"{"result":"success","base_code":"USD","rates":{"CNY":0}}"#,
-        #"{"result":"success","base_code":"USD","rates":{"CNY":-7.23}}"#,
+        #"{"result":"success","base":"USD","rates":{"CNY":0}}"#,
+        #"{"result":"success","base":"USD","rates":{"CNY":-7.23}}"#,
     ])
-    func rejectsInvalidPrimaryQuoteAndUsesValidFallback(body: String) async throws {
+    func rejectsInvalidLiveQuoteAndUsesValidFallback(body: String) async throws {
         ExchangeRateStubURLProtocol.reset()
         ExchangeRateStubURLProtocol.enqueue(status: 200, body: body)
         ExchangeRateStubURLProtocol.enqueue(
             status: 200,
-            body: #"{"base":"USD","date":"2026-09-14","rates":{"CNY":7.2}}"#
+            body: #"{"date":"2026-09-17","base":"USD","quote":"CNY","rate":7.2}"#
         )
         let service = ExchangeRateService.live(session: Self.stubbedSession())
 
@@ -99,18 +124,23 @@ struct ExchangeRateServiceTests {
     }
 
     @Test(arguments: [0.0, -7.2])
-    func rejectsNonpositiveFallbackRates(rate: Double) async {
+    func rejectsNonpositiveFrankfurterRatesAndUsesOpenExchangeRateAPI(rate: Double) async throws {
         ExchangeRateStubURLProtocol.reset()
         ExchangeRateStubURLProtocol.enqueue(status: 503, body: "{}")
         ExchangeRateStubURLProtocol.enqueue(
             status: 200,
-            body: "{\"base\":\"USD\",\"rates\":{\"CNY\":\(rate)}}"
+            body: "{\"base\":\"USD\",\"quote\":\"CNY\",\"rate\":\(rate)}"
+        )
+        ExchangeRateStubURLProtocol.enqueue(
+            status: 200,
+            body: #"{"result":"success","base_code":"USD","rates":{"CNY":7.2}}"#
         )
         let service = ExchangeRateService.live(session: Self.stubbedSession())
 
-        await #expect(throws: ExchangeRateError.self) {
-            try await service.fetchRate("USD", "CNY")
-        }
+        let quote = try await service.fetchRate("USD", "CNY")
+
+        #expect(quote.rate == 7.2)
+        #expect(ExchangeRateStubURLProtocol.lastRequest?.url?.host == "open.er-api.com")
     }
 
     private static func stubbedSession() -> URLSession {
@@ -123,10 +153,12 @@ struct ExchangeRateServiceTests {
 private final class ExchangeRateStubURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var queue: [(status: Int, body: String)] = []
     nonisolated(unsafe) static var lastRequest: URLRequest?
+    nonisolated(unsafe) static var requests: [URLRequest] = []
 
     nonisolated static func reset() {
         queue = []
         lastRequest = nil
+        requests = []
     }
 
     nonisolated static func enqueue(status: Int, body: String) {
@@ -139,6 +171,7 @@ private final class ExchangeRateStubURLProtocol: URLProtocol, @unchecked Sendabl
 
     override func startLoading() {
         Self.lastRequest = request
+        Self.requests.append(request)
         let next: (status: Int, body: String) = Self.queue.isEmpty ? (status: 200, body: "{}") : Self.queue.removeFirst()
         let response = HTTPURLResponse(
             url: request.url!,
