@@ -2811,6 +2811,7 @@ struct SettingsView: View {
                             }
                             .accessibilityLabel(loc("复制"))
                         }
+                        .padding(.leading, 12)
                     }
                 }
             }
