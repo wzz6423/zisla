@@ -96,8 +96,12 @@ struct CollapsedProgressGlowTests {
     }
 
     @Test
-    func progressGlowUsesAContinuousTrackAcrossThePhysicalNotch() {
+    func progressGlowUsesAContinuousTrackWithLightSurfaceContrast() {
         #expect(CollapsedProgress.requiredGlowClearance == 2)
+        #expect(CollapsedProgress.glowHeight == 2)
+        #expect(CollapsedProgress.glowBottomInset == 0)
+        #expect(CollapsedProgress.contrastBackdropOpacity >= 0.5)
+        #expect(CollapsedProgress.filledSegmentOpacity >= 0.9)
         #expect(CollapsedProgress.filledWidth(
             progress: 0.5,
             totalWidth: 500
@@ -181,6 +185,8 @@ struct CollapsedProgressGlowTests {
         )
         #expect(glowSource.contains("CollapsedProgress.filledWidth"))
         #expect(glowSource.contains("glowSegment(width: filledWidth)"))
+        #expect(glowSource.contains("Color.black.opacity(CollapsedProgress.contrastBackdropOpacity)"))
+        #expect(glowSource.contains("tint.opacity(CollapsedProgress.filledSegmentOpacity)"))
 
         let waveformSource = try String(
             contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/MediaWaveformView.swift"),

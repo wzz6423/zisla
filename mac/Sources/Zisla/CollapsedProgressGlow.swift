@@ -2,8 +2,10 @@ import SwiftUI
 import ZislaKit
 
 enum CollapsedProgress {
-    static let glowHeight: CGFloat = 1.5
-    static let glowBottomInset: CGFloat = 0.5
+    static let glowHeight: CGFloat = 2
+    static let glowBottomInset: CGFloat = 0
+    static let contrastBackdropOpacity = 0.56
+    static let filledSegmentOpacity = 0.96
     static var requiredGlowClearance: CGFloat { glowHeight + glowBottomInset }
 
     static func playbackFraction(
@@ -71,21 +73,10 @@ struct CollapsedProgressGlow: View {
     private func glowSegment(width: CGFloat) -> some View {
         ZStack(alignment: .leading) {
             Capsule()
-                .fill(tint.opacity(0.52))
+                .fill(Color.black.opacity(CollapsedProgress.contrastBackdropOpacity))
                 .frame(width: width, height: CollapsedProgress.glowHeight)
-                .blur(radius: 3)
             Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            tint.opacity(0.12),
-                            tint.opacity(0.82),
-                            tint.opacity(0.18),
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .fill(tint.opacity(CollapsedProgress.filledSegmentOpacity))
                 .frame(width: width, height: 1)
         }
     }
