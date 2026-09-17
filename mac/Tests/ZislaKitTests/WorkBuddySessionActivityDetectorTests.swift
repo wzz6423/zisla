@@ -169,7 +169,7 @@ struct WorkBuddySessionActivityDetectorTests {
             title: "stale",
             status: "working",
             createdAt: Self.milliseconds(Self.now.addingTimeInterval(-recencyThreshold - 60)),
-            updatedAt: Self.milliseconds(Self.now.addingTimeInterval(-recencyThreshold)),
+            updatedAt: Self.milliseconds(Self.now.addingTimeInterval(-recencyThreshold - 0.001)),
             lastActivityAt: Self.milliseconds(Self.now.addingTimeInterval(-recencyThreshold - 0.001))
         )
 
@@ -203,6 +203,34 @@ struct WorkBuddySessionActivityDetectorTests {
             now: { Self.now }
         ).activeTasks().first)
 
+        #expect(task.updatedAt == updatedAt)
+    }
+
+    @Test
+    func keepsLongRunningSessionsWhoseLastActivityStaled() throws {
+        let databaseURL = try makeWorkBuddyDatabase()
+        defer { removeWorkBuddyDatabase(at: databaseURL) }
+
+        // WorkBuddy freezes `last_activity_at` near creation time for sessions that keep running
+        // and only refreshes `updated_at` on agent activity, so recency must consider the fresher
+        // of the two or long-running conversations disappear from the island.
+        let updatedAt = Self.now.addingTimeInterval(-60)
+        try insertWorkBuddySession(
+            at: databaseURL,
+            id: Self.conversationID,
+            title: "stale activity, fresh updates",
+            status: "working",
+            createdAt: Self.milliseconds(Self.now.addingTimeInterval(-4 * 60 * 60)),
+            updatedAt: Self.milliseconds(updatedAt),
+            lastActivityAt: Self.milliseconds(Self.now.addingTimeInterval(-4 * 60 * 60 + 6 * 60))
+        )
+
+        let task = try #require(WorkBuddySessionActivityDetector(
+            databaseURL: databaseURL,
+            now: { Self.now }
+        ).activeTasks().first)
+
+        #expect(task.id == WorkBuddySessionActivityDetector.taskID(forConversationID: Self.conversationID))
         #expect(task.updatedAt == updatedAt)
     }
 
