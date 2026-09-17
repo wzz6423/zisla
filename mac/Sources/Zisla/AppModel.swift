@@ -1477,7 +1477,7 @@ final class AppModel: ObservableObject {
     detection.actions.append(.addToQuickNote)
     detection.actions.append(.share)
     if case .text = content,
-       [.text, .nonSystemLanguageText, .code, .math, .currency].contains(detection.kind) {
+       [.text, .nonSystemLanguageText, .code, .math, .conversion].contains(detection.kind) {
       detection.actions.append(.sendToTeleprompter)
     }
     if let bundleIdentifier = sourceApplication?.bundleIdentifier,
@@ -1508,7 +1508,7 @@ final class AppModel: ObservableObject {
     presentationGeneration: Int
   ) {
     currencyConversionTask?.cancel()
-    guard detection.kind == .currency,
+    guard detection.kind == .conversion,
           case .currencyExpression(let amount, let amountText, let source, let target)? = detection.detail
     else { return }
     currencyConversionTask = Task { [weak self, exchangeRateService] in
@@ -1561,7 +1561,7 @@ final class AppModel: ObservableObject {
     let fullExpression =
       "\(amountText) \(sourceCurrencyCode) = \(title) · 1 \(sourceCurrencyCode) = \(rateText) \(targetCurrencyCode)"
     var detection = ClipboardAssistantDetection(
-      kind: .currency,
+      kind: .conversion,
       title: title,
       detail: .currencyRate(
         sourceCurrencyCode: sourceCurrencyCode,
@@ -1590,7 +1590,7 @@ final class AppModel: ObservableObject {
     presentationGeneration: Int
   ) {
     let detection = ClipboardAssistantDetection(
-      kind: .currency,
+      kind: .conversion,
       title: clipboardAssistantMessage("汇率获取失败"),
       detail: .currencyExpression(
         amount: 0,

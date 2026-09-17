@@ -71,7 +71,14 @@ public enum ClipboardAssistantDetector {
         if enabledKinds.contains(.color), let color = parseColor(text) {
             return color
         }
-        if let conversion = conversionDetection(text, enabledKinds: enabledKinds, now: now, timeZone: timeZone, locale: locale) {
+        if enabledKinds.contains(.conversion), var conversion = conversionDetection(
+            text,
+            enabledKinds: [.math, .dateTime],
+            now: now,
+            timeZone: timeZone,
+            locale: locale
+        ) {
+            conversion.kind = .conversion
             return conversion
         }
         // Date/time runs before math and phone: dashed digit groups like "2024-03-05" parse as
@@ -94,13 +101,13 @@ public enum ClipboardAssistantDetector {
         // token the arithmetic parser cannot consume, but keep the order explicit anyway so
         // future overlaps resolve predictably. The live rate is fetched afterwards by the
         // presentation layer; this branch only recognizes the shape and defers the numbers.
-        if enabledKinds.contains(.currency),
+        if enabledKinds.contains(.conversion),
            let conversion = parseCurrencyConversion(text, preferredCurrencyCode: preferredCurrencyCode),
            conversion.sourceCurrencyCode
               != (conversion.targetCurrencyCode ?? resolvedPreferredCurrencyCode(preferredCurrencyCode)) {
             let target = conversion.targetCurrencyCode ?? resolvedPreferredCurrencyCode(preferredCurrencyCode)
             return ClipboardAssistantDetection(
-                kind: .currency,
+                kind: .conversion,
                 title: text,
                 detail: .currencyExpression(
                     amount: conversion.amount,

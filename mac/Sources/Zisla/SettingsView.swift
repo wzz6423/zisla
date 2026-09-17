@@ -691,6 +691,9 @@ struct SettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                         }
+                        if kind == .conversion {
+                            clipboardAssistantConversionExamples
+                        }
                     }
                 }
                 settingsGroup("复制助手") {
@@ -2776,6 +2779,7 @@ struct SettingsView: View {
         case .color: "颜色值"
         case .math: "算式"
         case .currency: "汇率换算"
+        case .conversion: "换算"
         case .dateTime: "日期时间"
         case .code: "代码"
         case .nonSystemLanguageText: "非当前系统语言文本"
@@ -2784,6 +2788,73 @@ struct SettingsView: View {
         case .file: "文件"
         }
     }
+
+    private var clipboardAssistantConversionExamples: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+            ForEach(Self.clipboardAssistantConversionExampleGroups) { group in
+                VStack(alignment: .leading, spacing: 2) {
+                    AppLocalizedText(group.title)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    ForEach(group.examples, id: \.self) { example in
+                        HStack(spacing: 6) {
+                            Text(example)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer(minLength: 0)
+                            IconButton(symbol: "doc.on.doc", help: loc("复制"), size: .compact) {
+                                copyClipboardAssistantConversionExample(example)
+                            }
+                            .accessibilityLabel(loc("复制"))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.leading, 62)
+        .padding(.trailing, 4)
+        .padding(.vertical, 6)
+    }
+
+    private func copyClipboardAssistantConversionExample(_ example: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(example, forType: .string)
+    }
+
+    private struct ClipboardAssistantConversionExampleGroup: Identifiable {
+        let title: String
+        let examples: [String]
+
+        var id: String { title }
+    }
+
+    private static let clipboardAssistantConversionExampleGroups = [
+        ClipboardAssistantConversionExampleGroup(
+            title: "单位换算",
+            examples: ["10 ft = m", "100 kg = lb", "5 km = mi"]
+        ),
+        ClipboardAssistantConversionExampleGroup(
+            title: "汇率换算",
+            examples: ["100 USD = CNY", "100$ = ¥", "100dollar = CNY"]
+        ),
+        ClipboardAssistantConversionExampleGroup(
+            title: "日期间隔",
+            examples: ["2026-09-17 - 2026-10-01", "2026/09/17 - 2026/10/01", "2026.09.17 - 2026.10.01"]
+        ),
+        ClipboardAssistantConversionExampleGroup(
+            title: "跨时区时间",
+            examples: [
+                "2026-09-17 09:30 Asia/Shanghai = America/New_York",
+                "09:30 UTC+08:00 = UTC",
+                "2026-09-17 09:30 America/New_York = Europe/London",
+            ]
+        ),
+    ]
 
     private struct AssistantBlacklistEntry {
         let bundleIdentifier: String

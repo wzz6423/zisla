@@ -12,7 +12,7 @@ struct ClipboardAssistantDetectorTests {
             text: "10 ft in m", enabledKinds: allKinds, systemLanguageIdentifier: "en",
             now: Date(timeIntervalSince1970: 0), timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: "en")
         ))
-        #expect(detection.kind == .math)
+        #expect(detection.kind == .conversion)
         #expect(detection.title.contains("3.048"))
         #expect(detection.fullContent?.contains("ft") == true)
         #expect(ClipboardAssistantDetector.parseUnitConversion("10 kg in lb")?.result ?? 0 > 22.04)
@@ -29,6 +29,7 @@ struct ClipboardAssistantDetectorTests {
             Issue.record("expected the natural-language currency request")
             return
         }
+        #expect(detection.kind == .conversion)
         #expect(amount == 100)
     }
 
@@ -767,7 +768,7 @@ struct ClipboardAssistantCurrencyDetectionTests {
 
     private func expression(_ detection: ClipboardAssistantDetection?)
         -> ClipboardAssistantDetail? {
-        guard detection?.kind == .currency else { return nil }
+        guard detection?.kind == .conversion else { return nil }
         return detection?.detail
     }
 
@@ -829,7 +830,7 @@ struct ClipboardAssistantCurrencyDetectionTests {
     func crossCurrencyConversionsWithAmbiguousPreferredTarget() {
         // "100元" with a CNY preference converts nothing: source equals the default target,
         // so the value must not read as a conversion.
-        #expect(detection("100元")?.kind != .currency)
+        #expect(detection("100元")?.kind != .conversion)
         // Naming a different target still works.
         guard case .currencyExpression(100, "100", "CNY", "USD")? = expression(detection("100元=$")) else {
             Issue.record("expected 100元=$ to target USD")
@@ -841,25 +842,25 @@ struct ClipboardAssistantCurrencyDetectionTests {
                 text: "100$=USD",
                 enabledKinds: allKinds,
                 preferredCurrencyCode: "USD"
-            )?.kind != .currency
+            )?.kind != .conversion
         )
         #expect(
             ClipboardAssistantDetector.detect(
                 text: "100$",
                 enabledKinds: allKinds,
                 preferredCurrencyCode: "USD"
-            )?.kind != .currency
+            )?.kind != .conversion
         )
     }
 
     @Test
     func rejectsValuesThatOnlyLookLikeConversions() {
         for text in ["2+2=", "100", "100%", "100 apples", "100$==¥", "hello world"] {
-            #expect(detection(text)?.kind != .currency, "expected \(text) not to read as a conversion")
+            #expect(detection(text)?.kind != .conversion, "expected \(text) not to read as a conversion")
         }
         // Arithmetic keeps the math branch; a stray currency token after the arithmetic is not
         // a conversion either (both parsers reject it, so it stays plain text).
         #expect(detection("2+2=")?.kind == .math)
-        #expect(detection("100+50$=")?.kind != .currency)
+        #expect(detection("100+50$=")?.kind != .conversion)
     }
 }

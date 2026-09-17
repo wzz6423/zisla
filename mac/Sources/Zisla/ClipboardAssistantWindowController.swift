@@ -915,7 +915,7 @@ struct ClipboardAssistantToastView: View {
     // MARK: Expanded content
 
     private func canExpand(_ detection: ClipboardAssistantDetection) -> Bool {
-        guard ![.url, .text, .nonSystemLanguageText, .code, .math, .currency].contains(detection.kind) else {
+        guard ![.url, .text, .nonSystemLanguageText, .code, .math, .conversion].contains(detection.kind) else {
             return false
         }
         guard !controller.isLightweightMode, let content = detection.fullContent else { return false }
