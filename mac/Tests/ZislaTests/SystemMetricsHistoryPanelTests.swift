@@ -5,7 +5,7 @@ import ZislaKit
 
 @testable import Zisla
 
-/// 历史窗口复用清理面板的窗口约定：普通窗口控件、关闭按钮回落到状态对象，不抢焦点层级。
+/// Match the cleanup panel's standard controls and state-driven close behavior without elevating focus.
 @Suite(.serialized)
 struct SystemMetricsHistoryPanelTests {
     @Test @MainActor

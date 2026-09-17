@@ -2189,8 +2189,8 @@ private struct CompactFocusCountdownBar: View {
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(AppLocalization.text("专注倒计时：%@", notice.detail ?? "00:00:00")))
-        .help(AppLocalization.text("专注倒计时：%@", notice.detail ?? "00:00:00"))
+        .accessibilityLabel(Text("\(notice.title) \(notice.detail ?? "00:00:00")"))
+        .help("\(notice.title) \(notice.detail ?? "00:00:00")")
     }
 }
 

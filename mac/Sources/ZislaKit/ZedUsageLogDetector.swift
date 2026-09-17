@@ -3,7 +3,7 @@ import SQLite3
 import ZislaCore
 import zstd
 
-/// 从 Zed 的本地线程数据库提取累计 token 用量；解压后的会话数据不会被持久化或展示。
+/// Reads cumulative Zed token usage without persisting or displaying decompressed session data.
 public final class ZedUsageLogDetector: AIUsageDetecting {
     public let databaseURL: URL
     public let maxThreads: Int

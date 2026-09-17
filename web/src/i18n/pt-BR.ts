@@ -135,7 +135,7 @@ export const ptBR = createCatalog({
       toolbox: {
         name: 'Utilitários',
         caption:
-          'Temporizador de foco, manter a tela ativa, limpeza de tela e teclado (bloqueia inclusive F1-F12), alarmes, teleprompter, espelho e Lixo em uma única página.',
+          'Temporizador de foco, manter a tela ativa, limpeza de tela e teclado (bloqueia inclusive F1-F12), teleprompter, espelho e Lixo em uma única página.',
         points: ['Temporizador de foco', 'Bloqueia F1-F12 durante a limpeza', 'Teleprompter e espelho'],
       },
       system: {
@@ -313,7 +313,7 @@ export const ptBR = createCatalog({
         <li><strong>Bluetooth:</strong> usado somente enquanto o módulo de bateria estiver aberto, para ler o nível de bateria publicado por dispositivos conectados ou emparelhados.</li>
         <li><strong>Automação:</strong> na primeira vez que você usa Notas rápidas, Mail, a organização da mesa ou o controle direto de um player compatível, o macOS pergunta separadamente se o zisla pode controlar Notas, Mail, Finder ou o app correspondente. Notas rápidas lê e grava no Notas; o Mail pode ler, redigir, responder, sinalizar e apagar mensagens.</li>
         <li><strong>Acesso Total ao Disco:</strong> necessário somente quando o Mail não está em execução e o zisla ainda precisa ler o índice local de e-mails para mostrar contas, remetentes, assuntos, prévias, horários e status de leitura.</li>
-        <li><strong>Notificações:</strong> solicitadas quando você ativa o timer Pomodoro ou alarmes, exclusivamente para mostrar uma notificação local quando o timer termina ou um alarme dispara.</li>
+        <li><strong>Notificações:</strong> solicitadas quando você ativa o timer Pomodoro, exclusivamente para mostrar uma notificação local e tocar um único som de aviso quando ele termina.</li>
       </ul>
       <p><strong>Pastas não são Acesso Total ao Disco:</strong> para as pastas de transferência, importação/exportação ou download escolhidas no seletor de arquivos do sistema, o zisla recebe acesso apenas àquela pasta, nunca acesso de leitura ao disco inteiro.</p>
       <p><strong>Sons do teclado e estatísticas de digitação:</strong> ambos ficam desativados por padrão, e os eventos globais do teclado só são observados quando um deles está ativado. Com os sons do teclado, os eventos das teclas servem apenas para reproduzir um som; com as estatísticas de digitação, somente dados agregados — contagem de caracteres, códigos físicos das teclas, horários e o app em primeiro plano — são armazenados, nunca o que você digitou. Você pode desativar cada opção separadamente nos Ajustes; depois disso, nada mais é registrado. Os dados já armazenados permanecem em um arquivo de banco de dados local que você pode excluir.</p>

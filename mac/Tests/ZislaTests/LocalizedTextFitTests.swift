@@ -5,12 +5,11 @@ import ZislaKit
 
 @testable import Zisla
 
-/// 窄容器的宽度是按中文文案设计的，而译文最长会膨胀到 2 倍。这里用 CoreText 复算 17 门语言的真实
-/// 渲染宽度：容器给不出空间、`minimumScaleFactor` 也补不回来时测试先失败，避免改译文或加语言时
-/// 把界面挤成截断。
+/// Translations can double the width of Chinese labels. Measure every language
+/// to catch truncation that the available width and minimum scale cannot avoid.
 @MainActor
 struct LocalizedTextFitTests {
-    /// `available` 是文案真正能占的宽度，`minimumScale` 与 `lines` 对应视图上的 fitsSingleLine/fitsLines。
+    /// Use the actual text width and the same scale and line limits as the view.
     private struct Slot {
         let origin: String
         let keys: [String]
@@ -20,7 +19,6 @@ struct LocalizedTextFitTests {
         var lines: Int = 1
 
         var font: NSFont { NSFont.systemFont(ofSize: fontSize, weight: .medium) }
-        /// 缩到最小仍要放得下：可用宽度先按行数放大，再除以最小缩放。
         var capacity: CGFloat { available * CGFloat(lines) / minimumScale }
     }
 
@@ -29,7 +27,7 @@ struct LocalizedTextFitTests {
             Slot(
                 origin: "SettingsView.swift:113 侧栏分区标题",
                 keys: SettingsSection.allCases.map(\.title),
-                // 148 侧栏 − 24 外 padding − 16 行内 padding − 17 图标 − 8 spacing
+                // 148pt sidebar minus 24pt outer padding, 16pt row padding, 17pt icon, and 8pt spacing.
                 available: 83,
                 fontSize: 11,
                 minimumScale: 0.7,
@@ -59,7 +57,7 @@ struct LocalizedTextFitTests {
                         宽 \(Int(width))pt，超出容量 \(Int(slot.capacity))pt
                         """
                     )
-                    // 换行只在词间发生，单个词放不进一行就一定会被截断。
+                    // Wrapping only happens between words; a word wider than one line still truncates.
                     let longest = text.split(separator: " ").map { Self.width(String($0), font: slot.font) }
                     #expect(
                         (longest.max() ?? 0) <= slot.available / slot.minimumScale,
@@ -73,12 +71,12 @@ struct LocalizedTextFitTests {
         }
     }
 
-    /// 侧栏页脚把版本号和退出胶囊挤在同一行，两段文案共享 124pt 减去图标和内边距后的余量。
+    /// The version and quit labels share the footer width after icons and padding.
     @Test
     func settingsSidebarFooterFitsEveryLanguage() {
         let font = NSFont.systemFont(ofSize: 9, weight: .medium)
         let quitFont = NSFont.systemFont(ofSize: 10, weight: .medium)
-        // 124 内容宽 − 24 图标 − 6 胶囊内 spacing − 7 胶囊右 padding − 6 行内 spacing
+        // 124pt content minus 24pt icon, 6pt pill spacing, 7pt pill padding, and 6pt row spacing.
         let available: CGFloat = 81
 
         for language in AppLanguage.allCases {
@@ -94,21 +92,21 @@ struct LocalizedTextFitTests {
         }
     }
 
-    /// 截图工具栏的 60pt 格子是按中文文案定的，中文必须始终保留文字，其他语言退成纯图标。
+    /// The 60pt toolbar cells fit Chinese titles; other languages use icons only.
     @Test
     func screenshotToolbarKeepsChineseTitles() {
         #expect(ScreenshotToolbarLayout.showsControlTitles(for: .simplifiedChinese))
         #expect(ScreenshotToolbarLayout.showsControlTitles(for: .traditionalChinese))
     }
 
-    /// 纯图标模式下的格子仍要容得下最宽的图标加下拉箭头（实测 aqi.medium 17pt + 4 + chevron 9pt）。
+    /// The widest icon needs 17pt, plus 4pt spacing and a 9pt dropdown chevron.
     @Test
     func screenshotToolbarIconOnlyCellFitsWidestGlyph() {
         let iconOnlyWidth: CGFloat = 34
         #expect(iconOnlyWidth >= 17 + 4 + 9)
     }
 
-    /// 钉图工具栏的透明度胶囊按译文差额生长：中文恰好等于 98pt 基线，其他语言只增不减。
+    /// Translations can widen the pinned opacity control beyond its 98pt Chinese baseline.
     @Test
     func pinnedOpacityPillGrowsOnlyBeyondChinese() {
         #expect(ScreenshotPinnedLayout.opacityControlWidth(for: .simplifiedChinese) == 98)
@@ -120,8 +118,8 @@ struct LocalizedTextFitTests {
         }
     }
 
-    /// 打码面板的强度标签列同样按译文差额生长：中文恰好等于 36pt 基线，其他语言只增不减，且必须
-    /// 容得下自己最宽的那个标签，否则滑块会把文字挤成截断。
+    /// The strength column must fit its widest translation without shrinking below
+    /// the 36pt Chinese baseline, or the slider will truncate the label.
     @Test
     func obscureStrengthLabelColumnFitsEveryLanguage() {
         let font = NSFont.systemFont(ofSize: 11, weight: .medium)
@@ -141,7 +139,7 @@ struct LocalizedTextFitTests {
         }
     }
 
-    /// 打码面板的强度与粗细文案随 main 的新面板一起进来，17 张表缺 key 时界面会静默回退中文原文。
+    /// A missing strength label silently falls back to Chinese in any of the language tables.
     @Test
     func obscurePanelLabelsAreTranslated() {
         for key in ["粗细", "模糊度", "格子", "画笔粗细"] {
@@ -157,7 +155,7 @@ struct LocalizedTextFitTests {
     @Test
     func clipboardRowSubtitleFitsEveryLanguage() {
         let font = NSFont.systemFont(ofSize: 9, weight: .medium)
-        // 820pt 岛宽扣除模块、列表、缩略图和右侧操作区后的可用宽度。
+        // Remaining width after module, list, thumbnail, and action insets in the 820pt island.
         let available: CGFloat = 386
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!

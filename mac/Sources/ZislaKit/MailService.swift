@@ -105,6 +105,7 @@ public final class MailService: ObservableObject {
     private let mailRunning: () -> Bool
     private var pollingTask: Task<Void, Never>?
     private var selectedAccountNames: Set<String> = []
+    private var refreshGeneration: UInt64 = 0
     private var messageOffset = 0
     private let pageSize = 10
 
@@ -142,12 +143,9 @@ public final class MailService: ObservableObject {
     public func start(accountNames: Set<String>) {
         let didChangeSelection = selectedAccountNames != accountNames
         selectedAccountNames = accountNames
-        guard pollingTask == nil else {
-            if didChangeSelection {
-                Task { await refresh() }
-            }
-            return
-        }
+        guard pollingTask == nil || didChangeSelection else { return }
+        stop()
+        if didChangeSelection { canLoadMore = false }
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.refresh()
@@ -161,6 +159,7 @@ public final class MailService: ObservableObject {
     }
 
     public func stop() {
+        refreshGeneration &+= 1
         pollingTask?.cancel()
         pollingTask = nil
         isLoading = false
@@ -168,8 +167,6 @@ public final class MailService: ObservableObject {
 
     public func refresh() async {
         guard !isLoading else { return }
-        messageOffset = 0
-        canLoadMore = true
         await fetchMessages(offset: 0, replacing: true)
     }
 
@@ -179,12 +176,15 @@ public final class MailService: ObservableObject {
     }
 
     private func fetchMessages(offset: Int, replacing: Bool) async {
+        let generation = refreshGeneration
         isLoading = true
-        defer { isLoading = false }
-        needsMailIndexAccess = false
+        defer {
+            if generation == refreshGeneration { isLoading = false }
+        }
 
         let isMailRunning = mailRunning()
         let indexResult = await readIndex(accountNames: selectedAccountNames, offset: offset)
+        guard generation == refreshGeneration, !Task.isCancelled else { return }
         if case let .success(snapshot) = indexResult,
            Self.canUseIndexSnapshot(snapshot, for: selectedAccountNames),
            !snapshot.messages.isEmpty {
@@ -193,7 +193,13 @@ public final class MailService: ObservableObject {
         }
 
         if isMailRunning {
-            switch await commandRunner(Self.inboxScript(accountNames: selectedAccountNames, pageSize: pageSize, offset: offset), true) {
+            let result = await commandRunner(
+                Self.inboxScript(accountNames: selectedAccountNames, pageSize: pageSize, offset: offset),
+                true
+            )
+            guard generation == refreshGeneration, !Task.isCancelled else { return }
+            needsMailIndexAccess = false
+            switch result {
             case let .success(.snapshot(snapshot)):
                 apply(snapshot, replacing: replacing)
             case .success:

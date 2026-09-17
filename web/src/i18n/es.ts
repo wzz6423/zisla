@@ -135,7 +135,7 @@ export const es = createCatalog({
       toolbox: {
         name: 'Utilidades',
         caption:
-          'Temporizador de concentración, mantener la pantalla activa, limpieza de pantalla y teclado (bloquea incluso F1-F12), alarmas, teleprompter, espejo y papelera en una sola página.',
+          'Temporizador de concentración, mantener la pantalla activa, limpieza de pantalla y teclado (bloquea incluso F1-F12), teleprompter, espejo y papelera en una sola página.',
         points: ['Temporizador de concentración', 'Bloquea F1-F12 durante la limpieza', 'Teleprompter y espejo'],
       },
       system: {
@@ -313,7 +313,7 @@ export const es = createCatalog({
         <li><strong>Bluetooth:</strong> solo se utiliza mientras el módulo de batería está abierto, para leer el nivel de batería que publican los dispositivos conectados o enlazados.</li>
         <li><strong>Automatización:</strong> la primera vez que usas Notas rápidas, Mail, la limpieza del escritorio o el control directo de un reproductor compatible, macOS pregunta por separado si zisla puede controlar Notas, Mail, Finder o esa app. Notas rápidas lee y escribe en Notas; Mail puede leer, redactar, responder, marcar y eliminar mensajes.</li>
         <li><strong>Acceso total al disco:</strong> solo es necesario cuando Mail no está en ejecución y zisla aún debe leer el índice local de correo para mostrar cuentas, remitentes, asuntos, vistas previas, marcas de tiempo y estado de lectura.</li>
-        <li><strong>Notificaciones:</strong> se solicitan al activar el temporizador Pomodoro o las alarmas, únicamente para mostrar una notificación local cuando termina un temporizador o se activa una alarma.</li>
+        <li><strong>Notificaciones:</strong> se solicitan al activar el temporizador Pomodoro, únicamente para mostrar una notificación local y reproducir un único sonido de aviso cuando termina.</li>
       </ul>
       <p><strong>Las carpetas no son Acceso total al disco:</strong> para las carpetas de la bandeja, de importación/exportación o de descargas que eliges en el selector de archivos del sistema, zisla solo obtiene acceso a esa carpeta, nunca permiso de lectura para todo el disco.</p>
       <p><strong>Sonidos del teclado y estadísticas de escritura:</strong> ambas funciones están desactivadas de forma predeterminada y los eventos globales del teclado solo se observan cuando una de ellas está activada. Con los sonidos del teclado, los eventos de las teclas se usan únicamente para reproducir un sonido; con las estadísticas de escritura, solo se guardan datos agregados —recuento de caracteres, códigos físicos de teclas, marcas de tiempo y la app en primer plano—, nunca lo que escribes. Puedes desactivarlas por separado en Ajustes; después no se registra nada más. Los datos ya guardados permanecen en un archivo de base de datos local que puedes eliminar.</p>

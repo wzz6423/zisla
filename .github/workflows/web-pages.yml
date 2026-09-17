@@ -12,7 +12,7 @@ on:
 permissions:
   contents: read
 
-# Pages 只允许一个部署在飞行中，取消进行中的部署会让站点停留在半更新状态。
+# Pages allows one deployment at a time; let the active deployment finish.
 concurrency:
   group: pages
   cancel-in-progress: false

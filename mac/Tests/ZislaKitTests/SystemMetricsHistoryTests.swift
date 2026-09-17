@@ -44,17 +44,19 @@ private final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @u
 private final class BlockingHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked Sendable {
     private let condition = NSCondition()
     private var stored: [SystemMetricsRecord]
-    private var loadStarted = false
     private var loadCanFinish = false
+    let loadStarted: AsyncStream<Void>
+    private let loadStartedContinuation: AsyncStream<Void>.Continuation
 
     init(seed: [SystemMetricsRecord]) {
         stored = seed
+        (loadStarted, loadStartedContinuation) = AsyncStream<Void>.makeStream()
     }
 
     func loadRecords() -> [SystemMetricsRecord] {
         condition.lock()
-        loadStarted = true
-        condition.broadcast()
+        loadStartedContinuation.yield(())
+        loadStartedContinuation.finish()
         while !loadCanFinish {
             condition.wait()
         }
@@ -73,14 +75,6 @@ private final class BlockingHistoryPersistence: SystemMetricsHistoryPersisting, 
     func removeAll() {
         condition.lock()
         stored = []
-        condition.unlock()
-    }
-
-    func waitUntilLoadStarts() {
-        condition.lock()
-        while !loadStarted {
-            condition.wait()
-        }
         condition.unlock()
     }
 
@@ -282,7 +276,7 @@ struct SystemMetricsHistorySeriesBuilderTests {
         let service = SystemMonitorService(historyPersistence: persistence)
         let load = Task { await service.loadHistoryStats() }
 
-        await Task.detached { persistence.waitUntilLoadStarts() }.value
+        for await _ in persistence.loadStarted { break }
         load.cancel()
         persistence.releaseLoad()
         await load.value

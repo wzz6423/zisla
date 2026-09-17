@@ -34,11 +34,15 @@ struct IslandRecycleAnimationTests {
     func onlyTheRecycleIsAnimatedSoRevealsStillSnapIn() throws {
         let source = try Self.source(of: "IslandRootView.swift")
 
-        #expect(source.contains("reduceMotion || !hidesIslandSurface ? nil : ZislaMotion.islandRecycleFade"))
-        #expect(source.contains("value: hidesIslandSurface"))
-        // The fade must stay on the surface itself; hoisting it above the frames would animate the
-        // panel geometry instead of the dissolve.
-        #expect(source.contains(".opacity(hidesIslandSurface ? 0 : 1)"))
+        let surfaceStart = try #require(source.range(of: "IslandSurface("))
+        let surfaceEnd = try #require(source[surfaceStart.upperBound...].range(of: "if petSlotWidth"))
+        let surface = source[surfaceStart.lowerBound..<surfaceEnd.lowerBound]
+
+        #expect(surface.contains("reduceMotion || !hidesIslandSurface ? nil : ZislaMotion.islandRecycleFade"))
+        #expect(surface.contains("value: hidesIslandSurface"))
+        #expect(surface.contains(".opacity(hidesIslandSurface ? 0 : 1)"))
+        // Structural changes are handled by the parent transaction, so only the surface fades.
+        #expect(source.contains("if isIslandCollapsed {\n                    transaction.animation = nil\n                }"))
     }
 
     /// The pet slot widens the panel on one side, so the surface hugs that edge. Releasing the slot

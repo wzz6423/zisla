@@ -1,6 +1,7 @@
+import AppKit
+import AVFoundation
 import Combine
 import Foundation
-import AppKit
 import ZislaCore
 @preconcurrency import UserNotifications
 
@@ -34,6 +35,37 @@ public enum PomodoroPhase: Equatable, Sendable {
     case idle
     case running
     case paused
+}
+
+enum PomodoroCompletionSound {
+    static let resourceName = "pomodoro-complete"
+    static let resourceExtension = "m4a"
+    static let resourceDirectory = "Pomodoro"
+
+    static func resourceURL() -> URL? {
+        Bundle.module.url(
+            forResource: resourceName,
+            withExtension: resourceExtension,
+            subdirectory: resourceDirectory
+        )
+    }
+}
+
+@MainActor
+private final class PomodoroCompletionSoundPlayer {
+    static let shared = PomodoroCompletionSoundPlayer()
+
+    private var player: AVAudioPlayer?
+
+    func play() {
+        guard let url = PomodoroCompletionSound.resourceURL(),
+              let player = try? AVAudioPlayer(contentsOf: url)
+        else {
+            return
+        }
+        self.player = player
+        player.play()
+    }
 }
 
 /// Pure state/time calculation: derives remaining time from a deadline; freezes remaining when paused.
@@ -192,12 +224,17 @@ public struct PomodoroEngine: Equatable, Sendable {
 public final class PomodoroService: ObservableObject {
     @Published public private(set) var engine = PomodoroEngine()
     @Published public private(set) var displayClock = "25:00"
-    /// When "mute notifications" is on, Pomodoro completion notifications are suppressed; synced by `AppModel` from settings.
+    @Published public private(set) var focusCountdownRunID = UUID()
+    /// When "mute notifications" is on, Pomodoro completion signals are suppressed; synced by `AppModel` from settings.
     public var notificationsMuted = false
+
+    public static let focusCountdownNoticeIDPrefix = "focus-countdown-"
 
     private var timer: Timer?
     private var notificationCenter: UNUserNotificationCenter?
     private let notificationRequestHandler: ((UNNotificationRequest) -> Void)?
+    private let completionSoundHandler: (() -> Void)?
+    private let now: () -> Date
     private let defaults: UserDefaults
     private let focusDurationKey = "zisla.pomodoro.focusDuration"
     private let restDurationKey = "zisla.pomodoro.restDuration"
@@ -206,11 +243,15 @@ public final class PomodoroService: ObservableObject {
     public init(
         notificationCenter: UNUserNotificationCenter? = nil,
         notificationRequestHandler: ((UNNotificationRequest) -> Void)? = nil,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        completionSoundHandler: (() -> Void)? = nil,
+        now: @escaping () -> Date = Date.init
     ) {
         self.notificationCenter = notificationCenter
         self.defaults = defaults
         self.notificationRequestHandler = notificationRequestHandler
+        self.completionSoundHandler = completionSoundHandler
+        self.now = now
         let savedFocus = defaults.object(forKey: focusDurationKey) as? TimeInterval
         let savedRest = defaults.object(forKey: restDurationKey) as? TimeInterval
         let focusDuration = PomodoroEngine.normalizedDuration(
@@ -239,7 +280,11 @@ public final class PomodoroService: ObservableObject {
     public var phase: PomodoroPhase { engine.phase }
     public var focusDuration: TimeInterval { engine.focusDuration }
     public var restDuration: TimeInterval { engine.restDuration }
-    public var displayClockWithHours: String { PomodoroEngine.formatHHMMSS(engine: engine) }
+    public var displayClockWithHours: String { PomodoroEngine.formatHHMMSS(at: now(), engine: engine) }
+
+    public func focusCountdownNoticeID(for side: NoticeSide) -> String {
+        "\(Self.focusCountdownNoticeIDPrefix)\(focusCountdownRunID.uuidString)-\(side.rawValue)"
+    }
 
     public func setFocusDuration(_ duration: TimeInterval) {
         let normalized = PomodoroEngine.normalizedDuration(
@@ -270,14 +315,18 @@ public final class PomodoroService: ObservableObject {
     }
 
     public func start() {
+        let startsRun = engine.phase != .running
         requestNotificationAuthorizationIfNeeded()
-        engine.start()
+        engine.start(at: now())
+        if startsRun {
+            focusCountdownRunID = UUID()
+        }
         ensureTimer()
         refreshDisplay()
     }
 
     public func pause() {
-        engine.pause()
+        engine.pause(at: now())
         stopTimer()
         refreshDisplay()
     }
@@ -326,9 +375,9 @@ public final class PomodoroService: ObservableObject {
         return center
     }
 
-    private func tick() {
+    func tick() {
         let completedMode = engine.mode
-        if engine.completeIfNeeded() {
+        if engine.completeIfNeeded(at: now()) {
             stopTimer()
             notifyCompletion(of: completedMode)
             refreshDisplay()
@@ -338,12 +387,13 @@ public final class PomodoroService: ObservableObject {
     }
 
     func refreshDisplay() {
-        let clock = PomodoroEngine.formatMMSS(engine: engine)
+        let clock = PomodoroEngine.formatMMSS(at: now(), engine: engine)
         guard displayClock != clock else { return }
         displayClock = clock
     }
 
     private func requestNotificationAuthorizationIfNeeded() {
+        guard notificationRequestHandler == nil else { return }
         resolvedNotificationCenter().getNotificationSettings { [weak self] settings in
             guard settings.authorizationStatus == .notDetermined else { return }
             Task { @MainActor [weak self] in
@@ -364,6 +414,11 @@ public final class PomodoroService: ObservableObject {
 
     private func notifyCompletion(of mode: PomodoroMode) {
         guard !notificationsMuted else { return }
+        if let completionSoundHandler {
+            completionSoundHandler()
+        } else {
+            PomodoroCompletionSoundPlayer.shared.play()
+        }
         let content = UNMutableNotificationContent()
         switch mode {
         case .focus:
@@ -374,7 +429,6 @@ public final class PomodoroService: ObservableObject {
             content.title = AppLocalization.text("休息结束")
             content.body = AppLocalization.text("开始下一段专注")
         }
-        content.sound = .default
         let request = UNNotificationRequest(
             identifier: "zisla.pomodoro.\(UUID().uuidString)",
             content: content,

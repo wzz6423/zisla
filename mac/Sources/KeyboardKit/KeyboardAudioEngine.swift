@@ -186,7 +186,9 @@ final class KeyboardAudioEngine {
         }
     }
 
-    private let engine = AVAudioEngine()
+    private let makeEngine: () -> AVAudioEngine
+    private let voiceCount: Int
+    private lazy var engine = makeEngine()
     private let playbackFormat = AVAudioFormat(
         standardFormatWithSampleRate: playbackSampleRate,
         channels: 1
@@ -209,27 +211,12 @@ final class KeyboardAudioEngine {
 
     var lastError: String? { engineError ?? resourceError ?? pointerResourceError }
 
-    init(voiceCount: Int = 16) {
-        voices = makeVoicePool(count: voiceCount, output: engine.mainMixerNode)
-        engine.isAutoShutdownEnabled = true
-        engine.prepare()
-        configurationObserver = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange,
-            object: engine,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.handleEngineConfigurationChange()
-            }
-        }
-    }
-
-    func warmUp() {
-        engine.prepare()
-        if startEngineIfNeeded() {
-            scheduleIdlePauseIfNeeded()
-        }
+    init(
+        voiceCount: Int = 16,
+        makeEngine: @escaping () -> AVAudioEngine = AVAudioEngine.init
+    ) {
+        self.voiceCount = voiceCount
+        self.makeEngine = makeEngine
     }
 
     func setKeyboardPlaybackGain(_ gain: Double) {
@@ -487,7 +474,8 @@ final class KeyboardAudioEngine {
         pitchVariation: Bool,
         baseRate: Float = 1
     ) {
-        guard let voiceIndex = nextVoiceIndex(allowsStealing: true) else { return }
+        guard volume > 0, volume.isFinite,
+              let voiceIndex = nextVoiceIndex(allowsStealing: true) else { return }
         schedule(
             buffer: buffer,
             voiceIndex: voiceIndex,
@@ -504,7 +492,8 @@ final class KeyboardAudioEngine {
         pitchVariation: Bool,
         baseRate: Float = 1
     ) {
-        guard let voiceIndex = nextVoiceIndex(allowsStealing: false) else { return }
+        guard volume > 0, volume.isFinite,
+              let voiceIndex = nextVoiceIndex(allowsStealing: false) else { return }
         schedule(
             buffer: buffer,
             voiceIndex: voiceIndex,
@@ -614,6 +603,22 @@ final class KeyboardAudioEngine {
     }
 
     private func nextVoiceIndex(allowsStealing: Bool) -> Int? {
+        guard voiceCount > 0 else { return nil }
+        if voices.isEmpty {
+            // Accessing the mixer creates the device output, so defer it until an audible request.
+            voices = makeVoicePool(count: voiceCount, output: engine.mainMixerNode)
+            engine.isAutoShutdownEnabled = true
+            engine.prepare()
+            configurationObserver = NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange,
+                object: engine,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleEngineConfigurationChange()
+                }
+            }
+        }
         guard let index = AudioVoiceSelector.nextIndex(
             count: voices.count,
             cursor: voiceCursor,
