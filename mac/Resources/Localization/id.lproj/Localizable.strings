@@ -336,8 +336,6 @@
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Belum ada alarm, tambahkan di bawah";
-"打开时钟" = "Buka Jam";
-"打开系统「时钟」App" = "Buka aplikasi Jam sistem";
 "停用" = "Nonaktifkan";
 "启用" = "Aktifkan";
 "编辑" = "Edit";
@@ -2105,7 +2103,6 @@
 "无法读取 AI 用量基线" = "Tidak bisa membaca baseline penggunaan AI";
 "无法读取 AI 用量游标" = "Tidak bisa membaca kursor penggunaan AI";
 "无法读取 AI 用量记录" = "Tidak bisa membaca catatan penggunaan AI";
-"未找到系统「时钟」App" = "Aplikasi «Jam» sistem tidak ditemukan";
 "未检测到可用的麦克风输入" = "Tidak ada input mikrofon yang terdeteksi";
 "正在下载背景音，点击取消" = "Mengunduh suara latar, klik untuk membatalkan";
 "此 Mac 没有可读风扇" = "Mac ini tidak punya kipas yang bisa dibaca";
@@ -2431,3 +2428,6 @@
 "合上兼容 MacBook 屏幕时显示景深过渡动画" = "Tampilkan transisi kedalaman saat menutup layar MacBook yang kompatibel";
 "预览动画" = "Pratinjau animasi";
 "不用合盖，在当前屏幕内容上播放一次" = "Memutar efek sekali pada isi layar saat ini tanpa menutup layar";
+"闹钟通知未获允许，请在系统设置中开启通知。" = "Notifikasi alarm belum diizinkan. Aktifkan notifikasi di Pengaturan Sistem.";
+"闹钟通知声音已关闭，请在系统设置中开启声音。" = "Suara notifikasi alarm dinonaktifkan. Aktifkan suara di Pengaturan Sistem.";
+"无法设置闹钟通知：%@" = "Tidak dapat menjadwalkan notifikasi alarm: %@";

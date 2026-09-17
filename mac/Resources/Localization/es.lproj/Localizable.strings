@@ -336,8 +336,6 @@
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Aún no hay alarmas, añadir abajo";
-"打开时钟" = "Abrir Reloj";
-"打开系统「时钟」App" = "Abrir app Reloj del sistema";
 "停用" = "Desactivar";
 "启用" = "Activar";
 "编辑" = "Editar";
@@ -2105,7 +2103,6 @@
 "无法读取 AI 用量基线" = "No se puede leer la referencia de consumo de IA";
 "无法读取 AI 用量游标" = "No se puede leer el cursor de consumo de IA";
 "无法读取 AI 用量记录" = "No se pueden leer los registros de consumo de IA";
-"未找到系统「时钟」App" = "No se encontró la app «Reloj» del sistema";
 "未检测到可用的麦克风输入" = "No se detectó ninguna entrada de micrófono disponible";
 "正在下载背景音，点击取消" = "Descargando el sonido de fondo, toca para cancelar";
 "此 Mac 没有可读风扇" = "Este Mac no tiene ventiladores legibles";
@@ -2431,3 +2428,6 @@
 "合上兼容 MacBook 屏幕时显示景深过渡动画" = "Mostrar una transición de profundidad al cerrar la tapa de un MacBook compatible";
 "预览动画" = "Previsualizar animación";
 "不用合盖，在当前屏幕内容上播放一次" = "Reproduce el efecto una vez sobre el contenido actual de la pantalla, sin cerrar la tapa";
+"闹钟通知未获允许，请在系统设置中开启通知。" = "Las notificaciones de alarma no están permitidas. Actívalas en Ajustes del Sistema.";
+"闹钟通知声音已关闭，请在系统设置中开启声音。" = "Los sonidos de las notificaciones de alarma están desactivados. Actívalos en Ajustes del Sistema.";
+"无法设置闹钟通知：%@" = "No se pudo programar la notificación de alarma: %@";
