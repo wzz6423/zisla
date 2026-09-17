@@ -101,7 +101,9 @@ struct CollapsedProgressGlowTests {
         #expect(CollapsedProgress.glowHeight == 2)
         #expect(CollapsedProgress.glowBottomInset == 0)
         #expect(CollapsedProgress.contrastBackdropOpacity >= 0.5)
+        #expect(CollapsedProgress.leadingSegmentOpacity >= 0.6)
         #expect(CollapsedProgress.filledSegmentOpacity >= 0.9)
+        #expect(CollapsedProgress.trailingSegmentOpacity >= 0.6)
         #expect(CollapsedProgress.filledWidth(
             progress: 0.5,
             totalWidth: 500
@@ -185,8 +187,12 @@ struct CollapsedProgressGlowTests {
         )
         #expect(glowSource.contains("CollapsedProgress.filledWidth"))
         #expect(glowSource.contains("glowSegment(width: filledWidth)"))
+        #expect(glowSource.contains("private func glowSegment(width: CGFloat) -> some View {\n        ZStack(alignment: .bottomLeading)"))
         #expect(glowSource.contains("Color.black.opacity(CollapsedProgress.contrastBackdropOpacity)"))
+        #expect(glowSource.contains("LinearGradient("))
+        #expect(glowSource.contains("tint.opacity(CollapsedProgress.leadingSegmentOpacity)"))
         #expect(glowSource.contains("tint.opacity(CollapsedProgress.filledSegmentOpacity)"))
+        #expect(glowSource.contains("tint.opacity(CollapsedProgress.trailingSegmentOpacity)"))
 
         let waveformSource = try String(
             contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/MediaWaveformView.swift"),
