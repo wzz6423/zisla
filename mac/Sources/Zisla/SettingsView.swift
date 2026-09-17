@@ -2731,7 +2731,6 @@ struct SettingsView: View {
         }
     }
 
-    /// 合盖动画的预览权：不合盖，在当前屏幕内容上把动画播放一次。
     private func lidClosePreviewRow() -> some View {
         settingRow(symbol: "play.circle", title: "预览动画", detail: "不用合盖，在当前屏幕内容上播放一次") {
             Button {

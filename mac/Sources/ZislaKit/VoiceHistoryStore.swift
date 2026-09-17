@@ -45,11 +45,11 @@ public struct VoiceHistoryStatistics: Equatable, Sendable {
     public var savedTime: TimeInterval
 }
 
-private struct VoiceHistoryPersistentState: Codable {
+struct VoiceHistoryPersistentState: Codable {
     var entries: [VoiceHistoryEntry]
     var cumulativeStatistics: CumulativeStatistics
 
-    struct CumulativeStatistics: Codable {
+    struct CumulativeStatistics: Codable, Equatable {
         var totalWordCount: Int
         var totalDuration: TimeInterval
     }
@@ -103,9 +103,11 @@ public final class VoiceHistoryStore: ObservableObject {
     @Published public private(set) var entries: [VoiceHistoryEntry] = []
     @Published public private(set) var errorDescription: String?
 
-    private let storageURL: URL
+    private let legacyStorageURL: URL
     private let recordingsDirectory: URL
     private let fileManager: FileManager
+    private var database: VoiceHistoryDatabase?
+    private var pendingAudioRevision: UUID?
     private var cumulativeWordCount: Int = 0
     private var cumulativeDuration: TimeInterval = 0
 
@@ -114,7 +116,7 @@ public final class VoiceHistoryStore: ObservableObject {
         recordingsDirectory: URL = AppPaths.voiceRecordings,
         fileManager: FileManager = .default
     ) {
-        self.storageURL = storageURL
+        self.legacyStorageURL = storageURL
         self.recordingsDirectory = recordingsDirectory.standardizedFileURL
         self.fileManager = fileManager
         load()
@@ -122,7 +124,7 @@ public final class VoiceHistoryStore: ObservableObject {
 
     public var statistics: VoiceHistoryStatistics {
         let wordsPerMinute = cumulativeDuration > 0
-            ? Double(cumulativeWordCount) / (cumulativeDuration / 60)
+            ? min(Double(Int.max).nextDown, Double(cumulativeWordCount) * 60 / cumulativeDuration)
             : 0
         let estimatedTypingDuration = Double(cumulativeWordCount)
             / VoiceTranscriptMetrics.assumedTypingWordsPerMinute * 60
@@ -148,6 +150,8 @@ public final class VoiceHistoryStore: ObservableObject {
 
     @discardableResult
     public func record(_ result: VoiceRecordingResult, retainAudio: Bool = true) -> Bool {
+        guard beginAccess() else { return false }
+        defer { finishAccess() }
         guard isSafeRecordingURL(result.audioFileURL, id: result.id) else {
             errorDescription = AppLocalization.text("录音文件不在语音记录目录中")
             return false
@@ -211,9 +215,9 @@ public final class VoiceHistoryStore: ObservableObject {
         }
         let removal = removeStagedAudioFiles(stagedAudioFiles)
         if let removalError = removal.error {
-            let restorationError = restoreStagedAudioFiles(removal.remaining)
-            let rollbackSucceeded = restorationError == nil
-                && persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+            // Commit compensation before restoring files so interrupted recovery has a durable decision.
+            let rollbackSucceeded = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration, commitRevision: UUID())
+            let restorationError = rollbackSucceeded ? restoreStagedAudioFiles(removal.remaining) : nil
             if !rollbackSucceeded {
                 entries = candidate
                 cumulativeWordCount = newCumulativeWordCount
@@ -230,6 +234,8 @@ public final class VoiceHistoryStore: ObservableObject {
 
     @discardableResult
     public func updateProcessedTranscript(id: UUID, transcript: String) -> Bool {
+        guard beginAccess() else { return false }
+        defer { finishAccess() }
         guard let index = entries.firstIndex(where: { $0.id == id }) else { return false }
         let normalized = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         var candidate = entries
@@ -240,6 +246,8 @@ public final class VoiceHistoryStore: ObservableObject {
     }
 
     public func remove(id: UUID) {
+        guard beginAccess() else { return }
+        defer { finishAccess() }
         guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
         let entry = entries[index]
         let audioURL = audioURL(for: entry)
@@ -263,9 +271,8 @@ public final class VoiceHistoryStore: ObservableObject {
         }
         let removal = removeStagedAudioFiles(stagedAudioFiles)
         if let removalError = removal.error {
-            let restorationError = restoreStagedAudioFiles(removal.remaining)
-            let rollbackSucceeded = restorationError == nil
-                && persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+            let rollbackSucceeded = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration, commitRevision: UUID())
+            let restorationError = rollbackSucceeded ? restoreStagedAudioFiles(removal.remaining) : nil
             if !rollbackSucceeded {
                 entries = candidate
             }
@@ -276,6 +283,8 @@ public final class VoiceHistoryStore: ObservableObject {
     }
 
     public func removeBatch(ids: Set<UUID>) {
+        guard beginAccess() else { return }
+        defer { finishAccess() }
         let toRemove = entries.filter { ids.contains($0.id) }
         guard !toRemove.isEmpty else { return }
 
@@ -306,15 +315,14 @@ public final class VoiceHistoryStore: ObservableObject {
             let restoredIDs = Set(audioFiles.compactMap { file in
                 remainingURLs.contains(file.url) ? file.id : nil
             })
-            let restorationError = restoreStagedAudioFiles(removal.remaining)
             let audioEntryIDs = Set(audioFiles.map(\.id))
             let fallback = entries.filter {
                 !ids.contains($0.id)
                     || !audioEntryIDs.contains($0.id)
                     || restoredIDs.contains($0.id)
             }
-            let rollbackSucceeded = restorationError == nil
-                && persistCandidate(fallback, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+            let rollbackSucceeded = persistCandidate(fallback, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration, commitRevision: UUID())
+            let restorationError = rollbackSucceeded ? restoreStagedAudioFiles(removal.remaining) : nil
             entries = rollbackSucceeded ? fallback : candidate
             errorDescription = (restorationError ?? removalError).localizedDescription
             return
@@ -323,6 +331,8 @@ public final class VoiceHistoryStore: ObservableObject {
     }
 
     public func removeAll() {
+        guard beginAccess() else { return }
+        defer { finishAccess() }
         var audioURLsByEntryID: [UUID: URL] = [:]
         for entry in entries {
             if let audioURL = audioURL(for: entry) {
@@ -363,16 +373,15 @@ public final class VoiceHistoryStore: ObservableObject {
         }
         let removal = removeStagedAudioFiles(stagedAudioFiles)
         if let removalError = removal.error {
-            let remainingURLs = Set(removal.remaining.map(\.originalURL))
-            let restorationError = restoreStagedAudioFiles(removal.remaining)
+            let remainingURLs = Set(removal.remaining.filter { isRegularFile(at: $0.stagingURL) }.map(\.originalURL))
             let restoredEntryIDs = Set(audioURLsByEntryID.compactMap { id, url in
-                remainingURLs.contains(url) && isRegularFile(at: url) ? id : nil
+                remainingURLs.contains(url) ? id : nil
             })
             let fallback = entries.filter { entry in
                 entry.audioFileName == nil || restoredEntryIDs.contains(entry.id)
             }
-            let rollbackSucceeded = restorationError == nil
-                && persistCandidate(fallback, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+            let rollbackSucceeded = persistCandidate(fallback, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration, commitRevision: UUID())
+            let restorationError = rollbackSucceeded ? restoreStagedAudioFiles(removal.remaining) : nil
             entries = rollbackSucceeded ? fallback : []
             errorDescription = (restorationError ?? removalError).localizedDescription
             return
@@ -381,59 +390,55 @@ public final class VoiceHistoryStore: ObservableObject {
     }
 
     private func load() {
-        guard fileManager.fileExists(atPath: storageURL.path) else { return }
         do {
-            let data = try Data(contentsOf: storageURL)
-
-            // Try the current format.
-            if let state = try? JSONDecoder().decode(VoiceHistoryPersistentState.self, from: data) {
-                entries = state.entries.compactMap(normalizedEntry(_:))
-                sortEntries()
-                let visibleWordCount = entries.reduce(0) { $0 + $1.wordCount }
-                let visibleDuration = entries.reduce(0) {
-                    addingCumulativeDuration($0, $1.duration)
+            let database = try VoiceHistoryDatabase(
+                storageURL: legacyStorageURL.deletingPathExtension().appendingPathExtension("sqlite"),
+                fileManager: fileManager
+            )
+            try database.lock()
+            defer { database.unlock() }
+            let state: VoiceHistoryPersistentState
+            if let stored = try database.load() {
+                state = stored
+            } else if fileManager.fileExists(atPath: legacyStorageURL.path) {
+                let data = try Data(contentsOf: legacyStorageURL)
+                if let stored = try? JSONDecoder().decode(VoiceHistoryPersistentState.self, from: data) {
+                    state = stored
+                } else {
+                    state = VoiceHistoryPersistentState(
+                        entries: try JSONDecoder().decode([VoiceHistoryEntry].self, from: data),
+                        cumulativeStatistics: .init(totalWordCount: 0, totalDuration: 0)
+                    )
                 }
-                cumulativeWordCount = max(
-                    0,
-                    visibleWordCount,
-                    state.cumulativeStatistics.totalWordCount
+            } else {
+                state = VoiceHistoryPersistentState(
+                    entries: [],
+                    cumulativeStatistics: .init(totalWordCount: 0, totalDuration: 0)
                 )
-                cumulativeDuration = max(
-                    0,
-                    visibleDuration,
-                    state.cumulativeStatistics.totalDuration.isFinite
-                        ? state.cumulativeStatistics.totalDuration
-                        : 0
-                )
-                errorDescription = nil
-                if entries != state.entries
-                    || cumulativeWordCount != state.cumulativeStatistics.totalWordCount
-                    || cumulativeDuration != state.cumulativeStatistics.totalDuration
-                {
-                    _ = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
-                }
-                return
             }
-
-            // Fall back to the legacy format for migration.
-            let legacyEntries = try JSONDecoder().decode([VoiceHistoryEntry].self, from: data)
-            entries = legacyEntries.compactMap(normalizedEntry(_:))
-            sortEntries()
-
-            // Use existing records as the migration baseline for cumulative values.
-            cumulativeWordCount = entries.reduce(0) { $0 + $1.wordCount }
-            cumulativeDuration = entries.reduce(0) {
+            try recoverStagedAudioFiles(committedRevision: database.revision)
+            let loadedEntries = state.entries.map(normalizedEntry(_:))
+            let visibleWordCount = loadedEntries.reduce(0) { $0 + $1.wordCount }
+            let visibleDuration = loadedEntries.reduce(0) {
                 addingCumulativeDuration($0, $1.duration)
             }
-
+            let loadedWordCount = max(0, visibleWordCount, state.cumulativeStatistics.totalWordCount)
+            let loadedDuration = max(visibleDuration, normalizedDuration(state.cumulativeStatistics.totalDuration))
+            try database.save(VoiceHistoryPersistentState(
+                entries: loadedEntries,
+                cumulativeStatistics: .init(
+                    totalWordCount: loadedWordCount,
+                    totalDuration: loadedDuration
+                )
+            ))
+            // Enable writes only after loading and migration have both succeeded.
+            self.database = database
+            entries = loadedEntries
+            sortEntries()
+            cumulativeWordCount = loadedWordCount
+            cumulativeDuration = loadedDuration
             errorDescription = nil
-
-            // Persist the migrated state in the current format.
-            _ = persistCandidate(entries, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
         } catch {
-            entries = []
-            cumulativeWordCount = 0
-            cumulativeDuration = 0
             errorDescription = error.localizedDescription
         }
     }
@@ -443,6 +448,8 @@ public final class VoiceHistoryStore: ObservableObject {
         now: Date = Date()
     ) {
         guard let daysThreshold = policy.daysThreshold else { return }
+        guard beginAccess() else { return }
+        defer { finishAccess() }
         let cutoffDate = now.addingTimeInterval(-Double(daysThreshold) * 24 * 60 * 60)
         var candidate = entries
         var audioDeletions: [(id: UUID, url: URL)] = []
@@ -479,13 +486,12 @@ public final class VoiceHistoryStore: ObservableObject {
             let restoredIDs = Set(audioDeletions.compactMap { deletion in
                 remainingURLs.contains(deletion.url) ? deletion.id : nil
             })
-            let restorationError = restoreStagedAudioFiles(removal.remaining)
             var fallback = candidate
             for index in fallback.indices where restoredIDs.contains(fallback[index].id) {
                 fallback[index].audioFileName = entries[index].audioFileName
             }
-            let rollbackSucceeded = restorationError == nil
-                && persistCandidate(fallback, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration)
+            let rollbackSucceeded = persistCandidate(fallback, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration, commitRevision: UUID())
+            let restorationError = rollbackSucceeded ? restoreStagedAudioFiles(removal.remaining) : nil
             entries = rollbackSucceeded ? fallback : candidate
             errorDescription = (restorationError ?? removalError).localizedDescription
             return
@@ -494,12 +500,9 @@ public final class VoiceHistoryStore: ObservableObject {
     }
 
     @discardableResult
-    private func persistCandidate(_ candidate: [VoiceHistoryEntry], cumulativeWordCount: Int, cumulativeDuration: TimeInterval) -> Bool {
+    private func persistCandidate(_ candidate: [VoiceHistoryEntry], cumulativeWordCount: Int, cumulativeDuration: TimeInterval, commitRevision: UUID? = nil) -> Bool {
+        guard let database else { return false }
         do {
-            try fileManager.createDirectory(
-                at: storageURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
             try fileManager.createDirectory(
                 at: recordingsDirectory,
                 withIntermediateDirectories: true
@@ -511,8 +514,8 @@ public final class VoiceHistoryStore: ObservableObject {
                     totalDuration: cumulativeDuration
                 )
             )
-            let data = try JSONEncoder().encode(state)
-            try data.write(to: storageURL, options: .atomic)
+            try database.save(state, commitRevision: commitRevision ?? pendingAudioRevision)
+            pendingAudioRevision = nil
             errorDescription = nil
             return true
         } catch {
@@ -521,15 +524,66 @@ public final class VoiceHistoryStore: ObservableObject {
         }
     }
 
+    private func beginAccess() -> Bool {
+        guard let database else { return false }
+        do {
+            try database.lock()
+        } catch {
+            errorDescription = error.localizedDescription
+            return false
+        }
+        do {
+            try database.validateRevision()
+            try recoverStagedAudioFiles(committedRevision: database.revision)
+            return true
+        } catch {
+            database.unlock()
+            errorDescription = error.localizedDescription
+            return false
+        }
+    }
+
+    private func finishAccess() {
+        pendingAudioRevision = nil
+        database?.unlock()
+    }
+
+    private func recoverStagedAudioFiles(committedRevision: String?) throws {
+        let names: [String]
+        do {
+            names = try fileManager.contentsOfDirectory(atPath: recordingsDirectory.path)
+        } catch {
+            guard !fileManager.fileExists(atPath: recordingsDirectory.path) else { throw error }
+            return
+        }
+        let prefix = ".zisla-deleting-"
+        for name in names where name.hasPrefix(prefix) {
+            let suffix = name.dropFirst(prefix.count)
+            guard let separator = suffix.firstIndex(of: "."),
+                  let revision = UUID(uuidString: String(suffix[..<separator])) else { continue }
+            let originalName = String(suffix[suffix.index(after: separator)...])
+            guard !originalName.isEmpty else { continue }
+            let stagedURL = recordingsDirectory.appendingPathComponent(name, isDirectory: false)
+            if revision.uuidString == committedRevision {
+                try fileManager.removeItem(at: stagedURL)
+            } else {
+                let originalURL = recordingsDirectory.appendingPathComponent(originalName, isDirectory: false)
+                try fileManager.moveItem(at: stagedURL, to: originalURL)
+            }
+        }
+    }
+
     private func stageAudioFiles(_ audioURLs: [URL]) throws -> [StagedAudioFile] {
         var staged: [StagedAudioFile] = []
         var seen = Set<URL>()
+        let commitRevision = UUID()
         for originalURL in audioURLs.map(\.standardizedFileURL)
         where seen.insert(originalURL).inserted {
+            pendingAudioRevision = commitRevision
             let stagingURL = originalURL
                 .deletingLastPathComponent()
                 .appendingPathComponent(
-                    ".zisla-deleting-\(UUID().uuidString).\(originalURL.lastPathComponent)",
+                    ".zisla-deleting-\(commitRevision.uuidString).\(originalURL.lastPathComponent)",
                     isDirectory: false
                 )
             do {
@@ -563,6 +617,7 @@ public final class VoiceHistoryStore: ObservableObject {
             do {
                 try fileManager.removeItem(at: staged[index].stagingURL)
             } catch {
+                if isMissingFile(at: staged[index].stagingURL) { continue }
                 return (Array(staged[index...]), error)
             }
         }
@@ -576,7 +631,7 @@ public final class VoiceHistoryStore: ObservableObject {
         }
     }
 
-    private func normalizedEntry(_ entry: VoiceHistoryEntry) -> VoiceHistoryEntry? {
+    private func normalizedEntry(_ entry: VoiceHistoryEntry) -> VoiceHistoryEntry {
         var normalized = entry
         if entry.audioFileName != nil, audioURL(for: entry) == nil {
             normalized.audioFileName = nil
@@ -609,5 +664,16 @@ public final class VoiceHistoryStore: ObservableObject {
 
     private func isRegularFile(at url: URL) -> Bool {
         (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+    }
+
+    private func isMissingFile(at url: URL) -> Bool {
+        do {
+            _ = try fileManager.attributesOfItem(atPath: url.path)
+            return false
+        } catch let error as CocoaError {
+            return error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile
+        } catch {
+            return false
+        }
     }
 }

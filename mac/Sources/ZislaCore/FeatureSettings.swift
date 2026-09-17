@@ -584,7 +584,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var collapsedProgressGlowEnabled: Bool
     public var compactStatusPriority: [CompactStatusPriority]
     public var moduleOrder: [IslandModuleOrder]
-    /// Temporarily suppresses system notifications pushed by Zisla itself (Pomodoro, etc.); alarms are unaffected.
+    /// Temporarily suppresses system notifications pushed by Zisla itself (Pomodoro, etc.).
     public var notificationsMuted: Bool
     public var hoverActivationEnabled: Bool
     public var activityNoticeDisplayDuration: ActivityNoticeDisplayDuration

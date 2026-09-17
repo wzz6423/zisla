@@ -337,8 +337,6 @@
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Noch keine Wecker, unten hinzufügen";
-"打开时钟" = "Uhr öffnen";
-"打开系统「时钟」App" = "System-Uhr-App öffnen";
 "停用" = "Deaktivieren";
 "启用" = "Aktivieren";
 "编辑" = "Bearbeiten";
@@ -2106,7 +2104,6 @@
 "无法读取 AI 用量基线" = "Die Basislinie der KI-Nutzung kann nicht gelesen werden";
 "无法读取 AI 用量游标" = "Der Cursor der KI-Nutzung kann nicht gelesen werden";
 "无法读取 AI 用量记录" = "Die KI-Nutzungseinträge können nicht gelesen werden";
-"未找到系统「时钟」App" = "Die System-App „Uhr“ wurde nicht gefunden";
 "未检测到可用的麦克风输入" = "Es wurde kein verfügbarer Mikrofoneingang erkannt";
 "正在下载背景音，点击取消" = "Der Hintergrundton wird geladen, zum Abbrechen tippen";
 "此 Mac 没有可读风扇" = "Dieser Mac hat keinen auslesbaren Lüfter";
@@ -2434,3 +2431,6 @@
 "不用合盖，在当前屏幕内容上播放一次" = "Spielt den Effekt einmal auf dem aktuellen Bildschirminhalt ab, ohne den Deckel zu schließen";
 "汇率换算" = "Währungsumrechnung";
 "汇率获取失败" = "Wechselkurs konnte nicht abgerufen werden";
+"闹钟通知未获允许，请在系统设置中开启通知。" = "Mitteilungen für Wecker sind nicht erlaubt. Aktiviere Mitteilungen in den Systemeinstellungen.";
+"闹钟通知声音已关闭，请在系统设置中开启声音。" = "Töne für Wecker-Mitteilungen sind deaktiviert. Aktiviere Töne in den Systemeinstellungen.";
+"无法设置闹钟通知：%@" = "Die Wecker-Mitteilung konnte nicht geplant werden: %@";

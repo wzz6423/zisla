@@ -1,3 +1,4 @@
+import AVFAudio
 import Foundation
 import CoreGraphics
 import Testing
@@ -7,6 +8,31 @@ import Testing
 
 @Suite(.serialized)
 struct KeyboardSoundModuleViewTests {
+    @Test
+    @MainActor
+    func idleKeyboardServicesDoNotConstructAudioEngine() throws {
+        let suiteName = "Zisla.KeyboardSoundModuleViewTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(false, forKey: "enabled")
+        defaults.set(false, forKey: "typingStatsEnabled")
+
+        var constructionCount = 0
+        let audioEngine = KeyboardAudioEngine(makeEngine: {
+            constructionCount += 1
+            return AVAudioEngine()
+        })
+        let model = KeyboardAppModel(
+            settings: AppSettings(defaults: defaults),
+            audioEngine: audioEngine,
+            startsServices: false
+        )
+
+        model.startServicesIfNeeded()
+        #expect(constructionCount == 0)
+        model.stop()
+    }
+
     @Test
     @MainActor
     func rightCommandFlagsChangedPreservesPresses() {

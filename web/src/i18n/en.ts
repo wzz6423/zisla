@@ -138,7 +138,7 @@ export const en: SiteContent = {
       toolbox: {
         name: 'Utilities',
         caption:
-          'Focus countdown, keep the display awake, screen cleaning, keyboard cleaning (which blocks key presses including F1-F12 while it runs), alarms, a teleprompter, a mirror and the Trash, all on one page.',
+          'Focus countdown, keep the display awake, screen cleaning, keyboard cleaning (which blocks key presses including F1-F12 while it runs), a teleprompter, a mirror and the Trash, all on one page.',
         points: ['Focus countdown', 'Blocks F1-F12 while cleaning', 'Teleprompter and mirror'],
       },
       system: {
@@ -324,7 +324,7 @@ export const en: SiteContent = {
         <li><strong>Bluetooth:</strong> used only while the battery module is open, to read the battery level that connected or paired devices publish.</li>
         <li><strong>Automation:</strong> the first time you use Quick Notes, Mail, desktop tidy-up or direct control of a supported player, macOS asks separately whether zisla may control Notes, Mail, Finder or that app. Quick Notes reads and writes Notes; Mail can read, compose, reply, flag and delete messages.</li>
         <li><strong>Full Disk Access:</strong> needed only when Mail is not running and zisla still has to read the local mail index to show accounts, senders, subjects, previews, timestamps and read state.</li>
-        <li><strong>Notifications:</strong> requested when you enable the Pomodoro timer or alarms, purely to show a local notification when a timer ends or an alarm fires.</li>
+        <li><strong>Notifications:</strong> requested when you enable the Pomodoro timer, purely to show a local notification and play one alert sound when it ends.</li>
       </ul>
       <p><strong>Folders are not Full Disk Access:</strong> for the shelf, import/export or download folders you pick in the system file picker, zisla receives access to that folder only, never read access to the whole disk.</p>
       <p><strong>Keyboard sounds and typing stats:</strong> both are off by default, and global keyboard events are only observed once one of them is on. With keyboard sounds on, key events are used solely to play a sound; with typing stats on, only aggregate data — character counts, physical key codes, timestamps and the frontmost app — is stored, never what you typed. You can turn each off separately in Settings, after which nothing more is recorded. Data already stored stays in a local database file that you are free to delete.</p>

@@ -158,7 +158,7 @@ export const fr: SiteContent = {
       toolbox: {
         name: 'Utilitaires',
         caption:
-          'Minuteur de concentration, écran maintenu allumé, nettoyage de l’écran, nettoyage du clavier (qui bloque les frappes, F1-F12 comprises, pendant l’opération), alarmes, téléprompteur, miroir et corbeille, sur une seule page.',
+          'Minuteur de concentration, écran maintenu allumé, nettoyage de l’écran, nettoyage du clavier (qui bloque les frappes, F1-F12 comprises, pendant l’opération), téléprompteur, miroir et corbeille, sur une seule page.',
         points: [
           'Minuteur de concentration',
           'Bloque F1-F12 pendant le nettoyage',
@@ -353,7 +353,7 @@ export const fr: SiteContent = {
         <li><strong>Bluetooth :</strong> utilisé uniquement pendant que le module batterie est ouvert, pour lire le niveau de charge publié par les appareils connectés ou associés.</li>
         <li><strong>Automatisation :</strong> à la première utilisation des notes rapides, de Mail, du rangement du bureau ou du pilotage direct d’un lecteur pris en charge, macOS demande séparément si zisla peut contrôler Notes, Mail, le Finder ou l’app concernée. Les notes rapides lisent et écrivent dans Notes ; Mail permet de lire, rédiger, répondre, marquer et supprimer des messages.</li>
         <li><strong>Accès complet au disque :</strong> nécessaire seulement quand Mail n’est pas lancé et que zisla doit tout de même lire l’index local des messages pour afficher comptes, expéditeurs, objets, extraits, horodatages et état de lecture.</li>
-        <li><strong>Notifications :</strong> demandées à l’activation du minuteur Pomodoro ou des alarmes, uniquement pour afficher une notification locale à la fin d’un minuteur ou au déclenchement d’une alarme.</li>
+        <li><strong>Notifications :</strong> demandées à l’activation du minuteur Pomodoro, uniquement pour afficher une notification locale et jouer un seul son d’alerte à la fin du minuteur.</li>
       </ul>
       <p><strong>Un dossier n’est pas un accès complet au disque :</strong> pour les dossiers de dépôt, d’import/export ou de téléchargement choisis dans le sélecteur de fichiers du système, zisla n’obtient l’accès qu’à ce dossier, jamais la lecture du disque entier.</p>
       <p><strong>Sons de clavier et statistiques de saisie :</strong> les deux sont désactivés par défaut, et les événements clavier globaux ne sont observés qu’après activation de l’un d’eux. Avec les sons de clavier, les événements de touche servent uniquement à jouer un son ; avec les statistiques, seules des données agrégées sont conservées — nombre de caractères, codes de touches physiques, horodatages et app au premier plan — jamais ce que vous avez tapé. Vous pouvez désactiver chaque option séparément dans les réglages, et plus rien n’est alors enregistré. Les données déjà conservées restent dans un fichier de base local que vous pouvez supprimer.</p>

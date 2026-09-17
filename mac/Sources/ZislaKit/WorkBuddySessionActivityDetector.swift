@@ -56,6 +56,12 @@ public final class WorkBuddySessionActivityDetector: AIActivityDetecting {
 
         // The status list mirrors `AIProgressStatus`; finished and archived rows stay out of SQL so
         // the scan never depends on the 70+ historical sessions a user accumulates.
+        //
+        // Recency must consider both timestamps: WorkBuddy only writes `last_activity_at` on some
+        // transitions (it is frozen at creation time for sessions that keep running), while
+        // `updated_at` keeps ticking on every agent activity. Taking the maximum of the two keeps
+        // long-running sessions visible; SQLite's scalar MAX yields NULL when either side is NULL,
+        // so the COALESCE guard stays.
         let sql = """
             SELECT s.id,
                    COALESCE(
@@ -65,12 +71,12 @@ public final class WorkBuddySessionActivityDetector: AIActivityDetecting {
                    LOWER(s.status),
                    s.model,
                    s.created_at,
-                   COALESCE(s.last_activity_at, s.updated_at)
+                   MAX(COALESCE(s.last_activity_at, s.updated_at), s.updated_at)
             FROM sessions s
             WHERE s.deleted_at IS NULL
               AND LOWER(s.status) IN (\(Self.activeStatuses.map { "'\($0)'" }.joined(separator: ", ")))
-              AND COALESCE(s.last_activity_at, s.updated_at) >= ?
-            ORDER BY COALESCE(s.last_activity_at, s.updated_at) DESC, s.id ASC
+              AND MAX(COALESCE(s.last_activity_at, s.updated_at), s.updated_at) >= ?
+            ORDER BY MAX(COALESCE(s.last_activity_at, s.updated_at), s.updated_at) DESC, s.id ASC
             """
 
         var statement: OpaquePointer?

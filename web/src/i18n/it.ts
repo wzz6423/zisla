@@ -135,7 +135,7 @@ export const it = createCatalog({
       toolbox: {
         name: 'Utility',
         caption:
-          'Timer di concentrazione, schermo sempre attivo, pulizia dello schermo e della tastiera (blocca anche F1-F12), sveglie, teleprompter, specchio e Cestino in un’unica pagina.',
+          'Timer di concentrazione, schermo sempre attivo, pulizia dello schermo e della tastiera (blocca anche F1-F12), teleprompter, specchio e Cestino in un’unica pagina.',
         points: ['Timer di concentrazione', 'Blocca F1-F12 durante la pulizia', 'Teleprompter e specchio'],
       },
       system: {
@@ -313,7 +313,7 @@ export const it = createCatalog({
         <li><strong>Bluetooth:</strong> usato solo mentre il modulo batteria è aperto, per leggere il livello pubblicato dai dispositivi connessi o abbinati.</li>
         <li><strong>Automazione:</strong> la prima volta che usi Note rapide, Mail, la pulizia della scrivania o il controllo diretto di un player supportato, macOS chiede separatamente se zisla può controllare Note, Mail, Finder o l'app interessata. Note rapide legge e scrive in Note; Mail può leggere, comporre, rispondere, contrassegnare ed eliminare i messaggi.</li>
         <li><strong>Accesso completo al disco:</strong> necessario solo quando Mail non è in esecuzione e zisla deve comunque leggere l'indice locale della posta per mostrare account, mittenti, oggetti, anteprime, orari e stato di lettura.</li>
-        <li><strong>Notifiche:</strong> richieste quando attivi il timer Pomodoro o le sveglie, esclusivamente per mostrare una notifica locale alla fine del timer o quando scatta una sveglia.</li>
+        <li><strong>Notifiche:</strong> richieste quando attivi il timer Pomodoro, esclusivamente per mostrare una notifica locale e riprodurre un singolo suono di avviso al termine del timer.</li>
       </ul>
       <p><strong>Le cartelle non equivalgono all'accesso completo al disco:</strong> per le cartelle di deposito, importazione/esportazione o download scelte nel selettore file di sistema, zisla ottiene accesso solo a quella cartella, mai la lettura dell'intero disco.</p>
       <p><strong>Suoni della tastiera e statistiche di digitazione:</strong> entrambe le funzioni sono disattivate per impostazione predefinita e gli eventi globali della tastiera vengono osservati solo quando una delle due è attiva. Con i suoni della tastiera, gli eventi dei tasti servono esclusivamente a riprodurre un suono; con le statistiche vengono salvati solo dati aggregati — conteggio dei caratteri, codici fisici dei tasti, orari e app in primo piano — mai ciò che hai digitato. Puoi disattivare ciascuna opzione separatamente nelle impostazioni; da quel momento non viene registrato altro. I dati già salvati restano in un file di database locale che puoi eliminare.</p>

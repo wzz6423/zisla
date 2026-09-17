@@ -336,8 +336,6 @@
 
 /* Alarm Editor */
 "还没有闹钟，在下方添加" = "Chưa có báo thức, thêm bên dưới";
-"打开时钟" = "Mở Đồng hồ";
-"打开系统「时钟」App" = "Mở ứng dụng Đồng hồ hệ thống";
 "停用" = "Vô hiệu hóa";
 "启用" = "Kích hoạt";
 "编辑" = "Chỉnh sửa";
@@ -2105,7 +2103,6 @@
 "无法读取 AI 用量基线" = "Không đọc được mốc cơ sở mức dùng AI";
 "无法读取 AI 用量游标" = "Không đọc được con trỏ mức dùng AI";
 "无法读取 AI 用量记录" = "Không đọc được bản ghi mức dùng AI";
-"未找到系统「时钟」App" = "Không tìm thấy ứng dụng «Đồng hồ» của hệ thống";
 "未检测到可用的麦克风输入" = "Không phát hiện đầu vào micro khả dụng";
 "正在下载背景音，点击取消" = "Đang tải âm thanh nền, nhấn để huỷ";
 "此 Mac 没有可读风扇" = "Mac này không có quạt đọc được";
@@ -2433,3 +2430,6 @@
 "不用合盖，在当前屏幕内容上播放一次" = "Chạy hiệu ứng một lần trên nội dung màn hình hiện tại mà không cần đóng nắp";
 "汇率换算" = "Quy đổi tiền tệ";
 "汇率获取失败" = "Không thể lấy tỷ giá";
+"闹钟通知未获允许，请在系统设置中开启通知。" = "Thông báo báo thức chưa được cho phép. Hãy bật thông báo trong Cài đặt hệ thống.";
+"闹钟通知声音已关闭，请在系统设置中开启声音。" = "Âm thanh thông báo báo thức đang tắt. Hãy bật âm thanh trong Cài đặt hệ thống.";
+"无法设置闹钟通知：%@" = "Không thể lên lịch thông báo báo thức: %@";
