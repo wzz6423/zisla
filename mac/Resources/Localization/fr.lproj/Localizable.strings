@@ -158,7 +158,7 @@
 "鼠标移入展开" = "Survol pour développer";
 "鼠标进入屏幕顶部感应区时显示" = "Afficher lorsque la souris entre dans la zone de détection en haut de l'écran";
 "仅本机保存文本和图片" = "Enregistrer uniquement le texte et les images localement";
-"发现可下载链接时提示" = "Avertir lorsque des liens téléchargeables sont détectés";
+"发现链接时提示" = "Avertir lorsque des liens sont détectés";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Gérer le répertoire de téléchargement, les notifications de téléchargement et les composants requis.";
