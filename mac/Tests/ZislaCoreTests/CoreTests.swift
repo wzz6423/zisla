@@ -1768,9 +1768,40 @@ struct DownloadCoreTests {
         )
 
         #expect(DownloadFailureDiagnostics.isDouyinCookieFailure(rawDiagnostic: raw, urlString: url))
+        #expect(DownloadFailureDiagnostics.requiresBrowserCookies(rawDiagnostic: raw, urlString: url))
+        #expect(DownloadFailureDiagnostics.requiresBrowserCookies(rawDiagnostic: message, urlString: url))
+        #expect(!DownloadFailureDiagnostics.requiresBrowserCookies(
+            rawDiagnostic: message,
+            urlString: "https://example.com/video"
+        ))
+        #expect(DownloadFailureDiagnostics.requiresBrowserCookies(
+            rawDiagnostic: AppLocalization.string(
+                "抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。",
+                language: .arabic
+            ),
+            urlString: url
+        ))
         #expect(message.contains("抖音"))
         #expect(message.contains("Cookies"))
         #expect(DownloadURLClassifier.isLikelyDownloadable(url))
+    }
+
+    @Test
+    func missingBrowserCookieDatabaseRetriesOnlyWhenACookieSourceWasChosen() {
+        let missingDatabase = "ERROR: could not find chrome cookies database in \\\"/Users/me/Library/Application Support/Google/Chrome\\\""
+
+        #expect(DownloadFailureDiagnostics.shouldRetryWithoutBrowserCookies(
+            rawDiagnostic: missingDatabase,
+            browserCookieSource: .chrome
+        ))
+        #expect(!DownloadFailureDiagnostics.shouldRetryWithoutBrowserCookies(
+            rawDiagnostic: missingDatabase,
+            browserCookieSource: nil
+        ))
+        #expect(!DownloadFailureDiagnostics.shouldRetryWithoutBrowserCookies(
+            rawDiagnostic: "ERROR: Fresh cookies are needed",
+            browserCookieSource: .chrome
+        ))
     }
 
     @Test

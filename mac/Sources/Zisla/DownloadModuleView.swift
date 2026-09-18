@@ -65,6 +65,7 @@ struct DownloadModuleView: View {
                 }
                 .disabled(model.isLoadingDownloadFormats)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 10) {
 

@@ -121,7 +121,7 @@ public enum DownloadOutputPathBuilder {
 public enum DownloadFailureDiagnostics {
     public static func actionableMessage(rawDiagnostic: String, urlString: String) -> String {
         if isDouyinCookieFailure(rawDiagnostic: rawDiagnostic, urlString: urlString) {
-            return AppLocalization.text("抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。")
+            return douyinCookieFailureMessage
         }
         guard isBilibiliHTTP412(rawDiagnostic: rawDiagnostic, urlString: urlString) else {
             return rawDiagnostic
@@ -160,6 +160,25 @@ public enum DownloadFailureDiagnostics {
             || (diagnostic.contains("http 403") && diagnostic.contains("cookies"))
     }
 
+    public static func requiresBrowserCookies(
+        rawDiagnostic: String,
+        urlString: String
+    ) -> Bool {
+        guard isDouyinURL(urlString) else { return false }
+        return isDouyinCookieFailure(rawDiagnostic: rawDiagnostic, urlString: urlString)
+            || isDouyinCookieFailureMessage(rawDiagnostic)
+    }
+
+    public static func shouldRetryWithoutBrowserCookies(
+        rawDiagnostic: String,
+        browserCookieSource: DownloadBrowserCookieSource?
+    ) -> Bool {
+        guard browserCookieSource != nil else { return false }
+        let diagnostic = rawDiagnostic.lowercased()
+        return diagnostic.contains("could not find")
+            && diagnostic.contains("cookies database")
+    }
+
     public static func isDouyinURL(_ string: String) -> Bool {
         guard let host = HTTPURLParser.url(from: string)?.host?.lowercased() else { return false }
         return host == "douyin.com" || host.hasSuffix(".douyin.com")
@@ -176,6 +195,18 @@ public enum DownloadFailureDiagnostics {
     private static func isRequestedFormatUnavailable(_ diagnostic: String) -> Bool {
         diagnostic.localizedCaseInsensitiveContains("requested format is not available")
     }
+
+    private static var douyinCookieFailureMessage: String {
+        AppLocalization.text(douyinCookieFailureKey)
+    }
+
+    private static func isDouyinCookieFailureMessage(_ value: String) -> Bool {
+        AppLanguage.allCases.contains {
+            value == AppLocalization.string(douyinCookieFailureKey, language: $0)
+        }
+    }
+
+    private static let douyinCookieFailureKey = "抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。"
 }
 
 public enum DownloadOutputPathValidator {
