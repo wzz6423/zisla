@@ -1260,7 +1260,8 @@ public enum EmojiNameCatalog {
             primaryAliases: [String: [String]],
             fallbackAliases: [String: [String]],
             primaryCanonicalNames: [String: [String]],
-            fallbackCanonicalNames: [String: [String]]
+            fallbackCanonicalNames: [String: [String]],
+            primaryAppleCanonicalNames: [String: [String]]
         ) {
             var canonicalExact: [String: [String]] = [:]
             var canonicalCompact: [String: [String]] = [:]
@@ -1283,7 +1284,11 @@ public enum EmojiNameCatalog {
                 }
             }
 
-            for namesByEmoji in [primaryCanonicalNames, fallbackCanonicalNames] {
+            for namesByEmoji in [
+                primaryCanonicalNames,
+                primaryAppleCanonicalNames,
+                fallbackCanonicalNames,
+            ] {
                 for emoji in namesByEmoji.keys.sorted() {
                     for name in namesByEmoji[emoji] ?? [] {
                         let key = EmojiNameCatalog.normalizedKey(name)
@@ -1345,6 +1350,49 @@ public enum EmojiNameCatalog {
         }
     }
 
+    enum AppleEmojiNameCatalog {
+        // Character Viewer names can differ from CLDR, so keep this private data on the host OS.
+        private static let resourceDirectory = URL(
+            fileURLWithPath: "/System/Library/PrivateFrameworks/CoreEmoji.framework/Resources",
+            isDirectory: true
+        )
+
+        static func canonicalNames(for language: AppLanguage) -> [String: [String]] {
+            let resourceURL = resourceDirectory
+                .appendingPathComponent("\(localizationDirectory(for: language)).lproj", isDirectory: true)
+                .appendingPathComponent("AppleName.strings")
+            return canonicalNames(from: try? Data(contentsOf: resourceURL, options: .mappedIfSafe))
+        }
+
+        static func canonicalNames(from data: Data?) -> [String: [String]] {
+            guard let data,
+                  let propertyList = try? PropertyListSerialization.propertyList(
+                    from: data,
+                    options: [],
+                    format: nil
+                  ),
+                  let names = propertyList as? [String: String]
+            else {
+                return [:]
+            }
+
+            return names.reduce(into: [:]) { result, entry in
+                let name = entry.value.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !entry.key.isEmpty, !name.isEmpty else { return }
+                result[entry.key] = [name]
+            }
+        }
+
+        private static func localizationDirectory(for language: AppLanguage) -> String {
+            switch language {
+            case .simplifiedChinese: "zh_CN"
+            case .traditionalChinese: "zh_TW"
+            case .brazilianPortuguese: "pt_BR"
+            default: language.rawValue
+            }
+        }
+    }
+
     private final class SupplementalCatalogCache: @unchecked Sendable {
         private let lock = NSLock()
         private var values: [AppLanguage: SupplementalCatalog] = [:]
@@ -1399,11 +1447,13 @@ public enum EmojiNameCatalog {
         let decoder = JSONDecoder()
         decoder.userInfo[requestedLanguageKey] = language.rawValue
         guard let slice = try? decoder.decode(EmojiCatalogSlice.self, from: data) else { return nil }
+        let primaryAppleCanonicalNames = AppleEmojiNameCatalog.canonicalNames(for: language)
         return SupplementalCatalog(
             primaryAliases: slice.primaryAliases,
             fallbackAliases: slice.fallbackAliases,
             primaryCanonicalNames: slice.primaryCanonicalNames,
-            fallbackCanonicalNames: slice.fallbackCanonicalNames
+            fallbackCanonicalNames: slice.fallbackCanonicalNames,
+            primaryAppleCanonicalNames: primaryAppleCanonicalNames
         )
     }
 

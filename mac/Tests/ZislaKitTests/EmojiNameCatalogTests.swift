@@ -44,6 +44,31 @@ struct EmojiNameCatalogTests {
     }
 
     @Test
+    func resolvesAppleCharacterViewerNames() {
+        #expect(
+            EmojiNameCatalog.emoji(for: "带面孔的新月", language: .simplifiedChinese) == "🌚"
+        )
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func resolvesAppleCharacterViewerNamesInEverySupportedLanguage(language: AppLanguage) throws {
+        let name = try #require(
+            EmojiNameCatalog.AppleEmojiNameCatalog.canonicalNames(for: language)["🌚"]?.first
+        )
+        #expect(EmojiNameCatalog.emoji(for: name, language: language) == "🌚")
+    }
+
+    @Test
+    func ignoresUnavailableOrMalformedAppleCharacterViewerCatalogs() {
+        #expect(EmojiNameCatalog.AppleEmojiNameCatalog.canonicalNames(from: nil).isEmpty)
+        #expect(
+            EmojiNameCatalog.AppleEmojiNameCatalog.canonicalNames(
+                from: Data("not a property list".utf8)
+            ).isEmpty
+        )
+    }
+
+    @Test
     func offersInputMethodStyleCandidatesForNaturalChineseNames() {
         for name in ["微笑的猫", "得意地笑的猫脸", "露齿而笑的猫脸"] {
             #expect(
@@ -168,6 +193,19 @@ struct EmojiNameCatalogTests {
         #expect(detection?.actions.contains(.copyEmoji("😺")) == true)
         let identifiers = detection?.actions.map(\.identifier) ?? []
         #expect(Set(identifiers).count == identifiers.count)
+    }
+
+    @Test
+    func detectorRecognizesAppleCharacterViewerNamesBeforeTextFallback() {
+        let detection = ClipboardAssistantDetector.detect(
+            text: "带面孔的新月",
+            enabledKinds: allKinds,
+            locale: Locale(identifier: "zh-Hans")
+        )
+
+        #expect(detection?.kind == .emojiName)
+        #expect(detection?.emoji == "🌚")
+        #expect(detection?.actions.first == .copyEmoji("🌚"))
     }
 
     @Test
