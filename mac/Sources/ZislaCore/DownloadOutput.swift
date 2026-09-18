@@ -174,9 +174,25 @@ public enum DownloadFailureDiagnostics {
         browserCookieSource: DownloadBrowserCookieSource?
     ) -> Bool {
         guard browserCookieSource != nil else { return false }
+        return isBrowserCookieDatabaseUnavailable(rawDiagnostic)
+    }
+
+    public static func canTryAnotherBrowserCookieSource(
+        rawDiagnostic: String,
+        urlString: String
+    ) -> Bool {
+        requiresBrowserCookies(rawDiagnostic: rawDiagnostic, urlString: urlString)
+            || isBrowserCookieDatabaseUnavailable(rawDiagnostic)
+    }
+
+    private static func isBrowserCookieDatabaseUnavailable(_ rawDiagnostic: String) -> Bool {
         let diagnostic = rawDiagnostic.lowercased()
-        return diagnostic.contains("could not find")
+        return (diagnostic.contains("could not find")
             && diagnostic.contains("cookies database")
+        ) || (
+            diagnostic.contains("cookies")
+                && (diagnostic.contains("cannot decrypt") || diagnostic.contains("failed to decrypt"))
+        )
     }
 
     public static func isDouyinURL(_ string: String) -> Bool {

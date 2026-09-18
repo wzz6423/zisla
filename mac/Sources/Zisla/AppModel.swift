@@ -2168,7 +2168,7 @@ final class AppModel: ObservableObject {
     let cookieSource = downloadBrowserCookieSource
     let task = Task { [weak self, downloadService] in
       do {
-        let result = try await downloadService.probeFormats(
+        let result = try await downloadService.probeFormatsAutomatically(
           urlString: normalizedDownloadURL,
           browserCookieSource: cookieSource
         )
@@ -2243,7 +2243,7 @@ final class AppModel: ObservableObject {
         if scopedAccess { request.outputDirectory.stopAccessingSecurityScopedResource() }
       }
       do {
-        let result = try await downloadService.download(
+        let result = try await downloadService.downloadAutomatically(
           request,
           taskID: taskID
         ) { [weak self] event in
@@ -2271,6 +2271,10 @@ final class AppModel: ObservableObject {
         }
         await MainActor.run {
           guard let self else { return }
+          if let browserCookieSource = result.browserCookieSource,
+             self.downloadBrowserCookieSource == nil {
+            self.downloadBrowserCookieSource = browserCookieSource
+          }
           self.addToShelf([result.fileURL])
           self.notices.enqueue(
             IslandNotice(
@@ -2412,6 +2416,11 @@ final class AppModel: ObservableObject {
       return
     }
     downloadFormatProbeTask = nil
+    if let browserCookieSource = result.browserCookieSource,
+       downloadBrowserCookieSource == nil {
+      downloadBrowserCookieSource = browserCookieSource
+    }
+    downloadFormatSourceURL = urlString
     isLoadingDownloadFormats = false
     downloadFormats = result.formats
     downloadFormatSelectionEnabled = result.canSelectFormats

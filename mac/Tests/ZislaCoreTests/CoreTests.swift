@@ -1802,6 +1802,22 @@ struct DownloadCoreTests {
             rawDiagnostic: "ERROR: Fresh cookies are needed",
             browserCookieSource: .chrome
         ))
+        #expect(DownloadFailureDiagnostics.canTryAnotherBrowserCookieSource(
+            rawDiagnostic: missingDatabase,
+            urlString: "https://v.douyin.com/example/"
+        ))
+        #expect(DownloadFailureDiagnostics.canTryAnotherBrowserCookieSource(
+            rawDiagnostic: "ERROR: Cannot decrypt cookies with the available keychain",
+            urlString: "https://v.douyin.com/example/"
+        ))
+        #expect(DownloadFailureDiagnostics.canTryAnotherBrowserCookieSource(
+            rawDiagnostic: "ERROR: Fresh cookies are needed",
+            urlString: "https://v.douyin.com/example/"
+        ))
+        #expect(!DownloadFailureDiagnostics.canTryAnotherBrowserCookieSource(
+            rawDiagnostic: "ERROR: Unsupported URL",
+            urlString: "https://v.douyin.com/example/"
+        ))
     }
 
     @Test

@@ -4,10 +4,16 @@ import ZislaCore
 public struct DownloadResult: Equatable, Sendable {
     public let taskID: UUID
     public let fileURL: URL
+    public let browserCookieSource: DownloadBrowserCookieSource?
 
-    public init(taskID: UUID, fileURL: URL) {
+    public init(
+        taskID: UUID,
+        fileURL: URL,
+        browserCookieSource: DownloadBrowserCookieSource? = nil
+    ) {
         self.taskID = taskID
         self.fileURL = fileURL
+        self.browserCookieSource = browserCookieSource
     }
 }
 
@@ -150,8 +156,31 @@ public actor DownloadService {
         return DownloadFormatProbeResult(
             title: result.title,
             formats: result.formats,
-            canSelectFormats: tools.capabilities.hasFFmpeg
+            canSelectFormats: tools.capabilities.hasFFmpeg,
+            browserCookieSource: browserCookieSource
         )
+    }
+
+    public func probeFormatsAutomatically(
+        urlString: String,
+        browserCookieSource: DownloadBrowserCookieSource? = nil
+    ) async throws -> DownloadFormatProbeResult {
+        do {
+            return try await probeFormats(
+                urlString: urlString,
+                browserCookieSource: browserCookieSource
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            guard browserCookieSource == nil,
+                  Self.requiresBrowserCookieDetection(error, urlString: urlString),
+                  let result = try await probeFormatsUsingAvailableBrowserCookies(urlString: urlString)
+            else {
+                throw error
+            }
+            return result
+        }
     }
 
     public func download(
@@ -343,6 +372,41 @@ public actor DownloadService {
         }
     }
 
+    public func downloadAutomatically(
+        _ request: DownloadRequest,
+        taskID: UUID = UUID(),
+        onEvent: @escaping @Sendable (YTDLPEvent) async -> Void = { _ in }
+    ) async throws -> DownloadResult {
+        do {
+            return try await download(request, taskID: taskID, onEvent: onEvent)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            guard request.browserCookieSource == nil,
+                  Self.requiresBrowserCookieDetection(error, urlString: request.urlString),
+                  let probeResult = try await probeFormatsUsingAvailableBrowserCookies(
+                    urlString: request.urlString
+                  ),
+                  let browserCookieSource = probeResult.browserCookieSource
+            else {
+                throw error
+            }
+            let retryRequest = try DownloadRequest(
+                urlString: request.urlString,
+                mode: request.mode,
+                outputDirectory: request.outputDirectory,
+                formatSelection: request.formatSelection,
+                browserCookieSource: browserCookieSource
+            )
+            let result = try await download(retryRequest, taskID: taskID, onEvent: onEvent)
+            return DownloadResult(
+                taskID: result.taskID,
+                fileURL: result.fileURL,
+                browserCookieSource: browserCookieSource
+            )
+        }
+    }
+
     private func downloadBilibiliVideo(
         _ request: DownloadRequest,
         taskID: UUID,
@@ -382,6 +446,54 @@ public actor DownloadService {
             components: components,
             taskTemporaryDirectory: taskTemporaryDirectory,
             outputDirectory: request.outputDirectory
+        )
+    }
+
+    private func probeFormatsUsingAvailableBrowserCookies(
+        urlString: String
+    ) async throws -> DownloadFormatProbeResult? {
+        for source in DownloadBrowserCookieSource.allCases {
+            do {
+                return try await probeFormats(
+                    urlString: urlString,
+                    browserCookieSource: source
+                )
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                guard Self.canTryAnotherBrowserCookieSource(error, urlString: urlString) else {
+                    throw error
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func requiresBrowserCookieDetection(
+        _ error: Error,
+        urlString: String
+    ) -> Bool {
+        guard let error = error as? DownloadServiceError,
+              case let .processFailed(_, diagnostic) = error else {
+            return false
+        }
+        return DownloadFailureDiagnostics.requiresBrowserCookies(
+            rawDiagnostic: diagnostic,
+            urlString: urlString
+        )
+    }
+
+    private static func canTryAnotherBrowserCookieSource(
+        _ error: Error,
+        urlString: String
+    ) -> Bool {
+        guard let error = error as? DownloadServiceError,
+              case let .processFailed(_, diagnostic) = error else {
+            return false
+        }
+        return DownloadFailureDiagnostics.canTryAnotherBrowserCookieSource(
+            rawDiagnostic: diagnostic,
+            urlString: urlString
         )
     }
 
