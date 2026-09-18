@@ -143,7 +143,7 @@ struct DownloadModuleView: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .frame(width: 292, height: 28)
+        .frame(width: 292, height: 28, alignment: .leading)
         .disabled(!model.canSelectDownloadFormats)
         .help(
             model.downloadFormatSelectionNeedsFFmpeg
@@ -171,7 +171,7 @@ struct DownloadModuleView: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .frame(width: 156, height: 28)
+        .frame(width: 156, height: 28, alignment: .leading)
     }
 
     private var downloadFormatPickerTitle: String {
