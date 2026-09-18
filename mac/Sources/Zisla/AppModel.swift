@@ -535,6 +535,8 @@ final class AppModel: ObservableObject {
   private var voiceInputTarget: VoiceTranscriptDeliveryTarget?
   private var voiceInputTargetProcessIdentifier: pid_t?
   private var voiceInputTargetMouseLocation: CGPoint?
+  /// Snapshot of locally installed applications used to resolve copied names.
+  private var installedApplications: [InstalledApplication] = []
 
   private init() {
     let networkProxyURL = settingsStore.settings.networkProxyURL
@@ -542,6 +544,7 @@ final class AppModel: ObservableObject {
     aiAgent.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
     managedTools.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
     Task { await downloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
+    startInstalledApplicationCatalog()
     sharingPickerDelegate.onCompletion = { [weak self] picker in
       self?.sharingPickerDidComplete(picker)
     }
@@ -1385,6 +1388,15 @@ final class AppModel: ObservableObject {
     AppLocalization.format(key, locale: languageStore.language.locale, [argument])
   }
 
+  /// Warms up the installed-application index in the background so copied names
+  /// can resolve as soon as the first snapshot lands; refreshed automatically
+  /// when watched application directories change.
+  private func startInstalledApplicationCatalog() {
+    InstalledApplicationCatalog.shared.start { [weak self] applications in
+      self?.installedApplications = applications
+    }
+  }
+
   private func handleCapturedClipboardContent(_ content: ClipboardHistoryContent) {
     let downloadableURL: URL?
     if case .text(let text) = content,
@@ -1442,7 +1454,8 @@ final class AppModel: ObservableObject {
       offersDownload: settings.downloaderEnabled,
       preferredCurrencyCode: ClipboardAssistantDetector.currentPreferredCurrencyCode(
         language: languageStore.language
-      )
+      ),
+      installedApplications: installedApplications
     ) else { return .unavailable }
     detection = augmentedClipboardAssistantDetection(
       detection,
@@ -1633,6 +1646,8 @@ final class AppModel: ObservableObject {
     switch action {
     case .openURL(let url):
       NSWorkspace.shared.open(url)
+    case .openApp(let bundleIdentifier, _):
+      openInstalledApplication(bundleIdentifier: bundleIdentifier)
     case .openDownload(let url):
       downloadURL = url.absoluteString
       selectModule(.download)
@@ -1746,6 +1761,24 @@ final class AppModel: ObservableObject {
       )
     } catch {
       return .google
+    }
+  }
+
+  /// Launches a locally installed application by bundle identifier. The assistant
+  /// fires from a collapsed island, so activation must go through the workspace
+  /// API rather than `open(_:)` on a file URL.
+  private func openInstalledApplication(bundleIdentifier: String) {
+    guard let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
+      transientMessage = clipboardAssistantMessage("无法打开应用")
+      return
+    }
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.activates = true
+    NSWorkspace.shared.openApplication(at: applicationURL, configuration: configuration) { [weak self] _, error in
+      guard error != nil else { return }
+      Task { @MainActor [weak self] in
+        self?.transientMessage = self?.clipboardAssistantMessage("无法打开应用")
+      }
     }
   }
 

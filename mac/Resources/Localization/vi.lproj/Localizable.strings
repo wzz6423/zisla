@@ -2437,3 +2437,8 @@
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Thông báo báo thức chưa được cho phép. Hãy bật thông báo trong Cài đặt hệ thống.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Âm thanh thông báo báo thức đang tắt. Hãy bật âm thanh trong Cài đặt hệ thống.";
 "无法设置闹钟通知：%@" = "Không thể lên lịch thông báo báo thức: %@";
+
+
+"应用程序" = "Ứng dụng";
+"打开应用" = "Mở ứng dụng";
+"无法打开应用" = "Không thể mở ứng dụng";
