@@ -3,8 +3,9 @@ import Combine
 import Foundation
 import ZislaCore
 
-/// Browser download source to display in the collapsed Dynamic Island.
+/// File transfer source to display in the collapsed Dynamic Island.
 public enum BrowserDownloadAgent: String, CaseIterable, Sendable {
+    case airDrop
     case safari
     case chrome
     case edge
@@ -16,6 +17,7 @@ public enum BrowserDownloadAgent: String, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
+        case .airDrop: "AirDrop"
         case .safari: "Safari"
         case .chrome: "Chrome"
         case .edge: "Microsoft Edge"
@@ -30,6 +32,7 @@ public enum BrowserDownloadAgent: String, CaseIterable, Sendable {
     /// Stable and preview releases of the same browser share download behavior; listed by priority.
     public var bundleIdentifiers: [String] {
         switch self {
+        case .airDrop: ["com.apple.sharingd"]
         case .safari: ["com.apple.Safari", "com.apple.SafariTechnologyPreview"]
         case .chrome: ["com.google.Chrome", "com.google.Chrome.beta", "com.google.Chrome.canary"]
         case .edge: ["com.microsoft.edgemac", "com.microsoft.edgemac.Beta"]
@@ -42,6 +45,13 @@ public enum BrowserDownloadAgent: String, CaseIterable, Sendable {
     }
 
     public var bundleIdentifier: String { bundleIdentifiers[0] }
+
+    public var symbolName: String {
+        switch self {
+        case .airDrop: "dot.radiowaves.left.and.right"
+        default: "arrow.down.circle.fill"
+        }
+    }
 }
 /// Temp-file extension for browser downloads → possible download sources; same-family browsers share an extension, so quarantine or runtime state is needed to distinguish them.
 enum BrowserDownloadTempExtension: String, CaseIterable, Sendable {
@@ -120,6 +130,12 @@ public struct BrowserDownloadSnapshot: Equatable, Identifiable, Sendable {
 
 /// Pure logic for resolving the download source, decoupled from `NSProgress` for unit testing.
 enum BrowserDownloadAgentResolver {
+    static func agent(
+        forFileOperationKind kind: Progress.FileOperationKind?
+    ) -> BrowserDownloadAgent? {
+        kind == .receiving ? .airDrop : nil
+    }
+
     /// The quarantine agent name may be a display name (`Google Chrome`), a short name (`Chrome`), or a bundle ID.
     static func agent(forQuarantineAgentName name: String) -> BrowserDownloadAgent? {
         let normalized = name.lowercased().trimmingCharacters(in: .whitespaces)
@@ -134,7 +150,7 @@ enum BrowserDownloadAgentResolver {
                 .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
                 .map(String.init)
         )
-        for agent in BrowserDownloadAgent.allCases where tokens.contains(agent.rawValue) {
+        for agent in BrowserDownloadAgent.allCases where tokens.contains(agent.rawValue.lowercased()) {
             return agent
         }
         return nil
@@ -156,7 +172,8 @@ enum BrowserDownloadAgentResolver {
             return candidates.first
         }
         let running = BrowserDownloadAgent.allCases.filter {
-            $0.bundleIdentifiers.contains(where: runningBundleIdentifiers.contains)
+            $0 != .airDrop
+                && $0.bundleIdentifiers.contains(where: runningBundleIdentifiers.contains)
         }
         return running.count == 1 ? running[0] : nil
     }
@@ -381,7 +398,8 @@ public final class BrowserDownloadMonitor: ObservableObject {
         let fileURL = Self.fileURL(for: progress)
         let entry = BrowserDownloadTracker.Entry(
             fileURL: fileURL,
-            agent: fileURL.flatMap { resolveAgent(forFileAt: $0) },
+            agent: BrowserDownloadAgentResolver.agent(forFileOperationKind: progress.fileOperationKind)
+                ?? fileURL.flatMap { resolveAgent(forFileAt: $0) },
             fileName: fileURL.map(BrowserDownloadAgentResolver.displayFileName) ?? "下载",
             fraction: Self.fraction(of: progress),
             startedAt: Date()
@@ -435,6 +453,11 @@ public final class BrowserDownloadMonitor: ObservableObject {
         for (token, box) in progressBoxes {
             let progress = box.progress
             tracker.update(token: token, fraction: Self.fraction(of: progress))
+            if let agent = BrowserDownloadAgentResolver.agent(
+                forFileOperationKind: progress.fileOperationKind
+            ) {
+                tracker.update(token: token, agent: agent)
+            }
             // Update fileURL if it becomes available after initial registration
             let currentFileURL = Self.fileURL(for: progress)
             if let currentFileURL, tracker.entries[token]?.fileURL != currentFileURL {

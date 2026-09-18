@@ -241,7 +241,7 @@ struct IslandRootView: View {
                             .padding(.bottom, IslandSurfaceGeometry.moduleInset)
                             .frame(
                                 maxWidth: .infinity,
-                                maxHeight: activeModule == .dashboard ? nil : .infinity,
+                                maxHeight: .infinity,
                                 alignment: .top
                             )
                             .clipShape(

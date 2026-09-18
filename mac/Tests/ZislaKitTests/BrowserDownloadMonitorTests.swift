@@ -7,6 +7,11 @@ import Testing
 struct BrowserDownloadAgentResolverTests {
     @Test
     func quarantineAgentNameMatchesDisplayNameShortNameAndBundleID() {
+        #expect(BrowserDownloadAgentResolver.agent(forQuarantineAgentName: "AirDrop") == .airDrop)
+        #expect(
+            BrowserDownloadAgentResolver.agent(forQuarantineAgentName: "com.apple.sharingd")
+                == .airDrop
+        )
         #expect(BrowserDownloadAgentResolver.agent(forQuarantineAgentName: "Chrome") == .chrome)
         #expect(
             BrowserDownloadAgentResolver.agent(forQuarantineAgentName: "Google Chrome") == .chrome
@@ -83,6 +88,28 @@ struct BrowserDownloadAgentResolverTests {
                 runningBundleIdentifiers: []
             ) == nil
         )
+        #expect(
+            BrowserDownloadAgentResolver.agent(
+                forTempExtension: nil,
+                runningBundleIdentifiers: ["com.apple.sharingd"]
+            ) == nil
+        )
+    }
+
+    @Test
+    func airDropUsesDedicatedSymbol() {
+        #expect(BrowserDownloadAgent.airDrop.displayName == "AirDrop")
+        #expect(BrowserDownloadAgent.airDrop.symbolName == "dot.radiowaves.left.and.right")
+        #expect(BrowserDownloadAgent.chrome.symbolName == "arrow.down.circle.fill")
+    }
+
+    @Test
+    func receivingFileProgressResolvesToAirDrop() {
+        #expect(
+            BrowserDownloadAgentResolver.agent(forFileOperationKind: .receiving) == .airDrop
+        )
+        #expect(BrowserDownloadAgentResolver.agent(forFileOperationKind: .downloading) == nil)
+        #expect(BrowserDownloadAgentResolver.agent(forFileOperationKind: nil) == nil)
     }
 
     @Test
