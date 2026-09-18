@@ -170,6 +170,76 @@ struct DownloadServiceTests {
     }
 
     @Test
+    func formatProbeUsesTheSelectedBrowserCookieSourceAndReportsCapabilities() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        let ffmpeg = directory.appendingPathComponent("tools/ffmpeg")
+        let argumentsFile = directory.appendingPathComponent("probe-arguments.txt")
+        let output = #"{"title":"Example","formats":[{"format_id":"137","ext":"mp4","width":1920,"height":1080,"fps":60,"vcodec":"avc1","acodec":"none"},{"format_id":"140","ext":"m4a","vcodec":"none","acodec":"mp4a"}]}"#
+        let script = """
+        #!/bin/sh
+        /usr/bin/printf '%s\\n' "$@" > \(shellSingleQuoted(argumentsFile.path))
+        /usr/bin/printf '%s\\n' '\(output)'
+        """
+        try writeExecutable(script, to: executable)
+        try writeExecutable("#!/bin/sh\nexit 0\n", to: ffmpeg)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [executable],
+                externalFFmpegCandidates: [ffmpeg]
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+        )
+
+        let result = try await service.probeFormats(
+            urlString: "https://v.douyin.com/example/",
+            browserCookieSource: .chrome
+        )
+        let arguments = try String(contentsOf: argumentsFile, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+
+        #expect(result.canSelectFormats)
+        #expect(result.formats.map(\.formatID) == ["137", "140"])
+        #expect(arguments.contains("--dump-single-json"))
+        #expect(arguments.contains("--skip-download"))
+        #expect(arguments.contains("--cookies-from-browser"))
+        #expect(arguments.contains("chrome"))
+        #expect(arguments.last == "https://v.douyin.com/example/")
+    }
+
+    @Test
+    func selectedFormatFailsWithoutFFmpegInsteadOfSilentlyChangingQuality() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        try writeExecutable("#!/bin/sh\nexit 0\n", to: executable)
+        let selection = try #require(DownloadFormatSelection(formatID: "137", audioFormatID: "140"))
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [executable],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+        )
+        let request = try DownloadRequest(
+            urlString: "https://example.com/video",
+            mode: .video,
+            outputDirectory: directory.appendingPathComponent("Downloads", isDirectory: true),
+            formatSelection: selection
+        )
+
+        await #expect(throws: DownloadServiceError.formatSelectionRequiresFFmpeg) {
+            try await service.download(request, taskID: UUID())
+        }
+    }
+
+    @Test
     func serviceRunsSeparateDownloadTasksConcurrently() async throws {
         let directory = kitTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

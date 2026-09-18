@@ -16,6 +16,8 @@ public enum DownloadServiceError: Error, Equatable, Sendable {
     case cannotPrepareDirectory(String)
     case launchFailed(String)
     case processFailed(exitCode: Int32, diagnostic: String)
+    case formatSelectionRequiresFFmpeg
+    case invalidFormatProbeResponse
     case missingCompletedFile
     case unsafeCompletedFile(String)
     case completedFileDoesNotExist(String)
@@ -66,6 +68,92 @@ public actor DownloadService {
         networkProxyEnabled = enabled
     }
 
+    public func probeFormats(
+        urlString: String,
+        browserCookieSource: DownloadBrowserCookieSource? = nil
+    ) async throws -> DownloadFormatProbeResult {
+        guard let url = HTTPURLParser.url(from: urlString) else {
+            throw DownloadRequestError.unsupportedURL
+        }
+
+        let tools = try resolver.resolve()
+        let probeDirectory = temporaryRootDirectory
+            .appendingPathComponent("FormatProbe-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(
+                at: probeDirectory,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            throw DownloadServiceError.cannotPrepareDirectory(error.localizedDescription)
+        }
+        defer { try? FileManager.default.removeItem(at: probeDirectory) }
+
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.executableURL = tools.ytDLPURL
+        process.arguments = DownloadFormatProbe.arguments(
+            urlString: url.absoluteString,
+            browserCookieSource: browserCookieSource
+        )
+        process.environment = DownloadProcessEnvironment.sanitized(
+            ProcessInfo.processInfo.environment,
+            proxyURL: networkProxyURL,
+            proxyEnabled: networkProxyEnabled
+        )
+        process.currentDirectoryURL = probeDirectory
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        let processBox = ProcessBox(process)
+        do {
+            try Task.checkCancellation()
+            try process.run()
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw DownloadServiceError.launchFailed(error.localizedDescription)
+        }
+
+        try? stdoutPipe.fileHandleForWriting.close()
+        try? stderrPipe.fileHandleForWriting.close()
+        let collector = DownloadEventCollector()
+        async let stdout = Self.readProbeOutput(FileHandleBox(stdoutPipe.fileHandleForReading))
+        async let stderr = Self.drain(
+            FileHandleBox(stderrPipe.fileHandleForReading),
+            collector: collector
+        )
+
+        let exitCode = await withTaskCancellationHandler {
+            await Self.waitForExit(processBox)
+        } onCancel: {
+            processBox.terminate()
+        }
+        let output = await stdout
+        let diagnostic = await stderr
+
+        try Task.checkCancellation()
+        guard exitCode == 0 else {
+            throw DownloadServiceError.processFailed(
+                exitCode: exitCode,
+                diagnostic: DownloadFailureDiagnostics.actionableMessage(
+                    rawDiagnostic: diagnostic,
+                    urlString: url.absoluteString
+                )
+            )
+        }
+        guard !output.isTruncated,
+              let result = try? DownloadFormatProbe.result(from: output.string) else {
+            throw DownloadServiceError.invalidFormatProbeResponse
+        }
+        return DownloadFormatProbeResult(
+            title: result.title,
+            formats: result.formats,
+            canSelectFormats: tools.capabilities.hasFFmpeg
+        )
+    }
+
     public func download(
         _ request: DownloadRequest,
         taskID: UUID = UUID(),
@@ -104,6 +192,7 @@ public actor DownloadService {
         defer { try? fileManager.removeItem(at: taskTemporaryDirectory) }
 
         if request.mode == .video,
+           request.formatSelection == nil,
            DownloadFailureDiagnostics.isBilibiliURL(request.urlString) {
             return try await downloadBilibiliVideo(
                 request,
@@ -117,6 +206,7 @@ public actor DownloadService {
             tools = try resolver.resolve()
         } catch let resolverError {
             guard request.mode == .video,
+                  request.formatSelection == nil,
                   DownloadFailureDiagnostics.isBilibiliURL(request.urlString)
             else {
                 throw resolverError
@@ -140,6 +230,9 @@ public actor DownloadService {
             for: request,
             capabilities: tools.capabilities
         )
+        if request.formatSelection != nil, !tools.capabilities.hasFFmpeg {
+            throw DownloadServiceError.formatSelectionRequiresFFmpeg
+        }
         let process = Process()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
@@ -197,6 +290,7 @@ public actor DownloadService {
                 stderr: diagnostics.1
             )
             if request.mode == .video,
+               request.formatSelection == nil,
                DownloadFailureDiagnostics.shouldUseBilibiliNativeFallback(
                    rawDiagnostic: diagnostic,
                    urlString: request.urlString
@@ -511,6 +605,34 @@ public actor DownloadService {
         }.value
     }
 
+    private nonisolated static func readProbeOutput(
+        _ fileHandle: FileHandleBox
+    ) async -> BoundedProcessOutput {
+        await Task.detached(priority: .utility) {
+            let limit = 4 * 1_024 * 1_024
+            var data = Data()
+            var isTruncated = false
+            do {
+                while let chunk = try fileHandle.read(upToCount: 32 * 1_024), !chunk.isEmpty {
+                    let remaining = limit - data.count
+                    if remaining > 0 {
+                        data.append(chunk.prefix(remaining))
+                    }
+                    if chunk.count > remaining {
+                        isTruncated = true
+                    }
+                }
+            } catch {
+                data.append(Data("\n\(error.localizedDescription)".utf8))
+                isTruncated = true
+            }
+            return BoundedProcessOutput(
+                string: String(decoding: data, as: UTF8.self),
+                isTruncated: isTruncated
+            )
+        }.value
+    }
+
     private nonisolated static func combinedDiagnostic(stdout: String, stderr: String) -> String {
         [stderr, stdout]
             .filter { !$0.isEmpty }
@@ -564,7 +686,7 @@ private actor DownloadEventCollector {
     private(set) var completedFile: URL?
     private(set) var components: [DownloadedMediaComponent] = []
 
-    init(onEvent: @escaping @Sendable (YTDLPEvent) async -> Void) {
+    init(onEvent: @escaping @Sendable (YTDLPEvent) async -> Void = { _ in }) {
         self.onEvent = onEvent
     }
 
@@ -577,6 +699,11 @@ private actor DownloadEventCollector {
         }
         await onEvent(event)
     }
+}
+
+private struct BoundedProcessOutput: Sendable {
+    let string: String
+    let isTruncated: Bool
 }
 
 private struct BoundedData {

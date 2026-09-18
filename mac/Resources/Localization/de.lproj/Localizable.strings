@@ -1,4 +1,18 @@
 /* Localizable.strings - English localization for Zisla macOS */
+/* Download format selection */
+"自动选择" = "Automatisch auswählen";
+"刷新格式" = "Formate aktualisieren";
+"需要 FFmpeg 才能选择格式" = "Zum Auswählen von Formaten ist FFmpeg erforderlich";
+"选择格式" = "Format auswählen";
+"不使用浏览器 Cookies" = "Browser-Cookies nicht verwenden";
+"浏览器 Cookies" = "Browser-Cookies";
+"使用 %@ Cookies" = "%@-Cookies verwenden";
+"%.0f FPS" = "%.0f FPS";
+"正在读取格式" = "Formate werden geladen";
+"未找到可用格式" = "Keine verfügbaren Formate gefunden";
+"选择浏览器 Cookies 后重试" = "Browser-Cookies auswählen und erneut versuchen";
+"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。" = "Douyin gab HTTP 403 zurück und benötigt aktuelle Browser-Cookies. Wähle Safari, Chrome oder Firefox und versuche es erneut. Eine Anmeldung ist nicht erforderlich.";
+"无法读取下载格式" = "Downloadformate konnten nicht gelesen werden";
 
 /* Common */
 "取消" = "Abbrechen";

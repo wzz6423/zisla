@@ -26,7 +26,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
 
   var allowsIslandKeyboardFocus: Bool {
     switch self {
-    case .shelf, .clipboard, .mail, .quickNotes:
+    case .shelf, .clipboard, .download, .mail, .quickNotes:
       true
     default:
       false
@@ -159,7 +159,7 @@ struct IslandModuleLayout: Equatable {
   }
 
   static let toolbox = compactModule(contentHeight: 136)
-  static let download = compactModule(contentHeight: 138)
+  static let download = compactModule(contentHeight: 170)
   static let agenda = compactModule(contentHeight: 160)
   /// Tall modules share the former CPU monitor height to keep their panel geometry consistent.
   static let system = compactModule(contentHeight: 401)
@@ -345,10 +345,27 @@ final class AppModel: ObservableObject {
   @Published var updateState: UpdateCheckState = .idle
   @Published private(set) var productUpdateAvailable = false
   @Published var downloadURL = ""
-  @Published var downloadMode: DownloadMode = .video
+  @Published var downloadMode: DownloadMode = .video {
+    didSet {
+      guard downloadMode != oldValue else { return }
+      selectedDownloadFormat = nil
+    }
+  }
   @Published var downloadDirectory = AppPaths.downloads
   @Published var downloadState: DownloadUIState = .idle
   @Published private(set) var activeDownloads: [DownloadTaskSnapshot] = []
+  @Published private(set) var downloadFormats: [DownloadFormat] = []
+  @Published private(set) var isLoadingDownloadFormats = false
+  @Published private(set) var downloadFormatSelectionEnabled = false
+  @Published private(set) var downloadFormatError: String?
+  @Published private(set) var downloadNeedsBrowserCookies = false
+  @Published var selectedDownloadFormat: DownloadFormatSelection?
+  @Published var downloadBrowserCookieSource: DownloadBrowserCookieSource? {
+    didSet {
+      guard downloadBrowserCookieSource != oldValue else { return }
+      resetDownloadFormatState()
+    }
+  }
   @Published var transientMessage: String? {
     didSet { scheduleTransientMessageDismissal() }
   }
@@ -481,6 +498,9 @@ final class AppModel: ObservableObject {
   private var downloadTaskStates: [UUID: DownloadUIState] = [:]
   private var downloadTaskURLs: [UUID: String] = [:]
   private var downloadTaskOrder: [UUID] = []
+  private var downloadFormatProbeTask: Task<Void, Never>?
+  private var downloadFormatProbeGeneration = 0
+  private var downloadFormatSourceURL: String?
   private var detectedLinkTask: Task<Void, Never>?
   private var translationTask: Task<Void, Never>?
   private var voiceModelDiscoveryTask: Task<Void, Never>?
@@ -1630,7 +1650,7 @@ final class AppModel: ObservableObject {
   }
 
   private func presentDetectedLink(_ url: URL) {
-    downloadURL = url.absoluteString
+    setDownloadURL(url.absoluteString)
     selectModule(.download)
     detectedLink = url
     detectedLinkTask?.cancel()
@@ -1651,7 +1671,7 @@ final class AppModel: ObservableObject {
     case .openApp(let bundleIdentifier, _):
       openInstalledApplication(bundleIdentifier: bundleIdentifier)
     case .openDownload(let url):
-      downloadURL = url.absoluteString
+      setDownloadURL(url.absoluteString)
       selectModule(.download)
     case .revealInFinder(let url):
       NSWorkspace.shared.activateFileViewerSelecting([url])
@@ -2074,21 +2094,131 @@ final class AppModel: ObservableObject {
   }
 
   private func prepareDownload(_ url: URL) {
-    downloadURL = url.absoluteString
+    setDownloadURL(url.absoluteString)
     selectModule(.download)
     detectedLinkTask?.cancel()
     detectedLink = nil
     transientMessage = AppLocalization.text("链接已放入下载中转")
   }
 
+  var downloadFormatOptions: [DownloadFormatOption] {
+    guard downloadFormatSourceURL == normalizedDownloadURL else { return [] }
+    return DownloadFormatCatalog.options(for: downloadMode, formats: downloadFormats)
+  }
+
+  var selectedDownloadFormatOption: DownloadFormatOption? {
+    guard let selectedDownloadFormat else { return nil }
+    return downloadFormatOptions.first { $0.selection == selectedDownloadFormat }
+  }
+
+  var canSelectDownloadFormats: Bool {
+    downloadFormatSelectionEnabled
+      && !isLoadingDownloadFormats
+      && !downloadFormatOptions.isEmpty
+  }
+
+  var downloadFormatSelectionNeedsFFmpeg: Bool {
+    !downloadFormats.isEmpty && !downloadFormatSelectionEnabled
+  }
+
+  func setDownloadURL(_ value: String) {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    let normalized = HTTPURLParser.url(from: trimmed)?.absoluteString ?? trimmed
+    guard downloadURL != normalized else { return }
+    downloadURL = normalized
+    downloadNeedsBrowserCookies = false
+    resetDownloadFormatState()
+  }
+
+  func clearDownloadURL() {
+    downloadURL = ""
+    downloadNeedsBrowserCookies = false
+    resetDownloadFormatState()
+    if !hasActiveDownloads { downloadState = .idle }
+  }
+
+  func downloadURLChangedByUser() {
+    guard downloadFormatSourceURL != normalizedDownloadURL else { return }
+    downloadNeedsBrowserCookies = false
+    resetDownloadFormatState()
+  }
+
+  func selectDownloadFormat(_ option: DownloadFormatOption?) {
+    guard option == nil || canSelectDownloadFormats else { return }
+    selectedDownloadFormat = option?.selection
+  }
+
+  func refreshDownloadFormats() {
+    guard let normalizedDownloadURL else {
+      resetDownloadFormatState()
+      let message = AppLocalization.text("链接或输出目录无效")
+      if hasActiveDownloads {
+        transientMessage = message
+      } else {
+        downloadState = .failed(message)
+      }
+      return
+    }
+
+    downloadURL = normalizedDownloadURL
+    resetDownloadFormatState()
+    downloadFormatSourceURL = normalizedDownloadURL
+    isLoadingDownloadFormats = true
+    let generation = downloadFormatProbeGeneration
+    let cookieSource = downloadBrowserCookieSource
+    let task = Task { [weak self, downloadService] in
+      do {
+        let result = try await downloadService.probeFormats(
+          urlString: normalizedDownloadURL,
+          browserCookieSource: cookieSource
+        )
+        guard !Task.isCancelled else { return }
+        await MainActor.run {
+          self?.finishDownloadFormatProbe(
+            result,
+            urlString: normalizedDownloadURL,
+            cookieSource: cookieSource,
+            generation: generation
+          )
+        }
+      } catch is CancellationError {
+        return
+      } catch {
+        await MainActor.run {
+          self?.failDownloadFormatProbe(
+            error,
+            urlString: normalizedDownloadURL,
+            cookieSource: cookieSource,
+            generation: generation
+          )
+        }
+      }
+    }
+    downloadFormatProbeTask = task
+  }
+
+  func retryDownloadWithBrowserCookies() {
+    guard downloadNeedsBrowserCookies, downloadBrowserCookieSource != nil else { return }
+    startDownload()
+  }
+
   func startDownload() {
     let request: DownloadRequest
     do {
-      request = try DownloadRequest(
+      let parsedRequest = try DownloadRequest(
         urlString: downloadURL,
         mode: downloadMode,
         outputDirectory: downloadDirectory
       )
+      request = try DownloadRequest(
+        urlString: parsedRequest.urlString,
+        mode: downloadMode,
+        outputDirectory: downloadDirectory,
+        formatSelection: selectedDownloadFormat(for: parsedRequest.urlString),
+        browserCookieSource: downloadBrowserCookieSource
+      )
+      downloadURL = request.urlString
+      downloadNeedsBrowserCookies = false
     } catch {
       if hasActiveDownloads {
         transientMessage = AppLocalization.text("链接或输出目录无效")
@@ -2162,6 +2292,10 @@ final class AppModel: ObservableObject {
         }
       } catch {
         await MainActor.run {
+          self?.downloadNeedsBrowserCookies = Self.requiresBrowserCookies(
+            error,
+            urlString: request.urlString
+          )
           self?.finishDownloadTask(
             taskID,
             state: .failed(Self.downloadErrorText(error)),
@@ -2227,6 +2361,79 @@ final class AppModel: ObservableObject {
             let urlString = downloadTaskURLs[taskID]
       else { return nil }
       return DownloadTaskSnapshot(id: taskID, urlString: urlString, state: state)
+    }
+  }
+
+  private var normalizedDownloadURL: String? {
+    HTTPURLParser.url(from: downloadURL)?.absoluteString
+  }
+
+  private func selectedDownloadFormat(for urlString: String) -> DownloadFormatSelection? {
+    guard downloadFormatSelectionEnabled,
+          downloadFormatSourceURL == urlString,
+          let selectedDownloadFormat,
+          downloadFormatOptions.contains(where: { $0.selection == selectedDownloadFormat }) else {
+      return nil
+    }
+    return selectedDownloadFormat
+  }
+
+  private func resetDownloadFormatState() {
+    downloadFormatProbeGeneration += 1
+    downloadFormatProbeTask?.cancel()
+    downloadFormatProbeTask = nil
+    downloadFormatSourceURL = nil
+    downloadFormats = []
+    isLoadingDownloadFormats = false
+    downloadFormatSelectionEnabled = false
+    downloadFormatError = nil
+    selectedDownloadFormat = nil
+  }
+
+  private func finishDownloadFormatProbe(
+    _ result: DownloadFormatProbeResult,
+    urlString: String,
+    cookieSource: DownloadBrowserCookieSource?,
+    generation: Int
+  ) {
+    guard generation == downloadFormatProbeGeneration,
+          downloadFormatSourceURL == urlString,
+          downloadBrowserCookieSource == cookieSource else {
+      return
+    }
+    downloadFormatProbeTask = nil
+    isLoadingDownloadFormats = false
+    downloadFormats = result.formats
+    downloadFormatSelectionEnabled = result.canSelectFormats
+    downloadFormatError = result.formats.isEmpty
+      ? AppLocalization.text("未找到可用格式")
+      : nil
+    downloadNeedsBrowserCookies = false
+  }
+
+  private func failDownloadFormatProbe(
+    _ error: Error,
+    urlString: String,
+    cookieSource: DownloadBrowserCookieSource?,
+    generation: Int
+  ) {
+    guard generation == downloadFormatProbeGeneration,
+          downloadFormatSourceURL == urlString,
+          downloadBrowserCookieSource == cookieSource else {
+      return
+    }
+    downloadFormatProbeTask = nil
+    isLoadingDownloadFormats = false
+    downloadFormatSelectionEnabled = false
+    selectedDownloadFormat = nil
+    let message = Self.downloadErrorText(error)
+    downloadFormatError = message
+    downloadNeedsBrowserCookies = Self.requiresBrowserCookies(
+      error,
+      urlString: urlString
+    )
+    if !hasActiveDownloads {
+      downloadState = .failed(message)
     }
   }
 
@@ -3570,10 +3777,23 @@ final class AppModel: ObservableObject {
     case .cannotPrepareDirectory: return "无法写入下载目录"
     case .launchFailed: return "无法启动下载任务"
     case .processFailed(_, let diagnostic): return diagnostic.isEmpty ? AppLocalization.text("下载失败") : diagnostic
+    case .formatSelectionRequiresFFmpeg: return AppLocalization.text("需要 FFmpeg 才能选择格式")
+    case .invalidFormatProbeResponse: return AppLocalization.text("无法读取下载格式")
     case .missingCompletedFile: return "未获得下载文件"
     case .unsafeCompletedFile: return "下载结果位于授权目录之外"
     case .completedFileDoesNotExist: return "下载文件不存在"
     }
+  }
+
+  private static func requiresBrowserCookies(_ error: Error, urlString: String) -> Bool {
+    guard let error = error as? DownloadServiceError,
+          case let .processFailed(_, diagnostic) = error else {
+      return false
+    }
+    return DownloadFailureDiagnostics.isDouyinCookieFailure(
+      rawDiagnostic: diagnostic,
+      urlString: urlString
+    )
   }
 }
 
