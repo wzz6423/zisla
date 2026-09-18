@@ -5,7 +5,7 @@ import Testing
 
 struct HeadphoneConnectionNoticeTests {
     @Test
-    func headphoneGlyphUsesSystemDeviceAssetsInsteadOfAnAirPodsSymbol() throws {
+    func headphoneGlyphPrefersSystemAssetsAndRestoresFallbackSymbolEffect() throws {
         let source = try String(contentsOf: Self.sideNoticeViewSourceURL, encoding: .utf8)
         let glyph = try Self.sourceSlice(
             in: source,
@@ -16,8 +16,9 @@ struct HeadphoneConnectionNoticeTests {
         #expect(glyph.contains("HeadphoneSystemAssetLocator.system.asset(for: productID)"))
         #expect(glyph.contains("HeadphoneConnectionAnimation(url: animationURL)"))
         #expect(glyph.contains("Image(nsImage: image)"))
-        #expect(!glyph.contains("airpods.pro"))
-        #expect(!glyph.contains(".symbolEffect("))
+        #expect(glyph.contains("Image(systemName: isSingleUnit ? \"headphones\" : \"airpods.pro\")"))
+        #expect(glyph.contains(".bounce.up.byLayer"))
+        #expect(glyph.contains("value: isPresented"))
     }
 
     @Test
@@ -66,10 +67,11 @@ struct HeadphoneConnectionNoticeTests {
         #expect(asset.imageURL.lastPathComponent == "B788.icns")
         #expect(asset.animationURL?.lastPathComponent == "Banner-PID-8231-Loop.mov")
         #expect(locator.asset(for: nil) == nil)
+        #expect(locator.asset(for: 0x2028) == nil)
     }
 
     @Test
-    func headphonePresentationPassesProductIDAndRespectsReduceMotion() throws {
+    func headphonePresentationPassesProductIDAndRestoresFallbackMotion() throws {
         let source = try String(contentsOf: Self.sideNoticeViewSourceURL, encoding: .utf8)
         let detail = try Self.sourceSlice(
             in: source,
@@ -83,8 +85,13 @@ struct HeadphoneConnectionNoticeTests {
         )
 
         for presentation in [detail, compact] {
+            #expect(presentation.contains("@State private var isPresented = false"))
             #expect(presentation.contains("productID: notice.headphoneProductID"))
+            #expect(presentation.contains("isPresented: isPresented"))
             #expect(presentation.contains("reduceMotion: reduceMotion"))
+            #expect(presentation.contains("guard !reduceMotion else { return }"))
+            #expect(presentation.contains("isPresented = true"))
+            #expect(!presentation.contains("withAnimation"))
         }
 
         let glyph = try Self.sourceSlice(
