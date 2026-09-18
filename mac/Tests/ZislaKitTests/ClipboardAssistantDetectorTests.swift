@@ -608,6 +608,102 @@ struct ClipboardAssistantDetectorTests {
         let garbage = ClipboardAssistantDetector.detect(content: .image(Data([0x00, 0x01])), enabledKinds: allKinds)
         #expect(garbage == nil)
     }
+
+    // MARK: - Installed applications
+
+    private let safari = InstalledApplication(
+        bundleIdentifier: "com.apple.Safari",
+        displayName: "Safari",
+        matchKeys: ["safari"]
+    )
+
+    @Test
+    func detectsInstalledApplicationByCopiedName() {
+        let detection = ClipboardAssistantDetector.detect(
+            text: "safari",
+            enabledKinds: allKinds,
+            installedApplications: [safari]
+        )
+        #expect(detection?.kind == .app)
+        #expect(detection?.title == "Safari")
+        #expect(detection?.action == .openApp(
+            bundleIdentifier: "com.apple.Safari", appName: "Safari"
+        ))
+    }
+
+    @Test
+    func appDetectionMatchesTheLocalizedDisplayName() {
+        let weChat = InstalledApplication(
+            bundleIdentifier: "com.tencent.xinWeChat",
+            displayName: "微信",
+            matchKeys: ["微信", "wechat"]
+        )
+        let detection = ClipboardAssistantDetector.detect(
+            text: "微信",
+            enabledKinds: allKinds,
+            installedApplications: [weChat]
+        )
+        #expect(detection?.kind == .app)
+        #expect(detection?.title == "微信")
+    }
+
+    @Test
+    func appDetectionRunsBeforeForeignLanguageAndTextBranches() {
+        // On a Chinese system "Safari" reads as English text; the exact application
+        // name match must win so the user gets the launch action they copied for.
+        let detection = ClipboardAssistantDetector.detect(
+            text: "Safari",
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "zh-CN",
+            installedApplications: [safari]
+        )
+        #expect(detection?.kind == .app)
+    }
+
+    @Test
+    func unknownTextStillFallsThroughToPlainTextField() {
+        let detection = ClipboardAssistantDetector.detect(
+            text: "hello world",
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en",
+            installedApplications: [safari]
+        )
+        #expect(detection?.kind == .text)
+    }
+
+    @Test
+    func copiedNamesThatAreNotInstalledStayText() {
+        // Deliberately ordinary English wording: an uninstalled name must simply
+        // keep the plain-text behavior it had before the application branch.
+        let detection = ClipboardAssistantDetector.detect(
+            text: "Fancy New Editor",
+            enabledKinds: allKinds,
+            systemLanguageIdentifier: "en",
+            installedApplications: [safari]
+        )
+        #expect(detection?.kind == .text, "actual kind: \(String(describing: detection?.kind))")
+    }
+
+    @Test
+    func appKindDisabledKeepsTextBehavior() {
+        var kinds = allKinds
+        kinds.remove(.app)
+        let detection = ClipboardAssistantDetector.detect(
+            text: "safari",
+            enabledKinds: kinds,
+            systemLanguageIdentifier: "en",
+            installedApplications: [safari]
+        )
+        #expect(detection?.kind == .text)
+    }
+
+    @Test
+    func appOrderDefaultsToOpenThenSearchThenNoteThenShare() {
+        #expect(ClipboardAssistantKind.allCases.contains(.app))
+        #expect(ClipboardAssistantActionOrder.defaults(for: .app) == [
+            .openApp, .search, .addToQuickNote, .share,
+        ])
+    }
 }
 
 struct ClipboardAssistantSearchEngineTests {
