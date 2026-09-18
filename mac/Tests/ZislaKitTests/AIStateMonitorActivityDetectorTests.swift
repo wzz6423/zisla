@@ -4,6 +4,8 @@ import Testing
 @testable import ZislaKit
 
 struct AIStateMonitorActivityDetectorTests {
+    private static let testPeriodicRefreshInterval: TimeInterval = 24 * 60 * 60
+
     @Test @MainActor
     func defaultActivityRefreshAvoidsHighFrequencyDirectoryScans() {
         #expect(AIStateMonitor.defaultDetectorRefreshInterval == 30)
@@ -229,7 +231,7 @@ struct AIStateMonitorActivityDetectorTests {
             directoryURL: directory,
             activityDetectors: [activityDetector],
             usageDetectors: [usageDetector],
-            detectorRefreshInterval: 60,
+            detectorRefreshInterval: Self.testPeriodicRefreshInterval,
             now: { now }
         )
         defer { monitor.stop() }
@@ -255,7 +257,7 @@ struct AIStateMonitorActivityDetectorTests {
         let monitor = AIStateMonitor(
             directoryURL: directory,
             activityDetectors: [detector],
-            detectorRefreshInterval: 60
+            detectorRefreshInterval: Self.testPeriodicRefreshInterval
         )
         defer { monitor.stop() }
 

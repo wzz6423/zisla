@@ -2437,8 +2437,8 @@
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Meldingen voor wekkers zijn niet toegestaan. Schakel meldingen in via Systeeminstellingen.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Geluiden voor wekkermeldingen zijn uitgeschakeld. Schakel geluiden in via Systeeminstellingen.";
 "无法设置闹钟通知：%@" = "De wekkermelding kon niet worden ingepland: %@";
-
-
 "应用程序" = "Programma's";
 "打开应用" = "App openen";
 "无法打开应用" = "Kan de app niet openen";
+"Emoji 名称" = "Emoji-naam";
+"复制 Emoji" = "Emoji kopiëren";

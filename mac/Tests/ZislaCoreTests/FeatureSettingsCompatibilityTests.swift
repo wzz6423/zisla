@@ -9,7 +9,7 @@ struct FeatureSettingsCompatibilityTests {
 
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
 
-        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .conversion, .app])
+        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .conversion, .app, .emojiName])
         let payload = try #require(
             JSONSerialization.jsonObject(
                 with: JSONEncoder().encode(decoded)
@@ -22,7 +22,7 @@ struct FeatureSettingsCompatibilityTests {
     func legacyCurrencyEnabledStateMigratesToConversionAndOptOutPersistsAfterRestart() throws {
         let legacy = Data(#"{"clipboardAssistantCurrencyDefaultApplied":true,"clipboardAssistantEnabledKinds":["text","currency"]}"#.utf8)
         var settings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
-        #expect(settings.clipboardAssistantEnabledKinds == [.text, .conversion, .app])
+        #expect(settings.clipboardAssistantEnabledKinds == [.text, .conversion, .app, .emojiName])
         settings.clipboardAssistantEnabledKinds.remove(.conversion)
 
         let decoded = try JSONDecoder().decode(
@@ -50,6 +50,7 @@ struct FeatureSettingsCompatibilityTests {
     @Test
     func clipboardAssistantConversionIsEnabledForNewSettings() throws {
         #expect(FeatureSettings.default.clipboardAssistantEnabledKinds.contains(.conversion))
+        #expect(FeatureSettings.default.clipboardAssistantEnabledKinds.contains(.emojiName))
         #expect(!FeatureSettings.default.clipboardAssistantEnabledKinds.contains(.currency))
         #expect(!ClipboardAssistantKind.allCases.contains(.currency))
         #expect(ClipboardAssistantKind.allCases.contains(.conversion))
@@ -82,7 +83,7 @@ struct FeatureSettingsCompatibilityTests {
 
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
 
-        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .app])
+        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .app, .emojiName])
         let payload = try #require(
             JSONSerialization.jsonObject(
                 with: JSONEncoder().encode(decoded)
@@ -103,7 +104,7 @@ struct FeatureSettingsCompatibilityTests {
             from: JSONEncoder().encode(settings)
         )
 
-        #expect(decoded.clipboardAssistantEnabledKinds == [.text])
+        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .emojiName])
     }
 
     @Test
@@ -136,6 +137,8 @@ struct FeatureSettingsCompatibilityTests {
             ) as? [String: Any]
         )
         payload["clipboardAssistantEnabledKinds"] = ["text", "chineseText"]
+        // A genuine pre-versioning payload carries no kind-set version marker.
+        payload.removeValue(forKey: "clipboardAssistantKindSetVersion")
         payload["clipboardAssistantActionOrders"] = [
             "chineseText",
             ["search", "translate", "saveText", "addToQuickNote", "sendToTeleprompter", "share"],
@@ -146,7 +149,7 @@ struct FeatureSettingsCompatibilityTests {
             from: JSONSerialization.data(withJSONObject: payload)
         )
 
-        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .nonSystemLanguageText])
+        #expect(decoded.clipboardAssistantEnabledKinds == [.text, .nonSystemLanguageText, .emojiName])
         #expect(decoded.clipboardAssistantActionOrders[.nonSystemLanguageText] == [
             .search, .translate, .saveText, .addToQuickNote, .sendToTeleprompter, .share,
         ])
@@ -157,6 +160,60 @@ struct FeatureSettingsCompatibilityTests {
         )
         #expect(reencoded.contains("\"chineseText\""))
         #expect(!reencoded.contains("\"nonSystemLanguageText\""))
+    }
+
+    @Test
+    func emojiNameKindIsEnabledOnceWhenUpgradingLegacyKindSets() throws {
+        var payload = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(FeatureSettings.default)
+            ) as? [String: Any]
+        )
+        // Stored before emojiName shipped: no version marker, set lacks the kind.
+        payload["clipboardAssistantEnabledKinds"] = ["url", "text"]
+        payload.removeValue(forKey: "clipboardAssistantKindSetVersion")
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONSerialization.data(withJSONObject: payload)
+        )
+
+        #expect(decoded.clipboardAssistantEnabledKinds == [.url, .text, .emojiName])
+
+        // The upgrade is one-shot: a post-upgrade payload carries the version
+        // marker, so a set without emojiName is a deliberate user choice.
+        var postUpgrade = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(decoded)
+            ) as? [String: Any]
+        )
+        postUpgrade["clipboardAssistantEnabledKinds"] = ["url", "text"]
+
+        let redecoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONSerialization.data(withJSONObject: postUpgrade)
+        )
+
+        #expect(redecoded.clipboardAssistantEnabledKinds == [.url, .text])
+    }
+
+    @Test
+    func emptyLegacyKindSetKeepsItsAllKindsMeaning() throws {
+        var payload = try #require(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(FeatureSettings.default)
+            ) as? [String: Any]
+        )
+        payload["clipboardAssistantEnabledKinds"] = [String]()
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONSerialization.data(withJSONObject: payload)
+        )
+
+        // Empty keeps its "all kinds" meaning at the use sites; the migration
+        // must not shrink it to just the newly introduced kind.
+        #expect(decoded.clipboardAssistantEnabledKinds.isEmpty)
     }
 
     @Test

@@ -2436,8 +2436,8 @@
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Alarm notifications are not allowed. Enable notifications in System Settings.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Alarm notification sounds are turned off. Enable sounds in System Settings.";
 "无法设置闹钟通知：%@" = "Could not schedule the alarm notification: %@";
-
-
 "应用程序" = "Applications";
 "打开应用" = "Open App";
 "无法打开应用" = "Could not open the app";
+"Emoji 名称" = "Emoji Name";
+"复制 Emoji" = "Copy Emoji";

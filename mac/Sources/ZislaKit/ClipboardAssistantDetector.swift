@@ -162,6 +162,22 @@ public enum ClipboardAssistantDetector {
                 )]
             )
         }
+        // Emoji names run before language/text fallbacks. Exact aliases are primary; a concise
+        // near match can expose related paste candidates without treating full sentences as names.
+        if enabledKinds.contains(.emojiName), text.count <= 64 {
+            let candidates = EmojiNameCatalog.emojiCandidates(
+                for: text,
+                language: EmojiNameCatalog.language(for: locale)
+            )
+            if let emoji = candidates.first {
+                return ClipboardAssistantDetection(
+                    kind: .emojiName,
+                    title: text,
+                    actions: candidates.map(ClipboardAssistantAction.copyEmoji),
+                    emoji: emoji
+                )
+            }
+        }
         if enabledKinds.contains(.nonSystemLanguageText),
            isNonCurrentSystemLanguageText(text, systemLanguageIdentifier: systemLanguageIdentifier) {
             let preview = previewText(text)

@@ -2437,8 +2437,8 @@
 "闹钟通知未获允许，请在系统设置中开启通知。" = "As notificações de alarme não estão permitidas. Ative as notificações nos Ajustes do Sistema.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Os sons das notificações de alarme estão desativados. Ative os sons nos Ajustes do Sistema.";
 "无法设置闹钟通知：%@" = "Não foi possível agendar a notificação do alarme: %@";
-
-
 "应用程序" = "Aplicativos";
 "打开应用" = "Abrir app";
 "无法打开应用" = "Não foi possível abrir o app";
+"Emoji 名称" = "Nome do emoji";
+"复制 Emoji" = "Copiar emoji";

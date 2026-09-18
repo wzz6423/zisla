@@ -75,6 +75,7 @@ let package = Package(
                 .product(name: "zstd", package: "zstd.swift"),
             ],
             resources: [
+                .copy("../../Resources/Emoji"),
                 .copy("../../Resources/Pomodoro"),
             ],
             linkerSettings: [
