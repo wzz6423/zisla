@@ -160,7 +160,7 @@
 "鼠标移入展开" = "Üzerine Gelerek Genişlet";
 "鼠标进入屏幕顶部感应区时显示" = "Fare ekranın üst algılama bölgesine girdiğinde göster";
 "仅本机保存文本和图片" = "Sadece yerel olarak metin ve resimleri kaydet";
-"发现可下载链接时提示" = "İndirilebilir bağlantılar algılandığında bildir";
+"发现链接时提示" = "Bağlantılar algılandığında bildir";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "İndirme dizinini, indirme bildirimlerini ve gerekli bileşenleri yönetin.";

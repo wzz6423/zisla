@@ -412,7 +412,7 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle(AppLocalization.text("剪贴板历史"), detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
                     rowDivider
-                    featureToggle(AppLocalization.text("剪贴板链接检测"), detail: "发现可下载链接时提示", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
+                    featureToggle(AppLocalization.text("剪贴板链接检测"), detail: "发现链接时提示", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
                 }
             }
 

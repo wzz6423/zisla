@@ -160,7 +160,7 @@
 "鼠标移入展开" = "Di chuột để Mở rộng";
 "鼠标进入屏幕顶部感应区时显示" = "Hiển thị khi chuột vào vùng phát hiện ở đỉnh màn hình";
 "仅本机保存文本和图片" = "Chỉ lưu văn bản và hình ảnh cục bộ";
-"发现可下载链接时提示" = "Nhắc khi phát hiện liên kết có thể tải xuống";
+"发现链接时提示" = "Nhắc khi phát hiện liên kết";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Quản lý thư mục tải xuống, thông báo tải xuống và các thành phần cần thiết.";

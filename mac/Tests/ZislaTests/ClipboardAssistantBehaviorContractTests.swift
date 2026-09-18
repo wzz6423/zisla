@@ -5,7 +5,7 @@ import Testing
 
 struct ClipboardAssistantBehaviorContractTests {
     @Test
-    func downloadableLinksAreRoutedOncePerPasteboardChange() throws {
+    func linksAreRoutedOncePerPasteboardChange() throws {
         let source = try String(contentsOf: appModelSourceURL, encoding: .utf8)
         let linkHandler = try sourceSlice(
             in: source,
@@ -18,7 +18,12 @@ struct ClipboardAssistantBehaviorContractTests {
             to: "private func presentClipboardAssistant("
         )
 
-        #expect(linkHandler.contains("routeCapturedClipboardContent(.text(url.absoluteString), downloadableURL: url)"))
+        #expect(linkHandler.contains(
+            "let downloadableURL = DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) ? url : nil"
+        ))
+        #expect(linkHandler.contains(
+            "routeCapturedClipboardContent(.text(url.absoluteString), downloadableURL: downloadableURL)"
+        ))
         #expect(router.contains("lastClipboardAssistantRoutingChangeCount != changeCount"))
         #expect(router.contains("lastClipboardAssistantRoutingChangeCount = changeCount"))
         #expect(router.contains("case .presented, .ignored:"))
@@ -33,6 +38,19 @@ struct ClipboardAssistantBehaviorContractTests {
         #expect(fallback.contains("downloadURL = url.absoluteString"))
         #expect(fallback.contains("selectModule(.download)"))
         #expect(fallback.contains("detectedLink = url"))
+    }
+
+    @Test
+    func clipboardLinkDetectionIsIndependentOfDownloader() throws {
+        let source = try String(contentsOf: appModelSourceURL, encoding: .utf8)
+        let configuration = try sourceSlice(
+            in: source,
+            from: "if selectedModule == .agenda { refreshAgendaIfEnabled() }",
+            to: "// The shared pasteboard monitor"
+        )
+
+        #expect(configuration.contains("settings.clipboardDetectionEnabled"))
+        #expect(!configuration.contains("settings.downloaderEnabled"))
     }
 
     @Test
