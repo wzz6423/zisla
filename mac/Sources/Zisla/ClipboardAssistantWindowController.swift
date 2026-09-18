@@ -393,19 +393,20 @@ final class ClipboardAssistantController: ObservableObject {
         let presentationGeneration = self.presentationGeneration
         let dismissalGeneration = self.dismissalGeneration
         let dismissSleeper = self.dismissSleeper
-        dismissTask = Task { [weak self] in
+        let dismissIfCurrent: @MainActor @Sendable () -> Void = { [weak self] in
+            guard let self else { return }
+            guard self.presentationGeneration == presentationGeneration,
+                  self.dismissalGeneration == dismissalGeneration else { return }
+            if self.presentation.isHovered { return }
+            self.dismiss()
+        }
+        dismissTask = Task.detached {
             do {
                 try await dismissSleeper(.seconds(remaining))
             } catch {
                 return
             }
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                guard self.presentationGeneration == presentationGeneration,
-                      self.dismissalGeneration == dismissalGeneration else { return }
-                if self.presentation.isHovered { return }
-                self.dismiss()
-            }
+            await dismissIfCurrent()
         }
     }
 
