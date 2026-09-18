@@ -763,11 +763,13 @@ private struct HeadphoneConnectionNotice: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.locale) private var locale
+    @State private var isPresented = false
 
     var body: some View {
         HStack(spacing: 9) {
             HeadphoneGlyph(
                 productID: notice.headphoneProductID,
+                isPresented: isPresented,
                 isSingleUnit: isSingleUnit,
                 reduceMotion: reduceMotion
             )
@@ -798,6 +800,10 @@ private struct HeadphoneConnectionNotice: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .help(BatteryLocalization.string("关闭", locale: locale))
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            isPresented = true
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(accessibilityDescription))
@@ -955,6 +961,7 @@ private final class HeadphoneConnectionAnimationView: NSView {
 
 private struct HeadphoneGlyph: View {
     var productID: UInt32?
+    var isPresented: Bool
     var isSingleUnit: Bool
     var reduceMotion: Bool
 
@@ -977,7 +984,12 @@ private struct HeadphoneGlyph: View {
     }
 
     private var fallbackSymbol: some View {
-        Image(systemName: "headphones")
+        Image(systemName: isSingleUnit ? "headphones" : "airpods.pro")
+            .symbolEffect(
+                .bounce.up.byLayer,
+                options: .speed(0.7),
+                value: isPresented
+            )
             .font(.system(size: isSingleUnit ? 27 : 25, weight: .medium))
             .foregroundStyle(.white)
             .shadow(color: .cyan.opacity(0.22), radius: 5, y: 1)
@@ -1053,6 +1065,7 @@ private struct CompactHeadphoneConnectionBar: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.locale) private var locale
+    @State private var isPresented = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -1089,6 +1102,10 @@ private struct CompactHeadphoneConnectionBar: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            guard !reduceMotion else { return }
+            isPresented = true
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("\(BatteryLocalization.string("耳机已连接：", locale: locale))\(notice.title)"))
     }
@@ -1097,6 +1114,7 @@ private struct CompactHeadphoneConnectionBar: View {
         HStack(spacing: 8) {
             HeadphoneGlyph(
                 productID: notice.headphoneProductID,
+                isPresented: isPresented,
                 isSingleUnit: isSingleUnit,
                 reduceMotion: reduceMotion
             )
