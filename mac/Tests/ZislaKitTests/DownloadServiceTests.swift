@@ -194,7 +194,7 @@ struct DownloadServiceTests {
             temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
         )
 
-        let result = try await service.probeFormats(
+        let result = try await service.probeFormatsAutomatically(
             urlString: "https://v.douyin.com/example/",
             browserCookieSource: .chrome
         )
@@ -203,12 +203,231 @@ struct DownloadServiceTests {
             .map(String.init)
 
         #expect(result.canSelectFormats)
+        #expect(result.browserCookieSource == .chrome)
         #expect(result.formats.map(\.formatID) == ["137", "140"])
         #expect(arguments.contains("--dump-single-json"))
         #expect(arguments.contains("--skip-download"))
         #expect(arguments.contains("--cookies-from-browser"))
         #expect(arguments.contains("chrome"))
         #expect(arguments.last == "https://v.douyin.com/example/")
+    }
+
+    @Test
+    func automaticFormatProbeSelectsTheFirstBrowserWithUsableCookies() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        let invocations = directory.appendingPathComponent("browser-cookie-probes.txt")
+        let output = #"{"title":"Example","formats":[{"format_id":"18","ext":"mp4","width":640,"height":360,"vcodec":"avc1","acodec":"mp4a"}]}"#
+        let cookieFailure = "ERROR: [Douyin] Failed to download web detail JSON: HTTP Error 403: Forbidden\nFresh cookies are needed"
+        let script = """
+        #!/bin/sh
+        cookie_source="none"
+        previous=""
+        for value in "$@"; do
+          if [ "$previous" = "--cookies-from-browser" ]; then
+            cookie_source="$value"
+            break
+          fi
+          previous="$value"
+        done
+        /usr/bin/printf '%s\\n' "$cookie_source" >> \(shellSingleQuoted(invocations.path))
+        if [ "$cookie_source" = "chrome" ]; then
+          /usr/bin/printf '%s\\n' '\(output)'
+        else
+          /usr/bin/printf '%s\\n' '\(cookieFailure)' >&2
+          exit 1
+        fi
+        """
+        try writeExecutable(script, to: executable)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [executable],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+        )
+
+        let result = try await service.probeFormatsAutomatically(
+            urlString: "https://v.douyin.com/example/"
+        )
+        let sources = try String(contentsOf: invocations, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+
+        #expect(result.browserCookieSource == .chrome)
+        #expect(result.formats.map(\.formatID) == ["18"])
+        #expect(sources == ["none", "safari", "chrome"])
+    }
+
+    @Test
+    func automaticDownloadRetriesWithTheDetectedBrowserCookies() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        let invocations = directory.appendingPathComponent("browser-cookie-downloads.txt")
+        let outputDirectory = directory.appendingPathComponent("Downloads", isDirectory: true)
+        let outputFile = outputDirectory.appendingPathComponent("result.m4a")
+        let output = #"{"title":"Example","formats":[{"format_id":"18","ext":"mp4","width":640,"height":360,"vcodec":"avc1","acodec":"mp4a"}]}"#
+        let jsonPath = outputFile.path.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let cookieFailure = "ERROR: [Douyin] Failed to download web detail JSON: HTTP Error 403: Forbidden\nFresh cookies are needed"
+        let script = """
+        #!/bin/sh
+        cookie_source="none"
+        is_probe=0
+        previous=""
+        for value in "$@"; do
+          if [ "$previous" = "--cookies-from-browser" ]; then
+            cookie_source="$value"
+          fi
+          if [ "$value" = "--dump-single-json" ]; then
+            is_probe=1
+          fi
+          previous="$value"
+        done
+        /usr/bin/printf '%s\\n' "$cookie_source:$is_probe" >> \(shellSingleQuoted(invocations.path))
+        if [ "$cookie_source" != "chrome" ]; then
+          /usr/bin/printf '%s\\n' '\(cookieFailure)' >&2
+          exit 1
+        fi
+        if [ "$is_probe" = "1" ]; then
+          /usr/bin/printf '%s\\n' '\(output)'
+          exit 0
+        fi
+        /bin/mkdir -p \(shellSingleQuoted(outputDirectory.path))
+        /usr/bin/touch \(shellSingleQuoted(outputFile.path))
+        /usr/bin/printf '%s\\n' '\(YTDLPOutputParser.sentinel){"event":"completed","filepath":"\(jsonPath)"}'
+        """
+        try writeExecutable(script, to: executable)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [executable],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+        )
+        let request = try DownloadRequest(
+            urlString: "https://v.douyin.com/example/",
+            mode: .audio,
+            outputDirectory: outputDirectory
+        )
+
+        let result = try await service.downloadAutomatically(request, taskID: UUID())
+        let sources = try String(contentsOf: invocations, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+
+        #expect(result.fileURL == outputFile.standardizedFileURL)
+        #expect(result.browserCookieSource == .chrome)
+        #expect(sources == ["none:0", "safari:1", "chrome:1", "chrome:0"])
+    }
+
+    @Test
+    func automaticFormatProbeKeepsTheOriginalFailureWhenNoBrowserCookiesWork() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        let invocations = directory.appendingPathComponent("browser-cookie-failures.txt")
+        let cookieFailure = "ERROR: [Douyin] Failed to download web detail JSON: HTTP Error 403: Forbidden\nFresh cookies are needed"
+        let script = """
+        #!/bin/sh
+        cookie_source="none"
+        previous=""
+        for value in "$@"; do
+          if [ "$previous" = "--cookies-from-browser" ]; then
+            cookie_source="$value"
+            break
+          fi
+          previous="$value"
+        done
+        /usr/bin/printf '%s\\n' "$cookie_source" >> \(shellSingleQuoted(invocations.path))
+        /usr/bin/printf '%s\\n' '\(cookieFailure)' >&2
+        exit 1
+        """
+        try writeExecutable(script, to: executable)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [executable],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+        )
+
+        do {
+            _ = try await service.probeFormatsAutomatically(
+                urlString: "https://v.douyin.com/example/"
+            )
+            Issue.record("All unavailable browser cookie sources must preserve the original failure")
+        } catch let error as DownloadServiceError {
+            guard case let .processFailed(_, diagnostic) = error else {
+                Issue.record("Expected a process failure, received \(error)")
+                return
+            }
+            #expect(DownloadFailureDiagnostics.requiresBrowserCookies(
+                rawDiagnostic: diagnostic,
+                urlString: "https://v.douyin.com/example/"
+            ))
+        }
+        let sources = try String(contentsOf: invocations, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+        #expect(sources == ["none", "safari", "chrome", "firefox"])
+    }
+
+    @Test
+    func automaticFormatProbeDoesNotScanBrowsersForAnUnrelatedFailure() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        let invocations = directory.appendingPathComponent("unrelated-failures.txt")
+        let script = """
+        #!/bin/sh
+        cookie_source="none"
+        previous=""
+        for value in "$@"; do
+          if [ "$previous" = "--cookies-from-browser" ]; then
+            cookie_source="$value"
+            break
+          fi
+          previous="$value"
+        done
+        /usr/bin/printf '%s\\n' "$cookie_source" >> \(shellSingleQuoted(invocations.path))
+        /usr/bin/printf '%s\\n' 'ERROR: Unsupported URL' >&2
+        exit 1
+        """
+        try writeExecutable(script, to: executable)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [executable],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+        )
+
+        do {
+            _ = try await service.probeFormatsAutomatically(
+                urlString: "https://v.douyin.com/example/"
+            )
+            Issue.record("An unrelated failure must not trigger browser cookie detection")
+        } catch let error as DownloadServiceError {
+            guard case .processFailed = error else {
+                Issue.record("Expected a process failure, received \(error)")
+                return
+            }
+        }
+        let sources = try String(contentsOf: invocations, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+        #expect(sources == ["none"])
     }
 
     @Test

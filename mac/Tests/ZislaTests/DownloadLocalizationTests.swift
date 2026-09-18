@@ -97,6 +97,15 @@ struct DownloadLocalizationTests {
         #expect(probeBody.contains("refreshDownloadFormats()"))
     }
 
+    @Test
+    func downloadModelUsesTheAutomaticallyDetectedBrowserCookieSource() throws {
+        let source = try String(contentsOf: Self.source("Zisla/AppModel.swift"), encoding: .utf8)
+
+        #expect(source.contains("downloadService.probeFormatsAutomatically("))
+        #expect(source.contains("downloadService.downloadAutomatically("))
+        #expect(source.contains("result.browserCookieSource"))
+    }
+
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {
         NSDictionary(contentsOf: packageRootURL
             .appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings"))

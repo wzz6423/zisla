@@ -195,15 +195,18 @@ public struct DownloadFormatProbeResult: Equatable, Sendable {
     public let title: String?
     public let formats: [DownloadFormat]
     public let canSelectFormats: Bool
+    public let browserCookieSource: DownloadBrowserCookieSource?
 
     public init(
         title: String?,
         formats: [DownloadFormat],
-        canSelectFormats: Bool = true
+        canSelectFormats: Bool = true,
+        browserCookieSource: DownloadBrowserCookieSource? = nil
     ) {
         self.title = title
         self.formats = formats
         self.canSelectFormats = canSelectFormats
+        self.browserCookieSource = browserCookieSource
     }
 }
 
