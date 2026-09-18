@@ -55,17 +55,20 @@ struct ClipboardAssistantDetectorTests {
 
     @Test
     func detectsPlainHTTPAndHTTPSURLs() {
-        let detection = ClipboardAssistantDetector.detect(
-            text: "https://example.com/path?q=1",
-            enabledKinds: allKinds
-        )
-        #expect(detection?.kind == .url)
-        #expect(detection?.title == "example.com")
-        #expect(detection?.secondaryActions.isEmpty == true)
-        if case .openURL(let url)? = detection?.action {
-            #expect(url.absoluteString == "https://example.com/path?q=1")
-        } else {
-            Issue.record("URL action expected")
+        for text in ["http://example.com/path?q=1", "https://example.com/path?q=1"] {
+            let detection = ClipboardAssistantDetector.detect(
+                text: text,
+                enabledKinds: allKinds,
+                offersDownload: true
+            )
+            #expect(detection?.kind == .url)
+            #expect(detection?.title == "example.com")
+            #expect(detection?.secondaryActions.isEmpty == true)
+            if case .openURL(let url)? = detection?.action {
+                #expect(url.absoluteString == text)
+            } else {
+                Issue.record("URL action expected")
+            }
         }
     }
 

@@ -164,7 +164,7 @@
 "鼠标移入展开" = "Hover to Expand";
 "鼠标进入屏幕顶部感应区时显示" = "Show when mouse enters top screen detection zone";
 "仅本机保存文本和图片" = "Only save text and images locally";
-"发现可下载链接时提示" = "Prompt when downloadable links are detected";
+"发现链接时提示" = "Prompt when links are detected";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Manage download directory, download notifications, and required components.";

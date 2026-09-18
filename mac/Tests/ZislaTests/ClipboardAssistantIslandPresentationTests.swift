@@ -521,7 +521,12 @@ struct ClipboardAssistantIslandPresentationTests {
             .range(of: "voiceInput.onRecordingWillStart")
         let linkHandler = appModelSource[linkHandlerStart.lowerBound..<(linkHandlerEnd?.lowerBound ?? appModelSource.endIndex)]
         #expect(!linkHandler.contains("selectModule(.download)"))
-        #expect(linkHandler.contains("routeCapturedClipboardContent(.text(url.absoluteString), downloadableURL: url)"))
+        #expect(linkHandler.contains(
+            "let downloadableURL = DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) ? url : nil"
+        ))
+        #expect(linkHandler.contains(
+            "routeCapturedClipboardContent(.text(url.absoluteString), downloadableURL: downloadableURL)"
+        ))
         #expect(!linkHandler.contains("notices.enqueue("))
 
         let downloadCompletionStart = try #require(appModelSource.range(of: "state: .completed(result.fileURL)"))

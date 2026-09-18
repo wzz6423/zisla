@@ -571,7 +571,8 @@ final class AppModel: ObservableObject {
     }
     clipboardMonitor.onLinkDetected = { [weak self] url in
       guard let self else { return }
-      routeCapturedClipboardContent(.text(url.absoluteString), downloadableURL: url)
+      let downloadableURL = DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) ? url : nil
+      routeCapturedClipboardContent(.text(url.absoluteString), downloadableURL: downloadableURL)
     }
     voiceInput.onRecordingWillStart = { [weak self] in
       guard let self else { return }
@@ -2330,7 +2331,7 @@ final class AppModel: ObservableObject {
     }
     if selectedModule == .agenda { refreshAgendaIfEnabled() }
     clipboardMonitor.setEnabled(
-      settings.downloaderEnabled && settings.clipboardDetectionEnabled
+      settings.clipboardDetectionEnabled
     )
     // The shared pasteboard monitor feeds both history recording and the copy assistant.
     clipboardHistoryMonitor.setEnabled(

@@ -160,7 +160,7 @@
 "鼠标移入展开" = "Passar Mouse para Expandir";
 "鼠标进入屏幕顶部感应区时显示" = "Exibir quando o mouse entra na zona de detecção superior da tela";
 "仅本机保存文本和图片" = "Salvar apenas texto e imagens localmente";
-"发现可下载链接时提示" = "Avisar quando links baixáveis forem detectados";
+"发现链接时提示" = "Avisar quando links forem detectados";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Gerenciar diretório de downloads, notificações de download e componentes necessários.";

@@ -161,7 +161,7 @@
 "鼠标移入展开" = "Hover zum Erweitern";
 "鼠标进入屏幕顶部感应区时显示" = "Anzeigen, wenn Maus die obere Bildschirmerkennungszone erreicht";
 "仅本机保存文本和图片" = "Nur lokal Text und Bilder speichern";
-"发现可下载链接时提示" = "Bei Erkennung herunterladbarer Links benachrichtigen";
+"发现链接时提示" = "Bei Erkennung von Links benachrichtigen";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Download-Verzeichnis, Download-Benachrichtigungen und erforderliche Komponenten verwalten.";

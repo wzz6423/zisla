@@ -160,7 +160,7 @@
 "鼠标移入展开" = "Uitvouwen bij zweven";
 "鼠标进入屏幕顶部感应区时显示" = "Toon wanneer muis de bovenste detectiezone van het scherm binnenkomt";
 "仅本机保存文本和图片" = "Bewaar alleen tekst en afbeeldingen lokaal";
-"发现可下载链接时提示" = "Waarschuw wanneer downloadbare links worden gedetecteerd";
+"发现链接时提示" = "Waarschuw wanneer links worden gedetecteerd";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Beheer downloadmap, downloadmeldingen en vereiste componenten.";

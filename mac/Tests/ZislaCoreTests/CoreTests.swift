@@ -1687,6 +1687,7 @@ struct DownloadCoreTests {
     @Test
     func httpURLParserRecognizesOnlyCompleteHTTPLinks() {
         #expect(HTTPURLParser.url(from: "  HTTPS://Example.com/中文路径  ") != nil)
+        #expect(HTTPURLParser.url(from: "http://example.com/path?q=1") != nil)
         #expect(HTTPURLParser.url(from: "https://example.com/path with spaces") == nil)
         #expect(HTTPURLParser.url(from: "www.example.com") == nil)
         #expect(HTTPURLParser.url(from: "ftp://example.com") == nil)
@@ -1703,23 +1704,12 @@ struct DownloadCoreTests {
         #expect(DownloadURLClassifier.isLikelyDownloadable("https://y.qq.com/n/ryqq/songDetail/abc"))
         #expect(DownloadURLClassifier.isLikelyDownloadable("https://cdn.example.com/movie.mp4"))
         #expect(!DownloadURLClassifier.isLikelyDownloadable("https://example.com/article"))
+        #expect(!DownloadURLClassifier.isLikelyDownloadable("https://cy.ncss.cn/"))
         #expect(!DownloadURLClassifier.isLikelyDownloadable("not a url"))
     }
 
     @Test
-    func clipboardClassifierRecognizesPlainPagesWithEmbeddedMedia() {
-        // cy.ncss.cn serves promo/course videos as direct <video src="…mp4">
-        // embeds; the bare domain entry covers every subdomain and page path.
-        #expect(DownloadURLClassifier.isLikelyDownloadable("https://cy.ncss.cn/"))
-        #expect(DownloadURLClassifier.isLikelyDownloadable("https://cy.ncss.cn/information/2c93f4c6a05c38d9"))
-        #expect(DownloadURLClassifier.isLikelyDownloadable("https://www.ncss.cn/"))
-        // Look-alike hosts must not leak through the suffix match.
-        #expect(!DownloadURLClassifier.isLikelyDownloadable("https://ncss.cn.example.com/"))
-        #expect(!DownloadURLClassifier.isLikelyDownloadable("https://xncss.cn/"))
-    }
-
-    @Test
-    func clipboardDetectorRequiresAChangeAndDeduplicatesLinks() {
+    func clipboardDetectorRecognizesAllHTTPLinksAndDeduplicatesLinks() {
         var detector = ClipboardLinkDetector(recentCapacity: 4)
         detector.begin(atChangeCount: 10)
 
@@ -1730,7 +1720,18 @@ struct DownloadCoreTests {
         )
         #expect(detector.detect(changeCount: 11, string: "https://youtu.be/other") == nil)
         #expect(detector.detect(changeCount: 12, string: "https://youtu.be/abc") == nil)
-        #expect(detector.detect(changeCount: 13, string: "https://example.com/article") == nil)
+        #expect(
+            detector.detect(changeCount: 13, string: "https://example.com/article")?.absoluteString
+                == "https://example.com/article"
+        )
+        #expect(
+            detector.detect(changeCount: 14, string: "https://cy.ncss.cn/")?.absoluteString
+                == "https://cy.ncss.cn/"
+        )
+        #expect(
+            detector.detect(changeCount: 15, string: "http://example.com/article")?.absoluteString
+                == "http://example.com/article"
+        )
     }
 }
 

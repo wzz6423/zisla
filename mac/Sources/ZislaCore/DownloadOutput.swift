@@ -200,11 +200,6 @@ public enum DownloadURLClassifier {
         "youku.com", "mgtv.com", "iqiyi.com",
         "music.apple.com", "itunes.apple.com", "y.qq.com",
         "music.163.com", "kugou.com", "kuwo.cn",
-        // Plain pages that embed direct media (e.g. cy.ncss.cn, the National
-        // College Student Innovation site, serves its promo/course videos as
-        // <video src="...mp4">). yt-dlp's generic extractor resolves those
-        // embeds, so the bare domain — not per-page paths — is allow-listed.
-        "ncss.cn",
     ]
 
     private static let mediaExtensions: Set<String> = [
@@ -246,11 +241,7 @@ public struct ClipboardLinkDetector: Sendable {
         guard let string else { return nil }
 
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard DownloadURLClassifier.isLikelyDownloadable(trimmed),
-              let url = URL(string: trimmed)
-        else {
-            return nil
-        }
+        guard let url = HTTPURLParser.url(from: trimmed) else { return nil }
 
         let key = url.absoluteString
         guard recentLinkSet.insert(key).inserted else { return nil }

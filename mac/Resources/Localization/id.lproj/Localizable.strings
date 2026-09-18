@@ -160,7 +160,7 @@
 "鼠标移入展开" = "Hover untuk Ekspansi";
 "鼠标进入屏幕顶部感应区时显示" = "Tampilkan saat mouse memasuki zona deteksi atas layar";
 "仅本机保存文本和图片" = "Hanya simpan teks dan gambar secara lokal";
-"发现可下载链接时提示" = "Beri tahu saat tautan yang dapat diunduh terdeteksi";
+"发现链接时提示" = "Beri tahu saat tautan terdeteksi";
 
 /* Settings - Download */
 "管理下载目录、下载通知与所需组件。" = "Kelola direktori unduhan, notifikasi unduhan, dan komponen yang diperlukan.";
