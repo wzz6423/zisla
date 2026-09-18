@@ -67,6 +67,8 @@ struct DownloadLocalizationTests {
 
         #expect(source.contains("HStack(spacing: 10) {\n                HStack(spacing: 10) {\n                    IslandOutlinedPicker("))
         #expect(source.contains("formatPicker\n                }\n\n                Spacer(minLength: 0)\n\n                HStack(spacing: 10) {\n                    browserCookiePicker"))
+        #expect(source.contains(".frame(width: 292, height: 28, alignment: .leading)"))
+        #expect(source.contains(".frame(width: 156, height: 28, alignment: .leading)"))
         #expect(source.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
     }
 
