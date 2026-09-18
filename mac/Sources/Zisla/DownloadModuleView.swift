@@ -40,30 +40,36 @@ struct DownloadModuleView: View {
             }
 
             HStack(spacing: 10) {
-                IslandOutlinedPicker(
-                    selection: $model.downloadMode,
-                    options: [.video, .audio],
-                    title: { $0 == .video ? "视频" : AppLocalization.text("音频") },
-                    selectionID: "download-mode-selection",
-                    symbol: { $0 == .video ? "film.fill" : "waveform" },
-                    fontSize: 11,
-                    width: 140,
-                    height: 28,
-                    usesGlassSelection: false
-                )
+                HStack(spacing: 10) {
+                    IslandOutlinedPicker(
+                        selection: $model.downloadMode,
+                        options: [.video, .audio],
+                        title: { $0 == .video ? "视频" : AppLocalization.text("音频") },
+                        selectionID: "download-mode-selection",
+                        symbol: { $0 == .video ? "film.fill" : "waveform" },
+                        fontSize: 11,
+                        width: 140,
+                        height: 28,
+                        usesGlassSelection: false
+                    )
 
-                formatPicker
-
-                browserCookiePicker
-
-                IconButton(
-                    symbol: "arrow.clockwise",
-                    help: AppLocalization.text("刷新格式"),
-                    size: .compact
-                ) {
-                    model.refreshDownloadFormats()
+                    formatPicker
                 }
-                .disabled(model.isLoadingDownloadFormats)
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 10) {
+                    browserCookiePicker
+
+                    IconButton(
+                        symbol: "arrow.clockwise",
+                        help: AppLocalization.text("刷新格式"),
+                        size: .compact
+                    ) {
+                        model.refreshDownloadFormats()
+                    }
+                    .disabled(model.isLoadingDownloadFormats)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 

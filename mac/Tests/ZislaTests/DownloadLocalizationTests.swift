@@ -62,21 +62,12 @@ struct DownloadLocalizationTests {
     }
 
     @Test
-    func downloadFormatControlRowUsesLeadingAlignment() throws {
+    func downloadFormatControlRowPinsFormatsAndCookiesToOppositeEdges() throws {
         let source = try String(contentsOf: Self.source("Zisla/DownloadModuleView.swift"), encoding: .utf8)
-        let picker = try #require(source.range(of: "IslandOutlinedPicker("))
-        let controlRowStart = try #require(source.range(
-            of: "HStack(spacing: 10)",
-            options: .backwards,
-            range: source.startIndex..<picker.lowerBound
-        ))
-        let controlRowEnd = try #require(source.range(
-            of: "HStack(spacing: 10)",
-            range: picker.upperBound..<source.endIndex
-        ))
-        let controlRow = source[controlRowStart.lowerBound..<controlRowEnd.lowerBound]
 
-        #expect(controlRow.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
+        #expect(source.contains("HStack(spacing: 10) {\n                HStack(spacing: 10) {\n                    IslandOutlinedPicker("))
+        #expect(source.contains("formatPicker\n                }\n\n                Spacer(minLength: 0)\n\n                HStack(spacing: 10) {\n                    browserCookiePicker"))
+        #expect(source.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
     }
 
     @Test
