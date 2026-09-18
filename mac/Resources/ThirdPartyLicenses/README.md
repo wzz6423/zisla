@@ -23,3 +23,12 @@ https://github.com/sumimakito/Mac-Duo
 
 Copyright 2026 Makito. Licensed under the Apache License 2.0. See
 `MacDuo-LICENSE.txt` in this directory.
+
+The bundled Emoji alias catalog is generated from Unicode CLDR 48.2 and
+Unicode Emoji 17.0 data:
+
+https://github.com/unicode-org/cldr
+https://github.com/unicode-org/cldr-json
+
+Copyright 1991-2026 Unicode, Inc. Licensed under Unicode License V3. See
+`Unicode-CLDR-LICENSE.txt` in this directory.

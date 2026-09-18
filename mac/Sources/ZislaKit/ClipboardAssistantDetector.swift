@@ -162,19 +162,21 @@ public enum ClipboardAssistantDetector {
                 )]
             )
         }
-        // Emoji names run before the language/text fallbacks so a copied Chinese name like
-        // "微笑" is not hijacked by translation and an English name like "fire" is not
-        // reduced to a plain web search. The match is whole-string: the trimmed value must
-        // be exactly one known name (English, Chinese, or `:shortcode:`), so ordinary prose
-        // and values containing digits or punctuation shapes keep their existing kinds.
-        if enabledKinds.contains(.emojiName), text.count <= 64,
-           let emoji = EmojiNameCatalog.emoji(for: text) {
-            return ClipboardAssistantDetection(
-                kind: .emojiName,
-                title: text,
-                actions: [.copyEmoji(emoji)],
-                emoji: emoji
+        // Emoji names run before language/text fallbacks. Exact aliases are primary; a concise
+        // near match can expose related paste candidates without treating full sentences as names.
+        if enabledKinds.contains(.emojiName), text.count <= 64 {
+            let candidates = EmojiNameCatalog.emojiCandidates(
+                for: text,
+                language: EmojiNameCatalog.language(for: locale)
             )
+            if let emoji = candidates.first {
+                return ClipboardAssistantDetection(
+                    kind: .emojiName,
+                    title: text,
+                    actions: candidates.map(ClipboardAssistantAction.copyEmoji),
+                    emoji: emoji
+                )
+            }
         }
         if enabledKinds.contains(.nonSystemLanguageText),
            isNonCurrentSystemLanguageText(text, systemLanguageIdentifier: systemLanguageIdentifier) {
