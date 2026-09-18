@@ -1,13 +1,14 @@
 import Foundation
+import NaturalLanguage
+import ZislaCore
 
-/// Curated emoji name catalog for the clipboard assistant.
+/// Emoji name catalog for the clipboard assistant.
 ///
-/// The catalog intentionally ships as bundled data instead of reading system
-/// emoji databases: it must stay stable across macOS versions, cover Chinese
-/// names regardless of the user's system language, and be fully testable.
-/// Coverage is the common set of emoji people actually type by name.
+/// Curated aliases stay first for the established short names, while the
+/// bundled CLDR catalog provides the complete stable Emoji roster and all
+/// supported interface languages without depending on the host macOS version.
 ///
-/// Matching rules implemented in `emoji(for:)`:
+/// Matching rules implemented in `emoji(for:)` and `emojiCandidates(for:)`:
 /// - Case-insensitive for Latin names ("Fire" matches "fire").
 /// - Surrounding colons are stripped, so Slack/GitHub style shortcodes work
 ///   (`:fire:`, `:thumbs_up:`).
@@ -15,8 +16,8 @@ import Foundation
 ///   names are also matched with spaces removed (`:thumbsup:` matches
 ///   "thumbs up").
 /// - Runs of whitespace collapse into single spaces.
-/// - The whole copied value must be exactly one name; embedded matches are
-///   rejected so ordinary prose never resolves.
+/// - Exact aliases resolve first. Near names use input-method-style candidate
+///   ranking only when they do not look like a sentence.
 public enum EmojiNameCatalog {
     /// Every alias across all entries must be unique so lookups stay
     /// deterministic; dictionary iteration order is not guaranteed. Internal
@@ -945,14 +946,517 @@ public enum EmojiNameCatalog {
         return table
     }()
 
+    private static let supplementalCatalogs = SupplementalCatalogCache()
+    private static let maximumCandidateCount = 6
+
     /// Resolves a copied value to the emoji it names, or `nil` when the value
     /// is not a known emoji name.
-    public static func emoji(for name: String) -> String? {
+    public static func emoji(
+        for name: String,
+        language: AppLanguage = AppLocalization.currentLanguage
+    ) -> String? {
+        emojiCandidates(for: name, language: language).first
+    }
+
+    /// Returns the most relevant Emoji candidates for a copied name. Exact
+    /// curated aliases remain deterministic; CLDR aliases can add nearby
+    /// candidates for a concise natural-language description.
+    static func emojiCandidates(
+        for name: String,
+        language: AppLanguage = AppLocalization.currentLanguage
+    ) -> [String] {
         let key = normalizedKey(name)
-        guard !key.isEmpty, key.count <= 64 else { return nil }
-        if let emoji = lookup[key] { return emoji }
+        guard !key.isEmpty, key.count <= 64 else { return [] }
+        if let emoji = lookup[key] { return [emoji] }
         let compact = key.replacingOccurrences(of: " ", with: "")
-        return compactLookup[compact]
+        if let emoji = compactLookup[compact] { return [emoji] }
+
+        let catalogs = lookupLanguages(for: key, preferred: language).compactMap {
+            supplementalCatalogs.catalog(for: $0)
+        }
+        guard !catalogs.isEmpty else { return [] }
+
+        let exact = unique(catalogs.flatMap {
+            isExplicitShortcode(name)
+                ? $0.shortcodeCandidates(for: key, compact: compact)
+                : $0.canonicalCandidates(for: key, compact: compact)
+        })
+        guard let query = EmojiQuery(key: key),
+              query.allowsFuzzyMatching,
+              !looksLikeSentence(key)
+        else {
+            return Array(exact.prefix(maximumCandidateCount))
+        }
+
+        let fuzzy = rankedFuzzyCandidates(
+            for: query,
+            catalogs: catalogs,
+            excluding: Set(exact)
+        )
+        return Array(unique(exact + fuzzy).prefix(maximumCandidateCount))
+    }
+
+    /// Maps an explicit formatter locale back to the app's supported language
+    /// set, so detector tests and live settings use the same catalog slice.
+    static func language(for locale: Locale) -> AppLanguage {
+        let identifier = locale.identifier.replacingOccurrences(of: "_", with: "-")
+        if identifier.hasPrefix("zh-Hant") || identifier.hasPrefix("zh-TW") || identifier.hasPrefix("zh-HK") {
+            return .traditionalChinese
+        }
+        if identifier.hasPrefix("zh") {
+            return .simplifiedChinese
+        }
+        if let exact = AppLanguage(rawValue: identifier) {
+            return exact
+        }
+        let primary = identifier.split(separator: "-").first.map(String.init)
+        return primary.flatMap { code in
+            AppLanguage.allCases.first {
+                $0.rawValue.caseInsensitiveCompare(code) == .orderedSame
+            }
+        } ?? AppLocalization.currentLanguage
+    }
+
+    static func supplementalEmojiCount(for language: AppLanguage) -> Int? {
+        supplementalCatalogs.catalog(for: language)?.emojiCount
+    }
+
+    static func supplementalSampleAlias(for language: AppLanguage) -> (emoji: String, alias: String)? {
+        supplementalCatalogs.catalog(for: language)?.sampleAlias
+    }
+
+    private static func lookupLanguages(for query: String, preferred: AppLanguage) -> [AppLanguage] {
+        var languages = [preferred]
+        if let detected = detectedLanguage(for: query) {
+            languages.append(detected)
+        }
+        languages += [.english, .simplifiedChinese, .traditionalChinese]
+        var seen: Set<AppLanguage> = []
+        return languages.filter { seen.insert($0).inserted }
+    }
+
+    private static func detectedLanguage(for text: String) -> AppLanguage? {
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(text)
+        guard let rawValue = recognizer.dominantLanguage?.rawValue else { return nil }
+        switch rawValue.lowercased() {
+        case "zh-hans", "zh-cn", "zh": return .simplifiedChinese
+        case "zh-hant", "zh-tw", "zh-hk": return .traditionalChinese
+        case "pt": return .brazilianPortuguese
+        default:
+            return AppLanguage.allCases.first {
+                $0.rawValue.caseInsensitiveCompare(rawValue) == .orderedSame
+            }
+        }
+    }
+
+    private static func rankedFuzzyCandidates(
+        for query: EmojiQuery,
+        catalogs: [SupplementalCatalog],
+        excluding exact: Set<String>
+    ) -> [String] {
+        var scores: [String: Double] = [:]
+        for catalog in catalogs {
+            for candidate in catalog.fuzzyCandidates(for: query) where !exact.contains(candidate.emoji) {
+                scores[candidate.emoji] = max(scores[candidate.emoji] ?? 0, candidate.score)
+            }
+        }
+        return scores
+            .sorted { lhs, rhs in
+                lhs.value == rhs.value ? lhs.key < rhs.key : lhs.value > rhs.value
+            }
+            .map(\.key)
+    }
+
+    private static func looksLikeSentence(_ value: String) -> Bool {
+        guard !value.unicodeScalars.allSatisfy(CharacterSet.decimalDigits.contains) else {
+            return true
+        }
+        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        tagger.string = value
+        var firstTag: NLTag?
+        var tags: [NLTag] = []
+        var wordCount = 0
+        tagger.enumerateTags(
+            in: value.startIndex..<value.endIndex,
+            unit: .word,
+            scheme: .lexicalClass,
+            options: [.omitWhitespace, .omitPunctuation]
+        ) { tag, _ in
+            if firstTag == nil {
+                firstTag = tag
+            }
+            if let tag {
+                tags.append(tag)
+            }
+            wordCount += 1
+            return true
+        }
+        guard wordCount > 1 else { return false }
+        if !tags.isEmpty && tags.allSatisfy({ $0 == .number }) {
+            return true
+        }
+        if firstTag == .pronoun || firstTag == .determiner || firstTag == .interjection {
+            return true
+        }
+        return firstTag == .verb && tags.dropFirst().contains {
+            $0 == .determiner || $0 == .preposition || $0 == .pronoun
+        }
+    }
+
+    private static func isExplicitShortcode(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count > 2 && trimmed.hasPrefix(":") && trimmed.hasSuffix(":")
+    }
+
+    private static func unique(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        return values.filter { seen.insert($0).inserted }
+    }
+
+    private static func fuzzyScore(query: EmojiQuery, alias: AliasRecord) -> Double? {
+        let sharedGrams = query.grams.intersection(alias.grams).count
+        guard sharedGrams > 0 else { return nil }
+
+        let editDistance = levenshteinDistance(query.characters, alias.characters)
+        let longestLength = max(query.characters.count, alias.characters.count)
+        let editSimilarity = 1 - Double(editDistance) / Double(longestLength)
+        let diceSimilarity = Double(2 * sharedGrams) / Double(query.grams.count + alias.grams.count)
+        let suffixSimilarity = Double(commonSuffixLength(query.characters, alias.characters))
+            / Double(query.characters.count)
+        let substringSimilarity = Double(longestCommonSubstringLength(query.characters, alias.characters))
+            / Double(min(query.characters.count, alias.characters.count))
+        let sharedWords = query.words.intersection(alias.words).count
+        let wordSimilarity = query.words.isEmpty || alias.words.isEmpty
+            ? 0
+            : Double(2 * sharedWords) / Double(query.words.count + alias.words.count)
+        let score = editSimilarity * 0.55
+            + diceSimilarity * 0.20
+            + suffixSimilarity * 0.30
+            + wordSimilarity * 0.15
+            + substringSimilarity * 0.25
+        return score >= 0.52 ? score : nil
+    }
+
+    private static func contentWords(in value: String) -> Set<String> {
+        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        tagger.string = value
+        var words: Set<String> = []
+        tagger.enumerateTags(
+            in: value.startIndex..<value.endIndex,
+            unit: .word,
+            scheme: .lexicalClass,
+            options: [.omitWhitespace, .omitPunctuation]
+        ) { tag, range in
+            guard let tag else { return true }
+            switch tag {
+            case .pronoun, .determiner, .preposition, .conjunction, .particle:
+                return true
+            default:
+                words.insert(String(value[range]).lowercased())
+                return true
+            }
+        }
+        return words
+    }
+
+    private static func levenshteinDistance(_ left: [Character], _ right: [Character]) -> Int {
+        var previous = Array(0...right.count)
+        for (leftIndex, leftCharacter) in left.enumerated() {
+            var current = [leftIndex + 1]
+            for (rightIndex, rightCharacter) in right.enumerated() {
+                current.append(min(
+                    previous[rightIndex + 1] + 1,
+                    current[rightIndex] + 1,
+                    previous[rightIndex] + (leftCharacter == rightCharacter ? 0 : 1)
+                ))
+            }
+            previous = current
+        }
+        return previous[right.count]
+    }
+
+    private static func commonSuffixLength(_ left: [Character], _ right: [Character]) -> Int {
+        var count = 0
+        for (leftCharacter, rightCharacter) in zip(left.reversed(), right.reversed()) {
+            guard leftCharacter == rightCharacter else { break }
+            count += 1
+        }
+        return count
+    }
+
+    private static func longestCommonSubstringLength(_ left: [Character], _ right: [Character]) -> Int {
+        var previous = Array(repeating: 0, count: right.count + 1)
+        var longest = 0
+        for leftCharacter in left {
+            var current = Array(repeating: 0, count: right.count + 1)
+            for (rightIndex, rightCharacter) in right.enumerated() {
+                if leftCharacter == rightCharacter {
+                    current[rightIndex + 1] = previous[rightIndex] + 1
+                    longest = max(longest, current[rightIndex + 1])
+                }
+            }
+            previous = current
+        }
+        return longest
+    }
+
+    private static func characterNgrams(_ characters: [Character]) -> Set<String> {
+        guard characters.count >= 2 else { return [] }
+        let length = characters.count >= 3 ? 3 : 2
+        return Set((0...(characters.count - length)).map { offset in
+            String(characters[offset..<(offset + length)])
+        })
+    }
+
+    private struct EmojiQuery {
+        let characters: [Character]
+        let grams: Set<String>
+        let words: Set<String>
+
+        init?(key: String) {
+            let compact = key.replacingOccurrences(of: " ", with: "")
+            let characters = Array(compact)
+            guard characters.count >= 2 else { return nil }
+            self.characters = characters
+            grams = EmojiNameCatalog.characterNgrams(characters)
+            words = EmojiNameCatalog.contentWords(in: key)
+        }
+
+        var allowsFuzzyMatching: Bool {
+            characters.count >= 3 && !grams.isEmpty && words.count > 1
+        }
+    }
+
+    private struct AliasRecord {
+        let emoji: String
+        let characters: [Character]
+        let grams: Set<String>
+        let words: Set<String>
+
+        init(emoji: String, key: String) {
+            self.emoji = emoji
+            characters = Array(key.replacingOccurrences(of: " ", with: ""))
+            grams = EmojiNameCatalog.characterNgrams(characters)
+            words = EmojiNameCatalog.contentWords(in: key)
+        }
+    }
+
+    private struct FuzzyCandidate {
+        let emoji: String
+        let score: Double
+    }
+
+    private struct SupplementalCatalog {
+        let canonicalExact: [String: [String]]
+        let canonicalCompact: [String: [String]]
+        let shortcodeExact: [String: [String]]
+        let shortcodeCompact: [String: [String]]
+        let fuzzyNames: [AliasRecord]
+        let emojiCount: Int
+        let sampleAlias: (emoji: String, alias: String)?
+
+        init(
+            primaryAliases: [String: [String]],
+            fallbackAliases: [String: [String]],
+            primaryCanonicalNames: [String: [String]],
+            fallbackCanonicalNames: [String: [String]]
+        ) {
+            var canonicalExact: [String: [String]] = [:]
+            var canonicalCompact: [String: [String]] = [:]
+            var shortcodeExact: [String: [String]] = [:]
+            var shortcodeCompact: [String: [String]] = [:]
+            var fuzzyNames: [AliasRecord] = []
+            var seenRecords: Set<String> = []
+
+            for aliasesByEmoji in [primaryAliases, fallbackAliases] {
+                for emoji in aliasesByEmoji.keys.sorted() {
+                    for alias in aliasesByEmoji[emoji] ?? [] {
+                        let key = EmojiNameCatalog.normalizedKey(alias)
+                        guard !key.isEmpty else { continue }
+                        Self.append(emoji, to: &shortcodeExact, for: key)
+                        let compactKey = key.replacingOccurrences(of: " ", with: "")
+                        if compactKey != key {
+                            Self.append(emoji, to: &shortcodeCompact, for: compactKey)
+                        }
+                    }
+                }
+            }
+
+            for namesByEmoji in [primaryCanonicalNames, fallbackCanonicalNames] {
+                for emoji in namesByEmoji.keys.sorted() {
+                    for name in namesByEmoji[emoji] ?? [] {
+                        let key = EmojiNameCatalog.normalizedKey(name)
+                        guard !key.isEmpty else { continue }
+                        Self.append(emoji, to: &canonicalExact, for: key)
+                        let compactKey = key.replacingOccurrences(of: " ", with: "")
+                        if compactKey != key {
+                            Self.append(emoji, to: &canonicalCompact, for: compactKey)
+                        }
+                        let recordKey = emoji + "\u{0}" + key
+                        if seenRecords.insert(recordKey).inserted {
+                            fuzzyNames.append(AliasRecord(emoji: emoji, key: key))
+                        }
+                    }
+                }
+            }
+
+            self.canonicalExact = canonicalExact
+            self.canonicalCompact = canonicalCompact
+            self.shortcodeExact = shortcodeExact
+            self.shortcodeCompact = shortcodeCompact
+            self.fuzzyNames = fuzzyNames
+            emojiCount = primaryAliases.count
+            sampleAlias = primaryCanonicalNames.keys.sorted().lazy.compactMap { emoji in
+                guard EmojiNameCatalog.entries[emoji] == nil else { return nil }
+                guard let name = primaryCanonicalNames[emoji]?.first(where: { !$0.isEmpty }) else { return nil }
+                let key = EmojiNameCatalog.normalizedKey(name)
+                let compactKey = key.replacingOccurrences(of: " ", with: "")
+                guard EmojiNameCatalog.lookup[key] == nil,
+                      EmojiNameCatalog.compactLookup[compactKey] == nil,
+                      canonicalExact[key]?.contains(emoji) == true
+                else {
+                    return nil
+                }
+                return (emoji, name)
+            }.first
+        }
+
+        func canonicalCandidates(for key: String, compact compactKey: String) -> [String] {
+            EmojiNameCatalog.unique((canonicalExact[key] ?? []) + (canonicalCompact[compactKey] ?? []))
+        }
+
+        func shortcodeCandidates(for key: String, compact compactKey: String) -> [String] {
+            EmojiNameCatalog.unique((shortcodeExact[key] ?? []) + (shortcodeCompact[compactKey] ?? []))
+        }
+
+        func fuzzyCandidates(for query: EmojiQuery) -> [FuzzyCandidate] {
+            var scores: [String: Double] = [:]
+            for alias in fuzzyNames {
+                guard let score = EmojiNameCatalog.fuzzyScore(query: query, alias: alias) else { continue }
+                scores[alias.emoji] = max(scores[alias.emoji] ?? 0, score)
+            }
+            return scores.map { FuzzyCandidate(emoji: $0.key, score: $0.value) }
+        }
+
+        private static func append(_ emoji: String, to table: inout [String: [String]], for key: String) {
+            guard !(table[key] ?? []).contains(emoji) else { return }
+            table[key, default: []].append(emoji)
+        }
+    }
+
+    private final class SupplementalCatalogCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var values: [AppLanguage: SupplementalCatalog] = [:]
+        private var accessOrder: [AppLanguage] = []
+
+        func catalog(for language: AppLanguage) -> SupplementalCatalog? {
+            lock.lock()
+            if let existing = values[language] {
+                touch(language)
+                lock.unlock()
+                return existing
+            }
+            lock.unlock()
+
+            guard let loaded = EmojiNameCatalog.loadSupplementalCatalog(for: language) else { return nil }
+            lock.lock()
+            defer { lock.unlock() }
+            if let existing = values[language] {
+                touch(language)
+                return existing
+            }
+            values[language] = loaded
+            touch(language)
+            while accessOrder.count > 4, let evicted = accessOrder.first {
+                accessOrder.removeFirst()
+                values.removeValue(forKey: evicted)
+            }
+            return loaded
+        }
+
+        private func touch(_ language: AppLanguage) {
+            accessOrder.removeAll { $0 == language }
+            accessOrder.append(language)
+        }
+    }
+
+    private static let supplementalCatalogData: Data? = {
+        guard let resourceURL = Bundle.module.url(
+            forResource: "EmojiNameAliases",
+            withExtension: "json",
+            subdirectory: "Emoji"
+        ) else {
+            return nil
+        }
+        return try? Data(contentsOf: resourceURL, options: .mappedIfSafe)
+    }()
+
+    private static let requestedLanguageKey = CodingUserInfoKey(rawValue: "EmojiNameCatalogLanguage")!
+
+    private static func loadSupplementalCatalog(for language: AppLanguage) -> SupplementalCatalog? {
+        guard let data = supplementalCatalogData else { return nil }
+        let decoder = JSONDecoder()
+        decoder.userInfo[requestedLanguageKey] = language.rawValue
+        guard let slice = try? decoder.decode(EmojiCatalogSlice.self, from: data) else { return nil }
+        return SupplementalCatalog(
+            primaryAliases: slice.primaryAliases,
+            fallbackAliases: slice.fallbackAliases,
+            primaryCanonicalNames: slice.primaryCanonicalNames,
+            fallbackCanonicalNames: slice.fallbackCanonicalNames
+        )
+    }
+
+    private struct EmojiCatalogSlice: Decodable {
+        let primaryAliases: [String: [String]]
+        let fallbackAliases: [String: [String]]
+        let primaryCanonicalNames: [String: [String]]
+        let fallbackCanonicalNames: [String: [String]]
+
+        private enum CodingKeys: String, CodingKey {
+            case canonicalNames
+            case fallbackLanguage
+            case languages
+        }
+
+        init(from decoder: Decoder) throws {
+            let root = try decoder.container(keyedBy: CodingKeys.self)
+            let fallbackLanguage = try root.decode(String.self, forKey: .fallbackLanguage)
+            let requestedLanguage = decoder.userInfo[EmojiNameCatalog.requestedLanguageKey] as? String
+                ?? fallbackLanguage
+            let languages = try root.nestedContainer(keyedBy: DynamicCodingKey.self, forKey: .languages)
+            let canonicalNames = try root.nestedContainer(keyedBy: DynamicCodingKey.self, forKey: .canonicalNames)
+            guard let primaryKey = DynamicCodingKey(stringValue: requestedLanguage),
+                  let fallbackKey = DynamicCodingKey(stringValue: fallbackLanguage),
+                  languages.contains(primaryKey),
+                  languages.contains(fallbackKey),
+                  canonicalNames.contains(primaryKey),
+                  canonicalNames.contains(fallbackKey)
+            else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .languages,
+                    in: root,
+                    debugDescription: "Emoji catalog has no requested language"
+                )
+            }
+            primaryAliases = try languages.decode([String: [String]].self, forKey: primaryKey)
+            fallbackAliases = try languages.decode([String: [String]].self, forKey: fallbackKey)
+            primaryCanonicalNames = try canonicalNames.decode([String: [String]].self, forKey: primaryKey)
+            fallbackCanonicalNames = try canonicalNames.decode([String: [String]].self, forKey: fallbackKey)
+        }
+    }
+
+    private struct DynamicCodingKey: CodingKey {
+        let stringValue: String
+        let intValue: Int? = nil
+
+        init?(stringValue: String) {
+            self.stringValue = stringValue
+        }
+
+        init?(intValue: Int) {
+            return nil
+        }
     }
 
     static func normalizedKey(_ text: String) -> String {

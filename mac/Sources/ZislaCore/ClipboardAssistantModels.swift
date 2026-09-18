@@ -382,7 +382,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .composeMail: "composeMail"
         case .copyText: "copyText"
         case .copyFullExpression: "copyFullExpression"
-        case .copyEmoji: "copyEmoji"
+        case .copyEmoji(let emoji): "copyEmoji:\(emoji)"
         case .compress: "compress"
         case .share: "share"
         case .callPhone: "callPhone"

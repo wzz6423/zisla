@@ -1,0 +1,176 @@
+name: Emoji Catalog Update
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Refresh Emoji Catalog
+    runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Regenerate the stable Emoji catalog
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: mac/Scripts/update-emoji-catalog.sh
+
+      - name: Detect catalog changes
+        id: changes
+        run: |
+          set -euo pipefail
+
+          catalog="mac/Resources/Emoji/EmojiNameAliases.json"
+          if git diff --quiet -- "$catalog"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git diff --check -- "$catalog"
+          revision="$(python3 - "$catalog" <<'PY'
+          import json
+          import re
+          import sys
+
+          catalog = json.load(open(sys.argv[1], encoding="utf-8"))
+          revision = catalog["cldrRevision"]
+          if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+              raise SystemExit("error: catalog has no full CLDR revision")
+          print(revision)
+          PY
+          )"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "branch=automation/emoji-catalog-${revision:0:12}" >> "$GITHUB_OUTPUT"
+
+      - name: Check for an open update pull request
+        id: existing
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.changes.outputs.branch }}
+        run: |
+          set -euo pipefail
+
+          count="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --base "$DEFAULT_BRANCH" \
+            --head "$BRANCH" \
+            --state open \
+            --json number \
+            --jq 'length')"
+          if [[ "$count" == "0" ]]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "An Emoji catalog update pull request is already open for $BRANCH."
+          fi
+
+      - name: Run Emoji catalog tests
+        if: steps.changes.outputs.changed == 'true' && steps.existing.outputs.exists != 'true'
+        working-directory: mac
+        run: |
+          set -euo pipefail
+          swift test \
+            --scratch-path "$RUNNER_TEMP/zisla-emoji-catalog" \
+            --filter EmojiNameCatalogTests
+
+      - name: Create an update pull request
+        if: steps.changes.outputs.changed == 'true' && steps.existing.outputs.exists != 'true'
+        env:
+          BRANCH: ${{ steps.changes.outputs.branch }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          catalog="mac/Resources/Emoji/EmojiNameAliases.json"
+          emoji_version="$(python3 - "$catalog" <<'PY'
+          import json
+          import re
+          import sys
+
+          emoji_version = json.load(open(sys.argv[1], encoding="utf-8"))["emojiVersion"]
+          if not isinstance(emoji_version, str) or not re.fullmatch(r"[0-9]+\.[0-9]+", emoji_version):
+              raise SystemExit("error: catalog has no stable Emoji version")
+          print(emoji_version)
+          PY
+          )"
+          cldr_version="$(python3 - "$catalog" <<'PY'
+          import json
+          import re
+          import sys
+
+          cldr_version = json.load(open(sys.argv[1], encoding="utf-8"))["cldrVersion"]
+          if not isinstance(cldr_version, str) or not re.fullmatch(r"[0-9]+\.[0-9]+", cldr_version):
+              raise SystemExit("error: catalog has no stable CLDR version")
+          print(cldr_version)
+          PY
+          )"
+
+          git switch --create "$BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$catalog"
+          git commit -m "chore(mac): update emoji catalog to Emoji $emoji_version"
+          git push --set-upstream origin "$BRANCH"
+
+          cat > "$RUNNER_TEMP/emoji-catalog-pr.md" <<EOF
+          ## Summary
+
+          Updates the bundled Emoji alias catalog from stable Unicode CLDR data.
+
+          ## GitHub Project
+
+          - Project: zisla Development
+
+          ## PR Type
+
+          - Type: chore
+
+          ## Validation
+
+          - Status: passed
+          - Command: swift test --scratch-path \$RUNNER_TEMP/zisla-emoji-catalog --filter EmojiNameCatalogTests
+          - Result: Emoji catalog tests passed after generating Emoji $emoji_version from CLDR $cldr_version.
+
+          ## Risk and Rollback
+
+          - Risk: Emoji aliases may change with the upstream stable CLDR release.
+          - Rollback: Revert this generated catalog update pull request.
+
+          ## Related Issue
+
+          None
+
+          ## AI Attribution
+
+          - Agent: None
+          EOF
+
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base "$DEFAULT_BRANCH" \
+            --head "$BRANCH" \
+            --title "chore(mac): update emoji catalog to Emoji $emoji_version" \
+            --body-file "$RUNNER_TEMP/emoji-catalog-pr.md"
+
+      - name: Remove test artifacts
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/zisla-emoji-catalog" "$RUNNER_TEMP/emoji-catalog-pr.md"
