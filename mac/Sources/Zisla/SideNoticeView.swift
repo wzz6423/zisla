@@ -799,13 +799,8 @@ private struct HeadphoneConnectionNotice: View {
             .help(BatteryLocalization.string("关闭", locale: locale))
         }
         .onAppear {
-            guard !reduceMotion else {
-                isPresented = true
-                return
-            }
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.72)) {
-                isPresented = true
-            }
+            guard !reduceMotion else { return }
+            isPresented = true
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(accessibilityDescription))
@@ -840,27 +835,15 @@ private struct HeadphoneGlyph: View {
     var isSingleUnit: Bool
 
     var body: some View {
-        Group {
-            if isSingleUnit {
-                Image(systemName: "headphones")
-                    .opacity(isPresented ? 1 : 0)
-                    .scaleEffect(isPresented ? 1 : 0.64)
-            } else {
-                ZStack {
-                    Image(systemName: "airpod.left")
-                        .offset(x: -9, y: isPresented ? -1 : 5)
-                        .opacity(isPresented ? 1 : 0)
-                        .scaleEffect(isPresented ? 1 : 0.64)
-                    Image(systemName: "airpod.right")
-                        .offset(x: 9, y: isPresented ? 1 : -5)
-                        .opacity(isPresented ? 1 : 0)
-                        .scaleEffect(isPresented ? 1 : 0.64)
-                }
-            }
-        }
-        .font(.system(size: isSingleUnit ? 27 : 25, weight: .medium))
-        .foregroundStyle(.white)
-        .shadow(color: .cyan.opacity(0.22), radius: 5, y: 1)
+        Image(systemName: isSingleUnit ? "headphones" : "airpods.pro")
+            .symbolEffect(
+                .bounce.up.byLayer,
+                options: .speed(0.7),
+                value: isPresented
+            )
+            .font(.system(size: isSingleUnit ? 27 : 25, weight: .medium))
+            .foregroundStyle(.white)
+            .shadow(color: .cyan.opacity(0.22), radius: 5, y: 1)
     }
 }
 
@@ -971,13 +954,8 @@ private struct CompactHeadphoneConnectionBar: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            guard !reduceMotion else {
-                isPresented = true
-                return
-            }
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.72)) {
-                isPresented = true
-            }
+            guard !reduceMotion else { return }
+            isPresented = true
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("\(BatteryLocalization.string("耳机已连接：", locale: locale))\(notice.title)"))
