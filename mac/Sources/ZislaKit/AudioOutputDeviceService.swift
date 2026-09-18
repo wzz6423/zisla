@@ -78,6 +78,29 @@ public struct HeadphoneBatterySnapshot: Equatable, Sendable {
     }
 
     static func fromBluetoothProfile(_ data: Data, deviceName: String) -> HeadphoneBatterySnapshot? {
+        HeadphoneBluetoothProfile.fromBluetoothProfile(data, deviceName: deviceName)?.battery
+    }
+
+    fileprivate static func percentage(_ value: Any?) -> Int? {
+        if let number = value as? NSNumber { return normalized(number.intValue) }
+        guard let text = value as? String else { return nil }
+        return normalized(Int(text.filter(\.isNumber)))
+    }
+
+    private static func normalized(_ value: Int?) -> Int? {
+        value.map { min(max($0, 0), 100) }
+    }
+
+    fileprivate static func normalizedName(_ value: String) -> String {
+        value.lowercased().components(separatedBy: .whitespacesAndNewlines).joined()
+    }
+}
+
+struct HeadphoneBluetoothProfile: Equatable, Sendable {
+    let battery: HeadphoneBatterySnapshot?
+    let productID: UInt32?
+
+    static func fromBluetoothProfile(_ data: Data, deviceName: String) -> HeadphoneBluetoothProfile? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let reports = root["SPBluetoothDataType"] as? [[String: Any]]
         else {
@@ -92,9 +115,9 @@ public struct HeadphoneBatterySnapshot: Equatable, Sendable {
                 }
             }
         }
-        let normalizedName = Self.normalizedName(deviceName)
+        let normalizedName = HeadphoneBatterySnapshot.normalizedName(deviceName)
         let namedDevice = connectedDevices.first { name, _ in
-            let candidate = Self.normalizedName(name)
+            let candidate = HeadphoneBatterySnapshot.normalizedName(name)
             return candidate.contains(normalizedName) || normalizedName.contains(candidate)
         }
         let connectedHeadphones = connectedDevices.filter { _, details in
@@ -104,47 +127,51 @@ public struct HeadphoneBatterySnapshot: Equatable, Sendable {
         guard let (_, details) = matchedDevice else { return nil }
 
         let snapshot = HeadphoneBatterySnapshot(
-            leftLevel: Self.percentage(details["device_batteryLevelLeft"]),
-            rightLevel: Self.percentage(details["device_batteryLevelRight"]),
-            caseLevel: Self.percentage(details["device_batteryLevelCase"]),
-            mainLevel: Self.percentage(details["device_batteryLevelMain"])
+            leftLevel: HeadphoneBatterySnapshot.percentage(details["device_batteryLevelLeft"]),
+            rightLevel: HeadphoneBatterySnapshot.percentage(details["device_batteryLevelRight"]),
+            caseLevel: HeadphoneBatterySnapshot.percentage(details["device_batteryLevelCase"]),
+            mainLevel: HeadphoneBatterySnapshot.percentage(details["device_batteryLevelMain"])
         )
-        return snapshot.leftLevel != nil
+        let battery = snapshot.leftLevel != nil
             || snapshot.rightLevel != nil
             || snapshot.caseLevel != nil
             || snapshot.mainLevel != nil
-            ? snapshot
-            : nil
+            ? snapshot : nil
+        return HeadphoneBluetoothProfile(
+            battery: battery,
+            productID: Self.productID(details["device_productID"])
+        )
     }
 
-    private static func percentage(_ value: Any?) -> Int? {
-        if let number = value as? NSNumber { return normalized(number.intValue) }
+    private static func productID(_ value: Any?) -> UInt32? {
+        if let number = value as? NSNumber { return number.uint32Value }
         guard let text = value as? String else { return nil }
-        return normalized(Int(text.filter(\.isNumber)))
-    }
-
-    private static func normalized(_ value: Int?) -> Int? {
-        value.map { min(max($0, 0), 100) }
-    }
-
-    private static func normalizedName(_ value: String) -> String {
-        value.lowercased().components(separatedBy: .whitespacesAndNewlines).joined()
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.lowercased().hasPrefix("0x") {
+            return UInt32(value.dropFirst(2), radix: 16)
+        }
+        return UInt32(value)
     }
 }
 
 public struct HeadphoneConnection: Equatable, Sendable, Identifiable {
+    public static let productIDMetadataKey = "headphoneProductID"
+
     public let id: UUID
     public let device: AudioOutputDevice
     public let battery: HeadphoneBatterySnapshot?
+    public let productID: UInt32?
 
     public init(
         id: UUID = UUID(),
         device: AudioOutputDevice,
-        battery: HeadphoneBatterySnapshot?
+        battery: HeadphoneBatterySnapshot?,
+        productID: UInt32? = nil
     ) {
         self.id = id
         self.device = device
         self.battery = battery
+        self.productID = productID
     }
 }
 
@@ -298,30 +325,36 @@ public final class AudioOutputDeviceService: ObservableObject {
     private func publishHeadphoneConnection(for device: AudioOutputDevice) {
         batteryTask?.cancel()
         batteryTask = Task { [weak self] in
-            let battery = await Self.readBluetoothBattery(for: device.name)
+            let details = await Self.readBluetoothConnection(for: device.name)
             guard !Task.isCancelled,
                   let self,
                   self.devices.contains(where: { $0.id == device.id })
             else { return }
-            self.headphoneConnection = HeadphoneConnection(device: device, battery: battery)
+            self.headphoneConnection = HeadphoneConnection(
+                device: device,
+                battery: details.battery,
+                productID: details.productID
+            )
         }
     }
 
-    nonisolated private static func readBluetoothBattery(
+    nonisolated private static func readBluetoothConnection(
         for deviceName: String
-    ) async -> HeadphoneBatterySnapshot? {
+    ) async -> (battery: HeadphoneBatterySnapshot?, productID: UInt32?) {
         do {
             let output = try await AIAgentProcessRunner.run(
                 executableURL: URL(fileURLWithPath: "/usr/sbin/system_profiler"),
                 arguments: ["SPBluetoothDataType", "-json"],
                 timeout: 15
             )
-            guard output.status == 0, !output.didTimeout else { return nil }
-            let profileSnapshot = HeadphoneBatterySnapshot.fromBluetoothProfile(
+            guard output.status == 0, !output.didTimeout else { return (nil, nil) }
+            let profile = HeadphoneBluetoothProfile.fromBluetoothProfile(
                 output.standardOutput,
                 deviceName: deviceName
             )
-            if profileSnapshot != nil { return profileSnapshot }
+            if let battery = profile?.battery {
+                return (battery, profile?.productID)
+            }
 
             let discovery = NetworkBatteryMonitor.bluetoothDiscovery(from: output.standardOutput)
             let normalizedDeviceName = Self.normalizedName(deviceName)
@@ -330,12 +363,13 @@ public final class AudioOutputDeviceService: ObservableObject {
             } ?? discovery.targets.first { target in
                 Self.normalizedName(target.name) == normalizedDeviceName
             }
-            guard let target else { return nil }
+            guard let target else { return (nil, profile?.productID) }
             let scannedDevices = await BluetoothBatteryScanner.collectBatteryDevices(targets: [target])
-            return scannedDevices.first { Self.normalizedName($0.name) == normalizedDeviceName }
+            let battery = scannedDevices.first { Self.normalizedName($0.name) == normalizedDeviceName }
                 .flatMap(HeadphoneBatterySnapshot.fromNetworkBatteryDevice)
+            return (battery, profile?.productID)
         } catch {
-            return nil
+            return (nil, nil)
         }
     }
 

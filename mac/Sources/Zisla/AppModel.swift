@@ -3405,7 +3405,10 @@ final class AppModel: ObservableObject {
         side: .right,
         style: .headphone,
         symbolName: connection.device.isAirPodsMax ? "headphones" : nil,
-        batteryLevels: connection.battery?.noticeLevels
+        batteryLevels: connection.battery?.noticeLevels,
+        metadata: connection.productID.map {
+          [HeadphoneConnection.productIDMetadataKey: String($0)]
+        }
       ),
       expiresAfter: 3
     )
