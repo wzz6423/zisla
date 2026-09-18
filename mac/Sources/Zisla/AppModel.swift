@@ -2292,11 +2292,21 @@ final class AppModel: ObservableObject {
         }
       } catch {
         await MainActor.run {
-          self?.downloadNeedsBrowserCookies = Self.requiresBrowserCookies(
+          guard let self else { return }
+          if Self.shouldRetryWithoutBrowserCookies(
+            error,
+            browserCookieSource: request.browserCookieSource
+          ), self.downloadBrowserCookieSource == request.browserCookieSource {
+            self.finishDownloadTask(taskID, state: .idle, showsCompletion: false)
+            self.downloadBrowserCookieSource = nil
+            self.startDownload()
+            return
+          }
+          self.downloadNeedsBrowserCookies = Self.requiresBrowserCookies(
             error,
             urlString: request.urlString
           )
-          self?.finishDownloadTask(
+          self.finishDownloadTask(
             taskID,
             state: .failed(Self.downloadErrorText(error)),
             showsCompletion: false
@@ -2423,6 +2433,11 @@ final class AppModel: ObservableObject {
       return
     }
     downloadFormatProbeTask = nil
+    if Self.shouldRetryWithoutBrowserCookies(error, browserCookieSource: cookieSource) {
+      downloadBrowserCookieSource = nil
+      refreshDownloadFormats()
+      return
+    }
     isLoadingDownloadFormats = false
     downloadFormatSelectionEnabled = false
     selectedDownloadFormat = nil
@@ -3790,9 +3805,23 @@ final class AppModel: ObservableObject {
           case let .processFailed(_, diagnostic) = error else {
       return false
     }
-    return DownloadFailureDiagnostics.isDouyinCookieFailure(
+    return DownloadFailureDiagnostics.requiresBrowserCookies(
       rawDiagnostic: diagnostic,
       urlString: urlString
+    )
+  }
+
+  private static func shouldRetryWithoutBrowserCookies(
+    _ error: Error,
+    browserCookieSource: DownloadBrowserCookieSource?
+  ) -> Bool {
+    guard let error = error as? DownloadServiceError,
+          case let .processFailed(_, diagnostic) = error else {
+      return false
+    }
+    return DownloadFailureDiagnostics.shouldRetryWithoutBrowserCookies(
+      rawDiagnostic: diagnostic,
+      browserCookieSource: browserCookieSource
     )
   }
 }

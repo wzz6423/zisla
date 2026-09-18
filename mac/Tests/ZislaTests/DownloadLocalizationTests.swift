@@ -61,6 +61,41 @@ struct DownloadLocalizationTests {
         #expect(IslandModuleLayout.download.islandSize.height > IslandModuleLayout.toolbox.islandSize.height)
     }
 
+    @Test
+    func downloadFormatControlRowUsesLeadingAlignment() throws {
+        let source = try String(contentsOf: Self.source("Zisla/DownloadModuleView.swift"), encoding: .utf8)
+        let picker = try #require(source.range(of: "IslandOutlinedPicker("))
+        let controlRowStart = try #require(source.range(
+            of: "HStack(spacing: 10)",
+            options: .backwards,
+            range: source.startIndex..<picker.lowerBound
+        ))
+        let controlRowEnd = try #require(source.range(
+            of: "HStack(spacing: 10)",
+            range: picker.upperBound..<source.endIndex
+        ))
+        let controlRow = source[controlRowStart.lowerBound..<controlRowEnd.lowerBound]
+
+        #expect(controlRow.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
+    }
+
+    @Test
+    func downloadModelClearsAnUnavailableBrowserCookieSourceBeforeRetrying() throws {
+        let source = try String(contentsOf: Self.source("Zisla/AppModel.swift"), encoding: .utf8)
+        let downloadRetry = try #require(source.range(of: "if Self.shouldRetryWithoutBrowserCookies("))
+        let retryBody = source[downloadRetry.lowerBound...]
+        let formatProbe = try #require(source.range(of: "private func failDownloadFormatProbe"))
+        let probeBody = source[formatProbe.lowerBound...]
+
+        #expect(retryBody.contains("browserCookieSource: request.browserCookieSource"))
+        #expect(retryBody.contains("self.downloadBrowserCookieSource == request.browserCookieSource"))
+        #expect(retryBody.contains("self.downloadBrowserCookieSource = nil"))
+        #expect(retryBody.contains("self.startDownload()"))
+        #expect(probeBody.contains("browserCookieSource: cookieSource"))
+        #expect(probeBody.contains("downloadBrowserCookieSource = nil"))
+        #expect(probeBody.contains("refreshDownloadFormats()"))
+    }
+
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {
         NSDictionary(contentsOf: packageRootURL
             .appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings"))
