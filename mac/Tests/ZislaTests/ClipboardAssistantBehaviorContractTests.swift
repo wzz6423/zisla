@@ -35,7 +35,7 @@ struct ClipboardAssistantBehaviorContractTests {
             from: "private func presentDetectedLink(_ url: URL)",
             to: "private func performClipboardAssistantAction"
         )
-        #expect(fallback.contains("downloadURL = url.absoluteString"))
+        #expect(fallback.contains("setDownloadURL(url.absoluteString)"))
         #expect(fallback.contains("selectModule(.download)"))
         #expect(fallback.contains("detectedLink = url"))
     }
@@ -62,7 +62,7 @@ struct ClipboardAssistantBehaviorContractTests {
             from: "case .openDownload(let url):",
             to: "case .revealInFinder"
         )
-        #expect(downloadAction.contains("downloadURL = url.absoluteString"))
+        #expect(downloadAction.contains("setDownloadURL(url.absoluteString)"))
         #expect(downloadAction.contains("selectModule(.download)"))
         #expect(!downloadAction.contains("startDownload()"))
 

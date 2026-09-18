@@ -1,4 +1,18 @@
 /* Localizable.strings - Vietnamese localization for Zisla macOS */
+/* Download format selection */
+"自动选择" = "Tự động chọn";
+"刷新格式" = "Làm mới định dạng";
+"需要 FFmpeg 才能选择格式" = "Cần FFmpeg để chọn định dạng";
+"选择格式" = "Chọn định dạng";
+"不使用浏览器 Cookies" = "Không dùng cookie trình duyệt";
+"浏览器 Cookies" = "Cookie trình duyệt";
+"使用 %@ Cookies" = "Dùng cookie %@";
+"%.0f FPS" = "%.0f FPS";
+"正在读取格式" = "Đang tải định dạng";
+"未找到可用格式" = "Không tìm thấy định dạng khả dụng";
+"选择浏览器 Cookies 后重试" = "Chọn cookie trình duyệt rồi thử lại";
+"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。" = "Douyin trả về HTTP 403 và cần cookie trình duyệt mới. Hãy chọn Safari, Chrome hoặc Firefox rồi thử lại. Không cần đăng nhập.";
+"无法读取下载格式" = "Không thể đọc định dạng tải xuống";
 
 /* Common */
 "取消" = "Hủy";

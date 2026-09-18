@@ -1,4 +1,18 @@
 /* Localizable.strings - Turkish localization for Zisla macOS */
+/* Download format selection */
+"自动选择" = "Otomatik seç";
+"刷新格式" = "Biçimleri yenile";
+"需要 FFmpeg 才能选择格式" = "Biçim seçmek için FFmpeg gerekir";
+"选择格式" = "Biçim seç";
+"不使用浏览器 Cookies" = "Tarayıcı çerezlerini kullanma";
+"浏览器 Cookies" = "Tarayıcı çerezleri";
+"使用 %@ Cookies" = "%@ çerezlerini kullan";
+"%.0f FPS" = "%.0f FPS";
+"正在读取格式" = "Biçimler yükleniyor";
+"未找到可用格式" = "Kullanılabilir biçim bulunamadı";
+"选择浏览器 Cookies 后重试" = "Tarayıcı çerezlerini seçip yeniden deneyin";
+"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。" = "Douyin HTTP 403 döndürdü ve güncel tarayıcı çerezlerine ihtiyaç duyuyor. Safari, Chrome veya Firefox'u seçip yeniden deneyin. Oturum açma gerekmez.";
+"无法读取下载格式" = "İndirme biçimleri okunamadı";
 
 /* Common */
 "取消" = "İptal";

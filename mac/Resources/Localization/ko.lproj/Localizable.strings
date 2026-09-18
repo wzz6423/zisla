@@ -1,4 +1,18 @@
 /* Localizable.strings - Korean localization for Zisla macOS */
+/* Download format selection */
+"自动选择" = "자동 선택";
+"刷新格式" = "형식 새로 고침";
+"需要 FFmpeg 才能选择格式" = "형식을 선택하려면 FFmpeg가 필요합니다";
+"选择格式" = "형식 선택";
+"不使用浏览器 Cookies" = "브라우저 Cookies 사용 안 함";
+"浏览器 Cookies" = "브라우저 Cookies";
+"使用 %@ Cookies" = "%@ Cookies 사용";
+"%.0f FPS" = "%.0f FPS";
+"正在读取格式" = "형식 읽는 중";
+"未找到可用格式" = "사용 가능한 형식을 찾을 수 없음";
+"选择浏览器 Cookies 后重试" = "브라우저 Cookies를 선택한 후 다시 시도";
+"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。" = "Douyin에서 HTTP 403을 반환했습니다. 최근 브라우저 Cookies가 필요합니다. Safari, Chrome 또는 Firefox를 선택한 후 다시 시도하세요. 로그인은 필요하지 않습니다.";
+"无法读取下载格式" = "다운로드 형식을 읽을 수 없습니다";
 
 /* Common */
 "取消" = "취소";

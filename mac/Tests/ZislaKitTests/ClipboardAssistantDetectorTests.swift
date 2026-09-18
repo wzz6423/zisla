@@ -73,6 +73,42 @@ struct ClipboardAssistantDetectorTests {
     }
 
     @Test
+    func detectsBareAndMarkdownURLs() throws {
+        let expectedBareURL = try #require(URL(string: "https://cy.ncss.cn"))
+        let bareDetection = ClipboardAssistantDetector.detect(
+            text: "cy.ncss.cn",
+            enabledKinds: allKinds,
+            offersDownload: true
+        )
+        #expect(bareDetection?.kind == .url)
+        #expect(bareDetection?.title == "cy.ncss.cn")
+        #expect(bareDetection?.action == .openURL(expectedBareURL))
+        #expect(bareDetection?.secondaryActions.isEmpty == true)
+
+        let expectedMarkdownURL = try #require(URL(string: "https://example.com/path?q=1"))
+        let markdownDetection = ClipboardAssistantDetector.detect(
+            text: "[Example link](https://example.com/path?q=1)",
+            enabledKinds: allKinds,
+            offersDownload: true
+        )
+        #expect(markdownDetection?.kind == .url)
+        #expect(markdownDetection?.title == "example.com")
+        #expect(markdownDetection?.action == .openURL(expectedMarkdownURL))
+        #expect(markdownDetection?.secondaryActions.isEmpty == true)
+
+        let expectedShareURL = try #require(URL(string: "https://v.douyin.com/example/"))
+        let shareDetection = ClipboardAssistantDetector.detect(
+            text: "3.56 复制打开抖音，看看【测试】 https://v.douyin.com/example/ 11/12",
+            enabledKinds: allKinds,
+            offersDownload: true
+        )
+        #expect(shareDetection?.kind == .url)
+        #expect(shareDetection?.title == "v.douyin.com")
+        #expect(shareDetection?.action == .openURL(expectedShareURL))
+        #expect(shareDetection?.secondaryActions == [.openDownload(expectedShareURL)])
+    }
+
+    @Test
     func offersDownloadForSupportedURLWhenEnabled() throws {
         let url = try #require(URL(string: "https://youtu.be/example"))
         let detection = ClipboardAssistantDetector.detect(

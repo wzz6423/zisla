@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="${0:A:h:h}"
-VERSION="${YTDLP_VERSION:-2026.06.09}"
+VERSION="${YTDLP_VERSION:-2026.08.19}"
 DESTINATION="${1:-$ROOT/Tools/yt-dlp}"
 WORK_DIRECTORY="$(mktemp -d "${TMPDIR:-/tmp}/zisla-ytdlp.XXXXXX")"
 TEMPORARY_DESTINATION=""

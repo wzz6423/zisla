@@ -513,7 +513,7 @@ struct ClipboardAssistantIslandPresentationTests {
             .range(of: "case .revealInFinder"))
         let downloadAction = appModelSource[downloadActionStart.lowerBound..<downloadActionEnd.lowerBound]
         #expect(!downloadAction.contains("guard !downloadState.isRunning else { return }"))
-        #expect(downloadAction.contains("downloadURL = url.absoluteString"))
+        #expect(downloadAction.contains("setDownloadURL(url.absoluteString)"))
         #expect(!downloadAction.contains("startDownload()"))
         #expect(downloadAction.contains("selectModule(.download)"))
         let linkHandlerStart = try #require(appModelSource.range(of: "clipboardMonitor.onLinkDetected"))

@@ -652,14 +652,14 @@ struct ClipboardHistoryStoreTests {
         let urlItems = restored.items.filter { $0.category == .url }
         let textItems = restored.items.filter { $0.category == .text }
 
-        #expect(urlItems.count == 3)
+        #expect(urlItems.count == 4)
         #expect(urlItems.contains { $0.content == .text("https://example.com") })
         #expect(urlItems.contains { $0.content == .text("http://github.com/user/repo") })
+        #expect(urlItems.contains { $0.content == .text("包含链接 https://example.com 的文本") })
         #expect(urlItems.contains { $0.content == .text("https://example.com/path?query=value#fragment") })
 
-        #expect(textItems.count == 2)
+        #expect(textItems.count == 1)
         #expect(textItems.contains { $0.content == .text("普通文本") })
-        #expect(textItems.contains { $0.content == .text("包含链接 https://example.com 的文本") })
     }
 
     @Test
@@ -673,9 +673,19 @@ struct ClipboardHistoryStoreTests {
             ClipboardHistoryItem(content: .text("  HTTPS://Example.com/中文路径  ")).category == .url
         )
         #expect(
-            ClipboardHistoryItem(content: .text("https://example.com/path with spaces")).category == .text
+            ClipboardHistoryItem(content: .text("https://example.com/path with spaces")).category == .url
         )
-        #expect(ClipboardHistoryItem(content: .text("www.example.com")).category == .text)
+        #expect(ClipboardHistoryItem(content: .text("www.example.com")).category == .url)
+        #expect(ClipboardHistoryItem(content: .text("cy.ncss.cn")).category == .url)
+        #expect(
+            ClipboardHistoryItem(content: .text("[Example link](https://example.com)")).category == .url
+        )
+        #expect(
+            ClipboardHistoryItem(
+                content: .text("3.56 复制打开抖音，看看【测试】 https://v.douyin.com/example/ 11/12")
+            ).category == .url
+        )
+        #expect(ClipboardHistoryItem(content: .text("user@example.com")).category == .text)
         #expect(ClipboardHistoryItem(content: .text("ftp://example.com")).category == .text)
     }
 

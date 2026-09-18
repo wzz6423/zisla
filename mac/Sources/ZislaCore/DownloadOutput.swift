@@ -120,6 +120,9 @@ public enum DownloadOutputPathBuilder {
 
 public enum DownloadFailureDiagnostics {
     public static func actionableMessage(rawDiagnostic: String, urlString: String) -> String {
+        if isDouyinCookieFailure(rawDiagnostic: rawDiagnostic, urlString: urlString) {
+            return AppLocalization.text("抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。")
+        }
         guard isBilibiliHTTP412(rawDiagnostic: rawDiagnostic, urlString: urlString) else {
             return rawDiagnostic
         }
@@ -145,6 +148,22 @@ public enum DownloadFailureDiagnostics {
         guard let host = URL(string: string)?.host?.lowercased() else { return false }
         return host == "bilibili.com" || host.hasSuffix(".bilibili.com")
             || host == "b23.tv" || host.hasSuffix(".b23.tv")
+    }
+
+    public static func isDouyinCookieFailure(
+        rawDiagnostic: String,
+        urlString: String
+    ) -> Bool {
+        guard isDouyinURL(urlString) else { return false }
+        let diagnostic = rawDiagnostic.lowercased()
+        return diagnostic.contains("fresh cookies")
+            || (diagnostic.contains("http 403") && diagnostic.contains("cookies"))
+    }
+
+    public static func isDouyinURL(_ string: String) -> Bool {
+        guard let host = HTTPURLParser.url(from: string)?.host?.lowercased() else { return false }
+        return host == "douyin.com" || host.hasSuffix(".douyin.com")
+            || host == "iesdouyin.com" || host.hasSuffix(".iesdouyin.com")
     }
 
     private static func isHTTP412(_ diagnostic: String) -> Bool {
@@ -176,14 +195,128 @@ public enum DownloadOutputPathValidator {
 public enum HTTPURLParser {
     public static func url(from string: String) -> URL? {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !trimmed.contains(where: \Character.isWhitespace),
-              let url = URL(string: trimmed),
+        guard !trimmed.isEmpty else { return nil }
+
+        let candidate = markdownURLString(from: trimmed)
+            ?? duplicatedMarkdownURLString(from: trimmed)
+            ?? trimmed
+        if let url = standaloneHTTPURL(from: candidate) {
+            return url
+        }
+        return detectedHTTPURL(in: trimmed)
+    }
+
+    private static func standaloneHTTPURL(from candidate: String) -> URL? {
+        guard !candidate.isEmpty, !candidate.contains(where: \Character.isWhitespace) else {
+            return nil
+        }
+
+        if let url = completeHTTPURL(from: candidate) {
+            return url
+        }
+        if candidate.hasPrefix("//") {
+            return completeHTTPURL(from: "https:\(candidate)")
+        }
+        guard !candidate.contains("://"),
+              !candidate.contains("@"),
+              let url = completeHTTPURL(from: "https://\(candidate)"),
+              isBareWebHost(url.host, candidate: candidate) else {
+            return nil
+        }
+        return url
+    }
+
+    private static func completeHTTPURL(from candidate: String) -> URL? {
+        guard let url = URL(string: candidate),
               let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https",
               url.host?.isEmpty == false else {
             return nil
         }
         return url
+    }
+
+    private static func isBareWebHost(_ host: String?, candidate: String) -> Bool {
+        guard let host, !host.isEmpty else { return false }
+        guard hasValidBareHostCharacters(candidate) else { return false }
+        return host.lowercased() == "localhost" || host.contains(".") || host.contains(":")
+    }
+
+    private static func hasValidBareHostCharacters(_ candidate: String) -> Bool {
+        let authority = candidate.prefix { $0 != "/" && $0 != "?" && $0 != "#" }
+        if authority.hasPrefix("[") {
+            return true
+        }
+        let rawHost = authority.split(separator: ":", maxSplits: 1).first ?? ""
+        let allowedCharacters = CharacterSet.alphanumerics
+            .union(CharacterSet(charactersIn: "-."))
+        return !rawHost.isEmpty && rawHost.unicodeScalars.allSatisfy(allowedCharacters.contains)
+    }
+
+    private static func markdownURLString(from string: String) -> String? {
+        if string.first == "<", string.last == ">", string.count > 2 {
+            return String(string.dropFirst().dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        let content = string.hasPrefix("!") ? String(string.dropFirst()) : string
+        guard content.first == "[",
+              let closingBracket = content.firstIndex(of: "]") else {
+            return nil
+        }
+        let openingParenthesis = content.index(after: closingBracket)
+        guard openingParenthesis < content.endIndex,
+              content[openingParenthesis] == "(",
+              content.last == ")" else {
+            return nil
+        }
+        let destinationStart = content.index(after: openingParenthesis)
+        let destinationEnd = content.index(before: content.endIndex)
+        let destination = String(content[destinationStart..<destinationEnd])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !destination.isEmpty else { return nil }
+
+        if destination.first == "<", destination.last == ">", destination.count > 2 {
+            return String(destination.dropFirst().dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return destination
+    }
+
+    private static func duplicatedMarkdownURLString(from string: String) -> String? {
+        guard !string.hasPrefix("["),
+              let separator = string.range(of: "](") else {
+            return nil
+        }
+        let source = String(string[..<separator.lowerBound])
+        var destination = String(string[separator.upperBound...])
+        if destination.last == ")" {
+            destination.removeLast()
+        }
+        return source == destination ? source : nil
+    }
+
+    private static func detectedHTTPURL(in string: String) -> URL? {
+        guard let detector = try? NSDataDetector(
+            types: NSTextCheckingResult.CheckingType.link.rawValue
+        ) else {
+            return nil
+        }
+        let range = NSRange(string.startIndex..., in: string)
+        for match in detector.matches(in: string, options: [], range: range) {
+            guard let matchRange = Range(match.range, in: string),
+                  let detectedURL = match.url else {
+                continue
+            }
+            var candidate = String(string[matchRange])
+            if candidate.last == "]", matchRange.upperBound < string.endIndex,
+               string[matchRange.upperBound] == "(" {
+                candidate.removeLast()
+            }
+            if let url = completeHTTPURL(from: candidate)
+                ?? completeHTTPURL(from: detectedURL.absoluteString) {
+                return url
+            }
+        }
+        return nil
     }
 }
 
@@ -192,6 +325,7 @@ public enum DownloadURLClassifier {
         "youtube.com", "youtu.be", "bilibili.com", "b23.tv",
         "vimeo.com", "twitter.com", "x.com", "tiktok.com",
         "twitch.tv", "dailymotion.com",
+        "douyin.com", "iesdouyin.com",
         // Common Chinese video/music and shared-link hosts. yt-dlp still
         // decides whether a particular page is downloadable; this list only
         // controls whether clipboard/drag UI offers the download affordance.
