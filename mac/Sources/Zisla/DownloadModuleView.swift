@@ -167,11 +167,11 @@ struct DownloadModuleView: View {
             Label(browserCookiePickerTitle, systemImage: "lock.shield")
                 .font(.system(size: 10, weight: .medium))
                 .fitsSingleLine()
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .frame(width: 156, height: 28, alignment: .leading)
+        .fixedSize(horizontal: true, vertical: false)
+        .frame(height: 28)
     }
 
     private var downloadFormatPickerTitle: String {

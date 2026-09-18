@@ -64,11 +64,19 @@ struct DownloadLocalizationTests {
     @Test
     func downloadFormatControlRowPinsFormatsAndCookiesToOppositeEdges() throws {
         let source = try String(contentsOf: Self.source("Zisla/DownloadModuleView.swift"), encoding: .utf8)
+        let cookiePickerStart = try #require(source.range(of: "private var browserCookiePicker"))
+        let cookiePickerEnd = try #require(source.range(
+            of: "private var downloadFormatPickerTitle",
+            range: cookiePickerStart.upperBound..<source.endIndex
+        ))
+        let cookiePicker = source[cookiePickerStart.lowerBound..<cookiePickerEnd.lowerBound]
 
         #expect(source.contains("HStack(spacing: 10) {\n                HStack(spacing: 10) {\n                    IslandOutlinedPicker("))
         #expect(source.contains("formatPicker\n                }\n\n                Spacer(minLength: 0)\n\n                HStack(spacing: 10) {\n                    browserCookiePicker"))
         #expect(source.contains(".frame(width: 292, height: 28, alignment: .leading)"))
-        #expect(source.contains(".frame(width: 156, height: 28, alignment: .leading)"))
+        #expect(cookiePicker.contains(".fixedSize(horizontal: true, vertical: false)"))
+        #expect(cookiePicker.contains(".frame(height: 28)"))
+        #expect(!cookiePicker.contains(".frame(width:"))
         #expect(source.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
     }
 
