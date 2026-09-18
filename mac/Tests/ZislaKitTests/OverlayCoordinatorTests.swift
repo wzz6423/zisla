@@ -768,6 +768,32 @@ extension OverlayCoordinatorTests {
     }
 
     @Test @MainActor
+    func reexpandingTextInputSurfaceRestoresKeyboardEligibility() throws {
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        defer { coordinator.stop() }
+
+        coordinator.updateScreens([Self.builtInScreen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setDragging(true)
+
+        let panel = try #require(contentView.window as? IslandPanel)
+        coordinator.setAllowsKeyWindow(true)
+        #expect(!panel.ignoresMouseEvents)
+        #expect(panel.canBecomeKey)
+
+        coordinator.setDragging(false)
+        coordinator.setAllowsKeyWindow(false)
+        #expect(panel.ignoresMouseEvents)
+        #expect(!panel.canBecomeKey)
+
+        coordinator.setDragging(true)
+        coordinator.setAllowsKeyWindow(true)
+        #expect(!panel.ignoresMouseEvents)
+        #expect(panel.canBecomeKey)
+    }
+
+    @Test @MainActor
     func pinningExpandedGlassPanelNeverTakesFocus() async throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)

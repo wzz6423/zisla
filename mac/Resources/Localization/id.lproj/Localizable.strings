@@ -1,4 +1,18 @@
 /* Localizable.strings - Indonesian localization for Zisla macOS */
+/* Download format selection */
+"自动选择" = "Pilih otomatis";
+"刷新格式" = "Segarkan format";
+"需要 FFmpeg 才能选择格式" = "FFmpeg diperlukan untuk memilih format";
+"选择格式" = "Pilih format";
+"不使用浏览器 Cookies" = "Jangan gunakan cookie browser";
+"浏览器 Cookies" = "Cookie browser";
+"使用 %@ Cookies" = "Gunakan cookie %@";
+"%.0f FPS" = "%.0f FPS";
+"正在读取格式" = "Memuat format";
+"未找到可用格式" = "Tidak ada format yang tersedia";
+"选择浏览器 Cookies 后重试" = "Pilih cookie browser lalu coba lagi";
+"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。" = "Douyin mengembalikan HTTP 403 dan memerlukan cookie browser terbaru. Pilih Safari, Chrome, atau Firefox lalu coba lagi. Tidak perlu masuk.";
+"无法读取下载格式" = "Tidak dapat membaca format unduhan";
 
 /* Common */
 "取消" = "Batal";

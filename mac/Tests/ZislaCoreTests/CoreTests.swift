@@ -1470,6 +1470,29 @@ struct DownloadCoreTests {
     }
 
     @Test
+    func requestNormalizesBareAndMarkdownWebLinks() throws {
+        let outputDirectory = URL(fileURLWithPath: "/tmp")
+        let cases = [
+            ("cy.ncss.cn", "https://cy.ncss.cn"),
+            ("[Douyin](https://v.douyin.com/example/)", "https://v.douyin.com/example/"),
+            ("https://example.com/path](https://example.com/path", "https://example.com/path"),
+            (
+                "3.56 复制打开抖音，看看【测试】 https://v.douyin.com/example/ 11/12",
+                "https://v.douyin.com/example/"
+            ),
+        ]
+
+        for (source, expected) in cases {
+            let request = try DownloadRequest(
+                urlString: source,
+                mode: .video,
+                outputDirectory: outputDirectory
+            )
+            #expect(request.urlString == expected)
+        }
+    }
+
+    @Test
     func argumentBuilderIsolatedURLAndMandatorySafetyFlags() throws {
         let url = "https://example.com/watch?v=1;$(touch%20/tmp/pwned)&name=--exec"
         let request = try DownloadRequest(
@@ -1496,6 +1519,71 @@ struct DownloadCoreTests {
         #expect(arguments.filter { $0 == url }.count == 1)
         #expect(arguments.contains("temp:\(taskTemporaryDirectory.path)"))
         #expect(!arguments.contains("touch"))
+    }
+
+    @Test
+    func selectedFormatAndBrowserCookieSourceStaySeparatedFromTheURL() throws {
+        let selection = try #require(
+            DownloadFormatSelection(formatID: "137", audioFormatID: "140")
+        )
+        let request = try DownloadRequest(
+            urlString: "https://v.douyin.com/example/",
+            mode: .video,
+            outputDirectory: URL(fileURLWithPath: "/tmp/Downloads"),
+            formatSelection: selection,
+            browserCookieSource: .safari
+        )
+
+        let arguments = YTDLPArgumentBuilder.arguments(
+            for: request,
+            capabilities: .init(hasFFmpeg: true),
+            taskTemporaryDirectory: URL(fileURLWithPath: "/tmp/Zisla/task-format")
+        )
+
+        #expect(argument(after: "-f", in: arguments) == "137+140")
+        #expect(argument(after: "--cookies-from-browser", in: arguments) == "safari")
+        #expect(arguments.last == request.urlString)
+        #expect(arguments.dropLast().last == "--")
+        #expect(DownloadFormatSelection(formatID: "--exec") == nil)
+        #expect(DownloadFormatSelection(formatID: "137", audioFormatID: "bad value") == nil)
+    }
+
+    @Test
+    func formatProbeParsesOnlySelectableMediaFormats() throws {
+        let output = #"""
+        {"title":"Example video","formats":[
+          {"format_id":"137","ext":"mp4","width":1920,"height":1080,"fps":60,"vcodec":"avc1.640028","acodec":"none","tbr":4500,"filesize":123456},
+          {"format_id":"140","ext":"m4a","vcodec":"none","acodec":"mp4a.40.2","abr":128,"filesize_approx":45678},
+          {"format_id":"18","ext":"mp4","width":640,"height":360,"fps":30,"vcodec":"avc1.42001E","acodec":"mp4a.40.2"},
+          {"format_id":"sb0","ext":"mhtml","vcodec":"none","acodec":"none"}
+        ]}
+        """#
+
+        let result = try DownloadFormatProbe.result(from: output)
+        let videoOptions = DownloadFormatCatalog.options(for: .video, formats: result.formats)
+        let audioOptions = DownloadFormatCatalog.options(for: .audio, formats: result.formats)
+
+        #expect(result.title == "Example video")
+        #expect(result.formats.map(\.formatID) == ["137", "140", "18"])
+        #expect(videoOptions.map(\.id) == ["137+140", "18"])
+        #expect(audioOptions.map(\.id) == ["140"])
+        #expect(videoOptions.first?.format.resolution == "1920×1080")
+        #expect(videoOptions.first?.format.fps == 60)
+        #expect(videoOptions.first?.format.estimatedFileSize == 123456)
+    }
+
+    @Test
+    func formatProbeArgumentsUseOnlyTheSelectedCookieSource() {
+        let arguments = DownloadFormatProbe.arguments(
+            urlString: "https://v.douyin.com/example/",
+            browserCookieSource: .firefox
+        )
+
+        #expect(arguments.contains("--dump-single-json"))
+        #expect(arguments.contains("--skip-download"))
+        #expect(argument(after: "--cookies-from-browser", in: arguments) == "firefox")
+        #expect(arguments.last == "https://v.douyin.com/example/")
+        #expect(arguments.dropLast().last == "--")
     }
 
     @Test
@@ -1670,6 +1758,22 @@ struct DownloadCoreTests {
     }
 
     @Test
+    func douyinCookieFailureMapsToAnActionableRetryAndIsDownloadable() {
+        let raw = "ERROR: [Douyin] Failed to download web detail JSON: HTTP Error 403: Forbidden\nFresh cookies (not necessarily logged in) are needed"
+        let url = "https://v.douyin.com/example/"
+
+        let message = DownloadFailureDiagnostics.actionableMessage(
+            rawDiagnostic: raw,
+            urlString: url
+        )
+
+        #expect(DownloadFailureDiagnostics.isDouyinCookieFailure(rawDiagnostic: raw, urlString: url))
+        #expect(message.contains("抖音"))
+        #expect(message.contains("Cookies"))
+        #expect(DownloadURLClassifier.isLikelyDownloadable(url))
+    }
+
+    @Test
     func completedOutputPathMustRemainInsideConfiguredDirectory() {
         let directory = URL(fileURLWithPath: "/Users/me/Downloads", isDirectory: true)
         let valid = URL(fileURLWithPath: "/Users/me/Downloads/album/../video.mp4")
@@ -1685,13 +1789,50 @@ struct DownloadCoreTests {
     }
 
     @Test
-    func httpURLParserRecognizesOnlyCompleteHTTPLinks() {
+    func httpURLParserNormalizesStandaloneWebLinks() {
         #expect(HTTPURLParser.url(from: "  HTTPS://Example.com/中文路径  ") != nil)
         #expect(HTTPURLParser.url(from: "http://example.com/path?q=1") != nil)
-        #expect(HTTPURLParser.url(from: "https://example.com/path with spaces") == nil)
-        #expect(HTTPURLParser.url(from: "www.example.com") == nil)
+        #expect(
+            HTTPURLParser.url(from: "cy.ncss.cn")?.absoluteString
+                == "https://cy.ncss.cn"
+        )
+        #expect(
+            HTTPURLParser.url(from: "www.example.com/path?q=1")?.absoluteString
+                == "https://www.example.com/path?q=1"
+        )
+        #expect(
+            HTTPURLParser.url(from: "[Example link](https://example.com/path?q=1)")?.absoluteString
+                == "https://example.com/path?q=1"
+        )
+        #expect(
+            HTTPURLParser.url(from: "[Example link](cy.ncss.cn/path)")?.absoluteString
+                == "https://cy.ncss.cn/path"
+        )
+        #expect(
+            HTTPURLParser.url(from: "<https://example.com/path>")?.absoluteString
+                == "https://example.com/path"
+        )
+        #expect(
+            HTTPURLParser.url(from: "https://example.com/path](https://example.com/path")?.absoluteString
+                == "https://example.com/path"
+        )
+        #expect(
+            HTTPURLParser.url(
+                from: "✨ 3.56 复制打开抖音，看看【测试】 https://v.douyin.com/example/ 11/12 ✨"
+            )?.absoluteString == "https://v.douyin.com/example/"
+        )
+        #expect(HTTPURLParser.url(from: "例子.公司") != nil)
+        #expect(HTTPURLParser.url(from: "这是一段中文内容，用于验证语言识别。") == nil)
+        #expect(HTTPURLParser.url(from: "user@example.com") == nil)
+        #expect(HTTPURLParser.url(from: "/Users/example/report.pdf") == nil)
+        #expect(HTTPURLParser.url(from: "not-a-url") == nil)
+        #expect(HTTPURLParser.url(from: "https://") == nil)
         #expect(HTTPURLParser.url(from: "ftp://example.com") == nil)
-        #expect(HTTPURLParser.url(from: "链接：https://example.com") == nil)
+        #expect(HTTPURLParser.url(from: "[Example link](not a url)") == nil)
+        #expect(
+            HTTPURLParser.url(from: "链接：https://example.com")?.absoluteString
+                == "https://example.com"
+        )
     }
 
     @Test
@@ -1732,6 +1873,35 @@ struct DownloadCoreTests {
             detector.detect(changeCount: 15, string: "http://example.com/article")?.absoluteString
                 == "http://example.com/article"
         )
+    }
+
+    @Test
+    func clipboardDetectorNormalizesBareAndMarkdownLinks() {
+        var detector = ClipboardLinkDetector(recentCapacity: 4)
+        detector.begin(atChangeCount: 20)
+
+        #expect(
+            detector.detect(changeCount: 21, string: "cy.ncss.cn")?.absoluteString
+                == "https://cy.ncss.cn"
+        )
+        #expect(detector.detect(changeCount: 22, string: "https://cy.ncss.cn") == nil)
+        #expect(
+            detector.detect(changeCount: 23, string: "[Example link](https://example.com/path)")?.absoluteString
+                == "https://example.com/path"
+        )
+        #expect(
+            detector.detect(
+                changeCount: 24,
+                string: "3.56 复制打开抖音，看看【测试】 https://v.douyin.com/example/ 11/12"
+            )?.absoluteString == "https://v.douyin.com/example/"
+        )
+        #expect(
+            detector.detect(
+                changeCount: 25,
+                string: "https://v.douyin.com/broken/](https://v.douyin.com/broken/"
+            )?.absoluteString == "https://v.douyin.com/broken/"
+        )
+        #expect(detector.detect(changeCount: 26, string: "user@example.com") == nil)
     }
 }
 

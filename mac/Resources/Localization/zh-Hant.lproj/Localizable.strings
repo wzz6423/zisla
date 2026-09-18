@@ -1,4 +1,18 @@
 /* Localizable.strings - Traditional Chinese localization for Zisla macOS */
+/* Download format selection */
+"自动选择" = "自動選擇";
+"刷新格式" = "重新整理格式";
+"需要 FFmpeg 才能选择格式" = "需要 FFmpeg 才能選擇格式";
+"选择格式" = "選擇格式";
+"不使用浏览器 Cookies" = "不使用瀏覽器 Cookies";
+"浏览器 Cookies" = "瀏覽器 Cookies";
+"使用 %@ Cookies" = "使用 %@ Cookies";
+"%.0f FPS" = "%.0f FPS";
+"正在读取格式" = "正在讀取格式";
+"未找到可用格式" = "找不到可用格式";
+"选择浏览器 Cookies 后重试" = "選擇瀏覽器 Cookies 後重試";
+"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。" = "抖音回傳 HTTP 403，需要近期瀏覽器 Cookies。請選擇 Safari、Chrome 或 Firefox 後重試；無須登入。";
+"无法读取下载格式" = "無法讀取下載格式";
 
 /* Common */
 "取消" = "取消";
