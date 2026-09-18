@@ -2438,8 +2438,8 @@
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Mitteilungen für Wecker sind nicht erlaubt. Aktiviere Mitteilungen in den Systemeinstellungen.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Töne für Wecker-Mitteilungen sind deaktiviert. Aktiviere Töne in den Systemeinstellungen.";
 "无法设置闹钟通知：%@" = "Die Wecker-Mitteilung konnte nicht geplant werden: %@";
-
-
 "应用程序" = "Programme";
 "打开应用" = "App öffnen";
 "无法打开应用" = "App konnte nicht geöffnet werden";
+"Emoji 名称" = "Emoji-Name";
+"复制 Emoji" = "Emoji kopieren";

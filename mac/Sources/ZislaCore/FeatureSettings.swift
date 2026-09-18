@@ -567,6 +567,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     private var clipboardAssistantCurrencyDefaultApplied: Bool
     private var clipboardAssistantConversionDefaultApplied: Bool
     private var clipboardAssistantAppDefaultApplied: Bool
+    /// Payload version of the clipboard-assistant kind preferences. Bumped when a
+    /// new kind ships so the decoder can enable it once for existing users instead
+    /// of silently leaving it off or resurrecting kinds they turned off.
+    public var clipboardAssistantKindSetVersion: Int
     /// Primary action and expanded-menu order for each recognized content kind.
     public var clipboardAssistantActionOrders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
     /// Engine used by the assistant's "search" action for copied text.
@@ -683,6 +687,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardAssistantMouseButton: Int? = nil,
         clipboardAssistantBlacklist: Set<String> = [],
         clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind> = Set(ClipboardAssistantKind.allCases),
+        clipboardAssistantKindSetVersion: Int = FeatureSettings.clipboardAssistantKindSetVersionCurrent,
         clipboardAssistantActionOrders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]] = [:],
         clipboardAssistantSearchEngine: ClipboardAssistantSearchEngine = .google,
         clipboardAssistantCustomSearchURL: String = "",
@@ -780,6 +785,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.clipboardAssistantCurrencyDefaultApplied = true
         self.clipboardAssistantConversionDefaultApplied = true
         self.clipboardAssistantAppDefaultApplied = true
+        self.clipboardAssistantKindSetVersion = clipboardAssistantKindSetVersion
         var actionOrders = clipboardAssistantActionOrders
         if let legacyCurrencyOrder = actionOrders.removeValue(forKey: .currency), actionOrders[.conversion] == nil {
             actionOrders[.conversion] = legacyCurrencyOrder
@@ -847,6 +853,15 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         return mailAccountNames.intersection(availableAccountNames)
     }
 
+    /// Current clipboard-assistant kind preference payload version.
+    public static let clipboardAssistantKindSetVersionCurrent = 1
+    /// Kinds shipped after the previous version; enabled once when a stored
+    /// preference from an older version is decoded. Empty stored sets keep
+    /// their "all kinds" meaning and need no migration.
+    private static let kindsIntroducedByVersion: [Int: Set<ClipboardAssistantKind>] = [
+        1: [.emojiName],
+    ]
+
     public static let `default` = FeatureSettings()
 
     private enum CodingKeys: String, CodingKey {
@@ -894,6 +909,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantCurrencyDefaultApplied
         case clipboardAssistantConversionDefaultApplied
         case clipboardAssistantAppDefaultApplied
+        case clipboardAssistantKindSetVersion
         case clipboardAssistantActionOrders
         case clipboardAssistantSearchEngine
         case clipboardAssistantCustomSearchURL
@@ -1052,6 +1068,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .clipboardAssistantAppDefaultApplied
         ) ?? false
+        let storedKindSetVersion = try container.decodeIfPresent(
+            Int.self,
+            forKey: .clipboardAssistantKindSetVersion
+        ) ?? 0
         var enabledKinds = try container.decodeIfPresent(
             Set<ClipboardAssistantKind>.self,
             forKey: .clipboardAssistantEnabledKinds
@@ -1064,10 +1084,17 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         if !hasAppliedAppDefault, !enabledKinds.isEmpty {
             enabledKinds.insert(.app)
         }
-        clipboardAssistantEnabledKinds = enabledKinds
         clipboardAssistantCurrencyDefaultApplied = true
         clipboardAssistantConversionDefaultApplied = true
         clipboardAssistantAppDefaultApplied = true
+        if !enabledKinds.isEmpty {
+            for (version, kinds) in Self.kindsIntroducedByVersion
+            where storedKindSetVersion < version {
+                enabledKinds.formUnion(kinds)
+            }
+        }
+        clipboardAssistantEnabledKinds = enabledKinds
+        clipboardAssistantKindSetVersion = Self.clipboardAssistantKindSetVersionCurrent
         var actionOrders = try container.decodeIfPresent(
             [ClipboardAssistantKind: [ClipboardAssistantActionKind]].self,
             forKey: .clipboardAssistantActionOrders

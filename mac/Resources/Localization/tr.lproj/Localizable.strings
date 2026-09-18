@@ -2437,8 +2437,8 @@
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Alarm bildirimlerine izin verilmemiş. Sistem Ayarları’ndan bildirimleri açın.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Alarm bildirim sesleri kapalı. Sistem Ayarları’ndan sesleri açın.";
 "无法设置闹钟通知：%@" = "Alarm bildirimi zamanlanamadı: %@";
-
-
 "应用程序" = "Uygulamalar";
 "打开应用" = "Uygulamayı aç";
 "无法打开应用" = "Uygulama açılamadı";
+"Emoji 名称" = "Emoji adı";
+"复制 Emoji" = "Emoji'yi kopyala";
