@@ -38,6 +38,7 @@ struct AudioOutputDeviceServiceTests {
                     {
                       "AirPods Pro": {
                         "device_minorType": "Headphones",
+                        "device_productID": "0x2027",
                         "device_batteryLevelLeft": "91%",
                         "device_batteryLevelRight": "83%",
                         "device_batteryLevelCase": "62%"
@@ -54,6 +55,41 @@ struct AudioOutputDeviceServiceTests {
 
         #expect(snapshot == HeadphoneBatterySnapshot(leftLevel: 91, rightLevel: 83, caseLevel: 62))
         #expect(snapshot?.noticeLevels.map(\.level) == [91, 83, 62])
+
+        let profile = HeadphoneBluetoothProfile.fromBluetoothProfile(data, deviceName: "AirPods Pro")
+        #expect(profile?.productID == 0x2027)
+    }
+
+    @Test
+    func keepsBatteryWhenBluetoothProfileProductIDIsInvalid() throws {
+        let data = try #require(
+            """
+            {
+              "SPBluetoothDataType": [
+                {
+                  "device_connected": [
+                    {
+                      "AirPods Pro": {
+                        "device_minorType": "Headphones",
+                        "device_productID": "not-a-product-id",
+                        "device_batteryLevelLeft": "91%"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+            """.data(using: .utf8)
+        )
+
+        let profile = HeadphoneBluetoothProfile.fromBluetoothProfile(data, deviceName: "AirPods Pro")
+
+        #expect(profile?.productID == nil)
+        #expect(profile?.battery == HeadphoneBatterySnapshot(
+            leftLevel: 91,
+            rightLevel: nil,
+            caseLevel: nil
+        ))
     }
 
     @Test

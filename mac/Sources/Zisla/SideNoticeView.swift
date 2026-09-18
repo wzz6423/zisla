@@ -1,4 +1,5 @@
 import AppKit
+@preconcurrency import AVFoundation
 import QuartzCore
 import ZislaCore
 import ZislaKit
@@ -762,13 +763,13 @@ private struct HeadphoneConnectionNotice: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.locale) private var locale
-    @State private var isPresented = false
 
     var body: some View {
         HStack(spacing: 9) {
             HeadphoneGlyph(
-                isPresented: isPresented,
-                isSingleUnit: isSingleUnit
+                productID: notice.headphoneProductID,
+                isSingleUnit: isSingleUnit,
+                reduceMotion: reduceMotion
             )
                 .frame(width: 42, height: 34)
 
@@ -798,10 +799,6 @@ private struct HeadphoneConnectionNotice: View {
             .foregroundStyle(.secondary)
             .help(BatteryLocalization.string("关闭", locale: locale))
         }
-        .onAppear {
-            guard !reduceMotion else { return }
-            isPresented = true
-        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(accessibilityDescription))
     }
@@ -830,17 +827,157 @@ private struct HeadphoneConnectionNotice: View {
     }
 }
 
+struct HeadphoneSystemAsset: Equatable, Sendable {
+    let imageURL: URL
+    let animationURL: URL?
+}
+
+struct HeadphoneSystemAssetLocator: Sendable {
+    static let system = HeadphoneSystemAssetLocator(
+        coreBluetoothUIResourcesURL: URL(
+            fileURLWithPath: "/System/Library/PrivateFrameworks/CoreBluetoothUI.framework/Versions/A/Resources"
+        ),
+        bluetoothUIServiceResourcesURL: URL(
+            fileURLWithPath: "/System/Library/CoreServices/BluetoothUIService.app/Contents/Resources"
+        )
+    )
+
+    let coreBluetoothUIResourcesURL: URL
+    let bluetoothUIServiceResourcesURL: URL
+
+    func asset(for productID: UInt32?) -> HeadphoneSystemAsset? {
+        guard let productID,
+              let imageName = imageName(for: productID)
+        else { return nil }
+        let imageURL = coreBluetoothUIResourcesURL.appendingPathComponent(imageName)
+        guard FileManager.default.fileExists(atPath: imageURL.path) else { return nil }
+
+        let animationDirectory = bluetoothUIServiceResourcesURL
+            .appendingPathComponent("Banner-PID-\(productID)-mov", isDirectory: true)
+        let animationURL = animationDirectory
+            .appendingPathComponent("Banner-PID-\(productID)-Loop.mov")
+        return HeadphoneSystemAsset(
+            imageURL: imageURL,
+            animationURL: FileManager.default.fileExists(atPath: animationURL.path) ? animationURL : nil
+        )
+    }
+
+    private func imageName(for productID: UInt32) -> String? {
+        guard let assetPaths = try? FileManager.default.contentsOfDirectory(
+            at: coreBluetoothUIResourcesURL,
+            includingPropertiesForKeys: nil
+        ) else { return nil }
+
+        for url in assetPaths where url.lastPathComponent.hasPrefix("AssetPaths")
+            && url.pathExtension == "plist" {
+            guard let data = try? Data(contentsOf: url),
+                  let propertyList = try? PropertyListSerialization.propertyList(
+                    from: data,
+                    format: nil
+                  ),
+                  let paths = propertyList as? [String: [String: Any]],
+                  let entry = paths.first(where: {
+                    Self.productID(from: $0.key) == productID
+                  })?.value,
+                  let imageName = entry["ImageName"] as? String,
+                  !imageName.isEmpty
+            else { continue }
+            return imageName
+        }
+        return nil
+    }
+
+    private static func productID(from value: String) -> UInt32? {
+        let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.lowercased().hasPrefix("0x") else { return nil }
+        return UInt32(value.dropFirst(2), radix: 16)
+    }
+}
+
+private struct HeadphoneConnectionAnimation: NSViewRepresentable {
+    let url: URL
+
+    func makeNSView(context: Context) -> HeadphoneConnectionAnimationView {
+        HeadphoneConnectionAnimationView(url: url)
+    }
+
+    func updateNSView(_ view: HeadphoneConnectionAnimationView, context: Context) {
+        view.setAnimation(url)
+    }
+
+    static func dismantleNSView(_ view: HeadphoneConnectionAnimationView, coordinator: ()) {
+        view.stop()
+    }
+}
+
+@MainActor
+private final class HeadphoneConnectionAnimationView: NSView {
+    private let player = AVQueuePlayer()
+    private let playerLayer = AVPlayerLayer()
+    private var looper: AVPlayerLooper?
+    private var currentURL: URL?
+
+    init(url: URL) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        playerLayer.player = player
+        playerLayer.videoGravity = .resizeAspect
+        playerLayer.backgroundColor = NSColor.clear.cgColor
+        layer?.addSublayer(playerLayer)
+        setAnimation(url)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func layout() {
+        super.layout()
+        playerLayer.frame = bounds
+    }
+
+    func setAnimation(_ url: URL) {
+        guard currentURL != url else { return }
+        currentURL = url
+        player.pause()
+        player.removeAllItems()
+        looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+        player.play()
+    }
+
+    func stop() {
+        player.pause()
+        player.removeAllItems()
+        looper = nil
+    }
+}
+
 private struct HeadphoneGlyph: View {
-    var isPresented: Bool
+    var productID: UInt32?
     var isSingleUnit: Bool
+    var reduceMotion: Bool
 
     var body: some View {
-        Image(systemName: isSingleUnit ? "headphones" : "airpods.pro")
-            .symbolEffect(
-                .bounce.up.byLayer,
-                options: .speed(0.7),
-                value: isPresented
-            )
+        if let asset = HeadphoneSystemAssetLocator.system.asset(for: productID) {
+            if !reduceMotion, let animationURL = asset.animationURL {
+                HeadphoneConnectionAnimation(url: animationURL)
+                    .aspectRatio(1, contentMode: .fit)
+            } else if let image = NSImage(contentsOf: asset.imageURL) {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+            } else {
+                fallbackSymbol
+            }
+        } else {
+            fallbackSymbol
+        }
+    }
+
+    private var fallbackSymbol: some View {
+        Image(systemName: "headphones")
             .font(.system(size: isSingleUnit ? 27 : 25, weight: .medium))
             .foregroundStyle(.white)
             .shadow(color: .cyan.opacity(0.22), radius: 5, y: 1)
@@ -916,7 +1053,6 @@ private struct CompactHeadphoneConnectionBar: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.locale) private var locale
-    @State private var isPresented = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -953,10 +1089,6 @@ private struct CompactHeadphoneConnectionBar: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            guard !reduceMotion else { return }
-            isPresented = true
-        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("\(BatteryLocalization.string("耳机已连接：", locale: locale))\(notice.title)"))
     }
@@ -964,8 +1096,9 @@ private struct CompactHeadphoneConnectionBar: View {
     private var headphoneIdentity: some View {
         HStack(spacing: 8) {
             HeadphoneGlyph(
-                isPresented: isPresented,
-                isSingleUnit: isSingleUnit
+                productID: notice.headphoneProductID,
+                isSingleUnit: isSingleUnit,
+                reduceMotion: reduceMotion
             )
                 .frame(width: 42, height: height)
 
@@ -985,6 +1118,12 @@ private struct CompactHeadphoneConnectionBar: View {
 
     private var isSingleUnit: Bool {
         notice.symbolName == "headphones"
+    }
+}
+
+private extension IslandNotice {
+    var headphoneProductID: UInt32? {
+        metadata?[HeadphoneConnection.productIDMetadataKey].flatMap(UInt32.init)
     }
 }
 
