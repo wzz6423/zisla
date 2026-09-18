@@ -1985,7 +1985,7 @@ private struct CompactBrowserDownloadWing: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: iconSize, height: iconSize)
             } else {
-                Image(systemName: "arrow.down.circle.fill")
+                Image(systemName: agent.symbolName)
                     .font(.system(size: min(15, height * 0.56), weight: .semibold))
                     .foregroundStyle(.white)
             }
@@ -2008,7 +2008,7 @@ private struct CompactBrowserDownloadWing: View {
                                     .aspectRatio(contentMode: .fit)
                                     .frame(width: stackIconSize, height: stackIconSize)
                             } else {
-                                Image(systemName: "arrow.down.circle.fill")
+                                Image(systemName: agent.symbolName)
                                     .font(.system(size: stackIconSize * 0.7, weight: .semibold))
                                     .foregroundStyle(.white)
                                     .frame(width: stackIconSize, height: stackIconSize)

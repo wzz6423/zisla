@@ -1,6 +1,8 @@
  import Foundation
 import Testing
 
+@testable import Zisla
+
 struct IslandDashboardViewLayoutTests {
     @Test
     func dashboardCardsUseTheSharedFixedHeight() throws {
@@ -25,6 +27,17 @@ struct IslandDashboardViewLayoutTests {
 
         #expect(!mediaCard.contains("ProgressView"))
         #expect(!mediaCard.contains("TimelineView"))
+    }
+
+    @Test
+    func dashboardCapsHeightAtKeyboardSurfaceHeightAndScrollsCards() throws {
+        let layout = IslandModuleLayout.resolved(for: .dashboard, dashboardCardCount: 100)
+
+        #expect(layout.islandSize.height == IslandModuleLayout.keyboardSound.islandSize.height)
+        #expect(layout.panelSize.height == IslandModuleLayout.keyboardSound.panelSize.height)
+
+        let source = try String(contentsOf: Self.dashboardSourceURL, encoding: .utf8)
+        #expect(source.contains("ScrollView(.vertical)"))
     }
 
     private static let dashboardSourceURL = URL(fileURLWithPath: #filePath)
