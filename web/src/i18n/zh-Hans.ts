@@ -102,8 +102,8 @@ export const zhHans: SiteContent = {
       download: {
         name: '下载器',
         caption:
-          '粘贴链接，或在开启后从剪贴板识别链接；选择视频或音频下载到默认或自选目录。支持常见视频平台与其他受支持链接，下载时显示来源图标、实时进度和完成状态。',
-        points: ['视频 / 音频模式', '默认或自选目录', '来源图标与实时进度'],
+          '粘贴链接，或在开启后从剪贴板识别链接；可选择可用的视频或音频格式，抖音下载需要时可使用已安装浏览器的 Cookies。下载到默认或自选目录时，显示来源图标、实时进度和完成状态。',
+        points: ['选择视频或音频格式', '抖音浏览器 Cookies', '来源图标与实时进度'],
       },
       agenda: {
         name: '日程与天气',
@@ -160,8 +160,8 @@ export const zhHans: SiteContent = {
       capture: {
         title: '截图、长截图与钉图',
         description:
-          '用全局快捷键截取或钉住屏幕内容，继续标注、拼接长截图，并识别或导出表格；导出前会保留正在编辑的文字标注。',
-        detail: '全局快捷键 · 标注与撤销 · 编辑内容随导出保存',
+          '用全局快捷键截取或钉住屏幕内容，保留窗口边框；继续标注、拼接长截图，并识别或导出表格；导出前会保留尚未完成的标注。',
+        detail: '全局快捷键 · 保留窗口边框 · 未完成标注随导出保存',
       },
       voice: {
         title: '语音输入与整理',
@@ -184,8 +184,8 @@ export const zhHans: SiteContent = {
       copyAssistant: {
         title: '复制助手与智能下一步',
         description:
-          '启用后，复制文本、链接、文件或图片会在独立的顶部提示条中预览，并按内容给出打开、Finder 定位、搜索、翻译、计算或保存等下一步，由你确认后执行。',
-        detail: '可选开关 · 本机识别 · 默认 Command+N',
+          '启用后，复制文本、链接、文件或图片会在独立的顶部提示条中预览；可识别链接、本机已安装应用名称和 Emoji 名称，也可按实时汇率换算复制的金额，所有下一步均由你确认后执行。',
+        detail: '本机识别 · 实时汇率换算 · 默认 Command+N',
       },
       aiManagement: {
         title: 'AI CLI 与 Skills 管理',
@@ -257,7 +257,7 @@ export const zhHans: SiteContent = {
   download: {
     eyebrow: '随时可用',
     title: '下载 zisla',
-    copy: '适用于 Apple 芯片 Mac；版本、其他架构与校验信息均在 Release 页面。安装后可按更新通道检查新版本，Sparkle 会先验证签名，再按设置手动或自动下载、安装并重启，更新会保留已授予的权限。若对某个版本不感兴趣，可以跳过，zisla 不会再提醒。',
+    copy: '适用于 Apple 芯片 Mac；版本、其他架构与校验信息均在 Release 页面。安装后可按更新通道检查新版本，Sparkle 会先验证签名，再按设置手动或自动下载、安装并重启，更新会保留已授予的权限；更新设置也提供直达问题反馈的入口。若对某个版本不感兴趣，可以跳过，zisla 不会再提醒。',
     primaryCta: '下载',
     primaryCtaAriaLabel: '下载',
     releaseCta: '查看 Release',

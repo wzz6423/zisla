@@ -116,10 +116,10 @@ export const fr: SiteContent = {
       download: {
         name: 'Téléchargeur',
         caption:
-          'Collez un lien ou laissez zisla repérer les liens du presse-papiers une fois l’option activée. Choisissez vidéo ou audio et enregistrez dans le dossier par défaut ou celui de votre choix. Les plateformes vidéo courantes et les autres liens pris en charge affichent l’icône de la source, la progression en temps réel et l’état final.',
+          'Collez un lien ou laissez zisla repérer les liens du presse-papiers une fois l’option activée. Choisissez un format vidéo ou audio disponible et utilisez les Cookies d’un navigateur installé lorsqu’un téléchargement Douyin les nécessite. Enregistrez dans le dossier par défaut ou celui de votre choix, avec l’icône de la source, la progression en temps réel et l’état final.',
         points: [
-          'Modes vidéo / audio',
-          'Dossier par défaut ou personnalisé',
+          'Choisir les formats vidéo ou audio disponibles',
+          'Cookies de navigateur pour Douyin',
           'Icône de source et progression',
         ],
       },
@@ -196,8 +196,8 @@ export const fr: SiteContent = {
       capture: {
         title: 'Captures, captures défilantes et épinglage',
         description:
-          'Capturez ou épinglez une zone de l’écran avec un raccourci global, puis annotez, assemblez une capture défilante, reconnaissez ou exportez des tableaux. Les annotations textuelles en cours d’édition sont conservées à l’export.',
-        detail: 'Raccourci global · Annoter et annuler · Modifications conservées à l’export',
+          'Capturez ou épinglez une zone de l’écran avec un raccourci global, en conservant l’encadrement des fenêtres ; puis annotez, assemblez une capture défilante, reconnaissez ou exportez des tableaux. Les annotations non terminées sont conservées à l’export.',
+        detail: 'Raccourci global · Encadrement des fenêtres · Annotations non terminées conservées à l’export',
       },
       voice: {
         title: 'Dictée et mise en forme',
@@ -220,8 +220,8 @@ export const fr: SiteContent = {
       copyAssistant: {
         title: 'Assistant de copie et étapes suivantes',
         description:
-          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran, avec des étapes adaptées au contenu — ouvrir, afficher dans le Finder, rechercher, traduire, calculer ou enregistrer — exécutées seulement après votre confirmation.',
-        detail: 'Option activable · Reconnaissance locale · Command+N par défaut',
+          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation.',
+        detail: 'Reconnaissance locale · Conversion aux taux en temps réel · Command+N par défaut',
       },
       aiManagement: {
         title: 'Gestion des CLI IA et des Skills',
@@ -299,7 +299,7 @@ export const fr: SiteContent = {
   download: {
     eyebrow: 'DISPONIBLE QUAND VOUS VOULEZ',
     title: 'Télécharger zisla',
-    copy: 'Pour les Mac Apple silicon. Versions, autres architectures et sommes de contrôle sont sur la page de publication. Après installation, zisla peut chercher les nouvelles versions sur le canal choisi : Sparkle vérifie d’abord la signature, puis télécharge, installe et redémarre manuellement ou automatiquement selon vos réglages, et les mises à jour conservent les permissions déjà accordées. Si une version ne vous concerne pas, ignorez-la : zisla ne la rappellera plus.',
+    copy: 'Pour les Mac Apple silicon. Versions, autres architectures et sommes de contrôle sont sur la page de publication. Après installation, zisla peut chercher les nouvelles versions sur le canal choisi : Sparkle vérifie d’abord la signature, puis télécharge, installe et redémarre manuellement ou automatiquement selon vos réglages, et les mises à jour conservent les permissions déjà accordées. Les réglages de mise à jour proposent aussi un lien direct vers les issues GitHub pour vos retours. Si une version ne vous concerne pas, ignorez-la : zisla ne la rappellera plus.',
     primaryCta: 'Télécharger',
     primaryCtaAriaLabel: 'Télécharger',
     releaseCta: 'Voir la publication',

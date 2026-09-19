@@ -494,9 +494,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.hero.sourceCta) +
     '</a></div><ul class="hero-hints">' +
     content.hero.hints.map((hint) => '<li>' + icon('check', 13) + '<span>' + escapeHtml(hint) + '</span></li>').join('') +
-    '</ul></div><div class="hero-identity" aria-hidden="true"><span class="hero-identity-rule"></span><img class="hero-identity-mark" src="./assets/zisla-icon.png" alt="" /><span class="hero-identity-caption">' +
-    escapeHtml(content.hero.identityCaption) +
-    '</span></div></div></section><section class="proof-band" aria-label="' +
+    '</ul></div><div class="hero-identity" aria-hidden="true"><span class="hero-identity-rule"></span><img class="hero-identity-mark" src="./assets/zisla-icon.png" alt="" /></div></div></section><section class="proof-band" aria-label="' +
     escapeHtml(content.proof.ariaLabel) +
     '"><div class="section-wrap proof-grid reveal-sequence">' +
     proofMarkup +

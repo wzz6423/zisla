@@ -111,10 +111,10 @@ export const de: SiteContent = {
       download: {
         name: 'Downloader',
         caption:
-          'Füge einen Link ein oder lass zisla nach dem Aktivieren Links aus der Zwischenablage erkennen. Wähle Video oder Audio und speichere in den Standardordner oder einen eigenen. Bei gängigen Videoplattformen und weiteren unterstützten Links erscheinen Quellsymbol, Fortschritt in Echtzeit und der Abschlussstatus.',
+          'Füge einen Link ein oder lass zisla nach dem Aktivieren Links aus der Zwischenablage erkennen. Wähle ein verfügbares Video- oder Audioformat und nutze Cookies eines installierten Browsers, wenn ein Douyin-Download sie benötigt. Speichere im Standardordner oder einem eigenen, mit Quellsymbol, Fortschritt in Echtzeit und Abschlussstatus.',
         points: [
-          'Video- / Audiomodus',
-          'Standard- oder eigener Ordner',
+          'Verfügbare Video- oder Audioformate wählen',
+          'Browser-Cookies für Douyin',
           'Quellsymbol und Fortschritt',
         ],
       },
@@ -183,8 +183,8 @@ export const de: SiteContent = {
       capture: {
         title: 'Bildschirmfotos, Scroll-Aufnahmen und Anheften',
         description:
-          'Nimm mit einem globalen Kürzel einen Bildschirmausschnitt auf oder hefte ihn an, setze anschließend Anmerkungen, füge Scroll-Aufnahmen zusammen und erkenne oder exportiere Tabellen. Textanmerkungen, die du noch bearbeitest, bleiben beim Export erhalten.',
-        detail: 'Globales Kürzel · Anmerken und widerrufen · Änderungen bleiben beim Export',
+          'Nimm mit einem globalen Kürzel einen Bildschirmausschnitt auf oder hefte ihn an, wobei Fensterrahmen erhalten bleiben; setze anschließend Anmerkungen, füge Scroll-Aufnahmen zusammen und erkenne oder exportiere Tabellen. Noch nicht abgeschlossene Anmerkungen bleiben beim Export erhalten.',
+        detail: 'Globales Kürzel · Fensterrahmen · Unfertige Anmerkungen beim Export erhalten',
       },
       voice: {
         title: 'Spracheingabe und Aufbereitung',
@@ -207,8 +207,8 @@ export const de: SiteContent = {
       copyAssistant: {
         title: 'Kopierassistent und nächste Schritte',
         description:
-          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand – mit passenden nächsten Schritten wie öffnen, im Finder anzeigen, suchen, übersetzen, rechnen oder speichern, ausgeführt erst nach deiner Bestätigung.',
-        detail: 'Optional aktivierbar · Erkennung lokal · Standard Command+N',
+          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Er erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte führt er erst nach deiner Bestätigung aus.',
+        detail: 'Lokale Erkennung · Live-Wechselkursumrechnung · Standard Command+N',
       },
       aiManagement: {
         title: 'KI-CLIs und Skills verwalten',
@@ -286,7 +286,7 @@ export const de: SiteContent = {
   download: {
     eyebrow: 'JEDERZEIT EINSATZBEREIT',
     title: 'zisla laden',
-    copy: 'Für Macs mit Apple Silicon. Versionen, weitere Architekturen und Prüfsummen stehen auf der Release-Seite. Nach der Installation prüft zisla im gewählten Update-Kanal auf neue Versionen: Sparkle verifiziert zuerst die Signatur und lädt, installiert und startet dann je nach Einstellung manuell oder automatisch neu; Updates behalten die bereits erteilten Berechtigungen. Ein Release, der dich nicht betrifft, lässt sich überspringen und wird nicht mehr gemeldet.',
+    copy: 'Für Macs mit Apple Silicon. Versionen, weitere Architekturen und Prüfsummen stehen auf der Release-Seite. Nach der Installation prüft zisla im gewählten Update-Kanal auf neue Versionen: Sparkle verifiziert zuerst die Signatur und lädt, installiert und startet dann je nach Einstellung manuell oder automatisch neu; Updates behalten die bereits erteilten Berechtigungen. Die Update-Einstellungen verlinken außerdem direkt zu GitHub Issues für Feedback. Ein Release, der dich nicht betrifft, lässt sich überspringen und wird nicht mehr gemeldet.',
     primaryCta: 'Laden',
     primaryCtaAriaLabel: 'Laden',
     releaseCta: 'Release ansehen',
