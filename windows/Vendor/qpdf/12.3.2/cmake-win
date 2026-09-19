@@ -1,0 +1,46 @@
+#!/bin/bash
+set -e
+whoami=$(basename $0)
+tool=$1
+mode=$2
+config=${3-RelWithDebInfo}
+
+dir=$(realpath --relative-to . $(dirname $0))
+if [ "$dir" = "." ]; then
+    echo 1>&2 "$whoami: run from other than the source directory."
+    exit 2
+fi
+declare -a args
+case $tool in
+    msvc)
+        args=(-DCMAKE_BUILD_TYPE=$config)
+        if cl 2>&1 | grep -q 'for x86'; then
+            args=("${args[@]}" -A win32)
+        fi
+        ;;
+    mingw)
+        args=(-G 'MSYS Makefiles' -DCMAKE_BUILD_TYPE=$config)
+        ;;
+    *)
+        echo 1>&2 "Usage: $whoami {msvc|mingw}"
+        exit 2
+        ;;
+esac
+if [ "$mode" = "maint" ]; then
+    args=("${args[@]}" -DWERROR=1 -DBUILD_STATIC_LIBS=0)
+elif [ "$mode" = "ci" ]; then
+    args=("${args[@]}" -DCI_MODE=1 -DINSTALL_MANUAL=1)
+fi
+args=("${args[@]}" -DCPACK_NSIS_MODIFY_PATH=ON)
+
+set -x
+cmake "${args[@]}" $dir
+set +x
+if [ "$tool" = "msvc" ]; then
+    echo ""
+    echo "***"
+    echo "*** Remember to pass --config $config to cmake --build"
+    echo "***  and -C $config to ctest"
+    echo "***"
+    echo ""
+fi

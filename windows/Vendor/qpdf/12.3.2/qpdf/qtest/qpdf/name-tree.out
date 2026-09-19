@@ -1,0 +1,48 @@
+01 one -> one!
+06 σιχ -> six!
+07 sev•n -> seven!
+11 elephant -> elephant?
+12 twelve -> twelve!
+15 fifteen -> fifteen!
+20 twenty -> twenty.
+22 twenty-two -> twenty-two!
+29 twenty-nine -> twenty-nine!
+01 one -> one!
+06 σιχ -> six!
+07 sev•n -> seven!
+11 elephant -> elephant?
+12 twelve -> twelve!
+15 fifteen -> fifteen!
+20 twenty -> twenty.
+22 twenty-two -> twenty-two!
+29 twenty-nine -> twenty-nine!
+insertAfter
+3 (3!)
+4 (4!)
+/Empty1
+/Empty2
+/Bad1 -- wrong key type
+WARNING: name-tree.pdf (Name/Number tree node (object 16)): attempting to repair after error: name-tree.pdf (Name/Number tree node (object 16)): item at index 2 is not the right type
+WARNING: name-tree.pdf (Name/Number tree node (object 16)): item 2 has the wrong type
+A
+Q
+Z
+/Bad2 -- invalid kid
+WARNING: name-tree.pdf (Name/Number tree node (object 17)): attempting to repair after error: name-tree.pdf (Name/Number tree node (object 19)): bad node during find
+WARNING: name-tree.pdf (Name/Number tree node (object 17)): skipping over invalid kid at index 1
+B
+W
+/Bad3 -- invalid kid
+WARNING: name-tree.pdf (Name/Number tree node (object 22)): kid number 0 is invalid
+/Bad4 -- invalid kid
+WARNING: name-tree.pdf (Name/Number tree node (object 23)): attempting to repair after error: name-tree.pdf (Name/Number tree node (object 23)): invalid kid at index 1
+WARNING: name-tree.pdf (Name/Number tree node (object 23)): skipping over invalid kid at index 1
+C
+Q
+Z
+/Bad5 -- loop in find
+WARNING: name-tree.pdf (Name/Number tree node (object 28)): attempting to repair after error: name-tree.pdf (Name/Number tree node (object 30)): loop detected in find
+WARNING: name-tree.pdf (Name/Number tree node (object 30)): loop detected while traversing name/number tree
+/Bad6 -- bad limits
+WARNING: name-tree.pdf (Name/Number tree node (object 32)): unable to determine limits
+test 48 done

@@ -1,0 +1,31 @@
+#!/bin/bash
+set -e
+if [ $(id -u) = 0 ]; then
+    if [ ! -d /tmp/build ]; then
+        echo "/tmp/build must exist"
+        exit 2
+    fi
+    id=$(stat -c %u /tmp/build)
+    adduser --home /tmp/build --no-create-home --uid $id --disabled-password --gecos build build
+    touch /tmp/.env
+    echo "export SKIP_TESTS=$SKIP_TESTS" >> /tmp/.env
+    echo "export RUN_SHELL=$RUN_SHELL" >> /tmp/.env
+    chown build /tmp/.env
+    exec sudo -iu build $0 "$@"
+fi
+
+cd /tmp/build
+if [ ! -d qpdf ]; then
+    if [ "$1" == "" ]; then
+        echo "A repository and optional git clone arguments must be given"
+        exit 2
+    fi
+    git clone "$@" qpdf
+fi
+cd qpdf
+source /tmp/.env
+if [ "$RUN_SHELL" = "1" ]; then
+    bash
+else
+    ./appimage/build-appimage
+fi

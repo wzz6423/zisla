@@ -1,0 +1,54 @@
+#!/usr/bin/env perl
+require 5.008;
+use warnings;
+use strict;
+
+unshift(@INC, '.');
+require qpdf_test_helpers;
+
+chdir("qpdf") or die "chdir testdir failed: $!\n";
+
+require TestDriver;
+
+cleanup();
+
+my $td = new TestDriver('page-errors');
+
+my $n_tests = 9;
+
+$td->runtest("handle page no with contents",
+             {$td->COMMAND => "qpdf --show-pages page-no-content.pdf"},
+             {$td->FILE => "page-no-content.out", $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("handle page with missing MediaBox",
+             {$td->COMMAND => "qpdf --static-id --empty --pages page-no-content.pdf -- a.pdf"},
+             {$td->FILE => "page-missing-mediabox.out", $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check output",
+             {$td->FILE => "a.pdf"},
+             {$td->FILE => "page-missing-mediabox-out.pdf"});
+$td->runtest("handle page with inherited MediaBox",
+             {$td->COMMAND => "qpdf --static-id --empty --pages page-inherit-mediabox.pdf -- a.pdf"},
+             {$td->FILE => "page-inherit-mediabox.out", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check output",
+             {$td->COMMAND => "qpdf-test-compare a.pdf page-inherit-mediabox-out.pdf"},
+             {$td->FILE => "page-inherit-mediabox-out.pdf", $td->EXIT_STATUS => 0});
+$td->runtest("check no type key for page nodes",
+             {$td->COMMAND => "qpdf --check no-pages-types.pdf"},
+             {$td->FILE => "no-pages-types.out", $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("no type key for page nodes",
+             {$td->COMMAND => "qpdf --static-id --split-pages no-pages-types.pdf a-split-out.pdf"},
+             {$td->FILE => "no-pages-types-fix.out", $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("check output",
+             {$td->COMMAND => "qpdf-test-compare a-split-out-1.pdf no-pages-types-fixed.pdf"},
+             {$td->FILE => "no-pages-types-fixed.pdf", $td->EXIT_STATUS => 0});
+$td->runtest("detect loops in pages structure",
+             {$td->COMMAND => "qpdf --check pages-loop.pdf"},
+             {$td->FILE => "pages-loop.out", $td->EXIT_STATUS => 2},
+             $td->NORMALIZE_NEWLINES);
+
+cleanup();
+$td->report($n_tests);

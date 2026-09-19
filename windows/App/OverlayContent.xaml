@@ -1,0 +1,2810 @@
+<UserControl
+    x:Class="Zisla.OverlayContent"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Zisla"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Border
+        x:Name="SurfaceBorder"
+        Background="{ThemeResource OverlaySurfaceBrush}"
+        BorderBrush="{ThemeResource OverlayStrokeBrush}"
+        BorderThickness="1"
+        CornerRadius="{ThemeResource OverlayCornerRadius}">
+        <Grid>
+            <Grid
+                x:Name="PeekLayout"
+                Padding="18,14"
+                AutomationProperties.Name="Zisla 状态预览">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Border
+                    x:Name="PeekArtworkContainer"
+                    Width="38"
+                    Height="38"
+                    VerticalAlignment="Center"
+                    Background="{ThemeResource OverlayAccentBrush}"
+                    CornerRadius="8">
+                    <Grid>
+                        <Image
+                            x:Name="PeekArtwork"
+                            Stretch="UniformToFill"
+                            Visibility="Collapsed" />
+                        <FontIcon
+                            x:Name="PeekFallbackIcon"
+                            Foreground="White"
+                            FontSize="18"
+                            Glyph="&#xE945;" />
+                    </Grid>
+                </Border>
+
+                <StackPanel
+                    Grid.Column="1"
+                    Margin="12,0,8,0"
+                    VerticalAlignment="Center"
+                    Spacing="2">
+                    <TextBlock
+                        x:Name="PeekTitle"
+                        Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                        FontSize="15"
+                        FontWeight="SemiBold"
+                        Text="Zisla" />
+                    <TextBlock
+                        x:Name="PeekDetail"
+                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                        FontSize="12"
+                        Text="暂无进行中的活动"
+                        TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <ProgressRing
+                    x:Name="PeekProgressRing"
+                    Grid.Column="2"
+                    Width="20"
+                    Height="20"
+                    VerticalAlignment="Center"
+                    IsActive="False"
+                    Visibility="Collapsed" />
+                <FontIcon
+                    x:Name="PeekPlaybackIcon"
+                    Grid.Column="2"
+                    Width="20"
+                    Height="20"
+                    VerticalAlignment="Center"
+                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                    FontSize="14"
+                    Glyph="&#xE769;"
+                    Visibility="Collapsed" />
+            </Grid>
+
+            <Grid x:Name="InteractiveLayout" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="52" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid Padding="14,8,8,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center" Spacing="0">
+                        <TextBlock
+                            Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                            FontSize="15"
+                            FontWeight="SemiBold"
+                            Text="Zisla" />
+                        <TextBlock
+                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                            FontSize="11"
+                            Text="Windows" />
+                    </StackPanel>
+
+                    <Button
+                        x:Name="PinButton"
+                        Grid.Column="1"
+                        Width="34"
+                        Height="34"
+                        Padding="0"
+                        AutomationProperties.Name="固定窗口"
+                        Click="PinButton_Click"
+                        ToolTipService.ToolTip="固定窗口">
+                        <FontIcon x:Name="PinIcon" FontSize="14" Glyph="&#xE840;" />
+                    </Button>
+                    <Button
+                        x:Name="VoiceInputButton"
+                        Grid.Column="2"
+                        Width="34"
+                        Height="34"
+                        Margin="4,0,0,0"
+                        Padding="0"
+                        AutomationProperties.Name="开始语音输入"
+                        Click="VoiceInputButton_Click"
+                        ToolTipService.ToolTip="开始语音输入"
+                        Visibility="Collapsed">
+                        <FontIcon x:Name="VoiceInputIcon" FontSize="14" Glyph="&#xE720;" />
+                    </Button>
+                    <Button
+                        Grid.Column="3"
+                        Width="34"
+                        Height="34"
+                        Margin="4,0,0,0"
+                        Padding="0"
+                        AutomationProperties.Name="打开设置"
+                        Click="SettingsButton_Click"
+                        ToolTipService.ToolTip="设置">
+                        <FontIcon FontSize="14" Glyph="&#xE713;" />
+                    </Button>
+                    <Button
+                        Grid.Column="4"
+                        Width="34"
+                        Height="34"
+                        Margin="4,0,0,0"
+                        Padding="0"
+                        AutomationProperties.Name="关闭窗口"
+                        Click="CloseButton_Click"
+                        ToolTipService.ToolTip="关闭">
+                        <FontIcon FontSize="14" Glyph="&#xE8BB;" />
+                    </Button>
+                </Grid>
+
+                <Grid
+                    x:Name="VoiceInputStatusBar"
+                    Grid.Row="1"
+                    Margin="14,0,8,6"
+                    AutomationProperties.LiveSetting="Polite"
+                    AutomationProperties.Name="语音输入状态"
+                    Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon
+                        x:Name="VoiceInputStatusIcon"
+                        Width="20"
+                        Height="20"
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource OverlayAccentBrush}"
+                        FontSize="14"
+                        Glyph="&#xE720;" />
+                    <TextBlock
+                        x:Name="VoiceInputStatusText"
+                        Grid.Column="1"
+                        Margin="8,0"
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                        FontSize="12"
+                        TextTrimming="CharacterEllipsis" />
+                    <ProgressRing
+                        x:Name="VoiceInputProgressRing"
+                        Grid.Column="2"
+                        Width="18"
+                        Height="18"
+                        IsActive="False"
+                        Visibility="Collapsed" />
+                </Grid>
+
+                <NavigationView
+                    x:Name="ModuleNavigation"
+                    Grid.Row="2"
+                    AlwaysShowHeader="False"
+                    Background="Transparent"
+                    IsBackButtonVisible="Collapsed"
+                    IsPaneOpen="False"
+                    IsPaneToggleButtonVisible="False"
+                    IsSettingsVisible="False"
+                    OpenPaneLength="150"
+                    PaneDisplayMode="LeftCompact"
+                    SelectionChanged="ModuleNavigation_SelectionChanged">
+                    <NavigationView.MenuItems>
+                        <NavigationViewItem
+                            Content="首页"
+                            IsSelected="True"
+                            Tag="dashboard"
+                            ToolTipService.ToolTip="首页">
+                            <NavigationViewItem.Icon>
+                                <FontIcon Glyph="&#xE80F;" />
+                            </NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="中转" Tag="shelf" ToolTipService.ToolTip="文件中转">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE838;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="剪贴板" Tag="clipboard" ToolTipService.ToolTip="剪贴板">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE8C8;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="AI 监控" Tag="ai" ToolTipService.ToolTip="AI 监控">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D2;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="AI Agent" Tag="agent" ToolTipService.ToolTip="AI Agent">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE945;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="下载" Tag="download" ToolTipService.ToolTip="下载">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE896;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="日程" Tag="agenda" ToolTipService.ToolTip="日程与天气">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE787;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="邮件" Tag="mail" ToolTipService.ToolTip="邮件">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE715;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="随记" Tag="notes" ToolTipService.ToolTip="随记">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE70B;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="PDF" Tag="pdf" ToolTipService.ToolTip="PDF 工具">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE8A5;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="小工具" Tag="toolbox" ToolTipService.ToolTip="小工具">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE90F;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem Content="系统" Tag="system" ToolTipService.ToolTip="系统监控">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D9;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                    </NavigationView.MenuItems>
+
+                    <Grid Padding="16,8,18,16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock
+                            x:Name="ModuleTitle"
+                            Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                            FontSize="20"
+                            FontWeight="SemiBold"
+                            Text="首页" />
+                        <StackPanel
+                            x:Name="ModuleState"
+                            Grid.Row="1"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="8">
+                            <FontIcon
+                                x:Name="ModuleStateIcon"
+                                Foreground="{ThemeResource OverlayAccentBrush}"
+                                FontSize="28"
+                                Glyph="&#xE73E;" />
+                            <TextBlock
+                                x:Name="ModuleStateText"
+                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                FontSize="13"
+                                Text="一切就绪"
+                                TextAlignment="Center"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ScrollViewer
+                            x:Name="DashboardScroll"
+                            Grid.Row="1"
+                            AutomationProperties.Name="首页活动"
+                            VerticalScrollBarVisibility="Auto"
+                            Visibility="Collapsed">
+                            <StackPanel Spacing="10">
+                                <Button
+                                    x:Name="DashboardFocusButton"
+                                    Padding="4,8"
+                                    HorizontalContentAlignment="Stretch"
+                                    AutomationProperties.Name="专注倒计时"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Click="DashboardFocusButton_Click"
+                                    Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border
+                                            Width="34"
+                                            Height="34"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center"
+                                            Background="{ThemeResource OverlayAccentBrush}"
+                                            CornerRadius="8">
+                                            <FontIcon
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Foreground="White"
+                                                FontSize="16"
+                                                Glyph="&#xE823;" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="8,0" Spacing="2">
+                                            <TextBlock
+                                                x:Name="DashboardFocusTitle"
+                                                Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                                                FontSize="13"
+                                                FontWeight="SemiBold"
+                                                Text="专注倒计时" />
+                                            <TextBlock
+                                                x:Name="DashboardFocusStatus"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="11"
+                                                Text="进行中" />
+                                        </StackPanel>
+                                        <StackPanel
+                                            Grid.Column="2"
+                                            VerticalAlignment="Center"
+                                            Orientation="Horizontal"
+                                            Spacing="8">
+                                            <TextBlock
+                                                x:Name="DashboardFocusClock"
+                                                Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                                                FontFamily="Consolas"
+                                                FontSize="16"
+                                                FontWeight="SemiBold"
+                                                Text="25:00" />
+                                            <FontIcon
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="12"
+                                                Glyph="&#xE76C;" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                                <Border
+                                    x:Name="DashboardFocusDivider"
+                                    Height="1"
+                                    Background="{ThemeResource OverlayStrokeBrush}"
+                                    Visibility="Collapsed" />
+                                <Button
+                                    x:Name="DashboardWeatherButton"
+                                    Padding="4,8"
+                                    HorizontalContentAlignment="Stretch"
+                                    AutomationProperties.Name="天气"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Click="DashboardWeatherButton_Click"
+                                    Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border
+                                            Width="34"
+                                            Height="34"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center"
+                                            Background="{ThemeResource OverlayAccentBrush}"
+                                            CornerRadius="8">
+                                            <FontIcon
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Foreground="White"
+                                                FontSize="16"
+                                                Glyph="&#xE706;" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="8,0" Spacing="2">
+                                            <TextBlock
+                                                x:Name="DashboardWeatherTitle"
+                                                Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                                                FontSize="13"
+                                                FontWeight="SemiBold"
+                                                Text="天气" />
+                                            <TextBlock
+                                                x:Name="DashboardWeatherStatus"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="11"
+                                                MaxLines="1"
+                                                TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <StackPanel
+                                            Grid.Column="2"
+                                            VerticalAlignment="Center"
+                                            Orientation="Horizontal"
+                                            Spacing="8">
+                                            <TextBlock
+                                                x:Name="DashboardWeatherTemperature"
+                                                Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                                                FontSize="16"
+                                                FontWeight="SemiBold" />
+                                            <FontIcon
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="12"
+                                                Glyph="&#xE76C;" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                                <Border
+                                    x:Name="DashboardWeatherDivider"
+                                    Height="1"
+                                    Background="{ThemeResource OverlayStrokeBrush}"
+                                    Visibility="Collapsed" />
+                                <Button
+                                    x:Name="DashboardAIButton"
+                                    Padding="4,8"
+                                    HorizontalContentAlignment="Stretch"
+                                    AutomationProperties.Name="AI 工作"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Click="DashboardAIButton_Click"
+                                    Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border
+                                            Width="34"
+                                            Height="34"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center"
+                                            Background="{ThemeResource OverlayAccentBrush}"
+                                            CornerRadius="8">
+                                            <FontIcon
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Foreground="White"
+                                                FontSize="16"
+                                                Glyph="&#xE945;" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="8,0" Spacing="2">
+                                            <TextBlock
+                                                x:Name="DashboardAITitle"
+                                                Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                                                FontSize="13"
+                                                FontWeight="SemiBold"
+                                                MaxLines="1"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <TextBlock
+                                                x:Name="DashboardAIStatus"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="11"
+                                                MaxLines="1"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <ProgressBar
+                                                x:Name="DashboardAIProgress"
+                                                Height="3"
+                                                Margin="0,3,0,0"
+                                                Maximum="1"
+                                                Visibility="Collapsed" />
+                                        </StackPanel>
+                                        <StackPanel
+                                            Grid.Column="2"
+                                            VerticalAlignment="Center"
+                                            Orientation="Horizontal"
+                                            Spacing="6">
+                                            <TextBlock
+                                                x:Name="DashboardAICount"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="11" />
+                                            <FontIcon
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="12"
+                                                Glyph="&#xE76C;" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                                <Border
+                                    x:Name="DashboardDivider"
+                                    Height="1"
+                                    Background="{ThemeResource OverlayStrokeBrush}"
+                                    Visibility="Collapsed" />
+                                <Button
+                                    x:Name="DashboardDownloadButton"
+                                    Padding="4,8"
+                                    HorizontalContentAlignment="Stretch"
+                                    AutomationProperties.Name="媒体下载"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Click="DashboardDownloadButton_Click"
+                                    Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border
+                                            Width="34"
+                                            Height="34"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center"
+                                            Background="{ThemeResource OverlayAccentBrush}"
+                                            CornerRadius="8">
+                                            <FontIcon
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Foreground="White"
+                                                FontSize="16"
+                                                Glyph="&#xE896;" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="8,0" Spacing="3">
+                                            <TextBlock
+                                                x:Name="DashboardDownloadTitle"
+                                                Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                                                FontSize="13"
+                                                FontWeight="SemiBold"
+                                                Text="媒体下载" />
+                                            <TextBlock
+                                                x:Name="DashboardDownloadStatus"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="11"
+                                                MaxLines="1"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <ProgressBar
+                                                x:Name="DashboardDownloadProgress"
+                                                Height="3"
+                                                Margin="0,2,0,0"
+                                                Maximum="1" />
+                                        </StackPanel>
+                                        <TextBlock
+                                            x:Name="DashboardDownloadPercent"
+                                            Grid.Column="2"
+                                            VerticalAlignment="Center"
+                                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                            FontFamily="Consolas"
+                                            FontSize="11" />
+                                    </Grid>
+                                </Button>
+                                <Border
+                                    x:Name="DashboardDownloadDivider"
+                                    Height="1"
+                                    Background="{ThemeResource OverlayStrokeBrush}"
+                                    Visibility="Collapsed" />
+                                <Button
+                                    x:Name="DashboardBrowserDownloadButton"
+                                    Padding="4,8"
+                                    HorizontalContentAlignment="Stretch"
+                                    AutomationProperties.Name="浏览器下载"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Click="DashboardBrowserDownloadButton_Click"
+                                    Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border
+                                            Width="34"
+                                            Height="34"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center"
+                                            Background="{ThemeResource OverlayAccentBrush}"
+                                            CornerRadius="8">
+                                            <FontIcon
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Foreground="White"
+                                                FontSize="16"
+                                                Glyph="&#xE896;" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="8,0" Spacing="3">
+                                            <TextBlock
+                                                x:Name="DashboardBrowserDownloadTitle"
+                                                Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                                                FontSize="13"
+                                                FontWeight="SemiBold"
+                                                Text="浏览器下载" />
+                                            <TextBlock
+                                                x:Name="DashboardBrowserDownloadStatus"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="11"
+                                                MaxLines="1"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <ProgressBar
+                                                x:Name="DashboardBrowserDownloadProgress"
+                                                Height="3"
+                                                Margin="0,2,0,0"
+                                                Maximum="1" />
+                                        </StackPanel>
+                                        <TextBlock
+                                            x:Name="DashboardBrowserDownloadPercent"
+                                            Grid.Column="2"
+                                            VerticalAlignment="Center"
+                                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                            FontFamily="Consolas"
+                                            FontSize="11" />
+                                    </Grid>
+                                </Button>
+                                <Border
+                                    x:Name="DashboardBrowserDownloadDivider"
+                                    Height="1"
+                                    Background="{ThemeResource OverlayStrokeBrush}"
+                                    Visibility="Collapsed" />
+                                <Grid
+                                    x:Name="MediaView"
+                                    Margin="4,0"
+                                    AutomationProperties.Name="系统正在播放"
+                                    Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="76" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border
+                                Width="68"
+                                Height="68"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                Background="{ThemeResource OverlayAccentBrush}"
+                                CornerRadius="8">
+                                <Grid>
+                                    <Image
+                                        x:Name="MediaArtwork"
+                                        Stretch="UniformToFill"
+                                        Visibility="Collapsed" />
+                                    <FontIcon
+                                        x:Name="MediaArtworkFallback"
+                                        Foreground="White"
+                                        FontSize="26"
+                                        Glyph="&#xE8D6;" />
+                                </Grid>
+                            </Border>
+
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Spacing="2">
+                                <TextBlock
+                                    x:Name="MediaTitle"
+                                    Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    MaxLines="1"
+                                    TextTrimming="CharacterEllipsis" />
+                                <TextBlock
+                                    x:Name="MediaArtist"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="12"
+                                    MaxLines="1"
+                                    TextTrimming="CharacterEllipsis" />
+                                <TextBlock
+                                    x:Name="MediaSource"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="11"
+                                    MaxLines="1"
+                                    Opacity="0.78"
+                                    TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+
+                            <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="36" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    x:Name="MediaElapsed"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="10"
+                                    Text="0:00" />
+                                <Slider
+                                    x:Name="MediaProgress"
+                                    Grid.Column="1"
+                                    MinWidth="160"
+                                    AutomationProperties.Name="播放进度"
+                                    ValueChanged="MediaProgress_ValueChanged" />
+                                <TextBlock
+                                    x:Name="MediaDuration"
+                                    Grid.Column="2"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="10"
+                                    Text="0:00" />
+                            </Grid>
+
+                            <StackPanel
+                                Grid.Row="2"
+                                Grid.ColumnSpan="2"
+                                Margin="0,10,0,0"
+                                HorizontalAlignment="Center"
+                                Orientation="Horizontal"
+                                Spacing="10">
+                                <Button
+                                    x:Name="MediaPreviousButton"
+                                    Width="36"
+                                    Height="36"
+                                    Padding="0"
+                                    AutomationProperties.Name="上一首"
+                                    Click="MediaPreviousButton_Click"
+                                    ToolTipService.ToolTip="上一首">
+                                    <FontIcon FontSize="15" Glyph="&#xE892;" />
+                                </Button>
+                                <Button
+                                    x:Name="MediaPlayPauseButton"
+                                    Width="40"
+                                    Height="40"
+                                    Padding="0"
+                                    AutomationProperties.Name="暂停"
+                                    Click="MediaPlayPauseButton_Click"
+                                    ToolTipService.ToolTip="暂停">
+                                    <FontIcon
+                                        x:Name="MediaPlayPauseIcon"
+                                        FontSize="17"
+                                        Glyph="&#xE769;" />
+                                </Button>
+                                <Button
+                                    x:Name="MediaNextButton"
+                                    Width="36"
+                                    Height="36"
+                                    Padding="0"
+                                    AutomationProperties.Name="下一首"
+                                    Click="MediaNextButton_Click"
+                                    ToolTipService.ToolTip="下一首">
+                                    <FontIcon FontSize="15" Glyph="&#xE893;" />
+                                </Button>
+                            </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                        <Grid
+                            x:Name="ShelfView"
+                            Grid.Row="1"
+                            AllowDrop="True"
+                            AutomationProperties.Name="文件中转站"
+                            DragLeave="ShelfView_DragLeave"
+                            DragOver="ShelfView_DragOver"
+                            Drop="ShelfView_Drop"
+                            Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="38" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    x:Name="ShelfCount"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="11"
+                                    Text="0/99" />
+                                <Button
+                                    x:Name="ShelfPasteButton"
+                                    Grid.Column="1"
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
+                                    AutomationProperties.Name="粘贴文件到中转站"
+                                    Click="ShelfPasteButton_Click"
+                                    ToolTipService.ToolTip="粘贴文件">
+                                    <FontIcon FontSize="14" Glyph="&#xE77F;" />
+                                </Button>
+                                <Button
+                                    x:Name="ShelfCopyAllButton"
+                                    Grid.Column="2"
+                                    Width="32"
+                                    Height="32"
+                                    Margin="4,0,0,0"
+                                    Padding="0"
+                                    AutomationProperties.Name="复制全部文件"
+                                    Click="ShelfCopyAllButton_Click"
+                                    ToolTipService.ToolTip="复制全部">
+                                    <FontIcon FontSize="14" Glyph="&#xE8C8;" />
+                                </Button>
+                                <Button
+                                    x:Name="ShelfShareButton"
+                                    Grid.Column="3"
+                                    Width="32"
+                                    Height="32"
+                                    Margin="4,0,0,0"
+                                    Padding="0"
+                                    AutomationProperties.Name="通过系统分享文件"
+                                    Click="ShelfShareButton_Click"
+                                    ToolTipService.ToolTip="系统分享">
+                                    <FontIcon FontSize="14" Glyph="&#xE72D;" />
+                                </Button>
+                                <Button
+                                    x:Name="ShelfClearButton"
+                                    Grid.Column="4"
+                                    Width="32"
+                                    Height="32"
+                                    Margin="4,0,0,0"
+                                    Padding="0"
+                                    AutomationProperties.Name="清空中转站"
+                                    Click="ShelfClearButton_Click"
+                                    ToolTipService.ToolTip="清空">
+                                    <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                                </Button>
+                            </Grid>
+
+                            <Grid Grid.Row="1">
+                                <StackPanel
+                                    x:Name="ShelfEmptyState"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="8">
+                                    <FontIcon
+                                        Foreground="{ThemeResource OverlayAccentBrush}"
+                                        FontSize="28"
+                                        Glyph="&#xE838;" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                        FontSize="13"
+                                        Text="中转站为空"
+                                        TextAlignment="Center" />
+                                </StackPanel>
+                                <ScrollViewer
+                                    x:Name="ShelfScroll"
+                                    VerticalScrollBarVisibility="Auto"
+                                    Visibility="Collapsed">
+                                    <StackPanel x:Name="ShelfRows" Spacing="0" />
+                                </ScrollViewer>
+                            </Grid>
+
+                            <Border
+                                x:Name="ShelfDropHint"
+                                Grid.RowSpan="2"
+                                IsHitTestVisible="False"
+                                BorderBrush="{ThemeResource OverlayAccentBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Visibility="Collapsed" />
+                        </Grid>
+                        <Grid
+                            x:Name="ClipboardView"
+                            Grid.Row="1"
+                            AutomationProperties.Name="剪贴板历史"
+                            Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="38" />
+                                <RowDefinition Height="42" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    x:Name="ClipboardCount"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="11"
+                                    Text="0 项" />
+                                <Button
+                                    Grid.Column="1"
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
+                                    AutomationProperties.Name="添加常用项"
+                                    ToolTipService.ToolTip="添加常用项">
+                                    <Button.Flyout>
+                                        <MenuFlyout>
+                                            <MenuFlyoutItem Text="添加文字" Click="ClipboardAddText_Click">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8D2;" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem Text="添加图片" Click="ClipboardAddImage_Click">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xEB9F;" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem Text="添加文件" Click="ClipboardAddFile_Click">
+                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8A5;" /></MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                        </MenuFlyout>
+                                    </Button.Flyout>
+                                    <FontIcon FontSize="14" Glyph="&#xE710;" />
+                                </Button>
+                                <Button
+                                    x:Name="ClipboardClearButton"
+                                    Grid.Column="2"
+                                    Width="32"
+                                    Height="32"
+                                    Margin="4,0,0,0"
+                                    Padding="0"
+                                    AutomationProperties.Name="清理剪贴板历史"
+                                    ToolTipService.ToolTip="清理">
+                                    <Button.Flyout>
+                                        <MenuFlyout>
+                                            <MenuFlyoutItem
+                                                Text="清空历史并保留常用项"
+                                                Click="ClipboardClearHistory_Click" />
+                                            <MenuFlyoutSeparator />
+                                            <MenuFlyoutItem
+                                                Text="清空全部"
+                                                Click="ClipboardClearAll_Click" />
+                                        </MenuFlyout>
+                                    </Button.Flyout>
+                                    <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                                </Button>
+                            </Grid>
+
+                            <Grid Grid.Row="1" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" Spacing="2">
+                                    <ToggleButton
+                                        x:Name="ClipboardAllFilter"
+                                        MinWidth="48"
+                                        Height="30"
+                                        Padding="10,0"
+                                        Content="全部"
+                                        IsChecked="True"
+                                        Tag="all"
+                                        Click="ClipboardFilterButton_Click" />
+                                    <ToggleButton
+                                        x:Name="ClipboardPinnedFilter"
+                                        MinWidth="48"
+                                        Height="30"
+                                        Padding="10,0"
+                                        Content="常用"
+                                        Tag="pinned"
+                                        Click="ClipboardFilterButton_Click" />
+                                    <ToggleButton
+                                        x:Name="ClipboardHistoryFilterButton"
+                                        MinWidth="48"
+                                        Height="30"
+                                        Padding="10,0"
+                                        Content="历史"
+                                        Tag="history"
+                                        Click="ClipboardFilterButton_Click" />
+                                </StackPanel>
+                                <TextBox
+                                    x:Name="ClipboardSearch"
+                                    Grid.Column="1"
+                                    Height="30"
+                                    AutomationProperties.Name="搜索剪贴板"
+                                    PlaceholderText="搜索"
+                                    TextChanged="ClipboardSearch_TextChanged" />
+                            </Grid>
+
+                            <Grid Grid.Row="2">
+                                <StackPanel
+                                    x:Name="ClipboardEmptyState"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="8">
+                                    <FontIcon
+                                        Foreground="{ThemeResource OverlayAccentBrush}"
+                                        FontSize="28"
+                                        Glyph="&#xE8C8;" />
+                                    <TextBlock
+                                        x:Name="ClipboardEmptyStateText"
+                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                        FontSize="13"
+                                        Text="暂无剪贴板项目"
+                                        TextAlignment="Center" />
+                                </StackPanel>
+                                <ListView
+                                    x:Name="ClipboardList"
+                                    AutomationProperties.Name="剪贴板项目"
+                                    IsItemClickEnabled="False"
+                                    SelectionMode="None"
+                                    Visibility="Collapsed">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="Padding" Value="0" />
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                </ListView>
+                            </Grid>
+                        </Grid>
+                        <Grid
+                            x:Name="NotesView"
+                            Grid.Row="1"
+                            AutomationProperties.Name="随记"
+                            Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="48" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <CommandBar
+                                Background="Transparent"
+                                ClosedDisplayMode="Compact"
+                                DefaultLabelPosition="Collapsed"
+                                IsDynamicOverflowEnabled="True">
+                                <CommandBar.Content>
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock
+                                            x:Name="NotesStatusText"
+                                            MaxWidth="110"
+                                            VerticalAlignment="Center"
+                                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                            FontSize="11"
+                                            Text="正在加载"
+                                            TextTrimming="CharacterEllipsis" />
+                                        <RadioButtons
+                                            x:Name="NotesModeSelector"
+                                            AutomationProperties.Name="随记显示模式"
+                                            MaxColumns="2"
+                                            SelectedIndex="0"
+                                            SelectionChanged="NotesMode_SelectionChanged">
+                                            <RadioButton Content="编辑" />
+                                            <RadioButton Content="预览" />
+                                        </RadioButtons>
+                                    </StackPanel>
+                                </CommandBar.Content>
+                                <CommandBar.PrimaryCommands>
+                                    <AppBarButton
+                                        AutomationProperties.Name="新建随记"
+                                        Click="NotesNewButton_Click"
+                                        Label="新建"
+                                        ToolTipService.ToolTip="新建随记">
+                                        <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
+                                    </AppBarButton>
+                                    <AppBarButton
+                                        AutomationProperties.Name="刷新随记"
+                                        Click="NotesRefreshButton_Click"
+                                        Label="刷新"
+                                        ToolTipService.ToolTip="刷新随记">
+                                        <AppBarButton.Icon><FontIcon Glyph="&#xE72C;" /></AppBarButton.Icon>
+                                    </AppBarButton>
+                                    <AppBarButton
+                                        x:Name="NotesDeleteButton"
+                                        AutomationProperties.Name="删除当前随记"
+                                        Click="NotesDeleteButton_Click"
+                                        IsEnabled="False"
+                                        Label="删除"
+                                        ToolTipService.ToolTip="删除当前随记">
+                                        <AppBarButton.Icon><FontIcon Glyph="&#xE74D;" /></AppBarButton.Icon>
+                                    </AppBarButton>
+                                </CommandBar.PrimaryCommands>
+                                <CommandBar.SecondaryCommands>
+                                    <AppBarButton
+                                        x:Name="NotesCopyButton"
+                                        AutomationProperties.Name="复制随记内容"
+                                        Click="NotesCopyButton_Click"
+                                        IsEnabled="False"
+                                        Label="复制内容">
+                                        <AppBarButton.Icon><FontIcon Glyph="&#xE8C8;" /></AppBarButton.Icon>
+                                    </AppBarButton>
+                                    <AppBarButton
+                                        x:Name="NotesTeleprompterButton"
+                                        AutomationProperties.Name="发送到提词器"
+                                        Click="NotesTeleprompterButton_Click"
+                                        IsEnabled="False"
+                                        Label="发送到提词器">
+                                        <AppBarButton.Icon><FontIcon Glyph="&#xE8D2;" /></AppBarButton.Icon>
+                                    </AppBarButton>
+                                </CommandBar.SecondaryCommands>
+                            </CommandBar>
+
+                            <Grid Grid.Row="1" ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="132" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="38" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <TextBox
+                                        x:Name="NotesSearch"
+                                        Height="30"
+                                        AutomationProperties.Name="搜索随记"
+                                        PlaceholderText="搜索"
+                                        TextChanged="NotesSearch_TextChanged" />
+                                    <Grid Grid.Row="1">
+                                        <StackPanel
+                                            x:Name="NotesListEmptyState"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Spacing="6">
+                                            <FontIcon
+                                                Foreground="{ThemeResource OverlayAccentBrush}"
+                                                FontSize="24"
+                                                Glyph="&#xE70B;" />
+                                            <TextBlock
+                                                x:Name="NotesListEmptyText"
+                                                MaxWidth="116"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="11"
+                                                Text="暂无随记"
+                                                TextAlignment="Center"
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ListView
+                                            x:Name="NotesList"
+                                            AutomationProperties.Name="随记列表"
+                                            SelectionChanged="NotesList_SelectionChanged"
+                                            SelectionMode="Single"
+                                            Visibility="Collapsed">
+                                            <ListView.ItemContainerStyle>
+                                                <Style TargetType="ListViewItem">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    <Setter Property="Padding" Value="0" />
+                                                </Style>
+                                            </ListView.ItemContainerStyle>
+                                        </ListView>
+                                    </Grid>
+                                </Grid>
+
+                                <Border
+                                    Grid.Column="1"
+                                    Background="{ThemeResource OverlayStrokeBrush}" />
+
+                                <Grid Grid.Column="2">
+                                    <TextBox
+                                        x:Name="NotesEditor"
+                                        AcceptsReturn="True"
+                                        AutomationProperties.Name="随记 Markdown 编辑器"
+                                        IsEnabled="False"
+                                        IsSpellCheckEnabled="True"
+                                        MaxLength="1048576"
+                                        PlaceholderText="开始记录..."
+                                        TextChanged="NotesEditor_TextChanged"
+                                        TextWrapping="Wrap"
+                                        VerticalContentAlignment="Top"
+                                        ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                                    <ScrollViewer
+                                        x:Name="NotesPreviewScroll"
+                                        AutomationProperties.Name="随记 Markdown 预览"
+                                        HorizontalScrollBarVisibility="Disabled"
+                                        Padding="10,6"
+                                        VerticalScrollBarVisibility="Auto"
+                                        Visibility="Collapsed">
+                                        <RichTextBlock
+                                            x:Name="NotesPreview"
+                                            IsTextSelectionEnabled="True"
+                                            TextWrapping="Wrap" />
+                                    </ScrollViewer>
+                                    <StackPanel
+                                        x:Name="NotesEditorEmptyState"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        IsHitTestVisible="False"
+                                        Spacing="7">
+                                        <FontIcon
+                                            Foreground="{ThemeResource OverlayAccentBrush}"
+                                            FontSize="28"
+                                            Glyph="&#xE70B;" />
+                                        <TextBlock
+                                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                            FontSize="12"
+                                            Text="选择或新建一条随记"
+                                            TextAlignment="Center" />
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                        <Grid
+                            x:Name="AIAgentView"
+                            Grid.Row="1"
+                            Visibility="Collapsed">
+                            <Pivot>
+                                <PivotItem Header="会话">
+                                    <local:AIAgentWorkspaceContent
+                                        x:Name="AIAgentWorkspaceView" />
+                                </PivotItem>
+                                <PivotItem Header="Skills">
+                                    <local:AIAgentSkillsContent
+                                        x:Name="AIAgentSkillsView" />
+                                </PivotItem>
+                            </Pivot>
+                        </Grid>
+                        <local:PDFToolsContent
+                            x:Name="PDFToolsView"
+                            Grid.Row="1"
+                            Visibility="Collapsed" />
+                        <Grid
+                            x:Name="DownloadView"
+                            Grid.Row="1"
+                            AutomationProperties.Name="下载"
+                            Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <TextBox
+                                x:Name="DownloadUrlBox"
+                                Height="38"
+                                AutomationProperties.Name="视频或音频链接"
+                                PlaceholderText="粘贴视频或音频链接"
+                                TextChanged="DownloadUrl_TextChanged" />
+
+                            <Grid Grid.Row="1" Margin="0,10,0,0" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="132" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="92" />
+                                </Grid.ColumnDefinitions>
+                                <Border
+                                    Padding="8,0"
+                                    Background="{ThemeResource OverlayCardBrush}"
+                                    BorderBrush="{ThemeResource OverlayStrokeBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <RadioButton
+                                            x:Name="DownloadVideoMode"
+                                            AutomationProperties.Name="下载视频"
+                                            Content="视频"
+                                            GroupName="DownloadMode"
+                                            IsChecked="True" />
+                                        <RadioButton
+                                            x:Name="DownloadAudioMode"
+                                            AutomationProperties.Name="下载音频"
+                                            Content="音频"
+                                            GroupName="DownloadMode" />
+                                    </StackPanel>
+                                </Border>
+                                <Button
+                                    x:Name="DownloadFolderButton"
+                                    Grid.Column="1"
+                                    HorizontalContentAlignment="Stretch"
+                                    AutomationProperties.Name="选择下载文件夹"
+                                    Click="DownloadFolderButton_Click">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon
+                                            VerticalAlignment="Center"
+                                            Foreground="{ThemeResource OverlayAccentBrush}"
+                                            FontSize="13"
+                                            Glyph="&#xE8B7;" />
+                                        <TextBlock
+                                            x:Name="DownloadFolderName"
+                                            Grid.Column="1"
+                                            Margin="7,0"
+                                            VerticalAlignment="Center"
+                                            FontSize="11"
+                                            Text="下载"
+                                            TextTrimming="CharacterEllipsis" />
+                                        <FontIcon
+                                            Grid.Column="2"
+                                            VerticalAlignment="Center"
+                                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                            FontSize="10"
+                                            Glyph="&#xE70D;" />
+                                    </Grid>
+                                </Button>
+                                <Button
+                                    x:Name="DownloadStartButton"
+                                    Grid.Column="2"
+                                    HorizontalContentAlignment="Center"
+                                    AutomationProperties.Name="开始下载"
+                                    Click="DownloadStartButton_Click"
+                                    IsEnabled="False">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontSize="13" Glyph="&#xE896;" />
+                                        <TextBlock Text="下载" />
+                                    </StackPanel>
+                                </Button>
+                                <Button
+                                    x:Name="DownloadCancelButton"
+                                    Grid.Column="2"
+                                    HorizontalContentAlignment="Center"
+                                    AutomationProperties.Name="取消下载"
+                                    Click="DownloadCancelButton_Click"
+                                    Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontSize="12" Glyph="&#xE71A;" />
+                                        <TextBlock Text="取消" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+
+                            <Border
+                                Grid.Row="2"
+                                Margin="0,12,0,0"
+                                Padding="12"
+                                Background="{ThemeResource OverlayCardBrush}"
+                                BorderBrush="{ThemeResource OverlayStrokeBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon
+                                            x:Name="DownloadStatusIcon"
+                                            VerticalAlignment="Center"
+                                            Foreground="{ThemeResource OverlayAccentBrush}"
+                                            FontSize="17"
+                                            Glyph="&#xE896;" />
+                                        <StackPanel Grid.Column="1" Margin="9,0" VerticalAlignment="Center" Spacing="2">
+                                            <TextBlock
+                                                x:Name="DownloadStatusText"
+                                                Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                                                FontSize="12"
+                                                FontWeight="SemiBold"
+                                                Text="准备就绪" />
+                                            <TextBlock
+                                                x:Name="DownloadDetailText"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="10"
+                                                MaxLines="2"
+                                                TextTrimming="CharacterEllipsis"
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button
+                                            x:Name="DownloadRevealButton"
+                                            Grid.Column="2"
+                                            Padding="0"
+                                            AutomationProperties.Name="在资源管理器中显示"
+                                            Click="DownloadRevealButton_Click"
+                                            ToolTipService.ToolTip="在资源管理器中显示"
+                                            Visibility="Collapsed">
+                                            <FontIcon FontSize="13" Glyph="&#xE838;" />
+                                        </Button>
+                                    </Grid>
+                                    <ProgressBar
+                                        x:Name="DownloadProgress"
+                                        Grid.Row="1"
+                                        Height="4"
+                                        Margin="0,10,0,0"
+                                        Maximum="1"
+                                        Visibility="Collapsed" />
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        <Grid
+                            x:Name="AgendaView"
+                            Grid.Row="1"
+                            AutomationProperties.Name="日程与待办"
+                            Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="38" />
+                                <RowDefinition Height="52" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Grid ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Button
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
+                                    AutomationProperties.Name="上一周"
+                                    Click="AgendaPreviousWeekButton_Click"
+                                    ToolTipService.ToolTip="上一周">
+                                    <FontIcon FontSize="12" Glyph="&#xE76B;" />
+                                </Button>
+                                <Button
+                                    Grid.Column="1"
+                                    Height="32"
+                                    Padding="10,0"
+                                    AutomationProperties.Name="回到今天"
+                                    Click="AgendaTodayButton_Click"
+                                    Content="今天" />
+                                <TextBlock
+                                    x:Name="AgendaWeekTitle"
+                                    Grid.Column="2"
+                                    Margin="8,0"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="11"
+                                    Text="本周"
+                                    TextTrimming="CharacterEllipsis" />
+                                <Button
+                                    Grid.Column="3"
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
+                                    AutomationProperties.Name="下一周"
+                                    Click="AgendaNextWeekButton_Click"
+                                    ToolTipService.ToolTip="下一周">
+                                    <FontIcon FontSize="12" Glyph="&#xE76C;" />
+                                </Button>
+                                <Button
+                                    Grid.Column="4"
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
+                                    AutomationProperties.Name="新建日程"
+                                    Click="AgendaNewEventButton_Click"
+                                    ToolTipService.ToolTip="新建日程">
+                                    <FontIcon FontSize="13" Glyph="&#xE787;" />
+                                </Button>
+                                <Button
+                                    Grid.Column="5"
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
+                                    AutomationProperties.Name="新建待办"
+                                    Click="AgendaNewReminderButton_Click"
+                                    ToolTipService.ToolTip="新建待办">
+                                    <FontIcon FontSize="13" Glyph="&#xE8A1;" />
+                                </Button>
+                            </Grid>
+
+                            <Grid x:Name="AgendaDaysGrid" Grid.Row="1" ColumnSpacing="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="AgendaDay0" Grid.Column="0" Height="46" Padding="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="AgendaDayButton_Click">
+                                    <StackPanel Spacing="1"><TextBlock x:Name="AgendaDay0Weekday" HorizontalAlignment="Center" FontSize="9" /><TextBlock x:Name="AgendaDay0Date" HorizontalAlignment="Center" FontSize="12" FontWeight="SemiBold" /></StackPanel>
+                                </Button>
+                                <Button x:Name="AgendaDay1" Grid.Column="1" Height="46" Padding="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="AgendaDayButton_Click">
+                                    <StackPanel Spacing="1"><TextBlock x:Name="AgendaDay1Weekday" HorizontalAlignment="Center" FontSize="9" /><TextBlock x:Name="AgendaDay1Date" HorizontalAlignment="Center" FontSize="12" FontWeight="SemiBold" /></StackPanel>
+                                </Button>
+                                <Button x:Name="AgendaDay2" Grid.Column="2" Height="46" Padding="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="AgendaDayButton_Click">
+                                    <StackPanel Spacing="1"><TextBlock x:Name="AgendaDay2Weekday" HorizontalAlignment="Center" FontSize="9" /><TextBlock x:Name="AgendaDay2Date" HorizontalAlignment="Center" FontSize="12" FontWeight="SemiBold" /></StackPanel>
+                                </Button>
+                                <Button x:Name="AgendaDay3" Grid.Column="3" Height="46" Padding="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="AgendaDayButton_Click">
+                                    <StackPanel Spacing="1"><TextBlock x:Name="AgendaDay3Weekday" HorizontalAlignment="Center" FontSize="9" /><TextBlock x:Name="AgendaDay3Date" HorizontalAlignment="Center" FontSize="12" FontWeight="SemiBold" /></StackPanel>
+                                </Button>
+                                <Button x:Name="AgendaDay4" Grid.Column="4" Height="46" Padding="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="AgendaDayButton_Click">
+                                    <StackPanel Spacing="1"><TextBlock x:Name="AgendaDay4Weekday" HorizontalAlignment="Center" FontSize="9" /><TextBlock x:Name="AgendaDay4Date" HorizontalAlignment="Center" FontSize="12" FontWeight="SemiBold" /></StackPanel>
+                                </Button>
+                                <Button x:Name="AgendaDay5" Grid.Column="5" Height="46" Padding="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="AgendaDayButton_Click">
+                                    <StackPanel Spacing="1"><TextBlock x:Name="AgendaDay5Weekday" HorizontalAlignment="Center" FontSize="9" /><TextBlock x:Name="AgendaDay5Date" HorizontalAlignment="Center" FontSize="12" FontWeight="SemiBold" /></StackPanel>
+                                </Button>
+                                <Button x:Name="AgendaDay6" Grid.Column="6" Height="46" Padding="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="AgendaDayButton_Click">
+                                    <StackPanel Spacing="1"><TextBlock x:Name="AgendaDay6Weekday" HorizontalAlignment="Center" FontSize="9" /><TextBlock x:Name="AgendaDay6Date" HorizontalAlignment="Center" FontSize="12" FontWeight="SemiBold" /></StackPanel>
+                                </Button>
+                            </Grid>
+
+                            <Grid Grid.Row="2" Margin="0,8,0,0">
+                                <ListView
+                                    x:Name="AgendaList"
+                                    AutomationProperties.Name="所选日期的日程与待办"
+                                    IsItemClickEnabled="False"
+                                    SelectionMode="None" />
+                                <StackPanel
+                                    x:Name="AgendaEmptyState"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    IsHitTestVisible="False"
+                                    Spacing="7">
+                                    <ProgressRing
+                                        x:Name="AgendaProgress"
+                                        Width="24"
+                                        Height="24"
+                                        IsActive="False"
+                                        Visibility="Collapsed" />
+                                    <FontIcon
+                                        x:Name="AgendaEmptyIcon"
+                                        Foreground="{ThemeResource OverlayAccentBrush}"
+                                        FontSize="28"
+                                        Glyph="&#xE787;" />
+                                    <TextBlock
+                                        x:Name="AgendaStatusText"
+                                        MaxWidth="320"
+                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                        FontSize="12"
+                                        Text="正在载入日程"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                        <Grid
+                            x:Name="MailView"
+                            Grid.Row="1"
+                            AutomationProperties.Name="Microsoft Graph 邮件"
+                            Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <CommandBar
+                                x:Name="MailCommandBar"
+                                Background="Transparent"
+                                ClosedDisplayMode="Compact"
+                                DefaultLabelPosition="Collapsed"
+                                IsDynamicOverflowEnabled="True">
+                                <CommandBar.Content>
+                                    <TextBlock
+                                        x:Name="MailStatusText"
+                                        MaxWidth="230"
+                                        VerticalAlignment="Center"
+                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                        FontSize="11"
+                                        Text="请在设置中连接 Microsoft Graph 邮箱"
+                                        TextTrimming="CharacterEllipsis" />
+                                </CommandBar.Content>
+                                <CommandBar.PrimaryCommands>
+                                    <AppBarButton
+                                        x:Name="MailRefreshButton"
+                                        AutomationProperties.Name="刷新收件箱"
+                                        Click="MailRefreshButton_Click"
+                                        Label="刷新"
+                                        ToolTipService.ToolTip="刷新收件箱">
+                                        <AppBarButton.Icon><FontIcon Glyph="&#xE72C;" /></AppBarButton.Icon>
+                                    </AppBarButton>
+                                    <AppBarButton
+                                        x:Name="MailAuthorizeButton"
+                                        AutomationProperties.Name="开始 Microsoft 登录"
+                                        Click="MailAuthorizeButton_Click"
+                                        Label="登录"
+                                        ToolTipService.ToolTip="开始 Microsoft 登录">
+                                        <AppBarButton.Icon><FontIcon Glyph="&#xE8FA;" /></AppBarButton.Icon>
+                                    </AppBarButton>
+                                </CommandBar.PrimaryCommands>
+                            </CommandBar>
+
+                            <StackPanel
+                                x:Name="MailDeviceCodePanel"
+                                Grid.Row="1"
+                                Margin="0,4,0,8"
+                                Padding="8"
+                                Background="{ThemeResource OverlayStrokeBrush}"
+                                Spacing="4"
+                                Visibility="Collapsed">
+                                <TextBlock
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="11"
+                                    Text="在浏览器中输入以下代码完成 Microsoft 登录" />
+                                <TextBlock
+                                    x:Name="MailVerificationCodeText"
+                                    FontFamily="Consolas"
+                                    FontSize="18"
+                                    FontWeight="SemiBold" />
+                                <TextBlock
+                                    x:Name="MailVerificationUriText"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="11"
+                                    TextWrapping="Wrap" />
+                                <Button
+                                    x:Name="MailOpenAuthorizationButton"
+                                    HorizontalAlignment="Left"
+                                    AutomationProperties.Name="打开 Microsoft 登录页面"
+                                    Click="MailOpenAuthorizationButton_Click"
+                                    Content="打开登录页面" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Spacing="8">
+                                <Expander
+                                    x:Name="MailComposeExpander"
+                                    Header="新邮件">
+                                    <StackPanel Margin="0,8,0,0" Spacing="8">
+                                        <TextBox
+                                            x:Name="MailRecipientsBox"
+                                            AutomationProperties.Name="邮件收件人"
+                                            Header="收件人"
+                                            MaxLength="16384"
+                                            PlaceholderText="多个地址用逗号或分号分隔" />
+                                        <TextBox
+                                            x:Name="MailSubjectBox"
+                                            AutomationProperties.Name="邮件主题"
+                                            Header="主题"
+                                            MaxLength="4096" />
+                                        <TextBox
+                                            x:Name="MailBodyBox"
+                                            AcceptsReturn="True"
+                                            AutomationProperties.Name="邮件正文"
+                                            Header="正文"
+                                            MaxHeight="108"
+                                            MaxLength="524288"
+                                            TextWrapping="Wrap"
+                                            VerticalContentAlignment="Top"
+                                            ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                                        <Button
+                                            x:Name="MailSendButton"
+                                            HorizontalAlignment="Right"
+                                            AutomationProperties.Name="发送邮件"
+                                            Click="MailSendButton_Click">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon FontSize="12" Glyph="&#xE724;" />
+                                                <TextBlock Text="发送" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Expander>
+
+                                <Grid
+                                    x:Name="MailReplyPanel"
+                                    Padding="0,4,0,0"
+                                    Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock
+                                        x:Name="MailReplyTargetText"
+                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                        FontSize="11"
+                                        Text="回复" />
+                                    <TextBox
+                                        x:Name="MailReplyBodyBox"
+                                        Grid.Row="1"
+                                        Margin="0,6,0,0"
+                                        AcceptsReturn="True"
+                                        AutomationProperties.Name="回复正文"
+                                        MaxHeight="92"
+                                        MaxLength="524288"
+                                        PlaceholderText="输入回复"
+                                        TextWrapping="Wrap"
+                                        VerticalContentAlignment="Top"
+                                        ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                                    <StackPanel
+                                        Grid.Row="2"
+                                        Margin="0,6,0,0"
+                                        HorizontalAlignment="Right"
+                                        Orientation="Horizontal"
+                                        Spacing="8">
+                                        <Button
+                                            x:Name="MailReplyCancelButton"
+                                            AutomationProperties.Name="取消回复"
+                                            Click="MailReplyCancelButton_Click"
+                                            Content="取消" />
+                                        <Button
+                                            x:Name="MailReplySendButton"
+                                            AutomationProperties.Name="发送回复"
+                                            Click="MailReplySendButton_Click"
+                                            Content="发送回复" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+
+                            <Grid Grid.Row="3" Margin="0,8,0,0">
+                                <ListView
+                                    x:Name="MailRows"
+                                    AutomationProperties.Name="收件箱"
+                                    IsItemClickEnabled="False"
+                                    SelectionMode="None" />
+                                <StackPanel
+                                    x:Name="MailEmptyState"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    IsHitTestVisible="False"
+                                    Spacing="7">
+                                    <ProgressRing
+                                        x:Name="MailProgress"
+                                        Width="24"
+                                        Height="24"
+                                        IsActive="False"
+                                        Visibility="Collapsed" />
+                                    <FontIcon
+                                        x:Name="MailEmptyIcon"
+                                        Foreground="{ThemeResource OverlayAccentBrush}"
+                                        FontSize="28"
+                                        Glyph="&#xE715;" />
+                                    <TextBlock
+                                        x:Name="MailEmptyStateText"
+                                        MaxWidth="320"
+                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                        FontSize="12"
+                                        Text="请在设置中连接 Microsoft Graph 邮箱"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                        <Grid
+                            x:Name="WeatherView"
+                            Grid.Row="1"
+                            AutomationProperties.Name="天气"
+                            Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="38" />
+                                <RowDefinition Height="42" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    x:Name="WeatherStatusText"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="11"
+                                    Text="等待刷新"
+                                    TextTrimming="CharacterEllipsis" />
+                                <ProgressRing
+                                    x:Name="WeatherProgress"
+                                    Grid.Column="1"
+                                    Width="18"
+                                    Height="18"
+                                    Margin="6,0"
+                                    IsActive="False"
+                                    Visibility="Collapsed" />
+                                <Button
+                                    Grid.Column="2"
+                                    Width="32"
+                                    Height="32"
+                                    Padding="0"
+                                    AutomationProperties.Name="刷新天气"
+                                    Click="WeatherRefreshButton_Click"
+                                    ToolTipService.ToolTip="刷新天气">
+                                    <FontIcon FontSize="14" Glyph="&#xE72C;" />
+                                </Button>
+                            </Grid>
+
+                            <AutoSuggestBox
+                                x:Name="WeatherSearch"
+                                Grid.Row="1"
+                                Height="32"
+                                AutomationProperties.Name="搜索天气地点"
+                                PlaceholderText="城市、区县或地区"
+                                QueryIcon="Find"
+                                QuerySubmitted="WeatherSearch_QuerySubmitted" />
+
+                            <Grid Grid.Row="2">
+                                <StackPanel
+                                    x:Name="WeatherEmptyState"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="8">
+                                    <FontIcon
+                                        Foreground="{ThemeResource OverlayAccentBrush}"
+                                        FontSize="28"
+                                        Glyph="&#xE753;" />
+                                    <TextBlock
+                                        x:Name="WeatherEmptyStateText"
+                                        MaxWidth="300"
+                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                        FontSize="13"
+                                        Text="等待刷新"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ScrollViewer
+                                    x:Name="WeatherScroll"
+                                    AutomationProperties.Name="天气地点"
+                                    VerticalScrollBarVisibility="Auto"
+                                    Visibility="Collapsed">
+                                    <StackPanel x:Name="WeatherRows" Spacing="0" />
+                                </ScrollViewer>
+                            </Grid>
+                        </Grid>
+                        <ScrollViewer
+                            x:Name="ToolboxView"
+                            Grid.Row="1"
+                            AutomationProperties.Name="小工具"
+                            VerticalScrollBarVisibility="Auto"
+                            Visibility="Collapsed">
+                            <StackPanel
+                                Margin="0,0,0,4"
+                                MaxWidth="360"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Top"
+                                Spacing="14">
+                                <TextBlock
+                                    x:Name="PomodoroModeText"
+                                    HorizontalAlignment="Center"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Text="专注" />
+                                <Button
+                                    x:Name="PomodoroDurationButton"
+                                    Padding="12,6"
+                                    HorizontalAlignment="Center"
+                                    AutomationProperties.Name="设置番茄钟时长"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    ToolTipService.ToolTip="设置时长">
+                                    <Button.Flyout>
+                                        <Flyout Placement="Bottom">
+                                            <StackPanel Spacing="12">
+                                                <TextBlock
+                                                    FontSize="14"
+                                                    FontWeight="SemiBold"
+                                                    Text="设置当前时长" />
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <NumberBox
+                                                        x:Name="PomodoroHours"
+                                                        Width="76"
+                                                        Header="小时"
+                                                        Maximum="999"
+                                                        Minimum="0"
+                                                        SmallChange="1"
+                                                        SpinButtonPlacementMode="Compact" />
+                                                    <NumberBox
+                                                        x:Name="PomodoroMinutes"
+                                                        Width="76"
+                                                        Header="分钟"
+                                                        Maximum="59"
+                                                        Minimum="0"
+                                                        SmallChange="1"
+                                                        SpinButtonPlacementMode="Compact" />
+                                                    <NumberBox
+                                                        x:Name="PomodoroSeconds"
+                                                        Width="76"
+                                                        Header="秒"
+                                                        Maximum="59"
+                                                        Minimum="0"
+                                                        SmallChange="1"
+                                                        SpinButtonPlacementMode="Compact" />
+                                                </StackPanel>
+                                                <Button
+                                                    HorizontalAlignment="Right"
+                                                    AutomationProperties.Name="应用番茄钟时长"
+                                                    Click="PomodoroApplyDurationButton_Click">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <FontIcon FontSize="12" Glyph="&#xE73E;" />
+                                                        <TextBlock Text="应用" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </StackPanel>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock
+                                            x:Name="PomodoroClock"
+                                            Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                                            FontFamily="Consolas"
+                                            FontSize="34"
+                                            FontWeight="Bold"
+                                            Text="25:00" />
+                                        <FontIcon
+                                            x:Name="PomodoroDurationChevron"
+                                            VerticalAlignment="Center"
+                                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                            FontSize="10"
+                                            Glyph="&#xE70D;" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock
+                                    x:Name="PomodoroPhaseText"
+                                    HorizontalAlignment="Center"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="12"
+                                    Text="待开始" />
+                                <StackPanel
+                                    HorizontalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Spacing="8">
+                                    <Button
+                                        x:Name="PomodoroStartPauseButton"
+                                        MinWidth="112"
+                                        Height="38"
+                                        AutomationProperties.Name="开始番茄钟"
+                                        Click="PomodoroStartPauseButton_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <FontIcon
+                                                x:Name="PomodoroStartPauseIcon"
+                                                FontSize="13"
+                                                Glyph="&#xE768;" />
+                                            <TextBlock
+                                                x:Name="PomodoroStartPauseText"
+                                                Text="开始" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button
+                                        Width="38"
+                                        Height="38"
+                                        Padding="0"
+                                        AutomationProperties.Name="重置番茄钟"
+                                        Click="PomodoroResetButton_Click"
+                                        ToolTipService.ToolTip="重置">
+                                        <FontIcon FontSize="14" Glyph="&#xE777;" />
+                                    </Button>
+                                </StackPanel>
+                                <StackPanel
+                                    HorizontalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Spacing="8">
+                                    <ToggleButton
+                                        x:Name="PowerDisplayToggle"
+                                        MinWidth="168"
+                                        Height="44"
+                                        AutomationProperties.Name="保持亮屏"
+                                        Click="PowerDisplayToggle_Click"
+                                        ToolTipService.ToolTip="保持显示器开启，并防止系统因空闲进入睡眠；合盖或主动睡眠仍可覆盖">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <FontIcon FontSize="14" Glyph="&#xE706;" />
+                                            <TextBlock Text="保持亮屏" />
+                                        </StackPanel>
+                                    </ToggleButton>
+                                    <ToggleButton
+                                        x:Name="PowerSystemToggle"
+                                        MinWidth="168"
+                                        Height="44"
+                                        AutomationProperties.Name="防止空闲休眠"
+                                        Click="PowerSystemToggle_Click"
+                                        ToolTipService.ToolTip="防止系统因空闲进入睡眠，显示器仍可按电源策略关闭；合盖或主动睡眠仍可覆盖">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <FontIcon FontSize="14" Glyph="&#xE770;" />
+                                            <TextBlock Text="防止空闲休眠" />
+                                        </StackPanel>
+                                    </ToggleButton>
+                                </StackPanel>
+                                <StackPanel
+                                    HorizontalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Spacing="8">
+                                    <Button
+                                        x:Name="ScreenCleaningButton"
+                                        MinWidth="168"
+                                        Height="44"
+                                        AutomationProperties.Name="清理屏幕"
+                                        Click="ScreenCleaningButton_Click"
+                                        ToolTipService.ToolTip="全屏黑色遮罩；点击任意位置退出">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <FontIcon FontSize="14" Glyph="&#xE7F4;" />
+                                            <TextBlock Text="清理屏幕" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button
+                                        x:Name="KeyboardCleaningButton"
+                                        MinWidth="168"
+                                        Height="44"
+                                        AutomationProperties.Name="清理键盘"
+                                        Click="KeyboardCleaningButton_Click"
+                                        ToolTipService.ToolTip="仅在清洁窗口位于前台时拦截按键；点击任意位置退出">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <FontIcon FontSize="14" Glyph="&#xE765;" />
+                                            <TextBlock
+                                                x:Name="KeyboardCleaningText"
+                                                Text="清理键盘" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <StackPanel
+                                    HorizontalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Spacing="8">
+                                    <Button
+                                        x:Name="DesktopArrangeButton"
+                                        MinWidth="168"
+                                        Height="44"
+                                        AutomationProperties.Name="自动排列桌面图标"
+                                        Click="DesktopArrangeButton_Click"
+                                        ToolTipService.ToolTip="启用 Explorer 自动排列桌面图标，不移动或重命名文件">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <FontIcon FontSize="14" Glyph="&#xE80A;" />
+                                            <TextBlock Text="自动排列" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button
+                                        x:Name="StoreUpdatesButton"
+                                        MinWidth="168"
+                                        Height="44"
+                                        AutomationProperties.Name="打开 Microsoft Store 更新"
+                                        Click="StoreUpdatesButton_Click"
+                                        ToolTipService.ToolTip="打开 Microsoft Store 的下载和更新页面">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <FontIcon FontSize="14" Glyph="&#xE896;" />
+                                            <TextBlock Text="应用更新" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <Button
+                                    x:Name="RecycleBinButton"
+                                    MinWidth="344"
+                                    Height="48"
+                                    HorizontalContentAlignment="Stretch"
+                                    AutomationProperties.Name="清空回收站"
+                                    Click="RecycleBinButton_Click"
+                                    ToolTipService.ToolTip="确认后永久清空回收站">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon
+                                            VerticalAlignment="Center"
+                                            FontSize="14"
+                                            Glyph="&#xE74D;" />
+                                        <StackPanel
+                                            Grid.Column="1"
+                                            Margin="8,0"
+                                            VerticalAlignment="Center"
+                                            Spacing="1">
+                                            <TextBlock FontSize="12" FontWeight="SemiBold" Text="回收站" />
+                                            <TextBlock
+                                                x:Name="RecycleBinDetail"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="10"
+                                                Text="正在读取"
+                                                TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <ProgressRing
+                                            x:Name="DesktopToolsProgress"
+                                            Grid.Column="2"
+                                            Width="18"
+                                            Height="18"
+                                            VerticalAlignment="Center"
+                                            IsActive="False"
+                                            Visibility="Collapsed" />
+                                    </Grid>
+                                </Button>
+                                <TextBlock
+                                    x:Name="DesktopToolsStatusText"
+                                    MaxWidth="344"
+                                    HorizontalAlignment="Center"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="10"
+                                    TextAlignment="Center"
+                                    TextWrapping="Wrap"
+                                    Visibility="Collapsed" />
+                                <Button
+                                    x:Name="AlarmButton"
+                                    MinWidth="344"
+                                    Height="44"
+                                    HorizontalContentAlignment="Stretch"
+                                    AutomationProperties.Name="管理闹钟"
+                                    ToolTipService.ToolTip="管理闹钟">
+                                    <Button.Flyout>
+                                        <Flyout Placement="Bottom">
+                                            <StackPanel Width="360" Spacing="10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock
+                                                        VerticalAlignment="Center"
+                                                        FontSize="15"
+                                                        FontWeight="SemiBold"
+                                                        Text="闹钟" />
+                                                    <Button
+                                                        Grid.Column="1"
+                                                        Padding="8,4"
+                                                        AutomationProperties.Name="打开 Windows 时钟"
+                                                        Click="AlarmOpenClockButton_Click"
+                                                        ToolTipService.ToolTip="打开 Windows 时钟">
+                                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                                            <FontIcon FontSize="12" Glyph="&#xE823;" />
+                                                            <TextBlock FontSize="11" Text="打开时钟" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                </Grid>
+
+                                                <TextBlock
+                                                    x:Name="AlarmEmptyText"
+                                                    HorizontalAlignment="Center"
+                                                    Margin="0,10"
+                                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                    FontSize="12"
+                                                    Text="还没有闹钟，在下方添加" />
+                                                <ScrollViewer
+                                                    x:Name="AlarmScroll"
+                                                    MaxHeight="156"
+                                                    VerticalScrollBarVisibility="Auto"
+                                                    Visibility="Collapsed">
+                                                    <StackPanel x:Name="AlarmRows" Spacing="4" />
+                                                </ScrollViewer>
+
+                                                <Border
+                                                    Height="1"
+                                                    Background="{ThemeResource OverlayStrokeBrush}" />
+
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="80" />
+                                                        <ColumnDefinition Width="80" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <NumberBox
+                                                        x:Name="AlarmHour"
+                                                        Header="小时"
+                                                        Maximum="23"
+                                                        Minimum="0"
+                                                        SmallChange="1"
+                                                        SpinButtonPlacementMode="Compact"
+                                                        Value="8" />
+                                                    <NumberBox
+                                                        x:Name="AlarmMinute"
+                                                        Grid.Column="1"
+                                                        Header="分钟"
+                                                        Maximum="59"
+                                                        Minimum="0"
+                                                        SmallChange="1"
+                                                        SpinButtonPlacementMode="Compact"
+                                                        Value="0" />
+                                                    <TextBox
+                                                        x:Name="AlarmLabel"
+                                                        Grid.Column="2"
+                                                        Header="备注"
+                                                        MaxLength="80"
+                                                        PlaceholderText="可选" />
+                                                </Grid>
+
+                                                <StackPanel
+                                                    HorizontalAlignment="Center"
+                                                    Orientation="Horizontal"
+                                                    Spacing="4">
+                                                    <ToggleButton x:Name="AlarmSunday" Width="36" Height="30" Content="日" Tag="1" Click="AlarmWeekdayButton_Click" />
+                                                    <ToggleButton x:Name="AlarmMonday" Width="36" Height="30" Content="一" Tag="2" Click="AlarmWeekdayButton_Click" />
+                                                    <ToggleButton x:Name="AlarmTuesday" Width="36" Height="30" Content="二" Tag="3" Click="AlarmWeekdayButton_Click" />
+                                                    <ToggleButton x:Name="AlarmWednesday" Width="36" Height="30" Content="三" Tag="4" Click="AlarmWeekdayButton_Click" />
+                                                    <ToggleButton x:Name="AlarmThursday" Width="36" Height="30" Content="四" Tag="5" Click="AlarmWeekdayButton_Click" />
+                                                    <ToggleButton x:Name="AlarmFriday" Width="36" Height="30" Content="五" Tag="6" Click="AlarmWeekdayButton_Click" />
+                                                    <ToggleButton x:Name="AlarmSaturday" Width="36" Height="30" Content="六" Tag="7" Click="AlarmWeekdayButton_Click" />
+                                                </StackPanel>
+
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock
+                                                        x:Name="AlarmRepeatHint"
+                                                        VerticalAlignment="Center"
+                                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                        FontSize="11"
+                                                        Text="仅响一次" />
+                                                    <StackPanel
+                                                        Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        Spacing="6">
+                                                        <Button
+                                                            x:Name="AlarmCancelButton"
+                                                            Content="取消"
+                                                            Click="AlarmCancelButton_Click"
+                                                            Visibility="Collapsed" />
+                                                        <Button
+                                                            x:Name="AlarmSaveButton"
+                                                            Click="AlarmSaveButton_Click">
+                                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                <FontIcon FontSize="12" Glyph="&#xE710;" />
+                                                                <TextBlock x:Name="AlarmSaveText" Text="添加" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <TextBlock
+                                                    x:Name="AlarmError"
+                                                    Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                                    FontSize="11"
+                                                    MaxLines="2"
+                                                    TextWrapping="Wrap"
+                                                    Visibility="Collapsed" />
+                                            </StackPanel>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon
+                                            VerticalAlignment="Center"
+                                            FontSize="14"
+                                            Glyph="&#xE823;" />
+                                        <StackPanel
+                                            Grid.Column="1"
+                                            Margin="8,0"
+                                            VerticalAlignment="Center"
+                                            Spacing="1">
+                                            <TextBlock FontSize="12" FontWeight="SemiBold" Text="闹钟" />
+                                            <TextBlock
+                                                x:Name="AlarmButtonDetail"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="10"
+                                                Text="暂无已启用闹钟"
+                                                TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <FontIcon
+                                            Grid.Column="2"
+                                            VerticalAlignment="Center"
+                                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                            FontSize="10"
+                                            Glyph="&#xE70D;" />
+                                    </Grid>
+                                </Button>
+                                <StackPanel
+                                    HorizontalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Spacing="8">
+                                    <Button
+                                        MinWidth="168"
+                                        Height="44"
+                                        AutomationProperties.Name="打开提词器"
+                                        Click="TeleprompterButton_Click"
+                                        ToolTipService.ToolTip="打开提词器">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <FontIcon FontSize="14" Glyph="&#xE8D2;" />
+                                            <TextBlock Text="提词器" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button
+                                        MinWidth="168"
+                                        Height="44"
+                                        AutomationProperties.Name="打开摄像头镜子"
+                                        Click="CameraMirrorButton_Click"
+                                        ToolTipService.ToolTip="打开摄像头镜子">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <FontIcon FontSize="14" Glyph="&#xE722;" />
+                                            <TextBlock Text="镜子" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                        <ScrollViewer
+                            x:Name="SystemView"
+                            Grid.Row="1"
+                            AutomationProperties.Name="系统监控"
+                            VerticalScrollBarVisibility="Auto"
+                            Visibility="Collapsed">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnSpacing="14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border
+                                        x:Name="SystemCPUSection"
+                                        Padding="10"
+                                        Background="{ThemeResource OverlayCardBrush}"
+                                        BorderBrush="{ThemeResource OverlayStrokeBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    FontSize="12"
+                                                    FontWeight="SemiBold"
+                                                    Text="CPU" />
+                                                <TextBlock
+                                                    x:Name="SystemCPUUsage"
+                                                    Grid.Column="1"
+                                                    FontFamily="Consolas"
+                                                    FontSize="15"
+                                                    FontWeight="SemiBold"
+                                                    Text="" />
+                                            </Grid>
+                                            <TextBlock
+                                                x:Name="SystemCPUName"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="9"
+                                                MaxLines="1"
+                                                Text=""
+                                                TextTrimming="CharacterEllipsis" />
+                                            <ProgressBar
+                                                x:Name="SystemCPUProgress"
+                                                Height="3"
+                                                Maximum="1" />
+                                            <Border
+                                                Background="{ThemeResource OverlayOpaqueSurfaceBrush}"
+                                                BorderBrush="{ThemeResource OverlayStrokeBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                Padding="7,5">
+                                                <Grid Height="78">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="*" />
+                                                    </Grid.RowDefinitions>
+                                                    <Border
+                                                        Height="1"
+                                                        VerticalAlignment="Top"
+                                                        Background="{ThemeResource OverlayStrokeBrush}" />
+                                                    <Border
+                                                        Grid.Row="1"
+                                                        Height="1"
+                                                        VerticalAlignment="Top"
+                                                        Background="{ThemeResource OverlayStrokeBrush}" />
+                                                    <Border
+                                                        Grid.Row="2"
+                                                        Height="1"
+                                                        VerticalAlignment="Top"
+                                                        Background="{ThemeResource OverlayStrokeBrush}" />
+                                                    <Border
+                                                        Grid.Row="3"
+                                                        Height="1"
+                                                        VerticalAlignment="Bottom"
+                                                        Background="{ThemeResource OverlayStrokeBrush}" />
+                                                    <Canvas
+                                                        x:Name="SystemCPUHistoryCanvas"
+                                                        Grid.RowSpan="4"
+                                                        IsHitTestVisible="False">
+                                                        <Polyline
+                                                            x:Name="SystemCPUIdleHistoryLine"
+                                                            Stroke="{ThemeResource OverlaySecondaryTextBrush}"
+                                                            StrokeLineJoin="Round"
+                                                            StrokeThickness="1.2" />
+                                                        <Polyline
+                                                            x:Name="SystemCPUSystemHistoryLine"
+                                                            Stroke="{ThemeResource OverlayDangerBrush}"
+                                                            StrokeLineJoin="Round"
+                                                            StrokeThickness="1.4" />
+                                                        <Polyline
+                                                            x:Name="SystemCPUUserHistoryLine"
+                                                            Stroke="{ThemeResource OverlayAccentBrush}"
+                                                            StrokeLineJoin="Round"
+                                                            StrokeThickness="1.5" />
+                                                    </Canvas>
+                                                    <TextBlock
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Top"
+                                                        Padding="2,0"
+                                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                        FontFamily="Consolas"
+                                                        FontSize="8"
+                                                        Text="100%" />
+                                                    <TextBlock
+                                                        Grid.Row="2"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Top"
+                                                        Padding="2,0"
+                                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                        FontFamily="Consolas"
+                                                        FontSize="8"
+                                                        Text="50%" />
+                                                    <TextBlock
+                                                        Grid.Row="3"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Bottom"
+                                                        Padding="2,0"
+                                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                        FontFamily="Consolas"
+                                                        FontSize="8"
+                                                        Text="0%" />
+                                                </Grid>
+                                            </Border>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                    FontSize="8"
+                                                    Text="最近 60 秒" />
+                                                <TextBlock
+                                                    Grid.Column="1"
+                                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                    FontSize="8"
+                                                    Text="处理器占用" />
+                                            </Grid>
+                                            <StackPanel
+                                                x:Name="SystemCPUDetail"
+                                                Orientation="Horizontal"
+                                                Spacing="10">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <Ellipse
+                                                        Width="6"
+                                                        Height="6"
+                                                        VerticalAlignment="Center"
+                                                        Fill="{ThemeResource OverlayAccentBrush}" />
+                                                    <TextBlock
+                                                        x:Name="SystemCPUUserDetail"
+                                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                        FontSize="9" />
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <Ellipse
+                                                        Width="6"
+                                                        Height="6"
+                                                        VerticalAlignment="Center"
+                                                        Fill="{ThemeResource OverlayDangerBrush}" />
+                                                    <TextBlock
+                                                        x:Name="SystemCPUSystemDetail"
+                                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                        FontSize="9" />
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <Ellipse
+                                                        Width="6"
+                                                        Height="6"
+                                                        VerticalAlignment="Center"
+                                                        Fill="{ThemeResource OverlaySecondaryTextBrush}" />
+                                                    <TextBlock
+                                                        x:Name="SystemCPUIdleDetail"
+                                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                        FontSize="9" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border
+                                        x:Name="SystemGPUSection"
+                                        Grid.Column="1"
+                                        Padding="10"
+                                        Background="{ThemeResource OverlayCardBrush}"
+                                        BorderBrush="{ThemeResource OverlayStrokeBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    FontSize="12"
+                                                    FontWeight="SemiBold"
+                                                    Text="GPU" />
+                                                <TextBlock
+                                                    x:Name="SystemGPUUsage"
+                                                    Grid.Column="1"
+                                                    FontFamily="Consolas"
+                                                    FontSize="15"
+                                                    FontWeight="SemiBold"
+                                                    Text="" />
+                                            </Grid>
+                                            <TextBlock
+                                                x:Name="SystemGPUName"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="9"
+                                                MaxLines="1"
+                                                Text=""
+                                                TextTrimming="CharacterEllipsis" />
+                                            <ProgressBar
+                                                x:Name="SystemGPUProgress"
+                                                Height="3"
+                                                Maximum="1" />
+                                            <Border
+                                                Background="{ThemeResource OverlayOpaqueSurfaceBrush}"
+                                                BorderBrush="{ThemeResource OverlayStrokeBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                Padding="7,5">
+                                                <Grid Height="78">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="*" />
+                                                    </Grid.RowDefinitions>
+                                                    <Border
+                                                        Height="1"
+                                                        VerticalAlignment="Top"
+                                                        Background="{ThemeResource OverlayStrokeBrush}" />
+                                                    <Border
+                                                        Grid.Row="1"
+                                                        Height="1"
+                                                        VerticalAlignment="Top"
+                                                        Background="{ThemeResource OverlayStrokeBrush}" />
+                                                    <Border
+                                                        Grid.Row="2"
+                                                        Height="1"
+                                                        VerticalAlignment="Top"
+                                                        Background="{ThemeResource OverlayStrokeBrush}" />
+                                                    <Border
+                                                        Grid.Row="3"
+                                                        Height="1"
+                                                        VerticalAlignment="Bottom"
+                                                        Background="{ThemeResource OverlayStrokeBrush}" />
+                                                    <Canvas
+                                                        x:Name="SystemGPUHistoryCanvas"
+                                                        Grid.RowSpan="4"
+                                                        IsHitTestVisible="False">
+                                                        <Polyline
+                                                            x:Name="SystemGPUHistoryLine"
+                                                            Stroke="{ThemeResource SystemFillColorSuccessBrush}"
+                                                            StrokeLineJoin="Round"
+                                                            StrokeThickness="1.5" />
+                                                    </Canvas>
+                                                    <TextBlock
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Top"
+                                                        Padding="2,0"
+                                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                        FontFamily="Consolas"
+                                                        FontSize="8"
+                                                        Text="100%" />
+                                                    <TextBlock
+                                                        Grid.Row="2"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Top"
+                                                        Padding="2,0"
+                                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                        FontFamily="Consolas"
+                                                        FontSize="8"
+                                                        Text="50%" />
+                                                    <TextBlock
+                                                        Grid.Row="3"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Bottom"
+                                                        Padding="2,0"
+                                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                        FontFamily="Consolas"
+                                                        FontSize="8"
+                                                        Text="0%" />
+                                                </Grid>
+                                            </Border>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                    FontSize="8"
+                                                    Text="最近 60 秒" />
+                                                <StackPanel
+                                                    Grid.Column="1"
+                                                    Orientation="Horizontal"
+                                                    Spacing="4">
+                                                    <Ellipse
+                                                        Width="6"
+                                                        Height="6"
+                                                        VerticalAlignment="Center"
+                                                        Fill="{ThemeResource SystemFillColorSuccessBrush}" />
+                                                    <TextBlock
+                                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                        FontSize="8"
+                                                        Text="利用率" />
+                                                </StackPanel>
+                                            </Grid>
+                                            <TextBlock
+                                                x:Name="SystemGPUDetail"
+                                                Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                                FontSize="9"
+                                                Text=""
+                                                TextTrimming="CharacterEllipsis"
+                                                Visibility="Collapsed" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <Border
+                                    x:Name="SystemResourceSeparator"
+                                    Height="1"
+                                    Background="{ThemeResource OverlayStrokeBrush}" />
+
+                                <StackPanel x:Name="SystemMemorySection" Spacing="4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock FontSize="11" FontWeight="SemiBold" Text="内存" />
+                                        <TextBlock
+                                            x:Name="SystemMemoryUsage"
+                                            Grid.Column="1"
+                                            FontFamily="Consolas"
+                                            FontSize="11"
+                                            Text="" />
+                                    </Grid>
+                                    <ProgressBar
+                                        x:Name="SystemMemoryProgress"
+                                        Height="3"
+                                        Maximum="1" />
+                                    <TextBlock
+                                        x:Name="SystemMemoryDetail"
+                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                        FontSize="9"
+                                        Text="" />
+                                    <Grid ColumnSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ProgressRing
+                                            x:Name="SystemMemoryTrimProgress"
+                                            Width="14"
+                                            Height="14"
+                                            VerticalAlignment="Center"
+                                            IsActive="False"
+                                            Visibility="Collapsed" />
+                                        <TextBlock
+                                            x:Name="SystemMemoryTrimStatusText"
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                            FontSize="9"
+                                            TextTrimming="CharacterEllipsis"
+                                            Visibility="Collapsed" />
+                                        <Button
+                                            x:Name="SystemMemoryTrimButton"
+                                            Grid.Column="2"
+                                            Height="30"
+                                            Padding="9,0"
+                                            AutomationProperties.Name="释放系统内存"
+                                            Click="SystemMemoryReleaseButton_Click"
+                                            ToolTipService.ToolTip="请求 Windows 回收系统内存；不会结束应用程序，但其他应用可能短暂重新加载数据">
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <FontIcon FontSize="11" Glyph="&#xE950;" />
+                                                <TextBlock FontSize="10" Text="释放系统内存" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+
+                                <StackPanel x:Name="SystemDiskSection" Spacing="4">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock FontSize="11" FontWeight="SemiBold" Text="磁盘" />
+                                        <TextBlock
+                                            x:Name="SystemDiskUsage"
+                                            Grid.Column="1"
+                                            FontFamily="Consolas"
+                                            FontSize="11"
+                                            Text="" />
+                                        <Button
+                                            x:Name="DiskCleanupScanButton"
+                                            Grid.Column="2"
+                                            Height="30"
+                                            Padding="9,0"
+                                            AutomationProperties.Name="扫描可清理项目"
+                                            Click="DiskCleanupScanButton_Click"
+                                            ToolTipService.ToolTip="扫描可安全移入回收站的临时文件和缓存">
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <FontIcon FontSize="11" Glyph="&#xE721;" />
+                                                <TextBlock FontSize="10" Text="清理" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                    <TextBlock
+                                        x:Name="SystemDiskDetail"
+                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                        FontSize="9"
+                                        Text=""
+                                        TextWrapping="Wrap" />
+                                    <StackPanel x:Name="SystemDiskVolumes" Spacing="6" />
+                                    <StackPanel
+                                        x:Name="DiskCleanupInlineContent"
+                                        Spacing="8"
+                                        Visibility="Collapsed">
+                                    <ProgressBar
+                                        x:Name="DiskCleanupProgress"
+                                        Height="3"
+                                        IsIndeterminate="True"
+                                        Visibility="Collapsed" />
+                                    <TextBlock
+                                        x:Name="DiskCleanupEmptyText"
+                                        HorizontalAlignment="Center"
+                                        Margin="0,4"
+                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                        FontSize="10"
+                                        Text="尚未扫描" />
+                                    <ScrollViewer
+                                        x:Name="DiskCleanupScroll"
+                                        MaxHeight="168"
+                                        VerticalScrollBarVisibility="Auto"
+                                        Visibility="Collapsed">
+                                        <StackPanel x:Name="DiskCleanupRows" Spacing="2" />
+                                    </ScrollViewer>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            x:Name="DiskCleanupSelectionText"
+                                            VerticalAlignment="Center"
+                                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                            FontSize="9"
+                                            Text="未选择项目" />
+                                        <Button
+                                            x:Name="DiskCleanupCleanButton"
+                                            Grid.Column="1"
+                                            Height="32"
+                                            Padding="10,0"
+                                            AutomationProperties.Name="将所选项目移入回收站"
+                                            Click="DiskCleanupCleanButton_Click"
+                                            IsEnabled="False">
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <FontIcon FontSize="12" Glyph="&#xE74D;" />
+                                                <TextBlock FontSize="11" Text="移入回收站" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                    <TextBlock
+                                        x:Name="DiskCleanupStatusText"
+                                        Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                        FontSize="9"
+                                        TextWrapping="Wrap"
+                                        Visibility="Collapsed" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <Border Height="1" Background="{ThemeResource OverlayStrokeBrush}" />
+
+                                <Grid x:Name="SystemNetworkSection" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel x:Name="SystemNetworkTraffic" Spacing="2">
+                                        <TextBlock FontSize="11" FontWeight="SemiBold" Text="网络" />
+                                        <TextBlock
+                                            x:Name="SystemNetworkDownload"
+                                            FontFamily="Consolas"
+                                            FontSize="10"
+                                            Text="" />
+                                        <TextBlock
+                                            x:Name="SystemNetworkUpload"
+                                            FontFamily="Consolas"
+                                            FontSize="10"
+                                            Text="" />
+                                    </StackPanel>
+                                    <StackPanel
+                                        x:Name="SystemNetworkAddresses"
+                                        Grid.Column="1"
+                                        Spacing="2">
+                                        <TextBlock
+                                            x:Name="SystemPrivateIP"
+                                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                            FontSize="9"
+                                            Text=""
+                                            TextTrimming="CharacterEllipsis" />
+                                        <TextBlock
+                                            x:Name="SystemPublicIP"
+                                            Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                            FontSize="9"
+                                            Text=""
+                                            TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid x:Name="SystemPowerPanel" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        x:Name="SystemBattery"
+                                        FontSize="9"
+                                        Text=""
+                                        TextWrapping="Wrap" />
+                                    <TextBlock
+                                        x:Name="SystemUptime"
+                                        Grid.Column="1"
+                                        FontSize="9"
+                                        Text=""
+                                        TextWrapping="Wrap" />
+                                </Grid>
+
+                                <TextBlock
+                                    x:Name="SystemSensorStatus"
+                                    Foreground="{ThemeResource OverlaySecondaryTextBrush}"
+                                    FontSize="9"
+                                    TextWrapping="Wrap"
+                                    Visibility="Collapsed" />
+                            </StackPanel>
+                        </ScrollViewer>
+                        <ScrollViewer
+                            x:Name="AITaskScroll"
+                            Grid.Row="1"
+                            AutomationProperties.Name="进行中的 AI 任务"
+                            VerticalScrollBarVisibility="Auto"
+                            Visibility="Collapsed">
+                            <StackPanel x:Name="AITaskRows" Spacing="0" />
+                        </ScrollViewer>
+                    </Grid>
+                </NavigationView>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

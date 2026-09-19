@@ -1,0 +1,54 @@
+#!/usr/bin/env perl
+require 5.008;
+use warnings;
+use strict;
+
+unshift(@INC, '.');
+require qpdf_test_helpers;
+
+chdir("qpdf") or die "chdir testdir failed: $!\n";
+
+require TestDriver;
+
+cleanup();
+
+my $td = new TestDriver('many-nulls');
+
+# The output of test_many_nulls is also used in performance testing.
+# If it changes, consider whether it should be updated in
+# performance-test-files as well. See performance_check at the top of
+# the source tree.
+$td->runtest("create file with many nulls",
+             {$td->COMMAND => "test_many_nulls a.pdf"},
+             {$td->STRING => "", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("compare output",
+             {$td->COMMAND => "qpdf-test-compare a.pdf many-nulls.pdf"},
+             {$td->FILE => "many-nulls.pdf", $td->EXIT_STATUS => 0});
+$td->runtest("run check file",
+             {$td->COMMAND => "qpdf --check a.pdf"},
+             {$td->FILE => "many-nulls.out", $td->EXIT_STATUS => 3},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("copy sparse array",
+             {$td->COMMAND => "test_driver 97 many-nulls.pdf"},
+             {$td->STRING => "test 97 done\n", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("copy file with many nulls",
+             {$td->COMMAND =>
+                    "qpdf minimal-nulls.pdf --qdf --static-id  --no-original-object-ids a.pdf"},
+             {$td->STRING => "", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("compare files",
+             {$td->FILE => "a.pdf"},
+             {$td->FILE => "minimal-nulls.pdf"});
+$td->runtest("file with many nulls to JSON v1",
+             {$td->COMMAND => "qpdf minimal-nulls.pdf --json=1 -"},
+             {$td->FILE => "minimal-nulls-1.json", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+$td->runtest("file with many nulls to JSON v2",
+             {$td->COMMAND => "qpdf minimal-nulls.pdf --json=2 -"},
+             {$td->FILE => "minimal-nulls-2.json", $td->EXIT_STATUS => 0},
+             $td->NORMALIZE_NEWLINES);
+
+cleanup();
+$td->report(8);

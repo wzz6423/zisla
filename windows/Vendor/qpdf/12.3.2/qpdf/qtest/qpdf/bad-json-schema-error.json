@@ -1,0 +1,10 @@
+{
+  "potato": {
+  },
+  "encrypt": {
+    "userPassword": "",
+    "ownerPassword": "someOwnerThing",
+    "256bit": {
+    }
+  }
+}

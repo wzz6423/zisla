@@ -1,0 +1,4 @@
+LIBQPDF_@qpdf_SOVERSION@ {
+  global:
+    *;
+};

@@ -4,7 +4,12 @@
 
 **zisla is a native macOS workspace that appears when you need it, then gets out of the way.** Move the pointer to the top center of the screen to open one lightweight place for active AI work, media, handoff, downloads, and desktop utilities. Displays without a notch use the same simulated status area.
 
-Current implementation: **macOS 14+**. Apple Silicon is the supported configuration; Intel release packages may work, but compatibility is not guaranteed.
+Current implementation: **macOS 14+ on Apple Silicon**. Intel release packages may work, but compatibility is not guaranteed.
+
+## Repository layout
+
+- `mac/`: the current macOS implementation, built with Swift, AppKit, and SwiftUI.
+- `windows/`: a Windows implementation, built with C++20, C++/WinRT, WinUI 3, and the Windows App SDK.
 
 ## Why it belongs at the top of your screen
 
@@ -79,6 +84,16 @@ swift run zisla
 ```
 
 The downloader requires `yt-dlp`; `ffmpeg` is optional. Office-to-PDF conversion requires LibreOffice or OpenOffice. Build, test, and packaging instructions are in the [macOS development guide](mac/README.md).
+
+### Windows development
+
+The Windows core uses standard CMake:
+
+```bash
+cmake -S windows -B build/windows -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/windows --parallel
+ctest --test-dir build/windows --output-on-failure
+```
 
 ## Designed to stay out of the way
 

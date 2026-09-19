@@ -1,0 +1,160 @@
+%PDF-1.3
+%¿÷¢þ
+%QDF-1.0
+
+1 0 obj
+<<
+  /Pages 2 0 R
+  /Type /Catalog
+>>
+endobj
+
+2 0 obj
+<<
+  /Count 1
+  /Kids [
+    3 0 R
+  ]
+  /Type /Pages
+>>
+endobj
+
+%% Page 1
+3 0 obj
+<<
+  /Contents 4 0 R
+  /MediaBox [
+    0
+    0
+    612
+    792
+  ]
+  /Parent 2 0 R
+  /Resources 6 0 R
+  /Type /Page
+>>
+endobj
+
+%% Contents for page 1
+4 0 obj
+<<
+  /Length 5 0 R
+>>
+stream
+BT
+  /F1 24 Tf
+  72 720 Td
+  (Potato) Tj
+ET
+endstream
+endobj
+
+5 0 obj
+44
+endobj
+
+6 0 obj
+<<
+  /Font 7 0 R
+  %ProcSet 8 0 R
+>>
+endobj
+
+7 0 obj
+<<
+  /F1 9 0 R
+>>
+endobj
+
+8 0 obj
+[
+  /PDF
+  /Text
+]
+endobj
+
+9 0 obj
+<<
+  /BaseFont /Helvetica
+  /Encoding /WinAnsiEncoding
+  /Name /F1
+  /Subtype /Type1
+  /Type /Font
+>>
+endobj
+
+xref
+0 10
+0000000000 65535 f 
+0000000025 00000 n 
+0000000079 00000 n 
+0000000161 00000 n 
+0000000319 00000 n 
+0000000418 00000 n 
+0000000437 00000 n 
+0000000490 00000 n 
+0000000524 00000 n 
+0000000559 00000 n 
+trailer <<
+  /Root 1 0 R
+  /Size 10
+  /ID [<6b7a9692034323b8032e358b75d57a4c><44f7cee2c1913f0970a8a391cd03f327>]
+>>
+startxref
+677
+%%EOF
+
+% Delete object 8.
+xref
+0 1
+0000000008 65535 f 
+8 1
+0000000000 00001 f 
+trailer <<
+  /Root 1 0 R
+  /Size 10
+  /Prev 677
+  /ID [<6b7a9692034323b8032e358b75d57a4c><44f7cee2c1913f0970a8a391cd03f327>]
+>>
+startxref
+1043
+%%EOF
+
+% Reuse object 8 such that we have to traverse through it to get to a
+% compressible object.
+7 0 obj
+<<
+  /F1 8 1 R
+>>
+endobj
+
+8 1 obj
+<<
+  /BaseFont 9 0 R
+  /Encoding /WinAnsiEncoding
+  /Name /F1
+  /Subtype /Type1
+  /Type /Font
+>>
+endobj
+
+9 0 obj
+/Times-Roman
+endobj
+
+xref
+0 1
+0000000000 65535 f 
+7 3
+0000001339 00000 n 
+0000001373 00001 n 
+0000001486 00000 n 
+trailer <<
+  /Root 1 0 R
+  /Size 10
+  /Prev 1043
+  /ID [<6b7a9692034323b8032e358b75d57a4c><44f7cee2c1913f0970a8a391cd03f327>]
+>>
+startxref
+1515
+%%EOF

@@ -1,0 +1,57 @@
+<UserControl
+    x:Class="Zisla.TaskbarWidgetContent"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="#FFFF00FF">
+    <Button
+        x:Name="OpenButton"
+        Width="36"
+        Height="36"
+        Padding="0"
+        AutomationProperties.Name="打开 Zisla"
+        Background="#FFFF00FF"
+        BorderBrush="#FFFF00FF"
+        BorderThickness="0"
+        Click="OpenButton_Click"
+        ToolTipService.ToolTip="打开 Zisla">
+        <Button.Resources>
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#FFFF00FF" />
+            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#FFFF00FF" />
+            <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#FFFF00FF" />
+        </Button.Resources>
+        <Grid
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            Background="#FFFF00FF">
+            <Image
+                x:Name="LogoMark"
+                Width="26"
+                Height="26"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Source="ms-appx:///Assets/TaskbarLogo.png"
+                Stretch="Uniform" />
+            <StackPanel
+                x:Name="NowPlayingLayout"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6"
+                Visibility="Collapsed">
+                <FontIcon
+                    x:Name="NowPlayingIcon"
+                    VerticalAlignment="Center"
+                    FontSize="14"
+                    Foreground="{ThemeResource OverlayAccentBrush}"
+                    Glyph="&#xE8D6;" />
+                <TextBlock
+                    x:Name="NowPlayingText"
+                    VerticalAlignment="Center"
+                    FontSize="12"
+                    Foreground="{ThemeResource OverlayPrimaryTextBrush}"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="NoWrap" />
+            </StackPanel>
+        </Grid>
+    </Button>
+</UserControl>
