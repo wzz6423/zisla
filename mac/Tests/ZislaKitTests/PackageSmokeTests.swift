@@ -9,6 +9,11 @@ struct PackageSmokeTests {
     }
 
     @Test
+    func issueURLTargetsGitHubNewIssueChooser() {
+        #expect(ZislaKitInfo.newIssueURL.absoluteString == "https://github.com/wzz6423/zisla/issues/new/choose")
+    }
+
+    @Test
     @MainActor
     func coreAndKitPublicSurfacesInitializeWithoutExternalServices() {
         let settings = FeatureSettings()

@@ -207,6 +207,9 @@
 
 /* Settings - Updates */
 "管理版本检查与自动更新。" = "Kelola pemeriksaan versi dan pembaruan otomatis.";
+"反馈与更新" = "Umpan Balik dan Pembaruan";
+"提交问题反馈、管理版本检查与自动更新。" = "Laporkan masalah dan kelola pemeriksaan versi serta pembaruan otomatis.";
+"反馈问题" = "Laporkan Masalah";
 "更新策略" = "Strategi Pembaruan";
 "检查更新" = "Periksa Pembaruan";
 "版本" = "Versi";

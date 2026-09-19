@@ -211,6 +211,9 @@
 
 /* Settings - Updates */
 "管理版本检查与自动更新。" = "Manage version checking and automatic updates.";
+"反馈与更新" = "Feedback & Updates";
+"提交问题反馈、管理版本检查与自动更新。" = "Report issues and manage version checks and automatic updates.";
+"反馈问题" = "Report an Issue";
 "更新策略" = "Update Strategy";
 "检查更新" = "Check for Updates";
 "版本" = "Version";

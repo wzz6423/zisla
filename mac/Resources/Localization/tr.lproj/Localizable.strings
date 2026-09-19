@@ -207,6 +207,9 @@
 
 /* Settings - Updates */
 "管理版本检查与自动更新。" = "Sürüm kontrolünü ve otomatik güncellemeleri yönetin.";
+"反馈与更新" = "Geri Bildirim ve Güncellemeler";
+"提交问题反馈、管理版本检查与自动更新。" = "Sorunları bildirin ve sürüm denetimi ile otomatik güncellemeleri yönetin.";
+"反馈问题" = "Sorun Bildir";
 "更新策略" = "Güncelleme Stratejisi";
 "检查更新" = "Güncellemeleri Kontrol Et";
 "版本" = "Sürüm";

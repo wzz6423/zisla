@@ -207,6 +207,9 @@
 
 /* Settings - Updates */
 "管理版本检查与自动更新。" = "Beheer versiecontrole en automatische updates.";
+"反馈与更新" = "Feedback en updates";
+"提交问题反馈、管理版本检查与自动更新。" = "Meld problemen en beheer versiecontrole en automatische updates.";
+"反馈问题" = "Probleem melden";
 "更新策略" = "Updatestrategie";
 "检查更新" = "Controleer op updates";
 "版本" = "Versie";
