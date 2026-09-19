@@ -133,6 +133,9 @@ enum ScreenshotCaptureService {
             configuration.width = width
             configuration.height = height
             configuration.showsCursor = false
+            configuration.ignoreShadows = false
+            configuration.ignoreClipping = false
+            configuration.includeChildWindows = true
             configuration.displayIntent = .local
             configuration.dynamicRange = .sdr
             let output = try await SCScreenshotManager.captureScreenshot(
@@ -150,6 +153,11 @@ enum ScreenshotCaptureService {
         configuration.height = height
         configuration.captureResolution = .best
         configuration.showsCursor = false
+        configuration.ignoreShadowsDisplay = false
+        configuration.ignoreGlobalClipDisplay = false
+        if #available(macOS 14.2, *) {
+            configuration.includeChildWindows = true
+        }
         let image = try await SCScreenshotManager.captureImage(
             contentFilter: filter,
             configuration: configuration
