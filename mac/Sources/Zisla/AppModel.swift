@@ -359,6 +359,7 @@ final class AppModel: ObservableObject {
   @Published private(set) var downloadFormatSelectionEnabled = false
   @Published private(set) var downloadFormatError: String?
   @Published private(set) var downloadNeedsBrowserCookies = false
+  @Published private(set) var downloadBrowserCookieSources: [DownloadBrowserCookieSource] = []
   @Published var selectedDownloadFormat: DownloadFormatSelection?
   @Published var downloadBrowserCookieSource: DownloadBrowserCookieSource? {
     didSet {
@@ -2143,12 +2144,26 @@ final class AppModel: ObservableObject {
     resetDownloadFormatState()
   }
 
+  func refreshDownloadBrowserCookieSources() {
+    Task { [weak self, downloadService] in
+      let sources = await downloadService.availableBrowserCookieSources()
+      await MainActor.run {
+        guard let self else { return }
+        self.downloadBrowserCookieSources = sources
+        if let selected = self.downloadBrowserCookieSource {
+          self.downloadBrowserCookieSource = sources.first { $0.id == selected.id }
+        }
+      }
+    }
+  }
+
   func selectDownloadFormat(_ option: DownloadFormatOption?) {
     guard option == nil || canSelectDownloadFormats else { return }
     selectedDownloadFormat = option?.selection
   }
 
   func refreshDownloadFormats() {
+    refreshDownloadBrowserCookieSources()
     guard let normalizedDownloadURL else {
       resetDownloadFormatState()
       let message = AppLocalization.text("链接或输出目录无效")
@@ -2168,7 +2183,7 @@ final class AppModel: ObservableObject {
     let cookieSource = downloadBrowserCookieSource
     let task = Task { [weak self, downloadService] in
       do {
-        let result = try await downloadService.probeFormats(
+        let result = try await downloadService.probeFormatsAutomatically(
           urlString: normalizedDownloadURL,
           browserCookieSource: cookieSource
         )
@@ -2243,7 +2258,7 @@ final class AppModel: ObservableObject {
         if scopedAccess { request.outputDirectory.stopAccessingSecurityScopedResource() }
       }
       do {
-        let result = try await downloadService.download(
+        let result = try await downloadService.downloadAutomatically(
           request,
           taskID: taskID
         ) { [weak self] event in
@@ -2271,6 +2286,14 @@ final class AppModel: ObservableObject {
         }
         await MainActor.run {
           guard let self else { return }
+          if let browserCookieSource = result.browserCookieSource,
+             self.downloadBrowserCookieSource == nil {
+            self.downloadBrowserCookieSource = browserCookieSource
+          }
+          if let browserCookieSource = result.browserCookieSource,
+             !self.downloadBrowserCookieSources.contains(browserCookieSource) {
+            self.downloadBrowserCookieSources.append(browserCookieSource)
+          }
           self.addToShelf([result.fileURL])
           self.notices.enqueue(
             IslandNotice(
@@ -2412,6 +2435,15 @@ final class AppModel: ObservableObject {
       return
     }
     downloadFormatProbeTask = nil
+    if let browserCookieSource = result.browserCookieSource,
+       downloadBrowserCookieSource == nil {
+      downloadBrowserCookieSource = browserCookieSource
+    }
+    if let browserCookieSource = result.browserCookieSource,
+       !downloadBrowserCookieSources.contains(browserCookieSource) {
+      downloadBrowserCookieSources.append(browserCookieSource)
+    }
+    downloadFormatSourceURL = urlString
     isLoadingDownloadFormats = false
     downloadFormats = result.formats
     downloadFormatSelectionEnabled = result.canSelectFormats
@@ -3795,6 +3827,7 @@ final class AppModel: ObservableObject {
     case .cannotPrepareDirectory: return "无法写入下载目录"
     case .launchFailed: return "无法启动下载任务"
     case .processFailed(_, let diagnostic): return diagnostic.isEmpty ? AppLocalization.text("下载失败") : diagnostic
+    case .browserCookieAccessDenied: return DownloadFailureDiagnostics.browserCookieAccessFailureMessage
     case .formatSelectionRequiresFFmpeg: return AppLocalization.text("需要 FFmpeg 才能选择格式")
     case .invalidFormatProbeResponse: return AppLocalization.text("无法读取下载格式")
     case .missingCompletedFile: return "未获得下载文件"

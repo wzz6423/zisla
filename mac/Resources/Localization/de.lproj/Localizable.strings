@@ -6,12 +6,14 @@
 "选择格式" = "Format auswählen";
 "不使用浏览器 Cookies" = "Browser-Cookies nicht verwenden";
 "浏览器 Cookies" = "Browser-Cookies";
+"未检测到可用浏览器 Cookies" = "Keine verfügbaren Browser-Cookies gefunden";
 "使用 %@ Cookies" = "%@-Cookies verwenden";
 "%.0f FPS" = "%.0f FPS";
 "正在读取格式" = "Formate werden geladen";
 "未找到可用格式" = "Keine verfügbaren Formate gefunden";
 "选择浏览器 Cookies 后重试" = "Browser-Cookies auswählen und erneut versuchen";
-"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。" = "Douyin gab HTTP 403 zurück und benötigt aktuelle Browser-Cookies. Wähle Safari, Chrome oder Firefox und versuche es erneut. Eine Anmeldung ist nicht erforderlich.";
+"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择可用的浏览器 Cookies 后重试；无需登录。" = "Douyin gab HTTP 403 zurück und benötigt aktuelle Browser-Cookies. Wähle verfügbare Browser-Cookies und versuche es erneut. Eine Anmeldung ist nicht erforderlich.";
+"无法读取浏览器 Cookies。请在「系统设置 → 隐私与安全性 → 完全磁盘访问」中允许 zisla，然后重启应用重试。" = "Browser-Cookies können nicht gelesen werden. Erlaube zisla unter Systemeinstellungen → Datenschutz & Sicherheit → Festplattenvollzugriff. Starte die App anschließend neu und versuche es erneut.";
 "无法读取下载格式" = "Downloadformate konnten nicht gelesen werden";
 
 /* Common */

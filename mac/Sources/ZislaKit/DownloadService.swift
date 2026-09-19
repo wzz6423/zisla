@@ -4,10 +4,16 @@ import ZislaCore
 public struct DownloadResult: Equatable, Sendable {
     public let taskID: UUID
     public let fileURL: URL
+    public let browserCookieSource: DownloadBrowserCookieSource?
 
-    public init(taskID: UUID, fileURL: URL) {
+    public init(
+        taskID: UUID,
+        fileURL: URL,
+        browserCookieSource: DownloadBrowserCookieSource? = nil
+    ) {
         self.taskID = taskID
         self.fileURL = fileURL
+        self.browserCookieSource = browserCookieSource
     }
 }
 
@@ -16,6 +22,7 @@ public enum DownloadServiceError: Error, Equatable, Sendable {
     case cannotPrepareDirectory(String)
     case launchFailed(String)
     case processFailed(exitCode: Int32, diagnostic: String)
+    case browserCookieAccessDenied
     case formatSelectionRequiresFFmpeg
     case invalidFormatProbeResponse
     case missingCompletedFile
@@ -37,6 +44,8 @@ public actor DownloadService {
     private let temporaryRootDirectory: URL
     private let mediaMuxer: any MediaMuxing
     private let bilibiliDownloader: any BilibiliDownloading
+    private let browserCookieSourceProvider: @Sendable () -> [DownloadBrowserCookieSource]
+    private let browserCookieDirectoryAccess: @Sendable (URL) throws -> Void
     private var activeTaskIDs: Set<UUID> = []
     private var activeProcesses: [UUID: ProcessBox] = [:]
     private var activeNativeDownloadTasks: [UUID: Task<[DownloadedMediaComponent], Error>] = [:]
@@ -51,12 +60,24 @@ public actor DownloadService {
         temporaryRootDirectory: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("Zisla/Downloads", isDirectory: true),
         mediaMuxer: any MediaMuxing = NativeMediaMuxer(),
-        bilibiliDownloader: any BilibiliDownloading = BilibiliDirectDownloader()
+        bilibiliDownloader: any BilibiliDownloading = BilibiliDirectDownloader(),
+        browserCookieSourceProvider: @escaping @Sendable () -> [DownloadBrowserCookieSource] = {
+            DownloadBrowserCookieDetector().detect()
+        },
+        browserCookieDirectoryAccess: @escaping @Sendable (URL) throws -> Void = {
+            _ = try FileManager.default.contentsOfDirectory(atPath: $0.path)
+        }
     ) {
         self.resolver = resolver
         self.temporaryRootDirectory = temporaryRootDirectory.standardizedFileURL
         self.mediaMuxer = mediaMuxer
         self.bilibiliDownloader = bilibiliDownloader
+        self.browserCookieSourceProvider = browserCookieSourceProvider
+        self.browserCookieDirectoryAccess = browserCookieDirectoryAccess
+    }
+
+    public func availableBrowserCookieSources() -> [DownloadBrowserCookieSource] {
+        browserCookieSourceProvider()
     }
 
     public func setNetworkProxyURL(_ value: String) {
@@ -135,6 +156,9 @@ public actor DownloadService {
 
         try Task.checkCancellation()
         guard exitCode == 0 else {
+            if browserCookieAccessIsDenied(browserCookieSource, diagnostic: diagnostic) {
+                throw DownloadServiceError.browserCookieAccessDenied
+            }
             throw DownloadServiceError.processFailed(
                 exitCode: exitCode,
                 diagnostic: DownloadFailureDiagnostics.actionableMessage(
@@ -150,8 +174,31 @@ public actor DownloadService {
         return DownloadFormatProbeResult(
             title: result.title,
             formats: result.formats,
-            canSelectFormats: tools.capabilities.hasFFmpeg
+            canSelectFormats: tools.capabilities.hasFFmpeg,
+            browserCookieSource: browserCookieSource
         )
+    }
+
+    public func probeFormatsAutomatically(
+        urlString: String,
+        browserCookieSource: DownloadBrowserCookieSource? = nil
+    ) async throws -> DownloadFormatProbeResult {
+        do {
+            return try await probeFormats(
+                urlString: urlString,
+                browserCookieSource: browserCookieSource
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            guard browserCookieSource == nil,
+                  Self.requiresBrowserCookieDetection(error, urlString: urlString),
+                  let result = try await probeFormatsUsingAvailableBrowserCookies(urlString: urlString)
+            else {
+                throw error
+            }
+            return result
+        }
     }
 
     public func download(
@@ -289,6 +336,9 @@ public actor DownloadService {
                 stdout: diagnostics.0,
                 stderr: diagnostics.1
             )
+            if browserCookieAccessIsDenied(request.browserCookieSource, diagnostic: diagnostic) {
+                throw DownloadServiceError.browserCookieAccessDenied
+            }
             if request.mode == .video,
                request.formatSelection == nil,
                DownloadFailureDiagnostics.shouldUseBilibiliNativeFallback(
@@ -343,6 +393,41 @@ public actor DownloadService {
         }
     }
 
+    public func downloadAutomatically(
+        _ request: DownloadRequest,
+        taskID: UUID = UUID(),
+        onEvent: @escaping @Sendable (YTDLPEvent) async -> Void = { _ in }
+    ) async throws -> DownloadResult {
+        do {
+            return try await download(request, taskID: taskID, onEvent: onEvent)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            guard request.browserCookieSource == nil,
+                  Self.requiresBrowserCookieDetection(error, urlString: request.urlString),
+                  let probeResult = try await probeFormatsUsingAvailableBrowserCookies(
+                    urlString: request.urlString
+                  ),
+                  let browserCookieSource = probeResult.browserCookieSource
+            else {
+                throw error
+            }
+            let retryRequest = try DownloadRequest(
+                urlString: request.urlString,
+                mode: request.mode,
+                outputDirectory: request.outputDirectory,
+                formatSelection: request.formatSelection,
+                browserCookieSource: browserCookieSource
+            )
+            let result = try await download(retryRequest, taskID: taskID, onEvent: onEvent)
+            return DownloadResult(
+                taskID: result.taskID,
+                fileURL: result.fileURL,
+                browserCookieSource: browserCookieSource
+            )
+        }
+    }
+
     private func downloadBilibiliVideo(
         _ request: DownloadRequest,
         taskID: UUID,
@@ -382,6 +467,140 @@ public actor DownloadService {
             components: components,
             taskTemporaryDirectory: taskTemporaryDirectory,
             outputDirectory: request.outputDirectory
+        )
+    }
+
+    private func probeFormatsUsingAvailableBrowserCookies(
+        urlString: String
+    ) async throws -> DownloadFormatProbeResult? {
+        var cookieAccessWasDenied = false
+        var attemptedSourceIDs = Set<String>()
+        for source in browserCookieSourceProvider() where attemptedSourceIDs.insert(source.id).inserted {
+            do {
+                return try await probeFormats(
+                    urlString: urlString,
+                    browserCookieSource: source
+                )
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch DownloadServiceError.browserCookieAccessDenied {
+                cookieAccessWasDenied = true
+            } catch {
+                guard Self.canTryAnotherBrowserCookieSource(error, urlString: urlString) else {
+                    throw error
+                }
+            }
+        }
+        if cookieAccessWasDenied {
+            throw DownloadServiceError.browserCookieAccessDenied
+        }
+        return nil
+    }
+
+    private func browserCookieAccessIsDenied(
+        _ source: DownloadBrowserCookieSource?,
+        diagnostic: String
+    ) -> Bool {
+        guard let source else { return false }
+        if DownloadFailureDiagnostics.isBrowserCookiePermissionDenied(diagnostic) {
+            return true
+        }
+        guard DownloadFailureDiagnostics.shouldRetryWithoutBrowserCookies(
+            rawDiagnostic: diagnostic,
+            browserCookieSource: source
+        ) else { return false }
+
+        let directory = source.cookieDirectory
+            ?? Self.defaultBrowserCookieDirectory(for: source.ytDLPBrowser)
+        guard let directory else { return false }
+        // yt-dlp's directory walk hides macOS privacy errors as missing cookie databases.
+        do {
+            try browserCookieDirectoryAccess(directory)
+        } catch {
+            let error = error as NSError
+            let cause = error.userInfo[NSUnderlyingErrorKey] as? NSError ?? error
+            return cause.domain == NSPOSIXErrorDomain && [Int(EPERM), Int(EACCES)].contains(cause.code)
+        }
+        return false
+    }
+
+    private static func defaultBrowserCookieDirectory(
+        for browser: String
+    ) -> URL? {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        switch browser {
+        case "safari":
+            return home.appendingPathComponent("Library/Cookies", isDirectory: true)
+        case "firefox":
+            return home.appendingPathComponent(
+                "Library/Application Support/Firefox/Profiles",
+                isDirectory: true
+            )
+        case "brave":
+            return home.appendingPathComponent(
+                "Library/Application Support/BraveSoftware/Brave-Browser",
+                isDirectory: true
+            )
+        case "chrome":
+            return home.appendingPathComponent(
+                "Library/Application Support/Google/Chrome",
+                isDirectory: true
+            )
+        case "chromium":
+            return home.appendingPathComponent(
+                "Library/Application Support/Chromium",
+                isDirectory: true
+            )
+        case "edge":
+            return home.appendingPathComponent(
+                "Library/Application Support/Microsoft Edge",
+                isDirectory: true
+            )
+        case "opera":
+            return home.appendingPathComponent(
+                "Library/Application Support/com.operasoftware.Opera",
+                isDirectory: true
+            )
+        case "vivaldi":
+            return home.appendingPathComponent(
+                "Library/Application Support/Vivaldi",
+                isDirectory: true
+            )
+        case "whale":
+            return home.appendingPathComponent(
+                "Library/Application Support/Naver/Whale",
+                isDirectory: true
+            )
+        default:
+            return nil
+        }
+    }
+
+    private static func requiresBrowserCookieDetection(
+        _ error: Error,
+        urlString: String
+    ) -> Bool {
+        guard let error = error as? DownloadServiceError,
+              case let .processFailed(_, diagnostic) = error else {
+            return false
+        }
+        return DownloadFailureDiagnostics.requiresBrowserCookies(
+            rawDiagnostic: diagnostic,
+            urlString: urlString
+        )
+    }
+
+    private static func canTryAnotherBrowserCookieSource(
+        _ error: Error,
+        urlString: String
+    ) -> Bool {
+        guard let error = error as? DownloadServiceError,
+              case let .processFailed(_, diagnostic) = error else {
+            return false
+        }
+        return DownloadFailureDiagnostics.canTryAnotherBrowserCookieSource(
+            rawDiagnostic: diagnostic,
+            urlString: urlString
         )
     }
 
@@ -650,13 +869,18 @@ public actor DownloadService {
 private final class ProcessBox: @unchecked Sendable {
     private let process: Process
     private let lock = NSLock()
+    private let exitSignal = DispatchSemaphore(value: 0)
 
     init(_ process: Process) {
         self.process = process
+        // Register before launch so fast cookie probes cannot lose their exit notification.
+        process.terminationHandler = { [exitSignal] _ in
+            exitSignal.signal()
+        }
     }
 
     func waitUntilExit() -> Int32 {
-        process.waitUntilExit()
+        exitSignal.wait()
         return process.terminationStatus
     }
 
