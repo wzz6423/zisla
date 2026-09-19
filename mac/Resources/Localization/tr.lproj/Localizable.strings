@@ -6,12 +6,14 @@
 "选择格式" = "Biçim seç";
 "不使用浏览器 Cookies" = "Tarayıcı çerezlerini kullanma";
 "浏览器 Cookies" = "Tarayıcı çerezleri";
+"未检测到可用浏览器 Cookies" = "Kullanılabilir tarayıcı çerezi bulunamadı";
 "使用 %@ Cookies" = "%@ çerezlerini kullan";
 "%.0f FPS" = "%.0f FPS";
 "正在读取格式" = "Biçimler yükleniyor";
 "未找到可用格式" = "Kullanılabilir biçim bulunamadı";
 "选择浏览器 Cookies 后重试" = "Tarayıcı çerezlerini seçip yeniden deneyin";
-"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。" = "Douyin HTTP 403 döndürdü ve güncel tarayıcı çerezlerine ihtiyaç duyuyor. Safari, Chrome veya Firefox'u seçip yeniden deneyin. Oturum açma gerekmez.";
+"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择可用的浏览器 Cookies 后重试；无需登录。" = "Douyin HTTP 403 döndürdü ve güncel tarayıcı çerezlerine ihtiyaç duyuyor. Kullanılabilir tarayıcı çerezlerini seçip yeniden deneyin. Oturum açma gerekmez.";
+"无法读取浏览器 Cookies。请在「系统设置 → 隐私与安全性 → 完全磁盘访问」中允许 zisla，然后重启应用重试。" = "Tarayıcı çerezleri okunamıyor. Sistem Ayarları → Gizlilik ve Güvenlik → Tam Disk Erişimi bölümünde zisla’ya izin verin, ardından uygulamayı yeniden başlatıp tekrar deneyin.";
 "无法读取下载格式" = "İndirme biçimleri okunamadı";
 
 /* Common */
