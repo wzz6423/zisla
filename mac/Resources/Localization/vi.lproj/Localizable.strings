@@ -207,6 +207,9 @@
 
 /* Settings - Updates */
 "管理版本检查与自动更新。" = "Quản lý kiểm tra phiên bản và cập nhật tự động.";
+"反馈与更新" = "Phản hồi và Cập nhật";
+"提交问题反馈、管理版本检查与自动更新。" = "Báo cáo sự cố và quản lý kiểm tra phiên bản cùng cập nhật tự động.";
+"反馈问题" = "Báo cáo sự cố";
 "更新策略" = "Chiến lược Cập nhật";
 "检查更新" = "Kiểm tra Cập nhật";
 "版本" = "Phiên bản";
