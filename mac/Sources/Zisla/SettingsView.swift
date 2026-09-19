@@ -2529,7 +2529,7 @@ struct SettingsView: View {
             repositoryLink(
                 "反馈问题",
                 symbol: "exclamationmark.bubble.fill",
-                tint: Color.accentColor,
+                tint: .secondary,
                 destination: ZislaKitInfo.newIssueURL
             )
             .padding(.horizontal, 4)
