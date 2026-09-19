@@ -79,7 +79,7 @@ struct SettingsNavigationTests {
             "天气",
             "网络",
             "推荐",
-            "更新",
+            "反馈与更新",
         ])
         #expect(SettingsSection.general.subtitle == "调整语言、外观、启动与展开方式。")
         #expect(SettingsSection.ai.subtitle == "管理 AI CLI 与 Skills。")
@@ -87,6 +87,27 @@ struct SettingsNavigationTests {
         #expect(SettingsSection.keyboardSound.subtitle == "键盘音效与输入统计。")
         #expect(!SettingsSection.keyboardSound.prefersWideLayout)
         #expect(SettingsSection.networkProxy.subtitle == "配置本地代理，用于更新、安装、下载与 GitHub 访问。")
+        #expect(SettingsSection.updates.subtitle == "提交问题反馈、管理版本检查与自动更新。")
+    }
+
+    @Test
+    func feedbackAndUpdatePageLinksToIssueChooserInEveryLanguage() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+
+        #expect(source.contains("case .updates: \"反馈与更新\""))
+        #expect(source.contains("case .updates: \"提交问题反馈、管理版本检查与自动更新。\""))
+        #expect(source.contains("\"反馈问题\""))
+        #expect(source.contains("destination: ZislaKitInfo.newIssueURL"))
+
+        for key in ["反馈与更新", "提交问题反馈、管理版本检查与自动更新。", "反馈问题"] {
+            for language in AppLanguage.allCases {
+                let translation = AppLocalization.string(key, language: language)
+                #expect(!translation.isEmpty, "\(language.rawValue) missing \(key)")
+                if language != .simplifiedChinese {
+                    #expect(translation != key, "\(language.rawValue) did not translate \(key)")
+                }
+            }
+        }
     }
 
     @Test

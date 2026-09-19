@@ -2526,6 +2526,14 @@ struct SettingsView: View {
 
     private var updatesContent: some View {
         VStack(alignment: .leading, spacing: 20) {
+            repositoryLink(
+                "反馈问题",
+                symbol: "exclamationmark.bubble.fill",
+                tint: .secondary,
+                destination: ZislaKitInfo.newIssueURL
+            )
+            .padding(.horizontal, 4)
+
             settingsGroup("更新策略") {
                 settingRow(
                     symbol: "arrow.triangle.branch",
@@ -3317,8 +3325,8 @@ struct SettingsView: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .strokeBorder(tint.opacity(colorScheme == .dark ? 0.42 : 0.24), lineWidth: 0.5)
         )
-        .help(AppLocalization.text("在浏览器中打开 %@", title))
-        .accessibilityLabel(AppLocalization.text("在浏览器中打开 %@", title))
+        .help(AppLocalization.text("在浏览器中打开 %@", AppLocalization.text(title)))
+        .accessibilityLabel(AppLocalization.text("在浏览器中打开 %@", AppLocalization.text(title)))
     }
 
     private func settingsGroup<Content: View>(
@@ -3797,7 +3805,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .download: "下载"
         case .networkProxy: "网络"
         case .weather: "天气"
-        case .updates: "更新"
+        case .updates: "反馈与更新"
         case .recommendations: "推荐"
         }
     }
@@ -3837,7 +3845,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .download: "管理下载目录、下载通知与所需组件。"
         case .networkProxy: "配置本地代理，用于更新、安装、下载与 GitHub 访问。"
         case .weather: "管理天气显示、地点和刷新。"
-        case .updates: "管理版本检查与自动更新。"
+        case .updates: "提交问题反馈、管理版本检查与自动更新。"
         case .recommendations: "一键下载和更新精选效率、网络、开发与桌面工具。"
         }
     }

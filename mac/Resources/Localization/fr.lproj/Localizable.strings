@@ -205,6 +205,9 @@
 
 /* Settings - Updates */
 "管理版本检查与自动更新。" = "Gérer la vérification des versions et les mises à jour automatiques.";
+"反馈与更新" = "Retours et mises à jour";
+"提交问题反馈、管理版本检查与自动更新。" = "Signaler des problèmes et gérer la vérification des versions et les mises à jour automatiques.";
+"反馈问题" = "Signaler un problème";
 "更新策略" = "Stratégie de mise à jour";
 "检查更新" = "Vérifier les mises à jour";
 "版本" = "Version";
