@@ -191,7 +191,8 @@ struct DownloadServiceTests {
                 externalYTDLPCandidates: [executable],
                 externalFFmpegCandidates: [ffmpeg]
             ),
-            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true),
+            browserCookieSourceProvider: { [.safari, .chrome] }
         )
 
         let result = try await service.probeFormatsAutomatically(
@@ -212,8 +213,49 @@ struct DownloadServiceTests {
         #expect(arguments.last == "https://v.douyin.com/example/")
     }
 
-    @Test
-    func automaticFormatProbeSelectsTheFirstBrowserWithUsableCookies() async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func formatProbesFinishAfterRepeatedImmediateFailures() async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        try writeExecutable("#!/bin/sh\nexit 1\n", to: executable)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [executable],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true),
+            browserCookieSourceProvider: { [.safari, .chrome] }
+        )
+
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<4 {
+                group.addTask {
+                    for _ in 0..<12 {
+                        await #expect(throws: DownloadServiceError.processFailed(exitCode: 1, diagnostic: "")) {
+                            try await service.probeFormats(
+                                urlString: "https://v.douyin.com/example/",
+                                browserCookieSource: .chrome
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        #expect(try FileManager.default.contentsOfDirectory(
+            atPath: directory.appendingPathComponent("Tasks").path
+        ).isEmpty)
+    }
+
+    @Test(arguments: [
+        "ERROR: Fresh cookies are needed",
+        "ERROR: [Errno 1] Operation not permitted: '/Users/me/Library/Cookies/Cookies.binarycookies'",
+        "ERROR: [Errno 13] Permission denied: '/Users/me/Library/Cookies/Cookies.binarycookies'",
+        "ERROR: [Errno 2] No such file or directory: '/Users/me/Library/Cookies/Cookies.binarycookies'",
+    ])
+    func automaticFormatProbeSelectsTheFirstBrowserWithUsableCookies(safariFailure: String) async throws {
         let directory = kitTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let executable = directory.appendingPathComponent("tools/yt-dlp")
@@ -234,6 +276,9 @@ struct DownloadServiceTests {
         /usr/bin/printf '%s\\n' "$cookie_source" >> \(shellSingleQuoted(invocations.path))
         if [ "$cookie_source" = "chrome" ]; then
           /usr/bin/printf '%s\\n' '\(output)'
+        elif [ "$cookie_source" = "safari" ]; then
+          /usr/bin/printf '%s\\n' \(shellSingleQuoted(safariFailure)) >&2
+          exit 1
         else
           /usr/bin/printf '%s\\n' '\(cookieFailure)' >&2
           exit 1
@@ -247,7 +292,8 @@ struct DownloadServiceTests {
                 externalYTDLPCandidates: [executable],
                 externalFFmpegCandidates: []
             ),
-            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true),
+            browserCookieSourceProvider: { [.safari, .chrome] }
         )
 
         let result = try await service.probeFormatsAutomatically(
@@ -260,20 +306,25 @@ struct DownloadServiceTests {
         #expect(result.browserCookieSource == .chrome)
         #expect(result.formats.map(\.formatID) == ["18"])
         #expect(sources == ["none", "safari", "chrome"])
+        #expect(try FileManager.default.contentsOfDirectory(
+            atPath: directory.appendingPathComponent("Tasks").path
+        ).isEmpty)
     }
 
-    @Test
-    func automaticDownloadRetriesWithTheDetectedBrowserCookies() async throws {
+    @Test(arguments: [DownloadMode.video, .audio])
+    func automaticDownloadRetriesWithTheDetectedBrowserCookies(mode: DownloadMode) async throws {
         let directory = kitTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let executable = directory.appendingPathComponent("tools/yt-dlp")
+        let ffmpeg = directory.appendingPathComponent("tools/ffmpeg")
         let invocations = directory.appendingPathComponent("browser-cookie-downloads.txt")
         let outputDirectory = directory.appendingPathComponent("Downloads", isDirectory: true)
-        let outputFile = outputDirectory.appendingPathComponent("result.m4a")
+        let outputFile = outputDirectory.appendingPathComponent(mode == .video ? "result.mp4" : "result.m4a")
         let output = #"{"title":"Example","formats":[{"format_id":"18","ext":"mp4","width":640,"height":360,"vcodec":"avc1","acodec":"mp4a"}]}"#
         let jsonPath = outputFile.path.replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         let cookieFailure = "ERROR: [Douyin] Failed to download web detail JSON: HTTP Error 403: Forbidden\nFresh cookies are needed"
+        let safariFailure = "ERROR: [Errno 1] Operation not permitted: '/Users/me/Library/Cookies/Cookies.binarycookies'"
         let script = """
         #!/bin/sh
         cookie_source="none"
@@ -289,7 +340,10 @@ struct DownloadServiceTests {
           previous="$value"
         done
         /usr/bin/printf '%s\\n' "$cookie_source:$is_probe" >> \(shellSingleQuoted(invocations.path))
-        if [ "$cookie_source" != "chrome" ]; then
+        if [ "$cookie_source" = "safari" ]; then
+          /usr/bin/printf '%s\\n' \(shellSingleQuoted(safariFailure)) >&2
+          exit 1
+        elif [ "$cookie_source" != "chrome" ]; then
           /usr/bin/printf '%s\\n' '\(cookieFailure)' >&2
           exit 1
         fi
@@ -302,18 +356,20 @@ struct DownloadServiceTests {
         /usr/bin/printf '%s\\n' '\(YTDLPOutputParser.sentinel){"event":"completed","filepath":"\(jsonPath)"}'
         """
         try writeExecutable(script, to: executable)
+        try writeExecutable("#!/bin/sh\nexit 0\n", to: ffmpeg)
         let service = DownloadService(
             resolver: YTDLPResolver(
                 bundleURL: directory.appendingPathComponent("Empty.app"),
                 managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
                 externalYTDLPCandidates: [executable],
-                externalFFmpegCandidates: []
+                externalFFmpegCandidates: [ffmpeg]
             ),
-            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true),
+            browserCookieSourceProvider: { [.safari, .chrome] }
         )
         let request = try DownloadRequest(
             urlString: "https://v.douyin.com/example/",
-            mode: .audio,
+            mode: mode,
             outputDirectory: outputDirectory
         )
 
@@ -325,15 +381,21 @@ struct DownloadServiceTests {
         #expect(result.fileURL == outputFile.standardizedFileURL)
         #expect(result.browserCookieSource == .chrome)
         #expect(sources == ["none:0", "safari:1", "chrome:1", "chrome:0"])
+        #expect(try FileManager.default.contentsOfDirectory(
+            atPath: directory.appendingPathComponent("Tasks").path
+        ).isEmpty)
     }
 
-    @Test
-    func automaticFormatProbeKeepsTheOriginalFailureWhenNoBrowserCookiesWork() async throws {
+    @Test(arguments: [false, true])
+    func automaticFormatProbeReportsWhyNoBrowserCookiesAreUsable(permissionDenied: Bool) async throws {
         let directory = kitTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let executable = directory.appendingPathComponent("tools/yt-dlp")
         let invocations = directory.appendingPathComponent("browser-cookie-failures.txt")
         let cookieFailure = "ERROR: [Douyin] Failed to download web detail JSON: HTTP Error 403: Forbidden\nFresh cookies are needed"
+        let safariFailure = permissionDenied
+            ? "ERROR: [Errno 1] Operation not permitted: '/Users/me/Library/Cookies/Cookies.binarycookies'"
+            : "ERROR: Fresh cookies are needed"
         let script = """
         #!/bin/sh
         cookie_source="none"
@@ -346,7 +408,12 @@ struct DownloadServiceTests {
           previous="$value"
         done
         /usr/bin/printf '%s\\n' "$cookie_source" >> \(shellSingleQuoted(invocations.path))
-        /usr/bin/printf '%s\\n' '\(cookieFailure)' >&2
+        case "$cookie_source" in
+          safari) /usr/bin/printf '%s\\n' \(shellSingleQuoted(safariFailure)) >&2 ;;
+          chrome) /usr/bin/printf '%s\\n' 'ERROR: Cannot decrypt cookies with the available keychain' >&2 ;;
+          firefox) /usr/bin/printf '%s\\n' 'ERROR: could not find firefox cookies database' >&2 ;;
+          *) /usr/bin/printf '%s\\n' '\(cookieFailure)' >&2 ;;
+        esac
         exit 1
         """
         try writeExecutable(script, to: executable)
@@ -357,32 +424,99 @@ struct DownloadServiceTests {
                 externalYTDLPCandidates: [executable],
                 externalFFmpegCandidates: []
             ),
-            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true),
+            browserCookieSourceProvider: { [.safari, .chrome, .firefox] },
+            browserCookieDirectoryAccess: { _ in }
         )
 
         do {
             _ = try await service.probeFormatsAutomatically(
                 urlString: "https://v.douyin.com/example/"
             )
-            Issue.record("All unavailable browser cookie sources must preserve the original failure")
+            Issue.record("Unavailable browser cookies must report the actionable failure")
         } catch let error as DownloadServiceError {
-            guard case let .processFailed(_, diagnostic) = error else {
-                Issue.record("Expected a process failure, received \(error)")
-                return
+            if permissionDenied {
+                #expect(error == .browserCookieAccessDenied)
+            } else {
+                #expect(error == .processFailed(
+                    exitCode: 1,
+                    diagnostic: DownloadFailureDiagnostics.actionableMessage(
+                        rawDiagnostic: cookieFailure,
+                        urlString: "https://v.douyin.com/example/"
+                    )
+                ))
             }
-            #expect(DownloadFailureDiagnostics.requiresBrowserCookies(
-                rawDiagnostic: diagnostic,
-                urlString: "https://v.douyin.com/example/"
-            ))
         }
         let sources = try String(contentsOf: invocations, encoding: .utf8)
             .split(whereSeparator: \.isNewline)
             .map(String.init)
         #expect(sources == ["none", "safari", "chrome", "firefox"])
+        #expect(try FileManager.default.contentsOfDirectory(
+            atPath: directory.appendingPathComponent("Tasks").path
+        ).isEmpty)
     }
 
-    @Test
-    func automaticFormatProbeDoesNotScanBrowsersForAnUnrelatedFailure() async throws {
+    @Test(arguments: [
+        (domain: NSPOSIXErrorDomain, code: EPERM, wrapped: true, denied: true),
+        (domain: NSPOSIXErrorDomain, code: EACCES, wrapped: true, denied: true),
+        (domain: NSPOSIXErrorDomain, code: ENOENT, wrapped: true, denied: false),
+        (domain: NSPOSIXErrorDomain, code: EIO, wrapped: true, denied: false),
+        (domain: NSPOSIXErrorDomain, code: EPERM, wrapped: false, denied: true),
+        (domain: "UnrelatedErrorDomain", code: EPERM, wrapped: false, denied: false),
+    ], [false, true])
+    func missingCookieDatabaseDistinguishesDirectoryAccessDenial(
+        failure: (domain: String, code: Int32, wrapped: Bool, denied: Bool),
+        isDownload: Bool
+    ) async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        let diagnostic = "ERROR: could not find chrome cookies database"
+        try writeExecutable("#!/bin/sh\n/usr/bin/printf '%s\\n' '\(diagnostic)' >&2\nexit 1\n", to: executable)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [executable],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true),
+            browserCookieDirectoryAccess: { url in
+                #expect(url.path.hasSuffix("/Library/Application Support/Google/Chrome"))
+                let cause = NSError(domain: failure.domain, code: Int(failure.code))
+                guard failure.wrapped else { throw cause }
+                throw NSError(domain: NSCocoaErrorDomain, code: CocoaError.fileReadNoPermission.rawValue, userInfo: [
+                    NSUnderlyingErrorKey: cause,
+                ])
+            }
+        )
+        let expected: DownloadServiceError = failure.denied
+            ? .browserCookieAccessDenied
+            : .processFailed(exitCode: 1, diagnostic: diagnostic)
+
+        await #expect(throws: expected) {
+            if isDownload {
+                let request = try DownloadRequest(
+                    urlString: "https://v.douyin.com/example/",
+                    mode: .audio,
+                    outputDirectory: directory.appendingPathComponent("Downloads", isDirectory: true),
+                    browserCookieSource: .chrome
+                )
+                _ = try await service.download(request)
+            } else {
+                _ = try await service.probeFormats(
+                    urlString: "https://v.douyin.com/example/",
+                    browserCookieSource: .chrome
+                )
+            }
+        }
+        #expect(try FileManager.default.contentsOfDirectory(
+            atPath: directory.appendingPathComponent("Tasks").path
+        ).isEmpty)
+    }
+
+    @Test(arguments: [nil, DownloadBrowserCookieSource.chrome])
+    func automaticFormatProbeDoesNotScanBrowsersForAnUnrelatedFailure(source: DownloadBrowserCookieSource?) async throws {
         let directory = kitTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let executable = directory.appendingPathComponent("tools/yt-dlp")
@@ -410,12 +544,17 @@ struct DownloadServiceTests {
                 externalYTDLPCandidates: [executable],
                 externalFFmpegCandidates: []
             ),
-            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true)
+            temporaryRootDirectory: directory.appendingPathComponent("Tasks", isDirectory: true),
+            browserCookieDirectoryAccess: { _ in
+                Issue.record("Unrelated failures must not read browser directories")
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM))
+            }
         )
 
         do {
             _ = try await service.probeFormatsAutomatically(
-                urlString: "https://v.douyin.com/example/"
+                urlString: "https://v.douyin.com/example/",
+                browserCookieSource: source
             )
             Issue.record("An unrelated failure must not trigger browser cookie detection")
         } catch let error as DownloadServiceError {
@@ -427,7 +566,7 @@ struct DownloadServiceTests {
         let sources = try String(contentsOf: invocations, encoding: .utf8)
             .split(whereSeparator: \.isNewline)
             .map(String.init)
-        #expect(sources == ["none"])
+        #expect(sources == [source?.rawValue ?? "none"])
     }
 
     @Test

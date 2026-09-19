@@ -185,6 +185,23 @@ public enum DownloadFailureDiagnostics {
             || isBrowserCookieDatabaseUnavailable(rawDiagnostic)
     }
 
+    public static func isBrowserCookiePermissionDenied(_ rawDiagnostic: String) -> Bool {
+        rawDiagnostic.lowercased().range(
+            of: #"(?:operation not permitted|permission denied): ['"][^\r\n]*/cookies(?:\.binarycookies|\.sqlite)?['"]"#,
+            options: .regularExpression
+        ) != nil
+    }
+
+    public static var browserCookieAccessFailureMessage: String {
+        AppLocalization.text(browserCookieAccessFailureKey)
+    }
+
+    public static func requiresBrowserCookieAccess(_ message: String) -> Bool {
+        AppLanguage.allCases.contains {
+            message == AppLocalization.string(browserCookieAccessFailureKey, language: $0)
+        }
+    }
+
     private static func isBrowserCookieDatabaseUnavailable(_ rawDiagnostic: String) -> Bool {
         let diagnostic = rawDiagnostic.lowercased()
         return (diagnostic.contains("could not find")
@@ -192,7 +209,10 @@ public enum DownloadFailureDiagnostics {
         ) || (
             diagnostic.contains("cookies")
                 && (diagnostic.contains("cannot decrypt") || diagnostic.contains("failed to decrypt"))
-        )
+        ) || diagnostic.range(
+            of: #"(?:operation not permitted|permission denied|no such file or directory): ['"][^\r\n]*/cookies(?:\.binarycookies|\.sqlite)?['"]"#,
+            options: .regularExpression
+        ) != nil
     }
 
     public static func isDouyinURL(_ string: String) -> Bool {
@@ -222,7 +242,8 @@ public enum DownloadFailureDiagnostics {
         }
     }
 
-    private static let douyinCookieFailureKey = "抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。"
+    private static let douyinCookieFailureKey = "抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择可用的浏览器 Cookies 后重试；无需登录。"
+    private static let browserCookieAccessFailureKey = "无法读取浏览器 Cookies。请在「系统设置 → 隐私与安全性 → 完全磁盘访问」中允许 zisla，然后重启应用重试。"
 }
 
 public enum DownloadOutputPathValidator {
@@ -280,7 +301,27 @@ public enum HTTPURLParser {
               url.host?.isEmpty == false else {
             return nil
         }
-        return url
+        return normalizedDouyinURL(url)
+    }
+
+    private static func normalizedDouyinURL(_ url: URL) -> URL {
+        guard let host = url.host?.lowercased(),
+              host == "douyin.com" || host == "www.douyin.com",
+              url.path == "/jingxuan" || url.path == "/jingxuan/",
+              let videoID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name == "modal_id" })?
+                .value,
+              (1...30).contains(videoID.utf8.count),
+              videoID.utf8.allSatisfy({ (48...57).contains($0) }) else {
+            return url
+        }
+
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "www.douyin.com"
+        components.path = "/video/\(videoID)"
+        return components.url ?? url
     }
 
     private static func isBareWebHost(_ host: String?, candidate: String) -> Bool {

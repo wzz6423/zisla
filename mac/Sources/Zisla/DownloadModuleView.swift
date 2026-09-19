@@ -115,6 +115,7 @@ struct DownloadModuleView: View {
                 .frame(maxWidth: .infinity, minHeight: 52, maxHeight: 52)
         }
         .frame(height: 170)
+        .onAppear { model.refreshDownloadBrowserCookieSources() }
     }
 
     private var formatPicker: some View {
@@ -158,9 +159,13 @@ struct DownloadModuleView: View {
                 model.downloadBrowserCookieSource = nil
             }
             Divider()
-            ForEach(DownloadBrowserCookieSource.allCases, id: \.self) { source in
-                Button(browserName(source)) {
-                    model.downloadBrowserCookieSource = source
+            if model.downloadBrowserCookieSources.isEmpty {
+                Text(AppLocalization.text("未检测到可用浏览器 Cookies"))
+            } else {
+                ForEach(model.downloadBrowserCookieSources) { source in
+                    Button(source.menuTitle) {
+                        model.downloadBrowserCookieSource = source
+                    }
                 }
             }
         } label: {
@@ -191,15 +196,7 @@ struct DownloadModuleView: View {
         guard let source = model.downloadBrowserCookieSource else {
             return AppLocalization.text("浏览器 Cookies")
         }
-        return AppLocalization.text("使用 %@ Cookies", browserName(source))
-    }
-
-    private func browserName(_ source: DownloadBrowserCookieSource) -> String {
-        switch source {
-        case .safari: "Safari"
-        case .chrome: "Chrome"
-        case .firefox: "Firefox"
-        }
+        return AppLocalization.text("使用 %@ Cookies", source.menuTitle)
     }
 
     private func downloadFormatText(_ option: DownloadFormatOption) -> String {
@@ -301,7 +298,16 @@ struct DownloadModuleView: View {
                             .lineLimit(2)
                         Spacer()
                     }
-                    if model.downloadNeedsBrowserCookies {
+                    if DownloadFailureDiagnostics.requiresBrowserCookieAccess(message) {
+                        Button {
+                            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
+                            NSWorkspace.shared.open(url)
+                        } label: {
+                            Label(AppLocalization.text("授权磁盘访问"), systemImage: "externaldrive.badge.checkmark")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                    } else if model.downloadNeedsBrowserCookies {
                         Button {
                             model.retryDownloadWithBrowserCookies()
                         } label: {

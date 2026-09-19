@@ -1447,6 +1447,81 @@ struct WeatherTests {
 
 struct DownloadCoreTests {
     @Test
+    func browserCookieSourceBuildsAStableYTDLPSpecificationAndRoundTrips() throws {
+        let source = try #require(DownloadBrowserCookieSource(
+            id: "quark|default",
+            displayName: "Quark",
+            ytDLPBrowser: "chrome",
+            profile: "/Users/example/Library/Application Support/Quark/Default",
+            cookieDirectory: URL(fileURLWithPath: "/Users/example/Library/Application Support/Quark/Default"),
+            profileName: "Default"
+        ))
+
+        #expect(source.menuTitle == "Quark (Default)")
+        #expect(source.ytDLPBrowserSpecification == "chrome:/Users/example/Library/Application Support/Quark/Default")
+        #expect(try JSONDecoder().decode(
+            DownloadBrowserCookieSource.self,
+            from: JSONEncoder().encode(source)
+        ) == source)
+        #expect(try JSONDecoder().decode(
+            DownloadBrowserCookieSource.self,
+            from: Data(#""firefox""#.utf8)
+        ) == .firefox)
+    }
+
+    @Test
+    func browserCookieSourceRejectsUnsafeOrUnsupportedSpecifications() {
+        #expect(DownloadBrowserCookieSource(
+            id: "bad\nsource",
+            displayName: "Chrome",
+            ytDLPBrowser: "chrome"
+        ) == nil)
+        #expect(DownloadBrowserCookieSource(
+            id: "chrome",
+            displayName: "   ",
+            ytDLPBrowser: "chrome"
+        ) == nil)
+        #expect(DownloadBrowserCookieSource(
+            id: "unknown",
+            displayName: "Unknown",
+            ytDLPBrowser: "unknown"
+        ) == nil)
+        #expect(DownloadBrowserCookieSource(
+            id: "chrome",
+            displayName: "Chrome",
+            ytDLPBrowser: "chrome",
+            profile: "/Users/example/Profile:Injected"
+        ) == nil)
+        #expect(DownloadBrowserCookieSource(
+            id: "chrome",
+            displayName: "Chrome",
+            ytDLPBrowser: "chrome",
+            cookieDirectory: URL(string: "https://example.com/Cookies")
+        ) == nil)
+        #expect(DownloadBrowserCookieSource(rawValue: "chrome:/Users/example/Profile:Injected") == nil)
+        #expect(DownloadBrowserCookieSource(rawValue: "chrome+unsupported:/Users/example/Profile") == nil)
+    }
+
+    @Test
+    func browserCookieSourceRejectsInvalidDecodedData() {
+        let invalid = Data(#"""
+        {
+            "id":"chrome",
+            "displayName":"Chrome",
+            "ytDLPBrowser":"chrome",
+            "profile":"/Users/example/Profile:Injected"
+        }
+        """#.utf8)
+
+        do {
+            _ = try JSONDecoder().decode(DownloadBrowserCookieSource.self, from: invalid)
+            Issue.record("Unsafe browser cookie source must not decode")
+        } catch {
+            #expect(error is DecodingError)
+        }
+    }
+
+    @Test
     func requestUsesDownloadsDirectoryByDefault() throws {
         let request = try DownloadRequest(
             urlString: "https://example.com/video.mp4",
@@ -1776,7 +1851,7 @@ struct DownloadCoreTests {
         ))
         #expect(DownloadFailureDiagnostics.requiresBrowserCookies(
             rawDiagnostic: AppLocalization.string(
-                "抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。",
+                "抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择可用的浏览器 Cookies 后重试；无需登录。",
                 language: .arabic
             ),
             urlString: url
@@ -1817,6 +1892,49 @@ struct DownloadCoreTests {
         #expect(!DownloadFailureDiagnostics.canTryAnotherBrowserCookieSource(
             rawDiagnostic: "ERROR: Unsupported URL",
             urlString: "https://v.douyin.com/example/"
+        ))
+    }
+
+    @Test(arguments: [
+        "ERROR: [Errno 1] Operation not permitted: '/Users/me/Library/Cookies/Cookies.binarycookies'",
+        "ERROR: [Errno 13] Permission denied: '/Users/me/Library/Application Support/Google/Chrome/Default/Cookies'",
+        "ERROR: [Errno 13] Permission denied: '/Users/me/Library/Application Support/Firefox/Profiles/default/cookies.sqlite'",
+        "ERROR: [Errno 2] No such file or directory: '/Users/me/Library/Cookies/Cookies.binarycookies'",
+    ])
+    func inaccessibleBrowserCookieFilesAllowAnotherBrowser(_ diagnostic: String) {
+        #expect(DownloadFailureDiagnostics.canTryAnotherBrowserCookieSource(
+            rawDiagnostic: diagnostic,
+            urlString: "https://v.douyin.com/example/"
+        ))
+        #expect(DownloadFailureDiagnostics.shouldRetryWithoutBrowserCookies(
+            rawDiagnostic: diagnostic,
+            browserCookieSource: .safari
+        ))
+        #expect(!DownloadFailureDiagnostics.shouldRetryWithoutBrowserCookies(
+            rawDiagnostic: diagnostic,
+            browserCookieSource: nil
+        ))
+    }
+
+    @Test(arguments: [
+        "",
+        "ERROR: [Errno 1] Operation not permitted: '/Users/me/Downloads/video.mp4'",
+        "ERROR: [Errno 13] Permission denied: '/Users/me/Downloads/video.mp4'",
+        "ERROR: [Errno 2] No such file or directory: '/Users/me/Downloads/video.mp4'",
+        "Extracted cookies from chrome\nERROR: [Errno 13] Permission denied: '/Users/me/Downloads/video.mp4'",
+        "ERROR: [Errno 13] Permission denied: '/Users/me/Downloads/cookies.mp4'",
+        "ERROR: cookies database is corrupted",
+        "ERROR: HTTP Error 403: Forbidden",
+    ])
+    func unrelatedFileErrorsDoNotRetryBrowserCookies(_ diagnostic: String) {
+        #expect(!DownloadFailureDiagnostics.isBrowserCookiePermissionDenied(diagnostic))
+        #expect(!DownloadFailureDiagnostics.canTryAnotherBrowserCookieSource(
+            rawDiagnostic: diagnostic,
+            urlString: "https://v.douyin.com/example/"
+        ))
+        #expect(!DownloadFailureDiagnostics.shouldRetryWithoutBrowserCookies(
+            rawDiagnostic: diagnostic,
+            browserCookieSource: .chrome
         ))
     }
 
@@ -1879,6 +1997,28 @@ struct DownloadCoreTests {
         #expect(
             HTTPURLParser.url(from: "链接：https://example.com")?.absoluteString
                 == "https://example.com"
+        )
+    }
+
+    @Test
+    func douyinJingxuanLinksNormalizeToSupportedVideoURLs() throws {
+        let source = "https://www.douyin.com/jingxuan?modal_id=7654498330147310894"
+        let normalized = try #require(HTTPURLParser.url(from: source))
+
+        #expect(normalized.absoluteString == "https://www.douyin.com/video/7654498330147310894")
+        #expect(try DownloadRequest(
+            urlString: source,
+            mode: .video
+        ).urlString == normalized.absoluteString)
+        #expect(
+            HTTPURLParser.url(
+                from: "https://www.douyin.com/jingxuan?modal_id=invalid"
+            )?.absoluteString == "https://www.douyin.com/jingxuan?modal_id=invalid"
+        )
+        #expect(
+            HTTPURLParser.url(
+                from: "https://example.com/jingxuan?modal_id=7654498330147310894"
+            )?.absoluteString == "https://example.com/jingxuan?modal_id=7654498330147310894"
         )
     }
 
