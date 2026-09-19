@@ -6,12 +6,14 @@
 "选择格式" = "選擇格式";
 "不使用浏览器 Cookies" = "不使用瀏覽器 Cookies";
 "浏览器 Cookies" = "瀏覽器 Cookies";
+"未检测到可用浏览器 Cookies" = "找不到可用的瀏覽器 Cookies";
 "使用 %@ Cookies" = "使用 %@ Cookies";
 "%.0f FPS" = "%.0f FPS";
 "正在读取格式" = "正在讀取格式";
 "未找到可用格式" = "找不到可用格式";
 "选择浏览器 Cookies 后重试" = "選擇瀏覽器 Cookies 後重試";
-"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。" = "抖音回傳 HTTP 403，需要近期瀏覽器 Cookies。請選擇 Safari、Chrome 或 Firefox 後重試；無須登入。";
+"抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择可用的浏览器 Cookies 后重试；无需登录。" = "抖音回傳 HTTP 403，需要近期瀏覽器 Cookies。請選擇可用的瀏覽器 Cookies 後重試；無須登入。";
+"无法读取浏览器 Cookies。请在「系统设置 → 隐私与安全性 → 完全磁盘访问」中允许 zisla，然后重启应用重试。" = "無法讀取瀏覽器 Cookies。請在「系統設定 → 隱私權與安全性 → 完整磁碟存取權」中允許 zisla，然後重新啟動應用程式再試。";
 "无法读取下载格式" = "無法讀取下載格式";
 
 /* Common */

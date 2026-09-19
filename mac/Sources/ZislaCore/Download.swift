@@ -5,10 +5,133 @@ public enum DownloadMode: String, Codable, Sendable {
     case audio
 }
 
-public enum DownloadBrowserCookieSource: String, CaseIterable, Codable, Hashable, Sendable {
-    case safari
-    case chrome
-    case firefox
+public struct DownloadBrowserCookieSource: Codable, Equatable, Hashable, Identifiable, RawRepresentable, Sendable {
+    public let id: String
+    public let displayName: String
+    public let ytDLPBrowser: String
+    public let profile: String?
+    public let cookieDirectory: URL?
+    public let profileName: String?
+
+    public init?(
+        id: String,
+        displayName: String,
+        ytDLPBrowser: String,
+        profile: String? = nil,
+        cookieDirectory: URL? = nil,
+        profileName: String? = nil
+    ) {
+        guard Self.isSafeText(id),
+              Self.isSafeText(displayName),
+              Self.supportedBrowsers.contains(ytDLPBrowser),
+              Self.isSafeSpecificationPart(profile),
+              Self.isSafeText(profileName),
+              cookieDirectory?.isFileURL ?? true else {
+            return nil
+        }
+        self.id = id
+        self.displayName = displayName
+        self.ytDLPBrowser = ytDLPBrowser
+        self.profile = profile
+        self.cookieDirectory = cookieDirectory?.standardizedFileURL
+        self.profileName = profileName
+    }
+
+    public init?(rawValue: String) {
+        let parts = rawValue.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+        guard let browser = parts.first.map(String.init),
+              Self.supportedBrowsers.contains(browser) else {
+            return nil
+        }
+        let profile = parts.count == 2 ? String(parts[1]) : nil
+        self.init(
+            id: rawValue,
+            displayName: browser.capitalized,
+            ytDLPBrowser: browser,
+            profile: profile
+        )
+    }
+
+    public init(from decoder: Decoder) throws {
+        if let container = try? decoder.singleValueContainer(),
+           let legacyValue = try? container.decode(String.self),
+           let source = Self(rawValue: legacyValue) {
+            self = source
+            return
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let id = try container.decode(String.self, forKey: .id)
+        let displayName = try container.decode(String.self, forKey: .displayName)
+        let browser = try container.decode(String.self, forKey: .ytDLPBrowser)
+        let profile = try container.decodeIfPresent(String.self, forKey: .profile)
+        let cookieDirectory = try container.decodeIfPresent(URL.self, forKey: .cookieDirectory)
+        let profileName = try container.decodeIfPresent(String.self, forKey: .profileName)
+        guard let source = Self(
+            id: id,
+            displayName: displayName,
+            ytDLPBrowser: browser,
+            profile: profile,
+            cookieDirectory: cookieDirectory,
+            profileName: profileName
+        ) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .id,
+                in: container,
+                debugDescription: "Invalid browser cookie source"
+            )
+        }
+        self = source
+    }
+
+    public var rawValue: String { ytDLPBrowserSpecification }
+
+    public var ytDLPBrowserSpecification: String {
+        var value = ytDLPBrowser
+        if let profile { value += ":\(profile)" }
+        return value
+    }
+
+    public var menuTitle: String {
+        guard let profileName, !profileName.isEmpty else { return displayName }
+        return "\(displayName) (\(profileName))"
+    }
+
+    public static let safari = DownloadBrowserCookieSource(
+        id: "safari",
+        displayName: "Safari",
+        ytDLPBrowser: "safari"
+    )!
+    public static let chrome = DownloadBrowserCookieSource(
+        id: "chrome",
+        displayName: "Chrome",
+        ytDLPBrowser: "chrome"
+    )!
+    public static let firefox = DownloadBrowserCookieSource(
+        id: "firefox",
+        displayName: "Firefox",
+        ytDLPBrowser: "firefox"
+    )!
+
+    private static let supportedBrowsers: Set<String> = [
+        "brave", "chrome", "chromium", "edge", "firefox", "opera", "safari", "vivaldi", "whale",
+    ]
+
+    private enum CodingKeys: String, CodingKey {
+        case id, displayName, ytDLPBrowser, profile, cookieDirectory, profileName
+    }
+
+    private static func isSafeSpecificationPart(_ value: String?) -> Bool {
+        guard let value else { return true }
+        return !value.isEmpty
+            && !value.contains(where: { $0 == "\0" || $0 == "\n" || $0 == "\r" || $0 == ":" })
+    }
+
+    private static func isSafeText(_ value: String?) -> Bool {
+        guard let value else { return true }
+        return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !value.contains(where: { $0 == "\0" || $0.isNewline })
+    }
 }
 
 public struct DownloadFormatSelection: Equatable, Hashable, Sendable {
@@ -195,15 +318,18 @@ public struct DownloadFormatProbeResult: Equatable, Sendable {
     public let title: String?
     public let formats: [DownloadFormat]
     public let canSelectFormats: Bool
+    public let browserCookieSource: DownloadBrowserCookieSource?
 
     public init(
         title: String?,
         formats: [DownloadFormat],
-        canSelectFormats: Bool = true
+        canSelectFormats: Bool = true,
+        browserCookieSource: DownloadBrowserCookieSource? = nil
     ) {
         self.title = title
         self.formats = formats
         self.canSelectFormats = canSelectFormats
+        self.browserCookieSource = browserCookieSource
     }
 }
 
@@ -225,7 +351,7 @@ public enum DownloadFormatProbe {
             "--no-warnings",
         ]
         if let browserCookieSource {
-            arguments += ["--cookies-from-browser", browserCookieSource.rawValue]
+            arguments += ["--cookies-from-browser", browserCookieSource.ytDLPBrowserSpecification]
         }
         arguments += ["--", urlString]
         return arguments
@@ -358,7 +484,7 @@ public enum YTDLPArgumentBuilder {
         }
 
         if let browserCookieSource = request.browserCookieSource {
-            arguments += ["--cookies-from-browser", browserCookieSource.rawValue]
+            arguments += ["--cookies-from-browser", browserCookieSource.ytDLPBrowserSpecification]
         }
 
         let selectedFormat = capabilities.hasFFmpeg ? request.formatSelection : nil

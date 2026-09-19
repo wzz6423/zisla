@@ -12,12 +12,15 @@ struct DownloadLocalizationTests {
         "选择格式",
         "不使用浏览器 Cookies",
         "浏览器 Cookies",
+        "未检测到可用浏览器 Cookies",
         "使用 %@ Cookies",
         "%.0f FPS",
         "正在读取格式",
         "未找到可用格式",
         "选择浏览器 Cookies 后重试",
-        "抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择 Safari、Chrome 或 Firefox 后重试；无需登录。",
+        "抖音返回 HTTP 403，需要近期浏览器 Cookies。请选择可用的浏览器 Cookies 后重试；无需登录。",
+        "无法读取浏览器 Cookies。请在「系统设置 → 隐私与安全性 → 完全磁盘访问」中允许 zisla，然后重启应用重试。",
+        "授权磁盘访问",
         "无法读取下载格式",
     ]
 
@@ -95,6 +98,40 @@ struct DownloadLocalizationTests {
         #expect(probeBody.contains("browserCookieSource: cookieSource"))
         #expect(probeBody.contains("downloadBrowserCookieSource = nil"))
         #expect(probeBody.contains("refreshDownloadFormats()"))
+    }
+
+    @Test
+    func downloadModelUsesTheAutomaticallyDetectedBrowserCookieSource() throws {
+        let source = try String(contentsOf: Self.source("Zisla/AppModel.swift"), encoding: .utf8)
+
+        #expect(source.contains("downloadService.probeFormatsAutomatically("))
+        #expect(source.contains("downloadService.downloadAutomatically("))
+        #expect(source.contains("result.browserCookieSource"))
+    }
+
+    @Test
+    func browserCookieMenuUsesOnlyCurrentlyDetectedSources() throws {
+        let view = try String(contentsOf: Self.source("Zisla/DownloadModuleView.swift"), encoding: .utf8)
+        let model = try String(contentsOf: Self.source("Zisla/AppModel.swift"), encoding: .utf8)
+
+        #expect(view.contains("ForEach(model.downloadBrowserCookieSources)"))
+        #expect(!view.contains("DownloadBrowserCookieSource.allCases"))
+        #expect(model.contains("self.downloadBrowserCookieSources = sources"))
+        #expect(model.contains("self.downloadBrowserCookieSource = sources.first { $0.id == selected.id }"))
+    }
+
+    @Test
+    func cookieAccessGuidanceIsRecognizedInEveryLanguageWithoutTreatingNetworkErrorsAsPermissions() {
+        for language in AppLanguage.allCases {
+            let message = AppLocalization.string(
+                "无法读取浏览器 Cookies。请在「系统设置 → 隐私与安全性 → 完全磁盘访问」中允许 zisla，然后重启应用重试。",
+                language: language
+            )
+            #expect(DownloadFailureDiagnostics.requiresBrowserCookieAccess(message))
+        }
+        #expect(!DownloadFailureDiagnostics.requiresBrowserCookieAccess(""))
+        #expect(!DownloadFailureDiagnostics.requiresBrowserCookieAccess("ERROR: HTTP Error 403: Forbidden"))
+        #expect(!DownloadFailureDiagnostics.requiresBrowserCookieAccess("ERROR: Fresh cookies are needed"))
     }
 
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {
