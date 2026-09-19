@@ -108,8 +108,8 @@ export const en: SiteContent = {
       download: {
         name: 'Downloader',
         caption:
-          'Paste a link, or let zisla pick links up from the clipboard once enabled. Choose video or audio and download to the default or a folder of your choice. Common video platforms and other supported links show a source icon, live progress and a completion state.',
-        points: ['Video / audio modes', 'Default or custom folder', 'Source icon and live progress'],
+          'Paste a link, or let zisla pick links up from the clipboard once enabled. Choose an available video or audio format, and use Cookies from an installed browser when a Douyin download needs them. Download to the default or a folder of your choice, with a source icon, live progress and a completion state.',
+        points: ['Choose video or audio formats', 'Douyin browser Cookies', 'Source icon and live progress'],
       },
       agenda: {
         name: 'Agenda and weather',
@@ -168,8 +168,8 @@ export const en: SiteContent = {
       capture: {
         title: 'Screenshots, scrolling captures and pinning',
         description:
-          'Capture or pin part of the screen with a global shortcut, then annotate, stitch a scrolling capture, and recognise or export tables. Text annotations you are still editing are preserved when you export.',
-        detail: 'Global shortcut · Annotate and undo · Edits kept on export',
+          'Capture or pin part of the screen with a global shortcut, preserving window framing; then annotate, stitch a scrolling capture, and recognise or export tables. Annotations you are still editing are preserved when you export.',
+        detail: 'Global shortcut · Window framing · Unfinished annotations kept on export',
       },
       voice: {
         title: 'Voice input and cleanup',
@@ -192,8 +192,8 @@ export const en: SiteContent = {
       copyAssistant: {
         title: 'Copy assistant and smart next steps',
         description:
-          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen, with next steps suited to the content — open, reveal in Finder, search, translate, calculate or save — carried out only after you confirm.',
-        detail: 'Optional toggle · On-device recognition · Command+N by default',
+          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm.',
+        detail: 'On-device recognition · Live currency conversion · Command+N by default',
       },
       aiManagement: {
         title: 'AI CLI and Skills management',
@@ -270,7 +270,7 @@ export const en: SiteContent = {
   download: {
     eyebrow: 'READY WHEN YOU ARE',
     title: 'Download zisla',
-    copy: 'For Apple silicon Macs. Versions, other architectures and checksums are on the release page. After installing, zisla can check for new versions on your chosen update channel: Sparkle verifies the signature first, then downloads, installs and restarts manually or automatically according to your settings, and updates keep the permissions you have already granted. If a release does not concern you, skip it and zisla will not bring it up again.',
+    copy: 'For Apple silicon Macs. Versions, other architectures and checksums are on the release page. After installing, zisla can check for new versions on your chosen update channel: Sparkle verifies the signature first, then downloads, installs and restarts manually or automatically according to your settings, and updates keep the permissions you have already granted. The Updates settings also link directly to the issue tracker for feedback. If a release does not concern you, skip it and zisla will not bring it up again.',
     primaryCta: 'Download',
     primaryCtaAriaLabel: 'Download',
     releaseCta: 'View release',

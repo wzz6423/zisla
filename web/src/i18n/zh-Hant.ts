@@ -102,8 +102,8 @@ export const zhHant: SiteContent = {
       download: {
         name: '下載器',
         caption:
-          '貼上連結，或在開啟後從剪貼簿辨識連結；選擇影片或音訊下載到預設或自選目錄。支援常見影片平台與其他受支援連結，下載時顯示來源圖示、即時進度與完成狀態。',
-        points: ['影片 / 音訊模式', '預設或自選目錄', '來源圖示與即時進度'],
+          '貼上連結，或在開啟後從剪貼簿辨識連結；可選擇可用的影片或音訊格式，抖音下載需要時可使用已安裝瀏覽器的 Cookies。下載到預設或自選目錄時，顯示來源圖示、即時進度與完成狀態。',
+        points: ['選擇可用的影片或音訊格式', '抖音瀏覽器 Cookies', '來源圖示與即時進度'],
       },
       agenda: {
         name: '行程與天氣',
@@ -161,8 +161,8 @@ export const zhHant: SiteContent = {
       capture: {
         title: '截圖、長截圖與釘圖',
         description:
-          '用全域快速鍵擷取或釘住螢幕內容，接著標註、拼接長截圖，並辨識或匯出表格；匯出前會保留正在編輯的文字標註。',
-        detail: '全域快速鍵 · 標註與復原 · 編輯內容隨匯出保存',
+          '用全域快速鍵擷取或釘住螢幕內容，保留視窗邊框；接著標註、拼接長截圖，並辨識或匯出表格；匯出前會保留尚未完成的標註。',
+        detail: '全域快速鍵 · 保留視窗邊框 · 未完成標註隨匯出保存',
       },
       voice: {
         title: '語音輸入與整理',
@@ -185,8 +185,8 @@ export const zhHant: SiteContent = {
       copyAssistant: {
         title: '複製助理與智慧下一步',
         description:
-          '啟用後，複製文字、連結、檔案或圖片會在獨立的頂端提示列中預覽，並依內容給出開啟、在 Finder 中顯示、搜尋、翻譯、計算或儲存等下一步，由你確認後執行。',
-        detail: '可選開關 · 本機辨識 · 預設 Command+N',
+          '啟用後，複製文字、連結、檔案或圖片會在獨立的頂端提示列中預覽；可辨識連結、本機已安裝應用程式名稱和 Emoji 名稱，也可按即時匯率換算複製的金額，所有下一步均由你確認後執行。',
+        detail: '本機辨識 · 即時匯率換算 · 預設 Command+N',
       },
       aiManagement: {
         title: 'AI CLI 與 Skills 管理',
@@ -258,7 +258,7 @@ export const zhHant: SiteContent = {
   download: {
     eyebrow: '隨時可用',
     title: '下載 zisla',
-    copy: '適用於 Apple 晶片 Mac；版本、其他架構與校驗資訊都在 Release 頁面。安裝後可依更新通道檢查新版本，Sparkle 會先驗證簽章，再依設定手動或自動下載、安裝並重新啟動，更新會保留已授予的權限。若對某個版本不感興趣，可以跳過，zisla 不會再提醒。',
+    copy: '適用於 Apple 晶片 Mac；版本、其他架構與校驗資訊都在 Release 頁面。安裝後可依更新通道檢查新版本，Sparkle 會先驗證簽章，再依設定手動或自動下載、安裝並重新啟動，更新會保留已授予的權限；更新設定也提供直達 GitHub 問題回報的入口。若對某個版本不感興趣，可以跳過，zisla 不會再提醒。',
     primaryCta: '下載',
     primaryCtaAriaLabel: '下載',
     releaseCta: '查看 Release',
