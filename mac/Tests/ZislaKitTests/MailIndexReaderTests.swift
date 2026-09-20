@@ -206,6 +206,22 @@ struct MailIndexReaderTests {
         #expect(older.messages.map(\.messageID) == ["-11"])
         #expect(!older.hasMore)
     }
+
+    @Test(arguments: [Int.min, 0, Int.max])
+    func extremePageSizesRemainValidSQLiteQueries(maxMessages: Int) throws {
+        let databaseURL = try makeMailIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        try execute("""
+            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
+            INSERT INTO messages (message_id, subject, mailbox) VALUES (42, 1, 1);
+            """, at: databaseURL)
+
+        let snapshot = try MailIndexReader(databaseURL: databaseURL, maxMessages: maxMessages)
+            .snapshot(accountNames: [])
+
+        #expect(snapshot.messages.map(\.messageID) == ["42"])
+        #expect(!snapshot.hasMore)
+    }
 }
 
 private func makeMailIndex() throws -> URL {

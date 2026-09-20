@@ -121,75 +121,77 @@ struct MailModuleView: View {
             .frame(height: 28)
             .padding(.horizontal, 4)
 
-            if mail.isLoading && visibleMessages.isEmpty {
-                ProgressView()
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let error = mail.errorDescription, mail.messages.isEmpty {
-                VStack(spacing: 10) {
-                    Label(AppLocalization.text("无法读取邮件"), systemImage: "envelope.badge.shield.half.filled")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.zislaWarning)
-                    Text(error)
-                        .font(.islandMicro())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(5)
-                        .multilineTextAlignment(.center)
-                    HStack(spacing: 8) {
-                        Button(AppLocalization.text("重新读取")) { Task { await model.refreshMail() } }
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                        Button {
-                            if mail.needsMailIndexAccess {
-                                openFullDiskAccessSettings()
-                            } else {
-                                openAutomationSettings()
-                            }
-                        } label: {
-                            Label(
-                                mail.needsMailIndexAccess ? AppLocalization.text("授权磁盘访问") : AppLocalization.text("打开系统设置"),
-                                systemImage: mail.needsMailIndexAccess ? "externaldrive.badge.checkmark" : "gear"
-                            )
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.mini)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if visibleMessages.isEmpty {
-                if selectedAccount != nil && mail.canLoadMore {
+            MailPaginationContainer(mail: mail, accountName: selectedAccountName) { loadMore in
+                if mail.isLoading && visibleMessages.isEmpty {
                     ProgressView()
                         .controlSize(.small)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .task(id: mail.paginationGeneration) {
-                            await mail.loadMore()
-                        }
-                } else {
-                    EmptyState(
-                        symbol: selectedAccount == nil ? "tray" : "envelope.badge",
-                        title: selectedAccount == nil ? AppLocalization.text("收件箱为空") : AppLocalization.text("此账户没有邮件")
-                    )
-                }
-            } else {
-                ScrollView(.vertical) {
-                    LazyVStack(spacing: 0) {
-                        ForEach(visibleMessages) { message in
-                            messageRow(message)
-                        }
-                        if mail.canLoadMore {
-                            ProgressView()
-                                .controlSize(.small)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 24)
-                                .opacity(mail.isLoading ? 1 : 0)
-                                .task(id: mail.paginationGeneration) {
-                                    await mail.loadMore()
+                } else if let error = mail.errorDescription, visibleMessages.isEmpty {
+                    VStack(spacing: 10) {
+                        Label(AppLocalization.text("无法读取邮件"), systemImage: "envelope.badge.shield.half.filled")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.zislaWarning)
+                        Text(error)
+                            .font(.islandMicro())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(5)
+                            .multilineTextAlignment(.center)
+                        HStack(spacing: 8) {
+                            Button(AppLocalization.text("重新读取")) { Task { await model.refreshMail() } }
+                                .buttonStyle(.bordered)
+                                .controlSize(.mini)
+                            Button {
+                                if mail.needsMailIndexAccess {
+                                    openFullDiskAccessSettings()
+                                } else {
+                                    openAutomationSettings()
                                 }
+                            } label: {
+                                Label(
+                                    mail.needsMailIndexAccess ? AppLocalization.text("授权磁盘访问") : AppLocalization.text("打开系统设置"),
+                                    systemImage: mail.needsMailIndexAccess ? "externaldrive.badge.checkmark" : "gear"
+                                )
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.mini)
                         }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if visibleMessages.isEmpty {
+                    if selectedAccount != nil && mail.canLoadMore {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .task(id: mail.paginationGeneration) {
+                                await loadMore()
+                            }
+                    } else {
+                        EmptyState(
+                            symbol: selectedAccount == nil ? "tray" : "envelope.badge",
+                            title: selectedAccount == nil ? AppLocalization.text("收件箱为空") : AppLocalization.text("此账户没有邮件")
+                        )
+                    }
+                } else {
+                    ScrollView(.vertical) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(visibleMessages) { message in
+                                messageRow(message)
+                            }
+                            if mail.canLoadMore {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 24)
+                                    .opacity(mail.isLoading ? 1 : 0)
+                                    .task(id: mail.paginationGeneration) {
+                                        await loadMore()
+                                    }
+                            }
+                        }
+                    }
+                    .scrollIndicators(.visible)
+                    .thinScrollChrome()
                 }
-                .scrollIndicators(.visible)
-                .thinScrollChrome()
             }
         }
         .padding(.trailing, 8)
@@ -312,7 +314,7 @@ struct MailModuleView: View {
                 .padding(.bottom, 6)
 
                 ScrollView(.vertical) {
-                    Text(message.preview)
+                    Text(Self.messageBodyText(message))
                         .font(.system(size: 11))
                         .foregroundStyle(Color.primary.opacity(0.9))
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -372,6 +374,10 @@ struct MailModuleView: View {
     }
 
     // MARK: - Helpers
+
+    static func messageBodyText(_ message: MailMessage) -> String {
+        message.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? message.preview : message.body
+    }
 
     private func selectAccount(_ accountName: String?) {
         selectedAccountName = accountName
@@ -433,6 +439,33 @@ struct MailModuleView: View {
     private func openFullDiskAccessSettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
         NSWorkspace.shared.open(url)
+    }
+}
+
+struct MailPaginationContainer<Content: View>: View {
+    @ObservedObject var mail: MailService
+    let accountName: String?
+    @ViewBuilder var content: (@escaping @MainActor () async -> Void) -> Content
+
+    @State private var request: Request?
+
+    private struct Request: Equatable {
+        let generation: Int
+        let accountName: String?
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            content {
+                guard !mail.isLoading else { return }
+                request = Request(generation: mail.paginationGeneration, accountName: accountName)
+            }
+        }
+        // Loading placeholders and recycled lazy rows must not cancel a page already in flight.
+        .task(id: request) {
+            guard request != nil else { return }
+            await mail.loadMore()
+        }
     }
 }
 
