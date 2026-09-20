@@ -21,6 +21,7 @@ struct MailScriptRow: Sendable {
     let body: String
     let receivedAt: Date
     let isRead: Bool
+    var htmlBody: String? = nil
 }
 
 struct MailSnapshot: Sendable {
@@ -254,7 +255,8 @@ public final class MailService: ObservableObject {
                 subject: current.subject,
                 body: current.body,
                 receivedAt: current.receivedAt,
-                isRead: isRead
+                isRead: isRead,
+                htmlBody: current.htmlBody
             )
         }
     }
@@ -322,7 +324,8 @@ public final class MailService: ObservableObject {
                 subject: row.subject,
                 body: row.body,
                 receivedAt: row.receivedAt,
-                isRead: row.isRead
+                isRead: row.isRead,
+                htmlBody: row.htmlBody
             )
         }
         .sorted { $0.receivedAt > $1.receivedAt }
@@ -404,7 +407,11 @@ public final class MailService: ObservableObject {
                                         -- Mail.app is slow to resolve each property separately.
                                         set messageProperties to properties of mailMessage
                                         set messageBody to content of messageProperties
-                                        set end of messageRows to {accountName, id of messageProperties as text, sender of messageProperties as text, subject of messageProperties as text, messageBody, date received of messageProperties, read status of messageProperties}
+                                        set messageSource to ""
+                                        try
+                                            set messageSource to source of mailMessage as text
+                                        end try
+                                        set end of messageRows to {accountName, id of messageProperties as text, sender of messageProperties as text, subject of messageProperties as text, messageBody, date received of messageProperties, read status of messageProperties, messageSource}
                                     on error
                                         -- Skip unreadable individual messages (corrupt or excessively large).
                                     end try
@@ -625,7 +632,7 @@ public final class MailService: ObservableObject {
             : .success(.succeeded)
     }
 
-    nonisolated private static func snapshot(from descriptor: NSAppleEventDescriptor) -> MailSnapshot {
+    nonisolated static func snapshot(from descriptor: NSAppleEventDescriptor) -> MailSnapshot {
         guard
             descriptor.numberOfItems >= 2,
             let accountsDescriptor = descriptor.atIndex(1),
@@ -653,7 +660,8 @@ public final class MailService: ObservableObject {
                 subject: row.atIndex(4)?.stringValue ?? "",
                 body: row.atIndex(5)?.stringValue ?? "",
                 receivedAt: row.atIndex(6)?.dateValue ?? Date(),
-                isRead: row.atIndex(7)?.booleanValue ?? false
+                isRead: row.atIndex(7)?.booleanValue ?? false,
+                htmlBody: row.atIndex(8)?.stringValue.flatMap(MailHTMLBody.html)
             )
         }
         let hasMore = descriptor.numberOfItems >= 3 && descriptor.atIndex(3)?.booleanValue == true
