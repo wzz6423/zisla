@@ -215,7 +215,7 @@ public final class NowPlayingService: ObservableObject {
   private typealias SetElapsedTimeFunction = @convention(c) (Double) -> Void
 
   private let audioMonitor = AudioPlaybackMonitor()
-  private let lyricsService = LyricsService()
+  private let loadLyrics: @Sendable (String, String, Double?) async -> LyricsSearchResult
   private let adapterClient = MediaRemoteAdapterClient()
   private let specialist = MediaAppSpecialist.shared
   private var activeProfile: MediaAppProfile?
@@ -236,7 +236,7 @@ public final class NowPlayingService: ObservableObject {
   private var remotePIDPending = false
   private var refreshStartingPID: pid_t?
   private var refreshGeneration: UInt64 = 0
-  private var lyricsTask: Task<Void, Never>?
+  private(set) var lyricsTask: Task<Void, Never>?
   private var artworkRefreshTask: Task<Void, Never>?
   private var artworkRefreshIdentity: ArtworkRefreshIdentity?
   private var artworkRefreshGeneration: UInt64 = 0
@@ -272,7 +272,16 @@ public final class NowPlayingService: ObservableObject {
 
   private let controlOverrideLifetime: TimeInterval = 2
 
-  public init() {}
+  public init() {
+    let lyricsService = LyricsService()
+    loadLyrics = { title, artist, duration in
+      await lyricsService.lyrics(title: title, artist: artist, duration: duration)
+    }
+  }
+
+  init(loadLyrics: @escaping @Sendable (String, String, Double?) async -> LyricsSearchResult) {
+    self.loadLyrics = loadLyrics
+  }
 
   public func setPreferredSource(_ preference: MediaSourcePreference) {
     guard preferredSource != preference else { return }
@@ -461,15 +470,11 @@ public final class NowPlayingService: ObservableObject {
     remoteInfoState = .unavailable
     remotePIDPending = false
     refreshStartingPID = nil
-    lyricsTask?.cancel()
-    lyricsTask = nil
+    clearLyrics()
     artworkRefreshTask?.cancel()
     artworkRefreshTask = nil
     artworkRefreshIdentity = nil
     artworkRefreshGeneration &+= 1
-    lyricsIdentity = nil
-    resolvedLyrics = nil
-    resolvedArtist = nil
     playbackModeOverride = nil
     playbackStateOverride = nil
     favoriteOverride = nil
@@ -1473,7 +1478,7 @@ public final class NowPlayingService: ObservableObject {
         preference: preferredSource
       ) else {
         activeProfile = nil
-        snapshot = resolvedAudioFallbackSnapshot(from: preferredSources)
+        publishSnapshot(resolvedAudioFallbackSnapshot(from: preferredSources))
         return
       }
       applySpecialization(to: &remote)
@@ -1488,7 +1493,7 @@ public final class NowPlayingService: ObservableObject {
         )
       {
         activeProfile = nil
-        snapshot = Self.audioFallbackSnapshot(for: activeSource)
+        publishSnapshot(Self.audioFallbackSnapshot(for: activeSource))
         return
       }
       if var stored = remoteSnapshot {
@@ -1499,17 +1504,22 @@ public final class NowPlayingService: ObservableObject {
         stored.isVideo = remote.isVideo
         remoteSnapshot = stored
       }
-      applyLyrics(to: &remote)
-      snapshot = remote
+      publishSnapshot(remote)
       return
     }
 
     activeProfile = nil
-    guard let fallback = resolvedAudioFallbackSnapshot(from: preferredSources) else {
+    publishSnapshot(resolvedAudioFallbackSnapshot(from: preferredSources))
+  }
+
+  func publishSnapshot(_ value: NowPlayingSnapshot?) {
+    guard var current = value else {
+      clearLyrics()
       snapshot = nil
       return
     }
-    snapshot = fallback
+    applyLyrics(to: &current)
+    snapshot = current
   }
 
   private func resolvedAudioFallbackSnapshot(
@@ -1523,9 +1533,7 @@ public final class NowPlayingService: ObservableObject {
         remotePIDPending: remotePIDPending
       )
     else { return nil }
-    var fallback = Self.audioFallbackSnapshot(for: source)
-    applyLyrics(to: &fallback)
-    return fallback
+    return Self.audioFallbackSnapshot(for: source)
   }
 
   private static func applicationIconData(
@@ -1794,6 +1802,14 @@ public final class NowPlayingService: ObservableObject {
     }
   }
 
+  private func clearLyrics() {
+    lyricsTask?.cancel()
+    lyricsTask = nil
+    lyricsIdentity = nil
+    resolvedLyrics = nil
+    resolvedArtist = nil
+  }
+
   func applyLyrics(to snapshot: inout NowPlayingSnapshot) {
     guard
       snapshot.supportsControls,
@@ -1803,11 +1819,8 @@ public final class NowPlayingService: ObservableObject {
         duration: snapshot.duration
       )
     else {
-      lyricsTask?.cancel()
-      lyricsTask = nil
-      lyricsIdentity = nil
-      resolvedLyrics = nil
-      resolvedArtist = nil
+      clearLyrics()
+      snapshot.lyrics = nil
       return
     }
 
@@ -1834,12 +1847,8 @@ public final class NowPlayingService: ObservableObject {
     let title = snapshot.title
     let artist = snapshot.artist
     let duration = snapshot.duration
-    lyricsTask = Task { [weak self, lyricsService] in
-      let result = await lyricsService.lyrics(
-        title: title,
-        artist: artist,
-        duration: duration
-      )
+    lyricsTask = Task { [weak self, loadLyrics] in
+      let result = await loadLyrics(title, artist, duration)
       guard !Task.isCancelled, let self, self.lyricsIdentity == identity else { return }
       self.resolvedLyrics = result.lyrics
       self.resolvedArtist = result.artistName

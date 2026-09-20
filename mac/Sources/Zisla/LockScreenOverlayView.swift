@@ -229,11 +229,9 @@ struct LockScreenOverlayView: View {
     }
 
     private func currentLyricText(_ item: NowPlayingSnapshot, date: Date) -> String {
-        // Prefer lyrics embedded in the snapshot; fall back to NowPlayingService's parsed lyric cache
-        // if the snapshot doesn't carry them yet (e.g. lock screen just refreshed, applyLyrics not yet written back).
         MediaTextFormatting.lyricLine(
             item,
-            lyrics: item.lyrics ?? media.resolvedLyrics,
+            lyrics: item.lyrics,
             date: date
         )
     }

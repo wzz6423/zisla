@@ -525,7 +525,7 @@ struct CompactStatusBarView: View {
                 if let item = detailedMediaItem {
                     DetailedMediaBar(
                         item: item,
-                        lyrics: item.lyrics ?? media.resolvedLyrics,
+                        lyrics: item.lyrics,
                         height: height,
                         centerInset: displayState.compactBarCenterInset
                     )
