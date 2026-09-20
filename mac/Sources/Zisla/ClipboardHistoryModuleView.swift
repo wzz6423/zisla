@@ -223,7 +223,7 @@ struct ClipboardHistoryModuleView: View {
                     .help(AppLocalization.text("上一页"))
 
                     TextField(AppLocalization.text("页码"), text: $pageInput)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .multilineTextAlignment(.center)
                         .frame(width: 36)
