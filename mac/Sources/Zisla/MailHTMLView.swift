@@ -13,7 +13,7 @@ struct MailHTMLView: NSViewRepresentable {
     }
 }
 
-final class MailBodyWebView: WKWebView, WKNavigationDelegate {
+final class MailBodyWebView: WKWebView, WKNavigationDelegate, WKUIDelegate {
     private var lastHTML: String?
     var openLink: (URL) -> Void = { NSWorkspace.shared.open($0) }
 
@@ -29,6 +29,7 @@ final class MailBodyWebView: WKWebView, WKNavigationDelegate {
         ))
         super.init(frame: .zero, configuration: configuration)
         navigationDelegate = self
+        uiDelegate = self
         // Match the Notes web view so the shared native glass surface remains visible.
         setValue(false, forKey: "drawsBackground")
         underPageBackgroundColor = .clear
@@ -96,6 +97,20 @@ final class MailBodyWebView: WKWebView, WKNavigationDelegate {
             isMainFrame: navigationAction.targetFrame?.isMainFrame == true,
             isLink: navigationAction.navigationType == .linkActivated
         ))
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        _ = navigationPolicy(
+            for: navigationAction.request.url,
+            isMainFrame: navigationAction.targetFrame?.isMainFrame == true,
+            isLink: navigationAction.navigationType == .linkActivated || navigationAction.targetFrame == nil
+        )
+        return nil
     }
 
     func navigationPolicy(for url: URL?, isMainFrame: Bool, isLink: Bool) -> WKNavigationActionPolicy {
