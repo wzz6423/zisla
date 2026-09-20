@@ -779,8 +779,8 @@ struct MailServiceTests {
         "",
         "第一段\n\n第二段包含 \"引号\" 和 \\ 路径",
         String(repeating: "完整正文🪷", count: 400) + "\n\n最后一段",
-    ]) @MainActor
-    func inboxScriptPreservesCompleteMessageBody(body: String) throws {
+    ], [false, true]) @MainActor
+    func inboxScriptPreservesCompleteMessageBody(body: String, sourceAvailable: Bool) throws {
         // Replace only Mail's object lookups; execute the generated paging and body logic locally.
         let source = MailService.inboxScript(accountNames: [])
             .replacingOccurrences(of: "tell application \"Mail\"", with: "")
@@ -788,6 +788,9 @@ struct MailServiceTests {
             .replacingOccurrences(of: "every account", with: "fixtureAccounts")
             .replacingOccurrences(of: "messages of mailbox \"INBOX\" of mailAccount", with: "fixtureInbox of mailAccount")
             .replacingOccurrences(of: "properties of mailMessage", with: "mailMessage")
+        let html = "<html><body><h1>Workflow</h1><a href=\"https://example.com\">View run</a></body></html>"
+        let rawSource = "Content-Type: text/html; charset=utf-8\n\n" + html
+        let sourceProperty = sourceAvailable ? ", source:\(MailService.appleScriptString(rawSource))" : ""
         let script = try #require(NSAppleScript(source: """
             using terms from application "Mail"
                 set fixtureDate to current date
@@ -795,7 +798,7 @@ struct MailServiceTests {
                 set month of fixtureDate to January
                 set day of fixtureDate to 1
                 set time of fixtureDate to 0
-                set fixtureMessage to {id:7, sender:"sender@example.com", subject:"Fixture", content:\(MailService.appleScriptString(body)), date received:fixtureDate, read status:false}
+                set fixtureMessage to {id:7, sender:"sender@example.com", subject:"Fixture", content:\(MailService.appleScriptString(body)), date received:fixtureDate, read status:false\(sourceProperty)}
                 set fixtureAccounts to {{name:"Work", email addresses:{"work@example.com"}, fixtureInbox:{fixtureMessage}}}
                 \(source)
             end using terms from
@@ -807,6 +810,35 @@ struct MailServiceTests {
         let rows = try #require(result.atIndex(2))
         #expect(rows.numberOfItems == 1)
         #expect(rows.atIndex(1)?.atIndex(5)?.stringValue == body)
+        let messages = MailService.messages(from: MailService.snapshot(from: result).messages)
+        #expect(messages.first?.body == body)
+        #expect(messages.first?.htmlBody == (sourceAvailable ? html : nil))
+    }
+
+    @Test @MainActor
+    func markingReadPreservesHTMLAndUsesPlainTextForThePreview() async throws {
+        let html = "<h1>Rich message</h1>"
+        let service = MailService(
+            commandRunner: { _, _ in
+                .success(.snapshot(MailSnapshot(
+                    accounts: [],
+                    messages: [MailScriptRow(
+                        accountName: "work", messageID: "7", sender: "sender@example.com",
+                        subject: "Fixture", body: "Plain\npreview", receivedAt: .distantPast,
+                        isRead: false, htmlBody: html
+                    )]
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        await service.refresh()
+        let message = try #require(service.messages.first)
+        service.markReadLocally(message)
+
+        #expect(service.messages.first?.isRead == true)
+        #expect(service.messages.first?.htmlBody == html)
+        #expect(service.messages.first?.preview == "Plain preview")
     }
 
     @Test @MainActor

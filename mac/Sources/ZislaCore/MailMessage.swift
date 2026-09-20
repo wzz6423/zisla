@@ -31,6 +31,7 @@ public struct MailMessage: Identifiable, Equatable, Sendable {
     public let sender: String
     public let subject: String
     public let body: String
+    public let htmlBody: String?
     public let receivedAt: Date
     public let isRead: Bool
 
@@ -41,7 +42,8 @@ public struct MailMessage: Identifiable, Equatable, Sendable {
         subject: String,
         body: String,
         receivedAt: Date,
-        isRead: Bool
+        isRead: Bool,
+        htmlBody: String? = nil
     ) {
         self.id = "\(accountName)\u{1F}\(messageID)"
         self.accountName = accountName
@@ -49,6 +51,7 @@ public struct MailMessage: Identifiable, Equatable, Sendable {
         self.sender = sender
         self.subject = subject
         self.body = body
+        self.htmlBody = htmlBody
         self.receivedAt = receivedAt
         self.isRead = isRead
     }

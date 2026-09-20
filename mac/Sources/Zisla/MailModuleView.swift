@@ -313,16 +313,23 @@ struct MailModuleView: View {
                 .frame(minHeight: 42)
                 .padding(.bottom, 6)
 
-                ScrollView(.vertical) {
-                    Text(Self.messageBodyText(message))
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.primary.opacity(0.9))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-                        .padding(10)
+                Group {
+                    if let html = message.htmlBody {
+                        MailHTMLView(html: html)
+                            .id(message.id)
+                    } else {
+                        ScrollView(.vertical) {
+                            Text(Self.messageBodyText(message))
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.primary.opacity(0.9))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                                .padding(10)
+                        }
+                        .scrollIndicators(.visible)
+                        .thinScrollChrome()
+                    }
                 }
-                .scrollIndicators(.visible)
-                .thinScrollChrome()
                 .background(Color.fillCard)
                 .clipShape(messageBodyShape)
                 .overlay {
