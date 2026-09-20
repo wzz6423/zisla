@@ -9,7 +9,7 @@ import XCTest
 @Suite(.serialized)
 struct MailHTMLViewTests {
     @Test
-    func rendersOriginalStylesTablesAndInlineImagesOnPaperBackground() async throws {
+    func rendersOriginalStylesTablesAndInlineImagesOnTransparentBackground() async throws {
         let webView = makeWebView()
         defer { webView.stopLoading() }
         try await load("""
@@ -31,8 +31,55 @@ struct MailHTMLViewTests {
         #expect(result["heading"] as? String == "Workflow run")
         #expect(result["cell"] as? String == "Failed")
         #expect(result["buttonColor"] as? String == "rgb(33, 135, 57)")
-        #expect(result["background"] as? String == "rgb(255, 255, 255)")
+        #expect(result["background"] as? String == "rgba(0, 0, 0, 0)")
         #expect(result["imageWidth"] as? Int == 1)
+    }
+
+    @Test
+    func exposesTheNativeGlassAndAdaptsNeutralMailColorsWithoutChangingAccents() async throws {
+        let webView = makeWebView()
+        defer { webView.stopLoading() }
+        try await load("""
+            <style>td { background:#f6f8fa !important; }</style>
+            <html style="background: rgb(0,40,80) !important"><body style="background: #fff !important; color: #24292f">
+            <table bgcolor="#ffffff"><tr><td style="background-color:rgb(246,248,250)">
+            <span id="modern" style="color:color(display-p3 1 0 0)">Brand</span>
+            <div id="text" style="color: #24292f !important">Readable message</div>
+            <a id="link" href="https://example.com">View issue</a>
+            <a id="button" style="background:#218739;color:white;padding:12px" href="https://example.com"><span>View run</span></a>
+            <p id="warning" style="color: rgb(180,20,20)">Failed</p>
+            <div id="accent" style="background:rgb(255,220,0)"><span style="color:black">Status</span></div>
+            <span id="hidden" style="color:rgba(0,0,0,0)">Hidden preview</span>
+            <svg width="10" height="10" style="color:black"><rect id="graphic" width="10" height="10" fill="currentColor"/></svg>
+            </td></tr></table></body></html>
+            """, in: webView)
+        let result = try #require(await webView.evaluateJavaScript("""
+            (() => ({
+              backgrounds: ['html', 'body', 'table', 'td'].map(selector => getComputedStyle(document.querySelector(selector)).backgroundColor),
+              text: getComputedStyle(document.getElementById('text')).color,
+              link: getComputedStyle(document.getElementById('link')).color,
+              button: getComputedStyle(document.getElementById('button')).backgroundColor,
+              warning: getComputedStyle(document.getElementById('warning')).color,
+              accent: getComputedStyle(document.getElementById('accent')).backgroundColor,
+              accentText: getComputedStyle(document.querySelector('#accent span')).color,
+              hidden: getComputedStyle(document.getElementById('hidden')).color,
+              modern: getComputedStyle(document.getElementById('modern')).color,
+              graphic: getComputedStyle(document.getElementById('graphic')).fill
+            }))()
+            """) as? [String: Any])
+        #expect(result["backgrounds"] as? [String] == Array(repeating: "rgba(0, 0, 0, 0)", count: 4))
+        #expect(result["text"] as? String == "rgba(255, 255, 255, 0.92)")
+        #expect(result["link"] as? String == "rgb(74, 163, 255)")
+        #expect(result["button"] as? String == "rgb(33, 135, 57)")
+        #expect(result["warning"] as? String == "rgb(180, 20, 20)")
+        #expect(result["accent"] as? String == "rgb(255, 220, 0)")
+        #expect(result["accentText"] as? String == "rgb(0, 0, 0)")
+        #expect(result["hidden"] as? String == "rgba(0, 0, 0, 0)")
+        #expect(result["modern"] as? String == "color(display-p3 1 0 0)")
+        #expect(result["graphic"] as? String == "rgb(0, 0, 0)")
+        #expect(!webView.isOpaque)
+        #expect(webView.underPageBackgroundColor.alphaComponent == 0)
+        #expect(!webView.configuration.defaultWebpagePreferences.allowsContentJavaScript)
     }
 
     @Test

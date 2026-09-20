@@ -283,12 +283,6 @@ struct MailModuleView: View {
 
     // MARK: - Message Detail
 
-    private var messageBodyShape: UnevenRoundedRectangle {
-        IslandSurfaceGeometry.moduleContentShape(
-            bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
-        )
-    }
-
     @ViewBuilder
     private var messageDetail: some View {
         if let message = selectedMessage {
@@ -330,12 +324,11 @@ struct MailModuleView: View {
                         .thinScrollChrome()
                     }
                 }
-                .background(Color.fillCard)
-                .clipShape(messageBodyShape)
-                .overlay {
-                    messageBodyShape
-                        .strokeBorder(Color.strokeCard, lineWidth: 1)
-                }
+                .islandGlassSurface(
+                    .input,
+                    cornerRadius: IslandSurfaceGeometry.moduleInnerCornerRadius,
+                    bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
+                )
             }
         } else {
             EmptyState(symbol: "envelope.open", title: AppLocalization.text("选择一封邮件"))
