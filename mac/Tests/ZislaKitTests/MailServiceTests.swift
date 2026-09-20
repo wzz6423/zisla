@@ -75,22 +75,32 @@ struct MailServiceTests {
     }
 
     @Test @MainActor
-    func usesTheLocalIndexBeforeMailAppWhenMailIsRunning() async throws {
+    func runningMailProvidesAccountIdentitySenderAndFullBodyEvenWhenIndexIsReadable() async throws {
         let databaseURL = try makeMailServiceIndex()
         defer { try? FileManager.default.removeItem(at: databaseURL) }
         try executeMailServiceSQL("""
-            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
+            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://11111111-2222-3333-4444-555555555555/INBOX');
             INSERT INTO subjects (ROWID, subject) VALUES (1, '快速主题');
             INSERT INTO summaries (ROWID, summary) VALUES (1, '快速摘要');
             INSERT INTO messages (message_id, subject, summary, date_received, display_date, mailbox, read, deleted)
             VALUES (42, 1, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0);
             """, at: databaseURL)
 
-        var appleScriptCalls = 0
+        let body = String(repeating: "完整正文", count: 400) + "\n\n最后一段"
         let service = MailService(
             commandRunner: { _, _ in
-                appleScriptCalls += 1
-                return .failure(.failed("AppleScript should not be used when the index is readable"))
+                .success(.snapshot(MailSnapshot(
+                    accounts: [MailScriptAccount(name: "工作邮箱", emailAddresses: ["work@example.com"])],
+                    messages: [MailScriptRow(
+                        accountName: "工作邮箱",
+                        messageID: "7",
+                        sender: "Sender <sender@example.com>",
+                        subject: "完整主题",
+                        body: body,
+                        receivedAt: Date(timeIntervalSince1970: 1_720_000_000),
+                        isRead: false
+                    )]
+                )))
             },
             indexReader: MailIndexReader(databaseURL: databaseURL),
             mailRunning: { true }
@@ -98,13 +108,16 @@ struct MailServiceTests {
 
         await service.refresh()
 
-        #expect(service.messages.map(\.messageID) == [42])
-        #expect(service.messages.first?.body == "快速摘要")
-        #expect(appleScriptCalls == 0)
+        #expect(service.accounts == [MailAccount(name: "工作邮箱", emailAddresses: ["work@example.com"])])
+        #expect(service.messages.map(\.messageID) == [7])
+        #expect(service.messages.first?.accountName == "工作邮箱")
+        #expect(service.messages.first?.sender == "Sender <sender@example.com>")
+        #expect(service.messages.first?.body == body)
+        #expect(service.errorDescription == nil)
     }
 
     @Test @MainActor
-    func fallsBackToMailAppWhenLocalIndexReturnsNoMessages() async throws {
+    func readsMailAppWhenLocalIndexReturnsNoMessages() async throws {
         let databaseURL = try makeMailServiceIndex()
         defer { try? FileManager.default.removeItem(at: databaseURL) }
         try executeMailServiceSQL(
@@ -137,6 +150,141 @@ struct MailServiceTests {
 
         #expect(appleScriptCalls == 1)
         #expect(service.messages.map(\.messageID) == [7])
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func runningMailDoesNotHideAnEmptyInboxOrAnErrorBehindIndexData(fails: Bool) async throws {
+        let databaseURL = try makeMailServiceIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        try executeMailServiceSQL("""
+            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
+            INSERT INTO messages (message_id, subject, mailbox) VALUES (42, 1, 1);
+            """, at: databaseURL)
+        let service = MailService(
+            commandRunner: { _, _ in
+                fails
+                    ? .failure(.failed("Mail access denied"))
+                    : .success(.snapshot(MailSnapshot(accounts: [], messages: [])))
+            },
+            indexReader: MailIndexReader(databaseURL: databaseURL),
+            mailRunning: { true }
+        )
+
+        await service.refresh()
+
+        #expect(service.messages.isEmpty)
+        #expect(service.accounts.isEmpty)
+        #expect(service.errorDescription == (fails ? "Mail access denied" : nil))
+        #expect(!service.needsMailIndexAccess)
+        #expect(!service.isLoading)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func refreshKeepsLoadedPagesCurrentAndResetsTheWindowWhenAccountsChange(isMailRunning: Bool) async throws {
+        let databaseURL = try makeMailServiceIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        let accountName = "work@example.com"
+        var inboxRows = (1...135).map { index in
+            MailScriptRow(
+                accountName: accountName,
+                messageID: String(index),
+                sender: "sender@example.com",
+                subject: "Message",
+                body: "Body",
+                receivedAt: Date(timeIntervalSince1970: Double(1_000 - index)),
+                isRead: true
+            )
+        }
+        let values = (1...135).map { "(\($0), 1, \(1_000 - $0), 1, 1)" }.joined(separator: ",")
+        try executeMailServiceSQL("""
+            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
+            INSERT INTO messages (message_id, subject, date_received, mailbox, read) VALUES \(values);
+            """, at: databaseURL)
+        let service = MailService(
+            commandRunner: { script, _ in
+                #expect(isMailRunning, "Reading the index must not launch Mail")
+                guard let (offset, limit) = mailServiceRequestBounds(script) else {
+                    return .failure(.failed("Missing inbox request bounds"))
+                }
+                return .success(.snapshot(MailSnapshot(
+                    accounts: [MailScriptAccount(name: accountName, emailAddresses: [accountName])],
+                    messages: Array(inboxRows.dropFirst(offset).prefix(limit)),
+                    hasMore: offset + limit < inboxRows.count
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: databaseURL),
+            mailRunning: { isMailRunning }
+        )
+        defer { service.stop() }
+
+        await service.refresh()
+        #expect(service.messages.count == 10)
+        for _ in 0..<12 { await service.loadMore() }
+        #expect(service.messages.count == 130)
+
+        inboxRows.removeAll { ["5", "115"].contains($0.messageID) }
+        inboxRows.insert(MailScriptRow(
+            accountName: accountName,
+            messageID: "1000",
+            sender: "new@example.com",
+            subject: "New message",
+            body: "New body",
+            receivedAt: Date(timeIntervalSince1970: 2_000),
+            isRead: false
+        ), at: 0)
+        try executeMailServiceSQL("""
+            UPDATE messages SET deleted = 1 WHERE message_id IN (5, 115);
+            INSERT INTO messages (message_id, subject, date_received, mailbox) VALUES (1000, 1, 2000, 1);
+            """, at: databaseURL)
+
+        await service.refresh()
+        #expect(service.messages.map(\.messageID) == inboxRows.prefix(130).compactMap { Int($0.messageID) })
+        #expect(service.canLoadMore)
+        await service.loadMore()
+        #expect(service.messages.map(\.messageID) == inboxRows.compactMap { Int($0.messageID) })
+        #expect(!service.canLoadMore)
+
+        service.start(accountNames: [accountName])
+        await service.refresh()
+        #expect(service.messages.count == 10)
+        #expect(service.canLoadMore)
+    }
+
+    @Test @MainActor
+    func refreshingAfterUnreadableMessagesDoesNotShrinkTheLoadedWindow() async {
+        let rows = (1...25).map { index in
+            MailScriptRow(
+                accountName: "work", messageID: String(index), sender: "sender@example.com",
+                subject: "Message", body: "Body",
+                receivedAt: Date(timeIntervalSince1970: Double(1_000 - index)), isRead: true
+            )
+        }
+        let unreadableIDs: Set<String> = ["2", "4", "6", "8", "10"]
+        let service = MailService(
+            commandRunner: { script, _ in
+                guard let (offset, limit) = mailServiceRequestBounds(script) else {
+                    return .failure(.failed("Missing inbox request bounds"))
+                }
+                return .success(.snapshot(MailSnapshot(
+                    accounts: [MailScriptAccount(name: "work", emailAddresses: ["work@example.com"])],
+                    messages: rows.dropFirst(offset).prefix(limit).filter { !unreadableIDs.contains($0.messageID) },
+                    hasMore: offset + limit < rows.count
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        await service.refresh()
+        await service.loadMore()
+        await service.loadMore()
+        let messages = service.messages
+        #expect(messages.count == 20)
+
+        for _ in 0..<2 {
+            await service.refresh()
+            #expect(service.messages == messages)
+            #expect(!service.canLoadMore)
+        }
     }
 
     @Test(arguments: [false, true]) @MainActor
@@ -627,6 +775,40 @@ struct MailServiceTests {
         #expect(script.contains("return {accountRows, messageRows, hasMoreMessages}"))
     }
 
+    @Test(arguments: [
+        "",
+        "第一段\n\n第二段包含 \"引号\" 和 \\ 路径",
+        String(repeating: "完整正文🪷", count: 400) + "\n\n最后一段",
+    ]) @MainActor
+    func inboxScriptPreservesCompleteMessageBody(body: String) throws {
+        // Replace only Mail's object lookups; execute the generated paging and body logic locally.
+        let source = MailService.inboxScript(accountNames: [])
+            .replacingOccurrences(of: "tell application \"Mail\"", with: "")
+            .replacingOccurrences(of: "end tell", with: "")
+            .replacingOccurrences(of: "every account", with: "fixtureAccounts")
+            .replacingOccurrences(of: "messages of mailbox \"INBOX\" of mailAccount", with: "fixtureInbox of mailAccount")
+            .replacingOccurrences(of: "properties of mailMessage", with: "mailMessage")
+        let script = try #require(NSAppleScript(source: """
+            using terms from application "Mail"
+                set fixtureDate to current date
+                set year of fixtureDate to 2024
+                set month of fixtureDate to January
+                set day of fixtureDate to 1
+                set time of fixtureDate to 0
+                set fixtureMessage to {id:7, sender:"sender@example.com", subject:"Fixture", content:\(MailService.appleScriptString(body)), date received:fixtureDate, read status:false}
+                set fixtureAccounts to {{name:"Work", email addresses:{"work@example.com"}, fixtureInbox:{fixtureMessage}}}
+                \(source)
+            end using terms from
+            """))
+        var error: NSDictionary?
+        let result = script.executeAndReturnError(&error)
+
+        #expect(error == nil)
+        let rows = try #require(result.atIndex(2))
+        #expect(rows.numberOfItems == 1)
+        #expect(rows.atIndex(1)?.atIndex(5)?.stringValue == body)
+    }
+
     @Test @MainActor
     func refreshAndLoadMoreAppendPagesWithoutRepeatingTheLastPage() async {
         var requestedScripts: [String] = []
@@ -877,6 +1059,16 @@ private func makeMailServiceSnapshot(account: String, messageID: Int, hasMore: B
         )],
         hasMore: hasMore
     )
+}
+
+private func mailServiceRequestBounds(_ script: String) -> (offset: Int, limit: Int)? {
+    func value(_ name: String) -> Int? {
+        script.split(separator: "\n")
+            .first { $0.trimmingCharacters(in: .whitespaces).hasPrefix("set \(name) to ") }?
+            .split(separator: " ").last.flatMap { Int($0) }
+    }
+    guard let offset = value("remainingOffset"), let limit = value("remainingPageSize") else { return nil }
+    return (offset, limit)
 }
 
 private func makeMailServiceIndex() throws -> URL {
