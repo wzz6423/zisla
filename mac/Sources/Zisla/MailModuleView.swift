@@ -283,12 +283,6 @@ struct MailModuleView: View {
 
     // MARK: - Message Detail
 
-    private var messageBodyShape: UnevenRoundedRectangle {
-        IslandSurfaceGeometry.moduleContentShape(
-            bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
-        )
-    }
-
     @ViewBuilder
     private var messageDetail: some View {
         if let message = selectedMessage {
@@ -313,22 +307,28 @@ struct MailModuleView: View {
                 .frame(minHeight: 42)
                 .padding(.bottom, 6)
 
-                ScrollView(.vertical) {
-                    Text(Self.messageBodyText(message))
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.primary.opacity(0.9))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-                        .padding(10)
+                Group {
+                    if let html = message.htmlBody {
+                        MailHTMLView(html: html)
+                            .id(message.id)
+                    } else {
+                        ScrollView(.vertical) {
+                            Text(Self.messageBodyText(message))
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.primary.opacity(0.9))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                                .padding(10)
+                        }
+                        .scrollIndicators(.visible)
+                        .thinScrollChrome()
+                    }
                 }
-                .scrollIndicators(.visible)
-                .thinScrollChrome()
-                .background(Color.fillCard)
-                .clipShape(messageBodyShape)
-                .overlay {
-                    messageBodyShape
-                        .strokeBorder(Color.strokeCard, lineWidth: 1)
-                }
+                .islandGlassSurface(
+                    .input,
+                    cornerRadius: IslandSurfaceGeometry.moduleInnerCornerRadius,
+                    bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
+                )
             }
         } else {
             EmptyState(symbol: "envelope.open", title: AppLocalization.text("选择一封邮件"))
