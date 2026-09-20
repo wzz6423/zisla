@@ -20,7 +20,7 @@ struct MailIndexReader: Sendable {
 
     init(databaseURL: URL? = nil, maxMessages: Int = 10) {
         self.databaseURL = databaseURL ?? Self.defaultDatabaseURL()
-        self.maxMessages = min(max(1, maxMessages), 120)
+        self.maxMessages = min(max(1, maxMessages), Int(Int32.max) - 1)
     }
 
     static func defaultDatabaseURL(

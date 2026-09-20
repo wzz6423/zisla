@@ -145,7 +145,10 @@ public final class MailService: ObservableObject {
         selectedAccountNames = accountNames
         guard pollingTask == nil || didChangeSelection else { return }
         stop()
-        if didChangeSelection { canLoadMore = false }
+        if didChangeSelection {
+            messageOffset = 0
+            canLoadMore = false
+        }
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.refresh()
@@ -167,15 +170,15 @@ public final class MailService: ObservableObject {
 
     public func refresh() async {
         guard !isLoading else { return }
-        await fetchMessages(offset: 0, replacing: true)
+        await fetchMessages(offset: 0, limit: max(pageSize, messageOffset), replacing: true)
     }
 
     public func loadMore() async {
         guard !isLoading, canLoadMore else { return }
-        await fetchMessages(offset: messageOffset, replacing: false)
+        await fetchMessages(offset: messageOffset, limit: pageSize, replacing: false)
     }
 
-    private func fetchMessages(offset: Int, replacing: Bool) async {
+    private func fetchMessages(offset: Int, limit: Int, replacing: Bool) async {
         let generation = refreshGeneration
         isLoading = true
         defer {
@@ -183,34 +186,28 @@ public final class MailService: ObservableObject {
         }
 
         let isMailRunning = mailRunning()
-        let indexResult = await readIndex(accountNames: selectedAccountNames, offset: offset)
         guard generation == refreshGeneration, !Task.isCancelled else { return }
-        if case let .success(snapshot) = indexResult,
-           Self.canUseIndexSnapshot(snapshot, for: selectedAccountNames),
-           !snapshot.messages.isEmpty {
-            apply(snapshot, replacing: replacing)
-            return
-        }
-
         if isMailRunning {
             let result = await commandRunner(
-                Self.inboxScript(accountNames: selectedAccountNames, pageSize: pageSize, offset: offset),
+                Self.inboxScript(accountNames: selectedAccountNames, pageSize: limit, offset: offset),
                 true
             )
             guard generation == refreshGeneration, !Task.isCancelled else { return }
             needsMailIndexAccess = false
             switch result {
             case let .success(.snapshot(snapshot)):
-                apply(snapshot, replacing: replacing)
+                apply(snapshot, limit: limit, replacing: replacing)
             case .success:
                 errorDescription = AppLocalization.text("邮件服务返回了无法识别的数据")
             case let .failure(error):
                 errorDescription = Self.message(for: error)
             }
         } else {
+            let indexResult = await readIndex(accountNames: selectedAccountNames, offset: offset, limit: limit)
+            guard generation == refreshGeneration, !Task.isCancelled else { return }
             switch indexResult {
             case let .success(snapshot):
-                apply(snapshot, replacing: replacing)
+                apply(snapshot, limit: limit, replacing: replacing)
             case let .failure(error):
                 needsMailIndexAccess = error == .unavailable || error == .openFailed
                 errorDescription = Self.message(for: error)
@@ -218,8 +215,8 @@ public final class MailService: ObservableObject {
         }
     }
 
-    private func readIndex(accountNames: Set<String>, offset: Int) async -> Result<MailSnapshot, MailIndexReaderError> {
-        let reader = indexReader
+    private func readIndex(accountNames: Set<String>, offset: Int, limit: Int) async -> Result<MailSnapshot, MailIndexReaderError> {
+        let reader = MailIndexReader(databaseURL: indexReader.databaseURL, maxMessages: limit)
         return await Task.detached(priority: .userInitiated) {
             do {
                 return .success(try reader.snapshot(accountNames: accountNames, offset: offset))
@@ -331,13 +328,6 @@ public final class MailService: ObservableObject {
         .sorted { $0.receivedAt > $1.receivedAt }
     }
 
-    static func canUseIndexSnapshot(_ snapshot: MailSnapshot, for accountNames: Set<String>) -> Bool {
-        guard !snapshot.accounts.isEmpty else { return false }
-        guard !accountNames.isEmpty else { return true }
-        let availableNames = Set(snapshot.accounts.map(\.name))
-        return accountNames.isSubset(of: availableNames)
-    }
-
     /// Mail's scripting dictionary exposes `inbox` on the application, not on `account`:
     /// `inbox of <account>` fails with "can't get inbox of account id …" (verified on Mail 16 /
     /// macOS 27), which silently emptied every fetch and made every write-back unreachable.
@@ -414,7 +404,6 @@ public final class MailService: ObservableObject {
                                         -- Mail.app is slow to resolve each property separately.
                                         set messageProperties to properties of mailMessage
                                         set messageBody to content of messageProperties
-                                        if (count of messageBody) > 1200 then set messageBody to text 1 thru 1200 of messageBody
                                         set end of messageRows to {accountName, id of messageProperties as text, sender of messageProperties as text, subject of messageProperties as text, messageBody, date received of messageProperties, read status of messageProperties}
                                     on error
                                         -- Skip unreadable individual messages (corrupt or excessively large).
@@ -545,12 +534,12 @@ public final class MailService: ObservableObject {
         }
     }
 
-    private func apply(_ snapshot: MailSnapshot, replacing: Bool) {
+    private func apply(_ snapshot: MailSnapshot, limit: Int, replacing: Bool) {
         accounts = Self.accounts(from: snapshot.accounts)
         let incoming = Self.messages(from: snapshot.messages)
         if replacing {
             messages = incoming
-            messageOffset = snapshot.hasMore ? pageSize : incoming.count
+            messageOffset = limit
         } else {
             var merged = messages
             let existingIDs = Set(messages.map { "\($0.accountName)\u{1F}\($0.messageID)" })
