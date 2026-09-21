@@ -53,7 +53,7 @@ struct IslandDashboardViewLayoutTests {
         let body = source[bodyStart.lowerBound..<dynamicCards.lowerBound]
 
         #expect(body.contains("ScrollView(.vertical)"))
-        #expect(body.contains(".scrollIndicators(.visible)\n                .thinScrollChrome()"))
+        #expect(body.contains(".scrollIndicators(.visible)\n                .thinScrollChrome(visibleWhenScrollable: true)"))
     }
 
     private static let dashboardSourceURL = URL(fileURLWithPath: #filePath)

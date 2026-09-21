@@ -27,7 +27,7 @@ struct IslandDashboardView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .scrollIndicators(.visible)
-                .thinScrollChrome()
+                .thinScrollChrome(visibleWhenScrollable: true)
             }
         }
         .onChange(of: activeCardCount, initial: true) { _, count in
