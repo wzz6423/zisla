@@ -186,7 +186,52 @@ enum BrowserDownloadAgentResolver {
         return String(name.dropLast(tempExtension.rawValue.count + 1))
     }
 }
-/// State machine for browser download display: manages entry insertion/removal and brief retention after completion; does not depend on `NSProgress`.
+struct AirDropBatch: Sendable {
+    var id: UUID
+    var fileNames: [String]
+    var fraction: Double?
+    var startedAt: Date
+
+    var snapshot: BrowserDownloadSnapshot {
+        BrowserDownloadSnapshot(
+            id: id,
+            agent: .airDrop,
+            fileName: fileNames.count == 1 ? fileNames[0] : AppLocalization.text("%ld 项下载", fileNames.count),
+            fraction: fraction,
+            isFinished: false
+        )
+    }
+}
+
+enum AirDropBatchParser {
+    static func batches(from data: Data) -> [AirDropBatch]? {
+        guard let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let received = payload["receiveTransfers"] as? [[String: Any]]
+        else { return nil }
+        // Swift encodes this UUID-keyed dictionary as alternating keys and transfer values.
+        return received.compactMap { transfer in
+            guard let identifier = (transfer["receiveID"] as? String).flatMap(UUID.init(uuidString:)),
+                let request = transfer["askRequest"] as? [String: Any],
+                let items = request["items"] as? [[String: Any]],
+                let state = transfer["state"] as? [String: Any],
+                let receiving = state["transferring"] as? [String: Any]
+            else { return nil }
+            let fileNames = items.compactMap { $0["fileName"] as? String }
+            guard !fileNames.isEmpty else { return nil }
+            let progress = (receiving["progress"] as? [String: Any])?["transferring"] as? [String: Any]
+            let total = (progress?["totalBytes"] as? NSNumber)?.doubleValue ?? 0
+            let completed = (progress?["bytesCopied"] as? NSNumber)?.doubleValue
+            return AirDropBatch(
+                id: identifier,
+                fileNames: fileNames,
+                fraction: total > 0 ? completed.map { $0 / total } : nil,
+                startedAt: Date(timeIntervalSinceReferenceDate: (transfer["startDate"] as? Double) ?? 0)
+            )
+        }
+    }
+}
+
+/// State machine for download cards and the compact-island summary.
 struct BrowserDownloadTracker: Sendable {
     struct Entry: Sendable {
         var fileURL: URL?
@@ -197,41 +242,62 @@ struct BrowserDownloadTracker: Sendable {
     }
 
     private(set) var entries: [UUID: Entry] = [:]
+    private var airDropBatches: [AirDropBatch] = []
+    private var airDropSummaryID = UUID()
+    private var airDropItemCount = 0
     private var finishedSnapshot: BrowserDownloadSnapshot?
 
     var snapshots: [BrowserDownloadSnapshot] {
-        let active = entries
-            .sorted { $0.value.startedAt > $1.value.startedAt }
-            .map { token, entry in
+        var cards = entries.compactMap { token, entry -> (BrowserDownloadSnapshot, Date)? in
+            guard entry.agent != .airDrop else { return nil }
+            return (
                 BrowserDownloadSnapshot(
-                    id: token,
-                    agent: entry.agent,
-                    fileName: entry.fileName,
-                    fraction: entry.fraction,
-                    isFinished: false
-                )
+                    id: token, agent: entry.agent, fileName: entry.fileName,
+                    fraction: entry.fraction, isFinished: false
+                ),
+                entry.startedAt
+            )
+        }
+        if !airDropBatches.isEmpty {
+            cards += airDropBatches.map { ($0.snapshot, $0.startedAt) }
+        } else {
+            let airDropEntries = entries.values.filter { $0.agent == .airDrop }
+            if let latest = airDropEntries.max(by: { $0.startedAt < $1.startedAt }) {
+                let fractions = airDropEntries.compactMap(\.fraction)
+                // Repeated copies of one batch must not lose a percentage point through summation error.
+                let fraction = fractions.first.map { baseline in
+                    baseline + fractions.reduce(0) { $0 + ($1 - baseline) } / Double(fractions.count)
+                }
+                cards.append((
+                    BrowserDownloadSnapshot(
+                        id: airDropSummaryID,
+                        agent: .airDrop,
+                        fileName: airDropItemCount == 1 ? latest.fileName : AppLocalization.text("%ld 项下载", airDropItemCount),
+                        fraction: fraction,
+                        isFinished: false
+                    ),
+                    latest.startedAt
+                ))
             }
+        }
+        let active = cards.sorted { $0.1 > $1.1 }.map(\.0)
         return active.isEmpty ? finishedSnapshot.map { [$0] } ?? [] : active
     }
 
-    /// Returns deduplicated browsers ordered by most recent download.
     var uniqueAgents: [BrowserDownloadAgent] {
         var seen = Set<BrowserDownloadAgent>()
         return snapshots.compactMap(\.agent).filter { seen.insert($0).inserted }
     }
 
-    /// Multiple in-progress downloads are represented by one compact-island summary whose fraction is their arithmetic mean.
     var snapshot: BrowserDownloadSnapshot? {
         let active = snapshots
         guard !active.isEmpty else { return nil }
-        if active.count == 1 { return active[0] }
-        let knownFractions = active.compactMap(\.fraction)
+        guard active.count > 1 else { return active[0] }
+        let fractions = active.compactMap(\.fraction)
         return BrowserDownloadSnapshot(
             agent: nil,
             fileName: AppLocalization.text("%ld 项下载", active.count),
-            fraction: knownFractions.isEmpty
-                ? nil
-                : knownFractions.reduce(0, +) / Double(knownFractions.count),
+            fraction: fractions.isEmpty ? nil : fractions.reduce(0, +) / Double(fractions.count),
             isFinished: false
         )
     }
@@ -239,49 +305,65 @@ struct BrowserDownloadTracker: Sendable {
     mutating func insert(token: UUID, entry: Entry) {
         finishedSnapshot = nil
         entries[token] = entry
+        if entry.agent == .airDrop { rememberAirDropItemCount() }
     }
 
     mutating func update(token: UUID, fraction: Double?) {
-        guard entries[token] != nil else { return }
         entries[token]?.fraction = fraction
     }
 
     mutating func update(token: UUID, agent: BrowserDownloadAgent?) {
-        guard entries[token] != nil, let agent else { return }
+        guard let existing = entries[token], let agent, existing.agent != agent else { return }
         entries[token]?.agent = agent
+        if agent == .airDrop { rememberAirDropItemCount() }
+    }
+
+    mutating func updateAirDropBatches(_ batches: [AirDropBatch]) {
+        airDropBatches = batches
+        if !batches.isEmpty { finishedSnapshot = nil }
     }
 
     mutating func update(token: UUID, fileURL: URL?, fileName: String?) {
         guard entries[token] != nil else { return }
-        if let fileURL {
-            entries[token]?.fileURL = fileURL
-        }
-        if let fileName {
-            entries[token]?.fileName = fileName
-        }
+        if let fileURL { entries[token]?.fileURL = fileURL }
+        if let fileName { entries[token]?.fileName = fileName }
     }
 
-    /// Removes the entry; on success, transitions to the hold state and returns true so the caller can schedule the clear timer.
     mutating func finish(token: UUID, succeeded: Bool) -> Bool {
-        guard let entry = entries.removeValue(forKey: token) else { return false }
+        guard let entry = entries[token] else { return false }
+        let batch = entry.agent == .airDrop
+            ? airDropBatches.first(where: { $0.fileNames.contains(entry.fileName) })?.snapshot
+                ?? snapshots.first(where: { $0.agent == .airDrop })
+            : nil
+        entries.removeValue(forKey: token)
         guard succeeded else { return false }
         finishedSnapshot = BrowserDownloadSnapshot(
-            id: token,
+            id: batch?.id ?? token,
             agent: entry.agent,
-            fileName: entry.fileName,
+            fileName: batch?.fileName ?? entry.fileName,
             fraction: 1,
             isFinished: true
         )
         return true
     }
 
-    mutating func clearFinishedHold() {
-        finishedSnapshot = nil
-    }
+    mutating func clearFinishedHold() { finishedSnapshot = nil }
 
     mutating func removeAll() {
         entries.removeAll()
+        airDropBatches.removeAll()
+        airDropItemCount = 0
         finishedSnapshot = nil
+    }
+
+    private mutating func rememberAirDropItemCount() {
+        let count = entries.values.filter { $0.agent == .airDrop }.count
+        if count == 1 {
+            airDropSummaryID = UUID()
+            airDropItemCount = 1
+        } else {
+            airDropItemCount = max(airDropItemCount, count)
+        }
     }
 }
 
@@ -303,8 +385,8 @@ struct BrowserDownloadMonitorLifecycle: Sendable {
 }
 /// Monitors `NSProgress` published by browsers to the downloads directory and shows an icon and percentage in the collapsed Dynamic Island.
 ///
-/// Uses the system's public progress-publishing mechanism (Chrome, Safari, etc. publish progress during downloads),
-/// does not read browser history databases, and makes no network requests.
+/// Uses the system's public progress-publishing mechanism (Chrome, Safari, etc. publish progress during downloads).
+/// Modern AirDrop batches come from a read-only system event stream; public item publications provide a grouped fallback.
 @MainActor
 public final class BrowserDownloadMonitor: ObservableObject {
     /// How long the green checkmark stays visible after a successful download.
@@ -317,6 +399,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
     private var tracker = BrowserDownloadTracker()
     private var subscriberTokens: [Any] = []
     private var progressBoxes: [UUID: ProgressBox] = [:]
+    private var airDropEventStream: AirDropTransferEventStream?
     private var timer: AnyCancellable?
     private var finishedClearTask: Task<Void, Never>?
     private var lifecycle = BrowserDownloadMonitorLifecycle()
@@ -350,6 +433,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
     public func start() {
         guard subscriberTokens.isEmpty, !directories.isEmpty else { return }
         let callbackGeneration = lifecycle.start()
+        startAirDropObservation(callbackGeneration: callbackGeneration)
         for directory in directories {
             let token = Progress.addSubscriber(forFileURL: directory) { [weak self] published in
                 let entryToken = UUID()
@@ -382,6 +466,8 @@ public final class BrowserDownloadMonitor: ObservableObject {
 
     public func stop() {
         lifecycle.stop()
+        airDropEventStream?.stop()
+        airDropEventStream = nil
         for token in subscriberTokens { Progress.removeSubscriber(token) }
         subscriberTokens.removeAll()
         timer?.cancel()
@@ -395,13 +481,16 @@ public final class BrowserDownloadMonitor: ObservableObject {
     }
     private func register(token: UUID, box: ProgressBox) {
         let progress = box.progress
-        let fileURL = Self.fileURL(for: progress)
+        let fileURL = box.publishedFileURL ?? Self.fileURL(for: progress)
+        let operationKind = box.publishedFileOperationKind ?? progress.fileOperationKind
+        let agent = BrowserDownloadAgentResolver.agent(forFileOperationKind: operationKind)
+            ?? fileURL.flatMap { resolveAgent(forFileAt: $0) }
+        let publishedFraction = Self.fraction(of: progress)
         let entry = BrowserDownloadTracker.Entry(
             fileURL: fileURL,
-            agent: BrowserDownloadAgentResolver.agent(forFileOperationKind: progress.fileOperationKind)
-                ?? fileURL.flatMap { resolveAgent(forFileAt: $0) },
+            agent: agent,
             fileName: fileURL.map(BrowserDownloadAgentResolver.displayFileName) ?? "下载",
-            fraction: Self.fraction(of: progress),
+            fraction: publishedFraction,
             startedAt: Date()
         )
         progressBoxes[token] = box
@@ -452,7 +541,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
         var runningBundleIdentifiers: Set<String>?
         for (token, box) in progressBoxes {
             let progress = box.progress
-            tracker.update(token: token, fraction: Self.fraction(of: progress))
+            let publishedFraction = Self.fraction(of: progress)
             if let agent = BrowserDownloadAgentResolver.agent(
                 forFileOperationKind: progress.fileOperationKind
             ) {
@@ -460,7 +549,14 @@ public final class BrowserDownloadMonitor: ObservableObject {
             }
             // Update fileURL if it becomes available after initial registration
             let currentFileURL = Self.fileURL(for: progress)
-            if let currentFileURL, tracker.entries[token]?.fileURL != currentFileURL {
+            if let currentFileURL,
+                let entry = tracker.entries[token],
+                Self.shouldReplacePublishedFileURL(
+                    entry.fileURL,
+                    with: currentFileURL,
+                    agent: entry.agent
+                )
+            {
                 tracker.update(
                     token: token,
                     fileURL: currentFileURL,
@@ -481,8 +577,33 @@ public final class BrowserDownloadMonitor: ObservableObject {
                     )
                 )
             }
+            tracker.update(token: token, fraction: publishedFraction)
         }
         refresh()
+    }
+
+    nonisolated static func shouldReplacePublishedFileURL(
+        _ existingURL: URL?,
+        with currentURL: URL,
+        agent: BrowserDownloadAgent?
+    ) -> Bool {
+        guard existingURL != currentURL else { return false }
+        return agent != .airDrop || existingURL == nil
+    }
+
+    private func startAirDropObservation(callbackGeneration: UInt64) {
+        let stream = AirDropTransferEventStream(onEvent: { [weak self] data in
+            guard let self, self.lifecycle.accepts(callbackGeneration),
+                let batches = AirDropBatchParser.batches(from: data)
+            else { return }
+            self.tracker.updateAirDropBatches(batches)
+            self.refresh()
+        }, onUnavailable: { [weak self] in
+            guard let self, self.lifecycle.accepts(callbackGeneration) else { return }
+            self.tracker.updateAirDropBatches([])
+            self.refresh()
+        })
+        if stream.start() { airDropEventStream = stream }
     }
 
     private func scheduleFinishedClear() {
@@ -551,8 +672,12 @@ public final class BrowserDownloadMonitor: ObservableObject {
 /// not `userInfo` enumeration (the publisher may mutate that dictionary concurrently).
 private final class ProgressBox: @unchecked Sendable {
     let progress: Progress
+    let publishedFileURL: URL?
+    let publishedFileOperationKind: Progress.FileOperationKind?
 
     init(_ progress: Progress) {
         self.progress = progress
+        publishedFileURL = progress.fileURL ?? progress.userInfo[.fileURLKey] as? URL
+        publishedFileOperationKind = progress.fileOperationKind
     }
 }
