@@ -131,7 +131,14 @@ public struct CompactBarContourMetrics: Equatable, Sendable {
 
 public struct SideNoticeLayoutEngine: Equatable, Sendable {
     public static let compactStatusWingWidth: CGFloat = 40
+    private static let compactStatusAdditionalDigitWidth: CGFloat = 8
     static let compactProgressClearance: CGFloat = 2
+
+    public static func compactStatusWingWidth(forCount count: Int) -> CGFloat {
+        let digitCount = String(max(0, count)).count
+        return compactStatusWingWidth
+            + CGFloat(max(0, digitCount - 2)) * compactStatusAdditionalDigitWidth
+    }
 
     private enum Layout {
         static let compactWingWidth = SideNoticeLayoutEngine.compactStatusWingWidth
@@ -319,7 +326,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         for screen: ScreenSnapshot,
         sideExtension: CGFloat,
         expandsForDetailedMedia: Bool,
-        progressGlowEnabled: Bool
+        progressGlowEnabled: Bool,
+        compactWingWidth: CGFloat = Layout.compactWingWidth
     ) -> CGRect {
         let topology = ScreenLayoutEngine().layout(for: screen).topology
         let anchor = topology.anchorFrame
@@ -330,7 +338,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             if expandsForDetailedMedia {
                 visibleWingWidth = Layout.compactBarMediaDetailSideWidth - Layout.compactOverlap
             } else {
-                visibleWingWidth = Layout.compactWingWidth
+                visibleWingWidth = compactWingWidth
                     + max(0, sideExtension)
                     - Layout.compactOverlap
             }
@@ -361,14 +369,20 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     public func compactBarFrame(
         for screen: ScreenSnapshot,
         notices: [IslandNotice],
-        settings: FeatureSettings
+        settings: FeatureSettings,
+        browserDownloadCount: Int = 0
     ) -> CGRect? {
-        guard let sizing = compactBarSizing(for: notices, settings: settings) else { return nil }
+        guard let sizing = compactBarSizing(
+            for: notices,
+            settings: settings,
+            browserDownloadCount: browserDownloadCount
+        ) else { return nil }
         return compactBarFrame(
             for: screen,
             sideExtension: sizing.sideExtension,
             expandsForDetailedMedia: sizing.expandsForDetailedStatus,
-            progressGlowEnabled: sizing.progressGlowEnabled
+            progressGlowEnabled: sizing.progressGlowEnabled,
+            compactWingWidth: sizing.compactWingWidth
         )
     }
 
@@ -390,14 +404,15 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         for layout: ScreenOverlayLayout,
         sideExtension: CGFloat,
         expandsForDetailedMedia: Bool,
-        progressGlowEnabled: Bool
+        progressGlowEnabled: Bool,
+        compactWingWidth: CGFloat = Layout.compactWingWidth
     ) -> CGRect {
         let anchor = layout.topology.anchorFrame
         let baseWidth: CGFloat
         if layout.topology.hasPhysicalNotch {
             let visibleWingWidth = expandsForDetailedMedia
                 ? Layout.compactBarMediaDetailSideWidth - Layout.compactOverlap
-                : Layout.compactWingWidth
+                : compactWingWidth
                     + max(0, sideExtension)
                     - Layout.compactOverlap
             baseWidth = anchor.width + visibleWingWidth * 2
@@ -431,27 +446,35 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     public func compactBarFrame(
         for layout: ScreenOverlayLayout,
         notices: [IslandNotice],
-        settings: FeatureSettings
+        settings: FeatureSettings,
+        browserDownloadCount: Int = 0
     ) -> CGRect? {
-        guard let sizing = compactBarSizing(for: notices, settings: settings) else { return nil }
+        guard let sizing = compactBarSizing(
+            for: notices,
+            settings: settings,
+            browserDownloadCount: browserDownloadCount
+        ) else { return nil }
         return compactBarFrame(
             for: layout,
             sideExtension: sizing.sideExtension,
             expandsForDetailedMedia: sizing.expandsForDetailedStatus,
-            progressGlowEnabled: sizing.progressGlowEnabled
+            progressGlowEnabled: sizing.progressGlowEnabled,
+            compactWingWidth: sizing.compactWingWidth
         )
     }
 
     private func compactBarSizing(
         for notices: [IslandNotice],
-        settings: FeatureSettings
+        settings: FeatureSettings,
+        browserDownloadCount: Int
     ) -> (
         sideExtension: CGFloat,
         expandsForDetailedStatus: Bool,
-        progressGlowEnabled: Bool
+        progressGlowEnabled: Bool,
+        compactWingWidth: CGFloat
     )? {
         if notices.contains(where: { $0.id.hasPrefix("voice-processing-") }) {
-            return (0, false, false)
+            return (0, false, false, Layout.compactWingWidth)
         }
         let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }
@@ -489,10 +512,19 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
         let progressGlowEnabled = settings.collapsedProgressGlowEnabled
             && selectedStatusSupportsProgressGlow
+        let compactWingWidth = switch selectedPriority {
+        case .aiActivity:
+            Self.compactStatusWingWidth(forCount: notices.count(where: { $0.id.hasPrefix("ai-active-") }))
+        case .browserDownload:
+            Self.compactStatusWingWidth(forCount: browserDownloadCount)
+        default:
+            Layout.compactWingWidth
+        }
         return (
             sideExtension,
             expandsForDetailedStatus,
-            progressGlowEnabled
+            progressGlowEnabled,
+            compactWingWidth
         )
     }
 
@@ -605,7 +637,12 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             || hasMail || hasToolbox || hasBrowserDownload || hasVideoDownload || hasVoiceProcessing || reserveCompactWing
         guard ordinaryCount > 0 else {
             return hasCompact
-                ? CGSize(width: Layout.compactWingWidth, height: compactWingHeight)
+                ? CGSize(
+                    width: activeAICount > 0
+                        ? Self.compactStatusWingWidth(forCount: activeAICount)
+                        : Layout.compactWingWidth,
+                    height: compactWingHeight
+                )
                 : .zero
         }
 
