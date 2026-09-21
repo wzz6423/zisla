@@ -18,7 +18,6 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 - **三种包都必须保留**：`x86_64` 和 `arm64` 包分别只包含单一架构，`universal` 包必须同时包含两个架构；三类资产都要分别压缩、分别上传，文件名必须带对应后缀。
 - 无论安装包构建时的 `UPDATE_CHANNEL` 是什么，运行时选择 Release 或 Preview 都必须切换到对应的 Sparkle feed；自动检查和“检查更新”均遵循当前选择。切换后 Sparkle 重置下一次检查周期，手动检查立即使用新通道。
 - 使用 `CFBundleShortVersionString` 作为用户可见版本。版本 tag 一律为 `v${VERSION}`（Preview 形如 `v0.2.0-preview.1`），与签名 appcast 的默认 ZIP URL 一致；禁止使用 `release/v1.2.3` 等路径前缀 tag，那会迫使每次发布额外覆盖 `SPARKLE_GITEE_DOWNLOAD_URL_PREFIX` 和 `SPARKLE_GITHUB_DOWNLOAD_URL_PREFIX`。
-- Release 正文引用的截图必须先作为同一 `v${VERSION}` Release 的附件上传，并使用该 tag 的稳定下载地址。禁止带路径前缀的 `.../releases/download/release/v${VERSION}/`、会随下一版移动的 `.../releases/latest/download/` 和临时图床；正文同步到另一镜像时，可以引用已验证可达的原站图片地址。发布后要在实际页面确认每张图返回 HTTP 200 且内容确实是 PNG。
 - 每次发布前验证 DMG 中只有 `zisla.app` 和 `Applications` 软链接。首次安装 Sparkle 版仍需要用户手动安装；之后的已安装 Sparkle 版本才可自动更新。
 - 正式版发布完成后必须同步 Homebrew cask：`Casks/zisla.rb` 的 `version` 与两个 `sha256` 必须分别对应本次 `arm64` 与 `x86_64` ZIP，并与官网 `latestRelease` 同版本，否则 CI 的 `Verify the Homebrew cask` 失败。cask 用 `arch` 映射按机器解析下载地址，Apple Silicon 与 Intel 各自只取对应架构的包；Sparkle 之后读同一架构的 appcast，安装不会在一次应用内更新后变成 Universal。Preview 不进 tap，避免 `brew upgrade` 把用户带到预发布版本。cask 保留 `auto_updates true`，更新链路仍归 Sparkle，Homebrew 只负责首次安装、显式升级，以及已装应用落后于 tap 时的兜底升级。tap 里的版本只能是三份 appcast 都已上传并验证通过的版本：brew 装到的用户之后靠 Sparkle 拿更新，而 `auto_updates true` 让 Homebrew 只在已装应用确实旧于 tap 时才接手（Homebrew 5.1.6 起读应用包内的版本号，更早的版本直接跳过 `auto_updates` 的 cask）。所以不含 Sparkle 或 appcast 缺失的版本必须先从 tap 移除（`Casks/zisla.rb` 曾因指向不含 Sparkle 的 0.1.6 而被撤下）。
 - 发版构建严禁使用调试变体：必须显式使用 `DEBUG_BUILD=false`，产物必须是 `zisla.app`、Bundle ID `dev.wzz.zisla`；`zisla-debug.app` 或 `dev.wzz.zisla.debug` 只能用于本地调试，不能上传。
@@ -276,14 +275,14 @@ test -d "$STAGING_DIRECTORY/universal/zisla.app/Contents/Frameworks/Sparkle.fram
 codesign --verify --deep --strict "$STAGING_DIRECTORY/universal/zisla.app"
 ```
 
-上传后分别获取 Gitee 主 feed 与 GitHub fallback feed 上的三份 appcast，确认每份都返回 HTTP 200、为有效 XML、含签名，并指向对应站点、对应架构的本次 ZIP：Release 验证 Gitee `update-release/download/` 与 GitHub `latest/download/` 下的 `appcast.xml`、`appcast-arm64.xml`、`appcast-x86_64.xml`；Preview 验证两端 `releases/download/preview/` 下的同三份。任一 feed 非 200、无法解析、未签名或未指向本次对应架构 ZIP 时，停止发布并修复本次发布资产，不能以客户端版本比较作为替代。使用一台已安装旧 Sparkle 版应用的测试机，分别验证 Release→Release、Preview→Preview、Release→Preview 与 Preview→Release：切换通道后手动检查应先访问 Gitee；断开 Gitee 或让 Gitee 更新包下载失败时只能自动重试 GitHub 一次；开启自动下载时应在退出或重启时完成替换。线上还没有任何含 Sparkle 的已发布版本时（0.1.6 及更早都不含），用本次包自建旧版代替，不得因为“没有旧版可装”而跳过这一步。单架构测试机更新后还要用 `lipo -archs` 确认应用仍只含本机架构，Universal 安装更新后同样用 `lipo -archs` 确认仍含两个架构，Rosetta 下运行的 x86_64 安装则应更新到 `arm64` 包。再验证两端 Release 正文里的截图：每个地址都必须使用本次 `v${VERSION}` tag 的稳定下载地址，返回 HTTP 200，且下载到的字节确实是 PNG。任一截图不满足时补传附件并改正正文，不能以“本地图片没问题”替代。
+上传后分别获取 Gitee 主 feed 与 GitHub fallback feed 上的三份 appcast，确认每份都返回 HTTP 200、为有效 XML、含签名，并指向对应站点、对应架构的本次 ZIP：Release 验证 Gitee `update-release/download/` 与 GitHub `latest/download/` 下的 `appcast.xml`、`appcast-arm64.xml`、`appcast-x86_64.xml`；Preview 验证两端 `releases/download/preview/` 下的同三份。任一 feed 非 200、无法解析、未签名或未指向本次对应架构 ZIP 时，停止发布并修复本次发布资产，不能以客户端版本比较作为替代。使用一台已安装旧 Sparkle 版应用的测试机，分别验证 Release→Release、Preview→Preview、Release→Preview 与 Preview→Release：切换通道后手动检查应先访问 Gitee；断开 Gitee 或让 Gitee 更新包下载失败时只能自动重试 GitHub 一次；开启自动下载时应在退出或重启时完成替换。线上还没有任何含 Sparkle 的已发布版本时（0.1.6 及更早都不含），用本次包自建旧版代替，不得因为“没有旧版可装”而跳过这一步。单架构测试机更新后还要用 `lipo -archs` 确认应用仍只含本机架构，Universal 安装更新后同样用 `lipo -archs` 确认仍含两个架构，Rosetta 下运行的 x86_64 安装则应更新到 `arm64` 包。
 
 两端资产清单与六份 feed 用与 CI 同一份脚本核对，避免逐个 URL 手点漏掉某个架构：
 
 ```zsh
 # 六份 feed 各自 200、恰好一个 item、带 edSignature，且指向本站本架构的本次 ZIP。
 ruby .github/scripts/appcast-feeds.rb verify --tag "v${VERSION}" --channel "$UPDATE_CHANNEL"
-# 15 份必需资产：三套 DMG/ZIP 及其 SHA-256，加三份 appcast。截图和源码包属于额外资产。
+# 15 份必需资产：三套 DMG/ZIP 及其 SHA-256，加三份 appcast。源码包属于额外资产。
 gh release view "v${VERSION}" --repo wzz6423/zisla --json assets --jq '.assets[].name' \
   | ruby .github/scripts/appcast-feeds.rb verify-assets --tag "v${VERSION}"
 curl -sS "https://gitee.com/api/v5/repos/wzz6423/zisla/releases/tags/v${VERSION}" \
@@ -296,25 +295,6 @@ fi
 ```
 
 发布后 GitHub Actions 的 `Release Feeds` 会自动跑上面这套校验：`release: published` 触发，prerelease 自动走 preview 通道，永久 feed tag（`preview`、`update-release`）跳过。永久 feed 是手工发版的后续步骤，所以它最多轮询 10 次、每次间隔 60 秒，任一环节始终缺失才失败；补齐资产后用 `gh workflow run 'Release Feeds' -f tag="v${VERSION}" -f channel="$UPDATE_CHANNEL"` 重跑即可。runner 访问 Gitee 常被限流或拒绝，此时该工作流只验 GitHub 回退 feed 并给出 warning，Gitee 主 feed 仍必须按上面的命令人工验证过才算发版完成。
-
-```zsh
-for HOST in github gitee; do
-  case "$HOST" in
-    github) RELEASE_BODY="$(gh release view "v${VERSION}" --repo wzz6423/zisla --json body --jq .body)" ;;
-    gitee) RELEASE_BODY="$(curl -sS "https://gitee.com/api/v5/repos/wzz6423/zisla/releases/tags/v${VERSION}" | jq -r .body)" ;;
-  esac
-  IMAGE_URLS=(${(f)"$(print -r -- "$RELEASE_BODY" | rg -o '!\[[^]]*\]\((https://[^)]+)\)' -r '$1')"})
-  test "${#IMAGE_URLS}" -ge 1
-  for IMAGE_URL in "${IMAGE_URLS[@]}"; do
-    [[ "$IMAGE_URL" == "https://github.com/wzz6423/zisla/releases/download/v${VERSION}/"*.png || \
-      "$IMAGE_URL" == "https://gitee.com/wzz6423/zisla/releases/download/v${VERSION}/"*.png ]]
-    IMAGE_FILE="$(mktemp "${TMPDIR:-/tmp}/zisla-release-image.XXXXXX")"
-    test "$(curl -sSL -o "$IMAGE_FILE" -w '%{http_code}' "$IMAGE_URL")" = 200
-    file -b "$IMAGE_FILE" | rg -q '^PNG image data'
-    rm -f "$IMAGE_FILE"
-  done
-done
-```
 
 自建旧版只改版本号与 Bundle ID，因此它验的是真实私钥签出的线上 feed、应用内置的真实 `SUPublicEDKey`，以及终止旧实例后重新拉起新版这一段——这三项本地测试都覆盖不到。改 Bundle ID 是为了不污染正式实例的 Sparkle 偏好；改过 Info.plist 必须重签，否则 Sparkle 校验宿主签名时失败。
 
@@ -359,7 +339,7 @@ brew livecheck --cask wzz6423/tap/zisla
 
 ## 结束发版：end commit
 
-只有两端全部资产、六份永久 feed、截图与自动更新验证通过，且正式版的 tap/cask/官网同步及校验完成，才允许结束；任何跳过、失败或未完成的验证都不得用 end 标记成功。正式版仅暂存 `Casks/zisla.rb`、`web/src/content.ts` 和 `web/README.md` 的发布元数据；tap 仓库由 `sync-cask` 单独提交和推送，其远端版本、校验和也须确认。Preview 不更新正式 cask、tap 或官网，但仍提交相同格式的空 end commit。
+只有两端全部资产、六份永久 feed 与自动更新验证通过，且正式版的 tap/cask/官网同步及校验完成，才允许结束；任何跳过、失败或未完成的验证都不得用 end 标记成功。正式版仅暂存 `Casks/zisla.rb`、`web/src/content.ts` 和 `web/README.md` 的发布元数据；tap 仓库由 `sync-cask` 单独提交和推送，其远端版本、校验和也须确认。Preview 不更新正式 cask、tap 或官网，但仍提交相同格式的空 end commit。
 
 ```zsh
 release_gate
@@ -387,4 +367,4 @@ done
 
 ## 交付记录
 
-在 Release 正文中写清楚版本类型、签名方式、公证状态、已测试的 macOS 范围、WeatherKit 限制、GitHub Issues/PR 入口，以及 Gitee 不受理 Issues/PR 的事实。说明首次安装需手动完成，Sparkle 版后续更新会自动验签并在退出或重启时安装。不要包含证书序列号、访问令牌、私钥、Keychain 密码或个人 Apple ID 信息。截图不由 `make build-package` 产出，也不属于 `outputs/`：先将截图作为 `v${VERSION}` Release 的附件上传，再在正文引用该 tag 的稳定地址；若两端都承载截图，则分别引用各自站点的地址。
+在 Release 正文中写清楚版本类型、签名方式、公证状态、已测试的 macOS 范围、WeatherKit 限制、GitHub Issues/PR 入口，以及 Gitee 不受理 Issues/PR 的事实。说明首次安装需手动完成，Sparkle 版后续更新会自动验签并在退出或重启时安装。不要包含证书序列号、访问令牌、私钥、Keychain 密码或个人 Apple ID 信息。
