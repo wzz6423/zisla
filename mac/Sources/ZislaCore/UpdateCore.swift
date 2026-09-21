@@ -1,5 +1,21 @@
 import Foundation
 
+public enum UpdateFeedPreference: Equatable, Sendable {
+    case giteeFirst
+    case githubFirst
+
+    public init(countryCode: String?) {
+        guard let normalizedCountryCode = countryCode?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased(),
+            !normalizedCountryCode.isEmpty else {
+            self = .giteeFirst
+            return
+        }
+        self = normalizedCountryCode == "CN" ? .giteeFirst : .githubFirst
+    }
+}
+
 public enum UpdateFeedSource: Equatable, Sendable {
     case primary
     case fallback

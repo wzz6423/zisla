@@ -64,6 +64,26 @@ struct UpdateNoticePresentationTests {
     }
 
     @Test
+    func automaticAndManualChecksResolveTheSameMirrorPreference() throws {
+        let source = try String(contentsOf: Self.appModelSourceURL, encoding: .utf8)
+        let updateCheck = try sourceSlice(
+            in: source,
+            from: "func checkForUpdates(manual:",
+            to: "func selectSystemMonitor()"
+        )
+        let polling = try sourceSlice(
+            in: source,
+            from: "private func configureUpdatePolling(enabled:",
+            to: "private func updateFeedPreferenceForCurrentProcess()"
+        )
+
+        #expect(source.contains("countryCodeForCurrentIP()"))
+        #expect(updateCheck.contains("await updateFeedPreferenceForCurrentProcess()"))
+        #expect(updateCheck.contains("feedPreference: feedPreference"))
+        #expect(polling.contains("checkForUpdates(manual: false)"))
+    }
+
+    @Test
     func skippedUpdateClearsTheCustomNoticeWhileManualChecksRemainUserInitiated() throws {
         let appModelSource = try String(contentsOf: Self.appModelSourceURL, encoding: .utf8)
         let controllerSource = try String(contentsOf: Self.sparkleUpdateControllerSourceURL, encoding: .utf8)

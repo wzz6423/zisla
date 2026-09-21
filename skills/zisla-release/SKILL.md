@@ -9,7 +9,7 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 
 ## 发布原则
 
-- Release 主 feed 固定为 `https://gitee.com/wzz6423/zisla/releases/download/update-release/appcast.xml`，失败时仅回退一次 `https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml`；Preview 主 feed 固定为 `https://gitee.com/wzz6423/zisla/releases/download/preview/appcast.xml`，失败时仅回退一次 `https://github.com/wzz6423/zisla/releases/download/preview/appcast.xml`。这四个地址是 Info.plist 里的基准值，单架构安装把文件名改写为运行架构的 `appcast-arm64.xml` 或 `appcast-x86_64.xml`（Rosetta 下运行的 x86_64 slice 按 `arm64` 请求，否则这台 Mac 会被永久留在 Intel 包上）；Universal 安装按可执行文件里的 slice 数判定，保留 `appcast.xml`，更新后仍是 Universal。0.1.6 及更早的版本不含 Sparkle，只能手动下载新版，因此没有任何已发布版本依赖这份基准名。Gitee appcast 检查或其更新包下载失败时回退；每次新的自动或手动检查都会重新从 Gitee 开始。appcast 与 ZIP 必须同时通过 EdDSA 签名；客户端在解压前验证，再替换并重启应用。
+- Release 的 Gitee 基准 feed 为 `https://gitee.com/wzz6423/zisla/releases/download/update-release/appcast.xml`，GitHub 基准 feed 为 `https://github.com/wzz6423/zisla/releases/latest/download/appcast.xml`；Preview 的 Gitee 与 GitHub 基准 feed 分别为 `https://gitee.com/wzz6423/zisla/releases/download/preview/appcast.xml` 和 `https://github.com/wzz6423/zisla/releases/download/preview/appcast.xml`。运行时会在本次进程中解析一次公网出口国家码：`CN` 使用 Gitee→GitHub，其他国家码使用 GitHub→Gitee；无法获取国家码时保留 Gitee→GitHub。这四个地址是 Info.plist 里的基准值，单架构安装把文件名改写为运行架构的 `appcast-arm64.xml` 或 `appcast-x86_64.xml`（Rosetta 下运行的 x86_64 slice 按 `arm64` 请求，否则这台 Mac 会被永久留在 Intel 包上）；Universal 安装按可执行文件里的 slice 数判定，保留 `appcast.xml`，更新后仍是 Universal。0.1.6 及更早的版本不含 Sparkle，只能手动下载新版，因此没有任何已发布版本依赖这份基准名。首选镜像的 appcast 检查或更新包下载失败时只回退另一镜像一次；每次新的自动或手动检查都会重新从首选镜像开始。appcast 与 ZIP 必须同时通过 EdDSA 签名；客户端在解压前验证，再替换并重启应用。
 - Gitee 的正式永久 feed tag 是 `update-release`，Preview 永久 feed tag 是 `preview`；GitHub 的正式 feed 使用 `latest`，Preview 使用永久 prerelease tag `preview`。两个 `preview` feed 都只保存当前 Preview 的三份 appcast，且各自指向实际版本 tag（例如 `v0.2.0-preview.1`）中本站对应架构的 ZIP。GitHub 的 `preview` 必须保持 prerelease，避免污染正式 `latest`。
 - 每个版本仍构建 `x86_64`、`arm64` 和 `universal` 三套包，三套 ZIP 都参与自动更新：每套各有一份只引用自己那套 ZIP 的 appcast，装哪套就一直更新哪套——单架构安装不会被 Universal 包换掉，装机体积优势不会在一次应用内更新后消失；Universal 安装也不会被换成单架构包，跨架构可用不会因为一次更新而失去。DMG 和校验文件只用于首次安装与 Release 页面下载，不参与应用内更新流程。
 - 每次运行 `package-release.sh` 都会在同目录生成 `appcast-gitee.xml` 和 `appcast-github.xml`，两者只引用本次构建的那一套 ZIP，分别指向 Gitee 与 GitHub。`make build-package` 因此产出三对；上传时 Universal 那对命名为 `appcast.xml`（Universal 安装请求的就是它），单架构那两对命名为 `appcast-arm64.xml` 与 `appcast-x86_64.xml`。不得手改已签名 appcast；需修改时重新运行生成工具。
@@ -275,7 +275,7 @@ test -d "$STAGING_DIRECTORY/universal/zisla.app/Contents/Frameworks/Sparkle.fram
 codesign --verify --deep --strict "$STAGING_DIRECTORY/universal/zisla.app"
 ```
 
-上传后分别获取 Gitee 主 feed 与 GitHub fallback feed 上的三份 appcast，确认每份都返回 HTTP 200、为有效 XML、含签名，并指向对应站点、对应架构的本次 ZIP：Release 验证 Gitee `update-release/download/` 与 GitHub `latest/download/` 下的 `appcast.xml`、`appcast-arm64.xml`、`appcast-x86_64.xml`；Preview 验证两端 `releases/download/preview/` 下的同三份。任一 feed 非 200、无法解析、未签名或未指向本次对应架构 ZIP 时，停止发布并修复本次发布资产，不能以客户端版本比较作为替代。使用一台已安装旧 Sparkle 版应用的测试机，分别验证 Release→Release、Preview→Preview、Release→Preview 与 Preview→Release：切换通道后手动检查应先访问 Gitee；断开 Gitee 或让 Gitee 更新包下载失败时只能自动重试 GitHub 一次；开启自动下载时应在退出或重启时完成替换。线上还没有任何含 Sparkle 的已发布版本时（0.1.6 及更早都不含），用本次包自建旧版代替，不得因为“没有旧版可装”而跳过这一步。单架构测试机更新后还要用 `lipo -archs` 确认应用仍只含本机架构，Universal 安装更新后同样用 `lipo -archs` 确认仍含两个架构，Rosetta 下运行的 x86_64 安装则应更新到 `arm64` 包。
+上传后分别获取 Gitee 与 GitHub feed 上的三份 appcast，确认每份都返回 HTTP 200、为有效 XML、含签名，并指向对应站点、对应架构的本次 ZIP：Release 验证 Gitee `update-release/download/` 与 GitHub `latest/download/` 下的 `appcast.xml`、`appcast-arm64.xml`、`appcast-x86_64.xml`；Preview 验证两端 `releases/download/preview/` 下的同三份。任一 feed 非 200、无法解析、未签名或未指向本次对应架构 ZIP 时，停止发布并修复本次发布资产，不能以客户端版本比较作为替代。使用已安装旧 Sparkle 版应用的中国大陆公网出口与境外公网出口，分别验证 Release→Release、Preview→Preview、Release→Preview 与 Preview→Release：前者手动检查应先访问 Gitee、失败时只重试 GitHub 一次；后者应先访问 GitHub、失败时只重试 Gitee 一次；开启自动下载时应在退出或重启时完成替换。线上还没有任何含 Sparkle 的已发布版本时（0.1.6 及更早都不含），用本次包自建旧版代替，不得因为“没有旧版可装”而跳过这一步。单架构测试机更新后还要用 `lipo -archs` 确认应用仍只含本机架构，Universal 安装更新后同样用 `lipo -archs` 确认仍含两个架构，Rosetta 下运行的 x86_64 安装则应更新到 `arm64` 包。
 
 两端资产清单与六份 feed 用与 CI 同一份脚本核对，避免逐个 URL 手点漏掉某个架构：
 
@@ -294,7 +294,7 @@ if [[ "$UPDATE_CHANNEL" == preview ]]; then
 fi
 ```
 
-发布后 GitHub Actions 的 `Release Feeds` 会自动跑上面这套校验：`release: published` 触发，prerelease 自动走 preview 通道，永久 feed tag（`preview`、`update-release`）跳过。永久 feed 是手工发版的后续步骤，所以它最多轮询 10 次、每次间隔 60 秒，任一环节始终缺失才失败；补齐资产后用 `gh workflow run 'Release Feeds' -f tag="v${VERSION}" -f channel="$UPDATE_CHANNEL"` 重跑即可。runner 访问 Gitee 常被限流或拒绝，此时该工作流只验 GitHub 回退 feed 并给出 warning，Gitee 主 feed 仍必须按上面的命令人工验证过才算发版完成。
+发布后 GitHub Actions 的 `Release Feeds` 会自动跑上面这套校验：`release: published` 触发，prerelease 自动走 preview 通道，永久 feed tag（`preview`、`update-release`）跳过。永久 feed 是手工发版的后续步骤，所以它最多轮询 10 次、每次间隔 60 秒，任一环节始终缺失才失败；补齐资产后用 `gh workflow run 'Release Feeds' -f tag="v${VERSION}" -f channel="$UPDATE_CHANNEL"` 重跑即可。runner 访问 Gitee 常被限流或拒绝，此时该工作流只验 GitHub 镜像并给出 warning，Gitee feed 仍必须按上面的命令人工验证过才算发版完成。
 
 自建旧版只改版本号与 Bundle ID，因此它验的是真实私钥签出的线上 feed、应用内置的真实 `SUPublicEDKey`，以及终止旧实例后重新拉起新版这一段——这三项本地测试都覆盖不到。改 Bundle ID 是为了不污染正式实例的 Sparkle 偏好；改过 Info.plist 必须重签，否则 Sparkle 校验宿主签名时失败。
 

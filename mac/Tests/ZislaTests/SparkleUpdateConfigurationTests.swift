@@ -1,9 +1,34 @@
 import Foundation
 import Testing
+import ZislaCore
 
 @testable import Zisla
 
 struct SparkleUpdateConfigurationTests {
+    @Test
+    func ordersMirrorFeedsByCountryCode() throws {
+        let giteeURL = try #require(URL(string: "https://gitee.example.com/appcast.xml"))
+        let githubURL = try #require(URL(string: "https://github.example.com/appcast.xml"))
+        let feeds = SparkleFeedPair(gitee: giteeURL, github: githubURL)
+
+        #expect(
+            feeds.url(for: .primary, preference: UpdateFeedPreference(countryCode: "CN"))
+                == giteeURL
+        )
+        #expect(
+            feeds.url(for: .fallback, preference: UpdateFeedPreference(countryCode: "CN"))
+                == githubURL
+        )
+        #expect(
+            feeds.url(for: .primary, preference: UpdateFeedPreference(countryCode: "US"))
+                == githubURL
+        )
+        #expect(
+            feeds.url(for: .fallback, preference: UpdateFeedPreference(countryCode: "US"))
+                == giteeURL
+        )
+    }
+
     @Test @MainActor
     func onlySkippingAnUpdateNotifiesTheClient() throws {
         let primaryURL = try #require(URL(string: "https://gitee.example.com/appcast.xml"))
