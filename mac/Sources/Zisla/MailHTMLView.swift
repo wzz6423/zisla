@@ -108,7 +108,7 @@ final class MailBodyWebView: WKWebView, WKNavigationDelegate, WKUIDelegate {
         _ = navigationPolicy(
             for: navigationAction.request.url,
             isMainFrame: navigationAction.targetFrame?.isMainFrame == true,
-            isLink: navigationAction.navigationType == .linkActivated || navigationAction.targetFrame == nil
+            isLink: true
         )
         return nil
     }
