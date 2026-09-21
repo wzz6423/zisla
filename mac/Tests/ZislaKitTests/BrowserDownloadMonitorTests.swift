@@ -124,6 +124,191 @@ struct BrowserDownloadAgentResolverTests {
     }
 }
 
+struct AirDropTransferMetadataParserTests {
+    @Test
+    func parsesCurrentAndLegacyFileMetadataKeys() {
+        let destination = URL(fileURLWithPath: "/Users/test/Downloads", isDirectory: true)
+        let completed = URL(fileURLWithPath: "/Users/test/Downloads/legacy.bin")
+
+        let items = AirDropTransferMetadataParser.items(
+            from: [
+                ["fileName": "current.bin", "fileSize": NSNumber(value: 200)],
+                ["FileName": "legacy.bin", "FileSize": NSNumber(value: 100)],
+                ["FileName": NSNumber(value: 42), "FileSize": NSNumber(value: 50)],
+                NSNull(),
+            ],
+            destinationURL: destination,
+            completedURLs: [completed]
+        )
+
+        #expect(items.map(\.fileName) == ["current.bin", "legacy.bin"])
+        #expect(items.map(\.expectedByteCount) == [200, 100])
+        #expect(items.allSatisfy { $0.destinationURL == destination })
+        #expect(items.allSatisfy { $0.completedURLs == [completed] })
+    }
+
+    @Test
+    func missingOrInvalidSizeRemainsUnknown() throws {
+        let items = AirDropTransferMetadataParser.items(
+            from: [
+                ["FileName": "missing.bin"],
+                ["FileName": "invalid.bin", "FileSize": "100"],
+            ],
+            destinationURL: nil,
+            completedURLs: []
+        )
+
+        #expect(items.count == 2)
+        #expect(try #require(items.first { $0.fileName == "missing.bin" }).expectedByteCount == nil)
+        #expect(try #require(items.first { $0.fileName == "invalid.bin" }).expectedByteCount == nil)
+    }
+}
+
+struct AirDropItemProgressResolverTests {
+    @Test
+    func twoItemsUseTheirOwnWrittenByteCounts() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-airdrop-progress-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let firstURL = directory.appendingPathComponent("first.bin")
+        let secondURL = directory.appendingPathComponent("second.bin")
+        try Data(repeating: 1, count: 20).write(to: firstURL)
+        try Data(repeating: 2, count: 80).write(to: secondURL)
+        let first = AirDropTransferItem(
+            fileName: "first.bin",
+            expectedByteCount: 100,
+            destinationURL: directory,
+            completedURLs: []
+        )
+        let second = AirDropTransferItem(
+            fileName: "second.bin",
+            expectedByteCount: 100,
+            destinationURL: directory,
+            completedURLs: []
+        )
+        let byteCount: (URL) -> Int64? = {
+            AirDropItemProgressResolver.fileByteCount(at: $0, fileManager: .default)
+        }
+
+        #expect(AirDropItemProgressResolver.fraction(for: first, progressFileURL: nil, fileByteCount: byteCount) == 0.2)
+        #expect(AirDropItemProgressResolver.fraction(for: second, progressFileURL: nil, fileByteCount: byteCount) == 0.8)
+    }
+
+    @Test
+    func explicitProgressFileURLIsUsedWhenPrivateDestinationIsUnavailable() {
+        let fileURL = URL(fileURLWithPath: "/Users/test/Downloads/item.bin")
+        let item = AirDropTransferItem(
+            fileName: "item.bin",
+            expectedByteCount: 200,
+            destinationURL: nil,
+            completedURLs: []
+        )
+
+        let fraction = AirDropItemProgressResolver.fraction(
+            for: item,
+            progressFileURL: fileURL,
+            fileByteCount: { $0 == fileURL ? 50 : nil }
+        )
+
+        #expect(fraction == 0.25)
+    }
+
+    @Test
+    func temporaryProgressFileTakesPriorityOverPrivateDestination() {
+        let destination = URL(fileURLWithPath: "/Users/test/Downloads", isDirectory: true)
+        let temporaryURL = destination.appendingPathComponent("item.bin.download")
+        let item = AirDropTransferItem(
+            fileName: "item.bin",
+            expectedByteCount: 200,
+            destinationURL: destination,
+            completedURLs: []
+        )
+        var requestedURLs: [URL] = []
+
+        let fraction = AirDropItemProgressResolver.fraction(
+            for: item,
+            progressFileURL: temporaryURL,
+            fileByteCount: {
+                requestedURLs.append($0)
+                return $0 == temporaryURL ? 50 : 200
+            }
+        )
+
+        #expect(fraction == 0.25)
+        #expect(requestedURLs == [temporaryURL])
+    }
+
+    @Test
+    func invalidSizeAndUnsafePathDoNotReadAnyFile() {
+        var readCount = 0
+        let read: (URL) -> Int64? = { _ in
+            readCount += 1
+            return 50
+        }
+        let destination = URL(fileURLWithPath: "/Users/test/Downloads", isDirectory: true)
+        let invalidSizes: [Int64?] = [nil, 0, -1]
+        for expectedByteCount in invalidSizes {
+            let item = AirDropTransferItem(
+                fileName: "item.bin",
+                expectedByteCount: expectedByteCount,
+                destinationURL: destination,
+                completedURLs: []
+            )
+            #expect(AirDropItemProgressResolver.fraction(for: item, progressFileURL: nil, fileByteCount: read) == nil)
+        }
+        let traversal = AirDropTransferItem(
+            fileName: "../outside.bin",
+            expectedByteCount: 100,
+            destinationURL: destination,
+            completedURLs: []
+        )
+        #expect(AirDropItemProgressResolver.fraction(for: traversal, progressFileURL: nil, fileByteCount: read) == nil)
+        #expect(readCount == 0)
+    }
+
+    @Test
+    func nonFileDestinationAndUnrelatedCompletedURLAreRejected() {
+        let item = AirDropTransferItem(
+            fileName: "item.bin",
+            expectedByteCount: 100,
+            destinationURL: URL(string: "https://example.com/Downloads"),
+            completedURLs: [URL(fileURLWithPath: "/Users/test/Downloads/other.bin")]
+        )
+
+        #expect(AirDropItemProgressResolver.privateFileURLs(for: item).isEmpty)
+    }
+
+    @Test
+    func byteCountRejectsDirectoriesAndSymbolicLinks() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-airdrop-file-kind-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let target = directory.appendingPathComponent("target.bin")
+        let link = directory.appendingPathComponent("link.bin")
+        try Data([1, 2, 3]).write(to: target)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+
+        #expect(AirDropItemProgressResolver.fileByteCount(at: target, fileManager: .default) == 3)
+        #expect(AirDropItemProgressResolver.fileByteCount(at: directory, fileManager: .default) == nil)
+        #expect(AirDropItemProgressResolver.fileByteCount(at: link, fileManager: .default) == nil)
+    }
+
+    @Test
+    func writtenBytesAreCappedAtComplete() {
+        let item = AirDropTransferItem(
+            fileName: "item.bin",
+            expectedByteCount: 100,
+            destinationURL: URL(fileURLWithPath: "/Users/test/Downloads", isDirectory: true),
+            completedURLs: []
+        )
+
+        #expect(AirDropItemProgressResolver.fraction(for: item, progressFileURL: nil, fileByteCount: { _ in 120 }) == 1)
+    }
+}
+
 struct BrowserDownloadMonitorLifecycleTests {
     @Test
     func staleCallbacksAreRejectedAfterStopAndRestart() {
@@ -198,12 +383,56 @@ struct BrowserDownloadSnapshotTests {
     }
 }
 
+struct BrowserDownloadFileURLPolicyTests {
+    @Test
+    func airDropKeepsTheURLCapturedForEachPublishedItem() {
+        let first = URL(fileURLWithPath: "/Users/test/Downloads/first.bin")
+        let second = URL(fileURLWithPath: "/Users/test/Downloads/second.bin")
+
+        #expect(
+            !BrowserDownloadMonitor.shouldReplacePublishedFileURL(
+                first,
+                with: second,
+                agent: .airDrop
+            )
+        )
+        #expect(
+            BrowserDownloadMonitor.shouldReplacePublishedFileURL(
+                nil,
+                with: first,
+                agent: .airDrop
+            )
+        )
+    }
+
+    @Test
+    func browserCanAdoptALaterPublishedURL() {
+        let first = URL(fileURLWithPath: "/Users/test/Downloads/report.pdf")
+        let temporary = first.appendingPathExtension("crdownload")
+
+        #expect(
+            BrowserDownloadMonitor.shouldReplacePublishedFileURL(
+                first,
+                with: temporary,
+                agent: .chrome
+            )
+        )
+        #expect(
+            !BrowserDownloadMonitor.shouldReplacePublishedFileURL(
+                first,
+                with: first,
+                agent: .chrome
+            )
+        )
+    }
+}
+
 struct BrowserDownloadTrackerTests {
     private func entry(
         agent: BrowserDownloadAgent? = .chrome,
         fileName: String = "report.pdf",
         fraction: Double? = 0,
-        progressObjectID: ObjectIdentifier? = nil,
+        batchFraction: Double? = nil,
         startedAt: Date = Date()
     ) -> BrowserDownloadTracker.Entry {
         BrowserDownloadTracker.Entry(
@@ -211,8 +440,8 @@ struct BrowserDownloadTrackerTests {
             agent: agent,
             fileName: fileName,
             fraction: fraction,
-            startedAt: startedAt,
-            progressObjectID: progressObjectID
+            batchFraction: batchFraction,
+            startedAt: startedAt
         )
     }
 
@@ -333,46 +562,8 @@ struct BrowserDownloadTrackerTests {
     }
 
     @Test
-    func repeatedAirDropBatchProgressCollapsesIntoOneBatchSnapshot() {
+    func airDropBatchKeepsIndependentItemsAndUsesBatchOnlyForCompactSummary() {
         var tracker = BrowserDownloadTracker()
-        let sharedProgress = NSObject()
-        let progressObjectID = ObjectIdentifier(sharedProgress)
-        let first = UUID()
-        let second = UUID()
-        tracker.insert(
-            token: first,
-            entry: entry(
-                agent: .airDrop,
-                fileName: "IMG_8239.HEIC",
-                fraction: 0.67,
-                progressObjectID: progressObjectID,
-                startedAt: Date(timeIntervalSince1970: 100)
-            )
-        )
-        tracker.insert(
-            token: second,
-            entry: entry(
-                agent: .airDrop,
-                fileName: "IMG_8240.HEIC",
-                fraction: 0.67,
-                progressObjectID: progressObjectID,
-                startedAt: Date(timeIntervalSince1970: 200)
-            )
-        )
-
-        #expect(tracker.snapshots.count == 1)
-        #expect(tracker.snapshots.first?.id == second)
-        #expect(tracker.snapshots.first?.agent == .airDrop)
-        #expect(tracker.snapshots.first?.fileName == "2 项下载")
-        #expect(tracker.snapshots.first?.fraction == 0.67)
-        #expect(tracker.snapshot == tracker.snapshots.first)
-    }
-
-    @Test
-    func distinctAirDropProgressesKeepTheirOwnSnapshots() {
-        var tracker = BrowserDownloadTracker()
-        let firstProgress = NSObject()
-        let secondProgress = NSObject()
         let first = UUID()
         let second = UUID()
         tracker.insert(
@@ -381,7 +572,7 @@ struct BrowserDownloadTrackerTests {
                 agent: .airDrop,
                 fileName: "IMG_8239.HEIC",
                 fraction: 0.2,
-                progressObjectID: ObjectIdentifier(firstProgress),
+                batchFraction: 0.67,
                 startedAt: Date(timeIntervalSince1970: 100)
             )
         )
@@ -391,7 +582,7 @@ struct BrowserDownloadTrackerTests {
                 agent: .airDrop,
                 fileName: "IMG_8240.HEIC",
                 fraction: 0.8,
-                progressObjectID: ObjectIdentifier(secondProgress),
+                batchFraction: 0.67,
                 startedAt: Date(timeIntervalSince1970: 200)
             )
         )
@@ -399,6 +590,40 @@ struct BrowserDownloadTrackerTests {
         #expect(tracker.snapshots.map(\.id) == [second, first])
         #expect(tracker.snapshots.map(\.fileName) == ["IMG_8240.HEIC", "IMG_8239.HEIC"])
         #expect(tracker.snapshots.map(\.fraction) == [0.8, 0.2])
+        #expect(tracker.snapshot?.fileName == "2 项下载")
+        #expect(tracker.snapshot?.fraction == 0.67)
+    }
+
+    @Test
+    func unresolvedAirDropItemsDoNotReuseBatchProgress() {
+        var tracker = BrowserDownloadTracker()
+        let first = UUID()
+        let second = UUID()
+        tracker.insert(
+            token: first,
+            entry: entry(
+                agent: .airDrop,
+                fileName: "IMG_8239.HEIC",
+                fraction: nil,
+                batchFraction: 0.67,
+                startedAt: Date(timeIntervalSince1970: 100)
+            )
+        )
+        tracker.insert(
+            token: second,
+            entry: entry(
+                agent: .airDrop,
+                fileName: "IMG_8240.HEIC",
+                fraction: nil,
+                batchFraction: 0.67,
+                startedAt: Date(timeIntervalSince1970: 200)
+            )
+        )
+
+        #expect(tracker.snapshots.map(\.id) == [second, first])
+        #expect(tracker.snapshots.allSatisfy { $0.fraction == nil })
+        #expect(tracker.snapshots.allSatisfy { $0.progressText == "…" })
+        #expect(tracker.snapshot?.fraction == 0.67)
     }
 
     @Test

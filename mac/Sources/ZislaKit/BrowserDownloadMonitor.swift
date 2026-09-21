@@ -186,6 +186,130 @@ enum BrowserDownloadAgentResolver {
         return String(name.dropLast(tempExtension.rawValue.count + 1))
     }
 }
+struct AirDropTransferItem: Sendable {
+    var fileName: String
+    var expectedByteCount: Int64?
+    var destinationURL: URL?
+    var completedURLs: [URL]
+}
+
+struct AirDropTransferSnapshot: Sendable {
+    var identifier: String
+    var batchFraction: Double?
+    var items: [AirDropTransferItem]
+}
+
+enum AirDropTransferMetadataParser {
+    static func items(
+        from rawFiles: [Any],
+        destinationURL: URL?,
+        completedURLs: [URL]
+    ) -> [AirDropTransferItem] {
+        rawFiles.compactMap { rawFile in
+            guard let values = rawFile as? NSDictionary else { return nil }
+            guard let fileName = string(in: values, keys: ["FileName", "fileName"]),
+                !fileName.isEmpty
+            else { return nil }
+            return AirDropTransferItem(
+                fileName: fileName,
+                expectedByteCount: number(in: values, keys: ["FileSize", "fileSize"]),
+                destinationURL: destinationURL,
+                completedURLs: completedURLs
+            )
+        }
+    }
+
+    private static func string(in values: NSDictionary, keys: [String]) -> String? {
+        keys.lazy.compactMap { values[$0] as? String }.first
+    }
+
+    private static func number(in values: NSDictionary, keys: [String]) -> Int64? {
+        keys.lazy.compactMap { (values[$0] as? NSNumber)?.int64Value }.first
+    }
+}
+
+enum AirDropItemProgressResolver {
+    static func fraction(
+        for item: AirDropTransferItem,
+        progressFileURL: URL?,
+        fileByteCount: (URL) -> Int64?
+    ) -> Double? {
+        guard
+            let expectedByteCount = item.expectedByteCount,
+            expectedByteCount > 0
+        else { return nil }
+        for fileURL in candidateFileURLs(for: item, progressFileURL: progressFileURL) {
+            guard let writtenByteCount = fileByteCount(fileURL), writtenByteCount >= 0 else {
+                continue
+            }
+            return min(Double(writtenByteCount) / Double(expectedByteCount), 1)
+        }
+        return nil
+    }
+
+    static func privateFileURLs(for item: AirDropTransferItem) -> [URL] {
+        guard isSafeFileName(item.fileName) else { return [] }
+        var candidates = item.completedURLs.compactMap { url -> URL? in
+            guard url.isFileURL, url.lastPathComponent == item.fileName else { return nil }
+            return url.standardizedFileURL
+        }
+        if let destinationURL = item.destinationURL?.standardizedFileURL {
+            if destinationURL.isFileURL {
+                if destinationURL.lastPathComponent == item.fileName {
+                    candidates.append(destinationURL)
+                } else {
+                    let candidate = destinationURL.appendingPathComponent(item.fileName)
+                        .standardizedFileURL
+                    if candidate.deletingLastPathComponent().standardizedFileURL == destinationURL {
+                        candidates.append(candidate)
+                    }
+                }
+            }
+        }
+        return deduplicated(candidates)
+    }
+
+    static func fileByteCount(at url: URL, fileManager: FileManager) -> Int64? {
+        guard
+            let attributes = try? fileManager.attributesOfItem(atPath: url.path),
+            attributes[.type] as? FileAttributeType == .typeRegular,
+            let size = attributes[.size] as? NSNumber
+        else { return nil }
+        let byteCount = size.int64Value
+        return byteCount >= 0 ? byteCount : nil
+    }
+
+    private static func isSafeFileName(_ fileName: String) -> Bool {
+        !fileName.isEmpty
+            && fileName != "."
+            && fileName != ".."
+            && fileName == (fileName as NSString).lastPathComponent
+    }
+
+    private static func candidateFileURLs(
+        for item: AirDropTransferItem,
+        progressFileURL: URL?
+    ) -> [URL] {
+        guard isSafeFileName(item.fileName) else { return [] }
+        let completedURLs = item.completedURLs.compactMap { url -> URL? in
+            guard url.isFileURL, url.lastPathComponent == item.fileName else { return nil }
+            return url.standardizedFileURL
+        }
+        if let progressFileURL = progressFileURL?.standardizedFileURL,
+            progressFileURL.isFileURL,
+            BrowserDownloadAgentResolver.displayFileName(for: progressFileURL) == item.fileName
+        {
+            return deduplicated(completedURLs + [progressFileURL])
+        }
+        return deduplicated(completedURLs + privateFileURLs(for: item))
+    }
+
+    private static func deduplicated(_ urls: [URL]) -> [URL] {
+        var seen = Set<URL>()
+        return urls.filter { seen.insert($0).inserted }
+    }
+}
+
 /// State machine for browser download display: manages entry insertion/removal and brief retention after completion; does not depend on `NSProgress`.
 struct BrowserDownloadTracker: Sendable {
     struct Entry: Sendable {
@@ -193,10 +317,9 @@ struct BrowserDownloadTracker: Sendable {
         var agent: BrowserDownloadAgent?
         var fileName: String
         var fraction: Double?
+        /// The aggregate Progress remains useful for the compact island but is never used by an AirDrop item card.
+        var batchFraction: Double? = nil
         var startedAt: Date
-        /// AirDrop can publish one batch Progress repeatedly while changing only the file URL.
-        var progressObjectID: ObjectIdentifier? = nil
-        var airDropBatchItemCount = 1
     }
 
     private(set) var entries: [UUID: Entry] = [:]
@@ -205,14 +328,8 @@ struct BrowserDownloadTracker: Sendable {
     var snapshots: [BrowserDownloadSnapshot] {
         let active = entries
             .sorted { $0.value.startedAt > $1.value.startedAt }
-        var emittedAirDropBatches = Set<ObjectIdentifier>()
-        let result = active.compactMap { token, entry in
-            guard
-                entry.agent == .airDrop,
-                entry.airDropBatchItemCount > 1,
-                let progressObjectID = entry.progressObjectID
-            else {
-                return BrowserDownloadSnapshot(
+            .map { token, entry in
+                BrowserDownloadSnapshot(
                     id: token,
                     agent: entry.agent,
                     fileName: entry.fileName,
@@ -220,25 +337,7 @@ struct BrowserDownloadTracker: Sendable {
                     isFinished: false
                 )
             }
-            guard emittedAirDropBatches.insert(progressObjectID).inserted else { return nil }
-
-            let batchEntries = active.filter {
-                $0.value.agent == .airDrop && $0.value.progressObjectID == progressObjectID
-            }
-            let knownFractions = batchEntries.compactMap { $0.value.fraction }
-            let itemCount = batchEntries.map { $0.value.airDropBatchItemCount }.max()
-                ?? entry.airDropBatchItemCount
-            return BrowserDownloadSnapshot(
-                id: token,
-                agent: .airDrop,
-                fileName: AppLocalization.text("%ld 项下载", itemCount),
-                fraction: knownFractions.isEmpty
-                    ? nil
-                    : knownFractions.reduce(0, +) / Double(knownFractions.count),
-                isFinished: false
-            )
-        }
-        return result.isEmpty ? finishedSnapshot.map { [$0] } ?? [] : result
+        return active.isEmpty ? finishedSnapshot.map { [$0] } ?? [] : active
     }
 
     /// Returns deduplicated browsers ordered by most recent download.
@@ -251,8 +350,23 @@ struct BrowserDownloadTracker: Sendable {
     var snapshot: BrowserDownloadSnapshot? {
         let active = snapshots
         guard !active.isEmpty else { return nil }
-        if active.count == 1 { return active[0] }
-        let knownFractions = active.compactMap(\.fraction)
+        if active.count == 1 {
+            let activeSnapshot = active[0]
+            guard let entry = entries[activeSnapshot.id], entry.agent == .airDrop else {
+                return activeSnapshot
+            }
+            return BrowserDownloadSnapshot(
+                id: activeSnapshot.id,
+                agent: activeSnapshot.agent,
+                fileName: activeSnapshot.fileName,
+                fraction: entry.batchFraction ?? activeSnapshot.fraction,
+                isFinished: false
+            )
+        }
+        let knownFractions = active.compactMap { snapshot in
+            guard let entry = entries[snapshot.id] else { return snapshot.fraction }
+            return entry.agent == .airDrop ? entry.batchFraction ?? entry.fraction : entry.fraction
+        }
         return BrowserDownloadSnapshot(
             agent: nil,
             fileName: AppLocalization.text("%ld 项下载", active.count),
@@ -266,7 +380,6 @@ struct BrowserDownloadTracker: Sendable {
     mutating func insert(token: UUID, entry: Entry) {
         finishedSnapshot = nil
         entries[token] = entry
-        markAirDropBatch(for: token)
     }
 
     mutating func update(token: UUID, fraction: Double?) {
@@ -277,7 +390,11 @@ struct BrowserDownloadTracker: Sendable {
     mutating func update(token: UUID, agent: BrowserDownloadAgent?) {
         guard entries[token] != nil, let agent else { return }
         entries[token]?.agent = agent
-        markAirDropBatch(for: token)
+    }
+
+    mutating func update(token: UUID, batchFraction: Double?) {
+        guard entries[token] != nil else { return }
+        entries[token]?.batchFraction = batchFraction
     }
 
     mutating func update(token: UUID, fileURL: URL?, fileName: String?) {
@@ -312,29 +429,6 @@ struct BrowserDownloadTracker: Sendable {
         entries.removeAll()
         finishedSnapshot = nil
     }
-
-    private mutating func markAirDropBatch(for token: UUID) {
-        guard
-            let entry = entries[token],
-            entry.agent == .airDrop,
-            let progressObjectID = entry.progressObjectID
-        else { return }
-
-        let batchTokens = entries.compactMap { candidateToken, candidate in
-            candidate.agent == .airDrop && candidate.progressObjectID == progressObjectID
-                ? candidateToken
-                : nil
-        }
-        guard batchTokens.count > 1 || entry.airDropBatchItemCount > 1 else { return }
-
-        let itemCount = max(
-            batchTokens.count,
-            batchTokens.compactMap { entries[$0]?.airDropBatchItemCount }.max() ?? 1
-        )
-        for batchToken in batchTokens {
-            entries[batchToken]?.airDropBatchItemCount = itemCount
-        }
-    }
 }
 
 struct BrowserDownloadMonitorLifecycle: Sendable {
@@ -355,8 +449,8 @@ struct BrowserDownloadMonitorLifecycle: Sendable {
 }
 /// Monitors `NSProgress` published by browsers to the downloads directory and shows an icon and percentage in the collapsed Dynamic Island.
 ///
-/// Uses the system's public progress-publishing mechanism (Chrome, Safari, etc. publish progress during downloads),
-/// does not read browser history databases, and makes no network requests.
+/// Uses the system's public progress-publishing mechanism (Chrome, Safari, etc. publish progress during downloads).
+/// AirDrop metadata is read through a runtime-checked system observer only to resolve the published item to its expected size.
 @MainActor
 public final class BrowserDownloadMonitor: ObservableObject {
     /// How long the green checkmark stays visible after a successful download.
@@ -369,6 +463,8 @@ public final class BrowserDownloadMonitor: ObservableObject {
     private var tracker = BrowserDownloadTracker()
     private var subscriberTokens: [Any] = []
     private var progressBoxes: [UUID: ProgressBox] = [:]
+    private var airDropObserver: AirDropTransferObserver?
+    private var airDropTransfers: [String: AirDropTransferSnapshot] = [:]
     private var timer: AnyCancellable?
     private var finishedClearTask: Task<Void, Never>?
     private var lifecycle = BrowserDownloadMonitorLifecycle()
@@ -402,6 +498,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
     public func start() {
         guard subscriberTokens.isEmpty, !directories.isEmpty else { return }
         let callbackGeneration = lifecycle.start()
+        startAirDropObservation(callbackGeneration: callbackGeneration)
         for directory in directories {
             let token = Progress.addSubscriber(forFileURL: directory) { [weak self] published in
                 let entryToken = UUID()
@@ -434,6 +531,9 @@ public final class BrowserDownloadMonitor: ObservableObject {
 
     public func stop() {
         lifecycle.stop()
+        airDropObserver?.stop()
+        airDropObserver = nil
+        airDropTransfers.removeAll()
         for token in subscriberTokens { Progress.removeSubscriber(token) }
         subscriberTokens.removeAll()
         timer?.cancel()
@@ -447,15 +547,18 @@ public final class BrowserDownloadMonitor: ObservableObject {
     }
     private func register(token: UUID, box: ProgressBox) {
         let progress = box.progress
-        let fileURL = Self.fileURL(for: progress)
+        let fileURL = box.publishedFileURL ?? Self.fileURL(for: progress)
+        let operationKind = box.publishedFileOperationKind ?? progress.fileOperationKind
+        let agent = BrowserDownloadAgentResolver.agent(forFileOperationKind: operationKind)
+            ?? fileURL.flatMap { resolveAgent(forFileAt: $0) }
+        let publishedFraction = Self.fraction(of: progress)
         let entry = BrowserDownloadTracker.Entry(
             fileURL: fileURL,
-            agent: BrowserDownloadAgentResolver.agent(forFileOperationKind: progress.fileOperationKind)
-                ?? fileURL.flatMap { resolveAgent(forFileAt: $0) },
+            agent: agent,
             fileName: fileURL.map(BrowserDownloadAgentResolver.displayFileName) ?? "下载",
-            fraction: Self.fraction(of: progress),
-            startedAt: Date(),
-            progressObjectID: ObjectIdentifier(progress)
+            fraction: agent == .airDrop ? nil : publishedFraction,
+            batchFraction: agent == .airDrop ? publishedFraction : nil,
+            startedAt: Date()
         )
         progressBoxes[token] = box
         tracker.insert(token: token, entry: entry)
@@ -467,6 +570,9 @@ public final class BrowserDownloadMonitor: ObservableObject {
         progressBoxes.removeValue(forKey: token)
         if tracker.finish(token: token, succeeded: succeeded) {
             scheduleFinishedClear()
+        }
+        if !tracker.entries.values.contains(where: { $0.agent == .airDrop }) {
+            airDropTransfers.removeAll()
         }
         if progressBoxes.isEmpty {
             timer?.cancel()
@@ -505,7 +611,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
         var runningBundleIdentifiers: Set<String>?
         for (token, box) in progressBoxes {
             let progress = box.progress
-            tracker.update(token: token, fraction: Self.fraction(of: progress))
+            let publishedFraction = Self.fraction(of: progress)
             if let agent = BrowserDownloadAgentResolver.agent(
                 forFileOperationKind: progress.fileOperationKind
             ) {
@@ -513,7 +619,14 @@ public final class BrowserDownloadMonitor: ObservableObject {
             }
             // Update fileURL if it becomes available after initial registration
             let currentFileURL = Self.fileURL(for: progress)
-            if let currentFileURL, tracker.entries[token]?.fileURL != currentFileURL {
+            if let currentFileURL,
+                let entry = tracker.entries[token],
+                Self.shouldReplacePublishedFileURL(
+                    entry.fileURL,
+                    with: currentFileURL,
+                    agent: entry.agent
+                )
+            {
                 tracker.update(
                     token: token,
                     fileURL: currentFileURL,
@@ -534,8 +647,89 @@ public final class BrowserDownloadMonitor: ObservableObject {
                     )
                 )
             }
+            guard let entry = tracker.entries[token] else { continue }
+            if entry.agent == .airDrop {
+                updateAirDropProgress(token: token, entry: entry, publishedFraction: publishedFraction)
+            } else {
+                tracker.update(token: token, fraction: publishedFraction)
+            }
         }
         refresh()
+    }
+
+    nonisolated static func shouldReplacePublishedFileURL(
+        _ existingURL: URL?,
+        with currentURL: URL,
+        agent: BrowserDownloadAgent?
+    ) -> Bool {
+        guard existingURL != currentURL else { return false }
+        return agent != .airDrop || existingURL == nil
+    }
+
+    private func startAirDropObservation(callbackGeneration: UInt64) {
+        let observer = AirDropTransferObserver(
+            onUpdated: { [weak self] transfer in
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self, self.lifecycle.accepts(callbackGeneration) else { return }
+                        self.airDropTransfers[transfer.identifier] = transfer
+                        self.refreshAirDropProgress()
+                        self.refresh()
+                    }
+                }
+            }
+        )
+        guard observer.start() else { return }
+        airDropObserver = observer
+    }
+
+    private func refreshAirDropProgress() {
+        for (token, entry) in tracker.entries where entry.agent == .airDrop {
+            updateAirDropProgress(token: token, entry: entry, publishedFraction: entry.batchFraction)
+        }
+    }
+
+    private func updateAirDropProgress(
+        token: UUID,
+        entry: BrowserDownloadTracker.Entry,
+        publishedFraction: Double?
+    ) {
+        guard let transferItem = airDropTransferItem(for: entry) else {
+            tracker.update(token: token, fraction: nil)
+            tracker.update(token: token, batchFraction: publishedFraction)
+            return
+        }
+        tracker.update(
+            token: token,
+            batchFraction: publishedFraction ?? transferItem.batchFraction
+        )
+        tracker.update(
+            token: token,
+            fraction: AirDropItemProgressResolver.fraction(
+                for: transferItem.item,
+                progressFileURL: entry.fileURL.flatMap { temporaryFileURL(for: $0) ?? $0 },
+                fileByteCount: { [fileManager] url in
+                    AirDropItemProgressResolver.fileByteCount(at: url, fileManager: fileManager)
+                }
+            )
+        )
+    }
+
+    private func airDropTransferItem(
+        for entry: BrowserDownloadTracker.Entry
+    ) -> (item: AirDropTransferItem, batchFraction: Double?)? {
+        let candidates = airDropTransfers.values.flatMap { transfer in
+            transfer.items
+                .filter { $0.fileName == entry.fileName }
+                .map { (item: $0, batchFraction: transfer.batchFraction) }
+        }
+        guard !candidates.isEmpty else { return nil }
+        guard candidates.count > 1 else { return candidates[0] }
+        guard let fileURL = entry.fileURL?.standardizedFileURL else { return nil }
+        let matchingCandidates = candidates.filter {
+            AirDropItemProgressResolver.privateFileURLs(for: $0.item).contains(fileURL)
+        }
+        return matchingCandidates.count == 1 ? matchingCandidates[0] : nil
     }
 
     private func scheduleFinishedClear() {
@@ -600,12 +794,106 @@ public final class BrowserDownloadMonitor: ObservableObject {
     }
 }
 
+private final class AirDropTransferObserver: NSObject, @unchecked Sendable {
+    private static let frameworkPath = "/System/Library/PrivateFrameworks/Sharing.framework"
+    private static let setDelegateSelector = NSSelectorFromString("setDelegate:")
+    private static let activateSelector = NSSelectorFromString("activate")
+    private static let invalidateSelector = NSSelectorFromString("invalidate")
+
+    private let onUpdated: @Sendable (AirDropTransferSnapshot) -> Void
+    private var observer: NSObject?
+
+    init(onUpdated: @escaping @Sendable (AirDropTransferSnapshot) -> Void) {
+        self.onUpdated = onUpdated
+    }
+
+    func start() -> Bool {
+        guard observer == nil else { return true }
+        guard Bundle(path: Self.frameworkPath)?.load() == true,
+            let observerClass = NSClassFromString("SFAirDropTransferObserver") as? NSObject.Type
+        else { return false }
+
+        let observer = observerClass.init()
+        guard observer.responds(to: Self.setDelegateSelector),
+            observer.responds(to: Self.activateSelector),
+            observer.responds(to: Self.invalidateSelector)
+        else { return false }
+
+        _ = observer.perform(Self.setDelegateSelector, with: self)
+        _ = observer.perform(Self.activateSelector)
+        self.observer = observer
+        return true
+    }
+
+    func stop() {
+        guard let observer else { return }
+        _ = observer.perform(Self.invalidateSelector)
+        _ = observer.perform(Self.setDelegateSelector, with: nil)
+        self.observer = nil
+    }
+
+    deinit {
+        stop()
+    }
+
+    @objc(updatedTransfer:)
+    private func updatedTransfer(_ transfer: AnyObject) {
+        guard let snapshot = Self.snapshot(from: transfer) else { return }
+        onUpdated(snapshot)
+    }
+
+    private static func snapshot(from transfer: AnyObject) -> AirDropTransferSnapshot? {
+        guard let identifier = identifier(from: transfer),
+            let transferObject = transfer as? NSObject,
+            let metadata = value(named: "metaData", from: transferObject) as? NSObject,
+            let rawFiles = value(named: "rawFiles", from: metadata) as? NSArray
+        else { return nil }
+
+        let destinationURL = value(named: "customDestinationURL", from: transferObject) as? URL
+        let completedURLs = (value(named: "completedURLs", from: transferObject) as? NSArray)?
+            .compactMap { $0 as? URL } ?? []
+        let progress = value(named: "transferProgress", from: transferObject) as? Progress
+        let batchFraction: Double?
+        if let progress, progress.totalUnitCount > 0, progress.fractionCompleted.isFinite {
+            batchFraction = progress.fractionCompleted
+        } else {
+            batchFraction = nil
+        }
+        let items = AirDropTransferMetadataParser.items(
+            from: rawFiles.map { $0 },
+            destinationURL: destinationURL,
+            completedURLs: completedURLs
+        )
+        guard !items.isEmpty else { return nil }
+        return AirDropTransferSnapshot(
+            identifier: identifier,
+            batchFraction: batchFraction,
+            items: items
+        )
+    }
+
+    private static func identifier(from transfer: AnyObject) -> String? {
+        guard let transferObject = transfer as? NSObject else { return nil }
+        return value(named: "identifier", from: transferObject) as? String
+    }
+
+    private static func value(named name: String, from object: NSObject) -> AnyObject? {
+        let selector = NSSelectorFromString(name)
+        guard object.responds(to: selector) else { return nil }
+        return object.perform(selector)?.takeUnretainedValue()
+    }
+}
+
 /// `Progress` is not `Sendable`; this read-only box carries it across thread boundaries using only named accessors,
 /// not `userInfo` enumeration (the publisher may mutate that dictionary concurrently).
 private final class ProgressBox: @unchecked Sendable {
     let progress: Progress
+    let publishedFileURL: URL?
+    let publishedFileOperationKind: Progress.FileOperationKind?
 
     init(_ progress: Progress) {
         self.progress = progress
+        publishedFileURL = progress.fileURL ?? progress.userInfo[.fileURLKey] as? URL
+        publishedFileOperationKind = progress.fileOperationKind
     }
 }
