@@ -143,11 +143,22 @@ enum ThinScrollChrome {
 final class ThinScroller: NSScroller {
     override class var isCompatibleWithOverlayScrollers: Bool { true }
 
-    override class func scrollerWidth(
-        for controlSize: NSControl.ControlSize,
-        scrollerStyle: NSScroller.Style
-    ) -> CGFloat {
-        ThinScrollChrome.width
+    override func drawKnob() {
+        // Keep native layout metrics: shrinking the control clips AppKit's backing layers.
+        var knob = rect(for: .knob)
+        if bounds.height > bounds.width {
+            knob.origin.x = floor(knob.midX - ThinScrollChrome.width / 2)
+            knob.size.width = ThinScrollChrome.width
+        } else {
+            knob.origin.y = floor(knob.midY - ThinScrollChrome.width / 2)
+            knob.size.height = ThinScrollChrome.width
+        }
+        NSColor.secondaryLabelColor.setFill()
+        NSBezierPath(
+            roundedRect: knob,
+            xRadius: ThinScrollChrome.width / 2,
+            yRadius: ThinScrollChrome.width / 2
+        ).fill()
     }
 
     override func drawKnobSlot(in slotRect: NSRect, highlight flag: Bool) {
