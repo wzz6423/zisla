@@ -13,7 +13,21 @@ struct MailHTMLView: NSViewRepresentable {
     }
 }
 
-final class MailBodyWebView: WKWebView, WKNavigationDelegate, WKUIDelegate {
+final class MailBodyWebView: WKWebView, WKNavigationDelegate {
+    private final class LinkMessageHandler: NSObject, WKScriptMessageHandler {
+        weak var webView: MailBodyWebView?
+
+        init(webView: MailBodyWebView) {
+            self.webView = webView
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            webView?.handleLinkMessage(message)
+        }
+    }
+
+    private static let linkMessageHandlerName = "zislaMailLink"
+    private lazy var linkMessageHandler = LinkMessageHandler(webView: self)
     private var lastHTML: String?
     var openLink: (URL) -> Void = { NSWorkspace.shared.open($0) }
 
@@ -27,9 +41,19 @@ final class MailBodyWebView: WKWebView, WKNavigationDelegate, WKUIDelegate {
             forMainFrameOnly: true,
             in: .defaultClient
         ))
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: Self.linkInterceptionScript,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true,
+            in: .defaultClient
+        ))
         super.init(frame: .zero, configuration: configuration)
+        configuration.userContentController.add(
+            linkMessageHandler,
+            contentWorld: .defaultClient,
+            name: Self.linkMessageHandlerName
+        )
         navigationDelegate = self
-        uiDelegate = self
         // Match the Notes web view so the shared native glass surface remains visible.
         setValue(false, forKey: "drawsBackground")
         underPageBackgroundColor = .clear
@@ -87,6 +111,19 @@ final class MailBodyWebView: WKWebView, WKNavigationDelegate, WKUIDelegate {
         })();
         """#
 
+    // WebKit reports scripted target=_blank HTTP(S) clicks as automatic navigation on macOS 26.
+    // Capture trusted and synthetic anchor clicks in our isolated world, then reuse native URL policy.
+    private static let linkInterceptionScript = """
+        document.addEventListener("click", event => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const anchor = target.closest("a[href]");
+          if (!anchor) return;
+          event.preventDefault();
+          window.webkit.messageHandlers.\(MailBodyWebView.linkMessageHandlerName).postMessage(anchor.href);
+        }, true);
+        """
+
     func webView(
         _ webView: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
@@ -99,18 +136,10 @@ final class MailBodyWebView: WKWebView, WKNavigationDelegate, WKUIDelegate {
         ))
     }
 
-    func webView(
-        _ webView: WKWebView,
-        createWebViewWith configuration: WKWebViewConfiguration,
-        for navigationAction: WKNavigationAction,
-        windowFeatures: WKWindowFeatures
-    ) -> WKWebView? {
-        _ = navigationPolicy(
-            for: navigationAction.request.url,
-            isMainFrame: navigationAction.targetFrame?.isMainFrame == true,
-            isLink: true
-        )
-        return nil
+    private func handleLinkMessage(_ message: WKScriptMessage) {
+        guard message.name == Self.linkMessageHandlerName,
+              let address = message.body as? String else { return }
+        _ = navigationPolicy(for: URL(string: address), isMainFrame: false, isLink: true)
     }
 
     func navigationPolicy(for url: URL?, isMainFrame: Bool, isLink: Bool) -> WKNavigationActionPolicy {
