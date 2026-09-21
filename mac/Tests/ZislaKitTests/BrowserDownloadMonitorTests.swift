@@ -203,6 +203,7 @@ struct BrowserDownloadTrackerTests {
         agent: BrowserDownloadAgent? = .chrome,
         fileName: String = "report.pdf",
         fraction: Double? = 0,
+        progressObjectID: ObjectIdentifier? = nil,
         startedAt: Date = Date()
     ) -> BrowserDownloadTracker.Entry {
         BrowserDownloadTracker.Entry(
@@ -210,7 +211,8 @@ struct BrowserDownloadTrackerTests {
             agent: agent,
             fileName: fileName,
             fraction: fraction,
-            startedAt: startedAt
+            startedAt: startedAt,
+            progressObjectID: progressObjectID
         )
     }
 
@@ -328,6 +330,75 @@ struct BrowserDownloadTrackerTests {
         // Prefer an in-progress download over a just-finished checkmark when one is still active.
         #expect(tracker.snapshot?.fileName == "report.zip")
         #expect(tracker.snapshot?.isFinished == false)
+    }
+
+    @Test
+    func repeatedAirDropBatchProgressCollapsesIntoOneBatchSnapshot() {
+        var tracker = BrowserDownloadTracker()
+        let sharedProgress = NSObject()
+        let progressObjectID = ObjectIdentifier(sharedProgress)
+        let first = UUID()
+        let second = UUID()
+        tracker.insert(
+            token: first,
+            entry: entry(
+                agent: .airDrop,
+                fileName: "IMG_8239.HEIC",
+                fraction: 0.67,
+                progressObjectID: progressObjectID,
+                startedAt: Date(timeIntervalSince1970: 100)
+            )
+        )
+        tracker.insert(
+            token: second,
+            entry: entry(
+                agent: .airDrop,
+                fileName: "IMG_8240.HEIC",
+                fraction: 0.67,
+                progressObjectID: progressObjectID,
+                startedAt: Date(timeIntervalSince1970: 200)
+            )
+        )
+
+        #expect(tracker.snapshots.count == 1)
+        #expect(tracker.snapshots.first?.id == second)
+        #expect(tracker.snapshots.first?.agent == .airDrop)
+        #expect(tracker.snapshots.first?.fileName == "2 项下载")
+        #expect(tracker.snapshots.first?.fraction == 0.67)
+        #expect(tracker.snapshot == tracker.snapshots.first)
+    }
+
+    @Test
+    func distinctAirDropProgressesKeepTheirOwnSnapshots() {
+        var tracker = BrowserDownloadTracker()
+        let firstProgress = NSObject()
+        let secondProgress = NSObject()
+        let first = UUID()
+        let second = UUID()
+        tracker.insert(
+            token: first,
+            entry: entry(
+                agent: .airDrop,
+                fileName: "IMG_8239.HEIC",
+                fraction: 0.2,
+                progressObjectID: ObjectIdentifier(firstProgress),
+                startedAt: Date(timeIntervalSince1970: 100)
+            )
+        )
+        tracker.insert(
+            token: second,
+            entry: entry(
+                agent: .airDrop,
+                fileName: "IMG_8240.HEIC",
+                fraction: 0.8,
+                progressObjectID: ObjectIdentifier(secondProgress),
+                startedAt: Date(timeIntervalSince1970: 200)
+            )
+        )
+
+        #expect(tracker.snapshots.map(\.id) == [second, first])
+        #expect(tracker.snapshots.map(\.fileName) == ["IMG_8240.HEIC", "IMG_8239.HEIC"])
+        #expect(tracker.snapshots.map(\.fraction) == [0.8, 0.2])
     }
 
     @Test

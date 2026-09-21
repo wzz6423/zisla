@@ -194,6 +194,9 @@ struct BrowserDownloadTracker: Sendable {
         var fileName: String
         var fraction: Double?
         var startedAt: Date
+        /// AirDrop can publish one batch Progress repeatedly while changing only the file URL.
+        var progressObjectID: ObjectIdentifier? = nil
+        var airDropBatchItemCount = 1
     }
 
     private(set) var entries: [UUID: Entry] = [:]
@@ -202,8 +205,14 @@ struct BrowserDownloadTracker: Sendable {
     var snapshots: [BrowserDownloadSnapshot] {
         let active = entries
             .sorted { $0.value.startedAt > $1.value.startedAt }
-            .map { token, entry in
-                BrowserDownloadSnapshot(
+        var emittedAirDropBatches = Set<ObjectIdentifier>()
+        let result = active.compactMap { token, entry in
+            guard
+                entry.agent == .airDrop,
+                entry.airDropBatchItemCount > 1,
+                let progressObjectID = entry.progressObjectID
+            else {
+                return BrowserDownloadSnapshot(
                     id: token,
                     agent: entry.agent,
                     fileName: entry.fileName,
@@ -211,7 +220,25 @@ struct BrowserDownloadTracker: Sendable {
                     isFinished: false
                 )
             }
-        return active.isEmpty ? finishedSnapshot.map { [$0] } ?? [] : active
+            guard emittedAirDropBatches.insert(progressObjectID).inserted else { return nil }
+
+            let batchEntries = active.filter {
+                $0.value.agent == .airDrop && $0.value.progressObjectID == progressObjectID
+            }
+            let knownFractions = batchEntries.compactMap { $0.value.fraction }
+            let itemCount = batchEntries.map { $0.value.airDropBatchItemCount }.max()
+                ?? entry.airDropBatchItemCount
+            return BrowserDownloadSnapshot(
+                id: token,
+                agent: .airDrop,
+                fileName: AppLocalization.text("%ld 项下载", itemCount),
+                fraction: knownFractions.isEmpty
+                    ? nil
+                    : knownFractions.reduce(0, +) / Double(knownFractions.count),
+                isFinished: false
+            )
+        }
+        return result.isEmpty ? finishedSnapshot.map { [$0] } ?? [] : result
     }
 
     /// Returns deduplicated browsers ordered by most recent download.
@@ -239,6 +266,7 @@ struct BrowserDownloadTracker: Sendable {
     mutating func insert(token: UUID, entry: Entry) {
         finishedSnapshot = nil
         entries[token] = entry
+        markAirDropBatch(for: token)
     }
 
     mutating func update(token: UUID, fraction: Double?) {
@@ -249,6 +277,7 @@ struct BrowserDownloadTracker: Sendable {
     mutating func update(token: UUID, agent: BrowserDownloadAgent?) {
         guard entries[token] != nil, let agent else { return }
         entries[token]?.agent = agent
+        markAirDropBatch(for: token)
     }
 
     mutating func update(token: UUID, fileURL: URL?, fileName: String?) {
@@ -282,6 +311,29 @@ struct BrowserDownloadTracker: Sendable {
     mutating func removeAll() {
         entries.removeAll()
         finishedSnapshot = nil
+    }
+
+    private mutating func markAirDropBatch(for token: UUID) {
+        guard
+            let entry = entries[token],
+            entry.agent == .airDrop,
+            let progressObjectID = entry.progressObjectID
+        else { return }
+
+        let batchTokens = entries.compactMap { candidateToken, candidate in
+            candidate.agent == .airDrop && candidate.progressObjectID == progressObjectID
+                ? candidateToken
+                : nil
+        }
+        guard batchTokens.count > 1 || entry.airDropBatchItemCount > 1 else { return }
+
+        let itemCount = max(
+            batchTokens.count,
+            batchTokens.compactMap { entries[$0]?.airDropBatchItemCount }.max() ?? 1
+        )
+        for batchToken in batchTokens {
+            entries[batchToken]?.airDropBatchItemCount = itemCount
+        }
     }
 }
 
@@ -402,7 +454,8 @@ public final class BrowserDownloadMonitor: ObservableObject {
                 ?? fileURL.flatMap { resolveAgent(forFileAt: $0) },
             fileName: fileURL.map(BrowserDownloadAgentResolver.displayFileName) ?? "下载",
             fraction: Self.fraction(of: progress),
-            startedAt: Date()
+            startedAt: Date(),
+            progressObjectID: ObjectIdentifier(progress)
         )
         progressBoxes[token] = box
         tracker.insert(token: token, entry: entry)
