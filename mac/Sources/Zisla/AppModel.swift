@@ -492,9 +492,9 @@ final class AppModel: ObservableObject {
   private var cancellables: Set<AnyCancellable> = []
   private var weatherTask: Task<Void, Never>?
   private var updatePollingTask: Task<Void, Never>?
-  private var updateFeedPreferenceTask: Task<UpdateFeedPreference, Never>?
-  private var updateConfigurationTask: Task<Void, Never>?
-  private var updateFeedPreference: UpdateFeedPreference?
+  private let updateFeedResolver = UpdateFeedResolver {
+    UpdateFeedPreference(countryCode: await AppModel.countryCodeForCurrentIP())
+  }
   private var voiceRecordingCleanupTask: Task<Void, Never>?
   private var appliedVoiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy?
   private var downloadTasks: [UUID: Task<Void, Never>] = [:]
@@ -949,10 +949,7 @@ final class AppModel: ObservableObject {
     aiAgent.store.flushPendingChanges()
     weatherTask?.cancel()
     updatePollingTask?.cancel()
-    updateFeedPreferenceTask?.cancel()
-    updateFeedPreferenceTask = nil
-    updateConfigurationTask?.cancel()
-    updateConfigurationTask = nil
+    updateFeedResolver.cancel()
     voiceRecordingCleanupTask?.cancel()
     voiceRecordingCleanupTask = nil
     appliedVoiceRecordingCleanupPolicy = nil
@@ -1302,40 +1299,33 @@ final class AppModel: ObservableObject {
     return mailComposeRequest
   }
 
-  func checkForUpdates(manual: Bool, channel: UpdateChannel? = nil) {
+  func checkForUpdates(manual: Bool) {
     guard manual || settingsStore.settings.updateChecksEnabled else { return }
-    let selectedChannel = channel ?? settingsStore.settings.updateChannel
-    let checksEnabled = settingsStore.settings.updateChecksEnabled
-    let automaticDownloadEnabled = settingsStore.settings.automaticDownloadEnabled
+    guard let sparkleUpdateController else {
+      if manual { updateState = .failed(AppLocalization.text("无法启动自动更新服务")) }
+      return
+    }
     if manual {
       updateState = .checking
     }
-    updateConfigurationTask?.cancel()
-    updateConfigurationTask = Task { @MainActor [weak self] in
+    updateFeedResolver.resolve(manual: manual) { [weak self] feedPreference in
       guard let self else { return }
-      let feedPreference = await updateFeedPreferenceForCurrentProcess()
-      guard !Task.isCancelled,
-            let sparkleUpdateController else {
-        if manual, !Task.isCancelled {
-          updateState = .failed(AppLocalization.text("无法启动自动更新服务"))
-        }
-        return
-      }
+      let settings = settingsStore.settings
 
       if manual {
         if !sparkleUpdateController.checkForUpdates(
-          channel: selectedChannel,
-          checksEnabled: checksEnabled,
-          automaticDownloadEnabled: automaticDownloadEnabled,
+          channel: settings.updateChannel,
+          checksEnabled: settings.updateChecksEnabled,
+          automaticDownloadEnabled: settings.automaticDownloadEnabled,
           feedPreference: feedPreference
         ) {
           updateState = .failed(AppLocalization.text("无法启动自动更新服务"))
         }
       } else {
         _ = sparkleUpdateController.configure(
-          channel: selectedChannel,
-          checksEnabled: checksEnabled,
-          automaticDownloadEnabled: automaticDownloadEnabled,
+          channel: settings.updateChannel,
+          checksEnabled: settings.updateChecksEnabled,
+          automaticDownloadEnabled: settings.automaticDownloadEnabled,
           feedPreference: feedPreference
         )
       }
@@ -1805,10 +1795,6 @@ final class AppModel: ObservableObject {
     } catch {
       return nil
     }
-  }
-
-  private nonisolated static func updateFeedPreferenceForCurrentIP() async -> UpdateFeedPreference {
-    UpdateFeedPreference(countryCode: await countryCodeForCurrentIP())
   }
 
   private nonisolated static func translationProviderForCurrentIP() async -> ClipboardAssistantTranslate.Provider {
@@ -2690,12 +2676,12 @@ final class AppModel: ObservableObject {
     if enabled {
       checkForUpdates(manual: false)
     } else {
-      updateConfigurationTask?.cancel()
+      updateFeedResolver.cancelAutomaticConfiguration()
       _ = sparkleUpdateController?.configure(
         channel: settingsStore.settings.updateChannel,
         checksEnabled: false,
         automaticDownloadEnabled: settingsStore.settings.automaticDownloadEnabled,
-        feedPreference: updateFeedPreference ?? .giteeFirst
+        feedPreference: updateFeedResolver.preference ?? .giteeFirst
       ) == true
     }
     guard isUpdatePollingEnabled != enabled else { return }
@@ -2718,21 +2704,6 @@ final class AppModel: ObservableObject {
         }
       }
     }
-  }
-
-  private func updateFeedPreferenceForCurrentProcess() async -> UpdateFeedPreference {
-    if let updateFeedPreference {
-      return updateFeedPreference
-    }
-    if let updateFeedPreferenceTask {
-      return await updateFeedPreferenceTask.value
-    }
-    let task = Task { await Self.updateFeedPreferenceForCurrentIP() }
-    updateFeedPreferenceTask = task
-    let preference = await task.value
-    updateFeedPreference = preference
-    updateFeedPreferenceTask = nil
-    return preference
   }
 
   private func configureVoiceRecordingCleanup(policy: VoiceRecordingCleanupPolicy) {

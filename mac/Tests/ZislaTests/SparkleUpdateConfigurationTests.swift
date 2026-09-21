@@ -1,10 +1,45 @@
 import Foundation
+import Sparkle
 import Testing
 import ZislaCore
 
 @testable import Zisla
 
 struct SparkleUpdateConfigurationTests {
+    @Test(arguments: [UpdateFeedPreference.giteeFirst, .githubFirst], [false, true])
+    @MainActor
+    func delegateRetriesTheOtherMirrorOnceThenResets(
+        preference: UpdateFeedPreference,
+        background: Bool
+    ) throws {
+        let feeds = SparkleFeedPair(
+            gitee: try #require(URL(string: "https://gitee.example/appcast.xml")),
+            github: try #require(URL(string: "https://github.example/appcast.xml"))
+        )
+        let delegate = SparkleFeedDelegate(feeds: feeds)
+        delegate.setFeeds(feeds, preference: preference)
+        let driver = SparkleStandardUserDriver(hostBundle: Bundle.main, shouldSuppressUpdaterError: { true })
+        let updater = SPUUpdater(hostBundle: Bundle.main, applicationBundle: Bundle.main, userDriver: driver, delegate: delegate)
+        let check: SPUUpdateCheck = background ? .updatesInBackground : .updates
+        let primary = preference == .githubFirst ? feeds.github : feeds.gitee
+        let fallback = preference == .githubFirst ? feeds.gitee : feeds.github
+        var retries: [String?] = []
+        delegate.onFallbackRequested = { _ in retries.append(delegate.feedURLString(for: updater)) }
+        defer { delegate.onFallbackRequested = nil }
+
+        #expect(delegate.updater(updater, mayPerformUpdateCheck: check, error: nil))
+        #expect(delegate.feedURLString(for: updater) == primary.absoluteString)
+        let error = URLError(.cannotConnectToHost)
+        delegate.updater(updater, didFinishUpdateCycleFor: check, error: error)
+        #expect(delegate.updater(updater, mayPerformUpdateCheck: check, error: nil))
+        #expect(delegate.feedURLString(for: updater) == fallback.absoluteString)
+        delegate.updater(updater, didFinishUpdateCycleFor: check, error: error)
+
+        #expect(retries == [fallback.absoluteString])
+        #expect(delegate.updater(updater, mayPerformUpdateCheck: check, error: nil))
+        #expect(delegate.feedURLString(for: updater) == primary.absoluteString)
+    }
+
     @Test
     func ordersMirrorFeedsByCountryCode() throws {
         let giteeURL = try #require(URL(string: "https://gitee.example.com/appcast.xml"))
