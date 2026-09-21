@@ -124,6 +124,60 @@ struct BrowserDownloadAgentResolverTests {
     }
 }
 
+struct AirDropBatchParserTests {
+    @Test
+    func parsesObservedModernReceiveTransferWithoutPerFileSizes() throws {
+        let identifier = UUID()
+        // The shape comes from a real macOS receive-transfer event; sender details are omitted.
+        let payload: [String: Any] = [
+            "receiveTransfers": [
+                ["id": "request-key"],
+                [
+                    "receiveID": identifier.uuidString,
+                    "startDate": 100.0,
+                    "askRequest": ["items": [
+                        ["fileName": "first.HEIC", "fileBomPath": "./NSIRD_sharingd_a/first.HEIC"],
+                        ["fileName": "second.MOV", "fileBomPath": "./NSIRD_sharingd_b/second.MOV"],
+                    ]],
+                    "state": ["transferring": ["progress": ["transferring": [
+                        "bytesCopied": 6_700, "totalBytes": 10_000, "filesCopied": 1,
+                    ]]]],
+                ],
+            ],
+            "sendTransfers": [],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        let batches = try #require(AirDropBatchParser.batches(from: data))
+
+        #expect(batches.count == 1)
+        #expect(batches[0].id == identifier)
+        #expect(batches[0].fileNames == ["first.HEIC", "second.MOV"])
+        #expect(batches[0].snapshot.fileName == "2 项下载")
+        #expect(batches[0].snapshot.progressText == "67%")
+    }
+
+    @Test
+    func emptyAndUnsupportedEventsAreDifferent() {
+        #expect(AirDropBatchParser.batches(from: Data(#"{"receiveTransfers":[],"sendTransfers":[]}"#.utf8))?.isEmpty == true)
+        #expect(AirDropBatchParser.batches(from: Data(#"{"sendTransfers":[]}"#.utf8)) == nil)
+        #expect(AirDropBatchParser.batches(from: Data("invalid".utf8)) == nil)
+    }
+
+    @Test
+    func ignoresRequestsThatHaveNotStartedReceiving() throws {
+        let payload: [String: Any] = [
+            "receiveTransfers": [[
+                "receiveID": UUID().uuidString,
+                "askRequest": ["items": [["fileName": "item.bin"]]],
+                "state": ["awaitingAcceptance": [:]],
+            ]]
+        ]
+        #expect(
+            AirDropBatchParser.batches(from: try JSONSerialization.data(withJSONObject: payload))?.isEmpty == true
+        )
+    }
+}
+
 struct BrowserDownloadMonitorLifecycleTests {
     @Test
     func staleCallbacksAreRejectedAfterStopAndRestart() {
@@ -194,6 +248,50 @@ struct BrowserDownloadSnapshotTests {
         #expect(snapshot(fraction: 0.72).displayKey != snapshot(fraction: 0.73).displayKey)
         #expect(
             snapshot(fraction: 1).displayKey != snapshot(fraction: 1, isFinished: true).displayKey
+        )
+    }
+}
+
+struct BrowserDownloadFileURLPolicyTests {
+    @Test
+    func airDropKeepsTheURLCapturedForEachPublishedItem() {
+        let first = URL(fileURLWithPath: "/Users/test/Downloads/first.bin")
+        let second = URL(fileURLWithPath: "/Users/test/Downloads/second.bin")
+
+        #expect(
+            !BrowserDownloadMonitor.shouldReplacePublishedFileURL(
+                first,
+                with: second,
+                agent: .airDrop
+            )
+        )
+        #expect(
+            BrowserDownloadMonitor.shouldReplacePublishedFileURL(
+                nil,
+                with: first,
+                agent: .airDrop
+            )
+        )
+    }
+
+    @Test
+    func browserCanAdoptALaterPublishedURL() {
+        let first = URL(fileURLWithPath: "/Users/test/Downloads/report.pdf")
+        let temporary = first.appendingPathExtension("crdownload")
+
+        #expect(
+            BrowserDownloadMonitor.shouldReplacePublishedFileURL(
+                first,
+                with: temporary,
+                agent: .chrome
+            )
+        )
+        #expect(
+            !BrowserDownloadMonitor.shouldReplacePublishedFileURL(
+                first,
+                with: first,
+                agent: .chrome
+            )
         )
     }
 }
@@ -328,6 +426,80 @@ struct BrowserDownloadTrackerTests {
         // Prefer an in-progress download over a just-finished checkmark when one is still active.
         #expect(tracker.snapshot?.fileName == "report.zip")
         #expect(tracker.snapshot?.isFinished == false)
+    }
+
+    @Test(arguments: [0.66, 0.67])
+    func repeatedAirDropItemPublicationsProduceOneBatchCard(fraction: Double) {
+        var tracker = BrowserDownloadTracker()
+        for index in 0..<210 {
+            tracker.insert(
+                token: UUID(),
+                entry: entry(agent: .airDrop, fileName: "IMG_\(index).HEIC", fraction: fraction)
+            )
+        }
+
+        #expect(tracker.snapshots.count == 1)
+        #expect(tracker.snapshots[0].agent == .airDrop)
+        #expect(tracker.snapshots[0].fileName == "210 项下载")
+        #expect(tracker.snapshots[0].progressText == "\(Int(fraction * 100))%")
+        #expect(tracker.snapshot?.fraction == fraction)
+    }
+
+    @Test
+    func fallbackBatchKeepsItsIdentityAndCountDuringUnpublication() {
+        var tracker = BrowserDownloadTracker()
+        let first = UUID()
+        let second = UUID()
+        tracker.insert(token: first, entry: entry(agent: .airDrop, fileName: "first.bin", fraction: 0.4))
+        tracker.insert(token: second, entry: entry(agent: .airDrop, fileName: "second.bin", fraction: 0.4))
+        let batchID = tracker.snapshots.first?.id
+        _ = tracker.finish(token: first, succeeded: true)
+
+        #expect(tracker.snapshots.count == 1)
+        #expect(tracker.snapshots.first?.id == batchID)
+        #expect(tracker.snapshots.first?.fileName == "2 项下载")
+        #expect(tracker.snapshots.first?.isFinished == false)
+
+        _ = tracker.finish(token: second, succeeded: true)
+        #expect(tracker.snapshots.first?.id == batchID)
+        #expect(tracker.snapshots.first?.fileName == "2 项下载")
+        #expect(tracker.snapshots.first?.progressText == "100%")
+        #expect(tracker.snapshots.first?.isFinished == true)
+    }
+
+    @Test
+    func realBatchIdentifiersKeepSimultaneousAirDropsSeparateWithoutDuplicatingFiles() {
+        var tracker = BrowserDownloadTracker()
+        let first = UUID()
+        let second = UUID()
+        tracker.insert(token: UUID(), entry: entry(agent: .airDrop, fileName: "a.bin", fraction: 0.2))
+        tracker.insert(token: UUID(), entry: entry(agent: .airDrop, fileName: "b.bin", fraction: 0.2))
+        tracker.insert(token: UUID(), entry: entry(agent: .airDrop, fileName: "c.bin", fraction: 0.8))
+        tracker.updateAirDropBatches([
+            AirDropBatch(id: first, fileNames: ["a.bin", "b.bin"], fraction: 0.2, startedAt: Date(timeIntervalSince1970: 100)),
+            AirDropBatch(id: second, fileNames: ["c.bin"], fraction: 0.8, startedAt: Date(timeIntervalSince1970: 200)),
+        ])
+
+        #expect(tracker.snapshots.map(\.id) == [second, first])
+        #expect(tracker.snapshots.map(\.progressText) == ["80%", "20%"])
+        #expect(tracker.snapshots.map(\.fileName) == ["c.bin", "2 项下载"])
+
+        tracker.updateAirDropBatches([])
+        #expect(tracker.snapshots.count == 1)
+        #expect(tracker.snapshots.first?.fileName == "3 项下载")
+    }
+
+    @Test
+    func browserCardsRemainIndependentAlongsideAirDropBatch() {
+        var tracker = BrowserDownloadTracker()
+        tracker.insert(token: UUID(), entry: entry(agent: .airDrop, fileName: "a.bin", fraction: 0.6))
+        tracker.insert(token: UUID(), entry: entry(agent: .airDrop, fileName: "b.bin", fraction: 0.6))
+        tracker.insert(token: UUID(), entry: entry(agent: .chrome, fileName: "report.pdf", fraction: 0.2))
+        tracker.insert(token: UUID(), entry: entry(agent: .chrome, fileName: "archive.zip", fraction: 0.8))
+
+        #expect(tracker.snapshots.count == 3)
+        #expect(tracker.snapshots.filter { $0.agent == .airDrop }.count == 1)
+        #expect(Set(tracker.snapshots.filter { $0.agent == .chrome }.map(\.fileName)) == ["report.pdf", "archive.zip"])
     }
 
     @Test
