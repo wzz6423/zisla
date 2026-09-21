@@ -22,6 +22,10 @@ final class SideNoticeDisplayState: ObservableObject {
 private enum CompactStatusMetrics {
     static let wingWidth: CGFloat = 40
     static let horizontalContentInset: CGFloat = 5
+
+    static func statusCountWingWidth(for count: Int) -> CGFloat {
+        SideNoticeLayoutEngine.compactStatusWingWidth(forCount: count)
+    }
 }
 
 private struct CompactNotchBackground: View {
@@ -1410,6 +1414,8 @@ private struct CompactAIWing: View {
                     Text("\(count)")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .foregroundStyle(.white)
             }
@@ -1417,7 +1423,7 @@ private struct CompactAIWing: View {
         .frame(maxHeight: min(22, height * 0.72))
         .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
         .frame(
-            width: CompactStatusMetrics.wingWidth,
+            width: CompactStatusMetrics.statusCountWingWidth(for: count),
             height: height,
             alignment: side == .left ? .leading : .trailing
         )
@@ -2069,7 +2075,7 @@ private struct CompactBrowserDownloadWing: View {
         }
         .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
         .frame(
-            width: CompactStatusMetrics.wingWidth,
+            width: CompactStatusMetrics.statusCountWingWidth(for: downloadCount),
             height: height,
             alignment: side == .left ? .leading : .trailing
         )
@@ -2187,6 +2193,8 @@ private struct CompactBrowserDownloadWing: View {
             Text("\(downloadCount)")
                 .font(.system(size: 10, weight: .bold, design: .rounded))
                 .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .foregroundStyle(.white)
     }

@@ -462,7 +462,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     compactBarFrame: SideNoticeLayoutEngine().compactBarFrame(
                         for: layout,
                         notices: notices,
-                        settings: model.settingsStore.settings
+                        settings: model.settingsStore.settings,
+                        browserDownloadCount: model.browserDownloads.snapshots.count
                     )
                 )
             }
@@ -682,7 +683,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         Publishers.MergeMany(
             model.settingsStore.$settings.map { _ in () }.eraseToAnyPublisher(),
             model.notices.$left.map { _ in () }.eraseToAnyPublisher(),
-            model.notices.$right.map { _ in () }.eraseToAnyPublisher()
+            model.notices.$right.map { _ in () }.eraseToAnyPublisher(),
+            model.browserDownloads.$snapshots
+                .map(\.count)
+                .removeDuplicates()
+                .map { _ in () }
+                .eraseToAnyPublisher()
         )
             .sink { [weak coordinator] _ in
                 Task { @MainActor in

@@ -1,16 +1,18 @@
 import AppKit
 import SwiftUI
 
-/// Narrows only the native scroller behind SwiftUI's `ScrollView`; does not change the system display policy.
+/// Narrows the native scroller behind SwiftUI's `ScrollView`.
 extension View {
-    func thinScrollChrome() -> some View {
-        background(ThinScrollChromeConfigurator())
+    func thinScrollChrome(visibleWhenScrollable: Bool = false) -> some View {
+        background(ThinScrollChromeConfigurator(visibleWhenScrollable: visibleWhenScrollable))
     }
 }
 
 private struct ThinScrollChromeConfigurator: NSViewRepresentable {
+    let visibleWhenScrollable: Bool
+
     func makeNSView(context: Context) -> ThinScrollChromeHost {
-        ThinScrollChromeHost()
+        ThinScrollChromeHost(visibleWhenScrollable: visibleWhenScrollable)
     }
 
     func updateNSView(_ nsView: ThinScrollChromeHost, context: Context) {
@@ -22,9 +24,11 @@ private struct ThinScrollChromeConfigurator: NSViewRepresentable {
 final class ThinScrollChromeHost: NSView {
     private weak var configuredScrollView: NSScrollView?
     private var pendingApply = false
+    private let visibleWhenScrollable: Bool
 
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
+    init(visibleWhenScrollable: Bool) {
+        self.visibleWhenScrollable = visibleWhenScrollable
+        super.init(frame: .zero)
         isHidden = true
     }
 
@@ -64,7 +68,7 @@ final class ThinScrollChromeHost: NSView {
            isThinScroller(scrollView.horizontalScroller) {
             return
         }
-        ThinScrollChrome.apply(to: scrollView)
+        ThinScrollChrome.apply(to: scrollView, visibleWhenScrollable: visibleWhenScrollable)
         configuredScrollView = scrollView
     }
 
@@ -111,7 +115,12 @@ enum ThinScrollChrome {
     /// Noticeably narrower than the system default width.
     static let width: CGFloat = 3
 
-    static func apply(to scrollView: NSScrollView) {
+    static func apply(to scrollView: NSScrollView, visibleWhenScrollable: Bool = false) {
+        if visibleWhenScrollable {
+            scrollView.scrollerStyle = .legacy
+            scrollView.autohidesScrollers = true
+            scrollView.hasVerticalScroller = true
+        }
         scrollView.scrollerKnobStyle = .default
 
         if scrollView.verticalScroller != nil, !(scrollView.verticalScroller is ThinScroller) {
@@ -134,11 +143,22 @@ enum ThinScrollChrome {
 final class ThinScroller: NSScroller {
     override class var isCompatibleWithOverlayScrollers: Bool { true }
 
-    override class func scrollerWidth(
-        for controlSize: NSControl.ControlSize,
-        scrollerStyle: NSScroller.Style
-    ) -> CGFloat {
-        ThinScrollChrome.width
+    override func drawKnob() {
+        // Keep native layout metrics: shrinking the control clips AppKit's backing layers.
+        var knob = rect(for: .knob)
+        if bounds.height > bounds.width {
+            knob.origin.x = floor(knob.midX - ThinScrollChrome.width / 2)
+            knob.size.width = ThinScrollChrome.width
+        } else {
+            knob.origin.y = floor(knob.midY - ThinScrollChrome.width / 2)
+            knob.size.height = ThinScrollChrome.width
+        }
+        NSColor.secondaryLabelColor.setFill()
+        NSBezierPath(
+            roundedRect: knob,
+            xRadius: ThinScrollChrome.width / 2,
+            yRadius: ThinScrollChrome.width / 2
+        ).fill()
     }
 
     override func drawKnobSlot(in slotRect: NSRect, highlight flag: Bool) {

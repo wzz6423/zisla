@@ -76,6 +76,47 @@ struct SideNoticeLayoutTests {
     }
 
     @Test
+    func compactStatusCountWingsExpandForAdditionalDigitsAndShrinkAfterCountDrops() throws {
+        let oneDigitWidth = SideNoticeLayoutEngine.compactStatusWingWidth(forCount: 9)
+        let twoDigitWidth = SideNoticeLayoutEngine.compactStatusWingWidth(forCount: 99)
+        let threeDigitWidth = SideNoticeLayoutEngine.compactStatusWingWidth(forCount: 100)
+        let fourDigitWidth = SideNoticeLayoutEngine.compactStatusWingWidth(forCount: 1_000)
+
+        #expect(oneDigitWidth == SideNoticeLayoutEngine.compactStatusWingWidth)
+        #expect(twoDigitWidth == oneDigitWidth)
+        #expect(threeDigitWidth > twoDigitWidth)
+        #expect(fourDigitWidth > threeDigitWidth)
+        #expect(SideNoticeLayoutEngine.compactStatusWingWidth(forCount: 99) == twoDigitWidth)
+
+        let screen = physicalNotchScreen()
+        let settings = FeatureSettings()
+        let browserNotice = IslandNotice(
+            id: "browser-download-left",
+            title: "archive.zip",
+            side: .left
+        )
+        let aiOneDigitFrame = try #require(compactBarFrame(forAIStatusCount: 9, screen: screen, settings: settings))
+        let aiTwoDigitFrame = try #require(compactBarFrame(forAIStatusCount: 99, screen: screen, settings: settings))
+        let aiThreeDigitFrame = try #require(compactBarFrame(forAIStatusCount: 100, screen: screen, settings: settings))
+        let aiFourDigitFrame = try #require(compactBarFrame(forAIStatusCount: 1_000, screen: screen, settings: settings))
+        let aiRecoveredFrame = try #require(compactBarFrame(forAIStatusCount: 99, screen: screen, settings: settings))
+        let browserThreeDigitFrame = try #require(engine.compactBarFrame(
+            for: screen,
+            notices: [browserNotice],
+            settings: settings,
+            browserDownloadCount: 100
+        ))
+
+        #expect(aiOneDigitFrame.width == aiTwoDigitFrame.width)
+        #expect(aiThreeDigitFrame.width > aiTwoDigitFrame.width)
+        #expect(aiFourDigitFrame.width > aiThreeDigitFrame.width)
+        #expect(aiRecoveredFrame.width == aiTwoDigitFrame.width)
+        #expect(browserThreeDigitFrame.width == aiThreeDigitFrame.width)
+        #expect(engine.presentation(for: aiNotices(count: 100)).panelSize.width == threeDigitWidth)
+        #expect(engine.presentation(for: aiNotices(count: 99)).panelSize.width == twoDigitWidth)
+    }
+
+    @Test
     func toolboxReminderUsesACompactWingWithoutOccupyingNoticeCapacity() {
         let reminder = IslandNotice(
             id: "toolbox-reminder-left",
@@ -721,6 +762,28 @@ struct SideNoticeLayoutTests {
         #expect(snapshotFrame == layoutFrame)
         #expect(engine.compactWingHeight(for: screen) + SideNoticeLayoutEngine.compactProgressClearance
             == engine.compactWingHeight(for: screen, progressGlowEnabled: true))
+    }
+
+    private func compactBarFrame(
+        forAIStatusCount count: Int,
+        screen: ScreenSnapshot,
+        settings: FeatureSettings
+    ) -> CGRect? {
+        engine.compactBarFrame(
+            for: screen,
+            notices: aiNotices(count: count),
+            settings: settings
+        )
+    }
+
+    private func aiNotices(count: Int) -> [IslandNotice] {
+        (0..<count).map { index in
+            IslandNotice(
+                id: "ai-active-codex-\(index)",
+                title: "Codex",
+                side: .left
+            )
+        }
     }
 
     private func physicalNotchScreen() -> ScreenSnapshot {

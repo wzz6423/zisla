@@ -174,6 +174,24 @@ struct SideNoticePresenterWindowLifecycleTests {
         #expect(!controllerSource.contains("guard enabled else {\n            stopSessionPolling()"))
     }
 
+    @Test
+    func persistentPetPanelsRefreshWhenBrowserDownloadCountChanges() throws {
+        let source = try Self.appSource()
+        let refreshStart = try #require(source.range(of: "Publishers.MergeMany("))
+        let refreshEnd = try #require(
+            source.range(
+                of: "\n\n        model.$isSharingPickerVisible",
+                range: refreshStart.lowerBound..<source.endIndex
+            )
+        )
+        let refreshBinding = source[refreshStart.lowerBound..<refreshEnd.lowerBound]
+
+        #expect(refreshBinding.contains("model.browserDownloads.$snapshots"))
+        #expect(refreshBinding.contains(".map(\\.count)"))
+        #expect(refreshBinding.contains(".removeDuplicates()"))
+        #expect(refreshBinding.contains("coordinator?.refreshPersistentPanels()"))
+    }
+
     private static func appSource() throws -> String {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
