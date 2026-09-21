@@ -43,6 +43,13 @@ final class SideNoticePresenter {
                 Task { @MainActor [weak self] in self?.updatePanels() }
             }
             .store(in: &cancellables)
+        browserDownloads.$snapshots
+            .map(\.count)
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.updatePanels() }
+            }
+            .store(in: &cancellables)
         // A settings change can switch the winning compact status and its required width.
         settingsStore.$settings
             .removeDuplicates()
@@ -172,7 +179,8 @@ final class SideNoticePresenter {
             let compactBarFrame = layoutEngine.compactBarFrame(
                 for: snapshot,
                 notices: compactNotices,
-                settings: settingsStore.settings
+                settings: settingsStore.settings,
+                browserDownloadCount: browserDownloads.snapshots.count
             ) ?? layoutEngine.compactBarFrame(for: snapshot)
             displayState.compactWingsEnabled = false
             displayState.compactWingHeight = compactBarFrame.height
@@ -266,7 +274,8 @@ final class SideNoticePresenter {
         guard let currentFrame = layoutEngine.compactBarFrame(
             for: snapshot,
             notices: compactNotices,
-            settings: settingsStore.settings
+            settings: settingsStore.settings,
+            browserDownloadCount: browserDownloads.snapshots.count
         ) else {
             panels.compactBar?.orderOut(nil)
             return presentsNewCompactStatus

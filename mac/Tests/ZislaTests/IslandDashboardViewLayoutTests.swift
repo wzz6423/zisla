@@ -40,6 +40,22 @@ struct IslandDashboardViewLayoutTests {
         #expect(source.contains("ScrollView(.vertical)"))
     }
 
+    @Test
+    func dashboardScrollUsesSharedThinScrollChrome() throws {
+        let source = try String(contentsOf: Self.dashboardSourceURL, encoding: .utf8)
+        let bodyStart = try #require(source.range(of: "    var body: some View {"))
+        let dynamicCards = try #require(
+            source.range(
+                of: "\n    private var dynamicCards",
+                range: bodyStart.lowerBound..<source.endIndex
+            )
+        )
+        let body = source[bodyStart.lowerBound..<dynamicCards.lowerBound]
+
+        #expect(body.contains("ScrollView(.vertical)"))
+        #expect(body.contains(".scrollIndicators(.visible)\n                .thinScrollChrome()"))
+    }
+
     private static let dashboardSourceURL = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
