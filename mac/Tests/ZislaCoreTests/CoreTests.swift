@@ -2519,6 +2519,19 @@ struct AIUsageAnalyticsTests {
 
 struct UpdateCoreTests {
     @Test
+    func updateFeedPreferenceUsesGiteeFirstForChinaAndUnknownLocations() {
+        #expect(UpdateFeedPreference(countryCode: " CN\n") == .giteeFirst)
+        #expect(UpdateFeedPreference(countryCode: nil) == .giteeFirst)
+        #expect(UpdateFeedPreference(countryCode: "  ") == .giteeFirst)
+    }
+
+    @Test
+    func updateFeedPreferenceUsesGitHubFirstOutsideChina() {
+        #expect(UpdateFeedPreference(countryCode: "US") == .githubFirst)
+        #expect(UpdateFeedPreference(countryCode: "de") == .githubFirst)
+    }
+
+    @Test
     func mockPrimaryAppcastFailureRetriesFallbackExactlyOnce() {
         var state = UpdateFeedFallbackState()
 

@@ -2568,10 +2568,7 @@ struct SettingsView: View {
                     HStack {
                         Spacer()
                         Button {
-                            model.checkForUpdates(
-                                manual: true,
-                                channel: model.settingsStore.settings.updateChannel
-                            )
+                            model.checkForUpdates(manual: true)
                         } label: {
                             Label(
                                 AppLocalization.text("检查 %@", AppLocalization.text(model.settingsStore.settings.updateChannel.menuTitle)),
@@ -3358,10 +3355,7 @@ struct SettingsView: View {
                 isActive: true,
                 size: .compact
             ) {
-                model.checkForUpdates(
-                    manual: true,
-                    channel: model.settingsStore.settings.updateChannel
-                )
+                model.checkForUpdates(manual: true)
             }
         } else {
         switch model.updateState {

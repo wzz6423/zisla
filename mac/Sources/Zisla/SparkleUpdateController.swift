@@ -6,10 +6,13 @@ struct SparkleFeedPair: Equatable {
     let gitee: URL
     let github: URL
 
-    func url(for source: UpdateFeedSource) -> URL {
-        switch source {
-        case .primary: gitee
-        case .fallback: github
+    func url(
+        for source: UpdateFeedSource,
+        preference: UpdateFeedPreference = .giteeFirst
+    ) -> URL {
+        switch (preference, source) {
+        case (.giteeFirst, .primary), (.githubFirst, .fallback): gitee
+        case (.githubFirst, .primary), (.giteeFirst, .fallback): github
         }
     }
 }
@@ -136,6 +139,7 @@ final class SparkleFeedDelegate: NSObject, SPUUpdaterDelegate {
     var onUpdateSkipped: (() -> Void)?
 
     private var feeds: SparkleFeedPair
+    private var preference: UpdateFeedPreference
     private var fallbackState = UpdateFeedFallbackState()
     private var fallbackRetryCheck: SPUUpdateCheck?
 
@@ -143,21 +147,38 @@ final class SparkleFeedDelegate: NSObject, SPUUpdaterDelegate {
         fallbackState.source == .primary
     }
 
-    init(feeds: SparkleFeedPair) {
+    init(
+        feeds: SparkleFeedPair,
+        preference: UpdateFeedPreference = .giteeFirst
+    ) {
         self.feeds = feeds
+        self.preference = preference
     }
 
     @discardableResult
-    func setFeeds(_ feeds: SparkleFeedPair) -> Bool {
-        let previousURL = self.feeds.url(for: fallbackState.source)
+    func setFeeds(
+        _ feeds: SparkleFeedPair,
+        preference: UpdateFeedPreference
+    ) -> Bool {
+        let previousURL = self.feeds.url(
+            for: fallbackState.source,
+            preference: self.preference
+        )
         self.feeds = feeds
+        self.preference = preference
         fallbackState.beginCheck()
         fallbackRetryCheck = nil
-        return previousURL != self.feeds.url(for: fallbackState.source)
+        return previousURL != self.feeds.url(
+            for: fallbackState.source,
+            preference: self.preference
+        )
     }
 
     func feedURLString(for updater: SPUUpdater) -> String? {
-        feeds.url(for: fallbackState.source).absoluteString
+        feeds.url(
+            for: fallbackState.source,
+            preference: preference
+        ).absoluteString
     }
 
     func updater(
@@ -330,10 +351,14 @@ final class SparkleUpdateController {
     func configure(
         channel: UpdateChannel,
         checksEnabled: Bool,
-        automaticDownloadEnabled: Bool
+        automaticDownloadEnabled: Bool,
+        feedPreference: UpdateFeedPreference
     ) -> Bool {
         guard let feeds = configuration.feedPair(for: channel) else { return false }
-        let didChangeFeed = updaterDelegate.setFeeds(feeds)
+        let didChangeFeed = updaterDelegate.setFeeds(
+            feeds,
+            preference: feedPreference
+        )
         let wasStarted = didStart
         guard startIfNeeded() else { return false }
         updater.automaticallyChecksForUpdates = checksEnabled
@@ -348,12 +373,14 @@ final class SparkleUpdateController {
     func checkForUpdates(
         channel: UpdateChannel,
         checksEnabled: Bool,
-        automaticDownloadEnabled: Bool
+        automaticDownloadEnabled: Bool,
+        feedPreference: UpdateFeedPreference
     ) -> Bool {
         guard configure(
             channel: channel,
             checksEnabled: checksEnabled,
-            automaticDownloadEnabled: automaticDownloadEnabled
+            automaticDownloadEnabled: automaticDownloadEnabled,
+            feedPreference: feedPreference
         ) else {
             return false
         }

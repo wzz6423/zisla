@@ -492,6 +492,9 @@ final class AppModel: ObservableObject {
   private var cancellables: Set<AnyCancellable> = []
   private var weatherTask: Task<Void, Never>?
   private var updatePollingTask: Task<Void, Never>?
+  private let updateFeedResolver = UpdateFeedResolver {
+    UpdateFeedPreference(countryCode: await AppModel.countryCodeForCurrentIP())
+  }
   private var voiceRecordingCleanupTask: Task<Void, Never>?
   private var appliedVoiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy?
   private var downloadTasks: [UUID: Task<Void, Never>] = [:]
@@ -946,6 +949,7 @@ final class AppModel: ObservableObject {
     aiAgent.store.flushPendingChanges()
     weatherTask?.cancel()
     updatePollingTask?.cancel()
+    updateFeedResolver.cancel()
     voiceRecordingCleanupTask?.cancel()
     voiceRecordingCleanupTask = nil
     appliedVoiceRecordingCleanupPolicy = nil
@@ -1295,29 +1299,37 @@ final class AppModel: ObservableObject {
     return mailComposeRequest
   }
 
-  func checkForUpdates(manual: Bool, channel: UpdateChannel? = nil) {
+  func checkForUpdates(manual: Bool) {
     guard manual || settingsStore.settings.updateChecksEnabled else { return }
-    let selectedChannel = channel ?? settingsStore.settings.updateChannel
     guard let sparkleUpdateController else {
       if manual { updateState = .failed(AppLocalization.text("无法启动自动更新服务")) }
       return
     }
     if manual {
       updateState = .checking
-      if !sparkleUpdateController.checkForUpdates(
-        channel: selectedChannel,
-        checksEnabled: settingsStore.settings.updateChecksEnabled,
-        automaticDownloadEnabled: settingsStore.settings.automaticDownloadEnabled
-      ) {
-        updateState = .failed(AppLocalization.text("无法启动自动更新服务"))
-      }
-      return
     }
-    _ = sparkleUpdateController.configure(
-      channel: selectedChannel,
-      checksEnabled: settingsStore.settings.updateChecksEnabled,
-      automaticDownloadEnabled: settingsStore.settings.automaticDownloadEnabled
-    )
+    updateFeedResolver.resolve(manual: manual) { [weak self] feedPreference in
+      guard let self else { return }
+      let settings = settingsStore.settings
+
+      if manual {
+        if !sparkleUpdateController.checkForUpdates(
+          channel: settings.updateChannel,
+          checksEnabled: settings.updateChecksEnabled,
+          automaticDownloadEnabled: settings.automaticDownloadEnabled,
+          feedPreference: feedPreference
+        ) {
+          updateState = .failed(AppLocalization.text("无法启动自动更新服务"))
+        }
+      } else {
+        _ = sparkleUpdateController.configure(
+          channel: settings.updateChannel,
+          checksEnabled: settings.updateChecksEnabled,
+          automaticDownloadEnabled: settings.automaticDownloadEnabled,
+          feedPreference: feedPreference
+        )
+      }
+    }
   }
 
   func selectSystemMonitor() {
@@ -1772,19 +1784,21 @@ final class AppModel: ObservableObject {
     }
   }
 
-  private nonisolated static func translationProviderForCurrentIP() async -> ClipboardAssistantTranslate.Provider {
-    guard let url = URL(string: "https://ipinfo.io/country") else { return .google }
+  private nonisolated static func countryCodeForCurrentIP() async -> String? {
+    guard let url = URL(string: "https://ipinfo.io/country") else { return nil }
     var request = URLRequest(url: url)
     request.timeoutInterval = 5
     do {
       let (data, response) = try await URLSession.shared.data(for: request)
-      guard (response as? HTTPURLResponse)?.statusCode == 200 else { return .google }
-      return ClipboardAssistantTranslate.provider(
-        forCountryCode: String(data: data, encoding: .utf8)
-      )
+      guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+      return String(data: data, encoding: .utf8)
     } catch {
-      return .google
+      return nil
     }
+  }
+
+  private nonisolated static func translationProviderForCurrentIP() async -> ClipboardAssistantTranslate.Provider {
+    ClipboardAssistantTranslate.provider(forCountryCode: await countryCodeForCurrentIP())
   }
 
   /// Launches a locally installed application by bundle identifier. The assistant
@@ -2659,11 +2673,17 @@ final class AppModel: ObservableObject {
   }
 
   private func configureUpdatePolling(enabled: Bool) {
-    _ = sparkleUpdateController?.configure(
-      channel: settingsStore.settings.updateChannel,
-      checksEnabled: enabled,
-      automaticDownloadEnabled: settingsStore.settings.automaticDownloadEnabled
-    ) == true
+    if enabled {
+      checkForUpdates(manual: false)
+    } else {
+      updateFeedResolver.cancelAutomaticConfiguration()
+      _ = sparkleUpdateController?.configure(
+        channel: settingsStore.settings.updateChannel,
+        checksEnabled: false,
+        automaticDownloadEnabled: settingsStore.settings.automaticDownloadEnabled,
+        feedPreference: updateFeedResolver.preference ?? .giteeFirst
+      ) == true
+    }
     guard isUpdatePollingEnabled != enabled else { return }
     isUpdatePollingEnabled = enabled
     updatePollingTask?.cancel()
