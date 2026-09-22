@@ -173,7 +173,7 @@ struct ClipboardAssistantConversionRobustnessTests {
             ("//example.com/path", .url),
             ("http://2026.1.23/", .url), ("https://example.com/?amount=100.5USD", .url), ("10-3", .math),
         ] {
-            #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: kinds, now: now, timeZone: utc)?.kind == kind)
+            #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: kinds, now: now, timeZone: utc, countryCode: "CN")?.kind == kind)
         }
         #expect(ClipboardAssistantDetector.detect(text: "100.5USD", enabledKinds: kinds, preferredCurrencyCode: "CNY", now: now, timeZone: utc)?.kind == .conversion)
         let zone = try #require(TimeZone(identifier: "America/New_York"))
