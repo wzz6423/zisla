@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import ZislaCore
 import ZislaKit
 import SwiftUI
@@ -385,14 +386,48 @@ private final class FileDropState: ObservableObject {
 }
 
 @MainActor
-private final class FileIconCache {
+final class FileIconCache {
     static let shared = FileIconCache()
-    private let cache = NSCache<NSString, NSImage>()
+    private final class CachedIcon: NSObject {
+        let image: NSImage
+        let fileSize: Int?
+        let modifiedAt: Date?
+
+        init(image: NSImage, values: URLResourceValues?) {
+            self.image = image
+            fileSize = values?.fileSize
+            modifiedAt = values?.contentModificationDate
+        }
+    }
+
+    private let cache = NSCache<NSString, CachedIcon>()
 
     func icon(for path: String) -> NSImage {
-        if let image = cache.object(forKey: path as NSString) { return image }
-        let image = NSWorkspace.shared.icon(forFile: path)
-        cache.setObject(image, forKey: path as NSString)
+        let url = URL(fileURLWithPath: path)
+        let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey])
+        if let cached = cache.object(forKey: path as NSString),
+           cached.fileSize == values?.fileSize, cached.modifiedAt == values?.contentModificationDate {
+            return cached.image
+        }
+        let image = Self.thumbnail(for: url, values: values) ?? NSWorkspace.shared.icon(forFile: path)
+        cache.setObject(CachedIcon(image: image, values: values), forKey: path as NSString)
         return image
+    }
+
+    private static func thumbnail(for url: URL, values: URLResourceValues?) -> NSImage? {
+        guard values?.isRegularFile == true,
+              let fileSize = values?.fileSize, fileSize <= 32 * 1_024 * 1_024,
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int,
+              width > 0, height > 0, width <= 16_000_000 / height else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 84,
+        ]
+        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return NSImage(cgImage: thumbnail, size: NSSize(width: thumbnail.width, height: thumbnail.height))
     }
 }

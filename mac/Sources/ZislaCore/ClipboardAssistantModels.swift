@@ -305,7 +305,8 @@ public enum ClipboardAssistantActionOrder {
         case .math: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
         case .currency, .conversion: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
         case .dateTime: [.createCalendarEvent, .copyText, .copyFullExpression, .addToQuickNote, .share]
-        case .address, .flight, .train, .tracking: [.openURL, .copyText, .addToQuickNote, .share]
+        case .address, .tracking: [.openURL, .copyText, .addToQuickNote, .share]
+        case .flight, .train: [.search, .openURL, .copyText, .addToQuickNote, .share]
         case .meeting: [.createCalendarEvent, .addToQuickNote, .share]
         case .emojiName: [.copyEmoji, .addToQuickNote, .share]
         case .nonSystemLanguageText: [.translate, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
@@ -342,6 +343,7 @@ public enum ClipboardAssistantActionOrder {
 
     private static func legacyDefault(for kind: ClipboardAssistantKind) -> [ClipboardAssistantActionKind]? {
         switch kind {
+        case .flight, .train: [.openURL, .copyText, .addToQuickNote, .share]
         case .math: [.copyText, .addToQuickNote, .share, .sendToTeleprompter]
         case .nonSystemLanguageText: [.translate, .search, .saveText, .addToQuickNote, .share, .sendToTeleprompter]
         case .code: [.saveText, .addToQuickNote, .share, .sendToTeleprompter]

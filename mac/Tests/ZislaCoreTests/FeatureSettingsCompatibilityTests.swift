@@ -142,6 +142,27 @@ struct FeatureSettingsCompatibilityTests {
         ])
     }
 
+    @Test(arguments: [ClipboardAssistantKind.flight, .train])
+    func lookupActionPrioritiesSurviveUpgradeAndSettingsRoundTrip(_ kind: ClipboardAssistantKind) throws {
+        let oldDefault: [ClipboardAssistantActionKind] = [.openURL, .copyText, .addToQuickNote, .share]
+        let legacy = try JSONEncoder().encode(LegacySettings(clipboardAssistantActionOrders: [kind: oldDefault]))
+        let upgraded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(upgraded.clipboardAssistantActionOrders[kind]?.first == .search)
+
+        let custom: [ClipboardAssistantActionKind] = [.copyText, .openURL, .addToQuickNote, .share]
+        let saved = try JSONEncoder().encode(LegacySettings(clipboardAssistantActionOrders: [kind: custom]))
+        let restored = try JSONDecoder().decode(FeatureSettings.self, from: saved)
+        #expect(restored.clipboardAssistantActionOrders[kind] == custom + [.search])
+        let reopened = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(restored))
+        #expect(reopened.clipboardAssistantActionOrders[kind] == restored.clipboardAssistantActionOrders[kind])
+
+        let number = kind == .train ? "ICE 123" : "CA1234"
+        let actions: [ClipboardAssistantAction] = [.search(number), .openURL(URL(string: "https://example.invalid/")!), .copyText(number)]
+        let ordered = ClipboardAssistantActionOrder.ordered(actions, for: kind, using: reopened.clipboardAssistantActionOrders)
+        #expect(ordered.first == .copyText(number))
+        #expect(Set(ordered.map(\.identifier)) == Set(actions.map(\.identifier)))
+    }
+
     @Test
     func legacyClipboardAssistantKindRawValueDecodesFromCompleteFeatureSettingsPayload() throws {
         var payload = try #require(

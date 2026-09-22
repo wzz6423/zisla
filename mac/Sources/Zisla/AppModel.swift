@@ -976,6 +976,7 @@ final class AppModel: ObservableObject {
     notices.remove(id: "voice-processing-right")
     detectedLinkTask?.cancel()
     translationTask?.cancel()
+    clipboardServiceOpenTask?.cancel()
     voiceModelDiscoveryTask?.cancel()
     voiceModelDiscoveryTask = nil
     voiceModelDiscoveryGeneration &+= 1
@@ -1424,6 +1425,7 @@ final class AppModel: ObservableObject {
   /// fresh on every conversion and never cached.
   private let exchangeRateService = ExchangeRateService.live()
   private var currencyConversionTask: Task<Void, Never>?
+  private var clipboardServiceOpenTask: Task<Void, Never>?
 
   private enum ClipboardAssistantPresentationResult {
     case presented
@@ -1697,8 +1699,22 @@ final class AppModel: ObservableObject {
     switch action {
     case .openURL(let url):
       NSWorkspace.shared.open(url)
-    case .openService(_, let url):
-      NSWorkspace.shared.open(url)
+    case .openService(let service, let url):
+      clipboardServiceOpenTask?.cancel()
+      if service == .railway12306 {
+        clipboardServiceOpenTask = Task { @MainActor [weak self] in
+          do {
+            let destination = try await ClipboardAssistantRailwayURLResolver.resolve(url)
+            guard !Task.isCancelled else { return }
+            NSWorkspace.shared.open(destination)
+          } catch {
+            guard !Task.isCancelled else { return }
+            self?.transientMessage = self?.clipboardAssistantMessage("无法完成操作")
+          }
+        }
+      } else {
+        NSWorkspace.shared.open(url)
+      }
     case .openApp(let bundleIdentifier, _):
       openInstalledApplication(bundleIdentifier: bundleIdentifier)
     case .openDownload(let url):

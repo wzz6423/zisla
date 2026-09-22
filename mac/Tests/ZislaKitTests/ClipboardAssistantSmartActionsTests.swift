@@ -28,7 +28,7 @@ struct ClipboardAssistantSmartActionsTests {
         let cn = try #require(detect("北京市海淀区中关村大街27号", country: "US"))
         let cnURL = try #require(serviceURL(cn, .baiduMaps))
         #expect(cn.kind == .address)
-        #expect(query(cnURL, "address") == "北京市海淀区中关村大街27号")
+        #expect(query(cnURL, "query") == "北京市海淀区中关村大街27号")
         let us = try #require(detect("Address: 123 King's Road, London #4", country: "CN"))
         let usURL = try #require(serviceURL(us, .googleMaps))
         #expect(query(usURL, "api") == "1")
@@ -46,8 +46,8 @@ struct ClipboardAssistantSmartActionsTests {
         #expect(serviceURL(flight, .united) != nil)
         #expect(flight.actions.contains(.copyText("UA123")))
         #expect(Set(flight.actions.map(\.identifier)).count == flight.actions.count)
-        #expect(serviceURL(try #require(detect("Flight XY123", country: "CN")), .umetrip) != nil)
-        #expect(detect("XY123") == nil)
+        #expect(serviceURL(try #require(detect("Flight ZZ123", country: "CN")), .umetrip) != nil)
+        #expect(detect("ZZ123") == nil)
     }
 
     @Test(arguments: ["3U8633", "9C8801", "LH400", "BA117", "flight no. UA123"])
@@ -114,7 +114,7 @@ struct ClipboardAssistantSmartActionsTests {
     }
 
     @Test func trustedDestinationsOnly() throws {
-        let hosts: Set<String> = ["www.umetrip.com", "www.flightaware.com", "www.united.com", "www.lufthansa.com", "www.britishairways.com", "kyfw.12306.cn", "www.bahn.de", "www.amtrak.com", "www.sncf-connect.com", "www.kuaidi100.com", "www.17track.net", "t.17track.net", "www.sf-express.com", "www.ups.com", "www.fedex.com", "www.dhl.com", "tools.usps.com"]
+        let hosts: Set<String> = ["www.umetrip.com", "www.flightaware.com", "www.united.com", "www.lufthansa.com", "www.britishairways.com", "kyfw.12306.cn", "kursbuch.bahn.de", "www.amtrak.com", "www.sncf-connect.com", "www.kuaidi100.com", "www.17track.net", "t.17track.net", "www.sf-express.com", "www.ups.com", "www.fedex.com", "www.dhl.com", "tools.usps.com"]
         for text in ["CA1234", "UA123", "LH400", "BA117", "G123", "ICE 123", "Amtrak 171", "TGV 6123", "SF1234567890123", "UPS 1Z999AA10123456784", "FedEx 123456789012", "DHL 123456789012", "USPS 9400111899223856921234"] {
             let result = try #require(detect(text))
             for action in result.actions {

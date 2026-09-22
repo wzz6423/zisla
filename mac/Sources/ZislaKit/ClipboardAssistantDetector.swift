@@ -11,6 +11,7 @@ public enum ClipboardAssistantDetector {
         enabledKinds: Set<ClipboardAssistantKind>,
         offersDownload: Bool = false,
         preferredCurrencyCode: String? = nil,
+        countryCode: String? = Locale.current.region?.identifier,
         installedApplications: [InstalledApplication] = []
     ) -> ClipboardAssistantDetection? {
         switch content {
@@ -26,6 +27,7 @@ public enum ClipboardAssistantDetector {
                 enabledKinds: enabledKinds,
                 offersDownload: offersDownload,
                 preferredCurrencyCode: preferredCurrencyCode,
+                countryCode: countryCode,
                 installedApplications: installedApplications
             )
         }
@@ -40,15 +42,23 @@ public enum ClipboardAssistantDetector {
         now: Date = Date(),
         timeZone: TimeZone = .current,
         locale: Locale = AppLocalization.currentLanguage.locale,
+        countryCode: String? = Locale.current.region?.identifier,
         installedApplications: [InstalledApplication] = []
     ) -> ClipboardAssistantDetection? {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
 
         if let detection = smartActionDetection(
-            text, enabledKinds: enabledKinds, now: now, timeZone: timeZone
+            text, enabledKinds: enabledKinds, countryCode: countryCode, now: now, timeZone: timeZone
         ) {
             return detection
+        }
+        let phone = enabledKinds.contains(.phone) ? ClipboardAssistantPhoneNumbers.parse(text, countryCode: countryCode) : nil
+        let phoneDetection = phone.map {
+            ClipboardAssistantDetection(kind: .phone, title: text, actions: [.callPhone($0.e164)])
+        }
+        if let phone, phone.prefersBareNumber || !text.allSatisfy(\.isNumber) {
+            return phoneDetection
         }
         // Dot-separated dates and decimal currency amounts also resemble bare web hosts.
         // Strict whole-value grammars must get the first chance to classify them.
@@ -141,13 +151,12 @@ public enum ClipboardAssistantDetector {
                 fullContent: fullExpression
             )
         }
-        if enabledKinds.contains(.phone), isPhoneNumber(text) {
-            let normalized = "+\(text.filter(\.isNumber))"
-            return ClipboardAssistantDetection(
-                kind: .phone,
-                title: text,
-                actions: [.callPhone(normalized)]
-            )
+        if let phoneDetection { return phoneDetection }
+        if enabledKinds.contains(.tracking),
+           let tracking = trackingDetection(
+               text, countryCode: countryCode, allowUnlabelledNumber: true
+           ) {
+            return tracking
         }
         if enabledKinds.contains(.code), let code = codeDetection(text) {
             return code
@@ -332,16 +341,6 @@ public enum ClipboardAssistantDetector {
     static func isEmailAddress(_ text: String) -> Bool {
         guard text.count <= 320, !text.contains(where: \Character.isWhitespace) else { return false }
         let pattern = #"^[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$"#
-        return text.range(of: pattern, options: .regularExpression) != nil
-    }
-
-    static func isPhoneNumber(_ text: String) -> Bool {
-        guard text.count <= 24 else { return false }
-        let digits = text.filter(\.isNumber)
-        guard digits.count >= 7, digits.count <= 18, digits.contains(where: { $0 != "0" } ) || digits.count > 1 else {
-            return false
-        }
-        let pattern = #"^\+?[0-9][0-9\s\-().]*[0-9]$|^\+?[0-9]{7,}$"#
         return text.range(of: pattern, options: .regularExpression) != nil
     }
 
