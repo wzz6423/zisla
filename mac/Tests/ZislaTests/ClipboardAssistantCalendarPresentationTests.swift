@@ -17,6 +17,7 @@ struct ClipboardAssistantCalendarPresentationTests {
     @Test(.timeLimit(.minutes(1)))
     func meetingAutomaticallyOpensItsDraftAfterPresentation() async throws {
         let controller = makeController()
+        defer { controller.dismiss() }
         let (stream, continuation) = AsyncStream<ClipboardAssistantAction>.makeStream()
         defer { continuation.finish() }
         controller.onPerformAction = { continuation.yield($0) }
