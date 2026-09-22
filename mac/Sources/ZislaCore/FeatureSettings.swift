@@ -541,6 +541,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// An empty set means all configured system Mail.app accounts are synced.
     public var mailAccountNames: Set<String>
     public var mailCompactStyle: MailCompactStyle
+    public var recommendedToolsEnabled: Bool
+    public var recommendedToolsAutomaticUpdatesEnabled: Bool
     public var updateChecksEnabled: Bool
     public var automaticDownloadEnabled: Bool
     /// Target channel for automatic and manual update checks.
@@ -675,6 +677,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mailEnabled: Bool = true,
         mailAccountNames: Set<String> = [],
         mailCompactStyle: MailCompactStyle = .compact,
+        recommendedToolsEnabled: Bool = true,
+        recommendedToolsAutomaticUpdatesEnabled: Bool = false,
         updateChecksEnabled: Bool = true,
         automaticDownloadEnabled: Bool = true,
         updateChannel: UpdateChannel = .release,
@@ -763,6 +767,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.mailEnabled = mailEnabled
         self.mailAccountNames = mailAccountNames
         self.mailCompactStyle = mailCompactStyle
+        self.recommendedToolsEnabled = recommendedToolsEnabled
+        self.recommendedToolsAutomaticUpdatesEnabled = recommendedToolsAutomaticUpdatesEnabled
         self.updateChecksEnabled = updateChecksEnabled
         self.automaticDownloadEnabled = automaticDownloadEnabled
         self.updateChannel = updateChannel
@@ -854,12 +860,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     }
 
     /// Current clipboard-assistant kind preference payload version.
-    public static let clipboardAssistantKindSetVersionCurrent = 1
+    public static let clipboardAssistantKindSetVersionCurrent = 2
     /// Kinds shipped after the previous version; enabled once when a stored
     /// preference from an older version is decoded. Empty stored sets keep
     /// their "all kinds" meaning and need no migration.
     private static let kindsIntroducedByVersion: [Int: Set<ClipboardAssistantKind>] = [
         1: [.emojiName],
+        2: [.address, .flight, .train, .tracking, .meeting],
     ]
 
     public static let `default` = FeatureSettings()
@@ -894,6 +901,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case mailEnabled
         case mailAccountNames
         case mailCompactStyle
+        case recommendedToolsEnabled
+        case recommendedToolsAutomaticUpdatesEnabled
         case updateChecksEnabled
         case automaticDownloadEnabled
         case updateChannel
@@ -1023,6 +1032,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mailEnabled = try container.decodeIfPresent(Bool.self, forKey: .mailEnabled) ?? defaults.mailEnabled
         mailAccountNames = try container.decodeIfPresent(Set<String>.self, forKey: .mailAccountNames) ?? defaults.mailAccountNames
         mailCompactStyle = try container.decodeIfPresent(MailCompactStyle.self, forKey: .mailCompactStyle) ?? defaults.mailCompactStyle
+        recommendedToolsEnabled = try container.decodeIfPresent(Bool.self, forKey: .recommendedToolsEnabled) ?? defaults.recommendedToolsEnabled
+        recommendedToolsAutomaticUpdatesEnabled = try container.decodeIfPresent(Bool.self, forKey: .recommendedToolsAutomaticUpdatesEnabled) ?? defaults.recommendedToolsAutomaticUpdatesEnabled
         updateChecksEnabled = try container.decodeIfPresent(Bool.self, forKey: .updateChecksEnabled) ?? defaults.updateChecksEnabled
         if let automaticDownload = try container.decodeIfPresent(Bool.self, forKey: .automaticDownloadEnabled) {
             automaticDownloadEnabled = automaticDownload

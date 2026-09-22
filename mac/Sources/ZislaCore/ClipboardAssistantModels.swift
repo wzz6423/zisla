@@ -12,6 +12,11 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
     case currency
     case conversion
     case dateTime
+    case address
+    case flight
+    case train
+    case tracking
+    case meeting
     case emojiName
     case code
     case nonSystemLanguageText = "chineseText"
@@ -30,6 +35,11 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
         .math,
         .conversion,
         .dateTime,
+        .address,
+        .flight,
+        .train,
+        .tracking,
+        .meeting,
         .emojiName,
         .code,
         .nonSystemLanguageText,
@@ -51,6 +61,11 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
         case .currency: "dollarsign"
         case .conversion: "arrow.left.arrow.right"
         case .dateTime: "calendar"
+        case .address: "map"
+        case .flight: "airplane"
+        case .train: "tram"
+        case .tracking: "shippingbox"
+        case .meeting: "calendar.badge.plus"
         case .emojiName: "smiley"
         case .nonSystemLanguageText: "character.book.closed"
         case .app: "app"
@@ -290,6 +305,8 @@ public enum ClipboardAssistantActionOrder {
         case .math: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
         case .currency, .conversion: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
         case .dateTime: [.createCalendarEvent, .copyText, .copyFullExpression, .addToQuickNote, .share]
+        case .address, .flight, .train, .tracking: [.openURL, .copyText, .addToQuickNote, .share]
+        case .meeting: [.createCalendarEvent, .addToQuickNote, .share]
         case .emojiName: [.copyEmoji, .addToQuickNote, .share]
         case .nonSystemLanguageText: [.translate, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .code: [.saveText, .addToQuickNote, .sendToTeleprompter, .share]
@@ -352,6 +369,7 @@ public enum ClipboardAssistantActionOrder {
 /// An executable next-step action offered by the clipboard assistant.
 public enum ClipboardAssistantAction: Equatable, Sendable {
     case openURL(URL)
+    case openService(service: ClipboardAssistantService, url: URL)
     case openDownload(URL)
     case revealInFinder(URL)
     case search(String)
@@ -369,12 +387,14 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     case saveImage(Data)
     case saveText(String)
     case createCalendarEvent(title: String, date: Date, isAllDay: Bool)
+    case editCalendarEvent(ClipboardCalendarDraft)
     case openApp(bundleIdentifier: String, appName: String)
 
     /// Stable identity used by SwiftUI to disambiguate buttons.
     public var identifier: String {
         switch self {
         case .openURL: "openURL"
+        case .openService(let service, _): "openService:\(service.rawValue)"
         case .openDownload: "openDownload"
         case .revealInFinder: "revealInFinder"
         case .search: "search"
@@ -392,6 +412,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .saveImage: "saveImage"
         case .saveText: "saveText"
         case .createCalendarEvent: "createCalendarEvent"
+        case .editCalendarEvent: "editCalendarEvent"
         case .openApp: "openApp"
         }
     }
@@ -399,6 +420,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     public var kind: ClipboardAssistantActionKind? {
         switch self {
         case .openURL: .openURL
+        case .openService: .openURL
         case .openDownload: .openDownload
         case .revealInFinder: .revealInFinder
         case .search: .search
@@ -416,6 +438,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .saveImage: .saveImage
         case .saveText: .saveText
         case .createCalendarEvent: .createCalendarEvent
+        case .editCalendarEvent: .createCalendarEvent
         case .openApp: .openApp
         }
     }

@@ -6,6 +6,43 @@ import ZislaCore
 
 struct SettingsNavigationTests {
     @Test
+    func recommendationVisibilityFollowsItsFeatureToggle() {
+        var settings = FeatureSettings()
+        #expect(SettingsSection.recommendations.isVisible(settings: settings))
+        settings.recommendedToolsEnabled = false
+        settings.recommendedToolsAutomaticUpdatesEnabled = true
+        #expect(!SettingsSection.recommendations.isVisible(settings: settings))
+    }
+
+    @Test
+    func recommendationControlsAreConditionalAndLocalizedInEveryLanguage() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        let controlsStart = try #require(source.range(of: "settingsGroup(\"推荐\")"))
+        let controlsEnd = try #require(source.range(of: "settingsGroup(\"媒体与文件\")", range: controlsStart.upperBound..<source.endIndex))
+        let controls = source[controlsStart.lowerBound..<controlsEnd.lowerBound]
+        #expect(controls.contains("if model.settingsStore.settings.recommendedToolsEnabled {"))
+        #expect(controls.contains("keyPath: \\.recommendedToolsAutomaticUpdatesEnabled"))
+        let keys = [
+            "显示推荐工具", "在设置中显示推荐工具和管理入口",
+            "自动更新推荐工具", "每天更新已安装的推荐工具；不会安装未安装的工具",
+        ]
+        let packageRoot = Self.settingsViewSourceURL.deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        for language in AppLanguage.allCases {
+            let tableURL = packageRoot.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
+            let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
+            for key in keys {
+                #expect(controls.contains("\"\(key)\""))
+                let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
+                #expect(!value.isEmpty)
+                #expect(AppLocalization.string(key, language: language) == value)
+                if language != .simplifiedChinese { #expect(value != key) }
+            }
+        }
+        #expect(AppLocalization.string("显示推荐工具", language: .english) == "Show Recommended Tools")
+    }
+
+    @Test
     func settingsContentTransitionTargetsMountedContent() throws {
         let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
         let detailRange = try #require(source.range(of: "    private var detail: some View {"))

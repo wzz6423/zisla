@@ -297,7 +297,21 @@ final class ClipboardAssistantController: ObservableObject {
         windowPresenter(self, detection)
         onPresentationChanged?(true)
         scheduleDismiss()
+        if detection.kind == .meeting {
+            Task { @MainActor [weak self] in
+                self?.performPendingCalendarDraft(for: generation)
+            }
+        }
         return generation
+    }
+
+    func performPendingCalendarDraft(for generation: Int) {
+        guard presentationGeneration == generation, !isScreenshotActive,
+              let action = presentation.detection?.actions.first(where: {
+                  if case .editCalendarEvent = $0 { return true }
+                  return false
+              }) else { return }
+        perform(action)
     }
 
     func dismiss(animated: Bool = true) {
@@ -1021,6 +1035,7 @@ struct ClipboardAssistantToastView: View {
     static func actionLabel(_ action: ClipboardAssistantAction) -> String {
         switch action {
         case .openURL: "打开链接"
+        case .openService(let service, _): service.localizedTitleKey
         case .openDownload: "下载"
         case .revealInFinder: "在 Finder 中显示"
         case .search: "搜索"
@@ -1037,7 +1052,7 @@ struct ClipboardAssistantToastView: View {
         case .sendToTeleprompter: "发送到提词器"
         case .saveImage: "保存图片"
         case .saveText: "保存文本"
-        case .createCalendarEvent: "新建日程"
+        case .createCalendarEvent, .editCalendarEvent: "新建日程"
         case .openApp: "打开应用"
         }
     }

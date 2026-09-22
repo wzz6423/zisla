@@ -9,6 +9,10 @@ public enum TransferPasteboardPayload: Hashable, Sendable {
 
 /// Reads shareable items from a pasteboard without writing or clearing it.
 public enum TransferPasteboard {
+    public static let shelfDropTypes: [NSPasteboard.PasteboardType] =
+        [.fileURL, .URL, .string, .png, .tiff]
+        + NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) }
+
     /// Local file URLs that currently exist, then plain text if no files are present.
     /// Text HTTP(S) strings stay as text (not coerced into downloads).
     public static func readShareableItems(
@@ -23,6 +27,59 @@ public enum TransferPasteboard {
             return [.text(text)]
         }
         return []
+    }
+
+    /// A drag may contain separate files, links, and text; alternatives on one item are read once.
+    public static func readShelfItems(
+        from pasteboard: NSPasteboard = .general
+    ) -> [TransferPasteboardPayload] {
+        var seen = Set<TransferPasteboardPayload>()
+        return (pasteboard.pasteboardItems ?? []).compactMap { item in
+            guard let payload = shelfPayload(from: item) else { return nil }
+            return seen.insert(payload).inserted ? payload : nil
+        }
+    }
+
+    public static func readShelfDropItems(from pasteboard: NSPasteboard) -> [FileShelfDropItem] {
+        var promises = (pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self]) as? [NSFilePromiseReceiver] ?? []).makeIterator()
+        return (pasteboard.pasteboardItems ?? []).compactMap { item in
+            if item.types.contains(where: { NSFilePromiseReceiver.readableDraggedTypes.contains($0.rawValue) }) {
+                return promises.next().map(FileShelfDropItem.promise)
+            }
+            if let payload = shelfPayload(from: item) { return .content(payload) }
+            for type in [NSPasteboard.PasteboardType.png, .tiff] {
+                if let data = item.data(forType: type) { return .image(data) }
+            }
+            return nil
+        }
+    }
+
+    private static func shelfPayload(from item: NSPasteboardItem) -> TransferPasteboardPayload? {
+        if item.types.contains(where: { NSFilePromiseReceiver.readableDraggedTypes.contains($0.rawValue) }) {
+            return nil
+        }
+        if let raw = item.string(forType: .fileURL) {
+            guard let url = URL(string: raw), url.isFileURL,
+                  FileManager.default.fileExists(atPath: url.path) else { return nil }
+            return .file(url.standardizedFileURL)
+        }
+        if let raw = item.string(forType: .URL), let url = webURL(from: raw) {
+            return .text(url.absoluteString)
+        }
+        if let raw = item.string(forType: .string),
+           !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .text(raw)
+        }
+        return nil
+    }
+
+    public static func webURL(from text: String) -> URL? {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.contains(where: { $0.isWhitespace || $0.isNewline }),
+              let url = URL(string: value),
+              ["http", "https"].contains(url.scheme?.lowercased()),
+              let host = url.host, !host.isEmpty else { return nil }
+        return url
     }
 
     private static func readExistingFileURLs(from pasteboard: NSPasteboard) -> [URL] {
