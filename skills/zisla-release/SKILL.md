@@ -367,4 +367,6 @@ done
 
 ## 交付记录
 
+Release 正文可只使用文字，不需要图片、截图或封面。
+
 在 Release 正文中写清楚版本类型、签名方式、公证状态、已测试的 macOS 范围、WeatherKit 限制、GitHub Issues/PR 入口，以及 Gitee 不受理 Issues/PR 的事实。说明首次安装需手动完成，Sparkle 版后续更新会自动验签并在退出或重启时安装。不要包含证书序列号、访问令牌、私钥、Keychain 密码或个人 Apple ID 信息。
