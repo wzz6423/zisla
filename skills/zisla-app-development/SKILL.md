@@ -124,6 +124,7 @@ description: 此技能用于开发、修复、重构或评审 zisla 应用及其
 
 - 由 AI 参与产出的每个 commit 都必须带 `Co-authored-by: Name <email>` trailer，并与 PR 正文 `AI Attribution` 里声明的 agent 一致。GitHub 只承认这条 trailer 作为非账号作者的共同署名，`PR Automation` 会逐条比对 commit，缺失即失败。
 - PR 正文使用 `.github/PULL_REQUEST_TEMPLATE.md` 的七节：`- Project:` 保留模板给出的项目名，`- Type:` 与标题类型一致，`Related Issue` 写 `Closes #N` 或 `None`，`- Agent:` 写实际 agent 或 `None`。
+- PR 正文可只使用文字，不需要图片、截图或封面；界面变更用文字记录实际验证结果。
 - 标签由 `PR Automation` 从正文推导（类型标签、`development`、`ai-assisted`），不要手工添加或删除这些标签；`skip-ci` 由 `CI Skip` 管理。
 - Issue 与 PR 由 `Project Automation` 放入 `zisla Development` 看板，所在列取自 `area:*` 与类型标签，关闭后转入 `Done`；不要手工拖动列来替代改标签。
 - 平台工作流按 `.github/ci-skip.json` 的 `paths` 裁剪：只改 `mac/**` 时 `Core Tests`、`Web CI`、`Skill CI` 会被跳过并报告成功，这是预期行为，不要因此重跑或改条件；新增顶层目录时同步补上对应的 `paths`。

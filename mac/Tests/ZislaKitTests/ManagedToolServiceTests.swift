@@ -504,7 +504,8 @@ struct ManagedToolServiceTests {
             toolsDirectory: tools,
             bundleURL: root,
             defaults: defaults,
-            releaseLoader: { _ in payload }
+            releaseLoader: { _ in payload },
+            executableResolver: { tool in tool == .ytDLP ? (executable, .managed) : nil }
         )
         await initial.refreshInstalledVersions()
         let latest = await initial.checkLatest(.ytDLP, quietly: true)
@@ -514,7 +515,8 @@ struct ManagedToolServiceTests {
             toolsDirectory: tools,
             bundleURL: root,
             defaults: defaults,
-            releaseLoader: { _ in throw ManagedToolError.releaseUnavailable("不应请求网络") }
+            releaseLoader: { _ in throw ManagedToolError.releaseUnavailable("不应请求网络") },
+            executableResolver: { tool in tool == .ytDLP ? (executable, .managed) : nil }
         )
         #expect(restored.states[.ytDLP]?.installedVersion == "2026.07.04")
         #expect(restored.states[.ytDLP]?.location == .managed)

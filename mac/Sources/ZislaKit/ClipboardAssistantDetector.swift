@@ -11,6 +11,7 @@ public enum ClipboardAssistantDetector {
         enabledKinds: Set<ClipboardAssistantKind>,
         offersDownload: Bool = false,
         preferredCurrencyCode: String? = nil,
+        countryCode: String? = Locale.current.region?.identifier,
         installedApplications: [InstalledApplication] = []
     ) -> ClipboardAssistantDetection? {
         switch content {
@@ -26,6 +27,7 @@ public enum ClipboardAssistantDetector {
                 enabledKinds: enabledKinds,
                 offersDownload: offersDownload,
                 preferredCurrencyCode: preferredCurrencyCode,
+                countryCode: countryCode,
                 installedApplications: installedApplications
             )
         }
@@ -40,40 +42,26 @@ public enum ClipboardAssistantDetector {
         now: Date = Date(),
         timeZone: TimeZone = .current,
         locale: Locale = AppLocalization.currentLanguage.locale,
+        countryCode: String? = Locale.current.region?.identifier,
         installedApplications: [InstalledApplication] = []
     ) -> ClipboardAssistantDetection? {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
 
-        if enabledKinds.contains(.url), let url = HTTPURLParser.url(from: text) {
-            var actions: [ClipboardAssistantAction] = [.openURL(url)]
-            if offersDownload, DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) {
-                actions.append(.openDownload(url))
-            }
-            return ClipboardAssistantDetection(
-                kind: .url,
-                title: url.host ?? text,
-                actions: actions
-            )
+        if let detection = smartActionDetection(
+            text, enabledKinds: enabledKinds, countryCode: countryCode, now: now, timeZone: timeZone
+        ) {
+            return detection
         }
-        if enabledKinds.contains(.filePath), let candidate = filePathCandidate(from: text) {
-            return ClipboardAssistantDetection(
-                kind: .filePath,
-                title: candidate.url.lastPathComponent,
-                detail: .path(candidate.url.path),
-                actions: filePathActions(for: candidate)
-            )
+        let phone = enabledKinds.contains(.phone) ? ClipboardAssistantPhoneNumbers.parse(text, countryCode: countryCode) : nil
+        let phoneDetection = phone.map {
+            ClipboardAssistantDetection(kind: .phone, title: text, actions: [.callPhone($0.e164)])
         }
-        if enabledKinds.contains(.email), isEmailAddress(text) {
-            return ClipboardAssistantDetection(
-                kind: .email,
-                title: text,
-                actions: [.composeMail(text)]
-            )
+        if let phone, phone.prefersBareNumber || !text.allSatisfy(\.isNumber) {
+            return phoneDetection
         }
-        if enabledKinds.contains(.color), let color = parseColor(text) {
-            return color
-        }
+        // Dot-separated dates and decimal currency amounts also resemble bare web hosts.
+        // Strict whole-value grammars must get the first chance to classify them.
         if enabledKinds.contains(.conversion), var conversion = conversionDetection(
             text,
             enabledKinds: [.math, .dateTime],
@@ -86,7 +74,7 @@ public enum ClipboardAssistantDetector {
         }
         // Date/time runs before math and phone: dashed digit groups like "2024-03-05" parse as
         // both arithmetic and a phone shape, but the date reading is the one users mean.
-        if enabledKinds.contains(.dateTime), let parsed = parseDateTime(text) {
+        if enabledKinds.contains(.dateTime), let parsed = parseDateTime(text, now: now, timeZone: timeZone) {
             // Date-only values become all-day events; values carrying a time become timed ones.
             let isAllDay = parsed.isDateOnly
             // Copy offers the canonical rendering; calendar creates an event from the value.
@@ -121,6 +109,35 @@ public enum ClipboardAssistantDetector {
                 actions: []
             )
         }
+        if enabledKinds.contains(.url), let url = HTTPURLParser.url(from: text) {
+            var actions: [ClipboardAssistantAction] = [.openURL(url)]
+            if offersDownload, DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) {
+                actions.append(.openDownload(url))
+            }
+            return ClipboardAssistantDetection(
+                kind: .url,
+                title: url.host ?? text,
+                actions: actions
+            )
+        }
+        if enabledKinds.contains(.filePath), let candidate = filePathCandidate(from: text) {
+            return ClipboardAssistantDetection(
+                kind: .filePath,
+                title: candidate.url.lastPathComponent,
+                detail: .path(candidate.url.path),
+                actions: filePathActions(for: candidate)
+            )
+        }
+        if enabledKinds.contains(.email), isEmailAddress(text) {
+            return ClipboardAssistantDetection(
+                kind: .email,
+                title: text,
+                actions: [.composeMail(text)]
+            )
+        }
+        if enabledKinds.contains(.color), let color = parseColor(text) {
+            return color
+        }
         if enabledKinds.contains(.math),
            let expression = arithmeticExpression(from: text),
            let result = evaluateArithmetic(expression) {
@@ -134,13 +151,12 @@ public enum ClipboardAssistantDetector {
                 fullContent: fullExpression
             )
         }
-        if enabledKinds.contains(.phone), isPhoneNumber(text) {
-            let normalized = "+\(text.filter(\.isNumber))"
-            return ClipboardAssistantDetection(
-                kind: .phone,
-                title: text,
-                actions: [.callPhone(normalized)]
-            )
+        if let phoneDetection { return phoneDetection }
+        if enabledKinds.contains(.tracking),
+           let tracking = trackingDetection(
+               text, countryCode: countryCode, allowUnlabelledNumber: true
+           ) {
+            return tracking
         }
         if enabledKinds.contains(.code), let code = codeDetection(text) {
             return code
@@ -328,16 +344,6 @@ public enum ClipboardAssistantDetector {
         return text.range(of: pattern, options: .regularExpression) != nil
     }
 
-    static func isPhoneNumber(_ text: String) -> Bool {
-        guard text.count <= 24 else { return false }
-        let digits = text.filter(\.isNumber)
-        guard digits.count >= 7, digits.count <= 18, digits.contains(where: { $0 != "0" } ) || digits.count > 1 else {
-            return false
-        }
-        let pattern = #"^\+?[0-9][0-9\s\-().]*[0-9]$|^\+?[0-9]{7,}$"#
-        return text.range(of: pattern, options: .regularExpression) != nil
-    }
-
     // MARK: - Date and time
 
     struct ParsedDateTime: Equatable {
@@ -348,91 +354,107 @@ public enum ClipboardAssistantDetector {
         var isoText: String
     }
 
-    /// Parses whole-string date/time values across common formats. Deliberately conservative:
-    /// ambiguous numeric orders (MM/dd vs dd/MM) are skipped, and full dates must carry a
-    /// four-digit year so short arithmetic like "10-3" never turns into a calendar event.
-    static func parseDateTime(_ text: String) -> ParsedDateTime? {
-        guard text.count <= 40 else { return nil }
-
-        let currentCalendar = Calendar(identifier: .gregorian)
-
-        if let date = iso8601Date(from: text) {
-            return ParsedDateTime(date: date, isDateOnly: false, isoText: isoText(date))
-        }
-
-        if let time = timeOnly(from: text) {
-            let components = currentCalendar.dateComponents([.year, .month, .day], from: Date())
-            if let today = currentCalendar.date(from: components),
-               let merged = currentCalendar.date(byAdding: time, to: today) {
-                return ParsedDateTime(date: merged, isDateOnly: false, isoText: isoText(merged))
-            }
+    /// Short month/day values are only accepted in an explicit interval or time expression,
+    /// so arithmetic and version fragments do not become calendar events.
+    static func parseDateTime(
+        _ rawText: String,
+        now: Date = Date(),
+        timeZone: TimeZone = .current
+    ) -> ParsedDateTime? {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.count <= 200 else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let date: Date
+        let isDateOnly: Bool
+        if let timestamp = unixDate(text) {
+            date = timestamp
+            isDateOnly = false
+        } else if let rfc = rfcDate(text, now: now) {
+            date = rfc
+            isDateOnly = false
+        } else if text.contains(":"), let source = timeZoneSource(text) {
+            guard let parsed = zonedDate(source.dateText, now: now, timeZone: source.zone) else { return nil }
+            date = parsed
+            isDateOnly = false
+        } else if text.contains(":"), let parsed = zonedDate(text, now: now, timeZone: timeZone) {
+            date = parsed
+            isDateOnly = false
+        } else if text.range(of: #"^[0-9]{4}(?:[-/.]|\s*年|\s*년)"#, options: .regularExpression) != nil,
+                  let parsed = intervalDate(text, now: now, calendar: calendar) {
+            date = parsed
+            isDateOnly = true
+        } else if let parsed = namedDate(text, calendar: calendar) {
+            date = parsed
+            isDateOnly = true
+        } else {
             return nil
         }
-
-        // Every remaining format embeds a four-digit year; enforce that up front so values like
-        // "10-3" or "3.5" fall through to other detectors instead of parsing as ancient dates.
-        guard text.range(of: #"\d{4}"#, options: .regularExpression) != nil else { return nil }
-
-        let formatsWithTime = ["yyyy-MM-dd HH:mm", "yyyy-MM-dd HH:mm:ss", "yyyy/MM/dd HH:mm", "yyyy/M/d H:mm"]
-        for format in formatsWithTime {
-            if let date = date(from: text, format: format) {
-                return ParsedDateTime(date: date, isDateOnly: false, isoText: isoText(date))
-            }
-        }
-
-        let dateFormats = [
-            "yyyy-MM-dd", "yyyy/M/d",
-            "yyyy年M月d日", "yyyy年MM月dd日",
-            "MMM d, yyyy", "MMMM d, yyyy", "d MMM yyyy", "d MMMM yyyy",
-        ]
-        for format in dateFormats {
-            if let date = date(from: text, format: format) {
-                // Lenient formatters may accept two-digit years; pin the result to modern dates.
-                let year = currentCalendar.component(.year, from: date)
-                guard year >= 1600 else { continue }
-                return ParsedDateTime(date: date, isDateOnly: true, isoText: isoText(date))
-            }
-        }
-        return nil
+        return ParsedDateTime(date: date, isDateOnly: isDateOnly, isoText: isoText(date, timeZone: timeZone))
     }
 
-    private static func iso8601Date(from text: String) -> Date? {
-        // Plain local ISO form without zone: 2024-03-05T14:30[:ss]
-        guard text.range(of: #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$"#, options: .regularExpression) != nil else {
+    private static func unixDate(_ text: String) -> Date? {
+        guard let parts = conversionCaptures(#"(?:(?:unix(?:\s+timestamp)?|timestamp|时间戳|時間戳)\s*[:：=]?\s*)?([1-9][0-9]{9}|[1-9][0-9]{12}|[1-9][0-9]{15}|[1-9][0-9]{18})"#, in: text),
+              let integer = UInt64(parts[0]) else { return nil }
+        let divisor: Double = switch parts[0].count {
+        case 10: 1
+        case 13: 1_000
+        case 16: 1_000_000
+        default: 1_000_000_000
+        }
+        let seconds = Double(integer) / divisor
+        // Bound bare-number guesses; labelled phone and tracking values never match this grammar.
+        guard (946_684_800..<4_102_444_800).contains(seconds) else { return nil }
+        return Date(timeIntervalSince1970: seconds)
+    }
+
+    private static func rfcDate(_ text: String, now: Date) -> Date? {
+        guard let parts = conversionCaptures(#"(?:(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s+)?([0-9]{1,2})\s+([A-Za-z]{3})\s+([0-9]{4})\s+([0-9]{2}:[0-9]{2}:[0-9]{2})\s+(GMT|UTC|[+-][0-9]{4})"#, in: text),
+              let month = englishMonth(parts[2]),
+              let zone = conversionTimeZone(parts[5]),
+              let date = zonedDate("\(parts[3])-\(month)-\(parts[1]) \(parts[4])", now: now, timeZone: zone) else { return nil }
+        if !parts[0].isEmpty {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = zone
+            let weekday = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][calendar.component(.weekday, from: date) - 1]
+            guard parts[0].lowercased() == weekday else { return nil }
+        }
+        return date
+    }
+
+    private static func namedDate(_ text: String, calendar: Calendar) -> Date? {
+        let parts: [String]
+        if let monthFirst = conversionCaptures(#"([A-Za-z]+)\s+([0-9]{1,2}),\s+([0-9]{4})"#, in: text) {
+            parts = monthFirst
+        } else if let dayFirst = conversionCaptures(#"([0-9]{1,2})\s+([A-Za-z]+)\s+([0-9]{4})"#, in: text) {
+            parts = [dayFirst[1], dayFirst[0], dayFirst[2]]
+        } else {
             return nil
         }
+        guard let month = englishMonth(parts[0]), let year = Int(parts[2]), year >= 1600 else { return nil }
+        let components = DateComponents(year: year, month: month, day: Int(parts[1]))
+        guard components.isValidDate(in: calendar) else { return nil }
+        return calendar.date(from: components)
+    }
+
+    private static func englishMonth(_ text: String) -> Int? {
+        let months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
+        return months.firstIndex { $0 == text.lowercased() || String($0.prefix(3)) == text.lowercased() }.map { $0 + 1 }
+    }
+
+    private static func isoText(_ date: Date, timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = text.count == 16 ? "yyyy-MM-dd'T'HH:mm" : "yyyy-MM-dd'T'HH:mm:ss"
-        return formatter.date(from: text)
-    }
-
-    private static func date(from text: String, format: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: format.contains("MMM") ? "en_US_POSIX" : "zh_CN")
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = format
-        formatter.isLenient = false
-        return formatter.date(from: text)
-    }
-
-    private static func timeOnly(from text: String) -> DateComponents? {
-        guard let match = text.range(of: #"^(\d{1,2}):(\d{2})(:(\d{2}))?$"#, options: .regularExpression) else {
-            return nil
-        }
-        let parts = text[match].split(separator: ":").compactMap { Int($0) }
-        guard parts.count >= 2, (0...23).contains(parts[0]), (0...59).contains(parts[1]) else { return nil }
-        var components = DateComponents()
-        components.hour = parts[0]
-        components.minute = parts[1]
-        components.second = parts.count > 2 ? min(max(parts[2], 0), 59) : 0
-        return components
-    }
-
-    private static func isoText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = timeZone
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        let seconds = date.timeIntervalSince1970.truncatingRemainder(dividingBy: 60)
+        if abs(seconds) > 0.000001 {
+            formatter.dateFormat += ":ss"
+            if abs(seconds.rounded() - seconds) > 0.000001 {
+                formatter.dateFormat += ".SSS"
+            }
+        }
         return formatter.string(from: date)
     }
 
@@ -457,37 +479,12 @@ public enum ClipboardAssistantDetector {
         preferredCurrencyCode: String?
     ) -> ParsedCurrencyConversion? {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard (1...40).contains(text.count) else { return nil }
+        guard (1...200).contains(text.count) else { return nil }
         let preferred = (preferredCurrencyCode ?? currentPreferredCurrencyCode()).uppercased()
 
-        // Natural-language exchange requests use the same operand grammar as unit conversion.
-        let naturalText = text.hasSuffix("=")
-            ? String(text.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines) : text
-        if !naturalText.contains("="), let operands = conversionOperands(naturalText) {
-            if let prefixed = parsePrefixedCurrencyAmount(operands[0], preferred: preferred) {
-                return completedConversion(prefixed, targetToken: operands[1], preferred: preferred)
-            }
-            guard let amount = conversionCaptures("(" + conversionAmountPattern + #")\s*(.+)"#, in: operands[0]),
-                  let value = Double(amount[0].replacingOccurrences(of: ",", with: "")),
-                  let source = resolveCurrencyToken(amount[1], preferred: preferred),
-                  let target = resolveCurrencyToken(operands[1], preferred: preferred), source != target else { return nil }
-            return ParsedCurrencyConversion(amount: value, amountText: amount[0], sourceCurrencyCode: source, targetCurrencyCode: target)
-        }
-
-        // Split off an optional "=target" suffix. A second "=" means arithmetic, not a
-        // conversion; an "=" followed by nothing must be trailing (i.e. "100$=", not "=100").
-        var head = text
-        var targetToken: String?
-        if let equals = text.firstIndex(of: "=") {
-            let target = text[text.index(after: equals)...].trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !target.contains("=") else { return nil }
-            if target.isEmpty {
-                guard equals == text.index(before: text.endIndex) else { return nil }
-            } else {
-                targetToken = target
-            }
-            head = String(text[..<equals])
-        }
+        let operands = conversionOperands(text)
+        let head = operands?[0] ?? (text.hasSuffix("=") ? String(text.dropLast()).trimmingCharacters(in: .whitespaces) : text)
+        let targetToken = operands.flatMap { $0[1].isEmpty ? nil : $0[1] }
 
         // Prefix symbol form first: "$100", "¥100.5", "US$1,000".
         if let prefixed = parsePrefixedCurrencyAmount(head, preferred: preferred) {
@@ -589,6 +586,7 @@ public enum ClipboardAssistantDetector {
     /// Leading run of amount characters (digits, separators), validated afterwards.
     private static func leadingAmount(in text: String) -> String? {
         var end = text.startIndex
+        if text.first == "+" || text.first == "-" { end = text.index(after: end) }
         while end < text.endIndex, "0123456789.,".contains(text[end]) {
             end = text.index(after: end)
         }
@@ -599,7 +597,7 @@ public enum ClipboardAssistantDetector {
     /// Validates an amount's shape (`1,000` / `100.50` / `100`) and parses it.
     private static func normalizedAmount(_ text: String) -> Double? {
         guard text.range(
-            of: #"^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$"#,
+            of: "^" + conversionAmountPattern + "$",
             options: .regularExpression
         ) != nil else { return nil }
         return Double(text.replacingOccurrences(of: ",", with: ""))
@@ -697,7 +695,7 @@ public enum ClipboardAssistantDetector {
 
     /// CJK currency spellings matched verbatim.
     private static let cjkCurrencyNames: [String: String] = [
-        "元": "CNY", "块": "CNY", "圆": "CNY", "人民币": "CNY",
+        "元": "CNY", "块": "CNY", "圆": "CNY", "人民币": "CNY", "人民幣": "CNY",
         "美元": "USD", "美金": "USD",
         "日元": "JPY", "円": "JPY",
         "欧元": "EUR",

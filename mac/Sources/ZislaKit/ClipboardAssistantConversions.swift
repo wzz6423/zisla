@@ -50,7 +50,10 @@ extension ClipboardAssistantDetector {
     }
 
     static func conversionOperands(_ text: String) -> [String]? {
-        conversionCaptures(#"(.+)\s*(?:\s+(?:in|to)\s+|=|->|→|换算成|转)\s*(.+?)\s*=?"#, in: text)?
+        guard text.filter({ $0 == "=" }).count <= 1 else { return nil }
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = text.hasSuffix("=") ? String(text.dropLast()) : text
+        return conversionCaptures(#"(.+)\s*(?:\s+(?:in|to)\s+|=|->|→|(?:换算|換算|转换|轉換)(?:成|为|為)?|转|轉|(?:等于|等於|是)(?:多少)?)\s*[？?]?\s*(.*?)\s*[？?]?"#, in: query)?
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
     }
 
@@ -95,7 +98,7 @@ extension ClipboardAssistantDetector {
         add("f|°f|fahrenheit|华氏度", UnitTemperature.fahrenheit, "temperature")
         add("k|kelvin|开尔文", UnitTemperature.kelvin, "temperature")
         add("s|sec|second|seconds|秒", UnitDuration.seconds, "duration")
-        add("min|minute|minutes|分钟", UnitDuration.minutes, "duration")
+        add("min|minute|minutes|分钟|分鐘", UnitDuration.minutes, "duration")
         add("h|hr|hour|hours|小时", UnitDuration.hours, "duration")
         add("m/s|米/秒", UnitSpeed.metersPerSecond, "speed")
         add("km/h|kph|公里/小时", UnitSpeed.kilometersPerHour, "speed")
@@ -125,7 +128,8 @@ extension ClipboardAssistantDetector {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let startText: String
         let endText: String
-        if let parts = firstConversionCaptures(dateIntervalBetweenPatterns, in: text) {
+        if let parts = conversionCaptures("(" + fullNumericDatePattern + #")\s*[-–—]\s*("# + fullNumericDatePattern + ")", in: text)
+            ?? firstConversionCaptures(dateIntervalBetweenPatterns, in: text) {
             startText = parts[0]
             endText = parts[1]
         } else if let parts = firstConversionCaptures(dateIntervalUntilPatterns, in: text) {
@@ -163,7 +167,7 @@ extension ClipboardAssistantDetector {
 
     private static let dateIntervalBetweenPatterns = [
         #"(?:how\s+many\s+)?(?:days\s+)?between\s+(.+?)\s+and\s+(.+?)\??"#,
-        #"(.+?)\s*(?:\s+to\s+|\s+-\s+|到|至)\s*(.+?)(?:\s*(?:相差|间隔|間隔)?\s*(?:多少天|几天|幾天)[？?]?)?"#,
+        #"(.+?)\s*(?:\s+to\s+|\s+-\s+|[~～〜–—]|到|至)\s*(.+?)(?:\s*(?:相差|间隔|間隔)?\s*(?:多少天|几天|幾天)[？?]?)?"#,
         #"(.+?)\s*から\s*(.+?)\s*まで(?:\s*(?:の間)?\s*(?:何日(?:間)?|何日ですか)?)?[？?]?"#,
         #"(.+?)\s*(?:부터|에서)\s*(.+?)\s*(?:까지|사이)(?:\s*(?:며칠|몇\s*일))?[？?]?"#,
         #"combien\s+de\s+jours\s+entre\s+(.+?)\s+et\s+(.+?)\??"#,
@@ -184,16 +188,25 @@ extension ClipboardAssistantDetector {
         patterns.lazy.compactMap { conversionCaptures($0, in: text) }.first
     }
 
-    private static func intervalDate(_ text: String, now: Date, calendar: Calendar) -> Date? {
+    private static let fullNumericDatePattern = #"[0-9]{4}(?:-[0-9]{1,2}-[0-9]{1,2}|/[0-9]{1,2}/[0-9]{1,2}|\.[0-9]{1,2}\.[0-9]{1,2})"#
+
+    static func intervalDate(_ text: String, now: Date, calendar: Calendar) -> Date? {
         if let offset = intervalDateOffsets[text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()] {
             return calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: now))
         }
-        guard let parts = conversionCaptures(#"(\d{4})-(\d{1,2})-(\d{1,2})"#, in: text)
+        let components: DateComponents
+        if let parts = conversionCaptures(#"(\d{4})-(\d{1,2})-(\d{1,2})"#, in: text)
             ?? conversionCaptures(#"(\d{4})/(\d{1,2})/(\d{1,2})"#, in: text)
             ?? conversionCaptures(#"(\d{4})\.(\d{1,2})\.(\d{1,2})"#, in: text)
-            ?? conversionCaptures(#"(\d{4})\s*(?:年|년)\s*(\d{1,2})\s*(?:月|월)\s*(\d{1,2})\s*(?:日|일)"#, in: text) else { return nil }
-        let components = DateComponents(year: Int(parts[0]), month: Int(parts[1]), day: Int(parts[2]))
-        guard components.isValidDate(in: calendar) else { return nil }
+            ?? conversionCaptures(#"(\d{4})\s*(?:年|년)\s*(\d{1,2})\s*(?:月|월)\s*(\d{1,2})\s*(?:日|일)"#, in: text) {
+            components = DateComponents(year: Int(parts[0]), month: Int(parts[1]), day: Int(parts[2]))
+        } else if let parts = conversionCaptures(#"([0-9]{1,2})[-/.]([0-9]{1,2})"#, in: text)
+            ?? conversionCaptures(#"([0-9]{1,2})\s*月\s*([0-9]{1,2})\s*日"#, in: text) {
+            components = DateComponents(year: calendar.component(.year, from: now), month: Int(parts[0]), day: Int(parts[1]))
+        } else {
+            return nil
+        }
+        guard (1600...9999).contains(components.year ?? 0), components.isValidDate(in: calendar) else { return nil }
         return calendar.date(from: components)
     }
 
@@ -233,13 +246,18 @@ extension ClipboardAssistantDetector {
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.calendar = Calendar(identifier: .gregorian)
             formatter.timeZone = zone
-            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss XXX"
+            let seconds = date.timeIntervalSince1970
+            formatter.dateFormat = abs(seconds.rounded() - seconds) > 0.000001
+                ? "yyyy-MM-dd HH:mm:ss.SSS XXX" : "yyyy-MM-dd HH:mm:ss XXX"
             return "\(formatter.string(from: date)) [\(zone.identifier)]"
         }
         return ParsedTimeZoneConversion(sourceText: render(source.zone), targetText: render(targetZone))
     }
 
     private static func timeZoneConversionOperands(_ text: String) -> [String]? {
+        if let parts = conversionCaptures(#"(.+?)\s*(?:是|等于|等於)\s*(.+?)\s*(?:几点|幾點|什么时间|甚麼時間)[？?]?"#, in: text) {
+            return parts
+        }
         if let operands = conversionOperands(text) { return operands }
         return firstConversionCaptures(timeZoneConversionOperandPatterns, in: text)?
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -306,10 +324,14 @@ extension ClipboardAssistantDetector {
         $0.count == $1.count ? $0 > $1 : $0.count > $1.count
     }
 
-    private static func timeZoneSource(_ text: String) -> (dateText: String, zone: TimeZone)? {
+    static func timeZoneSource(_ text: String) -> (dateText: String, zone: TimeZone)? {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if let source = conversionCaptures(#"(.+?)\s+([^\s]+)"#, in: text),
            let zone = conversionTimeZone(source[1]) {
+            return (source[0], zone)
+        }
+        if let source = conversionCaptures(#"(.+[0-9])\s*(Z|(?:UTC|GMT)?[+-][0-9]{2}:?[0-9]{2})"#, in: text),
+           source[0].contains(":"), let zone = conversionTimeZone(source[1]) {
             return (source[0], zone)
         }
         let lowercasedText = text.lowercased()
@@ -320,10 +342,16 @@ extension ClipboardAssistantDetector {
                 return (dateText, zone)
             }
         }
+        for alias in timeZoneAliasNames where lowercasedText.hasPrefix(alias) {
+            let dateText = String(text.dropFirst(alias.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !dateText.isEmpty, let zone = conversionTimeZone(alias) {
+                return (dateText, zone)
+            }
+        }
         return nil
     }
 
-    private static func conversionTimeZone(_ text: String) -> TimeZone? {
+    static func conversionTimeZone(_ text: String) -> TimeZone? {
         let key = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if let identifier = timeZoneAliases[key] ?? timeZoneIdentifiers[key] { return TimeZone(identifier: identifier) }
         // Ambiguous abbreviations such as CST and IST deliberately require an IANA zone or offset.
@@ -336,14 +364,14 @@ extension ClipboardAssistantDetector {
         return TimeZone(secondsFromGMT: (parts[0] == "-" ? -1 : 1) * (hours * 3600 + minutes * 60))
     }
 
-    private static func zonedDate(_ text: String, now: Date, timeZone: TimeZone) -> Date? {
+    static func zonedDate(_ text: String, now: Date, timeZone: TimeZone) -> Date? {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if timeZoneNowWords.contains(text.lowercased()) { return now }
-        guard let parts = conversionCaptures(#"(?:(.+?)[T ]+)?(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(am|pm))?"#, in: text),
+        guard let parts = conversionCaptures(#"(?:(.+?)[T ]+)?([0-9]{1,2}):([0-9]{2})(?::([0-9]{2})(?:\.([0-9]{1,9}))?)?(?:\s*(am|pm))?"#, in: text),
               var hour = Int(parts[1]), let minute = Int(parts[2]), minute < 60 else { return nil }
-        if !parts[4].isEmpty {
+        if !parts[5].isEmpty {
             guard (1...12).contains(hour) else { return nil }
-            hour = hour % 12 + (parts[4].lowercased() == "pm" ? 12 : 0)
+            hour = hour % 12 + (parts[5].lowercased() == "pm" ? 12 : 0)
         }
         let second = Int(parts[3]) ?? 0
         guard hour < 24, second < 60 else { return nil }
@@ -365,7 +393,7 @@ extension ClipboardAssistantDetector {
            calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: alternate) == components {
             return nil
         }
-        return first
+        return first.addingTimeInterval(Double("0." + parts[4])!)
     }
 
     private static let timeZoneNowWords: Set<String> = [

@@ -122,6 +122,7 @@ public final class SideNoticeQueue: ObservableObject {
             || notice.id.hasPrefix("focus-countdown-")
             || notice.id.hasPrefix("focus-mode-")
             || notice.id.hasPrefix("focus-transition")
+            || notice.id == LowBatteryNoticeController.noticeID
             || notice.id.hasPrefix("mail-notification-")
             || notice.id.hasPrefix("toolbox-reminder-")
             || notice.id.hasPrefix("browser-download-")

@@ -28,12 +28,12 @@ struct FileShelfDragSourceTests {
         try Data().write(to: fileURL)
         defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
 
-        let source = FileShelfDraggingView()
         let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+        defer { pasteboard.releaseGlobally() }
 
         for url in [fileURL, directoryURL] {
             pasteboard.clearContents()
-            #expect(pasteboard.writeObjects([source.pasteboardWriter(for: url)]))
+            #expect(pasteboard.writeObjects([FileShelfPasteboard.pasteboardWriter(for: .file(url))]))
 
             let values = pasteboard.readObjects(
                 forClasses: [NSURL.self],

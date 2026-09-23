@@ -456,67 +456,12 @@ struct AgendaModuleView: View {
     }
 
     private func presentNewItemEditor() {
-        var availableKinds: [(title: String, kind: CalendarItemKind)] = []
-        if calendar.hasEventAccess { availableKinds.append((AppLocalization.text("日历事件"), .event)) }
-        if calendar.hasReminderAccess { availableKinds.append((AppLocalization.text("提醒事项"), .reminder)) }
-        guard !availableKinds.isEmpty else {
-            handleAuthorizationAction()
-            return
-        }
-
-        let kindPicker = NSPopUpButton(frame: .zero, pullsDown: false)
-        kindPicker.addItems(withTitles: availableKinds.map(\.title))
-        let titleField = NSTextField(string: "")
-        titleField.placeholderString = AppLocalization.text("标题")
-        let datePicker = NSDatePicker()
-        datePicker.datePickerStyle = .textFieldAndStepper
-        datePicker.datePickerElements = [.yearMonthDay, .hourMinute]
-        datePicker.dateValue = defaultNewItemDate
-        let allDay = NSButton(checkboxWithTitle: AppLocalization.text("全天"), target: nil, action: nil)
-
-        let grid = NSGridView(views: [
-            [NSTextField(labelWithString: AppLocalization.text("类型")), kindPicker],
-            [NSTextField(labelWithString: "标题"), titleField],
-            [NSTextField(labelWithString: "时间"), datePicker],
-            [NSView(), allDay],
-        ])
-        grid.rowSpacing = 8
-        grid.columnSpacing = 10
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 1).width = 230
-        grid.frame = CGRect(x: 0, y: 0, width: 300, height: 126)
-
-        let alert = NSAlert()
-        alert.messageText = AppLocalization.text("新增日程")
-        alert.informativeText = AppLocalization.text("保存到系统日历或提醒事项。")
-        alert.accessoryView = grid
-        alert.addButton(withTitle: AppLocalization.text("新增"))
-        alert.addButton(withTitle: AppLocalization.text("取消"))
-        NSApp.activate(ignoringOtherApps: true)
-        WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-
-        do {
-            let kind = availableKinds[kindPicker.indexOfSelectedItem].kind
-            let isAllDay = allDay.state == .on
-            switch kind {
-            case .event:
-                let duration: TimeInterval = isAllDay ? 86_400 : 3_600
-                try calendar.createEvent(
-                    title: titleField.stringValue,
-                    startDate: datePicker.dateValue,
-                    endDate: datePicker.dateValue.addingTimeInterval(duration),
-                    isAllDay: isAllDay
-                )
-            case .reminder:
-                try calendar.createReminder(
-                    title: titleField.stringValue,
-                    dueDate: datePicker.dateValue,
-                    isAllDay: isAllDay
-                )
-            }
-        } catch {
-            model.transientMessage = error.localizedDescription
+        let start = defaultNewItemDate
+        Task {
+            await CalendarItemEditor.present(
+                calendar: calendar,
+                draft: ClipboardCalendarDraft(title: "", startDate: start, endDate: start.addingTimeInterval(3_600))
+            ) { model.transientMessage = $0 }
         }
     }
 

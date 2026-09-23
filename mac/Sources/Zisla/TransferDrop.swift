@@ -2,12 +2,30 @@ import AppKit
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
+import ZislaKit
 
 enum TransferDropItem: Hashable, Sendable {
     case file(URL)
     case link(URL)
     case text(String)
     case image(Data)
+
+    init(payload: TransferPasteboardPayload) {
+        switch payload {
+        case .file(let url): self = .file(url)
+        case .text(let text):
+            self = TransferPasteboard.webURL(from: text).map(Self.link) ?? .text(text)
+        }
+    }
+
+    var shelfPayload: TransferPasteboardPayload? {
+        switch self {
+        case .file(let url): .file(url)
+        case .link(let url): .text(url.absoluteString)
+        case .text(let text): .text(text)
+        case .image: nil
+        }
+    }
 
     var shareValue: Any {
         switch self {
@@ -52,13 +70,13 @@ struct TransferDropDelegate: DropDelegate {
         guard !providers.isEmpty else { return false }
 
         let loader = TransferDropLoader(count: providers.count, completion: onItems)
-        for provider in providers {
-            load(provider, into: loader)
+        for (index, provider) in providers.enumerated() {
+            load(provider, at: index, into: loader)
         }
         return true
     }
 
-    private func load(_ provider: NSItemProvider, into loader: TransferDropLoader) {
+    private func load(_ provider: NSItemProvider, at index: Int, into loader: TransferDropLoader) {
         let type: String
         if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
             type = UTType.fileURL.identifier
@@ -71,50 +89,35 @@ struct TransferDropDelegate: DropDelegate {
         }
 
         provider.loadItem(forTypeIdentifier: type) { value, _ in
-            loader.finish(with: Self.dropItem(from: value))
+            loader.finish(at: index, with: Self.dropItem(from: value, type: type))
         }
     }
 
-    nonisolated private static func dropItem(from value: NSSecureCoding?) -> TransferDropItem? {
-        let url: URL?
-        if let value = value as? URL {
-            url = value
-        } else if let value = value as? NSURL {
-            url = value as URL
+    nonisolated static func dropItem(from value: NSSecureCoding?, type: String) -> TransferDropItem? {
+        let string: String?
+        if let url = value as? URL {
+            string = url.absoluteString
         } else if let data = value as? Data {
-            url = URL(dataRepresentation: data, relativeTo: nil)
+            string = String(data: data, encoding: .utf8)
         } else {
-            url = nil
+            string = (value as? String) ?? (value as? NSString).map(String.init)
         }
-
-        if let url {
-            return url.isFileURL ? .file(url) : .link(url)
+        guard let string else { return nil }
+        if type == UTType.fileURL.identifier {
+            guard let url = URL(string: string), url.isFileURL else { return nil }
+            return .file(url)
         }
-
-        if let data = value as? Data,
-           let string = String(data: data, encoding: .utf8) {
-            return textItem(from: string)
-        }
-
-        guard let string = (value as? String) ?? (value as? NSString).map({ String($0) }) else {
-            return nil
-        }
-        return textItem(from: string)
-    }
-
-    nonisolated private static func textItem(from string: String) -> TransferDropItem? {
-        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let url = URL(string: trimmed), ["http", "https"].contains(url.scheme?.lowercased()) {
-            return .link(url)
-        }
-        return trimmed.isEmpty ? nil : .text(trimmed)
+        if let url = TransferPasteboard.webURL(from: string) { return .link(url) }
+        if type == UTType.url.identifier { return nil }
+        return string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .text(string)
     }
 }
 
-private final class TransferDropLoader: @unchecked Sendable {
+final class TransferDropLoader: @unchecked Sendable {
     private let lock = NSLock()
     private var remaining: Int
-    private var items: [TransferDropItem] = []
+    private var items: [Int: TransferDropItem] = [:]
+    private var completed = Set<Int>()
     private let completion: @MainActor @Sendable ([TransferDropItem]) -> Void
 
     init(
@@ -125,16 +128,82 @@ private final class TransferDropLoader: @unchecked Sendable {
         self.completion = completion
     }
 
-    func finish(with item: TransferDropItem?) {
+    func finish(at index: Int, with item: TransferDropItem?) {
         lock.lock()
-        if let item { items.append(item) }
+        guard completed.insert(index).inserted else {
+            lock.unlock()
+            return
+        }
+        if let item { items[index] = item }
         remaining -= 1
-        let result = remaining == 0 ? items : nil
+        let result = remaining == 0 ? items.sorted { $0.key < $1.key }.map(\.value) : nil
         lock.unlock()
 
         guard let result else { return }
         Task { @MainActor [completion] in
             completion(result)
         }
+    }
+}
+
+@MainActor
+struct ShelfDropTarget<Content: View>: NSViewRepresentable {
+    @Binding var isTargeted: Bool
+    var onItems: ([FileShelfDropItem]) -> Void
+    var content: Content
+
+    func makeNSView(context: Context) -> ShelfDropHostingView {
+        let view = ShelfDropHostingView(rootView: AnyView(content.environment(\.self, context.environment)))
+        updateNSView(view, context: context)
+        return view
+    }
+
+    func updateNSView(_ view: ShelfDropHostingView, context: Context) {
+        view.rootView = AnyView(content.environment(\.self, context.environment))
+        view.onTargeted = { isTargeted = $0 }
+        view.onItems = onItems
+    }
+}
+
+@MainActor
+final class ShelfDropHostingView: NSHostingView<AnyView> {
+    var onTargeted: ((Bool) -> Void)?
+    var onItems: (([FileShelfDropItem]) -> Void)?
+
+    required init(rootView: AnyView) {
+        super.init(rootView: rootView)
+        registerForDraggedTypes(TransferPasteboard.shelfDropTypes)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        let accepts = sender.draggingPasteboard.availableType(from: TransferPasteboard.shelfDropTypes) != nil
+        onTargeted?(accepts)
+        return accepts ? .copy : []
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation { .copy }
+
+    override func draggingExited(_ sender: (any NSDraggingInfo)?) { onTargeted?(false) }
+
+    override func prepareForDragOperation(_ sender: any NSDraggingInfo) -> Bool { true }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        onTargeted?(false)
+        let items = TransferPasteboard.readShelfDropItems(from: sender.draggingPasteboard)
+        guard !items.isEmpty else { return false }
+        onItems?(items)
+        return true
+    }
+}
+
+extension View {
+    func shelfDropTarget(
+        isTargeted: Binding<Bool>,
+        onItems: @escaping ([FileShelfDropItem]) -> Void
+    ) -> some View {
+        ShelfDropTarget(isTargeted: isTargeted, onItems: onItems, content: self)
     }
 }

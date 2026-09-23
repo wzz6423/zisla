@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import ZislaCore
 import ZislaKit
 import SwiftUI
@@ -50,12 +51,12 @@ struct ShelfModuleView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .help(AppLocalization.text("粘贴文件到中转站"))
+                    .help(AppLocalization.text("粘贴内容到中转站"))
                     .keyboardShortcut("v", modifiers: .command)
 
                     if !model.shelf.items.isEmpty {
                         Button {
-                            model.receiveQuickNoteTransferItems(model.shelf.items.map { .file($0.url) })
+                            model.receiveQuickNoteTransferItems(model.shelf.items.map { TransferDropItem(payload: $0.payload) })
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "note.text")
@@ -68,7 +69,7 @@ struct ShelfModuleView: View {
                         .help(AppLocalization.text("全部发送到随记"))
 
                         Button {
-                            model.copyShelfFiles(model.shelf.items.map(\.url))
+                            model.copyShelfItems(model.shelf.items)
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "doc.on.doc")
@@ -78,9 +79,11 @@ struct ShelfModuleView: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        .help(AppLocalization.text("复制全部文件"))
+                        .help(AppLocalization.text("复制全部内容"))
 
-                        ShareLink(items: model.shelf.items.map(\.url)) {
+                        Button {
+                            model.share(model.shelf.items.map { TransferDropItem(payload: $0.payload) })
+                        } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "square.and.arrow.up")
                                     .font(.system(size: 11, weight: .medium))
@@ -93,7 +96,7 @@ struct ShelfModuleView: View {
 
                         Button {
                             NSWorkspace.shared.activateFileViewerSelecting(
-                                model.shelf.items.map(\.url)
+                                model.shelf.items.filter { $0.text == nil }.map(\.url)
                             )
                         } label: {
                             HStack(spacing: 4) {
@@ -105,6 +108,7 @@ struct ShelfModuleView: View {
                         }
                         .buttonStyle(.plain)
                         .help(AppLocalization.text("在 Finder 中显示"))
+                        .disabled(!model.shelf.items.contains { $0.text == nil })
                     }
                 }
                 .frame(height: 30)
@@ -128,7 +132,7 @@ struct ShelfModuleView: View {
                     } else if filteredItems.isEmpty {
                         EmptyState(
                             symbol: "line.3.horizontal.decrease.circle",
-                            title: AppLocalization.text("无符合条件的文件"),
+                            title: AppLocalization.text("无符合条件的内容"),
                             tint: .secondary
                         )
                     } else {
@@ -137,9 +141,9 @@ struct ShelfModuleView: View {
                                 ForEach(filteredItems) { item in
                                     ShelfItemView(
                                         item: item,
-                                        onCopy: { model.copyShelfFiles([item.url]) },
+                                        onCopy: { model.copyShelfItems([item]) },
                                         onSendToQuickNote: {
-                                            model.receiveQuickNoteTransferItems([.file(item.url)])
+                                            model.receiveQuickNoteTransferItems([TransferDropItem(payload: item.payload)])
                                         },
                                         onRemove: { model.shelf.remove(id: item.id) }
                                     )
@@ -153,12 +157,9 @@ struct ShelfModuleView: View {
                         .thinScrollChrome()
                     }
                 }
-                .onDrop(
-                    of: TransferDropDelegate.supportedTypes,
-                    delegate: TransferDropDelegate(isTargeted: $dropState.shelfTargeted) {
-                        model.receiveTransferItems($0)
-                    }
-                )
+                .shelfDropTarget(isTargeted: $dropState.shelfTargeted) {
+                    model.receiveShelfDropItems($0)
+                }
             }
             .background {
                 moduleBackground(shape: Self.shelfShape, targeted: dropState.shelfTargeted)
@@ -180,7 +181,7 @@ struct ShelfModuleView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
-            TextField(AppLocalization.text("搜索文件名"), text: $searchText)
+            TextField(AppLocalization.text("搜索中转内容"), text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 11))
             if !searchText.isEmpty {
@@ -249,7 +250,7 @@ struct ShelfModuleView: View {
         // Apply the search filter.
         if !searchText.isEmpty {
             items = items.filter { item in
-                item.url.lastPathComponent.localizedCaseInsensitiveContains(searchText)
+                (item.text ?? item.url.lastPathComponent).localizedCaseInsensitiveContains(searchText)
             }
         }
 
@@ -333,12 +334,13 @@ private struct ShelfItemView: View {
         VStack(spacing: 5) {
             ZStack(alignment: .topTrailing) {
                 FileShelfDragSourceView(
-                    url: item.url,
+                    payload: item.payload,
                     image: FileIconCache.shared.icon(for: item.url.path),
-                    onOpen: { NSWorkspace.shared.open(item.url) },
+                    onOpen: { NSWorkspace.shared.open(item.linkURL ?? item.url) },
                     onReveal: {
                         NSWorkspace.shared.activateFileViewerSelecting([item.url])
                     },
+                    onCopy: onCopy,
                     onRemove: onRemove
                 )
                     .frame(width: 42, height: 42)
@@ -351,7 +353,7 @@ private struct ShelfItemView: View {
                 .offset(x: 5, y: -5)
                 .help(AppLocalization.text("移除"))
             }
-            Text(item.url.lastPathComponent)
+            Text(item.displayName)
                 .font(.system(size: 9, weight: .medium))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
@@ -360,12 +362,14 @@ private struct ShelfItemView: View {
         .frame(width: 66, height: 84)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
-            NSWorkspace.shared.open(item.url)
+            NSWorkspace.shared.open(item.linkURL ?? item.url)
         }
         .contextMenu {
-            Button(AppLocalization.text("打开")) { NSWorkspace.shared.open(item.url) }
-            Button(AppLocalization.text("在 Finder 中显示")) {
-                NSWorkspace.shared.activateFileViewerSelecting([item.url])
+            Button(AppLocalization.text("打开")) { NSWorkspace.shared.open(item.linkURL ?? item.url) }
+            if item.text == nil {
+                Button(AppLocalization.text("在 Finder 中显示")) {
+                    NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                }
             }
             Button(AppLocalization.text("复制"), action: onCopy)
             Button(AppLocalization.text("发送到随记"), action: onSendToQuickNote)
@@ -382,14 +386,48 @@ private final class FileDropState: ObservableObject {
 }
 
 @MainActor
-private final class FileIconCache {
+final class FileIconCache {
     static let shared = FileIconCache()
-    private let cache = NSCache<NSString, NSImage>()
+    private final class CachedIcon: NSObject {
+        let image: NSImage
+        let fileSize: Int?
+        let modifiedAt: Date?
+
+        init(image: NSImage, values: URLResourceValues?) {
+            self.image = image
+            fileSize = values?.fileSize
+            modifiedAt = values?.contentModificationDate
+        }
+    }
+
+    private let cache = NSCache<NSString, CachedIcon>()
 
     func icon(for path: String) -> NSImage {
-        if let image = cache.object(forKey: path as NSString) { return image }
-        let image = NSWorkspace.shared.icon(forFile: path)
-        cache.setObject(image, forKey: path as NSString)
+        let url = URL(fileURLWithPath: path)
+        let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey])
+        if let cached = cache.object(forKey: path as NSString),
+           cached.fileSize == values?.fileSize, cached.modifiedAt == values?.contentModificationDate {
+            return cached.image
+        }
+        let image = Self.thumbnail(for: url, values: values) ?? NSWorkspace.shared.icon(forFile: path)
+        cache.setObject(CachedIcon(image: image, values: values), forKey: path as NSString)
         return image
+    }
+
+    private static func thumbnail(for url: URL, values: URLResourceValues?) -> NSImage? {
+        guard values?.isRegularFile == true,
+              let fileSize = values?.fileSize, fileSize <= 32 * 1_024 * 1_024,
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int,
+              width > 0, height > 0, width <= 16_000_000 / height else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 84,
+        ]
+        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return NSImage(cgImage: thumbnail, size: NSSize(width: thumbnail.width, height: thumbnail.height))
     }
 }
