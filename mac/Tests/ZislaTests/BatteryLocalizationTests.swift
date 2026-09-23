@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import ZislaCore
@@ -8,6 +9,34 @@ import ZislaKit
 /// Missing battery keys silently fall back to Chinese, so check the runtime keys
 /// against every language table instead of relying on a successful build.
 struct BatteryLocalizationTests {
+    @Test @MainActor
+    func lowBatteryWarningUsesSystemSymbolAndTranslatesEveryLanguage() throws {
+        let queue = SideNoticeQueue()
+        defer { queue.removeAll() }
+        LowBatteryNoticeController(queue: queue).update(
+            snapshot: BatterySnapshot(
+                level: 0.2,
+                isCharging: false,
+                isPluggedIn: false,
+                isCharged: false,
+                timeRemainingMinutes: nil
+            ),
+            enabled: true
+        )
+        let notice = try #require(queue.left.first)
+        #expect(SideNoticePresenter.isCompactNotice(notice))
+        #expect(NSImage(systemSymbolName: CompactLowBatteryBar.symbolName, accessibilityDescription: nil) != nil)
+        #expect(AppLanguage.allCases.count == 17)
+        for language in AppLanguage.allCases {
+            let table = try #require(Self.stringsTable(for: language))
+            let translated = try #require(table[notice.title], "Missing battery warning for \(language.rawValue)")
+            #expect(!translated.isEmpty)
+            #expect(AppLocalization.string(notice.title, locale: language.locale) == translated)
+        }
+        #expect(AppLocalization.string(notice.title, locale: Locale(identifier: "en")) == "Low Battery")
+        #expect(AppLocalization.string(notice.title, locale: Locale(identifier: "ar")) == "البطارية منخفضة")
+    }
+
     @Test
     func historyTextUsesRequestedLanguage() {
         let now = Date(timeIntervalSince1970: 10_000)

@@ -100,6 +100,7 @@ struct ThinScrollChromeTests {
         let deadline = Date().addingTimeInterval(1)
         repeat {
             host.layoutSubtreeIfNeeded()
+            host.displayIfNeeded()
             var pending = [host as NSView]
             while let view = pending.popLast() {
                 if let scroll = view as? NSScrollView { scrollView = scroll }
@@ -109,7 +110,9 @@ struct ThinScrollChromeTests {
             if let scrollView {
                 scrollView.reflectScrolledClipView(scrollView.contentView)
             }
-            if scrollView?.verticalScroller is ThinScroller { break }
+            if let scroller = scrollView?.verticalScroller as? ThinScroller,
+               scroller.knobProportion > 0, scroller.knobProportion < 1,
+               scroller.bounds.contains(scroller.rect(for: .knob)) { break }
             await withCheckedContinuation { continuation in
                 DispatchQueue.main.async { continuation.resume() }
             }

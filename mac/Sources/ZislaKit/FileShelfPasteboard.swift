@@ -2,6 +2,26 @@ import AppKit
 
 public enum FileShelfPasteboard {
     @discardableResult
+    public static func writeItems(_ items: [FileShelfItem], to pasteboard: NSPasteboard = .general) -> Bool {
+        guard !items.isEmpty else { return false }
+        pasteboard.clearContents()
+        return pasteboard.writeObjects(items.map { pasteboardWriter(for: $0.payload) })
+    }
+
+    public static func pasteboardWriter(for payload: TransferPasteboardPayload) -> any NSPasteboardWriting {
+        switch payload {
+        case .file(let url): return url as NSURL
+        case .text(let text):
+            let item = NSPasteboardItem()
+            item.setString(text, forType: .string)
+            if let url = TransferPasteboard.webURL(from: text) {
+                item.setString(url.absoluteString, forType: .URL)
+            }
+            return item
+        }
+    }
+
+    @discardableResult
     public static func writeFileURLs(
         _ urls: [URL],
         to pasteboard: NSPasteboard = .general

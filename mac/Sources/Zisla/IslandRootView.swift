@@ -121,12 +121,9 @@ struct IslandRootView: View {
                     ) {
                         model.prepareDetectedLink()
                     }
-                    .onDrop(
-                        of: TransferDropDelegate.supportedTypes,
-                        delegate: TransferDropDelegate(isTargeted: $dropState.shelfTargeted) {
-                            model.receiveTransferItems($0)
-                        }
-                    )
+                    .shelfDropTarget(isTargeted: $dropState.shelfTargeted) {
+                        model.receiveShelfDropItems($0)
+                    }
                 }
                 .frame(width: surfaceSize.width)
                 .padding(.top, 62)

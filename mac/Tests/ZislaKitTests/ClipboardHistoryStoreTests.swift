@@ -666,9 +666,9 @@ struct ClipboardHistoryStoreTests {
     func urlCategoryAcceptsNormalizedHTTPLinks() {
         #expect(FileShelfCategory.url.rawValue == "URL")
         #expect(FileShelfCategory.clipboardCases.contains(.url))
-        #expect(!FileShelfCategory.fileShelfCases.contains(.url))
+        #expect(FileShelfCategory.fileShelfCases.contains(.url))
         #expect(FileShelfCategory.fileShelfCases.contains(.document))
-        #expect(!FileShelfCategory.fileShelfCases.contains(.text))
+        #expect(FileShelfCategory.fileShelfCases.contains(.text))
         #expect(
             ClipboardHistoryItem(content: .text("  HTTPS://Example.com/中文路径  ")).category == .url
         )

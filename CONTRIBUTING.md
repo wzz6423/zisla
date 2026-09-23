@@ -80,7 +80,8 @@ Thank you for opening a pull request. Check these requirements while it is await
   ```
 
 - The `PR Quality` check validates this format; a pull request cannot be merged while the check is failing. `PR Automation` then applies the labels and assigns the pull request.
-- Run `cd mac && swift test` for macOS code changes; include manual verification or screenshots for UI changes.
+- Run `cd mac && swift test` for macOS code changes; describe the manual verification results in text for UI changes.
+- PR bodies and release notes can be text-only; images, screenshots, and covers are not required.
 - Update the relevant documentation when changing user-visible behavior, build instructions, or the release process.
 - Do not commit `.build`, `dist`, downloaded files, logs, tokens, signing materials, or personal data.
 - `main` and `publish-v*` are protected and can only be updated through a reviewed pull request that passes its checks.

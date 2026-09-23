@@ -8,10 +8,13 @@ struct DragPayloadSnapshot: Equatable, Sendable {
     var hasSupportedTransferPayload: Bool {
         itemTypeIdentifiers.contains { identifiers in
             identifiers.contains { identifier in
+                if NSFilePromiseReceiver.readableDraggedTypes.contains(identifier) { return true }
                 guard let type = UTType(identifier) else { return false }
                 return type.conforms(to: .fileURL)
                     || type.conforms(to: .url)
                     || type.conforms(to: .plainText)
+                    || type.conforms(to: .png)
+                    || type.conforms(to: .tiff)
             }
         }
     }

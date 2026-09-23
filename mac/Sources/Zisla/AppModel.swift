@@ -427,6 +427,7 @@ final class AppModel: ObservableObject {
   let systemMonitor = SystemMonitorService()
   let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
+  private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
   let networkBattery = NetworkBatteryMonitor()
   let focusMode = FocusModeMonitor()
   let quickNotes = QuickNotesService()
@@ -701,6 +702,19 @@ final class AppModel: ObservableObject {
       }
       .store(in: &cancellables)
 
+    battery.$snapshot
+      .sink { [weak self] _ in
+        Task { @MainActor [weak self] in
+          guard let self else { return }
+          let settings = self.settingsStore.settings
+          self.lowBatteryNotice.update(
+            snapshot: self.battery.snapshot,
+            enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+          )
+        }
+      }
+      .store(in: &cancellables)
+
     media.$snapshot
       .sink { [weak self] snapshot in
         Task { @MainActor [weak self] in
@@ -944,6 +958,7 @@ final class AppModel: ObservableObject {
 
   func stop() {
     settingsStore.flushPendingChanges()
+    managedTools.setAutomaticUpdatesEnabled(false)
     keyboardSound.stop()
     clipboardHistory.flushPendingChanges()
     aiAgent.store.flushPendingChanges()
@@ -961,6 +976,7 @@ final class AppModel: ObservableObject {
     notices.remove(id: "voice-processing-right")
     detectedLinkTask?.cancel()
     translationTask?.cancel()
+    clipboardServiceOpenTask?.cancel()
     voiceModelDiscoveryTask?.cancel()
     voiceModelDiscoveryTask = nil
     voiceModelDiscoveryGeneration &+= 1
@@ -1373,20 +1389,20 @@ final class AppModel: ObservableObject {
   }
 
   func pasteFilesToShelf() {
-    let urls = FileShelfPasteboard.readFileURLs()
-    guard !urls.isEmpty else {
-      transientMessage = AppLocalization.text("剪贴板没有可粘贴的文件")
+    let payloads = TransferPasteboard.readShelfItems()
+    guard !payloads.isEmpty else {
+      transientMessage = AppLocalization.text("剪贴板没有可暂存的内容")
       return
     }
-    addToShelf(urls)
+    receiveTransferItems(payloads.map(TransferDropItem.init(payload:)))
   }
 
-  func copyShelfFiles(_ urls: [URL]) {
-    guard FileShelfPasteboard.writeFileURLs(urls) else {
-      transientMessage = AppLocalization.text("没有可复制的文件")
+  func copyShelfItems(_ items: [FileShelfItem]) {
+    guard FileShelfPasteboard.writeItems(items) else {
+      transientMessage = AppLocalization.text("无法写入剪贴板")
       return
     }
-    transientMessage = AppLocalization.text("已复制 %ld 个文件", urls.count)
+    transientMessage = AppLocalization.text("已复制到剪贴板")
   }
 
   func copyClipboardHistoryItem(_ item: ClipboardHistoryItem) {
@@ -1403,11 +1419,13 @@ final class AppModel: ObservableObject {
   /// for its own "copy result" writes.
   private var suppressedAssistantChangeCount: Int?
   private var clipboardAssistantContent: ClipboardHistoryContent?
+  private var isClipboardCalendarEditorPresented = false
   private var lastClipboardAssistantRoutingChangeCount: Int?
   /// Live exchange-rate fetching for the assistant's currency conversion; quotes are fetched
   /// fresh on every conversion and never cached.
   private let exchangeRateService = ExchangeRateService.live()
   private var currencyConversionTask: Task<Void, Never>?
+  private var clipboardServiceOpenTask: Task<Void, Never>?
 
   private enum ClipboardAssistantPresentationResult {
     case presented
@@ -1681,6 +1699,22 @@ final class AppModel: ObservableObject {
     switch action {
     case .openURL(let url):
       NSWorkspace.shared.open(url)
+    case .openService(let service, let url):
+      clipboardServiceOpenTask?.cancel()
+      if service == .railway12306 {
+        clipboardServiceOpenTask = Task { @MainActor [weak self] in
+          do {
+            let destination = try await ClipboardAssistantRailwayURLResolver.resolve(url)
+            guard !Task.isCancelled else { return }
+            NSWorkspace.shared.open(destination)
+          } catch {
+            guard !Task.isCancelled else { return }
+            self?.transientMessage = self?.clipboardAssistantMessage("无法完成操作")
+          }
+        }
+      } else {
+        NSWorkspace.shared.open(url)
+      }
     case .openApp(let bundleIdentifier, _):
       openInstalledApplication(bundleIdentifier: bundleIdentifier)
     case .openDownload(let url):
@@ -1780,7 +1814,16 @@ final class AppModel: ObservableObject {
     case .saveText(let text):
       saveAssistantText(text)
     case .createCalendarEvent(let title, let date, let isAllDay):
-      createAssistantCalendarEvent(title: title, date: date, isAllDay: isAllDay)
+      var calendar = Calendar(identifier: .gregorian)
+      calendar.timeZone = .current
+      let end = isAllDay
+        ? calendar.date(byAdding: .day, value: 1, to: date)!
+        : date.addingTimeInterval(3_600)
+      presentAssistantCalendarEditor(ClipboardCalendarDraft(
+        title: title, startDate: date, endDate: end, isAllDay: isAllDay
+      ))
+    case .editCalendarEvent(let draft):
+      presentAssistantCalendarEditor(draft)
     }
   }
 
@@ -1943,27 +1986,16 @@ final class AppModel: ObservableObject {
     }
   }
 
-  /// Creates an all-day (or timed) calendar event from a recognized date; errors surface inline.
-  private func createAssistantCalendarEvent(title: String, date: Date, isAllDay: Bool) {
-    do {
-      if isAllDay {
-        try calendar.createEvent(
-          title: title,
-          startDate: date,
-          endDate: date.addingTimeInterval(86_400),
-          isAllDay: true
-        )
-      } else {
-        try calendar.createEvent(
-          title: title,
-          startDate: date,
-          endDate: date.addingTimeInterval(3_600),
-          isAllDay: false
-        )
+  private func presentAssistantCalendarEditor(_ draft: ClipboardCalendarDraft) {
+    guard !isClipboardCalendarEditorPresented else { return }
+    isClipboardCalendarEditorPresented = true
+    clipboardAssistant.dismiss(animated: false)
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      defer { self.isClipboardCalendarEditorPresented = false }
+      await CalendarItemEditor.present(calendar: self.calendar, draft: draft, allowsReminders: false) { error in
+        self.transientMessage = self.clipboardAssistantMessage("操作失败：%@", error)
       }
-      transientMessage = clipboardAssistantMessage("已创建日程")
-    } catch {
-      transientMessage = clipboardAssistantMessage("操作失败：%@", error.localizedDescription)
     }
   }
 
@@ -2032,19 +2064,29 @@ final class AppModel: ObservableObject {
   }
 
   func receiveTransferItems(_ items: [TransferDropItem]) {
-    let files = items.compactMap { item -> URL? in
-      if case .file(let url) = item { return url }
-      return nil
+    let payloads = items.compactMap(\.shelfPayload)
+    guard !payloads.isEmpty else {
+      transientMessage = AppLocalization.text("中转站支持文件、链接或文本")
+      return
     }
-    if !files.isEmpty { addToShelf(files) }
+    let count = shelf.add(payloads: payloads)
+    if let error = shelf.errorDescription {
+      transientMessage = AppLocalization.text("操作失败：%@", error)
+    } else if count > 0 {
+      transientMessage = AppLocalization.text("已加入 %ld 个项目", count)
+    }
+    if count > 0 { selectModule(.shelf) }
+  }
 
-    if let link = items.compactMap({ item -> URL? in
-      if case .link(let url) = item { return url }
-      return nil
-    }).first {
-      prepareDownload(link)
-    } else if files.isEmpty {
-      transientMessage = AppLocalization.text("中转站支持文件或媒体链接")
+  func receiveShelfDropItems(_ items: [FileShelfDropItem]) {
+    shelf.receive(items) { [weak self] count in
+      guard let self else { return }
+      if let error = self.shelf.errorDescription {
+        self.transientMessage = AppLocalization.text("操作失败：%@", error)
+      } else if count > 0 {
+        self.transientMessage = AppLocalization.text("已加入 %ld 个项目", count)
+      }
+      if count > 0 { self.selectModule(.shelf) }
     }
   }
 
@@ -2518,6 +2560,9 @@ final class AppModel: ObservableObject {
     )
     pomodoro.notificationsMuted = settings.notificationsMuted
     configureUpdatePolling(enabled: settings.updateChecksEnabled)
+    managedTools.setAutomaticUpdatesEnabled(
+      settings.recommendedToolsEnabled && settings.recommendedToolsAutomaticUpdatesEnabled
+    )
     configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
     if settings.aiProgressEnabled {
       aiMonitor.start()
@@ -2581,6 +2626,10 @@ final class AppModel: ObservableObject {
     } else {
       battery.stop()
     }
+    lowBatteryNotice.update(
+      snapshot: battery.snapshot,
+      enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+    )
     if !settings.batteryMonitorEnabled {
       networkBattery.stop()
     }

@@ -478,7 +478,7 @@ private final class CalendarMutationRecorder {
 
     var commands: CalendarMutationCommands {
         CalendarMutationCommands(
-            createEvent: { [weak self] title, start, end, isAllDay in
+            createEvent: { [weak self] title, start, end, isAllDay, _, _ in
                 self?.createdEvent = (title, start, end, isAllDay)
             },
             createReminder: { [weak self] title, dueDate, isAllDay in

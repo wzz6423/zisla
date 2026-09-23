@@ -396,6 +396,25 @@ struct SettingsView: View {
     private var featuresContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             if input.selection == .features {
+                settingsGroup("推荐") {
+                    featureToggle(
+                        "显示推荐工具",
+                        detail: "在设置中显示推荐工具和管理入口",
+                        symbol: "sparkles",
+                        keyPath: \.recommendedToolsEnabled
+                    )
+                    if model.settingsStore.settings.recommendedToolsEnabled {
+                        rowDivider
+                        featureToggle(
+                            "自动更新推荐工具",
+                            detail: "每天更新已安装的推荐工具；不会安装未安装的工具",
+                            symbol: "arrow.triangle.2.circlepath",
+                            keyPath: \.recommendedToolsAutomaticUpdatesEnabled
+                        )
+                    }
+                }
+            }
+            if input.selection == .features {
                 settingsGroup("媒体与文件") {
                     featureToggle("媒体播放", detail: "显示系统正在播放的音乐或视频", symbol: "play.square.fill", keyPath: \.mediaEnabled)
                     rowDivider
@@ -2786,6 +2805,11 @@ struct SettingsView: View {
         case .currency: "汇率换算"
         case .conversion: "换算"
         case .dateTime: "日期时间"
+        case .address: "地址"
+        case .flight: "航班"
+        case .train: "火车车次"
+        case .tracking: "快递单号"
+        case .meeting: "会议日程"
         case .emojiName: "Emoji 名称"
         case .code: "代码"
         case .app: "应用程序"
@@ -3846,8 +3870,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     func isVisible(settings: FeatureSettings) -> Bool {
         switch self {
-        case .general, .features, .networkProxy, .recommendations:
+        case .general, .features, .networkProxy:
             return true
+        case .recommendations:
+            return settings.recommendedToolsEnabled
         case .keyboardSound:
             return settings.keyboardEnabled
         case .clipboardAssistant:

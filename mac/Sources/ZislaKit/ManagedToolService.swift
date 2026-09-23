@@ -17,6 +17,11 @@ public final class ManagedToolService: ObservableObject {
     private let homebrewExecutable: URL?
     private var refreshedInstalledVersions = Set<ManagedTool>()
     private var latestVersionCheckedAt: [ManagedTool: Date] = [:]
+    private let executableResolver: ((ManagedTool) -> (url: URL, location: ManagedToolState.Location)?)?
+    private let homebrewRunner: (([String], [String: String]) async throws -> String)?
+    private let automaticUpdateSleep: @Sendable (Duration) async throws -> Void
+    private var automaticUpdateTask: Task<Void, Never>?
+    private var automaticUpdatePassInProgress = false
 
     private static let cacheKey = "managed-tool-state-cache-v1"
     private static let latestVersionCacheLifetime: TimeInterval = 5 * 60
@@ -28,7 +33,12 @@ public final class ManagedToolService: ObservableObject {
         session: URLSession = .shared,
         defaults: UserDefaults = .standard,
         releaseLoader: ((String) async throws -> Data)? = nil,
-        homebrewExecutable: URL? = nil
+        homebrewExecutable: URL? = nil,
+        executableResolver: ((ManagedTool) -> (url: URL, location: ManagedToolState.Location)?)? = nil,
+        homebrewRunner: (([String], [String: String]) async throws -> String)? = nil,
+        automaticUpdateSleep: @escaping @Sendable (Duration) async throws -> Void = {
+            try await Task.sleep(for: $0)
+        }
     ) {
         self.toolsDirectory = toolsDirectory
         self.bundleURL = bundleURL
@@ -37,8 +47,35 @@ public final class ManagedToolService: ObservableObject {
         self.defaults = defaults
         self.homebrewExecutable = homebrewExecutable ?? Self.defaultHomebrewExecutable()
         self.releaseLoader = releaseLoader ?? Self.makeReleaseLoader(session: session)
+        self.executableResolver = executableResolver
+        self.homebrewRunner = homebrewRunner
+        self.automaticUpdateSleep = automaticUpdateSleep
         for tool in ManagedTool.allCases { states[tool] = ManagedToolState() }
         restoreCachedStates()
+    }
+
+    deinit {
+        automaticUpdateTask?.cancel()
+    }
+
+    public func setAutomaticUpdatesEnabled(_ enabled: Bool) {
+        if !enabled {
+            automaticUpdateTask?.cancel()
+            automaticUpdateTask = nil
+            return
+        }
+        guard automaticUpdateTask == nil else { return }
+        automaticUpdateTask = Task { [weak self, automaticUpdateSleep] in
+            while !Task.isCancelled {
+                await self?.updateInstalledTools()
+                do {
+                    try Task.checkCancellation()
+                    try await automaticUpdateSleep(.seconds(24 * 60 * 60))
+                } catch {
+                    return
+                }
+            }
+        }
     }
 
     public func setNetworkProxyURL(_ value: String) {
@@ -81,6 +118,7 @@ public final class ManagedToolService: ObservableObject {
     /// Resolution order: Zisla-downloaded > bundled > system-installed.
     /// The downloaded build wins, otherwise clicking "Update" would be pointless.
     public func resolvedExecutable(for tool: ManagedTool) -> (url: URL, location: ManagedToolState.Location)? {
+        if let executableResolver { return executableResolver(tool) }
         if !tool.usesHomebrew {
             let managed = toolsDirectory.appendingPathComponent(tool.executableName, isDirectory: false)
             if let trusted = trustedExecutable(managed) {
@@ -381,6 +419,72 @@ public final class ManagedToolService: ObservableObject {
 
     // MARK: - Download and install
 
+    func updateInstalledTools() async {
+        // A disabled scheduler may still be finishing a Homebrew transaction when enabled again.
+        guard !automaticUpdatePassInProgress else { return }
+        automaticUpdatePassInProgress = true
+        defer { automaticUpdatePassInProgress = false }
+        for tool in ManagedTool.allCases {
+            guard !Task.isCancelled else { return }
+            guard states[tool]?.isBusy != true else { continue }
+            guard let resolved = resolvedExecutable(for: tool) else {
+                states[tool]?.installedVersion = nil
+                states[tool]?.location = nil
+                continue
+            }
+            states[tool]?.phase = .checking
+            states[tool]?.errorMessage = nil
+            states[tool]?.location = resolved.location
+            defer { states[tool]?.phase = .idle }
+            do {
+                switch tool.installationSource {
+                case .githubRelease(let repository):
+                    try await installGitHubRelease(tool, repository: repository, updatingExisting: resolved.url)
+                case .homebrewCask(let name):
+                    try await upgradeHomebrewTool(tool, name: name, kind: "--cask")
+                case .homebrewFormula(let name):
+                    try await upgradeHomebrewTool(tool, name: name, kind: "--formula")
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                states[tool]?.errorMessage = (error as? ManagedToolError)?.message
+                    ?? ManagedToolError.downloadFailed(error.localizedDescription).message
+            }
+        }
+        persistCachedStates()
+    }
+
+    private func upgradeHomebrewTool(_ tool: ManagedTool, name: String, kind: String) async throws {
+        let installed = try await runHomebrew(["list", "--versions", kind, name])
+        guard let version = Self.parseHomebrewInstalledVersion(installed, tool: tool) else { return }
+        states[tool]?.installedVersion = version
+        states[tool]?.location = .homebrew
+        try Task.checkCancellation()
+        let metadata = try await runHomebrew(["info", kind, "--json=v2", name])
+        let latest = try kind == "--cask"
+            ? Self.parseHomebrewCaskInfo(Data(metadata.utf8), caskName: name, tool: tool)
+            : Self.parseHomebrewFormulaInfo(Data(metadata.utf8), formulaName: name, tool: tool)
+        states[tool]?.latestVersion = latest
+        guard version.compare(latest, options: .numeric) == .orderedAscending else { return }
+        try Task.checkCancellation()
+        // Executable discovery also finds unmanaged apps; only registered Homebrew packages may be upgraded.
+        let current = try await runHomebrew(["list", "--versions", kind, name])
+        guard let currentVersion = Self.parseHomebrewInstalledVersion(current, tool: tool) else { return }
+        states[tool]?.installedVersion = currentVersion
+        guard currentVersion.compare(latest, options: .numeric) == .orderedAscending else { return }
+        guard resolvedExecutable(for: tool) != nil else { return }
+        try Task.checkCancellation()
+        states[tool]?.phase = .installing
+        // Let an in-flight package transaction finish when the user disables scheduling.
+        let updated = try await Task {
+            _ = try await self.runHomebrew(["upgrade", kind, name])
+            return try await self.runHomebrew(["list", "--versions", kind, name])
+        }.value
+        states[tool]?.installedVersion = Self.parseHomebrewInstalledVersion(updated, tool: tool)
+        refreshedInstalledVersions.remove(tool)
+    }
+
     /// Installs or updates a component using its declared source.
     public func install(_ tool: ManagedTool) async {
         // Rendering may lag behind state, allowing repeated taps; discard later installs to prevent two tasks from racing over files and state.
@@ -419,6 +523,7 @@ public final class ManagedToolService: ObservableObject {
     }
 
     private func runHomebrew(_ arguments: [String]) async throws -> String {
+        if let homebrewRunner { return try await homebrewRunner(arguments, processEnvironment) }
         guard let homebrewExecutable else { throw ManagedToolError.homebrewUnavailable }
         switch await Self.runProcess(homebrewExecutable, arguments: arguments, environment: processEnvironment) {
         case .success(let output):
@@ -428,17 +533,26 @@ public final class ManagedToolService: ObservableObject {
         }
     }
 
-    private func installGitHubRelease(_ tool: ManagedTool, repository: String) async throws {
+    private func installGitHubRelease(_ tool: ManagedTool, repository: String, updatingExisting: URL? = nil) async throws {
         let data = try await releaseLoader(repository)
         let release = try Self.parseRelease(data, tool: tool)
         states[tool]?.latestVersion = release.version
+
+        if let updatingExisting {
+            guard resolvedExecutable(for: tool)?.url == updatingExisting,
+                  let version = await installedVersion(of: tool, at: updatingExisting)
+            else { return }
+            states[tool]?.installedVersion = version
+            guard version.compare(release.version, options: .numeric) == .orderedAscending else { return }
+            try Task.checkCancellation()
+        }
 
         states[tool]?.phase = .downloading(0)
         let downloaded = try await download(release.assetURL)
         defer { try? FileManager.default.removeItem(at: downloaded.deletingLastPathComponent()) }
 
         states[tool]?.phase = .installing
-        let (_, version) = try await install(downloaded, as: tool)
+        let (_, version) = try await install(downloaded, as: tool, updatingExisting: updatingExisting)
         states[tool]?.installedVersion = version
         states[tool]?.location = .managed
         refreshedInstalledVersions.insert(tool)
@@ -604,7 +718,7 @@ public final class ManagedToolService: ObservableObject {
         }
     }
 
-    private func install(_ executable: URL, as tool: ManagedTool) async throws -> (URL, String) {
+    private func install(_ executable: URL, as tool: ManagedTool, updatingExisting: URL? = nil) async throws -> (URL, String) {
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: toolsDirectory, withIntermediateDirectories: true)
         let destination = toolsDirectory.appendingPathComponent(
@@ -624,6 +738,11 @@ public final class ManagedToolService: ObservableObject {
         try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: staging.path)
         guard let version = await Self.readVersion(of: tool, at: staging, environment: processEnvironment) else {
             throw ManagedToolError.notExecutable(tool.displayName)
+        }
+
+        if let updatingExisting {
+            try Task.checkCancellation()
+            guard resolvedExecutable(for: tool)?.url == updatingExisting else { throw CancellationError() }
         }
 
         if fileManager.fileExists(atPath: destination.path) {

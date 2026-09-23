@@ -1,9 +1,23 @@
+import AppKit
 import Testing
 import UniformTypeIdentifiers
 
 @testable import ZislaKit
 
 struct DragPayloadSnapshotTests {
+    @Test
+    func filePromisesRevealTransferTargetsWithoutAnAlternateURL() {
+        for type in NSFilePromiseReceiver.readableDraggedTypes {
+            let snapshot = DragPayloadSnapshot(changeCount: 1, itemTypeIdentifiers: [[type]])
+            #expect(snapshot.hasSupportedTransferPayload)
+        }
+    }
+
+    @Test(arguments: [UTType.png.identifier, UTType.tiff.identifier])
+    func rawBrowserImagesRevealTransferTargets(type: String) {
+        #expect(DragPayloadSnapshot(changeCount: 2, itemTypeIdentifiers: [[type]]).hasSupportedTransferPayload)
+    }
+
     @Test
     func fileURLItemIsSupported() {
         let snapshot = DragPayloadSnapshot(
@@ -29,13 +43,13 @@ struct DragPayloadSnapshotTests {
     @Test
     func emptyOrUnrelatedItemsAreRejected() {
         let empty = DragPayloadSnapshot(changeCount: 2, itemTypeIdentifiers: [])
-        let image = DragPayloadSnapshot(
+        let unrelated = DragPayloadSnapshot(
             changeCount: 2,
-            itemTypeIdentifiers: [[UTType.png.identifier]]
+            itemTypeIdentifiers: [[UTType.pdf.identifier]]
         )
 
         #expect(!empty.hasSupportedTransferPayload)
-        #expect(!image.hasSupportedTransferPayload)
+        #expect(!unrelated.hasSupportedTransferPayload)
     }
 }
 

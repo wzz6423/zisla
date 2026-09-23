@@ -1,27 +1,31 @@
 import AppKit
 import SwiftUI
+import ZislaCore
 
 @MainActor
 public struct FileShelfDragSourceView: NSViewRepresentable {
     public typealias NSViewType = NSView
 
-    private var url: URL
+    private var payload: TransferPasteboardPayload
     private var image: NSImage
     private var onOpen: () -> Void
     private var onReveal: () -> Void
+    private var onCopy: () -> Void
     private var onRemove: () -> Void
 
     public init(
-        url: URL,
+        payload: TransferPasteboardPayload,
         image: NSImage,
         onOpen: @escaping () -> Void,
         onReveal: @escaping () -> Void,
+        onCopy: @escaping () -> Void,
         onRemove: @escaping () -> Void
     ) {
-        self.url = url
+        self.payload = payload
         self.image = image
         self.onOpen = onOpen
         self.onReveal = onReveal
+        self.onCopy = onCopy
         self.onRemove = onRemove
     }
 
@@ -37,19 +41,21 @@ public struct FileShelfDragSourceView: NSViewRepresentable {
     }
 
     private func configure(_ view: FileShelfDraggingView) {
-        view.fileURL = url
+        view.payload = payload
         view.image = image
         view.onOpen = onOpen
         view.onReveal = onReveal
+        view.onCopy = onCopy
         view.onRemove = onRemove
     }
 }
 
 @MainActor
 final class FileShelfDraggingView: NSImageView, NSDraggingSource {
-    var fileURL: URL?
+    var payload: TransferPasteboardPayload?
     var onOpen: (() -> Void)?
     var onReveal: (() -> Void)?
+    var onCopy: (() -> Void)?
     var onRemove: (() -> Void)?
     private var didBeginDragging = false
 
@@ -77,10 +83,10 @@ final class FileShelfDraggingView: NSImageView, NSDraggingSource {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard !didBeginDragging, let fileURL else { return }
+        guard !didBeginDragging, let payload else { return }
         didBeginDragging = true
 
-        let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardWriter(for: fileURL))
+        let draggingItem = NSDraggingItem(pasteboardWriter: FileShelfPasteboard.pasteboardWriter(for: payload))
         draggingItem.setDraggingFrame(bounds, contents: image)
         beginDraggingSession(with: [draggingItem], event: event, source: self)
     }
@@ -92,11 +98,14 @@ final class FileShelfDraggingView: NSImageView, NSDraggingSource {
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
-        guard fileURL != nil else { return nil }
+        guard payload != nil else { return nil }
 
         let menu = NSMenu()
         menu.addItem(menuItem(title: "打开", action: #selector(openItem)))
-        menu.addItem(menuItem(title: "在 Finder 中显示", action: #selector(revealItem)))
+        if case .file = payload {
+            menu.addItem(menuItem(title: "在 Finder 中显示", action: #selector(revealItem)))
+        }
+        menu.addItem(menuItem(title: "复制", action: #selector(copyItem)))
         menu.addItem(.separator())
         menu.addItem(menuItem(title: "移除", action: #selector(removeItem)))
         return menu
@@ -104,10 +113,6 @@ final class FileShelfDraggingView: NSImageView, NSDraggingSource {
 
     func sourceOperationMask(for context: NSDraggingContext) -> NSDragOperation {
         .copy
-    }
-
-    func pasteboardWriter(for url: URL) -> NSURL {
-        url as NSURL
     }
 
     func draggingSession(
@@ -122,7 +127,7 @@ final class FileShelfDraggingView: NSImageView, NSDraggingSource {
     }
 
     private func menuItem(title: String, action: Selector) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        let item = NSMenuItem(title: AppLocalization.text(title), action: action, keyEquivalent: "")
         item.target = self
         return item
     }
@@ -133,6 +138,10 @@ final class FileShelfDraggingView: NSImageView, NSDraggingSource {
 
     @objc private func revealItem() {
         onReveal?()
+    }
+
+    @objc private func copyItem() {
+        onCopy?()
     }
 
     @objc private func removeItem() {

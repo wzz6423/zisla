@@ -165,13 +165,15 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
 
     public init() {}
 
-    /// Focus transitions are explicit user-visible events, so they take precedence over the
+    /// Focus transitions and battery warnings are time-sensitive events, so they take precedence over the
     /// user's normal collapsed-status ordering until the transient notice expires.
     public static func selectedCompactStatusPriority(
         for notices: [IslandNotice],
         settings: FeatureSettings
     ) -> CompactStatusPriority? {
-        if notices.contains(where: { $0.id.hasPrefix("focus-transition") }) {
+        if notices.contains(where: {
+            $0.id.hasPrefix("focus-transition") || $0.id == LowBatteryNoticeController.noticeID
+        }) {
             return .transient
         }
         let priorities = CompactStatusPriority.normalized(settings.compactStatusPriority)
@@ -232,6 +234,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 && !$0.id.hasPrefix("focus-countdown-")
                 && !$0.id.hasPrefix("focus-mode-")
                 && !$0.id.hasPrefix("focus-transition")
+                && $0.id != LowBatteryNoticeController.noticeID
                 && !$0.id.hasPrefix("mail-notification-")
                 && !$0.id.hasPrefix("toolbox-reminder-")
                 && !$0.id.hasPrefix("browser-download-")
@@ -488,7 +491,10 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             false
         }
         let displayedTransientNotice = notices
-            .filter { $0.id.hasPrefix("focus-transition") || $0.style == .headphone }
+            .filter {
+                $0.id.hasPrefix("focus-transition") || $0.style == .headphone
+                    || $0.id == LowBatteryNoticeController.noticeID
+            }
             .max { $0.createdAt < $1.createdAt }
         let sideExtension: CGFloat
         if expandsForDetailedStatus {

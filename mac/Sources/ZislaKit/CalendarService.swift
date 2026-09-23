@@ -67,14 +67,14 @@ public struct CalendarEventSnapshot: Equatable, Identifiable, Sendable {
 
 @MainActor
 struct CalendarMutationCommands {
-    var createEvent: (String, Date, Date, Bool) throws -> Void
+    var createEvent: (String, Date, Date, Bool, String?, String?) throws -> Void
     var createReminder: (String, Date, Bool) throws -> Void
     var delete: (CalendarItemKind, String) throws -> Void
     var setReminderCompleted: (String, Bool) throws -> Void
 
     static func live(store: EKEventStore) -> CalendarMutationCommands {
         CalendarMutationCommands(
-            createEvent: { title, startDate, endDate, isAllDay in
+            createEvent: { title, startDate, endDate, isAllDay, location, notes in
                 guard let calendar = store.defaultCalendarForNewEvents else {
                     throw CalendarMutationError.calendarUnavailable
                 }
@@ -83,6 +83,8 @@ struct CalendarMutationCommands {
                 event.startDate = startDate
                 event.endDate = endDate
                 event.isAllDay = isAllDay
+                event.location = location
+                event.notes = notes
                 event.calendar = calendar
                 try store.save(event, span: .thisEvent, commit: true)
             },
@@ -298,11 +300,13 @@ public final class CalendarService: ObservableObject {
         title: String,
         startDate: Date,
         endDate: Date,
-        isAllDay: Bool
+        isAllDay: Bool,
+        location: String? = nil,
+        notes: String? = nil
     ) throws {
         let title = try normalizedTitle(title)
         guard endDate > startDate else { throw CalendarMutationError.invalidDateRange }
-        try mutations.createEvent(title, startDate, endDate, isAllDay)
+        try mutations.createEvent(title, startDate, endDate, isAllDay, location, notes)
         scheduleRefresh()
     }
 
