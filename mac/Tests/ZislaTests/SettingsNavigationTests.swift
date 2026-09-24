@@ -104,7 +104,7 @@ struct SettingsNavigationTests {
         #expect(SettingsSection.allCases.map(\.title) == [
             "通用",
             "功能",
-            "复制助手",
+            "快捷操作",
             "截图",
             "工作流",
             "信息",
@@ -119,6 +119,7 @@ struct SettingsNavigationTests {
             "反馈与更新",
         ])
         #expect(SettingsSection.general.subtitle == "调整语言、外观、启动与展开方式。")
+        #expect(SettingsSection.clipboardAssistant.subtitle == "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作")
         #expect(SettingsSection.ai.subtitle == "管理 AI CLI 与 Skills。")
         #expect(SettingsSection.voice.subtitle == "配置语音输入、整理模型与本机记录。")
         #expect(SettingsSection.keyboardSound.subtitle == "键盘音效与输入统计。")

@@ -426,8 +426,9 @@
 /* Clipboard assistant */
 "存在时长" = "Thời lượng hiển thị";
 "提示自动关闭前的时间；永不则仅手动关闭" = "Thời gian trước khi thông báo đóng; Không bao giờ nghĩa là chỉ đóng thủ công";
-"复制助手" = "Trợ lý sao chép";
-"复制后弹出识别结果和下一步操作" = "Hiển thị nội dung nhận dạng và hành động tiếp theo sau mỗi lần sao chép";
+"快捷操作" = "Thao tác nhanh";
+"复制、浏览器下载或 AirDrop 接收完成后显示下一步操作" = "Hiển thị thao tác tiếp theo sau khi sao chép, tải xuống bằng trình duyệt hoặc nhận tệp qua AirDrop";
+"打开文件夹" = "Mở thư mục";
 "快速触发快捷键" = "Phím tắt kích hoạt nhanh";
 "清除快捷键" = "Xóa phím tắt";
 "鼠标侧键" = "Nút bên chuột";

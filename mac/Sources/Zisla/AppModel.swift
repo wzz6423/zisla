@@ -280,6 +280,30 @@ struct MailComposeRequest: Equatable {
 }
 
 @MainActor
+enum BrowserDownloadQuickActionPresenter {
+  static func present(
+    _ transfer: BrowserCompletedTransfer,
+    on controller: ClipboardAssistantController,
+    settings: FeatureSettings,
+    isVoiceRecording: Bool,
+    isVoicePreparing: Bool,
+    isIslandVisible: Bool
+  ) -> Bool {
+    guard settings.clipboardAssistantEnabled,
+      !isVoiceRecording, !isVoicePreparing, !isIslandVisible else { return false }
+    let detection = ClipboardAssistantDetection(
+      kind: .file,
+      title: transfer.fileName,
+      detail: .path(transfer.directoryURL.path),
+      actions: [.openFolder(transfer.directoryURL)]
+    )
+    controller.displayDuration = settings.clipboardAssistantDisplayDuration
+    controller.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
+    return controller.present(detection, visualStyle: settings.islandVisualStyle) != nil
+  }
+}
+
+@MainActor
 final class AppModel: ObservableObject {
   private enum AIProcessingTarget {
     case http(
@@ -594,6 +618,9 @@ final class AppModel: ObservableObject {
     clipboardAssistant.onPerformAction = { [weak self] action in
       self?.performClipboardAssistantAction(action)
     }
+    browserDownloads.onCompletedTransfer = { [weak self] transfer in
+      self?.presentCompletedTransfer(transfer)
+    }
     clipboardMonitor.onLinkDetected = { [weak self] url in
       guard let self else { return }
       let downloadableURL = DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) ? url : nil
@@ -822,8 +849,10 @@ final class AppModel: ObservableObject {
     let hasPomodoro = pomodoro.phase != .idle
     let hasAITask = settings.aiProgressEnabled
       && aiMonitor.state.tasks.contains { $0.status.isActive }
+    let browserDownloadCount = settings.showsBrowserDownloadProgress
+      ? browserDownloads.snapshots.count : 0
     let cardCount = [hasPomodoro, hasAITask, hasActiveDownloads].filter { $0 }.count
-      + browserDownloads.snapshots.count
+      + browserDownloadCount
     if dashboardCardCount != cardCount {
       dashboardCardCount = cardCount
     }
@@ -1530,6 +1559,18 @@ final class AppModel: ObservableObject {
     return .presented
   }
 
+  private func presentCompletedTransfer(_ transfer: BrowserCompletedTransfer) {
+    guard BrowserDownloadQuickActionPresenter.present(
+      transfer,
+      on: clipboardAssistant,
+      settings: settingsStore.settings,
+      isVoiceRecording: voiceInput.isRecording,
+      isVoicePreparing: voiceInput.isPreparing,
+      isIslandVisible: isIslandVisible
+    ) else { return }
+    clipboardAssistantContent = nil
+  }
+
   /// Appends the universal actions every detection offers (quick note, sharing, blocking the
   /// source app) and applies the user-configured action order. Kept in one place so the async
   /// currency-conversion refresh can rebuild the detection identically.
@@ -1722,6 +1763,10 @@ final class AppModel: ObservableObject {
       selectModule(.download)
     case .revealInFinder(let url):
       NSWorkspace.shared.activateFileViewerSelecting([url])
+    case .openFolder(let url):
+      if !NSWorkspace.shared.open(url) {
+        transientMessage = clipboardAssistantMessage("无法完成操作")
+      }
     case .compress(let url):
       compressAssistantFile(url)
     case .share:
@@ -2614,9 +2659,13 @@ final class AppModel: ObservableObject {
     } else {
       calendar.stop()
     }
-    if settings.sideNoticesEnabled, settings.browserDownloadIslandEnabled {
+    if settings.observesBrowserDownloads {
       browserDownloads.start()
-      consumeBrowserDownloadSnapshot(browserDownloads.snapshot)
+      if settings.showsBrowserDownloadProgress {
+        consumeBrowserDownloadSnapshot(browserDownloads.snapshot)
+      } else {
+        clearBrowserDownloadNotices()
+      }
     } else {
       browserDownloads.stop()
       clearBrowserDownloadNotices()

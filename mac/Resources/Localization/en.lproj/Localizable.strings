@@ -481,8 +481,9 @@
 "显示电池详细信息与健康状态" = "Show battery details and health";
 
 /* Clipboard assistant */
-"复制助手" = "Copy Assistant";
-"复制后弹出识别结果和下一步操作" = "Show recognized content and next actions after every copy";
+"快捷操作" = "Quick Actions";
+"复制、浏览器下载或 AirDrop 接收完成后显示下一步操作" = "Show next actions after copying or when a browser download or AirDrop file arrives";
+"打开文件夹" = "Open Folder";
 "快速触发快捷键" = "Quick Trigger Hotkey";
 "清除快捷键" = "Clear Hotkey";
 "鼠标侧键" = "Mouse Side Button";

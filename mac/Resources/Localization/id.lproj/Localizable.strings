@@ -426,8 +426,9 @@
 /* Clipboard assistant */
 "存在时长" = "Durasi tampilan";
 "提示自动关闭前的时间；永不则仅手动关闭" = "Waktu sebelum pemberitahuan ditutup; Jangan pernah berarti hanya ditutup manual";
-"复制助手" = "Asisten Salin";
-"复制后弹出识别结果和下一步操作" = "Menampilkan konten yang dikenali dan tindakan berikutnya setelah setiap penyalinan";
+"快捷操作" = "Tindakan Cepat";
+"复制、浏览器下载或 AirDrop 接收完成后显示下一步操作" = "Tampilkan tindakan berikutnya setelah menyalin, mengunduh lewat browser, atau menerima berkas AirDrop";
+"打开文件夹" = "Buka Folder";
 "快速触发快捷键" = "Pintasan pemicu cepat";
 "清除快捷键" = "Hapus pintasan";
 "鼠标侧键" = "Tombol samping mouse";

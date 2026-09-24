@@ -427,8 +427,9 @@
 /* Clipboard assistant */
 "存在时长" = "Anzeigedauer";
 "提示自动关闭前的时间；永不则仅手动关闭" = "Zeit bis zum Schließen des Hinweises; Nie bedeutet nur manuelles Schließen";
-"复制助手" = "Kopier-Assistent";
-"复制后弹出识别结果和下一步操作" = "Zeigt nach jedem Kopieren erkannte Inhalte und nächste Schritte an";
+"快捷操作" = "Schnellaktionen";
+"复制、浏览器下载或 AirDrop 接收完成后显示下一步操作" = "Nächste Schritte nach dem Kopieren, einem Browser-Download oder dem AirDrop-Empfang anzeigen";
+"打开文件夹" = "Ordner öffnen";
 "快速触发快捷键" = "Schnelltrigger-Kurzbefehl";
 "清除快捷键" = "Kurzbefehl löschen";
 "鼠标侧键" = "Mausseitentaste";

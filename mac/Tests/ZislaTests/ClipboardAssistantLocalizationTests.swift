@@ -51,6 +51,40 @@ struct ClipboardAssistantLocalizationTests {
         #expect(english["打开应用"] == "Open App")
     }
 
+    @Test
+    func quickActionsNameAndFolderActionTranslateEveryLanguage() throws {
+        let settings = try String(
+            contentsOf: Self.sourceURL("Zisla/SettingsView.swift"), encoding: .utf8
+        )
+        let detailKey = "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作"
+        #expect(settings.contains("settingsGroup(\"快捷操作\")"))
+        #expect(settings.contains("case .clipboardAssistant: \"快捷操作\""))
+        #expect(settings.contains("detail: \"\(detailKey)\""))
+        #expect(!settings.contains("\"复制助手\""))
+
+        #expect(AppLanguage.allCases.count == 17)
+        for language in AppLanguage.allCases {
+            let table = try #require(
+                Self.stringsTable(for: language),
+                "无法解析 \(language.rawValue) 的 Localizable.strings"
+            )
+            for key in ["快捷操作", detailKey, "打开文件夹"] {
+                let value = try #require(table[key], "\(language.rawValue) 缺少「\(key)」")
+                #expect(!value.isEmpty, "\(language.rawValue) 的「\(key)」为空")
+                #expect(AppLocalization.string(key, language: language) == value)
+                if language != .simplifiedChinese && language != .traditionalChinese {
+                    #expect(value != key, "\(language.rawValue) 未翻译「\(key)」")
+                }
+            }
+            #expect(table["复制助手"] == nil)
+            #expect(table["复制后弹出识别结果和下一步操作"] == nil)
+        }
+
+        let english = try #require(Self.stringsTable(for: .english))
+        #expect(english["快捷操作"] == "Quick Actions")
+        #expect(english["打开文件夹"] == "Open Folder")
+    }
+
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {
         let url = localizationURL
             .appendingPathComponent("\(language.rawValue).lproj", isDirectory: true)

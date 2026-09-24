@@ -49,8 +49,10 @@ struct IslandDashboardView: View {
             if isDownloadActive {
                 transferCard.transition(cardTransition)
             }
-            ForEach(browserDownloads.snapshots) { snapshot in
-                browserDownloadCard(snapshot).transition(cardTransition)
+            if model.settingsStore.settings.showsBrowserDownloadProgress {
+                ForEach(browserDownloads.snapshots) { snapshot in
+                    browserDownloadCard(snapshot).transition(cardTransition)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -303,7 +305,10 @@ struct IslandDashboardView: View {
             activeAITask != nil,
             activeMediaItem != nil,
             isDownloadActive,
-        ].filter { $0 }.count + browserDownloads.snapshots.count
+        ].filter { $0 }.count + (
+            model.settingsStore.settings.showsBrowserDownloadProgress
+                ? browserDownloads.snapshots.count : 0
+        )
     }
 
     private var gridColumns: [GridItem] {

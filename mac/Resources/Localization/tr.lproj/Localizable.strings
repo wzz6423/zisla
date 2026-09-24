@@ -426,8 +426,9 @@
 /* Clipboard assistant */
 "存在时长" = "Görüntüleme Süresi";
 "提示自动关闭前的时间；永不则仅手动关闭" = "Bildirimin kapanmasından önceki süre; Asla yalnızca elle kapatılacağı anlamına gelir";
-"复制助手" = "Kopyalama Asistanı";
-"复制后弹出识别结果和下一步操作" = "Her kopyalamadan sonra tanınan içeriği ve sonraki adımları gösterir";
+"快捷操作" = "Hızlı Eylemler";
+"复制、浏览器下载或 AirDrop 接收完成后显示下一步操作" = "Kopyalama, tarayıcı indirmesi veya AirDrop ile dosya alma sonrasında sonraki eylemleri gösterir";
+"打开文件夹" = "Klasörü Aç";
 "快速触发快捷键" = "Hızlı tetikleyici kısayolu";
 "清除快捷键" = "Kısayolu temizle";
 "鼠标侧键" = "Fare yan tuşu";

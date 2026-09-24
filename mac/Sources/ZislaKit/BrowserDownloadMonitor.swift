@@ -3,6 +3,16 @@ import Combine
 import Foundation
 import ZislaCore
 
+public extension FeatureSettings {
+    var showsBrowserDownloadProgress: Bool {
+        sideNoticesEnabled && browserDownloadIslandEnabled
+    }
+
+    var observesBrowserDownloads: Bool {
+        showsBrowserDownloadProgress || clipboardAssistantEnabled
+    }
+}
+
 /// File transfer source to display in the collapsed Dynamic Island.
 public enum BrowserDownloadAgent: String, CaseIterable, Sendable {
     case airDrop
@@ -289,6 +299,17 @@ struct BrowserDownloadTracker: Sendable {
         return snapshots.compactMap(\.agent).filter { seen.insert($0).inserted }
     }
 
+    var hasActiveAirDrop: Bool {
+        !airDropBatches.isEmpty || entries.values.contains { $0.agent == .airDrop }
+    }
+
+    var activeAirDropBatchIDs: Set<UUID> { Set(airDropBatches.map(\.id)) }
+
+    func airDropBatchID(for fileName: String) -> UUID? {
+        let matches = airDropBatches.filter { $0.fileNames.contains(fileName) }
+        return matches.count == 1 ? matches[0].id : nil
+    }
+
     var snapshot: BrowserDownloadSnapshot? {
         let active = snapshots
         guard !active.isEmpty else { return nil }
@@ -367,6 +388,108 @@ struct BrowserDownloadTracker: Sendable {
     }
 }
 
+public struct BrowserCompletedTransfer: Equatable, Sendable {
+    public let id: UUID
+    public let fileName: String
+    public let directoryURL: URL
+}
+
+struct BrowserDownloadCompletionTracker {
+    static let resolutionWindow: TimeInterval = 10
+
+    private struct Candidate {
+        var token: UUID
+        var sourceURL: URL
+        var agent: BrowserDownloadAgent
+        var fileName: String
+        var airDropBatchID: UUID?
+        var resolutionStartedAt: Date?
+    }
+
+    private var candidates: [Candidate] = []
+
+    var hasPending: Bool { !candidates.isEmpty }
+
+    mutating func record(
+        token: UUID,
+        entry: BrowserDownloadTracker.Entry?,
+        succeeded: Bool,
+        airDropBatchID: UUID? = nil,
+        at date: Date
+    ) {
+        guard succeeded, let entry, let agent = entry.agent,
+            let url = entry.fileURL, url.isFileURL else { return }
+        candidates.append(Candidate(
+            token: token, sourceURL: url, agent: agent, fileName: entry.fileName,
+            airDropBatchID: airDropBatchID,
+            resolutionStartedAt: agent == .airDrop ? nil : date
+        ))
+    }
+
+    mutating func resolve(
+        at date: Date,
+        directories: [URL],
+        hasActiveAirDrop: Bool,
+        activeAirDropBatchIDs: Set<UUID> = [],
+        fileManager: FileManager = .default
+    ) -> BrowserCompletedTransfer? {
+        for index in candidates.indices.reversed() {
+            let candidate = candidates[index]
+            if candidate.agent == .airDrop {
+                if let batchID = candidate.airDropBatchID {
+                    guard !activeAirDropBatchIDs.contains(batchID) else { continue }
+                } else {
+                    guard !hasActiveAirDrop else { continue }
+                }
+            }
+            let startedAt = candidate.resolutionStartedAt ?? date
+            candidates[index].resolutionStartedAt = startedAt
+            guard date.timeIntervalSince(startedAt) < Self.resolutionWindow else {
+                candidates.remove(at: index)
+                continue
+            }
+            guard let fileURL = completedFileURL(
+                    for: candidate, directories: directories, fileManager: fileManager
+                ) else { continue }
+            candidates.removeSubrange(...index)
+            return BrowserCompletedTransfer(
+                id: candidate.token,
+                fileName: fileURL.lastPathComponent,
+                directoryURL: fileURL.deletingLastPathComponent()
+            )
+        }
+        return nil
+    }
+
+    mutating func removeAll() {
+        candidates.removeAll()
+    }
+
+    private func completedFileURL(
+        for candidate: Candidate,
+        directories: [URL],
+        fileManager: FileManager
+    ) -> URL? {
+        let source = candidate.sourceURL.standardizedFileURL
+        let isAirDropStaging = candidate.agent == .airDrop
+            && source.pathComponents.contains { $0.hasPrefix("NSIRD_") }
+        if isAirDropStaging, fileManager.fileExists(atPath: source.path) { return nil }
+        if !isAirDropStaging {
+            let finalURL = candidate.agent != .airDrop
+                && BrowserDownloadTempExtension(rawValue: source.pathExtension.lowercased()) != nil
+                ? source.deletingPathExtension() : source
+            if fileManager.fileExists(atPath: finalURL.path) { return finalURL }
+        }
+        guard candidate.agent == .airDrop,
+            candidate.fileName != "/",
+            candidate.fileName == URL(fileURLWithPath: candidate.fileName).lastPathComponent
+        else { return nil }
+        return directories.lazy
+            .map { $0.appendingPathComponent(candidate.fileName).standardizedFileURL }
+            .first { fileManager.fileExists(atPath: $0.path) }
+    }
+}
+
 struct BrowserDownloadMonitorLifecycle: Sendable {
     private(set) var generation: UInt64 = 0
 
@@ -395,8 +518,10 @@ public final class BrowserDownloadMonitor: ObservableObject {
     @Published public private(set) var snapshot: BrowserDownloadSnapshot?
     @Published public private(set) var snapshots: [BrowserDownloadSnapshot] = []
     public var uniqueAgents: [BrowserDownloadAgent] { tracker.uniqueAgents }
+    public var onCompletedTransfer: (@MainActor (BrowserCompletedTransfer) -> Void)?
 
     private var tracker = BrowserDownloadTracker()
+    private var completionTracker = BrowserDownloadCompletionTracker()
     private var subscriberTokens: [Any] = []
     private var progressBoxes: [UUID: ProgressBox] = [:]
     private var airDropEventStream: AirDropTransferEventStream?
@@ -444,18 +569,18 @@ public final class BrowserDownloadMonitor: ObservableObject {
                         self.register(token: entryToken, box: box)
                     }
                 }
-                let unregister: @MainActor @Sendable (Bool) -> Void = { [weak self] succeeded in
+                let unregister: @MainActor @Sendable (Bool, URL?) -> Void = { [weak self] succeeded, fileURL in
                     guard let self, self.lifecycle.accepts(callbackGeneration) else { return }
-                    self.unregister(token: entryToken, succeeded: succeeded)
+                    self.unregister(token: entryToken, succeeded: succeeded, publishedFileURL: fileURL)
                 }
                 return {
                     // Connection is torn down after unpublish; read values synchronously here before hopping to the main thread.
-                    let succeeded = box.progress.isFinished
-                        || box.progress.fractionCompleted >= 0.999
+                    let succeeded = Self.completedSuccessfully(box.progress)
+                    let fileURL = box.progress.fileURL ?? box.progress.userInfo[.fileURLKey] as? URL
                     // Keep teardown on the same serial queue as registration so a short-lived publication cannot finish first.
                     DispatchQueue.main.async {
                         MainActor.assumeIsolated {
-                            unregister(succeeded)
+                            unregister(succeeded, fileURL)
                         }
                     }
                 }
@@ -476,6 +601,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
         finishedClearTask = nil
         progressBoxes.removeAll()
         tracker.removeAll()
+        completionTracker.removeAll()
         snapshot = nil
         snapshots = []
     }
@@ -499,16 +625,38 @@ public final class BrowserDownloadMonitor: ObservableObject {
         refresh()
     }
 
-    private func unregister(token: UUID, succeeded: Bool) {
+    private func unregister(token: UUID, succeeded: Bool, publishedFileURL: URL?) {
+        if let publishedFileURL,
+            let entry = tracker.entries[token],
+            Self.shouldReplacePublishedFileURL(
+                entry.fileURL, with: publishedFileURL, agent: entry.agent
+            ) {
+            tracker.update(
+                token: token,
+                fileURL: publishedFileURL,
+                fileName: BrowserDownloadAgentResolver.displayFileName(for: publishedFileURL)
+            )
+        }
+        completionTracker.record(
+            token: token, entry: tracker.entries[token], succeeded: succeeded,
+            airDropBatchID: tracker.entries[token].flatMap { tracker.airDropBatchID(for: $0.fileName) },
+            at: Date()
+        )
         progressBoxes.removeValue(forKey: token)
         if tracker.finish(token: token, succeeded: succeeded) {
             scheduleFinishedClear()
         }
-        if progressBoxes.isEmpty {
+        if progressBoxes.isEmpty && !completionTracker.hasPending {
             timer?.cancel()
             timer = nil
         }
+        if completionTracker.hasPending { startTimerIfNeeded() }
+        resolveCompletedTransfers()
         refresh()
+    }
+
+    nonisolated static func completedSuccessfully(_ progress: Progress) -> Bool {
+        !progress.isCancelled && progress.isFinished
     }
 
     /// Returns nil when total size is unknown, to avoid staying stuck at 0% for a long time.
@@ -533,7 +681,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
     }
 
     private func poll() {
-        guard !progressBoxes.isEmpty else {
+        guard !progressBoxes.isEmpty || completionTracker.hasPending else {
             timer?.cancel()
             timer = nil
             return
@@ -580,6 +728,11 @@ public final class BrowserDownloadMonitor: ObservableObject {
             tracker.update(token: token, fraction: publishedFraction)
         }
         refresh()
+        resolveCompletedTransfers()
+        if progressBoxes.isEmpty && !completionTracker.hasPending {
+            timer?.cancel()
+            timer = nil
+        }
     }
 
     nonisolated static func shouldReplacePublishedFileURL(
@@ -597,10 +750,12 @@ public final class BrowserDownloadMonitor: ObservableObject {
                 let batches = AirDropBatchParser.batches(from: data)
             else { return }
             self.tracker.updateAirDropBatches(batches)
+            self.resolveCompletedTransfers()
             self.refresh()
         }, onUnavailable: { [weak self] in
             guard let self, self.lifecycle.accepts(callbackGeneration) else { return }
             self.tracker.updateAirDropBatches([])
+            self.resolveCompletedTransfers()
             self.refresh()
         })
         if stream.start() { airDropEventStream = stream }
@@ -632,6 +787,16 @@ public final class BrowserDownloadMonitor: ObservableObject {
         let next = tracker.snapshot
         guard snapshot?.displayKey != next?.displayKey else { return }
         snapshot = next
+    }
+
+    private func resolveCompletedTransfers() {
+        if let transfer = completionTracker.resolve(
+            at: Date(), directories: directories, hasActiveAirDrop: tracker.hasActiveAirDrop,
+            activeAirDropBatchIDs: tracker.activeAirDropBatchIDs,
+            fileManager: fileManager
+        ) {
+            onCompletedTransfer?(transfer)
+        }
     }
 
     /// Quarantine gives a precise source; falls back to extension candidates intersected with running browsers when absent.

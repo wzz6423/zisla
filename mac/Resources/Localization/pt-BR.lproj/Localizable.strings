@@ -426,8 +426,9 @@
 /* Clipboard assistant */
 "存在时长" = "Duração de exibição";
 "提示自动关闭前的时间；永不则仅手动关闭" = "Tempo antes de o aviso fechar; Nunca significa fechar apenas manualmente";
-"复制助手" = "Assistente de cópia";
-"复制后弹出识别结果和下一步操作" = "Mostra o conteúdo reconhecido e as próximas ações após cada cópia";
+"快捷操作" = "Ações rápidas";
+"复制、浏览器下载或 AirDrop 接收完成后显示下一步操作" = "Mostra as próximas ações após copiar, baixar no navegador ou receber um arquivo por AirDrop";
+"打开文件夹" = "Abrir pasta";
 "快速触发快捷键" = "Atalho de acionamento rápido";
 "清除快捷键" = "Limpar atalho";
 "鼠标侧键" = "Botão lateral do mouse";

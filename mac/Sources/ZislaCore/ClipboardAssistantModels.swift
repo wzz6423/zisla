@@ -374,6 +374,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     case openService(service: ClipboardAssistantService, url: URL)
     case openDownload(URL)
     case revealInFinder(URL)
+    case openFolder(URL)
     case search(String)
     case translate(String)
     case composeMail(String)
@@ -399,6 +400,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .openService(let service, _): "openService:\(service.rawValue)"
         case .openDownload: "openDownload"
         case .revealInFinder: "revealInFinder"
+        case .openFolder: "openFolder"
         case .search: "search"
         case .translate: "translate"
         case .composeMail: "composeMail"
@@ -425,6 +427,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .openService: .openURL
         case .openDownload: .openDownload
         case .revealInFinder: .revealInFinder
+        case .openFolder: nil
         case .search: .search
         case .translate: .translate
         case .composeMail: .composeMail

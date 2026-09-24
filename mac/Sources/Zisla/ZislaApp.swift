@@ -463,7 +463,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         for: layout,
                         notices: notices,
                         settings: model.settingsStore.settings,
-                        browserDownloadCount: model.browserDownloads.snapshots.count
+                        browserDownloadCount: model.settingsStore.settings.showsBrowserDownloadProgress
+                            ? model.browserDownloads.snapshots.count : 0
                     )
                 )
             }

@@ -179,6 +179,23 @@ struct AirDropBatchParserTests {
 }
 
 struct BrowserDownloadMonitorLifecycleTests {
+    @Test(arguments: [Int64(9_990), 10_000])
+    func cancelledProgressCannotCompleteATransfer(_ completed: Int64) {
+        let progress = Progress(totalUnitCount: 10_000)
+        progress.completedUnitCount = completed
+        progress.cancel()
+        #expect(!BrowserDownloadMonitor.completedSuccessfully(progress))
+    }
+
+    @Test
+    func onlyFinishedProgressCompletesATransfer() {
+        let progress = Progress(totalUnitCount: 10_000)
+        progress.completedUnitCount = 9_990
+        #expect(!BrowserDownloadMonitor.completedSuccessfully(progress))
+        progress.completedUnitCount = 10_000
+        #expect(BrowserDownloadMonitor.completedSuccessfully(progress))
+    }
+
     @Test
     func staleCallbacksAreRejectedAfterStopAndRestart() {
         var lifecycle = BrowserDownloadMonitorLifecycle()
@@ -597,5 +614,224 @@ struct BrowserDownloadTrackerTests {
         _ = tracker.finish(token: token, succeeded: true)
 
         #expect(tracker.uniqueAgents == [.safari])
+    }
+}
+
+struct BrowserDownloadCompletionTrackerTests {
+    private func entry(url: URL?, agent: BrowserDownloadAgent?) -> BrowserDownloadTracker.Entry {
+        BrowserDownloadTracker.Entry(
+            fileURL: url,
+            agent: agent,
+            fileName: url.map(BrowserDownloadAgentResolver.displayFileName) ?? "下载",
+            fraction: 1,
+            startedAt: Date(timeIntervalSince1970: 100)
+        )
+    }
+
+    private func temporaryDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-completed-transfer-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    @Test(arguments: ["crdownload", "download", "part", "opdownload"])
+    func browserWaitsForTheFinalFileInsteadOfOpeningATemporaryDownload(_ suffix: String) throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let completed = directory.appendingPathComponent("report.pdf")
+        let temporary = completed.appendingPathExtension(suffix)
+        try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: false)
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: temporary, agent: .chrome), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+        try Data("done".utf8).write(to: completed)
+        let resolved = tracker.resolve(
+            at: finishedAt.addingTimeInterval(0.5), directories: [directory], hasActiveAirDrop: false
+        )
+        let transfer = try #require(resolved)
+        #expect(transfer.fileName == "report.pdf")
+        #expect(transfer.directoryURL == directory)
+        #expect(tracker.resolve(at: finishedAt.addingTimeInterval(1), directories: [directory], hasActiveAirDrop: false) == nil)
+    }
+
+    @Test
+    func airDropWaitsForTheBatchAndTheFinalDestination() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stagingDirectory = directory.appendingPathComponent("NSIRD_sharingd_123", isDirectory: true)
+        try FileManager.default.createDirectory(at: stagingDirectory, withIntermediateDirectories: false)
+        let staged = stagingDirectory.appendingPathComponent("photo.HEIC")
+        try Data("photo".utf8).write(to: staged)
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: staged, agent: .airDrop), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: true) == nil)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+
+        let finalURL = directory.appendingPathComponent("photo.HEIC")
+        try FileManager.default.moveItem(at: staged, to: finalURL)
+        let resolved = tracker.resolve(
+            at: finishedAt.addingTimeInterval(1), directories: [directory], hasActiveAirDrop: false
+        )
+        let transfer = try #require(resolved)
+        #expect(transfer.directoryURL == directory)
+        #expect(transfer.fileName == "photo.HEIC")
+    }
+
+    @Test
+    func failedMissingAndExpiredTransfersNeverPublishAFolder() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let missing = directory.appendingPathComponent("missing.pdf")
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: missing, agent: .chrome), succeeded: false, at: finishedAt)
+        tracker.record(token: UUID(), entry: entry(url: nil, agent: .chrome), succeeded: true, at: finishedAt)
+        tracker.record(token: UUID(), entry: entry(url: missing, agent: nil), succeeded: true, at: finishedAt)
+        #expect(!tracker.hasPending)
+
+        tracker.record(token: UUID(), entry: entry(url: missing, agent: .chrome), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+        #expect(tracker.resolve(at: finishedAt.addingTimeInterval(11), directories: [directory], hasActiveAirDrop: false) == nil)
+        try Data("late".utf8).write(to: missing)
+        #expect(tracker.resolve(at: finishedAt.addingTimeInterval(11), directories: [directory], hasActiveAirDrop: false) == nil)
+        #expect(!tracker.hasPending)
+    }
+
+    @Test
+    func newestCompletedDownloadWinsEvenWhenAnotherDownloadIsStillActive() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let first = directory.appendingPathComponent("first.pdf")
+        let second = directory.appendingPathComponent("second.pdf")
+        try Data().write(to: first)
+        try Data().write(to: second)
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: first, agent: .chrome), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false)?.fileName == "first.pdf")
+        tracker.record(token: UUID(), entry: entry(url: second, agent: .safari), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false)?.fileName == "second.pdf")
+    }
+
+    @Test
+    func completedAirDropBatchDoesNotWaitForAnotherBatch() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("received.HEIC")
+        try Data().write(to: file)
+        let completedBatch = UUID()
+        let activeBatch = UUID()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+        var tracker = BrowserDownloadCompletionTracker()
+        tracker.record(
+            token: UUID(), entry: entry(url: file, agent: .airDrop), succeeded: true,
+            airDropBatchID: completedBatch, at: finishedAt
+        )
+        #expect(tracker.resolve(
+            at: finishedAt, directories: [directory], hasActiveAirDrop: true,
+            activeAirDropBatchIDs: [completedBatch, activeBatch]
+        ) == nil)
+        #expect(tracker.resolve(
+            at: finishedAt, directories: [directory], hasActiveAirDrop: true,
+            activeAirDropBatchIDs: [activeBatch]
+        )?.fileName == "received.HEIC")
+    }
+
+    @Test
+    func oldPendingDownloadCannotReplaceANewerCompletedDownload() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let oldFile = directory.appendingPathComponent("old.pdf")
+        let newFile = directory.appendingPathComponent("new.pdf")
+        try Data().write(to: newFile)
+        let finishedAt = Date(timeIntervalSince1970: 200)
+        var tracker = BrowserDownloadCompletionTracker()
+        tracker.record(token: UUID(), entry: entry(url: oldFile, agent: .chrome), succeeded: true, at: finishedAt)
+        tracker.record(token: UUID(), entry: entry(url: newFile, agent: .safari), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false)?.fileName == "new.pdf")
+        try Data().write(to: oldFile)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+    }
+
+    @Test
+    func receivingBatchDoesNotConsumeTheFinalFileResolutionWindow() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("received.HEIC")
+        try Data().write(to: file)
+        let batch = UUID()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+        var tracker = BrowserDownloadCompletionTracker()
+        tracker.record(
+            token: UUID(), entry: entry(url: file, agent: .airDrop), succeeded: true,
+            airDropBatchID: batch, at: finishedAt
+        )
+        #expect(tracker.resolve(
+            at: finishedAt, directories: [directory], hasActiveAirDrop: true,
+            activeAirDropBatchIDs: [batch]
+        ) == nil)
+        #expect(tracker.resolve(
+            at: finishedAt.addingTimeInterval(60), directories: [directory], hasActiveAirDrop: false
+        )?.fileName == "received.HEIC")
+    }
+
+    @Test
+    func airDropDoesNotResolveAnOldNamesakeWhileTheNewFileIsStillStaged() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let staging = directory.appendingPathComponent("NSIRD_sharingd_fixture", isDirectory: true)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
+        let staged = staging.appendingPathComponent("photo.HEIC")
+        try Data("new".utf8).write(to: staged)
+        try Data("old".utf8).write(to: directory.appendingPathComponent("photo.HEIC"))
+        let finishedAt = Date(timeIntervalSince1970: 200)
+        var tracker = BrowserDownloadCompletionTracker()
+        tracker.record(token: UUID(), entry: entry(url: staged, agent: .airDrop), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+    }
+
+    @Test
+    func nonFileURLsAndAirDropTraversalNeverResolveAFolder() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let finishedAt = Date(timeIntervalSince1970: 200)
+        var tracker = BrowserDownloadCompletionTracker()
+        tracker.record(
+            token: UUID(), entry: entry(url: URL(string: "https://example.invalid/report.pdf"), agent: .chrome),
+            succeeded: true, at: finishedAt
+        )
+        #expect(!tracker.hasPending)
+        let downloads = directory.appendingPathComponent("downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: false)
+        try Data("outside".utf8).write(to: directory.appendingPathComponent("outside.txt"))
+        for name in ["../outside.txt", "/", ".", "..", ""] {
+            tracker.removeAll()
+            var malicious = entry(url: downloads.appendingPathComponent("NSIRD_fixture/missing"), agent: .airDrop)
+            malicious.fileName = name
+            tracker.record(token: UUID(), entry: malicious, succeeded: true, at: finishedAt)
+            #expect(tracker.resolve(at: finishedAt, directories: [downloads], hasActiveAirDrop: false) == nil)
+        }
+    }
+
+    @Test
+    func stoppingClearsPendingCompletionWithoutReplayingIt() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("later.zip")
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: file, agent: .chrome), succeeded: true, at: finishedAt)
+        #expect(tracker.hasPending)
+        tracker.removeAll()
+        try Data().write(to: file)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
     }
 }

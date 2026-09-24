@@ -1038,6 +1038,7 @@ struct ClipboardAssistantToastView: View {
         case .openService(let service, _): service.localizedTitleKey
         case .openDownload: "下载"
         case .revealInFinder: "在 Finder 中显示"
+        case .openFolder: "打开文件夹"
         case .search: "搜索"
         case .translate: "翻译"
         case .composeMail: "写邮件"

@@ -4,10 +4,10 @@ export const de: SiteContent = {
   meta: {
     documentTitle: 'zisla · Dynamischer Arbeitsbereich',
     description:
-      'zisla ist ein nativer dynamischer Arbeitsbereich für macOS. Behalte KI-Aufgaben wie Zed Agent, Medien, Dateien und Termine an einem Ort – mit Tastaturklängen, Tippstatistik, Bildschirmfoto-Anmerkungen und Kopierassistent.',
+      'zisla ist ein nativer dynamischer Arbeitsbereich für macOS. Behalte KI-Aufgaben wie Zed Agent, Medien, Dateien und Termine an einem Ort – mit Tastaturklängen, Tippstatistik, Bildschirmfoto-Anmerkungen und Schnellaktionen.',
     ogTitle: 'zisla · Bring das Aktuelle dorthin, wo du es siehst',
     ogDescription:
-      'Von KI-Aufgaben wie Zed Agent und Medienwiedergabe bis zu Tastaturklängen, Tippstatistik, Kopierassistent, Bildschirmfoto-Anmerkungen und Schreibtisch-Werkzeugen: ein nativer macOS-Arbeitsbereich, der nur erscheint, wenn du ihn brauchst.',
+      'Von KI-Aufgaben wie Zed Agent und Medienwiedergabe bis zu Tastaturklängen, Tippstatistik, Schnellaktionen, Bildschirmfoto-Anmerkungen und Schreibtisch-Werkzeugen: ein nativer macOS-Arbeitsbereich, der nur erscheint, wenn du ihn brauchst.',
   },
   tagline: 'Nativer dynamischer Arbeitsbereich für macOS',
   header: {
@@ -30,7 +30,7 @@ export const de: SiteContent = {
   hero: {
     eyebrow: 'NATIVER MACOS-ARBEITSBEREICH',
     title: 'zisla<br><em>Was gerade<br>passiert, dort,<br>wo du es siehst.</em>',
-    lede: 'Sammle KI-Aufgaben, Medien, Dateien und Termine am oberen Bildschirmrand. Nach dem Kopieren zeigt eine eigene Assistentenleiste dort oben eine Vorschau und schlägt den nächsten Schritt vor. Sie erscheint bei Bedarf und tritt danach zurück.',
+    lede: 'Sammle KI-Aufgaben, Medien, Dateien und Termine am oberen Bildschirmrand. Nach dem Kopieren zeigt eine eigene Aktionsleiste dort oben eine Vorschau und schlägt den nächsten Schritt vor. Sie erscheint bei Bedarf und tritt danach zurück.',
     downloadCta: 'Laden',
     downloadCtaAriaLabel: 'Laden',
     sourceCta: 'Quellcode ansehen',
@@ -60,7 +60,7 @@ export const de: SiteContent = {
     summaryLede:
       'Von den Abläufen oben am Bildschirm bis zu lokalen Werkzeugen: hier steht Punkt für Punkt, was sich wirklich erledigen lässt.',
     summaryNote:
-      '{modules} Module oben am Bildschirm und {features} eigenständige Funktionen für Bildschirmfotos, Sprache, Medien, Downloads, Kopierassistent, KI-Verwaltung, Maskottchen und Sperrbildschirm.',
+      '{modules} Module oben am Bildschirm und {features} eigenständige Funktionen für Bildschirmfotos, Sprache, Medien, Downloads, Schnellaktionen, KI-Verwaltung, Maskottchen und Sperrbildschirm.',
     groupNames: {
       island: 'Abläufe oben am Bildschirm',
       ai: 'KI-Ablauf',
@@ -178,7 +178,7 @@ export const de: SiteContent = {
     summaryMono: 'JENSEITS DER ISLAND',
     summaryLede: 'Häufig genutzte Funktionen, jede an ihrem natürlichen Platz.',
     summaryNote:
-      'Bildschirmfotos, Aufnahme, Medien, Browser-Downloads, Kopierassistent, KI-Verwaltung, Maskottchen und Sperrbildschirm arbeiten jeweils eigenständig.',
+      'Bildschirmfotos, Aufnahme, Medien, Browser-Downloads, Schnellaktionen, KI-Verwaltung, Maskottchen und Sperrbildschirm arbeiten jeweils eigenständig.',
     features: {
       capture: {
         title: 'Bildschirmfotos, Scroll-Aufnahmen und Anheften',
@@ -205,9 +205,9 @@ export const de: SiteContent = {
         detail: '8 Browser · Quelle erkannt · Hinweis bei Abschluss',
       },
       copyAssistant: {
-        title: 'Kopierassistent und nächste Schritte',
+        title: 'Schnellaktionen und nächste Schritte',
         description:
-          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Er erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte führt er erst nach deiner Bestätigung aus.',
+          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Die Funktion erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte werden erst nach deiner Bestätigung ausgeführt. Nach einem Browser-Download oder dem Empfang einer Datei per AirDrop öffnet dasselbe Kürzel den zugehörigen Ordner; der Schalter für Schnellaktionen ist unabhängig von der Browser-Downloadanzeige.',
         detail: 'Lokale Erkennung · Live-Wechselkursumrechnung · Standard Command+N',
       },
       aiManagement: {
@@ -321,7 +321,7 @@ export const de: SiteContent = {
           'Nein. Die KI-Statusüberwachung liest nur den Aufgabenstatus, niemals Prompt- oder Antworttext.',
       },
       copyAssistant: {
-        question: 'Öffnet oder überträgt der Kopierassistent, was ich kopiere?',
+        question: 'Öffnen oder übertragen Schnellaktionen, was ich kopiere?',
         answer:
           'Nein. Nach dem Aktivieren laufen Erkennung und Vorschau vollständig auf deinem Mac, und zisla führt einen nächsten Schritt erst aus, wenn du ihn anklickst oder das Kürzel drückst.',
       },

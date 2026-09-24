@@ -426,8 +426,9 @@
 /* Clipboard assistant */
 "存在时长" = "Weergaveduur";
 "提示自动关闭前的时间；永不则仅手动关闭" = "Tijd voordat de melding sluit; Nooit betekent alleen handmatig sluiten";
-"复制助手" = "Kopieerassistent";
-"复制后弹出识别结果和下一步操作" = "Toont herkende inhoud en vervolgacties na elke kopie";
+"快捷操作" = "Snelle acties";
+"复制、浏览器下载或 AirDrop 接收完成后显示下一步操作" = "Toont vervolgacties na kopiëren, een browserdownload of ontvangst via AirDrop";
+"打开文件夹" = "Map openen";
 "快速触发快捷键" = "Sneltrigger-sneltoets";
 "清除快捷键" = "Sneltoets wissen";
 "鼠标侧键" = "Muisknop zijzijde";
