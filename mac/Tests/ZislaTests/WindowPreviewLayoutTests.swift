@@ -1,5 +1,6 @@
 import CoreGraphics
 import ScreenCaptureKit
+import SwiftUI
 import Testing
 
 @testable import Zisla
@@ -263,7 +264,7 @@ struct WindowPreviewWindowMatchTests {
     }
 
     @Test
-    func unmatchedWindowDoesNotRaiseAnotherWindow() {
+    func uniqueGeometryMatchesWhenWindowTitlesDiffer() {
         let candidates: [(title: String?, frame: CGRect?)] = [
             ("Other", CGRect(x: 0, y: 0, width: 300, height: 200)),
         ]
@@ -272,7 +273,34 @@ struct WindowPreviewWindowMatchTests {
             title: "Document",
             frame: CGRect(x: 0, y: 0, width: 300, height: 200),
             candidates: candidates
+        ) == 0)
+    }
+
+    @Test
+    func mismatchedTitleAndGeometryDoNotRaiseAnotherWindow() {
+        let candidates: [(title: String?, frame: CGRect?)] = [
+            ("Other", CGRect(x: 400, y: 0, width: 300, height: 200)),
+        ]
+
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Document",
+            frame: CGRect(x: 0, y: 0, width: 300, height: 200),
+            candidates: candidates
         ) == nil)
+    }
+
+    @Test
+    func uniqueGeometryWinsWhenAnotherWindowHasTheSameTitle() {
+        let candidates: [(title: String?, frame: CGRect?)] = [
+            ("Document", CGRect(x: 400, y: 0, width: 300, height: 200)),
+            ("Renamed", CGRect(x: 0, y: 0, width: 300, height: 200)),
+        ]
+
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Document",
+            frame: CGRect(x: 0, y: 0, width: 300, height: 200),
+            candidates: candidates
+        ) == 1)
     }
 
     @Test
@@ -286,5 +314,44 @@ struct WindowPreviewWindowMatchTests {
             frame: CGRect(x: 10, y: 10, width: 300, height: 200),
             candidates: candidates
         ) == 0)
+    }
+}
+
+@MainActor
+struct WindowPreviewPanelTests {
+    @Test
+    func previewPanelCanAppearAboveOtherAppsFullScreenSpaces() {
+        let controller = WindowPreviewController()
+        let panel = controller.makePanel()
+        defer { panel.close() }
+
+        #expect(panel.collectionBehavior.contains(.canJoinAllApplications))
+        #expect(panel.collectionBehavior.contains(.stationary))
+    }
+
+    @Test
+    func previewPanelCanBecomeKeyWithoutBecomingMain() {
+        let panel = WindowPreviewPanel(
+            contentRect: .zero,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        defer { panel.close() }
+
+        #expect(panel.canBecomeKey)
+        #expect(!panel.canBecomeMain)
+        #expect(!panel.ignoresMouseEvents)
+    }
+
+    @Test
+    func previewContentAcceptsTheFirstClick() throws {
+        let event = try #require(NSEvent.mouseEvent(
+            with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1
+        ))
+        let view = WindowPreviewHostingView(rootView: Button("Preview") {})
+
+        #expect(view.acceptsFirstMouse(for: event))
     }
 }

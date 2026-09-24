@@ -159,6 +159,12 @@ struct WindowPreviewWindowMatch {
         frame: CGRect,
         candidates: [(title: String?, frame: CGRect?)]
     ) -> Int? {
+        let nearby = candidates.indices.filter {
+            guard let candidate = candidates[$0].frame else { return false }
+            return abs(candidate.minX - frame.minX) <= 8 && abs(candidate.minY - frame.minY) <= 8
+                && abs(candidate.width - frame.width) <= 8 && abs(candidate.height - frame.height) <= 8
+        }
+        if nearby.count == 1 { return nearby.first }
         let matches = candidates.indices.filter {
             candidates[$0].title == title || (title.isEmpty && candidates[$0].title == nil)
         }
@@ -178,6 +184,15 @@ struct WindowPreviewWindowMatch {
         return abs(candidate.minX - target.minX) + abs(candidate.minY - target.minY)
             + abs(candidate.width - target.width) + abs(candidate.height - target.height)
     }
+}
+
+final class WindowPreviewPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
+final class WindowPreviewHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 @MainActor
@@ -515,20 +530,20 @@ final class WindowPreviewController: ObservableObject {
         if !panel.isVisible { panel.orderFrontRegardless() }
     }
 
-    private func makePanel() -> NSPanel {
-        let panel = NSPanel(
+    func makePanel() -> NSPanel {
+        let panel = WindowPreviewPanel(
             contentRect: .zero,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
         panel.level = .popUpMenu
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .canJoinAllApplications, .stationary]
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
-        panel.contentView = NSHostingView(rootView: WindowPreviewView(controller: self))
+        panel.contentView = WindowPreviewHostingView(rootView: WindowPreviewView(controller: self))
         self.panel = panel
         return panel
     }

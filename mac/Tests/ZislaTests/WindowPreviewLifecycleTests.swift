@@ -106,6 +106,25 @@ struct WindowPreviewLifecycleTests {
     }
 
     @Test
+    func clickingDockPreviewActivatesTheSelectedWindow() async throws {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { _ in [PreviewSystem.snapshot(11), PreviewSystem.snapshot(12)] }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(2, source: .dock))
+        await controller.captureTask?.value
+        let snapshot = try #require(controller.windows.last)
+
+        controller.activate(snapshot)
+
+        #expect(system.activations == [2])
+        #expect(system.activatedWindowIDs == [12])
+        #expect(controller.windows.isEmpty)
+    }
+
+    @Test
     func commandModifierDetectsNativeSwitcherWithoutReceivingItsTabKey() async throws {
         let system = PreviewSystem()
         let controller = WindowPreviewController(dependencies: system.dependencies())
@@ -328,6 +347,7 @@ private final class PreviewSystem {
     var presentations: [[CGWindowID]] = []
     var presentationAnchors: [CGRect?] = []
     var activations: [pid_t] = []
+    var activatedWindowIDs: [CGWindowID] = []
 
     func dependencies() -> WindowPreviewController.Dependencies {
         var value = WindowPreviewController.Dependencies()
@@ -362,7 +382,10 @@ private final class PreviewSystem {
             self.presentations.append(controller.windows.map(\.id))
             self.presentationAnchors.append(selection?.anchor)
         }
-        value.activate = { identifier, _ in self.activations.append(identifier) }
+        value.activate = { identifier, snapshot in
+            self.activations.append(identifier)
+            self.activatedWindowIDs.append(snapshot.id)
+        }
         return value
     }
 
