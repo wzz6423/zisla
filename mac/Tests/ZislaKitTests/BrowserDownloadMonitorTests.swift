@@ -519,6 +519,84 @@ struct BrowserDownloadMonitorLifecycleTests {
 
     @Test
     @MainActor
+    func unknownProgressFinishesWhenFinalRenameEventIsMissing() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], pollInterval: 0.02)
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = downloads.appendingPathComponent("Unconfirmed 123.crdownload")
+        let completed = downloads.appendingPathComponent("image.jpeg")
+        try Data(repeating: 0x42, count: 25_000).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        #expect(monitor.snapshot?.progressText == "…")
+        try FileManager.default.moveItem(at: temporary, to: completed)
+
+        let deadline = ContinuousClock.now + .seconds(1)
+        while transfers.isEmpty && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(transfers.count == 1)
+        #expect(transfers.first?.fileName == "image.jpeg")
+        #expect(monitor.snapshot?.isFinished == true)
+    }
+
+    @Test(arguments: [false, true])
+    @MainActor
+    func missingTemporaryFileHidesStaleProgressAndKeepsLateCompletion(_ movedToChosenFolder: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        let chosen = root.appendingPathComponent("Chosen", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], pollInterval: 0.02)
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = downloads.appendingPathComponent("Unconfirmed 456.crdownload")
+        let completed = chosen.appendingPathComponent("image.jpeg")
+        try Data("partial".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        if movedToChosenFolder {
+            try FileManager.default.moveItem(at: temporary, to: completed)
+        } else {
+            try FileManager.default.removeItem(at: temporary)
+        }
+
+        let deadline = ContinuousClock.now + .seconds(2)
+        while monitor.snapshot != nil && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(monitor.snapshot == nil)
+        #expect(transfers.isEmpty)
+
+        if movedToChosenFolder {
+            monitor.handleFileEvent(at: completed, fileID: identity.inode, renamed: true)
+            #expect(transfers.count == 1)
+            #expect(transfers.first?.directoryURL == chosen)
+        }
+    }
+
+    @Test
+    @MainActor
     func crossFolderRenameOffersDestinationAndReleasesOldFolder() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let downloads = root.appendingPathComponent("Downloads", isDirectory: true)

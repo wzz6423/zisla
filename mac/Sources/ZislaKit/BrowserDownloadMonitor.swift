@@ -494,6 +494,21 @@ struct BrowserDownloadCompletionTracker {
         candidates.removeAll()
     }
 
+    static func renamedFinalURL(
+        for temporaryURL: URL,
+        identity: BrowserDownloadFileIdentity,
+        fileManager: FileManager
+    ) -> URL? {
+        guard !fileManager.fileExists(atPath: temporaryURL.path),
+            let files = try? fileManager.contentsOfDirectory(
+                at: temporaryURL.deletingLastPathComponent(), includingPropertiesForKeys: nil
+            ) else { return nil }
+        return files.first {
+            BrowserDownloadTempExtension(rawValue: $0.pathExtension.lowercased()) == nil
+                && BrowserDownloadFileIdentity(url: $0) == identity
+        }
+    }
+
     private func completedFileURL(
         for candidate: Candidate,
         directories: [URL],
@@ -507,14 +522,7 @@ struct BrowserDownloadCompletionTracker {
             let isBrowserTemporary = candidate.agent != .airDrop
                 && BrowserDownloadTempExtension(rawValue: source.pathExtension.lowercased()) != nil
             if isBrowserTemporary, let identity = candidate.fileIdentity {
-                guard !fileManager.fileExists(atPath: source.path),
-                    let files = try? fileManager.contentsOfDirectory(
-                        at: source.deletingLastPathComponent(), includingPropertiesForKeys: nil
-                    ) else { return nil }
-                return files.first {
-                    BrowserDownloadTempExtension(rawValue: $0.pathExtension.lowercased()) == nil
-                        && BrowserDownloadFileIdentity(url: $0) == identity
-                }
+                return Self.renamedFinalURL(for: source, identity: identity, fileManager: fileManager)
             }
             let finalURL = isBrowserTemporary ? source.deletingPathExtension() : source
             if fileManager.fileExists(atPath: finalURL.path) { return finalURL }
@@ -553,6 +561,7 @@ struct BrowserDownloadMonitorLifecycle: Sendable {
 public final class BrowserDownloadMonitor: ObservableObject {
     /// How long the green checkmark stays visible after a successful download.
     public static let finishedHoldDuration: Double = 3
+    private static let missingProgressHoldDuration: TimeInterval = 0.5
 
     @Published public private(set) var snapshot: BrowserDownloadSnapshot?
     @Published public private(set) var snapshots: [BrowserDownloadSnapshot] = []
@@ -851,7 +860,16 @@ public final class BrowserDownloadMonitor: ObservableObject {
         for (identity, observed) in observedDownloads {
             if fileManager.fileExists(atPath: observed.temporaryURL.path) {
                 observedDownloads[identity]?.missingSince = nil
+            } else if let finalURL = BrowserDownloadCompletionTracker.renamedFinalURL(
+                for: observed.temporaryURL, identity: identity, fileManager: fileManager
+            ) {
+                handleFileEvent(at: finalURL, fileID: identity.inode, renamed: true)
             } else if let missingSince = observed.missingSince {
+                // Keep the identity for a late rename event after the stale card is hidden.
+                if now.timeIntervalSince(missingSince) >= Self.missingProgressHoldDuration,
+                    progressBoxes[observed.token] == nil {
+                    _ = tracker.finish(token: observed.token, succeeded: false)
+                }
                 guard now.timeIntervalSince(missingSince) >= BrowserDownloadCompletionTracker.resolutionWindow else { continue }
                 observedDownloads.removeValue(forKey: identity)
                 if progressBoxes[observed.token] == nil {
