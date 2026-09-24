@@ -2287,6 +2287,7 @@
 "%@（已导入）" = "%@ (geïmporteerd)";
 "显示器 %ld" = "Beeldscherm %ld";
 "%@快捷键与%@冲突，未保存" = "De toetscombinatie %@ conflicteert met %@ en is niet bewaard";
+"%@快捷键与%@冲突，请修改其中一个" = "De toetscombinatie %@ conflicteert met %@; wijzig er een van beide";
 "%@快捷键与语音输入冲突，未保存" = "De toetscombinatie %@ conflicteert met spraakinvoer en is niet bewaard";
 "正在下载 %ld%%" = "%ld%% gedownload";
 "未安装 · %@ · %@" = "Niet geïnstalleerd · %@ · %@";

@@ -204,6 +204,8 @@ struct ScreenshotLifecycleTests {
 
         #expect(registration.contains("onKeyDown: { [weak self] in self?.startScreenshot() }"))
         #expect(registration.contains("onKeyDown: { [weak self] in self?.startPinnedScreenshot() }"))
+        #expect(registration.contains("hotkey: settings.screenshotLongHotkey"))
+        #expect(registration.contains("reportScreenshotHotkeyRegistration(longResult"))
         #expect(!registration.contains("Task { @MainActor [weak self] in self?.startScreenshot() }"))
 
         let beginScreenshot = try #require(source.range(of: "private func beginScreenshot"))
@@ -217,9 +219,33 @@ struct ScreenshotLifecycleTests {
     }
 
     @Test
+    func longScreenshotHotkeyStartsScrollingCaptureAfterSelection() throws {
+        let source = try String(contentsOf: Self.appSourceURL, encoding: .utf8)
+        let beginScreenshot = try #require(source.range(of: "private func beginScreenshot"))
+        let sessionState = try #require(source.range(
+            of: "private func setScreenshotSessionActive",
+            range: beginScreenshot.upperBound..<source.endIndex
+        ))
+        let captureLifecycle = source[beginScreenshot.lowerBound..<sessionState.lowerBound]
+        let captured = try #require(captureLifecycle.range(of: "controller.onCaptured ="))
+        let cancelled = try #require(captureLifecycle.range(
+            of: "controller.onCancelled =",
+            range: captured.upperBound..<captureLifecycle.endIndex
+        ))
+        let capturedLifecycle = captureLifecycle[captured.lowerBound..<cancelled.lowerBound]
+        let registration = try #require(source.range(of: "hotkey: settings.screenshotLongHotkey"))
+        let longRegistration = source[registration.lowerBound..<source.endIndex]
+
+        #expect(source.contains("private func beginScreenshot(pinAfterCapture: Bool, startLongCaptureAfterSelection: Bool = false)"))
+        #expect(longRegistration.contains("self?.beginScreenshot(pinAfterCapture: false, startLongCaptureAfterSelection: true)"))
+        #expect(capturedLifecycle.contains("editor.present()\n            if shouldPin {\n                editor.setPinned(true)\n            } else if startLongCaptureAfterSelection {\n                editor.captureNextScreen()"))
+        #expect(!captureLifecycle[cancelled.lowerBound...].contains("captureNextScreen()"))
+    }
+
+    @Test
     func longCaptureKeepsToolbarInteractiveWhileRangePassesThroughScrolling() throws {
         let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)
-        let captureNextScreen = try #require(source.range(of: "private func captureNextScreen()"))
+        let captureNextScreen = try #require(source.range(of: "func captureNextScreen()"))
         let captureLifecycle = source[captureNextScreen.lowerBound..<source.endIndex]
         let showRange = try #require(captureLifecycle.range(of: "self.showLongCaptureRangeOverlay(on: screen)"))
         let activateCapturedApplication = try #require(
@@ -274,9 +300,35 @@ struct ScreenshotLifecycleTests {
     }
 
     @Test
+    func editorActivatesApplicationBeforeRequestingKeyboardFocus() throws {
+        let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)
+        let present = try #require(source.range(of: "func present()"))
+        let willClose = try #require(source.range(
+            of: "func windowWillClose(_ notification: Notification)",
+            range: present.upperBound..<source.endIndex
+        ))
+        let presentation = source[present.lowerBound..<willClose.lowerBound]
+        let activate = try #require(presentation.range(of: "NSApp.activate(ignoringOtherApps: true)"))
+        let show = try #require(presentation.range(of: "showWindow(nil)"))
+        let makeKey = try #require(presentation.range(of: "window?.makeKeyAndOrderFront(nil)"))
+        #expect(show.lowerBound < activate.lowerBound)
+        #expect(activate.lowerBound < makeKey.lowerBound)
+
+        let restore = try #require(source.range(of: "private func restoreEditorPresentation()"))
+        let dismissOverlays = try #require(source.range(
+            of: "private func dismissLongCaptureOverlays()",
+            range: restore.upperBound..<source.endIndex
+        ))
+        let restoration = source[restore.lowerBound..<dismissOverlays.lowerBound]
+        let reactivate = try #require(restoration.range(of: "NSApp.activate(ignoringOtherApps: true)"))
+        let restoreKey = try #require(restoration.range(of: "window.makeKeyAndOrderFront(nil)"))
+        #expect(reactivate.lowerBound < restoreKey.lowerBound)
+    }
+
+    @Test
     func longCaptureDoesNotDependOnGlobalScrollMonitoring() throws {
         let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)
-        let captureNextScreen = try #require(source.range(of: "private func captureNextScreen()"))
+        let captureNextScreen = try #require(source.range(of: "func captureNextScreen()"))
         let captureLifecycle = source[captureNextScreen.lowerBound..<source.endIndex]
 
         #expect(!captureLifecycle.contains("NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel)"))
@@ -328,7 +380,7 @@ struct ScreenshotLifecycleTests {
         let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)
         let finish = try #require(source.range(of: "private func finishLongCapture()"))
         let captureNext = try #require(source.range(
-            of: "private func captureNextScreen()",
+            of: "func captureNextScreen()",
             range: finish.upperBound..<source.endIndex
         ))
         let finishLifecycle = source[finish.lowerBound..<captureNext.lowerBound]
