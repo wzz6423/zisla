@@ -78,6 +78,22 @@ struct WindowPreviewLayoutTests {
     }
 }
 
+struct WindowPreviewTitleTests {
+    @Test(arguments: ["", "  ", "Clash Verge", " Clash Verge "])
+    func emptyOrRepeatedAppNameHasNoCardCaption(title: String) {
+        let snapshot = WindowPreviewSnapshot(id: 1, title: title, frame: .zero, image: nil)
+
+        #expect(snapshot.visibleTitle(for: "Clash Verge") == nil)
+    }
+
+    @Test
+    func distinctWindowTitleRemainsVisible() {
+        let snapshot = WindowPreviewSnapshot(id: 1, title: "Settings", frame: .zero, image: nil)
+
+        #expect(snapshot.visibleTitle(for: "Clash Verge") == "Settings")
+    }
+}
+
 struct WindowPreviewCaptureTests {
     @Test
     func captureRequestsRetinaDetailWithoutDistortingTheWindow() {
@@ -136,6 +152,68 @@ struct WindowPreviewCaptureTests {
 }
 
 struct WindowPreviewWindowMatchTests {
+    @Test @MainActor
+    func minimizedSameTitleWindowsKeepTheirOwnActivationTargets() async throws {
+        let first = NSWindow(
+            contentRect: CGRect(x: 100, y: 100, width: 300, height: 200),
+            styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false
+        )
+        let second = NSWindow(
+            contentRect: CGRect(x: 500, y: 100, width: 300, height: 200),
+            styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false
+        )
+        first.isReleasedWhenClosed = false
+        second.isReleasedWhenClosed = false
+        first.alphaValue = 0
+        second.alphaValue = 0
+        first.title = "Same title"
+        second.title = "Same title"
+        defer {
+            first.orderOut(nil)
+            second.orderOut(nil)
+            first.close()
+            second.close()
+        }
+        first.orderFrontRegardless()
+        second.orderFrontRegardless()
+        let firstID = CGWindowID(first.windowNumber)
+        let secondID = CGWindowID(second.windowNumber)
+        let processIdentifier = getpid()
+        let screenTop = NSScreen.screens.first?.frame.maxY ?? 0
+
+        func target(_ id: CGWindowID) -> (title: String, frame: CGRect)? {
+            WindowPreviewWindowMatch.currentTarget(
+                windowID: id, processIdentifier: processIdentifier, mainScreenTop: screenTop
+            )
+        }
+        for _ in 0..<100 where (target(firstID)?.frame.width ?? 0) == 0
+            || (target(secondID)?.frame.width ?? 0) == 0 {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let visibleFirst = try #require(target(firstID))
+        let visibleSecond = try #require(target(secondID))
+        #expect(visibleFirst.title == "Same title")
+        #expect(visibleSecond.title == "Same title")
+        #expect(visibleFirst.frame != visibleSecond.frame)
+
+        first.miniaturize(nil)
+        second.miniaturize(nil)
+        for _ in 0..<100 where !first.isMiniaturized || !second.isMiniaturized {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(first.isMiniaturized && second.isMiniaturized)
+        #expect(target(firstID)?.frame == visibleFirst.frame)
+        #expect(target(secondID)?.frame == visibleSecond.frame)
+        let candidates = [(title: Optional("Same title"), frame: Optional(visibleFirst.frame)),
+                          (title: Optional("Same title"), frame: Optional(visibleSecond.frame))]
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Same title", frame: try #require(target(firstID)).frame, candidates: candidates
+        ) == 0)
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Same title", frame: try #require(target(secondID)).frame, candidates: candidates
+        ) == 1)
+    }
+
     @Test
     func onlyManageableWindowsBecomePreviewCandidatesAcrossSpaces() {
         let chromeWindow = CGRect(x: 1512, y: 111, width: 1920, height: 969)
@@ -175,6 +253,39 @@ struct WindowPreviewWindowMatchTests {
         ))
         #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
             frame: chromeStrip, isOnScreen: true, accessibleWindows: []
+        ))
+    }
+
+    @Test
+    func inaccessibleFullscreenWindowInAnotherSpaceRemainsAPreviewCandidate() {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let fullScreenWindow = CGRect(x: 0, y: 33, width: 1512, height: 949)
+        let phantomWindow = CGRect(x: 406, y: 161, width: 700, height: 640)
+        let toolbar = CGRect(x: 0, y: 33, width: 1512, height: 81)
+
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: fullScreenWindow, isOnScreen: false, accessibleWindows: [],
+            hasUnmeasuredAccessibleWindow: true, screenFrames: [screen]
+        ))
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: fullScreenWindow, isOnScreen: false, accessibleWindows: [],
+            hasUnmeasuredAccessibleWindow: false, screenFrames: [screen]
+        ))
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: fullScreenWindow, isOnScreen: false, accessibleWindows: nil,
+            screenFrames: [screen]
+        ))
+        #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: phantomWindow, isOnScreen: false, accessibleWindows: [],
+            hasUnmeasuredAccessibleWindow: true, screenFrames: [screen]
+        ))
+        #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: phantomWindow, isOnScreen: false, accessibleWindows: nil,
+            screenFrames: [screen]
+        ))
+        #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: toolbar, isOnScreen: false, accessibleWindows: [],
+            hasUnmeasuredAccessibleWindow: true, screenFrames: [screen]
         ))
     }
 
@@ -250,6 +361,51 @@ struct WindowPreviewWindowMatchTests {
     }
 
     @Test
+    func aSingleUnmeasurableFullscreenWindowCanBeActivatedWithoutGuessingAmongOthers() {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let fullScreenWindow = CGRect(x: 0, y: 33, width: 1512, height: 949)
+        let oneWindow: [(title: String?, frame: CGRect?)] = [("ChatGPT", nil)]
+
+        #expect(WindowPreviewWindowMatch.index(
+            title: "ChatGPT", frame: fullScreenWindow, candidates: oneWindow,
+            screenFrames: [screen], isOnlyPreview: true
+        ) == 0)
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Other", frame: fullScreenWindow, candidates: oneWindow,
+            screenFrames: [screen], isOnlyPreview: true
+        ) == 0)
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Other", frame: fullScreenWindow, candidates: oneWindow,
+            screenFrames: [screen], isOnlyPreview: false
+        ) == nil)
+        #expect(WindowPreviewWindowMatch.index(
+            title: "ChatGPT", frame: CGRect(x: 50, y: 50, width: 700, height: 500),
+            candidates: oneWindow, screenFrames: [screen], isOnlyPreview: true
+        ) == nil)
+        #expect(WindowPreviewWindowMatch.index(
+            title: "ChatGPT", frame: fullScreenWindow,
+            candidates: [("ChatGPT", nil), ("ChatGPT", nil)], screenFrames: [screen], isOnlyPreview: true
+        ) == nil)
+    }
+
+    @Test
+    func fullscreenAppActivationWithoutAXRequiresOneVerifiedPreview() {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let fullScreenWindow = CGRect(x: 0, y: 33, width: 1512, height: 949)
+
+        #expect(WindowPreviewWindowMatch.canActivateWithoutAccessibilityWindow(
+            frame: fullScreenWindow, isOnlyPreview: true, screenFrames: [screen]
+        ))
+        #expect(!WindowPreviewWindowMatch.canActivateWithoutAccessibilityWindow(
+            frame: fullScreenWindow, isOnlyPreview: false, screenFrames: [screen]
+        ))
+        #expect(!WindowPreviewWindowMatch.canActivateWithoutAccessibilityWindow(
+            frame: CGRect(x: 40, y: 40, width: 700, height: 500),
+            isOnlyPreview: true, screenFrames: [screen]
+        ))
+    }
+
+    @Test
     func sameTitleWindowsResolveByPosition() {
         let candidates: [(title: String?, frame: CGRect?)] = [
             ("Document", CGRect(x: 20, y: 20, width: 300, height: 200)),
@@ -290,6 +446,19 @@ struct WindowPreviewWindowMatchTests {
     }
 
     @Test
+    func staleWindowMetadataDoesNotRaiseAnotherMinimizedWindowWithTheSameTitle() {
+        let candidates: [(title: String?, frame: CGRect?)] = [
+            ("Document", CGRect(x: 500, y: 0, width: 300, height: 200)),
+        ]
+
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Document",
+            frame: CGRect(x: 0, y: 0, width: 300, height: 200),
+            candidates: candidates
+        ) == nil)
+    }
+
+    @Test
     func uniqueGeometryWinsWhenAnotherWindowHasTheSameTitle() {
         let candidates: [(title: String?, frame: CGRect?)] = [
             ("Document", CGRect(x: 400, y: 0, width: 300, height: 200)),
@@ -319,6 +488,82 @@ struct WindowPreviewWindowMatchTests {
 
 @MainActor
 struct WindowPreviewPanelTests {
+    @Test
+    func anAlreadyVisiblePreviewReassertsItsOrderOnlyAfterChangingSpaces() async throws {
+        let screen = try #require(NSScreen.screens.first)
+        var dependencies = WindowPreviewController.Dependencies()
+        var onSpaceChange: (@MainActor () -> Void)?
+        var observerRemoved = false
+        var orderFrontCount = 0
+        dependencies.hasPermissions = { true }
+        dependencies.addGlobalMonitor = { _ in NSObject() }
+        dependencies.addLocalMonitor = { _ in NSObject() }
+        dependencies.removeMonitor = { _ in }
+        dependencies.addSpaceChangeObserver = { action in
+            onSpaceChange = action
+            return NSObject()
+        }
+        dependencies.removeSpaceChangeObserver = { _ in
+            observerRemoved = true
+            onSpaceChange = nil
+        }
+        dependencies.orderPanelFront = { panel in
+            orderFrontCount += 1
+            panel.orderFrontRegardless()
+        }
+        dependencies.timer = { interval, repeats, _ in
+            Timer(timeInterval: interval, repeats: repeats) { _ in }
+        }
+        dependencies.captureWindows = { _ in [
+            WindowPreviewSnapshot(
+                id: 42, title: "Document", frame: CGRect(x: 20, y: 20, width: 300, height: 200), image: nil
+            ),
+        ] }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        let panel = controller.makePanel()
+        panel.alphaValue = 0
+        defer {
+            controller.stop()
+            panel.orderOut(nil)
+            panel.close()
+        }
+
+        let anchor = CGRect(x: screen.visibleFrame.midX, y: screen.visibleFrame.minY + 8, width: 48, height: 48)
+        controller.configure(enabled: true)
+        controller.select(WindowPreviewSelection(
+            processIdentifier: 42, appName: "App", icon: nil, anchor: anchor, source: .dock
+        ))
+        await controller.captureTask?.value
+        #expect(panel.isVisible)
+        #expect(orderFrontCount == 1)
+
+        controller.select(WindowPreviewSelection(
+            processIdentifier: 42, appName: "App", icon: nil,
+            anchor: anchor.offsetBy(dx: 1, dy: 0), source: .dock
+        ))
+        #expect(orderFrontCount == 1)
+
+        let notifySpaceChange = try #require(onSpaceChange)
+        notifySpaceChange()
+        controller.select(WindowPreviewSelection(
+            processIdentifier: 42, appName: "App", icon: nil,
+            anchor: anchor.offsetBy(dx: 2, dy: 0), source: .dock
+        ))
+        #expect(orderFrontCount == 2)
+
+        controller.select(WindowPreviewSelection(
+            processIdentifier: 42, appName: "App", icon: nil,
+            anchor: anchor.offsetBy(dx: 3, dy: 0), source: .dock
+        ))
+        #expect(orderFrontCount == 2)
+
+        controller.stop()
+        #expect(observerRemoved)
+        #expect(onSpaceChange == nil)
+        #expect(!panel.isVisible)
+        #expect(orderFrontCount == 2)
+    }
+
     @Test
     func previewPanelCanAppearAboveOtherAppsFullScreenSpaces() {
         let controller = WindowPreviewController()

@@ -99,6 +99,7 @@ struct WindowPreviewLifecycleTests {
         system.timers.forEach { $0.fire() }
 
         #expect(system.activations == [2])
+        #expect(system.solePreviewActivations == [true])
         #expect(system.timers.allSatisfy { !$0.isValid })
         #expect(controller.windows.isEmpty)
         #expect(controller.appName.isEmpty)
@@ -121,6 +122,7 @@ struct WindowPreviewLifecycleTests {
 
         #expect(system.activations == [2])
         #expect(system.activatedWindowIDs == [12])
+        #expect(system.solePreviewActivations == [false])
         #expect(controller.windows.isEmpty)
     }
 
@@ -348,6 +350,7 @@ private final class PreviewSystem {
     var presentationAnchors: [CGRect?] = []
     var activations: [pid_t] = []
     var activatedWindowIDs: [CGWindowID] = []
+    var solePreviewActivations: [Bool] = []
 
     func dependencies() -> WindowPreviewController.Dependencies {
         var value = WindowPreviewController.Dependencies()
@@ -382,9 +385,10 @@ private final class PreviewSystem {
             self.presentations.append(controller.windows.map(\.id))
             self.presentationAnchors.append(selection?.anchor)
         }
-        value.activate = { identifier, snapshot in
+        value.activate = { identifier, snapshot, isOnlyPreview in
             self.activations.append(identifier)
             self.activatedWindowIDs.append(snapshot.id)
+            self.solePreviewActivations.append(isOnlyPreview)
         }
         return value
     }

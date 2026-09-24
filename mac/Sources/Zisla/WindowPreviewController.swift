@@ -123,18 +123,61 @@ struct WindowPreviewSnapshot: Identifiable {
     let title: String
     let frame: CGRect
     let image: NSImage?
+
+    func visibleTitle(for appName: String) -> String? {
+        let caption = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return caption.isEmpty || caption == appName ? nil : caption
+    }
 }
 
 struct WindowPreviewWindowMatch {
-    static func isPreviewCandidate(frame: CGRect, isOnScreen: Bool, accessibleWindows: [CGRect]?) -> Bool {
+    static func isPreviewCandidate(
+        frame: CGRect,
+        isOnScreen: Bool,
+        accessibleWindows: [CGRect]?,
+        hasUnmeasuredAccessibleWindow: Bool = false,
+        screenFrames: [CGRect] = []
+    ) -> Bool {
         // Browsers expose toolbar surfaces as layer-zero windows with extreme aspect ratios.
         guard frame.width <= frame.height * 6, frame.height <= frame.width * 6 else { return false }
-        // Accessibility window lists can be briefly empty while Spaces are switching.
-        guard let accessibleWindows, !accessibleWindows.isEmpty else { return isOnScreen }
-        return accessibleWindows.contains {
-            abs($0.minX - frame.minX) <= 8 && abs($0.minY - frame.minY) <= 8
-                && abs($0.width - frame.width) <= 8 && abs($0.height - frame.height) <= 8
+        if let accessibleWindows, !accessibleWindows.isEmpty {
+            if accessibleWindows.contains(where: {
+                abs($0.minX - frame.minX) <= 8 && abs($0.minY - frame.minY) <= 8
+                    && abs($0.width - frame.width) <= 8 && abs($0.height - frame.height) <= 8
+            }) { return true }
+            // An unmeasurable AX window can belong to an inactive full-screen Space.
+            return hasUnmeasuredAccessibleWindow && matchesFullScreenDisplay(frame, screenFrames: screenFrames)
         }
+        return isOnScreen || matchesFullScreenDisplay(frame, screenFrames: screenFrames)
+    }
+
+    private static func matchesFullScreenDisplay(_ frame: CGRect, screenFrames: [CGRect]) -> Bool {
+        screenFrames.contains {
+            abs($0.minX - frame.minX) <= 8 && abs($0.maxX - frame.maxX) <= 8
+                && abs($0.minY - frame.minY) <= 48 && abs($0.maxY - frame.maxY) <= 48
+        }
+    }
+
+    static func canActivateWithoutAccessibilityWindow(
+        frame: CGRect,
+        isOnlyPreview: Bool,
+        screenFrames: [CGRect]
+    ) -> Bool {
+        isOnlyPreview && matchesFullScreenDisplay(frame, screenFrames: screenFrames)
+    }
+
+    static func currentTarget(
+        windowID: CGWindowID,
+        processIdentifier: pid_t,
+        mainScreenTop: CGFloat
+    ) -> (title: String, frame: CGRect)? {
+        guard let windowInfo = CGWindowListCopyWindowInfo(
+            .optionAll, kCGNullWindowID
+        ) as? [[String: Any]] else { return nil }
+        return currentTarget(
+            windowID: windowID, processIdentifier: processIdentifier,
+            windowInfo: windowInfo, mainScreenTop: mainScreenTop
+        )
     }
 
     static func currentTarget(
@@ -157,16 +200,21 @@ struct WindowPreviewWindowMatch {
     static func index(
         title: String,
         frame: CGRect,
-        candidates: [(title: String?, frame: CGRect?)]
+        candidates: [(title: String?, frame: CGRect?)],
+        screenFrames: [CGRect] = [],
+        isOnlyPreview: Bool = false
     ) -> Int? {
+        if isOnlyPreview, candidates.count == 1, candidates[0].frame == nil,
+           matchesFullScreenDisplay(frame, screenFrames: screenFrames) {
+            return 0
+        }
         let nearby = candidates.indices.filter {
-            guard let candidate = candidates[$0].frame else { return false }
-            return abs(candidate.minX - frame.minX) <= 8 && abs(candidate.minY - frame.minY) <= 8
-                && abs(candidate.width - frame.width) <= 8 && abs(candidate.height - frame.height) <= 8
+            framesMatch(candidates[$0].frame, frame, tolerance: 8)
         }
         if nearby.count == 1 { return nearby.first }
         let matches = candidates.indices.filter {
-            candidates[$0].title == title || (title.isEmpty && candidates[$0].title == nil)
+            (candidates[$0].title == title || (title.isEmpty && candidates[$0].title == nil))
+                && framesMatch(candidates[$0].frame, frame, tolerance: 16)
         }
         if matches.count == 1 { return matches.first }
         let ranked = matches.sorted {
@@ -177,6 +225,14 @@ struct WindowPreviewWindowMatch {
               distance(candidates[first].frame, to: frame) < distance(candidates[ranked[1]].frame, to: frame)
         else { return nil }
         return first
+    }
+
+    private static func framesMatch(_ candidate: CGRect?, _ target: CGRect, tolerance: CGFloat) -> Bool {
+        guard let candidate else { return false }
+        return abs(candidate.minX - target.minX) <= tolerance
+            && abs(candidate.minY - target.minY) <= tolerance
+            && abs(candidate.width - target.width) <= tolerance
+            && abs(candidate.height - target.height) <= tolerance
     }
 
     private static func distance(_ candidate: CGRect?, to target: CGRect) -> CGFloat {
@@ -213,6 +269,18 @@ final class WindowPreviewController: ObservableObject {
             NSEvent.addLocalMonitorForEvents(matching: eventMask, handler: $0)
         }
         var removeMonitor: (Any) -> Void = { NSEvent.removeMonitor($0) }
+        var addSpaceChangeObserver: (@escaping @MainActor () -> Void) -> Any = { action in
+            NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.activeSpaceDidChangeNotification,
+                object: NSWorkspace.shared,
+                queue: .main
+            ) { _ in
+                MainActor.assumeIsolated { action() }
+            }
+        }
+        var removeSpaceChangeObserver: (Any) -> Void = {
+            NSWorkspace.shared.notificationCenter.removeObserver($0)
+        }
         var timer: (TimeInterval, Bool, @escaping @MainActor () -> Void) -> Timer = { interval, repeats, action in
             Timer.scheduledTimer(withTimeInterval: interval, repeats: repeats) { _ in
                 MainActor.assumeIsolated { action() }
@@ -227,7 +295,10 @@ final class WindowPreviewController: ObservableObject {
         var present: (WindowPreviewController, WindowPreviewSelection?) -> Void = { controller, selection in
             if let selection { controller.updatePanel(for: selection) } else { controller.panel?.orderOut(nil) }
         }
-        var activate: (pid_t, WindowPreviewSnapshot) -> Void = { WindowPreviewController.activate($1, processIdentifier: $0) }
+        var orderPanelFront: (NSPanel) -> Void = { $0.orderFrontRegardless() }
+        var activate: (pid_t, WindowPreviewSnapshot, Bool) -> Void = {
+            WindowPreviewController.activate($1, processIdentifier: $0, isOnlyPreview: $2)
+        }
     }
 
     private static let eventMask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .rightMouseDown, .keyDown, .flagsChanged]
@@ -238,6 +309,8 @@ final class WindowPreviewController: ObservableObject {
     private var enabled = false
     private var globalMonitor: Any?
     private var localMonitor: Any?
+    private var spaceChangeObserver: Any?
+    private var needsSpaceRefront = false
     private var switcherTimer: Timer?
     private var hoverTimer: Timer?
     private var dismissTimer: Timer?
@@ -287,14 +360,23 @@ final class WindowPreviewController: ObservableObject {
             MainActor.assumeIsolated { self?.handle(event) }
             return event
         }
-        if globalMonitor == nil || localMonitor == nil { stopMonitoring() }
+        if globalMonitor == nil || localMonitor == nil {
+            stopMonitoring()
+            return
+        }
+        spaceChangeObserver = dependencies.addSpaceChangeObserver { [weak self] in
+            self?.needsSpaceRefront = true
+        }
     }
 
     private func stopMonitoring() {
         if let globalMonitor { dependencies.removeMonitor(globalMonitor) }
         if let localMonitor { dependencies.removeMonitor(localMonitor) }
+        if let spaceChangeObserver { dependencies.removeSpaceChangeObserver(spaceChangeObserver) }
         globalMonitor = nil
         localMonitor = nil
+        spaceChangeObserver = nil
+        needsSpaceRefront = false
         switcherTimer?.invalidate()
         switcherTimer = nil
         hoverTimer?.invalidate()
@@ -481,13 +563,16 @@ final class WindowPreviewController: ObservableObject {
             kAXWindowsAttribute, from: AXUIElementCreateApplication(processIdentifier)
         ) as? [AXUIElement]
         let accessibleFrames = axWindows?.compactMap { Self.frame(of: $0) }
-        let mainScreenTop = NSScreen.screens.first?.frame.maxY ?? 0
+        let screenFrames = NSScreen.screens.map(\.frame)
+        let hasUnmeasuredAccessibleWindow = (axWindows?.count ?? 0) > (accessibleFrames?.count ?? 0)
+        let mainScreenTop = screenFrames.first?.maxY ?? 0
         let candidates = content.windows.filter {
             guard $0.owningApplication?.processID == processIdentifier && $0.windowLayer == 0
                     && $0.frame.width >= 80 && $0.frame.height >= 50 else { return false }
             let frame = WindowPreviewLayout.appKitFrame(for: $0.frame, mainScreenTop: mainScreenTop)
             return WindowPreviewWindowMatch.isPreviewCandidate(
-                frame: frame, isOnScreen: $0.isOnScreen, accessibleWindows: accessibleFrames
+                frame: frame, isOnScreen: $0.isOnScreen, accessibleWindows: accessibleFrames,
+                hasUnmeasuredAccessibleWindow: hasUnmeasuredAccessibleWindow, screenFrames: screenFrames
             )
         }
         var snapshots: [WindowPreviewSnapshot] = []
@@ -521,13 +606,16 @@ final class WindowPreviewController: ObservableObject {
         let width = min(CGFloat(windows.count) * 202 + 24, min(screen.visibleFrame.width - 24, 840))
         let frame = WindowPreviewLayout.frame(
             anchor: selection.anchor,
-            size: CGSize(width: width, height: 188),
+            size: CGSize(width: width, height: windows.contains { $0.visibleTitle(for: appName) != nil } ? 188 : 168),
             visibleFrame: screen.visibleFrame,
             isSwitcher: selection.source == .switcher
         )
         let panel = panel ?? makePanel()
         panel.setFrame(frame, display: true)
-        if !panel.isVisible { panel.orderFrontRegardless() }
+        if !panel.isVisible || needsSpaceRefront {
+            dependencies.orderPanelFront(panel)
+            needsSpaceRefront = false
+        }
     }
 
     func makePanel() -> NSPanel {
@@ -636,28 +724,37 @@ final class WindowPreviewController: ObservableObject {
 
     func activate(_ snapshot: WindowPreviewSnapshot) {
         guard let selection, let current = windows.first(where: { $0.id == snapshot.id }) else { return }
+        let isOnlyPreview = windows.count == 1
         endSwitcher()
-        dependencies.activate(selection.processIdentifier, current)
+        dependencies.activate(selection.processIdentifier, current, isOnlyPreview)
     }
 
-    private static func activate(_ snapshot: WindowPreviewSnapshot, processIdentifier: pid_t) {
+    private static func activate(_ snapshot: WindowPreviewSnapshot, processIdentifier: pid_t, isOnlyPreview: Bool) {
         guard let app = NSRunningApplication(processIdentifier: processIdentifier),
-              let windowInfo = CGWindowListCopyWindowInfo(.optionIncludingWindow, snapshot.id) as? [[String: Any]],
               let target = WindowPreviewWindowMatch.currentTarget(
                   windowID: snapshot.id,
                   processIdentifier: processIdentifier,
-                  windowInfo: windowInfo,
                   mainScreenTop: NSScreen.screens.first?.frame.maxY ?? 0
               ) else { return }
         let appElement = AXUIElementCreateApplication(processIdentifier)
         let axWindows = Self.attribute(kAXWindowsAttribute, from: appElement) as? [AXUIElement] ?? []
+        let screenFrames = NSScreen.screens.map(\.frame)
+        if axWindows.isEmpty {
+            guard WindowPreviewWindowMatch.canActivateWithoutAccessibilityWindow(
+                frame: target.frame, isOnlyPreview: isOnlyPreview, screenFrames: screenFrames
+            ) else { return }
+            _ = app.activate()
+            return
+        }
         let candidates = axWindows.map {
             (title: Self.attributeString(kAXTitleAttribute, from: $0), frame: Self.frame(of: $0))
         }
         let index = WindowPreviewWindowMatch.index(
             title: target.title,
             frame: target.frame,
-            candidates: candidates
+            candidates: candidates,
+            screenFrames: screenFrames,
+            isOnlyPreview: isOnlyPreview
         )
         guard let index else { return }
         _ = app.activate()
@@ -683,7 +780,7 @@ private struct WindowPreviewView: View {
                     .lineLimit(1)
             }
             ScrollView(.horizontal) {
-                HStack(spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
                     ForEach(controller.windows) { snapshot in
                         Button {
                             controller.activate(snapshot)
@@ -702,13 +799,16 @@ private struct WindowPreviewView: View {
                                 }
                                 .frame(width: 190, height: 114)
                                 .background(Color.black.opacity(0.1), in: RoundedRectangle(cornerRadius: 7))
-                                Text(snapshot.title.isEmpty ? controller.appName : snapshot.title)
-                                    .font(.system(size: 10))
-                                    .lineLimit(1)
+                                if let title = snapshot.visibleTitle(for: controller.appName) {
+                                    Text(title)
+                                        .font(.system(size: 10))
+                                        .lineLimit(1)
+                                }
                             }
                             .frame(width: 190)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(snapshot.visibleTitle(for: controller.appName) ?? controller.appName)
                     }
                 }
             }
