@@ -429,6 +429,8 @@
 "快捷操作" = "Ações rápidas";
 "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作" = "Mostra as próximas ações após copiar, baixar no navegador ou receber um arquivo por AirDrop";
 "打开文件夹" = "Abrir pasta";
+"下载与 AirDrop 完成提示" = "Avisos ao concluir downloads e AirDrop";
+"完成后显示“打开文件夹”快捷操作" = "Mostrar a ação rápida 'Abrir pasta' após a conclusão do arquivo";
 "快速触发快捷键" = "Atalho de acionamento rápido";
 "清除快捷键" = "Limpar atalho";
 "鼠标侧键" = "Botão lateral do mouse";
@@ -2104,7 +2106,7 @@
 "无法读取 Zed 线程" = "Não é possível ler os threads do Zed";
 "无法读取最近剪贴板记录" = "Não é possível ler os registros recentes da área de transferência";
 "正在处理另一项邮件操作" = "Outra operação de e-mail está em andamento";
-"每次保存图片时选择位置" = "Escolher o local a cada vez que salvar uma imagem";
+"每次保存文件时选择位置" = "Escolher o local sempre que salvar um arquivo";
 "读取备忘录锁定状态失败" = "Falha ao ler o estado de bloqueio da nota";
 "静音 Zisla 通知" = "Silenciar as notificações do Zisla";
 "AI 状态数据库写入失败" = "Falha ao gravar no banco de dados de estado da IA";

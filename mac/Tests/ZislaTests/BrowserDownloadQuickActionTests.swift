@@ -76,6 +76,20 @@ struct BrowserDownloadQuickActionTests {
     }
 
     @Test
+    func completedDownloadFolderActionCanBeDisabledWithoutHidingProgress() {
+        let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
+        defer { controller.dismiss(animated: false) }
+        var settings = FeatureSettings.default
+        settings.downloadCompletionFolderActionEnabled = false
+        #expect(settings.showsBrowserDownloadProgress)
+        #expect(!present(transfer, on: controller, settings: settings))
+        #expect(controller.presentation.detection == nil)
+
+        settings.downloadCompletionFolderActionEnabled = true
+        #expect(present(transfer, on: controller, settings: settings))
+    }
+
+    @Test
     func screenshotAndScreenLockKeepCompletedTransfersHidden() throws {
         let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
         defer { controller.dismiss(animated: false) }
@@ -151,6 +165,9 @@ struct BrowserDownloadObservationSettingsTests {
         settings.clipboardAssistantEnabled = true
         #expect(settings.observesBrowserDownloads)
         #expect(!settings.showsBrowserDownloadProgress)
+        settings.downloadCompletionFolderActionEnabled = false
+        #expect(!settings.observesBrowserDownloads)
+        settings.downloadCompletionFolderActionEnabled = true
         settings.clipboardAssistantEnabled = false
         #expect(!settings.observesBrowserDownloads)
         settings.sideNoticesEnabled = true

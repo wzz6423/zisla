@@ -85,6 +85,78 @@ struct ClipboardAssistantLocalizationTests {
         #expect(english["打开文件夹"] == "Open Folder")
     }
 
+    @Test
+    func saveFileLocationSettingCoversTextAndEveryLanguage() throws {
+        let settings = try String(
+            contentsOf: Self.sourceURL("Zisla/SettingsView.swift"), encoding: .utf8
+        )
+        let appModel = try String(
+            contentsOf: Self.sourceURL("Zisla/AppModel.swift"), encoding: .utf8
+        )
+        let textSaveStart = try #require(appModel.range(of: "private func saveAssistantText(_ text: String)"))
+        let textSaveEnd = try #require(appModel.range(
+            of: "private func presentAssistantCalendarEditor",
+            range: textSaveStart.upperBound..<appModel.endIndex
+        ))
+        let textSave = appModel[textSaveStart.lowerBound..<textSaveEnd.lowerBound]
+
+        #expect(settings.contains("AppLocalization.text(\"每次保存文件时选择位置\")"))
+        #expect(settings.contains("keyPath: \\.clipboardAssistantPromptsForImageSaveLocation"))
+        #expect(textSave.contains("if settingsStore.settings.clipboardAssistantPromptsForImageSaveLocation"))
+        #expect(textSave.contains("let panel = NSSavePanel()"))
+        #expect(textSave.contains("panel.allowedContentTypes = [.plainText]"))
+        #expect(textSave.contains("panel.prompt = clipboardAssistantMessage(\"保存文本\")"))
+
+        let key = "每次保存文件时选择位置"
+        #expect(AppLanguage.allCases.count == 17)
+        for language in AppLanguage.allCases {
+            let table = try #require(
+                Self.stringsTable(for: language),
+                "无法解析 \(language.rawValue) 的 Localizable.strings"
+            )
+            let value = try #require(table[key], "\(language.rawValue) 缺少「\(key)」")
+            #expect(!value.isEmpty)
+            #expect(AppLocalization.string(key, language: language) == value)
+            if language != .simplifiedChinese && language != .traditionalChinese {
+                #expect(value != key, "\(language.rawValue) 未翻译「\(key)」")
+            }
+            #expect(table["每次保存图片时选择位置"] == nil)
+        }
+        let english = try #require(Self.stringsTable(for: .english))
+        #expect(english[key] == "Choose a location whenever saving a file")
+    }
+
+    @Test
+    func downloadFolderActionSettingTranslatesEveryLanguage() throws {
+        let settings = try String(
+            contentsOf: Self.sourceURL("Zisla/SettingsView.swift"), encoding: .utf8
+        )
+        let title = "下载与 AirDrop 完成提示"
+        let detail = "完成后显示“打开文件夹”快捷操作"
+        #expect(settings.contains("AppLocalization.text(\"\(title)\")"))
+        #expect(settings.contains("detail: \"\(detail)\""))
+        #expect(settings.contains("keyPath: \\.downloadCompletionFolderActionEnabled"))
+
+        #expect(AppLanguage.allCases.count == 17)
+        for language in AppLanguage.allCases {
+            let table = try #require(
+                Self.stringsTable(for: language),
+                "无法解析 \(language.rawValue) 的 Localizable.strings"
+            )
+            for key in [title, detail] {
+                let value = try #require(table[key], "\(language.rawValue) 缺少「\(key)」")
+                #expect(!value.isEmpty)
+                #expect(AppLocalization.string(key, language: language) == value)
+                if language != .simplifiedChinese && language != .traditionalChinese {
+                    #expect(value != key, "\(language.rawValue) 未翻译「\(key)」")
+                }
+            }
+        }
+        let english = try #require(Self.stringsTable(for: .english))
+        #expect(english[title] == "Download and AirDrop Completion Prompts")
+        #expect(english[detail] == "Show an Open Folder quick action when a file finishes")
+    }
+
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {
         let url = localizationURL
             .appendingPathComponent("\(language.rawValue).lproj", isDirectory: true)

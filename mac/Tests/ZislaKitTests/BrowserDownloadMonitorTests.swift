@@ -635,6 +635,50 @@ struct BrowserDownloadCompletionTrackerTests {
         return directory
     }
 
+    @Test
+    func chromeTemporaryNameResolvesToRenamedFinalFile() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let temporary = directory.appendingPathComponent("Unconfirmed 123.crdownload")
+        let completed = directory.appendingPathComponent("report.pdf")
+        let unrelated = directory.appendingPathComponent("Unconfirmed 123")
+        try Data("older".utf8).write(to: unrelated)
+        try Data("download".utf8).write(to: temporary)
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: temporary, agent: .chrome), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+        try FileManager.default.moveItem(at: temporary, to: completed)
+
+        let transfer = tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false)
+        #expect(transfer?.fileName == "report.pdf")
+        #expect(transfer?.directoryURL.resolvingSymlinksInPath() == directory.resolvingSymlinksInPath())
+    }
+
+    @Test
+    func capturedTemporaryIdentitySurvivesRenameBeforeUnpublish() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let temporary = directory.appendingPathComponent("Unconfirmed 456.crdownload")
+        let completed = directory.appendingPathComponent("invoice.pdf")
+        try Data("download".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        try FileManager.default.moveItem(at: temporary, to: completed)
+        var finishedEntry = entry(url: temporary, agent: .chrome)
+        finishedEntry.fileIdentity = identity
+        var tracker = BrowserDownloadCompletionTracker()
+
+        tracker.record(
+            token: UUID(), entry: finishedEntry, succeeded: true,
+            at: Date(timeIntervalSince1970: 200)
+        )
+
+        #expect(tracker.resolve(
+            at: Date(timeIntervalSince1970: 200), directories: [directory], hasActiveAirDrop: false
+        )?.fileName == "invoice.pdf")
+    }
+
     @Test(arguments: ["crdownload", "download", "part", "opdownload"])
     func browserWaitsForTheFinalFileInsteadOfOpeningATemporaryDownload(_ suffix: String) throws {
         let directory = try temporaryDirectory()

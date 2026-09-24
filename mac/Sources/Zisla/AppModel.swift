@@ -289,7 +289,7 @@ enum BrowserDownloadQuickActionPresenter {
     isVoicePreparing: Bool,
     isIslandVisible: Bool
   ) -> Bool {
-    guard settings.clipboardAssistantEnabled,
+    guard settings.clipboardAssistantEnabled, settings.downloadCompletionFolderActionEnabled,
       !isVoiceRecording, !isVoicePreparing, !isIslandVisible else { return false }
     let detection = ClipboardAssistantDetection(
       kind: .file,
@@ -2013,19 +2013,34 @@ final class AppModel: ObservableObject {
     }
   }
 
-  /// Saves long copied text as a standalone file in the download directory and reveals it.
+  /// Saves long copied text as a standalone file and reveals it.
   private func saveAssistantText(_ text: String) {
-    let directory = downloadDirectory
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyyMMdd-HHmmss"
+    let name = "clipboard-\(formatter.string(from: Date())).txt"
+    let destination: URL
+    if settingsStore.settings.clipboardAssistantPromptsForImageSaveLocation {
+      let panel = NSSavePanel()
+      panel.directoryURL = downloadDirectory
+      panel.nameFieldStringValue = name
+      panel.allowedContentTypes = [.plainText]
+      panel.canCreateDirectories = true
+      panel.prompt = clipboardAssistantMessage("保存文本")
+      WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
+      guard panel.runModal() == .OK, let url = panel.url else { return }
+      destination = url
+    } else {
+      destination = downloadDirectory.appendingPathComponent(name)
+    }
+
+    let directory = destination.deletingLastPathComponent()
     let scopedAccess = directory.startAccessingSecurityScopedResource()
     defer { if scopedAccess { directory.stopAccessingSecurityScopedResource() } }
     do {
       try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-      let formatter = DateFormatter()
-      formatter.dateFormat = "yyyyMMdd-HHmmss"
-      let url = directory.appendingPathComponent("clipboard-\(formatter.string(from: Date())).txt")
-      try text.write(to: url, atomically: true, encoding: .utf8)
-      NSWorkspace.shared.activateFileViewerSelecting([url])
-      transientMessage = clipboardAssistantMessage("已保存到 %@", url.path)
+      try text.write(to: destination, atomically: true, encoding: .utf8)
+      NSWorkspace.shared.activateFileViewerSelecting([destination])
+      transientMessage = clipboardAssistantMessage("已保存到 %@", destination.path)
     } catch {
       transientMessage = clipboardAssistantMessage("操作失败：%@", error.localizedDescription)
     }

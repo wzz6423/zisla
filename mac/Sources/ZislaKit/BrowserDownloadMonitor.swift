@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Darwin
 import Foundation
 import ZislaCore
 
@@ -9,7 +10,7 @@ public extension FeatureSettings {
     }
 
     var observesBrowserDownloads: Bool {
-        showsBrowserDownloadProgress || clipboardAssistantEnabled
+        showsBrowserDownloadProgress || (clipboardAssistantEnabled && downloadCompletionFolderActionEnabled)
     }
 }
 
@@ -241,10 +242,25 @@ enum AirDropBatchParser {
     }
 }
 
+struct BrowserDownloadFileIdentity: Equatable, Sendable {
+    let device: dev_t
+    let inode: ino_t
+
+    init?(url: URL) {
+        guard url.isFileURL else { return nil }
+        var metadata = stat()
+        guard lstat(url.path, &metadata) == 0,
+            (metadata.st_mode & S_IFMT) == S_IFREG else { return nil }
+        device = metadata.st_dev
+        inode = metadata.st_ino
+    }
+}
+
 /// State machine for download cards and the compact-island summary.
 struct BrowserDownloadTracker: Sendable {
     struct Entry: Sendable {
         var fileURL: URL?
+        var fileIdentity: BrowserDownloadFileIdentity? = nil
         var agent: BrowserDownloadAgent?
         var fileName: String
         var fraction: Double?
@@ -350,6 +366,10 @@ struct BrowserDownloadTracker: Sendable {
         if let fileName { entries[token]?.fileName = fileName }
     }
 
+    mutating func updateIdentity(token: UUID, identity: BrowserDownloadFileIdentity?) {
+        if let identity { entries[token]?.fileIdentity = identity }
+    }
+
     mutating func finish(token: UUID, succeeded: Bool) -> Bool {
         guard let entry = entries[token] else { return false }
         let batch = entry.agent == .airDrop
@@ -400,6 +420,7 @@ struct BrowserDownloadCompletionTracker {
     private struct Candidate {
         var token: UUID
         var sourceURL: URL
+        var fileIdentity: BrowserDownloadFileIdentity?
         var agent: BrowserDownloadAgent
         var fileName: String
         var airDropBatchID: UUID?
@@ -420,7 +441,9 @@ struct BrowserDownloadCompletionTracker {
         guard succeeded, let entry, let agent = entry.agent,
             let url = entry.fileURL, url.isFileURL else { return }
         candidates.append(Candidate(
-            token: token, sourceURL: url, agent: agent, fileName: entry.fileName,
+            token: token, sourceURL: url,
+            fileIdentity: entry.fileIdentity ?? BrowserDownloadFileIdentity(url: url),
+            agent: agent, fileName: entry.fileName,
             airDropBatchID: airDropBatchID,
             resolutionStartedAt: agent == .airDrop ? nil : date
         ))
@@ -475,9 +498,19 @@ struct BrowserDownloadCompletionTracker {
             && source.pathComponents.contains { $0.hasPrefix("NSIRD_") }
         if isAirDropStaging, fileManager.fileExists(atPath: source.path) { return nil }
         if !isAirDropStaging {
-            let finalURL = candidate.agent != .airDrop
+            let isBrowserTemporary = candidate.agent != .airDrop
                 && BrowserDownloadTempExtension(rawValue: source.pathExtension.lowercased()) != nil
-                ? source.deletingPathExtension() : source
+            if isBrowserTemporary, let identity = candidate.fileIdentity {
+                guard !fileManager.fileExists(atPath: source.path),
+                    let files = try? fileManager.contentsOfDirectory(
+                        at: source.deletingLastPathComponent(), includingPropertiesForKeys: nil
+                    ) else { return nil }
+                return files.first {
+                    BrowserDownloadTempExtension(rawValue: $0.pathExtension.lowercased()) == nil
+                        && BrowserDownloadFileIdentity(url: $0) == identity
+                }
+            }
+            let finalURL = isBrowserTemporary ? source.deletingPathExtension() : source
             if fileManager.fileExists(atPath: finalURL.path) { return finalURL }
         }
         guard candidate.agent == .airDrop,
@@ -614,6 +647,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
         let publishedFraction = Self.fraction(of: progress)
         let entry = BrowserDownloadTracker.Entry(
             fileURL: fileURL,
+            fileIdentity: box.publishedFileIdentity ?? fileURL.flatMap(BrowserDownloadFileIdentity.init),
             agent: agent,
             fileName: fileURL.map(BrowserDownloadAgentResolver.displayFileName) ?? "下载",
             fraction: publishedFraction,
@@ -710,6 +744,10 @@ public final class BrowserDownloadMonitor: ObservableObject {
                     fileURL: currentFileURL,
                     fileName: BrowserDownloadAgentResolver.displayFileName(for: currentFileURL)
                 )
+            }
+            if tracker.entries[token]?.fileIdentity == nil,
+                let fileURL = tracker.entries[token]?.fileURL {
+                tracker.updateIdentity(token: token, identity: BrowserDownloadFileIdentity(url: fileURL))
             }
             // The temp file may appear on disk after progress is published; keep retrying while the source is unresolved.
             if tracker.entries[token]?.agent == nil,
@@ -838,11 +876,13 @@ public final class BrowserDownloadMonitor: ObservableObject {
 private final class ProgressBox: @unchecked Sendable {
     let progress: Progress
     let publishedFileURL: URL?
+    let publishedFileIdentity: BrowserDownloadFileIdentity?
     let publishedFileOperationKind: Progress.FileOperationKind?
 
     init(_ progress: Progress) {
         self.progress = progress
         publishedFileURL = progress.fileURL ?? progress.userInfo[.fileURLKey] as? URL
+        publishedFileIdentity = publishedFileURL.flatMap(BrowserDownloadFileIdentity.init)
         publishedFileOperationKind = progress.fileOperationKind
     }
 }

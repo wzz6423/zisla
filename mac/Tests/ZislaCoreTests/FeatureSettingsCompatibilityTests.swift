@@ -4,6 +4,19 @@ import Testing
 
 struct FeatureSettingsCompatibilityTests {
     @Test
+    func downloadFolderActionDefaultsOnAndOptOutSurvivesRestart() throws {
+        let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8))
+        #expect(legacy.downloadCompletionFolderActionEnabled)
+
+        var configured = legacy
+        configured.downloadCompletionFolderActionEnabled = false
+        let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(configured))
+        #expect(!restored.downloadCompletionFolderActionEnabled)
+        #expect(restored.clipboardAssistantEnabled)
+        #expect(restored.browserDownloadIslandEnabled)
+    }
+
+    @Test
     func recommendationSettingsKeepLegacyVisibilityAndRequireUpdateOptIn() throws {
         let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8))
         #expect(legacy.recommendedToolsEnabled)

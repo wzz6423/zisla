@@ -594,10 +594,17 @@ struct SettingsView: View {
                     }
                     rowDivider
                     featureToggle(
-                        AppLocalization.text("每次保存图片时选择位置"),
+                        AppLocalization.text("每次保存文件时选择位置"),
                         detail: "关闭时保存到“下载”中的默认下载目录",
                         symbol: "folder",
                         keyPath: \.clipboardAssistantPromptsForImageSaveLocation
+                    )
+                    rowDivider
+                    featureToggle(
+                        AppLocalization.text("下载与 AirDrop 完成提示"),
+                        detail: "完成后显示“打开文件夹”快捷操作",
+                        symbol: "folder.badge.plus",
+                        keyPath: \.downloadCompletionFolderActionEnabled
                     )
                     rowDivider
                     settingRow(
