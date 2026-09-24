@@ -87,8 +87,8 @@ struct WindowPreviewCaptureTests {
         #expect(small.ignoreShadowsSingleWindow)
 
         let large = WindowPreviewCapture.configuration(for: CGRect(x: 0, y: 0, width: 1600, height: 900))
-        #expect(large.width == 420)
-        #expect(large.height == 236)
+        #expect(large.width == 840)
+        #expect(large.height == 472)
     }
 
     @Test
@@ -98,14 +98,85 @@ struct WindowPreviewCaptureTests {
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ))
+        context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 400, height: 100))
         let capturedImage = try #require(context.makeImage())
-        let image = WindowPreviewCapture.image(from: capturedImage)
+        let image = try #require(WindowPreviewCapture.image(from: capturedImage))
 
         #expect(image.size == CGSize(width: 400, height: 100))
+    }
+
+    @Test
+    func transparentCaptureMarginsAreCroppedWithoutHidingOpaqueBlackContent() throws {
+        let context = try #require(CGContext(
+            data: nil, width: 100, height: 60, bitsPerComponent: 8, bytesPerRow: 400,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 20, y: 15, width: 60, height: 30))
+        let capture = try #require(context.makeImage())
+        let image = try #require(WindowPreviewCapture.image(from: capture))
+
+        #expect(image.size == CGSize(width: 60, height: 30))
+    }
+
+    @Test
+    func fullyTransparentCaptureHasNoPreviewImage() throws {
+        let context = try #require(CGContext(
+            data: nil, width: 100, height: 60, bitsPerComponent: 8, bytesPerRow: 400,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        let capture = try #require(context.makeImage())
+
+        #expect(WindowPreviewCapture.image(from: capture) == nil)
     }
 }
 
 struct WindowPreviewWindowMatchTests {
+    @Test
+    func onlyManageableWindowsBecomePreviewCandidatesAcrossSpaces() {
+        let chromeWindow = CGRect(x: 1512, y: 111, width: 1920, height: 969)
+        let chromeStrip = CGRect(x: 0, y: 30, width: 1920, height: 81)
+        let weChatWindow = CGRect(x: 204, y: 150, width: 1104, height: 650)
+        let weChatGhost = CGRect(x: 406, y: 161, width: 700, height: 640)
+        let fullScreenChatGPT = CGRect(x: 0, y: 33, width: 1512, height: 949)
+
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: chromeWindow, isOnScreen: true, accessibleWindows: [chromeWindow, chromeStrip]
+        ))
+        #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: chromeStrip, isOnScreen: true, accessibleWindows: [chromeWindow, chromeStrip]
+        ))
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: weChatWindow, isOnScreen: false, accessibleWindows: [weChatWindow]
+        ))
+        #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: weChatGhost, isOnScreen: false, accessibleWindows: [weChatWindow]
+        ))
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: fullScreenChatGPT, isOnScreen: false, accessibleWindows: [fullScreenChatGPT]
+        ))
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: fullScreenChatGPT.offsetBy(dx: 3, dy: -2),
+            isOnScreen: false, accessibleWindows: [fullScreenChatGPT]
+        ))
+        #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: fullScreenChatGPT.offsetBy(dx: 30, dy: 0),
+            isOnScreen: false, accessibleWindows: [fullScreenChatGPT]
+        ))
+        #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: weChatGhost, isOnScreen: false, accessibleWindows: nil
+        ))
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: fullScreenChatGPT, isOnScreen: true, accessibleWindows: []
+        ))
+        #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: chromeStrip, isOnScreen: true, accessibleWindows: []
+        ))
+    }
+
     @Test
     func currentWindowMetadataTracksRenamedAndMovedWindows() throws {
         let info: [[String: Any]] = [[

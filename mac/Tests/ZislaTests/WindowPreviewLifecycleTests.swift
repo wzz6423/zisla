@@ -261,31 +261,12 @@ struct WindowPreviewLifecycleTests {
     }
 
     @Test
-    func transparentCapturesAreExcludedWithoutDroppingOpaqueBlackWindows() async {
-        let system = PreviewSystem()
-        var dependencies = system.dependencies()
-        dependencies.captureWindows = { _ in [
-            PreviewSystem.snapshot(11, alpha: 0),
-            PreviewSystem.snapshot(12, alpha: 1),
-            PreviewSystem.snapshot(13, alpha: 0.1),
-        ] }
-        let controller = WindowPreviewController(dependencies: dependencies)
-        defer { controller.stop() }
-        controller.configure(enabled: true)
-        controller.select(PreviewSystem.selection(1, source: .dock))
-        await controller.captureTask?.value
-
-        #expect(controller.windows.map(\.id) == [12, 13])
-        #expect(system.presentations.last == [12, 13])
-    }
-
-    @Test
-    func failedAndTransparentCapturesLeaveNoBlankCards() async {
+    func verifiedWindowRemainsAvailableWhenItsCaptureTemporarilyFails() async {
         let system = PreviewSystem()
         var dependencies = system.dependencies()
         dependencies.captureWindows = { _ in [
             PreviewSystem.snapshot(11, alpha: nil),
-            PreviewSystem.snapshot(12, alpha: 0),
+            PreviewSystem.snapshot(12, alpha: 1),
         ] }
         let controller = WindowPreviewController(dependencies: dependencies)
         defer { controller.stop() }
@@ -293,7 +274,29 @@ struct WindowPreviewLifecycleTests {
         controller.select(PreviewSystem.selection(1, source: .dock))
         await controller.captureTask?.value
 
-        #expect(controller.windows.isEmpty)
+        #expect(controller.windows.map(\.id) == [11, 12])
+        #expect(controller.windows.first?.image == nil)
+        #expect(system.presentations.last == [11, 12])
+    }
+
+    @Test
+    func verifiedFullScreenWindowKeepsACardWhenItsImageIsUnavailable() async {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { _ in [
+            WindowPreviewSnapshot(
+                id: 11, title: "ChatGPT", frame: CGRect(x: 0, y: 0, width: 1512, height: 949), image: nil
+            ),
+        ] }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+
+        #expect(controller.windows.map(\.id) == [11])
+        #expect(controller.windows.first?.image == nil)
+        #expect(system.presentations.last == [11])
     }
 
     @Test

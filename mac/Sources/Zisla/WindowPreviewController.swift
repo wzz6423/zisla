@@ -67,7 +67,7 @@ struct WindowPreviewLayout {
 enum WindowPreviewCapture {
     static func configuration(for frame: CGRect) -> SCStreamConfiguration {
         let configuration = SCStreamConfiguration()
-        let scale = min(420 / frame.width, 260 / frame.height, 2)
+        let scale = min(840 / frame.width, 520 / frame.height, 2)
         configuration.width = max(1, Int(frame.width * scale))
         configuration.height = max(1, Int(frame.height * scale))
         configuration.captureResolution = .best
@@ -76,8 +76,37 @@ enum WindowPreviewCapture {
         return configuration
     }
 
-    static func image(from capture: CGImage) -> NSImage {
-        NSImage(cgImage: capture, size: .zero)
+    static func image(from capture: CGImage) -> NSImage? {
+        let bytesPerRow = capture.width * 4
+        var pixels = [UInt8](repeating: 0, count: bytesPerRow * capture.height)
+        guard let context = CGContext(
+            data: &pixels,
+            width: capture.width,
+            height: capture.height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        context.draw(capture, in: CGRect(x: 0, y: 0, width: capture.width, height: capture.height))
+        var minX = capture.width
+        var minY = capture.height
+        var maxX = -1
+        var maxY = -1
+        for y in 0..<capture.height {
+            for x in 0..<capture.width where pixels[y * bytesPerRow + x * 4 + 3] != 0 {
+                minX = min(minX, x)
+                minY = min(minY, y)
+                maxX = max(maxX, x)
+                maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= minX, maxY >= minY,
+              let rendered = context.makeImage(),
+              let cropped = rendered.cropping(to: CGRect(
+                  x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1
+              )) else { return nil }
+        return NSImage(cgImage: cropped, size: .zero)
     }
 }
 
@@ -94,26 +123,20 @@ struct WindowPreviewSnapshot: Identifiable {
     let title: String
     let frame: CGRect
     let image: NSImage?
-
-    var hasVisiblePixels: Bool {
-        guard let cgImage = image?.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
-        let bytesPerRow = cgImage.width * 4
-        var pixels = [UInt8](repeating: 0, count: bytesPerRow * cgImage.height)
-        guard let context = CGContext(
-            data: &pixels,
-            width: cgImage.width,
-            height: cgImage.height,
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return false }
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
-        return stride(from: 3, to: pixels.count, by: 4).contains { pixels[$0] != 0 }
-    }
 }
 
 struct WindowPreviewWindowMatch {
+    static func isPreviewCandidate(frame: CGRect, isOnScreen: Bool, accessibleWindows: [CGRect]?) -> Bool {
+        // Browsers expose toolbar surfaces as layer-zero windows with extreme aspect ratios.
+        guard frame.width <= frame.height * 6, frame.height <= frame.width * 6 else { return false }
+        // Accessibility window lists can be briefly empty while Spaces are switching.
+        guard let accessibleWindows, !accessibleWindows.isEmpty else { return isOnScreen }
+        return accessibleWindows.contains {
+            abs($0.minX - frame.minX) <= 8 && abs($0.minY - frame.minY) <= 8
+                && abs($0.width - frame.width) <= 8 && abs($0.height - frame.height) <= 8
+        }
+    }
+
     static func currentTarget(
         windowID: CGWindowID,
         processIdentifier: pid_t,
@@ -422,7 +445,7 @@ final class WindowPreviewController: ObservableObject {
                     self.stopMonitoring()
                     return
                 }
-                self.windows = snapshots.filter(\.hasVisiblePixels)
+                self.windows = snapshots
                 self.dependencies.present(self, self.selection)
             } catch {
                 guard !Task.isCancelled, let self, self.generation == currentGeneration else { return }
@@ -439,9 +462,18 @@ final class WindowPreviewController: ObservableObject {
     private static func captureWindows(processIdentifier: pid_t) async throws -> [WindowPreviewSnapshot] {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         try Task.checkCancellation()
+        let axWindows = Self.attribute(
+            kAXWindowsAttribute, from: AXUIElementCreateApplication(processIdentifier)
+        ) as? [AXUIElement]
+        let accessibleFrames = axWindows?.compactMap { Self.frame(of: $0) }
+        let mainScreenTop = NSScreen.screens.first?.frame.maxY ?? 0
         let candidates = content.windows.filter {
-            $0.owningApplication?.processID == processIdentifier && $0.windowLayer == 0
-                && $0.frame.width >= 80 && $0.frame.height >= 50
+            guard $0.owningApplication?.processID == processIdentifier && $0.windowLayer == 0
+                    && $0.frame.width >= 80 && $0.frame.height >= 50 else { return false }
+            let frame = WindowPreviewLayout.appKitFrame(for: $0.frame, mainScreenTop: mainScreenTop)
+            return WindowPreviewWindowMatch.isPreviewCandidate(
+                frame: frame, isOnScreen: $0.isOnScreen, accessibleWindows: accessibleFrames
+            )
         }
         var snapshots: [WindowPreviewSnapshot] = []
         for window in candidates {
@@ -455,9 +487,9 @@ final class WindowPreviewController: ObservableObject {
                 title: window.title ?? "",
                 frame: WindowPreviewLayout.appKitFrame(
                     for: window.frame,
-                    mainScreenTop: NSScreen.screens.first?.frame.maxY ?? 0
+                    mainScreenTop: mainScreenTop
                 ),
-                image: image.map(WindowPreviewCapture.image(from:))
+                image: image.flatMap(WindowPreviewCapture.image(from:))
             ))
         }
         return snapshots
