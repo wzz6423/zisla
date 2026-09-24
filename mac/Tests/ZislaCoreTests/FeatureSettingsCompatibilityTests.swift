@@ -3,6 +3,16 @@ import Testing
 @testable import ZislaCore
 
 struct FeatureSettingsCompatibilityTests {
+    private static let previousScreenshotToolHotkeys: [String: VoiceInputHotkeyPreset] = [
+        "rectangle": .init(keyCode: 23, carbonModifiers: 0x1000, keyDisplayName: "5"),
+        "ellipse": .init(keyCode: 22, carbonModifiers: 0x1000, keyDisplayName: "6"),
+        "brush": .init(keyCode: 26, carbonModifiers: 0x1000, keyDisplayName: "7"),
+        "arrow": .init(keyCode: 28, carbonModifiers: 0x1000, keyDisplayName: "8"),
+        "number": .init(keyCode: 25, carbonModifiers: 0x1000, keyDisplayName: "9"),
+        "text": .init(keyCode: 29, carbonModifiers: 0x1000, keyDisplayName: "0"),
+        "mosaic": .init(keyCode: 22, carbonModifiers: 0x1200, keyDisplayName: "6"),
+    ]
+
     @Test
     func recommendationSettingsKeepLegacyVisibilityAndRequireUpdateOptIn() throws {
         let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8))
@@ -1233,7 +1243,7 @@ struct FeatureSettingsCompatibilityTests {
         #expect(decoded.screenshotLongHotkey.keyCode == 20)
         #expect(decoded.screenshotLongHotkey.carbonModifiers == 0x1000)
         #expect(decoded.screenshotToolHotkeys == ScreenshotHotkeyDefaults.tools)
-        #expect(decoded.screenshotToolHotkeys.count == 8)
+        #expect(decoded.screenshotToolHotkeys.count == 7)
     }
 
     @Test
@@ -1302,21 +1312,98 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
+    func screenshotToolSettingsDiscardRemovedStoredTool() throws {
+        var legacy = FeatureSettings.default
+        let custom = VoiceInputHotkeyPreset(
+            keyCode: 15,
+            carbonModifiers: 0x0100,
+            keyDisplayName: "R"
+        )
+        legacy.screenshotToolHotkeys["rectangle"] = custom
+        legacy.screenshotToolHotkeys["emoji"] = VoiceInputHotkeyPreset(
+            keyCode: 23,
+            carbonModifiers: 0x1200,
+            keyDisplayName: "5"
+        )
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(legacy)
+        )
+        #expect(decoded.screenshotToolHotkeys["emoji"] == nil)
+        #expect(decoded.screenshotToolHotkeys["rectangle"] == custom)
+
+        let stored = try #require(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(decoded)
+        ) as? [String: Any])
+        let toolHotkeys = try #require(stored["screenshotToolHotkeys"] as? [String: Any])
+        #expect(toolHotkeys["emoji"] == nil)
+
+        let initialized = FeatureSettings(screenshotToolHotkeys: legacy.screenshotToolHotkeys)
+        #expect(initialized.screenshotToolHotkeys["emoji"] == nil)
+        #expect(initialized.screenshotToolHotkeys["rectangle"] == custom)
+    }
+
+    @Test
+    func screenshotToolOldDefaultsMigrateAfterRemovedToolIsFiltered() throws {
+        var legacy = FeatureSettings.default
+        legacy.screenshotToolHotkeys = Self.previousScreenshotToolHotkeys
+        legacy.screenshotToolHotkeys["emoji"] = VoiceInputHotkeyPreset(
+            keyCode: 23,
+            carbonModifiers: 0x1200,
+            keyDisplayName: "5"
+        )
+        let data = try JSONEncoder().encode(legacy)
+
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: data)
+
+        #expect(decoded.screenshotToolHotkeys == ScreenshotHotkeyDefaults.tools)
+        #expect(decoded.screenshotToolHotkeys["rectangle"]?.keyCode == 21)
+        #expect(decoded.screenshotHotkey == legacy.screenshotHotkey)
+        #expect(decoded.screenshotPinHotkey == legacy.screenshotPinHotkey)
+        #expect(decoded.screenshotLongHotkey == legacy.screenshotLongHotkey)
+        let restarted = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(decoded)
+        )
+        #expect(restarted.screenshotToolHotkeys == ScreenshotHotkeyDefaults.tools)
+    }
+
+    @Test
+    func screenshotToolOldDefaultsWithOneCustomKeyRemainUnchanged() throws {
+        var legacy = FeatureSettings.default
+        legacy.screenshotToolHotkeys = Self.previousScreenshotToolHotkeys
+        legacy.screenshotToolHotkeys["rectangle"] = VoiceInputHotkeyPreset(
+            keyCode: 15,
+            carbonModifiers: 0x0100,
+            keyDisplayName: "R"
+        )
+
+        let decoded = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: JSONEncoder().encode(legacy)
+        )
+
+        #expect(decoded.screenshotToolHotkeys == legacy.screenshotToolHotkeys)
+    }
+
+    @Test
     func screenshotToolDefaultsFollowControlNumberSequence() {
-        let expected: [(String, UInt32, UInt32)] = [
-            ("rectangle", 23, 0x1000),
-            ("ellipse", 22, 0x1000),
-            ("brush", 26, 0x1000),
-            ("arrow", 28, 0x1000),
-            ("number", 25, 0x1000),
-            ("text", 29, 0x1000),
-            ("emoji", 23, 0x1000 | 0x0200),
-            ("mosaic", 22, 0x1000 | 0x0200),
+        let expected: [(String, UInt32, String)] = [
+            ("rectangle", 21, "4"),
+            ("ellipse", 23, "5"),
+            ("brush", 22, "6"),
+            ("arrow", 26, "7"),
+            ("number", 28, "8"),
+            ("text", 25, "9"),
+            ("mosaic", 29, "0"),
         ]
-        for (tool, keyCode, modifiers) in expected {
+        #expect(ScreenshotHotkeyDefaults.tools.count == expected.count)
+        for (tool, keyCode, displayName) in expected {
             let hotkey = ScreenshotHotkeyDefaults.tools[tool]
             #expect(hotkey?.keyCode == keyCode, "Wrong key for \(tool)")
-            #expect(hotkey?.carbonModifiers == modifiers, "Wrong modifiers for \(tool)")
+            #expect(hotkey?.carbonModifiers == 0x1000, "Wrong modifiers for \(tool)")
+            #expect(hotkey?.keyDisplayName == displayName, "Wrong display name for \(tool)")
         }
     }
 

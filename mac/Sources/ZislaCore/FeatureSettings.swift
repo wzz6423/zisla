@@ -402,13 +402,21 @@ public enum ScreenshotHotkeyDefaults {
         keyDisplayName: "3"
     )
     public static let tools: [String: VoiceInputHotkeyPreset] = [
+        "rectangle": .init(keyCode: 21, carbonModifiers: 0x1000, keyDisplayName: "4"),
+        "ellipse": .init(keyCode: 23, carbonModifiers: 0x1000, keyDisplayName: "5"),
+        "brush": .init(keyCode: 22, carbonModifiers: 0x1000, keyDisplayName: "6"),
+        "arrow": .init(keyCode: 26, carbonModifiers: 0x1000, keyDisplayName: "7"),
+        "number": .init(keyCode: 28, carbonModifiers: 0x1000, keyDisplayName: "8"),
+        "text": .init(keyCode: 25, carbonModifiers: 0x1000, keyDisplayName: "9"),
+        "mosaic": .init(keyCode: 29, carbonModifiers: 0x1000, keyDisplayName: "0"),
+    ]
+    static let previousTools: [String: VoiceInputHotkeyPreset] = [
         "rectangle": .init(keyCode: 23, carbonModifiers: 0x1000, keyDisplayName: "5"),
         "ellipse": .init(keyCode: 22, carbonModifiers: 0x1000, keyDisplayName: "6"),
         "brush": .init(keyCode: 26, carbonModifiers: 0x1000, keyDisplayName: "7"),
         "arrow": .init(keyCode: 28, carbonModifiers: 0x1000, keyDisplayName: "8"),
         "number": .init(keyCode: 25, carbonModifiers: 0x1000, keyDisplayName: "9"),
         "text": .init(keyCode: 29, carbonModifiers: 0x1000, keyDisplayName: "0"),
-        "emoji": .init(keyCode: 23, carbonModifiers: 0x1200, keyDisplayName: "5"),
         "mosaic": .init(keyCode: 22, carbonModifiers: 0x1200, keyDisplayName: "6"),
     ]
 }
@@ -650,7 +658,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var screenshotHotkey: VoiceInputHotkeyPreset
     /// Global hotkey for toggling screenshot pin state.
     public var screenshotPinHotkey: VoiceInputHotkeyPreset
-    /// Opens screenshot selection; scrolling capture still starts from the editor toolbar.
+    /// Opens screenshot selection and starts manual scrolling capture after a region is selected.
     public var screenshotLongHotkey: VoiceInputHotkeyPreset
     /// Shortcuts that select annotation tools while the screenshot editor is active.
     public var screenshotToolHotkeys: [String: VoiceInputHotkeyPreset]
@@ -857,7 +865,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.screenshotHotkey = screenshotHotkey
         self.screenshotPinHotkey = screenshotPinHotkey
         self.screenshotLongHotkey = screenshotLongHotkey
-        self.screenshotToolHotkeys = screenshotToolHotkeys
+        self.screenshotToolHotkeys = screenshotToolHotkeys.filter { ScreenshotHotkeyDefaults.tools[$0.key] != nil }
         self.screenshotPinnedToolbarVisible = screenshotPinnedToolbarVisible
         self.keyboardEnabled = keyboardEnabled
         self.keyboardSelectedProfileID = keyboardSelectedProfileID
@@ -1260,10 +1268,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             VoiceInputHotkeyPreset.self,
             forKey: .screenshotLongHotkey
         ) ?? defaults.screenshotLongHotkey
-        screenshotToolHotkeys = try container.decodeIfPresent(
+        screenshotToolHotkeys = try (container.decodeIfPresent(
             [String: VoiceInputHotkeyPreset].self,
             forKey: .screenshotToolHotkeys
-        ) ?? defaults.screenshotToolHotkeys
+        ) ?? defaults.screenshotToolHotkeys).filter { ScreenshotHotkeyDefaults.tools[$0.key] != nil }
+        if screenshotToolHotkeys == ScreenshotHotkeyDefaults.previousTools {
+            screenshotToolHotkeys = ScreenshotHotkeyDefaults.tools
+        }
         screenshotPinnedToolbarVisible = try container.decodeIfPresent(
             Bool.self,
             forKey: .screenshotPinnedToolbarVisible

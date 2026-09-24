@@ -442,7 +442,6 @@ struct ScreenshotEditorTests {
             (.brush, .brush),
             (.arrow, .arrow),
             (.number, .number),
-            (.emoji, .emoji),
         ]
         for (tool, expectedKind) in tools {
             let previousCount = model.annotations.count
@@ -607,15 +606,15 @@ struct ScreenshotEditorTests {
         var undoCount = 0
         window.onToolHotkey = { keyCode, modifiers in
             selectedKeys.append((keyCode, modifiers))
-            return keyCode == UInt32(kVK_ANSI_5) && modifiers == UInt32(controlKey)
+            return keyCode == UInt32(kVK_ANSI_4) && modifiers == UInt32(controlKey)
         }
         window.onUndo = { undoCount += 1 }
 
         let tool = try #require(keyEvent(
-            keyCode: UInt16(kVK_ANSI_5), characters: "5", modifiers: [.control]
+            keyCode: UInt16(kVK_ANSI_4), characters: "4", modifiers: [.control]
         ))
         let unrelated = try #require(keyEvent(
-            keyCode: UInt16(kVK_ANSI_6), characters: "6", modifiers: [.control]
+            keyCode: UInt16(kVK_ANSI_4), characters: "4", modifiers: [.control, .shift]
         ))
         let undo = try #require(keyEvent(
             keyCode: UInt16(kVK_ANSI_Z), characters: "z", modifiers: [.command]
@@ -623,7 +622,7 @@ struct ScreenshotEditorTests {
 
         #expect(window.performKeyEquivalent(with: tool))
         #expect(selectedKeys.count == 1)
-        #expect(selectedKeys.first?.0 == UInt32(kVK_ANSI_5))
+        #expect(selectedKeys.first?.0 == UInt32(kVK_ANSI_4))
         #expect(selectedKeys.first?.1 == UInt32(controlKey))
         #expect(!window.performKeyEquivalent(with: unrelated))
         #expect(selectedKeys.count == 2)
@@ -654,12 +653,11 @@ struct ScreenshotEditorTests {
 
         for tool in ScreenshotTool.allCases {
             let hotkey = try #require(ScreenshotHotkeyDefaults.tools[tool.rawValue])
-            let modifiers: NSEvent.ModifierFlags = hotkey.carbonModifiers == 0x1200
-                ? [.control, .shift] : [.control]
+            #expect(hotkey.carbonModifiers == UInt32(controlKey))
             let event = try #require(NSEvent.keyEvent(
                 with: .keyDown,
                 location: .zero,
-                modifierFlags: modifiers,
+                modifierFlags: [.control],
                 timestamp: 0,
                 windowNumber: window.windowNumber,
                 context: nil,
@@ -671,6 +669,11 @@ struct ScreenshotEditorTests {
             window.sendEvent(event)
         }
 
+        #expect(selected == ScreenshotTool.allCases)
+        let retired = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_6), characters: "6", modifiers: [.control, .shift]
+        ))
+        #expect(!window.performKeyEquivalent(with: retired))
         #expect(selected == ScreenshotTool.allCases)
     }
 
@@ -781,17 +784,17 @@ struct ScreenshotEditorTests {
     func screenshotToolShortcutsFollowSavedSettingsAndIgnoreUnassignedKeys() {
         var hotkeys = ScreenshotHotkeyDefaults.tools
         #expect(ScreenshotTool.matchingShortcut(
-            keyCode: UInt32(kVK_ANSI_5),
+            keyCode: UInt32(kVK_ANSI_4),
             modifiers: UInt32(controlKey),
             hotkeys: hotkeys
         ) == .rectangle)
         #expect(ScreenshotTool.matchingShortcut(
-            keyCode: UInt32(kVK_ANSI_5),
+            keyCode: UInt32(kVK_ANSI_4),
             modifiers: UInt32(controlKey | shiftKey),
             hotkeys: hotkeys
-        ) == .emoji)
+        ) == nil)
         #expect(ScreenshotTool.matchingShortcut(
-            keyCode: UInt32(kVK_ANSI_5),
+            keyCode: UInt32(kVK_ANSI_4),
             modifiers: UInt32(optionKey),
             hotkeys: hotkeys
         ) == nil)
@@ -802,7 +805,7 @@ struct ScreenshotEditorTests {
             keyDisplayName: "R"
         )
         #expect(ScreenshotTool.matchingShortcut(
-            keyCode: UInt32(kVK_ANSI_5),
+            keyCode: UInt32(kVK_ANSI_4),
             modifiers: UInt32(controlKey),
             hotkeys: hotkeys
         ) == nil)
@@ -815,6 +818,17 @@ struct ScreenshotEditorTests {
             keyCode: UInt32(kVK_ANSI_R),
             modifiers: UInt32(optionKey),
             hotkeys: [:]
+        ) == nil)
+
+        hotkeys["emoji"] = VoiceInputHotkeyPreset(
+            keyCode: UInt32(kVK_ANSI_5),
+            carbonModifiers: UInt32(controlKey | shiftKey),
+            keyDisplayName: "5"
+        )
+        #expect(ScreenshotTool.matchingShortcut(
+            keyCode: UInt32(kVK_ANSI_5),
+            modifiers: UInt32(controlKey | shiftKey),
+            hotkeys: hotkeys
         ) == nil)
     }
 
@@ -890,7 +904,7 @@ struct ScreenshotEditorTests {
             .deletingLastPathComponent()
             .appendingPathComponent("Resources/Localization")
         let keys = ["工具", "长截图", "%@快捷键与%@冲突，请修改其中一个"]
-            + ScreenshotTool.allCases.map(\.title).filter { $0 != "Emoji" }
+            + ScreenshotTool.allCases.map(\.title)
 
         #expect(AppLanguage.allCases.count == 17)
         for language in AppLanguage.allCases {
@@ -1039,18 +1053,15 @@ struct ScreenshotEditorTests {
         let rectangle = ScreenshotAnnotation(kind: .rectangle, rect: CGRect(x: 10, y: 10, width: 40, height: 40))
         let ellipse = ScreenshotAnnotation(kind: .ellipse, rect: CGRect(x: 60, y: 10, width: 40, height: 40))
         let text = ScreenshotAnnotation(kind: .text, points: [CGPoint(x: 20, y: 80)], text: "文字")
-        let emoji = ScreenshotAnnotation(kind: .emoji, points: [CGPoint(x: 80, y: 80)], text: "⭐️")
-        [rectangle, ellipse, text, emoji].forEach { model.add($0) }
+        [rectangle, ellipse, text].forEach { model.add($0) }
 
         model.applySelectedStyle(to: rectangle.id, lineWidth: 8)
         model.applySelectedStyle(to: ellipse.id, lineWidth: 6)
         model.applySelectedStyle(to: text.id, fontSize: 32)
-        model.applySelectedStyle(to: emoji.id, fontSize: 40)
 
         #expect(model.annotations.first(where: { $0.id == rectangle.id })?.lineWidth == 8)
         #expect(model.annotations.first(where: { $0.id == ellipse.id })?.lineWidth == 6)
         #expect(model.annotations.first(where: { $0.id == text.id })?.fontSize == 32)
-        #expect(model.annotations.first(where: { $0.id == emoji.id })?.fontSize == 40)
     }
 
     @Test
@@ -3359,24 +3370,6 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func pinnedRenderCommitsPendingEmojiDraft() throws {
-        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
-        let model = ScreenshotEditorModel(image: sourceImage)
-        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
-            kind: .emoji,
-            points: [CGPoint(x: 50, y: 60)],
-            text: "⭐️",
-            fontSize: ScreenshotAnnotationGeometry.defaultEmojiDiameter
-        ))
-
-        _ = model.renderedImage()
-
-        #expect(model.pendingAnnotationDraft == nil)
-        #expect(model.annotations.first?.kind == .emoji)
-        #expect(model.annotations.first?.text == "⭐️")
-    }
-
-    @Test
     func imageExportCommitsPendingEditDraftWithoutDuplicatingAnnotation() throws {
         let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
         let model = ScreenshotEditorModel(image: sourceImage)
@@ -4309,87 +4302,6 @@ struct ScreenshotEditorTests {
               )
         else { return nil }
         return NSEvent(cgEvent: event)
-    }
-
-    @Test
-    func emojiAnnotationUsesCircularDefaultSize() {
-        let annotation = ScreenshotAnnotation(
-            kind: .emoji,
-            points: [CGPoint(x: 60, y: 40)],
-            text: "⭐️"
-        )
-
-        let bounds = ScreenshotAnnotationGeometry.bounds(for: annotation)
-
-        #expect(bounds.size == CGSize(width: 28, height: 28))
-    }
-
-    @Test
-    func emojiAnnotationMustNotRenderWhiteRectangleBackground() throws {
-        let sourceImage = try #require(makeGradientImage(width: 200, height: 150))
-        let model = ScreenshotEditorModel(image: sourceImage)
-        model.fontSize = 32
-
-        model.add(ScreenshotAnnotation(
-            kind: .emoji,
-            points: [CGPoint(x: 100, y: 75)],
-            text: "⭐️",
-            fontSize: 32
-        ))
-
-        let original = try #require(sourceImage.cgImage(forProposedRect: nil, context: nil, hints: nil))
-        let rendered = model.renderedImage()
-        let renderedCG = try #require(rendered.cgImage(forProposedRect: nil, context: nil, hints: nil))
-
-        let font = NSFont.systemFont(ofSize: 32, weight: .semibold)
-        let emojiTextSize = ("⭐️" as NSString).size(withAttributes: [.font: font])
-
-        let backgroundWidth = max(emojiTextSize.width + 8, 12)
-        let backgroundHeight = max(emojiTextSize.height + 4, 12)
-        let backgroundBounds = CGRect(
-            x: 100 - backgroundWidth / 2,
-            y: 75 - backgroundHeight / 2,
-            width: backgroundWidth,
-            height: backgroundHeight
-        )
-
-        let sampleOffset: CGFloat = 6
-        let cornerTestPoints = [
-            CGPoint(x: backgroundBounds.minX + sampleOffset, y: backgroundBounds.minY + sampleOffset),
-            CGPoint(x: backgroundBounds.maxX - sampleOffset, y: backgroundBounds.minY + sampleOffset),
-            CGPoint(x: backgroundBounds.minX + sampleOffset, y: backgroundBounds.maxY - sampleOffset),
-            CGPoint(x: backgroundBounds.maxX - sampleOffset, y: backgroundBounds.maxY - sampleOffset),
-        ]
-
-        var whiteBackgroundPixelCount = 0
-        for testPoint in cornerTestPoints {
-            let imageY = rendered.size.height - testPoint.y
-            let pixelX = Int((testPoint.x * CGFloat(renderedCG.width) / rendered.size.width).rounded())
-            let pixelY = Int((imageY * CGFloat(renderedCG.height) / rendered.size.height).rounded())
-            let clampedPoint = CGPoint(
-                x: min(max(pixelX, 0), renderedCG.width - 1),
-                y: min(max(pixelY, 0), renderedCG.height - 1)
-            )
-
-            guard let originalPixel = pixelColor(in: original, at: clampedPoint),
-                  let renderedPixel = pixelColor(in: renderedCG, at: clampedPoint)
-            else { continue }
-
-            let isWhiteBackground = renderedPixel.r > 220
-                && renderedPixel.g > 220
-                && renderedPixel.b > 220
-                && renderedPixel.a > 200
-            let changedFromOriginal = colorDistance(originalPixel, renderedPixel) > 50
-
-            if isWhiteBackground && changedFromOriginal {
-                whiteBackgroundPixelCount += 1
-            }
-        }
-
-        #expect(
-            whiteBackgroundPixelCount == 0,
-            "Emoji 标注不应渲染白色矩形背景（检测到 \(whiteBackgroundPixelCount)/\(cornerTestPoints.count) 个白色背景像素），当前与 text 共享背景渲染导致失败"
-        )
     }
 
     @Test

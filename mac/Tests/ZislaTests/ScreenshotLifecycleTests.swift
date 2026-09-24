@@ -300,6 +300,32 @@ struct ScreenshotLifecycleTests {
     }
 
     @Test
+    func editorActivatesApplicationBeforeRequestingKeyboardFocus() throws {
+        let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)
+        let present = try #require(source.range(of: "func present()"))
+        let willClose = try #require(source.range(
+            of: "func windowWillClose(_ notification: Notification)",
+            range: present.upperBound..<source.endIndex
+        ))
+        let presentation = source[present.lowerBound..<willClose.lowerBound]
+        let activate = try #require(presentation.range(of: "NSApp.activate(ignoringOtherApps: true)"))
+        let show = try #require(presentation.range(of: "showWindow(nil)"))
+        let makeKey = try #require(presentation.range(of: "window?.makeKeyAndOrderFront(nil)"))
+        #expect(show.lowerBound < activate.lowerBound)
+        #expect(activate.lowerBound < makeKey.lowerBound)
+
+        let restore = try #require(source.range(of: "private func restoreEditorPresentation()"))
+        let dismissOverlays = try #require(source.range(
+            of: "private func dismissLongCaptureOverlays()",
+            range: restore.upperBound..<source.endIndex
+        ))
+        let restoration = source[restore.lowerBound..<dismissOverlays.lowerBound]
+        let reactivate = try #require(restoration.range(of: "NSApp.activate(ignoringOtherApps: true)"))
+        let restoreKey = try #require(restoration.range(of: "window.makeKeyAndOrderFront(nil)"))
+        #expect(reactivate.lowerBound < restoreKey.lowerBound)
+    }
+
+    @Test
     func longCaptureDoesNotDependOnGlobalScrollMonitoring() throws {
         let source = try String(contentsOf: Self.editorSourceURL, encoding: .utf8)
         let captureNextScreen = try #require(source.range(of: "func captureNextScreen()"))
