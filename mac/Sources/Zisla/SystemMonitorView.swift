@@ -1038,6 +1038,7 @@ private struct SystemCleanupSheet: View {
                     : "exclamationmark.triangle.fill")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(result.failures.isEmpty ? Color.zislaSuccess : Color.zislaWarning)
+                    .help(result.failures.map { "\($0.url.path): \($0.message)" }.joined(separator: "\n"))
             }
 
             HStack {
@@ -1045,7 +1046,7 @@ private struct SystemCleanupSheet: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button(AppLocalization.text("取消"), action: onDismiss)
+                Button(AppLocalization.text(result == nil ? "取消" : "完成"), action: onDismiss)
                     .buttonStyle(.bordered)
                 Button(AppLocalization.text("移入废纸篓"), role: .destructive) {
                     guard !confirmationPresented, !isCleaning, !isScanning, !selectedURLs.isEmpty else { return }
@@ -1065,7 +1066,7 @@ private struct SystemCleanupSheet: View {
             titleVisibility: .visible
         ) {
             Button(AppLocalization.text("移入废纸篓"), role: .destructive) {
-                beginCleanupAndDismiss()
+                beginCleanup()
             }
         } message: {
             Text(
@@ -1242,7 +1243,7 @@ private struct SystemCleanupSheet: View {
         isScanning = false
     }
 
-    private func beginCleanupAndDismiss() {
+    private func beginCleanup() {
         guard !isCleaning else { return }
         let selectedCandidates = candidates.filter {
             selectedURLs.contains($0.url) && $0.isActionable
@@ -1254,14 +1255,20 @@ private struct SystemCleanupSheet: View {
 
         isCleaning = true
         confirmationPresented = false
+        result = nil
         selectedURLs = []
         cachedManualReviewCount = 0
-        onDismiss()
 
         let cleanupService = service
         let cleanupCompleted = onCleanupCompleted
         Task { @MainActor in
-            _ = await cleanupService.trashSelected(selectedCandidates)
+            let cleanupResult = await cleanupService.trashSelected(selectedCandidates)
+            let failedURLs = Set(cleanupResult.failures.map(\.url))
+            let movedURLs = Set(selectedCandidates.map(\.url)).subtracting(failedURLs)
+            candidates.removeAll { movedURLs.contains($0.url) }
+            groupedSections = makeGroupedSections(from: candidates)
+            result = cleanupResult
+            isCleaning = false
             cleanupCompleted?()
         }
     }

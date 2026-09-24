@@ -6,7 +6,7 @@ import ZislaCore
 
 @MainActor
 struct ManagedToolAutomaticUpdateTests {
-    @Test(arguments: [ManagedTool.fzf, .kaku])
+    @Test(arguments: [ManagedTool.fzf, .kaku, .openScreen])
     func updatesOnlyRegisteredPackagesWithoutInstallingOrTapping(_ tool: ManagedTool) async throws {
         let fixture = Fixture(tool: tool)
         let service = fixture.service()
