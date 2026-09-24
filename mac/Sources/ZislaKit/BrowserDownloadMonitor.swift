@@ -750,9 +750,6 @@ public final class BrowserDownloadMonitor: ObservableObject {
         guard isRunning, let identity = fileIdentity(forEventAt: fileURL, fileID: fileID) else { return }
         let directory = fileURL.deletingLastPathComponent().standardizedFileURL.resolvingSymlinksInPath()
         if BrowserDownloadTempExtension(rawValue: fileURL.pathExtension.lowercased()) != nil {
-            guard observedDownloads[identity] != nil || !directories.contains(where: {
-                $0.standardizedFileURL.resolvingSymlinksInPath() == directory
-            }) else { return }
             if removed && !renamed {
                 if let observed = observedDownloads[identity], observed.temporaryURL == fileURL {
                     observedDownloads.removeValue(forKey: identity)
@@ -785,7 +782,17 @@ public final class BrowserDownloadMonitor: ObservableObject {
                     runningBundleIdentifiers: runningBundleIdentifiers ?? Self.runningBundleIdentifiers()
                 ), agent != .airDrop else { return }
             subscribe(to: directory, callbackGeneration: lifecycle.generation)
-            let token = tracker.entries.first { $0.value.fileIdentity == identity }?.key ?? UUID()
+            let matchingProgress = progressDirectories.compactMap { token, progressDirectory -> UUID? in
+                guard progressDirectory == directory,
+                    let entry = tracker.entries[token], entry.agent != .airDrop,
+                    !observedDownloads.values.contains(where: { $0.token == token }),
+                    entry.fileIdentity == identity
+                        || (entry.fileIdentity == nil
+                            && (entry.fileURL == fileURL || entry.fileURL == fileURL.deletingPathExtension()))
+                else { return nil }
+                return token
+            }
+            let token = matchingProgress.count == 1 ? matchingProgress[0] : UUID()
             if tracker.entries[token] == nil {
                 tracker.insert(token: token, entry: BrowserDownloadTracker.Entry(
                     fileURL: fileURL,
@@ -795,6 +802,8 @@ public final class BrowserDownloadMonitor: ObservableObject {
                     fraction: nil,
                     startedAt: Date()
                 ))
+            } else {
+                tracker.updateIdentity(token: token, identity: identity)
             }
             observedDownloads[identity] = ObservedDownload(temporaryURL: fileURL, token: token)
             startTimerIfNeeded()
