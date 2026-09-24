@@ -10,6 +10,10 @@ enum WindowPreviewSource {
 }
 
 struct WindowPreviewLayout {
+    static func quartzPoint(for appKitPoint: CGPoint, mainScreenTop: CGFloat) -> CGPoint {
+        CGPoint(x: appKitPoint.x, y: mainScreenTop - appKitPoint.y)
+    }
+
     static func appKitFrame(for quartzFrame: CGRect, mainScreenTop: CGFloat) -> CGRect {
         CGRect(
             x: quartzFrame.minX,
@@ -464,17 +468,22 @@ final class WindowPreviewController: ObservableObject {
     }
 
     private static func dockSelectionAtPointer() -> WindowPreviewSelection? {
-        guard let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first,
-              let children = Self.attribute(
-                  kAXChildrenAttribute,
-                  from: AXUIElementCreateApplication(dock.processIdentifier)
-              ) as? [AXUIElement],
-              let list = children.first(where: { Self.attributeString(kAXRoleAttribute, from: $0) == kAXListRole }),
-              let selected = Self.attribute(kAXSelectedChildrenAttribute, from: list) as? [AXUIElement],
-              let item = selected.first,
+        guard let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first
+        else { return nil }
+        let pointer = NSEvent.mouseLocation
+        let quartzPoint = WindowPreviewLayout.quartzPoint(
+            for: pointer,
+            mainScreenTop: NSScreen.screens.first?.frame.maxY ?? 0
+        )
+        var hit: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(
+            AXUIElementCreateApplication(dock.processIdentifier),
+            Float(quartzPoint.x), Float(quartzPoint.y), &hit
+        ) == .success,
+              let item = hit,
               Self.attributeString(kAXSubroleAttribute, from: item) == "AXApplicationDockItem",
               let frame = Self.frame(of: item),
-              frame.insetBy(dx: -6, dy: -6).contains(NSEvent.mouseLocation) else { return nil }
+              frame.insetBy(dx: -6, dy: -6).contains(pointer) else { return nil }
         return selection(for: item, source: .dock, anchor: frame)
     }
 

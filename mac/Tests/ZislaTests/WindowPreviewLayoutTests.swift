@@ -16,6 +16,14 @@ struct WindowPreviewLayoutTests {
     }
 
     @Test
+    func dockHitTestingUsesQuartzPointerCoordinatesAcrossDisplays() {
+        #expect(WindowPreviewLayout.quartzPoint(for: CGPoint(x: 40, y: 50), mainScreenTop: 800)
+            == CGPoint(x: 40, y: 750))
+        #expect(WindowPreviewLayout.quartzPoint(for: CGPoint(x: -600, y: -100), mainScreenTop: 800)
+            == CGPoint(x: -600, y: 900))
+    }
+
+    @Test
     func bottomDockPreviewAppearsAboveItsIcon() {
         let icon = CGRect(x: 550, y: 5, width: 48, height: 48)
         let result = WindowPreviewLayout.frame(anchor: icon, size: panel, visibleFrame: screen, isSwitcher: false)
