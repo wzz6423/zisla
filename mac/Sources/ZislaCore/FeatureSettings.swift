@@ -595,6 +595,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Temporarily suppresses system notifications pushed by Zisla itself (Pomodoro, etc.).
     public var notificationsMuted: Bool
     public var hoverActivationEnabled: Bool
+    public var windowPreviewsEnabled: Bool
     public var activityNoticeDisplayDuration: ActivityNoticeDisplayDuration
     public var focusModeNoticeDisplayDuration: FocusModeNoticeDisplayDuration
     /// An empty set means activity notices appear on all currently connected displays.
@@ -705,6 +706,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         moduleOrder: [IslandModuleOrder] = IslandModuleOrder.defaultOrder,
         notificationsMuted: Bool = false,
         hoverActivationEnabled: Bool = true,
+        windowPreviewsEnabled: Bool = false,
         activityNoticeDisplayDuration: ActivityNoticeDisplayDuration = .threeSeconds,
         focusModeNoticeDisplayDuration: FocusModeNoticeDisplayDuration = .threeSeconds,
         activityNoticeDisplayIDs: Set<UInt32> = [],
@@ -811,6 +813,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.moduleOrder = IslandModuleOrder.normalized(moduleOrder)
         self.notificationsMuted = notificationsMuted
         self.hoverActivationEnabled = hoverActivationEnabled
+        self.windowPreviewsEnabled = windowPreviewsEnabled
         self.activityNoticeDisplayDuration = activityNoticeDisplayDuration
         self.focusModeNoticeDisplayDuration = focusModeNoticeDisplayDuration
         self.activityNoticeDisplayIDs = activityNoticeDisplayIDs
@@ -932,6 +935,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case moduleOrder
         case notificationsMuted
         case hoverActivationEnabled
+        case windowPreviewsEnabled
         case activityNoticeDisplayDuration
         case focusModeNoticeDisplayDuration
         case activityNoticeDisplayIDs
@@ -1156,6 +1160,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         }
         notificationsMuted = try container.decodeIfPresent(Bool.self, forKey: .notificationsMuted) ?? defaults.notificationsMuted
         hoverActivationEnabled = try container.decodeIfPresent(Bool.self, forKey: .hoverActivationEnabled) ?? defaults.hoverActivationEnabled
+        windowPreviewsEnabled = try container.decodeIfPresent(Bool.self, forKey: .windowPreviewsEnabled) ?? defaults.windowPreviewsEnabled
         activityNoticeDisplayDuration = try container.decodeIfPresent(
             ActivityNoticeDisplayDuration.self,
             forKey: .activityNoticeDisplayDuration

@@ -81,20 +81,63 @@ struct ManagedToolServiceTests {
     }
 
     @Test
-    func zshellPurposeHasATranslationInEveryLanguage() throws {
-        let key = ManagedTool.zshell.purpose
+    func dockDoorUsesTheHomebrewCaskAndExpectedExecutablePath() {
+        #expect(ManagedTool.dockDoor.installationSource == .homebrewCask(name: "dockdoor"))
+        #expect(ManagedTool.dockDoor.executableName == "DockDoor")
+        #expect(ManagedTool.dockDoor.usesNativeApplicationVersion)
+        #expect(ManagedTool.dockDoor.recommendationGroup == .desktopApplication)
+        #expect(ManagedToolService.externalPaths(for: .dockDoor).contains(
+            "/Applications/DockDoor.app/Contents/MacOS/DockDoor"
+        ))
+    }
 
-        for language in AppLanguage.allCases {
-            let tableURL = Self.localizationURL
-                .appendingPathComponent("\(language.rawValue).lproj", isDirectory: true)
-                .appendingPathComponent("Localizable.strings")
-            let table = try #require(
-                NSDictionary(contentsOf: tableURL) as? [String: String],
-                "无法解析 \(language.rawValue) 的 Localizable.strings"
-            )
-            let expected = try #require(table[key], "\(language.rawValue) 缺少「\(key)」")
+    @Test(arguments: [true, false])
+    func dockDoorReadsAppVersionWithoutLaunchingExecutable(hasVersion: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-dockdoor-version-\(UUID().uuidString)", isDirectory: true)
+        let contents = root.appendingPathComponent("DockDoor.app/Contents", isDirectory: true)
+        let executable = contents.appendingPathComponent("MacOS/DockDoor")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: executable.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        var info = [
+            "CFBundleIdentifier": "zisla.tests.dockdoor.\(UUID().uuidString)",
+            "CFBundleExecutable": "DockDoor",
+            "CFBundlePackageType": "APPL",
+        ]
+        if hasVersion { info["CFBundleShortVersionString"] = "1.18.3" }
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+            .write(to: contents.appendingPathComponent("Info.plist"))
+        try Data("#!/bin/sh\ntouch \"$0.started\"\necho 99.0.0\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
 
-            #expect(AppLocalization.string(key, language: language) == expected)
+        let version = await ManagedToolService.readVersion(of: .dockDoor, at: executable)
+
+        #expect(version == (hasVersion ? "1.18.3" : nil))
+        #expect(!FileManager.default.fileExists(atPath: executable.path + ".started"))
+    }
+
+    @Test
+    func desktopApplicationPurposesHaveTranslationsInEveryLanguage() throws {
+        for key in [ManagedTool.zshell.purpose, ManagedTool.dockDoor.purpose] {
+            for language in AppLanguage.allCases {
+                let tableURL = Self.localizationURL
+                    .appendingPathComponent("\(language.rawValue).lproj", isDirectory: true)
+                    .appendingPathComponent("Localizable.strings")
+                let table = try #require(
+                    NSDictionary(contentsOf: tableURL) as? [String: String],
+                    "无法解析 \(language.rawValue) 的 Localizable.strings"
+                )
+                let expected = try #require(table[key], "\(language.rawValue) 缺少「\(key)」")
+
+                #expect(!expected.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if language != .simplifiedChinese {
+                    #expect(expected != key, "\(language.rawValue) 未翻译「\(key)」")
+                }
+                #expect(AppLocalization.string(key, language: language) == expected)
+            }
         }
     }
 
@@ -132,9 +175,10 @@ struct ManagedToolServiceTests {
             (.packer, .homebrewFormula(name: "hashicorp/tap/packer"), "packer"),
             (.ytt, .homebrewFormula(name: "ytt"), "ytt"),
             (.kero, .homebrewCask(name: "egoist/tap/kero"), "kero"),
+            (.dockDoor, .homebrewCask(name: "dockdoor"), "DockDoor"),
         ]
 
-        #expect(ManagedTool.allCases.count == 46)
+        #expect(ManagedTool.allCases.count == 47)
         for (tool, source, executableName) in expected {
             #expect(tool.installationSource == source)
             #expect(tool.executableName == executableName)
@@ -153,7 +197,7 @@ struct ManagedToolServiceTests {
         #expect(count(.networkAndData) == 7)
         #expect(count(.developmentToolchain) == 21)
         #expect(count(.utility) == 3)
-        #expect(count(.desktopApplication) == 4)
+        #expect(count(.desktopApplication) == 5)
     }
 
     @Test

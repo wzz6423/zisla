@@ -1593,6 +1593,7 @@
 "目录树展示" = "Trình xem cây thư mục";
 "终端工作区" = "Không gian làm việc terminal";
 "原生 macOS 终端工作区" = "Không gian làm việc terminal macOS gốc";
+"Dock 窗口预览与应用切换" = "Xem trước cửa sổ trên Dock và chuyển đổi ứng dụng";
 "统计与权限" = "Thống kê và quyền";
 "统计已暂停" = "Đã tạm dừng thống kê";
 "自定义热词" = "Từ khóa tùy chỉnh";
@@ -2498,3 +2499,6 @@
 "在设置中显示推荐工具和管理入口" = "Hiển thị công cụ đề xuất và tùy chọn quản lý trong Cài đặt";
 "自动更新推荐工具" = "Tự động cập nhật công cụ đề xuất";
 "每天更新已安装的推荐工具；不会安装未安装的工具" = "Cập nhật hằng ngày các công cụ đề xuất đã cài; không cài công cụ còn thiếu";
+
+"窗口预览" = "Xem trước cửa sổ";
+"悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Xem trước cửa sổ khi trỏ vào Dock hoặc dùng Command-Tab; cần quyền Trợ năng và Ghi màn hình";

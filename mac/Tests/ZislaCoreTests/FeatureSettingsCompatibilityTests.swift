@@ -4,6 +4,31 @@ import Testing
 
 struct FeatureSettingsCompatibilityTests {
     @Test
+    func windowPreviewsRemainOffForExistingSettingsUntilEnabled() throws {
+        #expect(!FeatureSettings().windowPreviewsEnabled)
+        let legacy = Data(#"{"hoverActivationEnabled":true}"#.utf8)
+        var settings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
+        #expect(!settings.windowPreviewsEnabled)
+
+        for enabled in [true, false] {
+            settings.windowPreviewsEnabled = enabled
+            let restored = try JSONDecoder().decode(
+                FeatureSettings.self,
+                from: JSONEncoder().encode(settings)
+            )
+            #expect(restored.windowPreviewsEnabled == enabled)
+        }
+    }
+
+    @Test
+    func windowPreviewSettingRejectsInvalidValues() {
+        let invalid = Data(#"{"windowPreviewsEnabled":"true"}"#.utf8)
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(FeatureSettings.self, from: invalid)
+        }
+    }
+
+    @Test
     func recommendationSettingsKeepLegacyVisibilityAndRequireUpdateOptIn() throws {
         let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8))
         #expect(legacy.recommendedToolsEnabled)

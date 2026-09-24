@@ -1593,6 +1593,7 @@
 "目录树展示" = "Visualizador de árvore de diretórios";
 "终端工作区" = "Espaço de trabalho no terminal";
 "原生 macOS 终端工作区" = "Espaço de trabalho de terminal nativo para macOS";
+"Dock 窗口预览与应用切换" = "Prévia de janelas no Dock e alternância entre apps";
 "统计与权限" = "Estatísticas e permissões";
 "统计已暂停" = "Estatísticas pausadas";
 "自定义热词" = "Termos personalizados";
@@ -2498,3 +2499,6 @@
 "在设置中显示推荐工具和管理入口" = "Mostrar ferramentas recomendadas e seus controles de gerenciamento nos Ajustes";
 "自动更新推荐工具" = "Atualizar ferramentas recomendadas automaticamente";
 "每天更新已安装的推荐工具；不会安装未安装的工具" = "Atualizar diariamente as ferramentas recomendadas já instaladas; as ausentes não serão instaladas";
+
+"窗口预览" = "Prévia de janelas";
+"悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Visualize janelas ao passar o cursor no Dock ou usar Command-Tab; requer permissões de Acessibilidade e Gravação de Tela";
