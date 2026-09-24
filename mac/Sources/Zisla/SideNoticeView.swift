@@ -66,6 +66,9 @@ struct SideNoticeRootView: View {
                     height: presentation.compactWingHeight
                 )
                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
+            } else if let quotaNotice = presentation.activeTransientNotice, quotaNotice.id.hasPrefix("ai-quota-") {
+                CompactTransientWing(notice: quotaNotice, side: side, height: presentation.compactWingHeight)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
             } else if let mediaNotice = presentation.activeMediaNotice {
                 CompactMediaWing(
                     notice: mediaNotice,
@@ -287,7 +290,7 @@ struct CompactStatusBarView: View {
     private var transientNotice: IslandNotice? {
         (queue.left + queue.right)
             .filter {
-                $0.id.hasPrefix("focus-transition") || $0.style == .headphone
+                $0.id.hasPrefix("focus-transition") || $0.id.hasPrefix("ai-quota-") || $0.style == .headphone
                     || $0.id == LowBatteryNoticeController.noticeID
             }
             .max { $0.createdAt < $1.createdAt }
@@ -387,7 +390,15 @@ struct CompactStatusBarView: View {
         switch selectedCompactStatusPriority {
         case .transient:
             if let transientNotice {
-                if transientNotice.id == LowBatteryNoticeController.noticeID {
+                if transientNotice.id.hasPrefix("ai-quota-") {
+                    HStack(spacing: 0) {
+                        CompactTransientWing(notice: transientNotice, side: .left, height: height,
+                                             usesTransparentBackground: compactWingsUseTransparentBackground)
+                        Spacer(minLength: 0)
+                        CompactTransientWing(notice: transientNotice, side: .right, height: height,
+                                             usesTransparentBackground: compactWingsUseTransparentBackground)
+                    }
+                } else if transientNotice.id == LowBatteryNoticeController.noticeID {
                     CompactLowBatteryBar(notice: transientNotice, height: height)
                 } else if transientNotice.style == .headphone {
                     CompactHeadphoneConnectionBar(
@@ -1946,7 +1957,16 @@ private struct CompactTransientWing: View {
 
     var body: some View {
         Group {
-            if side == .left {
+            if notice.id.hasPrefix("ai-quota-") {
+                if side == .left {
+                    AIQuotaIcon(providerID: notice.metadata?["providerID"] ?? "", size: min(20, height * 0.65))
+                } else {
+                    Text(notice.metadata?["remaining"] ?? notice.title)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(notice.kind == .warning ? Color.orange : Color.white)
+                }
+            } else if side == .left {
                 Image(systemName: notice.symbolName ?? "moon.fill")
                     .font(.system(size: min(15, height * 0.56), weight: .semibold))
             } else {

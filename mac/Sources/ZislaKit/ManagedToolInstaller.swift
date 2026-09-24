@@ -3,6 +3,7 @@ import ZislaCore
 
 enum ManagedToolInstallationSource: Sendable, Equatable {
     case githubRelease(repository: String)
+    case githubApplication(repository: String)
     case homebrewCask(name: String)
     case homebrewFormula(name: String)
 }
@@ -73,6 +74,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     case kero
     case markdownPreview
     case zshell
+    case pulse
 
     public var id: String { rawValue }
 
@@ -124,6 +126,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kero: "Kero"
         case .markdownPreview: "Markdown Preview"
         case .zshell: "Zshell"
+        case .pulse: "Pulse"
         }
     }
 
@@ -175,6 +178,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kero: "终端工作区"
         case .markdownPreview: "Markdown 预览"
         case .zshell: "原生 macOS 终端工作区"
+        case .pulse: "AI 监控"
         }
     }
 
@@ -227,6 +231,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kero: "kero"
         case .markdownPreview: "mdp"
         case .zshell: "zshell"
+        case .pulse: "Pulse"
         }
     }
 
@@ -278,6 +283,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kero: .homebrewCask(name: "egoist/tap/kero")
         case .markdownPreview: .homebrewCask(name: "markdown-preview")
         case .zshell: .homebrewCask(name: "wzz6423/tap/zshell")
+        case .pulse: .githubApplication(repository: "qunqin24/Pulse")
         }
     }
 
@@ -303,14 +309,14 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
             .developmentToolchain
         case .ytDLP, .libreOffice, .keka:
             .utility
-        case .kaku, .kero, .markdownPreview, .zshell:
+        case .kaku, .kero, .markdownPreview, .zshell, .pulse:
             .desktopApplication
         }
     }
 
     var usesNativeApplicationVersion: Bool {
         switch self {
-        case .kaku, .kero, .markdownPreview, .keka, .zshell: true
+        case .kaku, .kero, .markdownPreview, .keka, .zshell, .pulse: true
         default: false
         }
     }
@@ -383,6 +389,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .ytDLP:
             return name == "yt-dlp_macos"
+        case .pulse:
+            return name.range(of: #"\APulse-[0-9]+(?:\.[0-9]+)*\.zip\z"#, options: .regularExpression) != nil
         default: return false
         }
     }
@@ -434,7 +442,7 @@ public struct ManagedToolState: Sendable, Equatable {
     /// True when the tool is installed and an update is known to exist. Never claims an update when the latest version could not be fetched.
     public var hasUpdate: Bool {
         guard let installedVersion, let latestVersion else { return false }
-        return installedVersion != latestVersion
+        return installedVersion.compare(latestVersion, options: .numeric) == .orderedAscending
     }
 }
 
@@ -444,6 +452,7 @@ public enum ManagedToolError: Error, Sendable, Equatable {
     case untrustedHost(String)
     case downloadFailed(String)
     case notExecutable(String)
+    case applicationRunning(String)
     case homebrewUnavailable
     case homebrewFailed(String)
 
@@ -459,6 +468,8 @@ public enum ManagedToolError: Error, Sendable, Equatable {
             AppLocalization.text("下载失败：%@", value)
         case .notExecutable(let value):
             AppLocalization.text("安装后无法执行：%@", value)
+        case .applicationRunning(let value):
+            AppLocalization.text("请先退出 %@ 再更新", value)
         case .homebrewUnavailable:
             "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具"
         case .homebrewFailed(let value):

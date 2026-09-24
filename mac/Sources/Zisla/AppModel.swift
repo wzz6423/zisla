@@ -173,7 +173,7 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: unifiedIslandWidth, height: 500),
     panelSize: CGSize(width: unifiedPanelWidth, height: 504)
   )
-  static let ai = compactModule(contentHeight: 350)
+  static let ai = keyboardSound
   static let battery = system
   static let keyboardSound = system
   static let notes = system
@@ -408,7 +408,12 @@ final class AppModel: ObservableObject {
   let settingsStore = FeatureSettingsStore()
   let languageStore = AppLanguageStore()
   let aiMonitor = AIStateMonitor()
+  let aiQuotaStore = AIQuotaConfigurationStore()
+  let aiQuotaMonitor = AIQuotaMonitor()
   let notices = SideNoticeQueue()
+  private lazy var aiQuotaNotice = AIQuotaNoticeController(queue: notices)
+  private let aiQuotaSettings = AIQuotaSettingsController()
+  private var aiQuotaProxy: (url: String, enabled: Bool)?
   let media = NowPlayingService()
   let audioOutput = AudioOutputDeviceService()
   let calendar = CalendarService()
@@ -699,6 +704,21 @@ final class AppModel: ObservableObject {
       .dropFirst()
       .sink { [weak self] state in
         Task { @MainActor [weak self] in self?.consumeAIState(state) }
+      }
+      .store(in: &cancellables)
+
+    aiQuotaStore.$configurations
+      .sink { [weak self] configurations in
+        self?.configureAIQuota(configurations)
+      }
+      .store(in: &cancellables)
+
+    aiQuotaMonitor.$snapshot
+      .dropFirst()
+      .sink { [weak self] snapshot in
+        guard let self else { return }
+        let settings = self.settingsStore.settings
+        self.aiQuotaNotice.consume(snapshot, enabled: settings.aiProgressEnabled && settings.sideNoticesEnabled)
       }
       .store(in: &cancellables)
 
@@ -995,6 +1015,9 @@ final class AppModel: ObservableObject {
     clipboardAssistant.dismiss()
     Task { [downloadService] in await downloadService.cancelAll() }
     aiMonitor.stop()
+    aiQuotaMonitor.stop()
+    aiQuotaNotice.stop()
+    aiQuotaSettings.close()
     aiAgent.stop()
     media.stop()
     audioOutput.stop()
@@ -2564,18 +2587,25 @@ final class AppModel: ObservableObject {
       settings.recommendedToolsEnabled && settings.recommendedToolsAutomaticUpdatesEnabled
     )
     configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
+    if aiQuotaProxy?.url != settings.networkProxyURL || aiQuotaProxy?.enabled != settings.networkProxyEnabled {
+      configureAIQuota(aiQuotaStore.configurations)
+    }
     if settings.aiProgressEnabled {
       aiMonitor.start()
+      aiQuotaMonitor.start()
       if selectedModule == .aiMonitor {
         aiMonitor.loadUsageHistory()
       }
     } else {
       aiMonitor.stop()
+      aiQuotaMonitor.stop()
+      aiQuotaNotice.stop()
       clearActiveAINotices()
       powerAssertions.setAIActivityActive(false)
     }
     aiAgent.start()
     syncAIActivityPowerAssertion(aiMonitor.state)
+    if !settings.sideNoticesEnabled { aiQuotaNotice.stop() }
     if settings.mediaEnabled {
       media.start()
       updateSpectrumMonitoring()
@@ -3237,6 +3267,23 @@ final class AppModel: ObservableObject {
     clearMediaNotices()
   }
 
+  func showAIQuotaSettings() {
+    aiQuotaSettings.show(store: aiQuotaStore, monitor: aiQuotaMonitor, languageStore: languageStore)
+  }
+
+  private func configureAIQuota(_ configurations: [AIQuotaConfiguration]) {
+    let settings = settingsStore.settings
+    aiQuotaProxy = (settings.networkProxyURL, settings.networkProxyEnabled)
+    let client = AIQuotaURLSessionClient(proxyURL: settings.networkProxyURL, proxyEnabled: settings.networkProxyEnabled)
+    let environment = NetworkProxy.environment(from: settings.networkProxyURL,
+      enabled: settings.networkProxyEnabled, base: ProcessInfo.processInfo.environment)
+    aiQuotaNotice.stop()
+    aiQuotaMonitor.configure(readers: configurations.filter(\.isEnabled).map {
+      AIQuotaProviderReader(configuration: $0, credentials: aiQuotaStore.credentials,
+        http: client, processEnvironment: environment)
+    })
+  }
+
   private func consumeAIState(_ state: AIState) {
     let settings = settingsStore.settings
     syncAIActivityPowerAssertion(state)
@@ -3842,7 +3889,7 @@ final class AppModel: ObservableObject {
 
   private func noticeSide(for provider: AIProvider) -> NoticeSide {
     switch provider {
-    case .claude, .gemini, .qwen, .trae, .doubao: .left
+    case .claude, .antigravity, .gemini, .qwen, .trae, .doubao: .left
     case .pi: .right
     case .codex, .grok, .gpt, .copilot, .kimi, .coder, .zcode, .zed, .opencode, .harness: .right
     }

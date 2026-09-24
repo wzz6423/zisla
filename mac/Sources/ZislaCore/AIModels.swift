@@ -5,6 +5,7 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
     case claude
     case codex
     case gemini
+    case antigravity
     case grok
     case gpt
     case copilot
@@ -28,6 +29,8 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
             self = .codex
         case "gemini", "google-gemini", "gemini-cli", "gemini-code-assist":
             self = .gemini
+        case "antigravity", "antigravity-ide", "antigravity-cli", "agy":
+            self = .antigravity
         case "grok", "grok-cli", "xai", "x-ai":
             self = .grok
         case "gpt", "openai", "chatgpt", "chat-gpt", "openai-gpt":

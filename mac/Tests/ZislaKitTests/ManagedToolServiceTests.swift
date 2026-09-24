@@ -6,10 +6,10 @@ import ZislaCore
 
 @MainActor
 struct ManagedToolServiceTests {
-    private func releaseJSON(tag: String, assets: [String]) -> Data {
+    private func releaseJSON(tag: String, assets: [String], repository: String = "o/r") -> Data {
         let assetObjects = assets.map { name in
             """
-            {"name":"\(name)","browser_download_url":"https://github.com/o/r/releases/download/\(tag)/\(name)"}
+            {"name":"\(name)","browser_download_url":"https://github.com/\(repository)/releases/download/\(tag)/\(name)"}
             """
         }.joined(separator: ",")
         return Data("""
@@ -24,6 +24,81 @@ struct ManagedToolServiceTests {
         // A same-named variant with a suffix must not match, otherwise the zip or checksum file would get installed.
         #expect(ManagedTool.ytDLP.matchesAsset(name: "yt-dlp_macos.zip") == false)
         #expect(ManagedTool.ytDLP.matchesAsset(name: "SHA2-256SUMS") == false)
+    }
+
+    @Test
+    func pulseRecommendationUsesItsOfficialApplicationRelease() throws {
+        #expect(ManagedTool.pulse.installationSource == .githubApplication(repository: "qunqin24/Pulse"))
+        #expect(ManagedTool.pulse.recommendationGroup == .desktopApplication)
+        #expect(ManagedTool.pulse.usesNativeApplicationVersion)
+        #expect(ManagedTool.pulse.matchesAsset(name: "Pulse-1.4.0.zip"))
+        #expect(!ManagedTool.pulse.matchesAsset(name: "Pulse-1.4.0.dmg"))
+        #expect(!ManagedTool.pulse.matchesAsset(name: "Pulse-latest.zip"))
+        #expect(!ManagedTool.pulse.matchesAsset(name: "Pulse-1.4.0.zip\n"))
+
+        let release = try ManagedToolService.parseRelease(
+            releaseJSON(tag: "v1.4.0", assets: ["Pulse-1.4.0.dmg", "Pulse-1.4.0.zip"], repository: "qunqin24/Pulse"),
+            tool: .pulse
+        )
+        #expect(release.version == "1.4.0")
+        #expect(release.assetURL.lastPathComponent == "Pulse-1.4.0.zip")
+    }
+
+    @Test
+    func pulseReleaseRequiresTheOfficialRepositoryVersionAndAsset() throws {
+        let official = "https://github.com/qunqin24/Pulse/releases/download/v1.4.0/Pulse-1.4.0.zip"
+        let urls = [
+            official.replacingOccurrences(of: "qunqin24/Pulse", with: "other/Pulse"),
+            official.replacingOccurrences(of: "/v1.4.0/", with: "/v1.3.0/"),
+            official.replacingOccurrences(of: "Pulse-1.4.0.zip", with: "Pulse-1.3.0.zip"),
+            official + "?download=1", official + "#asset",
+            official.replacingOccurrences(of: "github.com", with: "objects.githubusercontent.com"),
+        ]
+        for url in urls {
+            let data = try JSONSerialization.data(withJSONObject: [
+                "tag_name": "v1.4.0",
+                "assets": [["name": "Pulse-1.4.0.zip", "browser_download_url": url]],
+            ])
+            #expect(throws: ManagedToolError.self) { try ManagedToolService.parseRelease(data, tool: .pulse) }
+        }
+        #expect(throws: ManagedToolError.self) {
+            try ManagedToolService.parseRelease(
+                releaseJSON(tag: "v1.4.0", assets: ["Pulse-1.3.0.zip"], repository: "qunqin24/Pulse"), tool: .pulse
+            )
+        }
+    }
+
+    @Test
+    func pulseReleaseMutationCorpusNeverSelectsAForeignDownload() throws {
+        var seed: UInt64 = 0x50554c5345
+        for index in 0..<96 {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1
+            let token = String(seed, radix: 16)
+            let parts = [
+                index % 3 == 0 ? token : "qunqin24",
+                index % 3 == 1 ? token : "Pulse",
+                "releases", "download", index % 3 == 2 ? token : "v1.4.0", "Pulse-1.4.0.zip",
+            ]
+            let data = try JSONSerialization.data(withJSONObject: [
+                "tag_name": "v1.4.0", "assets": [[
+                    "name": "Pulse-1.4.0.zip", "browser_download_url": "https://github.com/" + parts.joined(separator: "/"),
+                ]],
+            ])
+            #expect(throws: ManagedToolError.self, "mutation \(index), seed \(seed)") {
+                try ManagedToolService.parseRelease(data, tool: .pulse)
+            }
+        }
+    }
+
+    @Test(arguments: ["AI 监控", "请先退出 %@ 再更新", "打开链接"])
+    func pulseRecommendationTextIsAvailableInEveryLanguage(_ key: String) throws {
+        for language in AppLanguage.allCases {
+            let tableURL = Self.localizationURL.appendingPathComponent("\(language.rawValue).lproj/Localizable.strings")
+            let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
+            let translated = try #require(table[key], "\(language.rawValue) 缺少「\(key)」")
+            #expect(AppLocalization.string(key, language: language) == translated)
+            #expect(translated.components(separatedBy: "%@").count == key.components(separatedBy: "%@").count)
+        }
     }
 
     @Test
@@ -134,7 +209,7 @@ struct ManagedToolServiceTests {
             (.kero, .homebrewCask(name: "egoist/tap/kero"), "kero"),
         ]
 
-        #expect(ManagedTool.allCases.count == 46)
+        #expect(ManagedTool.allCases.count == 47)
         for (tool, source, executableName) in expected {
             #expect(tool.installationSource == source)
             #expect(tool.executableName == executableName)
@@ -153,7 +228,7 @@ struct ManagedToolServiceTests {
         #expect(count(.networkAndData) == 7)
         #expect(count(.developmentToolchain) == 21)
         #expect(count(.utility) == 3)
-        #expect(count(.desktopApplication) == 4)
+        #expect(count(.desktopApplication) == 5)
     }
 
     @Test
@@ -396,6 +471,9 @@ struct ManagedToolServiceTests {
 
         state.latestVersion = "7.1.0"
         #expect(state.hasUpdate)
+
+        state.installedVersion = "7.2.0"
+        #expect(!state.hasUpdate)
     }
 
     @Test

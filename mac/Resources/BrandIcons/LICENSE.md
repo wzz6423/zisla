@@ -26,6 +26,21 @@ and logos remain trademarks of their respective owners.
 `github-mark.svg` is GitHub's official mark from `primer/octicons`, distributed under the MIT License.
 `kimi.png` is the official Kimi Code extension icon published by Moonshot AI on Open VSX.
 `deepseek.svg` is from `simple-icons/simple-icons`, distributed under CC0-1.0.
+`antigravity.png` is the official full-color icon published at https://www.antigravity.google/press.
+
+`kiro.svg`, `cursor.svg`, `ollama.svg`, `zai.svg`, `minimax.svg`, `xai.svg`,
+`volcengine.svg`, `commandcode.svg`, `devin.svg`, `xiaomimimo.svg`, `sub2api.svg`,
+`newapi.svg`, and `v2ex.svg` are copied from the icon resources at
+https://github.com/qunqin24/Pulse, revision
+`86bcb54cff24d4a9c96b4f14066f0098f12e87a6`. The upstream third-party notices
+identify `cursor.svg`, `ollama.svg`, `zai.svg`, `minimax.svg`, `xai.svg`,
+`volcengine.svg`, and `devin.svg` as Lobe Icons assets under MIT; see
+`../ThirdPartyLicenses/LobeIcons-LICENSE.txt`. The other listed assets are
+provided under the upstream Apache-2.0 license; see
+`../ThirdPartyLicenses/AIQuota-LICENSE.txt`. Their glyph paths are unchanged;
+the SVG dimensions were fixed to 24 points and `currentColor` was replaced
+with white for AppKit rendering on the black island. Product names and
+logos remain trademarks of their respective owners.
 
 # Video Platform Icons
 

@@ -32,3 +32,7 @@ https://github.com/unicode-org/cldr-json
 
 Copyright 1991-2026 Unicode, Inc. Licensed under Unicode License V3. See
 `Unicode-CLDR-LICENSE.txt` in this directory.
+
+AI quota provider adapters and supplementary brand icons are adapted from
+upstream Apache-2.0 and MIT licensed resources. See `AIQuota-LICENSE.txt`,
+`LobeIcons-LICENSE.txt`, and `../BrandIcons/LICENSE.md` for sources and terms.

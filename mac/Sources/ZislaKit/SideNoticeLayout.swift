@@ -172,7 +172,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         settings: FeatureSettings
     ) -> CompactStatusPriority? {
         if notices.contains(where: {
-            $0.id.hasPrefix("focus-transition") || $0.id == LowBatteryNoticeController.noticeID
+            $0.id.hasPrefix("focus-transition") || $0.id.hasPrefix("ai-quota-")
+                || $0.id == LowBatteryNoticeController.noticeID
         }) {
             return .transient
         }
@@ -202,7 +203,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             ? notices.first(where: { $0.id.hasPrefix("focus-mode-") })
             : nil
         let activeTransientNotice = compactWingsEnabled
-            ? notices.first(where: { $0.id.hasPrefix("focus-transition") })
+            ? notices.first(where: { $0.id.hasPrefix("focus-transition") || $0.id.hasPrefix("ai-quota-") })
             : nil
         let activeMailNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("mail-notification-") })
@@ -234,6 +235,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 && !$0.id.hasPrefix("focus-countdown-")
                 && !$0.id.hasPrefix("focus-mode-")
                 && !$0.id.hasPrefix("focus-transition")
+                && !$0.id.hasPrefix("ai-quota-")
                 && $0.id != LowBatteryNoticeController.noticeID
                 && !$0.id.hasPrefix("mail-notification-")
                 && !$0.id.hasPrefix("toolbox-reminder-")
@@ -492,7 +494,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
         let displayedTransientNotice = notices
             .filter {
-                $0.id.hasPrefix("focus-transition") || $0.style == .headphone
+                $0.id.hasPrefix("focus-transition") || $0.id.hasPrefix("ai-quota-") || $0.style == .headphone
                     || $0.id == LowBatteryNoticeController.noticeID
             }
             .max { $0.createdAt < $1.createdAt }
@@ -540,7 +542,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     ) -> Bool {
         return switch priority {
         case .transient:
-            notices.contains { $0.id.hasPrefix("focus-transition") || $0.style == .headphone }
+            notices.contains { $0.id.hasPrefix("focus-transition") || $0.id.hasPrefix("ai-quota-") || $0.style == .headphone }
         case .updateAvailable:
             notices.contains { $0.id.hasPrefix("update-available-") }
         case .mail:
@@ -644,7 +646,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         guard ordinaryCount > 0 else {
             return hasCompact
                 ? CGSize(
-                    width: activeAICount > 0
+                    width: activeAICount > 0 && !hasTransient
                         ? Self.compactStatusWingWidth(forCount: activeAICount)
                         : Layout.compactWingWidth,
                     height: compactWingHeight

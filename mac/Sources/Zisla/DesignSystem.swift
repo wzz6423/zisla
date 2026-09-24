@@ -21,6 +21,7 @@ enum ProviderBrand {
         case .claude: Color(red: 0.95, green: 0.48, blue: 0.34)
         case .codex: Color(red: 0.36, green: 0.90, blue: 0.66)
         case .gemini: Color(red: 0.50, green: 0.68, blue: 1.00)
+        case .antigravity: Color(red: 0.50, green: 0.68, blue: 1.00)
         case .grok: .primary
         case .gpt: Color(red: 0.42, green: 0.82, blue: 0.72)
         case .copilot: .primary

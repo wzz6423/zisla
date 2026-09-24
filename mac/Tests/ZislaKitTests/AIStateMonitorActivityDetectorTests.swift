@@ -54,6 +54,13 @@ struct AIStateMonitorActivityDetectorTests {
     }
 
     @Test @MainActor
+    func defaultActivityDetectorsIncludeAntigravitySessions() {
+        #expect(AIStateMonitor.defaultActivityDetectors().contains {
+            $0 is AntigravitySessionActivityDetector
+        })
+    }
+
+    @Test @MainActor
     func reloadMergesEveryInjectedProvider() {
         let directory = monitorTempDirectory("providers")
         defer { try? FileManager.default.removeItem(at: directory) }

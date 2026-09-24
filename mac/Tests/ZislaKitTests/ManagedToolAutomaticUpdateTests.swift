@@ -309,7 +309,7 @@ struct ManagedToolAutomaticUpdateTests {
             switch tool.installationSource {
             case .homebrewCask(let name): self.name = name; kind = "--cask"
             case .homebrewFormula(let name): self.name = name; kind = "--formula"
-            case .githubRelease: preconditionFailure("Use a Homebrew tool fixture")
+            case .githubRelease, .githubApplication: preconditionFailure("Use a Homebrew tool fixture")
             }
         }
 

@@ -19,7 +19,12 @@ struct AIProgressModuleView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            runningTasks
+            VStack(alignment: .leading, spacing: Self.sectionSpacing) {
+                AIQuotaPanel(monitor: model.aiQuotaMonitor, store: model.aiQuotaStore, configure: model.showAIQuotaSettings)
+                    .frame(height: 144, alignment: .top)
+                Divider()
+                runningTasks
+            }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             Hairline()

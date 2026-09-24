@@ -47,13 +47,10 @@ struct BatteryModuleTests {
     }
 
     @Test
-    func aiModuleUsesItsCompactHeightWithoutChangingCPUHeight() {
+    func aiModuleMatchesKeyboardStatisticsHeight() {
         #expect(IslandModule.aiMonitor.layout == IslandModuleLayout.ai)
-        #expect(IslandModuleLayout.ai.islandSize.height == 495)
-        #expect(IslandModuleLayout.ai.panelSize.height == 499)
-        #expect(IslandModuleLayout.ai.islandSize.height < IslandModuleLayout.system.islandSize.height)
-        #expect(IslandModuleLayout.system.islandSize.height == 546)
-        #expect(IslandModuleLayout.system.panelSize.height == 550)
+        #expect(IslandModuleLayout.ai.islandSize.height == IslandModuleLayout.keyboardSound.islandSize.height)
+        #expect(IslandModuleLayout.ai.panelSize.height == IslandModuleLayout.keyboardSound.panelSize.height)
     }
 
     @Test

@@ -30,6 +30,22 @@ struct SideNoticeLayoutTests {
 
     private let engine = SideNoticeLayoutEngine()
 
+    @Test
+    func quotaNoticeTemporarilyOverridesConfiguredCompactStatusWithoutAnActiveSession() {
+        var settings = FeatureSettings()
+        settings.compactStatusPriority = [.aiActivity, .media]
+        let left = IslandNotice(id: "ai-quota-codex-left", title: "Codex", side: .left)
+        let right = IslandNotice(id: "ai-quota-codex-right", title: "40%", side: .right)
+
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [left, right], settings: settings) == .transient)
+        #expect(engine.presentation(for: [left]).activeTransientNotice == left)
+        #expect(engine.presentation(for: [right]).activeTransientNotice == right)
+        #expect(engine.presentation(for: [left]).ordinaryNotices.isEmpty)
+        #expect(engine.presentation(for: [right]).ordinaryNotices.isEmpty)
+        #expect(engine.presentation(for: [left]).hasCompactContent)
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [], settings: settings) == nil)
+    }
+
     /// Expanding the island also dismisses the clipboard assistant; that dismissal must not
     /// clear the hidden state and let the collapsed status bar draw over the open panel.
     @Test

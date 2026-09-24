@@ -52,6 +52,11 @@ public enum AIMascotLibrary {
         "Gemini",
     ]
 
+    public static let antigravityApplicationNames = [
+        "Antigravity",
+        "Antigravity IDE",
+    ]
+
     /// Locates the locally installed Qoder/QoderWork.app; returns nil if not found, falling back to bundled brand assets.
     /// Uses injected closures to keep logic pure and testable; defaults to NSWorkspace / FileManager.
     public static func installedCoderApplicationURL(
@@ -152,6 +157,22 @@ public enum AIMascotLibrary {
         )
     }
 
+    public static func installedAntigravityApplicationURL(
+        applicationDirectories: [URL] = FileManager.default.urls(
+            for: .applicationDirectory,
+            in: .allDomainsMask
+        ),
+        fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL? {
+        installedApplicationURL(
+            bundleIdentifiers: [],
+            applicationNames: antigravityApplicationNames,
+            resolveBundleIdentifier: { _ in nil },
+            applicationDirectories: applicationDirectories,
+            fileExists: fileExists
+        )
+    }
+
     private static func installedApplicationURL(
         bundleIdentifiers: [String],
         applicationNames: [String],
@@ -180,6 +201,7 @@ public enum AIMascotLibrary {
         case .claude: "claude-color.svg"
         case .codex: "codex-color.svg"
         case .gemini: "gemini-color.svg"
+        case .antigravity: "antigravity.png"
         case .grok: "grok.svg"
         case .gpt: "openai.svg"
         case .copilot: "copilot.svg"
@@ -221,6 +243,7 @@ public enum AIMascotLibrary {
         case .claude: "Claude"
         case .codex: "Codex"
         case .gemini: "Gemini"
+        case .antigravity: "Antigravity"
         case .grok: "Grok"
         case .gpt: "ChatGPT"
         case .copilot: "GitHub Copilot"

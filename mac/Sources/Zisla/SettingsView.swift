@@ -2367,6 +2367,14 @@ struct SettingsView: View {
                 ) {
                     Task { await model.managedTools.install(tool) }
                 }
+                if tool == .pulse {
+                    Link(destination: URL(string: "https://github.com/qunqin24/Pulse/releases/latest")!) {
+                        Image(systemName: "link")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(AppLocalization.text("打开链接"))
+                    .accessibilityLabel(AppLocalization.text("打开链接"))
+                }
             }
         }
     }
@@ -2404,6 +2412,7 @@ struct SettingsView: View {
         case .keka: "archivebox.fill"
         case .kero: "terminal"
         case .zshell: "terminal.fill"
+        case .pulse: "waveform.path.ecg"
         default:
             switch tool.recommendationGroup {
             case .terminalEfficiency: "terminal"

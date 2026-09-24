@@ -28,7 +28,6 @@ struct AIProgressModuleViewTests {
         #expect(viewSource.contains("最近二十四周 AI token 用量热力图"))
         #expect(!viewSource.contains("usageTrendChartHeight"))
         #expect(!viewSource.contains("usageHeatmapWeeks"))
-        #expect(modelSource.contains("static let ai = compactModule(contentHeight: 350)"))
         #expect(modelSource.contains("static let system = compactModule(contentHeight: 401)"))
 
         guard let selectedModule = modelSource.range(of: "@Published var selectedModule") else {

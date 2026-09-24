@@ -47,6 +47,12 @@ struct AIMascotIdentityTests {
         ) == .geminiDesktop)
         #expect(AIMascotIdentity(noticeID: "ai-active-gemini-gemini-session-s1") == .gemini)
     }
+
+    @Test
+    func mapsAntigravityTaskAndActivityNoticeToSameIcon() {
+        #expect(AIMascotIdentity(provider: .antigravity, taskID: "antigravity-ide-session") == .antigravity)
+        #expect(AIMascotIdentity(noticeID: "ai-active-antigravity-antigravity-ide-session") == .antigravity)
+    }
 }
 
 @MainActor

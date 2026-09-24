@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -145,6 +146,7 @@ struct AIMascotLibraryTests {
         #expect(AIMascotLibrary.providerAssetName(for: .gpt) == "openai.svg")
         #expect(AIMascotLibrary.providerAssetName(for: .claude) == "claude-color.svg")
         #expect(AIMascotLibrary.providerAssetName(for: .gemini) == "gemini-color.svg")
+        #expect(AIMascotLibrary.providerAssetName(for: .antigravity) == "antigravity.png")
         #expect(AIMascotLibrary.providerAssetName(for: .grok) == "grok.svg")
         #expect(AIMascotLibrary.providerAssetName(for: .copilot) == "copilot.svg")
         #expect(AIMascotLibrary.providerAssetName(for: .kimi) == "kimi.png")
@@ -195,6 +197,33 @@ struct AIMascotLibraryTests {
             AIMascotLibrary.providerAssetName(for: .pi)
                 != AIMascotLibrary.providerAssetName(for: .opencode)
         )
+    }
+
+    @Test
+    func findsInstalledAntigravityIconSource() {
+        let applications = URL(fileURLWithPath: "/Applications", isDirectory: true)
+        let expected = applications.appendingPathComponent("Antigravity IDE.app", isDirectory: true)
+        #expect(AIMascotLibrary.installedAntigravityApplicationURL(
+            applicationDirectories: [applications],
+            fileExists: { $0 == expected }
+        ) == expected)
+    }
+
+    @Test
+    func bundledAntigravityIconDecodes() throws {
+        let resourceRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources", isDirectory: true)
+        let iconURL = try #require(AIMascotLibrary.providerAssetURL(
+            for: .antigravity,
+            resourceRoots: [resourceRoot]
+        ))
+        let image = try #require(NSImage(contentsOf: iconURL))
+        let bitmap = try #require(NSBitmapImageRep(data: Data(contentsOf: iconURL)))
+        #expect(image.size.width > 0 && image.size.height > 0)
+        #expect(bitmap.pixelsWide == 540 && bitmap.pixelsHigh == 540)
     }
 
     @Test

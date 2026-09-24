@@ -1,3 +1,5 @@
+import AppKit
+import Darwin
 import Foundation
 import ZislaCore
 
@@ -7,6 +9,8 @@ public final class ManagedToolService: ObservableObject {
     @Published public private(set) var states: [ManagedTool: ManagedToolState] = [:]
 
     private let toolsDirectory: URL
+    private let applicationsDirectory: URL
+    private let fileManager: FileManager
     private let bundleURL: URL
     private var session: URLSession
     private var releaseLoader: (String) async throws -> Data
@@ -19,6 +23,7 @@ public final class ManagedToolService: ObservableObject {
     private var latestVersionCheckedAt: [ManagedTool: Date] = [:]
     private let executableResolver: ((ManagedTool) -> (url: URL, location: ManagedToolState.Location)?)?
     private let homebrewRunner: (([String], [String: String]) async throws -> String)?
+    private let applicationIsRunning: (String) -> Bool
     private let automaticUpdateSleep: @Sendable (Duration) async throws -> Void
     private var automaticUpdateTask: Task<Void, Never>?
     private var automaticUpdatePassInProgress = false
@@ -29,18 +34,25 @@ public final class ManagedToolService: ObservableObject {
 
     public init(
         toolsDirectory: URL = AppPaths.managedTools,
+        applicationsDirectory: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications", isDirectory: true),
         bundleURL: URL = Bundle.main.bundleURL,
         session: URLSession = .shared,
+        fileManager: FileManager = .default,
         defaults: UserDefaults = .standard,
         releaseLoader: ((String) async throws -> Data)? = nil,
         homebrewExecutable: URL? = nil,
         executableResolver: ((ManagedTool) -> (url: URL, location: ManagedToolState.Location)?)? = nil,
         homebrewRunner: (([String], [String: String]) async throws -> String)? = nil,
+        applicationIsRunning: @escaping (String) -> Bool = {
+            !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty
+        },
         automaticUpdateSleep: @escaping @Sendable (Duration) async throws -> Void = {
             try await Task.sleep(for: $0)
         }
     ) {
         self.toolsDirectory = toolsDirectory
+        self.applicationsDirectory = applicationsDirectory
+        self.fileManager = fileManager
         self.bundleURL = bundleURL
         self.session = session
         self.usesDefaultReleaseLoader = releaseLoader == nil
@@ -49,6 +61,7 @@ public final class ManagedToolService: ObservableObject {
         self.releaseLoader = releaseLoader ?? Self.makeReleaseLoader(session: session)
         self.executableResolver = executableResolver
         self.homebrewRunner = homebrewRunner
+        self.applicationIsRunning = applicationIsRunning
         self.automaticUpdateSleep = automaticUpdateSleep
         for tool in ManagedTool.allCases { states[tool] = ManagedToolState() }
         restoreCachedStates()
@@ -119,6 +132,17 @@ public final class ManagedToolService: ObservableObject {
     /// The downloaded build wins, otherwise clicking "Update" would be pointless.
     public func resolvedExecutable(for tool: ManagedTool) -> (url: URL, location: ManagedToolState.Location)? {
         if let executableResolver { return executableResolver(tool) }
+        if tool == .pulse {
+            let personal = applicationsDirectory.appendingPathComponent("Pulse.app/Contents/MacOS/Pulse")
+            for path in [personal.path] + Self.externalPaths(for: tool) {
+                let executable = URL(fileURLWithPath: path)
+                let application = executable.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                if Self.applicationVersion(at: application) != nil, let trusted = trustedExecutable(executable) {
+                    return (trusted, path == personal.path ? .managed : .external(path))
+                }
+            }
+            return nil
+        }
         if !tool.usesHomebrew {
             let managed = toolsDirectory.appendingPathComponent(tool.executableName, isDirectory: false)
             if let trusted = trustedExecutable(managed) {
@@ -172,6 +196,9 @@ public final class ManagedToolService: ObservableObject {
                 "/opt/homebrew/bin/keka",
                 "/Applications/Keka.app/Contents/MacOS/Keka",
             ]
+        }
+        if tool == .pulse {
+            return ["/Applications/Pulse.app/Contents/MacOS/Pulse"]
         }
 
         // Common paths for command-line tools.
@@ -243,6 +270,9 @@ public final class ManagedToolService: ObservableObject {
         at url: URL,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) async -> String? {
+        if tool == .pulse {
+            return applicationVersion(at: url.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent())
+        }
         if tool.usesNativeApplicationVersion {
             return nativeApplicationVersion(at: url)
         }
@@ -344,6 +374,9 @@ public final class ManagedToolService: ObservableObject {
         let assets = root["assets"] as? [[String: Any]] ?? []
         let matched = assets.first { asset in
             guard let name = asset["name"] as? String else { return false }
+            if case .githubApplication = tool.installationSource {
+                return name == "\(tool.displayName)-\(version).zip" && tool.matchesAsset(name: name)
+            }
             return tool.matchesAsset(name: name)
         }
         guard let matched,
@@ -353,6 +386,12 @@ public final class ManagedToolService: ObservableObject {
             throw ManagedToolError.assetNotFound(tool: tool.displayName)
         }
         try validate(url)
+        if case .githubApplication(let repository) = tool.installationSource {
+            let expected = "https://github.com/\(repository)/releases/download/\(tag)/\(tool.displayName)-\(version).zip"
+            guard url.absoluteString == expected else {
+                throw ManagedToolError.untrustedHost(url.absoluteString)
+            }
+        }
         return Release(version: version, assetURL: url)
     }
 
@@ -384,7 +423,7 @@ public final class ManagedToolService: ObservableObject {
         do {
             let latestVersion: String
             switch tool.installationSource {
-            case .githubRelease(let repository):
+            case .githubRelease(let repository), .githubApplication(let repository):
                 let data = try await releaseLoader(repository)
                 latestVersion = try Self.parseRelease(data, tool: tool).version
             case .homebrewCask(let caskName):
@@ -440,6 +479,8 @@ public final class ManagedToolService: ObservableObject {
                 switch tool.installationSource {
                 case .githubRelease(let repository):
                     try await installGitHubRelease(tool, repository: repository, updatingExisting: resolved.url)
+                case .githubApplication(let repository):
+                    try await installGitHubApplication(tool, repository: repository, updatingExisting: resolved.url)
                 case .homebrewCask(let name):
                     try await upgradeHomebrewTool(tool, name: name, kind: "--cask")
                 case .homebrewFormula(let name):
@@ -498,6 +539,8 @@ public final class ManagedToolService: ObservableObject {
             switch tool.installationSource {
             case .githubRelease(let repository):
                 try await installGitHubRelease(tool, repository: repository)
+            case .githubApplication(let repository):
+                try await installGitHubApplication(tool, repository: repository, updatingExisting: resolvedExecutable(for: tool)?.url)
             case .homebrewCask(let caskName):
                 try await installHomebrewCask(tool, caskName: caskName)
             case .homebrewFormula(let formulaName):
@@ -557,6 +600,143 @@ public final class ManagedToolService: ObservableObject {
         states[tool]?.location = .managed
         refreshedInstalledVersions.insert(tool)
         persistCachedStates()
+    }
+
+    private func installGitHubApplication(_ tool: ManagedTool, repository: String, updatingExisting: URL?) async throws {
+        let data = try await releaseLoader(repository)
+        let release = try Self.parseRelease(data, tool: tool)
+        states[tool]?.latestVersion = release.version
+        defer { persistCachedStates() }
+        let destination = updatingExisting.map { $0.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent() }
+            ?? applicationsDirectory.appendingPathComponent("Pulse.app", isDirectory: true)
+        let executable = destination.appendingPathComponent("Contents/MacOS/Pulse")
+        let location: ManagedToolState.Location = destination.deletingLastPathComponent().standardizedFileURL.path
+            == applicationsDirectory.standardizedFileURL.path ? .managed : .external(executable.path)
+
+        if let updatingExisting {
+            let current = resolvedExecutable(for: tool)
+            guard current?.url == updatingExisting,
+                  let version = Self.applicationVersion(at: destination)
+            else {
+                states[tool]?.location = current?.location
+                states[tool]?.installedVersion = current.flatMap {
+                    Self.applicationVersion(at: $0.url.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent())
+                }
+                return
+            }
+            states[tool]?.installedVersion = version
+            states[tool]?.location = location
+            guard version.compare(release.version, options: .numeric) == .orderedAscending else { return }
+        }
+        try Task.checkCancellation()
+        guard !applicationIsRunning("io.github.qunqin24.Pulse") else {
+            throw ManagedToolError.applicationRunning(tool.displayName)
+        }
+
+        states[tool]?.phase = .downloading(0)
+        let downloaded = try await download(release.assetURL)
+        defer { try? fileManager.removeItem(at: downloaded.deletingLastPathComponent()) }
+        let summary = try await Self.runProcess(
+            URL(fileURLWithPath: "/usr/bin/unzip"), arguments: ["-Z", "-t", downloaded.path], timeout: 30
+        ).get().split(separator: " ")
+        guard summary.count >= 5, let entries = Int(summary[0]), (1...4096).contains(entries),
+              let size = Int64(summary[2]), size <= Int64(Self.maximumDownloadBytes) else {
+            throw ManagedToolError.notExecutable(tool.displayName)
+        }
+        let listing = try await Self.runProcess(
+            URL(fileURLWithPath: "/usr/bin/tar"), arguments: ["-tf", downloaded.path], timeout: 30
+        ).get()
+        let members = listing.split(whereSeparator: \.isNewline)
+        guard members.count == entries, members.allSatisfy({ name in
+            name.hasPrefix("Pulse.app/")
+                && !name.split(separator: "/").contains("..") && !name.contains("\\")
+        }) else { throw ManagedToolError.notExecutable(tool.displayName) }
+        let unpacked = downloaded.deletingLastPathComponent().appendingPathComponent("unpacked", isDirectory: true)
+        try fileManager.createDirectory(at: unpacked, withIntermediateDirectories: true)
+        _ = try await Self.runProcess(
+            URL(fileURLWithPath: "/usr/bin/ditto"),
+            arguments: ["-x", "-k", downloaded.path, unpacked.path],
+            timeout: 120
+        ).get()
+
+        states[tool]?.phase = .installing
+        let source = unpacked.appendingPathComponent("Pulse.app", isDirectory: true)
+        try validateApplication(source, version: release.version)
+        try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let staging = destination.deletingLastPathComponent()
+            .appendingPathComponent(".Pulse.\(UUID().uuidString).app", isDirectory: true)
+        defer { try? fileManager.removeItem(at: staging) }
+        try fileManager.copyItem(at: source, to: staging)
+        try validateApplication(staging, version: release.version)
+        try Task.checkCancellation()
+        let current = resolvedExecutable(for: tool)
+        guard current?.url == updatingExisting else {
+            states[tool]?.location = current?.location
+            states[tool]?.installedVersion = current.flatMap {
+                Self.applicationVersion(at: $0.url.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent())
+            }
+            throw CancellationError()
+        }
+        if updatingExisting != nil {
+            guard let version = Self.applicationVersion(at: destination) else {
+                throw ManagedToolError.notExecutable(tool.displayName)
+            }
+            states[tool]?.installedVersion = version
+            guard version.compare(release.version, options: .numeric) == .orderedAscending else { return }
+        }
+        guard !applicationIsRunning("io.github.qunqin24.Pulse") else {
+            throw ManagedToolError.applicationRunning(tool.displayName)
+        }
+        // A failed swap leaves the installed bundle untouched; after success the staging name holds the old version.
+        let flags = updatingExisting == nil ? UInt32(RENAME_EXCL) : UInt32(RENAME_SWAP)
+        guard renamex_np(staging.path, destination.path, flags) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        states[tool]?.installedVersion = release.version
+        states[tool]?.location = location
+    }
+
+    private static func applicationVersion(at url: URL) -> String? {
+        let paths: [(String, FileAttributeType)] = [
+            ("", .typeDirectory), ("Contents", .typeDirectory), ("Contents/MacOS", .typeDirectory),
+            ("Contents/Info.plist", .typeRegular), ("Contents/MacOS/Pulse", .typeRegular),
+        ]
+        guard paths.allSatisfy({ path, type in
+            (try? FileManager.default.attributesOfItem(atPath: url.appendingPathComponent(path).path)[.type]) as? FileAttributeType == type
+        }), FileManager.default.isExecutableFile(atPath: url.appendingPathComponent("Contents/MacOS/Pulse").path),
+              let data = try? Data(contentsOf: url.appendingPathComponent("Contents/Info.plist")),
+              let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              info["CFBundleIdentifier"] as? String == "io.github.qunqin24.Pulse",
+              info["CFBundleExecutable"] as? String == "Pulse",
+              let version = info["CFBundleShortVersionString"] as? String,
+              ManagedTool.pulse.matchesAsset(name: "Pulse-\(version).zip")
+        else { return nil }
+        return version
+    }
+
+    private func validateApplication(_ url: URL, version: String) throws {
+        let invalid = ManagedToolError.notExecutable(ManagedTool.pulse.displayName)
+        guard Self.applicationVersion(at: url) == version,
+              trustedExecutable(url.appendingPathComponent("Contents/MacOS/Pulse")) != nil
+        else { throw invalid }
+        let prefix = url.resolvingSymlinksInPath().standardizedFileURL.path + "/"
+        var enumerationError: Error?
+        guard let contents = fileManager.enumerator(at: url, includingPropertiesForKeys: nil, errorHandler: { _, error in
+            enumerationError = error
+            return false
+        }) else { throw invalid }
+        for case let item as URL in contents {
+            let type = try fileManager.attributesOfItem(atPath: item.path)[.type] as? FileAttributeType
+            if type == .typeSymbolicLink {
+                // Framework links must remain valid when the bundle moves out of the temporary directory.
+                guard item.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(prefix) else {
+                    throw invalid
+                }
+            } else if type != .typeRegular && type != .typeDirectory {
+                throw invalid
+            }
+        }
+        if let enumerationError { throw enumerationError }
     }
 
     private func installHomebrewCask(_ tool: ManagedTool, caskName: String) async throws {
@@ -705,15 +885,15 @@ public final class ManagedToolService: ObservableObject {
             throw ManagedToolError.downloadFailed(AppLocalization.text("下载文件超过大小限制"))
         }
         // The temporary file from download(for:) is reclaimed right after this await, so move it into a directory we own first.
-        let workDirectory = FileManager.default.temporaryDirectory
+        let workDirectory = fileManager.temporaryDirectory
             .appendingPathComponent("zisla-tool-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: workDirectory, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: workDirectory, withIntermediateDirectories: true)
         let destination = workDirectory.appendingPathComponent(url.lastPathComponent)
         do {
-            try FileManager.default.moveItem(at: temporaryURL, to: destination)
+            try fileManager.moveItem(at: temporaryURL, to: destination)
             return destination
         } catch {
-            try? FileManager.default.removeItem(at: workDirectory)
+            try? fileManager.removeItem(at: workDirectory)
             throw error
         }
     }

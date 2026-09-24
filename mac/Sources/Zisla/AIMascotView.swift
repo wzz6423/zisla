@@ -60,6 +60,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     case claude
     case codex
     case gemini
+    case antigravity
     case geminiDesktop
     case grok
     case gpt
@@ -93,6 +94,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .claude: self = .claude
         case .codex: self = .codex
         case .gemini: self = .gemini
+        case .antigravity: self = .antigravity
         case .grok: self = .grok
         case .gpt: self = .gpt
         case .copilot: self = .copilot
@@ -162,6 +164,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .claude: .claude
         case .codex: .codex
         case .gemini: .gemini
+        case .antigravity: .antigravity
         case .geminiDesktop: .gemini
         case .grok: .grok
         case .gpt: .gpt
@@ -245,6 +248,12 @@ struct AIMascotView: View {
         case .geminiDesktop:
             return AIMascotImageCache.shared.image(for: "installed|gemini") {
                 AIMascotLibrary.installedGeminiApplicationURL().map {
+                    NSWorkspace.shared.icon(forFile: $0.path)
+                }
+            }
+        case .antigravity:
+            return AIMascotImageCache.shared.image(for: "installed|antigravity") {
+                AIMascotLibrary.installedAntigravityApplicationURL().map {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }

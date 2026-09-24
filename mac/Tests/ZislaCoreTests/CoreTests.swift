@@ -1078,6 +1078,7 @@ struct CLIParserTests {
         #expect(AIProvider(token: "openai-codex") == .codex)
         #expect(AIProvider(token: "gemini") == .gemini)
         #expect(AIProvider(token: "google-gemini") == .gemini)
+        #expect(AIProvider(token: "antigravity-ide") == .antigravity)
         #expect(AIProvider(token: "claude-code") == .claude)
         #expect(AIProvider(token: "qwen-code") == .qwen)
         #expect(AIProvider(token: "qoder") == .coder)
