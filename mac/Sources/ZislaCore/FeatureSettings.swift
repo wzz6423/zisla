@@ -396,6 +396,21 @@ public enum ScreenshotHotkeyDefaults {
         carbonModifiers: 0x1000,
         keyDisplayName: "2"
     )
+    public static let longCapture = VoiceInputHotkeyPreset(
+        keyCode: 20,
+        carbonModifiers: 0x1000,
+        keyDisplayName: "3"
+    )
+    public static let tools: [String: VoiceInputHotkeyPreset] = [
+        "rectangle": .init(keyCode: 23, carbonModifiers: 0x1000, keyDisplayName: "5"),
+        "ellipse": .init(keyCode: 22, carbonModifiers: 0x1000, keyDisplayName: "6"),
+        "brush": .init(keyCode: 26, carbonModifiers: 0x1000, keyDisplayName: "7"),
+        "arrow": .init(keyCode: 28, carbonModifiers: 0x1000, keyDisplayName: "8"),
+        "number": .init(keyCode: 25, carbonModifiers: 0x1000, keyDisplayName: "9"),
+        "text": .init(keyCode: 29, carbonModifiers: 0x1000, keyDisplayName: "0"),
+        "emoji": .init(keyCode: 23, carbonModifiers: 0x1200, keyDisplayName: "5"),
+        "mosaic": .init(keyCode: 22, carbonModifiers: 0x1200, keyDisplayName: "6"),
+    ]
 }
 
 public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
@@ -635,6 +650,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var screenshotHotkey: VoiceInputHotkeyPreset
     /// Global hotkey for toggling screenshot pin state.
     public var screenshotPinHotkey: VoiceInputHotkeyPreset
+    /// Opens screenshot selection; scrolling capture still starts from the editor toolbar.
+    public var screenshotLongHotkey: VoiceInputHotkeyPreset
+    /// Shortcuts that select annotation tools while the screenshot editor is active.
+    public var screenshotToolHotkeys: [String: VoiceInputHotkeyPreset]
     /// Whether the pinned screenshot shows its bottom control bar.
     public var screenshotPinnedToolbarVisible: Bool
     /// Whether the integrated keyboard sounds are enabled.
@@ -729,6 +748,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         screenshotEnabled: Bool = true,
         screenshotHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.capture,
         screenshotPinHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.pin,
+        screenshotLongHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.longCapture,
+        screenshotToolHotkeys: [String: VoiceInputHotkeyPreset] = ScreenshotHotkeyDefaults.tools,
         screenshotPinnedToolbarVisible: Bool = true,
         keyboardEnabled: Bool = true,
         keyboardSelectedProfileID: String = "holypanda",
@@ -835,6 +856,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.screenshotEnabled = screenshotEnabled
         self.screenshotHotkey = screenshotHotkey
         self.screenshotPinHotkey = screenshotPinHotkey
+        self.screenshotLongHotkey = screenshotLongHotkey
+        self.screenshotToolHotkeys = screenshotToolHotkeys
         self.screenshotPinnedToolbarVisible = screenshotPinnedToolbarVisible
         self.keyboardEnabled = keyboardEnabled
         self.keyboardSelectedProfileID = keyboardSelectedProfileID
@@ -956,6 +979,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case screenshotEnabled
         case screenshotHotkey
         case screenshotPinHotkey
+        case screenshotLongHotkey
+        case screenshotToolHotkeys
         case screenshotPinnedToolbarVisible
         case keyboardEnabled
         case keyboardSelectedProfileID
@@ -1231,6 +1256,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             VoiceInputHotkeyPreset.self,
             forKey: .screenshotPinHotkey
         ) ?? defaults.screenshotPinHotkey
+        screenshotLongHotkey = try container.decodeIfPresent(
+            VoiceInputHotkeyPreset.self,
+            forKey: .screenshotLongHotkey
+        ) ?? defaults.screenshotLongHotkey
+        screenshotToolHotkeys = try container.decodeIfPresent(
+            [String: VoiceInputHotkeyPreset].self,
+            forKey: .screenshotToolHotkeys
+        ) ?? defaults.screenshotToolHotkeys
         screenshotPinnedToolbarVisible = try container.decodeIfPresent(
             Bool.self,
             forKey: .screenshotPinnedToolbarVisible

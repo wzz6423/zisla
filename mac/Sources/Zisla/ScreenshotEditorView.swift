@@ -44,6 +44,17 @@ enum ScreenshotTool: String, CaseIterable, Identifiable {
         case .mosaic: "马赛克"
         }
     }
+
+    static func matchingShortcut(
+        keyCode: UInt32,
+        modifiers: UInt32,
+        hotkeys: [String: VoiceInputHotkeyPreset]
+    ) -> Self? {
+        allCases.first { tool in
+            guard let hotkey = hotkeys[tool.rawValue] else { return false }
+            return hotkey.keyCode == keyCode && hotkey.carbonModifiers == modifiers
+        }
+    }
 }
 
 enum ScreenshotArrowStyle: String, CaseIterable, Identifiable, Equatable {
@@ -6683,6 +6694,20 @@ final class ScreenshotEditorWindow: NSWindow {
     var onSave: (() -> Void)?
     /// Returns false while editing so ⌘C stays with the inline text editor; only the pinned image copies here.
     var onCopyImage: (() -> Bool)?
+    var onToolHotkey: ((UInt32, UInt32) -> Bool)?
+
+    static func reservedAction(for hotkey: VoiceInputHotkeyPreset) -> String? {
+        switch (hotkey.keyCode, hotkey.carbonModifiers) {
+        case (UInt32(kVK_Return), 0), (UInt32(kVK_ANSI_KeypadEnter), 0),
+             (UInt32(kVK_ANSI_C), 0x0100): "复制"
+        case (UInt32(kVK_Escape), 0): "关闭"
+        case (UInt32(kVK_Delete), 0), (UInt32(kVK_ForwardDelete), 0): "删除"
+        case (UInt32(kVK_ANSI_Z), 0x0100): "撤销"
+        case (UInt32(kVK_ANSI_Z), 0x0300): "重做"
+        case (UInt32(kVK_ANSI_S), 0x0100): "保存"
+        default: nil
+        }
+    }
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -6701,13 +6726,23 @@ final class ScreenshotEditorWindow: NSWindow {
            NSApp.sendAction(action, to: firstResponder, from: self) {
             return true
         }
-        return handleEditingKey(event) || super.performKeyEquivalent(with: event)
+        return handleEditingKey(event) || handleToolHotkey(event) || super.performKeyEquivalent(with: event)
     }
 
     override func keyDown(with event: NSEvent) {
         if handleImageShortcut(event) { return }
         if handleEditingKey(event) { return }
         super.keyDown(with: event)
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        let pressedModifiers = GlobalHotkeyManager.modifierSides(
+            from: CGEventFlags(rawValue: UInt64(event.modifierFlags.rawValue))
+        )
+        if pressedModifiers.count == 1,
+           pressedModifiers.first?.keyCode == UInt32(event.keyCode),
+           handleToolHotkey(event) { return }
+        super.flagsChanged(with: event)
     }
 
     override func cancelOperation(_ sender: Any?) {
@@ -6773,6 +6808,14 @@ final class ScreenshotEditorWindow: NSWindow {
         default:
             return false
         }
+    }
+
+    private func handleToolHotkey(_ event: NSEvent) -> Bool {
+        guard !(firstResponder is NSTextView) else { return false }
+        return onToolHotkey?(
+            UInt32(event.keyCode),
+            GlobalHotkeyManager.carbonModifiers(from: event.modifierFlags)
+        ) ?? false
     }
 }
 
@@ -6901,6 +6944,20 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         window.onDelete = { [weak self] in self?.deleteSelectedAnnotation() ?? false }
         window.onSave = { [weak self] in self?.saveImage() }
         window.onCopyImage = { [weak self] in self?.copyPinnedImage() ?? false }
+        window.onToolHotkey = { [weak self] keyCode, modifiers in
+            guard let self, !self.isPinnedImagePresentation,
+                  let tool = ScreenshotTool.matchingShortcut(
+                    keyCode: keyCode,
+                    modifiers: modifiers,
+                    hotkeys: AppModel.shared.settingsStore.settings.screenshotToolHotkeys
+                  )
+            else { return false }
+            if self.model.tool != tool {
+                self.annotationSelectionState.deselect()
+            }
+            self.model.tool = tool
+            return true
+        }
         configureOverlayView(in: window)
         window.delegate = self
     }

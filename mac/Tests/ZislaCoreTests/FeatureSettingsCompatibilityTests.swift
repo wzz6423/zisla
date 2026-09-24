@@ -1215,7 +1215,7 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
-    func screenshotHotkeysDefaultToCtrl1AndCtrl2ForLegacySettings() throws {
+    func screenshotHotkeysDefaultForLegacySettings() throws {
         let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
 
@@ -1229,6 +1229,11 @@ struct FeatureSettingsCompatibilityTests {
         #expect(decoded.screenshotPinHotkey.keyDisplayName == "2")
         #expect(decoded.screenshotHotkey == ScreenshotHotkeyDefaults.capture)
         #expect(decoded.screenshotPinHotkey == ScreenshotHotkeyDefaults.pin)
+        #expect(decoded.screenshotLongHotkey == ScreenshotHotkeyDefaults.longCapture)
+        #expect(decoded.screenshotLongHotkey.keyCode == 20)
+        #expect(decoded.screenshotLongHotkey.carbonModifiers == 0x1000)
+        #expect(decoded.screenshotToolHotkeys == ScreenshotHotkeyDefaults.tools)
+        #expect(decoded.screenshotToolHotkeys.count == 8)
     }
 
     @Test
@@ -1269,6 +1274,16 @@ struct FeatureSettingsCompatibilityTests {
             carbonModifiers: 0x0800,
             keyDisplayName: "M"
         )
+        settings.screenshotLongHotkey = VoiceInputHotkeyPreset(
+            keyCode: 17,
+            carbonModifiers: 0x0100,
+            keyDisplayName: "T"
+        )
+        settings.screenshotToolHotkeys["rectangle"] = VoiceInputHotkeyPreset(
+            keyCode: 15,
+            carbonModifiers: 0x0100,
+            keyDisplayName: "R"
+        )
 
         let decoded = try JSONDecoder().decode(
             FeatureSettings.self,
@@ -1282,6 +1297,53 @@ struct FeatureSettingsCompatibilityTests {
         #expect(decoded.screenshotPinHotkey.keyCode == 46)
         #expect(decoded.screenshotPinHotkey.carbonModifiers == 0x0800)
         #expect(decoded.screenshotPinHotkey.keyDisplayName == "M")
+        #expect(decoded.screenshotLongHotkey == settings.screenshotLongHotkey)
+        #expect(decoded.screenshotToolHotkeys == settings.screenshotToolHotkeys)
+    }
+
+    @Test
+    func screenshotToolDefaultsFollowControlNumberSequence() {
+        let expected: [(String, UInt32, UInt32)] = [
+            ("rectangle", 23, 0x1000),
+            ("ellipse", 22, 0x1000),
+            ("brush", 26, 0x1000),
+            ("arrow", 28, 0x1000),
+            ("number", 25, 0x1000),
+            ("text", 29, 0x1000),
+            ("emoji", 23, 0x1000 | 0x0200),
+            ("mosaic", 22, 0x1000 | 0x0200),
+        ]
+        for (tool, keyCode, modifiers) in expected {
+            let hotkey = ScreenshotHotkeyDefaults.tools[tool]
+            #expect(hotkey?.keyCode == keyCode, "Wrong key for \(tool)")
+            #expect(hotkey?.carbonModifiers == modifiers, "Wrong modifiers for \(tool)")
+        }
+    }
+
+    @Test
+    func screenshotHotkeysDecodeNullAndEmptyValuesAndRejectMalformedRecords() throws {
+        let nullValues = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: Data(#"{"screenshotLongHotkey":null,"screenshotToolHotkeys":null}"#.utf8)
+        )
+        #expect(nullValues.screenshotLongHotkey == ScreenshotHotkeyDefaults.longCapture)
+        #expect(nullValues.screenshotToolHotkeys == ScreenshotHotkeyDefaults.tools)
+
+        let emptyTools = try JSONDecoder().decode(
+            FeatureSettings.self,
+            from: Data(#"{"screenshotToolHotkeys":{}}"#.utf8)
+        )
+        #expect(emptyTools.screenshotToolHotkeys.isEmpty)
+
+        for json in [
+            #"{"screenshotLongHotkey":"unknown"}"#,
+            #"{"screenshotToolHotkeys":[]}"#,
+            #"{"screenshotToolHotkeys":{"rectangle":{"keyCode":"invalid"}}}"#,
+        ] {
+            #expect(throws: DecodingError.self) {
+                _ = try JSONDecoder().decode(FeatureSettings.self, from: Data(json.utf8))
+            }
+        }
     }
 
     @Test

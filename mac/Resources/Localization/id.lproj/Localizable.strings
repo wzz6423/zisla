@@ -2287,6 +2287,7 @@
 "%@（已导入）" = "%@ (diimpor)";
 "显示器 %ld" = "Layar %ld";
 "%@快捷键与%@冲突，未保存" = "Pintasan %@ berbenturan dengan %@ dan tidak disimpan";
+"%@快捷键与%@冲突，请修改其中一个" = "Pintasan %@ berbenturan dengan %@; ubah salah satunya";
 "%@快捷键与语音输入冲突，未保存" = "Pintasan %@ berbenturan dengan input suara dan tidak disimpan";
 "正在下载 %ld%%" = "Mengunduh %ld%%";
 "未安装 · %@ · %@" = "Belum diinstal · %@ · %@";

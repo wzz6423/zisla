@@ -251,7 +251,7 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
         }
     }
 
-    static func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
+    public static func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
         var modifiers: UInt32 = 0
         if flags.contains(.command) { modifiers |= UInt32(cmdKey) }
         if flags.contains(.shift) { modifiers |= UInt32(shiftKey) }
@@ -444,7 +444,7 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
         return modifierSides
     }
 
-    static func modifierSides(from flags: CGEventFlags) -> Set<VoiceInputModifier> {
+    public static func modifierSides(from flags: CGEventFlags) -> Set<VoiceInputModifier> {
         Set(Self.deviceModifierMasks.compactMap { entry in
             flags.rawValue & entry.mask == 0 ? nil : entry.modifier
         })
