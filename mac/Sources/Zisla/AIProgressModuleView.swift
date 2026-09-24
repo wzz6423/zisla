@@ -174,7 +174,7 @@ private struct UsageTrendChart: View {
         }
         .chartXAxis {
             AxisMarks(values: xAxisValues) { value in
-                AxisValueLabel(anchor: .top) {
+                AxisValueLabel(centered: false, anchor: .top) {
                     if let date = value.as(Date.self) {
                         Text(date, format: .dateTime.month(.twoDigits).day(.twoDigits))
                             .font(.islandMicro(design: .monospaced))
