@@ -1,11 +1,81 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ZislaCore
 
 @testable import Zisla
 
 struct ClipboardAssistantIslandPresentationTests {
+    @MainActor
+    @Test(.serialized, arguments: [false, true])
+    func physicalNotchButtonsDismissThePromptWithoutTakingFocus(performsPrimaryAction: Bool) throws {
+        _ = NSApplication.shared
+        let wasActive = NSApp.isActive
+        let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
+        controller.displayDuration = .never
+        controller.presentation.islandTopHeight = 37
+        controller.presentation.physicalNotchWidth = 185
+        controller.presentation.progressGlowEnabled = false
+        controller.presentation.detection = ClipboardAssistantDetection(
+            kind: .nonSystemLanguageText,
+            title: "copied text",
+            detail: .characterAndWordCount(characters: 1726, words: 27),
+            actions: [.translate("copied text")]
+        )
+        var actions: [ClipboardAssistantAction] = []
+        controller.onPerformAction = { actions.append($0) }
+        let host = NSHostingView(rootView: ClipboardAssistantToastView(
+            presentation: controller.presentation,
+            controller: controller
+        ).environment(\.locale, Locale(identifier: "zh-Hans")))
+        host.sizingOptions = []
+        host.wantsLayer = true
+        host.layer?.backgroundColor = NSColor.clear.cgColor
+        let panel = ClipboardAssistantWindow(
+            contentView: host,
+            frame: CGRect(x: -100_000, y: -100_000, width: 533, height: 37)
+        )
+        defer { panel.orderOut(nil) }
+        #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) })
+        // SwiftUI installs its event graph only after the window is ordered in.
+        panel.orderFrontRegardless()
+        host.layoutSubtreeIfNeeded()
+        let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        let point = CGPoint(x: performsPrimaryAction ? 443 : 509, y: 18.5)
+        let down = try #require(NSEvent.mouseEvent(
+            with: .leftMouseDown,
+            location: point,
+            modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: panel.windowNumber,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1
+        ))
+        let up = try #require(NSEvent.mouseEvent(
+            with: .leftMouseUp,
+            location: point,
+            modifierFlags: [],
+            timestamp: down.timestamp + 0.1,
+            windowNumber: panel.windowNumber,
+            context: nil,
+            eventNumber: 1,
+            clickCount: 1,
+            pressure: 0
+        ))
+        panel.sendEvent(down)
+        panel.sendEvent(up)
+
+        #expect(controller.presentation.detection == nil)
+        #expect(actions == (performsPrimaryAction ? [.translate("copied text")] : []))
+        #expect(!panel.isKeyWindow)
+        #expect(!panel.canBecomeKey)
+        #expect(NSApp.isActive == wasActive)
+    }
+
     @Test
     func physicalNotchHeaderReservesTheHardwareCutout() {
         #expect(ClipboardAssistantToastView.physicalNotchSideWidth(totalWidth: 480, notchWidth: 185) == 147.5)
