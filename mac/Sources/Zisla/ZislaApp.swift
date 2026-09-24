@@ -1370,7 +1370,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         beginScreenshot(pinAfterCapture: true)
     }
 
-    private func beginScreenshot(pinAfterCapture: Bool) {
+    private func beginScreenshot(pinAfterCapture: Bool, startLongCaptureAfterSelection: Bool = false) {
         guard AppModel.shared.settingsStore.settings.screenshotEnabled else { return }
         guard screenshotSelectionController == nil else { return }
         let editors = [screenshotEditorController].compactMap { $0 } + additionalScreenshotEditors
@@ -1474,6 +1474,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             editor.present()
             if shouldPin {
                 editor.setPinned(true)
+            } else if startLongCaptureAfterSelection {
+                editor.captureNextScreen()
             }
         }
         controller.onCancelled = { [weak self] in
@@ -1551,7 +1553,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         else { return }
         let longResult = screenshotLongHotkeyManager.register(
             hotkey: settings.screenshotLongHotkey,
-            onKeyDown: { [weak self] in self?.startScreenshot() },
+            onKeyDown: { [weak self] in
+                self?.beginScreenshot(pinAfterCapture: false, startLongCaptureAfterSelection: true)
+            },
             onKeyUp: {}
         )
         reportScreenshotHotkeyRegistration(longResult, actionName: AppLocalization.text("长截图"))

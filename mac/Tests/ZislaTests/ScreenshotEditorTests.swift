@@ -633,6 +633,48 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func editorWindowDispatchesDefaultToolShortcutsFromWindowEvents() throws {
+        let window = ScreenshotEditorWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        var selected: [ScreenshotTool] = []
+        window.onToolHotkey = { keyCode, modifiers in
+            guard let tool = ScreenshotTool.matchingShortcut(
+                keyCode: keyCode,
+                modifiers: modifiers,
+                hotkeys: ScreenshotHotkeyDefaults.tools
+            ) else { return false }
+            selected.append(tool)
+            return true
+        }
+
+        for tool in ScreenshotTool.allCases {
+            let hotkey = try #require(ScreenshotHotkeyDefaults.tools[tool.rawValue])
+            let modifiers: NSEvent.ModifierFlags = hotkey.carbonModifiers == 0x1200
+                ? [.control, .shift] : [.control]
+            let event = try #require(NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: modifiers,
+                timestamp: 0,
+                windowNumber: window.windowNumber,
+                context: nil,
+                characters: hotkey.keyDisplayName,
+                charactersIgnoringModifiers: hotkey.keyDisplayName,
+                isARepeat: false,
+                keyCode: UInt16(hotkey.keyCode)
+            ))
+            window.sendEvent(event)
+        }
+
+        #expect(selected == ScreenshotTool.allCases)
+    }
+
+    @Test
     func editorWindowRoutesUnmodifiedToolShortcutsThroughKeyDown() throws {
         let window = ScreenshotEditorWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),

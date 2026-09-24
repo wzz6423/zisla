@@ -7335,7 +7335,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         restoreEditorPresentation()
     }
 
-    private func captureNextScreen() {
+    func captureNextScreen() {
         guard !isClosed else { return }
         guard let screen = activeScreen else {
             model.statusMessage = AppLocalization.text("找不到显示器")
