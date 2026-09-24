@@ -2499,6 +2499,7 @@
 "在设置中显示推荐工具和管理入口" = "Mostrar ferramentas recomendadas e seus controles de gerenciamento nos Ajustes";
 "自动更新推荐工具" = "Atualizar ferramentas recomendadas automaticamente";
 "每天更新已安装的推荐工具；不会安装未安装的工具" = "Atualizar diariamente as ferramentas recomendadas já instaladas; as ausentes não serão instaladas";
+"录屏与视频编辑" = "Gravação de tela e edição de vídeo";
 
 "窗口预览" = "Prévia de janelas";
 "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Visualize janelas ao passar o cursor no Dock ou usar Command-Tab; requer permissões de Acessibilidade e Gravação de Tela";

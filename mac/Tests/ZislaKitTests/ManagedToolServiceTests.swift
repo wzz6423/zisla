@@ -6,6 +6,11 @@ import ZislaCore
 
 @MainActor
 struct ManagedToolServiceTests {
+    @Test
+    func recommendedCatalogContainsOpenScreen() {
+        #expect(ManagedTool(rawValue: "openScreen") == .openScreen)
+    }
+
     private func releaseJSON(tag: String, assets: [String]) -> Data {
         let assetObjects = assets.map { name in
             """
@@ -70,6 +75,102 @@ struct ManagedToolServiceTests {
     }
 
     @Test
+    func openScreenUsesItsMaintainedHomebrewCaskAndApplicationBundle() {
+        #expect(ManagedTool.openScreen.displayName == "OpenScreen")
+        #expect(ManagedTool.openScreen.installationSource == .homebrewCask(name: "getopenscreen/openscreen/openscreen"))
+        #expect(ManagedTool.openScreen.requiredHomebrewTap == "getopenscreen/openscreen")
+        #expect(ManagedTool.openScreen.executableName == "Openscreen")
+        #expect(ManagedTool.openScreen.usesNativeApplicationVersion)
+        #expect(ManagedTool.openScreen.recommendationGroup == .desktopApplication)
+        #expect(ManagedToolService.externalPaths(for: .openScreen) == [
+            "/Applications/Openscreen.app/Contents/MacOS/Openscreen"
+        ])
+    }
+
+    @Test
+    func openScreenInstallationUsesItsTapAndFullyQualifiedCask() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-openscreen-install-\(UUID().uuidString)", isDirectory: true)
+        let executable = root.appendingPathComponent("Openscreen.app/Contents/MacOS/Openscreen")
+        let infoURL = root.appendingPathComponent("Openscreen.app/Contents/Info.plist")
+        let suiteName = "ManagedToolServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        try FileManager.default.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data().write(to: executable)
+        let info = [
+            "CFBundleIdentifier": "com.etiennelescot.openscreen",
+            "CFBundleExecutable": "Openscreen",
+            "CFBundlePackageType": "APPL",
+            "CFBundleShortVersionString": "1.12.2",
+        ]
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+            .write(to: infoURL)
+
+        var installed = false
+        var commands: [[String]] = []
+        let service = ManagedToolService(
+            toolsDirectory: root.appendingPathComponent("Tools"),
+            bundleURL: root,
+            defaults: defaults,
+            executableResolver: { tool in
+                tool == .openScreen && installed ? (executable, .homebrew) : nil
+            },
+            homebrewRunner: { arguments, _ in
+                commands.append(arguments)
+                switch arguments.first {
+                case "tap": return ""
+                case "info":
+                    return #"{"casks":[{"token":"openscreen","full_token":"getopenscreen/openscreen/openscreen","version":"1.12.2"}]}"#
+                case "install":
+                    installed = true
+                    return ""
+                default:
+                    Issue.record("Unexpected Homebrew command: \(arguments)")
+                    return ""
+                }
+            }
+        )
+
+        await service.install(.openScreen)
+
+        #expect(commands == [
+            ["tap", "getopenscreen/openscreen"],
+            ["info", "--cask", "--json=v2", "getopenscreen/openscreen/openscreen"],
+            ["install", "--cask", "getopenscreen/openscreen/openscreen"],
+        ])
+        #expect(service.states[.openScreen]?.installedVersion == "1.12.2")
+        #expect(service.states[.openScreen]?.latestVersion == "1.12.2")
+        #expect(service.states[.openScreen]?.location == .homebrew)
+        #expect(service.states[.openScreen]?.errorMessage == nil)
+    }
+
+    @Test
+    func openScreenTapFailureDoesNotAttemptInstall() async throws {
+        let suiteName = "ManagedToolServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var commands: [[String]] = []
+        let service = ManagedToolService(
+            defaults: defaults,
+            homebrewRunner: { arguments, _ in
+                commands.append(arguments)
+                throw ManagedToolError.homebrewFailed("tap unavailable")
+            }
+        )
+
+        await service.install(.openScreen)
+
+        #expect(commands == [["tap", "getopenscreen/openscreen"]])
+        #expect(service.states[.openScreen]?.location == nil)
+        #expect(service.states[.openScreen]?.phase == .idle)
+        #expect(service.states[.openScreen]?.errorMessage != nil)
+    }
+
+    @Test
     func zshellUsesTheHomebrewCaskAndExpectedExecutablePath() {
         #expect(ManagedTool.zshell.installationSource == .homebrewCask(name: "wzz6423/tap/zshell"))
         #expect(ManagedTool.zshell.requiredHomebrewTap == "wzz6423/tap")
@@ -121,7 +222,7 @@ struct ManagedToolServiceTests {
 
     @Test
     func desktopApplicationPurposesHaveTranslationsInEveryLanguage() throws {
-        for key in [ManagedTool.zshell.purpose, ManagedTool.dockDoor.purpose] {
+        for key in [ManagedTool.zshell.purpose, ManagedTool.dockDoor.purpose, ManagedTool.openScreen.purpose] {
             for language in AppLanguage.allCases {
                 let tableURL = Self.localizationURL
                     .appendingPathComponent("\(language.rawValue).lproj", isDirectory: true)
@@ -176,9 +277,10 @@ struct ManagedToolServiceTests {
             (.ytt, .homebrewFormula(name: "ytt"), "ytt"),
             (.kero, .homebrewCask(name: "egoist/tap/kero"), "kero"),
             (.dockDoor, .homebrewCask(name: "dockdoor"), "DockDoor"),
+            (.openScreen, .homebrewCask(name: "getopenscreen/openscreen/openscreen"), "Openscreen"),
         ]
 
-        #expect(ManagedTool.allCases.count == 47)
+        #expect(ManagedTool.allCases.count == 48)
         for (tool, source, executableName) in expected {
             #expect(tool.installationSource == source)
             #expect(tool.executableName == executableName)
@@ -197,7 +299,7 @@ struct ManagedToolServiceTests {
         #expect(count(.networkAndData) == 7)
         #expect(count(.developmentToolchain) == 21)
         #expect(count(.utility) == 3)
-        #expect(count(.desktopApplication) == 5)
+        #expect(count(.desktopApplication) == 6)
     }
 
     @Test

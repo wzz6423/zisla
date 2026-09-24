@@ -176,6 +176,9 @@ public final class ManagedToolService: ObservableObject {
                 "/Applications/Keka.app/Contents/MacOS/Keka",
             ]
         }
+        if tool == .openScreen {
+            return ["/Applications/Openscreen.app/Contents/MacOS/Openscreen"]
+        }
 
         // Common paths for command-line tools.
         let home = FileManager.default.homeDirectoryForCurrentUser.path

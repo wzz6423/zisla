@@ -69,6 +69,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     case ytDLP
     case libreOffice
     case keka
+    case openScreen
     case kaku
     case kero
     case markdownPreview
@@ -121,6 +122,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .ytDLP: "yt-dlp"
         case .libreOffice: "LibreOffice"
         case .keka: "Keka"
+        case .openScreen: "OpenScreen"
         case .kaku: "Kaku"
         case .kero: "Kero"
         case .markdownPreview: "Markdown Preview"
@@ -173,6 +175,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .ytDLP: "视频音频下载"
         case .libreOffice: "Office 转 PDF"
         case .keka: "压缩与解压"
+        case .openScreen: "录屏与视频编辑"
         case .kaku: "面向 AI 编码的终端"
         case .kero: "终端工作区"
         case .markdownPreview: "Markdown 预览"
@@ -226,6 +229,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .ytDLP: "yt-dlp"
         case .libreOffice: "soffice"
         case .keka: "keka"
+        case .openScreen: "Openscreen"
         case .kaku: "kaku"
         case .kero: "kero"
         case .markdownPreview: "mdp"
@@ -278,6 +282,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .ytDLP: .githubRelease(repository: "yt-dlp/yt-dlp")
         case .libreOffice: .homebrewCask(name: "libreoffice")
         case .keka: .homebrewCask(name: "keka")
+        case .openScreen: .homebrewCask(name: "getopenscreen/openscreen/openscreen")
         case .kaku: .homebrewCask(name: "tw93/tap/kakuku")
         case .kero: .homebrewCask(name: "egoist/tap/kero")
         case .markdownPreview: .homebrewCask(name: "markdown-preview")
@@ -288,6 +293,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
 
     var requiredHomebrewTap: String? {
         switch self {
+        case .openScreen: "getopenscreen/openscreen"
         case .kaku: "tw93/tap"
         case .kero: "egoist/tap"
         case .packer: "hashicorp/tap"
@@ -308,14 +314,14 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
             .developmentToolchain
         case .ytDLP, .libreOffice, .keka:
             .utility
-        case .kaku, .kero, .markdownPreview, .zshell, .dockDoor:
+        case .openScreen, .kaku, .kero, .markdownPreview, .zshell, .dockDoor:
             .desktopApplication
         }
     }
 
     var usesNativeApplicationVersion: Bool {
         switch self {
-        case .kaku, .kero, .markdownPreview, .keka, .zshell, .dockDoor: true
+        case .openScreen, .kaku, .kero, .markdownPreview, .keka, .zshell, .dockDoor: true
         default: false
         }
     }
