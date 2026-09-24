@@ -8,6 +8,8 @@ import Testing
 
 /// Fake FileManager for dependency injection; never touches the real filesystem.
 final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
+    private let directoryReadLock = NSLock()
+    private var directoryReadCounts: [String: Int] = [:]
     var existingPaths: Set<String> = []
     var directoryContents: [String: [URL]] = [:]
     var fileSystemAttributes: [String: [FileAttributeKey: Any]] = [:]
@@ -40,7 +42,16 @@ final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
         includingPropertiesForKeys keys: [URLResourceKey]?,
         options: FileManager.DirectoryEnumerationOptions
     ) throws -> [URL] {
-        directoryContents[url.path] ?? []
+        directoryReadLock.lock()
+        directoryReadCounts[url.path, default: 0] += 1
+        directoryReadLock.unlock()
+        return directoryContents[url.path] ?? []
+    }
+
+    func directoryReadCount(atPath path: String) -> Int {
+        directoryReadLock.lock()
+        defer { directoryReadLock.unlock() }
+        return directoryReadCounts[path, default: 0]
     }
 
     func attributesOfFileSystem(forPath path: String) throws -> [FileAttributeKey: Any] {
@@ -1018,6 +1029,100 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
+    func scanFindsApplicationSupportCachesWithoutOfferingApplicationData() throws {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let support = home.appendingPathComponent("Library/Application Support")
+        let app = support.appendingPathComponent("Code")
+        let cache = app.appendingPathComponent("Cache", isDirectory: true)
+        let codeCache = app.appendingPathComponent("Code Cache", isDirectory: true)
+        let gpuCache = app.appendingPathComponent("GPUCache", isDirectory: true)
+        let cachedData = app.appendingPathComponent("CachedData", isDirectory: true)
+        let workspace = app.appendingPathComponent("workspaceStorage")
+        mock.homeDirectory = home
+        mock.existingPaths = [support.path, app.path, cache.path, codeCache.path, gpuCache.path, cachedData.path, workspace.path]
+        mock.directoryContents[support.path] = [app]
+        mock.directoryContents[app.path] = [cache, codeCache, gpuCache, cachedData, workspace]
+        for url in [cache, codeCache, gpuCache, cachedData, workspace] {
+            mock.fileAttributes[url.path] = [.size: NSNumber(value: 4_096)]
+        }
+
+        let candidates = SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.appCache])
+        let urls = Set(candidates.map(\.url))
+
+        #expect(urls.contains(cache.standardizedFileURL))
+        #expect(urls.contains(codeCache.standardizedFileURL))
+        #expect(urls.contains(gpuCache.standardizedFileURL))
+        #expect(urls.contains(cachedData.standardizedFileURL))
+        #expect(!urls.contains(app.standardizedFileURL))
+        #expect(!urls.contains(workspace.standardizedFileURL))
+        #expect(SystemDiskCleanup.allowedScanRoots(fileManager: mock).contains {
+            $0.kind == .appCache && $0.url == cache.standardizedFileURL
+        })
+        let cacheCandidate = try #require(candidates.first { $0.url == cache.standardizedFileURL })
+        #expect(cacheCandidate.safetyLevel == .requiresManualReview)
+        let forged = DiskCleanupCandidate(url: workspace, kind: .appCache, byteSize: 4_096, displayName: "workspace")
+        mock.trashResults[cache.standardizedFileURL] = .success(home.appendingPathComponent(".Trash/Cache"))
+        let result = SystemDiskCleanup.trashSelected(candidates: [cacheCandidate, forged], fileManager: mock)
+        #expect(result.successCount == 1)
+        #expect(result.failures.map(\.url) == [workspace.standardizedFileURL])
+    }
+
+    @Test
+    func applicationSupportCacheSymlinkCannotOfferPersistentDataForCleanup() throws {
+        let fileManager = FileManager.default
+        let home = fileManager.temporaryDirectory.appendingPathComponent("zisla-cache-\(UUID().uuidString)")
+        defer { try? fileManager.removeItem(at: home) }
+        let support = home.appendingPathComponent("Library/Application Support")
+        let app = support.appendingPathComponent("Example")
+        let persistent = app.appendingPathComponent("workspaceStorage", isDirectory: true)
+        let cache = app.appendingPathComponent("Cache", isDirectory: true)
+        try fileManager.createDirectory(at: persistent, withIntermediateDirectories: true)
+        try fileManager.createSymbolicLink(at: cache, withDestinationURL: persistent)
+
+        let mock = MockFileManager()
+        mock.homeDirectory = home
+        mock.existingPaths = [support.path, app.path, persistent.path, cache.path]
+        mock.directoryContents[support.path] = [app]
+        mock.directoryContents[app.path] = [cache, persistent]
+        mock.trashResults[cache.standardizedFileURL] = .success(home.appendingPathComponent(".Trash/Cache"))
+
+        let candidates = SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.appCache])
+        #expect(!candidates.contains { $0.url.path == cache.path })
+        let forged = DiskCleanupCandidate(url: cache, kind: .appCache, byteSize: 0, displayName: "Cache")
+        let result = SystemDiskCleanup.trashSelected(candidates: [forged], fileManager: mock)
+        #expect(result.successCount == 0)
+        #expect(fileManager.fileExists(atPath: persistent.path))
+    }
+
+    @Test
+    func userSystemCachesAreSeparateFromApplicationCachesAndStayWithinTheirOwner() throws {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let caches = home.appendingPathComponent("Library/Caches")
+        let systemCache = caches.appendingPathComponent("com.apple.iconservices")
+        let appCache = caches.appendingPathComponent("com.example.app")
+        mock.homeDirectory = home
+        mock.existingPaths = [caches.path, systemCache.path, appCache.path]
+        mock.directoryContents[caches.path] = [systemCache, appCache]
+        mock.fileAttributes[systemCache.path] = [.size: NSNumber(value: 4_096)]
+        mock.fileAttributes[appCache.path] = [.size: NSNumber(value: 2_048)]
+        mock.trashResults[systemCache.standardizedFileURL] = .success(home.appendingPathComponent(".Trash/com.apple.iconservices"))
+
+        let candidates = SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.appCache, .cache])
+        #expect(candidates.first { $0.url == systemCache.standardizedFileURL }?.kind == .cache)
+        #expect(candidates.first { $0.url == systemCache.standardizedFileURL }?.safetyLevel == .requiresManualReview)
+        #expect(candidates.first { $0.url == appCache.standardizedFileURL }?.kind == .appCache)
+        #expect(SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.cache]).map(\.url) == [systemCache.standardizedFileURL])
+
+        let forged = DiskCleanupCandidate(url: appCache, kind: .cache, byteSize: 2_048, displayName: "forged")
+        let systemCandidate = try #require(candidates.first { $0.kind == .cache })
+        let result = SystemDiskCleanup.trashSelected(candidates: [forged, systemCandidate], fileManager: mock)
+        #expect(result.successCount == 1)
+        #expect(result.failures.map(\.url) == [appCache])
+    }
+
+    @Test
     func applicationContainerCleanupRootsExcludeApplicationData() {
         let mock = MockFileManager()
         let home = URL(fileURLWithPath: "/Users/test")
@@ -1449,6 +1554,54 @@ struct SystemMonitorServiceTests {
         let forgedResult = SystemDiskCleanup.trashSelected(candidates: [forgedAnalysisCandidate], fileManager: mock)
         #expect(forgedResult.successCount == 0)
         #expect(forgedResult.failures.first?.message.contains("仅用于分析") == true)
+    }
+
+    @Test
+    func smallPreferencesRequireInstalledAppEvidenceAndAreRecheckedBeforeTrash() throws {
+        let mock = MockFileManager()
+        let home = URL(fileURLWithPath: "/Users/test")
+        let preferences = home.appendingPathComponent("Library/Preferences")
+        let orphan = preferences.appendingPathComponent("net.example.removed.plist")
+        let wrongExtension = preferences.appendingPathComponent("net.example.other.txt")
+        mock.homeDirectory = home
+        mock.existingPaths = [preferences.path, orphan.path, wrongExtension.path]
+        mock.directoryContents[preferences.path] = [orphan, wrongExtension]
+        mock.fileAttributes[orphan.path] = [.size: NSNumber(value: 512)]
+        mock.fileAttributes[wrongExtension.path] = [.size: NSNumber(value: 512)]
+
+        #expect(SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.applicationResidual]).isEmpty)
+
+        let applications = URL(fileURLWithPath: "/Applications")
+        let app = applications.appendingPathComponent("Current.app")
+        let info = app.appendingPathComponent("Contents/Info.plist")
+        mock.existingPaths.formUnion([applications.path, app.path, info.path])
+        mock.directoryContents[applications.path] = [app]
+        mock.fileContentsData[info.path] = try PropertyListSerialization.data(
+            fromPropertyList: ["CFBundleIdentifier": "com.example.current"], format: .xml, options: 0
+        )
+
+        let candidates = SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.applicationResidual])
+        #expect(candidates.map(\.url) == [orphan.standardizedFileURL])
+        #expect(candidates.first?.safetyLevel == .requiresManualReview)
+
+        let secondOrphan = preferences.appendingPathComponent("org.other.leftover.plist")
+        mock.existingPaths.insert(secondOrphan.path)
+        mock.directoryContents[preferences.path] = [orphan, wrongExtension, secondOrphan]
+        mock.fileAttributes[secondOrphan.path] = [.size: NSNumber(value: 256)]
+        mock.trashResults[secondOrphan.standardizedFileURL] = .success(home.appendingPathComponent(".Trash/org.other.leftover.plist"))
+        let selected = SystemDiskCleanup.scanCandidates(fileManager: mock, kinds: [.applicationResidual])
+        #expect(selected.count == 2)
+
+        mock.fileContentsData[info.path] = try PropertyListSerialization.data(
+            fromPropertyList: ["CFBundleIdentifier": "NET.EXAMPLE.REMOVED"], format: .xml, options: 0
+        )
+        mock.trashResults[orphan.standardizedFileURL] = .success(home.appendingPathComponent(".Trash/net.example.removed.plist"))
+        let readsBeforeCleanup = mock.directoryReadCount(atPath: applications.path)
+        let result = SystemDiskCleanup.trashSelected(candidates: selected, fileManager: mock)
+        #expect(result.successCount == 1)
+        #expect(result.failures.map(\.url) == [orphan.standardizedFileURL])
+        #expect(result.failures.first?.message.contains("允许清理的用户目录") == true)
+        #expect(mock.directoryReadCount(atPath: applications.path) == readsBeforeCleanup + 1)
     }
 
     @Test
