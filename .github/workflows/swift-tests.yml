@@ -71,8 +71,10 @@ jobs:
         run: |
           # AppKit-heavy app tests can starve service timers in SwiftPM's shared test process.
           for target in ZislaCoreTests ZislaKitTests ZislaTests; do
-            swift test --filter "^${target}\." --skip '^ZislaTests\.(Mail(HTMLView|PaginationView)|ClipboardAssistantCurrencyPresentation)Tests'
+            swift test --filter "^${target}\." --skip '^(ZislaTests\.(Mail(HTMLView|PaginationView)|ClipboardAssistantCurrencyPresentation)|ZislaKitTests\.AIQuotaHTTPClient)Tests'
           done
+          # URLSession byte-stream tests need their own process under the full Kit test load.
+          swift test --filter '^ZislaKitTests\.AIQuotaHTTPClientTests'
           swift test --filter '^ZislaTests\.ClipboardAssistantCurrencyPresentationTests'
           # Run mail UI tests in their own process so unrelated modal UI cannot starve WebKit.
           swift test --filter '^ZislaTests\.Mail(HTMLView|PaginationView)Tests'
