@@ -600,13 +600,6 @@ struct SettingsView: View {
                         keyPath: \.clipboardAssistantPromptsForImageSaveLocation
                     )
                     rowDivider
-                    featureToggle(
-                        AppLocalization.text("下载与 AirDrop 完成提示"),
-                        detail: "完成后显示“打开文件夹”快捷操作",
-                        symbol: "folder.badge.plus",
-                        keyPath: \.downloadCompletionFolderActionEnabled
-                    )
-                    rowDivider
                     settingRow(
                         symbol: "magnifyingglass.circle",
                         title: "搜索引擎",
@@ -686,6 +679,14 @@ struct SettingsView: View {
                     ) {
                         EmptyView()
                     }
+                    rowDivider
+                    featureToggle(
+                        AppLocalization.text("下载与 AirDrop 完成提示"),
+                        detail: "完成后显示“打开文件夹”快捷操作",
+                        symbol: "folder.badge.plus",
+                        keyPath: \.downloadCompletionFolderActionEnabled,
+                        isNested: true
+                    )
                     ForEach(ClipboardAssistantKind.allCases, id: \.self) { kind in
                         rowDivider
                         settingRow(

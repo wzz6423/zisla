@@ -43,6 +43,23 @@ struct SettingsNavigationTests {
     }
 
     @Test
+    func downloadCompletionToggleIsNestedUnderRecognitionTypes() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        let heading = try #require(source.range(of: "title: \"识别类型\""))
+        let firstKind = try #require(source.range(
+            of: "ForEach(ClipboardAssistantKind.allCases, id: \\.self)",
+            range: heading.upperBound..<source.endIndex
+        ))
+        let toggle = try #require(source.range(of: "AppLocalization.text(\"下载与 AirDrop 完成提示\")"))
+
+        #expect(toggle.lowerBound > heading.upperBound)
+        #expect(toggle.lowerBound < firstKind.lowerBound)
+        let row = source[toggle.lowerBound..<firstKind.lowerBound]
+        #expect(row.contains("keyPath: \\.downloadCompletionFolderActionEnabled"))
+        #expect(row.contains("isNested: true"))
+    }
+
+    @Test
     func settingsContentTransitionTargetsMountedContent() throws {
         let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
         let detailRange = try #require(source.range(of: "    private var detail: some View {"))
