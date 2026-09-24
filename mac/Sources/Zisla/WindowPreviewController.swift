@@ -64,6 +64,23 @@ struct WindowPreviewLayout {
     }
 }
 
+enum WindowPreviewCapture {
+    static func configuration(for frame: CGRect) -> SCStreamConfiguration {
+        let configuration = SCStreamConfiguration()
+        let scale = min(420 / frame.width, 260 / frame.height, 2)
+        configuration.width = max(1, Int(frame.width * scale))
+        configuration.height = max(1, Int(frame.height * scale))
+        configuration.captureResolution = .best
+        configuration.ignoreShadowsSingleWindow = true
+        configuration.showsCursor = false
+        return configuration
+    }
+
+    static func image(from capture: CGImage) -> NSImage {
+        NSImage(cgImage: capture, size: .zero)
+    }
+}
+
 struct WindowPreviewSelection {
     let processIdentifier: pid_t
     let appName: String
@@ -77,6 +94,23 @@ struct WindowPreviewSnapshot: Identifiable {
     let title: String
     let frame: CGRect
     let image: NSImage?
+
+    var hasVisiblePixels: Bool {
+        guard let cgImage = image?.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
+        let bytesPerRow = cgImage.width * 4
+        var pixels = [UInt8](repeating: 0, count: bytesPerRow * cgImage.height)
+        guard let context = CGContext(
+            data: &pixels,
+            width: cgImage.width,
+            height: cgImage.height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return false }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
+        return stride(from: 3, to: pixels.count, by: 4).contains { pixels[$0] != 0 }
+    }
 }
 
 struct WindowPreviewWindowMatch {
@@ -337,6 +371,10 @@ final class WindowPreviewController: ObservableObject {
             return
         }
         if selection?.processIdentifier == next.processIdentifier && selection?.source == next.source {
+            if selection?.anchor != next.anchor {
+                selection = next
+                dependencies.present(self, next)
+            }
             return
         }
         clearSelection()
@@ -384,8 +422,8 @@ final class WindowPreviewController: ObservableObject {
                     self.stopMonitoring()
                     return
                 }
-                self.windows = snapshots
-                self.dependencies.present(self, selection)
+                self.windows = snapshots.filter(\.hasVisiblePixels)
+                self.dependencies.present(self, self.selection)
             } catch {
                 guard !Task.isCancelled, let self, self.generation == currentGeneration else { return }
                 if !self.dependencies.hasPermissions() {
@@ -409,11 +447,7 @@ final class WindowPreviewController: ObservableObject {
         for window in candidates {
             try Task.checkCancellation()
             let filter = SCContentFilter(desktopIndependentWindow: window)
-            let configuration = SCStreamConfiguration()
-            let scale = min(420 / window.frame.width, 260 / window.frame.height, 1)
-            configuration.width = max(1, Int(window.frame.width * scale))
-            configuration.height = max(1, Int(window.frame.height * scale))
-            configuration.showsCursor = false
+            let configuration = WindowPreviewCapture.configuration(for: window.frame)
             let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
             try Task.checkCancellation()
             snapshots.append(WindowPreviewSnapshot(
@@ -423,7 +457,7 @@ final class WindowPreviewController: ObservableObject {
                     for: window.frame,
                     mainScreenTop: NSScreen.screens.first?.frame.maxY ?? 0
                 ),
-                image: image.map { NSImage(cgImage: $0, size: window.frame.size) }
+                image: image.map(WindowPreviewCapture.image(from:))
             ))
         }
         return snapshots
@@ -491,14 +525,15 @@ final class WindowPreviewController: ObservableObject {
         guard let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first,
               let list = Self.findSwitcher(in: AXUIElementCreateApplication(dock.processIdentifier), depth: 5),
               let selected = Self.attribute(kAXSelectedChildrenAttribute, from: list) as? [AXUIElement],
-              let item = selected.first else { return nil }
-        return selection(for: item, source: .switcher, anchor: Self.frame(of: list))
+              let item = selected.first,
+              let frame = Self.frame(of: item) else { return nil }
+        return selection(for: item, source: .switcher, anchor: frame)
     }
 
     private static func selection(
         for element: AXUIElement,
         source: WindowPreviewSource,
-        anchor: CGRect? = nil
+        anchor: CGRect
     ) -> WindowPreviewSelection? {
         let url = (Self.attribute(kAXURLAttribute, from: element) as? NSURL)?.absoluteURL
         let bundleIdentifier = url.flatMap { Bundle(url: $0)?.bundleIdentifier }
@@ -507,12 +542,11 @@ final class WindowPreviewController: ObservableObject {
             NSRunningApplication.runningApplications(withBundleIdentifier: $0).first
         } ?? NSWorkspace.shared.runningApplications.first { $0.localizedName == title }
         guard let app, !app.isTerminated else { return nil }
-        let point = NSEvent.mouseLocation
         return WindowPreviewSelection(
             processIdentifier: app.processIdentifier,
             appName: app.localizedName ?? title ?? "",
             icon: app.icon,
-            anchor: anchor ?? Self.frame(of: element) ?? CGRect(x: point.x, y: point.y, width: 1, height: 1),
+            anchor: anchor,
             source: source
         )
     }

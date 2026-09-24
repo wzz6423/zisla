@@ -147,6 +147,33 @@ struct WindowPreviewLifecycleTests {
         #expect(controller.appName.isEmpty)
     }
 
+    @Test
+    func movingSelectedSwitcherIconRepositionsThePreviewDuringAndAfterCapture() async throws {
+        let system = PreviewSystem()
+        let capture = PreviewCaptureGate()
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { try await capture.capture($0) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(3, source: .switcher, anchorX: 300))
+        let task = try #require(controller.captureTask)
+        await capture.waitForRequests(1)
+
+        controller.select(PreviewSystem.selection(3, source: .switcher, anchorX: 600))
+        capture.finish(0)
+        await task.value
+        #expect(system.presentationAnchors.last == CGRect(x: 600, y: 0, width: 48, height: 48))
+
+        controller.select(PreviewSystem.selection(3, source: .switcher, anchorX: 820))
+        #expect(system.presentationAnchors.last == CGRect(x: 820, y: 0, width: 48, height: 48))
+        #expect(capture.requests.count == 1)
+
+        let presentationCount = system.presentationAnchors.count
+        controller.select(PreviewSystem.selection(3, source: .switcher, anchorX: 820))
+        #expect(system.presentationAnchors.count == presentationCount)
+    }
+
     @Test(arguments: [false, true])
     func staleCaptureCompletionCannotReplaceOrDismissANewerSelection(fails: Bool) async throws {
         let system = PreviewSystem()
@@ -234,6 +261,42 @@ struct WindowPreviewLifecycleTests {
     }
 
     @Test
+    func transparentCapturesAreExcludedWithoutDroppingOpaqueBlackWindows() async {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { _ in [
+            PreviewSystem.snapshot(11, alpha: 0),
+            PreviewSystem.snapshot(12, alpha: 1),
+            PreviewSystem.snapshot(13, alpha: 0.1),
+        ] }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+
+        #expect(controller.windows.map(\.id) == [12, 13])
+        #expect(system.presentations.last == [12, 13])
+    }
+
+    @Test
+    func failedAndTransparentCapturesLeaveNoBlankCards() async {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { _ in [
+            PreviewSystem.snapshot(11, alpha: nil),
+            PreviewSystem.snapshot(12, alpha: 0),
+        ] }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+
+        #expect(controller.windows.isEmpty)
+    }
+
+    @Test
     func aStalePreviewCannotActivateTheNewlySelectedApplication() async {
         let system = PreviewSystem()
         let controller = WindowPreviewController(dependencies: system.dependencies())
@@ -260,6 +323,7 @@ private final class PreviewSystem {
     var switcher: WindowPreviewSelection?
     var commandPressed = true
     var presentations: [[CGWindowID]] = []
+    var presentationAnchors: [CGRect?] = []
     var activations: [pid_t] = []
 
     func dependencies() -> WindowPreviewController.Dependencies {
@@ -291,23 +355,42 @@ private final class PreviewSystem {
         value.dockSelection = { nil }
         value.switcherSelection = { self.switcher }
         value.commandPressed = { self.commandPressed }
-        value.present = { controller, _ in self.presentations.append(controller.windows.map(\.id)) }
+        value.present = { controller, selection in
+            self.presentations.append(controller.windows.map(\.id))
+            self.presentationAnchors.append(selection?.anchor)
+        }
         value.activate = { identifier, _ in self.activations.append(identifier) }
         return value
     }
 
-    static func selection(_ identifier: pid_t, source: WindowPreviewSource) -> WindowPreviewSelection {
+    static func selection(
+        _ identifier: pid_t,
+        source: WindowPreviewSource,
+        anchorX: CGFloat = 100
+    ) -> WindowPreviewSelection {
         WindowPreviewSelection(
             processIdentifier: identifier, appName: "App \(identifier)", icon: nil,
-            anchor: CGRect(x: 100, y: 0, width: 48, height: 48), source: source
+            anchor: CGRect(x: anchorX, y: 0, width: 48, height: 48), source: source
         )
     }
 
-    static func snapshot(_ identifier: pid_t) -> WindowPreviewSnapshot {
+    static func snapshot(_ identifier: pid_t, alpha: CGFloat? = 1) -> WindowPreviewSnapshot {
         WindowPreviewSnapshot(
             id: CGWindowID(identifier), title: "Document \(identifier)",
-            frame: CGRect(x: 20, y: 20, width: 300, height: 200), image: nil
+            frame: CGRect(x: 20, y: 20, width: 300, height: 200),
+            image: alpha.map { image(alpha: $0) }
         )
+    }
+
+    private static func image(alpha: CGFloat) -> NSImage {
+        let context = CGContext(
+            data: nil, width: 2, height: 2, bitsPerComponent: 8, bytesPerRow: 8,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: alpha))
+        context.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+        return NSImage(cgImage: context.makeImage()!, size: CGSize(width: 2, height: 2))
     }
 }
 

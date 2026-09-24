@@ -1,4 +1,5 @@
 import CoreGraphics
+import ScreenCaptureKit
 import Testing
 
 @testable import Zisla
@@ -51,6 +52,19 @@ struct WindowPreviewLayoutTests {
     }
 
     @Test
+    func switcherPreviewTracksTheSelectedIconAcrossTheList() {
+        let leftIcon = CGRect(x: 300, y: 380, width: 48, height: 48)
+        let rightIcon = CGRect(x: 820, y: 380, width: 48, height: 48)
+        let left = WindowPreviewLayout.frame(anchor: leftIcon, size: panel, visibleFrame: screen, isSwitcher: true)
+        let right = WindowPreviewLayout.frame(anchor: rightIcon, size: panel, visibleFrame: screen, isSwitcher: true)
+
+        #expect(left.midX == leftIcon.midX)
+        #expect(right.midX == rightIcon.midX)
+        #expect(left.minX != right.minX)
+        #expect(left.minY == leftIcon.maxY + 10)
+    }
+
+    @Test
     func previewIsClampedToOffsetScreenBounds() {
         let external = CGRect(x: -1600, y: -200, width: 1600, height: 900)
         let icon = CGRect(x: -20, y: -195, width: 48, height: 48)
@@ -60,6 +74,34 @@ struct WindowPreviewLayoutTests {
         #expect(result.maxX <= external.maxX)
         #expect(result.minY >= external.minY)
         #expect(result.maxY <= external.maxY)
+    }
+}
+
+struct WindowPreviewCaptureTests {
+    @Test
+    func captureRequestsRetinaDetailWithoutDistortingTheWindow() {
+        let small = WindowPreviewCapture.configuration(for: CGRect(x: 0, y: 0, width: 160, height: 90))
+        #expect(small.width == 320)
+        #expect(small.height == 180)
+        #expect(small.captureResolution == .best)
+        #expect(small.ignoreShadowsSingleWindow)
+
+        let large = WindowPreviewCapture.configuration(for: CGRect(x: 0, y: 0, width: 1600, height: 900))
+        #expect(large.width == 420)
+        #expect(large.height == 236)
+    }
+
+    @Test
+    func previewUsesCapturedPixelAspectRatioRatherThanWindowMetadata() throws {
+        let context = try #require(CGContext(
+            data: nil, width: 400, height: 100, bitsPerComponent: 8, bytesPerRow: 1600,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        let capturedImage = try #require(context.makeImage())
+        let image = WindowPreviewCapture.image(from: capturedImage)
+
+        #expect(image.size == CGSize(width: 400, height: 100))
     }
 }
 
