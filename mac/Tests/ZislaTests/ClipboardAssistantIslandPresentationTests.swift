@@ -184,6 +184,23 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(source.contains("CollapsedProgress.elapsedFraction(fromRemaining: remaining)"))
     }
 
+    @Test
+    func dismissalClockDoesNotRerenderTheAssistantControlsEachFrame() throws {
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let viewStart = try #require(source.range(of: "struct ClipboardAssistantToastView"))
+        let bodyStart = try #require(source.range(of: "    var body: some View {", range: viewStart.lowerBound..<source.endIndex))
+        let bodyEnd = try #require(source.range(
+            of: "    private var isDismissalProgressActive: Bool {",
+            range: bodyStart.upperBound..<source.endIndex
+        ))
+        let body = source[bodyStart.lowerBound..<bodyEnd.lowerBound]
+
+        let surface = try #require(body.range(of: "IslandSurface("))
+        let timeline = try #require(body.range(of: "TimelineView("))
+        #expect(surface.lowerBound < timeline.lowerBound)
+        #expect(body[surface.lowerBound..<timeline.lowerBound].contains(".overlay {"))
+    }
+
     @MainActor
     @Test
     func sharingKeepsTheClipboardAssistantAnchorAlive() {
