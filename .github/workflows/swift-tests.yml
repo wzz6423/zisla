@@ -74,7 +74,6 @@ jobs:
             swift test --filter "^${target}\." --skip '^ZislaTests\.(Mail(HTMLView|PaginationView)|ClipboardAssistantCurrencyPresentation|ThinScrollChrome)Tests'
           done
           swift test --filter '^ZislaTests\.ClipboardAssistantCurrencyPresentationTests'
-          # Keep the hidden SwiftUI renderer's layout deadline independent of other AppKit tests.
           swift test --filter '^ZislaTests\.ThinScrollChromeTests'
           # Run mail UI tests in their own process so unrelated modal UI cannot starve WebKit.
           swift test --filter '^ZislaTests\.Mail(HTMLView|PaginationView)Tests'
