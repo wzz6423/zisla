@@ -934,6 +934,22 @@ struct SettingsView: View {
                             )
                         }
                         rowDivider
+                        settingRow(
+                            symbol: "rectangle.on.rectangle",
+                            title: "长截图",
+                            detail: "触发截图功能"
+                        ) {
+                            HotkeyRecorder(
+                                hotkey: Binding(
+                                    get: { model.settingsStore.settings.screenshotLongHotkey },
+                                    set: { newValue in
+                                        guard let newValue else { return }
+                                        updateScreenshotHotkey(newValue, action: .longCapture)
+                                    }
+                                )
+                            )
+                        }
+                        rowDivider
                         featureToggle(
                             AppLocalization.text("显示钉图控制条"),
                             detail: "隐藏后仍支持快捷键、手势和鼠标操作",
@@ -987,6 +1003,31 @@ struct SettingsView: View {
                                     .controlSize(.small)
                                     .keepsIntrinsicWidth()
                                 }
+                            }
+                        }
+                    }
+                }
+                if input.selection == .screenshot {
+                    settingsGroup("工具") {
+                        ForEach(ScreenshotTool.allCases) { tool in
+                            settingRow(
+                                symbol: tool.symbol,
+                                title: tool.title,
+                                detail: "",
+                                isNested: true
+                            ) {
+                                HotkeyRecorder(
+                                    hotkey: Binding(
+                                        get: { model.settingsStore.settings.screenshotToolHotkeys[tool.rawValue] },
+                                        set: { newValue in
+                                            guard let newValue else { return }
+                                            updateScreenshotHotkey(newValue, action: .tool(tool))
+                                        }
+                                    )
+                                )
+                            }
+                            if tool != ScreenshotTool.allCases.last {
+                                rowDivider
                             }
                         }
                     }
@@ -1938,30 +1979,78 @@ struct SettingsView: View {
         )
     }
 
-    private enum ScreenshotHotkeyAction: Equatable {
+    enum ScreenshotHotkeyAction: Equatable {
         case capture
         case pin
+        case longCapture
+        case tool(ScreenshotTool)
+
+        var name: String {
+            switch self {
+            case .capture: "截图"
+            case .pin: "钉图"
+            case .longCapture: "长截图"
+            case .tool(let tool): tool.title
+            }
+        }
+    }
+
+    static func screenshotHotkeys(in settings: FeatureSettings) -> [(ScreenshotHotkeyAction, VoiceInputHotkeyPreset)] {
+        [
+            (.capture, settings.screenshotHotkey),
+            (.pin, settings.screenshotPinHotkey),
+            (.longCapture, settings.screenshotLongHotkey),
+        ] + ScreenshotTool.allCases.compactMap { tool in
+            settings.screenshotToolHotkeys[tool.rawValue].map { (.tool(tool), $0) }
+        }
+    }
+
+    static func conflictingScreenshotAction(
+        for hotkey: VoiceInputHotkeyPreset,
+        action: ScreenshotHotkeyAction,
+        in settings: FeatureSettings
+    ) -> ScreenshotHotkeyAction? {
+        screenshotHotkeys(in: settings).first {
+            $0.0 != action && hotkey.conflicts(with: $0.1)
+        }?.0
     }
 
     private var screenshotHotkeysRequireInputMonitoring: Bool {
         let settings = model.settingsStore.settings
         return settings.screenshotEnabled
             && (settings.screenshotHotkey.requiresInputMonitoring
-                || settings.screenshotPinHotkey.requiresInputMonitoring)
+                || settings.screenshotPinHotkey.requiresInputMonitoring
+                || settings.screenshotLongHotkey.requiresInputMonitoring)
     }
 
     private var currentScreenshotHotkeyConflict: String? {
         let settings = model.settingsStore.settings
-        if settings.screenshotHotkey.conflicts(with: settings.screenshotPinHotkey) {
-            return "截图与钉图快捷键冲突，请修改其中一个"
-        }
-        if settings.voiceInputEnabled,
-           settings.screenshotHotkey.conflicts(with: settings.voiceInputHotkeyPreset) {
-            return "截图快捷键与语音输入冲突"
-        }
-        if settings.voiceInputEnabled,
-           settings.screenshotPinHotkey.conflicts(with: settings.voiceInputHotkeyPreset) {
-            return "钉图快捷键与语音输入冲突"
+        let hotkeys = Self.screenshotHotkeys(in: settings)
+        for (index, entry) in hotkeys.enumerated() {
+            if let other = hotkeys.dropFirst(index + 1).first(where: { entry.1.conflicts(with: $0.1) }) {
+                return AppLocalization.text(
+                    "%@快捷键与%@冲突，请修改其中一个",
+                    AppLocalization.text(entry.0.name),
+                    AppLocalization.text(other.0.name)
+                )
+            }
+            if settings.voiceInputEnabled,
+               entry.1.conflicts(with: settings.voiceInputHotkeyPreset) {
+                return AppLocalization.text(
+                    "%@快捷键与%@冲突，请修改其中一个",
+                    AppLocalization.text(entry.0.name),
+                    AppLocalization.text("语音输入")
+                )
+            }
+            if settings.clipboardAssistantEnabled,
+               let assistantHotkey = settings.clipboardAssistantTriggerConfiguration.hotkey,
+               entry.1.conflicts(with: assistantHotkey) {
+                return AppLocalization.text(
+                    "%@快捷键与%@冲突，请修改其中一个",
+                    AppLocalization.text(entry.0.name),
+                    AppLocalization.text("快速触发快捷键")
+                )
+            }
         }
         return nil
     }
@@ -1971,11 +2060,31 @@ struct SettingsView: View {
         action: ScreenshotHotkeyAction
     ) {
         var settings = model.settingsStore.settings
-        let other = action == .capture ? settings.screenshotPinHotkey : settings.screenshotHotkey
-        let actionName = AppLocalization.text(action == .capture ? "截图" : "钉图")
-        let otherName = AppLocalization.text(action == .capture ? "钉图" : "截图")
-        guard !hotkey.conflicts(with: other) else {
-            screenshotHotkeyValidationMessage = AppLocalization.text("%@快捷键与%@冲突，未保存", actionName, otherName)
+        let actionName = AppLocalization.text(action.name)
+        if let reservedAction = ScreenshotEditorWindow.reservedAction(for: hotkey) {
+            screenshotHotkeyValidationMessage = AppLocalization.text(
+                "%@快捷键与%@冲突，未保存",
+                actionName,
+                AppLocalization.text(reservedAction)
+            )
+            return
+        }
+        if let conflict = Self.conflictingScreenshotAction(for: hotkey, action: action, in: settings) {
+            screenshotHotkeyValidationMessage = AppLocalization.text(
+                "%@快捷键与%@冲突，未保存",
+                actionName,
+                AppLocalization.text(conflict.name)
+            )
+            return
+        }
+        if settings.clipboardAssistantEnabled,
+           let assistantHotkey = settings.clipboardAssistantTriggerConfiguration.hotkey,
+           hotkey.conflicts(with: assistantHotkey) {
+            screenshotHotkeyValidationMessage = AppLocalization.text(
+                "%@快捷键与%@冲突，未保存",
+                actionName,
+                AppLocalization.text("快速触发快捷键")
+            )
             return
         }
         guard !settings.voiceInputEnabled
@@ -1989,6 +2098,10 @@ struct SettingsView: View {
             settings.screenshotHotkey = hotkey
         case .pin:
             settings.screenshotPinHotkey = hotkey
+        case .longCapture:
+            settings.screenshotLongHotkey = hotkey
+        case .tool(let tool):
+            settings.screenshotToolHotkeys[tool.rawValue] = hotkey
         }
         screenshotHotkeyValidationMessage = nil
         model.settingsStore.settings = settings
@@ -2919,7 +3032,14 @@ struct SettingsView: View {
             settings.voiceInputEnabled && hotkey.conflicts(with: settings.voiceInputHotkeyPreset) ? loc("语音输入") : nil,
             settings.screenshotEnabled && hotkey.conflicts(with: settings.screenshotHotkey) ? loc("截图") : nil,
             settings.screenshotEnabled && hotkey.conflicts(with: settings.screenshotPinHotkey) ? loc("钉图") : nil,
-        ].compactMap { $0 }
+            settings.screenshotEnabled && hotkey.conflicts(with: settings.screenshotLongHotkey) ? loc("长截图") : nil,
+        ].compactMap { $0 } + (settings.screenshotEnabled
+            ? ScreenshotTool.allCases.compactMap { tool in
+                guard let toolHotkey = settings.screenshotToolHotkeys[tool.rawValue],
+                      hotkey.conflicts(with: toolHotkey) else { return nil }
+                return loc(tool.title)
+            }
+            : [])
         guard !conflicts.isEmpty else { return nil }
         return loc("快速触发快捷键与%@快捷键冲突，请更换其中一个")
             .replacingOccurrences(of: "%@", with: conflicts.joined(separator: AppLocalization.text("、")))

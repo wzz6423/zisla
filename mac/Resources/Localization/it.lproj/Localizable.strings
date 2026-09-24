@@ -2287,6 +2287,7 @@
 "%@（已导入）" = "%@ (importato)";
 "显示器 %ld" = "Display %ld";
 "%@快捷键与%@冲突，未保存" = "L’abbreviazione %@ è in conflitto con %@ e non è stata salvata";
+"%@快捷键与%@冲突，请修改其中一个" = "La scorciatoia %@ è in conflitto con %@; modificarne una delle due";
 "%@快捷键与语音输入冲突，未保存" = "L’abbreviazione %@ è in conflitto con l’input vocale e non è stata salvata";
 "正在下载 %ld%%" = "Download %ld %%";
 "未安装 · %@ · %@" = "Non installato · %@ · %@";

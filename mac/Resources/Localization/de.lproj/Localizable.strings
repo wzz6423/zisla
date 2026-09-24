@@ -2288,6 +2288,7 @@
 "%@（已导入）" = "%@ (importiert)";
 "显示器 %ld" = "Display %ld";
 "%@快捷键与%@冲突，未保存" = "Der Kurzbefehl %@ kollidiert mit %@ und wurde nicht gespeichert";
+"%@快捷键与%@冲突，请修改其中一个" = "Der Kurzbefehl %@ kollidiert mit %@; bitte einen davon ändern";
 "%@快捷键与语音输入冲突，未保存" = "Der Kurzbefehl %@ kollidiert mit der Spracheingabe und wurde nicht gespeichert";
 "正在下载 %ld%%" = "%ld %% geladen";
 "未安装 · %@ · %@" = "Nicht installiert · %@ · %@";

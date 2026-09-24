@@ -3,6 +3,7 @@ import Carbon.HIToolbox
 import SwiftUI
 import Testing
 import Vision
+import ZislaCore
 
 @testable import Zisla
 
@@ -441,7 +442,6 @@ struct ScreenshotEditorTests {
             (.brush, .brush),
             (.arrow, .arrow),
             (.number, .number),
-            (.emoji, .emoji),
         ]
         for (tool, expectedKind) in tools {
             let previousCount = model.annotations.count
@@ -594,6 +594,334 @@ struct ScreenshotEditorTests {
     }
 
     @Test
+    func editorWindowRoutesRecordedToolShortcutsWithoutChangingBuiltInKeys() throws {
+        let window = ScreenshotEditorWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        var selectedKeys: [(UInt32, UInt32)] = []
+        var undoCount = 0
+        window.onToolHotkey = { keyCode, modifiers in
+            selectedKeys.append((keyCode, modifiers))
+            return keyCode == UInt32(kVK_ANSI_4) && modifiers == UInt32(controlKey)
+        }
+        window.onUndo = { undoCount += 1 }
+
+        let tool = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_4), characters: "4", modifiers: [.control]
+        ))
+        let unrelated = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_4), characters: "4", modifiers: [.control, .shift]
+        ))
+        let undo = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_Z), characters: "z", modifiers: [.command]
+        ))
+
+        #expect(window.performKeyEquivalent(with: tool))
+        #expect(selectedKeys.count == 1)
+        #expect(selectedKeys.first?.0 == UInt32(kVK_ANSI_4))
+        #expect(selectedKeys.first?.1 == UInt32(controlKey))
+        #expect(!window.performKeyEquivalent(with: unrelated))
+        #expect(selectedKeys.count == 2)
+        #expect(window.performKeyEquivalent(with: undo))
+        #expect(undoCount == 1)
+        #expect(selectedKeys.count == 2)
+    }
+
+    @Test
+    func editorWindowDispatchesDefaultToolShortcutsFromWindowEvents() throws {
+        let window = ScreenshotEditorWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        var selected: [ScreenshotTool] = []
+        window.onToolHotkey = { keyCode, modifiers in
+            guard let tool = ScreenshotTool.matchingShortcut(
+                keyCode: keyCode,
+                modifiers: modifiers,
+                hotkeys: ScreenshotHotkeyDefaults.tools
+            ) else { return false }
+            selected.append(tool)
+            return true
+        }
+
+        for tool in ScreenshotTool.allCases {
+            let hotkey = try #require(ScreenshotHotkeyDefaults.tools[tool.rawValue])
+            #expect(hotkey.carbonModifiers == UInt32(controlKey))
+            let event = try #require(NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: [.control],
+                timestamp: 0,
+                windowNumber: window.windowNumber,
+                context: nil,
+                characters: hotkey.keyDisplayName,
+                charactersIgnoringModifiers: hotkey.keyDisplayName,
+                isARepeat: false,
+                keyCode: UInt16(hotkey.keyCode)
+            ))
+            window.sendEvent(event)
+        }
+
+        #expect(selected == ScreenshotTool.allCases)
+        let retired = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_6), characters: "6", modifiers: [.control, .shift]
+        ))
+        #expect(!window.performKeyEquivalent(with: retired))
+        #expect(selected == ScreenshotTool.allCases)
+    }
+
+    @Test
+    func editorWindowRoutesUnmodifiedToolShortcutsThroughKeyDown() throws {
+        let window = ScreenshotEditorWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        let hotkeys = ["rectangle": VoiceInputHotkeyPreset(
+            keyCode: UInt32(kVK_ANSI_R),
+            carbonModifiers: 0,
+            keyDisplayName: "R"
+        )]
+        var selected: [ScreenshotTool] = []
+        window.onToolHotkey = { keyCode, modifiers in
+            guard let tool = ScreenshotTool.matchingShortcut(
+                keyCode: keyCode, modifiers: modifiers, hotkeys: hotkeys
+            ) else { return false }
+            selected.append(tool)
+            return true
+        }
+
+        window.keyDown(with: try #require(keyEvent(keyCode: UInt16(kVK_ANSI_R), characters: "r")))
+        #expect(selected == [.rectangle])
+    }
+
+    @Test
+    func editorWindowRoutesModifierOnlyShortcutOnlyForItsOwnPress() throws {
+        let window = ScreenshotEditorWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        let hotkeys = ["rectangle": VoiceInputHotkeyPreset(
+            keyCode: UInt32(kVK_Control),
+            carbonModifiers: UInt32(controlKey),
+            keyDisplayName: "L⌃",
+            modifierSides: [.leftControl]
+        )]
+        var selected: [ScreenshotTool] = []
+        window.onToolHotkey = { keyCode, modifiers in
+            guard let tool = ScreenshotTool.matchingShortcut(
+                keyCode: keyCode, modifiers: modifiers, hotkeys: hotkeys
+            ) else { return false }
+            selected.append(tool)
+            return true
+        }
+
+        let events: [(UInt16, UInt, Int)] = [
+            (UInt16(kVK_Control), NSEvent.ModifierFlags.control.rawValue | 0x1, 1),
+            (UInt16(kVK_RightControl), NSEvent.ModifierFlags.control.rawValue | 0x2001, 1),
+            (UInt16(kVK_Control), NSEvent.ModifierFlags.control.rawValue | 0x2000, 1),
+            (UInt16(kVK_RightControl), 0, 1),
+            (UInt16(kVK_RightControl), NSEvent.ModifierFlags.control.rawValue | 0x2000, 1),
+            (UInt16(kVK_Control), NSEvent.ModifierFlags.control.rawValue | 0x2001, 1),
+            (UInt16(kVK_RightControl), NSEvent.ModifierFlags.control.rawValue | 0x1, 1),
+            (UInt16(kVK_Control), 0, 1),
+            (UInt16(kVK_Control), NSEvent.ModifierFlags.control.rawValue | 0x1, 2),
+            (UInt16(kVK_Control), 0, 2),
+        ]
+        for (keyCode, flags, expectedCount) in events {
+            let event = try #require(NSEvent.keyEvent(
+                with: .flagsChanged,
+                location: .zero,
+                modifierFlags: NSEvent.ModifierFlags(rawValue: flags),
+                timestamp: 0,
+                windowNumber: window.windowNumber,
+                context: nil,
+                characters: "",
+                charactersIgnoringModifiers: "",
+                isARepeat: false,
+                keyCode: keyCode
+            ))
+            window.flagsChanged(with: event)
+            #expect(selected.count == expectedCount, "keyCode=\(keyCode), flags=\(flags)")
+        }
+    }
+
+    @Test
+    func editorWindowLeavesToolShortcutsWithAnActiveTextEditor() throws {
+        let window = ScreenshotEditorWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        let text = NSTextView(frame: CGRect(x: 0, y: 0, width: 200, height: 100))
+        window.contentView = text
+        #expect(window.makeFirstResponder(text))
+        var selected = false
+        window.onToolHotkey = { _, _ in selected = true; return true }
+        let event = try #require(keyEvent(
+            keyCode: UInt16(kVK_ANSI_5), characters: "5", modifiers: [.control]
+        ))
+
+        _ = window.performKeyEquivalent(with: event)
+        #expect(!selected)
+    }
+
+    @Test
+    func screenshotToolShortcutsFollowSavedSettingsAndIgnoreUnassignedKeys() {
+        var hotkeys = ScreenshotHotkeyDefaults.tools
+        #expect(ScreenshotTool.matchingShortcut(
+            keyCode: UInt32(kVK_ANSI_4),
+            modifiers: UInt32(controlKey),
+            hotkeys: hotkeys
+        ) == .rectangle)
+        #expect(ScreenshotTool.matchingShortcut(
+            keyCode: UInt32(kVK_ANSI_4),
+            modifiers: UInt32(controlKey | shiftKey),
+            hotkeys: hotkeys
+        ) == nil)
+        #expect(ScreenshotTool.matchingShortcut(
+            keyCode: UInt32(kVK_ANSI_4),
+            modifiers: UInt32(optionKey),
+            hotkeys: hotkeys
+        ) == nil)
+
+        hotkeys["rectangle"] = VoiceInputHotkeyPreset(
+            keyCode: UInt32(kVK_ANSI_R),
+            carbonModifiers: UInt32(optionKey),
+            keyDisplayName: "R"
+        )
+        #expect(ScreenshotTool.matchingShortcut(
+            keyCode: UInt32(kVK_ANSI_4),
+            modifiers: UInt32(controlKey),
+            hotkeys: hotkeys
+        ) == nil)
+        #expect(ScreenshotTool.matchingShortcut(
+            keyCode: UInt32(kVK_ANSI_R),
+            modifiers: UInt32(optionKey),
+            hotkeys: hotkeys
+        ) == .rectangle)
+        #expect(ScreenshotTool.matchingShortcut(
+            keyCode: UInt32(kVK_ANSI_R),
+            modifiers: UInt32(optionKey),
+            hotkeys: [:]
+        ) == nil)
+
+        hotkeys["emoji"] = VoiceInputHotkeyPreset(
+            keyCode: UInt32(kVK_ANSI_5),
+            carbonModifiers: UInt32(controlKey | shiftKey),
+            keyDisplayName: "5"
+        )
+        #expect(ScreenshotTool.matchingShortcut(
+            keyCode: UInt32(kVK_ANSI_5),
+            modifiers: UInt32(controlKey | shiftKey),
+            hotkeys: hotkeys
+        ) == nil)
+    }
+
+    @Test
+    func screenshotShortcutRecorderCanRejectEditorReservedKeys() throws {
+        let reserved: [(UInt32, UInt32, String)] = [
+            (UInt32(kVK_Return), 0, "复制"),
+            (UInt32(kVK_ANSI_KeypadEnter), 0, "复制"),
+            (UInt32(kVK_Escape), 0, "关闭"),
+            (UInt32(kVK_Delete), 0, "删除"),
+            (UInt32(kVK_ForwardDelete), 0, "删除"),
+            (UInt32(kVK_ANSI_Z), UInt32(cmdKey), "撤销"),
+            (UInt32(kVK_ANSI_Z), UInt32(cmdKey | shiftKey), "重做"),
+            (UInt32(kVK_ANSI_S), UInt32(cmdKey), "保存"),
+            (UInt32(kVK_ANSI_C), UInt32(cmdKey), "复制"),
+        ]
+        for (keyCode, modifiers, action) in reserved {
+            let hotkey = VoiceInputHotkeyPreset(
+                keyCode: keyCode,
+                carbonModifiers: modifiers,
+                keyDisplayName: "key"
+            )
+            #expect(ScreenshotEditorWindow.reservedAction(for: hotkey) == action)
+        }
+        let rectangle = try #require(ScreenshotHotkeyDefaults.tools["rectangle"])
+        #expect(ScreenshotEditorWindow.reservedAction(for: rectangle) == nil)
+    }
+
+    @Test
+    func screenshotShortcutRecordingRejectsAnotherScreenshotAction() throws {
+        var settings = FeatureSettings.default
+        let globalHotkeys: [(SettingsView.ScreenshotHotkeyAction, VoiceInputHotkeyPreset)] = [
+            (.capture, settings.screenshotHotkey),
+            (.pin, settings.screenshotPinHotkey),
+            (.longCapture, settings.screenshotLongHotkey),
+        ]
+        for (action, hotkey) in globalHotkeys {
+            #expect(SettingsView.conflictingScreenshotAction(
+                for: hotkey,
+                action: .tool(.rectangle),
+                in: settings
+            ) == action)
+            #expect(SettingsView.conflictingScreenshotAction(
+                for: hotkey,
+                action: action,
+                in: settings
+            ) == nil)
+        }
+
+        let custom = VoiceInputHotkeyPreset(
+            keyCode: UInt32(kVK_ANSI_R),
+            carbonModifiers: UInt32(optionKey),
+            keyDisplayName: "R"
+        )
+        settings.screenshotToolHotkeys["rectangle"] = custom
+        #expect(SettingsView.conflictingScreenshotAction(
+            for: custom,
+            action: .tool(.ellipse),
+            in: settings
+        ) == .tool(.rectangle))
+        #expect(SettingsView.conflictingScreenshotAction(
+            for: custom,
+            action: .tool(.rectangle),
+            in: settings
+        ) == nil)
+    }
+
+    @Test
+    func screenshotShortcutLabelsExistInEveryLanguage() throws {
+        let localizationRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources/Localization")
+        let keys = ["工具", "长截图", "%@快捷键与%@冲突，请修改其中一个"]
+            + ScreenshotTool.allCases.map(\.title)
+
+        #expect(AppLanguage.allCases.count == 17)
+        for language in AppLanguage.allCases {
+            let file = localizationRoot.appendingPathComponent("\(language.rawValue).lproj/Localizable.strings")
+            let table = try #require(NSDictionary(contentsOf: file) as? [String: String])
+            for key in keys {
+                let translation = try #require(table[key], "\(language.rawValue) missing \(key)")
+                #expect(!translation.isEmpty)
+                #expect(translation.components(separatedBy: "%@").count == key.components(separatedBy: "%@").count)
+                #expect(AppLocalization.string(key, language: language) == translation)
+            }
+        }
+        #expect(AppLocalization.string("长截图", language: .english) == "Scrolling capture")
+        #expect(AppLocalization.string("长截图", language: .arabic) == "لقطة شاشة بالتمرير")
+    }
+
+    @Test
     func editorWindowRoutesBackspaceAndDeleteToRemoveAnnotation() throws {
         let window = ScreenshotEditorWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),
@@ -725,18 +1053,15 @@ struct ScreenshotEditorTests {
         let rectangle = ScreenshotAnnotation(kind: .rectangle, rect: CGRect(x: 10, y: 10, width: 40, height: 40))
         let ellipse = ScreenshotAnnotation(kind: .ellipse, rect: CGRect(x: 60, y: 10, width: 40, height: 40))
         let text = ScreenshotAnnotation(kind: .text, points: [CGPoint(x: 20, y: 80)], text: "文字")
-        let emoji = ScreenshotAnnotation(kind: .emoji, points: [CGPoint(x: 80, y: 80)], text: "⭐️")
-        [rectangle, ellipse, text, emoji].forEach { model.add($0) }
+        [rectangle, ellipse, text].forEach { model.add($0) }
 
         model.applySelectedStyle(to: rectangle.id, lineWidth: 8)
         model.applySelectedStyle(to: ellipse.id, lineWidth: 6)
         model.applySelectedStyle(to: text.id, fontSize: 32)
-        model.applySelectedStyle(to: emoji.id, fontSize: 40)
 
         #expect(model.annotations.first(where: { $0.id == rectangle.id })?.lineWidth == 8)
         #expect(model.annotations.first(where: { $0.id == ellipse.id })?.lineWidth == 6)
         #expect(model.annotations.first(where: { $0.id == text.id })?.fontSize == 32)
-        #expect(model.annotations.first(where: { $0.id == emoji.id })?.fontSize == 40)
     }
 
     @Test
@@ -3045,24 +3370,6 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func pinnedRenderCommitsPendingEmojiDraft() throws {
-        let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
-        let model = ScreenshotEditorModel(image: sourceImage)
-        model.updatePendingAnnotationDraft(ScreenshotAnnotation(
-            kind: .emoji,
-            points: [CGPoint(x: 50, y: 60)],
-            text: "⭐️",
-            fontSize: ScreenshotAnnotationGeometry.defaultEmojiDiameter
-        ))
-
-        _ = model.renderedImage()
-
-        #expect(model.pendingAnnotationDraft == nil)
-        #expect(model.annotations.first?.kind == .emoji)
-        #expect(model.annotations.first?.text == "⭐️")
-    }
-
-    @Test
     func imageExportCommitsPendingEditDraftWithoutDuplicatingAnnotation() throws {
         let sourceImage = try #require(makeGradientImage(width: 200, height: 120))
         let model = ScreenshotEditorModel(image: sourceImage)
@@ -3995,87 +4302,6 @@ struct ScreenshotEditorTests {
               )
         else { return nil }
         return NSEvent(cgEvent: event)
-    }
-
-    @Test
-    func emojiAnnotationUsesCircularDefaultSize() {
-        let annotation = ScreenshotAnnotation(
-            kind: .emoji,
-            points: [CGPoint(x: 60, y: 40)],
-            text: "⭐️"
-        )
-
-        let bounds = ScreenshotAnnotationGeometry.bounds(for: annotation)
-
-        #expect(bounds.size == CGSize(width: 28, height: 28))
-    }
-
-    @Test
-    func emojiAnnotationMustNotRenderWhiteRectangleBackground() throws {
-        let sourceImage = try #require(makeGradientImage(width: 200, height: 150))
-        let model = ScreenshotEditorModel(image: sourceImage)
-        model.fontSize = 32
-
-        model.add(ScreenshotAnnotation(
-            kind: .emoji,
-            points: [CGPoint(x: 100, y: 75)],
-            text: "⭐️",
-            fontSize: 32
-        ))
-
-        let original = try #require(sourceImage.cgImage(forProposedRect: nil, context: nil, hints: nil))
-        let rendered = model.renderedImage()
-        let renderedCG = try #require(rendered.cgImage(forProposedRect: nil, context: nil, hints: nil))
-
-        let font = NSFont.systemFont(ofSize: 32, weight: .semibold)
-        let emojiTextSize = ("⭐️" as NSString).size(withAttributes: [.font: font])
-
-        let backgroundWidth = max(emojiTextSize.width + 8, 12)
-        let backgroundHeight = max(emojiTextSize.height + 4, 12)
-        let backgroundBounds = CGRect(
-            x: 100 - backgroundWidth / 2,
-            y: 75 - backgroundHeight / 2,
-            width: backgroundWidth,
-            height: backgroundHeight
-        )
-
-        let sampleOffset: CGFloat = 6
-        let cornerTestPoints = [
-            CGPoint(x: backgroundBounds.minX + sampleOffset, y: backgroundBounds.minY + sampleOffset),
-            CGPoint(x: backgroundBounds.maxX - sampleOffset, y: backgroundBounds.minY + sampleOffset),
-            CGPoint(x: backgroundBounds.minX + sampleOffset, y: backgroundBounds.maxY - sampleOffset),
-            CGPoint(x: backgroundBounds.maxX - sampleOffset, y: backgroundBounds.maxY - sampleOffset),
-        ]
-
-        var whiteBackgroundPixelCount = 0
-        for testPoint in cornerTestPoints {
-            let imageY = rendered.size.height - testPoint.y
-            let pixelX = Int((testPoint.x * CGFloat(renderedCG.width) / rendered.size.width).rounded())
-            let pixelY = Int((imageY * CGFloat(renderedCG.height) / rendered.size.height).rounded())
-            let clampedPoint = CGPoint(
-                x: min(max(pixelX, 0), renderedCG.width - 1),
-                y: min(max(pixelY, 0), renderedCG.height - 1)
-            )
-
-            guard let originalPixel = pixelColor(in: original, at: clampedPoint),
-                  let renderedPixel = pixelColor(in: renderedCG, at: clampedPoint)
-            else { continue }
-
-            let isWhiteBackground = renderedPixel.r > 220
-                && renderedPixel.g > 220
-                && renderedPixel.b > 220
-                && renderedPixel.a > 200
-            let changedFromOriginal = colorDistance(originalPixel, renderedPixel) > 50
-
-            if isWhiteBackground && changedFromOriginal {
-                whiteBackgroundPixelCount += 1
-            }
-        }
-
-        #expect(
-            whiteBackgroundPixelCount == 0,
-            "Emoji 标注不应渲染白色矩形背景（检测到 \(whiteBackgroundPixelCount)/\(cornerTestPoints.count) 个白色背景像素），当前与 text 共享背景渲染导致失败"
-        )
     }
 
     @Test

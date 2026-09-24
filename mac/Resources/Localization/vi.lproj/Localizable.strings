@@ -2287,6 +2287,7 @@
 "%@（已导入）" = "%@ (đã nhập)";
 "显示器 %ld" = "Màn hình %ld";
 "%@快捷键与%@冲突，未保存" = "Phím tắt %@ xung đột với %@ nên chưa được lưu";
+"%@快捷键与%@冲突，请修改其中一个" = "Phím tắt %@ xung đột với %@; hãy đổi một trong hai";
 "%@快捷键与语音输入冲突，未保存" = "Phím tắt %@ xung đột với nhập bằng giọng nói nên chưa được lưu";
 "正在下载 %ld%%" = "Đang tải %ld%%";
 "未安装 · %@ · %@" = "Chưa cài đặt · %@ · %@";

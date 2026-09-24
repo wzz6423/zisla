@@ -355,6 +355,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var additionalScreenshotEditors: [ScreenshotEditorWindowController] = []
     private var screenshotHotkeyManager = GlobalHotkeyManager()
     private var screenshotPinHotkeyManager = GlobalHotkeyManager()
+    private var screenshotLongHotkeyManager = GlobalHotkeyManager()
     private var pendingScreenshotPin = false
     private var isScreenshotSessionActive = false
     private var screenshotSnapTargetProcessTracker = ScreenshotSnapTargetProcessTracker()
@@ -640,7 +641,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .store(in: &cancellables)
 
         model.settingsStore.$settings
-            .map { ($0.screenshotHotkey, $0.screenshotPinHotkey) }
+            .map { ($0.screenshotHotkey, $0.screenshotPinHotkey, $0.screenshotLongHotkey) }
             .removeDuplicates { $0 == $1 }
             .dropFirst()
             .sink { [weak self] _ in
@@ -849,6 +850,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         AppModel.shared.stop()
         screenshotHotkeyManager.unregister()
         screenshotPinHotkeyManager.unregister()
+        screenshotLongHotkeyManager.unregister()
         setScreenshotSessionActive(false)
         screenshotSelectionController?.cancel()
         screenshotEditorController?.close()
@@ -1368,7 +1370,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         beginScreenshot(pinAfterCapture: true)
     }
 
-    private func beginScreenshot(pinAfterCapture: Bool) {
+    private func beginScreenshot(pinAfterCapture: Bool, startLongCaptureAfterSelection: Bool = false) {
         guard AppModel.shared.settingsStore.settings.screenshotEnabled else { return }
         guard screenshotSelectionController == nil else { return }
         let editors = [screenshotEditorController].compactMap { $0 } + additionalScreenshotEditors
@@ -1472,6 +1474,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             editor.present()
             if shouldPin {
                 editor.setPinned(true)
+            } else if startLongCaptureAfterSelection {
+                editor.captureNextScreen()
             }
         }
         controller.onCancelled = { [weak self] in
@@ -1525,6 +1529,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let settings = AppModel.shared.settingsStore.settings
         screenshotHotkeyManager.unregister()
         screenshotPinHotkeyManager.unregister()
+        screenshotLongHotkeyManager.unregister()
         guard settings.screenshotEnabled else { return }
         let captureResult = screenshotHotkeyManager.register(
             hotkey: settings.screenshotHotkey,
@@ -1533,16 +1538,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
         reportScreenshotHotkeyRegistration(captureResult, actionName: AppLocalization.text("截图"))
 
-        guard !settings.screenshotHotkey.conflicts(with: settings.screenshotPinHotkey) else {
+        if settings.screenshotHotkey.conflicts(with: settings.screenshotPinHotkey) {
             AppModel.shared.transientMessage = AppLocalization.text("截图与钉图快捷键冲突，钉图快捷键未启用")
-            return
+        } else {
+            let pinResult = screenshotPinHotkeyManager.register(
+                hotkey: settings.screenshotPinHotkey,
+                onKeyDown: { [weak self] in self?.startPinnedScreenshot() },
+                onKeyUp: {}
+            )
+            reportScreenshotHotkeyRegistration(pinResult, actionName: AppLocalization.text("钉图"))
         }
-        let pinResult = screenshotPinHotkeyManager.register(
-            hotkey: settings.screenshotPinHotkey,
-            onKeyDown: { [weak self] in self?.startPinnedScreenshot() },
+        guard !settings.screenshotLongHotkey.conflicts(with: settings.screenshotHotkey),
+              !settings.screenshotLongHotkey.conflicts(with: settings.screenshotPinHotkey)
+        else { return }
+        let longResult = screenshotLongHotkeyManager.register(
+            hotkey: settings.screenshotLongHotkey,
+            onKeyDown: { [weak self] in
+                self?.beginScreenshot(pinAfterCapture: false, startLongCaptureAfterSelection: true)
+            },
             onKeyUp: {}
         )
-        reportScreenshotHotkeyRegistration(pinResult, actionName: AppLocalization.text("钉图"))
+        reportScreenshotHotkeyRegistration(longResult, actionName: AppLocalization.text("长截图"))
     }
 
     private func reportScreenshotHotkeyRegistration(

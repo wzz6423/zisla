@@ -14,7 +14,6 @@ enum ScreenshotTool: String, CaseIterable, Identifiable {
     case arrow
     case number
     case text
-    case emoji
     case mosaic
 
     var id: Self { self }
@@ -27,7 +26,6 @@ enum ScreenshotTool: String, CaseIterable, Identifiable {
         case .arrow: "arrow.up.right"
         case .number: "1.circle"
         case .text: "textformat"
-        case .emoji: "face.smiling"
         case .mosaic: "square.grid.3x3"
         }
     }
@@ -40,8 +38,18 @@ enum ScreenshotTool: String, CaseIterable, Identifiable {
         case .arrow: "箭头"
         case .number: "标号"
         case .text: "文字"
-        case .emoji: "Emoji"
         case .mosaic: "马赛克"
+        }
+    }
+
+    static func matchingShortcut(
+        keyCode: UInt32,
+        modifiers: UInt32,
+        hotkeys: [String: VoiceInputHotkeyPreset]
+    ) -> Self? {
+        allCases.first { tool in
+            guard let hotkey = hotkeys[tool.rawValue] else { return false }
+            return hotkey.keyCode == keyCode && hotkey.carbonModifiers == modifiers
         }
     }
 }
@@ -977,7 +985,6 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         case arrow
         case number
         case text
-        case emoji
         case mosaic
     }
 
@@ -1113,12 +1120,12 @@ enum ScreenshotAnnotationTransform {
                 width: size.width,
                 height: size.height
             )
-            if annotation.kind == .text || annotation.kind == .emoji {
+            if annotation.kind == .text {
                 result.fontSize = max(3, annotation.fontSize * factor)
             } else if annotation.kind == .number {
                 result.lineWidth = max(1, annotation.lineWidth * factor)
             }
-        } else if annotation.kind == .text || annotation.kind == .emoji {
+        } else if annotation.kind == .text {
             result.fontSize = max(3, annotation.fontSize * factor)
         } else if annotation.kind == .number {
             result.lineWidth = max(1, annotation.lineWidth * factor)
@@ -1159,16 +1166,11 @@ enum ScreenshotAnnotationEditHandle: Equatable {
 
 enum ScreenshotAnnotationGeometry {
     static let minimumSize: CGFloat = 12
-    static let defaultEmojiDiameter: CGFloat = 28
     static let handleRadius: CGFloat = 14
     static let rotationOffset: CGFloat = 24
 
     static func numberDiameter(for lineWidth: CGFloat) -> CGFloat {
         max(18, lineWidth * 7)
-    }
-
-    static func emojiDiameter(for fontSize: CGFloat) -> CGFloat {
-        max(defaultEmojiDiameter, fontSize)
     }
 
     static func bounds(for annotation: ScreenshotAnnotation) -> CGRect {
@@ -1179,15 +1181,6 @@ enum ScreenshotAnnotationGeometry {
                 for: pathGeometryPoints(for: annotation),
                 inset: max(1, annotation.lineWidth / 2),
                 minimumSize: minimumSize
-            )
-        }
-        if annotation.kind == .emoji {
-            let diameter = emojiDiameter(for: annotation.fontSize)
-            return CGRect(
-                x: point.x - diameter / 2,
-                y: point.y - diameter / 2,
-                width: diameter,
-                height: diameter
             )
         }
         if annotation.kind == .text {
@@ -1563,7 +1556,7 @@ enum ScreenshotAnnotationGeometry {
         }
         var result = annotation
         result.rect = resizedRect
-        if annotation.kind == .text || annotation.kind == .emoji {
+        if annotation.kind == .text {
             result.points = [result.rect.origin]
         }
         return result
@@ -1594,7 +1587,6 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var lineWidth: CGFloat = 3
     @Published var arrowStyle: ScreenshotArrowStyle = .straight
     @Published var fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize
-    @Published var selectedEmoji = "⭐️"
     @Published var obscureShape: ScreenshotObscureShape = .rectangle
     @Published var obscureEffect: ScreenshotObscureEffect = .blur
     @Published var pixelateStrength: CGFloat = 3
@@ -1649,7 +1641,7 @@ final class ScreenshotEditorModel: ObservableObject {
     private(set) var pendingTextDraft: PendingTextDraft?
 
     /// Geometry the canvas has drawn but not yet handed over, so an interrupted mouse-up cannot
-    /// silently drop a shape, number, stroke, or emoji when the image is exported.
+    /// silently drop a shape, number, or stroke when the image is exported.
     private(set) var pendingAnnotationDraft: ScreenshotAnnotation?
 
     init(image: NSImage) {
@@ -1709,7 +1701,7 @@ final class ScreenshotEditorModel: ObservableObject {
                 updated.arrowStyle = arrowStyle
                 changed = true
             }
-        case .text, .emoji:
+        case .text:
             if let fontSize, annotation.fontSize != fontSize {
                 updated.fontSize = fontSize
                 changed = true
@@ -2372,22 +2364,6 @@ final class ScreenshotEditorModel: ObservableObject {
                     height: bounds.height
                 )
             )
-        case .emoji:
-            guard !annotation.points.isEmpty else { return }
-            let font = NSFont.systemFont(
-                ofSize: ScreenshotAnnotationGeometry.emojiDiameter(for: annotation.fontSize),
-                weight: .semibold
-            )
-            let value = annotation.text as NSString
-            let textSize = value.size(withAttributes: [.font: font])
-            let bounds = ScreenshotAnnotationGeometry.bounds(for: annotation)
-            value.draw(
-                at: NSPoint(
-                    x: bounds.midX - textSize.width / 2,
-                    y: imageSize.height - bounds.midY - textSize.height / 2
-                ),
-                withAttributes: [.font: font]
-            )
         case .mosaic:
             break
         }
@@ -3030,9 +3006,9 @@ enum ScreenshotToolbarLayout {
     }
 
     /// Every label the 60pt cells host, in the same order `toolbar(viewportWidth:popoverEdge:)` builds
-    /// them — emoji and mosaic are excluded because the rail renders the obscure effect instead.
+    /// them. Mosaic is excluded because the rail renders the obscure effect instead.
     private static var titleKeys: [String] {
-        ScreenshotTool.allCases.filter { $0 != .emoji && $0 != .mosaic }.map(\.title)
+        ScreenshotTool.allCases.filter { $0 != .mosaic }.map(\.title)
             + ScreenshotObscureEffect.allCases.map(\.title)
             + ScreenshotLongCaptureDirection.allCases.map(\.title)
             + ["撤销", "重做", "继续", "长截图", "完成", "缩小", "放大", "取消置顶", "钉图", "复制", "保存", "关闭"]
@@ -4249,7 +4225,7 @@ struct ScreenshotEditorView: View {
                 model.lineWidth = annotation.lineWidth
             case .arrow:
                 model.arrowStyle = annotation.arrowStyle
-            case .text, .emoji:
+            case .text:
                 model.fontSize = annotation.fontSize
             case .mosaic:
                 model.lineWidth = annotation.lineWidth
@@ -4705,19 +4681,6 @@ struct ScreenshotEditorView: View {
                     .position(geometry.canvasPoint(from: bounds.center))
                     .rotationEffect(.radians(Double(annotation.rotation)))
             }
-        case .emoji:
-            if annotation.points.first != nil {
-                let bounds = ScreenshotAnnotationGeometry.bounds(for: annotation)
-                let canvasBounds = geometry.canvasRect(from: bounds)
-                Text(annotation.text)
-                    .font(.system(
-                        size: ScreenshotAnnotationGeometry.emojiDiameter(for: annotation.fontSize) * geometry.scale,
-                        weight: .semibold
-                    ))
-                    .frame(width: canvasBounds.width, height: canvasBounds.height)
-                    .position(geometry.canvasPoint(from: bounds.center))
-                    .rotationEffect(.radians(Double(annotation.rotation)))
-            }
         case .mosaic:
             EmptyView()
         }
@@ -5153,7 +5116,7 @@ struct ScreenshotEditorView: View {
             appendDraftPoint(point)
         case .arrow:
             draftPoints = [start, point]
-        case .number, .text, .emoji:
+        case .number, .text:
             break
         }
 
@@ -5168,7 +5131,7 @@ struct ScreenshotEditorView: View {
         }
 
         switch model.tool {
-        case .rectangle, .ellipse, .mosaic, .brush, .arrow, .number, .emoji:
+        case .rectangle, .ellipse, .mosaic, .brush, .arrow, .number:
             guard let annotation = committableDraftAnnotation(at: point) else { return }
             model.add(annotation)
         case .text:
@@ -5267,15 +5230,6 @@ struct ScreenshotEditorView: View {
             )
         case .number:
             return model.numberAnnotation(at: point)
-        case .emoji:
-            return ScreenshotAnnotation(
-                kind: .emoji,
-                points: [point],
-                text: model.selectedEmoji,
-                color: model.color,
-                lineWidth: model.lineWidth,
-                fontSize: ScreenshotAnnotationGeometry.defaultEmojiDiameter
-            )
         case .text:
             return nil
         }
@@ -5289,7 +5243,6 @@ struct ScreenshotEditorView: View {
         case .arrow: [.arrow]
         case .number: [.number]
         case .text: [.text]
-        case .emoji: [.emoji]
         case .mosaic: [.mosaic]
         }
         return model.annotations.reversed().first {
@@ -5309,7 +5262,7 @@ struct ScreenshotEditorView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: ScreenshotToolbarLayout.spacing) {
                 toolbarDragHandle
-                ForEach(ScreenshotTool.allCases.filter { $0 != .emoji && $0 != .mosaic }) { tool in
+                ForEach(ScreenshotTool.allCases.filter { $0 != .mosaic }) { tool in
                     toolButtonWithMenu(tool, popoverEdge: popoverEdge)
                 }
                 obscureButton(popoverEdge: popoverEdge)
@@ -6683,6 +6636,20 @@ final class ScreenshotEditorWindow: NSWindow {
     var onSave: (() -> Void)?
     /// Returns false while editing so ⌘C stays with the inline text editor; only the pinned image copies here.
     var onCopyImage: (() -> Bool)?
+    var onToolHotkey: ((UInt32, UInt32) -> Bool)?
+
+    static func reservedAction(for hotkey: VoiceInputHotkeyPreset) -> String? {
+        switch (hotkey.keyCode, hotkey.carbonModifiers) {
+        case (UInt32(kVK_Return), 0), (UInt32(kVK_ANSI_KeypadEnter), 0),
+             (UInt32(kVK_ANSI_C), 0x0100): "复制"
+        case (UInt32(kVK_Escape), 0): "关闭"
+        case (UInt32(kVK_Delete), 0), (UInt32(kVK_ForwardDelete), 0): "删除"
+        case (UInt32(kVK_ANSI_Z), 0x0100): "撤销"
+        case (UInt32(kVK_ANSI_Z), 0x0300): "重做"
+        case (UInt32(kVK_ANSI_S), 0x0100): "保存"
+        default: nil
+        }
+    }
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -6701,13 +6668,23 @@ final class ScreenshotEditorWindow: NSWindow {
            NSApp.sendAction(action, to: firstResponder, from: self) {
             return true
         }
-        return handleEditingKey(event) || super.performKeyEquivalent(with: event)
+        return handleEditingKey(event) || handleToolHotkey(event) || super.performKeyEquivalent(with: event)
     }
 
     override func keyDown(with event: NSEvent) {
         if handleImageShortcut(event) { return }
         if handleEditingKey(event) { return }
         super.keyDown(with: event)
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        let pressedModifiers = GlobalHotkeyManager.modifierSides(
+            from: CGEventFlags(rawValue: UInt64(event.modifierFlags.rawValue))
+        )
+        if pressedModifiers.count == 1,
+           pressedModifiers.first?.keyCode == UInt32(event.keyCode),
+           handleToolHotkey(event) { return }
+        super.flagsChanged(with: event)
     }
 
     override func cancelOperation(_ sender: Any?) {
@@ -6773,6 +6750,14 @@ final class ScreenshotEditorWindow: NSWindow {
         default:
             return false
         }
+    }
+
+    private func handleToolHotkey(_ event: NSEvent) -> Bool {
+        guard !(firstResponder is NSTextView) else { return false }
+        return onToolHotkey?(
+            UInt32(event.keyCode),
+            GlobalHotkeyManager.carbonModifiers(from: event.modifierFlags)
+        ) ?? false
     }
 }
 
@@ -6901,6 +6886,20 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         window.onDelete = { [weak self] in self?.deleteSelectedAnnotation() ?? false }
         window.onSave = { [weak self] in self?.saveImage() }
         window.onCopyImage = { [weak self] in self?.copyPinnedImage() ?? false }
+        window.onToolHotkey = { [weak self] keyCode, modifiers in
+            guard let self, !self.isPinnedImagePresentation,
+                  let tool = ScreenshotTool.matchingShortcut(
+                    keyCode: keyCode,
+                    modifiers: modifiers,
+                    hotkeys: AppModel.shared.settingsStore.settings.screenshotToolHotkeys
+                  )
+            else { return false }
+            if self.model.tool != tool {
+                self.annotationSelectionState.deselect()
+            }
+            self.model.tool = tool
+            return true
+        }
         configureOverlayView(in: window)
         window.delegate = self
     }
@@ -6915,8 +6914,8 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
             window?.setFrame(screen.frame, display: true)
         }
         showWindow(nil)
-        window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -7278,7 +7277,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         restoreEditorPresentation()
     }
 
-    private func captureNextScreen() {
+    func captureNextScreen() {
         guard !isClosed else { return }
         guard let screen = activeScreen else {
             model.statusMessage = AppLocalization.text("找不到显示器")
@@ -7450,8 +7449,8 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         // long-capture toolbar is stretched over the whole screen renders as solid black.
         window.isOpaque = true
         window.backgroundColor = .black
-        window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
     }
 
     private func dismissLongCaptureOverlays() {

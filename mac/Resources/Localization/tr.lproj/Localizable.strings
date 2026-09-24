@@ -2287,6 +2287,7 @@
 "%@（已导入）" = "%@ (içe aktarıldı)";
 "显示器 %ld" = "Ekran %ld";
 "%@快捷键与%@冲突，未保存" = "%@ kısayolu %@ ile çakıştığı için kaydedilmedi";
+"%@快捷键与%@冲突，请修改其中一个" = "%@ kısayolu %@ ile çakışıyor; lütfen birini değiştirin";
 "%@快捷键与语音输入冲突，未保存" = "%@ kısayolu sesli girişle çakıştığı için kaydedilmedi";
 "正在下载 %ld%%" = "İndiriliyor %ld%%";
 "未安装 · %@ · %@" = "Kurulu değil · %@ · %@";

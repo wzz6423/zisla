@@ -2283,6 +2283,7 @@
 "%@（已导入）" = "%@ (importé)";
 "显示器 %ld" = "Écran %ld";
 "%@快捷键与%@冲突，未保存" = "Le raccourci %@ est en conflit avec %@ et n’a pas été enregistré";
+"%@快捷键与%@冲突，请修改其中一个" = "Le raccourci %@ est en conflit avec %@ ; modifiez l'un des deux";
 "%@快捷键与语音输入冲突，未保存" = "Le raccourci %@ est en conflit avec la saisie vocale et n’a pas été enregistré";
 "正在下载 %ld%%" = "Téléchargement %ld %%";
 "未安装 · %@ · %@" = "Non installé · %@ · %@";
