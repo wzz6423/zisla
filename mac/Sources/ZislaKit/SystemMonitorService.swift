@@ -1715,12 +1715,14 @@ public enum SystemDiskCleanup {
 
     private enum ApplicationCacheSource {
         case library
+        case applicationSupport
         case sandboxContainer
         case groupContainer
 
         var detailPrefix: String {
             switch self {
             case .library: "应用缓存"
+            case .applicationSupport: "应用缓存"
             case .sandboxContainer: "沙盒应用缓存"
             case .groupContainer: "群组容器缓存"
             }
@@ -1774,6 +1776,31 @@ public enum SystemDiskCleanup {
                     continue
                 }
                 roots.append(ApplicationCacheRoot(url: cacheURL, identifier: identifier, source: entry.source))
+            }
+        }
+
+        let support = home.appendingPathComponent("Library/Application Support", isDirectory: true)
+        if let applications = try? fileManager.contentsOfDirectory(
+            at: support,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            for application in applications where !isSymbolicLink(application) {
+                guard isDirectory(application, fileManager: fileManager),
+                      SystemMonitorPathSafety.isURL(application, withinAllowedRoots: allowedHome)
+                else { continue }
+                for name in ["Cache", "Code Cache", "GPUCache", "CachedData"] {
+                    let cacheURL = application.appendingPathComponent(name, isDirectory: true).standardizedFileURL
+                    guard fileManager.fileExists(atPath: cacheURL.path),
+                          !isSymbolicLink(cacheURL),
+                          SystemMonitorPathSafety.isURL(cacheURL, withinAllowedRoots: allowedHome)
+                    else { continue }
+                    roots.append(ApplicationCacheRoot(
+                        url: cacheURL,
+                        identifier: "\(application.lastPathComponent) · \(name)",
+                        source: .applicationSupport
+                    ))
+                }
             }
         }
 
@@ -1956,9 +1983,9 @@ public enum SystemDiskCleanup {
         let requestedKinds = kinds.subtracting(excludedScanKinds)
         var tasks: [CleanupScanTask] = []
 
-        if requestedKinds.contains(.appCache) {
+        if !requestedKinds.isDisjoint(with: [.appCache, .cache]) {
             tasks.append(CleanupScanTask {
-                scanApplicationCaches(fileManager: fileManager)
+                scanApplicationCaches(fileManager: fileManager, kinds: requestedKinds)
             })
         }
 
@@ -2035,9 +2062,9 @@ public enum SystemDiskCleanup {
         let requestedKinds = kinds.subtracting(excludedScanKinds)
         var tasks: [CleanupScanTask] = []
 
-        if requestedKinds.contains(.appCache) {
+        if !requestedKinds.isDisjoint(with: [.appCache, .cache]) {
             tasks.append(CleanupScanTask {
-                scanApplicationCaches(fileManager: fileManager)
+                scanApplicationCaches(fileManager: fileManager, kinds: requestedKinds)
             })
         }
 
@@ -2104,7 +2131,8 @@ public enum SystemDiskCleanup {
     }
 
     private static func scanApplicationCaches(
-        fileManager: SystemMonitorFileManaging
+        fileManager: SystemMonitorFileManaging,
+        kinds: Set<DiskCleanupKind>
     ) -> [DiskCleanupCandidate] {
         let roots = applicationCacheRoots(fileManager: fileManager)
         let allowed = SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
@@ -2130,7 +2158,11 @@ public enum SystemDiskCleanup {
                 }
                 for child in children {
                     let cacheURL = child.standardizedFileURL
-                    guard SystemMonitorPathSafety.isURL(cacheURL, withinAllowedRoots: allowed),
+                    let kind: DiskCleanupKind = cacheURL.lastPathComponent.lowercased().hasPrefix("com.apple.")
+                        ? .cache : .appCache
+                    guard kinds.contains(kind),
+                          !isSymbolicLink(cacheURL),
+                          SystemMonitorPathSafety.isURL(cacheURL, withinAllowedRoots: allowed),
                           !dedicatedRootPaths.contains(SystemMonitorPathSafety.standardizedPath(cacheURL))
                     else {
                         continue
@@ -2139,14 +2171,17 @@ public enum SystemDiskCleanup {
                         at: cacheURL,
                         identifier: cacheURL.lastPathComponent,
                         source: .library,
+                        kind: kind,
                         fileManager: fileManager
                     ))
                 }
-            case .sandboxContainer, .groupContainer:
+            case .applicationSupport, .sandboxContainer, .groupContainer:
+                guard kinds.contains(.appCache) else { continue }
                 result.append(applicationCacheCandidate(
                     at: root.url,
                     identifier: root.identifier,
                     source: root.source,
+                    kind: .appCache,
                     fileManager: fileManager
                 ))
             }
@@ -2158,14 +2193,18 @@ public enum SystemDiskCleanup {
         at url: URL,
         identifier: String,
         source: ApplicationCacheSource,
+        kind: DiskCleanupKind,
         fileManager: SystemMonitorFileManaging
     ) -> DiskCleanupCandidate {
-        DiskCleanupCandidate(
+        let safetyLevel: DiskCleanupSafetyLevel? = kind == .cache || source == .applicationSupport
+            ? .requiresManualReview : nil
+        return DiskCleanupCandidate(
             url: url,
-            kind: .appCache,
+            kind: kind,
             byteSize: allocatedByteSize(of: url, fileManager: fileManager),
             displayName: AppLocalization.text("%@ 缓存", identifier),
-            detail: "\(source.detailPrefix) · \(url.path)"
+            detail: "\(AppLocalization.text(kind == .cache ? "缓存" : source.detailPrefix)) · \(url.path)",
+            safetyLevel: safetyLevel
         )
     }
 
@@ -2824,6 +2863,7 @@ public enum SystemDiskCleanup {
     ) -> [DiskCleanupCandidate] {
         let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
         let installed = installedBundleIdentifiers(fileManager: fileManager, home: home)
+        guard !installed.isEmpty else { return [] }
         var result: [DiskCleanupCandidate] = []
         for relativeRoot in applicationResidualRoots {
             let root = home.appendingPathComponent(relativeRoot, isDirectory: true)
@@ -2844,7 +2884,11 @@ public enum SystemDiskCleanup {
                           !isAppleSystemIdentifier(identifier),
                           !isOwnedByInstalledApplication(identifier, installed: installed),
                           looksLikeBundleIdentifier(identifier),
-                          let size = significantApplicationResidualSize(of: child, fileManager: fileManager)
+                          let size = significantApplicationResidualSize(
+                              of: child,
+                              minimumSize: root.lastPathComponent == "Preferences" ? 1 : applicationResidualMinimumSize,
+                              fileManager: fileManager
+                          )
                     else {
                         return
                     }
@@ -2867,7 +2911,7 @@ public enum SystemDiskCleanup {
     private static func residualIdentifier(for url: URL, root: URL) -> String? {
         let name = url.deletingPathExtension().lastPathComponent
         if root.lastPathComponent == "Preferences" || root.lastPathComponent == "LaunchAgents" {
-            return name
+            return url.pathExtension.lowercased() == "plist" ? name : nil
         }
         return url.lastPathComponent
     }
@@ -2881,27 +2925,29 @@ public enum SystemDiskCleanup {
     }
 
     private static func isAppleSystemIdentifier(_ identifier: String) -> Bool {
-        identifier == "com.apple"
-            || identifier.hasPrefix("com.apple.")
-            || identifier == "group.com.apple"
-            || identifier.hasPrefix("group.com.apple.")
+        let value = identifier.lowercased()
+        return value == "com.apple"
+            || value.hasPrefix("com.apple.")
+            || value == "group.com.apple"
+            || value.hasPrefix("group.com.apple.")
     }
 
     private static func significantApplicationResidualSize(
         of url: URL,
+        minimumSize: UInt64,
         fileManager: SystemMonitorFileManaging
     ) -> UInt64? {
         if isDirectory(url, fileManager: fileManager) {
             let size = allocatedByteSize(of: url, fileManager: fileManager)
-            return size >= applicationResidualMinimumSize ? size : nil
+            return size >= minimumSize ? size : nil
         }
         guard let size = (try? fileManager.attributesOfItem(atPath: url.path)[.size]) as? NSNumber,
-              size.uint64Value >= applicationResidualMinimumSize
+              size.uint64Value >= minimumSize
         else {
             return nil
         }
         let allocated = allocatedByteSize(of: url, fileManager: fileManager)
-        return allocated >= applicationResidualMinimumSize ? allocated : nil
+        return allocated >= minimumSize ? allocated : nil
     }
 
     private static func residualOwnerIdentifiers(for identifier: String) -> [String] {
@@ -2925,7 +2971,7 @@ public enum SystemDiskCleanup {
     }
 
     private static func isOwnedByInstalledApplication(_ identifier: String, installed: Set<String>) -> Bool {
-        let ownerIdentifiers = residualOwnerIdentifiers(for: identifier)
+        let ownerIdentifiers = residualOwnerIdentifiers(for: identifier.lowercased())
         if ownerIdentifiers.contains(where: installed.contains) {
             return true
         }
@@ -2984,7 +3030,7 @@ public enum SystemDiskCleanup {
                format: nil
            ) as? [String: Any],
            let identifier = plist["CFBundleIdentifier"] as? String {
-            identifiers.insert(identifier)
+            identifiers.insert(identifier.lowercased())
         }
         collectEmbeddedBundleIdentifiers(
             at: bundle.appendingPathComponent("Contents", isDirectory: true),
@@ -3337,6 +3383,9 @@ public enum SystemDiskCleanup {
         fileManager: SystemMonitorFileManaging,
         sizeProvider: ((URL) -> UInt64)? = nil
     ) -> DiskCleanupResult {
+        let installedResidualOwners = candidates.contains { $0.kind == .applicationResidual }
+            ? installedBundleIdentifiers(fileManager: fileManager, home: fileManager.homeDirectoryForCurrentUser())
+            : Set<String>()
         var success = 0
         var freed: UInt64 = 0
         var failures: [DiskCleanupFailure] = []
@@ -3351,7 +3400,11 @@ public enum SystemDiskCleanup {
                 )
                 continue
             }
-            guard candidatePathIsEligibleForTrash(candidate, fileManager: fileManager) else {
+            guard candidatePathIsEligibleForTrash(
+                candidate,
+                fileManager: fileManager,
+                installedResidualOwners: installedResidualOwners
+            ) else {
                 failures.append(
                     DiskCleanupFailure(
                         url: candidate.url,
@@ -3375,7 +3428,8 @@ public enum SystemDiskCleanup {
 
     private static func candidatePathIsEligibleForTrash(
         _ candidate: DiskCleanupCandidate,
-        fileManager: SystemMonitorFileManaging
+        fileManager: SystemMonitorFileManaging,
+        installedResidualOwners: Set<String>
     ) -> Bool {
         guard candidate.url.isFileURL, candidate.kind.safetyLevel != .analysisOnly else { return false }
         let path = SystemMonitorPathSafety.standardizedPath(candidate.url)
@@ -3383,10 +3437,21 @@ public enum SystemDiskCleanup {
 
         switch candidate.kind {
         case .applicationResidual:
+            guard !isSymbolicLink(candidate.url) else { return false }
+            guard !installedResidualOwners.isEmpty else { return false }
             return applicationResidualRoots.contains { root in
                 let rootURL = URL(fileURLWithPath: home).appendingPathComponent(root, isDirectory: true)
-                return URL(fileURLWithPath: path).deletingLastPathComponent().path == rootURL.path
+                guard URL(fileURLWithPath: path).deletingLastPathComponent().path == rootURL.path,
+                      let identifier = residualIdentifier(for: candidate.url, root: rootURL)
+                else { return false }
+                return looksLikeBundleIdentifier(identifier)
+                    && !isAppleSystemIdentifier(identifier)
+                    && !isOwnedByInstalledApplication(identifier, installed: installedResidualOwners)
             }
+        case .cache:
+            let caches = URL(fileURLWithPath: home).appendingPathComponent("Library/Caches", isDirectory: true)
+            return URL(fileURLWithPath: path).deletingLastPathComponent().path == caches.path
+                && candidate.url.lastPathComponent.lowercased().hasPrefix("com.apple.")
         case .projectBuildArtifact:
             return path.hasPrefix(home + "/")
                 && projectArtifactNames.contains(URL(fileURLWithPath: path).lastPathComponent)
