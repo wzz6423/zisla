@@ -161,6 +161,9 @@ public final class ManagedToolService: ObservableObject {
         if tool == .zshell {
             return ["/Applications/zshell.app/Contents/MacOS/zshell"]
         }
+        if tool == .dockDoor {
+            return ["/Applications/DockDoor.app/Contents/MacOS/DockDoor"]
+        }
         if tool == .markdownPreview {
             return [
                 "/opt/homebrew/bin/mdp",

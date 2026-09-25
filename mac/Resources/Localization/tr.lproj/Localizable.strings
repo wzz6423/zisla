@@ -1596,6 +1596,7 @@
 "目录树展示" = "Dizin ağacı görüntüleyicisi";
 "终端工作区" = "Terminal çalışma alanı";
 "原生 macOS 终端工作区" = "Yerel macOS terminal çalışma alanı";
+"Dock 窗口预览与应用切换" = "Dock pencere önizlemeleri ve uygulama geçişi";
 "统计与权限" = "İstatistikler ve izinler";
 "统计已暂停" = "İstatistikler duraklatıldı";
 "自定义热词" = "Özel terimler";
@@ -2503,3 +2504,6 @@
 "自动更新推荐工具" = "Önerilen araçları otomatik güncelle";
 "每天更新已安装的推荐工具；不会安装未安装的工具" = "Yüklü önerilen araçları günlük günceller; eksik araçları yüklemez";
 "录屏与视频编辑" = "Ekran kaydı ve video düzenleme";
+
+"窗口预览" = "Pencere Önizlemeleri";
+"悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Dock üzerine gelince veya Command-Tab kullanırken pencereleri önizleyin; Erişilebilirlik ve Ekran Kaydı izinleri gerekir";

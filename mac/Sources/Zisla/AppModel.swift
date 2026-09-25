@@ -549,6 +549,7 @@ final class AppModel: ObservableObject {
   }()
   private let downloadService = DownloadService()
   private let hotkeyManager = GlobalHotkeyManager()
+  private let windowPreview = WindowPreviewController()
   private let voicePostProcessingQueue = VoicePostProcessingQueue()
   /// Serial voice-processing runs share one pair of wing notices; removed when the last run finishes.
   private var voiceProcessingOperationCount = 0
@@ -753,7 +754,9 @@ final class AppModel: ObservableObject {
     settingsStore.$settings
       .dropFirst()
       .sink { [weak self] settings in
-        Task { @MainActor [weak self] in self?.apply(settings: settings) }
+        Task { @MainActor [weak self] in
+          self?.apply(settings: settings, requestWindowPreviewPermissions: true)
+        }
         let networkProxyURL = settings.networkProxyURL
         let networkProxyEnabled = settings.networkProxyEnabled
         self?.aiAgent.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
@@ -957,6 +960,7 @@ final class AppModel: ObservableObject {
   }
 
   func refreshAssistantAccessibility() {
+    windowPreview.refreshPermissions()
     guard assistantAccessibilityGranted != AccessibilityPermission.isTrusted else { return }
     assistantAccessibilityGranted = AccessibilityPermission.isTrusted
     // Re-apply the gesture when the permission flips to granted.
@@ -1026,6 +1030,7 @@ final class AppModel: ObservableObject {
   }
 
   func stop() {
+    windowPreview.stop()
     settingsStore.flushPendingChanges()
     islandClipboardHandoff.cancel()
     managedTools.setAutomaticUpdatesEnabled(false)
@@ -2692,7 +2697,12 @@ final class AppModel: ObservableObject {
     }
   }
 
-  private func apply(settings: FeatureSettings) {
+  private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
+    windowPreview.setVisualStyle(settings.islandVisualStyle)
+    windowPreview.configure(
+      enabled: settings.windowPreviewsEnabled,
+      requestPermissions: requestWindowPreviewPermissions
+    )
     // Regular UI appearance is controlled by user settings; the island panel is separately pinned to dark at the window level (see IslandPanel).
     NSApp.appearance = settings.appearanceMode.nsAppearance
     keyboardSound.apply(
