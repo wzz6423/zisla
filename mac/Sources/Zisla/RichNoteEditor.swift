@@ -55,6 +55,7 @@ struct RichNoteEditor: NSViewRepresentable {
     let noteID: String?
     let command: RichNoteEditorCommand?
     let isEditable: Bool
+    let onCopy: (() -> Void)?
     let onChange: (String?, String, String) -> Void
 
     static var newNoteHTML: String { "<h1>\(AppLocalization.text("新随记"))</h1><div><span style=\"font-size: 11px\"><br></span></div>" }
@@ -64,12 +65,14 @@ struct RichNoteEditor: NSViewRepresentable {
         noteID: String? = nil,
         command: RichNoteEditorCommand?,
         isEditable: Bool,
+        onCopy: (() -> Void)? = nil,
         onChange: @escaping (String?, String, String) -> Void
     ) {
         self.html = html
         self.noteID = noteID
         self.command = command
         self.isEditable = isEditable
+        self.onCopy = onCopy
         self.onChange = onChange
     }
 
@@ -184,7 +187,7 @@ struct RichNoteEditor: NSViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onChange: onChange, isEditable: isEditable)
+        Coordinator(onChange: onChange, onCopy: onCopy, isEditable: isEditable)
     }
 
     func makeNSView(context: Context) -> WKWebView {
@@ -192,6 +195,7 @@ struct RichNoteEditor: NSViewRepresentable {
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         configuration.userContentController.add(context.coordinator, name: "richNoteChanged")
+        configuration.userContentController.add(context.coordinator, name: "richNoteCopied")
 
         let webView = TransparentWKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
@@ -218,6 +222,7 @@ struct RichNoteEditor: NSViewRepresentable {
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "richNoteChanged")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "richNoteCopied")
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
@@ -232,6 +237,7 @@ struct RichNoteEditor: NSViewRepresentable {
         }
 
         private let onChange: (String?, String, String) -> Void
+        private let onCopy: (() -> Void)?
         private weak var webView: WKWebView?
         private var desiredDocument: Document?
         private var appliedDocument: Document?
@@ -249,9 +255,11 @@ struct RichNoteEditor: NSViewRepresentable {
 
         init(
             onChange: @escaping (String?, String, String) -> Void,
+            onCopy: (() -> Void)?,
             isEditable: Bool
         ) {
             self.onChange = onChange
+            self.onCopy = onCopy
             self.isEditable = isEditable
         }
 
@@ -375,6 +383,10 @@ struct RichNoteEditor: NSViewRepresentable {
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "richNoteCopied" {
+                onCopy?()
+                return
+            }
             guard message.name == "richNoteChanged",
                   let payload = message.body as? [String: Any],
                   let html = payload["html"] as? String,
@@ -801,6 +813,9 @@ struct RichNoteEditor: NSViewRepresentable {
           editor.addEventListener('focus', scheduleCaretUpdate);
           editor.addEventListener('blur', hideCaret);
           editor.addEventListener('keydown', scheduleCaretUpdate);
+          editor.addEventListener('copy', () => {
+            setTimeout(() => window.webkit.messageHandlers.richNoteCopied.postMessage(null), 0);
+          });
           document.addEventListener('selectionchange', () => {
             saveSelection();
             scheduleCaretUpdate();

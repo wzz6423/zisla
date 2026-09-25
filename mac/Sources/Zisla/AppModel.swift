@@ -303,6 +303,46 @@ enum BrowserDownloadQuickActionPresenter {
   }
 }
 
+struct IslandClipboardHandoff {
+  struct Pending {
+    let content: ClipboardHistoryContent
+    let downloadableURL: URL?
+    let changeCount: Int
+    let sourceApplication: NSRunningApplication?
+
+    init(
+      content: ClipboardHistoryContent,
+      downloadableURL: URL?,
+      changeCount: Int,
+      sourceApplication: NSRunningApplication? = nil
+    ) {
+      self.content = content
+      self.downloadableURL = downloadableURL
+      self.changeCount = changeCount
+      self.sourceApplication = sourceApplication
+    }
+  }
+
+  private(set) var shouldDefer = false
+  private var pending: Pending?
+
+  mutating func noteDidCopy() { shouldDefer = true }
+  mutating func beginRecycle() { shouldDefer = true }
+  mutating func hold(_ capture: Pending) { pending = capture }
+
+  mutating func finishRecycle(currentChangeCount: Int) -> Pending? {
+    shouldDefer = false
+    defer { pending = nil }
+    guard pending?.changeCount == currentChangeCount else { return nil }
+    return pending
+  }
+
+  mutating func cancel() {
+    shouldDefer = false
+    pending = nil
+  }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
   private enum AIProcessingTarget {
@@ -987,6 +1027,7 @@ final class AppModel: ObservableObject {
 
   func stop() {
     settingsStore.flushPendingChanges()
+    islandClipboardHandoff.cancel()
     managedTools.setAutomaticUpdatesEnabled(false)
     keyboardSound.stop()
     clipboardHistory.flushPendingChanges()
@@ -1450,6 +1491,7 @@ final class AppModel: ObservableObject {
   private var clipboardAssistantContent: ClipboardHistoryContent?
   private var isClipboardCalendarEditorPresented = false
   private var lastClipboardAssistantRoutingChangeCount: Int?
+  private var islandClipboardHandoff = IslandClipboardHandoff()
   /// Live exchange-rate fetching for the assistant's currency conversion; quotes are fetched
   /// fresh on every conversion and never cached.
   private let exchangeRateService = ExchangeRateService.live()
@@ -1490,6 +1532,34 @@ final class AppModel: ObservableObject {
     routeCapturedClipboardContent(content, downloadableURL: downloadableURL)
   }
 
+  func quickNoteDidCopy() {
+    guard settingsStore.settings.clipboardAssistantEnabled,
+      isIslandVisible, !isExternalDragging,
+      !voiceInput.isRecording, !voiceInput.isPreparing else { return }
+    islandClipboardHandoff.noteDidCopy()
+    islandCollapseRequested = true
+  }
+
+  func islandDidBeginRecycling() {
+    islandClipboardHandoff.beginRecycle()
+  }
+
+  func islandDidFinishRecycling() {
+    let pending = islandClipboardHandoff.finishRecycle(
+      currentChangeCount: NSPasteboard.general.changeCount
+    )
+    guard !isIslandVisible, let pending else { return }
+    presentCapturedClipboardContent(
+      pending.content,
+      downloadableURL: pending.downloadableURL,
+      sourceApplication: pending.sourceApplication
+    )
+  }
+
+  func islandDidReexpand() {
+    islandClipboardHandoff.cancel()
+  }
+
   private func routeCapturedClipboardContent(
     _ content: ClipboardHistoryContent,
     downloadableURL: URL?
@@ -1498,7 +1568,29 @@ final class AppModel: ObservableObject {
     guard lastClipboardAssistantRoutingChangeCount != changeCount else { return }
     lastClipboardAssistantRoutingChangeCount = changeCount
 
-    switch presentClipboardAssistant(for: content) {
+    let sourceApplication = NSWorkspace.shared.frontmostApplication
+    if islandClipboardHandoff.shouldDefer {
+      islandClipboardHandoff.hold(.init(
+        content: content,
+        downloadableURL: downloadableURL,
+        changeCount: changeCount,
+        sourceApplication: sourceApplication
+      ))
+      return
+    }
+    presentCapturedClipboardContent(
+      content,
+      downloadableURL: downloadableURL,
+      sourceApplication: sourceApplication
+    )
+  }
+
+  private func presentCapturedClipboardContent(
+    _ content: ClipboardHistoryContent,
+    downloadableURL: URL?,
+    sourceApplication: NSRunningApplication?
+  ) {
+    switch presentClipboardAssistant(for: content, sourceApplication: sourceApplication) {
     case .presented, .ignored:
       guard downloadableURL != nil else { return }
       detectedLinkTask?.cancel()
@@ -1510,7 +1602,8 @@ final class AppModel: ObservableObject {
   }
 
   private func presentClipboardAssistant(
-    for content: ClipboardHistoryContent
+    for content: ClipboardHistoryContent,
+    sourceApplication: NSRunningApplication?
   ) -> ClipboardAssistantPresentationResult {
     let settings = settingsStore.settings
     guard settings.clipboardAssistantEnabled else { return .unavailable }
@@ -1523,7 +1616,6 @@ final class AppModel: ObservableObject {
       return .ignored
     }
     // The frontmost app at capture time is the app the user copied from.
-    let sourceApplication = NSWorkspace.shared.frontmostApplication
     if let bundleIdentifier = sourceApplication?.bundleIdentifier,
        settings.clipboardAssistantBlacklist.contains(bundleIdentifier) {
       return .unavailable

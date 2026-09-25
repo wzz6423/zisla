@@ -364,6 +364,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var effectiveAppearanceObservation: NSKeyValueObservation?
     private var currentApplicationIconImage: NSImage?
     private var expandedSizeUpdateTask: Task<Void, Never>?
+    private var islandClipboardHandoffTask: Task<Void, Never>?
     /// Last panel size actually applied to the coordinator; basis for the two-phase
     /// (union → target) resize that keeps the SwiftUI surface spring unclipped.
     private var lastAppliedPanelSize: CGSize?
@@ -470,7 +471,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         )
         coordinator.onVisibilityChanged = { [weak self] visible in
+            let wasVisible = model.isIslandVisible
             model.isIslandVisible = visible
+            if visible {
+                self?.islandClipboardHandoffTask?.cancel()
+                self?.islandClipboardHandoffTask = nil
+                model.islandDidReexpand()
+            } else if wasVisible {
+                model.islandDidBeginRecycling()
+                self?.islandClipboardHandoffTask?.cancel()
+                self?.islandClipboardHandoffTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: ZislaMotion.islandRecycleSettleDelay)
+                    guard !Task.isCancelled else { return }
+                    model.islandDidFinishRecycling()
+                    self?.islandClipboardHandoffTask = nil
+                }
+            }
             self?.noticePresenter?.setIslandExpanded(visible)
             if visible {
                 self?.flushVoiceRecordingPanelRestore()
@@ -860,6 +876,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         noticePresenter?.stop()
         petController?.stop()
         overlayCoordinator?.stop()
+        islandClipboardHandoffTask?.cancel()
     }
 
     /// Holds the island panel at its recording size until the recycle fold has folded the pill back

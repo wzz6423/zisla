@@ -7,6 +7,36 @@ import ZislaCore
 @testable import Zisla
 
 struct ClipboardAssistantIslandPresentationTests {
+    @Test
+    func quickNoteCopyWaitsForTheFoldAndKeepsTheNewestCapture() {
+        var handoff = IslandClipboardHandoff()
+        handoff.noteDidCopy()
+        #expect(handoff.shouldDefer)
+
+        handoff.hold(.init(content: .text("first"), downloadableURL: nil, changeCount: 10))
+        handoff.beginRecycle()
+        handoff.hold(.init(content: .text("latest"), downloadableURL: nil, changeCount: 11))
+
+        let pending = handoff.finishRecycle(currentChangeCount: 11)
+        #expect(pending?.content == .text("latest"))
+        #expect(!handoff.shouldDefer)
+    }
+
+    @Test
+    func reExpansionAndNewPasteboardChangesDiscardStaleHandoffs() {
+        var handoff = IslandClipboardHandoff()
+        handoff.beginRecycle()
+        #expect(handoff.shouldDefer)
+        handoff.hold(.init(content: .text("old"), downloadableURL: nil, changeCount: 3))
+        #expect(handoff.finishRecycle(currentChangeCount: 4) == nil)
+
+        handoff.noteDidCopy()
+        handoff.hold(.init(content: .text("cancelled"), downloadableURL: nil, changeCount: 5))
+        handoff.cancel()
+        #expect(!handoff.shouldDefer)
+        #expect(handoff.finishRecycle(currentChangeCount: 5) == nil)
+    }
+
     @MainActor
     @Test(.serialized, arguments: [false, true])
     func physicalNotchButtonsDismissThePromptWithoutTakingFocus(performsPrimaryAction: Bool) throws {
