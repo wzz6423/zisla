@@ -965,6 +965,12 @@ struct WindowPreviewView: View {
     @ObservedObject var controller: WindowPreviewController
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
+    static func usesNativeGlass(reduceTransparency: Bool, visualStyle: IslandVisualStyle) -> Bool {
+        guard !reduceTransparency, visualStyle == .transparent else { return false }
+        if #available(macOS 26.0, *) { return true }
+        return false
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             if controller.showsAppHeader {
@@ -1021,7 +1027,7 @@ struct WindowPreviewView: View {
         if reduceTransparency {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(nsColor: .windowBackgroundColor))
-        } else if visualStyle == .transparent, #available(macOS 26.0, *) {
+        } else if usesNativeGlass(reduceTransparency: reduceTransparency, visualStyle: visualStyle) {
             LiquidGlassPaneBackground(cornerRadius: 12)
         } else {
             RoundedRectangle(cornerRadius: 12)

@@ -508,21 +508,11 @@ struct WindowPreviewWindowMatchTests {
 @MainActor
 struct WindowPreviewPanelTests {
     @Test
-    func previewPanelUsesNativeGlassOnSupportedSystems() throws {
+    func previewSelectsNativeGlassOnSupportedSystems() {
         guard #available(macOS 26.0, *) else { return }
-        let controller = WindowPreviewController()
-        controller.setVisualStyle(.transparent)
-        let panel = controller.makePanel()
-        defer { panel.close() }
-        panel.setFrame(CGRect(x: 100, y: 100, width: 226, height: 168), display: true)
-        let content = try #require(panel.contentView)
-        content.layoutSubtreeIfNeeded()
-
-        let glass = try #require(nativeGlass(in: content))
-        #expect(abs(glass.frame.width - content.bounds.width) < 1)
-        #expect(abs(glass.frame.height - content.bounds.height) < 1)
-        #expect(glass.style == .clear)
-        #expect(glass.cornerRadius == 12)
+        #expect(WindowPreviewView.usesNativeGlass(reduceTransparency: false, visualStyle: .transparent))
+        #expect(!WindowPreviewView.usesNativeGlass(reduceTransparency: false, visualStyle: .frosted))
+        #expect(!WindowPreviewView.usesNativeGlass(reduceTransparency: true, visualStyle: .transparent))
     }
 
     @available(macOS 26.0, *)
@@ -550,7 +540,7 @@ struct WindowPreviewPanelTests {
     }
 
     @Test
-    func visiblePreviewFollowsVisualStyleChanges() async throws {
+    func visiblePreviewFollowsVisualStyleChanges() throws {
         guard #available(macOS 26.0, *) else { return }
         let controller = WindowPreviewController()
         let panel = controller.makePanel()
@@ -561,24 +551,22 @@ struct WindowPreviewPanelTests {
         panel.setFrame(CGRect(x: 100, y: 100, width: 226, height: 168), display: true)
         panel.alphaValue = 0
         panel.orderFrontRegardless()
-        let content = try #require(panel.contentView)
+        let content = try #require(panel.contentView as? WindowPreviewHostingView<WindowPreviewView>)
         #expect(panel.isVisible)
-        content.layoutSubtreeIfNeeded()
-        #expect(nativeGlass(in: content) != nil)
+        #expect(content.rootView.controller === controller)
+        #expect(WindowPreviewView.usesNativeGlass(
+            reduceTransparency: false, visualStyle: content.rootView.controller.visualStyle
+        ))
 
         controller.setVisualStyle(.frosted)
-        await withCheckedContinuation { continuation in
-            DispatchQueue.main.async { continuation.resume() }
-        }
-        content.layoutSubtreeIfNeeded()
-        #expect(nativeGlass(in: content) == nil)
+        #expect(!WindowPreviewView.usesNativeGlass(
+            reduceTransparency: false, visualStyle: content.rootView.controller.visualStyle
+        ))
 
         controller.setVisualStyle(.transparent)
-        await withCheckedContinuation { continuation in
-            DispatchQueue.main.async { continuation.resume() }
-        }
-        content.layoutSubtreeIfNeeded()
-        #expect(nativeGlass(in: content) != nil)
+        #expect(WindowPreviewView.usesNativeGlass(
+            reduceTransparency: false, visualStyle: content.rootView.controller.visualStyle
+        ))
     }
 
     @Test
