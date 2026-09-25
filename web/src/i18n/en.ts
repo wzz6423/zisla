@@ -349,7 +349,7 @@ export const en: SiteContent = {
       storage: {
         question: 'Where does zisla store its data?',
         answer:
-          'Local data lives in ~/Library/Application Support/zisla/. Typing stats are kept separately in ~/Library/Application Support/SimuBoard/typing-stats.sqlite3. Quick Notes uses the system Notes app.',
+          'Local data lives in ~/Library/Application Support/zisla/. Typing stats are kept separately in ~/Library/Application Support/zisla/typing-stats.sqlite3. Quick Notes uses the system Notes app.',
       },
     },
   },

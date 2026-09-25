@@ -334,7 +334,7 @@ export const es = createCatalog({
       },
       storage: {
         question: '¿Dónde guarda zisla sus datos?',
-        answer: 'Los datos locales están en ~/Library/Application Support/zisla/. Las estadísticas de escritura se guardan aparte en ~/Library/Application Support/SimuBoard/typing-stats.sqlite3. Notas rápidas usa Notas.',
+        answer: 'Los datos locales están en ~/Library/Application Support/zisla/. Las estadísticas de escritura se guardan aparte en ~/Library/Application Support/zisla/typing-stats.sqlite3. Notas rápidas usa Notas.',
       },
     },
   },

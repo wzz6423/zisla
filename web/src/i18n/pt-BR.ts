@@ -334,7 +334,7 @@ export const ptBR = createCatalog({
       },
       storage: {
         question: 'Onde o zisla armazena os dados?',
-        answer: 'Os dados locais ficam em ~/Library/Application Support/zisla/. Estatísticas de digitação ficam separadas em ~/Library/Application Support/SimuBoard/typing-stats.sqlite3. Notas rápidas usa o app Notas.',
+        answer: 'Os dados locais ficam em ~/Library/Application Support/zisla/. Estatísticas de digitação ficam separadas em ~/Library/Application Support/zisla/typing-stats.sqlite3. Notas rápidas usa o app Notas.',
       },
     },
   },

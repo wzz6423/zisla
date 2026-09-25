@@ -365,7 +365,7 @@ export const de: SiteContent = {
       storage: {
         question: 'Wo speichert zisla seine Daten?',
         answer:
-          'Lokale Daten liegen in ~/Library/Application Support/zisla/. Die Tippstatistik wird getrennt in ~/Library/Application Support/SimuBoard/typing-stats.sqlite3 gespeichert. Kurznotizen nutzen die System-App Notizen.',
+          'Lokale Daten liegen in ~/Library/Application Support/zisla/. Die Tippstatistik wird getrennt in ~/Library/Application Support/zisla/typing-stats.sqlite3 gespeichert. Kurznotizen nutzen die System-App Notizen.',
       },
     },
   },

@@ -257,7 +257,7 @@ export const ru = createCatalog({
       network: { question: 'Подключается ли zisla к сети?', answer: 'Погода, подписанные проверки обновлений, начатые вами загрузки и дополнительная удалённая обработка голоса используют сеть по необходимости. Ссылки из буфера распознаются локально.' },
       multiDisplay: { question: 'Поддерживает ли zisla несколько дисплеев?', answer: 'Да: несколько дисплеев, Spaces и обычные полноэкранные приложения; раскрытие не забирает фокус.' },
       intel: { question: 'Можно ли использовать zisla на Intel Mac?', answer: 'Сборка для Intel может существовать, но совместимость не гарантируется. Сейчас поддерживается конфигурация Apple Silicon.' },
-      storage: { question: 'Где zisla хранит данные?', answer: 'Локальные данные находятся в ~/Library/Application Support/zisla/. Статистика ввода хранится отдельно в ~/Library/Application Support/SimuBoard/typing-stats.sqlite3. Быстрые заметки используют системное приложение «Заметки».' },
+      storage: { question: 'Где zisla хранит данные?', answer: 'Локальные данные находятся в ~/Library/Application Support/zisla/. Статистика ввода хранится отдельно в ~/Library/Application Support/zisla/typing-stats.sqlite3. Быстрые заметки используют системное приложение «Заметки».' },
     },
   },
   developers: {

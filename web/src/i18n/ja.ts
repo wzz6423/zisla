@@ -342,7 +342,7 @@ export const ja: SiteContent = {
       storage: {
         question: 'zisla のデータはどこに保存されますか？',
         answer:
-          'ローカルデータは ~/Library/Application Support/zisla/ にあります。入力統計は ~/Library/Application Support/SimuBoard/typing-stats.sqlite3 に別途保存されます。クイックメモはシステムの「メモ」を使います。',
+          'ローカルデータは ~/Library/Application Support/zisla/ にあります。入力統計は ~/Library/Application Support/zisla/typing-stats.sqlite3 に別途保存されます。クイックメモはシステムの「メモ」を使います。',
       },
     },
   },
