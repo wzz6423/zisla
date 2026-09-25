@@ -1,4 +1,5 @@
 import {
+  AppWindow,
   ArrowDownToLine,
   ArrowUpRight,
   Bot,
@@ -20,6 +21,7 @@ import {
 } from 'lucide';
 import {
   brewInstallCommand,
+  changelogEntries,
   crossModuleFeatureIcons,
   crossModuleFeatureIds,
   documentationCardIds,
@@ -61,6 +63,7 @@ if (!app) {
 }
 
 const siteIcons = {
+  AppWindow,
   ArrowDownToLine,
   ArrowUpRight,
   Bot,
@@ -113,9 +116,12 @@ const readInitialLocale = (): SiteLocale => {
   return resolvePreferredLocale(preferred);
 };
 
+const desktopQuery = window.matchMedia('(min-width: 1200px)');
+const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 let currentLocale = readInitialLocale();
 let revealObserver: IntersectionObserver | undefined;
 let toastTimer: number | undefined;
+let sectionProgressItems: { section: HTMLElement; link: HTMLAnchorElement }[] = [];
 const copyFeedbackTimers = new WeakMap<HTMLButtonElement, number>();
 const progressBar = document.createElement('div');
 progressBar.className = 'scroll-progress';
@@ -238,7 +244,7 @@ const bindReveals = () => {
   revealObserver?.disconnect();
   revealObserver = undefined;
   const revealItems = document.querySelectorAll<HTMLElement>('.reveal, .reveal-sequence');
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reducedMotion = reducedMotionQuery.matches;
   if (reducedMotion) {
     document.documentElement.classList.remove('reveal-ready');
     revealItems.forEach((element) => element.classList.add('visible'));
@@ -272,6 +278,56 @@ const updateScrollProgress = () => {
   const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
   const progress = scrollableHeight > 0 ? window.scrollY / scrollableHeight : 0;
   progressBar.style.transform = 'scaleX(' + Math.min(1, Math.max(0, progress)) + ')';
+
+  const sectionThreshold =
+    (document.querySelector<HTMLElement>('.site-header')?.getBoundingClientRect().height ?? 80) + 24;
+  let activeIndex = 0;
+  sectionProgressItems.forEach(({ section }, index) => {
+    if (section.getBoundingClientRect().top <= sectionThreshold) activeIndex = index;
+  });
+  if (scrollableHeight > 0 && window.scrollY >= scrollableHeight - 2) {
+    activeIndex = sectionProgressItems.length - 1;
+  }
+  sectionProgressItems.forEach(({ link }, index) => {
+    if (index === activeIndex) link.setAttribute('aria-current', 'location');
+    else link.removeAttribute('aria-current');
+  });
+};
+
+const setupChangelogPagination = () => {
+  const timeline = document.querySelector<HTMLOListElement>('.changelog-timeline');
+  if (!timeline) return;
+  const pager = document.querySelector<HTMLElement>('.changelog-pager');
+  const items = Array.from(timeline.querySelectorAll<HTMLLIElement>('.changelog-release'));
+  const input = pager?.querySelector<HTMLInputElement>('.changelog-pager-input');
+  const prevBtn = pager?.querySelector<HTMLButtonElement>('[data-changelog-nav="prev"]');
+  const nextBtn = pager?.querySelector<HTMLButtonElement>('[data-changelog-nav="next"]');
+  if (!pager || !input || !prevBtn || !nextBtn) return;
+  const pageSize = 5;
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
+  let current = 0;
+  const showPage = (page: number) => {
+    current = Math.min(pageCount, Math.max(1, Math.trunc(page) || 1));
+    // Off-page cards are display:none; their reveal opacity comes from the visible sequence parent.
+    timeline.classList.add('visible');
+    items.forEach((item, index) => {
+      item.classList.toggle('is-hidden', Math.floor(index / pageSize) + 1 !== current);
+    });
+    input.value = String(current);
+    prevBtn.disabled = current <= 1;
+    nextBtn.disabled = current >= pageCount;
+  };
+  prevBtn.addEventListener('click', () => showPage(current - 1));
+  nextBtn.addEventListener('click', () => showPage(current + 1));
+  const commitInput = () => showPage(Number(input.value));
+  input.addEventListener('change', commitInput);
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitInput();
+    }
+  });
+  showPage(1);
 };
 
 const renderSite = (locale: SiteLocale, preserveScroll = false) => {
@@ -280,6 +336,28 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
   currentLocale = locale;
   updateDocumentMetadata(locale, content);
 
+  const heroTitle = content.hero.title.replace(/^([^<]+)<br>/, '<span class="hero-word">$1</span>');
+  const sectionProgressMarkup = [
+    ['top', content.header.brandHomeAriaLabel],
+    ['showcase', content.showcase.eyebrow],
+    ['capabilities', content.extensions.eyebrow],
+    ['ai', content.ai.eyebrow],
+    ['how-it-works', content.flow.eyebrow],
+    ['download', content.download.eyebrow],
+    ['faq', content.faq.eyebrow],
+    ['developers', content.developers.eyebrow],
+    ['changelog', content.changelog.eyebrow],
+  ]
+    .map(([id, label]) =>
+      '<a class="section-progress-link" href="#' + id + '" aria-label="' + escapeHtml(label) +
+      '"><span class="section-progress-label" aria-hidden="true">' + escapeHtml(label) + '</span></a>',
+    )
+    .join('');
+  const renderMarquee = (items: readonly string[], variant: 'features' | 'tools') => {
+    const group = items.map((item) => '<span>' + escapeHtml(item) + '</span>').join('');
+    return '<div class="marquee marquee-' + variant + '" aria-hidden="true"><div class="marquee-track">' +
+      '<div class="marquee-group">' + group + '</div><div class="marquee-group">' + group + '</div></div></div>';
+  };
   const workflowMarkup = (['island', 'ai', 'daily', 'tools'] as const)
     .map((group, groupIndex) => {
       const modules = showcaseModuleGroups.filter((module) => module.group === group);
@@ -397,6 +475,97 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     })
     .join('');
 
+  const changelogPageSize = 5;
+  const changelogPageCount = Math.ceil(changelogEntries.length / changelogPageSize);
+  const releaseCount = String(changelogEntries.length).padStart(2, '0');
+  const changelogTimelineMarkup = changelogEntries
+    .map((release, index) => {
+      const isLatest = index === 0;
+      const page = Math.floor(index / changelogPageSize) + 1;
+      const releasePage = repositoryLinks.github + '/releases/tag/' + release.version;
+      const notesMarkup = release.notes
+        .map(
+          (note) =>
+            '<li class="changelog-note"><span class="changelog-note-mark" aria-hidden="true">+</span><span class="changelog-note-text">' +
+            escapeHtml(note) +
+            '</span></li>',
+        )
+        .join('');
+      const badgeMarkup = isLatest
+        ? '<span class="changelog-release-badge">' +
+          escapeHtml(content.changelog.latestBadge) +
+          '</span>'
+        : '';
+      return (
+        '<li class="changelog-release reveal-step' +
+        (isLatest ? ' changelog-release-latest' : '') +
+        (page === 1 ? '' : ' is-hidden') +
+        '" data-changelog-page="' +
+        page +
+        '" style="--reveal-index: ' +
+        (index % changelogPageSize) +
+        '"><div class="changelog-release-head"><a class="changelog-release-version changelog-release-link" href="' +
+        releasePage +
+        '" target="_blank" rel="noreferrer" aria-label="' +
+        escapeHtml(content.download.releaseCtaAriaLabel) +
+        '">' +
+        escapeHtml(release.version) +
+        icon('arrow-up-right', 16) +
+        '</a>' +
+        badgeMarkup +
+        '<span class="changelog-release-date">' +
+        escapeHtml(release.date) +
+        '</span></div><ul class="changelog-notes">' +
+        notesMarkup +
+        '</ul></li>'
+      );
+    })
+    .join('');
+  const changelogPagerMarkup =
+    changelogPageCount > 1
+      ? '<nav class="changelog-pager" aria-label="' +
+        escapeHtml(content.changelog.pagerAriaLabel) +
+        '"><button class="changelog-pager-btn changelog-pager-step" type="button" data-changelog-nav="prev" aria-label="' +
+        escapeHtml(content.changelog.prevPageLabel) +
+        '">' +
+        escapeHtml(content.changelog.prevPageLabel) +
+        '</button><span class="changelog-pager-status"><input class="changelog-pager-input" type="number" inputmode="numeric" min="1" max="' +
+        changelogPageCount +
+        '" value="1" aria-label="' +
+        escapeHtml(content.changelog.pagerAriaLabel) +
+        '" /><span class="changelog-pager-total" aria-hidden="true">/ ' +
+        String(changelogPageCount).padStart(2, '0') +
+        '</span></span><button class="changelog-pager-btn changelog-pager-step" type="button" data-changelog-nav="next" aria-label="' +
+        escapeHtml(content.changelog.nextPageLabel) +
+        '">' +
+        escapeHtml(content.changelog.nextPageLabel) +
+        '</button></nav>'
+      : '';
+  const changelogSectionMarkup =
+    '<section class="section changelog-section" id="changelog"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
+    escapeHtml(content.changelog.eyebrow) +
+    '</p><h2 class="section-title">' +
+    escapeHtml(content.changelog.title) +
+    '</h2></div></div><dl class="changelog-stats reveal" aria-label="' +
+    escapeHtml(content.changelog.ariaLabel) +
+    '"><div class="changelog-stat"><dt>' +
+    escapeHtml(content.changelog.releaseCountLabel) +
+    '</dt><dd>' +
+    releaseCount +
+    '</dd></div><div class="changelog-stat"><dt>' +
+    escapeHtml(content.changelog.latestLabel) +
+    '</dt><dd>' +
+    escapeHtml(latestRelease.version) +
+    '</dd></div><div class="changelog-stat"><dt>' +
+    escapeHtml(content.changelog.shippedLabel) +
+    '</dt><dd>' +
+    escapeHtml(latestRelease.date) +
+    '</dd></div></dl><ol class="changelog-timeline reveal-sequence">' +
+    changelogTimelineMarkup +
+    '</ol>' +
+    changelogPagerMarkup +
+    '</div></section>';
+
   const languageOptions = siteLocales
     .map(
       (value) =>
@@ -444,18 +613,19 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     .join('');
 
   app.innerHTML =
-    '<main><section class="hero" id="top"><header class="site-header">' +
+    '<nav class="section-progress-nav" aria-label="' + escapeHtml(content.header.navAriaLabel) + '">' +
+    sectionProgressMarkup + '</nav><main><section class="hero" id="top"><header class="site-header">' +
     '<a class="brand" href="#top" aria-label="' +
     escapeHtml(content.header.brandHomeAriaLabel) +
     '"><img class="brand-mark" src="./assets/zisla-icon.png" alt="" /><span>zisla <span class="brand-subtitle">/ ' +
     escapeHtml(content.tagline) +
-    '</span></span></a><button class="menu-toggle" type="button" aria-label="' +
+    '</span></span></a><button class="menu-toggle" type="button" aria-controls="siteNavigation" aria-label="' +
     escapeHtml(content.header.menuOpenLabel) +
     '" aria-expanded="false" title="' +
     escapeHtml(content.header.menuButtonTitle) +
     '">' +
     icon('menu', 18) +
-    '</button><nav class="nav" aria-label="' +
+    '</button><nav class="nav" id="siteNavigation" aria-label="' +
     escapeHtml(content.header.navAriaLabel) +
     '">' +
     navIds
@@ -475,8 +645,9 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     '</a></nav></header><div class="section-wrap hero-inner"><div class="hero-copy"><p class="eyebrow">' +
     escapeHtml(content.hero.eyebrow) +
     '</p><h1 class="hero-title">' +
-    content.hero.title +
-    '</h1><p class="hero-lede">' +
+    heroTitle +
+    '</h1></div><div class="hero-identity"><img class="hero-identity-mark" src="./assets/zisla-icon.png" alt="" /><span class="hero-version">' +
+    escapeHtml(latestRelease.version) + '</span></div><div class="hero-bottom"><p class="hero-lede">' +
     escapeHtml(content.hero.lede) +
     '</p><div class="hero-actions"><a class="button button-primary" href="' +
     latestRelease.dmg +
@@ -494,7 +665,9 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.hero.sourceCta) +
     '</a></div><ul class="hero-hints">' +
     content.hero.hints.map((hint) => '<li>' + icon('check', 13) + '<span>' + escapeHtml(hint) + '</span></li>').join('') +
-    '</ul></div><div class="hero-identity" aria-hidden="true"><span class="hero-identity-rule"></span><img class="hero-identity-mark" src="./assets/zisla-icon.png" alt="" /></div></div></section><section class="proof-band" aria-label="' +
+    '</ul></div></div></section>' +
+    renderMarquee(showcaseModuleGroups.map((module) => content.showcase.modules[module.id].name), 'features') +
+    '<section class="proof-band" aria-label="' +
     escapeHtml(content.proof.ariaLabel) +
     '"><div class="section-wrap proof-grid reveal-sequence">' +
     proofMarkup +
@@ -506,7 +679,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.showcase.lede) +
     '</p></div><div class="workflow-overview" aria-label="' +
     escapeHtml(content.showcase.ariaLabel) +
-    '"><aside class="workflow-summary reveal"><span class="mono-label">' +
+    '"><aside class="workflow-summary reveal"><span class="summary-number" aria-hidden="true">' + showcaseModuleGroups.length + '</span><span class="mono-label">' +
     escapeHtml(format(content.showcase.summaryMono, { modules: showcaseModuleGroups.length, groups: 4 })) +
     '</span><p>' +
     escapeHtml(content.showcase.summaryLede) +
@@ -530,7 +703,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.extensions.summaryNote) +
     '</span></aside><div class="extension-list reveal-sequence">' +
     crossModuleMarkup +
-    '</div></div></div></section><section class="section ai-section" id="ai"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
+    '</div></div></div></section>' + renderMarquee(supportedAITools(content.ai.doubaoName), 'tools') + '<section class="section ai-section" id="ai"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
     escapeHtml(content.ai.eyebrow) +
     '</p><h2 class="section-title">' +
     content.ai.title +
@@ -616,7 +789,8 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.download.brewNote) +
     '</p></div></div><dl class="download-notes reveal-step" style="--reveal-index: 1">' +
     downloadNoteIds.map(renderDownloadNote).join('') +
-    '</dl></div></section><section class="section faq-section" id="faq"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
+    '</dl></div></section>' +
+    '<section class="section faq-section" id="faq"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
     escapeHtml(content.faq.eyebrow) +
     '</p><h2 class="section-title">' +
     escapeHtml(content.faq.title) +
@@ -661,7 +835,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.developers.checksumLabel) +
     '</a></div></div><ul class="performance-list">' +
     content.developers.performancePoints.map((point) => '<li>' + icon('check', 14) + '<span>' + escapeHtml(point) + '</span></li>').join('') +
-    '</ul></div></div></section></main><footer class="site-footer"><div class="section-wrap reveal-sequence"><div class="footer-top reveal-step" style="--reveal-index: 0"><a class="brand" href="#top" aria-label="' +
+    '</ul></div></div></section>' + changelogSectionMarkup + '</main><footer class="site-footer"><div class="section-wrap reveal-sequence"><div class="footer-word" aria-hidden="true">zisla</div><div class="footer-top reveal-step" style="--reveal-index: 0"><a class="brand" href="#top" aria-label="' +
     escapeHtml(content.footer.brandHomeAriaLabel) +
     '"><img class="brand-mark" src="./assets/zisla-icon.png" alt="" /><span>zisla</span></a><div class="footer-links"><a href="' +
     repositoryLinks.github +
@@ -686,6 +860,14 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
   createIcons({ icons: siteIcons });
   setMenuOpen(false);
   bindReveals();
+  sectionProgressItems = Array.from(
+    document.querySelectorAll<HTMLAnchorElement>('.section-progress-link'),
+  ).flatMap((link) => {
+    const section = document.getElementById(link.hash.substring(1));
+    return section ? [{ section, link }] : [];
+  });
+
+  setupChangelogPagination();
 
   document.querySelector<HTMLButtonElement>('.menu-toggle')?.addEventListener('click', () => {
     const nav = document.querySelector<HTMLElement>('.nav');
@@ -764,9 +946,12 @@ const showLocale = async (locale: SiteLocale, preserveScroll = false) => {
 
 window.addEventListener('scroll', updateScrollProgress, { passive: true });
 window.addEventListener('resize', updateScrollProgress);
-const desktopQuery = window.matchMedia('(min-width: 901px)');
-desktopQuery.addEventListener?.('change', ({ matches }) => {
-  if (matches) setMenuOpen(false);
+desktopQuery.addEventListener?.('change', () => setMenuOpen(false));
+reducedMotionQuery.addEventListener?.('change', bindReveals);
+window.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !document.querySelector('.nav.is-open')) return;
+  setMenuOpen(false);
+  document.querySelector<HTMLButtonElement>('.menu-toggle')?.focus();
 });
 
 void showLocale(currentLocale);

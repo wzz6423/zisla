@@ -20,6 +20,7 @@ export const ko: SiteContent = {
       showcase: '기능',
       ai: 'AI 워크플로',
       download: '다운로드',
+      changelog: '변경 로그',
       faq: 'FAQ',
       developers: '개발자',
     },
@@ -40,7 +41,6 @@ export const ko: SiteContent = {
       '복사한 뒤 Command+N으로 다음 단계를 바로 실행',
       '알아서 접히므로 작업을 방해하지 않습니다',
     ],
-    identityCaption: '화면 위쪽',
   },
   proof: {
     ariaLabel: '제품 개요',
@@ -59,7 +59,7 @@ export const ko: SiteContent = {
     summaryMono: '모듈 {modules}개 / 분류 {groups}개',
     summaryLede: '상단 워크플로부터 로컬 도구까지, 실제로 할 수 있는 일을 하나씩 적었습니다.',
     summaryNote:
-      '상단 모듈 {modules}개와 독립 기능 {features}개. 스크린샷, 음성, 미디어, 다운로드, 빠른 동작, AI 관리, 펫, 잠금 화면을 포함합니다.',
+      '상단 모듈 {modules}개와 독립 기능 {features}개. 창 미리보기와 캡처부터 AI 관리, 추천 앱까지 제공합니다.',
     groupNames: {
       island: '상단 워크플로',
       ai: 'AI 워크플로',
@@ -138,8 +138,8 @@ export const ko: SiteContent = {
       system: {
         name: '시스템 상태',
         caption:
-          'CPU, GPU, 메모리, 디스크, 네트워크, 팬 등의 상태를 확인하고, 기기가 지원하면 NVMe SMART 온도를 읽고, 분 단위 기록을 저장해 원하는 기간의 그래프를 보고 .xlsx로 내보낼 수 있으며, 안전하게 지울 수 있는 캐시와 로그를 정리합니다.',
-        points: ['칩 단위 모니터링', '기록 그래프와 .xlsx 내보내기', '캐시 한 번에 정리'],
+          'CPU, GPU, 메모리, 디스크, 네트워크, 팬 등의 상태를 확인하고, 기기가 지원하면 NVMe SMART 온도를 읽고, 분 단위 기록을 저장해 원하는 기간의 그래프를 보고 .xlsx로 내보낼 수 있습니다. 앱 캐시, Apple 사용자 캐시, 로그와 남은 환경설정 파일을 검색합니다. 검토 후 선택한 항목을 휴지통으로 옮기고 처리 결과를 확인하세요.',
+        points: ['칩 단위 모니터링', '기록 그래프와 .xlsx 내보내기', '검토 후 휴지통으로 이동'],
       },
       battery: {
         name: '배터리',
@@ -157,13 +157,19 @@ export const ko: SiteContent = {
     summaryMono: '아일랜드 바깥',
     summaryLede: '자주 쓰는 기능을 각자 가장 자연스러운 자리에.',
     summaryNote:
-      '스크린샷, 녹음, 미디어, 브라우저 다운로드, 빠른 동작, AI 관리, 펫, 잠금 화면이 각각 독립적으로 동작합니다.',
+      '창 미리보기, 캡처와 빠른 동작을 편한 위치에서 사용하고, 추천 앱에서 더 많은 데스크톱 도구를 찾아보세요.',
     features: {
+      windowPreviews: {
+        title: '창을 미리 보고 클릭으로 전환',
+        description:
+          'Dock에 포인터를 올리거나 Command-Tab으로 전환할 때 창을 미리 보고, 카드를 클릭해 해당 창을 활성화하세요. 기본적으로 꺼져 있으며 설정에서 켜고 필요한 권한을 허용해야 합니다.',
+        detail: 'Dock 및 Command-Tab · 클릭으로 창 전환 · 기본적으로 꺼짐',
+      },
       capture: {
         title: '스크린샷, 스크롤 캡처, 화면 고정',
         description:
-          '전역 단축키로 화면을 캡처하거나 고정해 창 테두리를 보존한 뒤 주석을 달고, 스크롤 캡처를 이어 붙이고, 표를 인식하거나 내보낼 수 있습니다. 내보낼 때는 아직 완료하지 않은 주석도 보존됩니다.',
-        detail: '전역 단축키 · 창 테두리 보존 · 미완성 주석도 내보내기',
+          '전역 단축키로 화면을 캡처하거나 고정해 창 테두리를 보존한 뒤 주석을 달고, 스크롤 캡처를 이어 붙이고, 표를 인식하거나 내보낼 수 있습니다. 내보낼 때는 아직 완료하지 않은 주석도 보존됩니다. 스크린샷, 고정, 스크롤 캡처와 주석 도구의 단축키를 바꿀 수 있습니다. 캡처·음성 입력·빠른 동작 사이의 충돌을 확인하며, 보조 키만으로 실행하려면 입력 모니터링 권한이 필요합니다.',
+        detail: '단축키 맞춤 설정 · 충돌 확인 · 미완성 주석도 내보내기',
       },
       voice: {
         title: '음성 입력과 정리',
@@ -186,7 +192,7 @@ export const ko: SiteContent = {
       copyAssistant: {
         title: '빠른 동작과 다음 단계 제안',
         description:
-          '켜 두면 복사한 텍스트, 링크, 파일, 이미지가 별도의 상단 바에서 미리 보입니다. 링크, 로컬에 설치된 앱 이름, Emoji 이름을 인식하고, 복사한 금액을 실시간 환율로 환산할 수 있으며 모든 다음 단계는 확인한 뒤 실행합니다. 브라우저 다운로드나 AirDrop 파일 수신이 완료되면 같은 단축키로 파일이 있는 폴더를 열 수 있습니다. 이 기능은 빠른 동작 스위치로 제어하며 브라우저 다운로드 진행률 스위치와는 별개입니다.',
+          '켜 두면 복사한 텍스트, 링크, 파일, 이미지가 별도의 상단 바에서 미리 보입니다. 링크, 로컬에 설치된 앱 이름, Emoji 이름을 인식하고, 복사한 금액을 실시간 환율로 환산할 수 있으며 모든 다음 단계는 확인한 뒤 실행합니다. 브라우저 다운로드나 AirDrop 수신이 완료되면 빠른 동작으로 파일이 있는 폴더를 여세요. Chrome의 기본 및 직접 선택한 다운로드 폴더를 지원하며 진행률 표시와 별도로 켤 수 있습니다.',
         detail: '로컬 인식 · 실시간 환율 환산 · 기본 Command+N',
       },
       aiManagement: {
@@ -206,6 +212,12 @@ export const ko: SiteContent = {
         description:
           '필요할 때 macOS 잠금 화면에 날짜, 상태, 재생 중인 항목을 표시합니다. 독립된 잠금 화면 오버레이이므로 아일랜드의 모듈 목록이나 캐러셀에는 나타나지 않습니다.',
         detail: '독립 오버레이 · 선택해서 켜기 · 포커스를 가져가지 않음',
+      },
+      recommendedTools: {
+        title: '추천 앱',
+        description:
+          '화면 녹화와 동영상 편집용 OpenScreen, Dock 창 미리보기와 앱 전환용 DockDoor 등의 도구를 찾아보세요. 모두 별도로 설치하는 타사 앱입니다.',
+        detail: '데스크톱 도구 탐색 · 타사 앱 · 별도 설치',
       },
     },
   },
@@ -280,6 +292,21 @@ export const ko: SiteContent = {
       architectures: { term: '다른 아키텍처', value: '릴리스 페이지' },
       mirror: { term: '미러', value: 'Gitee Releases' },
     },
+  },
+  changelog: {
+    eyebrow: '변경 로그',
+    title: '각 zisla 릴리스의 변경 사항: 새로운 기능, 개선 사항, 수정 사항입니다.',
+    lede: '각 zisla 릴리스의 변경 사항: 새로운 기능, 개선 사항, 수정 사항입니다.',
+    ariaLabel: 'zisla 릴리스 기록',
+    releaseCountLabel: '릴리스',
+    latestLabel: '최신',
+    shippedLabel: '배포일',
+    latestBadge: '최신',
+    noteLabel: '릴리스',
+    pagerAriaLabel: '변경 로그 페이지',
+    pageLabel: '{page}페이지',
+    prevPageLabel: '이전',
+    nextPageLabel: '다음',
   },
   faq: {
     eyebrow: '분명한 답 몇 가지',
