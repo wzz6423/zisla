@@ -436,17 +436,17 @@ struct SettingsView: View {
             }
 
             if input.selection == .features {
-                settingsGroup("复制助手") {
+                settingsGroup("快捷操作") {
                     featureToggle(
-                        "复制助手",
-                        detail: "复制后弹出识别结果和下一步操作",
+                        "快捷操作",
+                        detail: "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作",
                         symbol: "sparkles.rectangle.stack",
                         keyPath: \.clipboardAssistantEnabled
                     )
                 }
             }
             if input.selection == .clipboardAssistant {
-                settingsGroup("复制助手") {
+                settingsGroup("快捷操作") {
                     settingRow(
                         symbol: "keyboard",
                         title: "快速触发快捷键",
@@ -594,7 +594,7 @@ struct SettingsView: View {
                     }
                     rowDivider
                     featureToggle(
-                        AppLocalization.text("每次保存图片时选择位置"),
+                        AppLocalization.text("每次保存文件时选择位置"),
                         detail: "关闭时保存到“下载”中的默认下载目录",
                         symbol: "folder",
                         keyPath: \.clipboardAssistantPromptsForImageSaveLocation
@@ -679,6 +679,14 @@ struct SettingsView: View {
                     ) {
                         EmptyView()
                     }
+                    rowDivider
+                    featureToggle(
+                        AppLocalization.text("下载与 AirDrop 完成提示"),
+                        detail: "完成后显示“打开文件夹”快捷操作",
+                        symbol: "folder.badge.plus",
+                        keyPath: \.downloadCompletionFolderActionEnabled,
+                        isNested: true
+                    )
                     ForEach(ClipboardAssistantKind.allCases, id: \.self) { kind in
                         rowDivider
                         settingRow(
@@ -715,7 +723,7 @@ struct SettingsView: View {
                         }
                     }
                 }
-                settingsGroup("复制助手") {
+                settingsGroup("快捷操作") {
                     ForEach(ClipboardAssistantKind.allCases, id: \.self) { kind in
                         let actions = clipboardAssistantActionOrder(for: kind)
                         if kind != ClipboardAssistantKind.allCases.first { rowDivider }
@@ -3933,7 +3941,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: "通用"
         case .features: "功能"
         case .keyboardSound: "键盘音效"
-        case .clipboardAssistant: "复制助手"
+        case .clipboardAssistant: "快捷操作"
         case .screenshot: "截图"
         case .workflow: "工作流"
         case .info: "信息"
@@ -3973,7 +3981,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: "调整语言、外观、启动与展开方式。"
         case .features: "集中开启或关闭所有功能模块。"
         case .keyboardSound: "键盘音效与输入统计。"
-        case .clipboardAssistant: "复制后弹出识别结果和下一步操作"
+        case .clipboardAssistant: "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作"
         case .screenshot: "启用截图、钉图与全局快捷键"
         case .workflow: "管理灵动岛中的工作流模块。"
         case .info: "配置日历、邮件、锁屏与通知显示。"

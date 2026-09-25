@@ -4,10 +4,10 @@ export const en: SiteContent = {
   meta: {
     documentTitle: 'zisla · Dynamic workspace',
     description:
-      'zisla is a native dynamic workspace for macOS. Keep AI tasks such as Zed Agent, media, files and your agenda in one place, with keyboard sounds, typing stats, screenshot annotation and a copy assistant.',
+      'zisla is a native dynamic workspace for macOS. Keep AI tasks such as Zed Agent, media, files and your agenda in one place, with keyboard sounds, typing stats, screenshot annotation and Quick Actions.',
     ogTitle: 'zisla · Put what is happening where you can see it',
     ogDescription:
-      'From AI tasks such as Zed Agent and media playback to keyboard sounds, typing stats, the copy assistant, screenshot annotation and desktop tools — a native macOS workspace that appears only when you need it.',
+      'From AI tasks such as Zed Agent and media playback to keyboard sounds, typing stats, Quick Actions, screenshot annotation and desktop tools — a native macOS workspace that appears only when you need it.',
   },
   tagline: 'Native macOS dynamic workspace',
   header: {
@@ -31,7 +31,7 @@ export const en: SiteContent = {
     eyebrow: 'NATIVE MACOS WORKSPACE',
     title:
       'zisla<br><em>What is happening,<br>right where you<br class="hero-mobile-break"> can see it.</em>',
-    lede: 'Collect AI tasks, media, files and your agenda at the top of the screen. After you copy something, a separate assistant bar previews it up there and suggests the next step. It appears when needed and steps aside when you are done.',
+    lede: 'Collect AI tasks, media, files and your agenda at the top of the screen. After you copy something, a separate Quick Actions bar previews it up there and suggests the next step. It appears when needed and steps aside when you are done.',
     downloadCta: 'Download',
     downloadCtaAriaLabel: 'Download',
     sourceCta: 'View source',
@@ -61,7 +61,7 @@ export const en: SiteContent = {
     summaryLede:
       'From top-of-screen workflows to local tools, every task you can actually complete is spelled out here.',
     summaryNote:
-      '{modules} top-of-screen modules plus {features} standalone capabilities covering screenshots, voice, media, downloads, the copy assistant, AI management, the pet and the lock screen.',
+      '{modules} top-of-screen modules plus {features} standalone capabilities covering screenshots, voice, media, downloads, Quick Actions, AI management, the pet and the lock screen.',
     groupNames: {
       island: 'Top-of-screen workflows',
       ai: 'AI workflow',
@@ -163,7 +163,7 @@ export const en: SiteContent = {
     summaryMono: 'BEYOND THE ISLAND',
     summaryLede: 'Frequently used capabilities, each where it feels natural.',
     summaryNote:
-      'Screenshots, recording, media, browser downloads, the copy assistant, AI management, the pet and the lock screen are each presented on their own.',
+      'Screenshots, recording, media, browser downloads, Quick Actions, AI management, the pet and the lock screen are each presented on their own.',
     features: {
       capture: {
         title: 'Screenshots, scrolling captures and pinning',
@@ -190,9 +190,9 @@ export const en: SiteContent = {
         detail: '8 browsers · Source detection · Completion notice',
       },
       copyAssistant: {
-        title: 'Copy assistant and smart next steps',
+        title: 'Quick Actions and smart next steps',
         description:
-          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm.',
+          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. The feature recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. When a browser download or AirDrop file arrives, the same shortcut can open its folder; the Quick Actions switch controls this independently of browser download progress.',
         detail: 'On-device recognition · Live currency conversion · Command+N by default',
       },
       aiManagement: {
@@ -305,7 +305,7 @@ export const en: SiteContent = {
           'No. AI status monitoring reads task status only, never prompt or reply text.',
       },
       copyAssistant: {
-        question: 'Does the copy assistant open or upload what I copy?',
+        question: 'Do Quick Actions open or upload what I copy?',
         answer:
           'No. Once enabled, recognition and preview happen entirely on your Mac, and zisla only carries out a next step after you click it or press the quick trigger.',
       },

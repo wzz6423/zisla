@@ -175,7 +175,7 @@ struct ClipboardAssistantCurrencyPresentationTests {
         await Self.expectAutomaticDismissal(controller, gate: gate, duration: 5)
     }
 
-    private static func expectAutomaticDismissal(
+    static func expectAutomaticDismissal(
         _ controller: ClipboardAssistantController,
         gate: DismissalGate,
         duration: Double
@@ -223,7 +223,7 @@ struct ClipboardAssistantCurrencyPresentationTests {
     )
 }
 
-private actor DismissalGate {
+actor DismissalGate {
     nonisolated let started = XCTestExpectation(description: "The reading duration starts")
     private(set) var durations: [Duration] = []
     private var continuations: [CheckedContinuation<Void, Never>] = []

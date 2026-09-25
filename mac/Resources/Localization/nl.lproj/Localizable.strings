@@ -426,8 +426,11 @@
 /* Clipboard assistant */
 "存在时长" = "Weergaveduur";
 "提示自动关闭前的时间；永不则仅手动关闭" = "Tijd voordat de melding sluit; Nooit betekent alleen handmatig sluiten";
-"复制助手" = "Kopieerassistent";
-"复制后弹出识别结果和下一步操作" = "Toont herkende inhoud en vervolgacties na elke kopie";
+"快捷操作" = "Snelle acties";
+"复制、浏览器下载或 AirDrop 接收完成后显示下一步操作" = "Toont vervolgacties na kopiëren, een browserdownload of ontvangst via AirDrop";
+"打开文件夹" = "Map openen";
+"下载与 AirDrop 完成提示" = "Meldingen na downloads en AirDrop";
+"完成后显示“打开文件夹”快捷操作" = "Toon na voltooiing de snelle actie 'Map openen'";
 "快速触发快捷键" = "Sneltrigger-sneltoets";
 "清除快捷键" = "Sneltoets wissen";
 "鼠标侧键" = "Muisknop zijzijde";
@@ -2103,7 +2106,7 @@
 "无法读取 Zed 线程" = "Kan de Zed-threads niet lezen";
 "无法读取最近剪贴板记录" = "Kan de recente klembordvermeldingen niet lezen";
 "正在处理另一项邮件操作" = "Er wordt al een andere e-mailactie verwerkt";
-"每次保存图片时选择位置" = "Bij elke afbeelding een locatie kiezen";
+"每次保存文件时选择位置" = "Bij het opslaan van elk bestand een locatie kiezen";
 "读取备忘录锁定状态失败" = "Lezen van de vergrendelstatus van de notitie mislukt";
 "静音 Zisla 通知" = "Zisla-meldingen dempen";
 "AI 状态数据库写入失败" = "Schrijven naar de AI-statusdatabase mislukt";

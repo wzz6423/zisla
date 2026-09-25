@@ -1,11 +1,111 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ZislaCore
 
 @testable import Zisla
 
 struct ClipboardAssistantIslandPresentationTests {
+    @Test
+    func quickNoteCopyWaitsForTheFoldAndKeepsTheNewestCapture() {
+        var handoff = IslandClipboardHandoff()
+        handoff.noteDidCopy()
+        #expect(handoff.shouldDefer)
+
+        handoff.hold(.init(content: .text("first"), downloadableURL: nil, changeCount: 10))
+        handoff.beginRecycle()
+        handoff.hold(.init(content: .text("latest"), downloadableURL: nil, changeCount: 11))
+
+        let pending = handoff.finishRecycle(currentChangeCount: 11)
+        #expect(pending?.content == .text("latest"))
+        #expect(!handoff.shouldDefer)
+    }
+
+    @Test
+    func reExpansionAndNewPasteboardChangesDiscardStaleHandoffs() {
+        var handoff = IslandClipboardHandoff()
+        handoff.beginRecycle()
+        #expect(handoff.shouldDefer)
+        handoff.hold(.init(content: .text("old"), downloadableURL: nil, changeCount: 3))
+        #expect(handoff.finishRecycle(currentChangeCount: 4) == nil)
+
+        handoff.noteDidCopy()
+        handoff.hold(.init(content: .text("cancelled"), downloadableURL: nil, changeCount: 5))
+        handoff.cancel()
+        #expect(!handoff.shouldDefer)
+        #expect(handoff.finishRecycle(currentChangeCount: 5) == nil)
+    }
+
+    @MainActor
+    @Test(.serialized, arguments: [false, true])
+    func physicalNotchButtonsDismissThePromptWithoutTakingFocus(performsPrimaryAction: Bool) throws {
+        _ = NSApplication.shared
+        let wasActive = NSApp.isActive
+        let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
+        controller.displayDuration = .never
+        controller.presentation.islandTopHeight = 37
+        controller.presentation.physicalNotchWidth = 185
+        controller.presentation.progressGlowEnabled = false
+        controller.presentation.detection = ClipboardAssistantDetection(
+            kind: .nonSystemLanguageText,
+            title: "copied text",
+            detail: .characterAndWordCount(characters: 1726, words: 27),
+            actions: [.translate("copied text")]
+        )
+        var actions: [ClipboardAssistantAction] = []
+        controller.onPerformAction = { actions.append($0) }
+        let host = NSHostingView(rootView: ClipboardAssistantToastView(
+            presentation: controller.presentation,
+            controller: controller
+        ).environment(\.locale, Locale(identifier: "zh-Hans")))
+        host.sizingOptions = []
+        host.wantsLayer = true
+        host.layer?.backgroundColor = NSColor.clear.cgColor
+        let panel = ClipboardAssistantWindow(
+            contentView: host,
+            frame: CGRect(x: -100_000, y: -100_000, width: 533, height: 37)
+        )
+        defer { panel.orderOut(nil) }
+        #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) })
+        // SwiftUI installs its event graph only after the window is ordered in.
+        panel.orderFrontRegardless()
+        host.layoutSubtreeIfNeeded()
+        let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        let point = CGPoint(x: performsPrimaryAction ? 443 : 509, y: 18.5)
+        let down = try #require(NSEvent.mouseEvent(
+            with: .leftMouseDown,
+            location: point,
+            modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: panel.windowNumber,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1
+        ))
+        let up = try #require(NSEvent.mouseEvent(
+            with: .leftMouseUp,
+            location: point,
+            modifierFlags: [],
+            timestamp: down.timestamp + 0.1,
+            windowNumber: panel.windowNumber,
+            context: nil,
+            eventNumber: 1,
+            clickCount: 1,
+            pressure: 0
+        ))
+        panel.sendEvent(down)
+        panel.sendEvent(up)
+
+        #expect(controller.presentation.detection == nil)
+        #expect(actions == (performsPrimaryAction ? [.translate("copied text")] : []))
+        #expect(!panel.isKeyWindow)
+        #expect(!panel.canBecomeKey)
+        #expect(NSApp.isActive == wasActive)
+    }
+
     @Test
     func physicalNotchHeaderReservesTheHardwareCutout() {
         #expect(ClipboardAssistantToastView.physicalNotchSideWidth(totalWidth: 480, notchWidth: 185) == 147.5)
@@ -112,6 +212,23 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(viewSource.contains("CollapsedProgressGlow(progress: progress)"))
         #expect(viewSource.contains("if !isExpanded"))
         #expect(source.contains("CollapsedProgress.elapsedFraction(fromRemaining: remaining)"))
+    }
+
+    @Test
+    func dismissalClockDoesNotRerenderTheAssistantControlsEachFrame() throws {
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let viewStart = try #require(source.range(of: "struct ClipboardAssistantToastView"))
+        let bodyStart = try #require(source.range(of: "    var body: some View {", range: viewStart.lowerBound..<source.endIndex))
+        let bodyEnd = try #require(source.range(
+            of: "    private var isDismissalProgressActive: Bool {",
+            range: bodyStart.upperBound..<source.endIndex
+        ))
+        let body = source[bodyStart.lowerBound..<bodyEnd.lowerBound]
+
+        let surface = try #require(body.range(of: "IslandSurface("))
+        let timeline = try #require(body.range(of: "TimelineView("))
+        #expect(surface.lowerBound < timeline.lowerBound)
+        #expect(body[surface.lowerBound..<timeline.lowerBound].contains(".overlay {"))
     }
 
     @MainActor

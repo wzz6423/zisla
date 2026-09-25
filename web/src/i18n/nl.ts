@@ -4,7 +4,7 @@ export const nl = createCatalog({
   meta: {
     documentTitle: 'zisla · Dynamische werkruimte',
     description:
-      'zisla is een native dynamische werkruimte voor macOS. Houd AI-taken, media, bestanden en je agenda bij elkaar, met toetsenbordgeluiden, typestatistieken, schermaantekeningen en een kopieerassistent.',
+      'zisla is een native dynamische werkruimte voor macOS. Houd AI-taken, media, bestanden en je agenda bij elkaar, met toetsenbordgeluiden, typestatistieken, schermaantekeningen en snelle acties.',
     ogTitle: 'zisla · Zet wat er gebeurt waar je het kunt zien',
     ogDescription:
       'Van AI-taken en media tot toetsenbordgeluiden, typestatistieken, schermaantekeningen en desktoptools: een native macOS-werkruimte die verschijnt wanneer je haar nodig hebt.',
@@ -31,7 +31,7 @@ export const nl = createCatalog({
     eyebrow: 'NATIVE MACOS-WERKRUIMTE',
     title: 'zisla<br><em>Wat er gebeurt,<br>precies waar<br class="hero-mobile-break"> je het ziet.</em>',
     lede:
-      'Verzamel AI-taken, media, bestanden en je agenda bovenaan het scherm. Na het kopiëren toont een aparte assistentbalk een voorbeeld en stelt de volgende stap voor. Ze verschijnt wanneer nodig en verdwijnt daarna weer.',
+      'Verzamel AI-taken, media, bestanden en je agenda bovenaan het scherm. Na het kopiëren toont een aparte balk met snelle acties een voorbeeld en stelt de volgende stap voor. Ze verschijnt wanneer nodig en verdwijnt daarna weer.',
     downloadCta: 'Download',
     downloadCtaAriaLabel: 'Download',
     sourceCta: 'Broncode bekijken',
@@ -62,7 +62,7 @@ export const nl = createCatalog({
     summaryLede:
       'Van workflows bovenaan tot lokale tools: elke taak die je echt kunt uitvoeren staat hier beschreven.',
     summaryNote:
-      '{modules} modules bovenaan en {features} zelfstandige functies voor schermafbeeldingen, spraak, media, downloads, kopieerassistent, AI-beheer, huisdier en vergrendelscherm.',
+      '{modules} modules bovenaan en {features} zelfstandige functies voor schermafbeeldingen, spraak, media, downloads, snelle acties, AI-beheer, huisdier en vergrendelscherm.',
     groupNames: {
       island: 'Workflows bovenaan',
       ai: 'AI-workflow',
@@ -161,7 +161,7 @@ export const nl = createCatalog({
     summaryMono: 'VOORBIJ HET EILAND',
     summaryLede: 'Veelgebruikte functies, elk op een natuurlijke plek.',
     summaryNote:
-      'Schermafbeeldingen, opname, media, browserdownloads, kopieerassistent, AI-beheer, huisdier en vergrendelscherm worden afzonderlijk getoond.',
+      'Schermafbeeldingen, opname, media, browserdownloads, snelle acties, AI-beheer, huisdier en vergrendelscherm worden afzonderlijk getoond.',
     features: {
       capture: {
         title: 'Schermafbeeldingen, scrollcaptures en vastzetten',
@@ -188,9 +188,9 @@ export const nl = createCatalog({
         detail: '8 browsers · Bronherkenning · Melding bij voltooiing',
       },
       copyAssistant: {
-        title: 'Kopieerassistent en volgende stappen',
+        title: 'Snelle acties en volgende stappen',
         description:
-          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging.',
+          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Na een browserdownload of ontvangst van een bestand via AirDrop kun je met dezelfde sneltoets de bijbehorende map openen; de schakelaar voor Snelle acties staat los van de weergave van browserdownloads.',
         detail: 'Optionele schakelaar · Lokale herkenning · Command+N standaard',
       },
       aiManagement: {
@@ -275,7 +275,7 @@ export const nl = createCatalog({
     items: {
       audience: { question: 'Voor wie is zisla?', answer: 'Voor Mac-gebruikers die AI, media, bestanden en agenda op één plek willen. Ook schermen zonder notch worden ondersteund.' },
       aiPrivacy: { question: 'Leest zisla mijn AI-gesprekken?', answer: 'Nee. AI-statusbewaking leest alleen de taakstatus, nooit de tekst van prompts of antwoorden.' },
-      copyAssistant: { question: 'Opent of uploadt de kopieerassistent wat ik kopieer?', answer: 'Nee. Herkenning en voorbeeldweergave gebeuren op je Mac; een volgende stap wordt pas na jouw bevestiging uitgevoerd.' },
+      copyAssistant: { question: 'Openen of uploaden snelle acties wat ik kopieer?', answer: 'Nee. Herkenning en voorbeeldweergave gebeuren op je Mac; een volgende stap wordt pas na jouw bevestiging uitgevoerd.' },
       permissions: {
         question: 'Welke systeemmachtigingen heeft zisla nodig?',
         answer: `

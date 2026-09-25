@@ -4,10 +4,10 @@ export const id = createCatalog({
   meta: {
     documentTitle: 'zisla · Ruang kerja dinamis',
     description:
-      'zisla adalah ruang kerja dinamis native untuk macOS. Satukan tugas AI, media, berkas, dan agenda, lengkap dengan suara keyboard, statistik mengetik, anotasi tangkapan layar, dan asisten salin.',
+      'zisla adalah ruang kerja dinamis native untuk macOS. Satukan tugas AI, media, berkas, dan agenda, lengkap dengan suara keyboard, statistik mengetik, anotasi tangkapan layar, dan tindakan cepat.',
     ogTitle: 'zisla · Letakkan apa yang terjadi di tempat yang dapat Anda lihat',
     ogDescription:
-      'Dari tugas AI dan media hingga suara keyboard, statistik mengetik, asisten salin, anotasi tangkapan layar, dan alat desktop: ruang kerja macOS native yang muncul saat diperlukan.',
+      'Dari tugas AI dan media hingga suara keyboard, statistik mengetik, tindakan cepat, anotasi tangkapan layar, dan alat desktop: ruang kerja macOS native yang muncul saat diperlukan.',
   },
   tagline: 'Ruang kerja dinamis native untuk macOS',
   header: {
@@ -31,7 +31,7 @@ export const id = createCatalog({
     eyebrow: 'RUANG KERJA MACOS NATIVE',
     title: 'zisla<br><em>Letakkan yang terjadi<br>tepat di tempat<br class="hero-mobile-break"> yang dapat Anda lihat.</em>',
     lede:
-      'Kumpulkan tugas AI, media, berkas, dan agenda di bagian atas layar. Setelah menyalin sesuatu, bilah asisten terpisah menampilkan pratinjau dan menyarankan langkah berikutnya. Muncul saat dibutuhkan lalu menyingkir setelah selesai.',
+      'Kumpulkan tugas AI, media, berkas, dan agenda di bagian atas layar. Setelah menyalin sesuatu, bilah tindakan cepat terpisah menampilkan pratinjau dan menyarankan langkah berikutnya. Muncul saat dibutuhkan lalu menyingkir setelah selesai.',
     downloadCta: 'Unduh',
     downloadCtaAriaLabel: 'Unduh',
     sourceCta: 'Lihat kode sumber',
@@ -60,7 +60,7 @@ export const id = createCatalog({
     ariaLabel: 'Katalog fitur zisla',
     summaryMono: '{modules} MODUL / {groups} ALUR KERJA',
     summaryLede: 'Dari alur kerja atas layar hingga alat lokal, setiap tugas yang dapat diselesaikan dijelaskan di sini.',
-    summaryNote: '{modules} modul atas dan {features} kemampuan mandiri untuk tangkapan layar, suara, media, unduhan, asisten salin, pengelolaan AI, hewan peliharaan, dan layar terkunci.',
+    summaryNote: '{modules} modul atas dan {features} kemampuan mandiri untuk tangkapan layar, suara, media, unduhan, tindakan cepat, pengelolaan AI, hewan peliharaan, dan layar terkunci.',
     groupNames: {
       island: 'Alur kerja atas layar',
       ai: 'Alur kerja AI',
@@ -92,13 +92,13 @@ export const id = createCatalog({
     ariaLabel: 'Kemampuan desktop mandiri',
     summaryMono: 'MELAMPAUI PULAU',
     summaryLede: 'Kemampuan yang sering dipakai, masing-masing di tempat yang alami.',
-    summaryNote: 'Tangkapan, rekaman, media, unduhan browser, asisten salin, pengelolaan AI, hewan peliharaan, dan layar terkunci ditampilkan terpisah.',
+    summaryNote: 'Tangkapan, rekaman, media, unduhan browser, tindakan cepat, pengelolaan AI, hewan peliharaan, dan layar terkunci ditampilkan terpisah.',
     features: {
       capture: { title: 'Tangkapan, tangkapan gulir, dan pin', description: 'Tangkap atau pin bagian layar dengan pintasan global, beri anotasi, gabungkan tangkapan gulir, serta kenali atau ekspor tabel. Anotasi teks yang masih diedit tetap tersimpan saat ekspor.', detail: 'Pintasan global · Anotasi dan urungkan · Perubahan dipertahankan saat ekspor' },
       voice: { title: 'Input suara dan pembersihan', description: 'Beralih dengan tombol atau tahan untuk berbicara memakai pengenal suara sistem. Tambahkan kosakata, kata khusus, format terstruktur, atau pembersihan oleh model lokal maupun jarak jauh.', detail: 'Dua mode rekaman · Kosakata dan kata khusus · Pembersihan opsional' },
       media: { title: 'Media dan suara latar sistem', description: 'Kendalikan pemutaran dari bagian atas pulau atau pilih suara latar macOS. Suara dapat berhenti saat layar terkunci, screensaver dimulai, atau layar tidur.', detail: 'Kontrol pemutaran · Lirik tersinkron · Berhenti otomatis' },
       browserDownloads: { title: 'Progres unduhan browser', description: 'Mendeteksi unduhan Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera, dan Arc, lalu menampilkan sumber serta progres langsung di atas.', detail: '8 browser · Deteksi sumber · Pemberitahuan selesai' },
-      copyAssistant: { title: 'Asisten salin dan langkah berikutnya', description: 'Setelah diaktifkan, teks, tautan, berkas, atau gambar yang disalin dipratinjau di bilah terpisah dengan saran buka, tampilkan di Finder, cari, terjemahkan, hitung, atau simpan—hanya setelah Anda mengonfirmasi.', detail: 'Sakelar opsional · Pengenalan lokal · Command+N sebagai default' },
+      copyAssistant: { title: 'Tindakan Cepat dan langkah berikutnya', description: 'Setelah diaktifkan, teks, tautan, berkas, atau gambar yang disalin dipratinjau di bilah terpisah dengan saran buka, tampilkan di Finder, cari, terjemahkan, hitung, atau simpan—hanya setelah Anda mengonfirmasi. Setelah unduhan browser atau penerimaan berkas lewat AirDrop selesai, pintasan yang sama dapat membuka folder berkas; sakelar Tindakan Cepat mengaturnya secara terpisah dari tampilan progres unduhan browser.', detail: 'Sakelar opsional · Pengenalan lokal · Command+N sebagai default' },
       aiManagement: { title: 'Pengelolaan CLI AI dan Skills', description: 'Deteksi, pasang, perbarui, dan hapus CLI AI dari Pengaturan, serta tinjau dan kelola Skills lokal agar lebih jarang berpindah terminal.', detail: 'Deteksi dan pasang · Perbarui dan hapus · Skills lokal' },
       pet: { title: 'Hewan peliharaan pulau', description: 'Pilih hewan bawaan dan letakkan di sisi kiri atau kanan pulau. Matikan kapan saja.', detail: 'Karakter bawaan · Kiri atau kanan · Aktif sesuai kebutuhan' },
       lockScreen: { title: 'Informasi layar terkunci', description: 'Tampilkan tanggal, status, dan media yang sedang diputar di layar terkunci macOS secara opsional. Ini adalah overlay terpisah dan tidak muncul di daftar atau karusel modul pulau.', detail: 'Overlay terpisah · Pilihan pengguna · Tidak mengambil fokus' },
@@ -162,7 +162,7 @@ export const id = createCatalog({
     items: {
       audience: { question: 'Untuk siapa zisla?', answer: 'Untuk pengguna Mac yang ingin AI, media, berkas, dan agenda di satu tempat. Layar tanpa notch juga didukung.' },
       aiPrivacy: { question: 'Apakah zisla membaca percakapan AI saya?', answer: 'Tidak. Pemantauan status AI hanya membaca status tugas, bukan teks prompt atau balasan.' },
-      copyAssistant: { question: 'Apakah asisten salin membuka atau mengunggah yang saya salin?', answer: 'Tidak. Pengenalan dan pratinjau terjadi di Mac, dan langkah berikutnya dijalankan hanya setelah konfirmasi Anda.' },
+      copyAssistant: { question: 'Apakah tindakan cepat membuka atau mengunggah yang saya salin?', answer: 'Tidak. Pengenalan dan pratinjau terjadi di Mac, dan langkah berikutnya dijalankan hanya setelah konfirmasi Anda.' },
       permissions: {
         question: 'Izin sistem apa yang diperlukan zisla?',
         answer: `

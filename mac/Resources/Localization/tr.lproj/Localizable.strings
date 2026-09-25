@@ -426,8 +426,11 @@
 /* Clipboard assistant */
 "存在时长" = "Görüntüleme Süresi";
 "提示自动关闭前的时间；永不则仅手动关闭" = "Bildirimin kapanmasından önceki süre; Asla yalnızca elle kapatılacağı anlamına gelir";
-"复制助手" = "Kopyalama Asistanı";
-"复制后弹出识别结果和下一步操作" = "Her kopyalamadan sonra tanınan içeriği ve sonraki adımları gösterir";
+"快捷操作" = "Hızlı Eylemler";
+"复制、浏览器下载或 AirDrop 接收完成后显示下一步操作" = "Kopyalama, tarayıcı indirmesi veya AirDrop ile dosya alma sonrasında sonraki eylemleri gösterir";
+"打开文件夹" = "Klasörü Aç";
+"下载与 AirDrop 完成提示" = "İndirme ve AirDrop tamamlama bildirimleri";
+"完成后显示“打开文件夹”快捷操作" = "Dosya tamamlandığında Klasörü Aç hızlı işlemini göster";
 "快速触发快捷键" = "Hızlı tetikleyici kısayolu";
 "清除快捷键" = "Kısayolu temizle";
 "鼠标侧键" = "Fare yan tuşu";
@@ -2103,7 +2106,7 @@
 "无法读取 Zed 线程" = "Zed iş parçacıkları okunamadı";
 "无法读取最近剪贴板记录" = "Son pano kayıtları okunamadı";
 "正在处理另一项邮件操作" = "Başka bir e-posta işlemi sürüyor";
-"每次保存图片时选择位置" = "Her görsel kaydında konum seç";
+"每次保存文件时选择位置" = "Her dosya kaydında konum seç";
 "读取备忘录锁定状态失败" = "Notlar kilit durumu okunamadı";
 "静音 Zisla 通知" = "Zisla bildirimlerini sessize al";
 "AI 状态数据库写入失败" = "AI durum veritabanına yazma başarısız";

@@ -280,6 +280,70 @@ struct MailComposeRequest: Equatable {
 }
 
 @MainActor
+enum BrowserDownloadQuickActionPresenter {
+  static func present(
+    _ transfer: BrowserCompletedTransfer,
+    on controller: ClipboardAssistantController,
+    settings: FeatureSettings,
+    isVoiceRecording: Bool,
+    isVoicePreparing: Bool,
+    isIslandVisible: Bool
+  ) -> Bool {
+    guard settings.clipboardAssistantEnabled, settings.downloadCompletionFolderActionEnabled,
+      !isVoiceRecording, !isVoicePreparing, !isIslandVisible else { return false }
+    let detection = ClipboardAssistantDetection(
+      kind: .file,
+      title: transfer.fileName,
+      detail: .path(transfer.directoryURL.path),
+      actions: [.openFolder(transfer.directoryURL)]
+    )
+    controller.displayDuration = settings.clipboardAssistantDisplayDuration
+    controller.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
+    return controller.present(detection, visualStyle: settings.islandVisualStyle) != nil
+  }
+}
+
+struct IslandClipboardHandoff {
+  struct Pending {
+    let content: ClipboardHistoryContent
+    let downloadableURL: URL?
+    let changeCount: Int
+    let sourceApplication: NSRunningApplication?
+
+    init(
+      content: ClipboardHistoryContent,
+      downloadableURL: URL?,
+      changeCount: Int,
+      sourceApplication: NSRunningApplication? = nil
+    ) {
+      self.content = content
+      self.downloadableURL = downloadableURL
+      self.changeCount = changeCount
+      self.sourceApplication = sourceApplication
+    }
+  }
+
+  private(set) var shouldDefer = false
+  private var pending: Pending?
+
+  mutating func noteDidCopy() { shouldDefer = true }
+  mutating func beginRecycle() { shouldDefer = true }
+  mutating func hold(_ capture: Pending) { pending = capture }
+
+  mutating func finishRecycle(currentChangeCount: Int) -> Pending? {
+    shouldDefer = false
+    defer { pending = nil }
+    guard pending?.changeCount == currentChangeCount else { return nil }
+    return pending
+  }
+
+  mutating func cancel() {
+    shouldDefer = false
+    pending = nil
+  }
+}
+
+@MainActor
 final class AppModel: ObservableObject {
   private enum AIProcessingTarget {
     case http(
@@ -594,6 +658,9 @@ final class AppModel: ObservableObject {
     clipboardAssistant.onPerformAction = { [weak self] action in
       self?.performClipboardAssistantAction(action)
     }
+    browserDownloads.onCompletedTransfer = { [weak self] transfer in
+      self?.presentCompletedTransfer(transfer)
+    }
     clipboardMonitor.onLinkDetected = { [weak self] url in
       guard let self else { return }
       let downloadableURL = DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) ? url : nil
@@ -822,8 +889,10 @@ final class AppModel: ObservableObject {
     let hasPomodoro = pomodoro.phase != .idle
     let hasAITask = settings.aiProgressEnabled
       && aiMonitor.state.tasks.contains { $0.status.isActive }
+    let browserDownloadCount = settings.showsBrowserDownloadProgress
+      ? browserDownloads.snapshots.count : 0
     let cardCount = [hasPomodoro, hasAITask, hasActiveDownloads].filter { $0 }.count
-      + browserDownloads.snapshots.count
+      + browserDownloadCount
     if dashboardCardCount != cardCount {
       dashboardCardCount = cardCount
     }
@@ -958,6 +1027,7 @@ final class AppModel: ObservableObject {
 
   func stop() {
     settingsStore.flushPendingChanges()
+    islandClipboardHandoff.cancel()
     managedTools.setAutomaticUpdatesEnabled(false)
     keyboardSound.stop()
     clipboardHistory.flushPendingChanges()
@@ -1421,6 +1491,7 @@ final class AppModel: ObservableObject {
   private var clipboardAssistantContent: ClipboardHistoryContent?
   private var isClipboardCalendarEditorPresented = false
   private var lastClipboardAssistantRoutingChangeCount: Int?
+  private var islandClipboardHandoff = IslandClipboardHandoff()
   /// Live exchange-rate fetching for the assistant's currency conversion; quotes are fetched
   /// fresh on every conversion and never cached.
   private let exchangeRateService = ExchangeRateService.live()
@@ -1461,6 +1532,34 @@ final class AppModel: ObservableObject {
     routeCapturedClipboardContent(content, downloadableURL: downloadableURL)
   }
 
+  func quickNoteDidCopy() {
+    guard settingsStore.settings.clipboardAssistantEnabled,
+      isIslandVisible, !isExternalDragging,
+      !voiceInput.isRecording, !voiceInput.isPreparing else { return }
+    islandClipboardHandoff.noteDidCopy()
+    islandCollapseRequested = true
+  }
+
+  func islandDidBeginRecycling() {
+    islandClipboardHandoff.beginRecycle()
+  }
+
+  func islandDidFinishRecycling() {
+    let pending = islandClipboardHandoff.finishRecycle(
+      currentChangeCount: NSPasteboard.general.changeCount
+    )
+    guard !isIslandVisible, let pending else { return }
+    presentCapturedClipboardContent(
+      pending.content,
+      downloadableURL: pending.downloadableURL,
+      sourceApplication: pending.sourceApplication
+    )
+  }
+
+  func islandDidReexpand() {
+    islandClipboardHandoff.cancel()
+  }
+
   private func routeCapturedClipboardContent(
     _ content: ClipboardHistoryContent,
     downloadableURL: URL?
@@ -1469,7 +1568,29 @@ final class AppModel: ObservableObject {
     guard lastClipboardAssistantRoutingChangeCount != changeCount else { return }
     lastClipboardAssistantRoutingChangeCount = changeCount
 
-    switch presentClipboardAssistant(for: content) {
+    let sourceApplication = NSWorkspace.shared.frontmostApplication
+    if islandClipboardHandoff.shouldDefer {
+      islandClipboardHandoff.hold(.init(
+        content: content,
+        downloadableURL: downloadableURL,
+        changeCount: changeCount,
+        sourceApplication: sourceApplication
+      ))
+      return
+    }
+    presentCapturedClipboardContent(
+      content,
+      downloadableURL: downloadableURL,
+      sourceApplication: sourceApplication
+    )
+  }
+
+  private func presentCapturedClipboardContent(
+    _ content: ClipboardHistoryContent,
+    downloadableURL: URL?,
+    sourceApplication: NSRunningApplication?
+  ) {
+    switch presentClipboardAssistant(for: content, sourceApplication: sourceApplication) {
     case .presented, .ignored:
       guard downloadableURL != nil else { return }
       detectedLinkTask?.cancel()
@@ -1481,7 +1602,8 @@ final class AppModel: ObservableObject {
   }
 
   private func presentClipboardAssistant(
-    for content: ClipboardHistoryContent
+    for content: ClipboardHistoryContent,
+    sourceApplication: NSRunningApplication?
   ) -> ClipboardAssistantPresentationResult {
     let settings = settingsStore.settings
     guard settings.clipboardAssistantEnabled else { return .unavailable }
@@ -1494,7 +1616,6 @@ final class AppModel: ObservableObject {
       return .ignored
     }
     // The frontmost app at capture time is the app the user copied from.
-    let sourceApplication = NSWorkspace.shared.frontmostApplication
     if let bundleIdentifier = sourceApplication?.bundleIdentifier,
        settings.clipboardAssistantBlacklist.contains(bundleIdentifier) {
       return .unavailable
@@ -1528,6 +1649,18 @@ final class AppModel: ObservableObject {
       presentationGeneration: presentationGeneration
     )
     return .presented
+  }
+
+  private func presentCompletedTransfer(_ transfer: BrowserCompletedTransfer) {
+    guard BrowserDownloadQuickActionPresenter.present(
+      transfer,
+      on: clipboardAssistant,
+      settings: settingsStore.settings,
+      isVoiceRecording: voiceInput.isRecording,
+      isVoicePreparing: voiceInput.isPreparing,
+      isIslandVisible: isIslandVisible
+    ) else { return }
+    clipboardAssistantContent = nil
   }
 
   /// Appends the universal actions every detection offers (quick note, sharing, blocking the
@@ -1722,6 +1855,10 @@ final class AppModel: ObservableObject {
       selectModule(.download)
     case .revealInFinder(let url):
       NSWorkspace.shared.activateFileViewerSelecting([url])
+    case .openFolder(let url):
+      if !NSWorkspace.shared.open(url) {
+        transientMessage = clipboardAssistantMessage("无法完成操作")
+      }
     case .compress(let url):
       compressAssistantFile(url)
     case .share:
@@ -1968,19 +2105,34 @@ final class AppModel: ObservableObject {
     }
   }
 
-  /// Saves long copied text as a standalone file in the download directory and reveals it.
+  /// Saves long copied text as a standalone file and reveals it.
   private func saveAssistantText(_ text: String) {
-    let directory = downloadDirectory
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyyMMdd-HHmmss"
+    let name = "clipboard-\(formatter.string(from: Date())).txt"
+    let destination: URL
+    if settingsStore.settings.clipboardAssistantPromptsForImageSaveLocation {
+      let panel = NSSavePanel()
+      panel.directoryURL = downloadDirectory
+      panel.nameFieldStringValue = name
+      panel.allowedContentTypes = [.plainText]
+      panel.canCreateDirectories = true
+      panel.prompt = clipboardAssistantMessage("保存文本")
+      WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
+      guard panel.runModal() == .OK, let url = panel.url else { return }
+      destination = url
+    } else {
+      destination = downloadDirectory.appendingPathComponent(name)
+    }
+
+    let directory = destination.deletingLastPathComponent()
     let scopedAccess = directory.startAccessingSecurityScopedResource()
     defer { if scopedAccess { directory.stopAccessingSecurityScopedResource() } }
     do {
       try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-      let formatter = DateFormatter()
-      formatter.dateFormat = "yyyyMMdd-HHmmss"
-      let url = directory.appendingPathComponent("clipboard-\(formatter.string(from: Date())).txt")
-      try text.write(to: url, atomically: true, encoding: .utf8)
-      NSWorkspace.shared.activateFileViewerSelecting([url])
-      transientMessage = clipboardAssistantMessage("已保存到 %@", url.path)
+      try text.write(to: destination, atomically: true, encoding: .utf8)
+      NSWorkspace.shared.activateFileViewerSelecting([destination])
+      transientMessage = clipboardAssistantMessage("已保存到 %@", destination.path)
     } catch {
       transientMessage = clipboardAssistantMessage("操作失败：%@", error.localizedDescription)
     }
@@ -2614,9 +2766,13 @@ final class AppModel: ObservableObject {
     } else {
       calendar.stop()
     }
-    if settings.sideNoticesEnabled, settings.browserDownloadIslandEnabled {
+    if settings.observesBrowserDownloads {
       browserDownloads.start()
-      consumeBrowserDownloadSnapshot(browserDownloads.snapshot)
+      if settings.showsBrowserDownloadProgress {
+        consumeBrowserDownloadSnapshot(browserDownloads.snapshot)
+      } else {
+        clearBrowserDownloadNotices()
+      }
     } else {
       browserDownloads.stop()
       clearBrowserDownloadNotices()

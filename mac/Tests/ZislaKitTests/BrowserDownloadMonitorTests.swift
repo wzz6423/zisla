@@ -180,6 +180,481 @@ struct AirDropBatchParserTests {
 
 struct BrowserDownloadMonitorLifecycleTests {
     @Test
+    @MainActor
+    func renamedChromeDownloadOutsideDefaultFolderOffersItsActualFolderOnce() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        let chosen = root.appendingPathComponent("Chosen", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root])
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = chosen.appendingPathComponent("Unconfirmed 123.crdownload")
+        let namedTemporary = chosen.appendingPathComponent("report.pdf.crdownload")
+        let completed = chosen.appendingPathComponent("report.pdf")
+        try Data("download".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        #expect(monitor.snapshot?.agent == .chrome)
+        #expect(monitor.snapshot?.isFinished == false)
+        try FileManager.default.moveItem(at: temporary, to: namedTemporary)
+        monitor.handleFileEvent(
+            at: namedTemporary, fileID: identity.inode, renamed: true,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        monitor.handleFileEvent(at: temporary, fileID: identity.inode, renamed: false, removed: true)
+        #expect(monitor.snapshot?.fileName == "report.pdf")
+        try FileManager.default.moveItem(at: namedTemporary, to: completed)
+        monitor.handleFileEvent(
+            at: completed, fileID: identity.inode, renamed: true,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        monitor.handleFileEvent(
+            at: completed, fileID: identity.inode, renamed: true,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+
+        #expect(transfers.count == 1)
+        #expect(transfers.first?.fileName == "report.pdf")
+        #expect(transfers.first?.directoryURL.resolvingSymlinksInPath() == chosen.resolvingSymlinksInPath())
+    }
+
+    @Test
+    @MainActor
+    func fileEventsDetectChromeDownloadInChosenFolder() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        let chosen = root.appendingPathComponent("Chosen", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root])
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = chosen.appendingPathComponent("Unconfirmed 456.crdownload")
+        let completed = chosen.appendingPathComponent("archive.zip")
+        try Data("download".utf8).write(to: temporary)
+        let startedDeadline = ContinuousClock.now + .seconds(3)
+        while monitor.snapshot == nil && ContinuousClock.now < startedDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(monitor.snapshot?.agent == .chrome)
+
+        try FileManager.default.moveItem(at: temporary, to: completed)
+        let finishedDeadline = ContinuousClock.now + .seconds(3)
+        while transfers.isEmpty && ContinuousClock.now < finishedDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(transfers.count == 1)
+        #expect(transfers.first?.fileName == "archive.zip")
+        #expect(transfers.first?.directoryURL.resolvingSymlinksInPath() == chosen.resolvingSymlinksInPath())
+    }
+
+    @Test
+    @MainActor
+    func chosenFolderReceivesPublishedDownloadPercentage() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        let chosen = root.appendingPathComponent("Chosen", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [])
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = chosen.appendingPathComponent("report.pdf.crdownload")
+        try Data("partial".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+
+        let progress = Progress(totalUnitCount: 100)
+        progress.kind = .file
+        progress.fileOperationKind = .downloading
+        progress.fileURL = chosen.appendingPathComponent("report.pdf")
+        progress.completedUnitCount = 40
+        progress.publish()
+        var isPublished = true
+        defer { if isPublished { progress.unpublish() } }
+
+        let deadline = ContinuousClock.now + .seconds(3)
+        while monitor.snapshot?.fraction == nil && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(monitor.snapshot?.agent == .chrome)
+        #expect(abs((monitor.snapshot?.fraction ?? 0) - 0.4) < 0.001)
+        #expect(monitor.snapshots.count == 1)
+
+        let completed = chosen.appendingPathComponent("report.pdf")
+        try FileManager.default.moveItem(at: temporary, to: completed)
+        progress.completedUnitCount = 100
+        progress.unpublish()
+        isPublished = false
+        let completionDeadline = ContinuousClock.now + .seconds(3)
+        while transfers.isEmpty && ContinuousClock.now < completionDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        monitor.handleFileEvent(at: completed, fileID: identity.inode, renamed: true)
+        #expect(transfers.count == 1)
+    }
+
+    @Test
+    @MainActor
+    func removedOrStoppedTemporaryDownloadDoesNotOfferFolder() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        let chosen = root.appendingPathComponent("Chosen", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root])
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+
+        let temporary = chosen.appendingPathComponent("Unconfirmed 789.crdownload")
+        try Data("partial".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        try FileManager.default.removeItem(at: temporary)
+        monitor.handleFileEvent(at: temporary, fileID: identity.inode, renamed: false, removed: true)
+        #expect(monitor.snapshot == nil)
+        #expect(transfers.isEmpty)
+
+        monitor.stop()
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        #expect(monitor.snapshot == nil)
+        #expect(transfers.isEmpty)
+    }
+
+    @Test(arguments: ["report.pdf.crdownload", "Unconfirmed 123.crdownload"])
+    @MainActor
+    func defaultDownloadsFolderWithoutPublishedProgressOffersCompletedFile(_ temporaryName: String) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root])
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = downloads.appendingPathComponent(temporaryName)
+        let completed = downloads.appendingPathComponent("report.pdf")
+        try Data("download".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        #expect(monitor.snapshot?.agent == .chrome)
+        #expect(monitor.snapshot?.isFinished == false)
+        try FileManager.default.moveItem(at: temporary, to: completed)
+        monitor.handleFileEvent(at: completed, fileID: identity.inode, renamed: true)
+
+        #expect(monitor.snapshot?.agent == .chrome)
+        #expect(monitor.snapshot?.isFinished == true)
+        #expect(transfers.count == 1)
+        #expect(transfers.first?.fileName == "report.pdf")
+        #expect(transfers.first?.directoryURL == downloads)
+    }
+
+    @Test
+    @MainActor
+    func quickDefaultFolderDownloadCompletesThroughFileEvents() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root])
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = downloads.appendingPathComponent("Unconfirmed 123.crdownload")
+        let completed = downloads.appendingPathComponent("image.jpeg")
+        try Data(repeating: 0x42, count: 25_000).write(to: temporary)
+        try FileManager.default.moveItem(at: temporary, to: completed)
+
+        let deadline = ContinuousClock.now + .seconds(3)
+        while transfers.isEmpty && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(transfers.count == 1)
+        #expect(transfers.first?.fileName == "image.jpeg")
+        #expect(transfers.first?.directoryURL == downloads)
+    }
+
+    @Test
+    @MainActor
+    func defaultDownloadsFolderMergesPublishedProgressBeforeFileEvent() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [])
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let completed = downloads.appendingPathComponent("report.pdf")
+        let temporary = completed.appendingPathExtension("crdownload")
+        let progress = Progress(totalUnitCount: 100)
+        progress.kind = .file
+        progress.fileOperationKind = .downloading
+        progress.fileURL = completed
+        progress.completedUnitCount = 40
+        progress.publish()
+        var isPublished = true
+        defer { if isPublished { progress.unpublish() } }
+
+        let deadline = ContinuousClock.now + .seconds(3)
+        while monitor.snapshot?.fraction == nil && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(monitor.snapshot?.fraction == 0.4)
+        try Data("partial".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        #expect(monitor.snapshots.count == 1)
+        #expect(monitor.snapshot?.fraction == 0.4)
+
+        try FileManager.default.moveItem(at: temporary, to: completed)
+        monitor.handleFileEvent(at: completed, fileID: identity.inode, renamed: true)
+        progress.completedUnitCount = 100
+        progress.unpublish()
+        isPublished = false
+        let finishedDeadline = ContinuousClock.now + .seconds(3)
+        while transfers.isEmpty && ContinuousClock.now < finishedDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(transfers.count == 1)
+        #expect(transfers.first?.fileName == "report.pdf")
+    }
+
+    @Test
+    @MainActor
+    func defaultFolderResolvesRenamedFileWhenFinalEventIsMissing() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [])
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = downloads.appendingPathComponent("Unconfirmed 456.crdownload")
+        let completed = downloads.appendingPathComponent("image.jpeg")
+        let progress = Progress(totalUnitCount: 100)
+        progress.kind = .file
+        progress.fileOperationKind = .downloading
+        progress.fileURL = temporary
+        progress.completedUnitCount = 40
+        progress.publish()
+        var isPublished = true
+        defer { if isPublished { progress.unpublish() } }
+
+        let deadline = ContinuousClock.now + .seconds(3)
+        while monitor.snapshot == nil && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(monitor.snapshot != nil)
+        try Data("partial".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        #expect(monitor.snapshots.count == 1)
+
+        try FileManager.default.moveItem(at: temporary, to: completed)
+        progress.completedUnitCount = 100
+        progress.unpublish()
+        isPublished = false
+        let finishedDeadline = ContinuousClock.now + .seconds(3)
+        while transfers.isEmpty && ContinuousClock.now < finishedDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(transfers.count == 1)
+        #expect(transfers.first?.fileName == "image.jpeg")
+    }
+
+    @Test
+    @MainActor
+    func unknownProgressFinishesWhenFinalRenameEventIsMissing() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], pollInterval: 0.02)
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = downloads.appendingPathComponent("Unconfirmed 123.crdownload")
+        let completed = downloads.appendingPathComponent("image.jpeg")
+        try Data(repeating: 0x42, count: 25_000).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        #expect(monitor.snapshot?.progressText == "…")
+        try FileManager.default.moveItem(at: temporary, to: completed)
+
+        let deadline = ContinuousClock.now + .seconds(1)
+        while transfers.isEmpty && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(transfers.count == 1)
+        #expect(transfers.first?.fileName == "image.jpeg")
+        #expect(monitor.snapshot?.isFinished == true)
+    }
+
+    @Test(arguments: [false, true])
+    @MainActor
+    func missingTemporaryFileHidesStaleProgressAndKeepsLateCompletion(_ movedToChosenFolder: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        let chosen = root.appendingPathComponent("Chosen", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], pollInterval: 0.02)
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = downloads.appendingPathComponent("Unconfirmed 456.crdownload")
+        let completed = chosen.appendingPathComponent("image.jpeg")
+        try Data("partial".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        if movedToChosenFolder {
+            try FileManager.default.moveItem(at: temporary, to: completed)
+        } else {
+            try FileManager.default.removeItem(at: temporary)
+        }
+
+        let deadline = ContinuousClock.now + .seconds(2)
+        while monitor.snapshot != nil && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(monitor.snapshot == nil)
+        #expect(transfers.isEmpty)
+
+        if movedToChosenFolder {
+            monitor.handleFileEvent(at: completed, fileID: identity.inode, renamed: true)
+            #expect(transfers.count == 1)
+            #expect(transfers.first?.directoryURL == chosen)
+        }
+    }
+
+    @Test
+    @MainActor
+    func crossFolderRenameOffersDestinationAndReleasesOldFolder() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        let first = root.appendingPathComponent("First", isDirectory: true)
+        let chosen = root.appendingPathComponent("Chosen", isDirectory: true)
+        for directory in [downloads, first, chosen] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [])
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = first.appendingPathComponent("report.pdf.crdownload")
+        let completed = chosen.appendingPathComponent("report.pdf")
+        try Data("download".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(
+            at: temporary, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        try FileManager.default.moveItem(at: temporary, to: completed)
+        monitor.handleFileEvent(at: completed, fileID: identity.inode, renamed: true)
+        #expect(transfers.first?.directoryURL.resolvingSymlinksInPath() == chosen.resolvingSymlinksInPath())
+
+        let unrelated = Progress(totalUnitCount: 100)
+        unrelated.kind = .file
+        unrelated.fileOperationKind = .downloading
+        unrelated.fileURL = first.appendingPathComponent("later.pdf")
+        unrelated.completedUnitCount = 20
+        unrelated.publish()
+        defer { unrelated.unpublish() }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(monitor.snapshot?.isFinished == true)
+        #expect(transfers.count == 1)
+    }
+
+    @Test(arguments: [Int64(9_990), 10_000])
+    func cancelledProgressCannotCompleteATransfer(_ completed: Int64) {
+        let progress = Progress(totalUnitCount: 10_000)
+        progress.completedUnitCount = completed
+        progress.cancel()
+        #expect(!BrowserDownloadMonitor.completedSuccessfully(progress))
+    }
+
+    @Test
+    func onlyFinishedProgressCompletesATransfer() {
+        let progress = Progress(totalUnitCount: 10_000)
+        progress.completedUnitCount = 9_990
+        #expect(!BrowserDownloadMonitor.completedSuccessfully(progress))
+        progress.completedUnitCount = 10_000
+        #expect(BrowserDownloadMonitor.completedSuccessfully(progress))
+    }
+
+    @Test
     func staleCallbacksAreRejectedAfterStopAndRestart() {
         var lifecycle = BrowserDownloadMonitorLifecycle()
         let firstGeneration = lifecycle.start()
@@ -597,5 +1072,268 @@ struct BrowserDownloadTrackerTests {
         _ = tracker.finish(token: token, succeeded: true)
 
         #expect(tracker.uniqueAgents == [.safari])
+    }
+}
+
+struct BrowserDownloadCompletionTrackerTests {
+    private func entry(url: URL?, agent: BrowserDownloadAgent?) -> BrowserDownloadTracker.Entry {
+        BrowserDownloadTracker.Entry(
+            fileURL: url,
+            agent: agent,
+            fileName: url.map(BrowserDownloadAgentResolver.displayFileName) ?? "下载",
+            fraction: 1,
+            startedAt: Date(timeIntervalSince1970: 100)
+        )
+    }
+
+    private func temporaryDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-completed-transfer-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    @Test
+    func chromeTemporaryNameResolvesToRenamedFinalFile() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let temporary = directory.appendingPathComponent("Unconfirmed 123.crdownload")
+        let completed = directory.appendingPathComponent("report.pdf")
+        let unrelated = directory.appendingPathComponent("Unconfirmed 123")
+        try Data("older".utf8).write(to: unrelated)
+        try Data("download".utf8).write(to: temporary)
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: temporary, agent: .chrome), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+        try FileManager.default.moveItem(at: temporary, to: completed)
+
+        let transfer = tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false)
+        #expect(transfer?.fileName == "report.pdf")
+        #expect(transfer?.directoryURL.resolvingSymlinksInPath() == directory.resolvingSymlinksInPath())
+    }
+
+    @Test
+    func capturedTemporaryIdentitySurvivesRenameBeforeUnpublish() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let temporary = directory.appendingPathComponent("Unconfirmed 456.crdownload")
+        let completed = directory.appendingPathComponent("invoice.pdf")
+        try Data("download".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        try FileManager.default.moveItem(at: temporary, to: completed)
+        var finishedEntry = entry(url: temporary, agent: .chrome)
+        finishedEntry.fileIdentity = identity
+        var tracker = BrowserDownloadCompletionTracker()
+
+        tracker.record(
+            token: UUID(), entry: finishedEntry, succeeded: true,
+            at: Date(timeIntervalSince1970: 200)
+        )
+
+        #expect(tracker.resolve(
+            at: Date(timeIntervalSince1970: 200), directories: [directory], hasActiveAirDrop: false
+        )?.fileName == "invoice.pdf")
+    }
+
+    @Test(arguments: ["crdownload", "download", "part", "opdownload"])
+    func browserWaitsForTheFinalFileInsteadOfOpeningATemporaryDownload(_ suffix: String) throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let completed = directory.appendingPathComponent("report.pdf")
+        let temporary = completed.appendingPathExtension(suffix)
+        try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: false)
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: temporary, agent: .chrome), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+        try Data("done".utf8).write(to: completed)
+        let resolved = tracker.resolve(
+            at: finishedAt.addingTimeInterval(0.5), directories: [directory], hasActiveAirDrop: false
+        )
+        let transfer = try #require(resolved)
+        #expect(transfer.fileName == "report.pdf")
+        #expect(transfer.directoryURL == directory)
+        #expect(tracker.resolve(at: finishedAt.addingTimeInterval(1), directories: [directory], hasActiveAirDrop: false) == nil)
+    }
+
+    @Test
+    func airDropWaitsForTheBatchAndTheFinalDestination() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stagingDirectory = directory.appendingPathComponent("NSIRD_sharingd_123", isDirectory: true)
+        try FileManager.default.createDirectory(at: stagingDirectory, withIntermediateDirectories: false)
+        let staged = stagingDirectory.appendingPathComponent("photo.HEIC")
+        try Data("photo".utf8).write(to: staged)
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: staged, agent: .airDrop), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: true) == nil)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+
+        let finalURL = directory.appendingPathComponent("photo.HEIC")
+        try FileManager.default.moveItem(at: staged, to: finalURL)
+        let resolved = tracker.resolve(
+            at: finishedAt.addingTimeInterval(1), directories: [directory], hasActiveAirDrop: false
+        )
+        let transfer = try #require(resolved)
+        #expect(transfer.directoryURL == directory)
+        #expect(transfer.fileName == "photo.HEIC")
+    }
+
+    @Test
+    func failedMissingAndExpiredTransfersNeverPublishAFolder() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let missing = directory.appendingPathComponent("missing.pdf")
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: missing, agent: .chrome), succeeded: false, at: finishedAt)
+        tracker.record(token: UUID(), entry: entry(url: nil, agent: .chrome), succeeded: true, at: finishedAt)
+        tracker.record(token: UUID(), entry: entry(url: missing, agent: nil), succeeded: true, at: finishedAt)
+        #expect(!tracker.hasPending)
+
+        tracker.record(token: UUID(), entry: entry(url: missing, agent: .chrome), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+        #expect(tracker.resolve(at: finishedAt.addingTimeInterval(11), directories: [directory], hasActiveAirDrop: false) == nil)
+        try Data("late".utf8).write(to: missing)
+        #expect(tracker.resolve(at: finishedAt.addingTimeInterval(11), directories: [directory], hasActiveAirDrop: false) == nil)
+        #expect(!tracker.hasPending)
+    }
+
+    @Test
+    func newestCompletedDownloadWinsEvenWhenAnotherDownloadIsStillActive() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let first = directory.appendingPathComponent("first.pdf")
+        let second = directory.appendingPathComponent("second.pdf")
+        try Data().write(to: first)
+        try Data().write(to: second)
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: first, agent: .chrome), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false)?.fileName == "first.pdf")
+        tracker.record(token: UUID(), entry: entry(url: second, agent: .safari), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false)?.fileName == "second.pdf")
+    }
+
+    @Test
+    func completedAirDropBatchDoesNotWaitForAnotherBatch() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("received.HEIC")
+        try Data().write(to: file)
+        let completedBatch = UUID()
+        let activeBatch = UUID()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+        var tracker = BrowserDownloadCompletionTracker()
+        tracker.record(
+            token: UUID(), entry: entry(url: file, agent: .airDrop), succeeded: true,
+            airDropBatchID: completedBatch, at: finishedAt
+        )
+        #expect(tracker.resolve(
+            at: finishedAt, directories: [directory], hasActiveAirDrop: true,
+            activeAirDropBatchIDs: [completedBatch, activeBatch]
+        ) == nil)
+        #expect(tracker.resolve(
+            at: finishedAt, directories: [directory], hasActiveAirDrop: true,
+            activeAirDropBatchIDs: [activeBatch]
+        )?.fileName == "received.HEIC")
+    }
+
+    @Test
+    func oldPendingDownloadCannotReplaceANewerCompletedDownload() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let oldFile = directory.appendingPathComponent("old.pdf")
+        let newFile = directory.appendingPathComponent("new.pdf")
+        try Data().write(to: newFile)
+        let finishedAt = Date(timeIntervalSince1970: 200)
+        var tracker = BrowserDownloadCompletionTracker()
+        tracker.record(token: UUID(), entry: entry(url: oldFile, agent: .chrome), succeeded: true, at: finishedAt)
+        tracker.record(token: UUID(), entry: entry(url: newFile, agent: .safari), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false)?.fileName == "new.pdf")
+        try Data().write(to: oldFile)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+    }
+
+    @Test
+    func receivingBatchDoesNotConsumeTheFinalFileResolutionWindow() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("received.HEIC")
+        try Data().write(to: file)
+        let batch = UUID()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+        var tracker = BrowserDownloadCompletionTracker()
+        tracker.record(
+            token: UUID(), entry: entry(url: file, agent: .airDrop), succeeded: true,
+            airDropBatchID: batch, at: finishedAt
+        )
+        #expect(tracker.resolve(
+            at: finishedAt, directories: [directory], hasActiveAirDrop: true,
+            activeAirDropBatchIDs: [batch]
+        ) == nil)
+        #expect(tracker.resolve(
+            at: finishedAt.addingTimeInterval(60), directories: [directory], hasActiveAirDrop: false
+        )?.fileName == "received.HEIC")
+    }
+
+    @Test
+    func airDropDoesNotResolveAnOldNamesakeWhileTheNewFileIsStillStaged() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let staging = directory.appendingPathComponent("NSIRD_sharingd_fixture", isDirectory: true)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
+        let staged = staging.appendingPathComponent("photo.HEIC")
+        try Data("new".utf8).write(to: staged)
+        try Data("old".utf8).write(to: directory.appendingPathComponent("photo.HEIC"))
+        let finishedAt = Date(timeIntervalSince1970: 200)
+        var tracker = BrowserDownloadCompletionTracker()
+        tracker.record(token: UUID(), entry: entry(url: staged, agent: .airDrop), succeeded: true, at: finishedAt)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
+    }
+
+    @Test
+    func nonFileURLsAndAirDropTraversalNeverResolveAFolder() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let finishedAt = Date(timeIntervalSince1970: 200)
+        var tracker = BrowserDownloadCompletionTracker()
+        tracker.record(
+            token: UUID(), entry: entry(url: URL(string: "https://example.invalid/report.pdf"), agent: .chrome),
+            succeeded: true, at: finishedAt
+        )
+        #expect(!tracker.hasPending)
+        let downloads = directory.appendingPathComponent("downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: false)
+        try Data("outside".utf8).write(to: directory.appendingPathComponent("outside.txt"))
+        for name in ["../outside.txt", "/", ".", "..", ""] {
+            tracker.removeAll()
+            var malicious = entry(url: downloads.appendingPathComponent("NSIRD_fixture/missing"), agent: .airDrop)
+            malicious.fileName = name
+            tracker.record(token: UUID(), entry: malicious, succeeded: true, at: finishedAt)
+            #expect(tracker.resolve(at: finishedAt, directories: [downloads], hasActiveAirDrop: false) == nil)
+        }
+    }
+
+    @Test
+    func stoppingClearsPendingCompletionWithoutReplayingIt() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("later.zip")
+        var tracker = BrowserDownloadCompletionTracker()
+        let finishedAt = Date(timeIntervalSince1970: 200)
+
+        tracker.record(token: UUID(), entry: entry(url: file, agent: .chrome), succeeded: true, at: finishedAt)
+        #expect(tracker.hasPending)
+        tracker.removeAll()
+        try Data().write(to: file)
+        #expect(tracker.resolve(at: finishedAt, directories: [directory], hasActiveAirDrop: false) == nil)
     }
 }

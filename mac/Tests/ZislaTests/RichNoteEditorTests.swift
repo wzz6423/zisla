@@ -10,6 +10,43 @@ import ZislaKit
 @Suite(.serialized)
 struct RichNoteEditorTests {
     @Test
+    func copyEventReachesTheIslandHandoff() async throws {
+        var copyCount = 0
+        let hostingView = NSHostingView(rootView:
+            RichNoteEditor(
+                html: "<div>copy me</div>",
+                command: nil,
+                isEditable: true,
+                onCopy: { copyCount += 1 },
+                onChange: { _, _, _ in }
+            )
+            .frame(width: 320, height: 240)
+        )
+        let window = NSWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.alphaValue = 0
+        window.contentView = hostingView
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+
+        let webView = try await waitForWebView(in: hostingView)
+        try await waitUntilEditorIsReady(in: webView)
+        _ = try await webView.evaluateJavaScript(
+            "document.getElementById('editor').dispatchEvent(new Event('copy', { bubbles: true }))"
+        )
+        for _ in 0..<50 {
+            if copyCount != 0 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(copyCount == 1)
+    }
+
+    @Test
     func keepsSyncedBodyHTMLInsteadOfMigratingMarkdown() {
         let content = NotesAppBridge.NoteContent(
             plainText: "# 标题\n    缩进行",

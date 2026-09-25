@@ -4,7 +4,7 @@ export const it = createCatalog({
   meta: {
     documentTitle: 'zisla · Spazio di lavoro dinamico',
     description:
-      'zisla è uno spazio di lavoro dinamico nativo per macOS. Riunisce attività IA, media, file e agenda, oltre a suoni della tastiera, statistiche di digitazione, annotazioni delle schermate e assistente di copia.',
+      'zisla è uno spazio di lavoro dinamico nativo per macOS. Riunisce attività IA, media, file e agenda, oltre a suoni della tastiera, statistiche di digitazione, annotazioni delle schermate e azioni rapide.',
     ogTitle: 'zisla · Porta ciò che accade dove puoi vederlo',
     ogDescription:
       'Dalle attività IA ai media, dai suoni della tastiera alle statistiche di digitazione, alle annotazioni e agli strumenti desktop: uno spazio macOS nativo che appare quando serve.',
@@ -31,7 +31,7 @@ export const it = createCatalog({
     eyebrow: 'SPAZIO DI LAVORO NATIVO PER MACOS',
     title: 'zisla<br><em>Ciò che accade,<br>proprio dove<br class="hero-mobile-break"> puoi vederlo.</em>',
     lede:
-      'Riunisci attività IA, media, file e agenda nella parte superiore dello schermo. Dopo una copia, una barra assistente separata mostra un’anteprima e suggerisce il passo successivo. Appare quando serve e si fa da parte quando hai finito.',
+      'Riunisci attività IA, media, file e agenda nella parte superiore dello schermo. Dopo una copia, una barra delle azioni rapide separata mostra un’anteprima e suggerisce il passo successivo. Appare quando serve e si fa da parte quando hai finito.',
     downloadCta: 'Scarica',
     downloadCtaAriaLabel: 'Scarica',
     sourceCta: 'Vedi il codice',
@@ -62,7 +62,7 @@ export const it = createCatalog({
     summaryLede:
       'Dai flussi in alto agli strumenti locali, qui trovi ogni attività che puoi davvero completare.',
     summaryNote:
-      '{modules} moduli superiori e {features} capacità indipendenti per schermate, voce, media, download, assistente di copia, gestione IA, mascotte e blocco schermo.',
+      '{modules} moduli superiori e {features} capacità indipendenti per schermate, voce, media, download, azioni rapide, gestione IA, mascotte e blocco schermo.',
     groupNames: {
       island: 'Flussi superiori',
       ai: 'Flusso IA',
@@ -161,7 +161,7 @@ export const it = createCatalog({
     summaryMono: 'OLTRE L’ISOLA',
     summaryLede: 'Funzioni frequenti, ognuna nel suo posto naturale.',
     summaryNote:
-      'Schermate, registrazione, media, download del browser, assistente di copia, gestione IA, mascotte e blocco schermo sono presentati separatamente.',
+      'Schermate, registrazione, media, download del browser, azioni rapide, gestione IA, mascotte e blocco schermo sono presentati separatamente.',
     features: {
       capture: {
         title: 'Schermate, catture lunghe e fissaggio',
@@ -188,9 +188,9 @@ export const it = createCatalog({
         detail: '8 browser · Rilevamento origine · Avviso di completamento',
       },
       copyAssistant: {
-        title: 'Assistente di copia e passi successivi',
+        title: 'Azioni rapide e passi successivi',
         description:
-          'Quando è attivo, mostra l’anteprima di testo, link, file o immagini copiati in una barra separata e propone apertura, Finder, ricerca, traduzione, calcolo o salvataggio solo dopo la tua conferma.',
+          'Quando la funzione è attiva, mostra l’anteprima di testo, link, file o immagini copiati in una barra separata e propone apertura, Finder, ricerca, traduzione, calcolo o salvataggio solo dopo la tua conferma. Al termine di un download del browser o della ricezione di un file via AirDrop, la stessa scorciatoia può aprire la cartella del file; l’opzione Azioni rapide è indipendente dall’avanzamento dei download del browser.',
         detail: 'Attivazione opzionale · Riconoscimento locale · Command+N predefinito',
       },
       aiManagement: {
@@ -295,7 +295,7 @@ export const it = createCatalog({
         answer: 'No. Il monitor IA legge solo lo stato delle attività, mai il testo dei prompt o delle risposte.',
       },
       copyAssistant: {
-        question: 'L’assistente di copia apre o carica ciò che copio?',
+        question: 'Le azioni rapide aprono o caricano ciò che copio?',
         answer: 'No. Riconoscimento e anteprima restano sul Mac e il passo successivo viene eseguito solo dopo la tua conferma.',
       },
       permissions: {
