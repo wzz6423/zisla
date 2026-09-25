@@ -194,9 +194,9 @@ struct WindowPreviewSnapshot: Identifiable {
     let frame: CGRect
     let image: NSImage?
 
-    func visibleTitle(for appName: String) -> String? {
+    func accessibilityTitle(for appName: String) -> String {
         let caption = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return caption.isEmpty || caption == appName ? nil : caption
+        return caption.isEmpty || caption == appName ? appName : caption
     }
 }
 
@@ -797,8 +797,7 @@ final class WindowPreviewController: ObservableObject {
             ?? WindowPlacement.screenUnderMouse()
         guard let screen else { return }
         let width = min(CGFloat(windows.count) * 202 + 24, min(screen.visibleFrame.width - 24, 840))
-        let height: CGFloat = (showsAppHeader ? 168 : 141)
-            + (windows.contains { $0.visibleTitle(for: appName) != nil } ? 20 : 0)
+        let height: CGFloat = showsAppHeader ? 168 : 141
         let frame = WindowPreviewLayout.frame(
             anchor: selection.anchor,
             size: CGSize(width: width, height: height),
@@ -986,30 +985,22 @@ struct WindowPreviewView: View {
                         Button {
                             controller.activate(snapshot)
                         } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Group {
-                                    if let image = snapshot.image {
-                                        Image(nsImage: image)
-                                            .resizable()
-                                            .scaledToFit()
-                                    } else {
-                                        Image(systemName: "macwindow")
-                                            .font(.system(size: 32))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                .frame(width: 190, height: 114)
-                                .background(Color.black.opacity(0.1), in: RoundedRectangle(cornerRadius: 7))
-                                if let title = snapshot.visibleTitle(for: controller.appName) {
-                                    Text(title)
-                                        .font(.system(size: 10))
-                                        .lineLimit(1)
+                            Group {
+                                if let image = snapshot.image {
+                                    Image(nsImage: image)
+                                        .resizable()
+                                        .scaledToFit()
+                                } else {
+                                    Image(systemName: "macwindow")
+                                        .font(.system(size: 32))
+                                        .foregroundStyle(.secondary)
                                 }
                             }
-                            .frame(width: 190)
+                            .frame(width: 190, height: 114)
+                            .background(Color.black.opacity(0.1), in: RoundedRectangle(cornerRadius: 7))
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(snapshot.visibleTitle(for: controller.appName) ?? controller.appName)
+                        .accessibilityLabel(snapshot.accessibilityTitle(for: controller.appName))
                     }
                 }
             }

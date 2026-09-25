@@ -99,17 +99,17 @@ struct WindowPreviewLayoutTests {
 
 struct WindowPreviewTitleTests {
     @Test(arguments: ["", "  ", "Clash Verge", " Clash Verge "])
-    func emptyOrRepeatedAppNameHasNoCardCaption(title: String) {
+    func emptyOrRepeatedWindowTitleUsesAppAccessibilityLabel(title: String) {
         let snapshot = WindowPreviewSnapshot(id: 1, title: title, frame: .zero, image: nil)
 
-        #expect(snapshot.visibleTitle(for: "Clash Verge") == nil)
+        #expect(snapshot.accessibilityTitle(for: "Clash Verge") == "Clash Verge")
     }
 
     @Test
-    func distinctWindowTitleRemainsVisible() {
+    func distinctWindowTitleRemainsAccessible() {
         let snapshot = WindowPreviewSnapshot(id: 1, title: "Settings", frame: .zero, image: nil)
 
-        #expect(snapshot.visibleTitle(for: "Clash Verge") == "Settings")
+        #expect(snapshot.accessibilityTitle(for: "Clash Verge") == "Settings")
     }
 }
 
@@ -632,7 +632,8 @@ struct WindowPreviewPanelTests {
             Timer(timeInterval: interval, repeats: repeats) { _ in }
         }
         dependencies.captureWindows = { _ in [
-            WindowPreviewSnapshot(id: 42, title: "App", frame: screen.frame, image: nil),
+            WindowPreviewSnapshot(id: 42, title: "新标签页", frame: screen.frame, image: nil),
+            WindowPreviewSnapshot(id: 43, title: "Settings", frame: screen.frame, image: nil),
         ] }
         let controller = WindowPreviewController(dependencies: dependencies)
         let panel = controller.makePanel()
