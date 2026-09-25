@@ -378,7 +378,7 @@ export const fr: SiteContent = {
       storage: {
         question: 'Où zisla stocke-t-il ses données ?',
         answer:
-          'Les données locales se trouvent dans ~/Library/Application Support/zisla/. Les statistiques de saisie sont conservées à part dans ~/Library/Application Support/SimuBoard/typing-stats.sqlite3. Les notes rapides utilisent l’app Notes du système.',
+          'Les données locales se trouvent dans ~/Library/Application Support/zisla/. Les statistiques de saisie sont conservées à part dans ~/Library/Application Support/zisla/typing-stats.sqlite3. Les notes rapides utilisent l’app Notes du système.',
       },
     },
   },

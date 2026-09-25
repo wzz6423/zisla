@@ -331,7 +331,7 @@ export const zhHant: SiteContent = {
       storage: {
         question: 'zisla 的資料儲存在哪裡？',
         answer:
-          '本機資料位於 ~/Library/Application Support/zisla/；鍵盤輸入統計單獨保存在 ~/Library/Application Support/SimuBoard/typing-stats.sqlite3；隨記使用系統「備忘錄」。',
+          '本機資料位於 ~/Library/Application Support/zisla/；鍵盤輸入統計單獨保存在 ~/Library/Application Support/zisla/typing-stats.sqlite3；隨記使用系統「備忘錄」。',
       },
     },
   },

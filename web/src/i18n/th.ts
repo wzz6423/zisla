@@ -188,7 +188,7 @@ export const th = createCatalog({
       network: { question: 'zisla เชื่อมต่ออินเทอร์เน็ตหรือไม่', answer: 'สภาพอากาศ การตรวจอัปเดตที่มีลายเซ็น การดาวน์โหลดที่คุณเริ่ม และการปรับแต่งเสียงระยะไกลที่เลือกใช้จะใช้เครือข่ายตามต้องการ การตรวจลิงก์จากคลิปบอร์ดทำในเครื่อง' },
       multiDisplay: { question: 'zisla รองรับหลายจอภาพหรือไม่', answer: 'รองรับหลายจอภาพ Spaces และแอปเต็มหน้าจอทั่วไป การขยายไม่แย่งโฟกัส' },
       intel: { question: 'ใช้บน Mac Intel ได้หรือไม่', answer: 'อาจมีบิลด์สำหรับ Intel แต่ไม่รับประกันความเข้ากันได้ การกำหนดค่าที่รองรับในปัจจุบันคือ Apple Silicon' },
-      storage: { question: 'zisla เก็บข้อมูลไว้ที่ไหน', answer: 'ข้อมูลในเครื่องอยู่ที่ ~/Library/Application Support/zisla/ สถิติการพิมพ์อยู่ที่ ~/Library/Application Support/SimuBoard/typing-stats.sqlite3 แยกต่างหาก และโน้ตด่วนใช้แอปโน้ตของระบบ' },
+      storage: { question: 'zisla เก็บข้อมูลไว้ที่ไหน', answer: 'ข้อมูลในเครื่องอยู่ที่ ~/Library/Application Support/zisla/ สถิติการพิมพ์อยู่ที่ ~/Library/Application Support/zisla/typing-stats.sqlite3 แยกต่างหาก และโน้ตด่วนใช้แอปโน้ตของระบบ' },
     },
   },
   developers: {

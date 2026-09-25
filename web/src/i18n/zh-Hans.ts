@@ -329,7 +329,7 @@ export const zhHans: SiteContent = {
       storage: {
         question: 'zisla 的数据存储在哪里？',
         answer:
-          '本地数据位于 ~/Library/Application Support/zisla/；键盘输入统计单独保存在 ~/Library/Application Support/SimuBoard/typing-stats.sqlite3；随记使用系统「备忘录」。',
+          '本地数据位于 ~/Library/Application Support/zisla/；键盘输入统计单独保存在 ~/Library/Application Support/zisla/typing-stats.sqlite3；随记使用系统「备忘录」。',
       },
     },
   },

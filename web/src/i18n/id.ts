@@ -188,7 +188,7 @@ export const id = createCatalog({
       network: { question: 'Apakah zisla terhubung ke internet?', answer: 'Cuaca, pemeriksaan pembaruan bertanda tangan, unduhan yang Anda mulai, dan pembersihan suara jarak jauh opsional menggunakan jaringan sesuai kebutuhan. Deteksi tautan clipboard berjalan lokal.' },
       multiDisplay: { question: 'Apakah zisla mendukung banyak layar?', answer: 'Ya: banyak layar, Spaces, dan aplikasi layar penuh biasa; membuka tidak mengambil fokus.' },
       intel: { question: 'Bisakah digunakan di Mac Intel?', answer: 'Build Intel mungkin tersedia, tetapi kompatibilitas tidak dijamin. Konfigurasi yang didukung saat ini adalah Apple Silicon.' },
-      storage: { question: 'Di mana zisla menyimpan data?', answer: 'Data lokal berada di ~/Library/Application Support/zisla/. Statistik mengetik disimpan terpisah di ~/Library/Application Support/SimuBoard/typing-stats.sqlite3. Catatan cepat memakai aplikasi Catatan sistem.' },
+      storage: { question: 'Di mana zisla menyimpan data?', answer: 'Data lokal berada di ~/Library/Application Support/zisla/. Statistik mengetik disimpan terpisah di ~/Library/Application Support/zisla/typing-stats.sqlite3. Catatan cepat memakai aplikasi Catatan sistem.' },
     },
   },
   developers: {

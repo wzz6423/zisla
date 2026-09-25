@@ -188,7 +188,7 @@ export const vi = createCatalog({
       network: { question: 'zisla có kết nối mạng không?', answer: 'Thời tiết, kiểm tra cập nhật có chữ ký, lượt tải bạn khởi động và làm sạch giọng nói từ xa tùy chọn dùng mạng khi cần. Nhận dạng liên kết clipboard chạy cục bộ.' },
       multiDisplay: { question: 'zisla có hỗ trợ nhiều màn hình không?', answer: 'Có: nhiều màn hình, Spaces và ứng dụng toàn màn hình thông thường; mở rộng không lấy tiêu điểm.' },
       intel: { question: 'Có thể dùng trên Mac Intel không?', answer: 'Có thể có bản dựng cho Intel nhưng không đảm bảo tương thích. Cấu hình được hỗ trợ hiện tại là Apple Silicon.' },
-      storage: { question: 'zisla lưu dữ liệu ở đâu?', answer: 'Dữ liệu cục bộ nằm tại ~/Library/Application Support/zisla/. Thống kê gõ được lưu riêng tại ~/Library/Application Support/SimuBoard/typing-stats.sqlite3. Ghi chú nhanh dùng ứng dụng Ghi chú hệ thống.' },
+      storage: { question: 'zisla lưu dữ liệu ở đâu?', answer: 'Dữ liệu cục bộ nằm tại ~/Library/Application Support/zisla/. Thống kê gõ được lưu riêng tại ~/Library/Application Support/zisla/typing-stats.sqlite3. Ghi chú nhanh dùng ứng dụng Ghi chú hệ thống.' },
     },
   },
   developers: {
