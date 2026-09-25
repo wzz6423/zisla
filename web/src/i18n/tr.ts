@@ -193,7 +193,7 @@ export const tr = createCatalog({
       network: { question: 'zisla internete bağlanır mı?', answer: 'Hava durumu, imzalı güncelleme kontrolleri, başlattığınız indirmeler ve isteğe bağlı uzak ses temizleme gerektiğinde ağı kullanır. Pano bağlantısı algılama tamamen Mac\'inizde çalışır.' },
       multiDisplay: { question: 'zisla birden çok ekranı destekler mi?', answer: 'Evet: birden çok ekran, Spaces ve normal tam ekran uygulamaları desteklenir; genişletme odağı almaz.' },
       intel: { question: 'Intel Mac\'te kullanabilir miyim?', answer: 'Intel makineler için bir derleme bulunabilir ancak uyumluluk garanti edilmez. Günümüzde desteklenen yapılandırma Apple Silicon Mac\'lerdir.' },
-      storage: { question: 'zisla verilerini nereye kaydeder?', answer: 'Yerel veriler ~/Library/Application Support/zisla/ konumundadır. Yazma istatistikleri ayrı olarak ~/Library/Application Support/SimuBoard/typing-stats.sqlite3 konumunda tutulur. Hızlı Notlar sistem Notlar uygulamasını kullanır.' },
+      storage: { question: 'zisla verilerini nereye kaydeder?', answer: 'Yerel veriler ~/Library/Application Support/zisla/ konumundadır. Yazma istatistikleri ayrı olarak ~/Library/Application Support/zisla/typing-stats.sqlite3 konumunda tutulur. Hızlı Notlar sistem Notlar uygulamasını kullanır.' },
     },
   },
   developers: {

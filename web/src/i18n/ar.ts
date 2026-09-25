@@ -241,7 +241,7 @@ export const ar = createCatalog({
       network: { question: 'هل يتصل zisla بالإنترنت؟', answer: 'يستخدم الطقس وفحوص التحديث الموقعة والتنزيلات التي تبدأها ومعالجة الصوت البعيدة الاختيارية الشبكة عند الحاجة. يكتشف روابط الحافظة محليًا.' },
       multiDisplay: { question: 'هل يدعم zisla شاشات متعددة؟', answer: 'نعم: شاشات متعددة وSpaces وتطبيقات ملء الشاشة العادية، ولا ينتزع التوسيع التركيز.' },
       intel: { question: 'هل يمكن استخدامه على Mac بمعالج Intel؟', answer: 'قد تتوفر بنية لأجهزة Intel، لكن التوافق غير مضمون. التكوين المدعوم حاليًا هو Apple Silicon.' },
-      storage: { question: 'أين يخزن zisla بياناته؟', answer: 'توجد البيانات المحلية في ~/Library/Application Support/zisla/. وتُحفظ إحصاءات الكتابة منفصلة في ~/Library/Application Support/SimuBoard/typing-stats.sqlite3. تستخدم الملاحظات السريعة تطبيق الملاحظات.' },
+      storage: { question: 'أين يخزن zisla بياناته؟', answer: 'توجد البيانات المحلية في ~/Library/Application Support/zisla/. وتُحفظ إحصاءات الكتابة منفصلة في ~/Library/Application Support/zisla/typing-stats.sqlite3. تستخدم الملاحظات السريعة تطبيق الملاحظات.' },
     },
   },
   developers: {

@@ -341,7 +341,7 @@ export const ko: SiteContent = {
       storage: {
         question: 'zisla의 데이터는 어디에 저장되나요?',
         answer:
-          '로컬 데이터는 ~/Library/Application Support/zisla/에 있습니다. 키보드 입력 통계는 ~/Library/Application Support/SimuBoard/typing-stats.sqlite3에 따로 저장됩니다. 빠른 메모는 시스템 "메모"를 사용합니다.',
+          '로컬 데이터는 ~/Library/Application Support/zisla/에 있습니다. 키보드 입력 통계는 ~/Library/Application Support/zisla/typing-stats.sqlite3에 따로 저장됩니다. 빠른 메모는 시스템 "메모"를 사용합니다.',
       },
     },
   },
