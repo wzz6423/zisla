@@ -20,6 +20,7 @@ export const vi = createCatalog({
       showcase: 'Tính năng',
       ai: 'Quy trình AI',
       download: 'Tải xuống',
+      changelog: 'Nhật ký thay đổi',
       faq: 'Câu hỏi thường gặp',
       developers: 'Nhà phát triển',
     },
@@ -29,7 +30,7 @@ export const vi = createCatalog({
   },
   hero: {
     eyebrow: 'KHÔNG GIAN LÀM VIỆC MACOS NGUYÊN BẢN',
-    title: 'zisla<br><em>Điều đang diễn ra,<br>ngay nơi<br class="hero-mobile-break"> bạn có thể thấy.</em>',
+    title: 'zisla<br><em>Điều đang diễn ra,<br>ngay nơi bạn có thể thấy.</em>',
     lede:
       'Gom tác vụ AI, phương tiện, tệp và lịch ở đầu màn hình. Sau khi bạn sao chép, một thanh thao tác nhanh riêng hiển thị bản xem trước và gợi ý bước tiếp theo. Thanh xuất hiện khi cần rồi thu lại khi xong.',
     downloadCta: 'Tải xuống',
@@ -41,7 +42,6 @@ export const vi = createCatalog({
       'Sau khi sao chép, nhấn Command+N cho bước thông minh tiếp theo',
       'Tự thu lại mà không làm gián đoạn công việc',
     ],
-    identityCaption: 'Đầu màn hình',
   },
   proof: {
     ariaLabel: 'Tổng quan sản phẩm',
@@ -60,7 +60,7 @@ export const vi = createCatalog({
     ariaLabel: 'Danh mục tính năng zisla',
     summaryMono: '{modules} MÔ-ĐUN / {groups} QUY TRÌNH',
     summaryLede: 'Từ quy trình trên cùng đến công cụ cục bộ, mọi tác vụ có thể hoàn thành đều được mô tả ở đây.',
-    summaryNote: '{modules} mô-đun trên cùng và {features} khả năng độc lập cho ảnh chụp, giọng nói, phương tiện, tải xuống, thao tác nhanh, quản lý AI, thú cưng và màn hình khóa.',
+    summaryNote: '{modules} mô-đun trên cùng và {features} khả năng độc lập, từ xem trước cửa sổ và chụp màn hình đến quản lý AI và ứng dụng đề xuất.',
     groupNames: {
       island: 'Quy trình trên cùng',
       ai: 'Quy trình AI',
@@ -81,7 +81,7 @@ export const vi = createCatalog({
       quickNotes: { name: 'Ghi chú nhanh', caption: 'Dùng ứng dụng Ghi chú của hệ thống để xem, sửa, tạo và xóa ghi chú với bản xem trước Markdown trực tiếp, và nhảy thẳng đến chín ghi chú đầu tiên bằng Command+1 đến 9. Bản nháp tự động được ghi lại.', points: ['Dữ liệu nằm trong Ghi chú', 'Trình soạn Markdown', 'Tự động lưu bản nháp'] },
       pdf: { name: 'Công cụ PDF', caption: 'Mười bốn thao tác ngay trên máy: hợp nhất, tách, xoay, cắt, chuyển đổi ảnh và tệp Office, kết xuất ảnh, trích xuất văn bản, thêm watermark và số trang, mã hóa, xóa mật khẩu và sửa metadata.', points: ['14 công cụ trên máy', 'Hợp nhất theo thứ tự bạn muốn', 'Không có dữ liệu rời khỏi Mac'] },
       toolbox: { name: 'Tiện ích', caption: 'Đếm giờ tập trung, giữ màn hình sáng, dọn màn hình và bàn phím (chặn cả F1-F12), teleprompter, gương và Thùng rác trong một trang.', points: ['Đếm giờ tập trung', 'Chặn F1-F12 khi dọn dẹp', 'Teleprompter và gương'] },
-      system: { name: 'Trạng thái hệ thống', caption: 'Kiểm tra CPU, GPU, bộ nhớ, ổ đĩa, mạng và quạt; đọc nhiệt độ NVMe SMART khi phần cứng hỗ trợ, ghi lại lịch sử theo phút để xem biểu đồ theo bất kỳ khoảng thời gian nào và xuất ra .xlsx, đồng thời dọn cache cùng nhật ký an toàn để xóa.', points: ['Theo dõi cấp chip', 'Biểu đồ lịch sử và xuất .xlsx', 'Dọn cache bằng một chạm'] },
+      system: { name: 'Trạng thái hệ thống', caption: 'Kiểm tra CPU, GPU, bộ nhớ, ổ đĩa, mạng và quạt; đọc nhiệt độ NVMe SMART khi phần cứng hỗ trợ, ghi lại lịch sử theo phút để xem biểu đồ theo bất kỳ khoảng thời gian nào và xuất ra .xlsx. Quét bộ nhớ đệm ứng dụng, bộ nhớ đệm người dùng Apple, nhật ký và tệp tùy chọn còn sót. Kiểm tra các mục đã chọn, chuyển vào Thùng rác rồi xem kết quả.', points: ['Theo dõi cấp chip', 'Biểu đồ lịch sử và xuất .xlsx', 'Kiểm tra trước khi chuyển vào Thùng rác'] },
       battery: { name: 'Pin', caption: 'Xem mức sạc, tình trạng, số chu kỳ, nhiệt độ và dung lượng của Mac này, cùng mức pin của các thiết bị lân cận mà hệ thống cung cấp.', points: ['Chỉ số sức khỏe Mac', 'Thời gian còn lại', 'Pin thiết bị lân cận'] },
     },
   },
@@ -92,16 +92,28 @@ export const vi = createCatalog({
     ariaLabel: 'Khả năng desktop độc lập',
     summaryMono: 'VƯỢT RA NGOÀI ĐẢO',
     summaryLede: 'Các khả năng dùng thường xuyên, mỗi khả năng ở đúng vị trí tự nhiên.',
-    summaryNote: 'Ảnh chụp, ghi âm, phương tiện, tải xuống trình duyệt, thao tác nhanh, quản lý AI, thú cưng và màn hình khóa được trình bày riêng.',
+    summaryNote: 'Xem trước cửa sổ, chụp màn hình và Thao tác nhanh luôn dễ truy cập; ứng dụng đề xuất giúp bạn tìm thêm công cụ cho máy tính.',
     features: {
-      capture: { title: 'Ảnh chụp, ảnh cuộn và ghim', description: 'Chụp hoặc ghim một phần màn hình bằng phím tắt toàn cục, thêm chú thích, ghép ảnh cuộn và nhận dạng hoặc xuất bảng. Chú thích đang sửa vẫn được giữ khi xuất.', detail: 'Phím tắt toàn cục · Chú thích và hoàn tác · Giữ chỉnh sửa khi xuất' },
+      windowPreviews: {
+        title: 'Xem trước cửa sổ, nhấp để chuyển',
+        description:
+          'Xem trước cửa sổ từ Dock hoặc khi chuyển bằng Command-Tab, rồi nhấp vào thẻ để kích hoạt cửa sổ đó. Mặc định tắt; hãy bật trong Cài đặt và cấp các quyền cần thiết.',
+        detail: 'Dock và Command-Tab · Nhấp để chuyển cửa sổ · Mặc định tắt',
+      },
+      capture: { title: 'Ảnh chụp, ảnh cuộn và ghim', description: 'Chụp hoặc ghim một phần màn hình bằng phím tắt toàn cục, thêm chú thích, ghép ảnh cuộn và nhận dạng hoặc xuất bảng. Chú thích đang sửa vẫn được giữ khi xuất. Tùy chỉnh phím tắt chụp màn hình, ghim ảnh, chụp cuộn và công cụ chú thích. Cài đặt kiểm tra xung đột với chụp ảnh, nhập giọng nói và Thao tác nhanh; dùng riêng phím bổ trợ cần quyền Giám sát đầu vào.', detail: 'Phím tắt tùy chỉnh · Kiểm tra xung đột · Giữ chú thích khi xuất' },
       voice: { title: 'Nhập giọng nói và làm sạch', description: 'Bật bằng phím hoặc giữ để nói, dùng nhận dạng giọng nói hệ thống. Thêm từ vựng, từ nóng tùy chỉnh, định dạng có cấu trúc hoặc làm sạch bằng mô hình cục bộ hay từ xa.', detail: 'Hai chế độ ghi âm · Từ vựng và từ nóng · Làm sạch tùy chọn' },
       media: { title: 'Phương tiện và âm thanh nền hệ thống', description: 'Điều khiển nội dung đang phát từ đầu đảo hoặc chọn âm thanh nền macOS. Âm thanh có thể tự dừng khi khóa màn hình, bật trình bảo vệ hoặc màn hình ngủ.', detail: 'Điều khiển phát · Lời bài hát đồng bộ · Tự dừng âm thanh' },
       browserDownloads: { title: 'Tiến trình tải xuống trình duyệt', description: 'Phát hiện tải xuống từ Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera và Arc, hiển thị nguồn và tiến trình trực tiếp ở trên.', detail: '8 trình duyệt · Nhận dạng nguồn · Thông báo hoàn tất' },
-      copyAssistant: { title: 'Thao tác nhanh và bước tiếp theo', description: 'Khi bật, văn bản, liên kết, tệp hoặc ảnh đã sao chép được xem trước trong thanh riêng, kèm đề xuất mở, hiện trong Finder, tìm kiếm, dịch, tính toán hoặc lưu chỉ sau khi bạn xác nhận. Khi tải xuống bằng trình duyệt hoặc nhận tệp qua AirDrop hoàn tất, cùng phím tắt có thể mở thư mục chứa tệp; công tắc Thao tác nhanh điều khiển tính năng này độc lập với phần hiển thị tiến trình tải xuống.', detail: 'Bật tùy chọn · Nhận dạng cục bộ · Command+N mặc định' },
+      copyAssistant: { title: 'Thao tác nhanh và bước tiếp theo', description: 'Khi bật, văn bản, liên kết, tệp hoặc ảnh đã sao chép được xem trước trong thanh riêng, kèm đề xuất mở, hiện trong Finder, tìm kiếm, dịch, tính toán hoặc lưu chỉ sau khi bạn xác nhận. Mở thư mục chứa tệp qua Thao tác nhanh sau khi tải bằng trình duyệt hoặc nhận qua AirDrop. Hỗ trợ thư mục tải mặc định và tự chọn của Chrome, với công tắc riêng so với hiển thị tiến trình tải.', detail: 'Bật tùy chọn · Nhận dạng cục bộ · Command+N mặc định' },
       aiManagement: { title: 'Quản lý CLI và Skills AI', description: 'Phát hiện, cài đặt, cập nhật và gỡ CLI AI trong Cài đặt, đồng thời xem và quản lý Skills cục bộ để ít phải chuyển giữa các terminal.', detail: 'Phát hiện và cài đặt · Cập nhật và gỡ · Skills cục bộ' },
       pet: { title: 'Thú cưng trong đảo', description: 'Chọn thú cưng tích hợp và đặt ở bên trái hoặc phải đảo. Tắt bất cứ lúc nào.', detail: 'Nhân vật tích hợp · Trái hoặc phải · Bật khi cần' },
       lockScreen: { title: 'Thông tin màn hình khóa', description: 'Tùy chọn hiển thị ngày, trạng thái và nội dung đang phát trên màn hình khóa macOS. Đây là lớp phủ riêng, không xuất hiện trong danh sách hay băng chuyền mô-đun của đảo.', detail: 'Lớp phủ riêng · Tùy chọn bật · Không chiếm tiêu điểm' },
+      recommendedTools: {
+        title: 'Ứng dụng đề xuất',
+        description:
+          'Khám phá OpenScreen để quay màn hình và biên tập video, cùng DockDoor để xem trước cửa sổ trên Dock và chuyển ứng dụng. Đây là các ứng dụng bên thứ ba được cài riêng.',
+        detail: 'Khám phá công cụ máy tính · Ứng dụng bên thứ ba · Cài đặt riêng',
+      },
     },
   },
   ai: {
@@ -154,6 +166,21 @@ export const vi = createCatalog({
       architectures: { term: 'Kiến trúc khác', value: 'Trang phát hành' },
       mirror: { term: 'Bản sao', value: 'Gitee Releases' },
     },
+  },
+  changelog: {
+    eyebrow: 'Nhật ký thay đổi',
+    title: 'Những thay đổi trong mỗi bản phát hành zisla: tính năng mới, cải tiến và sửa lỗi.',
+    lede: 'Những thay đổi trong mỗi bản phát hành zisla: tính năng mới, cải tiến và sửa lỗi.',
+    ariaLabel: 'lịch sử phát hành zisla',
+    releaseCountLabel: 'bản phát hành',
+    latestLabel: 'mới nhất',
+    shippedLabel: 'đã phát hành',
+    latestBadge: 'Mới nhất',
+    noteLabel: 'bản phát hành',
+    pagerAriaLabel: 'Trang nhật ký thay đổi',
+    pageLabel: 'Trang {page}',
+    prevPageLabel: 'Trước',
+    nextPageLabel: 'Sau',
   },
   faq: {
     eyebrow: 'MỘT VÀI CÂU TRẢ LỜI RÕ RÀNG',

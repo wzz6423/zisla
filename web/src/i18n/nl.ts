@@ -20,6 +20,7 @@ export const nl = createCatalog({
       showcase: 'Functies',
       ai: 'AI-workflow',
       download: 'Download',
+      changelog: 'Wijzigingslog',
       faq: 'Veelgestelde vragen',
       developers: 'Ontwikkelaars',
     },
@@ -29,7 +30,7 @@ export const nl = createCatalog({
   },
   hero: {
     eyebrow: 'NATIVE MACOS-WERKRUIMTE',
-    title: 'zisla<br><em>Wat er gebeurt,<br>precies waar<br class="hero-mobile-break"> je het ziet.</em>',
+    title: 'zisla<br><em>Wat er gebeurt,<br>precies waar je het ziet.</em>',
     lede:
       'Verzamel AI-taken, media, bestanden en je agenda bovenaan het scherm. Na het kopiëren toont een aparte balk met snelle acties een voorbeeld en stelt de volgende stap voor. Ze verschijnt wanneer nodig en verdwijnt daarna weer.',
     downloadCta: 'Download',
@@ -41,7 +42,6 @@ export const nl = createCatalog({
       'Druk na het kopiëren op Command+N voor de slimme volgende stap',
       'Klapt vanzelf in zonder je werk te onderbreken',
     ],
-    identityCaption: 'Bovenkant van het scherm',
   },
   proof: {
     ariaLabel: 'Productoverzicht',
@@ -62,7 +62,7 @@ export const nl = createCatalog({
     summaryLede:
       'Van workflows bovenaan tot lokale tools: elke taak die je echt kunt uitvoeren staat hier beschreven.',
     summaryNote:
-      '{modules} modules bovenaan en {features} zelfstandige functies voor schermafbeeldingen, spraak, media, downloads, snelle acties, AI-beheer, huisdier en vergrendelscherm.',
+      '{modules} modules bovenaan en {features} zelfstandige functies, van venstervoorbeelden en opnamen tot AI-beheer en aanbevolen apps.',
     groupNames: {
       island: 'Workflows bovenaan',
       ai: 'AI-workflow',
@@ -141,8 +141,8 @@ export const nl = createCatalog({
       system: {
         name: 'Systeemstatus',
         caption:
-          'Controleer CPU, GPU, geheugen, schijf, netwerk en ventilatoren; lees de NVMe-SMART-temperatuur wanneer de hardware die aanbiedt, houd een minuutsgewijze geschiedenis bij die je voor elke periode als grafiek bekijkt en als .xlsx exporteert, en ruim veilige caches en logboeken op.',
-        points: ['Monitoring op chipniveau', 'Geschiedenisgrafieken en .xlsx-export', 'Caches met één tik opruimen'],
+          'Controleer CPU, GPU, geheugen, schijf, netwerk en ventilatoren; lees de NVMe-SMART-temperatuur wanneer de hardware die aanbiedt, houd een minuutsgewijze geschiedenis bij die je voor elke periode als grafiek bekijkt en als .xlsx exporteert. Scan appcaches, Apple-gebruikerscaches, logboeken en achtergebleven voorkeurenbestanden. Controleer de selectie, verplaats deze naar de prullenmand en bekijk het resultaat.',
+        points: ['Monitoring op chipniveau', 'Geschiedenisgrafieken en .xlsx-export', 'Controleren vóór verplaatsen naar prullenmand'],
       },
       battery: {
         name: 'Batterij',
@@ -161,13 +161,19 @@ export const nl = createCatalog({
     summaryMono: 'VOORBIJ HET EILAND',
     summaryLede: 'Veelgebruikte functies, elk op een natuurlijke plek.',
     summaryNote:
-      'Schermafbeeldingen, opname, media, browserdownloads, snelle acties, AI-beheer, huisdier en vergrendelscherm worden afzonderlijk getoond.',
+      'Venstervoorbeelden, opnamen en snelle acties zijn binnen handbereik; aanbevolen apps helpen je meer hulpmiddelen voor je bureaublad te ontdekken.',
     features: {
+      windowPreviews: {
+        title: 'Bekijk een venster, wissel met een klik',
+        description:
+          'Bekijk vensters vanuit het Dock of tijdens het wisselen met Command-Tab en klik op een kaart om het venster te activeren. Standaard uitgeschakeld; zet het aan in Instellingen en geef de benodigde toestemmingen.',
+        detail: 'Dock en Command-Tab · Wissel vensters met een klik · Standaard uit',
+      },
       capture: {
         title: 'Schermafbeeldingen, scrollcaptures en vastzetten',
         description:
-          'Maak of pin een deel van het scherm met een globale sneltoets, annoteer, voeg een scrollcapture samen en herken of exporteer tabellen. Bewerkte tekstannotaties blijven behouden bij export.',
-        detail: 'Globale sneltoets · Annoteren en ongedaan maken · Bewerkingen blijven behouden',
+          'Maak of pin een deel van het scherm met een globale sneltoets, annoteer, voeg een scrollcapture samen en herken of exporteer tabellen. Bewerkte tekstannotaties blijven behouden bij export. Pas sneltoetsen voor schermafdrukken, vastzetten, scrollende opnamen en annotaties aan. Instellingen controleren conflicten met opnamen, spraakinvoer en snelle acties; alleen een modificatietoets gebruiken vereist toestemming voor invoerbewaking.',
+        detail: 'Eigen sneltoetsen · Controle op conflicten · Annotaties blijven behouden bij export',
       },
       voice: {
         title: 'Spraakinvoer en opschonen',
@@ -190,7 +196,7 @@ export const nl = createCatalog({
       copyAssistant: {
         title: 'Snelle acties en volgende stappen',
         description:
-          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Na een browserdownload of ontvangst van een bestand via AirDrop kun je met dezelfde sneltoets de bijbehorende map openen; de schakelaar voor Snelle acties staat los van de weergave van browserdownloads.',
+          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Open de bestandsmap via snelle acties na een browserdownload of AirDrop-overdracht. Ondersteunt standaard en zelfgekozen Chrome-downloadmappen, met een aparte schakelaar naast de downloadvoortgang.',
         detail: 'Optionele schakelaar · Lokale herkenning · Command+N standaard',
       },
       aiManagement: {
@@ -209,6 +215,12 @@ export const nl = createCatalog({
         description:
           'Toon optioneel datum, status en huidige media op het macOS-vergrendelscherm. Het is een aparte overlay en verschijnt nooit in de modulelijst of carrousel.',
         detail: 'Aparte vergrendeloverlay · Opt-in · Neemt geen focus',
+      },
+      recommendedTools: {
+        title: 'Aanbevolen apps',
+        description:
+          'Ontdek OpenScreen voor schermopnamen en videobewerking en DockDoor voor venstervoorbeelden in het Dock en wisselen tussen apps. Dit zijn apart te installeren apps van andere ontwikkelaars.',
+        detail: 'Ontdek bureaubladtools · Apps van derden · Aparte installatie',
       },
     },
   },
@@ -267,6 +279,21 @@ export const nl = createCatalog({
       architectures: { term: 'Andere architecturen', value: 'Releasepagina' },
       mirror: { term: 'Mirror', value: 'Gitee Releases' },
     },
+  },
+  changelog: {
+    eyebrow: 'Wijzigingslog',
+    title: 'Wat er in elke zisla-release is veranderd: nieuwe functies, verbeteringen en oplossingen.',
+    lede: 'Wat er in elke zisla-release is veranderd: nieuwe functies, verbeteringen en oplossingen.',
+    ariaLabel: 'zisla-releasegeschiedenis',
+    releaseCountLabel: 'releases',
+    latestLabel: 'nieuwste',
+    shippedLabel: 'uitgebracht',
+    latestBadge: 'Nieuwste',
+    noteLabel: 'release',
+    pagerAriaLabel: "Changelog-pagina's",
+    pageLabel: 'Pagina {page}',
+    prevPageLabel: 'Vorige',
+    nextPageLabel: 'Volgende',
   },
   faq: {
     eyebrow: 'EEN PAAR DUIDELIJKE ANTWOORDEN',

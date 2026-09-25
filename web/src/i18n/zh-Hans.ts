@@ -20,6 +20,7 @@ export const zhHans: SiteContent = {
       showcase: '功能',
       ai: 'AI 工作流',
       download: '下载',
+      changelog: '更新日志',
       faq: 'FAQ',
       developers: '开发者',
     },
@@ -30,7 +31,7 @@ export const zhHans: SiteContent = {
   hero: {
     eyebrow: '原生 MACOS 工作空间',
     title:
-      'zisla<br><em>把正在发生的事<br>放到你看得<br class="hero-mobile-break">见的地方。</em>',
+      'zisla<br><em>把正在发生的事<br>放到你看得见的地方。</em>',
     lede: '把 AI 任务、媒体、文件和日程收进屏幕顶部；复制后，独立的快捷操作提示条会在屏幕顶端预览内容并给出下一步。需要时出现，完成后收起。',
     downloadCta: '下载',
     downloadCtaAriaLabel: '下载',
@@ -41,7 +42,6 @@ export const zhHans: SiteContent = {
       '复制后可用 Command+N 调出智能下一步',
       '自动收起，不干扰当前工作',
     ],
-    identityCaption: '屏幕顶部',
   },
   proof: {
     ariaLabel: '产品概览',
@@ -60,7 +60,7 @@ export const zhHans: SiteContent = {
     summaryMono: '{modules} 个模块 / {groups} 类工作流',
     summaryLede: '从顶部工作流到本地工具，实际能完成的任务都在这里逐项写清。',
     summaryNote:
-      '{modules} 个顶部模块 + {features} 项独立能力，覆盖截图、语音、媒体、下载、快捷操作、AI 管理、宠物与锁屏。',
+      '{modules} 个顶部模块 + {features} 项独立能力，从窗口预览、截图与 AI 管理，到推荐应用。',
     groupNames: {
       island: '顶部工作流',
       ai: 'AI 工作流',
@@ -138,8 +138,8 @@ export const zhHans: SiteContent = {
       system: {
         name: '系统状态',
         caption:
-          '查看 CPU、GPU、内存、磁盘、网络和风扇等状态，在设备支持时读取 NVMe SMART 温度，持续记录分钟级历史，可按任意时间范围绘制图表并导出 .xlsx，还能清理可安全删除的缓存与日志。',
-        points: ['芯片级监控', '历史图表与 .xlsx 导出', '一键清理缓存'],
+          '查看 CPU、GPU、内存、磁盘、网络和风扇等状态，在设备支持时读取 NVMe SMART 温度，持续记录分钟级历史，可按任意时间范围绘制图表并导出 .xlsx。扫描应用缓存、Apple 用户缓存、日志与偏好设置残留，复核后将所选项目移入废纸篓，并查看处理结果。',
+        points: ['芯片级监控', '历史图表与 .xlsx 导出', '复核后移入废纸篓'],
       },
       battery: {
         name: '电池',
@@ -155,13 +155,19 @@ export const zhHans: SiteContent = {
     ariaLabel: '独立桌面能力',
     summaryMono: '灵动岛之外',
     summaryLede: '常用能力，各在最顺手的位置。',
-    summaryNote: '截图、录音、媒体、浏览器下载、快捷操作、AI 管理、宠物与锁屏各自独立呈现。',
+    summaryNote: '窗口预览、截图与快捷操作各在最顺手的位置，推荐应用帮你发现更多桌面工具。',
     features: {
+      windowPreviews: {
+        title: '窗口预览，点击即切换',
+        description:
+          '在 Dock 悬停或用 Command-Tab 切换时预览窗口，点击卡片激活对应窗口。默认关闭，需在设置中启用并授予相关权限。',
+        detail: 'Dock 与 Command-Tab · 点击切换窗口 · 默认关闭',
+      },
       capture: {
         title: '截图、长截图与钉图',
         description:
-          '用全局快捷键截取或钉住屏幕内容，保留窗口边框；继续标注、拼接长截图，并识别或导出表格；导出前会保留尚未完成的标注。',
-        detail: '全局快捷键 · 保留窗口边框 · 未完成标注随导出保存',
+          '用全局快捷键截取或钉住屏幕内容，保留窗口边框；继续标注、拼接长截图，并识别或导出表格；导出前会保留尚未完成的标注。自定义截图、钉图、长截图与标注工具的快捷键。设置会检查截图、语音输入和快捷操作之间的冲突；单独修饰键触发需要输入监控权限。',
+        detail: '自定义快捷键 · 冲突检查 · 未完成标注随导出保存',
       },
       voice: {
         title: '语音输入与整理',
@@ -184,7 +190,7 @@ export const zhHans: SiteContent = {
       copyAssistant: {
         title: '快捷操作与智能下一步',
         description:
-          '启用后，复制文本、链接、文件或图片会在独立的顶部提示条中预览；可识别链接、本机已安装应用名称和 Emoji 名称，也可按实时汇率换算复制的金额，所有下一步均由你确认后执行。浏览器下载或 AirDrop 文件接收完成后，也可用同一快捷键打开文件所在文件夹；此功能由快捷操作开关控制，与浏览器下载进度开关独立。',
+          '启用后，复制文本、链接、文件或图片会在独立的顶部提示条中预览；可识别链接、本机已安装应用名称和 Emoji 名称，也可按实时汇率换算复制的金额，所有下一步均由你确认后执行。浏览器下载或 AirDrop 接收完成后，通过快捷操作打开文件所在文件夹。支持 Chrome 的默认与自选下载目录，可独立于下载进度显示启用。',
         detail: '本机识别 · 实时汇率换算 · 默认 Command+N',
       },
       aiManagement: {
@@ -203,6 +209,12 @@ export const zhHans: SiteContent = {
         description:
           '按需在 macOS 锁屏界面显示日期、状态与正在播放信息；它是独立锁屏叠层，不会出现在灵动岛的模块列表或轮播中。',
         detail: '独立锁屏叠层 · 按需开启 · 不抢焦点',
+      },
+      recommendedTools: {
+        title: '推荐应用',
+        description:
+          '在推荐应用中发现 OpenScreen（录屏与视频编辑）和 DockDoor（Dock 窗口预览与应用切换）等工具，均为单独安装的第三方应用。',
+        detail: '发现桌面工具 · 第三方应用 · 单独安装',
       },
     },
   },
@@ -272,6 +284,21 @@ export const zhHans: SiteContent = {
       architectures: { term: '其他架构', value: 'Release 页面' },
       mirror: { term: '镜像', value: 'Gitee Releases' },
     },
+  },
+  changelog: {
+    eyebrow: '更新日志',
+    title: '每个 zisla 版本的变化：新功能、改进与修复。',
+    lede: '每个 zisla 版本的变化：新功能、改进与修复。',
+    ariaLabel: 'zisla 发布记录',
+    releaseCountLabel: '个版本',
+    latestLabel: '最新',
+    shippedLabel: '已发布',
+    latestBadge: '最新',
+    noteLabel: '版本',
+    pagerAriaLabel: '更新日志分页',
+    pageLabel: '第 {page} 页',
+    prevPageLabel: '上一页',
+    nextPageLabel: '下一页',
   },
   faq: {
     eyebrow: '几个明确的答案',

@@ -20,6 +20,7 @@ export const fr: SiteContent = {
       showcase: 'Fonctions',
       ai: 'Flux IA',
       download: 'Télécharger',
+      changelog: 'Journal des modifications',
       faq: 'FAQ',
       developers: 'Développeurs',
     },
@@ -30,7 +31,7 @@ export const fr: SiteContent = {
   hero: {
     eyebrow: 'ESPACE DE TRAVAIL MACOS NATIF',
     title:
-      'zisla<br><em>Ce qui se passe,<br>là où vous<br class="hero-mobile-break"> pouvez le voir.</em>',
+      'zisla<br><em>Ce qui se passe,<br>là où vous pouvez le voir.</em>',
     lede: 'Regroupez tâches IA, médias, fichiers et agenda en haut de l’écran. Après une copie, une barre d’actions rapides distincte en affiche un aperçu et propose l’étape suivante. Elle apparaît quand il faut et s’efface ensuite.',
     downloadCta: 'Télécharger',
     downloadCtaAriaLabel: 'Télécharger',
@@ -41,7 +42,6 @@ export const fr: SiteContent = {
       'Après une copie, Command+N lance l’étape suivante',
       'Se referme toute seule, sans interrompre votre travail',
     ],
-    identityCaption: 'Haut de l’écran',
   },
   proof: {
     ariaLabel: 'Aperçu du produit',
@@ -61,7 +61,7 @@ export const fr: SiteContent = {
     summaryLede:
       'Des flux en haut de l’écran aux outils locaux, chaque tâche réellement possible est décrite ici.',
     summaryNote:
-      '{modules} modules en haut de l’écran et {features} fonctions indépendantes couvrant les captures, la voix, les médias, les téléchargements, les actions rapides, la gestion de l’IA, la mascotte et l’écran verrouillé.',
+      '{modules} modules en haut de l’écran et {features} fonctions indépendantes, des aperçus de fenêtres et captures à la gestion de l’IA et aux apps recommandées.',
     groupNames: {
       island: 'Flux en haut de l’écran',
       ai: 'Flux IA',
@@ -168,11 +168,11 @@ export const fr: SiteContent = {
       system: {
         name: 'État du système',
         caption:
-          'Consultez l’état du processeur, du GPU, de la mémoire, du disque, du réseau et des ventilateurs, lisez la température NVMe SMART quand le matériel la publie, conservez un historique à la minute consultable sur n’importe quelle période et exportable en .xlsx, et videz les caches et journaux qu’il est sûr de supprimer.',
+          'Consultez l’état du processeur, du GPU, de la mémoire, du disque, du réseau et des ventilateurs, lisez la température NVMe SMART quand le matériel la publie, conservez un historique à la minute consultable sur n’importe quelle période et exportable en .xlsx. Analysez les caches des apps et de l’utilisateur Apple, les journaux et les fichiers de préférences résiduels, puis vérifiez la sélection avant de l’envoyer à la Corbeille et consultez le résultat.',
         points: [
           'Surveillance au niveau de la puce',
           'Graphiques d’historique et export .xlsx',
-          'Vider les caches en un geste',
+          'Vérifier avant de mettre à la Corbeille',
         ],
       },
       battery: {
@@ -191,13 +191,19 @@ export const fr: SiteContent = {
     summaryMono: 'AU-DELÀ DE L’ÎLE',
     summaryLede: 'Les fonctions les plus utilisées, chacune à sa place naturelle.',
     summaryNote:
-      'Captures, enregistrement, médias, téléchargements du navigateur, actions rapides, gestion de l’IA, mascotte et écran verrouillé fonctionnent chacun de leur côté.',
+      'Aperçus de fenêtres, captures et actions rapides restent à portée de main ; les apps recommandées permettent de découvrir d’autres outils de bureau.',
     features: {
+      windowPreviews: {
+        title: 'Voir une fenêtre, cliquer pour y passer',
+        description:
+          'Prévisualisez les fenêtres depuis le Dock ou avec Command-Tab, puis cliquez sur une carte pour activer sa fenêtre. Désactivé par défaut : activez la fonction dans les réglages et accordez les autorisations nécessaires.',
+        detail: 'Dock et Command-Tab · Changer de fenêtre en un clic · Désactivé par défaut',
+      },
       capture: {
         title: 'Captures, captures défilantes et épinglage',
         description:
-          'Capturez ou épinglez une zone de l’écran avec un raccourci global, en conservant l’encadrement des fenêtres ; puis annotez, assemblez une capture défilante, reconnaissez ou exportez des tableaux. Les annotations non terminées sont conservées à l’export.',
-        detail: 'Raccourci global · Encadrement des fenêtres · Annotations non terminées conservées à l’export',
+          'Capturez ou épinglez une zone de l’écran avec un raccourci global, en conservant l’encadrement des fenêtres ; puis annotez, assemblez une capture défilante, reconnaissez ou exportez des tableaux. Les annotations non terminées sont conservées à l’export. Personnalisez les raccourcis de capture, d’épinglage, de capture défilante et d’annotation. Les réglages détectent les conflits avec la capture, la saisie vocale et les actions rapides ; une touche de modification seule nécessite l’autorisation de surveillance de l’entrée.',
+        detail: 'Raccourcis personnalisés · Détection des conflits · Annotations conservées à l’export',
       },
       voice: {
         title: 'Dictée et mise en forme',
@@ -220,7 +226,7 @@ export const fr: SiteContent = {
       copyAssistant: {
         title: 'Actions rapides et étapes suivantes',
         description:
-          'Une fois la fonction activée, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Elle reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. À la fin d’un téléchargement du navigateur ou de la réception d’un fichier par AirDrop, le même raccourci peut ouvrir son dossier ; l’option Actions rapides est indépendante de l’affichage de la progression des téléchargements.',
+          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. Ouvrez le dossier d’un fichier via les actions rapides après un téléchargement ou un transfert AirDrop. Les dossiers Chrome par défaut ou choisis sont pris en charge, avec une activation indépendante de la progression des téléchargements.',
         detail: 'Reconnaissance locale · Conversion aux taux en temps réel · Command+N par défaut',
       },
       aiManagement: {
@@ -240,6 +246,12 @@ export const fr: SiteContent = {
         description:
           'Affichez au besoin la date, l’état et la lecture en cours sur l’écran verrouillé de macOS. Il s’agit d’une surcouche distincte, jamais présente dans la liste des modules ni dans le carrousel de l’île.',
         detail: 'Surcouche distincte · Activation au choix · Ne prend jamais le focus',
+      },
+      recommendedTools: {
+        title: 'Apps recommandées',
+        description:
+          'Découvrez notamment OpenScreen pour la capture vidéo et le montage, et DockDoor pour les aperçus de fenêtres du Dock et le changement d’app. Ces applications tierces s’installent séparément.',
+        detail: 'Découvrir des outils de bureau · Apps tierces · Installation séparée',
       },
     },
   },
@@ -317,6 +329,21 @@ export const fr: SiteContent = {
       architectures: { term: 'Autres architectures', value: 'Page de publication' },
       mirror: { term: 'Miroir', value: 'Gitee Releases' },
     },
+  },
+  changelog: {
+    eyebrow: 'Journal des modifications',
+    title: 'Les changements de chaque version de zisla : nouveautés, améliorations et corrections.',
+    lede: 'Les changements de chaque version de zisla : nouveautés, améliorations et corrections.',
+    ariaLabel: 'historique des versions de zisla',
+    releaseCountLabel: 'versions',
+    latestLabel: 'dernière',
+    shippedLabel: 'publié',
+    latestBadge: 'Dernière',
+    noteLabel: 'version',
+    pagerAriaLabel: 'Pages du journal des modifications',
+    pageLabel: 'Page {page}',
+    prevPageLabel: 'Précédent',
+    nextPageLabel: 'Suivant',
   },
   faq: {
     eyebrow: 'QUELQUES RÉPONSES NETTES',
