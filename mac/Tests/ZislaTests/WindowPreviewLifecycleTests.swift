@@ -107,6 +107,20 @@ struct WindowPreviewLifecycleTests {
     }
 
     @Test
+    func switcherOmitsTheApplicationHeaderWhileDockKeepsIt() {
+        let system = PreviewSystem()
+        let controller = WindowPreviewController(dependencies: system.dependencies())
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        #expect(controller.showsAppHeader)
+
+        controller.select(PreviewSystem.selection(2, source: .switcher))
+        #expect(!controller.showsAppHeader)
+    }
+
+    @Test
     func clickingDockPreviewActivatesTheSelectedWindow() async throws {
         let system = PreviewSystem()
         var dependencies = system.dependencies()
@@ -149,7 +163,7 @@ struct WindowPreviewLifecycleTests {
         system.commandPressed = false
         poll.fire()
         #expect(controller.windows.isEmpty)
-        #expect(system.timers.allSatisfy { !$0.isValid })
+        #expect(!poll.isValid)
     }
 
     @Test
@@ -321,6 +335,295 @@ struct WindowPreviewLifecycleTests {
     }
 
     @Test
+    func aFailedOffSpaceCaptureUsesTheLastSuccessfulImageAndThenRefreshesIt() async throws {
+        let system = PreviewSystem()
+        let firstImage = try #require(PreviewSystem.snapshot(11).image)
+        let refreshedImage = try #require(PreviewSystem.snapshot(11, alpha: 0.5).image)
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { _ in
+            captures += 1
+            let image: NSImage? = switch captures {
+            case 1: firstImage
+            case 3: refreshedImage
+            default: nil
+            }
+            return [WindowPreviewSnapshot(
+                id: 11, title: "Frame \(captures)",
+                frame: CGRect(x: 0, y: 0, width: 1512, height: 949), image: image
+            )]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        let refresh = try #require(system.timers.first { $0.timeInterval == 1 })
+
+        refresh.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image === firstImage)
+        #expect(controller.windows.first?.title == "Frame 2")
+
+        refresh.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image === refreshedImage)
+    }
+
+    @Test
+    func cachedImagesAreIsolatedByProcessAndRemovedWithClosedWindows() async throws {
+        let system = PreviewSystem()
+        let firstImage = try #require(PreviewSystem.snapshot(11).image)
+        let secondImage = try #require(PreviewSystem.snapshot(11, alpha: 0.5).image)
+        var firstAppCaptures = 0
+        var secondAppCaptures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            if pid == 1 {
+                firstAppCaptures += 1
+                return firstAppCaptures == 2 ? [] : [WindowPreviewSnapshot(
+                    id: 11, title: "First", frame: .zero,
+                    image: firstAppCaptures == 1 ? firstImage : nil
+                )]
+            }
+            secondAppCaptures += 1
+            return [WindowPreviewSnapshot(
+                id: 11, title: "Second", frame: .zero,
+                image: secondAppCaptures == 2 ? secondImage : nil
+            )]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        controller.select(PreviewSystem.selection(2, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image == nil)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.isEmpty)
+        controller.select(PreviewSystem.selection(2, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image === secondImage)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image == nil)
+    }
+
+    @Test
+    func foregroundCaptureSeedsFullscreenPreviewAndCoalescesWorkspaceEvents() async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        let visible = PreviewSystem.snapshot(11)
+        var captures: [pid_t] = []
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            captures.append(pid)
+            return [WindowPreviewSnapshot(
+                id: 11, title: "Fullscreen", frame: visible.frame,
+                image: captures.count == 1 ? visible.image : nil
+            )]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        let initial = try #require(system.timers.last)
+
+        system.applicationActivated?()
+        system.spaceChanged?()
+        let scheduled = system.timers
+        #expect(scheduled.count == 3)
+        #expect(!initial.isValid)
+        #expect(scheduled.filter(\.isValid).count == 1)
+        scheduled.last?.fire()
+        await controller.prefetchTask?.value
+        #expect(captures == [1])
+
+        system.foregroundPID = nil
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image === visible.image)
+        #expect(captures == [1, 1])
+    }
+
+    @Test
+    func stoppingCancelsAnInFlightForegroundCaptureAndClearsItsImage() async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        let gate = PreviewCaptureGate()
+        var calls = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            calls += 1
+            if calls == 1 { return try await gate.capture(pid) }
+            return [PreviewSystem.snapshot(11, alpha: nil)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        controller.configure(enabled: true)
+        try #require(system.timers.last).fire()
+        let task = try #require(controller.prefetchTask)
+        await gate.waitForRequests(1)
+
+        controller.stop()
+        gate.finish(0)
+        await task.value
+        #expect(task.isCancelled)
+        #expect(system.workspaceObservers.isEmpty)
+        #expect(system.timers.allSatisfy { !$0.isValid })
+
+        system.foregroundPID = nil
+        controller.configure(enabled: true)
+        defer { controller.stop() }
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image == nil)
+    }
+
+    @Test
+    func applicationTerminationDropsItsCachedWindowImage() async throws {
+        let system = PreviewSystem()
+        let visible = PreviewSystem.snapshot(11)
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { _ in
+            captures += 1
+            return [WindowPreviewSnapshot(
+                id: 11, title: "Fullscreen", frame: visible.frame,
+                image: captures == 1 ? visible.image : nil
+            )]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+
+        system.applicationTerminated?(1)
+        #expect(controller.windows.isEmpty)
+        #expect(system.presentations.last == [])
+        controller.select(PreviewSystem.selection(2, source: .dock))
+        await controller.captureTask?.value
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image == nil)
+    }
+
+    @Test
+    func olderForegroundCaptureCannotOverwriteANewerSelectedWindowImage() async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        let gate = PreviewCaptureGate()
+        let old = PreviewSystem.snapshot(11)
+        let newer = PreviewSystem.snapshot(11, alpha: 0.5)
+        var calls = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            calls += 1
+            if calls == 1 { return try await gate.capture(pid) }
+            return [calls == 2 ? newer : PreviewSystem.snapshot(11, alpha: nil)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        try #require(system.timers.last).fire()
+        let prefetch = try #require(controller.prefetchTask)
+        await gate.waitForRequests(1)
+
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        gate.finish(0, snapshots: [old])
+        await prefetch.value
+        try #require(system.timers.first { $0.timeInterval == 1 }).fire()
+        await controller.captureTask?.value
+
+        #expect(controller.windows.first?.image === newer.image)
+    }
+
+    @Test
+    func aTemporaryEmptyCandidateListRetainsALiveOffSpaceWindowImage() async throws {
+        let system = PreviewSystem()
+        system.existingWindowIDs = [11]
+        let first = PreviewSystem.snapshot(11)
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { _ in
+            captures += 1
+            switch captures {
+            case 1: return [first]
+            case 2, 4: return []
+            default: return [PreviewSystem.snapshot(11, alpha: nil)]
+            }
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        let refresh = try #require(system.timers.first { $0.timeInterval == 1 })
+
+        refresh.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.isEmpty)
+        refresh.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image === first.image)
+
+        system.existingWindowIDs = []
+        refresh.fire()
+        await controller.captureTask?.value
+        refresh.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image == nil)
+    }
+
+    @Test
+    func cacheEvictsTheOldestImageWhenItsLimitIsReached() throws {
+        var cache = WindowPreviewImageCache(limit: 2)
+        let first = PreviewSystem.snapshot(11)
+        let second = PreviewSystem.snapshot(12)
+        let third = PreviewSystem.snapshot(13)
+        for snapshot in [first, second, third] {
+            _ = cache.reconcile([snapshot], processIdentifier: 1, presentWindowIDs: { _ in [11, 12, 13] })
+        }
+        let missing = [first, second, third].map {
+            WindowPreviewSnapshot(id: $0.id, title: $0.title, frame: $0.frame, image: nil)
+        }
+        let result = cache.reconcile(missing, processIdentifier: 1, presentWindowIDs: { _ in [11, 12, 13] })
+
+        #expect(result[0].image == nil)
+        #expect(result[1].image === second.image)
+        #expect(result[2].image === third.image)
+    }
+
+    @Test
+    func disablingTheFeatureClearsPreviouslyCapturedImages() async throws {
+        let system = PreviewSystem()
+        let visible = PreviewSystem.snapshot(11)
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { _ in
+            captures += 1
+            return [WindowPreviewSnapshot(
+                id: 11, title: "Fullscreen", frame: visible.frame,
+                image: captures == 1 ? visible.image : nil
+            )]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+
+        controller.configure(enabled: false)
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image == nil)
+    }
+
+    @Test
     func aStalePreviewCannotActivateTheNewlySelectedApplication() async {
         let system = PreviewSystem()
         let controller = WindowPreviewController(dependencies: system.dependencies())
@@ -343,6 +646,12 @@ private final class PreviewSystem {
     var localMonitorFails = false
     var monitors: [NSObject] = []
     var globalHandler: ((NSEvent) -> Void)?
+    var applicationActivated: (() -> Void)?
+    var applicationTerminated: ((pid_t) -> Void)?
+    var spaceChanged: (() -> Void)?
+    var foregroundPID: pid_t?
+    var existingWindowIDs: Set<CGWindowID> = []
+    var workspaceObservers: [NSObject] = []
     var timers: [Timer] = []
     var switcher: WindowPreviewSelection?
     var commandPressed = true
@@ -370,6 +679,29 @@ private final class PreviewSystem {
             return monitor
         }
         value.removeMonitor = { token in self.monitors.removeAll { $0 === token as AnyObject } }
+        value.addSpaceChangeObserver = { action in
+            self.spaceChanged = action
+            let token = NSObject()
+            self.workspaceObservers.append(token)
+            return token
+        }
+        value.removeWorkspaceObserver = { token in
+            self.workspaceObservers.removeAll { $0 === token as AnyObject }
+        }
+        value.addApplicationActivationObserver = { action in
+            self.applicationActivated = action
+            let token = NSObject()
+            self.workspaceObservers.append(token)
+            return token
+        }
+        value.addApplicationTerminationObserver = { action in
+            self.applicationTerminated = action
+            let token = NSObject()
+            self.workspaceObservers.append(token)
+            return token
+        }
+        value.frontmostProcessIdentifier = { self.foregroundPID }
+        value.presentWindowIDs = { _ in self.existingWindowIDs }
         value.timer = { interval, repeats, action in
             let timer = Timer(timeInterval: interval, repeats: repeats) { _ in
                 MainActor.assumeIsolated { action() }
@@ -445,11 +777,11 @@ private final class PreviewCaptureGate {
         await withCheckedContinuation { waiter = (count, $0) }
     }
 
-    func finish(_ index: Int, fails: Bool = false) {
+    func finish(_ index: Int, fails: Bool = false, snapshots: [WindowPreviewSnapshot]? = nil) {
         if fails {
             requests[index].1.resume(throwing: Failure.unavailable)
         } else {
-            requests[index].1.resume(returning: [PreviewSystem.snapshot(requests[index].0)])
+            requests[index].1.resume(returning: snapshots ?? [PreviewSystem.snapshot(requests[index].0)])
         }
     }
 }

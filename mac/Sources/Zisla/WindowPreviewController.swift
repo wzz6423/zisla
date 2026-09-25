@@ -10,6 +10,16 @@ enum WindowPreviewSource {
 }
 
 struct WindowPreviewLayout {
+    static func switcherAnchor(icon: CGRect, list: CGRect?) -> CGRect {
+        guard let list, list.intersects(icon),
+              list.height <= icon.height * 6 else { return icon }
+        let minY = min(icon.minY, list.minY)
+        return CGRect(
+            x: icon.minX, y: minY, width: icon.width,
+            height: max(icon.maxY, list.maxY) - minY
+        )
+    }
+
     static func quartzPoint(for appKitPoint: CGPoint, mainScreenTop: CGFloat) -> CGPoint {
         CGPoint(x: appKitPoint.x, y: mainScreenTop - appKitPoint.y)
     }
@@ -107,6 +117,65 @@ enum WindowPreviewCapture {
                   x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1
               )) else { return nil }
         return NSImage(cgImage: cropped, size: .zero)
+    }
+}
+
+struct WindowPreviewImageCache {
+    private struct Key: Hashable {
+        let processIdentifier: pid_t
+        let windowID: CGWindowID
+    }
+
+    private var images: [Key: NSImage] = [:]
+    private var order: [Key] = []
+    private let limit: Int
+
+    init(limit: Int = 24) {
+        self.limit = limit
+    }
+
+    mutating func reconcile(
+        _ snapshots: [WindowPreviewSnapshot], processIdentifier: pid_t,
+        presentWindowIDs: (pid_t) -> Set<CGWindowID>?
+    ) -> [WindowPreviewSnapshot] {
+        let currentIDs = Set(snapshots.map(\.id))
+        if order.contains(where: { $0.processIdentifier == processIdentifier && !currentIDs.contains($0.windowID) }),
+           let liveIDs = presentWindowIDs(processIdentifier) {
+            order.removeAll { key in
+                guard key.processIdentifier == processIdentifier && !currentIDs.contains(key.windowID)
+                        && !liveIDs.contains(key.windowID) else { return false }
+                images.removeValue(forKey: key)
+                return true
+            }
+        }
+        return snapshots.map { snapshot in
+            let key = Key(processIdentifier: processIdentifier, windowID: snapshot.id)
+            if let image = snapshot.image {
+                images[key] = image
+                order.removeAll { $0 == key }
+                order.append(key)
+                if order.count > limit {
+                    images.removeValue(forKey: order.removeFirst())
+                }
+                return snapshot
+            }
+            return WindowPreviewSnapshot(
+                id: snapshot.id, title: snapshot.title, frame: snapshot.frame, image: images[key]
+            )
+        }
+    }
+
+    mutating func remove(processIdentifier: pid_t) {
+        order.removeAll { key in
+            guard key.processIdentifier == processIdentifier else { return false }
+            images.removeValue(forKey: key)
+            return true
+        }
+    }
+
+    mutating func removeAll() {
+        images.removeAll()
+        order.removeAll()
     }
 }
 
@@ -278,8 +347,41 @@ final class WindowPreviewController: ObservableObject {
                 MainActor.assumeIsolated { action() }
             }
         }
-        var removeSpaceChangeObserver: (Any) -> Void = {
+        var addApplicationActivationObserver: (@escaping @MainActor () -> Void) -> Any = { action in
+            NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didActivateApplicationNotification,
+                object: NSWorkspace.shared,
+                queue: .main
+            ) { _ in
+                MainActor.assumeIsolated { action() }
+            }
+        }
+        var addApplicationTerminationObserver: (@escaping @MainActor (pid_t) -> Void) -> Any = { action in
+            NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didTerminateApplicationNotification,
+                object: NSWorkspace.shared,
+                queue: .main
+            ) { notification in
+                guard let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                    as? NSRunningApplication else { return }
+                MainActor.assumeIsolated { action(application.processIdentifier) }
+            }
+        }
+        var removeWorkspaceObserver: (Any) -> Void = {
             NSWorkspace.shared.notificationCenter.removeObserver($0)
+        }
+        var frontmostProcessIdentifier: () -> pid_t? = {
+            NSWorkspace.shared.frontmostApplication?.processIdentifier
+        }
+        var presentWindowIDs: (pid_t) -> Set<CGWindowID>? = { processIdentifier in
+            guard let windows = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID)
+                as? [[String: Any]] else { return nil }
+            return Set(windows.compactMap {
+                guard ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processIdentifier else {
+                    return nil
+                }
+                return ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value
+            })
         }
         var timer: (TimeInterval, Bool, @escaping @MainActor () -> Void) -> Timer = { interval, repeats, action in
             Timer.scheduledTimer(withTimeInterval: interval, repeats: repeats) { _ in
@@ -310,17 +412,26 @@ final class WindowPreviewController: ObservableObject {
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var spaceChangeObserver: Any?
+    private var applicationActivationObserver: Any?
+    private var applicationTerminationObserver: Any?
     private var needsSpaceRefront = false
     private var switcherTimer: Timer?
     private var hoverTimer: Timer?
     private var dismissTimer: Timer?
     private var captureTimer: Timer?
+    private var prefetchTimer: Timer?
     private(set) var captureTask: Task<Void, Never>?
+    private(set) var prefetchTask: Task<Void, Never>?
     private var generation = 0
+    private var prefetchGeneration = 0
+    private var prefetchProcessIdentifier: pid_t?
+    private var imageCache = WindowPreviewImageCache()
     private var lastPointerProbe: TimeInterval = 0
     private var selection: WindowPreviewSelection?
     private var panel: NSPanel?
     private let dependencies: Dependencies
+
+    var showsAppHeader: Bool { selection?.source == .dock }
 
     init(dependencies: Dependencies = Dependencies()) {
         self.dependencies = dependencies
@@ -366,17 +477,38 @@ final class WindowPreviewController: ObservableObject {
         }
         spaceChangeObserver = dependencies.addSpaceChangeObserver { [weak self] in
             self?.needsSpaceRefront = true
+            self?.scheduleForegroundCapture()
         }
+        applicationActivationObserver = dependencies.addApplicationActivationObserver { [weak self] in
+            self?.scheduleForegroundCapture()
+        }
+        applicationTerminationObserver = dependencies.addApplicationTerminationObserver { [weak self] processIdentifier in
+            guard let self else { return }
+            if self.prefetchProcessIdentifier == processIdentifier {
+                self.cancelForegroundCapture()
+            }
+            self.imageCache.remove(processIdentifier: processIdentifier)
+            if self.selection?.processIdentifier == processIdentifier { self.clearSelection() }
+        }
+        scheduleForegroundCapture()
     }
 
     private func stopMonitoring() {
         if let globalMonitor { dependencies.removeMonitor(globalMonitor) }
         if let localMonitor { dependencies.removeMonitor(localMonitor) }
-        if let spaceChangeObserver { dependencies.removeSpaceChangeObserver(spaceChangeObserver) }
+        if let spaceChangeObserver { dependencies.removeWorkspaceObserver(spaceChangeObserver) }
+        if let applicationActivationObserver { dependencies.removeWorkspaceObserver(applicationActivationObserver) }
+        if let applicationTerminationObserver { dependencies.removeWorkspaceObserver(applicationTerminationObserver) }
         globalMonitor = nil
         localMonitor = nil
         spaceChangeObserver = nil
+        applicationActivationObserver = nil
+        applicationTerminationObserver = nil
         needsSpaceRefront = false
+        prefetchTimer?.invalidate()
+        prefetchTimer = nil
+        cancelForegroundCapture()
+        imageCache.removeAll()
         switcherTimer?.invalidate()
         switcherTimer = nil
         hoverTimer?.invalidate()
@@ -490,6 +622,7 @@ final class WindowPreviewController: ObservableObject {
             stopMonitoring()
             return
         }
+        if prefetchProcessIdentifier == next.processIdentifier { cancelForegroundCapture() }
         if selection?.processIdentifier == next.processIdentifier && selection?.source == next.source {
             if selection?.anchor != next.anchor {
                 selection = next
@@ -522,6 +655,52 @@ final class WindowPreviewController: ObservableObject {
         dependencies.present(self, nil)
     }
 
+    private func scheduleForegroundCapture() {
+        guard enabled, dependencies.hasPermissions() else { return }
+        prefetchTimer?.invalidate()
+        prefetchTimer = dependencies.timer(0.2, false) { [weak self] in
+            self?.prefetchTimer = nil
+            self?.captureForegroundApplication()
+        }
+    }
+
+    private func cancelForegroundCapture() {
+        prefetchGeneration &+= 1
+        prefetchTask?.cancel()
+        prefetchTask = nil
+        prefetchProcessIdentifier = nil
+    }
+
+    private func captureForegroundApplication() {
+        guard enabled, dependencies.hasPermissions(),
+              let processIdentifier = dependencies.frontmostProcessIdentifier(),
+              processIdentifier != getpid(),
+              selection?.processIdentifier != processIdentifier else { return }
+        cancelForegroundCapture()
+        let currentGeneration = prefetchGeneration
+        prefetchProcessIdentifier = processIdentifier
+        let captureWindows = dependencies.captureWindows
+        prefetchTask = Task { [weak self] in
+            defer {
+                if self?.prefetchGeneration == currentGeneration {
+                    self?.prefetchTask = nil
+                    self?.prefetchProcessIdentifier = nil
+                }
+            }
+            do {
+                let snapshots = try await captureWindows(processIdentifier)
+                guard !Task.isCancelled, let self, self.prefetchGeneration == currentGeneration,
+                      self.enabled, self.dependencies.hasPermissions() else { return }
+                _ = self.imageCache.reconcile(
+                    snapshots, processIdentifier: processIdentifier,
+                    presentWindowIDs: self.dependencies.presentWindowIDs
+                )
+            } catch {
+                return
+            }
+        }
+    }
+
     private func refreshWindows() {
         guard enabled, dependencies.hasPermissions() else {
             stopMonitoring()
@@ -542,7 +721,10 @@ final class WindowPreviewController: ObservableObject {
                     self.stopMonitoring()
                     return
                 }
-                self.windows = snapshots
+                self.windows = self.imageCache.reconcile(
+                    snapshots, processIdentifier: selection.processIdentifier,
+                    presentWindowIDs: self.dependencies.presentWindowIDs
+                )
                 self.dependencies.present(self, self.selection)
             } catch {
                 guard !Task.isCancelled, let self, self.generation == currentGeneration else { return }
@@ -604,9 +786,11 @@ final class WindowPreviewController: ObservableObject {
             ?? WindowPlacement.screenUnderMouse()
         guard let screen else { return }
         let width = min(CGFloat(windows.count) * 202 + 24, min(screen.visibleFrame.width - 24, 840))
+        let height: CGFloat = (showsAppHeader ? 168 : 141)
+            + (windows.contains { $0.visibleTitle(for: appName) != nil } ? 20 : 0)
         let frame = WindowPreviewLayout.frame(
             anchor: selection.anchor,
-            size: CGSize(width: width, height: windows.contains { $0.visibleTitle(for: appName) != nil } ? 188 : 168),
+            size: CGSize(width: width, height: height),
             visibleFrame: screen.visibleFrame,
             isSwitcher: selection.source == .switcher
         )
@@ -662,7 +846,10 @@ final class WindowPreviewController: ObservableObject {
               let selected = Self.attribute(kAXSelectedChildrenAttribute, from: list) as? [AXUIElement],
               let item = selected.first,
               let frame = Self.frame(of: item) else { return nil }
-        return selection(for: item, source: .switcher, anchor: frame)
+        return selection(
+            for: item, source: .switcher,
+            anchor: WindowPreviewLayout.switcherAnchor(icon: frame, list: Self.frame(of: list))
+        )
     }
 
     private static func selection(
@@ -764,20 +951,23 @@ final class WindowPreviewController: ObservableObject {
     }
 }
 
-private struct WindowPreviewView: View {
+struct WindowPreviewView: View {
     @ObservedObject var controller: WindowPreviewController
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 7) {
-                if let icon = controller.appIcon {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: 18, height: 18)
+            if controller.showsAppHeader {
+                HStack(spacing: 7) {
+                    if let icon = controller.appIcon {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .frame(width: 18, height: 18)
+                    }
+                    Text(controller.appName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
                 }
-                Text(controller.appName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
             }
             ScrollView(.horizontal) {
                 HStack(alignment: .top, spacing: 12) {
@@ -816,6 +1006,19 @@ private struct WindowPreviewView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .background { Self.previewBackground(reduceTransparency: reduceTransparency) }
+    }
+
+    @ViewBuilder
+    static func previewBackground(reduceTransparency: Bool) -> some View {
+        if reduceTransparency {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(nsColor: .windowBackgroundColor))
+        } else if #available(macOS 26.0, *) {
+            LiquidGlassPaneBackground(cornerRadius: 12)
+        } else {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.regularMaterial)
+        }
     }
 }

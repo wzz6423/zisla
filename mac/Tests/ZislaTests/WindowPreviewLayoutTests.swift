@@ -66,6 +66,25 @@ struct WindowPreviewLayoutTests {
     }
 
     @Test
+    func switcherPreviewClearsTheWholeSwitcherBarWhileFollowingTheSelectedIcon() {
+        let icon = CGRect(x: 550, y: 370, width: 48, height: 48)
+        let switcherBar = CGRect(x: 280, y: 340, width: 640, height: 110)
+        let anchor = WindowPreviewLayout.switcherAnchor(icon: icon, list: switcherBar)
+        let result = WindowPreviewLayout.frame(anchor: anchor, size: panel, visibleFrame: screen, isSwitcher: true)
+
+        #expect(result.minY == switcherBar.maxY + 10)
+        #expect(result.midX == icon.midX)
+        #expect(WindowPreviewLayout.switcherAnchor(icon: icon, list: nil) == icon)
+        #expect(WindowPreviewLayout.switcherAnchor(icon: icon, list: .zero) == icon)
+        #expect(WindowPreviewLayout.switcherAnchor(
+            icon: icon, list: CGRect(x: 0, y: 0, width: 100, height: 100)
+        ) == icon)
+        #expect(WindowPreviewLayout.switcherAnchor(
+            icon: icon, list: CGRect(x: 0, y: 0, width: 1200, height: 800)
+        ) == icon)
+    }
+
+    @Test
     func previewIsClampedToOffsetScreenBounds() {
         let external = CGRect(x: -1600, y: -200, width: 1600, height: 900)
         let icon = CGRect(x: -20, y: -195, width: 48, height: 48)
@@ -489,6 +508,83 @@ struct WindowPreviewWindowMatchTests {
 @MainActor
 struct WindowPreviewPanelTests {
     @Test
+    func previewPanelUsesNativeGlassOnSupportedSystems() throws {
+        guard #available(macOS 26.0, *) else { return }
+        let controller = WindowPreviewController()
+        let panel = controller.makePanel()
+        defer { panel.close() }
+        panel.setFrame(CGRect(x: 100, y: 100, width: 226, height: 168), display: true)
+        let content = try #require(panel.contentView)
+        content.layoutSubtreeIfNeeded()
+
+        let glass = try #require(nativeGlass(in: content))
+        #expect(abs(glass.frame.width - content.bounds.width) < 1)
+        #expect(abs(glass.frame.height - content.bounds.height) < 1)
+        #expect(glass.style == .clear)
+        #expect(glass.cornerRadius == 12)
+    }
+
+    @available(macOS 26.0, *)
+    private func nativeGlass(in view: NSView) -> NSGlassEffectView? {
+        if let glass = view as? NSGlassEffectView { return glass }
+        return view.subviews.compactMap(nativeGlass(in:)).first
+    }
+
+    @Test
+    func reducedTransparencyUsesAnOpaqueBackgroundWithoutNativeGlass() throws {
+        let host = NSHostingView(rootView: WindowPreviewView.previewBackground(reduceTransparency: true))
+        host.frame = CGRect(x: 0, y: 0, width: 226, height: 168)
+        host.layoutSubtreeIfNeeded()
+        host.displayIfNeeded()
+
+        if #available(macOS 26.0, *) {
+            #expect(nativeGlass(in: host) == nil)
+        }
+        let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        let pixel = try #require(bitmap.colorAt(x: 30, y: 30))
+        #expect(pixel.alphaComponent > 0.99)
+    }
+
+    @Test
+    func switcherPanelShrinksWhenItsApplicationHeaderIsHidden() async throws {
+        let screen = try #require(NSScreen.screens.first)
+        var dependencies = WindowPreviewController.Dependencies()
+        dependencies.hasPermissions = { true }
+        dependencies.addGlobalMonitor = { _ in NSObject() }
+        dependencies.addLocalMonitor = { _ in NSObject() }
+        dependencies.removeMonitor = { _ in }
+        dependencies.timer = { interval, repeats, _ in
+            Timer(timeInterval: interval, repeats: repeats) { _ in }
+        }
+        dependencies.captureWindows = { _ in [
+            WindowPreviewSnapshot(id: 42, title: "App", frame: screen.frame, image: nil),
+        ] }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        let panel = controller.makePanel()
+        panel.alphaValue = 0
+        defer {
+            controller.stop()
+            panel.orderOut(nil)
+            panel.close()
+        }
+        let anchor = CGRect(x: screen.visibleFrame.midX, y: screen.visibleFrame.midY, width: 48, height: 48)
+        controller.configure(enabled: true)
+
+        controller.select(WindowPreviewSelection(
+            processIdentifier: 42, appName: "App", icon: nil, anchor: anchor, source: .dock
+        ))
+        await controller.captureTask?.value
+        #expect(panel.frame.height == 168)
+
+        controller.select(WindowPreviewSelection(
+            processIdentifier: 42, appName: "App", icon: nil, anchor: anchor, source: .switcher
+        ))
+        await controller.captureTask?.value
+        #expect(panel.frame.height == 141)
+    }
+
+    @Test
     func anAlreadyVisiblePreviewReassertsItsOrderOnlyAfterChangingSpaces() async throws {
         let screen = try #require(NSScreen.screens.first)
         var dependencies = WindowPreviewController.Dependencies()
@@ -503,7 +599,7 @@ struct WindowPreviewPanelTests {
             onSpaceChange = action
             return NSObject()
         }
-        dependencies.removeSpaceChangeObserver = { _ in
+        dependencies.removeWorkspaceObserver = { _ in
             observerRemoved = true
             onSpaceChange = nil
         }
