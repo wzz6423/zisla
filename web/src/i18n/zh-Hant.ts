@@ -20,6 +20,7 @@ export const zhHant: SiteContent = {
       showcase: '功能',
       ai: 'AI 工作流程',
       download: '下載',
+      changelog: '更新日誌',
       faq: 'FAQ',
       developers: '開發者',
     },
@@ -30,7 +31,7 @@ export const zhHant: SiteContent = {
   hero: {
     eyebrow: '原生 MACOS 工作空間',
     title:
-      'zisla<br><em>把正在發生的事<br>放到你看得<br class="hero-mobile-break">見的地方。</em>',
+      'zisla<br><em>把正在發生的事<br>放到你看得見的地方。</em>',
     lede: '把 AI 任務、媒體、檔案與行程收進螢幕頂端；複製後，獨立的快捷操作提示列會在螢幕上方預覽內容並給出下一步。需要時出現，完成後收起。',
     downloadCta: '下載',
     downloadCtaAriaLabel: '下載',
@@ -41,7 +42,6 @@ export const zhHant: SiteContent = {
       '複製後可用 Command+N 呼出智慧下一步',
       '自動收起，不干擾目前的工作',
     ],
-    identityCaption: '螢幕頂端',
   },
   proof: {
     ariaLabel: '產品概覽',
@@ -60,7 +60,7 @@ export const zhHant: SiteContent = {
     summaryMono: '{modules} 個模組 / {groups} 類工作流程',
     summaryLede: '從頂端工作流程到本機工具，實際能完成的任務都在這裡逐項寫清楚。',
     summaryNote:
-      '{modules} 個頂端模組 + {features} 項獨立能力，涵蓋截圖、語音、媒體、下載、快捷操作、AI 管理、寵物與鎖定畫面。',
+      '{modules} 個頂端模組 + {features} 項獨立能力，從視窗預覽、截圖與 AI 管理，到推薦應用程式。',
     groupNames: {
       island: '頂端工作流程',
       ai: 'AI 工作流程',
@@ -138,8 +138,8 @@ export const zhHant: SiteContent = {
       system: {
         name: '系統狀態',
         caption:
-          '檢視 CPU、GPU、記憶體、磁碟、網路與風扇等狀態，在裝置支援時讀取 NVMe SMART 溫度，持續記錄分鐘級歷史，可依任意時間範圍繪製圖表並匯出 .xlsx，還能清理可安全刪除的快取與記錄檔。',
-        points: ['晶片級監控', '歷史圖表與 .xlsx 匯出', '一鍵清理快取'],
+          '檢視 CPU、GPU、記憶體、磁碟、網路與風扇等狀態，在裝置支援時讀取 NVMe SMART 溫度，持續記錄分鐘級歷史，可依任意時間範圍繪製圖表並匯出 .xlsx。掃描應用程式快取、Apple 使用者快取、記錄檔與偏好設定殘留，複核後將所選項目移至垃圾桶，並查看處理結果。',
+        points: ['晶片級監控', '歷史圖表與 .xlsx 匯出', '複核後移至垃圾桶'],
       },
       battery: {
         name: '電池',
@@ -156,13 +156,19 @@ export const zhHant: SiteContent = {
     ariaLabel: '獨立桌面能力',
     summaryMono: '靈動島之外',
     summaryLede: '常用能力，各在最順手的位置。',
-    summaryNote: '截圖、錄音、媒體、瀏覽器下載、快捷操作、AI 管理、寵物與鎖定畫面各自獨立呈現。',
+    summaryNote: '視窗預覽、截圖與快捷操作各在最順手的位置，推薦應用程式幫你發現更多桌面工具。',
     features: {
+      windowPreviews: {
+        title: '視窗預覽，點按即切換',
+        description:
+          '在 Dock 暫留游標或用 Command-Tab 切換時預覽視窗，點按卡片啟用對應視窗。預設關閉，需在設定中啟用並授予相關權限。',
+        detail: 'Dock 與 Command-Tab · 點按切換視窗 · 預設關閉',
+      },
       capture: {
         title: '截圖、長截圖與釘圖',
         description:
-          '用全域快速鍵擷取或釘住螢幕內容，保留視窗邊框；接著標註、拼接長截圖，並辨識或匯出表格；匯出前會保留尚未完成的標註。',
-        detail: '全域快速鍵 · 保留視窗邊框 · 未完成標註隨匯出保存',
+          '用全域快速鍵擷取或釘住螢幕內容，保留視窗邊框；接著標註、拼接長截圖，並辨識或匯出表格；匯出前會保留尚未完成的標註。自訂截圖、釘圖、長截圖與標註工具的快捷鍵。設定會檢查截圖、語音輸入和快捷操作之間的衝突；單獨修飾鍵觸發需要輸入監控權限。',
+        detail: '自訂快捷鍵 · 衝突檢查 · 未完成標註隨匯出保存',
       },
       voice: {
         title: '語音輸入與整理',
@@ -185,7 +191,7 @@ export const zhHant: SiteContent = {
       copyAssistant: {
         title: '快捷操作與智慧下一步',
         description:
-          '啟用後，複製文字、連結、檔案或圖片會在獨立的頂端提示列中預覽；可辨識連結、本機已安裝應用程式名稱和 Emoji 名稱，也可按即時匯率換算複製的金額，所有下一步均由你確認後執行。瀏覽器下載或 AirDrop 檔案接收完成後，也可用同一快捷鍵開啟檔案所在資料夾；此功能由快捷操作開關控制，與瀏覽器下載進度開關獨立。',
+          '啟用後，複製文字、連結、檔案或圖片會在獨立的頂端提示列中預覽；可辨識連結、本機已安裝應用程式名稱和 Emoji 名稱，也可按即時匯率換算複製的金額，所有下一步均由你確認後執行。瀏覽器下載或 AirDrop 接收完成後，透過快捷操作開啟檔案所在的檔案夾。支援 Chrome 的預設與自選下載目錄，可獨立於下載進度顯示啟用。',
         detail: '本機辨識 · 即時匯率換算 · 預設 Command+N',
       },
       aiManagement: {
@@ -204,6 +210,12 @@ export const zhHant: SiteContent = {
         description:
           '隨需在 macOS 鎖定畫面顯示日期、狀態與正在播放的內容；它是獨立的鎖定畫面覆蓋層，不會出現在靈動島的模組列表或輪播中。',
         detail: '獨立鎖定畫面覆蓋層 · 隨需開啟 · 不搶焦點',
+      },
+      recommendedTools: {
+        title: '推薦應用程式',
+        description:
+          '在推薦應用程式中發現 OpenScreen（螢幕錄製與影片編輯）和 DockDoor（Dock 視窗預覽與應用程式切換）等工具，皆為另行安裝的第三方應用程式。',
+        detail: '探索桌面工具 · 第三方應用程式 · 另行安裝',
       },
     },
   },
@@ -273,6 +285,21 @@ export const zhHant: SiteContent = {
       architectures: { term: '其他架構', value: 'Release 頁面' },
       mirror: { term: '鏡像', value: 'Gitee Releases' },
     },
+  },
+  changelog: {
+    eyebrow: '更新日誌',
+    title: '每個 zisla 版本的變化：新功能、改進與修正。',
+    lede: '每個 zisla 版本的變化：新功能、改進與修正。',
+    ariaLabel: 'zisla 發布記錄',
+    releaseCountLabel: '個版本',
+    latestLabel: '最新',
+    shippedLabel: '已發布',
+    latestBadge: '最新',
+    noteLabel: '版本',
+    pagerAriaLabel: '更新日誌分頁',
+    pageLabel: '第 {page} 頁',
+    prevPageLabel: '上一頁',
+    nextPageLabel: '下一頁',
   },
   faq: {
     eyebrow: '幾個明確的答案',

@@ -20,6 +20,7 @@ export const de: SiteContent = {
       showcase: 'Funktionen',
       ai: 'KI-Ablauf',
       download: 'Download',
+      changelog: 'Änderungsprotokoll',
       faq: 'FAQ',
       developers: 'Entwickler',
     },
@@ -40,7 +41,6 @@ export const de: SiteContent = {
       'Nach dem Kopieren führt Command+N den nächsten Schritt aus',
       'Klappt von selbst zu und unterbricht die Arbeit nicht',
     ],
-    identityCaption: 'Oberer Bildschirmrand',
   },
   proof: {
     ariaLabel: 'Produktübersicht',
@@ -60,7 +60,7 @@ export const de: SiteContent = {
     summaryLede:
       'Von den Abläufen oben am Bildschirm bis zu lokalen Werkzeugen: hier steht Punkt für Punkt, was sich wirklich erledigen lässt.',
     summaryNote:
-      '{modules} Module oben am Bildschirm und {features} eigenständige Funktionen für Bildschirmfotos, Sprache, Medien, Downloads, Schnellaktionen, KI-Verwaltung, Maskottchen und Sperrbildschirm.',
+      '{modules} Module am oberen Bildschirmrand und {features} eigenständige Funktionen: von Fenstervorschauen und Aufnahmen bis zur KI-Verwaltung und empfohlenen Apps.',
     groupNames: {
       island: 'Abläufe oben am Bildschirm',
       ai: 'KI-Ablauf',
@@ -155,11 +155,11 @@ export const de: SiteContent = {
       system: {
         name: 'Systemstatus',
         caption:
-          'Sieh den Status von CPU, GPU, Speicher, Datenträger, Netzwerk und Lüftern, lies die NVMe-SMART-Temperatur, wo die Hardware sie meldet, zeichne einen minütlichen Verlauf auf, der sich für jeden Zeitraum als Diagramm zeigen und als .xlsx exportieren lässt, und räume Caches und Protokolle auf, die sicher gelöscht werden können.',
+          'Sieh den Status von CPU, GPU, Speicher, Datenträger, Netzwerk und Lüftern, lies die NVMe-SMART-Temperatur, wo die Hardware sie meldet, zeichne einen minütlichen Verlauf auf, der sich für jeden Zeitraum als Diagramm zeigen und als .xlsx exportieren lässt. Scanne App-Caches, Apple-Benutzercaches, Protokolle und verbliebene Einstellungsdateien. Prüfe die Auswahl, verschiebe sie in den Papierkorb und sieh dir das Ergebnis an.',
         points: [
           'Überwachung bis zum Chip',
           'Verlaufsdiagramme und .xlsx-Export',
-          'Caches in einem Schritt leeren',
+          'Vor dem Verschieben in den Papierkorb prüfen',
         ],
       },
       battery: {
@@ -178,13 +178,19 @@ export const de: SiteContent = {
     summaryMono: 'JENSEITS DER ISLAND',
     summaryLede: 'Häufig genutzte Funktionen, jede an ihrem natürlichen Platz.',
     summaryNote:
-      'Bildschirmfotos, Aufnahme, Medien, Browser-Downloads, Schnellaktionen, KI-Verwaltung, Maskottchen und Sperrbildschirm arbeiten jeweils eigenständig.',
+      'Fenstervorschauen, Aufnahmen und Schnellaktionen bleiben griffbereit; empfohlene Apps helfen dir, weitere Desktop-Werkzeuge zu entdecken.',
     features: {
+      windowPreviews: {
+        title: 'Fenster ansehen, per Klick wechseln',
+        description:
+          'Sieh dir Fenster im Dock oder beim Wechsel mit Command-Tab an und aktiviere ein Fenster per Klick auf seine Karte. Standardmäßig ausgeschaltet; aktiviere die Funktion in den Einstellungen und erteile die nötigen Berechtigungen.',
+        detail: 'Dock und Command-Tab · Fenster per Klick wechseln · Standardmäßig aus',
+      },
       capture: {
         title: 'Bildschirmfotos, Scroll-Aufnahmen und Anheften',
         description:
-          'Nimm mit einem globalen Kürzel einen Bildschirmausschnitt auf oder hefte ihn an, wobei Fensterrahmen erhalten bleiben; setze anschließend Anmerkungen, füge Scroll-Aufnahmen zusammen und erkenne oder exportiere Tabellen. Noch nicht abgeschlossene Anmerkungen bleiben beim Export erhalten.',
-        detail: 'Globales Kürzel · Fensterrahmen · Unfertige Anmerkungen beim Export erhalten',
+          'Nimm mit einem globalen Kürzel einen Bildschirmausschnitt auf oder hefte ihn an, wobei Fensterrahmen erhalten bleiben; setze anschließend Anmerkungen, füge Scroll-Aufnahmen zusammen und erkenne oder exportiere Tabellen. Noch nicht abgeschlossene Anmerkungen bleiben beim Export erhalten. Passe Kürzel für Screenshots, Anheften, Scrollaufnahmen und Anmerkungen an. Die Einstellungen prüfen Konflikte mit Aufnahme, Spracheingabe und Schnellaktionen; einzelne Modifikatortasten benötigen die Berechtigung zur Eingabeüberwachung.',
+        detail: 'Eigene Tastenkürzel · Konfliktprüfung · Unfertige Anmerkungen beim Export erhalten',
       },
       voice: {
         title: 'Spracheingabe und Aufbereitung',
@@ -207,7 +213,7 @@ export const de: SiteContent = {
       copyAssistant: {
         title: 'Schnellaktionen und nächste Schritte',
         description:
-          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Die Funktion erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte werden erst nach deiner Bestätigung ausgeführt. Nach einem Browser-Download oder dem Empfang einer Datei per AirDrop öffnet dasselbe Kürzel den zugehörigen Ordner; der Schalter für Schnellaktionen ist unabhängig von der Browser-Downloadanzeige.',
+          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Er erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte führt er erst nach deiner Bestätigung aus. Öffne nach einem Browserdownload oder AirDrop-Empfang den Zielordner über Schnellaktionen. Unterstützt die standardmäßigen und selbst gewählten Chrome-Downloadordner, unabhängig von der Anzeige des Downloadfortschritts.',
         detail: 'Lokale Erkennung · Live-Wechselkursumrechnung · Standard Command+N',
       },
       aiManagement: {
@@ -227,6 +233,12 @@ export const de: SiteContent = {
         description:
           'Zeig bei Bedarf Datum, Status und laufende Wiedergabe im Sperrbildschirm von macOS. Es ist ein eigenes Overlay und erscheint nie in der Modulliste oder im Karussell der Island.',
         detail: 'Eigenes Overlay · Selbst aktivieren · Nimmt keinen Fokus',
+      },
+      recommendedTools: {
+        title: 'Empfohlene Apps',
+        description:
+          'Entdecke OpenScreen für Bildschirmaufnahmen und Videoschnitt sowie DockDoor für Fenstervorschauen im Dock und App-Wechsel. Diese Anwendungen von Drittanbietern werden separat installiert.',
+        detail: 'Desktop-Werkzeuge entdecken · Drittanbieter-Apps · Separate Installation',
       },
     },
   },
@@ -304,6 +316,21 @@ export const de: SiteContent = {
       architectures: { term: 'Weitere Architekturen', value: 'Release-Seite' },
       mirror: { term: 'Spiegel', value: 'Gitee Releases' },
     },
+  },
+  changelog: {
+    eyebrow: 'Änderungsprotokoll',
+    title: 'Was sich in jeder zisla-Version geändert hat: neue Funktionen, Verbesserungen und Fehlerbehebungen.',
+    lede: 'Was sich in jeder zisla-Version geändert hat: neue Funktionen, Verbesserungen und Fehlerbehebungen.',
+    ariaLabel: 'zisla-Änderungsprotokoll',
+    releaseCountLabel: 'Versionen',
+    latestLabel: 'Neueste',
+    shippedLabel: 'Ausgeliefert',
+    latestBadge: 'Neueste',
+    noteLabel: 'Version',
+    pagerAriaLabel: 'Changelog-Seiten',
+    pageLabel: 'Seite {page}',
+    prevPageLabel: 'Zurück',
+    nextPageLabel: 'Weiter',
   },
   faq: {
     eyebrow: 'EIN PAAR KLARE ANTWORTEN',

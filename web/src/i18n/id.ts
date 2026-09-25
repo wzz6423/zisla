@@ -20,6 +20,7 @@ export const id = createCatalog({
       showcase: 'Fitur',
       ai: 'Alur kerja AI',
       download: 'Unduh',
+      changelog: 'Catatan perubahan',
       faq: 'Pertanyaan umum',
       developers: 'Pengembang',
     },
@@ -29,7 +30,7 @@ export const id = createCatalog({
   },
   hero: {
     eyebrow: 'RUANG KERJA MACOS NATIVE',
-    title: 'zisla<br><em>Letakkan yang terjadi<br>tepat di tempat<br class="hero-mobile-break"> yang dapat Anda lihat.</em>',
+    title: 'zisla<br><em>Letakkan yang terjadi<br>tepat di tempat yang dapat Anda lihat.</em>',
     lede:
       'Kumpulkan tugas AI, media, berkas, dan agenda di bagian atas layar. Setelah menyalin sesuatu, bilah tindakan cepat terpisah menampilkan pratinjau dan menyarankan langkah berikutnya. Muncul saat dibutuhkan lalu menyingkir setelah selesai.',
     downloadCta: 'Unduh',
@@ -41,7 +42,6 @@ export const id = createCatalog({
       'Setelah menyalin, tekan Command+N untuk langkah cerdas berikutnya',
       'Menutup sendiri tanpa mengganggu pekerjaan',
     ],
-    identityCaption: 'Bagian atas layar',
   },
   proof: {
     ariaLabel: 'Ringkasan produk',
@@ -60,7 +60,7 @@ export const id = createCatalog({
     ariaLabel: 'Katalog fitur zisla',
     summaryMono: '{modules} MODUL / {groups} ALUR KERJA',
     summaryLede: 'Dari alur kerja atas layar hingga alat lokal, setiap tugas yang dapat diselesaikan dijelaskan di sini.',
-    summaryNote: '{modules} modul atas dan {features} kemampuan mandiri untuk tangkapan layar, suara, media, unduhan, tindakan cepat, pengelolaan AI, hewan peliharaan, dan layar terkunci.',
+    summaryNote: '{modules} modul di bagian atas dan {features} kemampuan mandiri, dari pratinjau jendela dan tangkapan layar hingga pengelolaan AI dan aplikasi rekomendasi.',
     groupNames: {
       island: 'Alur kerja atas layar',
       ai: 'Alur kerja AI',
@@ -81,7 +81,7 @@ export const id = createCatalog({
       quickNotes: { name: 'Catatan cepat', caption: 'Menggunakan aplikasi Catatan sistem untuk melihat, mengedit, membuat, dan menghapus catatan dengan pratinjau Markdown langsung, serta melompat langsung ke sembilan catatan pertama dengan Command+1 hingga 9. Draf ditulis kembali secara otomatis.', points: ['Data berada di Catatan', 'Editor Markdown', 'Draf tersimpan otomatis'] },
       pdf: { name: 'Alat PDF', caption: 'Empat belas operasi di perangkat: gabungkan, pisahkan, putar, pangkas, konversi gambar dan Office, render ke gambar, ekstrak teks, tambahkan watermark dan nomor halaman, enkripsi, hapus kata sandi, dan edit metadata.', points: ['14 alat di perangkat', 'Gabungkan sesuai urutan Anda', 'Tidak ada yang meninggalkan Mac'] },
       toolbox: { name: 'Utilitas', caption: 'Penghitung fokus, menjaga layar tetap aktif, pembersihan layar dan keyboard (termasuk memblokir F1-F12), teleprompter, cermin, dan Sampah dalam satu halaman.', points: ['Penghitung fokus', 'Blokir F1-F12 saat membersihkan', 'Teleprompter dan cermin'] },
-      system: { name: 'Status sistem', caption: 'Periksa CPU, GPU, memori, disk, jaringan, dan kipas; baca suhu NVMe SMART jika didukung perangkat keras, simpan riwayat per menit yang bisa dilihat sebagai grafik untuk rentang waktu apa pun dan diekspor ke .xlsx, serta bersihkan cache serta log yang aman dihapus.', points: ['Pemantauan tingkat chip', 'Grafik riwayat dan ekspor .xlsx', 'Bersihkan cache sekali ketuk'] },
+      system: { name: 'Status sistem', caption: 'Periksa CPU, GPU, memori, disk, jaringan, dan kipas; baca suhu NVMe SMART jika didukung perangkat keras, simpan riwayat per menit yang bisa dilihat sebagai grafik untuk rentang waktu apa pun dan diekspor ke .xlsx. Pindai cache aplikasi, cache pengguna Apple, log, dan berkas preferensi yang tertinggal. Tinjau pilihan, pindahkan ke Sampah, lalu lihat hasilnya.', points: ['Pemantauan tingkat chip', 'Grafik riwayat dan ekspor .xlsx', 'Tinjau sebelum memindahkan ke Sampah'] },
       battery: { name: 'Baterai', caption: 'Lihat pengisian, kesehatan, siklus, suhu, dan kapasitas Mac ini, serta tingkat baterai perangkat sekitar yang dibagikan sistem.', points: ['Metrik kesehatan Mac', 'Sisa waktu', 'Baterai perangkat sekitar'] },
     },
   },
@@ -92,16 +92,28 @@ export const id = createCatalog({
     ariaLabel: 'Kemampuan desktop mandiri',
     summaryMono: 'MELAMPAUI PULAU',
     summaryLede: 'Kemampuan yang sering dipakai, masing-masing di tempat yang alami.',
-    summaryNote: 'Tangkapan, rekaman, media, unduhan browser, tindakan cepat, pengelolaan AI, hewan peliharaan, dan layar terkunci ditampilkan terpisah.',
+    summaryNote: 'Pratinjau jendela, tangkapan layar, dan Tindakan Cepat mudah dijangkau; aplikasi rekomendasi membantu Anda menemukan lebih banyak alat desktop.',
     features: {
-      capture: { title: 'Tangkapan, tangkapan gulir, dan pin', description: 'Tangkap atau pin bagian layar dengan pintasan global, beri anotasi, gabungkan tangkapan gulir, serta kenali atau ekspor tabel. Anotasi teks yang masih diedit tetap tersimpan saat ekspor.', detail: 'Pintasan global · Anotasi dan urungkan · Perubahan dipertahankan saat ekspor' },
+      windowPreviews: {
+        title: 'Lihat jendela, klik untuk beralih',
+        description:
+          'Pratinjau jendela dari Dock atau saat beralih dengan Command-Tab, lalu klik kartu untuk mengaktifkan jendelanya. Nonaktif secara default; aktifkan di Pengaturan dan berikan izin yang diperlukan.',
+        detail: 'Dock dan Command-Tab · Klik untuk beralih jendela · Nonaktif secara default',
+      },
+      capture: { title: 'Tangkapan, tangkapan gulir, dan pin', description: 'Tangkap atau pin bagian layar dengan pintasan global, beri anotasi, gabungkan tangkapan gulir, serta kenali atau ekspor tabel. Anotasi teks yang masih diedit tetap tersimpan saat ekspor. Sesuaikan pintasan tangkapan layar, penyematan, tangkapan bergulir, dan alat anotasi. Pengaturan memeriksa konflik dengan tangkapan, input suara, dan Tindakan Cepat; pemicu dengan tombol pengubah saja memerlukan izin Pemantauan Input.', detail: 'Pintasan khusus · Pemeriksaan konflik · Anotasi dipertahankan saat ekspor' },
       voice: { title: 'Input suara dan pembersihan', description: 'Beralih dengan tombol atau tahan untuk berbicara memakai pengenal suara sistem. Tambahkan kosakata, kata khusus, format terstruktur, atau pembersihan oleh model lokal maupun jarak jauh.', detail: 'Dua mode rekaman · Kosakata dan kata khusus · Pembersihan opsional' },
       media: { title: 'Media dan suara latar sistem', description: 'Kendalikan pemutaran dari bagian atas pulau atau pilih suara latar macOS. Suara dapat berhenti saat layar terkunci, screensaver dimulai, atau layar tidur.', detail: 'Kontrol pemutaran · Lirik tersinkron · Berhenti otomatis' },
       browserDownloads: { title: 'Progres unduhan browser', description: 'Mendeteksi unduhan Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera, dan Arc, lalu menampilkan sumber serta progres langsung di atas.', detail: '8 browser · Deteksi sumber · Pemberitahuan selesai' },
-      copyAssistant: { title: 'Tindakan Cepat dan langkah berikutnya', description: 'Setelah diaktifkan, teks, tautan, berkas, atau gambar yang disalin dipratinjau di bilah terpisah dengan saran buka, tampilkan di Finder, cari, terjemahkan, hitung, atau simpan—hanya setelah Anda mengonfirmasi. Setelah unduhan browser atau penerimaan berkas lewat AirDrop selesai, pintasan yang sama dapat membuka folder berkas; sakelar Tindakan Cepat mengaturnya secara terpisah dari tampilan progres unduhan browser.', detail: 'Sakelar opsional · Pengenalan lokal · Command+N sebagai default' },
+      copyAssistant: { title: 'Tindakan Cepat dan langkah berikutnya', description: 'Setelah diaktifkan, teks, tautan, berkas, atau gambar yang disalin dipratinjau di bilah terpisah dengan saran buka, tampilkan di Finder, cari, terjemahkan, hitung, atau simpan—hanya setelah Anda mengonfirmasi. Buka folder berkas melalui Tindakan Cepat setelah unduhan browser atau transfer AirDrop. Mendukung folder unduhan bawaan dan pilihan di Chrome, dengan sakelar terpisah dari tampilan progres unduhan.', detail: 'Sakelar opsional · Pengenalan lokal · Command+N sebagai default' },
       aiManagement: { title: 'Pengelolaan CLI AI dan Skills', description: 'Deteksi, pasang, perbarui, dan hapus CLI AI dari Pengaturan, serta tinjau dan kelola Skills lokal agar lebih jarang berpindah terminal.', detail: 'Deteksi dan pasang · Perbarui dan hapus · Skills lokal' },
       pet: { title: 'Hewan peliharaan pulau', description: 'Pilih hewan bawaan dan letakkan di sisi kiri atau kanan pulau. Matikan kapan saja.', detail: 'Karakter bawaan · Kiri atau kanan · Aktif sesuai kebutuhan' },
       lockScreen: { title: 'Informasi layar terkunci', description: 'Tampilkan tanggal, status, dan media yang sedang diputar di layar terkunci macOS secara opsional. Ini adalah overlay terpisah dan tidak muncul di daftar atau karusel modul pulau.', detail: 'Overlay terpisah · Pilihan pengguna · Tidak mengambil fokus' },
+      recommendedTools: {
+        title: 'Aplikasi rekomendasi',
+        description:
+          'Temukan OpenScreen untuk merekam layar dan menyunting video, serta DockDoor untuk pratinjau jendela di Dock dan pergantian aplikasi. Keduanya aplikasi pihak ketiga yang dipasang terpisah.',
+        detail: 'Temukan alat desktop · Aplikasi pihak ketiga · Instalasi terpisah',
+      },
     },
   },
   ai: {
@@ -154,6 +166,21 @@ export const id = createCatalog({
       architectures: { term: 'Arsitektur lain', value: 'Halaman rilis' },
       mirror: { term: 'Mirror', value: 'Gitee Releases' },
     },
+  },
+  changelog: {
+    eyebrow: 'Catatan perubahan',
+    title: 'Perubahan di setiap rilis zisla: fitur baru, peningkatan, dan perbaikan.',
+    lede: 'Perubahan di setiap rilis zisla: fitur baru, peningkatan, dan perbaikan.',
+    ariaLabel: 'riwayat rilis zisla',
+    releaseCountLabel: 'rilis',
+    latestLabel: 'terbaru',
+    shippedLabel: 'dirilis',
+    latestBadge: 'Terbaru',
+    noteLabel: 'rilis',
+    pagerAriaLabel: 'Halaman changelog',
+    pageLabel: 'Halaman {page}',
+    prevPageLabel: 'Sebelumnya',
+    nextPageLabel: 'Berikutnya',
   },
   faq: {
     eyebrow: 'JAWABAN YANG JELAS',

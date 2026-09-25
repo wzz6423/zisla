@@ -20,6 +20,7 @@ export const it = createCatalog({
       showcase: 'Funzioni',
       ai: 'Flusso IA',
       download: 'Download',
+      changelog: 'Registro modifiche',
       faq: 'Domande frequenti',
       developers: 'Sviluppatori',
     },
@@ -29,7 +30,7 @@ export const it = createCatalog({
   },
   hero: {
     eyebrow: 'SPAZIO DI LAVORO NATIVO PER MACOS',
-    title: 'zisla<br><em>Ciò che accade,<br>proprio dove<br class="hero-mobile-break"> puoi vederlo.</em>',
+    title: 'zisla<br><em>Ciò che accade,<br>proprio dove puoi vederlo.</em>',
     lede:
       'Riunisci attività IA, media, file e agenda nella parte superiore dello schermo. Dopo una copia, una barra delle azioni rapide separata mostra un’anteprima e suggerisce il passo successivo. Appare quando serve e si fa da parte quando hai finito.',
     downloadCta: 'Scarica',
@@ -41,7 +42,6 @@ export const it = createCatalog({
       'Dopo una copia, premi Command+N per il passo intelligente successivo',
       'Si richiude da sola senza interrompere il lavoro',
     ],
-    identityCaption: 'Parte superiore dello schermo',
   },
   proof: {
     ariaLabel: 'Panoramica del prodotto',
@@ -62,7 +62,7 @@ export const it = createCatalog({
     summaryLede:
       'Dai flussi in alto agli strumenti locali, qui trovi ogni attività che puoi davvero completare.',
     summaryNote:
-      '{modules} moduli superiori e {features} capacità indipendenti per schermate, voce, media, download, azioni rapide, gestione IA, mascotte e blocco schermo.',
+      '{modules} moduli superiori e {features} funzioni indipendenti, dalle anteprime delle finestre e catture alla gestione IA e alle app consigliate.',
     groupNames: {
       island: 'Flussi superiori',
       ai: 'Flusso IA',
@@ -141,8 +141,8 @@ export const it = createCatalog({
       system: {
         name: 'Stato del sistema',
         caption:
-          'Controlla CPU, GPU, memoria, disco, rete e ventole; leggi la temperatura SMART NVMe quando l’hardware la espone, registra uno storico al minuto che puoi graficare per qualsiasi intervallo ed esportare in .xlsx, e cancella cache e log sicuri da rimuovere.',
-        points: ['Monitoraggio a livello di chip', 'Grafici dello storico ed export .xlsx', 'Pulisci la cache con un tocco'],
+          'Controlla CPU, GPU, memoria, disco, rete e ventole; leggi la temperatura SMART NVMe quando l’hardware la espone, registra uno storico al minuto che puoi graficare per qualsiasi intervallo ed esportare in .xlsx. Analizza cache delle app e dell’utente Apple, log e file di preferenze residui. Controlla gli elementi, sposta quelli selezionati nel Cestino e consulta i risultati.',
+        points: ['Monitoraggio a livello di chip', 'Grafici dello storico ed export .xlsx', 'Controlla prima di spostare nel Cestino'],
       },
       battery: {
         name: 'Batteria',
@@ -161,13 +161,19 @@ export const it = createCatalog({
     summaryMono: 'OLTRE L’ISOLA',
     summaryLede: 'Funzioni frequenti, ognuna nel suo posto naturale.',
     summaryNote:
-      'Schermate, registrazione, media, download del browser, azioni rapide, gestione IA, mascotte e blocco schermo sono presentati separatamente.',
+      'Anteprime delle finestre, catture e azioni rapide sono a portata di mano; le app consigliate aiutano a scoprire altri strumenti per il desktop.',
     features: {
+      windowPreviews: {
+        title: 'Guarda la finestra, passa con un clic',
+        description:
+          'Visualizza le finestre dal Dock o mentre passi con Command-Tab, poi fai clic su una scheda per attivare la finestra. Disattivato di default: abilitalo nelle impostazioni e concedi i permessi necessari.',
+        detail: 'Dock e Command-Tab · Cambia finestra con un clic · Disattivato di default',
+      },
       capture: {
         title: 'Schermate, catture lunghe e fissaggio',
         description:
-          'Cattura o fissa una parte dello schermo con una scorciatoia globale, annota, unisci una cattura a scorrimento e riconosci o esporta tabelle. Le annotazioni ancora in modifica restano nell’esportazione.',
-        detail: 'Scorciatoia globale · Annotazione e annullamento · Modifiche conservate',
+          'Cattura o fissa una parte dello schermo con una scorciatoia globale, annota, unisci una cattura a scorrimento e riconosci o esporta tabelle. Le annotazioni ancora in modifica restano nell’esportazione. Personalizza le scorciatoie per catture, immagini fissate, catture a scorrimento e annotazioni. Le impostazioni verificano conflitti con cattura, input vocale e azioni rapide; un solo tasto modificatore richiede il permesso di monitoraggio input.',
+        detail: 'Scorciatoie personalizzate · Controllo dei conflitti · Annotazioni conservate all’esportazione',
       },
       voice: {
         title: 'Input vocale e pulizia',
@@ -190,7 +196,7 @@ export const it = createCatalog({
       copyAssistant: {
         title: 'Azioni rapide e passi successivi',
         description:
-          'Quando la funzione è attiva, mostra l’anteprima di testo, link, file o immagini copiati in una barra separata e propone apertura, Finder, ricerca, traduzione, calcolo o salvataggio solo dopo la tua conferma. Al termine di un download del browser o della ricezione di un file via AirDrop, la stessa scorciatoia può aprire la cartella del file; l’opzione Azioni rapide è indipendente dall’avanzamento dei download del browser.',
+          'Quando è attivo, mostra l’anteprima di testo, link, file o immagini copiati in una barra separata e propone apertura, Finder, ricerca, traduzione, calcolo o salvataggio solo dopo la tua conferma. Apri la cartella del file con le azioni rapide dopo un download del browser o un trasferimento AirDrop. Supporta le cartelle predefinite e scelte in Chrome, con un interruttore indipendente dall’avanzamento dei download.',
         detail: 'Attivazione opzionale · Riconoscimento locale · Command+N predefinito',
       },
       aiManagement: {
@@ -209,6 +215,12 @@ export const it = createCatalog({
         description:
           'Mostra facoltativamente data, stato e contenuti in riproduzione nella schermata di blocco di macOS. È una sovrapposizione indipendente e non compare nell’elenco o nel carosello dei moduli.',
         detail: 'Sovrapposizione indipendente · Attivazione volontaria · Non ruba il focus',
+      },
+      recommendedTools: {
+        title: 'App consigliate',
+        description:
+          'Scopri OpenScreen per registrare lo schermo e montare video e DockDoor per le anteprime delle finestre nel Dock e il cambio di app. Sono app di terze parti da installare separatamente.',
+        detail: 'Scopri strumenti per il desktop · App di terze parti · Installazione separata',
       },
     },
   },
@@ -280,6 +292,21 @@ export const it = createCatalog({
       architectures: { term: 'Altre architetture', value: 'Pagina delle release' },
       mirror: { term: 'Mirror', value: 'Gitee Releases' },
     },
+  },
+  changelog: {
+    eyebrow: 'Registro modifiche',
+    title: 'Cosa cambia in ogni release di zisla: nuove funzioni, miglioramenti e correzioni.',
+    lede: 'Cosa cambia in ogni release di zisla: nuove funzioni, miglioramenti e correzioni.',
+    ariaLabel: 'cronologia delle release di zisla',
+    releaseCountLabel: 'release',
+    latestLabel: 'ultima',
+    shippedLabel: 'pubblicata',
+    latestBadge: 'Ultima',
+    noteLabel: 'release',
+    pagerAriaLabel: 'Pagine del changelog',
+    pageLabel: 'Pagina {page}',
+    prevPageLabel: 'Precedente',
+    nextPageLabel: 'Successiva',
   },
   faq: {
     eyebrow: 'RISPOSTE CHIARE',

@@ -20,6 +20,7 @@ export const tr = createCatalog({
       showcase: 'Özellikler',
       ai: 'AI iş akışı',
       download: 'İndir',
+      changelog: 'Değişiklik günlüğü',
       faq: 'SSS',
       developers: 'Geliştiriciler',
     },
@@ -29,7 +30,7 @@ export const tr = createCatalog({
   },
   hero: {
     eyebrow: 'YEREL MACOS ÇALIŞMA ALANI',
-    title: 'zisla<br><em>Olan biteni,<br>tam da<br class="hero-mobile-break"> görebileceğiniz yerde.</em>',
+    title: 'zisla<br><em>Olan biteni,<br>tam da görebileceğiniz yerde.</em>',
     lede:
       'AI görevlerini, medyayı, dosyaları ve gündeminizi ekranın üst kısmında toplayın. Bir şeyi kopyaladıktan sonra ayrı bir hızlı eylem çubuğu içeriği orada önizler ve sonraki adımı önerir. Gerektiğinde görünür, işiniz bittiğinde kenara çekilir.',
     downloadCta: 'İndir',
@@ -41,7 +42,6 @@ export const tr = createCatalog({
       'Kopyaladıktan sonra akıllı sonraki adım için Command+N tuşlarına basın',
       'İşinizi bölmeden kendiliğinden kapanır',
     ],
-    identityCaption: 'Ekranın üst kısmı',
   },
   proof: {
     ariaLabel: 'Ürün özeti',
@@ -61,7 +61,7 @@ export const tr = createCatalog({
     summaryMono: '{modules} MODÜL / {groups} İŞ AKIŞI',
     summaryLede: 'Ekran üstü iş akışlarından yerel araçlara kadar tamamlayabileceğiniz her görev burada açıklanır.',
     summaryNote:
-      'Ekran üstü {modules} modül ve ekran görüntüleri, ses, medya, indirmeler, hızlı eylemler, AI yönetimi, evcil hayvan ve kilit ekranını kapsayan {features} bağımsız özellik.',
+      'Ekranın üstünde {modules} modül ve pencere önizlemeleri ile çekimden AI yönetimine ve önerilen uygulamalara uzanan {features} bağımsız özellik.',
     groupNames: {
       island: 'Ekran üstü iş akışları',
       ai: 'AI iş akışı',
@@ -82,7 +82,7 @@ export const tr = createCatalog({
       quickNotes: { name: 'Hızlı Notlar', caption: 'Sistem Notlar uygulamasını temel alır: notları canlı Markdown önizlemesiyle görüntüleyin, düzenleyin, oluşturun ve silin, Command+1 ila 9 ile ilk dokuz nota doğrudan geçin. Taslaklar otomatik olarak Notlar\'a geri yazılır.', points: ['Veriler Notlar\'da', 'Markdown düzenleyici', 'Taslaklar otomatik kaydedilir'] },
       pdf: { name: 'PDF araçları', caption: 'Mac\'inizde çalışan on dört işlem: birleştirme, bölme, döndürme, kırpma, görüntü ve Office dosyalarını dönüştürme, görüntü olarak oluşturma, metin çıkarma, metin veya görüntü filigranı ekleme, sayfa numarası ekleme, şifreleme, parolayı kaldırma ve meta verileri düzenleme.', points: ['Cihazda çalışan 14 araç', 'Kendi sıranızla birleştirin', 'Hiçbir şey Mac\'inizden çıkmaz'] },
       toolbox: { name: 'Yardımcı araçlar', caption: 'Odak sayacı, ekranı uyanık tutma, ekran temizleme, çalışırken F1-F12 dahil tuşları engelleyen klavye temizleme, teleprompter, ayna ve Çöp Sepeti tek sayfada.', points: ['Odak sayacı', 'Temizleme sırasında F1-F12 engellenir', 'Teleprompter ve ayna'] },
-      system: { name: 'Sistem durumu', caption: 'CPU, GPU, bellek, disk, ağ ve fan durumunu kontrol edin; donanım bildirdiğinde NVMe SMART sıcaklığını okuyun, herhangi bir zaman aralığı için grafik olarak görüntülenebilen ve .xlsx olarak dışa aktarılabilen dakikalık geçmişi kaydedin ve güvenle silinebilecek önbellekleri ve günlükleri temizleyin.', points: ['Çip düzeyinde izleme', 'Geçmiş grafikleri ve .xlsx dışa aktarma', 'Önbelleği tek dokunuşla temizleyin'] },
+      system: { name: 'Sistem durumu', caption: 'CPU, GPU, bellek, disk, ağ ve fan durumunu kontrol edin; donanım bildirdiğinde NVMe SMART sıcaklığını okuyun, herhangi bir zaman aralığı için grafik olarak görüntülenebilen ve .xlsx olarak dışa aktarılabilen dakikalık geçmişi kaydedin. Uygulama önbelleklerini, Apple kullanıcı önbelleklerini, günlükleri ve artık tercih dosyalarını tarayın. Seçilen öğeleri inceleyip Çöp Sepeti’ne taşıyın ve sonuçları görün.', points: ['Çip düzeyinde izleme', 'Geçmiş grafikleri ve .xlsx dışa aktarma', 'Çöp Sepeti’ne taşımadan önce inceleyin'] },
       battery: { name: 'Pil', caption: 'Bu Mac\'in şarj, sağlık, döngü sayısı, sıcaklık ve kapasite gibi ayrıntılı ölçümlerini ve sistemin bildirdiği yakındaki cihazların pil seviyelerini görün.', points: ['Bu Mac için sağlık ölçümleri', 'Kalan süre', 'Yakındaki cihazların pili'] },
     },
   },
@@ -93,16 +93,28 @@ export const tr = createCatalog({
     ariaLabel: 'Bağımsız masaüstü özellikleri',
     summaryMono: 'ADANIN ÖTESİNDE',
     summaryLede: 'Sık kullanılan özellikler, her biri doğal yerinde.',
-    summaryNote: 'Ekran görüntüleri, kayıt, medya, tarayıcı indirmeleri, hızlı eylemler, AI yönetimi, evcil hayvan ve kilit ekranı ayrı ayrı sunulur.',
+    summaryNote: 'Pencere önizlemeleri, çekim ve Hızlı Eylemler elinizin altında; önerilen uygulamalarla daha fazla masaüstü aracı keşfedin.',
     features: {
-      capture: { title: 'Ekran görüntüleri, kaydırmalı yakalama ve sabitleme', description: 'Global bir kısayolla ekranın bir bölümünü yakalayın veya sabitleyin; açıklama ekleyin, kaydırmalı görüntüyü birleştirin ve tabloları tanıyıp dışa aktarın. Hâlâ düzenlediğiniz metin açıklamaları dışa aktarırken korunur.', detail: 'Global kısayol · Açıklama ve geri alma · Düzenlemeler dışa aktarımda korunur' },
+      windowPreviews: {
+        title: 'Pencereye bakın, tıklayıp geçin',
+        description:
+          'Dock üzerinden veya Command-Tab ile geçiş yaparken pencereleri önizleyin, ardından kartı tıklayıp pencereyi etkinleştirin. Varsayılan olarak kapalıdır; Ayarlar’dan açıp gerekli izinleri verin.',
+        detail: 'Dock ve Command-Tab · Tıklayarak pencere değiştirin · Varsayılan olarak kapalı',
+      },
+      capture: { title: 'Ekran görüntüleri, kaydırmalı yakalama ve sabitleme', description: 'Global bir kısayolla ekranın bir bölümünü yakalayın veya sabitleyin; açıklama ekleyin, kaydırmalı görüntüyü birleştirin ve tabloları tanıyıp dışa aktarın. Hâlâ düzenlediğiniz metin açıklamaları dışa aktarırken korunur. Ekran görüntüsü, sabitleme, kaydırmalı çekim ve açıklama araçlarının kısayollarını özelleştirin. Ayarlar; çekim, sesle giriş ve Hızlı Eylemler arasındaki çakışmaları denetler. Tek başına değiştirici tuş kullanmak Giriş İzleme izni gerektirir.', detail: 'Özel kısayollar · Çakışma denetimi · Açıklamalar dışa aktarımda korunur' },
       voice: { title: 'Sesli giriş ve temizleme', description: 'Bir tuşla geçiş yapın veya konuşmak için basılı tutun; sistemin konuşma tanıyıcısını kullanır. Gerektiğinde alan sözlükleri, özel etkin sözcükler, yapılandırılmış biçimlendirme ya da yerel veya uzak modelle temizleme ekleyin.', detail: 'İki kayıt modu · Sözlükler ve etkin sözcükler · İsteğe bağlı model temizleme' },
       media: { title: 'Medya ve sistem ortam sesleri', description: 'Çalan içeriği adanın üstünden kontrol edin veya bir macOS sistem ortam sesi seçin. Ekran kilitlendiğinde, ekran koruyucu başladığında ya da ekran uykuya geçtiğinde otomatik olarak durabilir.', detail: 'Oynatma denetimi · Eşzamanlı şarkı sözleri · Ortam sesi otomatik durur' },
       browserDownloads: { title: 'Tarayıcı indirme ilerlemesi', description: 'Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera ve Arc indirmelerini algılar; kaynaklarını ve canlı ilerlemeyi ekranın üstünde gösterir.', detail: '8 tarayıcı · Kaynak algılama · Tamamlanma bildirimi' },
-      copyAssistant: { title: 'Hızlı Eylemler ve akıllı sonraki adımlar', description: 'Etkinleştirildiğinde kopyalanan metin, bağlantı, dosya veya görüntü ayrı bir üst çubukta önizlenir; açma, Finder\'da gösterme, arama, çevirme, hesaplama veya kaydetme gibi sonraki adımlar yalnızca onayınızdan sonra gerçekleştirilir. Tarayıcı indirmesi veya AirDrop ile dosya alımı tamamlandığında aynı kısayol dosyanın klasörünü açabilir; Hızlı Eylemler anahtarı bu özelliği tarayıcı indirme ilerlemesi anahtarından bağımsız yönetir.', detail: 'İsteğe bağlı anahtar · Cihazda tanıma · Varsayılan Command+N' },
+      copyAssistant: { title: 'Hızlı Eylemler ve akıllı sonraki adımlar', description: 'Etkinleştirildiğinde kopyalanan metin, bağlantı, dosya veya görüntü ayrı bir üst çubukta önizlenir; açma, Finder\'da gösterme, arama, çevirme, hesaplama veya kaydetme gibi sonraki adımlar yalnızca onayınızdan sonra gerçekleştirilir. Tarayıcı indirmesi veya AirDrop aktarımı bittikten sonra Hızlı Eylemler ile dosyanın klasörünü açın. Chrome’un varsayılan ve seçilen indirme klasörleri desteklenir; indirme ilerlemesinden bağımsız açılıp kapatılır.', detail: 'İsteğe bağlı anahtar · Cihazda tanıma · Varsayılan Command+N' },
       aiManagement: { title: 'AI CLI ve Skills yönetimi', description: 'Ayarlar\'dan popüler AI CLI\'larını algılayın, kurun, güncelleyin ve kaldırın; yerel Skills\'leri inceleyip yönetin, böylece terminaller ve araçlar arasında daha az geçiş yapın.', detail: 'Algıla ve kur · Güncelle ve kaldır · Yerel Skills' },
       pet: { title: 'Ada evcil hayvanı', description: 'Yerleşik evcil hayvanlardan birini seçin ve adanın soluna veya sağına yerleştirin. İstediğiniz zaman kapatın.', detail: 'Yerleşik karakterler · Sol veya sağ · İstediğinizde açın' },
       lockScreen: { title: 'Kilit ekranı bilgileri', description: 'Tarihi, durumu ve çalan içeriği isteğe bağlı olarak macOS kilit ekranında gösterin. Bu ayrı bir kilit ekranı katmanıdır; ada modül listesinde veya döngüsünde görünmez.', detail: 'Ayrı kilit ekranı katmanı · İsteğe bağlı · Odağı almaz' },
+      recommendedTools: {
+        title: 'Önerilen uygulamalar',
+        description:
+          'Ekran kaydı ve video düzenleme için OpenScreen’i, Dock pencere önizlemeleri ve uygulama geçişleri için DockDoor’u keşfedin. Bunlar ayrı kurulan üçüncü taraf uygulamalarıdır.',
+        detail: 'Masaüstü araçları keşfedin · Üçüncü taraf uygulamalar · Ayrı kurulum',
+      },
     },
   },
   ai: {
@@ -159,6 +171,21 @@ export const tr = createCatalog({
       architectures: { term: 'Diğer mimariler', value: 'Sürüm sayfası' },
       mirror: { term: 'Ayna', value: 'Gitee Releases' },
     },
+  },
+  changelog: {
+    eyebrow: 'Değişiklik günlüğü',
+    title: 'Her zisla sürümündeki değişiklikler: yeni özellikler, iyileştirmeler ve düzeltmeler.',
+    lede: 'Her zisla sürümündeki değişiklikler: yeni özellikler, iyileştirmeler ve düzeltmeler.',
+    ariaLabel: 'zisla sürüm geçmişi',
+    releaseCountLabel: 'sürüm',
+    latestLabel: 'en yeni',
+    shippedLabel: 'yayınlandı',
+    latestBadge: 'En yeni',
+    noteLabel: 'sürüm',
+    pagerAriaLabel: 'Değişiklik günlüğü sayfaları',
+    pageLabel: 'Sayfa {page}',
+    prevPageLabel: 'Önceki',
+    nextPageLabel: 'Sonraki',
   },
   faq: {
     eyebrow: 'BİRKAÇ NET YANIT',

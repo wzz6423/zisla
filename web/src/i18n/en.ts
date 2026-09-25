@@ -20,6 +20,7 @@ export const en: SiteContent = {
       showcase: 'Features',
       ai: 'AI workflow',
       download: 'Download',
+      changelog: 'Changelog',
       faq: 'FAQ',
       developers: 'Developers',
     },
@@ -30,7 +31,7 @@ export const en: SiteContent = {
   hero: {
     eyebrow: 'NATIVE MACOS WORKSPACE',
     title:
-      'zisla<br><em>What is happening,<br>right where you<br class="hero-mobile-break"> can see it.</em>',
+      'zisla<br><em>What is happening,<br>right where you can see it.</em>',
     lede: 'Collect AI tasks, media, files and your agenda at the top of the screen. After you copy something, a separate Quick Actions bar previews it up there and suggests the next step. It appears when needed and steps aside when you are done.',
     downloadCta: 'Download',
     downloadCtaAriaLabel: 'Download',
@@ -41,7 +42,6 @@ export const en: SiteContent = {
       'After copying, press Command+N for the smart next step',
       'Collapses on its own, without interrupting your work',
     ],
-    identityCaption: 'Top of the screen',
   },
   proof: {
     ariaLabel: 'Product overview',
@@ -61,7 +61,7 @@ export const en: SiteContent = {
     summaryLede:
       'From top-of-screen workflows to local tools, every task you can actually complete is spelled out here.',
     summaryNote:
-      '{modules} top-of-screen modules plus {features} standalone capabilities covering screenshots, voice, media, downloads, Quick Actions, AI management, the pet and the lock screen.',
+      '{modules} top-of-screen modules and {features} standalone capabilities, from window previews and capture to AI management and recommended apps.',
     groupNames: {
       island: 'Top-of-screen workflows',
       ai: 'AI workflow',
@@ -144,8 +144,8 @@ export const en: SiteContent = {
       system: {
         name: 'System status',
         caption:
-          'Check CPU, GPU, memory, disk, network and fan status, read NVMe SMART temperature where the hardware reports it, keep a minute-level history you can chart for any time range and export as .xlsx, and clear caches and logs that are safe to delete.',
-        points: ['Chip-level monitoring', 'History charts and .xlsx export', 'Clear caches in one tap'],
+          'Check CPU, GPU, memory, disk, network and fan status, read NVMe SMART temperature where the hardware reports it, keep a minute-level history you can chart for any time range and export as .xlsx. Scan app caches, Apple user caches, logs and leftover preference files, then review and move selected items to Trash with visible results.',
+        points: ['Chip-level monitoring', 'History charts and .xlsx export', 'Review before moving to Trash'],
       },
       battery: {
         name: 'Battery',
@@ -163,13 +163,19 @@ export const en: SiteContent = {
     summaryMono: 'BEYOND THE ISLAND',
     summaryLede: 'Frequently used capabilities, each where it feels natural.',
     summaryNote:
-      'Screenshots, recording, media, browser downloads, Quick Actions, AI management, the pet and the lock screen are each presented on their own.',
+      'Window previews, capture and Quick Actions each stay within reach; recommended apps help you discover more desktop tools.',
     features: {
+      windowPreviews: {
+        title: 'Preview a window. Click to switch.',
+        description:
+          'Preview windows from the Dock or while switching with Command-Tab, then click a card to activate its window. Off by default; enable it in Settings and grant the required permissions.',
+        detail: 'Dock and Command-Tab · Click to switch windows · Off by default',
+      },
       capture: {
         title: 'Screenshots, scrolling captures and pinning',
         description:
-          'Capture or pin part of the screen with a global shortcut, preserving window framing; then annotate, stitch a scrolling capture, and recognise or export tables. Annotations you are still editing are preserved when you export.',
-        detail: 'Global shortcut · Window framing · Unfinished annotations kept on export',
+          'Capture or pin part of the screen with a global shortcut, preserving window framing; then annotate, stitch a scrolling capture, and recognise or export tables. Annotations you are still editing are preserved when you export. Customize shortcuts for screenshots, pinning, scrolling captures and annotation tools. Settings check conflicts with capture, voice input and Quick Actions; modifier-only triggers need Input Monitoring permission.',
+        detail: 'Custom shortcuts · Conflict checks · Unfinished annotations kept on export',
       },
       voice: {
         title: 'Voice input and cleanup',
@@ -192,7 +198,7 @@ export const en: SiteContent = {
       copyAssistant: {
         title: 'Quick Actions and smart next steps',
         description:
-          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. The feature recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. When a browser download or AirDrop file arrives, the same shortcut can open its folder; the Quick Actions switch controls this independently of browser download progress.',
+          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. Open the containing folder through Quick Actions after a browser download or AirDrop transfer. Supports default and chosen Chrome download folders, with a separate switch from download progress.',
         detail: 'On-device recognition · Live currency conversion · Command+N by default',
       },
       aiManagement: {
@@ -212,6 +218,12 @@ export const en: SiteContent = {
         description:
           'Optionally show the date, status and now playing on the macOS lock screen. It is a separate lock screen overlay and never appears in the island module list or carousel.',
         detail: 'Separate lock screen overlay · Opt in · Never takes focus',
+      },
+      recommendedTools: {
+        title: 'Recommended apps',
+        description:
+          'Discover tools such as OpenScreen for screen recording and video editing, and DockDoor for Dock window previews and app switching. These are third-party apps installed separately.',
+        detail: 'Discover desktop tools · Third-party apps · Separate installation',
       },
     },
   },
@@ -288,6 +300,21 @@ export const en: SiteContent = {
       architectures: { term: 'Other architectures', value: 'Release page' },
       mirror: { term: 'Mirror', value: 'Gitee Releases' },
     },
+  },
+  changelog: {
+    eyebrow: 'Changelog',
+    title: 'What changed in each zisla release: new features, improvements, and fixes.',
+    lede: 'What changed in each zisla release: new features, improvements, and fixes.',
+    ariaLabel: 'zisla release history',
+    releaseCountLabel: 'releases',
+    latestLabel: 'latest',
+    shippedLabel: 'shipped',
+    latestBadge: 'Latest',
+    noteLabel: 'release',
+    pagerAriaLabel: 'Changelog pages',
+    pageLabel: 'Page {page}',
+    prevPageLabel: 'Previous',
+    nextPageLabel: 'Next',
   },
   faq: {
     eyebrow: 'A FEW STRAIGHT ANSWERS',
