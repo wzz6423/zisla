@@ -844,6 +844,15 @@ struct SettingsView: View {
                     featureToggle("语音输入", detail: "开启后可通过全局快捷键触发语音输入", symbol: "mic.fill", keyPath: \.voiceInputEnabled)
                 }
 
+                settingsGroup("窗口") {
+                    featureToggle(
+                        "窗口预览",
+                        detail: "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限",
+                        symbol: "macwindow.on.rectangle",
+                        keyPath: \.windowPreviewsEnabled
+                    )
+                }
+
                 settingsGroup("工具与监控") {
                     featureToggle("小工具", detail: "番茄钟、亮屏与屏幕清洁", symbol: "wrench.and.screwdriver.fill", keyPath: \.toolboxEnabled)
                     rowDivider

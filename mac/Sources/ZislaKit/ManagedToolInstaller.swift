@@ -74,6 +74,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     case kero
     case markdownPreview
     case zshell
+    case dockDoor
 
     public var id: String { rawValue }
 
@@ -126,6 +127,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kero: "Kero"
         case .markdownPreview: "Markdown Preview"
         case .zshell: "Zshell"
+        case .dockDoor: "DockDoor"
         }
     }
 
@@ -178,6 +180,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kero: "终端工作区"
         case .markdownPreview: "Markdown 预览"
         case .zshell: "原生 macOS 终端工作区"
+        case .dockDoor: "Dock 窗口预览与应用切换"
         }
     }
 
@@ -231,6 +234,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kero: "kero"
         case .markdownPreview: "mdp"
         case .zshell: "zshell"
+        case .dockDoor: "DockDoor"
         }
     }
 
@@ -283,6 +287,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .kero: .homebrewCask(name: "egoist/tap/kero")
         case .markdownPreview: .homebrewCask(name: "markdown-preview")
         case .zshell: .homebrewCask(name: "wzz6423/tap/zshell")
+        case .dockDoor: .homebrewCask(name: "dockdoor")
         }
     }
 
@@ -309,14 +314,14 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
             .developmentToolchain
         case .ytDLP, .libreOffice, .keka:
             .utility
-        case .openScreen, .kaku, .kero, .markdownPreview, .zshell:
+        case .openScreen, .kaku, .kero, .markdownPreview, .zshell, .dockDoor:
             .desktopApplication
         }
     }
 
     var usesNativeApplicationVersion: Bool {
         switch self {
-        case .openScreen, .kaku, .kero, .markdownPreview, .keka, .zshell: true
+        case .openScreen, .kaku, .kero, .markdownPreview, .keka, .zshell, .dockDoor: true
         default: false
         }
     }

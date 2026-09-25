@@ -6,6 +6,27 @@ import ZislaCore
 
 struct SettingsNavigationTests {
     @Test
+    func windowPreviewSettingIsLocalizedInEveryLanguage() throws {
+        let keys = [
+            "窗口",
+            "窗口预览",
+            "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限",
+        ]
+        let packageRoot = Self.settingsViewSourceURL.deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        for language in AppLanguage.allCases {
+            let tableURL = packageRoot.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
+            let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
+            for key in keys {
+                let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
+                #expect(!value.isEmpty)
+                #expect(AppLocalization.string(key, language: language) == value)
+                if language != .simplifiedChinese { #expect(value != key) }
+            }
+        }
+    }
+
+    @Test
     func recommendationVisibilityFollowsItsFeatureToggle() {
         var settings = FeatureSettings()
         #expect(SettingsSection.recommendations.isVisible(settings: settings))
