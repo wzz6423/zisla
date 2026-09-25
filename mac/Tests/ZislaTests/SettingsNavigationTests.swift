@@ -43,6 +43,23 @@ struct SettingsNavigationTests {
     }
 
     @Test
+    func downloadCompletionToggleIsNestedUnderRecognitionTypes() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        let heading = try #require(source.range(of: "title: \"识别类型\""))
+        let firstKind = try #require(source.range(
+            of: "ForEach(ClipboardAssistantKind.allCases, id: \\.self)",
+            range: heading.upperBound..<source.endIndex
+        ))
+        let toggle = try #require(source.range(of: "AppLocalization.text(\"下载与 AirDrop 完成提示\")"))
+
+        #expect(toggle.lowerBound > heading.upperBound)
+        #expect(toggle.lowerBound < firstKind.lowerBound)
+        let row = source[toggle.lowerBound..<firstKind.lowerBound]
+        #expect(row.contains("keyPath: \\.downloadCompletionFolderActionEnabled"))
+        #expect(row.contains("isNested: true"))
+    }
+
+    @Test
     func settingsContentTransitionTargetsMountedContent() throws {
         let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
         let detailRange = try #require(source.range(of: "    private var detail: some View {"))
@@ -104,7 +121,7 @@ struct SettingsNavigationTests {
         #expect(SettingsSection.allCases.map(\.title) == [
             "通用",
             "功能",
-            "复制助手",
+            "快捷操作",
             "截图",
             "工作流",
             "信息",
@@ -119,6 +136,7 @@ struct SettingsNavigationTests {
             "反馈与更新",
         ])
         #expect(SettingsSection.general.subtitle == "调整语言、外观、启动与展开方式。")
+        #expect(SettingsSection.clipboardAssistant.subtitle == "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作")
         #expect(SettingsSection.ai.subtitle == "管理 AI CLI 与 Skills。")
         #expect(SettingsSection.voice.subtitle == "配置语音输入、整理模型与本机记录。")
         #expect(SettingsSection.keyboardSound.subtitle == "键盘音效与输入统计。")

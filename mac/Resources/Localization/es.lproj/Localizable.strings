@@ -426,8 +426,11 @@
 /* Clipboard assistant */
 "存在时长" = "Duración de visualización";
 "提示自动关闭前的时间；永不则仅手动关闭" = "Tiempo antes de cerrar el aviso; Nunca significa cierre manual";
-"复制助手" = "Asistente de copiado";
-"复制后弹出识别结果和下一步操作" = "Muestra el contenido reconocido y las siguientes acciones tras cada copia";
+"快捷操作" = "Acciones rápidas";
+"复制、浏览器下载或 AirDrop 接收完成后显示下一步操作" = "Muestra las siguientes acciones tras copiar, descargar en el navegador o recibir un archivo por AirDrop";
+"打开文件夹" = "Abrir carpeta";
+"下载与 AirDrop 完成提示" = "Avisos al finalizar descargas y AirDrop";
+"完成后显示“打开文件夹”快捷操作" = "Mostrar la acción rápida «Abrir carpeta» al finalizar un archivo";
 "快速触发快捷键" = "Atajo de activación rápida";
 "清除快捷键" = "Borrar atajo";
 "鼠标侧键" = "Botón lateral del ratón";
@@ -2103,7 +2106,7 @@
 "无法读取 Zed 线程" = "No se pueden leer los hilos de Zed";
 "无法读取最近剪贴板记录" = "No se pueden leer los registros recientes del portapapeles";
 "正在处理另一项邮件操作" = "Se está procesando otra operación de correo";
-"每次保存图片时选择位置" = "Elegir la ubicación cada vez que se guarde una imagen";
+"每次保存文件时选择位置" = "Elegir la ubicación cada vez que se guarde un archivo";
 "读取备忘录锁定状态失败" = "Error al leer el estado de bloqueo de la nota";
 "静音 Zisla 通知" = "Silenciar las notificaciones de Zisla";
 "AI 状态数据库写入失败" = "Error al escribir en la base de datos de estado de IA";

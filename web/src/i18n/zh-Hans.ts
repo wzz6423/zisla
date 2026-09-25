@@ -4,10 +4,10 @@ export const zhHans: SiteContent = {
   meta: {
     documentTitle: 'zisla · 动态工作空间',
     description:
-      'zisla：面向 macOS 的原生动态工作空间。集中查看 Zed Agent 等 AI 任务、媒体、文件和日程，并使用键盘音效、输入统计、截图标注与复制助手。',
+      'zisla：面向 macOS 的原生动态工作空间。集中查看 Zed Agent 等 AI 任务、媒体、文件和日程，并使用键盘音效、输入统计、截图标注与快捷操作。',
     ogTitle: 'zisla · 把正在发生的事放到你看得见的地方',
     ogDescription:
-      '从 Zed Agent 等 AI 任务与媒体，到键盘音效、输入统计、复制助手、截图标注和桌面工具，一个按需出现的原生 macOS 工作空间。',
+      '从 Zed Agent 等 AI 任务与媒体，到键盘音效、输入统计、快捷操作、截图标注和桌面工具，一个按需出现的原生 macOS 工作空间。',
   },
   tagline: '原生 macOS 动态工作空间',
   header: {
@@ -31,7 +31,7 @@ export const zhHans: SiteContent = {
     eyebrow: '原生 MACOS 工作空间',
     title:
       'zisla<br><em>把正在发生的事<br>放到你看得<br class="hero-mobile-break">见的地方。</em>',
-    lede: '把 AI 任务、媒体、文件和日程收进屏幕顶部；复制后，独立的助手提示条会在屏幕顶端预览内容并给出下一步。需要时出现，完成后收起。',
+    lede: '把 AI 任务、媒体、文件和日程收进屏幕顶部；复制后，独立的快捷操作提示条会在屏幕顶端预览内容并给出下一步。需要时出现，完成后收起。',
     downloadCta: '下载',
     downloadCtaAriaLabel: '下载',
     sourceCta: '查看源码',
@@ -60,7 +60,7 @@ export const zhHans: SiteContent = {
     summaryMono: '{modules} 个模块 / {groups} 类工作流',
     summaryLede: '从顶部工作流到本地工具，实际能完成的任务都在这里逐项写清。',
     summaryNote:
-      '{modules} 个顶部模块 + {features} 项独立能力，覆盖截图、语音、媒体、下载、复制助手、AI 管理、宠物与锁屏。',
+      '{modules} 个顶部模块 + {features} 项独立能力，覆盖截图、语音、媒体、下载、快捷操作、AI 管理、宠物与锁屏。',
     groupNames: {
       island: '顶部工作流',
       ai: 'AI 工作流',
@@ -155,7 +155,7 @@ export const zhHans: SiteContent = {
     ariaLabel: '独立桌面能力',
     summaryMono: '灵动岛之外',
     summaryLede: '常用能力，各在最顺手的位置。',
-    summaryNote: '截图、录音、媒体、浏览器下载、复制助手、AI 管理、宠物与锁屏各自独立呈现。',
+    summaryNote: '截图、录音、媒体、浏览器下载、快捷操作、AI 管理、宠物与锁屏各自独立呈现。',
     features: {
       capture: {
         title: '截图、长截图与钉图',
@@ -182,9 +182,9 @@ export const zhHans: SiteContent = {
         detail: '8 种浏览器 · 来源识别 · 完成提示',
       },
       copyAssistant: {
-        title: '复制助手与智能下一步',
+        title: '快捷操作与智能下一步',
         description:
-          '启用后，复制文本、链接、文件或图片会在独立的顶部提示条中预览；可识别链接、本机已安装应用名称和 Emoji 名称，也可按实时汇率换算复制的金额，所有下一步均由你确认后执行。',
+          '启用后，复制文本、链接、文件或图片会在独立的顶部提示条中预览；可识别链接、本机已安装应用名称和 Emoji 名称，也可按实时汇率换算复制的金额，所有下一步均由你确认后执行。浏览器下载或 AirDrop 文件接收完成后，也可用同一快捷键打开文件所在文件夹；此功能由快捷操作开关控制，与浏览器下载进度开关独立。',
         detail: '本机识别 · 实时汇率换算 · 默认 Command+N',
       },
       aiManagement: {
@@ -287,7 +287,7 @@ export const zhHans: SiteContent = {
         answer: '不会。AI 状态监控只读取任务状态，不读取提示词或回答正文。',
       },
       copyAssistant: {
-        question: '复制助手会自动打开或上传我复制的内容吗？',
+        question: '快捷操作会自动打开或上传我复制的内容吗？',
         answer:
           '不会。启用后，内容识别和预览均在本机完成；只有你点击动作或按下快速触发后，zisla 才会执行对应下一步。',
       },

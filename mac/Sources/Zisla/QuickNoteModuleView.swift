@@ -255,7 +255,8 @@ struct QuickNoteModuleView: View {
                     html: draftHTML,
                     noteID: loadedNoteID,
                     command: service.isBuiltInWelcomeNoteSelected ? nil : editorCommand,
-                    isEditable: !service.isBuiltInWelcomeNoteSelected
+                    isEditable: !service.isBuiltInWelcomeNoteSelected,
+                    onCopy: model.quickNoteDidCopy
                 ) { id, html, plainText in
                     if let id, !service.isBuiltInWelcomeNote(id: id) {
                         service.scheduleSave(id: id, html: html)

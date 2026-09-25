@@ -4,10 +4,10 @@ export const vi = createCatalog({
   meta: {
     documentTitle: 'zisla · Không gian làm việc động',
     description:
-      'zisla là không gian làm việc động nguyên bản cho macOS. Gom tác vụ AI, phương tiện, tệp và lịch vào một nơi, cùng âm thanh bàn phím, thống kê gõ, chú thích ảnh chụp và trợ lý sao chép.',
+      'zisla là không gian làm việc động nguyên bản cho macOS. Gom tác vụ AI, phương tiện, tệp và lịch vào một nơi, cùng âm thanh bàn phím, thống kê gõ, chú thích ảnh chụp và thao tác nhanh.',
     ogTitle: 'zisla · Đưa mọi thứ đang diễn ra đến nơi bạn có thể thấy',
     ogDescription:
-      'Từ tác vụ AI và phương tiện đến âm thanh bàn phím, thống kê gõ, trợ lý sao chép, chú thích ảnh chụp và công cụ desktop — không gian macOS nguyên bản chỉ xuất hiện khi bạn cần.',
+      'Từ tác vụ AI và phương tiện đến âm thanh bàn phím, thống kê gõ, thao tác nhanh, chú thích ảnh chụp và công cụ desktop — không gian macOS nguyên bản chỉ xuất hiện khi bạn cần.',
   },
   tagline: 'Không gian làm việc động nguyên bản cho macOS',
   header: {
@@ -31,7 +31,7 @@ export const vi = createCatalog({
     eyebrow: 'KHÔNG GIAN LÀM VIỆC MACOS NGUYÊN BẢN',
     title: 'zisla<br><em>Điều đang diễn ra,<br>ngay nơi<br class="hero-mobile-break"> bạn có thể thấy.</em>',
     lede:
-      'Gom tác vụ AI, phương tiện, tệp và lịch ở đầu màn hình. Sau khi bạn sao chép, một thanh trợ lý riêng hiển thị bản xem trước và gợi ý bước tiếp theo. Thanh xuất hiện khi cần rồi thu lại khi xong.',
+      'Gom tác vụ AI, phương tiện, tệp và lịch ở đầu màn hình. Sau khi bạn sao chép, một thanh thao tác nhanh riêng hiển thị bản xem trước và gợi ý bước tiếp theo. Thanh xuất hiện khi cần rồi thu lại khi xong.',
     downloadCta: 'Tải xuống',
     downloadCtaAriaLabel: 'Tải xuống',
     sourceCta: 'Xem mã nguồn',
@@ -60,7 +60,7 @@ export const vi = createCatalog({
     ariaLabel: 'Danh mục tính năng zisla',
     summaryMono: '{modules} MÔ-ĐUN / {groups} QUY TRÌNH',
     summaryLede: 'Từ quy trình trên cùng đến công cụ cục bộ, mọi tác vụ có thể hoàn thành đều được mô tả ở đây.',
-    summaryNote: '{modules} mô-đun trên cùng và {features} khả năng độc lập cho ảnh chụp, giọng nói, phương tiện, tải xuống, trợ lý sao chép, quản lý AI, thú cưng và màn hình khóa.',
+    summaryNote: '{modules} mô-đun trên cùng và {features} khả năng độc lập cho ảnh chụp, giọng nói, phương tiện, tải xuống, thao tác nhanh, quản lý AI, thú cưng và màn hình khóa.',
     groupNames: {
       island: 'Quy trình trên cùng',
       ai: 'Quy trình AI',
@@ -92,13 +92,13 @@ export const vi = createCatalog({
     ariaLabel: 'Khả năng desktop độc lập',
     summaryMono: 'VƯỢT RA NGOÀI ĐẢO',
     summaryLede: 'Các khả năng dùng thường xuyên, mỗi khả năng ở đúng vị trí tự nhiên.',
-    summaryNote: 'Ảnh chụp, ghi âm, phương tiện, tải xuống trình duyệt, trợ lý sao chép, quản lý AI, thú cưng và màn hình khóa được trình bày riêng.',
+    summaryNote: 'Ảnh chụp, ghi âm, phương tiện, tải xuống trình duyệt, thao tác nhanh, quản lý AI, thú cưng và màn hình khóa được trình bày riêng.',
     features: {
       capture: { title: 'Ảnh chụp, ảnh cuộn và ghim', description: 'Chụp hoặc ghim một phần màn hình bằng phím tắt toàn cục, thêm chú thích, ghép ảnh cuộn và nhận dạng hoặc xuất bảng. Chú thích đang sửa vẫn được giữ khi xuất.', detail: 'Phím tắt toàn cục · Chú thích và hoàn tác · Giữ chỉnh sửa khi xuất' },
       voice: { title: 'Nhập giọng nói và làm sạch', description: 'Bật bằng phím hoặc giữ để nói, dùng nhận dạng giọng nói hệ thống. Thêm từ vựng, từ nóng tùy chỉnh, định dạng có cấu trúc hoặc làm sạch bằng mô hình cục bộ hay từ xa.', detail: 'Hai chế độ ghi âm · Từ vựng và từ nóng · Làm sạch tùy chọn' },
       media: { title: 'Phương tiện và âm thanh nền hệ thống', description: 'Điều khiển nội dung đang phát từ đầu đảo hoặc chọn âm thanh nền macOS. Âm thanh có thể tự dừng khi khóa màn hình, bật trình bảo vệ hoặc màn hình ngủ.', detail: 'Điều khiển phát · Lời bài hát đồng bộ · Tự dừng âm thanh' },
       browserDownloads: { title: 'Tiến trình tải xuống trình duyệt', description: 'Phát hiện tải xuống từ Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera và Arc, hiển thị nguồn và tiến trình trực tiếp ở trên.', detail: '8 trình duyệt · Nhận dạng nguồn · Thông báo hoàn tất' },
-      copyAssistant: { title: 'Trợ lý sao chép và bước tiếp theo', description: 'Khi bật, văn bản, liên kết, tệp hoặc ảnh đã sao chép được xem trước trong thanh riêng, kèm đề xuất mở, hiện trong Finder, tìm kiếm, dịch, tính toán hoặc lưu chỉ sau khi bạn xác nhận.', detail: 'Bật tùy chọn · Nhận dạng cục bộ · Command+N mặc định' },
+      copyAssistant: { title: 'Thao tác nhanh và bước tiếp theo', description: 'Khi bật, văn bản, liên kết, tệp hoặc ảnh đã sao chép được xem trước trong thanh riêng, kèm đề xuất mở, hiện trong Finder, tìm kiếm, dịch, tính toán hoặc lưu chỉ sau khi bạn xác nhận. Khi tải xuống bằng trình duyệt hoặc nhận tệp qua AirDrop hoàn tất, cùng phím tắt có thể mở thư mục chứa tệp; công tắc Thao tác nhanh điều khiển tính năng này độc lập với phần hiển thị tiến trình tải xuống.', detail: 'Bật tùy chọn · Nhận dạng cục bộ · Command+N mặc định' },
       aiManagement: { title: 'Quản lý CLI và Skills AI', description: 'Phát hiện, cài đặt, cập nhật và gỡ CLI AI trong Cài đặt, đồng thời xem và quản lý Skills cục bộ để ít phải chuyển giữa các terminal.', detail: 'Phát hiện và cài đặt · Cập nhật và gỡ · Skills cục bộ' },
       pet: { title: 'Thú cưng trong đảo', description: 'Chọn thú cưng tích hợp và đặt ở bên trái hoặc phải đảo. Tắt bất cứ lúc nào.', detail: 'Nhân vật tích hợp · Trái hoặc phải · Bật khi cần' },
       lockScreen: { title: 'Thông tin màn hình khóa', description: 'Tùy chọn hiển thị ngày, trạng thái và nội dung đang phát trên màn hình khóa macOS. Đây là lớp phủ riêng, không xuất hiện trong danh sách hay băng chuyền mô-đun của đảo.', detail: 'Lớp phủ riêng · Tùy chọn bật · Không chiếm tiêu điểm' },
@@ -162,7 +162,7 @@ export const vi = createCatalog({
     items: {
       audience: { question: 'zisla dành cho ai?', answer: 'Dành cho người dùng Mac muốn xem AI, phương tiện, tệp và lịch ở một nơi. Màn hình không có notch cũng được hỗ trợ.' },
       aiPrivacy: { question: 'zisla có đọc cuộc trò chuyện AI của tôi không?', answer: 'Không. Theo dõi AI chỉ đọc trạng thái tác vụ, không đọc văn bản prompt hay câu trả lời.' },
-      copyAssistant: { question: 'Trợ lý sao chép có mở hoặc tải lên nội dung tôi sao chép không?', answer: 'Không. Nhận dạng và xem trước diễn ra trên Mac, bước tiếp theo chỉ chạy sau khi bạn xác nhận.' },
+      copyAssistant: { question: 'Thao tác nhanh có mở hoặc tải lên nội dung tôi sao chép không?', answer: 'Không. Nhận dạng và xem trước diễn ra trên Mac, bước tiếp theo chỉ chạy sau khi bạn xác nhận.' },
       permissions: {
         question: 'zisla cần những quyền hệ thống nào?',
         answer: `

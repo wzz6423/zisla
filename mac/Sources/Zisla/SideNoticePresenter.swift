@@ -180,7 +180,8 @@ final class SideNoticePresenter {
                 for: snapshot,
                 notices: compactNotices,
                 settings: settingsStore.settings,
-                browserDownloadCount: browserDownloads.snapshots.count
+                browserDownloadCount: settingsStore.settings.showsBrowserDownloadProgress
+                    ? browserDownloads.snapshots.count : 0
             ) ?? layoutEngine.compactBarFrame(for: snapshot)
             displayState.compactWingsEnabled = false
             displayState.compactWingHeight = compactBarFrame.height
@@ -275,7 +276,8 @@ final class SideNoticePresenter {
             for: snapshot,
             notices: compactNotices,
             settings: settingsStore.settings,
-            browserDownloadCount: browserDownloads.snapshots.count
+            browserDownloadCount: settingsStore.settings.showsBrowserDownloadProgress
+                ? browserDownloads.snapshots.count : 0
         ) else {
             panels.compactBar?.orderOut(nil)
             return presentsNewCompactStatus

@@ -4,10 +4,10 @@ export const fr: SiteContent = {
   meta: {
     documentTitle: 'zisla · Espace de travail dynamique',
     description:
-      'zisla est un espace de travail dynamique et natif pour macOS. Regroupez les tâches IA comme Zed Agent, les médias, les fichiers et votre agenda, avec les sons de clavier, les statistiques de saisie, l’annotation de captures et l’assistant de copie.',
+      'zisla est un espace de travail dynamique et natif pour macOS. Regroupez les tâches IA comme Zed Agent, les médias, les fichiers et votre agenda, avec les sons de clavier, les statistiques de saisie, l’annotation de captures et les actions rapides.',
     ogTitle: 'zisla · Mettez ce qui se passe là où vous pouvez le voir',
     ogDescription:
-      'Des tâches IA comme Zed Agent et de la lecture multimédia jusqu’aux sons de clavier, aux statistiques de saisie, à l’assistant de copie, à l’annotation de captures et aux outils de bureau : un espace de travail macOS natif qui n’apparaît que lorsque vous en avez besoin.',
+      'Des tâches IA comme Zed Agent et de la lecture multimédia jusqu’aux sons de clavier, aux statistiques de saisie, à les actions rapides, à l’annotation de captures et aux outils de bureau : un espace de travail macOS natif qui n’apparaît que lorsque vous en avez besoin.',
   },
   tagline: 'Espace de travail dynamique natif pour macOS',
   header: {
@@ -31,7 +31,7 @@ export const fr: SiteContent = {
     eyebrow: 'ESPACE DE TRAVAIL MACOS NATIF',
     title:
       'zisla<br><em>Ce qui se passe,<br>là où vous<br class="hero-mobile-break"> pouvez le voir.</em>',
-    lede: 'Regroupez tâches IA, médias, fichiers et agenda en haut de l’écran. Après une copie, une barre d’assistance distincte en affiche un aperçu et propose l’étape suivante. Elle apparaît quand il faut et s’efface ensuite.',
+    lede: 'Regroupez tâches IA, médias, fichiers et agenda en haut de l’écran. Après une copie, une barre d’actions rapides distincte en affiche un aperçu et propose l’étape suivante. Elle apparaît quand il faut et s’efface ensuite.',
     downloadCta: 'Télécharger',
     downloadCtaAriaLabel: 'Télécharger',
     sourceCta: 'Voir le code',
@@ -61,7 +61,7 @@ export const fr: SiteContent = {
     summaryLede:
       'Des flux en haut de l’écran aux outils locaux, chaque tâche réellement possible est décrite ici.',
     summaryNote:
-      '{modules} modules en haut de l’écran et {features} fonctions indépendantes couvrant les captures, la voix, les médias, les téléchargements, l’assistant de copie, la gestion de l’IA, la mascotte et l’écran verrouillé.',
+      '{modules} modules en haut de l’écran et {features} fonctions indépendantes couvrant les captures, la voix, les médias, les téléchargements, les actions rapides, la gestion de l’IA, la mascotte et l’écran verrouillé.',
     groupNames: {
       island: 'Flux en haut de l’écran',
       ai: 'Flux IA',
@@ -191,7 +191,7 @@ export const fr: SiteContent = {
     summaryMono: 'AU-DELÀ DE L’ÎLE',
     summaryLede: 'Les fonctions les plus utilisées, chacune à sa place naturelle.',
     summaryNote:
-      'Captures, enregistrement, médias, téléchargements du navigateur, assistant de copie, gestion de l’IA, mascotte et écran verrouillé fonctionnent chacun de leur côté.',
+      'Captures, enregistrement, médias, téléchargements du navigateur, actions rapides, gestion de l’IA, mascotte et écran verrouillé fonctionnent chacun de leur côté.',
     features: {
       capture: {
         title: 'Captures, captures défilantes et épinglage',
@@ -218,9 +218,9 @@ export const fr: SiteContent = {
         detail: '8 navigateurs · Source identifiée · Avis de fin',
       },
       copyAssistant: {
-        title: 'Assistant de copie et étapes suivantes',
+        title: 'Actions rapides et étapes suivantes',
         description:
-          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation.',
+          'Une fois la fonction activée, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Elle reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. À la fin d’un téléchargement du navigateur ou de la réception d’un fichier par AirDrop, le même raccourci peut ouvrir son dossier ; l’option Actions rapides est indépendante de l’affichage de la progression des téléchargements.',
         detail: 'Reconnaissance locale · Conversion aux taux en temps réel · Command+N par défaut',
       },
       aiManagement: {
@@ -334,7 +334,7 @@ export const fr: SiteContent = {
           'Non. Le suivi de l’état IA lit uniquement l’état des tâches, jamais le texte des invites ni des réponses.',
       },
       copyAssistant: {
-        question: 'L’assistant de copie ouvre-t-il ou envoie-t-il ce que je copie ?',
+        question: 'Les actions rapides ouvrent-elles ou envoient-elles ce que je copie ?',
         answer:
           'Non. Une fois activé, la reconnaissance et l’aperçu se font entièrement sur votre Mac, et zisla n’exécute une étape qu’après votre clic ou votre raccourci.',
       },

@@ -586,38 +586,38 @@ struct ClipboardAssistantToastView: View {
     }
 
     var body: some View {
-        TimelineView(
-            .animation(
-                minimumInterval: 1.0 / 30.0,
-                paused: !isDismissalProgressActive
-            )
-        ) { context in
-            GeometryReader { geometry in
-                if let detection = presentation.detection {
-                    IslandSurface(
-                        isCollapsed: !isExpanded,
-                        collapsedSize: CGSize(
-                            width: geometry.size.width,
-                            height: min(geometry.size.height, presentation.islandTopHeight)
-                        ),
-                        expandedSize: geometry.size,
-                        visualStyle: presentation.visualStyle,
-                        collapsedTopCornerRadius: 0,
-                        bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
-                    ) {
-                        VStack(spacing: 0) {
-                            toastHeader(detection)
-                            if isExpanded, let content = expandableContent(detection) {
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.08))
-                                    .frame(height: 0.5)
-                                    .padding(.horizontal, 14)
-                                expandedContentView(content)
-                            }
+        GeometryReader { geometry in
+            if let detection = presentation.detection {
+                IslandSurface(
+                    isCollapsed: !isExpanded,
+                    collapsedSize: CGSize(
+                        width: geometry.size.width,
+                        height: min(geometry.size.height, presentation.islandTopHeight)
+                    ),
+                    expandedSize: geometry.size,
+                    visualStyle: presentation.visualStyle,
+                    collapsedTopCornerRadius: 0,
+                    bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
+                ) {
+                    VStack(spacing: 0) {
+                        toastHeader(detection)
+                        if isExpanded, let content = expandableContent(detection) {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.08))
+                                .frame(height: 0.5)
+                                .padding(.horizontal, 14)
+                            expandedContentView(content)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     }
-                    .overlay {
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                }
+                .overlay {
+                    TimelineView(
+                        .animation(
+                            minimumInterval: 1.0 / 30.0,
+                            paused: !isDismissalProgressActive
+                        )
+                    ) { context in
                         if !isExpanded,
                            presentation.progressGlowEnabled,
                            let progress = controller.dismissalProgress(at: context.date) {
@@ -628,12 +628,12 @@ struct ClipboardAssistantToastView: View {
                                 ))
                         }
                     }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.85), value: presentation.detection)
-                    .onChange(of: presentation.detection) {
-                        // A new copy collapses any previously expanded preview.
-                        if isExpanded { isExpanded = false }
-                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: presentation.detection)
+                .onChange(of: presentation.detection) {
+                    // A new copy collapses any previously expanded preview.
+                    if isExpanded { isExpanded = false }
                 }
             }
         }
@@ -1038,6 +1038,7 @@ struct ClipboardAssistantToastView: View {
         case .openService(let service, _): service.localizedTitleKey
         case .openDownload: "下载"
         case .revealInFinder: "在 Finder 中显示"
+        case .openFolder: "打开文件夹"
         case .search: "搜索"
         case .translate: "翻译"
         case .composeMail: "写邮件"

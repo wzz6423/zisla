@@ -4,10 +4,10 @@ export const tr = createCatalog({
   meta: {
     documentTitle: 'zisla · Dinamik çalışma alanı',
     description:
-      'zisla, macOS için yerel ve dinamik bir çalışma alanıdır. AI görevlerini, medyayı, dosyaları ve gündeminizi klavye sesleri, yazma istatistikleri, ekran görüntüsü açıklamaları ve kopyalama yardımcısıyla tek yerde tutar.',
+      'zisla, macOS için yerel ve dinamik bir çalışma alanıdır. AI görevlerini, medyayı, dosyaları ve gündeminizi klavye sesleri, yazma istatistikleri, ekran görüntüsü açıklamaları ve hızlı eylemlerle tek yerde tutar.',
     ogTitle: 'zisla · Olan biteni görebileceğiniz yere taşıyın',
     ogDescription:
-      'AI görevlerinden ve medya oynatmadan klavye seslerine, yazma istatistiklerine, kopyalama yardımcısına, ekran görüntüsü açıklamalarına ve masaüstü araçlarına kadar — yalnızca gerektiğinde görünen yerel bir macOS çalışma alanı.',
+      'AI görevlerinden ve medya oynatmadan klavye seslerine, yazma istatistiklerine, hızlı eylemlere, ekran görüntüsü açıklamalarına ve masaüstü araçlarına kadar — yalnızca gerektiğinde görünen yerel bir macOS çalışma alanı.',
   },
   tagline: 'Yerel macOS dinamik çalışma alanı',
   header: {
@@ -31,7 +31,7 @@ export const tr = createCatalog({
     eyebrow: 'YEREL MACOS ÇALIŞMA ALANI',
     title: 'zisla<br><em>Olan biteni,<br>tam da<br class="hero-mobile-break"> görebileceğiniz yerde.</em>',
     lede:
-      'AI görevlerini, medyayı, dosyaları ve gündeminizi ekranın üst kısmında toplayın. Bir şeyi kopyaladıktan sonra ayrı bir yardımcı çubuğu içeriği orada önizler ve sonraki adımı önerir. Gerektiğinde görünür, işiniz bittiğinde kenara çekilir.',
+      'AI görevlerini, medyayı, dosyaları ve gündeminizi ekranın üst kısmında toplayın. Bir şeyi kopyaladıktan sonra ayrı bir hızlı eylem çubuğu içeriği orada önizler ve sonraki adımı önerir. Gerektiğinde görünür, işiniz bittiğinde kenara çekilir.',
     downloadCta: 'İndir',
     downloadCtaAriaLabel: 'zisla indir',
     sourceCta: 'Kaynak kodunu görüntüle',
@@ -61,7 +61,7 @@ export const tr = createCatalog({
     summaryMono: '{modules} MODÜL / {groups} İŞ AKIŞI',
     summaryLede: 'Ekran üstü iş akışlarından yerel araçlara kadar tamamlayabileceğiniz her görev burada açıklanır.',
     summaryNote:
-      'Ekran üstü {modules} modül ve ekran görüntüleri, ses, medya, indirmeler, kopyalama yardımcısı, AI yönetimi, evcil hayvan ve kilit ekranını kapsayan {features} bağımsız özellik.',
+      'Ekran üstü {modules} modül ve ekran görüntüleri, ses, medya, indirmeler, hızlı eylemler, AI yönetimi, evcil hayvan ve kilit ekranını kapsayan {features} bağımsız özellik.',
     groupNames: {
       island: 'Ekran üstü iş akışları',
       ai: 'AI iş akışı',
@@ -93,13 +93,13 @@ export const tr = createCatalog({
     ariaLabel: 'Bağımsız masaüstü özellikleri',
     summaryMono: 'ADANIN ÖTESİNDE',
     summaryLede: 'Sık kullanılan özellikler, her biri doğal yerinde.',
-    summaryNote: 'Ekran görüntüleri, kayıt, medya, tarayıcı indirmeleri, kopyalama yardımcısı, AI yönetimi, evcil hayvan ve kilit ekranı ayrı ayrı sunulur.',
+    summaryNote: 'Ekran görüntüleri, kayıt, medya, tarayıcı indirmeleri, hızlı eylemler, AI yönetimi, evcil hayvan ve kilit ekranı ayrı ayrı sunulur.',
     features: {
       capture: { title: 'Ekran görüntüleri, kaydırmalı yakalama ve sabitleme', description: 'Global bir kısayolla ekranın bir bölümünü yakalayın veya sabitleyin; açıklama ekleyin, kaydırmalı görüntüyü birleştirin ve tabloları tanıyıp dışa aktarın. Hâlâ düzenlediğiniz metin açıklamaları dışa aktarırken korunur.', detail: 'Global kısayol · Açıklama ve geri alma · Düzenlemeler dışa aktarımda korunur' },
       voice: { title: 'Sesli giriş ve temizleme', description: 'Bir tuşla geçiş yapın veya konuşmak için basılı tutun; sistemin konuşma tanıyıcısını kullanır. Gerektiğinde alan sözlükleri, özel etkin sözcükler, yapılandırılmış biçimlendirme ya da yerel veya uzak modelle temizleme ekleyin.', detail: 'İki kayıt modu · Sözlükler ve etkin sözcükler · İsteğe bağlı model temizleme' },
       media: { title: 'Medya ve sistem ortam sesleri', description: 'Çalan içeriği adanın üstünden kontrol edin veya bir macOS sistem ortam sesi seçin. Ekran kilitlendiğinde, ekran koruyucu başladığında ya da ekran uykuya geçtiğinde otomatik olarak durabilir.', detail: 'Oynatma denetimi · Eşzamanlı şarkı sözleri · Ortam sesi otomatik durur' },
       browserDownloads: { title: 'Tarayıcı indirme ilerlemesi', description: 'Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera ve Arc indirmelerini algılar; kaynaklarını ve canlı ilerlemeyi ekranın üstünde gösterir.', detail: '8 tarayıcı · Kaynak algılama · Tamamlanma bildirimi' },
-      copyAssistant: { title: 'Kopyalama yardımcısı ve akıllı sonraki adımlar', description: 'Etkinleştirildiğinde kopyalanan metin, bağlantı, dosya veya görüntü ayrı bir üst çubukta önizlenir; açma, Finder\'da gösterme, arama, çevirme, hesaplama veya kaydetme gibi sonraki adımlar yalnızca onayınızdan sonra gerçekleştirilir.', detail: 'İsteğe bağlı anahtar · Cihazda tanıma · Varsayılan Command+N' },
+      copyAssistant: { title: 'Hızlı Eylemler ve akıllı sonraki adımlar', description: 'Etkinleştirildiğinde kopyalanan metin, bağlantı, dosya veya görüntü ayrı bir üst çubukta önizlenir; açma, Finder\'da gösterme, arama, çevirme, hesaplama veya kaydetme gibi sonraki adımlar yalnızca onayınızdan sonra gerçekleştirilir. Tarayıcı indirmesi veya AirDrop ile dosya alımı tamamlandığında aynı kısayol dosyanın klasörünü açabilir; Hızlı Eylemler anahtarı bu özelliği tarayıcı indirme ilerlemesi anahtarından bağımsız yönetir.', detail: 'İsteğe bağlı anahtar · Cihazda tanıma · Varsayılan Command+N' },
       aiManagement: { title: 'AI CLI ve Skills yönetimi', description: 'Ayarlar\'dan popüler AI CLI\'larını algılayın, kurun, güncelleyin ve kaldırın; yerel Skills\'leri inceleyip yönetin, böylece terminaller ve araçlar arasında daha az geçiş yapın.', detail: 'Algıla ve kur · Güncelle ve kaldır · Yerel Skills' },
       pet: { title: 'Ada evcil hayvanı', description: 'Yerleşik evcil hayvanlardan birini seçin ve adanın soluna veya sağına yerleştirin. İstediğiniz zaman kapatın.', detail: 'Yerleşik karakterler · Sol veya sağ · İstediğinizde açın' },
       lockScreen: { title: 'Kilit ekranı bilgileri', description: 'Tarihi, durumu ve çalan içeriği isteğe bağlı olarak macOS kilit ekranında gösterin. Bu ayrı bir kilit ekranı katmanıdır; ada modül listesinde veya döngüsünde görünmez.', detail: 'Ayrı kilit ekranı katmanı · İsteğe bağlı · Odağı almaz' },
@@ -167,7 +167,7 @@ export const tr = createCatalog({
     items: {
       audience: { question: 'zisla kimler için?', answer: 'AI, medya, dosyalar ve gündemini tek yerde görmek isteyen Mac kullanıcıları için. Çentiksiz ekranlar da desteklenir.' },
       aiPrivacy: { question: 'zisla AI konuşmalarımı okur mu?', answer: 'Hayır. AI durum izleyicisi yalnızca görev durumunu okur; istem veya yanıt metnini okumaz.' },
-      copyAssistant: { question: 'Kopyalama yardımcısı kopyaladıklarımı açar veya yükler mi?', answer: 'Hayır. Etkinleştirildiğinde tanıma ve önizleme tamamen Mac\'inizde gerçekleşir; zisla sonraki adımı yalnızca tıkladığınızda veya hızlı kısayola bastığınızda yürütür.' },
+      copyAssistant: { question: 'Hızlı Eylemler kopyaladıklarımı açar veya yükler mi?', answer: 'Hayır. Etkinleştirildiğinde tanıma ve önizleme tamamen Mac\'inizde gerçekleşir; zisla sonraki adımı yalnızca tıkladığınızda veya hızlı kısayola bastığınızda yürütür.' },
       permissions: {
         question: 'zisla hangi sistem izinlerine ihtiyaç duyar?',
         answer: `

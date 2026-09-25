@@ -4,10 +4,10 @@ export const ptBR = createCatalog({
   meta: {
     documentTitle: 'zisla · Espaço de trabalho dinâmico',
     description:
-      'O zisla é um espaço de trabalho dinâmico nativo para macOS. Reúne tarefas de IA, mídia, arquivos e agenda, além de sons do teclado, estatísticas de digitação, anotações de capturas e um assistente de cópia.',
+      'O zisla é um espaço de trabalho dinâmico nativo para macOS. Reúne tarefas de IA, mídia, arquivos e agenda, além de sons do teclado, estatísticas de digitação, anotações de capturas e ações rápidas.',
     ogTitle: 'zisla · Coloque o que está acontecendo onde você pode ver',
     ogDescription:
-      'De tarefas de IA e mídia a sons do teclado, estatísticas de digitação, assistente de cópia, anotações de capturas e ferramentas de desktop: um espaço nativo do macOS que aparece quando você precisa.',
+      'De tarefas de IA e mídia a sons do teclado, estatísticas de digitação, ações rápidas, anotações de capturas e ferramentas de desktop: um espaço nativo do macOS que aparece quando você precisa.',
   },
   tagline: 'Espaço de trabalho dinâmico nativo para macOS',
   header: {
@@ -31,7 +31,7 @@ export const ptBR = createCatalog({
     eyebrow: 'ESPAÇO DE TRABALHO NATIVO PARA MACOS',
     title: 'zisla<br><em>O que está acontecendo,<br>bem onde<br class="hero-mobile-break"> você pode ver.</em>',
     lede:
-      'Reúna tarefas de IA, mídia, arquivos e agenda no topo da tela. Depois de copiar algo, uma barra de assistência separada mostra uma prévia e sugere o próximo passo. Ela aparece quando necessário e sai do caminho quando você termina.',
+      'Reúna tarefas de IA, mídia, arquivos e agenda no topo da tela. Depois de copiar algo, uma barra de ações rápidas separada mostra uma prévia e sugere o próximo passo. Ela aparece quando necessário e sai do caminho quando você termina.',
     downloadCta: 'Baixar',
     downloadCtaAriaLabel: 'Baixar',
     sourceCta: 'Ver código',
@@ -62,7 +62,7 @@ export const ptBR = createCatalog({
     summaryLede:
       'Dos fluxos no topo às ferramentas locais, cada tarefa que você realmente pode concluir está descrita aqui.',
     summaryNote:
-      '{modules} módulos no topo e {features} recursos independentes para capturas, voz, mídia, downloads, assistente de cópia, gestão de IA, mascote e tela bloqueada.',
+      '{modules} módulos no topo e {features} recursos independentes para capturas, voz, mídia, downloads, ações rápidas, gestão de IA, mascote e tela bloqueada.',
     groupNames: {
       island: 'Fluxos no topo',
       ai: 'Fluxo de IA',
@@ -161,7 +161,7 @@ export const ptBR = createCatalog({
     summaryMono: 'ALÉM DA ILHA',
     summaryLede: 'Recursos frequentes, cada um em seu lugar natural.',
     summaryNote:
-      'Capturas, gravação, mídia, downloads do navegador, assistente de cópia, gestão de IA, mascote e tela bloqueada são apresentados separadamente.',
+      'Capturas, gravação, mídia, downloads do navegador, ações rápidas, gestão de IA, mascote e tela bloqueada são apresentados separadamente.',
     features: {
       capture: {
         title: 'Capturas, rolagem e fixação',
@@ -188,9 +188,9 @@ export const ptBR = createCatalog({
         detail: '8 navegadores · Detecção de origem · Aviso de conclusão',
       },
       copyAssistant: {
-        title: 'Assistente de cópia e próximos passos',
+        title: 'Ações rápidas e próximos passos',
         description:
-          'Quando ativado, mostra uma prévia de textos, links, arquivos ou imagens copiados em uma barra separada e sugere abrir, mostrar no Finder, buscar, traduzir, calcular ou salvar, somente após sua confirmação.',
+          'Com a função ativada, mostra uma prévia de textos, links, arquivos ou imagens copiados em uma barra separada e sugere abrir, mostrar no Finder, buscar, traduzir, calcular ou salvar, somente após sua confirmação. Ao concluir um download do navegador ou receber um arquivo por AirDrop, o mesmo atalho pode abrir sua pasta; a opção Ações rápidas é independente do progresso dos downloads do navegador.',
         detail: 'Ativação opcional · Reconhecimento local · Command+N por padrão',
       },
       aiManagement: {
@@ -295,7 +295,7 @@ export const ptBR = createCatalog({
         answer: 'Não. O monitor de IA lê apenas o estado das tarefas, nunca o texto de prompts ou respostas.',
       },
       copyAssistant: {
-        question: 'O assistente de cópia abre ou envia o que copio?',
+        question: 'As ações rápidas abrem ou enviam o que copio?',
         answer: 'Não. O reconhecimento e a prévia acontecem no Mac, e o próximo passo só é executado após sua confirmação.',
       },
       permissions: {

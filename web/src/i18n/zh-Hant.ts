@@ -4,10 +4,10 @@ export const zhHant: SiteContent = {
   meta: {
     documentTitle: 'zisla · 動態工作空間',
     description:
-      'zisla：專為 macOS 打造的原生動態工作空間。集中檢視 Zed Agent 等 AI 任務、媒體、檔案與行程，並使用鍵盤音效、輸入統計、截圖標註與複製助理。',
+      'zisla：專為 macOS 打造的原生動態工作空間。集中檢視 Zed Agent 等 AI 任務、媒體、檔案與行程，並使用鍵盤音效、輸入統計、截圖標註與快捷操作。',
     ogTitle: 'zisla · 把正在發生的事放到你看得見的地方',
     ogDescription:
-      '從 Zed Agent 等 AI 任務與媒體，到鍵盤音效、輸入統計、複製助理、截圖標註與桌面工具，一個隨需出現的原生 macOS 工作空間。',
+      '從 Zed Agent 等 AI 任務與媒體，到鍵盤音效、輸入統計、快捷操作、截圖標註與桌面工具，一個隨需出現的原生 macOS 工作空間。',
   },
   tagline: '原生 macOS 動態工作空間',
   header: {
@@ -31,7 +31,7 @@ export const zhHant: SiteContent = {
     eyebrow: '原生 MACOS 工作空間',
     title:
       'zisla<br><em>把正在發生的事<br>放到你看得<br class="hero-mobile-break">見的地方。</em>',
-    lede: '把 AI 任務、媒體、檔案與行程收進螢幕頂端；複製後，獨立的助理提示列會在螢幕上方預覽內容並給出下一步。需要時出現，完成後收起。',
+    lede: '把 AI 任務、媒體、檔案與行程收進螢幕頂端；複製後，獨立的快捷操作提示列會在螢幕上方預覽內容並給出下一步。需要時出現，完成後收起。',
     downloadCta: '下載',
     downloadCtaAriaLabel: '下載',
     sourceCta: '檢視原始碼',
@@ -60,7 +60,7 @@ export const zhHant: SiteContent = {
     summaryMono: '{modules} 個模組 / {groups} 類工作流程',
     summaryLede: '從頂端工作流程到本機工具，實際能完成的任務都在這裡逐項寫清楚。',
     summaryNote:
-      '{modules} 個頂端模組 + {features} 項獨立能力，涵蓋截圖、語音、媒體、下載、複製助理、AI 管理、寵物與鎖定畫面。',
+      '{modules} 個頂端模組 + {features} 項獨立能力，涵蓋截圖、語音、媒體、下載、快捷操作、AI 管理、寵物與鎖定畫面。',
     groupNames: {
       island: '頂端工作流程',
       ai: 'AI 工作流程',
@@ -156,7 +156,7 @@ export const zhHant: SiteContent = {
     ariaLabel: '獨立桌面能力',
     summaryMono: '靈動島之外',
     summaryLede: '常用能力，各在最順手的位置。',
-    summaryNote: '截圖、錄音、媒體、瀏覽器下載、複製助理、AI 管理、寵物與鎖定畫面各自獨立呈現。',
+    summaryNote: '截圖、錄音、媒體、瀏覽器下載、快捷操作、AI 管理、寵物與鎖定畫面各自獨立呈現。',
     features: {
       capture: {
         title: '截圖、長截圖與釘圖',
@@ -183,9 +183,9 @@ export const zhHant: SiteContent = {
         detail: '8 種瀏覽器 · 來源辨識 · 完成提示',
       },
       copyAssistant: {
-        title: '複製助理與智慧下一步',
+        title: '快捷操作與智慧下一步',
         description:
-          '啟用後，複製文字、連結、檔案或圖片會在獨立的頂端提示列中預覽；可辨識連結、本機已安裝應用程式名稱和 Emoji 名稱，也可按即時匯率換算複製的金額，所有下一步均由你確認後執行。',
+          '啟用後，複製文字、連結、檔案或圖片會在獨立的頂端提示列中預覽；可辨識連結、本機已安裝應用程式名稱和 Emoji 名稱，也可按即時匯率換算複製的金額，所有下一步均由你確認後執行。瀏覽器下載或 AirDrop 檔案接收完成後，也可用同一快捷鍵開啟檔案所在資料夾；此功能由快捷操作開關控制，與瀏覽器下載進度開關獨立。',
         detail: '本機辨識 · 即時匯率換算 · 預設 Command+N',
       },
       aiManagement: {
@@ -288,7 +288,7 @@ export const zhHant: SiteContent = {
         answer: '不會。AI 狀態監控只讀取任務狀態，不讀取提示詞或回覆內容。',
       },
       copyAssistant: {
-        question: '複製助理會自動開啟或上傳我複製的內容嗎？',
+        question: '快捷操作會自動開啟或上傳我複製的內容嗎？',
         answer:
           '不會。啟用後，內容辨識與預覽都在本機完成；只有你點按動作或按下快速觸發後，zisla 才會執行對應的下一步。',
       },

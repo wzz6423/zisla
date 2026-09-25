@@ -580,6 +580,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var clipboardDetectionEnabled: Bool
     /// Whether copying shows the assistant toast with a recognized result and next-step action.
     public var clipboardAssistantEnabled: Bool
+    /// Whether completed browser downloads and AirDrop transfers offer an Open Folder action.
+    public var downloadCompletionFolderActionEnabled: Bool
     /// Quick trigger hotkey firing the assistant's primary action while its toast is visible.
     /// Modifier-only presets fire on double-tap; ordinary combos fire on key-down.
     public var clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration
@@ -605,7 +607,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var clipboardAssistantLightweightMode: Bool
     /// Default time before the clipboard assistant closes automatically.
     public var clipboardAssistantDisplayDuration: ClipboardAssistantDisplayDuration
-    /// Whether image saves should ask for a destination instead of using the shared download directory.
+    /// Whether assistant file saves should ask for a destination instead of using the shared download directory.
     public var clipboardAssistantPromptsForImageSaveLocation: Bool
     /// Hold left mouse button + right-click to copy the selection (simulated ⌘C); off by default.
     /// Requires input monitoring and accessibility permissions.
@@ -714,6 +716,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardHistoryEnabled: Bool = true,
         clipboardDetectionEnabled: Bool = true,
         clipboardAssistantEnabled: Bool = true,
+        downloadCompletionFolderActionEnabled: Bool = true,
         clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration = .default,
         clipboardAssistantMouseButton: Int? = nil,
         clipboardAssistantBlacklist: Set<String> = [],
@@ -806,6 +809,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.clipboardHistoryEnabled = clipboardHistoryEnabled
         self.clipboardDetectionEnabled = clipboardDetectionEnabled
         self.clipboardAssistantEnabled = clipboardAssistantEnabled
+        self.downloadCompletionFolderActionEnabled = downloadCompletionFolderActionEnabled
         self.clipboardAssistantTriggerConfiguration = clipboardAssistantTriggerConfiguration
         self.clipboardAssistantMouseButton = clipboardAssistantMouseButton
         self.clipboardAssistantBlacklist = clipboardAssistantBlacklist
@@ -942,6 +946,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardHistoryEnabled
         case clipboardDetectionEnabled
         case clipboardAssistantEnabled
+        case downloadCompletionFolderActionEnabled
         case clipboardAssistantTriggerConfiguration
         case clipboardAssistantMouseButton
         case clipboardAssistantBlacklist
@@ -1084,6 +1089,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .clipboardAssistantEnabled
         ) ?? defaults.clipboardAssistantEnabled
+        downloadCompletionFolderActionEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .downloadCompletionFolderActionEnabled
+        ) ?? defaults.downloadCompletionFolderActionEnabled
         clipboardAssistantTriggerConfiguration = try container.decodeIfPresent(
             ClipboardAssistantTriggerConfiguration.self,
             forKey: .clipboardAssistantTriggerConfiguration

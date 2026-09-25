@@ -19,6 +19,29 @@ struct IslandRecycleAnimationTests {
     }
 
     @Test
+    func quickNoteClipboardAssistantWaitsUntilTheFoldSettles() throws {
+        #expect(ZislaMotion.islandRecycleSettleDelay == .milliseconds(280))
+
+        let app = try Self.source(of: "ZislaApp.swift")
+        let callbackStart = try #require(app.range(of: "coordinator.onVisibilityChanged ="))
+        let callbackEnd = try #require(app[callbackStart.upperBound...].range(of: "coordinator.onDraggingChanged ="))
+        let callback = app[callbackStart.lowerBound..<callbackEnd.lowerBound]
+        let begin = try #require(callback.range(of: "model.islandDidBeginRecycling()"))
+        let wait = try #require(callback.range(of: "Task.sleep(for: ZislaMotion.islandRecycleSettleDelay)"))
+        let finish = try #require(callback.range(of: "model.islandDidFinishRecycling()"))
+        #expect(begin.lowerBound < wait.lowerBound && wait.lowerBound < finish.lowerBound)
+        #expect(callback.contains("model.islandDidReexpand()"))
+
+        let model = try Self.source(of: "AppModel.swift")
+        #expect(model.contains("if islandClipboardHandoff.shouldDefer {"))
+        let copyStart = try #require(model.range(of: "func quickNoteDidCopy()"))
+        let copyEnd = try #require(model[copyStart.upperBound...].range(of: "func islandDidBeginRecycling()"))
+        #expect(model[copyStart.lowerBound..<copyEnd.lowerBound].contains("islandCollapseRequested = true"))
+        let note = try Self.source(of: "QuickNoteModuleView.swift")
+        #expect(note.contains("onCopy: model.quickNoteDidCopy"))
+    }
+
+    @Test
     func theRevealMaskFoldsBackWithTheRecycleToken() throws {
         let source = try Self.source(of: "IslandSurface.swift")
         let maskStart = try #require(source.range(of: ".mask {"))
