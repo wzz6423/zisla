@@ -96,7 +96,7 @@ struct AIProgressModuleView: View {
 
 }
 
-private struct UsageTrendChart: View {
+struct UsageTrendChart: View {
     var series: [UsageBreakdownPoint]
 
     private var yScale: AIUsageAnalytics.TokenAxisScale {
@@ -118,10 +118,6 @@ private struct UsageTrendChart: View {
             return first...last
         }
         return start...end
-    }
-
-    private var xAxisValues: [Date] {
-        series.map(\.timestamp)
     }
 
     var body: some View {
@@ -172,13 +168,21 @@ private struct UsageTrendChart: View {
                 }
             }
         }
-        .chartXAxis {
-            AxisMarks(values: xAxisValues) { value in
-                AxisValueLabel(anchor: .top) {
-                    if let date = value.as(Date.self) {
-                        Text(date, format: .dateTime.month(.twoDigits).day(.twoDigits))
-                            .font(.islandMicro(design: .monospaced))
-                            .foregroundStyle(.secondary)
+        .chartXAxis(.hidden)
+        .chartPlotStyle { plot in
+            plot.padding(.bottom, 14)
+        }
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                if let plotFrame = proxy.plotFrame {
+                    let frame = geometry[plotFrame]
+                    ForEach(series, id: \.timestamp) { point in
+                        if let x = proxy.position(forX: point.timestamp) {
+                            Text(point.timestamp, format: .dateTime.month(.twoDigits).day(.twoDigits))
+                                .font(.islandMicro(design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .position(x: frame.minX + x, y: frame.maxY + 8)
+                        }
                     }
                 }
             }
