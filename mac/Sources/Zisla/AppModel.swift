@@ -2546,6 +2546,7 @@ final class AppModel: ObservableObject {
   }
 
   private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
+    windowPreview.setVisualStyle(settings.islandVisualStyle)
     windowPreview.configure(
       enabled: settings.windowPreviewsEnabled,
       requestPermissions: requestWindowPreviewPermissions

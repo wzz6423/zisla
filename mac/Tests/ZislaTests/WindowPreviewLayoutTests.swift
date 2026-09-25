@@ -511,6 +511,7 @@ struct WindowPreviewPanelTests {
     func previewPanelUsesNativeGlassOnSupportedSystems() throws {
         guard #available(macOS 26.0, *) else { return }
         let controller = WindowPreviewController()
+        controller.setVisualStyle(.transparent)
         let panel = controller.makePanel()
         defer { panel.close() }
         panel.setFrame(CGRect(x: 100, y: 100, width: 226, height: 168), display: true)
@@ -531,8 +532,81 @@ struct WindowPreviewPanelTests {
     }
 
     @Test
+    func frostedPreviewUsesMaterialInsteadOfNativeGlass() throws {
+        let host = NSHostingView(rootView: WindowPreviewView.previewBackground(
+            reduceTransparency: false, visualStyle: .frosted
+        ))
+        host.frame = CGRect(x: 0, y: 0, width: 226, height: 168)
+        host.layoutSubtreeIfNeeded()
+        host.displayIfNeeded()
+
+        if #available(macOS 26.0, *) {
+            #expect(nativeGlass(in: host) == nil)
+        }
+        let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        let pixel = try #require(bitmap.colorAt(x: 30, y: 30))
+        #expect(pixel.alphaComponent > 0.5)
+    }
+
+    @Test
+    func visiblePreviewFollowsVisualStyleChanges() async throws {
+        guard #available(macOS 26.0, *) else { return }
+        let controller = WindowPreviewController()
+        let panel = controller.makePanel()
+        defer {
+            panel.orderOut(nil)
+            panel.close()
+        }
+        panel.setFrame(CGRect(x: 100, y: 100, width: 226, height: 168), display: true)
+        panel.alphaValue = 0
+        panel.orderFrontRegardless()
+        let content = try #require(panel.contentView)
+        #expect(panel.isVisible)
+        content.layoutSubtreeIfNeeded()
+        #expect(nativeGlass(in: content) != nil)
+
+        controller.setVisualStyle(.frosted)
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        content.layoutSubtreeIfNeeded()
+        #expect(nativeGlass(in: content) == nil)
+
+        controller.setVisualStyle(.transparent)
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        content.layoutSubtreeIfNeeded()
+        #expect(nativeGlass(in: content) != nil)
+    }
+
+    @Test
+    func previewGlassStaysActiveWithoutTakingKeyFocus() throws {
+        let controller = WindowPreviewController()
+        let panel = controller.makePanel()
+        defer {
+            panel.orderOut(nil)
+            panel.close()
+        }
+        let selectorName = "_hasActiveAppearance"
+        let selector = Selector(selectorName)
+        let method = try #require(class_getInstanceMethod(WindowPreviewPanel.self, selector))
+        let baseMethod = try #require(class_getInstanceMethod(NSPanel.self, selector))
+        typealias BoolQuery = @convention(c) (AnyObject, Selector) -> Bool
+        let query = unsafeBitCast(method_getImplementation(method), to: BoolQuery.self)
+        panel.orderFrontRegardless()
+
+        #expect(method_getImplementation(method) != method_getImplementation(baseMethod))
+        #expect(query(panel, selector))
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test
     func reducedTransparencyUsesAnOpaqueBackgroundWithoutNativeGlass() throws {
-        let host = NSHostingView(rootView: WindowPreviewView.previewBackground(reduceTransparency: true))
+        let host = NSHostingView(rootView: WindowPreviewView.previewBackground(
+            reduceTransparency: true, visualStyle: .transparent
+        ))
         host.frame = CGRect(x: 0, y: 0, width: 226, height: 168)
         host.layoutSubtreeIfNeeded()
         host.displayIfNeeded()

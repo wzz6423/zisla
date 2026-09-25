@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import ScreenCaptureKit
 import SwiftUI
+import ZislaCore
 import ZislaKit
 
 enum WindowPreviewSource {
@@ -314,6 +315,10 @@ struct WindowPreviewWindowMatch {
 final class WindowPreviewPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    // Mirror IslandPanel so native glass remains refractive without taking focus.
+    @objc(_hasActiveAppearance)
+    private func previewHasActiveAppearance() -> Bool { true }
 }
 
 final class WindowPreviewHostingView<Content: View>: NSHostingView<Content> {
@@ -407,6 +412,7 @@ final class WindowPreviewController: ObservableObject {
     @Published private(set) var appName = ""
     @Published private(set) var appIcon: NSImage?
     @Published private(set) var windows: [WindowPreviewSnapshot] = []
+    @Published private(set) var visualStyle: IslandVisualStyle = .transparent
 
     private var enabled = false
     private var globalMonitor: Any?
@@ -435,6 +441,11 @@ final class WindowPreviewController: ObservableObject {
 
     init(dependencies: Dependencies = Dependencies()) {
         self.dependencies = dependencies
+    }
+
+    func setVisualStyle(_ style: IslandVisualStyle) {
+        guard visualStyle != style else { return }
+        visualStyle = style
     }
 
     func configure(enabled: Bool, requestPermissions: Bool = false) {
@@ -1006,15 +1017,20 @@ struct WindowPreviewView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background { Self.previewBackground(reduceTransparency: reduceTransparency) }
+        .background {
+            Self.previewBackground(
+                reduceTransparency: reduceTransparency,
+                visualStyle: controller.visualStyle
+            )
+        }
     }
 
     @ViewBuilder
-    static func previewBackground(reduceTransparency: Bool) -> some View {
+    static func previewBackground(reduceTransparency: Bool, visualStyle: IslandVisualStyle) -> some View {
         if reduceTransparency {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(nsColor: .windowBackgroundColor))
-        } else if #available(macOS 26.0, *) {
+        } else if visualStyle == .transparent, #available(macOS 26.0, *) {
             LiquidGlassPaneBackground(cornerRadius: 12)
         } else {
             RoundedRectangle(cornerRadius: 12)
