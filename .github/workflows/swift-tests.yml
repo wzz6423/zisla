@@ -70,14 +70,15 @@ jobs:
       - name: Run swift test
         run: |
           # AppKit-heavy app tests can starve service timers in SwiftPM's shared test process.
-          for target in ZislaCoreTests ZislaKitTests ZislaTests; do
-            swift test --filter "^${target}\." --skip '^ZislaTests\.(Mail(HTMLView|PaginationView)|BrowserDownloadQuickAction|ClipboardAssistantCurrencyPresentation|ThinScrollChrome)Tests'
-          done
-          swift test --filter '^ZislaTests\.BrowserDownloadQuickActionTests'
-          swift test --filter '^ZislaTests\.ClipboardAssistantCurrencyPresentationTests'
-          swift test --filter '^ZislaTests\.ThinScrollChromeTests'
+          zsh Scripts/swift-test.sh --filter '^ZislaCoreTests\.'
+          zsh Scripts/swift-test-suites.sh ZislaKitTests
+          zsh Scripts/swift-test.sh --filter '^ZislaTests\.' --skip '^ZislaTests\.(Mail(HTMLView|PaginationView)|BrowserDownloadQuickAction|ClipboardAssistant(Calendar|Currency)Presentation|ThinScrollChrome)Tests'
+          zsh Scripts/swift-test.sh --filter '^ZislaTests\.BrowserDownloadQuickActionTests'
+          zsh Scripts/swift-test.sh --filter '^ZislaTests\.ClipboardAssistantCalendarPresentationTests'
+          zsh Scripts/swift-test.sh --filter '^ZislaTests\.ClipboardAssistantCurrencyPresentationTests'
+          zsh Scripts/swift-test.sh --filter '^ZislaTests\.ThinScrollChromeTests'
           # Run mail UI tests in their own process so unrelated modal UI cannot starve WebKit.
-          swift test --filter '^ZislaTests\.Mail(HTMLView|PaginationView)Tests'
+          zsh Scripts/swift-test.sh --filter '^ZislaTests\.Mail(HTMLView|PaginationView)Tests'
       - name: Remove test artifacts
         if: always()
         run: rm -rf .build
