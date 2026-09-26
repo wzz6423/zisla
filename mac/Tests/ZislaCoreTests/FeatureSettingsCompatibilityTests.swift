@@ -233,7 +233,7 @@ struct FeatureSettingsCompatibilityTests {
 
         #expect(decoded.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.text, .nonSystemLanguageText, .emojiName]).union([.address, .flight, .train, .tracking, .meeting]))
         #expect(decoded.clipboardAssistantActionOrders[.nonSystemLanguageText] == [
-            .search, .translate, .saveText, .addToQuickNote, .sendToTeleprompter, .share,
+            .search, .translate, .saveText, .addToQuickNote, .sendToTeleprompter, .share, .autoTranslate,
         ])
 
         let reencoded = String(

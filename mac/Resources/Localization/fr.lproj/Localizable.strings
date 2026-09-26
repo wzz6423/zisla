@@ -2503,3 +2503,15 @@
 
 "窗口预览" = "Aperçu des fenêtres";
 "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Prévisualisez les fenêtres en survolant le Dock ou avec Command-Tab ; autorisations Accessibilité et Enregistrement de l’écran requises";
+
+"自动翻译" = "Traduction automatique";
+
+"正在翻译…" = "Traduction en cours…";
+
+"翻译失败，请重试或使用浏览器翻译" = "Échec de la traduction. Réessayez ou traduisez dans votre navigateur.";
+
+"关闭弹窗快捷键" = "Raccourci pour fermer la fenêtre contextuelle";
+"弹窗可见时连按 %@ 关闭当前弹窗" = "Appuyez deux fois sur %@ pour fermer la fenêtre contextuelle lorsqu’elle est visible";
+"弹窗可见时按下 %@ 关闭当前弹窗" = "Appuyez sur %@ pour fermer la fenêtre contextuelle lorsqu’elle est visible";
+"关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "Le raccourci de fermeture n’a pas pu être activé. Vérifiez les conflits de raccourcis ou l’autorisation de surveillance de l’entrée.";
+"关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Le raccourci de fermeture correspond à celui d’une action. La fermeture de la fenêtre contextuelle est prioritaire.";
