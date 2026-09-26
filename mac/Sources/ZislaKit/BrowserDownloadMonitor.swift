@@ -635,7 +635,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
     private func subscribe(to directory: URL, callbackGeneration: UInt64) {
         let directory = directory.standardizedFileURL.resolvingSymlinksInPath()
         guard subscriberTokens[directory] == nil else { return }
-        let token = Progress.addSubscriber(forFileURL: directory) { [weak self] published in
+        let token = Progress.addSubscriber(forFileURL: directory) { @Sendable [weak self] published in
             let entryToken = UUID()
             let box = ProgressBox(published)
             DispatchQueue.main.async { [weak self] in
