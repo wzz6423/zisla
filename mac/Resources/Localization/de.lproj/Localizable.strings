@@ -2508,3 +2508,15 @@
 
 "窗口预览" = "Fenstervorschau";
 "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Fenster beim Zeigen auf das Dock oder mit Command-Tab ansehen; Bedienungshilfen und Bildschirmaufnahme erforderlich";
+
+"自动翻译" = "Automatisch übersetzen";
+
+"正在翻译…" = "Wird übersetzt…";
+
+"翻译失败，请重试或使用浏览器翻译" = "Übersetzung fehlgeschlagen. Erneut versuchen oder im Browser übersetzen.";
+
+"关闭弹窗快捷键" = "Kurzbefehl zum Schließen des Pop-ups";
+"弹窗可见时连按 %@ 关闭当前弹窗" = "Bei sichtbarem Pop-up %@ zweimal drücken, um es zu schließen";
+"弹窗可见时按下 %@ 关闭当前弹窗" = "Bei sichtbarem Pop-up %@ drücken, um es zu schließen";
+"关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "Der Kurzbefehl zum Schließen konnte nicht aktiviert werden. Prüfe auf Kurzbefehlkonflikte oder die Berechtigung zur Eingabeüberwachung.";
+"关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Der Kurzbefehl zum Schließen entspricht einem Aktionskurzbefehl. Das Schließen des Pop-ups hat Vorrang.";

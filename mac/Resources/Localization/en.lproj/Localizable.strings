@@ -2506,3 +2506,15 @@
 
 "窗口预览" = "Window Previews";
 "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Preview windows on Dock hover or with Command-Tab; requires Accessibility and Screen Recording permissions";
+
+"自动翻译" = "Auto Translate";
+
+"正在翻译…" = "Translating…";
+
+"翻译失败，请重试或使用浏览器翻译" = "Translation failed. Try again or translate in your browser.";
+
+"关闭弹窗快捷键" = "Dismiss Popup Shortcut";
+"弹窗可见时连按 %@ 关闭当前弹窗" = "Double-tap %@ while the popup is visible to dismiss it";
+"弹窗可见时按下 %@ 关闭当前弹窗" = "Press %@ while the popup is visible to dismiss it";
+"关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "The dismiss shortcut could not be enabled. Check for shortcut conflicts or Input Monitoring access.";
+"关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "The dismiss shortcut matches an action shortcut. Dismissing the popup takes priority.";

@@ -197,7 +197,7 @@ public enum ClipboardAssistantDetector {
         if enabledKinds.contains(.nonSystemLanguageText),
            isNonCurrentSystemLanguageText(text, systemLanguageIdentifier: systemLanguageIdentifier) {
             let preview = previewText(text)
-            var actions: [ClipboardAssistantAction] = [.translate(text)]
+            var actions: [ClipboardAssistantAction] = [.translate(text), .autoTranslate(text)]
             if text.count <= ClipboardAssistantDefaults.saveableTextLength {
                 actions.append(.search(text))
             } else {

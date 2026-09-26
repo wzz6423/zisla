@@ -220,17 +220,22 @@ public enum ClipboardAssistantTranslate {
 
 /// Defaults for the clipboard assistant quick trigger.
 public enum ClipboardAssistantDefaults {
-    /// ⌘ N; ordinary combinations are registered through the system global hotkey API.
+    /// ⌘ 1; ordinary combinations are registered through the system global hotkey API.
     public static let triggerHotkey = VoiceInputHotkeyPreset(
-        keyCode: 45,              // kVK_ANSI_N
+        keyCode: 18,              // kVK_ANSI_1
         carbonModifiers: 0x0100,  // cmdKey
-        keyDisplayName: "N"
+        keyDisplayName: "1"
+    )
+    public static let dismissHotkey = VoiceInputHotkeyPreset(
+        keyCode: 51,
+        carbonModifiers: 0x0100,
+        keyDisplayName: "⌫"
     )
     /// Text longer than this many characters offers a dedicated "save as file" action.
     public static let saveableTextLength = 50
 }
 
-/// Quick-trigger keyboard configuration. A dedicated enum (instead of an optional preset)
+/// Assistant keyboard configuration. A dedicated enum (instead of an optional preset)
 /// so a cleared trigger persists as `.none`: JSONEncoder omits nil optionals entirely,
 /// which would resurrect the default hotkey on every relaunch.
 public enum ClipboardAssistantTriggerConfiguration: Codable, Equatable, Sendable {
@@ -255,6 +260,7 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
     case revealInFinder
     case search
     case translate
+    case autoTranslate
     case composeMail
     case copyText
     case copyFullExpression
@@ -276,6 +282,7 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
         case .revealInFinder: "folder"
         case .search: "magnifyingglass"
         case .translate: "character.book.closed"
+        case .autoTranslate: "character.bubble"
         case .composeMail: "envelope"
         case .copyText: "doc.on.doc"
         case .copyFullExpression: "doc.on.doc"
@@ -309,7 +316,7 @@ public enum ClipboardAssistantActionOrder {
         case .flight, .train: [.search, .openURL, .copyText, .addToQuickNote, .share]
         case .meeting: [.createCalendarEvent, .addToQuickNote, .share]
         case .emojiName: [.copyEmoji, .addToQuickNote, .share]
-        case .nonSystemLanguageText: [.translate, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
+        case .nonSystemLanguageText: [.translate, .autoTranslate, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .code: [.saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .app: [.openApp, .search, .addToQuickNote, .share]
         case .text: [.search, .saveText, .translate, .addToQuickNote, .sendToTeleprompter, .share]
@@ -377,6 +384,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     case openFolder(URL)
     case search(String)
     case translate(String)
+    case autoTranslate(String)
     case composeMail(String)
     case copyText(String)
     case copyFullExpression(String)
@@ -403,6 +411,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .openFolder: "openFolder"
         case .search: "search"
         case .translate: "translate"
+        case .autoTranslate: "autoTranslate"
         case .composeMail: "composeMail"
         case .copyText: "copyText"
         case .copyFullExpression: "copyFullExpression"
@@ -430,6 +439,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .openFolder: nil
         case .search: .search
         case .translate: .translate
+        case .autoTranslate: .autoTranslate
         case .composeMail: .composeMail
         case .copyText: .copyText
         case .copyFullExpression: .copyFullExpression

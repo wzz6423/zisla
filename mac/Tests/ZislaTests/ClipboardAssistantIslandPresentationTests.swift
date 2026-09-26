@@ -598,7 +598,7 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(source.contains("rowHeight = SideNoticeLayoutEngine().compactWingHeight("))
         #expect(source.contains("progressGlowEnabled: presentation.progressGlowEnabled"))
         #expect(source.contains("presentation.islandTopHeight = layout.rowHeight"))
-        #expect(source.contains("y: collapsedFrame.maxY - rowHeight"))
+        #expect(source.contains("y: collapsedFrame.maxY - height"))
         #expect(source.contains("height: rowHeight"))
         #expect(source.contains("ClipboardAssistantToastView.requiredRowWidth("))
         #expect(toastSource.contains(".fixedSize(horizontal: true, vertical: false)"))

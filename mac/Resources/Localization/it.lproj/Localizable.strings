@@ -2507,3 +2507,15 @@
 
 "窗口预览" = "Anteprime delle finestre";
 "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Mostra le anteprime passando sul Dock o usando Command-Tab; richiede i permessi Accessibilità e Registrazione schermo";
+
+"自动翻译" = "Traduzione automatica";
+
+"正在翻译…" = "Traduzione in corso…";
+
+"翻译失败，请重试或使用浏览器翻译" = "Traduzione non riuscita. Riprova o traduci nel browser.";
+
+"关闭弹窗快捷键" = "Scorciatoia per chiudere il popup";
+"弹窗可见时连按 %@ 关闭当前弹窗" = "Premi %@ due volte mentre il popup è visibile per chiuderlo";
+"弹窗可见时按下 %@ 关闭当前弹窗" = "Premi %@ mentre il popup è visibile per chiuderlo";
+"关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "Impossibile attivare la scorciatoia di chiusura. Verifica i conflitti tra scorciatoie o l’autorizzazione al monitoraggio input.";
+"关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "La scorciatoia di chiusura coincide con quella di un’azione. La chiusura del popup ha la precedenza.";

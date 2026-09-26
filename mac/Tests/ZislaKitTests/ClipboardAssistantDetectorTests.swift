@@ -383,11 +383,31 @@ struct ClipboardAssistantDetectorTests {
         } else {
             Issue.record("translate action expected")
         }
+        #expect(detection?.actions.contains(.autoTranslate("这是一段中文内容，用于验证语言识别。")) == true)
         if case .characterCount(let count)? = detection?.detail {
             #expect(count == 18)
         } else {
             Issue.record("character count detail expected")
         }
+    }
+
+    @Test
+    func automaticTranslationCanBeTheDefaultWithoutTruncatingTheForeignText() throws {
+        let text = String(repeating: "这是一段用于验证完整翻译的中文内容。\n", count: 80)
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: text,
+            enabledKinds: [.nonSystemLanguageText],
+            systemLanguageIdentifier: "en"
+        ))
+        let ordered = ClipboardAssistantActionOrder.ordered(
+            detection.actions,
+            for: .nonSystemLanguageText,
+            using: [.nonSystemLanguageText: [.autoTranslate, .translate]]
+        )
+        let fullText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(ordered.first == .autoTranslate(fullText))
+        #expect(ordered.contains(.translate(fullText)))
+        #expect(detection.title.count < fullText.count)
     }
 
     @Test

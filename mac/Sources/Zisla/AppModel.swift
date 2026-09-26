@@ -990,7 +990,8 @@ final class AppModel: ObservableObject {
     if granted, !wasGranted, settingsStore.settings.clipboardAssistantEnabled {
       clipboardAssistant.setTriggers(
         hotkey: settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey,
-        mouseButton: settingsStore.settings.clipboardAssistantMouseButton
+        mouseButton: settingsStore.settings.clipboardAssistantMouseButton,
+        dismissHotkey: settingsStore.settings.clipboardAssistantDismissConfiguration.hotkey
       )
       applyAssistantMouseGesture()
     }
@@ -1065,7 +1066,7 @@ final class AppModel: ObservableObject {
     hotkeyManager.unregister()
     clipboardMonitor.setEnabled(false)
     clipboardHistoryMonitor.setEnabled(false)
-    clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil)
+    clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil, dismissHotkey: nil)
     clipboardAssistant.setMouseGesture(enabled: false, onQuickCopy: {})
     clipboardAssistant.dismiss()
     Task { [downloadService] in await downloadService.cancelAll() }
@@ -1572,6 +1573,9 @@ final class AppModel: ObservableObject {
     let changeCount = NSPasteboard.general.changeCount
     guard lastClipboardAssistantRoutingChangeCount != changeCount else { return }
     lastClipboardAssistantRoutingChangeCount = changeCount
+    if clipboardAssistant.presentation.translation != nil, suppressedAssistantChangeCount != changeCount {
+      clipboardAssistant.dismiss(animated: false)
+    }
 
     let sourceApplication = NSWorkspace.shared.frontmostApplication
     if islandClipboardHandoff.shouldDefer {
@@ -1893,6 +1897,21 @@ final class AppModel: ObservableObject {
         NSWorkspace.shared.open(url)
       } else {
         transientMessage = clipboardAssistantMessage("无法完成操作")
+      }
+    case .autoTranslate(let text):
+      translationTask?.cancel()
+      let sourceChangeCount = NSPasteboard.general.changeCount
+      guard lastClipboardAssistantRoutingChangeCount == sourceChangeCount else { return }
+      clipboardAssistant.translate(
+        text,
+        targetLanguage: languageStore.language.translateTargetCode,
+        isSourceCurrent: { NSPasteboard.general.changeCount == sourceChangeCount }
+      ) { [weak self] result in
+        guard let self, ClipboardHistoryPasteboard.write(.text(result), onlyIfChangeCount: sourceChangeCount) else {
+          return false
+        }
+        self.suppressedAssistantChangeCount = NSPasteboard.general.changeCount
+        return true
       }
     case .translate(let text):
       // Translate in the browser using the interface language as the target.
@@ -2823,13 +2842,14 @@ final class AppModel: ObservableObject {
     if settings.clipboardAssistantEnabled {
       clipboardAssistant.setTriggers(
         hotkey: settings.clipboardAssistantTriggerConfiguration.hotkey,
-        mouseButton: settings.clipboardAssistantMouseButton
+        mouseButton: settings.clipboardAssistantMouseButton,
+        dismissHotkey: settings.clipboardAssistantDismissConfiguration.hotkey
       )
       clipboardAssistant.isLightweightMode = settings.clipboardAssistantLightweightMode
       clipboardAssistant.displayDuration = settings.clipboardAssistantDisplayDuration
       clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
     } else {
-      clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil)
+      clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil, dismissHotkey: nil)
       clipboardAssistant.dismiss()
     }
     applyAssistantMouseGesture()
