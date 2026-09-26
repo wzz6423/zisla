@@ -10,6 +10,79 @@ import ZislaKit
 @Suite(.serialized)
 struct RichNoteEditorTests {
     @Test
+    func inputMethodReportsIslandWindowLevelWithoutChangingPanelOrdering() async throws {
+        let hostingView = NSHostingView(rootView:
+            RichNoteEditor(html: "<div><br></div>", command: nil, isEditable: true, onChange: { _, _ in })
+                .frame(width: 320, height: 240)
+        )
+        let panel = IslandPanel(
+            contentView: hostingView,
+            frame: CGRect(x: 0, y: 0, width: 320, height: 240)
+        )
+        defer { panel.contentView = nil }
+        let webView = try await waitForWebView(in: hostingView)
+        let inputClient = try #require(webView as? NSTextInputClient)
+
+        #expect(inputClient.windowLevel?() == NSWindow.Level.statusBar.rawValue)
+        #expect(panel.level == .statusBar)
+        #expect(!panel.isVisible)
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test
+    func inputMethodTracksExpandedEditorWindowLevel() async throws {
+        let hostingView = NSHostingView(rootView:
+            RichNoteEditor(html: "<div>输入</div>", command: nil, isEditable: true, onChange: { _, _ in })
+                .frame(width: 320, height: 240)
+        )
+        let window = QuickNotesEditorWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = hostingView
+        defer { window.contentView = nil }
+        let webView = try await waitForWebView(in: hostingView)
+        try await waitUntilEditorIsReady(in: webView)
+        _ = try await webView.evaluateJavaScript("document.getElementById('editor').focus()")
+        #expect(window.makeFirstResponder(webView))
+        for _ in 0..<100 {
+            if webView.inputContext != nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let inputClient = try #require(webView.inputContext?.client)
+        #expect(inputClient as AnyObject === webView)
+
+        for level: NSWindow.Level in [.normal, .floating, .popUpMenu] {
+            window.level = level
+            #expect(inputClient.windowLevel?() == level.rawValue)
+            #expect(window.level == level)
+        }
+        #expect(!window.isVisible)
+        #expect(!window.isKeyWindow)
+    }
+
+    @Test
+    func inputMethodUsesNormalLevelAfterEditorDetachesFromWindow() async throws {
+        let hostingView = NSHostingView(rootView:
+            RichNoteEditor(html: "<div><br></div>", command: nil, isEditable: true, onChange: { _, _ in })
+                .frame(width: 320, height: 240)
+        )
+        let panel = IslandPanel(
+            contentView: hostingView,
+            frame: CGRect(x: 0, y: 0, width: 320, height: 240)
+        )
+        defer { panel.contentView = nil }
+        let webView = try await waitForWebView(in: hostingView)
+        let inputClient = try #require(webView as? NSTextInputClient)
+        panel.contentView = nil
+
+        #expect(webView.window == nil)
+        #expect(inputClient.windowLevel?() == NSWindow.Level.normal.rawValue)
+    }
+
+    @Test
     func copyEventReachesTheIslandHandoff() async throws {
         var copyCount = 0
         let hostingView = NSHostingView(rootView:

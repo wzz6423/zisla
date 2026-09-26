@@ -9,6 +9,11 @@ private final class TransparentWKWebView: WKWebView {
     override var isOpaque: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    // Input methods need the host level to keep candidate windows above the island.
+    @objc func windowLevel() -> Int {
+        window?.level.rawValue ?? NSWindow.Level.normal.rawValue
+    }
+
     @objc func undo(_ sender: Any?) {
         evaluateJavaScript("window.zisla?.exec('undo');", completionHandler: nil)
     }
