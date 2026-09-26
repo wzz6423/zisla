@@ -1088,6 +1088,7 @@ svg {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: right;
   gap: 12px;
   margin-top: clamp(28px, 3vw, 40px);
 }
