@@ -1,14 +1,110 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import XCTest
 import ZislaCore
-import ZislaKit
 
 @testable import Zisla
+@testable import ZislaKit
 
 @MainActor
 struct ClipboardTranslationPresentationTests {
+    @Test
+    func translationWindowUsesTheVoiceIslandsActiveGlassWithoutTakingFocus() throws {
+        let panel: NSPanel = ClipboardAssistantController.makeWindow(
+            contentView: NSView(),
+            frame: CGRect(x: -100_000, y: -100_000, width: 240, height: 54)
+        )
+        defer { panel.close() }
+        let queryName = "_hasActiveAppearance"
+        let selector = Selector(queryName)
+        let method = try #require(class_getInstanceMethod(type(of: panel), selector))
+        typealias AppearanceQuery = @convention(c) (AnyObject, Selector) -> Bool
+        let hasActiveAppearance = unsafeBitCast(method_getImplementation(method), to: AppearanceQuery.self)
+
+        #expect(panel is IslandPanel)
+        #expect(hasActiveAppearance(panel, selector))
+        #expect(!panel.canBecomeKey)
+        #expect(!panel.canBecomeMain)
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test
+    func translationWindowClicksDoNotActivateTheApp() throws {
+        let panel = ClipboardAssistantController.makeWindow(
+            contentView: NSView(),
+            frame: CGRect(x: -100_000, y: -100_000, width: 240, height: 54)
+        )
+        defer { panel.close() }
+        var activationRequests = 0
+        panel.applicationActivationHandler = { activationRequests += 1 }
+        let click = try #require(NSEvent.mouseEvent(
+            with: .leftMouseDown, location: CGPoint(x: 10, y: 10), modifierFlags: [],
+            timestamp: 0, windowNumber: panel.windowNumber, context: nil,
+            eventNumber: 0, clickCount: 1, pressure: 1
+        ))
+
+        NSApplication.shared.sendEvent(click)
+
+        #expect(activationRequests == 0)
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test(arguments: [
+        ClipboardTranslationPresentation.loading,
+        .result(text: "译文保持显示", copied: true),
+        .failed,
+    ])
+    func translationContentSwitchesBetweenTheVoiceIslandsGlassMaterials(translation: ClipboardTranslationPresentation) async throws {
+        let controller = makeController()
+        defer { controller.dismiss(animated: false) }
+        let presentation = controller.presentation
+        presentation.translation = translation
+        let host = NSHostingView(rootView: ClipboardTranslationResultView(
+            translation: translation, presentation: presentation, controller: controller,
+            size: CGSize(width: 240, height: 54)
+        ).transaction { $0.disablesAnimations = true })
+        host.sizingOptions = []
+        let panel = ClipboardAssistantController.makeWindow(
+            contentView: host,
+            frame: CGRect(x: -100_000, y: -100_000, width: 240, height: 54)
+        )
+        defer { panel.close() }
+
+        for style in [IslandVisualStyle.transparent, .frosted, .transparent] {
+            presentation.visualStyle = style
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+            host.layoutSubtreeIfNeeded()
+            host.displayIfNeeded()
+            var descendants: [NSView] = []
+            var pending = [host as NSView]
+            while let view = pending.popLast() {
+                descendants.append(view)
+                pending.append(contentsOf: view.subviews)
+            }
+            let reducesTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+            if style == .frosted && !reducesTransparency {
+                let effect = try #require(descendants.compactMap { $0 as? NSVisualEffectView }.first)
+                #expect(effect.material == .hudWindow)
+                #expect(effect.blendingMode == .behindWindow)
+            }
+            if #available(macOS 26.0, *) {
+                let glass = descendants.compactMap { $0 as? NSGlassEffectView }.first
+                if style == .transparent && !reducesTransparency {
+                    #expect(try #require(glass).style == .clear)
+                    #expect(glass?.cornerRadius == VoiceRecordingIslandGeometry.bottomCornerRadius)
+                } else {
+                    #expect(glass == nil)
+                }
+            }
+            #expect(presentation.translation == translation)
+            #expect(!panel.isKeyWindow)
+        }
+    }
+
     @Test
     func loadingDoesNotStartAReadingTimerAfterHoverSettingsOrScreenshotChanges() async throws {
         let controller = makeController()

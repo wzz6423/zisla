@@ -2284,8 +2284,8 @@ final class AppModel: ObservableObject {
     picker.delegate = sharingPickerDelegate
     let previousPicker = sharingPicker
     sharingPicker = picker
-    sharingPickerDismissesClipboardAssistant = anchor.window is ClipboardAssistantWindow
-    isSharingPickerVisible = anchor.window is IslandPanel
+    sharingPickerDismissesClipboardAssistant = anchor === clipboardAssistant.sharingAnchorView
+    isSharingPickerVisible = anchor.window is IslandPanel && !sharingPickerDismissesClipboardAssistant
     previousPicker?.close()
     picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
   }
