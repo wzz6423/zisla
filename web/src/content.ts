@@ -172,17 +172,17 @@ export const downloadLinks: readonly DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.12',
-  date: '2026-09-23',
+  version: 'v0.1.13',
+  date: '2026-09-27',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.12',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.12/zisla-v0.1.12-macOS-arm64.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.12/zisla-v0.1.12-macOS-arm64.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.12/zisla-v0.1.12-macOS-arm64.zip.sha256',
-  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.12/zisla-v0.1.12-macOS-universal.dmg',
-  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.12/zisla-v0.1.12-macOS-universal.zip',
-  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.12/zisla-v0.1.12-macOS-x86_64.dmg',
-  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.12/zisla-v0.1.12-macOS-x86_64.zip',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.13',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-arm64.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-arm64.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-arm64.zip.sha256',
+  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-universal.dmg',
+  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-universal.zip',
+  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-x86_64.dmg',
+  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-x86_64.zip',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.3-preview.1',
 };
 
@@ -198,6 +198,16 @@ export interface ChangelogEntry {
  * 统一以英文原文展示（11 版 × 17 语翻译不可维护）；v0.1.8/v0.1.0 无 Highlights 段，取其正文概述。
  */
 export const changelogEntries: readonly ChangelogEntry[] = [
+  {
+    version: 'v0.1.13',
+    date: '2026-09-27',
+    notes: [
+      'Copied text can now auto-translate directly in the island using your global translation settings, reusing the voice island window for a compact, in-place result.',
+      'Clipboard actions gain configurable keyboard shortcuts, and Quick Actions add download-folder shortcuts for faster access.',
+      'Optional Dock and Command-Tab window previews, customizable screenshot capture and tool shortcuts, and OpenScreen joining the recommended tools.',
+      'Expanded disk cleanup caches with residual review, plus reliability fixes for AirDrop and download progress callbacks, Quick Notes candidate placement, and token trend dates.',
+    ],
+  },
   {
     version: 'v0.1.12',
     date: '2026-09-23',

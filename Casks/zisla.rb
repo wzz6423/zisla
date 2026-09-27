@@ -1,9 +1,9 @@
 cask "zisla" do
   arch arm: "arm64", intel: "x86_64"
 
-  version "0.1.12"
-  sha256 arm:   "303282abbfd306290e14dac7b812bcee5442acdeecb6e82bb695f484de327233",
-         intel: "d90f7ebb6acb9d62faa8cae1bd472a4acb06f61cdbbdca1d8ab24d79e6c8b5bc"
+  version "0.1.13"
+  sha256 arm:   "de84339afbc095fc275fdf4427051ccdc2bace1655db4f109e545bbfc34d1979",
+         intel: "ae692161219503eb69f9ac16250ecd91fdb7f724613bfd7df5d427e0fe7aa81e"
 
   url "https://github.com/wzz6423/zisla/releases/download/v#{version}/zisla-v#{version}-macOS-#{arch}.zip"
   name "zisla"
