@@ -35,40 +35,6 @@ private extension ClipboardAssistantController {
     }
 }
 
-    /// Borderless always-on-top panel hosting the assistant island row; mirrors IslandPanel's setup.
-@MainActor
-final class ClipboardAssistantWindow: NSPanel {
-    static let defaultWindowLevel = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
-
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
-
-    init(contentView: NSView, frame: CGRect) {
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = Self.defaultWindowLevel
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .canJoinAllApplications, .stationary, .ignoresCycle]
-        isOpaque = false
-        backgroundColor = .clear
-        appearance = NSAppearance(named: .darkAqua)
-        hasShadow = false
-        hidesOnDeactivate = false
-        isMovable = false
-        isReleasedWhenClosed = false
-        animationBehavior = .none
-        self.contentView = contentView
-        SkyLightOperator.shared.delegateWindow(self)
-    }
-
-    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
-        frameRect
-    }
-}
-
 /// Presentation state driving the island row's SwiftUI content.
 @MainActor
 final class ClipboardAssistantPresentation: ObservableObject {
@@ -92,6 +58,17 @@ final class ClipboardAssistantPresentation: ObservableObject {
 /// content.
 @MainActor
 final class ClipboardAssistantController: ObservableObject {
+    static let windowLevel = NSWindow.Level(rawValue: IslandPanel.onTopLevel.rawValue + 1)
+
+    static func makeWindow(contentView: NSView, frame: CGRect) -> IslandPanel {
+        let panel = IslandPanel(contentView: contentView, frame: frame)
+        panel.level = windowLevel
+        // Clipboard actions must leave the source application's caret in place.
+        panel.avoidsAppActivation = true
+        SkyLightOperator.shared.delegateWindow(panel)
+        return panel
+    }
+
     static let numberedActionHotkeys: [VoiceInputHotkeyPreset] =
         [18, 19, 20, 21, 23, 22, 26, 28, 25, 29].enumerated().map { index, keyCode in
             VoiceInputHotkeyPreset(
@@ -153,7 +130,7 @@ final class ClipboardAssistantController: ObservableObject {
     }
     private var isSharingAnchorHeld = false
 
-    private var window: ClipboardAssistantWindow?
+    private var window: IslandPanel?
     private var dismissTask: Task<Void, Never>?
     private var presentationGeneration = 0
     private var dismissalGeneration = 0
@@ -397,7 +374,7 @@ final class ClipboardAssistantController: ObservableObject {
         guard let window else { return }
         let hidesLiveWindow = screenshotPhase == .selecting || isSystemScreenshotActive
         window.ignoresMouseEvents = hidesLiveWindow
-        window.level = ClipboardAssistantWindow.defaultWindowLevel
+        window.level = Self.windowLevel
         guard presentation.detection != nil else { return }
         if hidesLiveWindow {
             if window.isVisible {
@@ -481,8 +458,8 @@ final class ClipboardAssistantController: ObservableObject {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 guard self.presentationGeneration == generation else { return }
-                window.orderOut(nil)
-                window.alphaValue = 1
+                self.window?.orderOut(nil)
+                self.window?.alphaValue = 1
                 self.presentation.detection = nil
                 self.onPresentationChanged?(false)
             }
@@ -712,7 +689,7 @@ final class ClipboardAssistantController: ObservableObject {
         guard let layout = rowLayout(for: detection) else { return }
         presentation.islandTopHeight = layout.rowHeight
         let frame = layout.frame
-        let window: ClipboardAssistantWindow
+        let window: IslandPanel
         if let existing = self.window {
             window = existing
         } else {
@@ -728,7 +705,7 @@ final class ClipboardAssistantController: ObservableObject {
             hostingView.sizingOptions = []
             hostingView.wantsLayer = true
             hostingView.layer?.backgroundColor = NSColor.clear.cgColor
-            window = ClipboardAssistantWindow(contentView: hostingView, frame: frame)
+            window = Self.makeWindow(contentView: hostingView, frame: frame)
             self.window = window
         }
         window.setFrame(frame, display: false)
