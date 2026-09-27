@@ -585,6 +585,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Quick trigger hotkey firing the assistant's primary action while its toast is visible.
     /// Modifier-only presets fire on double-tap; ordinary combos fire on key-down.
     public var clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration
+    /// Closing a prompt remains independent of the primary and numbered action shortcuts.
+    public var clipboardAssistantDismissConfiguration: ClipboardAssistantTriggerConfiguration
     /// Mouse side button (CGEvent button number, e.g. 3 = back) firing the primary action; `nil` disables it.
     public var clipboardAssistantMouseButton: Int?
     /// Bundle identifiers of apps whose copies never trigger the assistant toast.
@@ -719,6 +721,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardAssistantEnabled: Bool = true,
         downloadCompletionFolderActionEnabled: Bool = true,
         clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration = .default,
+        clipboardAssistantDismissConfiguration: ClipboardAssistantTriggerConfiguration = .hotkey(ClipboardAssistantDefaults.dismissHotkey),
         clipboardAssistantMouseButton: Int? = nil,
         clipboardAssistantBlacklist: Set<String> = [],
         clipboardAssistantEnabledKinds: Set<ClipboardAssistantKind> = Set(ClipboardAssistantKind.allCases),
@@ -813,6 +816,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.clipboardAssistantEnabled = clipboardAssistantEnabled
         self.downloadCompletionFolderActionEnabled = downloadCompletionFolderActionEnabled
         self.clipboardAssistantTriggerConfiguration = clipboardAssistantTriggerConfiguration
+        self.clipboardAssistantDismissConfiguration = clipboardAssistantDismissConfiguration
         self.clipboardAssistantMouseButton = clipboardAssistantMouseButton
         self.clipboardAssistantBlacklist = clipboardAssistantBlacklist
         var enabledKinds = clipboardAssistantEnabledKinds
@@ -951,6 +955,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantEnabled
         case downloadCompletionFolderActionEnabled
         case clipboardAssistantTriggerConfiguration
+        case clipboardAssistantDismissConfiguration
         case clipboardAssistantMouseButton
         case clipboardAssistantBlacklist
         case clipboardAssistantEnabledKinds
@@ -1101,6 +1106,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             ClipboardAssistantTriggerConfiguration.self,
             forKey: .clipboardAssistantTriggerConfiguration
         ) ?? .default
+        clipboardAssistantDismissConfiguration = try container.decodeIfPresent(
+            ClipboardAssistantTriggerConfiguration.self,
+            forKey: .clipboardAssistantDismissConfiguration
+        ) ?? defaults.clipboardAssistantDismissConfiguration
         if container.contains(.clipboardAssistantMouseButton) {
             clipboardAssistantMouseButton = try container.decodeIfPresent(
                 Int.self,

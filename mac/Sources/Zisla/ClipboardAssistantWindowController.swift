@@ -12,7 +12,8 @@ private extension ClipboardAssistantController {
 
     static func trailingControlsWidth(
         for detection: ClipboardAssistantDetection,
-        isLightweightMode: Bool
+        isLightweightMode: Bool,
+        shortcutHint: String?
     ) -> CGFloat {
         let horizontalPadding: CGFloat = 22
         guard !isLightweightMode, let action = detection.action else {
@@ -25,41 +26,12 @@ private extension ClipboardAssistantController {
         let textWidth = (title as NSString).size(withAttributes: [
             .font: NSFont.systemFont(ofSize: 11, weight: .medium),
         ]).width
-        return horizontalPadding + 22 + 8 + textWidth + 24 + 8 + 19 + 8 + 20
-    }
-}
-
-    /// Borderless always-on-top panel hosting the assistant island row; mirrors IslandPanel's setup.
-@MainActor
-final class ClipboardAssistantWindow: NSPanel {
-    static let defaultWindowLevel = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
-
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
-
-    init(contentView: NSView, frame: CGRect) {
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        level = Self.defaultWindowLevel
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .canJoinAllApplications, .stationary, .ignoresCycle]
-        isOpaque = false
-        backgroundColor = .clear
-        appearance = NSAppearance(named: .darkAqua)
-        hasShadow = false
-        hidesOnDeactivate = false
-        isMovable = false
-        isReleasedWhenClosed = false
-        animationBehavior = .none
-        self.contentView = contentView
-        SkyLightOperator.shared.delegateWindow(self)
-    }
-
-    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
-        frameRect
+        let shortcutWidth = shortcutHint.map {
+            6 + ($0 as NSString).size(withAttributes: [
+                .font: NSFont.systemFont(ofSize: 10, weight: .medium),
+            ]).width
+        } ?? 0
+        return horizontalPadding + 22 + 8 + textWidth + shortcutWidth + 24 + 8 + 19 + 8 + 20
     }
 }
 
@@ -67,6 +39,9 @@ final class ClipboardAssistantWindow: NSPanel {
 @MainActor
 final class ClipboardAssistantPresentation: ObservableObject {
     @Published var detection: ClipboardAssistantDetection?
+    @Published var translation: ClipboardTranslationPresentation?
+    @Published var translationIsPaused = false
+    @Published var translationGeneration = 0
     /// Thumbnail preview shown for copied images.
     @Published var imageThumbnail: NSImage?
     /// Matches the surface to the Dynamic Island appearance selected in Settings.
@@ -83,7 +58,27 @@ final class ClipboardAssistantPresentation: ObservableObject {
 /// content.
 @MainActor
 final class ClipboardAssistantController: ObservableObject {
+    static let windowLevel = NSWindow.Level(rawValue: IslandPanel.onTopLevel.rawValue + 1)
+
+    static func makeWindow(contentView: NSView, frame: CGRect) -> IslandPanel {
+        let panel = IslandPanel(contentView: contentView, frame: frame)
+        panel.level = windowLevel
+        // Clipboard actions must leave the source application's caret in place.
+        panel.avoidsAppActivation = true
+        SkyLightOperator.shared.delegateWindow(panel)
+        return panel
+    }
+
+    static let numberedActionHotkeys: [VoiceInputHotkeyPreset] =
+        [18, 19, 20, 21, 23, 22, 26, 28, 25, 29].enumerated().map { index, keyCode in
+            VoiceInputHotkeyPreset(
+                keyCode: UInt32(keyCode), carbonModifiers: 0x0100,
+                keyDisplayName: String((index + 1) % 10)
+            )
+        }
+
     let presentation = ClipboardAssistantPresentation()
+    let systemTranslation = ClipboardSystemTranslationBridge()
     /// Lets the main island pause hover activation while this row occupies its trigger area.
     var onPresentationChanged: ((Bool) -> Void)?
     /// Auto-dismiss setting for newly presented assistant prompts.
@@ -135,7 +130,7 @@ final class ClipboardAssistantController: ObservableObject {
     }
     private var isSharingAnchorHeld = false
 
-    private var window: ClipboardAssistantWindow?
+    private var window: IslandPanel?
     private var dismissTask: Task<Void, Never>?
     private var presentationGeneration = 0
     private var dismissalGeneration = 0
@@ -143,11 +138,29 @@ final class ClipboardAssistantController: ObservableObject {
     private var dismissalTotalDuration: Double?
     private var pausedDismissalRemainingFraction: Double?
     private var isAwaitingCurrencyConversion = false
+    private(set) var translationTask: Task<Void, Never>?
+    private var translationCopy: ((String) -> Bool)?
+    private var translationSourceIsCurrent: (() -> Bool)?
+    private var translationReadingSeconds: Double?
+    private var visibleTranslationGeneration: Int?
+    private var pendingTranslationAppearance: (
+        value: ClipboardTranslationPresentation, rowWidth: CGFloat, locale: Locale
+    )?
     private let windowPresenter: @MainActor (ClipboardAssistantController, ClipboardAssistantDetection) -> Void
     private let dismissSleeper: @Sendable (Duration) async throws -> Void
-    private let triggerMonitor = ClipboardAssistantTriggerMonitor()
+    private let makeTriggerMonitor: @MainActor () -> any ClipboardAssistantTriggerRegistering
+    private let triggerMonitor: any ClipboardAssistantTriggerRegistering
+    private let dismissTriggerMonitor: any ClipboardAssistantTriggerRegistering
+    private var numberedTriggerMonitors: [any ClipboardAssistantTriggerRegistering] = []
+    private var configuredHotkey: VoiceInputHotkeyPreset?
+    private var configuredDismissHotkey: VoiceInputHotkeyPreset?
+    private var configuredMouseButton: Int?
+    private var triggerGeneration = 0
+    private var isDismissing = false
     private let gestureMonitor = ClipboardAssistantMouseGestureMonitor()
     @Published private(set) var isMoreActionsPresented = false
+    @Published private(set) var actionHotkeys: [String: [VoiceInputHotkeyPreset]] = [:]
+    @Published private(set) var dismissShortcutFeedbackKey: String?
 
     init(
         windowPresenter: @escaping @MainActor (ClipboardAssistantController, ClipboardAssistantDetection) -> Void = {
@@ -155,23 +168,111 @@ final class ClipboardAssistantController: ObservableObject {
         },
         dismissSleeper: @escaping @Sendable (Duration) async throws -> Void = {
             try await Task.sleep(for: $0)
+        },
+        makeTriggerMonitor: @escaping @MainActor () -> any ClipboardAssistantTriggerRegistering = {
+            ClipboardAssistantTriggerMonitor()
         }
     ) {
         self.windowPresenter = windowPresenter
         self.dismissSleeper = dismissSleeper
+        self.makeTriggerMonitor = makeTriggerMonitor
+        triggerMonitor = makeTriggerMonitor()
+        dismissTriggerMonitor = makeTriggerMonitor()
+    }
+
+    isolated deinit {
+        triggerMonitor.stop()
+        dismissTriggerMonitor.stop()
+        for monitor in numberedTriggerMonitors { monitor.stop() }
     }
 
     /// Applies the user-configured quick triggers (hotkey + mouse side button).
-    /// Returns `false` when a configured trigger needs the input-monitoring permission
-    /// that has not been granted yet.
+    /// Returns `false` when registration for a visible prompt needs input-monitoring permission.
     @discardableResult
     func setTriggers(
         hotkey: VoiceInputHotkeyPreset?,
-        mouseButton: Int?
+        mouseButton: Int?,
+        dismissHotkey: VoiceInputHotkeyPreset? = nil
     ) -> Bool {
-        triggerMonitor.apply(hotkey: hotkey, mouseButton: mouseButton) { [weak self] in
-            MainActor.assumeIsolated { self?.performCurrentAction() }
+        configuredHotkey = hotkey
+        configuredMouseButton = mouseButton
+        configuredDismissHotkey = dismissHotkey
+        return refreshTriggers()
+    }
+
+    func shortcutHint(for action: ClipboardAssistantAction) -> String? {
+        guard let hotkeys = actionHotkeys[action.identifier] else { return nil }
+        return hotkeys.map { $0.isModifierOnly ? "\($0.settingsDisplayName) ×2" : $0.settingsDisplayName }
+            .joined(separator: " / ")
+    }
+
+    @discardableResult
+    private func refreshTriggers() -> Bool {
+        triggerGeneration &+= 1
+        let generation = triggerGeneration
+        triggerMonitor.stop()
+        dismissTriggerMonitor.stop()
+        for monitor in numberedTriggerMonitors { monitor.stop() }
+        numberedTriggerMonitors.removeAll()
+        actionHotkeys = [:]
+        dismissShortcutFeedbackKey = nil
+        guard !isDismissing, !isScreenshotActive, !isSharingAnchorHeld,
+              let detection = presentation.detection else { return true }
+
+        var hasPermission = true
+        if let configuredDismissHotkey {
+            hasPermission = dismissTriggerMonitor.apply(hotkey: configuredDismissHotkey, mouseButton: nil) { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, self.triggerGeneration == generation else { return }
+                    self.dismiss()
+                }
+            }
+            if dismissTriggerMonitor.registeredHotkey == nil {
+                dismissShortcutFeedbackKey = "关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限"
+            }
         }
+        guard presentation.translation == nil, let primary = detection.action else { return hasPermission }
+        let registeredDismissHotkey = dismissTriggerMonitor.registeredHotkey
+        var primaryHotkey = configuredHotkey
+        if let configuredHotkey, registeredDismissHotkey?.conflicts(with: configuredHotkey) == true {
+            primaryHotkey = nil
+            dismissShortcutFeedbackKey = "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗"
+        }
+
+        let primaryHasPermission = triggerMonitor.apply(
+            hotkey: primaryHotkey, mouseButton: configuredMouseButton
+        ) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.triggerGeneration == generation else { return }
+                self.performCurrentAction()
+            }
+        }
+        if let registered = triggerMonitor.registeredHotkey {
+            actionHotkeys[primary.identifier] = [registered]
+        }
+        hasPermission = hasPermission && primaryHasPermission
+        guard let configuredHotkey else { return hasPermission }
+
+        for (action, hotkey) in zip(detection.actions, Self.numberedActionHotkeys) {
+            if registeredDismissHotkey?.conflicts(with: hotkey) == true {
+                dismissShortcutFeedbackKey = "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗"
+                continue
+            }
+            // A custom primary shortcut keeps its meaning even when its registration fails.
+            guard !hotkey.conflicts(with: configuredHotkey) else { continue }
+            let monitor = makeTriggerMonitor()
+            monitor.apply(hotkey: hotkey, mouseButton: nil) { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, self.triggerGeneration == generation else { return }
+                    self.perform(action)
+                }
+            }
+            if let registered = monitor.registeredHotkey {
+                actionHotkeys[action.identifier, default: []].append(registered)
+            }
+            numberedTriggerMonitors.append(monitor)
+        }
+        return hasPermission
     }
 
     /// Enables the hold-left + right-click quick copy gesture. Returns `false` when either the
@@ -254,6 +355,13 @@ final class ClipboardAssistantController: ObservableObject {
     }
 
     private func updateScreenshotDismissal() {
+        presentation.translationIsPaused = isScreenshotActive
+        if isScreenshotActive, presentation.translation != nil {
+            translationReadingSeconds = nil
+            pendingTranslationAppearance = nil
+            dismissalTotalDuration = nil
+            pausedDismissalRemainingFraction = nil
+        }
         if screenshotPhase == .capturing || screenshotPhase == .selecting || isSystemScreenshotActive {
             cancelDismissTask()
         } else {
@@ -262,10 +370,11 @@ final class ClipboardAssistantController: ObservableObject {
     }
 
     private func applyScreenshotPhase() {
+        refreshTriggers()
         guard let window else { return }
         let hidesLiveWindow = screenshotPhase == .selecting || isSystemScreenshotActive
         window.ignoresMouseEvents = hidesLiveWindow
-        window.level = ClipboardAssistantWindow.defaultWindowLevel
+        window.level = Self.windowLevel
         guard presentation.detection != nil else { return }
         if hidesLiveWindow {
             if window.isVisible {
@@ -283,6 +392,8 @@ final class ClipboardAssistantController: ObservableObject {
     func present(_ detection: ClipboardAssistantDetection, visualStyle: IslandVisualStyle) -> Int? {
         setMoreActionsPresented(false)
         guard !isScreenshotActive, !isScreenLocked else { return nil }
+        isDismissing = false
+        cancelTranslation()
         isSharingAnchorHeld = false
         cancelDismissTask()
         isAwaitingCurrencyConversion = if case .currencyExpression? = detection.detail { true } else { false }
@@ -294,6 +405,7 @@ final class ClipboardAssistantController: ObservableObject {
         presentation.visualStyle = visualStyle
         presentation.detection = detection
         presentation.imageThumbnail = Self.thumbnail(for: detection)
+        refreshTriggers()
         windowPresenter(self, detection)
         onPresentationChanged?(true)
         scheduleDismiss()
@@ -315,6 +427,9 @@ final class ClipboardAssistantController: ObservableObject {
     }
 
     func dismiss(animated: Bool = true) {
+        isDismissing = true
+        refreshTriggers()
+        cancelTranslation()
         setMoreActionsPresented(false)
         isSharingAnchorHeld = false
         cancelDismissTask()
@@ -343,8 +458,8 @@ final class ClipboardAssistantController: ObservableObject {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 guard self.presentationGeneration == generation else { return }
-                window.orderOut(nil)
-                window.alphaValue = 1
+                self.window?.orderOut(nil)
+                self.window?.alphaValue = 1
                 self.presentation.detection = nil
                 self.onPresentationChanged?(false)
             }
@@ -353,10 +468,14 @@ final class ClipboardAssistantController: ObservableObject {
 
     /// Fires the given action and dismisses after completion; sharing keeps the anchor until its picker closes.
     func perform(_ action: ClipboardAssistantAction) {
+        guard !isDismissing, !isScreenshotActive,
+              presentation.translation == nil, !isSharingAnchorHeld,
+              presentation.detection?.actions.contains(action) == true else { return }
         setMoreActionsPresented(false)
         let generation = presentationGeneration
         if case .share = action {
             isSharingAnchorHeld = true
+            refreshTriggers()
             pauseDismissal()
             cancelDismissTask()
         }
@@ -370,6 +489,113 @@ final class ClipboardAssistantController: ObservableObject {
     func performCurrentAction() {
         guard let action = presentation.detection?.action else { return }
         perform(action)
+    }
+
+    func translate(
+        _ text: String,
+        targetLanguage: String,
+        service: ClipboardTranslationService = .live(),
+        isSourceCurrent: @escaping () -> Bool = { true },
+        copyResult: @escaping (String) -> Bool
+    ) {
+        guard let detection = presentation.detection, !isScreenshotActive, !isScreenLocked,
+              isSourceCurrent() else { return }
+        cancelTranslation()
+        cancelDismissTask()
+        presentationGeneration &+= 1
+        let generation = presentationGeneration
+        presentation.translationGeneration = generation
+        dismissalTotalDuration = nil
+        pausedDismissalRemainingFraction = nil
+        presentation.translation = .loading
+        refreshTriggers()
+        translationCopy = copyResult
+        translationSourceIsCurrent = isSourceCurrent
+        windowPresenter(self, detection)
+        let systemTranslation = systemTranslation
+        var additionalProviders: [ClipboardTranslationService.Provider] = []
+        if #available(macOS 15.0, *) {
+            additionalProviders.append { text, language in
+                try await systemTranslation.translate(text, targetLanguage: language)
+            }
+        }
+        translationTask = Task { @MainActor [weak self] in
+            let translation: ClipboardTranslationPresentation
+            do {
+                let result = try await service.translate(
+                    text, targetLanguage: targetLanguage, additionalProviders: additionalProviders
+                )
+                translation = .result(text: result, copied: nil)
+            } catch {
+                translation = .failed
+            }
+            guard let self, self.presentationGeneration == generation else { return }
+            guard isSourceCurrent() else {
+                self.dismiss(animated: false)
+                return
+            }
+            self.presentation.translation = translation
+        }
+    }
+
+    func translationWindowDidAppear(for generation: Int) {
+        guard presentationGeneration == generation, presentation.translation != nil else { return }
+        visibleTranslationGeneration = generation
+        if let pending = pendingTranslationAppearance {
+            translationDidAppear(pending.value, for: generation, rowWidth: pending.rowWidth, locale: pending.locale)
+        }
+    }
+
+    func translationDidAppear(
+        _ translation: ClipboardTranslationPresentation,
+        for generation: Int,
+        rowWidth: CGFloat,
+        locale: Locale
+    ) {
+        guard presentationGeneration == generation, presentation.translation == translation,
+              translationReadingSeconds == nil else { return }
+        guard !isScreenshotActive else { return }
+        guard visibleTranslationGeneration == generation else {
+            pendingTranslationAppearance = (translation, rowWidth, locale)
+            return
+        }
+        guard translationSourceIsCurrent?() != false else {
+            dismiss(animated: false)
+            return
+        }
+        pendingTranslationAppearance = nil
+        // SwiftUI may mount a result while the panel is still fading in. Flush its display only
+        // after both the row and the window's current reveal have completed.
+        window?.contentView?.layoutSubtreeIfNeeded()
+        window?.displayIfNeeded()
+        switch translation {
+        case .loading: return
+        case .result(let text, let copied):
+            if copied == nil {
+                presentation.translation = .result(text: text, copied: translationCopy?(text) == true)
+            }
+            translationCopy = nil
+        case .failed:
+            translationCopy = nil
+        }
+        translationSourceIsCurrent = nil
+        translationReadingSeconds = ClipboardTranslationPresentation.readingSeconds(
+            for: translation.rowText(locale: locale), rowWidth: rowWidth
+        )
+        pausedDismissalRemainingFraction = 1
+        if !presentation.isHovered { scheduleDismiss() }
+    }
+
+    private func cancelTranslation() {
+        translationTask?.cancel()
+        translationTask = nil
+        systemTranslation.cancel()
+        translationCopy = nil
+        translationSourceIsCurrent = nil
+        translationReadingSeconds = nil
+        visibleTranslationGeneration = nil
+        pendingTranslationAppearance = nil
+        presentation.translation = nil
     }
 
     func setHovered(_ hovered: Bool) {
@@ -389,12 +615,14 @@ final class ClipboardAssistantController: ObservableObject {
         guard !isScreenshotActive else { return }
         guard !isSharingAnchorHeld else { return }
         guard !isAwaitingCurrencyConversion else { return }
-        guard let seconds = displayDuration.expiresAfter else {
+        if presentation.translation != nil, translationReadingSeconds == nil { return }
+        guard let configuredSeconds = displayDuration.expiresAfter else {
             dismissalTotalDuration = nil
             pausedDismissalRemainingFraction = nil
             dismissTask = nil
             return
         }
+        let seconds = max(configuredSeconds, translationReadingSeconds ?? 0)
         dismissalTotalDuration = seconds
         let remainingFraction = pausedDismissalRemainingFraction ?? 1
         let remaining = seconds * remainingFraction
@@ -461,7 +689,7 @@ final class ClipboardAssistantController: ObservableObject {
         guard let layout = rowLayout(for: detection) else { return }
         presentation.islandTopHeight = layout.rowHeight
         let frame = layout.frame
-        let window: ClipboardAssistantWindow
+        let window: IslandPanel
         if let existing = self.window {
             window = existing
         } else {
@@ -477,17 +705,20 @@ final class ClipboardAssistantController: ObservableObject {
             hostingView.sizingOptions = []
             hostingView.wantsLayer = true
             hostingView.layer?.backgroundColor = NSColor.clear.cgColor
-            window = ClipboardAssistantWindow(contentView: hostingView, frame: frame)
+            window = Self.makeWindow(contentView: hostingView, frame: frame)
             self.window = window
         }
         window.setFrame(frame, display: false)
         window.alphaValue = 0
         window.orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup { context in
+        let generation = presentationGeneration
+        NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.22
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             window.animator().alphaValue = 1
-        }
+        }, completionHandler: { [weak self] in
+            MainActor.assumeIsolated { self?.translationWindowDidAppear(for: generation) }
+        })
     }
 
     private struct RowLayout {
@@ -515,13 +746,17 @@ final class ClipboardAssistantController: ObservableObject {
         } else {
             presentation.physicalNotchWidth = 0
         }
-        let width = ClipboardAssistantToastView.requiredRowWidth(
+        let width = presentation.translation != nil
+            ? (layout?.collapsedFrame.width ?? ScreenLayoutConfiguration().simulatedIslandSize.width)
+                + (presentation.physicalNotchWidth > 0 ? SideNoticeLayoutEngine.compactStatusWingWidth * 2 : 0)
+            : ClipboardAssistantToastView.requiredRowWidth(
             baseWidth: Self.islandRowWidth,
             maximumWidth: max(320, screen.frame.width - 48),
             notchWidth: presentation.physicalNotchWidth,
             trailingControlsWidth: Self.trailingControlsWidth(
                 for: detection,
-                isLightweightMode: isLightweightMode
+                isLightweightMode: isLightweightMode,
+                shortcutHint: detection.action.flatMap { shortcutHint(for: $0) }
             )
         )
         let rowHeight: CGFloat
@@ -533,11 +768,12 @@ final class ClipboardAssistantController: ObservableObject {
         } else {
             rowHeight = collapsedFrame.height
         }
+        let height = rowHeight + (presentation.translation == nil ? 0 : VoiceRecordingIslandGeometry.transcriptRowHeight)
         let frame = CGRect(
             x: collapsedFrame.midX - width / 2,
-            y: collapsedFrame.maxY - rowHeight,
+            y: collapsedFrame.maxY - height,
             width: width,
-            height: rowHeight
+            height: height
         )
         return RowLayout(frame: frame, rowHeight: rowHeight)
     }
@@ -550,6 +786,7 @@ final class ClipboardAssistantController: ObservableObject {
         dismissalTotalDuration = displayDuration.expiresAfter
         pausedDismissalRemainingFraction = dismissalTotalDuration.map { _ in 1 }
         presentation.detection = detection
+        refreshTriggers()
         if !presentation.isHovered { scheduleDismiss() }
         guard let window, window.isVisible, let layout = rowLayout(for: detection) else { return }
         presentation.islandTopHeight = layout.rowHeight
@@ -587,7 +824,16 @@ struct ClipboardAssistantToastView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            if let detection = presentation.detection {
+            if let translation = presentation.translation {
+                ClipboardTranslationResultView(
+                    translation: translation,
+                    presentation: presentation,
+                    controller: controller,
+                    size: geometry.size
+                )
+                .id(presentation.translationGeneration)
+                .id(presentation.translationIsPaused)
+            } else if let detection = presentation.detection {
                 IslandSurface(
                     isCollapsed: !isExpanded,
                     collapsedSize: CGSize(
@@ -639,6 +885,11 @@ struct ClipboardAssistantToastView: View {
         }
         .ignoresSafeArea(edges: .top)
         .environment(\.colorScheme, .dark)
+        .background {
+            if #available(macOS 15.0, *) {
+                ClipboardSystemTranslationView(bridge: controller.systemTranslation)
+            }
+        }
     }
 
     private var isDismissalProgressActive: Bool {
@@ -828,16 +1079,23 @@ struct ClipboardAssistantToastView: View {
                     Button {
                         controller.perform(primary)
                     } label: {
-                        Text(loc(Self.actionLabel(primary)))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.95))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, controlVerticalPadding)
-                            .background(Capsule().fill(Color.white.opacity(0.14)))
-                            .fixedSize(horizontal: true, vertical: false)
+                        HStack(spacing: 6) {
+                            Text(loc(Self.actionLabel(primary)))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.95))
+                            if let shortcut = controller.shortcutHint(for: primary) {
+                                Text(shortcut)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.6))
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, controlVerticalPadding)
+                        .background(Capsule().fill(Color.white.opacity(0.14)))
+                        .fixedSize(horizontal: true, vertical: false)
                     }
                     .buttonStyle(.plain)
-                    .help(loc(Self.actionLabel(primary)))
+                    .help(actionTitleWithShortcut(primary))
                 }
                 if detection.action != nil {
                     Button {
@@ -903,12 +1161,18 @@ struct ClipboardAssistantToastView: View {
             controller.setMoreActionsPresented(false)
             controller.perform(action)
         } label: {
-            Text(actionTitle(action))
-                .font(.system(size: 12))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .contentShape(Rectangle())
+            HStack {
+                Text(actionTitle(action))
+                Spacer(minLength: 12)
+                if let shortcut = controller.shortcutHint(for: action) {
+                    Text(shortcut)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .font(.system(size: 12))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -921,14 +1185,20 @@ struct ClipboardAssistantToastView: View {
                 Button(role: .destructive) {
                     controller.perform(action)
                 } label: {
-                    Text(actionTitle(action))
+                    Text(actionTitleWithShortcut(action))
                 }
             } else {
-                Button(actionTitle(action)) {
+                Button(actionTitleWithShortcut(action)) {
                     controller.perform(action)
                 }
             }
         }
+    }
+
+    private func actionTitleWithShortcut(_ action: ClipboardAssistantAction) -> String {
+        let title = actionTitle(action)
+        guard let shortcut = controller.shortcutHint(for: action) else { return title }
+        return "\(title) (\(shortcut))"
     }
 
     // MARK: Expanded content
@@ -1041,6 +1311,7 @@ struct ClipboardAssistantToastView: View {
         case .openFolder: "打开文件夹"
         case .search: "搜索"
         case .translate: "翻译"
+        case .autoTranslate: "自动翻译"
         case .composeMail: "写邮件"
         case .copyText: "复制结果"
         case .copyFullExpression: "复制完整算式"
@@ -1073,17 +1344,37 @@ struct ClipboardAssistantToastView: View {
 ///   modifier usage (copy/paste chords) never fires the action accidentally.
 /// - Mouse side buttons always require the input-monitoring permission.
 @MainActor
-final class ClipboardAssistantTriggerMonitor {
-    private var configuredHotkey: VoiceInputHotkeyPreset?
+protocol ClipboardAssistantTriggerRegistering: AnyObject {
+    var registeredHotkey: VoiceInputHotkeyPreset? { get }
+    @discardableResult
+    func apply(hotkey: VoiceInputHotkeyPreset?, mouseButton: Int?, onTrigger: @escaping () -> Void) -> Bool
+    func stop()
+}
+
+@MainActor
+final class ClipboardAssistantTriggerMonitor: ClipboardAssistantTriggerRegistering {
+    private(set) var registeredHotkey: VoiceInputHotkeyPreset?
     private var configuredMouseButton: Int?
-    private var needsInputMonitoring = false
-    private let carbonHotkeyManager = GlobalHotkeyManager()
+    private let registerHotkey: (VoiceInputHotkeyPreset, @escaping () -> Void)
+        -> (GlobalHotkeyRegistrationResult, () -> Void)
+    private var unregisterHotkey: (() -> Void)?
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var modifierKeyCode: UInt32?
     private var lastModifierReleaseAt: TimeInterval = 0
     private var onTrigger: (() -> Void)?
     private static let doubleTapWindow: TimeInterval = 0.45
+
+    init(
+        registerHotkey: @escaping (VoiceInputHotkeyPreset, @escaping () -> Void)
+            -> (GlobalHotkeyRegistrationResult, () -> Void) = { hotkey, onTrigger in
+                let manager = GlobalHotkeyManager()
+                let result = manager.register(hotkey: hotkey, onKeyDown: onTrigger, onKeyUp: {})
+                return (result, { manager.unregister() })
+            }
+    ) {
+        self.registerHotkey = registerHotkey
+    }
 
     /// Applies both triggers. Returns `false` when any configured trigger needs the
     /// input-monitoring permission that is not granted yet.
@@ -1093,24 +1384,24 @@ final class ClipboardAssistantTriggerMonitor {
         mouseButton: Int?,
         onTrigger: @escaping () -> Void
     ) -> Bool {
-        guard hotkey != configuredHotkey || mouseButton != configuredMouseButton || needsInputMonitoring else {
-            return true
-        }
         stop()
-        configuredHotkey = hotkey
         configuredMouseButton = mouseButton
 
-        needsInputMonitoring = false
+        var needsInputMonitoring = false
         if let hotkey {
             if hotkey.isModifierOnly {
                 if GlobalHotkeyManager.hasInputMonitoringAccess {
                     modifierKeyCode = hotkey.keyCode
                     ensureEventTap()
+                    if eventTap != nil { registeredHotkey = hotkey }
                 } else {
                     needsInputMonitoring = true
                 }
             } else {
-                carbonHotkeyManager.register(hotkey: hotkey, onKeyDown: onTrigger, onKeyUp: {})
+                let (result, unregister) = registerHotkey(hotkey, onTrigger)
+                unregisterHotkey = unregister
+                if result == .registered { registeredHotkey = hotkey }
+                needsInputMonitoring = result == .inputMonitoringPermissionRequired
             }
         }
         if mouseButton != nil {
@@ -1125,7 +1416,8 @@ final class ClipboardAssistantTriggerMonitor {
     }
 
     func stop() {
-        carbonHotkeyManager.unregister()
+        unregisterHotkey?()
+        unregisterHotkey = nil
         if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         }
@@ -1136,9 +1428,9 @@ final class ClipboardAssistantTriggerMonitor {
         runLoopSource = nil
         modifierKeyCode = nil
         lastModifierReleaseAt = 0
-        configuredHotkey = nil
+        registeredHotkey = nil
         configuredMouseButton = nil
-        needsInputMonitoring = false
+        onTrigger = nil
     }
 
     /// One shared listen-only tap covers both flagsChanged (modifier double-tap) and

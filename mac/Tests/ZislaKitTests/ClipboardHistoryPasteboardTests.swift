@@ -16,6 +16,36 @@ struct ClipboardHistoryPasteboardTests {
     }
 
     @Test
+    func translationCannotReplaceANewerClipboardValueOrChangeItsVersion() {
+        let pasteboard = makePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        #expect(ClipboardHistoryPasteboard.write(.text("translation source"), to: pasteboard))
+        let sourceVersion = pasteboard.changeCount
+        #expect(ClipboardHistoryPasteboard.write(.text("new user copy"), to: pasteboard))
+        let currentVersion = pasteboard.changeCount
+        let currentTypes = pasteboard.types
+        #expect(!ClipboardHistoryPasteboard.write(.text("stale translation"), to: pasteboard, onlyIfChangeCount: sourceVersion))
+        #expect(pasteboard.changeCount == currentVersion)
+        #expect(pasteboard.types == currentTypes)
+        #expect(ClipboardHistoryPasteboard.readContent(from: pasteboard) == .text("new user copy"))
+    }
+
+    @Test
+    func matchingTranslationWritesTheFullTextOnlyOnce() {
+        let pasteboard = makePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        #expect(ClipboardHistoryPasteboard.write(.text("source"), to: pasteboard))
+        let version = pasteboard.changeCount
+        let translation = "  完整译文\n含有空白、符号 + & 和末尾。  "
+        #expect(ClipboardHistoryPasteboard.write(.text(translation), to: pasteboard, onlyIfChangeCount: version))
+        let copiedVersion = pasteboard.changeCount
+        #expect(pasteboard.string(forType: .string) == translation)
+        #expect(!ClipboardHistoryPasteboard.write(.text("duplicate"), to: pasteboard, onlyIfChangeCount: version))
+        #expect(pasteboard.changeCount == copiedVersion)
+        #expect(pasteboard.string(forType: .string) == translation)
+    }
+
+    @Test
     func pngRoundTripsThroughPasteboard() throws {
         let pasteboard = makePasteboard()
         defer { pasteboard.releaseGlobally() }

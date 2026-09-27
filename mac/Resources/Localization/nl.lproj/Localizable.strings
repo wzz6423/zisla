@@ -460,7 +460,7 @@
 "颜色值" = "Kleurwaarde";
 "算式" = "Berekening";
 "日期时间" = "Datum en tijd";
-"非当前系统语言文本" = "Tekst in een andere systeemtaal";
+"非 Zisla 全局语言文本" = "Tekst in een andere taal dan de algemene taal van Zisla";
 "代码" = "Code";
 "翻译" = "Vertaal";
 "写邮件" = "E-mail schrijven";
@@ -2507,3 +2507,15 @@
 
 "窗口预览" = "Venstervoorbeelden";
 "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Bekijk vensters bij aanwijzen in het Dock of met Command-Tab; vereist toegankelijkheids- en schermopnamerechten";
+
+"自动翻译" = "Automatisch vertalen";
+
+"正在翻译…" = "Bezig met vertalen…";
+
+"翻译失败，请重试或使用浏览器翻译" = "Vertaling mislukt. Probeer het opnieuw of vertaal in je browser.";
+
+"关闭弹窗快捷键" = "Sneltoets om pop-up te sluiten";
+"弹窗可见时连按 %@ 关闭当前弹窗" = "Druk tweemaal op %@ terwijl de pop-up zichtbaar is om deze te sluiten";
+"弹窗可见时按下 %@ 关闭当前弹窗" = "Druk op %@ terwijl de pop-up zichtbaar is om deze te sluiten";
+"关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "De sneltoets voor sluiten kon niet worden ingeschakeld. Controleer op conflicterende sneltoetsen of toestemming voor invoercontrole.";
+"关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "De sneltoets voor sluiten is gelijk aan een actiesneltoets. Het sluiten van de pop-up krijgt voorrang.";

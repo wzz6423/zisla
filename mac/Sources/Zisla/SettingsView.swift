@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var settingsStore: FeatureSettingsStore
+    @ObservedObject private var clipboardAssistant: ClipboardAssistantController
     @StateObject private var input = SettingsInput()
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @StateObject private var networkProxyMonitor = NetworkProxyAvailabilityMonitor()
@@ -30,6 +31,7 @@ struct SettingsView: View {
     init(model: AppModel) {
         self.model = model
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
+        _clipboardAssistant = ObservedObject(wrappedValue: model.clipboardAssistant)
     }
 
     var body: some View {
@@ -473,6 +475,43 @@ struct SettingsView: View {
                                 .help(loc("清除快捷键"))
                             }
                         }
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "xmark.rectangle",
+                        title: "关闭弹窗快捷键",
+                        detail: clipboardAssistantDismissHotkeyDetail
+                    ) {
+                        HStack(spacing: 4) {
+                            HotkeyRecorder(
+                                hotkey: Binding(
+                                    get: { model.settingsStore.settings.clipboardAssistantDismissConfiguration.hotkey },
+                                    set: { newValue in
+                                        model.settingsStore.settings.clipboardAssistantDismissConfiguration =
+                                            newValue.map(ClipboardAssistantTriggerConfiguration.hotkey) ?? .none
+                                    }
+                                )
+                            )
+                            if model.settingsStore.settings.clipboardAssistantDismissConfiguration.hotkey != nil {
+                                Button {
+                                    model.settingsStore.settings.clipboardAssistantDismissConfiguration = .none
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help(loc("清除快捷键"))
+                            }
+                        }
+                    }
+                    if let feedbackKey = Self.clipboardAssistantDismissFeedbackKey(
+                        in: model.settingsStore.settings,
+                        registrationFeedback: clipboardAssistant.dismissShortcutFeedbackKey
+                    ) {
+                        Label(loc(feedbackKey), systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.zislaWarning)
+                            .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
                     }
                     if clipboardAssistantTriggersRequireInputMonitoring {
                         rowDivider
@@ -2943,7 +2982,7 @@ struct SettingsView: View {
         case .emojiName: "Emoji 名称"
         case .code: "代码"
         case .app: "应用程序"
-        case .nonSystemLanguageText: "非当前系统语言文本"
+        case .nonSystemLanguageText: "非 Zisla 全局语言文本"
         case .text: "文本"
         case .image: "图片"
         case .file: "文件"
@@ -3035,8 +3074,32 @@ struct SettingsView: View {
 
     private var clipboardAssistantTriggersRequireInputMonitoring: Bool {
         model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey?.requiresInputMonitoring == true
+            || model.settingsStore.settings.clipboardAssistantDismissConfiguration.hotkey?.requiresInputMonitoring == true
             || model.settingsStore.settings.clipboardAssistantMouseButton != nil
             || model.settingsStore.settings.clipboardAssistantMouseGestureEnabled
+    }
+
+    private var clipboardAssistantDismissHotkeyDetail: String {
+        guard let hotkey = model.settingsStore.settings.clipboardAssistantDismissConfiguration.hotkey else {
+            return loc("未配置；点击右侧录制")
+        }
+        return hotkey.isModifierOnly
+            ? loc("弹窗可见时连按 %@ 关闭当前弹窗").replacingOccurrences(of: "%@", with: hotkey.settingsDisplayName)
+            : loc("弹窗可见时按下 %@ 关闭当前弹窗").replacingOccurrences(of: "%@", with: hotkey.settingsDisplayName)
+    }
+
+    static func clipboardAssistantDismissFeedbackKey(
+        in settings: FeatureSettings,
+        registrationFeedback: String?
+    ) -> String? {
+        guard settings.clipboardAssistantEnabled,
+              let dismissHotkey = settings.clipboardAssistantDismissConfiguration.hotkey else { return nil }
+        if let registrationFeedback { return registrationFeedback }
+        guard let primaryHotkey = settings.clipboardAssistantTriggerConfiguration.hotkey else { return nil }
+        guard dismissHotkey.conflicts(with: primaryHotkey)
+            || ClipboardAssistantController.numberedActionHotkeys.contains(where: { dismissHotkey.conflicts(with: $0) })
+        else { return nil }
+        return "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗"
     }
 
     /// Warns when the assistant trigger collides with the other global hotkeys.
@@ -3329,6 +3392,7 @@ struct SettingsView: View {
         case .revealInFinder: "在 Finder 中显示"
         case .search: "搜索"
         case .translate: "翻译"
+        case .autoTranslate: "自动翻译"
         case .composeMail: "写邮件"
         case .copyText: "复制结果"
         case .copyFullExpression: "复制完整算式"
@@ -3657,7 +3721,7 @@ private extension VoiceInputModifier {
     }
 }
 
-private extension VoiceInputHotkeyPreset {
+extension VoiceInputHotkeyPreset {
     var settingsDisplayName: String {
         if isModifierOnly, let modifier = modifierSides?.first {
             return modifier.settingsDisplayName

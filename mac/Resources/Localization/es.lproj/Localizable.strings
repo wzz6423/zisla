@@ -460,7 +460,7 @@
 "颜色值" = "Valor de color";
 "算式" = "Cálculo";
 "日期时间" = "Fecha y hora";
-"非当前系统语言文本" = "Texto en un idioma distinto al del sistema";
+"非 Zisla 全局语言文本" = "Texto en un idioma distinto al idioma global de Zisla";
 "代码" = "Código";
 "翻译" = "Traducir";
 "写邮件" = "Redactar correo";
@@ -2507,3 +2507,15 @@
 
 "窗口预览" = "Vista previa de ventanas";
 "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Previsualiza ventanas al pasar por el Dock o usar Command-Tab; requiere permisos de Accesibilidad y Grabación de pantalla";
+
+"自动翻译" = "Traducción automática";
+
+"正在翻译…" = "Traduciendo…";
+
+"翻译失败，请重试或使用浏览器翻译" = "La traducción falló. Inténtalo de nuevo o traduce en el navegador.";
+
+"关闭弹窗快捷键" = "Atajo para cerrar la ventana emergente";
+"弹窗可见时连按 %@ 关闭当前弹窗" = "Pulsa %@ dos veces mientras la ventana emergente esté visible para cerrarla";
+"弹窗可见时按下 %@ 关闭当前弹窗" = "Pulsa %@ mientras la ventana emergente esté visible para cerrarla";
+"关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "No se pudo activar el atajo para cerrar. Comprueba si hay conflictos de atajos o falta permiso de monitorización de entrada.";
+"关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "El atajo para cerrar coincide con el de una acción. Cerrar la ventana emergente tiene prioridad.";

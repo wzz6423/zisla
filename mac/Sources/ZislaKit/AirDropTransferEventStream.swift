@@ -89,15 +89,15 @@ final class AirDropTransferEventStream {
         let session = generation
         let connection = NSXPCConnection(machServiceName: "com.apple.sharing.airdrop.service")
         connection.remoteObjectInterface = remote
-        connection.interruptionHandler = { [weak self] in
+        connection.interruptionHandler = { @Sendable [weak self] in
             DispatchQueue.main.async { self?.stop(session: session) }
         }
-        connection.invalidationHandler = { [weak self] in
+        connection.invalidationHandler = { @Sendable [weak self] in
             DispatchQueue.main.async { self?.stop(session: session) }
         }
         self.connection = connection
         connection.resume()
-        let proxy = connection.remoteObjectProxyWithErrorHandler { [weak self] _ in
+        let proxy = connection.remoteObjectProxyWithErrorHandler { @Sendable [weak self] _ in
             DispatchQueue.main.async { self?.stop(session: session) }
         } as AnyObject
         proxy.invoke?(
@@ -106,7 +106,7 @@ final class AirDropTransferEventStream {
             parametersAsyncSequenceContainer: nil,
             parametersBlocksContainer: nil,
             sync: false
-        ) { [weak self] data, sequence, blocks, error in
+        ) { @Sendable [weak self] data, sequence, blocks, error in
             let reply = Reply(data: data as Data?, object: sequence, blocks: blocks, failed: error != nil)
             DispatchQueue.main.async {
                 self?.makeIterator(reply: reply, session: session)
@@ -141,7 +141,7 @@ final class AirDropTransferEventStream {
         // The container must outlive the asynchronous request, or XPC releases the remote iterator.
         self.sequence = sequence
         self.blocks = reply.blocks
-        sequence.makeIterator?(identifier) { [weak self] iterator, sequence, blocks in
+        sequence.makeIterator?(identifier) { @Sendable [weak self] iterator, sequence, blocks in
             let reply = Reply(object: iterator, sequence: sequence, blocks: blocks)
             DispatchQueue.main.async {
                 guard let self, session == self.generation else { return }
@@ -156,7 +156,7 @@ final class AirDropTransferEventStream {
 
     private func readNext(session: UUID) {
         guard session == generation, let iterator else { return }
-        iterator.next? { [weak self] data, error in
+        iterator.next? { @Sendable [weak self] data, error in
             let reply = Reply(data: data as Data?, failed: error != nil)
             DispatchQueue.main.async {
                 guard let self, session == self.generation else { return }
