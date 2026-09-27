@@ -517,7 +517,7 @@
 "颜色值" = "Color Value";
 "算式" = "Calculation";
 "日期时间" = "Date and Time";
-"非当前系统语言文本" = "Text in Another System Language";
+"非 Zisla 全局语言文本" = "Text Not in Zisla’s Global Language";
 "代码" = "Code";
 "翻译" = "Translate";
 "写邮件" = "Compose Email";

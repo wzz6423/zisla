@@ -1638,6 +1638,7 @@ final class AppModel: ObservableObject {
       preferredCurrencyCode: ClipboardAssistantDetector.currentPreferredCurrencyCode(
         language: languageStore.language
       ),
+      locale: languageStore.language.locale,
       installedApplications: installedApplications
     ) else { return .unavailable }
     detection = augmentedClipboardAssistantDetection(
@@ -2847,6 +2848,7 @@ final class AppModel: ObservableObject {
       )
       clipboardAssistant.isLightweightMode = settings.clipboardAssistantLightweightMode
       clipboardAssistant.displayDuration = settings.clipboardAssistantDisplayDuration
+      clipboardAssistant.presentation.visualStyle = settings.islandVisualStyle
       clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
     } else {
       clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil, dismissHotkey: nil)

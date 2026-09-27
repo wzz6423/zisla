@@ -460,7 +460,7 @@
 "颜色值" = "Valor de cor";
 "算式" = "Cálculo";
 "日期时间" = "Data e hora";
-"非当前系统语言文本" = "Texto em idioma diferente do sistema";
+"非 Zisla 全局语言文本" = "Texto em um idioma diferente do idioma global do Zisla";
 "代码" = "Código";
 "翻译" = "Traduzir";
 "写邮件" = "Escrever e-mail";

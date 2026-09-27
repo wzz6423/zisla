@@ -2982,7 +2982,7 @@ struct SettingsView: View {
         case .emojiName: "Emoji 名称"
         case .code: "代码"
         case .app: "应用程序"
-        case .nonSystemLanguageText: "非当前系统语言文本"
+        case .nonSystemLanguageText: "非 Zisla 全局语言文本"
         case .text: "文本"
         case .image: "图片"
         case .file: "文件"
