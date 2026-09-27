@@ -11,6 +11,7 @@ public enum ClipboardAssistantDetector {
         enabledKinds: Set<ClipboardAssistantKind>,
         offersDownload: Bool = false,
         preferredCurrencyCode: String? = nil,
+        locale: Locale = AppLocalization.currentLanguage.locale,
         countryCode: String? = Locale.current.region?.identifier,
         installedApplications: [InstalledApplication] = []
     ) -> ClipboardAssistantDetection? {
@@ -27,6 +28,7 @@ public enum ClipboardAssistantDetector {
                 enabledKinds: enabledKinds,
                 offersDownload: offersDownload,
                 preferredCurrencyCode: preferredCurrencyCode,
+                locale: locale,
                 countryCode: countryCode,
                 installedApplications: installedApplications
             )
@@ -37,7 +39,7 @@ public enum ClipboardAssistantDetector {
         text rawText: String,
         enabledKinds: Set<ClipboardAssistantKind>,
         offersDownload: Bool = false,
-        systemLanguageIdentifier: String? = Locale.preferredLanguages.first,
+        systemLanguageIdentifier: String? = nil,
         preferredCurrencyCode: String? = nil,
         now: Date = Date(),
         timeZone: TimeZone = .current,
@@ -195,7 +197,7 @@ public enum ClipboardAssistantDetector {
             }
         }
         if enabledKinds.contains(.nonSystemLanguageText),
-           isNonCurrentSystemLanguageText(text, systemLanguageIdentifier: systemLanguageIdentifier) {
+           isNonCurrentAppLanguageText(text, languageIdentifier: systemLanguageIdentifier ?? locale.identifier) {
             let preview = previewText(text)
             var actions: [ClipboardAssistantAction] = [.translate(text), .autoTranslate(text)]
             if text.count <= ClipboardAssistantDefaults.saveableTextLength {
@@ -733,13 +735,13 @@ public enum ClipboardAssistantDetector {
         return currencySymbolCode(token, preferred: preferred)
     }
 
-    // MARK: - Non-current-system-language text
+    // MARK: - Non-current-app-language text
 
-    static func isNonCurrentSystemLanguageText(
+    static func isNonCurrentAppLanguageText(
         _ text: String,
-        systemLanguageIdentifier: String?
+        languageIdentifier: String?
     ) -> Bool {
-        guard let systemLanguageCode = primaryLanguageCode(from: systemLanguageIdentifier) else {
+        guard let appLanguageCode = primaryLanguageCode(from: languageIdentifier) else {
             return false
         }
         let recognizer = NLLanguageRecognizer()
@@ -751,7 +753,7 @@ public enum ClipboardAssistantDetector {
               let detectedLanguageCode = primaryLanguageCode(from: detectedLanguage.rawValue) else {
             return false
         }
-        return detectedLanguageCode != systemLanguageCode
+        return detectedLanguageCode != appLanguageCode
     }
 
     private static func primaryLanguageCode(from identifier: String?) -> String? {

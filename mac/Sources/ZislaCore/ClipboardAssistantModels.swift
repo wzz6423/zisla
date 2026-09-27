@@ -330,7 +330,15 @@ public enum ClipboardAssistantActionOrder {
     ) -> [ClipboardAssistantActionKind] {
         let defaults = defaults(for: kind)
         var seen: Set<ClipboardAssistantActionKind> = []
-        return (order + defaults).filter { defaults.contains($0) && seen.insert($0).inserted }
+        let normalized = (order + defaults).filter { defaults.contains($0) && seen.insert($0).inserted }
+        // The first auto-translation upgrade appended it to the saved default order.
+        if kind == .nonSystemLanguageText,
+           !order.contains(.autoTranslate) || order == defaults.filter({ $0 != .autoTranslate }) + [.autoTranslate] {
+            return normalized.filter { $0 != .autoTranslate }.flatMap {
+                $0 == .translate ? [.translate, .autoTranslate] : [$0]
+            }
+        }
+        return normalized
     }
 
     public static func normalized(
